@@ -1,5 +1,5 @@
-"""An unhold on a CA publishing delta CRLs: a lift refused after the removeFromCRL delta was
-published republishes the CRL."""
+"""An unhold on a CA publishing delta CRLs: a final revocation made meanwhile is never staged
+over, and a lift refused after the removeFromCRL delta was published republishes the CRL."""
 import base64
 import uuid
 
@@ -75,6 +75,21 @@ def _final_meanwhile(app, monkeypatch, row_id, record_id, where):
         return found
     monkeypatch.setattr(issued_lookup, 'persisted_revocation', then_revoked)
     return done
+
+
+class TestAFinalRowBetweenTheEntryReadAndTheStaging:
+
+    def test_the_unhold_is_refused_and_the_row_stays_final(self, app, auth_client, delta_issuer,
+                                                           monkeypatch, crl_calls):
+        row_id, record_id = _held_leaf(app, delta_issuer, 'staging-final.example.test')
+        done = _final_meanwhile(app, monkeypatch, row_id, record_id, ('row',))
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert done and r.status_code == 409, r.data
+        assert _row(app, row_id) == (True, 'keyCompromise', LATER)
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id) is not None
+        # Nothing staged, so no removeFromCRL delta went out
+        assert crl_calls == []
 
 
 class TestARefusedLiftRepublishesTheCrl:
