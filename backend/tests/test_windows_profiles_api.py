@@ -9,6 +9,7 @@ from sqlalchemy import event
 from models import ADConnectorConfig, CA, Certificate, WindowsEnrollmentProfile, db
 from models.audit_log import AuditLog
 from utils.datetime_utils import utc_now
+from utils.revocation_reasons import HOLD_REASONS
 from datetime import timedelta
 
 URL = '/api/v2/windows-profiles'
@@ -379,3 +380,17 @@ def test_the_default_name_taken_in_a_race_is_chosen_again(app, auth_client, monk
                 p = db.session.get(WindowsEnrollmentProfile, pid)
                 p.is_default, p.name = True, name
             db.session.commit()
+
+
+@pytest.mark.parametrize('reason', HOLD_REASONS)
+def test_a_certificate_on_hold_blocks_deleting_its_profile(app, auth_client, reason):
+    p = _created(auth_client)
+    with app.app_context():
+        db.session.add(_cert(p['id'], revoked=True, revoke_reason=reason))
+        db.session.commit()
+    r = auth_client.delete(f"{URL}/{p['id']}")
+    assert r.status_code == 409 and '1 valid certificate' in r.get_json()['message']
+    with app.app_context():
+        Certificate.query.filter_by(windows_profile_id=p['id']).update({'revoke_reason': 'keyCompromise'})
+        db.session.commit()
+    assert auth_client.delete(f"{URL}/{p['id']}").status_code == 200
