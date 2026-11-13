@@ -37,7 +37,7 @@ def make_gate(ca, *, operation, profile, identity=None, extra=None):
         else:
             dns = protocol_approval.csr_names(csr)[1]
         data = dict(extra or {}, operation=operation, profile_id=getattr(profile, 'id', None),
-                    profile_name=getattr(profile, 'name', None))
+                    profile_name=getattr(profile, 'name', None), profile_realm=getattr(profile, 'realm', None))
         csr_ref = protocol_approval.csr_ref(csr)
         if signing_cert is not None:
             data['renewal_of'] = signing_cert.public_bytes(Encoding.PEM).decode()
@@ -59,13 +59,27 @@ def _profile_gone(data):
     return f'The Windows enrollment profile {name} no longer exists' if name else PROFILE_GONE
 
 
+def _held_realm(data):
+    """The realm the request was held for: its profile's, else its Kerberos principal's."""
+    realm = data.get('profile_realm')
+    if not realm and '@' in (data.get('kerberos_principal') or ''):
+        realm = data['kerberos_principal'].rsplit('@', 1)[1]
+    return (realm or '').upper() or None
+
+
 def _held_profile(data):
     """The profile the request was held for, by name (by id when held before names were
-    recorded), the default for one held before profiles were; None when it no longer exists."""
+    recorded), the default for one held before profiles were; None when it no longer exists.
+    A name no longer found falls back on the id when that profile has the request's realm (renamed)."""
     from models import WindowsEnrollmentProfile
     from services.windows_profiles import default_profile
     if data.get('profile_name'):
-        return WindowsEnrollmentProfile.query.filter_by(name=data['profile_name']).one_or_none()
+        profile = WindowsEnrollmentProfile.query.filter_by(name=data['profile_name']).one_or_none()
+        if profile is None and data.get('profile_id') is not None and _held_realm(data):
+            renamed = db.session.get(WindowsEnrollmentProfile, int(data['profile_id']))
+            if renamed is not None and (renamed.realm or '').upper() == _held_realm(data):
+                return renamed
+        return profile
     if 'profile_id' not in data:
         return default_profile()
     profile_id = data['profile_id']

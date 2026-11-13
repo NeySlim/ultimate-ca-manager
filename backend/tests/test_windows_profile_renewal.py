@@ -386,7 +386,8 @@ def test_a_held_request_whose_profile_name_is_unknown_is_refused_readably(app, c
     with app.app_context():
         row = db.session.get(ApprovalRequest, approval_id)
         data = json.loads(row.request_data)
-        data['profile_name'] = 'c05-elsewhere'
+        # Restored elsewhere: its name unknown, its id naming a profile of another realm
+        data.update(profile_name='c05-elsewhere', profile_id=_profile('c04-a').id)
         row.request_data = json.dumps(data)
         db.session.commit()
     body = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'}).get_json()
@@ -564,3 +565,36 @@ def test_a_request_held_under_the_former_reference_is_still_recognised(app, clie
         db.session.commit()
     assert b'Pending' in client.post(CES_KERBEROS_PATH, data=body, headers=NEGOTIATE).data
     assert [r[0] for r in requests_of(app, held_on_b, 'wstep_request')] == [approval_id]
+
+
+@pytest.mark.parametrize('recorded', ['realm', 'principal only'])
+def test_a_held_request_follows_its_renamed_profile_by_id_and_realm(app, client, auth_client, directory,
+                                                                    held_on_b, recorded):
+    """The name no longer found, the recorded id serves when its profile has the request's realm
+    (recorded with it, or that of the principal for a request held before)."""
+    world = directory
+    _body, approval_id, data = _held_on_b(app, client, world, held_on_b, f'c05-renamed-{recorded[0]}')
+    assert data['profile_realm'] == 'C04B.TEST'
+    with app.app_context():
+        if recorded != 'realm':
+            row = db.session.get(ApprovalRequest, approval_id)
+            row.request_data = json.dumps({k: v for k, v in data.items() if k != 'profile_realm'})
+        _profile('c04-b').name = 'c04-b-renamed'
+        db.session.commit()
+    approve(auth_client, approval_id)
+    (_id, _status, _data, cert_id), = requests_of(app, held_on_b, 'wstep_request')
+    with app.app_context():
+        row = db.session.get(Certificate, cert_id)
+        assert (row.caref, row.windows_profile_id) == (world['cas']['B']['refid'], _profile('c04-b-renamed').id)
+
+
+def test_a_held_request_whose_renamed_profile_changed_realm_is_refused(app, client, auth_client, directory,
+                                                                      held_on_b):
+    world = directory
+    _body, approval_id, _data = _held_on_b(app, client, world, held_on_b, 'c05-renamed-realm')
+    with app.app_context():
+        profile = _profile('c04-b')
+        profile.name, profile.realm = 'c04-b-elsewhere', 'C05OTHER.TEST'
+        db.session.commit()
+    body = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'}).get_json()
+    assert body['data']['issue_error'] == 'The Windows enrollment profile c04-b no longer exists'
