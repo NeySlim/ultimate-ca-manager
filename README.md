@@ -1,3 +1,4 @@
+[English](README.md) | [简体中文](README_zh.md)
 # Ultimate Certificate Manager
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
