@@ -935,6 +935,7 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
         return None, None, None
 
     subject, san, reached = None, None, True
+    unresolved = 'could not resolve the requester'
     if sam_account_name and is_machine:
         dns_hostname = lookup.lookup_computer_dns_hostname(connector, sam_account_name)
         reached = dns_hostname is not lookup.UNREACHABLE
@@ -946,6 +947,12 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
         subject, san = _user_directory_subject(connector, sam_account_name)
         if subject is lookup.UNREACHABLE:
             reached, subject = False, None
+        elif subject is lookup.NO_UPN:
+            subject, unresolved = None, 'found the account but it has no userPrincipalName'
+        elif subject is _UNUSABLE_DN:
+            subject, unresolved = None, "found the account but could not read its directory path"
+        elif subject is None:
+            unresolved = 'found no account for the requester'
 
     # The requester is not at fault when the directory cannot answer: env:Receiver
     if subject is None and not reached:
@@ -953,18 +960,23 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
     if subject is None and built_by_ca and not naked:
         if template is None and sam_account_name and not is_machine:
             return None, None, 'The request matches no certificate template whose subject it may supply'
-        return None, None, ('The certificate subject is built from Active Directory, '
-                            'which could not resolve the requester')
+        return None, None, f'The certificate subject is built from Active Directory, which {unresolved}'
     return subject, san, None
+
+
+_UNUSABLE_DN = object()
 
 
 def _user_directory_subject(connector, sam_account_name):
     """(subject, SAN) from the AD user object: its DN, its UPN, its mail when valid;
-    (``lookup.UNREACHABLE``, None) when the directory could not answer."""
+    (``lookup.UNREACHABLE``, None) when the directory could not answer, (``lookup.NO_UPN``, None)
+    when the account has no userPrincipalName."""
     from services.ad_connector import lookup
 
     identity = lookup.lookup_user_ad_identity(connector, sam_account_name)
     if identity is lookup.UNREACHABLE:
+        return identity, None
+    if identity is lookup.NO_UPN:
         return identity, None
     if not identity:
         return None, None
@@ -977,7 +989,7 @@ def _user_directory_subject(connector, sam_account_name):
         email = None
     subject = _x509_name_from_dn_components(identity['dn_components'], email=email)
     if subject is None:
-        return None, None
+        return _UNUSABLE_DN, None
     san = [build_upn_other_name(identity['upn'])]
     if email:
         san.append(x509.RFC822Name(email))

@@ -231,6 +231,16 @@ class TestLookupComputerDnsHostname:
             assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') == 'win11.hagland.domain'
 
 
+class TestLookupUserAdIdentityNoUpn:
+    def test_an_account_without_upn_is_told_apart_from_a_missing_one(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        entry = _FakeEntry({'mail': 'alice@hagland.domain'})
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
+        with app.app_context():
+            answer = lookup.lookup_user_ad_identity(_cfg(), 'alice')
+        assert answer is lookup.NO_UPN and not answer
+
+
 class TestLookupUserAdIdentityUnreachable:
     def test_not_found_is_none_and_unreachable_is_told_apart(self, app, monkeypatch):
         _configure(None, app, enabled=True)
