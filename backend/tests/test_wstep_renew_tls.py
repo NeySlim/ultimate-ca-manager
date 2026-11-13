@@ -550,8 +550,14 @@ def test_two_claims_never_lock_in_opposite_orders(app):
 
 @pytest.fixture
 def templated_ca(app, create_ca):
-    """A CA offering the given templates: {name: (EKU names, allowed AD group)}."""
+    """A CA offering the given templates: {name: (EKU names, allowed AD group)}. The default
+    profile its certificates are issued and renewed under exists for the test."""
+    from tests.windows_profile_support import default_profile
     made = []
+    with app.app_context():
+        no_profile = default_profile() is None
+        default_profile(create=True)
+        db.session.commit()
 
     def _make(cn, templates):
         ca_data = create_ca(cn=cn)
@@ -570,6 +576,10 @@ def templated_ca(app, create_ca):
     yield _make
     with app.app_context():
         delete_templates(made)
+        if no_profile:
+            Certificate.query.filter(Certificate.windows_profile_id == default_profile().id).update(
+                {'windows_profile_id': None})
+            db.session.delete(default_profile())
         db.session.commit()
 
 
