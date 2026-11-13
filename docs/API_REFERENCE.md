@@ -1654,11 +1654,13 @@ GET /api/v2/windows-profiles?q=corp&page=1&per_page=25
 GET /api/v2/windows-profiles/{id}
 POST /api/v2/windows-profiles
 PUT /api/v2/windows-profiles/{id}
+PATCH /api/v2/windows-profiles/{id}
 DELETE /api/v2/windows-profiles/{id}
 ```
 
 - `q` matches the name or the realm; `per_page` is capped at 200; `meta` carries `total`, `page`, `per_page`, `total_pages`.
-- Writable fields: `name`, `realm` (upper-cased; refused when another profile holds it or the keytab does not name it), `enabled`, `connector_id` (its base DN domain must equal the realm), `issuing_ca_refid` (must be able to sign), `policy_ca_refid` (no EdDSA key), `validity_days`, `xcep_username`, `xcep_password`, `wstep_username`, `wstep_password`, `allowed_ad_group`, `pinned_subject_fields`.
+- `PUT` and `PATCH` are the same partial update: only the fields sent change.
+- Writable fields: `name`, `realm` (upper-cased; refused when another profile holds it or the keytab does not name it; `null` clears it, an empty or blank string is a 400), `enabled` and `is_default` (JSON booleans, else 400; `is_default` is accepted at creation only, for the first default profile), `connector_id` (an integer or `null`) (its base DN domain must equal the realm), `issuing_ca_refid` (a string; must be able to sign), `policy_ca_refid` (a string; no EdDSA key), `validity_days`, `xcep_username`, `xcep_password`, `wstep_username`, `wstep_password`, `allowed_ad_group`, `pinned_subject_fields`.
 - There is at most one default profile; it cannot be deleted (disable it) and `is_default` cannot be changed on an existing profile.
 - A profile through which valid certificates were issued cannot be deleted (409 with the count); disable it instead.
 

@@ -89,16 +89,21 @@ def _apply(profile, data):
 
     if 'realm' in data:
         realm = data['realm']
-        if isinstance(realm, str):
-            realm = realm.strip().upper() or None
+        # Only an explicit null clears the realm; a blank string is a mistake
+        if isinstance(realm, str) and realm.strip():
+            realm = realm.strip().upper()
         if realm is not None:
             problem = windows_profiles.realm_problem(realm, profile)
             if problem:
                 return problem
         profile.realm = realm
 
+    for flag in ('is_default', 'enabled'):
+        if flag in data and type(data[flag]) is not bool:
+            return f'{flag} must be a JSON boolean', 400
+
     if 'is_default' in data:
-        wanted = bool(data['is_default'])
+        wanted = data['is_default']
         if profile.id is None and wanted:
             if windows_profiles.default_profile() is not None:
                 return 'there is already a default profile', 409
@@ -106,12 +111,14 @@ def _apply(profile, data):
         elif wanted != bool(profile.is_default):
             return 'the default profile cannot be changed here', 409
     if 'enabled' in data:
-        profile.enabled = bool(data['enabled'])
+        profile.enabled = data['enabled']
 
     for field, check in (('issuing_ca_refid', signing_ca_problem), ('policy_ca_refid', xcep_ca_problem)):
         if field not in data:
             continue
-        refid = str(data[field]) if data[field] else None
+        if data[field] is not None and not isinstance(data[field], str):
+            return f'{field} must be a string', 400
+        refid = data[field] or None
         if refid:
             ca = CA.query.filter_by(refid=refid).first()
             if ca is None:
@@ -141,6 +148,8 @@ def _apply(profile, data):
             from utils.password_hash import hash_password
             setattr(profile, field, hash_password(str(data[field])))
 
+    if data.get('connector_id') is not None and type(data['connector_id']) is not int:
+        return 'connector_id must be an integer', 400
     if 'connector_id' in data and data['connector_id'] is not None:
         if db.session.get(ADConnectorConfig, data['connector_id']) is None:
             return 'connector not found', 404

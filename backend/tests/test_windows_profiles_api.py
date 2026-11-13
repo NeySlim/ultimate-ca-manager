@@ -299,3 +299,34 @@ def test_a_legacy_write_survives_a_non_default_profile_named_default(app, auth_c
                 p = db.session.get(WindowsEnrollmentProfile, pid)
                 p.is_default, p.name = True, name
             db.session.commit()
+
+
+@pytest.mark.parametrize('field, value', [
+    ('connector_id', '1'), ('connector_id', True), ('connector_id', 1.5), ('connector_id', [1]),
+    ('issuing_ca_refid', 5), ('issuing_ca_refid', True), ('issuing_ca_refid', ['x']),
+    ('policy_ca_refid', 5), ('policy_ca_refid', {'a': 1}),
+])
+def test_identifiers_of_the_wrong_type_are_a_400(auth_client, field, value):
+    assert _new(auth_client, **{field: value}).status_code == 400
+    p = _created(auth_client)
+    assert auth_client.put(f"{URL}/{p['id']}", json={field: value}).status_code == 400
+
+
+@pytest.mark.parametrize('field', ['is_default', 'enabled'])
+@pytest.mark.parametrize('value', ['false', 'true', 0, 1, None, []])
+def test_flags_must_be_json_booleans(app, auth_client, field, value):
+    assert _new(auth_client, **{field: value}).status_code == 400
+    p = _created(auth_client)
+    assert auth_client.put(f"{URL}/{p['id']}", json={field: value}).status_code == 400
+    with app.app_context():
+        assert WindowsEnrollmentProfile.query.filter_by(is_default=True).count() <= 1
+
+
+def test_the_realm_is_cleared_by_null_only(auth_client):
+    p = _created(auth_client, realm='clear.example')
+    for blank in ('', '   '):
+        r = auth_client.put(f"{URL}/{p['id']}", json={'realm': blank})
+        assert r.status_code == 400, blank
+    assert auth_client.get(f"{URL}/{p['id']}").get_json()['data']['realm'] == 'CLEAR.EXAMPLE'
+    r = auth_client.put(f"{URL}/{p['id']}", json={'realm': None})
+    assert r.status_code == 200 and r.get_json()['data']['realm'] is None
