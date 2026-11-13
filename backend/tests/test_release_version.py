@@ -9,6 +9,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
 import time
 
 import pytest
@@ -410,3 +411,32 @@ def test_the_watcher_matches_a_three_segment_target():
     assert match('2.254.1', '2.254.1') and match('2.254.1~rc1', '2.254.1-rc1') and match('2.254.1-1', '2.254.1')
     assert not match('2.254', '2.254.1') and not match('2.254.1', '2.254')
     assert not match('2.254.1-1', '2.254')
+
+
+# ---- 6. smoke_release compares the reported version exactly -------------------------------------
+
+def _smoke_module():
+    spec = importlib.util.spec_from_file_location('smoke_release', ROOT / 'scripts' / 'smoke_release.py')
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules['smoke_release'] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _health_run(monkeypatch, reported, expected):
+    mod = _smoke_module()
+    body = json.dumps({'status': 'ok', 'version': reported}).encode()
+    monkeypatch.setattr(mod, '_request', lambda *a, **k: (200, {}, body))
+    # The run stops at the login step once the version check has passed.
+    with pytest.raises(AssertionError) as exc:
+        mod.smoke_one(mod.Target('t', 'https://x'), expected, 'u', 'p', allow_rc=True)
+    return str(exc.value)
+
+
+def test_smoke_release_refuses_a_version_that_only_starts_the_same(monkeypatch):
+    assert 'version mismatch' in _health_run(monkeypatch, '2.254.1', '2.254')
+    assert 'version mismatch' in _health_run(monkeypatch, '2.254', '2.254.1')
+
+
+def test_smoke_release_accepts_the_exact_version(monkeypatch):
+    assert 'version mismatch' not in _health_run(monkeypatch, '2.254.1', '2.254.1')
