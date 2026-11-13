@@ -267,3 +267,26 @@ def test_deleting_a_profile_releases_its_certificates(app, auth_client):
     with app.app_context():
         assert db.session.get(Certificate, cid).windows_profile_id is None
 
+
+def test_a_legacy_write_survives_a_non_default_profile_named_default(app, auth_client):
+    with app.app_context():
+        aside = WindowsEnrollmentProfile.query.filter_by(is_default=True).all()
+        saved = [(p.id, p.name) for p in aside]
+        for p in aside:
+            p.is_default = False
+            p.name = f'wp-api-aside-{p.id}'
+        db.session.commit()
+    try:
+        assert _new(auth_client, name='default').status_code == 201
+        r = auth_client.patch('/api/v2/wstep/config', json={'username': 'zz'})
+        assert r.status_code == 200, r.data
+    finally:
+        with app.app_context():
+            for p in WindowsEnrollmentProfile.query.filter_by(is_default=True).all():
+                db.session.delete(p)
+            WindowsEnrollmentProfile.query.filter_by(name='default').delete()
+            db.session.commit()
+            for pid, name in saved:
+                p = db.session.get(WindowsEnrollmentProfile, pid)
+                p.is_default, p.name = True, name
+            db.session.commit()

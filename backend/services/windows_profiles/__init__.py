@@ -115,10 +115,15 @@ def default_for_write(actor=None, fill=True):
     profile = default_profile()
     if profile is None:
         connector = ADConnectorConfig.get_singleton()
+        # A profile made through the API may already hold DEFAULT_NAME
+        name, n = DEFAULT_NAME, 1
+        while WindowsEnrollmentProfile.query.filter_by(name=name).first() is not None:
+            n += 1
+            name = f'{DEFAULT_NAME}-{n}'
         try:
             # A concurrent writer may create it first: its row is the default then
             with db.session.begin_nested():
-                profile = WindowsEnrollmentProfile(name=DEFAULT_NAME, is_default=True, enabled=True,
+                profile = WindowsEnrollmentProfile(name=name, is_default=True, enabled=True,
                                                    connector_id=connector.id if connector else None,
                                                    created_by=actor)
                 db.session.add(profile)
