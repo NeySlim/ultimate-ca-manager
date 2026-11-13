@@ -21,7 +21,7 @@ from models.hsm import HsmKey
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
 from services.import_service import CrossCertificateImport, refused_as_cross_certificate
-from utils.cert_issuer import find_ca_by_ski, is_self_signed
+from utils.cert_issuer import authority_key_identifier_hex, cas_by_ski, is_self_signed, self_signed_first
 from utils.key_type import weak_ca_key_refusal
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
 from utils.serial_format import serial_to_int
@@ -812,33 +812,34 @@ class CACreationMixin:
         # 6. Chain to the issuing CA when it is known to UCM (AKI→SKI, then
         #    issuer DN). Absence is non-blocking — the offline root may be
         #    imported later, and chain-repair re-links orphans.
+        #    The first candidate that verifies wins, a self-signed root before
+        #    a cross or link certificate of the same key.
         caref = None
-        parent = None
-        try:
-            aki_ext = cert.extensions.get_extension_for_oid(
-                ExtensionOID.AUTHORITY_KEY_IDENTIFIER
-            )
-            if aki_ext.value.key_identifier:
-                aki_hex = aki_ext.value.key_identifier.hex(':').upper()
-                parent = find_ca_by_ski(aki_hex, exclude_id=ca.id)
-        except x509.ExtensionNotFound:
-            pass
-        if parent is None:
-            parent = CA.query.filter(
+        candidates = []
+        aki_hex = authority_key_identifier_hex(cert)
+        if aki_hex:
+            candidates = cas_by_ski(aki_hex, exclude_id=ca.id)
+        if not candidates:
+            candidates = self_signed_first(CA.query.filter(
                 CA.subject == cert.issuer.rfc4514_string(), CA.id != ca.id
-            ).first()
-        if parent is not None and parent.crt:
+            ).order_by(CA.id).all())
+        for parent in candidates:
+            if not parent.crt:
+                continue
             try:
                 parent_cert = x509.load_pem_x509_certificate(
                     base64.b64decode(parent.crt), default_backend()
                 )
                 cert.verify_directly_issued_by(parent_cert)
-                caref = parent.refid
             except Exception:
-                warnings.append(
-                    "A CA matching the issuer was found but signature verification failed"
-                )
-        elif parent is None:
+                continue
+            caref = parent.refid
+            break
+        if caref is None and any(parent.crt for parent in candidates):
+            warnings.append(
+                "A CA matching the issuer was found but signature verification failed"
+            )
+        elif not candidates:
             warnings.append(
                 "Issuing CA not found in UCM: import the external root "
                 "(certificate only) to complete the chain"

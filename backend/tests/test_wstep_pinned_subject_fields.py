@@ -25,6 +25,7 @@ from tests.fixtures.templates import delete_templates, template_ids_named
 from services.ad_connector import lookup as ad_lookup
 from services.wstep import wstep_service
 from tests.windows_profile_support import connectors_kept, default_profile, default_realm
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
 # The CAs and certificates this file issues are removed after it

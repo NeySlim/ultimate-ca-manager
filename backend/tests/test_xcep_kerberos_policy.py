@@ -20,6 +20,7 @@ from tests.fixtures.templates import delete_templates
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import SOAP_NS
 from tests.windows_profile_support import restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 XCEP_KRB_URL = '/ADPolicyProvider_CEP_Kerberos/service.svc'
 XCEP_USERPASS_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'

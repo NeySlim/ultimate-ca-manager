@@ -23,6 +23,7 @@ from tests.test_wstep_kerberos_issue import _build_rst, _issued_cert_from_rstr
 from tests.test_wstep_renew import _build_signed_rst
 from tests.test_wstep_renew_tls import _cmc_renewal, _post, _renewal_csr, _rst
 from tests.windows_profile_support import default_profile, restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 # KB5014754 SID security extension
 SID_EXTENSION = '1.3.6.1.4.1.311.25.2'

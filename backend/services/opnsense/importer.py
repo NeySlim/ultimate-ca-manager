@@ -9,6 +9,8 @@ import traceback
 from pathlib import Path
 from typing import Dict, List
 
+from cryptography import x509
+
 from models import db, CA, Certificate
 from services.file_regen_service import mirror_private_key
 from utils.key_codec import store_pem_bytes
@@ -31,6 +33,7 @@ class ImportMixin:
         Returns:
             Dict with import statistics.
         """
+        created = []
         stats = {
             'total': len(cas_data),
             'imported': 0,
@@ -79,7 +82,6 @@ class ImportMixin:
 
                 if not ca_data.get('is_root', False):
                     # Chained under the stored CA whose key signed it, never a namesake
-                    from cryptography import x509
                     from services.import_service import relink_parent_caref
                     try:
                         ca.caref = relink_parent_caref(
@@ -89,6 +91,7 @@ class ImportMixin:
 
                 db.session.add(ca)
                 db.session.flush()
+                created.append(ca)
 
                 if ca_data.get('crt'):
                     data_dir = os.path.join(
@@ -120,6 +123,17 @@ class ImportMixin:
                 logger.error(f"Failed to import CA: {e}")
                 traceback.print_exc()
 
+        # A CA listed before its parent finds it once the whole batch is stored
+        from services.import_service import relink_parent_caref
+        for ca in created:
+            if ca.caref or not ca.crt:
+                continue
+            try:
+                ca.caref = relink_parent_caref(
+                    x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), None, exclude_ca_id=ca.id)
+            except ValueError:
+                continue
+
         try:
             db.session.commit()
         except Exception as e:
@@ -139,7 +153,6 @@ class ImportMixin:
         Returns:
             Dict with import statistics.
         """
-        from cryptography import x509
         from cryptography.hazmat.backends import default_backend
 
         created = []

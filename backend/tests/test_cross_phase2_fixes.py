@@ -4,6 +4,9 @@ from models.ca_cross_certificate import CACrossCertificate
 from services.smart_import.importer import SmartImporter
 from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 from tests.test_cross_review_fixes2 import _x, sibling_world  # noqa: F401
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 
 def test_a_revocation_policy_on_the_sibling_record_of_the_issuer_still_holds_the_request(

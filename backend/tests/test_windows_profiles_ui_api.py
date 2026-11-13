@@ -11,6 +11,7 @@ from services.kerberos import negotiate_auth
 from tests.keytab_support import keytab
 from tests.test_keytab_composed import HOST, ONE, TWO, profiles  # noqa: F401
 from tests.windows_profile_support import connectors_kept
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 URL = '/api/v2/windows-profiles'
 

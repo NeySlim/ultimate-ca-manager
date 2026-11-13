@@ -12,6 +12,7 @@ from services import shared_files
 from services.kerberos import negotiate_auth
 from tests.keytab_support import keytab
 from tests.windows_profile_support import default_profile_id, upload_keytab
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 KEYTAB = keytab('HTTP/ucm.example.test@EXAMPLE.TEST')
 

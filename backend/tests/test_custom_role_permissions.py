@@ -12,6 +12,8 @@ import pytest
 from models import CA, User, db
 from models.rbac import CustomRole
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 ROLES = '/api/v2/rbac/roles'
 
 

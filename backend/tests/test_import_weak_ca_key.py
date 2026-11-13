@@ -249,8 +249,20 @@ def test_opnsense_cross_entry_cannot_carry_a_weak_key_to_its_counterpart(app, au
         assert CA.query.filter_by(descr=f'B {tag}').one().prv is None
 
 
+@pytest.fixture
+def _drop_csrs(app):
+    """Deletes the pending requests a test recorded by id."""
+    from models import Certificate, db
+    ids = []
+    yield ids
+    with app.app_context():
+        for row in Certificate.query.filter(Certificate.id.in_(ids)).all():
+            db.session.delete(row)
+        db.session.commit()
+
+
 @pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
-def test_weak_key_of_a_pending_request_does_not_become_the_ca_key(app, auth_client, path):
+def test_weak_key_of_a_pending_request_does_not_become_the_ca_key(app, auth_client, path, _drop_csrs):
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes
     from cryptography.x509.oid import NameOID
@@ -262,6 +274,7 @@ def test_weak_key_of_a_pending_request_does_not_become_the_ca_key(app, auth_clie
     r = _post(auth_client, '/api/v2/csrs/import', pem_content=csr.public_bytes(serialization.Encoding.PEM).decode())
     assert r.status_code in (200, 201), r.data
     csr_id = json.loads(r.data)['data']['id']
+    _drop_csrs.append(csr_id)
     r = auth_client.post(f'/api/v2/csrs/{csr_id}/key', json={'key': key_pem(key)})
     assert r.status_code in (200, 201), r.data
     cert = make_cert(name.rfc4514_string().split('=', 1)[1], key,
@@ -299,7 +312,11 @@ def test_certificates_import_asks_write_cas_before_judging_the_key(app, auth_cli
         'permissions': ['read:certificates', 'write:certificates']}), 201)
     key = _weak_key()
     cert = _ca(uuid.uuid4().hex[:8], key)
-    r = app.test_client().post('/api/v2/certificates/import', headers={'X-API-Key': created['key']},
-                               data={'pem_content': pem(cert) + key_pem(key)}, content_type='multipart/form-data')
+    try:
+        r = app.test_client().post('/api/v2/certificates/import', headers={'X-API-Key': created['key']},
+                                   data={'pem_content': pem(cert) + key_pem(key)},
+                                   content_type='multipart/form-data')
+    finally:
+        assert auth_client.delete(f"/api/v2/account/apikeys/{created['id']}").status_code == 200
     assert r.status_code == 403, r.data
     assert _stored(app, cert) == []

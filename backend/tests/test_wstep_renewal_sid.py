@@ -21,6 +21,7 @@ from tests.test_wstep_issue import _issued_cert_from_rstr, wstep_config  # noqa:
 from tests.test_wstep_renew import RENEW_URL, _build_signed_rst, wstep_renew_config  # noqa: F401
 from tests.test_wstep_renew_tls import _cmc_renewal, _key, _post, _rst
 from tests.test_wstep_strong_cert_mapping import _clear_ad_connector, _configure_ad_connector
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 

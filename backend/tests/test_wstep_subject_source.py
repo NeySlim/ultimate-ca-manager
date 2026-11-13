@@ -22,6 +22,7 @@ from services.xcep import policy_builder
 from tests.fixtures.templates import delete_templates
 from utils.upn_san import build_upn_other_name, extract_upns_from_san_list
 from tests.windows_profile_support import default_profile, default_realm
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 FIXTURES = Path(__file__).parent / 'fixtures'
 MACHINE = 'WIN11$@EXAMPLE.TEST'

@@ -17,6 +17,7 @@ from tests.test_wstep_issue import ISSUE_URL, _basic_auth, _build_rst, wstep_con
 from tests.test_wstep_protocol_conformance import _fault, _fault_code
 from tests.test_wstep_requested_template import TWINS, _oid_of
 from tests.test_wstep_subject_source import _issue, subject_ca  # noqa: F401
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 TEMPLATE_EXT_OID = '1.3.6.1.4.1.311.21.7'
 

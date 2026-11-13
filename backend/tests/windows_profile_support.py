@@ -6,9 +6,10 @@ created when missing; every other key is a SystemConfig row. Callers hold an app
 """
 from contextlib import contextmanager
 
+import pytest
 from sqlalchemy import delete, insert, select, update
 
-from models import ADConnectorConfig, SystemConfig, WindowsEnrollmentProfile, db
+from models import ADConnectorConfig, SystemConfig, WindowsEnrollmentProfile, WindowsProfileTemplate, db
 
 FIELDS = {
     'xcep_ca_refid': 'policy_ca_refid', 'xcep_username': 'xcep_username',
@@ -141,3 +142,39 @@ def connectors_kept(app):
                 db.session.execute(update(profiles).where(profiles.c.id == profile_id)
                                    .values(connector_id=connector_id, realm=realm))
             db.session.commit()
+
+
+@contextmanager
+def profiles_kept(app):
+    """Every Windows profile row and its template links put back as they were, the default
+    one included: a default profile left, or its keytab and realm, reaches the next file."""
+    profiles, links = WindowsEnrollmentProfile.__table__, WindowsProfileTemplate.__table__
+    with app.app_context():
+        saved = [dict(r._mapping) for r in db.session.execute(select(profiles).order_by(profiles.c.id))]
+        saved_links = [dict(r._mapping) for r in db.session.execute(select(links))]
+        db.session.commit()
+    try:
+        yield
+    finally:
+        with app.app_context():
+            from models import CertificateTemplate
+            # A connector or template the file deleted is not linked back (foreign keys on PostgreSQL)
+            connectors = set(db.session.execute(select(ADConnectorConfig.__table__.c.id)).scalars())
+            templates = set(db.session.execute(select(CertificateTemplate.__table__.c.id)).scalars())
+            db.session.execute(delete(links))
+            db.session.execute(delete(profiles))
+            if saved:
+                db.session.execute(insert(profiles), [
+                    {**row, 'connector_id': row['connector_id'] if row['connector_id'] in connectors else None}
+                    for row in saved])
+            kept_links = [row for row in saved_links if row['template_id'] in templates]
+            if kept_links:
+                db.session.execute(insert(links), kept_links)
+            db.session.commit()
+
+
+@pytest.fixture(autouse=True, scope='module')
+def windows_profiles_restored(app):
+    """Imported by a test file that changes the Windows profiles: puts them back after it."""
+    with profiles_kept(app):
+        yield

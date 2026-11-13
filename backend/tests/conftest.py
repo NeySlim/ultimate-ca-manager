@@ -390,7 +390,10 @@ def _seeded_rows_stay_in_their_module():
 _LEAK_TABLES = (
     'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
     'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
+    'windows_enrollment_profiles',
 )
+# Tables whose rows are compared too: a default profile edited in place keeps the count.
+_LEAK_CONTENT = {'windows_enrollment_profiles': ('updated_at', 'updated_by')}
 # Files allowed to change the shared tables: they reset or migrate the database.
 _LEAK_EXEMPT = {
     'test_api_routes.py', 'test_admin_seed_kwargs.py', 'test_system.py',
@@ -409,6 +412,11 @@ def _leak_counts():
         for table in _LEAK_TABLES:
             if table in present:
                 counts[table] = db.session.execute(_text(f'SELECT COUNT(*) FROM "{table}"')).scalar()
+        for table, ignored in _LEAK_CONTENT.items():
+            if table in present:
+                rows = db.session.execute(_text(f'SELECT * FROM "{table}" ORDER BY id')).mappings()
+                counts[f'{table} content'] = hash(repr(
+                    [sorted((k, repr(v)) for k, v in row.items() if k not in ignored) for row in rows]))
         db.session.rollback()
     return counts
 
@@ -423,11 +431,11 @@ def _shared_tables_stay_in_their_module(request):
     if name in _LEAK_EXEMPT or before is None:
         return
     after = _leak_counts() or {}
-    deltas = {t: after[t] - before[t] for t in before if t in after and after[t] != before[t]}
-    if not deltas:
+    changed = sorted(t for t in before if t in after and after[t] != before[t])
+    if not changed:
         return
     message = f'{name} left the shared tables changed: ' + ', '.join(
-        f'{t} {d:+d}' for t, d in sorted(deltas.items()))
+        t if t.endswith(' content') else f'{t} {after[t] - before[t]:+d}' for t in changed)
     if os.environ.get('UCM_TEST_LEAK_MODE', 'warn') == 'fail':
         pytest.fail(message)
     import warnings
@@ -451,6 +459,32 @@ def drop_new_cas_and_certificates(app):
         with app.app_context():
             for row_id in [row.id for row in model.query.filter(model.id > floors[model])]:
                 delete(row_id)
+
+
+@pytest.fixture(scope='module')
+def drop_new_users(app):
+    """Deletes, through the admin route, the accounts a module created (ids above the
+    highest one before it), so a user it made never reaches the next file."""
+    from models import User, db
+
+    def _top():
+        with app.app_context():
+            return db.session.query(db.func.max(User.id)).scalar() or 0
+    floor = _top()
+    yield
+    with app.app_context():
+        # The session admin can be seeded during the first module: never one of its own
+        made = [u.id for u in User.query.filter(User.id > floor, User.username != 'admin').order_by(User.id)]
+    if not made:
+        return
+    admin = app.test_client()
+    r = admin.post('/api/v2/auth/login', json={'username': 'admin', 'password': 'changeme123'})
+    assert r.status_code == 200, r.data
+    import warnings
+    for user_id in made:
+        r = admin.delete(f'/api/v2/users/{user_id}')
+        if r.status_code != 200:
+            warnings.warn(f'drop_new_users could not delete user {user_id}: HTTP {r.status_code}')
 
 
 def sandbox_paths(application, replaced=None):

@@ -15,6 +15,8 @@ from services.smart_import.importer import SmartImporter
 from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 
 def _x(b, xid=None, tail=''):
     return f'/api/v2/cas/{b}/cross-certificates' + (f'/{xid}' if xid else '') + tail

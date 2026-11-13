@@ -10,6 +10,7 @@ from models.system_config import SystemConfig
 from tests.fixtures.templates import delete_templates
 from services.wstep.soap_envelope import SOAP_NS
 from tests.windows_profile_support import get_config, restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
 XCEP_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'

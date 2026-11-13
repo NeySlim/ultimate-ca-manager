@@ -22,6 +22,7 @@ from tests.test_wstep_renewal_sid import _issued, _renew_tls
 from tests.test_wstep_renewal_sid import _issue as _wstep_issue
 from tests.test_wstep_renewal_sid import _sid_ext as _wstep_sid_ext
 from tests.windows_profile_support import connectors_kept
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 

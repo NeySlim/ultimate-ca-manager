@@ -16,6 +16,7 @@ from services.xcep.policy_builder import _policy_oid_for_template
 from tests.test_wstep_subject_source import CLIENT_AUTH, SERVER_AUTH, _issue, subject_ca  # noqa: F401
 from tests.test_wstep_renew_tls import _eku_csr, _renew, _template_oid
 from tests.windows_profile_support import default_profile
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 TWINS = {
     'User': ('usr_cert', ['clientAuth'], False, 'RSA-2048'),

@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from services.kerberos import negotiate_auth
-from tests.windows_profile_support import upload_keytab
+from tests.windows_profile_support import windows_profiles_restored, upload_keytab  # noqa: F401
 
 try:
     import gssapi  # noqa: F401

@@ -26,6 +26,7 @@ from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WST_NS, WSSE_NS
 from utils.upn_san import extract_upns_from_san_list
 from tests.windows_profile_support import connectors_kept, restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 ISSUE_URL = '/ADCertificateService_CES_Kerberos/service.svc'
 KERBEROS_PRINCIPAL = 'HOST$@HAGLAND.DOMAIN'

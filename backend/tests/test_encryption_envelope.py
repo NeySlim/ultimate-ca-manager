@@ -16,6 +16,7 @@ from models import db, SharedFile, SystemConfig
 from services import shared_files
 from security.dek_rotation import GRACE_KEY
 from tests import pg_app_harness
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 @pytest.fixture(autouse=True)
 def _dek_refresh(dek_refresh_now, dek_retire_at_once):

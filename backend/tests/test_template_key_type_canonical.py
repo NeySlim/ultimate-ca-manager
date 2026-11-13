@@ -19,6 +19,7 @@ from lxml import etree
 from models import CA, CATemplatePin, Certificate, CertificateTemplate, db
 from tests.conftest import get_json
 from tests.fixtures.templates import templates_created_here_removed
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
 @pytest.fixture(autouse=True, scope='module')

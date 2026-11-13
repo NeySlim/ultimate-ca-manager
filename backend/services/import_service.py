@@ -340,18 +340,20 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     """The caref a CA record should hold once *cert* is its certificate.
 
     None for a self-signed certificate; the CA whose key verifies the
-    signature, found by AKI then by issuer name; *current_caref* when UCM
-    holds no such CA (an external root imported later relinks it).
+    signature, found by AKI then by issuer name, the self-signed record
+    before a cross or link certificate of the same key; *current_caref*
+    when UCM holds no such CA (an external root imported later relinks it).
     """
     from models import CA
-    from utils.cert_issuer import certificate_signed_by, authority_key_identifier_hex, is_self_signed
+    from utils.cert_issuer import certificate_signed_by, authority_key_identifier_hex, is_self_signed, \
+        self_signed_first
     if is_self_signed(cert):
         return None
     aki = authority_key_identifier_hex(cert)
     candidates = cas_by_ski(aki) if aki else []
     if not candidates:
-        candidates = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).all()
-    for parent in candidates:
+        candidates = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).order_by(CA.id).all()
+    for parent in self_signed_first(candidates):
         if exclude_ca_id is not None and parent.id == exclude_ca_id or not parent.crt:
             continue
         try:

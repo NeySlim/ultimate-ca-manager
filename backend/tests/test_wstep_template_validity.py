@@ -10,6 +10,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID
 from models import CA, db
 from services.wstep import wstep_service
 from tests.test_wstep_template_eku import _make_csr, smartcard_template_config  # noqa: F401
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
 def _days(cert_pem):
