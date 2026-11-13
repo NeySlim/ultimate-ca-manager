@@ -37,6 +37,10 @@ from security.encryption import decrypt_private_key, encrypt_private_key
 _REVOCATION_FIELDS = ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')
 
 
+class _AlreadyRevoked(ValueError):
+    """The refusal met under the lock: answered to the caller, not an error to log."""
+
+
 def _request_user_id(username):
     """Id of the request's user when it is the one named, else None."""
     from flask import g, has_request_context
@@ -424,11 +428,6 @@ class LifecycleMixin:
 
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
         is_hold = reason in HOLD_REASONS
-        # A hold made final: dated now, so the delta lists the change; invalid since the hold
-        # (the row's, or its record's when only the record holds it)
-        held = effective_revocation(certificate)
-        held_since = held.revoked_at if held is not None else None
-        previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}
         now = utc_now()
         rejected_renewals = []
         try:
@@ -438,6 +437,16 @@ class LifecycleMixin:
             record = RevokedSerial.query.filter_by(
                 caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)
             ).with_for_update().first() if ca is not None else None
+            # The row as it stands under its own lock: an unhold or a revocation committed
+            # while this one waited is seen, and only changed columns are sent
+            db.session.refresh(certificate, with_for_update=True)
+            if not revocable(certificate, reason):
+                raise _AlreadyRevoked("Certificate already revoked")
+            # A hold made final: dated now, so the delta lists the change; invalid since the hold
+            # (the row's, or its record's when only the record holds it)
+            held = effective_revocation(certificate)
+            held_since = held.revoked_at if held is not None else None
+            previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}
             certificate.revoked = True
             certificate.revoked_at = now
             certificate.revoke_reason = reason
@@ -477,9 +486,10 @@ class LifecycleMixin:
                     certificate_id=certificate.id, reason='Revoked directly', commit=False)
             db.session.flush()
             remember_if_compromised(certificate)
-        except Exception:
+        except Exception as e:
             db.session.rollback()
-            logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
+            if not isinstance(e, _AlreadyRevoked):
+                logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
             raise
         rejected_snapshots = request_snapshots(rejected_renewals)
 

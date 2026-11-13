@@ -24,8 +24,7 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('kerberos_v2', __name__)
 
 KEYTAB_EXTENSIONS = {'.keytab', '.kt'}
-# Real keytabs are a handful of KB (a few dozen bytes per key entry); 256KB
-# is generous headroom while still catching an obviously-wrong upload early.
+# Per profile: a keytab is a few dozen bytes per key entry; the composed file has no cap
 MAX_KEYTAB_SIZE = 256 * 1024
 
 
@@ -47,14 +46,28 @@ def _keytab_status():
     toast at upload time)."""
     inspection = negotiate_auth.inspect_keytab()
     spn = negotiate_auth.get_spn()
+    entries = inspection.get('entries') or []
+    principals = {e['principal'] for e in entries} or {inspection['principal']}
     return {
         'keytab_valid': inspection['valid'],
         'keytab_principal': inspection['principal'],
         'keytab_error': inspection['error'],
-        'keytab_spn_matches': (
-            inspection['valid'] and bool(spn) and inspection['principal'] == spn
-        ),
+        'keytab_entries': entries,
+        'keytab_spn_matches': inspection['valid'] and bool(spn) and spn in principals,
     }
+
+
+def _foreign_entries(entries, realm):
+    """The principals of *entries* that are not ``<service>/<SPN host>@<realm>``: the unnamed
+    acceptor takes a ticket for any entry, so a stray one widens what UCM accepts."""
+    parsed = negotiate_auth._parse_spn(negotiate_auth.get_spn())
+    service, host = parsed if parsed else ('HTTP', None)
+    hosts = {e.components[1].lower() for e in entries if len(e.components) == 2}
+    if host is None and len(hosts) == 1:
+        host = next(iter(hosts))
+    return [e.principal for e in entries
+            if e.realm != realm or len(e.components) != 2 or e.components[0] != service
+            or e.components[1].lower() != (host or '').lower()]
 
 
 def _realm_problem(realm):
@@ -123,20 +136,10 @@ def update_kerberos_config():
 @bp.route('/api/v2/kerberos/keytab', methods=['POST'])
 @require_auth(['write:kerberos'])
 def upload_kerberos_keytab():
-    """Upload the keytab backing the Kerberos binding's acceptor
-    credential. Overwrites any previously uploaded keytab.
-
-    Validated with the same GSSAPI keytab-loading call the real acceptor
-    uses (``negotiate_auth.inspect_keytab``) *before* it's persisted -- a
-    keytab that doesn't even parse is rejected outright rather than
-    silently replacing a working one, closing the gap where the only
-    previous feedback was a generic "settings saved" toast with no
-    indication the upload was actually usable (issue #229 item 4). A
-    keytab that parses but doesn't match the configured SPN is still
-    accepted (a keytab can legitimately carry more than one principal, or
-    the SPN field might be the one that's wrong) -- surfaced via
-    ``keytab_spn_matches`` in the response for the UI to warn on, not a
-    hard rejection.
+    """Upload the keytab of a Windows enrollment profile (form field ``profile_id``, else the
+    default profile), replacing the one it held. Loaded with GSSAPI before it is stored; every
+    entry must be ``<SPN service>/<SPN host>@<realm of the profile>``, else 400. The acceptor
+    reads the file composed from the keytabs of the enabled profiles.
     """
     if 'file' not in request.files:
         return error_response('No file provided', 400)
@@ -165,31 +168,57 @@ def upload_kerberos_keytab():
         return error_response(
             f"Keytab is not a valid krb5 keytab: {inspection['error']}", 400
         )
+    from services.kerberos.keytab_format import read_entries
+    entries = read_entries(file_content)
+    if not entries:
+        return error_response('Keytab holds no entry', 400)
 
-    # The default profile holds the keytab; the file every node writes is rebuilt from it
+    # The profile holds the keytab; the file every node writes is composed from the profiles
     # and reload_keytab reaches the other nodes (HA)
+    from models import WindowsEnrollmentProfile
     from services import cluster_commands, windows_profiles
     user = getattr(g, 'current_user', None)
-    profile = windows_profiles.default_for_write(getattr(user, 'username', None), fill=False)
+    profile_id = request.form.get('profile_id')
+    if profile_id:
+        profile = (db.session.get(WindowsEnrollmentProfile, int(profile_id))
+                   if profile_id.isdigit() else None)
+        if profile is None:
+            return error_response('Windows enrollment profile not found', 404)
+        profile.updated_by = getattr(user, 'username', None)
+    else:
+        profile = windows_profiles.default_for_write(getattr(user, 'username', None), fill=False)
     profile.set_keytab(file_content)
     windows_profiles.fill_realm(profile)
-    windows_profiles.publish_keytab(actor=getattr(user, 'username', None))
+    if profile.realm is None:
+        db.session.rollback()
+        return error_response('the profile has no realm: set it, then upload its keytab', 400)
+    foreign = _foreign_entries(entries, profile.realm)
+    if foreign:
+        db.session.rollback()
+        return error_response(f"Keytab entries outside HTTP/<host>@{profile.realm}: "
+                              f"{', '.join(sorted(set(foreign)))}", 400)
+    try:
+        windows_profiles.publish_keytab(actor=getattr(user, 'username', None))
+    except ValueError as e:
+        db.session.rollback()
+        return error_response(f'Keytab not composed: {e}', 409)
     cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
     ok, _err = safe_commit(logger, "Failed to store Kerberos keytab")
     if not ok:
         return _err
 
     try:
-        negotiate_auth.sync_keytab_file(file_content)
-    except OSError as e:
+        negotiate_auth.write_stored_keytab()
+    except (OSError, ValueError) as e:
         logger.error("Failed to write Kerberos keytab: %s", e)
         return error_response('Failed to save keytab', 500)
 
     AuditService.log_action(
         action='kerberos_keytab_upload',
         resource_type='kerberos',
-        resource_name='Kerberos Keytab',
-        details=f"Uploaded a new Kerberos keytab (principal: {inspection['principal']})",
+        resource_name=f'Kerberos Keytab ({profile.name})',
+        details=f"Uploaded a Kerberos keytab for profile {profile.name} (principals: "
+                f"{', '.join(sorted({e.principal for e in entries}))})",
         success=True
     )
 

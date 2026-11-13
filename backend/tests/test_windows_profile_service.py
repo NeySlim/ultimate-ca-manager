@@ -591,7 +591,7 @@ def test_an_uploaded_keytab_names_the_realm_before_a_disabled_connector(
         'valid': True, 'principal': 'HTTP/ucm.example@EXAMPLE.TEST', 'error': None})
     with app.app_context():
         _connector_as({'enabled': False, 'base_dn': 'DC=corp,DC=example'})
-        _set('kerberos_spn', 'HTTP/ucm.example')
+        _set('kerberos_spn', 'HTTP/testhost.example.test')
         db.session.commit()
     r = auth_client.post('/api/v2/kerberos/keytab', data={'file': (io.BytesIO(ONE_REALM), 'k.keytab')},
                          content_type='multipart/form-data')
@@ -798,16 +798,17 @@ def test_a_start_queues_a_reload_only_when_it_changed_the_keytab(app, clean_slat
         shared_files.store_file(shared_files.KERBEROS_KEYTAB, TARGET_KEYTAB)
         ClusterCommand.query.filter_by(kind=cluster_commands.RELOAD_KEYTAB).delete()
         db.session.commit()
-    real, reads = shared_files.read_file, []
+    from services import windows_profiles
+    real, holders, reads = shared_files.read_file, windows_profiles.keytab_holders, []
 
-    def stale_then_rebuilt(name):
-        value = real(name)
+    def stale_then_rebuilt():
+        value = holders()
         if raced and not reads:
-            # This node saw the stale keytab; the other node's rebuild commits right after
+            # This node read the profiles; the other node's rebuild commits right after
             _committed_elsewhere(ARCHIVED_KEYTAB, insert=False)
         reads.append(1)
         return value
-    monkeypatch.setattr(shared_files, 'read_file', stale_then_rebuilt)
+    monkeypatch.setattr(windows_profiles, 'keytab_holders', stale_then_rebuilt)
     try:
         negotiate_auth.restore_keytab_at_start(app)
         with app.app_context():
@@ -834,7 +835,7 @@ def test_a_failed_rebuild_still_writes_the_stored_keytab_file(app, clean_slate, 
         shared_files.store_file(shared_files.KERBEROS_KEYTAB, TARGET_KEYTAB)
         db.session.commit()
 
-    def failing(data):
+    def failing():
         raise RuntimeError('c01 rebuild failed')
     monkeypatch.setattr(negotiate_auth, '_rebuild_shared_keytab', failing)
     negotiate_auth.restore_keytab_at_start(app)
