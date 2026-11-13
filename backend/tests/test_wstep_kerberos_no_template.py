@@ -313,3 +313,36 @@ def test_an_initial_request_without_template_is_refused_before_the_approval_gate
     with approval_policy(app, world['cas']['A']['id'], 'c15-held-initial') as pid:
         assert _fault(_post(client, world, MACHINE, _csr('c15-initial'))) == (400, 's:Sender', NO_TEMPLATE)
         assert requests_of(app, pid, 'wstep_request') == []
+
+
+@pytest.fixture
+def two_eku_machine(app, world):
+    """A machine template of CA A issuing serverAuth and clientAuth to an RSA-2048 key."""
+    with app.app_context():
+        t = CertificateTemplate(name='C15 A Two EKU', template_type='web_server', key_type='RSA-2048',
+                                validity_days=30, digest='sha256', is_active=True,
+                                extensions_template=json.dumps({'extended_key_usage': ['serverAuth', 'clientAuth']}))
+        db.session.add(t)
+        db.session.flush()
+        db.session.add(CATemplatePin(ca_id=world['cas']['A']['id'], template_id=t.id))
+        db.session.commit()
+        template_id = t.id
+    yield template_id
+    with app.app_context():
+        CATemplatePin.query.filter_by(template_id=template_id).delete()
+        db.session.commit()
+        delete_templates([template_id])
+        db.session.commit()
+
+
+@pytest.mark.parametrize('ekus', [[CLIENT_AUTH], [SERVER_AUTH]], ids=['same-ekus', 'part-of-the-ekus'])
+def test_a_request_whose_ekus_match_only_a_template_of_another_key_is_told_so(
+        app, client, world, realm_a, two_eku_machine, ekus):
+    """The cause is the key, not the EKUs: the refusal names the key the template issues."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+    floor = _top_audit(app)
+    status, code, reason = _fault(_post(client, world, MACHINE, _csr('c15-ec', ekus=ekus,
+                                                                     key=ec.generate_private_key(ec.SECP256R1()))))
+    assert (status, code) == (400, 's:Sender') and reason != NO_TEMPLATE, reason
+    assert 'key' in reason.lower(), reason
+    assert [a[0] for a in _audits(app, floor)] == ['windows_enrollment.refused']

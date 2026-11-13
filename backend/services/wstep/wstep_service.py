@@ -373,6 +373,16 @@ def _match_template(ca, csr, principal=None, *, profile):
     return None, None
 
 
+def _other_key_refusal(ca, csr, *, profile):
+    """The key refusal of a request whose EKUs fit only templates of another key, a subset of
+    their EKUs included (score 0, which ``_match_template`` leaves unmatched); None otherwise."""
+    csr_label = _csr_key_label(csr)
+    others = [t for t in _ca_templates(ca, profile=profile)
+              if _template_key_type(t, ca.id) is not None and not _template_takes_key(t, csr_label, ca.id)]
+    other, _score = _best_eku_match(others, _eku_oids(csr) or set())
+    return _key_refusal(other, csr_label, ca.id) if other is not None else None
+
+
 # szOID_ENROLL_CERTTYPE_EXTENSION (MS-WCCE 2.2.2.7.7.1): the template's name
 _ENROLL_CERTTYPE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2')
 
@@ -1228,7 +1238,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     exempted = None
     if kerberos_principal and matched_template is None:
         if renewed is None or _template_ext_oid(renewed) is not None:
-            return None, NO_TEMPLATE
+            return None, _other_key_refusal(ca, csr, profile=profile) or NO_TEMPLATE
         # Decided on arrival, the exemption travels with a held request: only a revocation since withdraws it
         if approved_renewal is not None and _revoked(ca, approved_renewal):
             return None, RENEWED_REVOKED
