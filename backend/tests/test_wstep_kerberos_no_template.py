@@ -13,6 +13,8 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from models import CA, CATemplatePin, Certificate, CertificateTemplate, db
 from services.ad_connector import lookup as ad_lookup
+from services import protocol_approval
+from services.ad_connector.renewal_identity import UNRESOLVED_MESSAGE
 from services.ca_service import CAService
 from services.wstep import CES_KERBEROS_PATH, wstep_service
 from services.xcep.policy_builder import _policy_oid_for_template
@@ -182,6 +184,15 @@ def test_a_kerberos_renewal_of_its_own_windows_certificate_without_template_is_s
     assert _fault(_renew(client, world, principal, None, None)) == (400, 's:Sender', NO_TEMPLATE)
 
 
+def test_a_directory_that_cannot_answer_is_no_final_refusal_of_a_renewal(app, client, world, realm_a, monkeypatch):
+    """Without SID extension the owner is asked of the directory: unreachable, the request may come back."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old = _template_less_certificate(app, world, key, sid=None)
+    monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda config, sam: ad_lookup.UNREACHABLE)
+    status, code, text = _fault(_renew(client, world, MACHINE, old, key))
+    assert (status, code) == (500, 's:Receiver') and text == UNRESOLVED_MESSAGE
+
+
 def test_a_kerberos_renewal_of_a_user_certificate_without_sid_matches_its_directory_subject(
         app, client, world, realm_a):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -292,7 +303,7 @@ def test_an_exempted_renewal_whose_certificate_is_revoked_before_approval_is_ref
         before = _issued_count(app, world)
         r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
         assert r.get_json()['message'] == 'Request closed'
-        assert r.get_json()['data']['issue_error'].endswith(wstep_service.RENEWED_REVOKED)
+        assert r.get_json()['data']['issue_error'].endswith(protocol_approval.RENEWED_REVOKED)
         assert _issued_count(app, world) == before
         reason, invalid, _echo = _held_fault(_query(client, world, MACHINE, request_id))
         assert reason == 'Refused at issuance' and invalid == 'true'

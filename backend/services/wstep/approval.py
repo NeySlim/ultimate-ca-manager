@@ -126,7 +126,8 @@ def _issue(approval, data):
                 ca, signing_cert, db_cert, csr, validity_days, 'wstep', require_pop,
                 on_stored=protocol_approval.linker(approval), profile=profile)
     else:
-        # The template-less renewal the request was held for, decided when it came in
+        # The template-less renewal the request was held for, decided when it came in: only a revocation
+        # since withdraws it, where the Certificate binding above also refuses an expired or superseded signer
         renewed = x509.load_pem_x509_certificate(data['renewal_of'].encode()) if data.get('renewal_of') else None
         cert_pem, err = wstep_service.issue(
             ca, csr.public_bytes(Encoding.DER), validity_days, require_pop=require_pop,

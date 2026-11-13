@@ -25,7 +25,7 @@ from services.ad_connector import renewal_identity
 from services.ca.ca_signing import AlreadySuperseded, SubjectTaken
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
-from services.protocol_approval import AlreadyIssued
+from services.protocol_approval import RENEWED_REVOKED, AlreadyIssued
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
@@ -93,7 +93,6 @@ NOT_IN_GROUP = 'Requester is not authorized to enroll against this {what}'
 # AD CS refuses a request without template (CERTSRV_E_NO_CERT_TYPE); so does the Kerberos binding
 NO_TEMPLATE = ('The request names no certificate template and its Extended Key Usages '
                'match none this profile offers')
-RENEWED_REVOKED = 'The certificate being renewed has been revoked'
 
 
 def _x509_name_from_dn_components(dn_components, email=None):
@@ -1120,7 +1119,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     subject a certificate of another account already carries under this CA (RFC 5280 §4.1.2.6).
     A naked CSR (see ``_is_naked_csr``) is built the same way, as GPO autoenrollment expects;
     a user's only when a template opted in (``_user_ad_derivation_enabled``). A request matching
-    no template is refused (``NO_TEMPLATE``), unless it renews a certificate that names none.
+    no template is refused (``NO_TEMPLATE``, or the key when another key's template fits), unless it
+    renews the requester's own valid certificate issued here without one (``_requester_renewal``).
     Only a matched template announcing a client-supplied subject keeps the CSR's.
     Derivation never fails open: a naked CSR falls through to the normal
     rejection, a populated one under a CA-built template or none is refused.
@@ -1230,11 +1230,18 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     if renewed is None and kerberos_principal and outer_signed_data is not None:
         renewed = _requester_renewal(ca, outer_signed_data, kerberos_principal, kerberos_sam_account_name,
                                      connector, requester_sid, profile=profile)
+    # The directory could not say whose certificate signs the envelope: not a final refusal
+    from services.ad_connector import lookup
+    unresolved = renewed is lookup.UNREACHABLE
+    if unresolved:
+        renewed = None
     if renewal is not None and renewed is not None:
         renewal['serial'] = renewed.serial_number
     # Only the requester's own valid Windows certificate issued without template (before 3.0) is exempted
     exempted = None
     if kerberos_principal and matched_template is None:
+        if unresolved:
+            return None, ServerError(renewal_identity.UNRESOLVED_MESSAGE)
         if renewed is None or _template_ext_oid(renewed) is not None:
             return None, _other_key_refusal(ca, csr, profile=profile) or NO_TEMPLATE
         # Decided on arrival, the exemption travels with a held request: only a revocation since withdraws it
@@ -1511,9 +1518,12 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
                        profile):
     """The certificate a Kerberos request renews, as Windows signs the envelope with its key: one of
     *ca*, valid (not revoked, expired or superseded), recorded under *profile* and the requester's
-    own (``_requester_holds``); None for an initial enrollment or the certificate of another."""
+    own (``_requester_holds``); None for an initial enrollment or the certificate of another,
+    ``lookup.UNREACHABLE`` when the directory could not say whose it is."""
+    from services.ad_connector import lookup
     from services.cert.issued_lookup import OK, issued_certificate_status
     from services.windows_profiles import certificate_profile
+    unreachable = False
     for cert in _envelope_certificates(outer_signed_data):
         row, status = issued_certificate_status(ca, cert)
         if row is None or status != OK or _verify_renewal_signer(outer_signed_data, cert) is not None:
@@ -1521,9 +1531,12 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
         recorded, _refusal = certificate_profile(row)
         if recorded is None or profile is None or recorded.id != profile.id:
             continue
-        if _requester_holds(cert, principal, sam_account_name, connector, requester_sid, profile=profile):
+        held = _requester_holds(cert, principal, sam_account_name, connector, requester_sid, profile=profile)
+        if held is lookup.UNREACHABLE:
+            unreachable = True
+        elif held:
             return cert
-    return None
+    return lookup.UNREACHABLE if unreachable else None
 
 
 def _revoked(ca, cert):
@@ -1533,7 +1546,8 @@ def _revoked(ca, cert):
 
 def _requester_holds(cert, principal, sam_account_name, connector, requester_sid, *, profile):
     """Whether *cert* names the requester: its SID extension when it carries one, else the
-    dNSHostName (computer) or the subject (user) the directory gives the account."""
+    dNSHostName (computer) or the subject (user) the directory gives the account;
+    ``lookup.UNREACHABLE`` when the directory could not answer."""
     from services.ad_connector import lookup
     from services.trust_store.csr_operations_mixin import ad_security_extension_sid
     from utils.dn_match import same_name
@@ -1544,6 +1558,8 @@ def _requester_holds(cert, principal, sam_account_name, connector, requester_sid
         return False
     if lookup.is_machine_principal(principal):
         dns_hostname = lookup.lookup_computer_dns_hostname(connector, sam_account_name)
+        if dns_hostname is lookup.UNREACHABLE:
+            return lookup.UNREACHABLE
         if not dns_hostname:
             return False
         if same_name(cert.subject, x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, dns_hostname)])):
@@ -1551,6 +1567,8 @@ def _requester_holds(cert, principal, sam_account_name, connector, requester_sid
         return ('DNSName', dns_hostname.lower()) in {(kind, value.lower())
                                                       for kind, value in _san_values(cert) or ()}
     subject, _san = _user_directory_subject(connector, sam_account_name, profile=profile)
+    if subject is lookup.UNREACHABLE:
+        return lookup.UNREACHABLE
     return isinstance(subject, x509.Name) and same_name(cert.subject, subject)
 
 
