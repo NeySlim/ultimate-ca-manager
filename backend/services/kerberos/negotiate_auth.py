@@ -67,11 +67,9 @@ from models import SystemConfig
 
 logger = logging.getLogger(__name__)
 
+# Composed from the keytabs of the enabled profiles; the acceptor names it in its credential
+# store, never through KRB5_KTNAME, which a Kerberos MSCA connection may rewrite (A12)
 KEYTAB_PATH = DATA_DIR / 'kerberos.keytab'
-
-# Tracks the KRB5_KTNAME value this process has already set, so repeated
-# per-request calls are a cheap no-op instead of an env var write every time.
-_ktname_synced_for = None
 
 # In-progress (not yet `complete`) SPNEGO contexts, keyed by the client's
 # source IP -- see the module docstring for why a multi-leg exchange is
@@ -181,9 +179,8 @@ def sync_keytab_file(raw_bytes):
     Write-to-temp-then-``os.replace`` rather than writing the target path
     directly: the keytab only changes when an admin uploads a new one (rare,
     API-triggered — see ``api/v2/kerberos.py``), but GSSAPI re-reads
-    whatever's on disk on every request via ``KRB5_KTNAME``
-    (``_ensure_krb5_ktname``, below), so a request landing mid-write would
-    otherwise risk reading a truncated file.
+    whatever's on disk on every request (``_new_acceptor``, below), so a
+    request landing mid-write would otherwise risk reading a truncated file.
     """
     KEYTAB_PATH.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_path = tempfile.mkstemp(prefix='.kerberos-keytab-', dir=str(KEYTAB_PATH.parent))
@@ -233,7 +230,8 @@ def restore_keytab_at_start(app):
     with app.app_context():
         try:
             profile = windows_profiles.default_profile()
-            if profile is None or not profile.keytab:
+            # A keytab held by any profile, enabled or not, means the import has been done
+            if not windows_profiles.keytab_holders():
                 data = None
                 if db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is not None:
                     data = shared_files.read_file(shared_files.KERBEROS_KEYTAB)
@@ -256,12 +254,12 @@ def restore_keytab_at_start(app):
                     windows_profiles.fill_realm(profile)
                     if profile.realm is not None:
                         db.session.commit()
-            elif shared_files.read_file(shared_files.KERBEROS_KEYTAB) != profile.keytab_bytes():
-                # The profile is the source: a file it does not hold is rebuilt, everywhere
+            else:
+                # The profiles are the source: a file they do not compose is rebuilt, everywhere
                 from services import cluster_commands
-                if _rebuild_shared_keytab(profile.keytab_bytes()):
+                if _rebuild_shared_keytab():
                     cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
-                    logger.info("Kerberos keytab rebuilt from the default Windows enrollment profile")
+                    logger.info("Kerberos keytab rebuilt from the Windows enrollment profiles")
                 db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -278,17 +276,22 @@ def restore_keytab_at_start(app):
             db.session.remove()
 
 
-def _rebuild_shared_keytab(data):
-    """The shared keytab set to the profile's *data*; True when this node changed it. The row
-    is read again under lock and a concurrent insert is undone alone, so a node starting at
-    the same time that rebuilt it first is neither overwritten in error nor reloaded twice."""
+def _rebuild_shared_keytab():
+    """The shared keytab set to the profiles' composition (None: removed); True when this node changed it.
+    Composed under the row lock, so an upload or a node starting at the same time is neither
+    overwritten with a stale composition nor reloaded twice; a concurrent insert is undone alone."""
     from sqlalchemy.exc import IntegrityError
     from models import SharedFile, db
-    from services import shared_files
+    from services import shared_files, windows_profiles
     name = shared_files.KERBEROS_KEYTAB
     for attempt in (1, 2):
         row = (db.session.query(SharedFile).filter_by(name=name)
                .with_for_update().populate_existing().first())
+        data = windows_profiles.composed_keytab()
+        if row is None and data is None:
+            return False
+        if row is not None and data is None:
+            return shared_files.drop_file(name)
         if row is not None and shared_files.read_file(name) == data:
             return False
         try:
@@ -302,45 +305,142 @@ def _rebuild_shared_keytab(data):
 
 
 def inspect_keytab(path=None):
-    """Parse the keytab at ``path`` (default ``KEYTAB_PATH``) via GSSAPI's
-    own keytab-loading code, the same mechanism the real acceptor uses at
-    request time -- so a "valid" result here means the keytab will actually
-    work, not just that a hand-rolled parser accepted the bytes.
-
-    Returns ``{'valid': bool, 'principal': str | None, 'error': str | None}``.
-    ``principal`` is the krb5 principal name (``service/host@REALM``) GSSAPI
-    resolved from the keytab -- compare against ``get_spn()`` to catch a
-    keytab uploaded for the wrong SPN before it fails at request time
-    instead. Never raises; a missing/unreadable/malformed keytab comes back
-    as ``valid: False`` with ``error`` set.
-    """
+    """Load the keytab at ``path`` (default ``KEYTAB_PATH``) with GSSAPI, as the acceptor
+    does, and list every entry: ``valid``, ``principal`` (the first entry, as GSSAPI names
+    it), ``entries`` (``principal``, ``realm``, ``kvno``, ``enctype`` each) and ``error``.
+    Never raises; a missing, unreadable or malformed keytab is ``valid: False``."""
     target = str(path) if path is not None else str(KEYTAB_PATH)
     if not os.path.exists(target):
-        return {'valid': False, 'principal': None, 'error': 'No keytab uploaded'}
+        return {'valid': False, 'principal': None, 'entries': [], 'error': 'No keytab uploaded'}
+    from services.kerberos.keytab_format import read_entries
+    try:
+        with open(target, 'rb') as f:
+            entries = read_entries(f.read())
+    except OSError:
+        entries = None
+    listed = [{'principal': e.principal, 'realm': e.realm, 'kvno': e.kvno, 'enctype': e.enctype}
+              for e in entries or ()]
+    principal, error = _gssapi_load(target)
+    if error is None and entries is None:
+        error = 'the entries of the keytab cannot be read'
+    return {'valid': error is None, 'principal': principal if error is None else None,
+            'entries': listed, 'error': error}
+
+
+def _gssapi_load(target):
+    """(first principal, None) when GSSAPI loads the keytab as an acceptor credential, else (None, reason)."""
     try:
         import gssapi
         creds = gssapi.Credentials(usage='accept', store={'keytab': target})
-        return {'valid': True, 'principal': str(creds.name), 'error': None}
+        return str(creds.name), None
     except Exception as e:
-        return {'valid': False, 'principal': None, 'error': str(e)}
+        return None, str(e)
 
 
-def _ensure_krb5_ktname():
-    """Point GSSAPI's keytab lookup at ``KEYTAB_PATH`` for this process.
+def _new_acceptor(hostname, service):
+    """A SPNEGO acceptor whose Kerberos credential is the composed keytab, named in the GSSAPI
+    store: never the process' default keytab. pyspnego takes it only through these private
+    arguments, checked below, so a version that drops them fails closed instead of reading KRB5_KTNAME."""
+    import gssapi
+    import spnego
+    from spnego._context import GSSMech
+    credential = gssapi.Credentials(usage='accept', store={'keytab': f'FILE:{KEYTAB_PATH}'},
+                                    mechs=[gssapi.OID.from_int_seq(GSSMech.kerberos.value)])
+    kerberos = spnego.server(hostname=hostname, service=service, protocol='kerberos',
+                             options=spnego.NegotiateOptions.use_gssapi, _gssapi_credential=credential)
+    kerberos._is_wrapped = True
+    contexts = {GSSMech.kerberos: kerberos}
+    server = spnego.server(hostname=hostname, service=service, protocol='negotiate',
+                           _negotiate_contexts=contexts)
+    if (getattr(server, '_available_contexts', None) is not contexts
+            or getattr(kerberos, '_credential', None) is not credential):
+        raise RuntimeError('this pyspnego version does not take the acceptor keytab')
+    return server
 
-    Set once per worker process, idempotently: the *path* is fixed for the
-    life of the process (only its contents change, via ``sync_keytab_file``)
-    and MIT/Heimdal krb5 re-opens the file itself on every
-    ``gss_accept_sec_context`` call, so there's no need to touch the env var
-    per request — which would just invite a race between concurrent
-    greenlets/threads mutating a process-global for no benefit, since every
-    request wants the same value anyway.
-    """
-    global _ktname_synced_for
-    target = f'FILE:{KEYTAB_PATH}'
-    if _ktname_synced_for != target:
-        os.environ['KRB5_KTNAME'] = target
-        _ktname_synced_for = target
+
+def _ticket_realm(token):
+    """The realm of the service ticket in a NegTokenInit (or raw Kerberos token), else None.
+    Read from the clear part of the AP-REQ, only to say which realm has no key."""
+    def tlv(data, pos):
+        tag, length = data[pos], data[pos + 1]
+        pos += 2
+        if length & 0x80:
+            count = length & 0x7f
+            length = int.from_bytes(data[pos:pos + count], 'big')
+            pos += count
+        if pos + length > len(data):
+            raise IndexError('truncated')
+        return tag, data[pos:pos + length], pos + length
+
+    def fields(data):
+        out, pos = {}, 0
+        while pos < len(data):
+            tag, value, pos = tlv(data, pos)
+            out[tag] = value
+        return out
+
+    try:
+        tag, body, _ = tlv(token, 0)
+        if tag != 0x60:
+            return None
+        oid_tag, oid, pos = tlv(body, 0)
+        if oid == b'\x2b\x06\x01\x05\x05\x02':   # SPNEGO: NegTokenInit, its mechToken
+            _, init, _ = tlv(body, pos)
+            _, seq, _ = tlv(init, 0)
+            mech_token = fields(seq).get(0xa2)
+            if mech_token is None:
+                return None
+            _, inner, _ = tlv(mech_token, 0)
+            return _ticket_realm(inner)
+        if oid_tag != 0x06 or body[pos:pos + 2] != b'\x01\x00':   # Kerberos: AP-REQ only
+            return None
+        _, ap_req, _ = tlv(body, pos + 2)
+        _, ap_seq, _ = tlv(ap_req, 0)
+        _, ticket, _ = tlv(fields(ap_seq)[0xa3], 0)
+        _, ticket_seq, _ = tlv(ticket, 0)
+        _, realm, _ = tlv(fields(ticket_seq)[0xa1], 0)
+        text = realm.decode('ascii')
+        return text if text.isprintable() and 0 < len(text) <= 255 else None
+    except (IndexError, KeyError, UnicodeDecodeError):
+        return None
+
+
+def _realm_without_key(token):
+    """The ticket's realm when the composed keytab holds no entry of it, else None."""
+    realm = _ticket_realm(token)
+    if realm is None:
+        return None
+    from services.kerberos.keytab_format import read_entries
+    try:
+        entries = read_entries(KEYTAB_PATH.read_bytes())
+    except OSError:
+        entries = None
+    return realm if entries is not None and realm not in {e.realm for e in entries} else None
+
+
+def _accepted_target(server):
+    """The principal of the keytab entry that accepted the ticket, None when GSSAPI does not say."""
+    try:
+        name = server._context._context.target_name
+        return str(name).rstrip('\x00') if name is not None else None
+    except Exception:
+        return None
+
+
+def _realm_of(principal):
+    return principal.rpartition('@')[2] if principal and '@' in principal else None
+
+
+def _served_realm_matches(server):
+    """Entries are validated as their profile's realm: a client of another realm is refused."""
+    target = _accepted_target(server)
+    if _realm_of(target) is None:
+        return True
+    if _realm_of(server.client_principal) == _realm_of(target):
+        return True
+    logger.warning("Kerberos: client realm %s does not match the realm %s of the key that accepted it",
+                   _realm_of(server.client_principal), _realm_of(target))
+    return False
 
 
 def _is_kerberos_negotiated(server):
@@ -442,20 +542,23 @@ def authenticate_negotiate(auth_header, connection_key):
             return NegotiateResult(status='failed', error='Kerberos authentication failed')
         service, hostname = parsed_spn
 
-        _ensure_krb5_ktname()
         try:
-            server = spnego.server(hostname=hostname, service=service, protocol='negotiate')
-        except spnego.exceptions.SpnegoError as e:
+            server = _new_acceptor(hostname, service)
+        except Exception as e:
             logger.warning("Kerberos/SPNEGO context creation failed: %s", e)
             return NegotiateResult(status='failed', error='Kerberos authentication failed')
 
     try:
         out_token = server.step(token)
-    except spnego.exceptions.SpnegoError as e:
-        logger.warning("Kerberos/SPNEGO authentication failed: %s", e)
-        return NegotiateResult(status='failed', error='Kerberos authentication failed')
     except Exception as e:
-        logger.error("Unexpected error during Kerberos/SPNEGO authentication: %s", e)
+        # A realm the keytab lacks is a client of an unserved forest, not a fault of UCM
+        realm = _realm_without_key(token)
+        if realm is not None:
+            logger.warning("Kerberos: no key for this realm (%s) in the keytab", realm)
+        elif isinstance(e, spnego.exceptions.SpnegoError):
+            logger.warning("Kerberos/SPNEGO authentication failed: %s", e)
+        else:
+            logger.error("Unexpected error during Kerberos/SPNEGO authentication: %s", e)
         return NegotiateResult(status='failed', error='Kerberos authentication failed')
 
     if not server.complete and server.client_principal:
@@ -478,7 +581,7 @@ def authenticate_negotiate(auth_header, connection_key):
         # exists to detect. _is_kerberos_negotiated below turns "no weaker
         # mechanism configured" into a checked invariant rather than an
         # assumption.
-        if not _is_kerberos_negotiated(server):
+        if not _is_kerberos_negotiated(server) or not _served_realm_matches(server):
             return NegotiateResult(status='failed', error='Kerberos authentication failed')
         return NegotiateResult(status='authenticated', client_principal=server.client_principal)
 
@@ -491,7 +594,7 @@ def authenticate_negotiate(auth_header, connection_key):
         _pending_contexts[connection_key] = (server, time.monotonic() + _PENDING_CONTEXT_TTL_SECONDS)
         return NegotiateResult(status='continue', response_token_b64=base64.b64encode(out_token).decode('ascii'))
 
-    if not _is_kerberos_negotiated(server):
+    if not _is_kerberos_negotiated(server) or not _served_realm_matches(server):
         return NegotiateResult(status='failed', error='Kerberos authentication failed')
     response_b64 = base64.b64encode(out_token).decode('ascii') if out_token else None
     return NegotiateResult(

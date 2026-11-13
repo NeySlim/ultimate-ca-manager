@@ -15,13 +15,14 @@ from services import cluster_commands as cc
 from services import shared_files
 from services.kerberos import negotiate_auth
 from tests import pg_app_harness
+from tests.keytab_support import keytab
 from utils.datetime_utils import utc_now
 
 pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
                                 reason='needs UCM_TEST_APP_PG_URL (HA runs on PostgreSQL)')
 
 PREFIX = f'sf-{secrets.token_hex(3)}-'
-KEYTAB = b'\x05\x02keytab-uploaded-on-a'
+KEYTAB = keytab('HTTP/ucm.example.test@EXAMPLE.TEST')
 
 
 def wait_for(predicate, timeout=8.0):
@@ -82,6 +83,42 @@ def test_a_keytab_uploaded_on_a_is_served_by_b_after_the_command(app, auth_clien
     assert wait_for(lambda: on_b.exists() and on_b.read_bytes() == KEYTAB)
     with app.app_context():
         assert negotiate_auth.is_configured()
+
+
+def test_keytabs_of_two_profiles_uploaded_on_a_compose_the_same_file_on_b(app, auth_client, node_b,
+                                                                          tmp_path, monkeypatch):
+    from models import WindowsEnrollmentProfile, db
+    from services.kerberos.keytab_format import read_entries
+    start, _restarts = node_b
+    monkeypatch.setattr(negotiate_auth, '_gssapi_load', lambda target: ('HTTP/ucm.example.test', None))
+    monkeypatch.setattr(negotiate_auth, 'get_spn', lambda: 'HTTP/ucm.example.test@EXAMPLE.TEST')
+    on_a = tmp_path / 'a.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', on_a)
+    with app.app_context():
+        other = WindowsEnrollmentProfile(name=PREFIX + 'two', realm='TWO.TEST', enabled=True)
+        db.session.add(other)
+        db.session.commit()
+        other_id = other.id
+    try:
+        assert _upload_keytab(auth_client, KEYTAB).status_code == 200
+        r = _upload_keytab(auth_client, keytab('HTTP/ucm.example.test@TWO.TEST'), other_id)
+        assert r.status_code == 200, r.data
+        assert {e.realm for e in read_entries(on_a.read_bytes())} == {'EXAMPLE.TEST', 'TWO.TEST'}
+        on_b = tmp_path / 'b.keytab'
+        monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', on_b)
+        start()
+        assert wait_for(lambda: on_b.exists() and on_b.read_bytes() == on_a.read_bytes())
+    finally:
+        with app.app_context():
+            WindowsEnrollmentProfile.query.filter_by(id=other_id).delete()
+            db.session.commit()
+
+
+def _upload_keytab(client, data, profile_id=None):
+    form = {'file': (io.BytesIO(data), 'ucm.keytab')}
+    if profile_id is not None:
+        form['profile_id'] = str(profile_id)
+    return client.post('/api/v2/kerberos/keytab', data=form, content_type='multipart/form-data')
 
 
 def test_a_certificate_applied_on_a_restarts_b_which_then_serves_it(
