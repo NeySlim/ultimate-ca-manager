@@ -45,8 +45,8 @@ def _revocation_key(holder):
 
 
 def _kept_final(service, here):
-    """In a merge, the final revocation a certificate row holds here, which the archive's
-    hold or validity never replaces; None otherwise."""
+    """In a merge, the final revocation a certificate or CA row holds here, which the
+    archive's hold or validity never replaces; None otherwise."""
     from utils.revocation_reasons import HOLD_REASONS
     if (not getattr(service, '_merging', False) or here is None or not here.revoked
             or here.revoke_reason in HOLD_REASONS + ('removeFromCRL',)):
@@ -406,7 +406,7 @@ class RestoreCoreMixin:
         # Files are staged during the transaction and published just before the
         # commit; a commit that fails puts them back (`unpublish()`).
         results['mode'] = mode
-        # A merge never lowers a revocation made here (see _kept_final)
+        # A merge never lowers a final revocation made here, of a certificate or a CA (_kept_final)
         self._merging = mode == 'merge'
         self._kept_finals = []
 
@@ -685,9 +685,10 @@ class RestoreCoreMixin:
             results['webauthn_credentials'] = nested
 
     @staticmethod
-    def _apply_ca_revocation(ca, ca_data: Dict) -> None:
+    def _apply_ca_revocation(ca, ca_data: Dict, here_final=None) -> None:
         """Carry the CA's revocation state back (#343): a restore that drops
-        it brings a revoked CA back as active and able to sign again."""
+        it brings a revoked CA back as active and able to sign again. A merge
+        keeps ``here_final`` (``_kept_final``) over a lighter or no revocation."""
         where = f"certificate authority {ca_data.get('refid') or ca_data.get('descr')}"
 
         def _dt_or_none(column, val):
@@ -702,6 +703,9 @@ class RestoreCoreMixin:
         ca.revoked_at = _dt_or_none('revoked_at', ca_data.get('revoked_at'))
         ca.revoke_reason = ca_data.get('revoke_reason')
         ca.invalidity_at = _dt_or_none('invalidity_at', ca_data.get('invalidity_at'))
+        if here_final is not None and (not ca.revoked or _revocation_key(ca) > _revocation_key(here_final)):
+            for field, value in vars(here_final).items():
+                setattr(ca, field, value)
 
     @staticmethod
     def _apply_ca_fields(ca, ca_data: Dict) -> None:
@@ -895,6 +899,8 @@ class RestoreCoreMixin:
                 from security.encryption import encrypt_private_key
                 prv_b64 = encrypt_private_key(prv_b64)
 
+            # Read before apply_columns writes the archive's revocation columns
+            here_final = _kept_final(self, ca)
             if ca is None:
                 # descr and crt are NOT NULL; both are overwritten below
                 ca = CA(refid=ca_data['refid'], descr=ca_data.get('descr'), crt='')
@@ -918,7 +924,7 @@ class RestoreCoreMixin:
             ca.serial_number = ca_data.get('serial_number') or ca.serial_number
             ca.ski = ca_data.get('ski') or ca.ski
             self._apply_ca_fields(ca, ca_data)
-            self._apply_ca_revocation(ca, ca_data)
+            self._apply_ca_revocation(ca, ca_data, here_final)
             results['cas'] += 1
 
     def _restore_certificates(self, backup_data: Dict, results: Dict, master_key: bytes,

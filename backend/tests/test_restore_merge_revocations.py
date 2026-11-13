@@ -57,3 +57,37 @@ class TestACertificateRevokedHere:
         row = Certificate.query.filter_by(refid='merge-graver').one()
         ca = CA.query.filter_by(refid=row.caref).one()
         assert answered_revocation(row, ca).revoke_reason == 'keyCompromise'
+
+
+class TestACaRevokedHere:
+
+    @pytest.mark.parametrize('archived', [None, 'certificateHold', 'superseded'])
+    def test_the_archive_never_lowers_it(self, target, archived):
+        from models import CA
+        refid = f'merge-ca-{archived or "valid"}'
+        ca = _authority_row(refid)[0]
+        if archived:
+            _revoke(ca, archived, LATER)
+        blob = _snapshot()
+        _revoke(ca, 'keyCompromise', LATER)
+        db.session.commit()
+
+        _restore(blob, mode='merge')
+
+        db.session.expire_all()
+        ca = CA.query.filter_by(refid=refid).one()
+        assert (bool(ca.revoked), ca.revoke_reason, ca.revoked_at) == (True, 'keyCompromise', LATER)
+
+    def test_a_graver_archive_still_wins(self, target):
+        from models import CA
+        ca = _authority_row('merge-ca-graver')[0]
+        _revoke(ca, 'keyCompromise', EARLY)
+        blob = _snapshot()
+        _revoke(ca, 'superseded', LATER)
+        db.session.commit()
+
+        _restore(blob, mode='merge')
+
+        db.session.expire_all()
+        ca = CA.query.filter_by(refid='merge-ca-graver').one()
+        assert (bool(ca.revoked), ca.revoke_reason, ca.revoked_at) == (True, 'keyCompromise', EARLY)
