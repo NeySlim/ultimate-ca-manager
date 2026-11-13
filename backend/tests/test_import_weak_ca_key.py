@@ -196,3 +196,14 @@ def test_pkcs12_weak_key_without_import_key_is_read(app, auth_client, path):
     stored = _stored(app, cert)
     assert len(stored) == 1 and stored[0].prv is None
 
+
+def test_weak_key_cannot_be_posted_to_a_keyless_ca(app, auth_client):
+    key = _weak_key()
+    cert = _ca(uuid.uuid4().hex[:8], key)
+    assert _post(auth_client, '/api/v2/cas/import', pem_content=pem(cert)).status_code == 201
+    ca_id = _stored(app, cert)[0].id
+    r = auth_client.post(f'/api/v2/cas/{ca_id}/key', json={'key': key_pem(key)})
+    assert r.status_code == 400, r.data
+    assert '2048' in json.loads(r.data)['message']
+    assert _stored(app, cert)[0].prv is None
+
