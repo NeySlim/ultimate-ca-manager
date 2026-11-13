@@ -8,6 +8,7 @@ tests/test_user_delete_revokes_mtls.py
 tests/test_wstep*.py
 tests/test_xcep*.py
 tests/test_windows_profile*.py
+tests/test_windows_scale_150.py
 tests/test_certificates*.py
 tests/test_revocation*.py
 tests/test_scheduler*.py
