@@ -8,7 +8,8 @@ import unicodedata
 USER_VARIABLES = ('username', 'upn', 'mail', 'displayName', 'givenName', 'surname')
 MACHINE_VARIABLES = ('hostname', 'fqdn')
 COMMON_VARIABLES = ('domain', 'realm')
-# Not unique in a directory: the editor warns, nothing enforces it
+# Not unique in a directory: the editor warns; issuance refuses a subject that a certificate
+# of the same CA carries for another account (wstep_service.SubjectHeldByAnother)
 NON_UNIQUE_VARIABLES = ('displayName', 'givenName', 'surname', 'mail')
 # RFC 5280 appendix A: ub-common-name
 MAX_COMMON_NAME = 64

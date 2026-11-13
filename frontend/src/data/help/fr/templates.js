@@ -39,7 +39,7 @@ export default {
           { label: 'Construire le sujet depuis Active Directory', text: 'Dériver le sujet et les SAN depuis l\'objet AD du demandeur (via le connecteur AD) au lieu d\'exiger que le client les fournisse, pour l\'autoenrollment GPO sans intervention' },
           { label: 'Restreindre l\'enrôlement à un groupe AD', text: 'Seuls les membres du groupe AD configuré (appartenance imbriquée incluse) peuvent enrôler via le point de terminaison Kerberos. Vide = tout principal authentifié. Non appliqué sur le point de terminaison Username/Password' },
           { label: 'Champs de sujet épinglés', text: 'Force les valeurs C/ST/L/O/OU sur chaque certificat émis via WSTEP, en écrasant le CSR ou la dérivation AD pour ces champs. Le CN et les SAN ne sont jamais affectés, laissez un champ vide pour le garder dynamique' },
-          { label: 'Motif du nom commun', text: 'Construit le CN à partir de texte fixe et de variables de l\'annuaire, par exemple {hostname}-WiFi ou {displayName}, pour un modèle dont UCM construit le sujet. Seul le CN change : les SAN et l\'extension SID restent ceux de l\'annuaire. Une variable vide ou un CN de plus de 64 caractères refuse la demande' },
+          { label: 'Motif du nom commun', text: 'Construit le CN à partir de texte fixe et de variables de l\'annuaire, par exemple {hostname}-WiFi ou {displayName}, pour un modèle dont UCM construit le sujet. Seul le CN change : les SAN et l\'extension SID restent ceux de l\'annuaire. Une variable vide ou un CN de plus de 64 caractères refuse la demande, de même qu\'un sujet qu\'un certificat de la même CA porte déjà pour un autre compte' },
         ]
       },
     ],
@@ -119,7 +119,8 @@ Pour l'enrôlement Windows, un modèle dont UCM construit le sujet (un modèle m
 - **Conserver le chemin d'annuaire** décoché : le sujet est le CN seul, plus les champs épinglés. Coché : le DN de l'objet après son propre nom suit le CN (pour un utilisateur, l'attribut e-mail reste comme sans motif)
 - **Seul le CN change** : les SAN (le nom DNS de la machine, l'UPN et l'e-mail de l'utilisateur) et l'extension SID restent comme sans motif, et un motif n'ajoute jamais de SAN
 - **Refusé, jamais tronqué** : une variable que l'annuaire laisse vide, un résultat de plus de 64 caractères ou contenant un caractère de contrôle refuse la demande ; la raison nomme le modèle et la variable et figure dans le journal d'audit
-- \`{displayName}\`, \`{givenName}\`, \`{surname}\` et \`{mail}\` ne sont pas uniques : deux comptes peuvent recevoir le même CN
+- **Un sujet par compte** (RFC 5280), contrôlé à l'émission : un sujet qu'un certificat de la même CA, quel que soit son statut, porte déjà pour un autre compte est refusé (casse et espaces superflus ignorés), et l'audit nomme le numéro de série de ce certificat ; le même compte renouvelle et s'inscrit de nouveau
+- \`{displayName}\`, \`{givenName}\`, \`{surname}\` et \`{mail}\` ne sont pas uniques, ni \`{username}\` ou \`{hostname}\` d'un domaine à l'autre : ajoutez \`{upn}\`, \`{fqdn}\`, ou \`{username}\`/\`{hostname}\` avec \`{domain}\` ou **Conserver le chemin d'annuaire**
 - **Le renouvellement** avec le certificat prend le motif en vigueur, pour le compte que nomme le SID du certificat ; il est refusé quand aucun connecteur du profil ne trouve ce compte
 - Le point de terminaison Username/Password n'a pas d'identité d'annuaire : le motif ne s'y applique pas et le client fournit le sujet
 
