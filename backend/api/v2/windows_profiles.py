@@ -10,7 +10,6 @@ from auth.unified import require_auth
 from models import CA, ADConnectorConfig, Certificate, WindowsEnrollmentProfile, WindowsProfileTemplate, db
 from services import windows_profiles
 from services.audit_service import AuditService
-from services.ad_connector import lookup
 from services.deletion_blockers import first_blocker, windows_profile_deletion_blockers
 from utils.db_transaction import safe_commit
 from utils.pagination import parse_request_pagination
@@ -166,12 +165,8 @@ def _connector_problem(profile):
     """The connector's domain must be the profile's realm (A1): the DN realm is compared exactly."""
     if not profile.connector_id or not profile.realm:
         return None
-    connector = db.session.get(ADConnectorConfig, profile.connector_id)
-    realm = lookup.realm_of_base_dn(connector.base_dn) if connector is not None else None
-    if realm and realm != profile.realm:
-        return (f'the connector serves the domain {realm}, not the realm {profile.realm} '
-                'of this profile'), 400
-    return None
+    return windows_profiles.connector_domain_problem(
+        db.session.get(ADConnectorConfig, profile.connector_id), profile.realm)
 
 
 def _audit(action, profile, details):

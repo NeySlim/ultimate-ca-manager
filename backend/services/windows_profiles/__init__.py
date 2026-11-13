@@ -118,6 +118,29 @@ def _unused_name():
     return name
 
 
+def connector_domain_problem(connector, realm, profile_name='this profile'):
+    """(message, 400) when *connector* serves another domain than *realm* (A1), else None."""
+    from services.ad_connector import lookup
+    served = lookup.realm_of_base_dn(connector.base_dn) if connector is not None else None
+    if realm and served and served != realm:
+        return (f'the connector serves the domain {served}, not the realm {realm} '
+                f'of {profile_name}'), 400
+    return None
+
+
+def profiles_off_domain(connector_id, base_dn):
+    """The profiles using connector *connector_id* whose realm is not the domain of *base_dn*."""
+    from services.ad_connector import lookup
+    served = lookup.realm_of_base_dn(base_dn)
+    if not served:
+        return []
+    return (WindowsEnrollmentProfile.query
+            .filter(WindowsEnrollmentProfile.connector_id == connector_id,
+                    WindowsEnrollmentProfile.realm.isnot(None),
+                    WindowsEnrollmentProfile.realm != served)
+            .order_by(WindowsEnrollmentProfile.id).all())
+
+
 def default_for_write(actor=None, fill=True):
     """The default profile the configuration routes write, created by the first write.
     ``fill=False``: the caller sets a keytab first and fills the realm itself."""

@@ -394,3 +394,75 @@ def test_a_certificate_on_hold_blocks_deleting_its_profile(app, auth_client, rea
         Certificate.query.filter_by(windows_profile_id=p['id']).update({'revoke_reason': 'keyCompromise'})
         db.session.commit()
     assert auth_client.delete(f"{URL}/{p['id']}").status_code == 200
+
+
+@pytest.fixture
+def other_domain_connector(app):
+    """The connector singleton disabled and on DC=conn,DC=example; restored afterwards."""
+    with app.app_context():
+        connector = ADConnectorConfig.get_singleton()
+        created = connector is None
+        if created:
+            connector = ADConnectorConfig(name='default')
+            db.session.add(connector)
+        saved = (connector.base_dn, connector.enabled)
+        connector.base_dn, connector.enabled = 'DC=conn,DC=example', False
+        db.session.commit()
+        cid = connector.id
+        # Profiles of earlier tests would answer for the connector too: set apart
+        linked = [p.id for p in WindowsEnrollmentProfile.query.filter_by(connector_id=cid)]
+        WindowsEnrollmentProfile.query.filter_by(connector_id=cid).update({'connector_id': None})
+        db.session.commit()
+    yield cid
+    with app.app_context():
+        for pid in linked:
+            row = db.session.get(WindowsEnrollmentProfile, pid)
+            if row is not None and not created:
+                row.connector_id = cid
+        connector = db.session.get(ADConnectorConfig, cid)
+        if created:
+            db.session.delete(connector)
+        else:
+            connector.base_dn, connector.enabled = saved
+        db.session.commit()
+
+
+def test_the_kerberos_route_refuses_a_realm_the_connector_contradicts(app, auth_client,
+                                                                      other_domain_connector):
+    with app.app_context():
+        aside = WindowsEnrollmentProfile.query.filter_by(is_default=True).all()
+        saved = [(p.id, p.name) for p in aside]
+        for p in aside:
+            p.is_default = False
+            p.name = f'wp-api-aside-{p.id}'
+        db.session.add(WindowsEnrollmentProfile(name='wp-api-kdefault', is_default=True,
+                                                connector_id=other_domain_connector))
+        db.session.commit()
+    try:
+        r = auth_client.patch('/api/v2/kerberos/config', json={'realm': 'MINE.EXAMPLE'})
+        assert r.status_code == 400 and 'CONN.EXAMPLE' in r.get_json()['message']
+        with app.app_context():
+            assert WindowsEnrollmentProfile.query.filter_by(is_default=True).one().realm is None
+        assert auth_client.patch('/api/v2/kerberos/config',
+                                 json={'realm': 'CONN.EXAMPLE'}).status_code == 200
+    finally:
+        with app.app_context():
+            WindowsEnrollmentProfile.query.filter_by(name='wp-api-kdefault').delete()
+            db.session.commit()
+            for pid, name in saved:
+                p = db.session.get(WindowsEnrollmentProfile, pid)
+                p.is_default, p.name = True, name
+            db.session.commit()
+
+
+def test_a_connector_keeps_the_domain_its_profiles_serve(app, auth_client, other_domain_connector):
+    p = _created(auth_client, realm='CONN.EXAMPLE', connector_id=other_domain_connector)
+    r = auth_client.put('/api/v2/ad-connector', json={'base_dn': 'DC=moved,DC=example'})
+    assert r.status_code == 409 and p['name'] in r.get_json()['message']
+    with app.app_context():
+        assert db.session.get(ADConnectorConfig, other_domain_connector).base_dn == 'DC=conn,DC=example'
+    assert auth_client.put('/api/v2/ad-connector',
+                           json={'base_dn': 'DC=conn,DC=example'}).status_code == 200
+    assert auth_client.put(f"{URL}/{p['id']}", json={'realm': None}).status_code == 200
+    assert auth_client.put('/api/v2/ad-connector',
+                           json={'base_dn': 'DC=moved,DC=example'}).status_code == 200
