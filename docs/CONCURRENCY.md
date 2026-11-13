@@ -36,6 +36,6 @@ lists them, keeps them, and leaves the index pending under the `SystemConfig` ke
 migration refuses the source, and a restore of a backup taken from it is refused on an
 installation that has the index, naming the rows; the pending installation itself still
 restores its own backups. The flag never travels in a backup.
-While the key is set, every start runs the upgrade steps 142 and 144 again, and only
-them: once the rows are resolved, a restart creates the index and stores every serial in
-decimal.
+While the key is set, every start runs the upgrade step 144 again, and only it, which clears
+the key in the same transaction as the conversion: once the rows are resolved, a restart creates the
+index and stores every serial in decimal, and a start cut short leaves the key for the next.

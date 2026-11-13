@@ -273,7 +273,9 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 # Serial steps: run again at each start while they leave the unique index pending
 # ---------------------------------------------------------------------------
 
-SERIAL_STEPS = ("142_serial_per_ca_and_proxy_links", "144_canonical_certificate_serials")
+# Step 144 alone: it converts, creates the index and resets the key in one commit, so a
+# replay cut short keeps the key that triggers the next one (142 commits its deletion apart)
+SERIAL_STEP = "144_canonical_certificate_serials"
 
 
 def _serial_steps_pending(engine) -> bool:
@@ -286,19 +288,17 @@ def _serial_steps_pending(engine) -> bool:
 
 
 def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
-    """Steps 142 and 144 alone, idempotent; the 300 row and its date stay as they are."""
+    """Step 144 alone, idempotent; the 300 row and its date stay as they are."""
     from migrations._from_2_254 import step
-    say("  → serial_unique_index_pending is set: upgrade steps 142 and 144 run again...", end=" ")
+    say("  → serial_unique_index_pending is set: upgrade step 144 runs again...", end=" ")
     try:
         if is_pg:
             with engine.begin() as conn:
-                for name in SERIAL_STEPS:
-                    step(name).upgrade(conn)
+                step(SERIAL_STEP).upgrade(conn)
         else:
             conn = sqlite3.connect(sqlite_path or os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db"))
             try:
-                for name in SERIAL_STEPS:
-                    step(name).upgrade(conn)
+                step(SERIAL_STEP).upgrade(conn)
             finally:
                 conn.close()
     except Exception as exc:  # noqa: BLE001

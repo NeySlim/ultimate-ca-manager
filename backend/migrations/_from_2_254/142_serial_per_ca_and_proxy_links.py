@@ -3,8 +3,9 @@
 RFC 5280 §4.1.2.2: a CA never issues two certificates with the same serial.
 Existing duplicates are listed, never deleted: the index is created only on a
 clean table; otherwise the pairs are logged and kept under the SystemConfig key
-``serial_unique_index_pending``. While that key is set, every start runs this step and
-step 144 again (migration_runner), so a restart after the cleanup creates the index.
+``serial_unique_index_pending``. While that key is set, every start runs step 144
+again (migration_runner), which holds raw duplicates too, so a restart after the
+cleanup creates the index.
 
 ``acme_proxy_challenge_links`` records which proxy order a challenge belongs to, so
 any worker or node answers the challenge POST that another one's authz fetch prepared.

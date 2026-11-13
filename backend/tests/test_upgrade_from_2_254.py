@@ -213,8 +213,8 @@ def snapshot_index_names(db):
     return {k[2] for k in snapshot(db.engine) if k[0] == 'index'}
 
 
-def test_a_start_after_the_twins_are_resolved_runs_steps_142_and_144_alone(base):
-    """The documented cleanup is a restart: 142 and 144 run again, no other step, the 300 row stays."""
+def test_a_start_after_the_twins_are_resolved_runs_step_144_alone(base):
+    """The documented cleanup is a restart: 144 runs again, no other step, the 300 row stays."""
     populate(base)
     twin_crt = _material()['twin'][1]
     # A third row spelled '255' too: 142 finds a raw duplicate and creates no index
@@ -241,6 +241,29 @@ def test_a_start_after_the_twins_are_resolved_runs_steps_142_and_144_alone(base)
     assert base.run("SELECT applied_at FROM _migrations WHERE name = '300_upgrade_from_2_254'") == stamp
     # Nothing pending any more: the next start runs nothing
     assert base.upgrade()
+
+
+def test_a_replay_that_fails_leaves_the_key_for_the_next_start(base, monkeypatch):
+    """The key is the only replay trigger: a failed replay must not have cleared it first."""
+    import migrations._from_2_254 as package
+    real = package.step
+    populate(base)
+    assert base.upgrade()
+    base.run("DELETE FROM certificates WHERE id = 3")
+
+    class _Broken:
+        @staticmethod
+        def upgrade(conn):
+            raise RuntimeError('killed during the PEM scan')
+
+    monkeypatch.setattr(package, 'step',
+                        lambda name: _Broken if name == '144_canonical_certificate_serials' else real(name))
+    assert base.upgrade() is False
+    assert base.run("SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'") != []
+    monkeypatch.setattr(package, 'step', real)
+    assert base.upgrade()
+    assert _cert_row(base, 4, 'serial_number') == ('255',)
+    assert base.run("SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'") == []
 
 
 def test_the_cleanup_never_asks_to_edit_the_registry():

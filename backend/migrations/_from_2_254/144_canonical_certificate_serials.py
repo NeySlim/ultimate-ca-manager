@@ -6,7 +6,8 @@ text is ambiguous, so the unique (caref, serial_number) index of step 142 sees o
 spelling per serial. Rows of one CA that would end up sharing a serial are left as they
 are and listed under ``serial_unique_index_pending``, as step 142 does, with any row
 whose decimal is still a held row's spelling; no row is ever deleted. Running it again
-changes nothing.
+changes nothing. While that key is set every start runs this step alone: one commit
+converts, creates the index and resets the key, so a run cut short keeps the key.
 """
 import json
 import logging
