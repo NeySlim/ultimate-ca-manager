@@ -35,10 +35,12 @@ def _set_config(key, value):
 @pytest.fixture(scope='module')
 def xcep_kerberos_config(app, create_ca):
     ca_data = create_ca(cn='XCEP Kerberos CA')
-    keys = ('xcep_enabled', 'xcep_ca_refid', 'xcep_username', 'xcep_password')
+    keys = ('xcep_enabled', 'xcep_ca_refid', 'xcep_username', 'xcep_password', 'windows_realm')
     with app.app_context():
         previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
+        # The default profile serves the realm of the principals of this file
+        _set_config('windows_realm', 'HAGLAND.DOMAIN')
         _set_config('xcep_enabled', 'true')
         _set_config('xcep_ca_refid', ca.refid)
         _set_config('xcep_username', XCEP_USER)

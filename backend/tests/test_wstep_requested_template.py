@@ -15,6 +15,7 @@ from models.certificate_template import CertificateTemplate
 from services.xcep.policy_builder import _policy_oid_for_template
 from tests.test_wstep_subject_source import CLIENT_AUTH, SERVER_AUTH, _issue, subject_ca  # noqa: F401
 from tests.test_wstep_renew_tls import _eku_csr, _renew, _template_oid
+from tests.windows_profile_support import default_profile
 
 TWINS = {
     'User': ('usr_cert', ['clientAuth'], False, 'RSA-2048'),
@@ -167,11 +168,11 @@ def test_only_an_oid_of_the_template_is_stamped(app, split_xcep):
         ca = db.session.get(CA, ca_id)
         vpn = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
         user = CertificateTemplate.query.filter_by(name='Named split WSTEP CA User').one()
-        assert _template_oid_for(ca, vpn, oid) == oid
+        assert _template_oid_for(ca, vpn, oid, profile=default_profile()) == oid
         xcep_ca = db.session.get(CA, ca_id_of_xcep(oid))
         # A request naming another template's OID, or none, gets the OID XCEP announced
-        assert _template_oid_for(ca, user, oid) == _policy_oid_for_template(xcep_ca, user)
-        assert _template_oid_for(ca, user, None) == _policy_oid_for_template(xcep_ca, user)
+        assert _template_oid_for(ca, user, oid, profile=default_profile()) == _policy_oid_for_template(xcep_ca, user)
+        assert _template_oid_for(ca, user, None, profile=default_profile()) == _policy_oid_for_template(xcep_ca, user)
 
 
 def ca_id_of_xcep(oid):

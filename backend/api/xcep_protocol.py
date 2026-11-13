@@ -112,10 +112,9 @@ def _authenticate_xcep_client(security_header):
     return False, None
 
 
-def _resolve_xcep_ca():
-    """Return (ca, error_response) for the policy CA of the serving profile."""
-    from services.windows_profiles import policy_ca, serving_profile
-    profile = serving_profile()
+def _resolve_xcep_ca(profile):
+    """Return (ca, error_response) for the policy CA of *profile*."""
+    from services.windows_profiles import policy_ca
     if profile is None or not profile.policy_refid:
         logger.warning("XCEP request refused: XCEP not configured")
         return None, build_soap_fault('XCEP not configured')
@@ -133,15 +132,16 @@ def _fault_response(reason, status, relates_to=None):
                     status=status, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
 
-def _handle_get_policies(parsed, ad_identity):
+def _handle_get_policies(parsed, ad_identity, profile):
     """Shared GetPoliciesResponse construction for every CEP binding, once
     that binding's own auth check has already succeeded. Not itself
     binding-specific: the CAURI collection it builds advertises every
     configured WSTEP CES endpoint regardless of which CEP endpoint a client
     happened to poll, exactly like real ADCS. ``ad_identity``: whether the
     binding authenticates an AD principal (Kerberos), see ``subject_name_flags``.
+    ``profile``: the Windows enrollment profile served, its CA and templates.
     """
-    ca, ca_error = _resolve_xcep_ca()
+    ca, ca_error = _resolve_xcep_ca(profile)
     if ca_error:
         return Response(ca_error, status=503, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
@@ -169,11 +169,13 @@ def _handle_get_policies(parsed, ad_identity):
             (AUTH_USERNAME_PASSWORD, f'{base}{CES_USERNAME_PASSWORD_PATH}', False),
             (AUTH_CLIENT_CERTIFICATE, f'{base}{CES_CERTIFICATE_PATH}', True),
         ]
-        if negotiate_auth.is_library_available() and negotiate_auth.is_configured():
+        from services.windows_profiles import kerberos_refusal
+        if (negotiate_auth.is_library_available() and negotiate_auth.is_configured()
+                and kerberos_refusal(profile) is None):
             enrollment_uris.append((AUTH_KERBEROS, f'{base}{CES_KERBEROS_PATH}', False))
         xml_body = build_get_policies_response(
             ca, templates, enrollment_uris=enrollment_uris, message_id=parsed.message_id,
-            ad_identity=ad_identity,
+            ad_identity=ad_identity, profile=profile,
         )
         return Response(xml_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
     except Exception as e:
@@ -214,7 +216,9 @@ def get_policies():
     if not authenticated:
         return _fault_response('Authentication failed', status=400, relates_to=parsed.message_id)
 
-    return _handle_get_policies(parsed, ad_identity=False)
+    # A2: the shared account serves the default profile alone
+    from services.windows_profiles import serving_profile
+    return _handle_get_policies(parsed, ad_identity=False, profile=serving_profile())
 
 
 @bp.route('/ADPolicyProvider_CEP_Kerberos/service.svc', methods=['GET', 'POST', 'HEAD'])
@@ -266,7 +270,15 @@ def get_policies_kerberos():
     except GetPoliciesParseError as e:
         return _fault_response(f'Malformed request: {e}', status=400)
 
-    response = _handle_get_policies(parsed, ad_identity=True)
+    from services.windows_profiles import serve_kerberos
+    from services.wstep.wstep_service import REALM_NOT_SERVED
+    profile = serve_kerberos(result.client_principal, 'CEP')
+    if profile is None:
+        # Authenticated (RFC 4559): a refused realm is the request's fault, never a new challenge
+        response = _fault_response(REALM_NOT_SERVED, status=400, relates_to=parsed.message_id)
+    else:
+        logger.info("XCEP: policy of profile %s served to %s", profile.name, result.client_principal)
+        response = _handle_get_policies(parsed, ad_identity=True, profile=profile)
     if result.response_token_b64:
         response.headers['WWW-Authenticate'] = f'Negotiate {result.response_token_b64}'
     return response

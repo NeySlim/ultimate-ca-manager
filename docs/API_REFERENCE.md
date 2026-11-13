@@ -1661,6 +1661,7 @@ DELETE /api/v2/windows-profiles/{id}
 - `q` matches the name or the realm; `per_page` is capped at 200; `meta` carries `total`, `page`, `per_page`, `total_pages`.
 - `PUT` and `PATCH` are the same partial update: only the fields sent change.
 - Writable fields: `name`, `realm` (upper-cased; refused when another profile holds it or the keytab does not name it; `null` clears it, an empty or blank string is a 400), `enabled` and `is_default` (JSON booleans, else 400; `is_default` is accepted at creation only, for the first default profile), `connector_id` (an integer or `null`) (its base DN domain must equal the realm), `issuing_ca_refid` (a string; must be able to sign), `policy_ca_refid` (a string; no EdDSA key), `validity_days`, `xcep_username`, `xcep_password`, `wstep_username`, `wstep_password`, `allowed_ad_group`, `pinned_subject_fields`.
+- `pinned_subject_fields` takes an object, or its JSON text, with the keys `O`, `OU`, `C` (two letters, upper-cased), `ST` and `L` only; an empty object, an empty string or `null` stores none, anything else is a 400. It is returned as JSON text.
 - There is at most one default profile; it cannot be deleted (disable it) and `is_default` cannot be changed on an existing profile.
 - A profile through which valid certificates were issued cannot be deleted (409 with the count); disable it instead.
 

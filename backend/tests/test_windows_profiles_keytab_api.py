@@ -62,8 +62,8 @@ def test_the_profile_api_carries_no_second_keytab_path(auth_client, profiles):  
     assert auth_client.get(f'{URL}/{profiles.two}').get_json()['data']['keytab_set'] is True
 
 
-def test_disabling_then_deleting_a_profile_recomposes_the_served_file(app, auth_client, profiles,  # noqa: F811
-                                                                      monkeypatch):
+def test_disabling_keeps_the_served_file_and_deleting_recomposes_it(app, auth_client, profiles,  # noqa: F811
+                                                                    monkeypatch):
     from config.settings import Config
     monkeypatch.setattr(Config, 'HA_MODE', True)
     assert _upload(auth_client, ONE, profiles.default).status_code == 200
@@ -73,19 +73,16 @@ def test_disabling_then_deleting_a_profile_recomposes_the_served_file(app, auth_
         ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).delete()
         db.session.commit()
 
+    # A disabled profile is refused by realm after authentication (C-04): its keys stay served
     assert auth_client.put(f'{URL}/{profiles.two}', json={'enabled': False}).status_code == 200
-    assert _realms() == ['ONE.TEST']
-    with app.app_context():
-        assert ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).count() == 1
-        stored = shared_files.read_file(shared_files.KERBEROS_KEYTAB)
-    assert stored == negotiate_auth.KEYTAB_PATH.read_bytes()
-
-    assert auth_client.put(f'{URL}/{profiles.two}', json={'enabled': True}).status_code == 200
     assert _realms() == ['ONE.TEST', 'TWO.TEST']
+    with app.app_context():
+        assert ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).count() == 0
 
     assert auth_client.delete(f'{URL}/{profiles.two}').status_code == 200
     assert _realms() == ['ONE.TEST']
     with app.app_context():
+        assert ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).count() == 1
         assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == negotiate_auth.KEYTAB_PATH.read_bytes()
 
 
@@ -116,8 +113,8 @@ def test_a_write_the_database_refuses_during_the_composition_is_an_answered_erro
     def refused(**_k):
         raise IntegrityError('UPDATE windows_enrollment_profiles', {}, Exception('unique'))
     monkeypatch.setattr(windows_profiles, 'publish_keytab', refused)
-    r = auth_client.put(f'{URL}/{profiles.two}', json={'enabled': False})
-    assert r.status_code == 500 and 'Failed to save' in r.get_json()['detail'], r.data
+    r = auth_client.delete(f'{URL}/{profiles.two}')
+    assert r.status_code == 500, r.data
     with app.app_context():
-        assert db.session.get(WindowsEnrollmentProfile, profiles.two).enabled is True
+        assert db.session.get(WindowsEnrollmentProfile, profiles.two) is not None
     assert _realms() == ['ONE.TEST', 'TWO.TEST']

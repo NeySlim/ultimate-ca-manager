@@ -14,7 +14,7 @@ FIELDS = {
     'xcep_ca_refid': 'policy_ca_refid', 'xcep_username': 'xcep_username',
     'xcep_password': 'xcep_password', 'wstep_ca_refid': 'issuing_ca_refid',
     'wstep_username': 'wstep_username', 'wstep_password': 'wstep_password',
-    'wstep_validity_days': 'validity_days',
+    'wstep_validity_days': 'validity_days', 'windows_realm': 'realm',
 }
 
 
@@ -63,6 +63,20 @@ def delete_config(key, commit=True):
         SystemConfig.query.filter_by(key=key).delete()
     if commit:
         db.session.commit()
+
+
+@contextmanager
+def default_realm(app, realm):
+    """The default profile serves Kerberos principals of *realm* for the duration, then gets
+    its realm back: a principal is served by the profile of its realm only."""
+    with app.app_context():
+        saved = snapshot(('windows_realm',))
+        set_config('windows_realm', realm)
+    try:
+        yield
+    finally:
+        with app.app_context():
+            restore(saved)
 
 
 def snapshot(keys):

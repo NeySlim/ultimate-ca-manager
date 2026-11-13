@@ -82,13 +82,15 @@ def get_kerberos_config():
     """Get Kerberos/SPNEGO configuration; ``reason`` says why it is not configured."""
     from services import windows_profiles
     profile = windows_profiles.default_profile()
+    # The default profile's view (A1), as this route has shown it until the profile API replaces it
+    reason = negotiate_auth.not_configured_reason() or windows_profiles.kerberos_refusal(profile)
     return success_response(data={
         'enabled': negotiate_auth.is_enabled(),
         'spn': negotiate_auth.get_spn(),
         'keytab_set': negotiate_auth.KEYTAB_PATH.exists(),
         'library_available': negotiate_auth.is_library_available(),
-        'configured': negotiate_auth.is_configured(),
-        'reason': negotiate_auth.not_configured_reason(),
+        'configured': reason is None,
+        'reason': reason,
         'realm': profile.realm if profile is not None else None,
         **_keytab_status(),
     })
@@ -139,7 +141,7 @@ def upload_kerberos_keytab():
     """Upload the keytab of a Windows enrollment profile (form field ``profile_id``, else the
     default profile), replacing the one it held. Loaded with GSSAPI before it is stored; every
     entry must be ``<SPN service>/<SPN host>@<realm of the profile>``, else 400. The acceptor
-    reads the file composed from the keytabs of the enabled profiles.
+    reads the file composed from the keytabs of every profile, enabled or not.
     """
     if 'file' not in request.files:
         return error_response('No file provided', 400)

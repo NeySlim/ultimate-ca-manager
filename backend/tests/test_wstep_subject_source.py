@@ -21,6 +21,7 @@ from services.wstep.rst_parser import _unwrap_pkcs7_csr
 from services.xcep import policy_builder
 from tests.fixtures.templates import delete_templates
 from utils.upn_san import build_upn_other_name, extract_upns_from_san_list
+from tests.windows_profile_support import default_profile, default_realm
 
 FIXTURES = Path(__file__).parent / 'fixtures'
 MACHINE = 'WIN11$@EXAMPLE.TEST'
@@ -28,6 +29,12 @@ USER = 'alice@EXAMPLE.TEST'
 SERVER_AUTH = ExtendedKeyUsageOID.SERVER_AUTH
 CLIENT_AUTH = ExtendedKeyUsageOID.CLIENT_AUTH
 EMAIL = ExtendedKeyUsageOID.EMAIL_PROTECTION
+
+
+@pytest.fixture(autouse=True)
+def _served_realm(app):
+    with default_realm(app, 'EXAMPLE.TEST'):
+        yield
 
 
 @pytest.fixture
@@ -90,7 +97,7 @@ def _issue(app, ca_id, csr, principal=None, **kwargs):
     der = csr if isinstance(csr, bytes) else csr.public_bytes(serialization.Encoding.DER)
     with app.app_context():
         pem, err = wstep_service.issue(db.session.get(CA, ca_id), der, 30,
-                                       kerberos_principal=principal, **kwargs)
+                                       kerberos_principal=principal, profile=default_profile(), **kwargs)
     return (x509.load_pem_x509_certificate(pem.encode()) if pem else None), err
 
 

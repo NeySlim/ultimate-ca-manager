@@ -2,6 +2,7 @@
 Windows enrollment profiles v2.0
 /api/v2/windows-profiles - one realm each, served by XCEP, WSTEP and Kerberos
 """
+import json
 import logging
 
 from flask import Blueprint, g, request
@@ -136,8 +137,12 @@ def _apply(profile, data):
             return f'validity_days must be between {MIN_VALIDITY_DAYS} and {MAX_VALIDITY_DAYS}', 400
         profile.validity_days = days
 
-    for field in ('allowed_ad_group', 'pinned_subject_fields',
-                  *(f'{svc}_username' for svc in SERVICES)):
+    if 'pinned_subject_fields' in data:
+        pinned, err = _pinned_subject_fields(data['pinned_subject_fields'])
+        if err:
+            return err, 400
+        profile.pinned_subject_fields = pinned
+    for field in ('allowed_ad_group', *(f'{svc}_username' for svc in SERVICES)):
         if field in data:
             value = data[field]
             if value is not None and not isinstance(value, str):
@@ -162,6 +167,25 @@ def _apply(profile, data):
     return None
 
 
+def _pinned_subject_fields(value):
+    """(stored JSON or None, error): an object or its JSON text, checked as a template's pins."""
+    from api.v2.templates import _clean_pinned_subject_fields
+    if isinstance(value, str):
+        try:
+            value = json.loads(value) if value.strip() else None
+        except ValueError:
+            return None, 'pinned_subject_fields must be a JSON object'
+    if value is not None and not isinstance(value, dict):
+        return None, 'pinned_subject_fields must be an object'
+    try:
+        cleaned, err = _clean_pinned_subject_fields(value)
+    except AttributeError:
+        return None, 'pinned_subject_fields values must be strings'
+    if err:
+        return None, err
+    return (json.dumps(cleaned) if cleaned else None), None
+
+
 def _connector_problem(profile):
     """The connector's domain must be the profile's realm (A1): the DN realm is compared exactly."""
     if not profile.connector_id or not profile.realm:
@@ -175,7 +199,7 @@ def _connector_problem(profile):
 
 
 def _recompose_keytab():
-    """Recompose the served keytab from the enabled profiles, in the caller's transaction;
+    """Recompose the served keytab from the profiles, in the caller's transaction;
     an (message, status) pair when a keytab cannot be decrypted here."""
     from sqlalchemy.exc import SQLAlchemyError
     from services import cluster_commands
@@ -268,22 +292,14 @@ def update_windows_profile(profile_id):
     if not isinstance(data, dict):
         return error_response('A JSON object is required', 400)
     changed = sorted(k for k in data if k in WRITABLE)
-    was_enabled = bool(profile.enabled)
     problem = _apply(profile, {k: v for k, v in data.items() if k in WRITABLE})
     if problem:
         db.session.rollback()
         return error_response(problem[0], problem[1])
     profile.updated_by = _actor()
-    recompose = bool(profile.keytab) and bool(profile.enabled) != was_enabled
-    if recompose:
-        problem = _recompose_keytab()
-        if problem:
-            return error_response(problem[0], problem[1])
     ok, err = safe_commit(logger, 'Failed to update the Windows enrollment profile')
     if not ok:
         return err
-    if recompose:
-        _write_keytab_file()
     _audit('windows_profile_update', profile,
            f"Updated Windows enrollment profile {profile.name}; fields: {', '.join(changed) or 'none'}")
     return success_response(data=_render(profile, _ca_names([profile])), message='Profile updated')

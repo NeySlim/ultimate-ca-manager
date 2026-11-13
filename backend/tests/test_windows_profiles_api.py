@@ -392,3 +392,26 @@ def test_a_certificate_on_hold_blocks_deleting_its_profile(app, auth_client, rea
         Certificate.query.filter_by(windows_profile_id=p['id']).update({'revoke_reason': 'keyCompromise'})
         db.session.commit()
     assert auth_client.delete(f"{URL}/{p['id']}").status_code == 200
+
+
+@pytest.mark.parametrize('value', ['[]', '{"C": "USA"}', '{"CN": "x"}', 'not json', ['O'], {'C': 'USA'}, {'O': 5}])
+def test_pinned_subject_fields_are_validated_as_the_template_s(app, auth_client, value):
+    """A3: an object of O/OU/C/ST/L only, C of two letters, on create as on update."""
+    assert _new(auth_client, pinned_subject_fields=value).status_code == 400
+    p = _created(auth_client)
+    r = auth_client.put(f"{URL}/{p['id']}", data=json.dumps({'pinned_subject_fields': value}),
+                        content_type='application/json')
+    assert r.status_code == 400
+    with app.app_context():
+        assert db.session.get(WindowsEnrollmentProfile, p['id']).pinned_subject_fields is None
+
+
+@pytest.mark.parametrize('value, stored', [({'O': ' Org ', 'C': 'fr'}, {'O': 'Org', 'C': 'FR'}),
+                                           ('{"OU": "Site", "L": ""}', {'OU': 'Site'}),
+                                           ('{}', None), ({}, None), ('', None), (None, None)])
+def test_pinned_subject_fields_are_stored_cleaned_and_none_when_empty(app, auth_client, value, stored):
+    r = _new(auth_client, pinned_subject_fields=value)
+    assert r.status_code == 201, r.data
+    with app.app_context():
+        saved = db.session.get(WindowsEnrollmentProfile, r.get_json()['data']['id']).pinned_subject_fields
+    assert (json.loads(saved) if saved else None) == stored

@@ -99,11 +99,11 @@ def test_wstep_match_leaves_out_a_template_whose_default_is_refused(app, monkeyp
     from services.xcep import policy_builder
     keyless, keyed = _tpl(9001, ''), _tpl(9002, 'RSA-2048')
     monkeypatch.setattr(wstep_service, 'default_issue_key_type', _refuse_default_of(9001))
-    monkeypatch.setattr(policy_builder, '_resolve_templates_for_ca', lambda ca, rows: [keyless, keyed])
+    monkeypatch.setattr(policy_builder, '_resolve_templates_for_ca', lambda ca, rows, profile: [keyless, keyed])
     ca = SimpleNamespace(id=None, refid='ca-wstep', template_pins=[])
     with app.app_context():
-        assert wstep_service._match_template(ca, _csr()) == (keyed, None)
-        template, refusal = wstep_service._match_template(ca, _csr(template_name='T9001'))
+        assert wstep_service._match_template(ca, _csr(), profile=None) == (keyed, None)
+        template, refusal = wstep_service._match_template(ca, _csr(template_name='T9001'), profile=None)
     assert template is None and 'T9001' in refusal and 'key type' in refusal
 
 

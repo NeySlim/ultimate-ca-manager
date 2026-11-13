@@ -29,18 +29,21 @@ def keytab_on(monkeypatch, tmp_path, app):
     from models import ClusterCommand, db
     from tests.windows_profile_support import default_profile
     with app.app_context():
-        # A default profile another file left takes the realm of the keytab uploaded here
-        realm = default_profile().realm if default_profile() is not None else None
-        if default_profile() is not None:
-            default_profile().realm = 'EXAMPLE.TEST'
-            db.session.commit()
+        # The default profile holds the realm of the keytab uploaded here, whatever SPN or
+        # connector another file left to name one
+        made = default_profile() is None
+        profile = default_profile(create=True)
+        realm, profile.realm = profile.realm, 'EXAMPLE.TEST'
+        db.session.commit()
     yield point
     with app.app_context():
         shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
         ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).delete()
-        if default_profile() is not None:
-            default_profile().keytab = None
-            default_profile().realm = realm
+        profile = default_profile()
+        if profile is not None and made:
+            db.session.delete(profile)
+        elif profile is not None:
+            profile.keytab, profile.realm = None, realm
         db.session.commit()
 
 
@@ -58,7 +61,8 @@ def _stored_content(app):
 
 def test_upload_stores_the_keytab_under_the_master_key(app, auth_client, keytab_on, encryption_enabled):
     path = keytab_on('a')
-    assert _upload(auth_client).status_code == 200
+    r = _upload(auth_client)
+    assert r.status_code == 200, r.data
     assert path.read_bytes() == KEYTAB
     content = _stored_content(app)
     assert content and encryption_enabled.key_encryption.is_encrypted(content)

@@ -248,13 +248,18 @@ def _nil_element(parent, local_name):
     return el
 
 
-def _resolve_templates_for_ca(ca, all_active_templates):
+def _resolve_templates_for_ca(ca, all_active_templates, *, profile):
     """The active templates pinned to this CA, or every active template when it has
-    no pin at all. Deactivating its pinned templates never widens what a CA offers."""
+    no pin at all. Deactivating its pinned templates never widens what a CA offers.
+    A *profile* listing templates offers those of them its CA offers, never another's (A3)."""
     pins = [pin for pin in (ca.template_pins or []) if pin.template]
     if pins:
-        return [pin.template for pin in pins if pin.template.is_active]
-    return list(all_active_templates)
+        offered = [pin.template for pin in pins if pin.template.is_active]
+    else:
+        offered = list(all_active_templates)
+    from services.windows_profiles import profile_template_ids
+    listed = profile_template_ids(profile)
+    return [t for t in offered if t.id in listed] if listed else offered
 
 
 def _key_type_info(key_type, ca_id=None, template_id=None):
@@ -386,7 +391,8 @@ def _build_extensions_element(attributes, extensions, oids, template_extension):
         )
 
 
-def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=None, ad_identity=True):
+def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=None, ad_identity=True,
+                                profile=None):
     """Build an MS-XCEP ``GetPoliciesResponse`` SOAP envelope.
 
     Args:
@@ -403,6 +409,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             matters to a real client).
         ad_identity: False on the UsernamePassword binding, whose requests
             carry no AD identity to build a subject from (``subject_name_flags``).
+        profile: the Windows enrollment profile served, whose template list narrows the CA's.
 
     Returns:
         bytes: UTF-8 encoded, well-formed SOAP XML.
@@ -411,7 +418,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         MS_TEMPLATE_MAJOR_VERSION, MS_TEMPLATE_MINOR_VERSION, _certificate_template_extension)
 
     oids = _OidTable()
-    resolved_templates = _resolve_templates_for_ca(ca, templates)
+    resolved_templates = _resolve_templates_for_ca(ca, templates, profile=profile)
 
     response_root = etree.Element('{%s}GetPoliciesResponse' % XCEP_NS, nsmap=NSMAP)
 

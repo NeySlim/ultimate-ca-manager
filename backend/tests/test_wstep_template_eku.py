@@ -147,7 +147,7 @@ def test_issue_restores_smartcard_logon_from_matched_template(app, smartcard_tem
     )
     with app.app_context():
         ca = db.session.get(CA, smartcard_template_config['id'])
-        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
 
     assert err is None, err
     cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -170,7 +170,7 @@ def test_issue_with_no_matching_template_has_no_smartcard_logon(app, create_ca):
         csr, _key = _make_csr(
             'plain-user.hagland.domain', ekus=[ExtendedKeyUsageOID.CLIENT_AUTH]
         )
-        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
 
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())

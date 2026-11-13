@@ -25,7 +25,7 @@ from services.ad_connector import lookup as ad_lookup
 from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID
 from services.wstep import wstep_service
 from tests.fixtures.templates import delete_templates
-from tests.windows_profile_support import connectors_kept
+from tests.windows_profile_support import connectors_kept, default_profile, default_realm
 
 
 # The CAs and certificates this file issues are removed after it
@@ -35,7 +35,7 @@ pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 @pytest.fixture(autouse=True)
 def _connectors_put_back(app):
     """The connector rows this file deletes and rewrites are the session's: put back."""
-    with connectors_kept(app):
+    with connectors_kept(app), default_realm(app, 'HAGLAND.DOMAIN'):
         yield
 
 
@@ -108,7 +108,7 @@ class TestStrongCertMapping:
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, err = wstep_service.issue(
                 ca, csr.public_bytes(Encoding.DER), validity_days=30,
-                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL,
+                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL, profile=default_profile(),
             )
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -130,7 +130,7 @@ class TestStrongCertMapping:
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, err = wstep_service.issue(
                 ca, csr.public_bytes(Encoding.DER), validity_days=30,
-                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL,
+                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL, profile=default_profile(),
             )
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -156,7 +156,7 @@ class TestStrongCertMapping:
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, err = wstep_service.issue(
                 ca, csr.public_bytes(Encoding.DER), validity_days=30,
-                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL,
+                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL, profile=default_profile(),
             )
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -176,7 +176,7 @@ class TestStrongCertMapping:
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, err = wstep_service.issue(
                 ca, csr.public_bytes(Encoding.DER), validity_days=30,
-                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL,
+                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL, profile=default_profile(),
             )
         assert cert_pem is None
         assert err is not None
@@ -199,6 +199,7 @@ class TestStrongCertMapping:
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, err = wstep_service.issue(
                 ca, csr.public_bytes(Encoding.DER), validity_days=30, kerberos_principal=None,
+                profile=default_profile(),
             )
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -218,7 +219,7 @@ def _issue_supplied_subject(app, ca_id, principal):
     with _supplied_subject_template(app, ca_id), app.app_context():
         ca = db.session.get(CA, ca_id)
         return wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30,
-                                   kerberos_principal=principal)
+                                   kerberos_principal=principal, profile=default_profile())
 
 
 class TestSidCheckIsNeverSkipped:
@@ -231,14 +232,15 @@ class TestSidCheckIsNeverSkipped:
         _clear_ad_connector(app)
 
     def test_foreign_realm_is_refused_before_any_lookup(self, app, create_ca, monkeypatch):
+        """The profile of the realm with a connector of another domain: never looked up there."""
         ca_data = create_ca(cn='Strong Mapping Foreign Realm CA')
-        _configure_connector_row(app)
+        _configure_connector_row(app, base_dn='DC=other,DC=domain')
 
         def _fail_if_called(_config, sam):
             raise AssertionError('a foreign principal must not be looked up in this domain')
 
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', _fail_if_called)
-        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'WIN11$@OTHER.DOMAIN')
+        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], KERBEROS_MACHINE_PRINCIPAL)
         assert cert_pem is None
         assert err == "The requester's realm is not served by the directory connector"
         assert not isinstance(err, wstep_service.ServerError)
@@ -247,10 +249,11 @@ class TestSidCheckIsNeverSkipped:
         ca_data = create_ca(cn='Strong Mapping No Account CA')
         _configure_connector_row(app)
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: _REAL_SID)
+        # A principal naming no account names no realm either: no profile serves it
         for principal in ('@HAGLAND.DOMAIN', 'WIN11$'):
             cert_pem, err = _issue_supplied_subject(app, ca_data['id'], principal)
             assert cert_pem is None, principal
-            assert err == "The requester's principal names no directory account"
+            assert err == wstep_service.REALM_NOT_SERVED
             assert not isinstance(err, wstep_service.ServerError)
 
     def test_connector_without_base_dn_is_a_server_fault(self, app, create_ca, monkeypatch, caplog):
@@ -266,15 +269,17 @@ class TestSidCheckIsNeverSkipped:
             assert err == 'Could not resolve requester identity for strong certificate mapping'
             assert cause in caplog.text, base_dn
 
-    def test_disabled_connector_still_issues_a_foreign_principal_without_sid(
+    def test_disabled_connector_issues_its_realm_without_sid_and_never_a_foreign_one(
             self, app, create_ca, monkeypatch):
         ca_data = create_ca(cn='Strong Mapping Disabled Foreign CA')
         _configure_connector_row(app, enabled=False)
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid',
                             lambda _config, sam: (_ for _ in ()).throw(AssertionError('connector is off')))
-        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'WIN11$@OTHER.DOMAIN')
+        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], KERBEROS_MACHINE_PRINCIPAL)
         assert err is None, err
         assert _sid_extension_value(x509.load_pem_x509_certificate(cert_pem.encode())) is None
+        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'WIN11$@OTHER.DOMAIN')
+        assert (cert_pem, err) == (None, wstep_service.REALM_NOT_SERVED)
 
     def test_same_realm_keeps_the_sid_and_its_lowercase_spelling_is_another_realm(
             self, app, create_ca, monkeypatch):
@@ -289,7 +294,7 @@ class TestSidCheckIsNeverSkipped:
         # RFC 4120 §6.1: realm names are case sensitive
         cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'WIN11$@hagland.domain')
         assert cert_pem is None
-        assert err == "The requester's realm is not served by the directory connector"
+        assert err == wstep_service.REALM_NOT_SERVED
 
     def test_two_accounts_of_the_requester_s_name_are_a_server_fault(self, app, create_ca, monkeypatch):
         """A Global Catalog answers for child domains too: an ambiguous account is never mapped."""

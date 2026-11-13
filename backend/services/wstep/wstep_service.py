@@ -85,6 +85,11 @@ class ServerError(str):
     """An error message for a failure on the CA's side, faulted as SOAP env:Receiver (HTTP 500)."""
 
 
+# One text for an unknown realm and a disabled profile: the client learns nothing of the profiles
+REALM_NOT_SERVED = "The requester's realm is not served"
+NOT_IN_GROUP = 'Requester is not authorized to enroll against this template'
+
+
 def _x509_name_from_dn_components(dn_components, email=None):
     """Build an x509.Name from AD DN RDN components (attr, value) pairs.
 
@@ -293,7 +298,7 @@ def _load_csr(csr_der):
         return None, 'Invalid CSR encoding'
 
 
-def _match_template(ca, csr, principal=None):
+def _match_template(ca, csr, principal=None, *, profile):
     """The template a request is issued under: the one it names (``_named_template``),
     else the best match of its requested EKUs against the CA's advertised
     templates (the same set XCEP's GetPolicies exposed).
@@ -314,6 +319,7 @@ def _match_template(ca, csr, principal=None):
 
     ``principal`` (Kerberos binding): the templates of its kind (a computer, or
     a user, generalFlags) are matched first, as a Windows client only offers those.
+    ``profile``: the Windows enrollment profile served, whose template list narrows the CA's.
 
     Callers use the matched row three ways: its policy OID (via
     ``_template_oid_for``) for the issued cert's
@@ -323,7 +329,7 @@ def _match_template(ca, csr, principal=None):
     EKUs (``_template_extra_ekus``) as both ``extra_ekus`` and the
     ``template_ekus`` that replace the request's.
     """
-    named, refusal, has_name = _named_template(ca, csr)
+    named, refusal, has_name = _named_template(ca, csr, profile=profile)
     if has_name:
         return named, refusal
 
@@ -334,7 +340,7 @@ def _match_template(ca, csr, principal=None):
         return None, None
 
     all_active = CertificateTemplate.query.filter_by(is_active=True).all()
-    candidates = [t for t in _resolve_templates_for_ca(ca, all_active)
+    candidates = [t for t in _resolve_templates_for_ca(ca, all_active, profile=profile)
                   if _template_key_type(t, ca.id) is not None]
     if not candidates:
         return None, None
@@ -386,7 +392,7 @@ def _template_identifiers(csr):
     return oid, value.native.strip()
 
 
-def _named_template(ca, csr):
+def _named_template(ca, csr, *, profile):
     """``(template, refusal, named)`` for the template the request names by OID or
     name (MS-WCCE 3.2.2.6.2.1.4.1): an identifier this CA does not offer, two that
     disagree, or EKUs or a key the template does not issue are refused."""
@@ -398,10 +404,10 @@ def _named_template(ca, csr):
         return None, 'Invalid certificate template extension in the request', True
     if oid is None and name is None:
         return None, None, False
-    offered = _ca_templates(ca)
+    offered = _ca_templates(ca, profile=profile)
     found = []
     if oid is not None:
-        cas = _policy_oid_cas(ca)
+        cas = _policy_oid_cas(ca, profile=profile)
         by_oid = [t for t in offered if oid in {_policy_oid_for_template(c, t) for c in cas}]
         if not by_oid:
             return None, f'Certificate template {oid} is not offered by this CA', True
@@ -426,21 +432,19 @@ def _named_template(ca, csr):
     return template, None, True
 
 
-def _policy_oid_cas(ca):
+def _policy_oid_cas(ca, *, profile):
     """The CAs whose policy OIDs a request may name: *ca*, and the profile's policy CA when set apart."""
     from models import CA
-    from services.windows_profiles import serving_profile
-    profile = serving_profile()
     refid = profile.policy_ca_refid if profile is not None else None
     xcep_ca = CA.query.filter_by(refid=refid).first() if refid and refid != ca.refid else None
     return [ca, xcep_ca] if xcep_ca is not None else [ca]
 
 
-def _template_oid_for(ca, template, wanted):
+def _template_oid_for(ca, template, wanted, *, profile):
     """The template OID a certificate carries: ``wanted`` when it is one of the template's,
     else the one XCEP announces (another CA's on a split setup), which autoenrollment looks for."""
     from services.xcep.policy_builder import _policy_oid_for_template
-    cas = _policy_oid_cas(ca)
+    cas = _policy_oid_cas(ca, profile=profile)
     if wanted is not None and wanted in {_policy_oid_for_template(c, template) for c in cas}:
         return wanted
     return _policy_oid_for_template(cas[-1], template)
@@ -472,7 +476,7 @@ def _eku_oids(cert_or_csr):
         return None
 
 
-def _renewal_template(ca, renewed_cert, csr):
+def _renewal_template(ca, renewed_cert, csr, *, profile):
     """``(template, extra_ekus, issued_ekus, refusal)`` for a renewal. As in AD CS, a
     renewal keeps the template named in the renewed certificate (MS-CRTD
     certificateTemplate) and issues its EKUs (``issued_ekus`` replaces the CSR's);
@@ -487,12 +491,12 @@ def _renewal_template(ca, renewed_cert, csr):
     if template_oid is None:
         # Older certificate without the extension: matched from the request as
         # on issuance, but never beyond the EKUs it already carries
-        matched, refusal = _match_template(ca, csr)
+        matched, refusal = _match_template(ca, csr, profile=profile)
         if refusal:
             return None, [], None, refusal
         if matched is not None and issues_only_capped_ekus(matched):
             return None, [], None, _capped_only_refusal(matched)
-        if matched is None and not _ca_templates(ca):
+        if matched is None and not _ca_templates(ca, profile=profile):
             return None, [], None, ServerError('This CA offers no certificate template')
         extra = _template_extra_ekus(matched)
         prior = _eku_oids(renewed_cert)
@@ -512,7 +516,7 @@ def _renewal_template(ca, renewed_cert, csr):
     from models import CA
     from services.xcep.policy_builder import _policy_oid_for_template
     template_id = _template_id_of_policy_oid(template_oid)
-    template = next((t for t in _ca_templates(ca) if t.id == template_id), None)
+    template = next((t for t in _ca_templates(ca, profile=profile) if t.id == template_id), None)
     if template is not None and template_oid not in {
             _policy_oid_for_template(c, template) for c in CA.query.all()}:
         template = None
@@ -528,7 +532,7 @@ def _renewal_template(ca, renewed_cert, csr):
     # issuance); a template without EKUs keeps the renewal within the old ones
     allowed = set(_template_configured_ekus(template)) or _eku_oids(renewed_cert)
     if allowed is not None and csr_eku - allowed:
-        other, _refusal = _match_template(ca, csr)
+        other, _refusal = _match_template(ca, csr, profile=profile)
         asked = (f"template '{other.name}'" if other is not None and other.id != template.id
                  else 'other Extended Key Usages')
         return None, [], None, f"Renewal stays on template '{template.name}'; the request asks for {asked}"
@@ -543,11 +547,12 @@ def _issuable_ekus(prior):
     return kept[:MAX_EKU_COUNT] or None
 
 
-def _ca_templates(ca):
-    """Active templates offered by *ca*, as XCEP advertises them."""
+def _ca_templates(ca, *, profile):
+    """Active templates offered by *ca* to *profile*, as XCEP advertises them."""
     from models import CertificateTemplate
     from services.xcep.policy_builder import _resolve_templates_for_ca
-    return _resolve_templates_for_ca(ca, CertificateTemplate.query.filter_by(is_active=True).all())
+    return _resolve_templates_for_ca(ca, CertificateTemplate.query.filter_by(is_active=True).all(),
+                                     profile=profile)
 
 
 def _best_eku_match(candidates, csr_eku):
@@ -736,7 +741,7 @@ def _template_configured_ekus(template):
     return oids
 
 
-def _required_enroll_acl_groups(ca, matched_template):
+def _required_enroll_acl_groups(ca, matched_template, *, profile):
     """The AD group(s) whose membership satisfies the Enroll ACL for this
     issuance attempt, as a de-duplicated list -- empty if nothing is
     restricted.
@@ -758,18 +763,17 @@ def _required_enroll_acl_groups(ca, matched_template):
     never actually applies to unattended autoenrollment -- the primary
     scenario it exists to restrict -- so an unmatched naked CSR must
     satisfy ANY restricted template's group instead of none of them.
+
+    A group set on ``profile`` replaces the templates' for every issuance of it (A3).
     """
+    from services.windows_profiles import profile_group
+    group = profile_group(profile)
+    if group:
+        return [group]
     if matched_template is not None:
         return [matched_template.allowed_ad_group] if matched_template.allowed_ad_group else []
 
-    try:
-        from models import CertificateTemplate
-        from services.xcep.policy_builder import _resolve_templates_for_ca
-    except Exception:
-        return []
-
-    all_active = CertificateTemplate.query.filter_by(is_active=True).all()
-    candidates = _resolve_templates_for_ca(ca, all_active)
+    candidates = _ca_templates(ca, profile=profile)
     groups = []
     seen = set()
     for template in candidates:
@@ -797,7 +801,7 @@ def _template_pinned_fields(template):
     """``{field: value}`` for a template's ``pinned_subject_fields`` JSON
     column, filtered to the known pinnable keys (O/OU/C/ST/L -- never CN)
     with a truthy value. ``{}`` for no template, no column value, or
-    unparseable JSON -- never raises."""
+    unparseable JSON -- never raises. A profile's column reads the same way."""
     if not template or not template.pinned_subject_fields:
         return {}
     try:
@@ -805,10 +809,12 @@ def _template_pinned_fields(template):
         raw = json.loads(template.pinned_subject_fields)
     except (TypeError, ValueError):
         return {}
-    return {k: v for k, v in raw.items() if k in _PINNED_FIELD_OIDS and v}
+    if not isinstance(raw, dict):
+        return {}
+    return {k: v for k, v in raw.items() if k in _PINNED_FIELD_OIDS and v and isinstance(v, str)}
 
 
-def _required_pinned_subject_fields(ca, matched_template):
+def _required_pinned_subject_fields(ca, matched_template, *, profile):
     """Pinned O/OU/C/ST/L values to force onto this WSTEP issuance's
     subject, overriding whatever the client's CSR (or AD-derivation)
     supplied for that specific field -- CN/SAN are never touched here.
@@ -826,18 +832,17 @@ def _required_pinned_subject_fields(ca, matched_template):
     field is skipped (not enforced) and a warning is logged, rather than
     silently picking a winner an admin never chose. Non-conflicting
     fields, and CN/SAN, still apply normally.
+
+    Fields pinned on ``profile`` replace the templates' for every issuance of it (A3).
     """
+    # Decided on the parsed result: a profile pinning nothing usable keeps the templates' pins
+    fields = _template_pinned_fields(profile)
+    if fields:
+        return fields
     if matched_template is not None:
         return _template_pinned_fields(matched_template)
 
-    try:
-        from models import CertificateTemplate
-        from services.xcep.policy_builder import _resolve_templates_for_ca
-    except Exception:
-        return {}
-
-    all_active = CertificateTemplate.query.filter_by(is_active=True).all()
-    candidates = _resolve_templates_for_ca(ca, all_active)
+    candidates = _ca_templates(ca, profile=profile)
 
     seen = {}
     for template in candidates:
@@ -876,7 +881,7 @@ def _merge_pinned_subject_fields(subject, pinned_fields):
     return x509.Name(pinned_attrs + remaining)
 
 
-def _user_ad_derivation_enabled(ca):
+def _user_ad_derivation_enabled(ca, *, profile):
     """Whether any template resolvable for ``ca`` has opted into
     AD-derived user subjects (``CertificateTemplate.ad_derived_subject``).
 
@@ -887,14 +892,7 @@ def _user_ad_derivation_enabled(ca):
     only asks "did an admin opt any template into AD-derivation for this CA,"
     mirroring how the machine branch has no template dependency either.
     """
-    try:
-        from models import CertificateTemplate
-        from services.xcep.policy_builder import _resolve_templates_for_ca
-    except Exception:
-        return False
-
-    all_active = CertificateTemplate.query.filter_by(is_active=True).all()
-    candidates = _resolve_templates_for_ca(ca, all_active)
+    candidates = _ca_templates(ca, profile=profile)
     return any(getattr(t, 'ad_derived_subject', False) for t in candidates)
 
 
@@ -914,7 +912,7 @@ def _subject_source(template):
     return 'machine' if is_machine_template(template) else 'directory'
 
 
-def _directory_subject(ca, template, csr, principal, sam_account_name, connector):
+def _directory_subject(ca, template, csr, principal, sam_account_name, connector, *, profile):
     """``(override_subject, override_san, refusal)`` for a Kerberos-bound request.
 
     A template whose subject is built by the CA (MS-WCCE 3.2.2.6.2.1.4.5.9: the CA
@@ -944,7 +942,7 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
             subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, dns_hostname)])
             # MS-WCCE: the dNSHostName is the DNS SAN; a CSR without SAN gets it from the CN
             san = [x509.DNSName(dns_hostname)] if _san_values(csr) is not None else None
-    elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca)):
+    elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca, profile=profile)):
         subject, san = _user_directory_subject(connector, sam_account_name)
         if subject is lookup.UNREACHABLE:
             reached, subject = False, None
@@ -987,7 +985,7 @@ def _user_directory_subject(connector, sam_account_name):
 
 
 def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos_principal=None,
-          outer_signed_data=None, gate=None, on_stored=None):
+          outer_signed_data=None, gate=None, on_stored=None, *, profile):
     """UsernamePassword- or Kerberos-bound initial enrollment. Returns
     (cert_pem, error).
 
@@ -1015,6 +1013,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     Only a matched template announcing a client-supplied subject keeps the CSR's.
     Derivation never fails open: a naked CSR falls through to the normal
     rejection, a populated one under a CA-built template or none is refused.
+
+    ``profile``: the Windows enrollment profile serving the request; a Kerberos principal is
+    issued only by the enabled profile of its own realm, with that profile's connector.
 
     Enroll ACL: see ``_required_enroll_acl_groups`` for exactly which
     template's ``allowed_ad_group`` applies (the matched template's own,
@@ -1053,9 +1054,13 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     connector = None
     if kerberos_principal:
         from services.ad_connector import lookup
-        from services.windows_profiles import default_connector
+        from services.windows_profiles import kerberos_route, profile_connector
 
-        connector = default_connector()
+        # The route resolved the profile; an approval replays it: both must still be the realm's own
+        routed, _realm, _refusal = kerberos_route(kerberos_principal)
+        if profile is None or routed is None or routed.id != profile.id or not profile.enabled:
+            return None, REALM_NOT_SERVED
+        connector = profile_connector(profile)
         # An enabled connector that cannot resolve the requester refuses: issuing anyway
         # would drop the SID extension (KB5014754) and the Enroll ACL's account.
         account = lookup.connector_account(connector, kerberos_principal)
@@ -1098,21 +1103,22 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         if err:
             return None, err
 
-    matched_template, refusal = _match_template(ca, csr, kerberos_principal)
+    matched_template, refusal = _match_template(ca, csr, kerberos_principal, profile=profile)
     if refusal:
         return None, refusal
     if matched_template is not None and issues_only_capped_ekus(matched_template):
         return None, _capped_only_refusal(matched_template)
     # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
-    if matched_template is None and not _ca_templates(ca):
+    if matched_template is None and not _ca_templates(ca, profile=profile):
         return None, ServerError('This CA offers no certificate template')
     template_oid = None
     if matched_template is not None:
-        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(csr))
+        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(csr), profile=profile)
 
     if kerberos_principal:
         override_subject, override_san, refusal = _directory_subject(
-            ca, matched_template, csr, kerberos_principal, kerberos_sam_account_name, connector)
+            ca, matched_template, csr, kerberos_principal, kerberos_sam_account_name, connector,
+            profile=profile)
         if refusal:
             return None, refusal
         # Without EKUs the default profile would give serverAuth to the name the request chose
@@ -1134,7 +1140,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # own static config. Runs after _validate_csr above, so it can never
     # rescue an otherwise-rejected fully-naked CSR into being issuable --
     # it only ever overlays onto a request whose subject is already valid.
-    pinned_fields = _required_pinned_subject_fields(ca, matched_template)
+    pinned_fields = _required_pinned_subject_fields(ca, matched_template, profile=profile)
     if pinned_fields:
         base_subject = override_subject if override_subject is not None else csr.subject
         override_subject = _merge_pinned_subject_fields(base_subject, pinned_fields)
@@ -1148,7 +1154,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # sam_account_name and a restricted template is denied, never skipped:
     # this is a security gate, not a best-effort convenience lookup.
     if kerberos_principal:
-        required_groups = _required_enroll_acl_groups(ca, matched_template)
+        required_groups = _required_enroll_acl_groups(ca, matched_template, profile=profile)
         allowed, unreachable = False, False
         for group in (required_groups if kerberos_sam_account_name else []):
             answer = lookup.is_member_of_group(connector, kerberos_sam_account_name, group)
@@ -1163,7 +1169,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             )
             if unreachable:
                 return None, ServerError('The directory could not be reached to check enrollment rights')
-            return None, 'Requester is not authorized to enroll against this template'
+            return None, NOT_IN_GROUP
 
     # The approval gate sees the subject and names the certificate will carry
     err = _pass_gate(gate, csr, matched_template,
@@ -1206,7 +1212,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
 
 
 def renew(ca, csr_der, security_header, csr_element, validity_days, source='wstep', require_pop=True,
-          outer_signed_data=None, audit=None, gate=None):
+          outer_signed_data=None, audit=None, gate=None, *, profile):
     """Certificate-bound renewal: the RST is signed with the client's
     current certificate's private key. Returns (cert_pem, error).
 
@@ -1245,7 +1251,8 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
         err = _new_key_proof(csr, signing_cert, outer_signed_data)
         if err:
             return None, err
-    return _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=gate)
+    return _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=gate,
+                         profile=profile)
 
 
 def _new_key_proof(csr, renewed_cert, outer_signed_data):
@@ -1271,7 +1278,7 @@ def _new_key_proof(csr, renewed_cert, outer_signed_data):
 
 
 def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_data, validity_days,
-                                  source='wstep', audit=None, gate=None):
+                                  source='wstep', audit=None, gate=None, *, profile):
     """Renewal on the Certificate binding as Windows sends it: authenticated by the
     TLS client certificate, which must also sign the CMS request (MS-WSTEP, RFC 5272).
     Returns (cert_pem, error); ``audit`` as in ``renew()``."""
@@ -1301,7 +1308,8 @@ def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_dat
     err = _new_key_proof(csr, client_cert, outer_signed_data)
     if err:
         return None, err
-    return _sign_renewal(ca, client_cert, db_cert, csr, validity_days, source, require_pop=False, gate=gate)
+    return _sign_renewal(ca, client_cert, db_cert, csr, validity_days, source, require_pop=False, gate=gate,
+                         profile=profile)
 
 
 def _verify_renewal_signer(outer_signed_data, cert):
@@ -1351,6 +1359,27 @@ def _verify_renewal_signer(outer_signed_data, cert):
     return 'Renewal request is not signed by the certificate being renewed'
 
 
+def renewed_serial(ca, outer_signed_data):
+    """The serial of a certificate of *ca* whose key signs the request envelope, as Windows
+    signs a renewal on the Kerberos binding; None for an initial enrollment. For the audit only."""
+    from services.cert.issued_lookup import issued_certificate_status
+    try:
+        choices = list(outer_signed_data['certificates'] or []) if outer_signed_data is not None else []
+    except Exception:
+        return None
+    for choice in choices:
+        try:
+            if choice.name != 'certificate':
+                continue
+            cert = x509.load_der_x509_certificate(choice.chosen.dump())
+        except Exception:
+            continue
+        row, _status = issued_certificate_status(ca, cert)
+        if row is not None and _verify_renewal_signer(outer_signed_data, cert) is None:
+            return cert.serial_number
+    return None
+
+
 def _note_renewed_serial(audit, cert, row):
     """Records the serial once a row holds ``cert`` byte for byte, its key proven by the
     XML signature or the TLS handshake: a lookalike naming a public serial is never audited."""
@@ -1377,7 +1406,7 @@ def _renewable_certificate(ca, cert):
 
 
 def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=None,
-                  on_stored=None):
+                  on_stored=None, *, profile):
     """Issue the renewal once the caller has authenticated ``signing_cert``."""
     err = _validate_csr(csr, require_pop=require_pop)
     if err:
@@ -1388,12 +1417,12 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     if not _san_matches(signing_cert, csr):
         return None, 'CSR SubjectAltName does not match signing certificate'
 
-    matched_template, extra_ekus, issued_ekus, refusal = _renewal_template(ca, signing_cert, csr)
+    matched_template, extra_ekus, issued_ekus, refusal = _renewal_template(ca, signing_cert, csr, profile=profile)
     if refusal:
         return None, refusal
     template_oid = None
     if matched_template is not None:
-        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert))
+        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert), profile=profile)
 
     try:
         requester_sid = renewal_identity.renewal_requester_sid(

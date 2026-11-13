@@ -2,8 +2,8 @@
 
 The client is answered with a pending RSTR carrying the approval request's
 id as ``wstep:RequestID``, which it sends back with QueryTokenStatus; the
-approval issues the certificate as the enrolment or renewal would have, with the
-validity of the default profile, and only while it is enabled.
+approval issues the certificate as the enrolment or renewal would have, under the
+profile the request was held for (``profile_id``), and only while it is enabled.
 """
 import base64
 import hashlib
@@ -24,9 +24,9 @@ def certificate_identity(cert) -> str:
     return 'cert:' + hashlib.sha256(cert.public_bytes(Encoding.DER)).hexdigest()
 
 
-def make_gate(ca, *, operation, identity=None, extra=None):
+def make_gate(ca, *, operation, profile, identity=None, extra=None):
     """The gate ``wstep_service.issue`` and the renewals call before signing.
-    A renewal's identity is the certificate it renews."""
+    A renewal's identity is the certificate it renews; the decision replays *profile*."""
     def gate(*, csr, template, subject, san, signing_cert=None):
         requester = certificate_identity(signing_cert) if signing_cert is not None else identity
         cn_attrs = subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)
@@ -35,7 +35,7 @@ def make_gate(ca, *, operation, identity=None, extra=None):
             dns = [n.value for n in san if isinstance(n, x509.DNSName)]
         else:
             dns = protocol_approval.csr_names(csr)[1]
-        data = dict(extra or {}, operation=operation)
+        data = dict(extra or {}, operation=operation, profile_id=getattr(profile, 'id', None))
         if signing_cert is not None:
             data['renewal_of'] = signing_cert.public_bytes(Encoding.PEM).decode()
         return protocol_approval.gate_protocol_issuance(
@@ -47,17 +47,32 @@ def make_gate(ca, *, operation, identity=None, extra=None):
     return gate
 
 
+PROFILE_GONE = 'The Windows enrollment profile of the request no longer exists'
+
+
+def _held_profile(data):
+    """The profile the request was held for, the default for one held before profiles were
+    recorded; None when it no longer exists."""
+    from models import WindowsEnrollmentProfile
+    from services.windows_profiles import default_profile
+    if 'profile_id' not in data:
+        return default_profile()
+    profile_id = data['profile_id']
+    return db.session.get(WindowsEnrollmentProfile, int(profile_id)) if profile_id is not None else None
+
+
 def _issue(approval, data):
-    """Issue an approved request with the validity of the default profile; refused at issuance
-    when the CA is gone or the profile no longer serves."""
-    from services.windows_profiles import serving_profile
+    """Issue an approved request under the profile it was held for; refused at issuance
+    when the CA or the profile is gone, or the profile no longer serves."""
     from services.wstep import wstep_service
     ca = db.session.get(CA, int(data['ca_id'])) if data.get('ca_id') is not None else None
     if ca is None:
         raise ProtocolRequestGone('The WSTEP CA no longer exists', refusal=protocol_approval.ISSUANCE_REFUSAL)
-    profile = serving_profile()
+    profile = _held_profile(data)
     if profile is None:
-        raise ProtocolRequestGone('The Windows enrollment profile is disabled',
+        raise ProtocolRequestGone(PROFILE_GONE, refusal=protocol_approval.ISSUANCE_REFUSAL)
+    if not profile.enabled:
+        raise ProtocolRequestGone(f'The Windows enrollment profile {profile.name} is disabled',
                                   refusal=protocol_approval.ISSUANCE_REFUSAL)
     validity_days = profile.validity_days
     csr = x509.load_pem_x509_csr(data['csr'].encode())
@@ -69,12 +84,12 @@ def _issue(approval, data):
             # The proof of possession was checked when the request came in
             cert_pem, err = wstep_service._sign_renewal(
                 ca, signing_cert, db_cert, csr, validity_days, 'wstep', require_pop,
-                on_stored=protocol_approval.linker(approval))
+                on_stored=protocol_approval.linker(approval), profile=profile)
     else:
         cert_pem, err = wstep_service.issue(
             ca, csr.public_bytes(Encoding.DER), validity_days, require_pop=require_pop,
             kerberos_principal=data.get('kerberos_principal'),
-            on_stored=protocol_approval.linker(approval))
+            on_stored=protocol_approval.linker(approval), profile=profile)
     if err:
         if isinstance(err, wstep_service.ServerError):
             raise ValueError(str(err))
@@ -89,7 +104,7 @@ def _issue(approval, data):
 def _gone(approval, data):
     if data.get('ca_id') is None or db.session.get(CA, int(data['ca_id'])) is None:
         return 'The WSTEP CA no longer exists'
-    return None
+    return PROFILE_GONE if _held_profile(data) is None else None
 
 
 protocol_approval.register('wstep_request', _issue, gone=_gone)

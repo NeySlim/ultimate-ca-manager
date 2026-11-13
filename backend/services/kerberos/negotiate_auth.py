@@ -67,7 +67,7 @@ from models import SystemConfig
 
 logger = logging.getLogger(__name__)
 
-# Composed from the keytabs of the enabled profiles; the acceptor names it in its credential
+# Composed from the keytabs of every profile, enabled or not; the acceptor names it in its credential
 # store, never through KRB5_KTNAME, which a Kerberos MSCA connection may rewrite (A12)
 KEYTAB_PATH = DATA_DIR / 'kerberos.keytab'
 
@@ -161,16 +161,15 @@ def is_configured():
 
 
 def not_configured_reason():
-    """Why the Kerberos binding serves nobody, None when it is configured."""
+    """Why the Kerberos binding authenticates nobody, None when it is configured. Which
+    profile serves an authenticated principal is decided after, by its realm."""
     if not is_enabled():
         return 'Kerberos is disabled'
     if not get_spn():
         return 'no SPN set'
     if not KEYTAB_PATH.exists():
         return 'no keytab uploaded'
-    # A profile without a realm, or disabled, serves no Kerberos client (A1)
-    from services.windows_profiles import kerberos_refusal
-    return kerberos_refusal()
+    return None
 
 
 def sync_keytab_file(raw_bytes):
