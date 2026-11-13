@@ -260,6 +260,9 @@ def test_the_kerberos_refusal_names_the_profile_or_what_the_binding_lacks(app, m
         assert kerberos_refusal(served) == 'profile k-off is disabled'
         assert kerberos_unserved_reason(served) == 'profile k-off is disabled'
         served.enabled = True
+        # A realm whose profile holds no key is a 401 at the acceptor, whatever the profile says
+        assert kerberos_unserved_reason(served) == 'no key for realm K.EXAMPLE: upload the keytab of this profile'
+        served.keytab = 'stored'
         assert kerberos_unserved_reason(served) is None
         monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no keytab uploaded')
         assert kerberos_unserved_reason(served) == 'no keytab uploaded'
@@ -288,7 +291,8 @@ def test_the_binding_reason_needs_the_kerberos_read_scope(app, auth_client, prof
         one = client.get(f'{URL}/{profiles.two}', headers=headers).get_json()['data']
         listed = client.get(f'{URL}?q=c03-two', headers=headers).get_json()['data']
         row = next(r for r in listed if r['id'] == profiles.two)
-        assert one['kerberos_refusal'] == row['kerberos_refusal'] == ('no SPN set' if binding_shown else None)
+        assert one['kerberos_refusal'] == row['kerberos_refusal'] == (
+            'no SPN set' if binding_shown else 'no key for realm TWO.TEST: upload the keytab of this profile')
     finally:
         auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
 
@@ -319,3 +323,18 @@ def test_the_profile_api_gives_the_reason_the_binding_is_not_configured(app, aut
             WindowsEnrollmentProfile.query.filter(
                 WindowsEnrollmentProfile.name.like('a-pad-%')).delete(synchronize_session=False)
             db.session.commit()
+
+
+def test_the_list_and_the_detail_agree_on_a_realm_without_key(
+        app, auth_client, profiles, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: None)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    with app.app_context():
+        db.session.get(WindowsEnrollmentProfile, profiles.default).keytab = 'stored'
+        db.session.commit()
+    reason = 'no key for realm TWO.TEST: upload the keytab of this profile'
+    one = auth_client.get(f'{URL}/{profiles.two}').get_json()['data']
+    row = next(r for r in auth_client.get(f'{URL}?q=c03-two').get_json()['data'] if r['id'] == profiles.two)
+    assert one['kerberos_refusal'] == row['kerberos_refusal'] == reason
+    keyed = auth_client.get(f'{URL}/{profiles.default}').get_json()['data']
+    assert keyed['keytab_set'] and keyed['kerberos_refusal'] is None

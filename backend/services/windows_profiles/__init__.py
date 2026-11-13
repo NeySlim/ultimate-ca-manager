@@ -95,11 +95,15 @@ def kerberos_binding_reason():
 
 def kerberos_unserved_reason(profile=None, binding_reason=False):
     """Why Kerberos reaches no client of *profile*: the binding itself first (library, switch,
-    SPN, keytab), then the profile (``kerberos_refusal``). None when it is served. A list passes the
+    SPN, keytab), then the profile (``kerberos_refusal``), then its own key: a realm with no keytab
+    in the composed file is a 401 at the acceptor. None when it is served. A list passes the
     binding's reason it computed once."""
     if binding_reason is False:
         binding_reason = kerberos_binding_reason()
-    return binding_reason or kerberos_refusal(profile)
+    reason = binding_reason or kerberos_refusal(profile)
+    if reason is None and profile is not None and not profile.keytab:
+        return f'no key for realm {profile.realm}: upload the keytab of this profile'
+    return reason
 
 
 UNKNOWN_REALM = 'no profile serves this realm'
