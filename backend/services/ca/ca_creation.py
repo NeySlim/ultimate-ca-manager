@@ -22,6 +22,7 @@ from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
 from services.import_service import CrossCertificateImport, refused_as_cross_certificate
 from utils.cert_issuer import find_ca_by_ski, is_self_signed
+from utils.key_type import weak_ca_key_refusal
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
 from utils.serial_format import serial_to_int
 from .helpers import save_ca_files, save_ca_key_file
@@ -574,6 +575,11 @@ class CACreationMixin:
             ca_ski = ski_ext.value.key_identifier.hex(':').upper()
         except x509.ExtensionNotFound:
             pass
+
+        if key_pem:
+            weak = weak_ca_key_refusal(key_pem)
+            if weak:
+                raise ValueError(weak)
 
         # Encrypt imported private key at rest, mirroring create_internal_ca
         # (otherwise imported CA keys sit base64-only in the DB).

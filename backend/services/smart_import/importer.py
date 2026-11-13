@@ -38,7 +38,7 @@ from utils.foreign_algorithms import spki_der
 from utils.cert_issuer import signing_ca_for
 from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
-from utils.key_type import unsignable_csr_key
+from utils.key_type import unsignable_csr_key, weak_ca_key_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -430,13 +430,24 @@ class SmartImporter:
             
             # Find matching private key
             prv = None
+            refused = None
             for key_idx, cert_idx in matching.get("matched_pairs", []):
                 if objects[cert_idx] == ca_obj:
                     key_obj = objects[key_idx]
+                    weak = weak_ca_key_refusal(key_obj.raw_pem)
+                    if weak:
+                        refused = weak
+                        break
                     prv = _encrypt_prv(key_obj.raw_pem)
                     result.keys_matched += 1
                     break
             
+            if refused:
+                cn = self._get_cn(ca_obj.subject)
+                result.warnings.append(f"Skipped CA '{cn}': {refused}")
+                result.warning_details.append({'code': 'ca_key_refused', 'subject': ca_obj.subject, 'reason': refused})
+                continue
+
             # Create CA
             refid = secrets.token_hex(8)
             ca = CA(

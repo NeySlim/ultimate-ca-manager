@@ -16,6 +16,7 @@ from utils.key_codec import MalformedKey
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.cert_issuer import private_key_matches
+from utils.key_type import weak_ca_key_refusal
 from services.import_service import (
     KeyPasswordError, parse_certificate_file, extract_cert_info, find_existing_ca_for_import, cross_mode_from, finish_cross_attach, AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import,
     install_on_pending_ca, find_pending_csr_for_certificate,
@@ -83,6 +84,11 @@ def import_ca():
         # it would sign nothing anyone can verify (#347 review)
         if private_key is not None and not private_key_matches(private_key, cert):
             return error_response('Private key does not match the certificate', 400)
+
+        # A CA that would sign must clear the RSA floor; without its key it is only read
+        weak = private_key is not None and weak_ca_key_refusal(private_key)
+        if weak:
+            return error_response(weak, 400)
 
         # Extract certificate info
         cert_info = extract_cert_info(cert)

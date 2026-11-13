@@ -17,6 +17,7 @@ from models import db, CA, Certificate
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.key_codec import store_pem_bytes
+from utils.key_type import weak_ca_key_refusal
 from utils.safe_requests import create_session
 from utils.ssrf_protection import (
     pin_host, validate_url_not_cloud_metadata, validated_addresses)
@@ -66,6 +67,16 @@ def _encoded_private_key(row):
     if row.get('prv_payload'):
         return store_pem_bytes(row['prv_payload'].encode('utf-8'))
     return None
+
+
+def _decoded_private_key(row):
+    """The PEM of the key an OPNsense row carries, or None."""
+    if row.get('prv_payload'):
+        return row['prv_payload']
+    try:
+        return base64.b64decode(row['prv']) if row.get('prv') else None
+    except ValueError:
+        return None
 
 
 def _keep_attached_key(ca, entry, stats):
@@ -642,6 +653,12 @@ def import_items():
                 stats['errors'].append(f"CA '{ca_data.get('descr')}' already exists with refid {duplicate_by_name.refid}")
                 continue
             
+            weak = weak_ca_key_refusal(_decoded_private_key(ca_data))
+            if weak:
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{_display_name(ca_data, item_id)}' not imported: {weak}")
+                continue
+
             cert_info = _parse_cert(crt)
             try:
                 serial = int(ca_data.get('serial') or 0)

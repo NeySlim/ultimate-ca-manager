@@ -1,0 +1,184 @@
+"""A CA arriving with its private key must clear the RSA floor; the same CA without a key is still read."""
+import base64
+import io
+import json
+import uuid
+
+import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
+
+from models import CA
+from tests.fixtures.cross_pki import key_pem, make_cert, new_key, pem
+from tests.test_opnsense_import import _Session
+
+WEAK = 1024
+
+
+@pytest.fixture(autouse=True)
+def _forget_cas(app):
+    from models import db
+    with app.app_context():
+        before = {c.id for c in CA.query.all()}
+    yield
+    with app.app_context():
+        CA.query.filter(~CA.id.in_(before)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def _weak_key():
+    return rsa.generate_private_key(65537, WEAK)
+
+
+def _ca(tag, key):
+    return make_cert(f'Weak CA {tag}', key)
+
+
+def _post(auth_client, path, **form):
+    return auth_client.post(path, data=form, content_type='multipart/form-data')
+
+
+def _stored(app, cert):
+    with app.app_context():
+        return CA.query.filter_by(subject=cert.subject.rfc4514_string()).all()
+
+
+def test_rule_refuses_only_short_rsa():
+    from utils.key_type import weak_ca_key_refusal
+    msg = weak_ca_key_refusal(_weak_key())
+    assert str(WEAK) in msg and '2048' in msg
+    assert weak_ca_key_refusal(_weak_key().public_key()) == msg
+    assert weak_ca_key_refusal(key_pem(_weak_key())) == msg
+    assert weak_ca_key_refusal(new_key('rsa')) is None
+    assert weak_ca_key_refusal(ec.generate_private_key(ec.SECP192R1())) is None
+    assert weak_ca_key_refusal(ed25519.Ed25519PrivateKey.generate()) is None
+    assert weak_ca_key_refusal(None) is None
+
+
+@pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+def test_pem_with_weak_key_is_refused_and_without_key_imported(app, auth_client, path):
+    key = _weak_key()
+    cert = _ca(uuid.uuid4().hex[:8], key)
+    r = _post(auth_client, path, pem_content=pem(cert) + key_pem(key))
+    assert r.status_code == 400, r.data
+    message = json.loads(r.data)['message']
+    assert str(WEAK) in message and '2048' in message
+    assert _stored(app, cert) == []
+
+    r = _post(auth_client, path, pem_content=pem(cert))
+    assert r.status_code in (200, 201), r.data
+    assert len(_stored(app, cert)) == 1
+
+
+@pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+def test_pkcs12_with_weak_key_is_refused(app, auth_client, path):
+    key = _weak_key()
+    cert = _ca(uuid.uuid4().hex[:8], key)
+    blob = pkcs12.serialize_key_and_certificates(
+        b'weak', key, cert, None, serialization.BestAvailableEncryption(b'pw'))
+    r = auth_client.post(path, data={'file': (io.BytesIO(blob), 'weak.p12'), 'password': 'pw'},
+                         content_type='multipart/form-data')
+    assert r.status_code == 400, r.data
+    assert '2048' in json.loads(r.data)['message']
+    assert _stored(app, cert) == []
+
+
+def test_weak_key_cannot_be_attached_to_a_stored_ca(app, auth_client):
+    key = _weak_key()
+    cert = _ca(uuid.uuid4().hex[:8], key)
+    assert _post(auth_client, '/api/v2/cas/import', pem_content=pem(cert)).status_code == 201
+    r = _post(auth_client, '/api/v2/cas/import', pem_content=pem(cert) + key_pem(key))
+    assert r.status_code == 400, r.data
+    assert _stored(app, cert)[0].prv is None
+
+
+def test_ec_ca_with_key_still_imported(app, auth_client):
+    key = new_key()
+    cert = _ca(uuid.uuid4().hex[:8], key)
+    r = _post(auth_client, '/api/v2/cas/import', pem_content=pem(cert) + key_pem(key))
+    assert r.status_code == 201, r.data
+    assert _stored(app, cert)[0].prv
+
+
+def test_smart_import_refuses_the_weak_ca_and_keeps_the_others(app):
+    from services.smart_import.importer import SmartImporter
+    weak_key, good_key = _weak_key(), new_key()
+    tag = uuid.uuid4().hex[:8]
+    weak, good = _ca(f'w{tag}', weak_key), _ca(f'g{tag}', good_key)
+    with app.app_context():
+        result = SmartImporter().execute(pem(weak) + key_pem(weak_key) + pem(good) + key_pem(good_key))
+        assert result.cas_imported == 1
+        named = [w for w in result.warnings if f'w{tag}' in w]
+        assert named and '1024' in named[0] and '2048' in named[0]
+        assert CA.query.filter_by(subject=weak.subject.rfc4514_string()).count() == 0
+        assert CA.query.filter_by(subject=good.subject.rfc4514_string()).one().prv
+
+
+def test_smart_import_reads_the_weak_ca_without_its_key(app):
+    from services.smart_import.importer import SmartImporter
+    weak = _ca(uuid.uuid4().hex[:8], _weak_key())
+    with app.app_context():
+        result = SmartImporter().execute(pem(weak))
+        assert result.cas_imported == 1
+        assert CA.query.filter_by(subject=weak.subject.rfc4514_string()).one().prv is None
+
+
+def _row(cert, descr, key=None):
+    row = {'uuid': str(uuid.uuid4()), 'refid': uuid.uuid4().hex[:13], 'descr': descr,
+           'crt': base64.b64encode(pem(cert).encode()).decode(), 'serial': '1'}
+    if key is not None:
+        row['prv'] = base64.b64encode(key_pem(key).encode()).decode()
+    return row
+
+
+def _opnsense(auth_client, monkeypatch, ca_rows):
+    from api.v2 import import_opnsense
+    monkeypatch.setattr(import_opnsense, 'create_session', lambda verify_ssl=True: _Session(ca_rows, []))
+    r = auth_client.post('/api/v2/import/opnsense/import', json={
+        'host': '192.0.2.10', 'port': 443, 'api_key': 'k', 'api_secret': 's',
+        'verify_ssl': False, 'items': []})
+    assert r.status_code == 200, r.data
+    return json.loads(r.data)['data']
+
+
+def test_opnsense_route_refuses_weak_ca_with_key_only(app, auth_client, monkeypatch):
+    tag = uuid.uuid4().hex[:8]
+    weak_key, readonly_key, good_key = _weak_key(), _weak_key(), new_key()
+    weak, readonly, good = _ca(f'w{tag}', weak_key), _ca(f'r{tag}', readonly_key), _ca(f'g{tag}', good_key)
+    body = _opnsense(auth_client, monkeypatch, [
+        _row(weak, f'weak {tag}', weak_key), _row(readonly, f'readonly {tag}'), _row(good, f'good {tag}', good_key)])
+    assert body['imported']['cas'] == 2
+    assert body['skipped'] == 1
+    assert any(f'weak {tag}' in e and '1024' in e and '2048' in e for e in body['errors'])
+    assert _stored(app, weak) == []
+    assert _stored(app, readonly)[0].prv is None
+    assert _stored(app, good)[0].prv
+
+
+def test_opnsense_config_importer_refuses_weak_ca_with_key_only(app):
+    from services.opnsense.importer import ImportMixin
+    tag = uuid.uuid4().hex[:8]
+    weak_key, good_key = _weak_key(), new_key()
+    weak, good = _ca(f'w{tag}', weak_key), _ca(f'g{tag}', good_key)
+
+    def data(cert, key, descr):
+        return {'refid': uuid.uuid4().hex[:13], 'descr': descr, 'is_root': True,
+                'crt': base64.b64encode(pem(cert).encode()).decode(),
+                'prv': base64.b64encode(key_pem(key).encode()).decode(),
+                'subject': cert.subject.rfc4514_string(), 'issuer': cert.issuer.rfc4514_string()}
+
+    with app.app_context():
+        stats = ImportMixin().import_cas([data(weak, weak_key, f'weak {tag}'), data(good, good_key, f'good {tag}')])
+        assert stats['imported'] == 1 and stats['failed'] == 1
+        assert any(f'weak {tag}' in e and '2048' in e for e in stats['errors'])
+        assert CA.query.filter_by(subject=weak.subject.rfc4514_string()).count() == 0
+
+
+def test_ca_service_import_refuses_weak_key(app):
+    from services.ca_service import CAService
+    key = _weak_key()
+    cert = _ca(uuid.uuid4().hex[:8], key)
+    with app.app_context():
+        with pytest.raises(ValueError, match='2048'):
+            CAService.import_ca('weak', pem(cert), key_pem(key))
