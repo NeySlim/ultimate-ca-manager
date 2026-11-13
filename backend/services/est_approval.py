@@ -22,9 +22,9 @@ def _issue(approval, data):
     csr = x509.load_pem_x509_csr(data['csr'].encode())
     renewal_of = supersedes = None
     if data.get('operation') == 'reenroll':
-        from services.cert.issued_lookup import OK, issued_certificate_status
+        from services.cert.issued_lookup import OK, protocol_renewal_status
         renewal_of = x509.load_pem_x509_certificate(data['renewal_of'].encode())
-        supersedes, status = issued_certificate_status(ca, renewal_of)
+        supersedes, status = protocol_renewal_status(ca, renewal_of)
         if status != OK:
             raise ProtocolRequestGone(f'The certificate being renewed can no longer be renewed ({status})',
                                       refusal=protocol_approval.ISSUANCE_REFUSAL)

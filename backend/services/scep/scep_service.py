@@ -1106,6 +1106,23 @@ class SCEPService:
                     "Renewal: CSR subject must match existing certificate",
                 )
 
+            from services.cert.issued_lookup import (
+                OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, WINDOWS_PROFILE,
+                protocol_renewal_status,
+            )
+            row, status = protocol_renewal_status(self.ca, signer_cert)
+            # Before the validity window: a lapsed Windows certificate is refused, and audited, as one
+            if status == WINDOWS_PROFILE:
+                from services.windows_profiles import (
+                    PROTOCOL_RENEWAL_REFUSED, audit_protocol_renewal_refusal,
+                )
+                logger.warning(
+                    f"SCEP renewal: signer cert refused ({status}) "
+                    f"(serial={signer_cert.serial_number}, ca={self.ca_refid})"
+                )
+                audit_protocol_renewal_refusal('SCEP', row, signer_cert.subject.rfc4514_string())
+                return self.FAIL_BAD_MESSAGE_CHECK, f"Renewal: {PROTOCOL_RENEWAL_REFUSED}"
+
             # The signer cert must still be within its validity period — an
             # attacker who recovers an old/expired key MUST NOT be able to
             # bootstrap a new cert via renewal. RFC 8894 §3.3.2 implies the
@@ -1135,10 +1152,6 @@ class SCEPService:
             # holds, not revoked (row or persistent revocation record, the
             # serial column mixing decimal and hexadecimal forms), not
             # expired -- the one rule shared with EST and WSTEP.
-            from services.cert.issued_lookup import (
-                OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
-            )
-            _row, status = issued_certificate_status(self.ca, signer_cert)
             if status != OK:
                 logger.warning(
                     f"SCEP renewal: signer cert refused ({status}) "
@@ -1403,9 +1416,13 @@ class SCEPService:
         check_issuer_window(self.ca_cert)
         if renewal_of is not None:
             # A manual approval may come after the renewed certificate was revoked
-            from services.cert.issued_lookup import REVOKED, issued_certificate_status
-            if issued_certificate_status(self.ca, renewal_of)[1] == REVOKED:
+            from services.cert.issued_lookup import REVOKED, WINDOWS_PROFILE, protocol_renewal_status
+            status = protocol_renewal_status(self.ca, renewal_of)[1]
+            if status == REVOKED:
                 raise SCEPRequestRefused('Signing certificate has been revoked')
+            if status == WINDOWS_PROFILE:
+                from services.windows_profiles import PROTOCOL_RENEWAL_REFUSED
+                raise SCEPRequestRefused(PROTOCOL_RENEWAL_REFUSED)
         # A RenewalReq keeps the renewed certificate's SID extension, resolved at signing
         from services.ad_connector.renewal_identity import renewal_requester_sid
         requester_sid = renewal_requester_sid(renewal_of, self.ca_cert, 'SCEP') if renewal_of is not None else None

@@ -30,6 +30,8 @@ REVOKED = 'revoked'
 EXPIRED = 'expired'
 NOT_YET_VALID = 'not_yet_valid'
 SUPERSEDED = 'superseded'
+# EST and SCEP only: the certificate renews through its Windows enrollment profile (WSTEP)
+WINDOWS_PROFILE = 'windows_profile'
 
 
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
@@ -389,6 +391,19 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
     if not_after <= now or (row.valid_to and row.valid_to < now):
         return row, EXPIRED
     return row, OK
+
+
+def protocol_renewal_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
+    """``issued_certificate_status`` for an EST or SCEP renewal: a certificate a Windows enrollment
+    profile holds (an id, even of a profile deleted since, or a ``wstep`` row) answers WINDOWS_PROFILE,
+    expired or superseded alike; only REVOKED takes precedence."""
+    row, status = issued_certificate_status(ca, cert)
+    # The row that carries the profile answers, not a plain twin beside it: the audit names it
+    held = next((r for r in find_issued_rows(ca, cert)
+                 if r.windows_profile_id is not None or r.source == 'wstep'), None)
+    if status != REVOKED and held is not None:
+        return held, WINDOWS_PROFILE
+    return row, status
 
 
 def _san_identity(cert_or_csr):

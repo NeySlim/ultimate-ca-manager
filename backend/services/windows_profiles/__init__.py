@@ -159,6 +159,27 @@ def certificate_profile(row):
     return profile, None
 
 
+PROTOCOL_RENEWAL_REFUSED = 'The certificate belongs to a Windows enrollment profile and renews through it'
+
+
+def audit_protocol_renewal_refusal(protocol, row, requester):
+    """One audit entry per EST or SCEP renewal refused to a certificate of a Windows profile,
+    naming the profile and why it does not serve, committed at once (the refusal stores nothing)."""
+    from services.audit.staging import stage_audit_entry
+    from utils.db_transaction import safe_commit
+    profile, why = certificate_profile(row)
+    name = profile.name if profile is not None else None
+    stage_audit_entry(
+        action='windows_enrollment.refused', resource_type='windows_profile',
+        resource_id=str(profile.id) if profile is not None else None, resource_name=name,
+        username=requester, success=False,
+        details=(f'{protocol} renewal refused: {PROTOCOL_RENEWAL_REFUSED} '
+                 f'(certificate {row.descr or row.subject} serial {row.serial_number}, '
+                 f'profile {name or row.windows_profile_id or "-"}'
+                 f'{f": {why}" if why else ""})'))
+    safe_commit(logger, 'Windows profile renewal refusal audit commit failed')
+
+
 def presented_certificate_profile(cert):
     """``(profile, refusal, served)`` for a certificate presented to renew: the profile its stored
     rows record (``certificate_profile``), whichever CA they sit under, and how an audit names it.
