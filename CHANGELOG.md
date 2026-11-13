@@ -88,12 +88,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- Backup: a merge restore no longer turns a certificate revoked for good here back into a hold or a valid certificate, nor its revocation record into a hold.
+- Backup: a merge restore no longer turns a certificate or a CA revoked for good here back into a hold or a valid one, nor its revocation record into a hold.
 - Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.
 - OCSP: a serial the CA revoked answers `revoked`, as on its CRL, even when a non-revoked record of that serial is stored again.
 - Certificates: a certificate imported again after its revocation and deletion comes back revoked, and a certificate its CA's revocation record names is no longer renewed in place.
 - Revocation: a certificate its CA recorded as revoked is now shown and treated as revoked everywhere, and an hourly pass marks such certificates revoked, with an audit entry.
-- Revocation: lifting a hold is refused with one code (409) and one message when the certificate or its CA's record holds a final revocation; otherwise it removes the hold's record under every record of the CA key.
+- Revocation: when a final revocation is recorded, on the certificate or on its CA's record, lifting a hold is refused with one code (409) and one message; otherwise it removes the hold's record under every record of the CA key.
 - Revocation: revoking or suspending a certificate its CA already recorded as revoked for good answers that it is already revoked; a recorded hold can still be made final.
 - Revocation: the upgrade deletes once the suspension records that lifting a hold used to leave behind, unless a 2.x upgrade already did.
 - Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, also as the related partner of a lifted certificate, and the certificate details and list show the revocation the CA recorded.
