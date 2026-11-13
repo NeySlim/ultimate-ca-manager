@@ -527,6 +527,13 @@ def _sid_bytes_to_string(raw):
     return f"S-{revision}-{authority}-" + "-".join(str(s) for s in sub_authorities)
 
 
+def sid_domain(sid):
+    """``'S-1-5-21-a-b-c-1105'`` -> ``'S-1-5-21-a-b-c'``: the domain an account SID belongs
+    to, its last sub-authority being the RID (MS-DTYP 2.4.2.4); None when it has none."""
+    head, sep, rid = (sid or '').rpartition('-')
+    return head if sep and rid.isdecimal() and head.count('-') >= 3 else None
+
+
 def lookup_object_sid(config, sam_account_name):
     """The AD object's ``objectSid`` (user or computer -- no ``objectClass``
     filter needed since ``sAMAccountName`` is domain-unique, machine
@@ -542,7 +549,8 @@ def lookup_object_sid(config, sam_account_name):
     ``_sid_bytes_to_string``.
 
     ``None`` when the connector is off or the entry is not found; the falsy ``UNUSABLE_SID``
-    when its SID is missing or malformed; the falsy ``UNREACHABLE`` when the directory cannot
+    when its SID is missing, malformed or outside the connector's ``domain_sid`` (when known),
+    so a base DN reaching another domain cannot lend its SID; the falsy ``UNREACHABLE`` when the directory cannot
     answer. Never raises. A caller telling "connector off" from "not found" resolves the
     account with ``connector_account`` first.
     """
@@ -567,7 +575,13 @@ def lookup_object_sid(config, sam_account_name):
             return entry
         if 'objectSid' not in entry or not entry.objectSid.raw_values:
             return UNUSABLE_SID
-        return _sid_bytes_to_string(entry.objectSid.raw_values[0]) or UNUSABLE_SID
+        sid = _sid_bytes_to_string(entry.objectSid.raw_values[0])
+        domain = getattr(config, 'domain_sid', None)
+        if sid and domain and sid_domain(sid) != domain:
+            logger.warning("AD Connector: %r has SID %s, outside the connector's domain %s",
+                           sam_account_name, sid, domain)
+            return UNUSABLE_SID
+        return sid or UNUSABLE_SID
     except Exception as e:
         logger.warning("AD Connector: SID lookup failed: %s", e)
         return UNREACHABLE

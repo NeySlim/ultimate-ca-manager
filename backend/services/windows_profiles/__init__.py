@@ -39,6 +39,22 @@ def default_connector():
     return lowest_connector() if profile is None else profile_connector(profile)
 
 
+def sid_connectors(sid):
+    """The enabled connectors to ask for the account of *sid* (A9), in order. Those whose
+    ``domain_sid`` is the SID's domain; none when only disabled ones are (the SID is carried
+    over); for a domain no connector names, the enabled ones of unknown domain, the default
+    profile's first."""
+    from services.ad_connector.lookup import sid_domain
+    domain = sid_domain(sid)
+    rows = ADConnectorConfig.query.order_by(ADConnectorConfig.id)
+    known = rows.filter(ADConnectorConfig.domain_sid == domain).all() if domain else []
+    if known:
+        return [c for c in known if c.enabled]
+    unknown = rows.filter(ADConnectorConfig.domain_sid.is_(None), ADConnectorConfig.enabled.is_(True)).all()
+    default = default_connector()
+    return sorted(unknown, key=lambda c: default is None or c.id != default.id)
+
+
 def serving_profile():
     """The default profile when it may serve, else None."""
     profile = default_profile()

@@ -97,6 +97,23 @@ def test_a_lookup_binds_only_to_the_domain_controllers_of_its_connector(app, mon
         assert directory.binds == [('forest-b', 'dc1.b.example')]
 
 
+
+@pytest.mark.parametrize('returned, expected', [
+    ('S-1-5-21-1-2-3-1105', 'S-1-5-21-1-2-3-1105'),
+    ('S-1-5-21-9-9-9-1105', lookup.UNUSABLE_SID),
+    ('S-1-5-21-1-2-34-1105', lookup.UNUSABLE_SID),
+    ('S-1-5-21-1-2-3-5-1105', lookup.UNUSABLE_SID),
+], ids=['own-domain', 'other-domain', 'longer-sub-authority', 'extra-sub-authority'])
+def test_a_sid_outside_the_connector_domain_is_refused(app, monkeypatch, returned, expected):
+    """C-02b criterion 3: a base DN reaching another domain cannot lend its SID."""
+    _Directory(monkeypatch, [_Entry(objectSid=_sid_bytes(returned))])
+    with app.app_context():
+        config = add_connector('forest-a', server='dc1.a.example', base_dn='DC=a,DC=example',
+                               bind_dn='svc', enabled=True, domain_sid='S-1-5-21-1-2-3')
+        assert lookup.lookup_object_sid(config, 'X$') == expected
+        config.domain_sid = None
+        assert lookup.lookup_object_sid(config, 'X$') == returned  # domain never read: not checked
+
 # Criterion 2
 def test_a_probe_pass_stops_at_its_budget_and_the_next_one_resumes(app, monkeypatch):
     with app.app_context():
