@@ -67,14 +67,15 @@ class TestALiftBetweenTheImportsReadAndItsMark:
             db.session.rollback()
 
     def test_a_lift_just_before_the_mark_still_wins(self, app, issuer, monkeypatch):
-        """A stored row takes no lock on the record: the mark statement itself checks it."""
+        """A stored row takes no lock on the record: the mark statement itself checks it. Only the
+        record goes here, the row being locked by then."""
         from services.cert import issued_lookup
         from services.cert.issued_lookup import apply_persisted_revocation
         _, row_id, record_id = _recorded_hold(app, issuer, 'import-lift-reread.example.test')
         mark = issued_lookup._mark_while_recorded
 
         def lifted_then_marked(row, record):
-            _lifted(row_id, record_id)
+            _lifted(None, record_id)
             return mark(row, record)
         monkeypatch.setattr(issued_lookup, '_mark_while_recorded', lifted_then_marked)
         with app.app_context():
@@ -90,3 +91,45 @@ class TestALiftBetweenTheImportsReadAndItsMark:
             assert apply_persisted_revocation(db.session.get(Certificate, row_id)) is True
             db.session.commit()
         assert _row(app, row_id)[:2] == (True, 'certificateHold')
+
+
+def test_an_unhold_committed_while_the_mark_waits_on_the_row_wins(app, issuer):
+    """PostgreSQL: an unhold holds the row and has deleted the record, uncommitted, when the mark
+    waits on the row; once it commits, the mark must see the record gone (no hold left without one)."""
+    import threading
+    from tests.test_revocation_record_rule import _wait_for_a_lock_waiter
+    from services.cert.issued_lookup import apply_persisted_revocation
+    if not _on_postgresql(app):
+        pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+    _, row_id, record_id = _recorded_hold(app, issuer, 'import-lift-during-wait.example.test')
+    outcome = {}
+    with app.app_context():
+        engine = db.engine
+
+    def import_mark():
+        with app.app_context():
+            try:
+                outcome['mark'] = apply_persisted_revocation(db.session.get(Certificate, row_id))
+                db.session.commit()
+            except Exception as e:  # noqa: BLE001
+                db.session.rollback()
+                outcome['mark'] = repr(e)
+            finally:
+                db.session.remove()
+
+    with engine.connect() as unhold, engine.connect() as watcher:
+        tx = unhold.begin()
+        unhold.execute(RevokedSerial.__table__.select().where(
+            RevokedSerial.id == record_id).with_for_update())
+        unhold.execute(update(Certificate).where(Certificate.id == row_id).values(
+            revoked=False, revoke_reason=None, revoked_at=None))
+        unhold.execute(delete(RevokedSerial).where(RevokedSerial.id == record_id))
+        worker = threading.Thread(target=import_mark)
+        worker.start()
+        outcome['waited'] = _wait_for_a_lock_waiter(watcher, 10)
+        tx.commit()
+        worker.join(30)
+    assert outcome == {'waited': True, 'mark': False}, outcome
+    assert _row(app, row_id) == (False, None, None)
+    with app.app_context():
+        assert RevokedSerial.query.filter_by(id=record_id).count() == 0

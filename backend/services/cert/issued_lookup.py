@@ -235,9 +235,10 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
         record = row_persisted_revocation(row)
         if record is None:
             return False
-        # A stored row is marked by one statement that re-reads the record, never under a share
-        # lock on it: an import holding the row would deadlock with a revocation holding the record
+        # A stored row is locked first, then marked by a statement that checks the record with a
+        # snapshot taken after any wait, never under a share lock on the record (deadlock)
         if inspect(row).persistent:
+            db.session.query(Certificate.id).filter(Certificate.id == row.id).with_for_update().first()
             return _mark_while_recorded(row, record)
         if not _record_still_held(record):
             return False
