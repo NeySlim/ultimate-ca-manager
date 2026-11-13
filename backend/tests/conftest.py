@@ -669,7 +669,15 @@ def viewer_client(app):
             user = User.query.filter_by(username='viewer_test').first()
             user_id = user.id if user else None
         if user_id is not None:
-            admin.delete(f'/api/v2/users/{user_id}')
+            # A fresh admin session: the module may have ended the one opened at setup
+            import warnings
+            fresh = app.test_client()
+            fresh.post('/api/v2/auth/login',
+                       data=json.dumps({'username': 'admin', 'password': 'changeme123'}),
+                       content_type='application/json')
+            r = fresh.delete(f'/api/v2/users/{user_id}')
+            if r.status_code != 200:
+                warnings.warn(f'viewer_client could not delete viewer_test: HTTP {r.status_code}')
 
 
 # ============================================================
