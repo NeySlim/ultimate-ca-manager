@@ -58,6 +58,18 @@ class TestACertificateRevokedHere:
         ca = CA.query.filter_by(refid=row.caref).one()
         assert answered_revocation(row, ca).revoke_reason == 'keyCompromise'
 
+    def test_a_hold_carried_by_the_row_alone_gives_way_to_a_valid_archive(self, target):
+        """Suspensions are reversible: what is not final is the archive's in a merge."""
+        issuer = _authority_row('merge-hold-ca')
+        row = _certificate_row('merge-row-hold', issuer)
+        blob = _snapshot()
+        _revoke(row, 'certificateHold', LATER)
+        db.session.commit()
+
+        _restore(blob, mode='merge')
+
+        assert _state('merge-row-hold') == (False, None, [])
+
 
 class TestACaRevokedHere:
 
