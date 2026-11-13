@@ -23,7 +23,9 @@ def _forget_cas(app):
         before = {c.id for c in CA.query.all()}
     yield
     with app.app_context():
-        CA.query.filter(~CA.id.in_(before)).delete(synchronize_session=False)
+        # ORM delete: SQLite tests run without foreign keys, so a bulk delete would orphan cross rows
+        for ca in CA.query.filter(~CA.id.in_(before)).all():
+            db.session.delete(ca)
         db.session.commit()
 
 
