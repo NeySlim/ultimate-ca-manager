@@ -26,6 +26,8 @@ PROFILE_COLUMNS = ('name', 'realm', 'is_default', 'enabled', 'connector_id', 'is
                    'policy_ca_refid', 'validity_days', 'xcep_username', 'xcep_password',
                    'wstep_username', 'wstep_password')
 BACKEND = Path(__file__).resolve().parents[1]
+# The CAs two_cas makes are this file's: the leak guard sees the session's tables unchanged
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _envelope(username=USER, password=PASSWORD):
@@ -274,7 +276,7 @@ def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=Tr
     return as_v3(blob, BACKUP_PASSWORD, edit=as_2x), connector_row
 
 
-def test_a_2x_archive_restores_as_the_profile_the_migration_makes(app, clean_slate, two_cas):
+def test_a_2x_archive_restores_as_the_profile_the_migration_makes(app, clean_slate, no_shared_keytab, two_cas):
     """Same conversion: the default profile from a 2.x archive equals the one migration 155
     makes of the same settings, and its WSTEP certificate is attached to it."""
     from services.backup_service import BackupService
@@ -308,7 +310,8 @@ def test_a_2x_archive_restores_as_the_profile_the_migration_makes(app, clean_sla
 
 @pytest.mark.parametrize('xcep_ca', ['', None], ids=['empty', 'absent'])
 @pytest.mark.parametrize('route', ['migration', 'restore'])
-def test_xcep_without_its_own_ca_is_switched_off(app, client, auth_client, clean_slate, two_cas,
+def test_xcep_without_its_own_ca_is_switched_off(app, client, auth_client, clean_slate, no_shared_keytab,
+                                                 two_cas,
                                                  monkeypatch, xcep_ca, route):
     """2.x answered GetPolicies 503 without an XCEP CA; the profile would serve the issuing CA's
     policy (A4): the switch goes off, the client still gets a 503 and no policy."""
@@ -349,7 +352,7 @@ def test_xcep_without_its_own_ca_is_switched_off(app, client, auth_client, clean
     assert client.post(XCEP_URL, data=_envelope()).status_code == 200
 
 
-def test_a_30_archive_round_trip_keeps_the_profile(app, clean_slate, two_cas):
+def test_a_30_archive_round_trip_keeps_the_profile(app, clean_slate, no_shared_keytab, two_cas):
     from services.backup_service import BackupService
     issuing, policy, template_id = two_cas
     with app.app_context():
@@ -687,7 +690,7 @@ def _restore(app, archive, mode='merge'):
             db.session.commit()
 
 
-def test_a_2x_archive_with_only_kerberos_gets_the_profile_the_migration_makes(app, clean_slate):
+def test_a_2x_archive_with_only_kerberos_gets_the_profile_the_migration_makes(app, clean_slate, no_shared_keytab):
     """One criterion on both sides: an SPN alone was a Windows configuration to carry."""
     settings = {'kerberos_enabled': 'true', 'kerberos_spn': 'HTTP/ucm.c01.example@C01.EXAMPLE'}
     archive, _connector = _2x_archive(app, settings)
@@ -705,7 +708,7 @@ def test_a_2x_archive_with_only_kerberos_gets_the_profile_the_migration_makes(ap
     assert restored['realm'] == 'C01.EXAMPLE' and restored['enabled']
 
 
-def test_a_30_archive_without_the_profiles_section_creates_none(app, clean_slate):
+def test_a_30_archive_without_the_profiles_section_creates_none(app, clean_slate, no_shared_keytab):
     from services.backup_service import BackupService
     with app.app_context():
         _set('kerberos_spn', 'HTTP/ucm.c01.example@C01.EXAMPLE')
@@ -717,7 +720,7 @@ def test_a_30_archive_without_the_profiles_section_creates_none(app, clean_slate
         assert _default() is None
 
 
-def test_a_converted_realm_the_keytab_here_lacks_is_reported(app, clean_slate, two_cas):
+def test_a_converted_realm_the_keytab_here_lacks_is_reported(app, clean_slate, no_shared_keytab, two_cas):
     from tests.test_windows_profile_migration import ONE_REALM
     issuing, policy, _template = two_cas
     with app.app_context():
@@ -796,7 +799,8 @@ def _without_connector(name):
 
 @pytest.mark.parametrize('sections', [('ad_connector',), ('ad_connector', 'windows_enrollment_profiles')],
                          ids=['profiles-not-carried', 'profiles-carried'])
-def test_a_replacing_restore_keeps_a_connector_a_profile_still_uses(app, clean_slate, own_connector, sections):
+def test_a_replacing_restore_keeps_a_connector_a_profile_still_uses(app, clean_slate, no_shared_keytab,
+                                                                    own_connector, sections):
     """A connector the restore would remove while a profile it keeps or restores still names it:
     refused, never a profile with a dangling connector nor one that silently lost it."""
     from services.backup.restore.conflict import RestoreConflictError
@@ -808,7 +812,7 @@ def test_a_replacing_restore_keeps_a_connector_a_profile_still_uses(app, clean_s
         assert _default().connector_id == own_connector
 
 
-def test_a_replacing_restore_removes_a_connector_no_profile_uses(app, clean_slate, own_connector):
+def test_a_replacing_restore_removes_a_connector_no_profile_uses(app, clean_slate, no_shared_keytab, own_connector):
     def edit(payload):
         _without_connector('c01-replace-connector')(payload)
         for row in payload['windows_enrollment_profiles']:
@@ -820,7 +824,7 @@ def test_a_replacing_restore_removes_a_connector_no_profile_uses(app, clean_slat
         assert _default().connector_id is None
 
 
-def test_a_2x_archive_takes_the_realm_of_its_own_connector(app, clean_slate, two_cas):
+def test_a_2x_archive_takes_the_realm_of_its_own_connector(app, clean_slate, no_shared_keytab, two_cas):
     """No realm in the SPN, no keytab: only the archive's connector names it."""
     issuing, policy, _template = two_cas
     settings = {**_settings_2x(issuing, policy), 'kerberos_spn': 'HTTP/ucm.c01.example'}
@@ -839,7 +843,7 @@ def _raw_keytab(profile_id):
                               {'i': profile_id}).scalar()
 
 
-def test_the_keytab_column_is_stored_under_the_master_key(app, clean_slate, encryption_enabled):
+def test_the_keytab_column_is_stored_under_the_master_key(app, clean_slate, no_shared_keytab, encryption_enabled):
     import base64
     from services.backup_service import BackupService
     is_encrypted = encryption_enabled.key_encryption.is_encrypted
