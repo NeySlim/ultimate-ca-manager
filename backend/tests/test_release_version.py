@@ -188,6 +188,48 @@ def test_the_release_notes_step_names_the_published_files(tmp_path, v):
     assert f'releases/download/v{v}/' in notes and 'Marker.' in notes
 
 
+# ---- 3b. the branch a tag must sit on -------------------------------------------------------------
+
+def _tagged_checkout(tmp_path, branches, tag_on):
+    """A checkout at a tagged commit, as the validate-tag job has it: one commit per branch of
+    *branches* on the origin, HEAD on the tip of *tag_on* (or on a commit no branch holds)."""
+    bare, work = tmp_path / 'origin.git', tmp_path / 'work'
+    git = ['git', '-c', 'user.name=t', '-c', 'user.email=t@t']
+    subprocess.run(['git', 'init', '-q', '--bare', str(bare)], check=True)
+    subprocess.run(['git', 'init', '-q', str(work)], check=True)
+    subprocess.run(['git', 'remote', 'add', 'origin', str(bare)], cwd=work, check=True)
+    for branch in branches:
+        subprocess.run(['git', 'checkout', '-q', '--orphan', branch], cwd=work, check=True)
+        subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', branch], cwd=work, check=True)
+        subprocess.run(['git', 'push', '-q', 'origin', branch], cwd=work, check=True)
+    if tag_on in branches:
+        subprocess.run(['git', 'checkout', '-q', '--detach', tag_on], cwd=work, check=True)
+    else:
+        subprocess.run(['git', 'checkout', '-q', '--orphan', 'elsewhere'], cwd=work, check=True)
+        subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', 'elsewhere'], cwd=work, check=True)
+    return work
+
+
+@pytest.mark.parametrize('branches,tag_on,version,accepted', [
+    (['main', 'test'], 'main', '2.254.1', True),
+    (['main', 'test'], 'test', '2.254.1-rc1', True),
+    (['main', 'test'], 'test', '2.254.1', False),
+    (['main', 'test', '2.x'], '2.x', '2.254.2', True),
+    (['main', 'test', '2.x'], '2.x', '2.254.2-rc1', True),
+    (['main', 'test', '2.x'], 'main', '2.254.2', True),
+    (['main', 'test', '2.x'], '2.x', '2.255', False),
+    (['main', 'test', '2.x'], '2.x', '3.0.1', False),
+    (['main', 'test', '3.x'], '3.x', '3.0.1', True),
+    (['main', 'test', '2.x'], 'nowhere', '2.254.2', False),
+    (['main', 'test'], 'nowhere', '2.254.2', False),
+])
+def test_a_tag_sits_on_its_release_branch_or_its_maintenance_branch(tmp_path, branches, tag_on, version, accepted):
+    work = _tagged_checkout(tmp_path, branches, tag_on)
+    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
+    result = _run_step(step, work, {'GITHUB_REF': f'refs/tags/v{version}'})
+    assert (result.returncode == 0) is accepted, result.stdout + result.stderr
+
+
 # ---- 4. latest ---------------------------------------------------------------------------------
 
 @pytest.mark.parametrize('published,tag,expected', [
@@ -241,6 +283,16 @@ def test_a_branch_run_never_takes_latest(tmp_path, job):
     out = tmp_path / 'gh_output'
     step = _step('build-release.yml', job, 'Decide latest')
     result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': '2.254', 'GITHUB_REF': 'refs/heads/dev'})
+    assert result.returncode == 0, result.stderr
+    assert out.read_text().strip() == 'latest=false'
+
+
+@pytest.mark.parametrize('job', ['docker-manifest', 'docker-fips-manifest', 'release'])
+def test_a_run_of_another_tag_never_takes_latest(tmp_path, job):
+    work = _origin_with_tags(tmp_path, ['v2.253', 'v2.254'])
+    out = tmp_path / 'gh_output'
+    step = _step('build-release.yml', job, 'Decide latest')
+    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': '2.254.2', 'GITHUB_REF': 'refs/tags/v2.254'})
     assert result.returncode == 0, result.stderr
     assert out.read_text().strip() == 'latest=false'
 
@@ -462,7 +514,7 @@ def test_smoke_release_accepts_the_exact_version(monkeypatch):
 
 # ---- 7. the manual publisher follows the same rules ---------------------------------------------
 
-def _publish(tmp_path, tags, version, changelog):
+def _publish(tmp_path, tags, version, changelog, *flags):
     work = _origin_with_tags(tmp_path, tags)
     (work / 'scripts' / 'release_publish.sh').write_text((ROOT / 'scripts' / 'release_publish.sh').read_text())
     (work / 'CHANGELOG.md').write_text(changelog)
@@ -480,7 +532,7 @@ def _publish(tmp_path, tags, version, changelog):
         'fi\n')
     gh.chmod(0o755)
     env = {**os.environ, 'PATH': f'{fake}:{os.environ["PATH"]}'}
-    result = subprocess.run([BASH, 'scripts/release_publish.sh', version], cwd=work, env=env,
+    result = subprocess.run([BASH, 'scripts/release_publish.sh', version, *flags], cwd=work, env=env,
                             capture_output=True, text=True)
     return result, log
 
@@ -500,3 +552,11 @@ def test_release_publish_passes_the_latest_rule_and_the_section(tmp_path, tags, 
     assert f'--latest={latest}' in args
     notes = pathlib.Path(str(log) + '.notes').read_text()
     assert 'Fixed a.b thing.' in notes and 'Older entry' not in notes and 'Dots are literal' not in notes
+
+
+@pytest.mark.parametrize('flag', ['--draft', '--pre'])
+def test_release_publish_never_marks_a_draft_or_a_prerelease_latest(tmp_path, flag):
+    result, log = _publish(tmp_path, ['v2.253', 'v2.254', 'v2.254.1'], '2.254.1', PUBLISH_CHANGELOG, flag)
+    assert result.returncode == 0, result.stderr
+    assert '--latest=false' in log.read_text().splitlines()
+

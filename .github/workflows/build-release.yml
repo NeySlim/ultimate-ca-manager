@@ -51,12 +51,22 @@ jobs:
           git fetch origin main:refs/remotes/origin/main test:refs/remotes/origin/test
           EXPECTED_SHA="$(git rev-parse "$EXPECTED_REF")"
 
+          # A maintenance release (X.Y.Z, RC or stable) may also sit at the tip of its <major>.x branch
+          MAINT_BRANCH="${VERSION%%.*}.x"
+          MAINT_SHA=""
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && git ls-remote --exit-code --heads origin "$MAINT_BRANCH" > /dev/null; then
+            git fetch origin "$MAINT_BRANCH:refs/remotes/origin/$MAINT_BRANCH"
+            MAINT_SHA="$(git rev-parse "origin/$MAINT_BRANCH")"
+          fi
+
           echo "Version: $VERSION"
           echo "Tag SHA: $TAG_SHA"
           echo "Expected $EXPECTED_REF SHA: $EXPECTED_SHA"
+          [ -z "$MAINT_SHA" ] || echo "Or origin/$MAINT_BRANCH SHA: $MAINT_SHA"
 
-          if [ "$TAG_SHA" != "$EXPECTED_SHA" ]; then
-            echo "Stable tags must point to origin/main; RC tags must point to origin/test."
+          if [ "$TAG_SHA" != "$EXPECTED_SHA" ] && [ "$TAG_SHA" != "$MAINT_SHA" ]; then
+            echo "Stable tags must point to origin/main and RC tags to origin/test;"
+            echo "a maintenance release (X.Y.Z) may also point to its <major>.x branch."
             echo "Refusing to build release from an unexpected commit."
             exit 1
           fi
@@ -383,10 +393,10 @@ jobs:
           VERSION: ${{ needs.build-deb.outputs.version }}
         run: |
           set -euo pipefail
-          # A manual run from a branch never takes latest
-          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
+          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
             echo "latest=false" >> "$GITHUB_OUTPUT"
-            echo "latest for $VERSION: false (not a tag run)"
+            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
             exit 0
           fi
           LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
@@ -608,10 +618,10 @@ jobs:
           VERSION: ${{ needs.build-deb.outputs.version }}
         run: |
           set -euo pipefail
-          # A manual run from a branch never takes latest
-          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
+          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
             echo "latest=false" >> "$GITHUB_OUTPUT"
-            echo "latest for $VERSION: false (not a tag run)"
+            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
             exit 0
           fi
           LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
@@ -892,10 +902,10 @@ jobs:
           VERSION: ${{ needs.build-deb.outputs.version }}
         run: |
           set -euo pipefail
-          # A manual run from a branch never takes latest
-          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
+          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
             echo "latest=false" >> "$GITHUB_OUTPUT"
-            echo "latest for $VERSION: false (not a tag run)"
+            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
             exit 0
           fi
           LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")

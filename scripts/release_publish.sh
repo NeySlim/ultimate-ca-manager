@@ -13,7 +13,7 @@
 #   scripts/release_publish.sh --draft           # create as draft
 #   scripts/release_publish.sh --edit            # edit existing release notes
 #
-# Requires: gh, git. Repository must be the current working directory.
+# Requires: gh, git, python3 (scripts/ci/release_version.py). Repository must be the current working directory.
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -64,6 +64,8 @@ fi
 
 # `latest` only for the highest stable tag on origin (same rule as the workflow).
 LATEST="$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")"
+# GitHub refuses a prerelease or a draft as latest
+[[ $PRERELEASE -eq 1 || $DRAFT -eq 1 ]] && LATEST=false
 
 NOTES_FILE="$(mktemp -t ucm-relnotes.XXXXXX.md)"
 trap 'rm -f "$NOTES_FILE"' EXIT

@@ -149,7 +149,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--version",
         required=True,
-        help="Expected release version (e.g. 2.143). Must appear in /api/v2/health.",
+        help="Expected release version (e.g. 2.254.1). Must equal the version /api/v2/health reports.",
     )
     parser.add_argument(
         "--base-url",

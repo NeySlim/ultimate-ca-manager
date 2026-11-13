@@ -5,6 +5,7 @@
 #
 # In CI (build-release.yml), the tag drives VERSION automatically.
 # This script is for local dev to keep VERSION + package.json in sync.
+# Requires: node, python3 (scripts/ci/release_version.py).
 
 set -e
 
