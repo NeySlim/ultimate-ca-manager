@@ -121,6 +121,13 @@ def test_a_connector_of_another_domain_is_refused(app, auth_client):
         r = auth_client.put(f"{URL}/{p['id']}", json={'realm': 'MINE.EXAMPLE'})
         assert r.status_code == 400
         assert auth_client.put(f"{URL}/{p['id']}", json={'connector_id': 99999}).status_code == 404
+        # A connector moved to another domain elsewhere still lets the profile be disabled
+        with app.app_context():
+            db.session.get(ADConnectorConfig, cid).base_dn = 'DC=two,DC=example'
+            db.session.commit()
+        assert auth_client.put(f"{URL}/{p['id']}", json={'enabled': False}).status_code == 200
+        r = auth_client.put(f"{URL}/{p['id']}", json={'connector_id': cid})
+        assert r.status_code == 400 and 'TWO.EXAMPLE' in r.get_json()['message']
     finally:
         with app.app_context():
             ADConnectorConfig.query.filter_by(id=cid).first().base_dn = saved

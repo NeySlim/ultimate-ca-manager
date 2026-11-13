@@ -147,7 +147,10 @@ def _apply(profile, data):
         profile.connector_id = data['connector_id']
     elif 'connector_id' in data:
         profile.connector_id = None
-    return _connector_problem(profile)
+    # Checked when chosen only, as the CAs: a pair saved elsewhere stays saveable
+    if 'realm' in data or 'connector_id' in data:
+        return _connector_problem(profile)
+    return None
 
 
 def _connector_problem(profile):
