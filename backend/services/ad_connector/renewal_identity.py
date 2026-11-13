@@ -26,8 +26,8 @@ def renewal_requester_sid(renewed_cert, ca_cert, protocol):
     """The SID ``renewed_cert``'s extension carries, None without a readable one or
     when ``ca_cert`` did not sign it (an import sets the issuer without checking).
 
-    An enabled AD Connector must still find that account, as issuance refuses an
-    unresolved requester; with the connector off the SID is carried over as is.
+    The enabled connectors serving the SID's domain must still find that account, as
+    issuance refuses an unresolved requester; a domain none serves carries the SID over (A9).
     """
     from services.ad_connector import lookup
     from services.trust_store.csr_operations_mixin import ad_security_extension_sid
@@ -44,13 +44,21 @@ def renewal_requester_sid(renewed_cert, ca_cert, protocol):
         logger.warning("%s: renewed certificate serial %x was not signed by this CA, its SID is not carried over",
                        protocol, renewed_cert.serial_number)
         return None
-    account = lookup.lookup_account_by_sid(sid)
-    if account is None or account:
+    from services.windows_profiles import sid_connectors
+    unreachable = None
+    connectors = sid_connectors(sid)
+    for connector in connectors:
+        account = lookup.lookup_account_by_sid(connector, sid)
+        if account:
+            return sid
+        if account is lookup.UNREACHABLE and unreachable is None:
+            unreachable = connector
+    if not connectors:
         return sid
-    if account is lookup.UNREACHABLE:
-        fault = lookup.connector_config_fault()
-        logger.warning("%s: the AD Connector cannot resolve SID %s of a renewed certificate%s",
-                       protocol, sid, f': {fault}' if fault else '')
+    if unreachable is not None:
+        fault = lookup.connector_config_fault(unreachable)
+        logger.warning("%s: the AD Connector %s cannot resolve SID %s of a renewed certificate%s",
+                       protocol, unreachable.name, sid, f': {fault}' if fault else '')
         raise RenewalIdentityUnresolved(UNRESOLVED_MESSAGE)
     logger.warning("%s: SID %s of a renewed certificate names no directory account", protocol, sid)
     raise RenewalAccountGone(NOT_FOUND_MESSAGE)

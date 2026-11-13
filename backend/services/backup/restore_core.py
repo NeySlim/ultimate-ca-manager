@@ -35,7 +35,7 @@ from .restore.replace import plan_replacement, remove_after_writes, remove_befor
 from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
-from .restore.windows_profiles import upgrade_archived_windows_profiles
+from .restore.windows_profiles import link_restored_connectors, upgrade_archived_windows_profiles
 
 logger = logging.getLogger(__name__)
 
@@ -466,6 +466,7 @@ class RestoreCoreMixin:
                 # row exists: this is where an authority finds the HSM key the
                 # same restore has just created.
                 results['relinked'] = relink_references(backup_data, plan)
+                link_restored_connectors(backup_data)
                 results['repairs'] = replay_repairs(backup_data, plan)
                 # The rows written take the revocation their CA records, as the hourly pass does
                 aligned = self._align_restored_revocations(plan) + self._align_kept_finals()

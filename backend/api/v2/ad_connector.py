@@ -1,8 +1,8 @@
 """
 Active Directory Connector settings routes
-/api/v2/ad-connector/* -- single stored LDAP connection UCM uses to query
-Active Directory directly, kept deliberately separate from SSO's own LDAP
-provider config (see models/ad_connector.py's module docstring for why).
+/api/v2/ad-connector/* -- the 2.x single-connector routes, on the connector the default
+Windows profile uses (the collection is /api/v2/ad-connectors), kept deliberately separate
+from SSO's own LDAP provider config (see models/ad_connector.py's module docstring for why).
 """
 import logging
 import re
@@ -71,10 +71,23 @@ def _parse_servers(data):
     return joined, None
 
 
+def _legacy_connector():
+    """The connector the single-connector routes show: the one the protocols use. Retired
+    with these routes."""
+    from services import windows_profiles
+    return windows_profiles.default_connector()
+
+
+def _free_name():
+    taken = set(db.session.scalars(db.select(ADConnectorConfig.name)))
+    return next(name for name in ('default', *(f'connector-{n}' for n in range(2, len(taken) + 3)))
+                if name not in taken)
+
+
 def _get_or_create():
-    config = ADConnectorConfig.get_singleton()
+    config = _legacy_connector()
     if config is None:
-        config = ADConnectorConfig()
+        config = ADConnectorConfig(name=_free_name())
         db.session.add(config)
     return config
 
@@ -83,7 +96,7 @@ def _get_or_create():
 @require_auth(['read:ad_connector'])
 def get_config():
     """Get the Active Directory Connector configuration."""
-    config = ADConnectorConfig.get_singleton()
+    config = _legacy_connector()
     if config is None:
         return success_response(data=ADConnectorConfig().to_dict())
     return success_response(data=config.to_dict())
@@ -111,17 +124,9 @@ def _ad_retarget_error(saved, data):
     return retarget_error(current, requested, True)
 
 
-@bp.route('/api/v2/ad-connector', methods=['PUT'])
-@require_auth(['write:ad_connector'])
-def update_config():
-    """Update the Active Directory Connector configuration (upsert)."""
-    data = request.json or {}
-
-    err = _ad_retarget_error(ADConnectorConfig.get_singleton(), data)
-    if err:
-        return err
-    config = _get_or_create()
-
+def apply_fields(config, data):
+    """Copy the submitted settings onto *config*; an error response, or None. The domain
+    SID read for a base DN or a DC list is dropped when either changes."""
     if 'servers' in data or 'server' in data:
         joined, err = _parse_servers(data)
         if err:
@@ -132,6 +137,7 @@ def update_config():
             # get applied to the new list. Clearing it means the next probe
             # decides, and until then _connect simply has no opinion.
             config.health = None
+            config.domain_sid = None
         config.server = joined or None
     if 'port' in data:
         try:
@@ -165,6 +171,8 @@ def update_config():
         if base_dn and not lookup.realm_of_base_dn(base_dn):
             return error_response('base_dn must name the domain with DC components, '
                                   'such as DC=corp,DC=example', 400)
+        if (base_dn or None) != config.base_dn:
+            config.domain_sid = None
         config.base_dn = base_dn or None
     if 'bind_dn' in data:
         bind_dn = (data['bind_dn'] or '').strip()
@@ -185,10 +193,37 @@ def update_config():
     if config.enabled and not config.bind_password:
         db.session.rollback()
         return error_response('bind_password is required while the connector is enabled', 400)
+    return None
+
+
+def refresh_domain_sid(config):
+    """Read the SID of the domain head the base DN sits under when the row has none; a failed
+    read leaves it empty.
+    Every save route calls it, so renewals routed on the SID see the saved connector."""
+    if config.domain_sid or not config.base_dn:
+        return
+    config.domain_sid = lookup.fetch_domain_sid(config)
+
+
+@bp.route('/api/v2/ad-connector', methods=['PUT'])
+@require_auth(['write:ad_connector'])
+def update_config():
+    """Update the Active Directory Connector configuration (upsert)."""
+    data = request.json or {}
+
+    err = _ad_retarget_error(_legacy_connector(), data)
+    if err:
+        return err
+    config = _get_or_create()
+
+    err = apply_fields(config, data)
+    if err:
+        return err
 
     config.updated_at = utc_now()
 
     try:
+        refresh_domain_sid(config)
         # The default profile is served by the connector; a realm it had none for may now be known
         from services import windows_profiles
         profile = windows_profiles.default_profile()
@@ -222,9 +257,14 @@ def update_config():
 @require_auth(['write:ad_connector'])
 def test_connection_inline():
     """Test connectivity using unsaved form data (before save)."""
+    return run_unsaved_test(request.json or {}, _legacy_connector())
+
+
+def run_unsaved_test(data, saved_connector):
+    """Test the submitted values; a blank password is the *saved_connector*'s only when
+    the target is the one it was saved for."""
     from types import SimpleNamespace
 
-    data = request.json or {}
     joined, err = _parse_servers(data)
     if err:
         return err
@@ -249,7 +289,7 @@ def test_connection_inline():
     bind_password = data.get('bind_password')
     if not bind_password:
         # The saved secret only goes to the saved target, trusted the saved way
-        saved = ADConnectorConfig.get_singleton()
+        saved = saved_connector
         if (saved and saved.bind_password
                 and set(lookup.split_servers(joined)) <= set(lookup.split_servers(saved.server))
                 and (saved.port or 389, bool(saved.use_ssl), bool(saved.verify_ssl),
@@ -270,6 +310,7 @@ def test_connection_inline():
         ca_bundle=ca_bundle,
         bind_dn=data.get('bind_dn'),
         bind_password=bind_password,
+        base_dn=(data.get('base_dn') or '').strip() or None,
     )
     result = lookup.test_connection(cfg)
     if result.get('success'):
@@ -285,11 +326,17 @@ def test_connection_inline():
 @require_auth(['write:ad_connector'])
 def test_connection_saved():
     """Test connectivity using the saved configuration."""
-    config = ADConnectorConfig.get_singleton()
+    return run_saved_test(_legacy_connector())
+
+
+def run_saved_test(config):
+    """Test *config*'s saved settings, record the verdict on the row."""
     if config is None or not config.server:
         return error_response('AD Connector is not configured', 400)
 
     result = lookup.test_connection(config)
+    if result.get('success') and result.get('domain_sid'):
+        config.domain_sid = result['domain_sid']
     # The badge reflects the test just run, which is the same per-DC bind the
     # probe performs. Only for an enabled connector (a disabled one serves no
     # lookup), and only when DCs were tried: a refused bind reached none.

@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
+from tests.ad_connector_support import connector_row as lowest_connector_row
 from models import (CA, ADConnectorConfig, Certificate, CATemplatePin, CertificateTemplate, SystemConfig,
                     WindowsEnrollmentProfile, WindowsProfileTemplate, db)
 from services.backup import manifest
@@ -85,7 +86,7 @@ def clean_slate(app):
             parked_state = (parked.id, parked.name, parked.realm)
             parked.is_default, parked.name, parked.realm = False, f'parked-{parked.id}', None
         SystemConfig.query.filter(SystemConfig.key.in_(MIGRATED_KEYS)).delete(synchronize_session=False)
-        connector = ADConnectorConfig.get_singleton()
+        connector = lowest_connector_row()
         connector_state = (connector.enabled, connector.base_dn) if connector is not None else None
         connectors = {c.id for c in ADConnectorConfig.query.all()}
         db.session.commit()
@@ -113,7 +114,7 @@ def clean_slate(app):
         WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.connector_id.in_(added)).update(
             {'connector_id': None}, synchronize_session=False)
         ADConnectorConfig.query.filter(ADConnectorConfig.id.in_(added)).delete(synchronize_session=False)
-        connector = ADConnectorConfig.get_singleton()
+        connector = lowest_connector_row()
         if connector is not None and connector_state is not None:
             connector.enabled, connector.base_dn = connector_state
         db.session.commit()
@@ -242,7 +243,7 @@ def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=Tr
     from services.backup_service import BackupService
     from tests.backup_v3 import as_v3
     with app.app_context():
-        connector = ADConnectorConfig.get_singleton()
+        connector = lowest_connector_row()
         if connector is None:
             connector = ADConnectorConfig(name='default', server='dc.c01.example')
             db.session.add(connector)
@@ -431,7 +432,7 @@ def no_shared_keytab(app):
 
 def _connector_as(state):
     """The shared connector row as a 2.x case wants it; None: as good as absent."""
-    connector = ADConnectorConfig.get_singleton()
+    connector = lowest_connector_row()
     if connector is None:
         connector = ADConnectorConfig(name='default', server='dc.c01.example')
         db.session.add(connector)
@@ -993,7 +994,7 @@ def test_a_2x_archive_takes_the_realm_of_its_own_connector(app, clean_slate, no_
     settings = {**_settings_2x(issuing, policy), 'kerberos_spn': 'HTTP/ucm.c01.example'}
     archive, _connector = _2x_archive(app, settings, base_dn='DC=archived,DC=example')
     with app.app_context():
-        ADConnectorConfig.get_singleton().base_dn = 'DC=target,DC=example'
+        lowest_connector_row().base_dn = 'DC=target,DC=example'
         db.session.commit()
     _restore(app, archive)
     with app.app_context():
@@ -1027,3 +1028,24 @@ def test_the_keytab_column_is_stored_under_the_master_key(app, clean_slate, no_s
         raw = _raw_keytab(_default().id)
         assert raw != plain and is_encrypted(raw)
         assert _default().keytab_bytes() == ARCHIVED_KEYTAB
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_a_restore_of_the_connectors_alone_gives_them_to_a_default_profile_without_one(
+        app, clean_slate, no_shared_keytab, mode):
+    """As a created connector does: the protocols must not be left without the connector the screen shows."""
+    from services import windows_profiles
+    from services.backup_service import BackupService
+    with app.app_context():
+        db.session.add(ADConnectorConfig(name='c02b-restored', server='dc.restored.example',
+                                         base_dn='DC=restored,DC=example'))
+        db.session.commit()
+        include = {name: name == 'ad_connector' for name in manifest.SECTIONS}
+        blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
+        ADConnectorConfig.query.filter_by(name='c02b-restored').delete()
+        db.session.add(WindowsEnrollmentProfile(name='default', is_default=True, realm='RESTORED.EXAMPLE'))
+        db.session.commit()
+    _restore(app, blob, mode=mode)
+    with app.app_context():
+        lowest = windows_profiles.lowest_connector()
+        assert lowest is not None and _default().connector_id == lowest.id

@@ -8,14 +8,28 @@ import json
 
 import pytest
 
+from tests.ad_connector_support import connector_row
 from models import db, ADConnectorConfig
 from tests.windows_profile_support import connectors_kept
 
 
 @pytest.fixture(autouse=True)
 def _connectors_put_back(app):
+    """A 2.x install: no default profile, so the screen shows the lowest-id row."""
+    from models import WindowsEnrollmentProfile
     with connectors_kept(app):
-        yield
+        with app.app_context():
+            parked = [p.id for p in WindowsEnrollmentProfile.query.filter_by(is_default=True)]
+            WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.id.in_(parked)).update(
+                {'is_default': False}, synchronize_session=False)
+            db.session.commit()
+        try:
+            yield
+        finally:
+            with app.app_context():
+                WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.id.in_(parked)).update(
+                    {'is_default': True}, synchronize_session=False)
+                db.session.commit()
 
 
 def test_bind_password_encrypted_at_rest(app):
@@ -70,7 +84,7 @@ def test_get_singleton_returns_none_when_unconfigured(app):
     with app.app_context():
         ADConnectorConfig.query.delete()
         db.session.commit()
-        assert ADConnectorConfig.get_singleton() is None
+        assert connector_row() is None
 
 
 class TestServerListValidation:
@@ -119,7 +133,7 @@ class TestServerListValidation:
         })
         assert response.status_code == 200, response.data
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().servers == \
+            assert connector_row().servers == \
                 ['dc1.corp.local', 'dc2.corp.local']
 
 
@@ -146,7 +160,7 @@ class TestSavedTestDoesNotRecordForADisabledConnector:
         response = auth_client.post('/api/v2/ad-connector/test-saved')
         assert response.status_code == 400
         with app.app_context():
-            config = ADConnectorConfig.get_singleton()
+            config = connector_row()
             assert config.health == {}
             # The test itself is still recorded -- only the health verdict
             # (which drives the badge and the skip list) is withheld.
@@ -224,7 +238,7 @@ class TestBindCredentialIsRequired:
         assert response.status_code == 400
         with app.app_context():
             # Refused, not half-applied: the partial mutation is rolled back.
-            assert ADConnectorConfig.get_singleton() is None
+            assert connector_row() is None
 
     def test_setup_can_be_filled_in_before_the_switch_is_turned_on(self, app, auth_client):
         """Nothing binds while it is off, so the form can be completed over
@@ -260,7 +274,7 @@ class TestBindCredentialIsRequired:
         assert self._put(auth_client, {'port': 636}).status_code == 400
         assert self._put(auth_client, {'port': 636, 'bind_password': 'svc-password'}).status_code == 200
         with app.app_context():
-            config = ADConnectorConfig.get_singleton()
+            config = connector_row()
             assert (config.port, config.bind_password) == (636, 'svc-password')
 
     def test_clearing_it_on_an_enabled_connector_is_refused(self, app, auth_client):
@@ -275,7 +289,7 @@ class TestBindCredentialIsRequired:
 
         assert self._put(auth_client, {'bind_password': ''}).status_code == 400
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().bind_password == 'svc-password'
+            assert connector_row().bind_password == 'svc-password'
 
     def test_first_save_of_an_enabled_connector_without_a_bind_dn_is_refused(self, app, auth_client):
         with app.app_context():
@@ -287,7 +301,7 @@ class TestBindCredentialIsRequired:
         })
         assert response.status_code == 400
         with app.app_context():
-            assert ADConnectorConfig.get_singleton() is None
+            assert connector_row() is None
 
     def test_clearing_the_bind_dn_on_an_enabled_connector_is_refused(self, app, auth_client):
         with app.app_context():
@@ -301,7 +315,7 @@ class TestBindCredentialIsRequired:
 
         assert self._put(auth_client, {'bind_dn': ''}).status_code == 400
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().bind_dn == 'CN=svc-ucm,DC=corp,DC=local'
+            assert connector_row().bind_dn == 'CN=svc-ucm,DC=corp,DC=local'
 
     def test_a_legacy_connector_can_still_be_switched_off(self, app, auth_client):
         """The regression this rule caused when it was unconditional. The
@@ -317,7 +331,7 @@ class TestBindCredentialIsRequired:
 
         assert self._put(auth_client, {'enabled': False}).status_code == 200
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().enabled is False
+            assert connector_row().enabled is False
 
     def test_a_legacy_connector_cannot_be_re_enabled_without_one(self, app, auth_client):
         with app.app_context():
@@ -329,7 +343,7 @@ class TestBindCredentialIsRequired:
 
         assert self._put(auth_client, {'enabled': True}).status_code == 400
         with app.app_context():
-            assert ADConnectorConfig.get_singleton().enabled is False
+            assert connector_row().enabled is False
 
     def test_the_saved_test_will_not_bind_anonymously(self, app, auth_client):
         """The other half of the same rule: POST /test refused an anonymous
@@ -348,7 +362,7 @@ class TestBindCredentialIsRequired:
         response = auth_client.post('/api/v2/ad-connector/test-saved')
         assert response.status_code == 400
         with app.app_context():
-            config = ADConnectorConfig.get_singleton()
+            config = connector_row()
             # No DC was reached, so the stored verdict is left alone rather
             # than being overwritten with "nothing was healthy".
             assert config.health['state'] == 'up'

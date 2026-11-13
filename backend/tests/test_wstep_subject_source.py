@@ -61,10 +61,10 @@ def directory(monkeypatch):
     found = {'dns': 'win11.example.test', 'user': {
         'dn_components': [('CN', 'Alice'), ('CN', 'Users'), ('DC', 'example'), ('DC', 'test')],
         'upn': 'alice@example.test'}}
-    monkeypatch.setattr(ad_lookup, 'connector_account', lambda principal: principal.split('@')[0])
-    monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda sam: found['dns'])
-    monkeypatch.setattr(ad_lookup, 'lookup_user_ad_identity', lambda sam: found['user'])
-    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: 'S-1-5-21-1-2-3-1000')
+    monkeypatch.setattr(ad_lookup, 'connector_account', lambda _config, principal: principal.split('@')[0])
+    monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda _config, sam: found['dns'])
+    monkeypatch.setattr(ad_lookup, 'lookup_user_ad_identity', lambda _config, sam: found['user'])
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: 'S-1-5-21-1-2-3-1000')
     return found
 
 
@@ -160,11 +160,11 @@ def test_a_directory_that_cannot_answer_is_the_server_s_failure(app, subject_ca,
 def test_an_unresolved_principal_gets_no_requested_subject(app, subject_ca, directory, monkeypatch):
     """No connector leaves no identity to build from; a realm it does not serve is refused outright."""
     ca_id = subject_ca('Subject source unresolved CA', MIXED)
-    monkeypatch.setattr(ad_lookup, 'connector_account', lambda principal: None)
+    monkeypatch.setattr(ad_lookup, 'connector_account', lambda _config, principal: None)
     cert, err = _issue(app, ca_id, _csr('dc01.example.test', ekus=[SERVER_AUTH]), MACHINE)
     assert cert is None
     assert err == 'The certificate subject is built from Active Directory, which could not resolve the requester'
-    monkeypatch.setattr(ad_lookup, 'connector_account', lambda principal: ad_lookup.FOREIGN_REALM)
+    monkeypatch.setattr(ad_lookup, 'connector_account', lambda _config, principal: ad_lookup.FOREIGN_REALM)
     cert, err = _issue(app, ca_id, _csr('dc01.example.test', ekus=[SERVER_AUTH]), MACHINE)
     assert cert is None
     assert err == "The requester's realm is not served by the directory connector"

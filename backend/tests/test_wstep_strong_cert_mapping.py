@@ -18,7 +18,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
-from models import CA, ADConnectorConfig, CATemplatePin, db
+from models import CA, CATemplatePin, db
+from tests.ad_connector_support import clear_connectors, mount_connector
 from models.certificate_template import CertificateTemplate
 from services.ad_connector import lookup as ad_lookup
 from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID
@@ -56,20 +57,13 @@ def _make_csr(common_name=None):
 
 def _configure_ad_connector(app, enabled=True):
     with app.app_context():
-        ADConnectorConfig.query.delete()
-        config = ADConnectorConfig(
-            server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
-            bind_dn='svc-ucm', enabled=enabled,
-        )
-        config.bind_password = 'irrelevant'
-        db.session.add(config)
-        db.session.commit()
+        mount_connector(server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
+                        bind_dn='svc-ucm', enabled=enabled)
 
 
 def _clear_ad_connector(app):
     with app.app_context():
-        ADConnectorConfig.query.delete()
-        db.session.commit()
+        clear_connectors()
 
 
 @contextlib.contextmanager
@@ -106,8 +100,8 @@ class TestStrongCertMapping:
         SID extension, both present on the same issued cert."""
         ca_data = create_ca(cn='Strong Mapping Naked CA')
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda sam: 'win11.hagland.domain')
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: _REAL_SID)
+        monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda _config, sam: 'win11.hagland.domain')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: _REAL_SID)
 
         csr, _key = _make_csr()
         with app.app_context():
@@ -129,7 +123,7 @@ class TestStrongCertMapping:
         of _is_naked_csr, unlike the AD-derived-subject mechanism."""
         ca_data = create_ca(cn='Strong Mapping Manual CA')
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: _REAL_SID)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: _REAL_SID)
 
         csr, _key = _make_csr(common_name='win11-manual.hagland.domain')
         with _supplied_subject_template(app, ca_data['id']), app.app_context():
@@ -152,7 +146,7 @@ class TestStrongCertMapping:
         ca_data = create_ca(cn='Strong Mapping Unconfigured CA')
         _clear_ad_connector(app)
 
-        def _fail_if_called(sam):
+        def _fail_if_called(_config, sam):
             raise AssertionError('lookup_object_sid must not be called when AD Connector is unconfigured')
 
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', _fail_if_called)
@@ -175,7 +169,7 @@ class TestStrongCertMapping:
         to a weaker-mapped cert."""
         ca_data = create_ca(cn='Strong Mapping Lookup Fail CA')
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: None)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: None)
 
         csr, _key = _make_csr(common_name='win11-manual.hagland.domain')
         with app.app_context():
@@ -195,7 +189,7 @@ class TestStrongCertMapping:
         ca_data = create_ca(cn='Strong Mapping UP CA')
         _configure_ad_connector(app)
 
-        def _fail_if_called(sam):
+        def _fail_if_called(_config, sam):
             raise AssertionError('lookup_object_sid must not be called for UsernamePassword-bound issuance')
 
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', _fail_if_called)
@@ -213,14 +207,10 @@ class TestStrongCertMapping:
 
 def _configure_connector_row(app, **fields):
     with app.app_context():
-        ADConnectorConfig.query.delete()
         values = dict(server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
                       bind_dn='svc-ucm', enabled=True)
         values.update(fields)
-        config = ADConnectorConfig(**values)
-        config.bind_password = 'irrelevant'
-        db.session.add(config)
-        db.session.commit()
+        mount_connector(**values)
 
 
 def _issue_supplied_subject(app, ca_id, principal):
@@ -244,7 +234,7 @@ class TestSidCheckIsNeverSkipped:
         ca_data = create_ca(cn='Strong Mapping Foreign Realm CA')
         _configure_connector_row(app)
 
-        def _fail_if_called(sam):
+        def _fail_if_called(_config, sam):
             raise AssertionError('a foreign principal must not be looked up in this domain')
 
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', _fail_if_called)
@@ -256,7 +246,7 @@ class TestSidCheckIsNeverSkipped:
     def test_principal_without_an_account_is_refused(self, app, create_ca, monkeypatch):
         ca_data = create_ca(cn='Strong Mapping No Account CA')
         _configure_connector_row(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: _REAL_SID)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: _REAL_SID)
         for principal in ('@HAGLAND.DOMAIN', 'WIN11$'):
             cert_pem, err = _issue_supplied_subject(app, ca_data['id'], principal)
             assert cert_pem is None, principal
@@ -265,7 +255,7 @@ class TestSidCheckIsNeverSkipped:
 
     def test_connector_without_base_dn_is_a_server_fault(self, app, create_ca, monkeypatch, caplog):
         ca_data = create_ca(cn='Strong Mapping No Base DN CA')
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: _REAL_SID)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: _REAL_SID)
         for base_dn, cause in ((None, 'no base DN'), ('', 'no base DN'),
                                ('not a dn', 'no DC component'), ('OU=Machines', 'no DC component')):
             _configure_connector_row(app, base_dn=base_dn)
@@ -281,7 +271,7 @@ class TestSidCheckIsNeverSkipped:
         ca_data = create_ca(cn='Strong Mapping Disabled Foreign CA')
         _configure_connector_row(app, enabled=False)
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid',
-                            lambda sam: (_ for _ in ()).throw(AssertionError('connector is off')))
+                            lambda _config, sam: (_ for _ in ()).throw(AssertionError('connector is off')))
         cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'WIN11$@OTHER.DOMAIN')
         assert err is None, err
         assert _sid_extension_value(x509.load_pem_x509_certificate(cert_pem.encode())) is None
@@ -291,7 +281,7 @@ class TestSidCheckIsNeverSkipped:
         ca_data = create_ca(cn='Strong Mapping Same Realm CA')
         _configure_connector_row(app)
         looked_up = []
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: looked_up.append(sam) or _REAL_SID)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: looked_up.append(sam) or _REAL_SID)
         cert_pem, err = _issue_supplied_subject(app, ca_data['id'], KERBEROS_MACHINE_PRINCIPAL)
         assert err is None, err
         assert looked_up == ['WIN11$']

@@ -10,6 +10,7 @@ import uuid
 import pytest
 
 from models import db
+from tests.ad_connector_support import connector_row, mount_connector
 from tests.windows_profile_support import connectors_kept
 
 
@@ -483,20 +484,16 @@ class TestADConnector:
 
     @pytest.fixture
     def saved(self, app):
-        from models import ADConnectorConfig
+        # Linked to the default profile, if any: the screen shows that profile's connector
         with app.app_context():
-            ADConnectorConfig.query.delete()
-            row = ADConnectorConfig(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
-                                    verify_ssl=True, base_dn='DC=corp,DC=local',
-                                    bind_dn='CN=svc,DC=corp,DC=local')
-            row.bind_password = 'saved-bind'
-            db.session.add(row)
-            db.session.commit()
+            mount_connector(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
+                            verify_ssl=True, base_dn='DC=corp,DC=local',
+                            bind_dn='CN=svc,DC=corp,DC=local', password='saved-bind')
 
     def _row(self, app):
         from models import ADConnectorConfig
         with app.app_context():
-            row = ADConnectorConfig.get_singleton()
+            row = connector_row()
             return row.server, row.port, row.verify_ssl, row.bind_dn, row.bind_password, row.base_dn
 
     @pytest.mark.parametrize('over', [

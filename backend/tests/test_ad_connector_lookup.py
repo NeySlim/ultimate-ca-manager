@@ -15,6 +15,11 @@ import pytest
 
 from models import db, ADConnectorConfig
 from services.ad_connector import lookup
+from tests.ad_connector_support import connector_row
+
+
+def _cfg():
+    return connector_row()
 
 
 class TestParseKerberosPrincipal:
@@ -65,22 +70,22 @@ class TestRealmMatchesConnector:
     def test_matches(self, app, monkeypatch):
         _configure(monkeypatch, app)
         with app.app_context():
-            assert lookup.realm_matches_connector('HAGLAND.DOMAIN') is True
+            assert lookup.realm_matches_connector(_cfg(), 'HAGLAND.DOMAIN') is True
 
     def test_realm_names_are_case_sensitive(self, app, monkeypatch):
         """RFC 4120 §6.1: realm names are case sensitive; AD's is its domain in capitals."""
         _configure(monkeypatch, app)
         with app.app_context():
-            assert lookup.realm_matches_connector('hagland.domain') is False
-            assert lookup.realm_matches_connector('Hagland.Domain') is False
+            assert lookup.realm_matches_connector(_cfg(), 'hagland.domain') is False
+            assert lookup.realm_matches_connector(_cfg(), 'Hagland.Domain') is False
 
     def test_characterization_a_child_domain_realm_is_another_realm(self, app, monkeypatch):
         """Characterization, true before the exact comparison too: it guards against a
         suffix match (``realm.endswith(connector_realm)``), which would let a child domain in."""
         _configure(monkeypatch, app)
         with app.app_context():
-            assert lookup.realm_matches_connector('CHILD.HAGLAND.DOMAIN') is False
-            assert lookup.connector_account('host$@CHILD.HAGLAND.DOMAIN') is lookup.FOREIGN_REALM
+            assert lookup.realm_matches_connector(_cfg(), 'CHILD.HAGLAND.DOMAIN') is False
+            assert lookup.connector_account(_cfg(), 'host$@CHILD.HAGLAND.DOMAIN') is lookup.FOREIGN_REALM
 
     def test_different_realm_rejected(self, app, monkeypatch):
         """A ticket from a trusted-but-different realm must not be treated
@@ -89,24 +94,24 @@ class TestRealmMatchesConnector:
         is."""
         _configure(monkeypatch, app)
         with app.app_context():
-            assert lookup.realm_matches_connector('OTHER.DOMAIN') is False
+            assert lookup.realm_matches_connector(_cfg(), 'OTHER.DOMAIN') is False
 
     def test_connector_not_configured(self, app):
         with app.app_context():
             ADConnectorConfig.query.delete()
             db.session.commit()
-            assert lookup.realm_matches_connector('HAGLAND.DOMAIN') is False
+            assert lookup.realm_matches_connector(_cfg(), 'HAGLAND.DOMAIN') is False
 
     def test_connector_disabled(self, app, monkeypatch):
         _configure(monkeypatch, app, enabled=False)
         with app.app_context():
-            assert lookup.realm_matches_connector('HAGLAND.DOMAIN') is False
+            assert lookup.realm_matches_connector(_cfg(), 'HAGLAND.DOMAIN') is False
 
     def test_empty_realm(self, app, monkeypatch):
         _configure(monkeypatch, app)
         with app.app_context():
-            assert lookup.realm_matches_connector('') is False
-            assert lookup.realm_matches_connector(None) is False
+            assert lookup.realm_matches_connector(_cfg(), '') is False
+            assert lookup.realm_matches_connector(_cfg(), None) is False
 
     def test_malformed_base_dn_fails_closed(self, app):
         with app.app_context():
@@ -118,7 +123,7 @@ class TestRealmMatchesConnector:
             config.bind_password = 'irrelevant'
             db.session.add(config)
             db.session.commit()
-            assert lookup.realm_matches_connector('HAGLAND.DOMAIN') is False
+            assert lookup.realm_matches_connector(_cfg(), 'HAGLAND.DOMAIN') is False
 
 
 class _FakeAttr:
@@ -175,39 +180,39 @@ class TestLookupComputerDnsHostname:
         with app.app_context():
             ADConnectorConfig.query.delete()
             db.session.commit()
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is None
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') is None
 
     def test_disabled_returns_none(self, app):
         _configure(None, app, enabled=False)
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is None
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') is None
 
     def test_bind_failure_returns_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('bind failed')))
         with app.app_context():
-            result = lookup.lookup_computer_dns_hostname('WIN11$')
+            result = lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$')
             assert result is lookup.UNREACHABLE and not result
 
     def test_computer_not_found_returns_none(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[]))
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is None
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') is None
 
     def test_empty_attribute_returns_none(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         entry = _FakeEntry({'dNSHostName': ''})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is None
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') is None
 
     def test_missing_attribute_returns_none(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         entry = _FakeEntry({})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is None
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') is None
 
     def test_search_exception_returns_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -216,14 +221,14 @@ class TestLookupComputerDnsHostname:
             lambda config: _FakeConnection(search_raises=RuntimeError('search failed')),
         )
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is lookup.UNREACHABLE
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') is lookup.UNREACHABLE
 
     def test_success_returns_dns_hostname(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         entry = _FakeEntry({'dNSHostName': 'win11.hagland.domain'})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') == 'win11.hagland.domain'
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') == 'win11.hagland.domain'
 
 
 class TestLookupUserAdIdentityUnreachable:
@@ -231,16 +236,16 @@ class TestLookupUserAdIdentityUnreachable:
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[]))
         with app.app_context():
-            assert lookup.lookup_user_ad_identity('alice') is None
+            assert lookup.lookup_user_ad_identity(_cfg(), 'alice') is None
         monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('bind failed')))
         with app.app_context():
-            assert lookup.lookup_user_ad_identity('alice') is lookup.UNREACHABLE
+            assert lookup.lookup_user_ad_identity(_cfg(), 'alice') is lookup.UNREACHABLE
         monkeypatch.setattr(
             lookup, '_connect',
             lambda config: _FakeConnection(search_raises=RuntimeError('search failed')),
         )
         with app.app_context():
-            assert lookup.lookup_user_ad_identity('alice') is lookup.UNREACHABLE
+            assert lookup.lookup_user_ad_identity(_cfg(), 'alice') is lookup.UNREACHABLE
 
 
 class TestEnabledWithoutServer:
@@ -260,10 +265,10 @@ class TestEnabledWithoutServer:
     def test_every_lookup_is_unreachable(self, app, server, base_dn):
         self._configure_incomplete(app, server=server, base_dn=base_dn)
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is lookup.UNREACHABLE
-            assert lookup.lookup_object_sid('WIN11$') is lookup.UNREACHABLE
-            assert lookup.lookup_user_ad_identity('alice') is lookup.UNREACHABLE
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') is lookup.UNREACHABLE
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') is lookup.UNREACHABLE
+            assert lookup.lookup_user_ad_identity(_cfg(), 'alice') is lookup.UNREACHABLE
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is lookup.UNREACHABLE
 
 
 class TestSidBytesToString:
@@ -312,31 +317,31 @@ class TestLookupObjectSid:
         with app.app_context():
             ADConnectorConfig.query.delete()
             db.session.commit()
-            assert lookup.lookup_object_sid('WIN11$') is None
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') is None
 
     def test_disabled_returns_none(self, app):
         _configure(None, app, enabled=False)
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is None
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') is None
 
     def test_bind_failure_is_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('bind failed')))
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is lookup.UNREACHABLE
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') is lookup.UNREACHABLE
 
     def test_not_found_returns_none(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[]))
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is None
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') is None
 
     def test_missing_attribute_is_unusable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         entry = _FakeEntry({})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is lookup.UNUSABLE_SID
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') is lookup.UNUSABLE_SID
 
     def test_empty_raw_values_is_unusable(self, app, monkeypatch):
         # _FakeEntry wraps every dict value in _FakeAttr itself (see its
@@ -348,14 +353,14 @@ class TestLookupObjectSid:
         entry = _FakeEntry({'objectSid': b''})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is lookup.UNUSABLE_SID
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') is lookup.UNUSABLE_SID
 
     def test_malformed_sid_is_unusable_not_absent(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         entry = _FakeEntry({'objectSid': b'\x01\x05\x00'})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            result = lookup.lookup_object_sid('WIN11$')
+            result = lookup.lookup_object_sid(_cfg(), 'WIN11$')
             assert result is lookup.UNUSABLE_SID and not result
 
     def test_search_exception_is_unreachable(self, app, monkeypatch):
@@ -365,7 +370,7 @@ class TestLookupObjectSid:
             lambda config: _FakeConnection(search_raises=RuntimeError('search failed')),
         )
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is lookup.UNREACHABLE
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') is lookup.UNREACHABLE
 
     def test_success_returns_sid_string(self, app, monkeypatch):
         """Reads raw_values (the real binary SID), not .value -- ldap3
@@ -379,7 +384,7 @@ class TestLookupObjectSid:
         entry = _FakeEntry({'objectSid': raw_sid})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') == 'S-1-5-21-1608104657-630783805-1473387121-1105'
+            assert lookup.lookup_object_sid(_cfg(), 'WIN11$') == 'S-1-5-21-1608104657-630783805-1473387121-1105'
 
 
 class _FakeSequentialConnection:
@@ -409,37 +414,37 @@ class TestIsMemberOfGroup:
         with app.app_context():
             ADConnectorConfig.query.delete()
             db.session.commit()
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is False
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is False
 
     def test_disabled_returns_false(self, app):
         _configure(None, app, enabled=False)
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is False
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is False
 
     def test_empty_sam_account_name_returns_false(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         with app.app_context():
-            assert lookup.is_member_of_group('', 'VPN-Enroll') is False
-            assert lookup.is_member_of_group(None, 'VPN-Enroll') is False
+            assert lookup.is_member_of_group(_cfg(), '', 'VPN-Enroll') is False
+            assert lookup.is_member_of_group(_cfg(), None, 'VPN-Enroll') is False
 
     def test_empty_group_returns_false(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         with app.app_context():
-            assert lookup.is_member_of_group('alice', '') is False
-            assert lookup.is_member_of_group('alice', None) is False
+            assert lookup.is_member_of_group(_cfg(), 'alice', '') is False
+            assert lookup.is_member_of_group(_cfg(), 'alice', None) is False
 
     def test_bind_failure_returns_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('bind failed')))
         with app.app_context():
-            result = lookup.is_member_of_group('alice', 'VPN-Enroll')
+            result = lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll')
             assert result is lookup.UNREACHABLE and not result
 
     def test_group_name_not_found_returns_false(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeSequentialConnection([[]]))
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is False
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is False
 
     def test_member_by_group_name(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -451,7 +456,7 @@ class TestIsMemberOfGroup:
             lambda config: _FakeSequentialConnection([[group_entry], [member_entry]]),
         )
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is True
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is True
 
     def test_not_member_by_group_name(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -462,7 +467,7 @@ class TestIsMemberOfGroup:
             lambda config: _FakeSequentialConnection([[group_entry], []]),
         )
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is False
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is False
 
     def test_member_by_group_dn_skips_resolution_search(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -472,8 +477,7 @@ class TestIsMemberOfGroup:
             lambda config: _FakeSequentialConnection([[member_entry]]),
         )
         with app.app_context():
-            assert lookup.is_member_of_group(
-                'alice', 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'
             ) is True
 
     def test_search_exception_returns_unreachable(self, app, monkeypatch):
@@ -483,7 +487,7 @@ class TestIsMemberOfGroup:
             lambda config: _FakeConnection(search_raises=RuntimeError('search failed')),
         )
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is lookup.UNREACHABLE
 
     def test_machine_principal_sam_account_name(self, app, monkeypatch):
         """A trailing '$' on a machine account's sAMAccountName is passed
@@ -497,7 +501,7 @@ class TestIsMemberOfGroup:
             lambda config: _FakeSequentialConnection([[group_entry], [member_entry]]),
         )
         with app.app_context():
-            assert lookup.is_member_of_group('WIN11$', 'Enroll-Machines') is True
+            assert lookup.is_member_of_group(_cfg(), 'WIN11$', 'Enroll-Machines') is True
 
 
 class TestSplitServers:
@@ -1033,7 +1037,7 @@ class TestRunHealthProbe:
                              ('dc2.corp.local', True, 'ok')])
             result = h.run_health_probe()
             assert (result['status'], result['state']) == ('ok', h.STATE_DEGRADED)
-            stored = ADConnectorConfig.get_singleton().health
+            stored = connector_row().health
             assert stored['servers']['dc1.corp.local']['healthy'] is False
             assert stored['servers']['dc2.corp.local']['healthy'] is True
 
@@ -1104,7 +1108,7 @@ class TestRunHealthProbe:
             monkeypatch.setattr(lookup_mod, '_build_tls', _explode)
             result = h.run_health_probe()
             assert result['status'] == 'failed'
-            stored = ADConnectorConfig.get_singleton().health
+            stored = connector_row().health
             assert stored['state'] == 'degraded'
             assert stored['servers']['dc1.corp.local']['healthy'] is False
 
@@ -1124,7 +1128,7 @@ class TestRunHealthProbe:
             assert result['status'] == 'skipped'
             assert 'credential' in result['reason']
             # Nothing probed means nothing recorded: no verdict is invented.
-            assert ADConnectorConfig.get_singleton().health == {}
+            assert connector_row().health == {}
 
 
 # Result codes (RFC 4511 §4.1.9) a search answers with when the directory could not
@@ -1136,11 +1140,11 @@ _FAILED_SEARCHES = [
     (4, 'sizeLimitExceeded'),
 ]
 _LOOKUPS = {
-    'computer': lambda: lookup.lookup_computer_dns_hostname('WIN11$'),
-    'sid': lambda: lookup.lookup_object_sid('WIN11$'),
-    'user': lambda: lookup.lookup_user_ad_identity('alice'),
-    'group': lambda: lookup.is_member_of_group('alice', 'VPN-Enroll'),
-    'group-dn': lambda: lookup.is_member_of_group('alice', 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'),
+    'computer': lambda: lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$'),
+    'sid': lambda: lookup.lookup_object_sid(_cfg(), 'WIN11$'),
+    'user': lambda: lookup.lookup_user_ad_identity(_cfg(), 'alice'),
+    'group': lambda: lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll'),
+    'group-dn': lambda: lookup.is_member_of_group(_cfg(), 'alice', 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'),
 }
 
 
@@ -1164,7 +1168,7 @@ class TestSearchResultCodes:
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeSequentialConnection(
             [[group_entry], []], results=[_SUCCESS, busy]))
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is lookup.UNREACHABLE
 
     @pytest.mark.parametrize('name, absent', [
         ('computer', None), ('sid', None), ('user', None), ('group', False), ('group-dn', False)])
@@ -1180,7 +1184,7 @@ class TestSearchResultCodes:
         limited = {'result': 4, 'description': 'sizeLimitExceeded', 'message': ''}
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry], result=limited))
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') == 'win11.hagland.domain'
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') == 'win11.hagland.domain'
 
 
 class TestSearchResultCodesOnLdap3:
@@ -1201,15 +1205,15 @@ class TestSearchResultCodesOnLdap3:
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: self._mock_connection(base='DC=other,DC=test'))
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is lookup.UNREACHABLE
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$') is lookup.UNREACHABLE
 
     def test_the_same_directory_still_finds_and_misses(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: self._mock_connection())
         with app.app_context():
             # The schema-less mock hands values back as bytes: only presence is compared
-            assert 'win11.hagland.domain' in lookup.lookup_computer_dns_hostname('WIN11$')
-            assert lookup.lookup_computer_dns_hostname('GHOST$') is None
+            assert 'win11.hagland.domain' in lookup.lookup_computer_dns_hostname(_cfg(), 'WIN11$')
+            assert lookup.lookup_computer_dns_hostname(_cfg(), 'GHOST$') is None
 
 
 class TestSearchWithoutResult:
@@ -1237,7 +1241,7 @@ class TestAmbiguousAclGroup:
         monkeypatch.setattr(lookup, '_connect',
                             lambda config: _FakeSequentialConnection([[second, first], [member]]))
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
+            assert lookup.is_member_of_group(_cfg(), 'alice', 'VPN-Enroll') is lookup.UNREACHABLE
 
 
 class TestBaseDnSpellings:
@@ -1258,8 +1262,8 @@ class TestBaseDnSpellings:
             db.session.add(config)
             db.session.commit()
             try:
-                assert lookup.connector_account(f'WIN11$@{realm}') == 'WIN11$'
-                assert lookup.connector_config_fault() is None
+                assert lookup.connector_account(_cfg(), f'WIN11$@{realm}') == 'WIN11$'
+                assert lookup.connector_config_fault(_cfg()) is None
             finally:
                 ADConnectorConfig.query.delete()
                 db.session.commit()
@@ -1318,17 +1322,17 @@ class TestLookupAccountBySid:
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: pytest.fail('no search for a malformed SID'))
         with app.app_context():
-            assert lookup.lookup_account_by_sid(sid) is lookup.NO_ACCOUNT
+            assert lookup.lookup_account_by_sid(_cfg(), sid) is lookup.NO_ACCOUNT
 
     def test_connector_off_is_none(self, app):
         _configure(None, app, enabled=False)
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) is None
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) is None
 
     def test_enabled_without_server_is_unreachable(self, app):
         TestEnabledWithoutServer._configure_incomplete(app)
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) is lookup.UNREACHABLE
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) is lookup.UNREACHABLE
 
     def test_bind_failure_is_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -1337,14 +1341,14 @@ class TestLookupAccountBySid:
             raise RuntimeError('bind refused')
         monkeypatch.setattr(lookup, '_connect', refuse)
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) is lookup.UNREACHABLE
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) is lookup.UNREACHABLE
 
     def test_failed_search_is_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         busy = {'result': 51, 'description': 'busy'}
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(result=busy))
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) is lookup.UNREACHABLE
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) is lookup.UNREACHABLE
 
     def test_several_accounts_are_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -1353,20 +1357,20 @@ class TestLookupAccountBySid:
             e.entry_dn = 'CN=x'
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=entries))
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) is lookup.UNREACHABLE
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) is lookup.UNREACHABLE
 
     def test_not_found_is_no_account(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[]))
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) is lookup.NO_ACCOUNT
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) is lookup.NO_ACCOUNT
 
     def test_an_answer_for_another_sid_is_no_account(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         other = lookup._sid_string_to_bytes('S-1-5-21-1608104657-630783805-1473387121-500')
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[self._entry(other)]))
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) is lookup.NO_ACCOUNT
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) is lookup.NO_ACCOUNT
 
     @pytest.mark.parametrize('sam', [None, ''])
     def test_an_object_without_an_account_name_is_no_account(self, app, monkeypatch, sam):
@@ -1379,14 +1383,14 @@ class TestLookupAccountBySid:
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[fsp]))
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) is lookup.NO_ACCOUNT
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) is lookup.NO_ACCOUNT
 
     def test_found_searches_the_binary_sid_and_names_the_account(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         conn = _RecordingConnection(entries=[self._entry()])
         monkeypatch.setattr(lookup, '_connect', lambda config: conn)
         with app.app_context():
-            assert lookup.lookup_account_by_sid(self._SID) == 'WIN11$'
+            assert lookup.lookup_account_by_sid(_cfg(), self._SID) == 'WIN11$'
         assert conn.filter_str == ('(objectSid=\\01\\05\\00\\00\\00\\00\\00\\05\\15\\00\\00\\00'
                                    '\\d1\\ba\\d9\\5f\\3d\\ff\\98\\25\\71\\1a\\d2\\57\\51\\04\\00\\00)')
         assert conn.unbound

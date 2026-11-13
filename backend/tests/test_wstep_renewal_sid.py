@@ -100,7 +100,7 @@ def test_a_certificate_the_ca_did_not_sign_is_refused(client, app, auth_client, 
     from tests.test_protocol_renewal_sid import forged_import
     _row_id, forged, key = forged_import(app, auth_client, wstep_renew_config['id'],
                                          f'sid-forged-{renew.__name__.strip('_').replace('_', '-')}.example.test')
-    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: pytest.fail('unsigned SID'))
+    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: pytest.fail('unsigned SID'))
     _configure_ad_connector(app)
     before = _count(app)
     r = renew(client, forged, key)
@@ -117,7 +117,7 @@ def test_a_sid_in_the_renewal_csr_is_ignored(client, app, wstep_renew_config):
 def test_a_certificate_without_the_extension_renews_without_it(client, app, wstep_renew_config, monkeypatch):
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'sid-none.example.test', sid=None)
     _configure_ad_connector(app)
-    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: pytest.fail('no SID to resolve'))
+    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: pytest.fail('no SID to resolve'))
     renewed = _issued(_renew_tls(client, old_cert, old_key, csr_sid=OTHER_SID))
     assert _sid_ext(renewed) is None
 
@@ -136,7 +136,7 @@ def test_connector_finds_the_account_and_the_sid_is_kept(client, app, wstep_rene
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'sid-found.example.test')
     _configure_ad_connector(app)
     asked = []
-    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: asked.append(sid) or 'WIN11$')
+    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: asked.append(sid) or 'WIN11$')
     renewed = _issued(_renew_tls(client, old_cert, old_key, csr_sid=OTHER_SID))
     assert asked == [SID]
     assert _sid_ext(renewed).value.value == _ad_security_extension(SID).value
@@ -145,7 +145,7 @@ def test_connector_finds_the_account_and_the_sid_is_kept(client, app, wstep_rene
 def test_connector_without_the_account_refuses(client, app, wstep_renew_config, monkeypatch):
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'sid-gone.example.test')
     _configure_ad_connector(app)
-    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.NO_ACCOUNT)
+    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.NO_ACCOUNT)
     before = _count(app)
     r = _renew_tls(client, old_cert, old_key)
     assert r.status_code == 400
@@ -157,7 +157,7 @@ def test_connector_without_the_account_refuses(client, app, wstep_renew_config, 
 def test_unreachable_directory_is_a_server_fault(client, app, wstep_renew_config, monkeypatch, renew):
     old_cert, old_key = _issue(app, wstep_renew_config['id'], f'sid-down-{renew.__name__.strip('_').replace('_', '-')}.example.test')
     _configure_ad_connector(app)
-    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
+    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.UNREACHABLE)
     before = _count(app)
     r = renew(client, old_cert, old_key)
     assert r.status_code == 500
@@ -201,7 +201,7 @@ def test_approved_renewal_checks_the_account_when_it_signs(app, client, auth_cli
         _pending(_renew_tls(client, old_cert, old_key))
         (approval_id, *_), = requests_of(app, pid, 'wstep_request')
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.NO_ACCOUNT)
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.NO_ACCOUNT)
         r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
         assert r.get_json()['message'] == 'Request closed'
         (_id, status, data, cert_id), = requests_of(app, pid, 'wstep_request')

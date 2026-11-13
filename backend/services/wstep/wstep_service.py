@@ -914,7 +914,7 @@ def _subject_source(template):
     return 'machine' if is_machine_template(template) else 'directory'
 
 
-def _directory_subject(ca, template, csr, principal, sam_account_name):
+def _directory_subject(ca, template, csr, principal, sam_account_name, connector):
     """``(override_subject, override_san, refusal)`` for a Kerberos-bound request.
 
     A template whose subject is built by the CA (MS-WCCE 3.2.2.6.2.1.4.5.9: the CA
@@ -938,14 +938,14 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
 
     subject, san, reached = None, None, True
     if sam_account_name and is_machine:
-        dns_hostname = lookup.lookup_computer_dns_hostname(sam_account_name)
+        dns_hostname = lookup.lookup_computer_dns_hostname(connector, sam_account_name)
         reached = dns_hostname is not lookup.UNREACHABLE
         if dns_hostname:
             subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, dns_hostname)])
             # MS-WCCE: the dNSHostName is the DNS SAN; a CSR without SAN gets it from the CN
             san = [x509.DNSName(dns_hostname)] if _san_values(csr) is not None else None
     elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca)):
-        subject, san = _user_directory_subject(sam_account_name)
+        subject, san = _user_directory_subject(connector, sam_account_name)
         if subject is lookup.UNREACHABLE:
             reached, subject = False, None
 
@@ -960,12 +960,12 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
     return subject, san, None
 
 
-def _user_directory_subject(sam_account_name):
+def _user_directory_subject(connector, sam_account_name):
     """(subject, SAN) from the AD user object: its DN, its UPN, its mail when valid;
     (``lookup.UNREACHABLE``, None) when the directory could not answer."""
     from services.ad_connector import lookup
 
-    identity = lookup.lookup_user_ad_identity(sam_account_name)
+    identity = lookup.lookup_user_ad_identity(connector, sam_account_name)
     if identity is lookup.UNREACHABLE:
         return identity, None
     if not identity:
@@ -1050,15 +1050,18 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     override_san = None
     kerberos_sam_account_name = None
     requester_sid = None
+    connector = None
     if kerberos_principal:
         from services.ad_connector import lookup
+        from services.windows_profiles import default_connector
 
+        connector = default_connector()
         # An enabled connector that cannot resolve the requester refuses: issuing anyway
         # would drop the SID extension (KB5014754) and the Enroll ACL's account.
-        account = lookup.connector_account(kerberos_principal)
+        account = lookup.connector_account(connector, kerberos_principal)
         if account is lookup.UNREACHABLE:
             logger.warning("WSTEP: the AD Connector cannot resolve %r: %s", kerberos_principal,
-                           lookup.connector_config_fault() or 'its settings changed')
+                           lookup.connector_config_fault(connector) or 'its settings changed')
             return None, ServerError(renewal_identity.UNRESOLVED_MESSAGE)
         if account is lookup.FOREIGN_REALM:
             # sAMAccountName is unique only within its domain: never look it up in another
@@ -1073,7 +1076,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # the SID security extension, as AD CS does, whatever the template and the CSR's subject.
     # With the connector off there is no account (no extension); with it on, a failed lookup refuses.
     if kerberos_sam_account_name:
-        requester_sid = lookup.lookup_object_sid(kerberos_sam_account_name)
+        requester_sid = lookup.lookup_object_sid(connector, kerberos_sam_account_name)
         if not requester_sid:
             logger.warning(
                 "WSTEP: could not resolve requester SID for %r via AD "
@@ -1109,7 +1112,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
 
     if kerberos_principal:
         override_subject, override_san, refusal = _directory_subject(
-            ca, matched_template, csr, kerberos_principal, kerberos_sam_account_name)
+            ca, matched_template, csr, kerberos_principal, kerberos_sam_account_name, connector)
         if refusal:
             return None, refusal
         # Without EKUs the default profile would give serverAuth to the name the request chose
@@ -1148,7 +1151,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         required_groups = _required_enroll_acl_groups(ca, matched_template)
         allowed, unreachable = False, False
         for group in (required_groups if kerberos_sam_account_name else []):
-            answer = lookup.is_member_of_group(kerberos_sam_account_name, group)
+            answer = lookup.is_member_of_group(connector, kerberos_sam_account_name, group)
             if answer:
                 allowed = True
                 break
