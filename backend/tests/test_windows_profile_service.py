@@ -706,6 +706,79 @@ def test_the_node_that_loses_the_race_writes_its_keytab_file(app, clean_slate, n
         assert _default().keytab_bytes() == TARGET_KEYTAB
 
 
+def _committed_elsewhere(content, insert):
+    """Another node's transaction on shared_files, committed outside this session."""
+    from sqlalchemy import insert as sql_insert, update
+    from models import SharedFile
+    from services import shared_files
+    from utils.key_codec import store_pem_bytes
+    table = SharedFile.__table__
+    with db.engine.begin() as conn:
+        if insert:
+            conn.execute(sql_insert(table).values(name=shared_files.KERBEROS_KEYTAB,
+                                                  content=store_pem_bytes(content), updated_by='other-node'))
+        else:
+            conn.execute(update(table).where(table.c.name == shared_files.KERBEROS_KEYTAB).values(
+                content=store_pem_bytes(content), updated_by='other-node'))
+
+
+def test_the_node_that_loses_the_keytab_insert_writes_its_file(app, clean_slate, no_shared_keytab,
+                                                                monkeypatch, tmp_path, caplog):
+    """Two nodes rebuild the missing shared keytab at once: the one whose insert collides keeps
+    the other's row and still writes its own file."""
+    from config.settings import Config
+    from models import SharedFile
+    from services import shared_files
+    from utils.key_codec import store_pem_bytes
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    path = tmp_path / 'kerberos.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    with app.app_context():
+        profile = WindowsEnrollmentProfile(name='default', is_default=True, realm='KT.EXAMPLE')
+        profile.set_keytab(ARCHIVED_KEYTAB)
+        db.session.add(profile)
+        db.session.commit()
+    real, raced = shared_files.store_file, []
+
+    def colliding(name, data, actor=None):
+        if raced:
+            return real(name, data, actor)
+        # This node looked and found no row; the other node's insert commits before its own
+        raced.append(1)
+        _committed_elsewhere(data, insert=True)
+        row = SharedFile(name=name, content=store_pem_bytes(data))
+        db.session.add(row)
+        return row
+    monkeypatch.setattr(shared_files, 'store_file', colliding)
+    with caplog.at_level('ERROR'):
+        negotiate_auth.restore_keytab_at_start(app)
+    assert raced and path.read_bytes() == ARCHIVED_KEYTAB
+    assert 'not restored' not in caplog.text
+    with app.app_context():
+        assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == ARCHIVED_KEYTAB
+
+
+def test_a_failed_rebuild_still_writes_the_stored_keytab_file(app, clean_slate, no_shared_keytab,
+                                                              monkeypatch, tmp_path):
+    from config.settings import Config
+    from services import shared_files
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    path = tmp_path / 'kerberos.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    with app.app_context():
+        profile = WindowsEnrollmentProfile(name='default', is_default=True, realm='KT.EXAMPLE')
+        profile.set_keytab(ARCHIVED_KEYTAB)
+        db.session.add(profile)
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, TARGET_KEYTAB)
+        db.session.commit()
+
+    def failing(data):
+        raise RuntimeError('c01 rebuild failed')
+    monkeypatch.setattr(negotiate_auth, '_rebuild_shared_keytab', failing)
+    negotiate_auth.restore_keytab_at_start(app)
+    assert path.read_bytes() == TARGET_KEYTAB
+
+
 def _restore(app, archive, mode='merge'):
     from services.backup_service import BackupService
     try:

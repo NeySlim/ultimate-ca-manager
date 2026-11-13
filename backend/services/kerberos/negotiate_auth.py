@@ -259,18 +259,37 @@ def restore_keytab_at_start(app):
             elif shared_files.read_file(shared_files.KERBEROS_KEYTAB) != profile.keytab_bytes():
                 # The profile is the source: a file it does not hold is rebuilt, everywhere
                 from services import cluster_commands
-                windows_profiles.publish_keytab()
+                _rebuild_shared_keytab(profile.keytab_bytes())
                 cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
                 db.session.commit()
                 logger.info("Kerberos keytab rebuilt from the default Windows enrollment profile")
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Kerberos keytab not restored from the database: {type(e).__name__}: {e}")
+        # Apart: a failed rebuild above still leaves this node the stored keytab's file
+        try:
             if db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is not None:
                 if write_stored_keytab() == 'written':
                     logger.info("Kerberos keytab written from the database")
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Kerberos keytab not restored from the database: {type(e).__name__}: {e}")
+            logger.error(f"Kerberos keytab file not written: {type(e).__name__}: {e}")
         finally:
             db.session.remove()
+
+
+def _rebuild_shared_keytab(data):
+    """The shared keytab set to the profile's *data*. A node starting at the same time may
+    insert the row first: the collision is undone alone and the row then updated."""
+    from sqlalchemy.exc import IntegrityError
+    from models import db
+    from services import shared_files
+    try:
+        with db.session.begin_nested():
+            shared_files.store_file(shared_files.KERBEROS_KEYTAB, data, actor='system')
+    except IntegrityError:
+        db.session.expire_all()
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, data, actor='system')
 
 
 def inspect_keytab(path=None):
