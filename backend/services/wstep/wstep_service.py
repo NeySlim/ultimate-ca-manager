@@ -1082,7 +1082,7 @@ def _user_directory_subject(connector, sam_account_name, patterned=None, *, prof
 
 
 def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos_principal=None,
-          outer_signed_data=None, gate=None, on_stored=None, *, profile):
+          outer_signed_data=None, gate=None, on_stored=None, renewal=None, *, profile):
     """UsernamePassword- or Kerberos-bound initial enrollment. Returns
     (cert_pem, error).
 
@@ -1116,6 +1116,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
 
     ``profile``: the Windows enrollment profile serving the request; a Kerberos principal is
     issued only by the enabled profile of its own realm, with that profile's connector.
+    ``renewal``: a dict that receives the ``serial`` of the certificate a Kerberos request renews
+    (``_requester_renewal``), for the audit.
 
     Enroll ACL: see ``_required_enroll_acl_groups`` for exactly which
     template's ``allowed_ad_group`` applies (the matched template's own,
@@ -1212,9 +1214,15 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
     if matched_template is None and not _ca_templates(ca, profile=profile):
         return None, ServerError('This CA offers no certificate template')
-    # A renewal of a certificate issued without template (before 3.0) keeps being served as it was
+    renewed = None
+    if kerberos_principal and outer_signed_data is not None:
+        renewed = _requester_renewal(ca, outer_signed_data, kerberos_principal, kerberos_sam_account_name,
+                                     connector, requester_sid, profile=profile)
+    if renewal is not None and renewed is not None:
+        renewal['serial'] = renewed.serial_number
+    # Only the requester's own valid Windows certificate issued without template (before 3.0) is exempted
     if (kerberos_principal and matched_template is None
-            and not _renews_template_less(ca, outer_signed_data)):
+            and (renewed is None or _template_ext_oid(renewed) is not None)):
         return None, NO_TEMPLATE
     template_oid = None
     if matched_template is not None:
@@ -1468,37 +1476,59 @@ def _verify_renewal_signer(outer_signed_data, cert):
     return 'Renewal request is not signed by the certificate being renewed'
 
 
-def _renewed_certificate(ca, outer_signed_data):
-    """The certificate of *ca* whose key signs the request envelope, as Windows signs a
-    renewal on the Kerberos binding; None for an initial enrollment."""
-    from services.cert.issued_lookup import issued_certificate_status
+def _envelope_certificates(outer_signed_data):
     try:
         choices = list(outer_signed_data['certificates'] or []) if outer_signed_data is not None else []
     except Exception:
-        return None
+        return
     for choice in choices:
         try:
-            if choice.name != 'certificate':
-                continue
-            cert = x509.load_der_x509_certificate(choice.chosen.dump())
+            if choice.name == 'certificate':
+                yield x509.load_der_x509_certificate(choice.chosen.dump())
         except Exception:
             continue
-        row, _status = issued_certificate_status(ca, cert)
-        if row is not None and _verify_renewal_signer(outer_signed_data, cert) is None:
+
+
+def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, connector, requester_sid, *,
+                       profile):
+    """The certificate a Kerberos request renews, as Windows signs the envelope with its key: one of
+    *ca*, valid (not revoked, expired or superseded), recorded under *profile* and the requester's
+    own (``_requester_holds``); None for an initial enrollment or the certificate of another."""
+    from services.cert.issued_lookup import OK, issued_certificate_status
+    from services.windows_profiles import certificate_profile
+    for cert in _envelope_certificates(outer_signed_data):
+        row, status = issued_certificate_status(ca, cert)
+        if row is None or status != OK or _verify_renewal_signer(outer_signed_data, cert) is not None:
+            continue
+        recorded, _refusal = certificate_profile(row)
+        if recorded is None or profile is None or recorded.id != profile.id:
+            continue
+        if _requester_holds(cert, principal, sam_account_name, connector, requester_sid, profile=profile):
             return cert
     return None
 
 
-def renewed_serial(ca, outer_signed_data):
-    """The serial of ``_renewed_certificate``, None for an initial enrollment. For the audit only."""
-    cert = _renewed_certificate(ca, outer_signed_data)
-    return cert.serial_number if cert is not None else None
-
-
-def _renews_template_less(ca, outer_signed_data):
-    """Whether the request renews a certificate of *ca* that names no template."""
-    cert = _renewed_certificate(ca, outer_signed_data)
-    return cert is not None and _template_ext_oid(cert) is None
+def _requester_holds(cert, principal, sam_account_name, connector, requester_sid, *, profile):
+    """Whether *cert* names the requester: its SID extension when it carries one, else the
+    dNSHostName (computer) or the subject (user) the directory gives the account."""
+    from services.ad_connector import lookup
+    from services.trust_store.csr_operations_mixin import ad_security_extension_sid
+    from utils.dn_match import same_name
+    sid = ad_security_extension_sid(cert)
+    if sid is not None:
+        return bool(requester_sid) and sid.upper() == str(requester_sid).upper()
+    if not sam_account_name:
+        return False
+    if lookup.is_machine_principal(principal):
+        dns_hostname = lookup.lookup_computer_dns_hostname(connector, sam_account_name)
+        if not dns_hostname:
+            return False
+        if same_name(cert.subject, x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, dns_hostname)])):
+            return True
+        return ('DNSName', dns_hostname.lower()) in {(kind, value.lower())
+                                                      for kind, value in _san_values(cert) or ()}
+    subject, _san = _user_directory_subject(connector, sam_account_name, profile=profile)
+    return isinstance(subject, x509.Name) and same_name(cert.subject, subject)
 
 
 def _renewable_certificate(ca, cert):

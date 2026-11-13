@@ -3,6 +3,7 @@ request without template (CERTSRV_E_NO_CERT_TYPE), instead of being issued as a 
 (SQLite, and PostgreSQL with UCM_TEST_APP_PG_URL). A naked request that names its template, the
 GPO autoenrollment shape, is still issued; the UsernamePassword binding is not changed."""
 import json
+from datetime import datetime, timedelta
 
 import pytest
 from cryptography import x509
@@ -18,8 +19,8 @@ from services.xcep.policy_builder import _policy_oid_for_template
 from tests.fixtures.templates import delete_templates
 from tests.test_wstep_kerberos_issue import _build_rst, _issued_cert_from_rstr
 from tests.test_wstep_renew_tls import _cmc_renewal, _rst
-from tests.test_windows_profile_routing import (NEGOTIATE, _as, _audits, _fault, _profile, _top_audit,  # noqa: F401
-                                                world)
+from tests.test_windows_profile_routing import (NEGOTIATE, SID, _as, _audits, _fault, _profile,  # noqa: F401
+                                                _top_audit, world)
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 MACHINE = 'hosta$@C04A.TEST'
@@ -131,33 +132,107 @@ def test_the_username_password_binding_still_issues_a_request_matching_no_templa
     assert list(cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value) == [SERVER_AUTH]
 
 
-def _template_less_certificate(app, world, key, ekus):
-    """A certificate of CA A issued without template extension, as before 3.0."""
+def _template_less_certificate(app, world, key, ekus=(SERVER_AUTH,), *, cn='hosta.c04a.test', sid=SID,
+                               source='wstep', profile='c04-a', revoked=False, expired=False):
+    """A certificate of CA A issued without template extension, as before 3.0: by default the
+    Windows certificate of hosta$ (profile c04-a, its SID); each keyword departs from that."""
     with app.app_context():
         pem, _serial = CAService.sign_csr_from_crypto(
-            ca=db.session.get(CA, world['cas']['A']['id']), csr=_csr('c15-old', ekus=ekus, key=key),
-            validity_days=30, source='test')
-    cert = x509.load_pem_x509_certificate(pem.encode())
+            ca=db.session.get(CA, world['cas']['A']['id']), csr=_csr(cn, ekus=ekus, key=key),
+            validity_days=30, source=source, requester_sid=sid,
+            windows_profile_id=_profile(profile).id if profile else None)
+        cert = x509.load_pem_x509_certificate(pem.encode())
+        row = Certificate.query.filter_by(serial_number=str(cert.serial_number)).one()
+        row.revoked = revoked
+        if expired:
+            row.valid_to = datetime.utcnow() - timedelta(days=1)
+        db.session.commit()
     with pytest.raises(x509.ExtensionNotFound):
         cert.extensions.get_extension_for_class(x509.MSCertificateTemplate)
     return cert
 
 
-def test_a_kerberos_renewal_of_a_certificate_without_template_is_served(app, client, world, realm_a):
+def _renew(client, world, principal, old, key, new_key=None, csr=None):
+    """A Kerberos request signed by the new key and by *old*'s key, as Windows renews."""
+    new_key = new_key or rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr = csr or _csr('c15-old', ekus=[SERVER_AUTH], key=new_key)
+    _as(world, principal)
+    signers = [(new_key, None), (key, old)] if old is not None else [(new_key, None)]
+    return client.post(CES_KERBEROS_PATH, data=_rst(_cmc_renewal(csr, signers)), headers=NEGOTIATE)
+
+
+@pytest.mark.parametrize('principal, cn, sid', [
+    (MACHINE, 'hosta.c04a.test', SID),
+    (MACHINE, 'hosta.c04a.test', None),
+    (USER, 'User A', SID),
+], ids=['machine-sid', 'machine-dns-hostname', 'user-sid'])
+def test_a_kerberos_renewal_of_its_own_windows_certificate_without_template_is_served(
+        app, client, world, realm_a, principal, cn, sid):
     """A certificate issued before 3.0 without template renews as it did: Windows copies its
     extensions (here serverAuth, which no template of the profile issues) into the request."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    old = _template_less_certificate(app, world, key, [SERVER_AUTH])
-    new_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    csr = _csr('c15-old', ekus=[SERVER_AUTH], key=new_key)
-    _as(world, MACHINE)
-    r = client.post(CES_KERBEROS_PATH, data=_rst(_cmc_renewal(csr, [(new_key, None), (key, old)])),
-                    headers=NEGOTIATE)
+    old = _template_less_certificate(app, world, key, cn=cn, sid=sid)
+    floor = _top_audit(app)
+    r = _renew(client, world, principal, old, key)
     assert r.status_code == 200, r.data
+    (action, _u, _n, details, ok), = _audits(app, floor)
+    assert action == 'certificate.renewed' and ok and f'old serial {old.serial_number}' in details
     # The same request, signed by the new key alone, is an initial enrollment: refused
-    _as(world, MACHINE)
-    r = client.post(CES_KERBEROS_PATH, data=_rst(_cmc_renewal(csr, [(new_key, None)])), headers=NEGOTIATE)
-    assert _fault(r) == (400, 's:Sender', NO_TEMPLATE)
+    assert _fault(_renew(client, world, principal, None, None)) == (400, 's:Sender', NO_TEMPLATE)
+
+
+def test_a_kerberos_renewal_of_a_user_certificate_without_sid_matches_its_directory_subject(
+        app, client, world, realm_a):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    with app.app_context():
+        pem, _s = CAService.sign_csr_from_crypto(
+            ca=db.session.get(CA, world['cas']['A']['id']), csr=_csr('ignored', ekus=[SERVER_AUTH], key=key),
+            validity_days=30, source='wstep', windows_profile_id=_profile('c04-a').id,
+            override_subject=x509.Name.from_rfc4514_string('CN=user a,CN=Users,DC=C04A,DC=test'))
+    assert _renew(client, world, USER, x509.load_pem_x509_certificate(pem.encode()), key).status_code == 200
+    other = _template_less_certificate(app, world, key, cn='User B', sid=None)
+    assert _fault(_renew(client, world, USER, other, key)) == (400, 's:Sender', NO_TEMPLATE)
+
+
+@pytest.mark.parametrize('principal', [MACHINE, USER], ids=['machine', 'user'])
+@pytest.mark.parametrize('kind', ['acme-of-another-revoked', 'windows-of-another-sid',
+                                  'windows-of-another-host', 'own-revoked', 'own-expired',
+                                  'own-not-windows', 'own-of-another-profile'])
+def test_a_kerberos_renewal_of_any_other_certificate_without_template_is_refused(
+        app, client, world, realm_a, principal, kind):
+    """Only the requester's own valid certificate of the Windows enrollment is exempted; the
+    audit never names another certificate as renewed."""
+    own_cn = 'hosta.c04a.test' if principal == MACHINE else 'User A'
+    old_kwargs = {
+        'acme-of-another-revoked': dict(cn='victim.example.test', sid=None, source='acme', profile=None,
+                                        revoked=True),
+        'windows-of-another-sid': dict(cn=own_cn, sid='S-1-5-21-1-2-3-9999'),
+        'windows-of-another-host': dict(cn='hostb.c04a.test' if principal == MACHINE else 'User B', sid=None),
+        'own-revoked': dict(cn=own_cn, revoked=True),
+        'own-expired': dict(cn=own_cn, expired=True),
+        'own-not-windows': dict(cn=own_cn, source='acme', profile=None),
+        'own-of-another-profile': dict(cn=own_cn, profile='c04-b'),
+    }[kind]
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old = _template_less_certificate(app, world, key, **old_kwargs)
+    floor, before = _top_audit(app), _issued_count(app, world)
+    assert _fault(_renew(client, world, principal, old, key)) == (400, 's:Sender', NO_TEMPLATE)
+    assert [a[0] for a in _audits(app, floor)] == ['windows_enrollment.refused']
+    assert _issued_count(app, world) == before
+
+
+def test_a_request_signed_by_the_certificate_of_another_is_audited_as_an_enrollment(app, client, world, realm_a):
+    """A request naming its template, signed by a key that holds another's revoked certificate,
+    is issued as an enrollment: the audit does not call that certificate renewed."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old = _template_less_certificate(app, world, key, cn='victim.example.test', sid=None, source='acme',
+                                     profile=None, revoked=True)
+    new_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    floor = _top_audit(app)
+    r = _renew(client, world, MACHINE, old, key, new_key, _csr(template_oid=realm_a['machine'], key=new_key))
+    assert r.status_code == 200, r.data
+    (action, _u, _n, details, _ok), = _audits(app, floor)
+    assert action == 'certificate.issued' and str(old.serial_number) not in details
 
 
 def test_a_kerberos_renewal_of_a_certificate_with_template_follows_the_rule(app, client, world, realm_a):

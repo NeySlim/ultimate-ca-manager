@@ -128,8 +128,8 @@ def _named(app, ca_id, name):
 
 
 def _template_less_renewal(app, ca_id):
-    """A naked request renewing a certificate of the CA issued without template (before 3.0):
-    the Kerberos request still served without a matched template. Returns (body, new key)."""
+    """A naked request renewing the requester's Windows certificate issued without template (before
+    3.0, its SID): the Kerberos request still served without a matched template. Returns (body, new key)."""
     from services.ca_service import CAService
     from tests.test_wstep_renew_tls import _cmc_renewal, _rst
     old_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -137,7 +137,8 @@ def _template_less_renewal(app, ca_id):
         x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'old.hagland.domain')])).sign(old_key, hashes.SHA256())
     with app.app_context():
         pem, _serial = CAService.sign_csr_from_crypto(ca=db.session.get(CA, ca_id), csr=old_csr,
-                                                      validity_days=30, source='test')
+                                                      validity_days=30, source='wstep',
+                                                      requester_sid='S-1-5-21-1-2-3-1000')
     old = x509.load_pem_x509_certificate(pem.encode())
     csr, key = _make_naked_csr()
     return _rst(_cmc_renewal(csr, [(key, None), (old_key, old)])), key

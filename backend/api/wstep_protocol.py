@@ -307,11 +307,12 @@ def _issue_and_respond(ca, parsed, username, *, profile, kerberos_principal=None
         return _query_token_status(ca, parsed, identity)
     gate = make_gate(ca, operation='issue', identity=identity, profile=profile, extra={
         'kerberos_principal': kerberos_principal, 'require_pop': not parsed.was_pkcs7_wrapped})
+    renewal = {}
     try:
         cert_pem, error = wstep_service.issue(
             ca, parsed.csr_der, _validity_days(profile), require_pop=not parsed.was_pkcs7_wrapped,
             kerberos_principal=kerberos_principal, outer_signed_data=parsed.outer_signed_data,
-            gate=gate, profile=profile,
+            gate=gate, renewal=renewal, profile=profile,
         )
     except wstep_service.HeldForApproval as held:
         return _answer_held(ca, parsed, held.approval)
@@ -334,8 +335,8 @@ def _issue_and_respond(ca, parsed, username, *, profile, kerberos_principal=None
         logger.error("WSTEP: failed to build RSTR: %s", e)
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
-    # A Kerberos request signed by a certificate of this CA renews it (the Kerberos binding renews too)
-    old_serial = wstep_service.renewed_serial(ca, parsed.outer_signed_data) if kerberos_principal else None
+    # A Kerberos request signed by the requester's own valid certificate renews it (the binding renews too)
+    old_serial = renewal.get('serial')
     served = f'profile {profile.name}' + (f', realm {profile.realm}' if kerberos_principal else '')
     if old_serial is not None:
         action, details = 'certificate.renewed', (
