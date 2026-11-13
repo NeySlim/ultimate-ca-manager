@@ -9,8 +9,8 @@ import base64
 import logging
 from typing import Any, Dict, Optional
 
-from services.windows_profiles.legacy import (MIGRATED_KEYS, connector_names, keytab_realms, profile_from_2x,
-                                              switches_from_2x)
+from services.windows_profiles.legacy import (MIGRATED_KEYS, connector_names, has_windows_configuration,
+                                              keytab_realms, profile_from_2x, switches_from_2x)
 
 from ..export_generic import REFERENCE_SUFFIX
 
@@ -62,11 +62,13 @@ def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Di
     first = connectors[0] if connectors else None
     connector = ({'id': first.get('id'), 'enabled': bool(first.get('enabled')),
                   'base_dn': first.get('base_dn')} if first else None)
-    keytab = _keytab_here()
-    settings.update(switches_from_2x({**settings, **migrated}))
-    profile = profile_from_2x({**settings, **migrated}, connector, keytab)
-    if profile is None:
+    archived = {**settings, **migrated}
+    # The archive alone carries a configuration or not; the keytab here only gives the realm
+    if not has_windows_configuration(archived):
         return None
+    keytab = _keytab_here()
+    settings.update(switches_from_2x(archived))
+    profile = profile_from_2x(archived, connector, keytab)
     realms = keytab_realms(keytab) if keytab else None
     if keytab and profile['realm'] and profile['realm'] not in (realms or ()):
         message = (f"windows_enrollment_profiles: the realm {profile['realm']} of the default profile "

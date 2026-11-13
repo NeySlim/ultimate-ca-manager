@@ -233,7 +233,8 @@ def test_no_code_names_a_setting_the_profile_replaced():
     assert not found, found
 
 
-def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=True):
+def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=True,
+                sections=('configuration', 'ad_connector', 'certificates')):
     """An archive as 2.x wrote it: *settings* in the configuration, the connector unnamed,
     the WSTEP certificate ``c01-wstep-cert`` without a profile, no profile sections."""
     from services.backup_service import BackupService
@@ -249,7 +250,7 @@ def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=Tr
         db.session.add(cert)
         db.session.commit()
         connector_row = {'id': connector.id, 'enabled': connector_enabled, 'base_dn': base_dn}
-        include = {name: name in ('configuration', 'ad_connector', 'certificates') for name in manifest.SECTIONS}
+        include = {name: name in sections for name in manifest.SECTIONS}
         blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
         Certificate.query.filter_by(refid='c01-wstep-cert').delete()
         db.session.commit()
@@ -259,8 +260,9 @@ def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=Tr
         for row in payload['ad_connector']:
             row.pop('name', None)
             row.pop('domain_sid', None)
-        payload['certificates'] = [r for r in payload['certificates'] if r['refid'] == 'c01-wstep-cert']
-        for row in payload['certificates']:
+        if 'certificates' in payload:
+            payload['certificates'] = [r for r in payload['certificates'] if r['refid'] == 'c01-wstep-cert']
+        for row in payload.get('certificates', ()):
             row.pop('windows_profile_id', None)
             row.pop('windows_profile_id_ref', None)
         payload.pop('windows_enrollment_profiles', None)
@@ -704,6 +706,30 @@ def test_a_converted_realm_the_keytab_here_lacks_is_reported(app, clean_slate, t
     archive, _connector = _2x_archive(app, _settings_2x(issuing, policy))
     results = _restore(app, archive)
     assert any('C01.EXAMPLE' in w and 'EXAMPLE.TEST' in w for w in results['warnings']), results['warnings']
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_a_2x_archive_without_windows_settings_leaves_the_profile_here(app, clean_slate, two_cas,
+                                                                       no_shared_keytab, mode):
+    """The archive alone decides whether it carries a configuration: the keytab of this installation
+    does not, so no profile section is made and neither mode touches the profile here."""
+    from tests.test_windows_profile_migration import ONE_REALM
+    issuing, policy, _template = two_cas
+    archive, connector_row = _2x_archive(app, {'kerberos_spn': ''}, sections=('configuration', 'ad_connector'))
+    with app.app_context():
+        profile = WindowsEnrollmentProfile(
+            name='default', is_default=True, realm='EXAMPLE.TEST', connector_id=connector_row['id'],
+            issuing_ca_refid=issuing['refid'], policy_ca_refid=policy['refid'], validity_days=42,
+            xcep_username=USER, xcep_password='hashed-cep', wstep_username='c01-ces-user',
+            wstep_password='hashed-ces')
+        profile.set_keytab(ONE_REALM)
+        db.session.add(profile)
+        db.session.commit()
+        before = _columns(profile)
+    _restore(app, archive, mode=mode)
+    with app.app_context():
+        assert WindowsEnrollmentProfile.query.filter_by(name='default').count() == 1
+        assert _columns(_default()) == before and _default().keytab_bytes() == ONE_REALM
 
 
 @pytest.fixture
