@@ -318,10 +318,9 @@ def _match_template(ca, csr, principal=None, *, profile):
     arbitrary but deterministic. Returns ``(template, refusal)``: the matched
     ``CertificateTemplate`` row or ``None`` if nothing matches at all, and a
     refusal when the request's EKUs match only a template its key does not fit
-    (family, curve or size). A template the key does not fit that scores 0 is no match:
-    the request falls back to no template, which is safe because the Enroll
-    ACL and pinned fields then fall back to every template of the CA (a CA
-    offering none is refused by the callers).
+    (family, curve or size). A template the key does not fit that scores 0 is no match: on the
+    Kerberos binding no template is refused (``NO_TEMPLATE``, naming the key through
+    ``_other_key_refusal``) unless it renews the requester's own template-less certificate.
 
     ``principal`` (Kerberos binding): the templates of its kind (a computer, or
     a user, generalFlags) are matched first, as a Windows client only offers those.
@@ -892,10 +891,9 @@ def _user_ad_derivation_enabled(ca, *, profile):
     """Whether any template resolvable for ``ca`` has opted into
     AD-derived user subjects (``CertificateTemplate.ad_derived_subject``).
 
-    Deliberately independent of ``_match_template``: it applies without a matched template
-    (the renewal of a certificate that names none, see ``NO_TEMPLATE``) and only asks "did an
-    admin opt any template into AD-derivation for this CA," as the machine branch has no
-    template dependency either.
+    Deliberately independent of ``_match_template``: it applies to a naked CSR matched under a
+    ``request`` template and to the renewal of a certificate that names none (``NO_TEMPLATE``),
+    and only asks "did an admin opt any template into AD-derivation for this CA."
     """
     candidates = _ca_templates(ca, profile=profile)
     return any(getattr(t, 'ad_derived_subject', False) for t in candidates)
@@ -1281,8 +1279,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # Enroll ACL: only gates the Kerberos-bound path -- the UsernamePassword
     # path authenticates a single shared SystemConfig credential, not a
     # per-request principal, so there's no identity here to check group
-    # membership for. See _required_enroll_acl_groups for why an unmatched
-    # (typically naked) CSR checks against every restricted template for
+    # membership for. An unmatched CSR (only an exempted template-less
+    # renewal on this binding) checks against every restricted template for
     # the CA rather than being skipped. With the connector off there is no
     # sam_account_name and a restricted template is denied, never skipped:
     # this is a security gate, not a best-effort convenience lookup.
