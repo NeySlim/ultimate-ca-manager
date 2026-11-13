@@ -32,6 +32,37 @@ class AlreadySuperseded(Exception):
     """The certificate being renewed was superseded by a concurrent renewal."""
 
 
+class SubjectTaken(Exception):
+    """RFC 5280 §4.1.2.6: the subject is already carried by a certificate of the CA issued to
+    another entity; *serial* is that certificate's."""
+
+    def __init__(self, subject, serial):
+        super().__init__(f'the subject {subject} is already carried by certificate serial {serial}')
+        self.subject, self.serial = subject, serial
+
+
+def _subject_holder(ca, cert, requester_sid, own_id):
+    """The serial of a certificate of *ca*, whatever its status, whose subject equals *cert*'s
+    (RFC 5280 §7.1) and whose SID extension does not name *requester_sid*; else None."""
+    from services.trust_store.csr_operations_mixin import ad_security_extension_sid
+    from utils.dn_match import name_key, same_name
+    rows = (db.session.query(Certificate.crt, Certificate.serial_number)
+            .filter(Certificate.caref == ca.refid, Certificate.subject_key == name_key(cert.subject),
+                    Certificate.id != own_id, Certificate.crt.isnot(None))
+            .order_by(Certificate.id))
+    for crt, serial in rows:
+        try:
+            held = x509.load_pem_x509_certificate(base64.b64decode(crt))
+        except Exception:
+            continue
+        if not same_name(held.subject, cert.subject):
+            continue
+        # Without the extension nothing proves the same entity: never a yes without proof
+        if requester_sid is None or ad_security_extension_sid(held) != requester_sid:
+            return serial
+    return None
+
+
 def _claim_superseded(row, presented=None, successor=None):
     """Archive every live row holding *presented*, the certificate the client renews (by
     default *row*'s), same DER under any CA: it is replaced everywhere. False when another
@@ -163,6 +194,7 @@ class CASigningMixin:
         template_key_usage: list = None,
         on_stored=None,
         windows_profile_id: int = None,
+        unique_subject: bool = False,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -210,6 +242,9 @@ class CASigningMixin:
                 writes is committed with the certificate (an approval's link).
             windows_profile_id: the Windows enrollment profile a WSTEP issuance
                 or renewal served, recorded on the row; None for other protocols.
+            unique_subject: raise SubjectTaken when another entity's certificate of
+                the CA carries the issued subject (``_subject_holder``); WSTEP passes
+                it for a subject built by a common name pattern.
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -358,8 +393,15 @@ class CASigningMixin:
             # Every row written (A's link included) is locked before the CA row, last
             db.session.flush()
             next_ca_serial(ca)
+            # Read once the CA row is locked (PostgreSQL) or the database write lock held
+            # (SQLite, since the flush): a concurrent issuance under this CA commits before or after
+            if unique_subject:
+                holder = _subject_holder(ca, cert_obj, requester_sid, new_cert.id)
+                if holder is not None:
+                    db.session.rollback()
+                    raise SubjectTaken(cert_obj.subject.rfc4514_string(), holder)
             db.session.commit()
-        except AlreadySuperseded:
+        except (AlreadySuperseded, SubjectTaken):
             raise
         except Exception as _commit_err:
             rollback_unless_serial_collision(_commit_err)

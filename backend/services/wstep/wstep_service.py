@@ -22,7 +22,7 @@ from cryptography.x509.oid import NameOID
 
 from models import Certificate
 from services.ad_connector import renewal_identity
-from services.ca.ca_signing import AlreadySuperseded
+from services.ca.ca_signing import AlreadySuperseded, SubjectTaken
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
 from services.protocol_approval import AlreadyIssued
@@ -984,6 +984,17 @@ class _PatternRefusal(str):
     """The requester's directory object cannot fill the template's common name pattern."""
 
 
+class SubjectHeldByAnother(str):
+    """A patterned subject a certificate of another account of the CA carries: the requester's
+    fault, naming no account; ``audited`` adds the serial of that certificate, for the audit only."""
+
+    def __new__(cls, template, taken):
+        refusal = super().__new__(cls, f"Template '{template.name}' builds the subject {taken.subject}, "
+                                       'which a certificate of another account already carries')
+        refusal.audited = f'{refusal} (serial {taken.serial})'
+        return refusal
+
+
 def _cn_pattern_applies(template):
     """Whether ``template`` carries a common name pattern for a subject the CA builds."""
     return (template is not None and bool(getattr(template, 'subject_cn_pattern', None))
@@ -1147,6 +1158,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     kerberos_sam_account_name = None
     requester_sid = None
     connector = None
+    patterned = False
     if kerberos_principal:
         from services.ad_connector import lookup
         from services.windows_profiles import kerberos_route, profile_connector
@@ -1216,6 +1228,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             profile=profile)
         if refusal:
             return None, refusal
+        patterned = override_subject is not None and _cn_pattern_applies(matched_template)
         # Without EKUs the default profile would give serverAuth to the name the request chose
         if (override_subject is None and matched_template is not None
                 and _subject_source(matched_template) == 'request'
@@ -1293,8 +1306,10 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
-            windows_profile_id=getattr(profile, 'id', None),
+            windows_profile_id=getattr(profile, 'id', None), unique_subject=patterned,
         )
+    except SubjectTaken as e:
+        return None, SubjectHeldByAnother(matched_template, e)
     except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
     except RequestRejected as e:
@@ -1592,10 +1607,12 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
-            windows_profile_id=profile.id,
+            windows_profile_id=profile.id, unique_subject=override_subject is not None,
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'
+    except SubjectTaken as e:
+        return None, SubjectHeldByAnother(matched_template, e)
     except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
     except RequestRejected as e:

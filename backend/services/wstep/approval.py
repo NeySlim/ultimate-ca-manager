@@ -131,7 +131,8 @@ def _issue(approval, data):
     if err:
         if isinstance(err, wstep_service.ServerError):
             raise ValueError(str(err))
-        raise ProtocolRequestGone(f'The WSTEP request can no longer be issued: {err}',
+        # The approver reads the audited form: the client is told the fixed refusal only
+        raise ProtocolRequestGone(f'The WSTEP request can no longer be issued: {getattr(err, "audited", err)}',
                                   refusal=protocol_approval.ISSUANCE_REFUSAL)
     serial = x509.load_pem_x509_certificate(cert_pem.encode()).serial_number
     row = Certificate.query.filter_by(serial_number=str(serial), caref=ca.refid).first()

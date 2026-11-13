@@ -583,6 +583,9 @@ def renew_certificate_bound():
             _audit_issuance('certificate.renewed', None, username, success=False, details=(
                 f'WSTEP renewal refused from {client_ip()}: {error} '
                 f'(old serial {cert.serial_number}, {served})'))
+        if isinstance(error, wstep_service.SubjectHeldByAnother):
+            from services.windows_profiles import audit_renewal_refusal
+            audit_renewal_refusal('CES', cert.serial_number, profile, error)
         return _fault_response(error, status=status or _error_status(error), relates_to=parsed.message_id)
 
     try:
