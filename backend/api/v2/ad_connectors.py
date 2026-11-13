@@ -167,10 +167,10 @@ def delete_connector(connector_id):
     blocker = first_blocker(connector_deletion_blockers(config))
     if blocker:
         # The profiles that use it ride along, so the screen can name them
-        using = WindowsEnrollmentProfile.query.filter_by(connector_id=config.id).order_by(
-            WindowsEnrollmentProfile.name).limit(MAX_LISTED_PROFILES).all()
-        return error_response(blocker.message, blocker.status,
-                              details={'profiles': [{'id': p.id, 'name': p.name} for p in using]})
+        query = WindowsEnrollmentProfile.query.filter_by(connector_id=config.id)
+        using = query.order_by(WindowsEnrollmentProfile.name).limit(MAX_LISTED_PROFILES).all()
+        return error_response(blocker.message, blocker.status, details={
+            'profiles': [{'id': p.id, 'name': p.name} for p in using], 'total': query.count()})
     name = config.name
     db.session.delete(config)
     ok, err = safe_commit(logger, 'Failed to delete the AD connector')

@@ -26,7 +26,7 @@ export default function AdConnectorSection({ hasPermission }) {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null) // a connector, or {} for a new one
   const [testingId, setTestingId] = useState(null)
-  const [refusal, setRefusal] = useState(null) // { name, message, profiles }
+  const [refusal, setRefusal] = useState(null) // { name, message, profiles, total }
   const canWrite = hasPermission('write:ad_connector')
 
   const load = useCallback(async () => {
@@ -93,7 +93,10 @@ export default function AdConnectorSection({ hasPermission }) {
     } catch (error) {
       const profiles = error.data?.details?.profiles
       if (error.status === 409 && Array.isArray(profiles)) {
-        setRefusal({ name: connector.name, message: error.message, profiles })
+        setRefusal({
+          name: connector.name, message: error.message, profiles,
+          total: error.data.details.total ?? profiles.length,
+        })
       } else {
         showError(error.message || t('adConnector.deleteFailed'))
       }
@@ -231,7 +234,7 @@ export default function AdConnectorSection({ hasPermission }) {
       >
         {refusal && (
           <div className="p-4 space-y-3">
-            <p className="text-sm text-text-primary">{t('adConnector.deleteRefused', { count: refusal.profiles.length })}</p>
+            <p className="text-sm text-text-primary">{t('adConnector.deleteRefused', { count: refusal.total })}</p>
             <ul className="list-disc pl-5 text-sm text-text-primary" data-testid="refusal-profiles">
               {refusal.profiles.map(profile => <li key={profile.id}>{profile.name}</li>)}
             </ul>

@@ -75,6 +75,18 @@ describe('AdConnectorSection', () => {
     expect(mocks.notify.showError).not.toHaveBeenCalled()
   })
 
+  it('counts every profile that uses the connector, not only the ones listed', async () => {
+    const listed = Array.from({ length: 50 }, (_, i) => ({ id: i + 1, name: `p${i}` }))
+    mocks.remove.mockRejectedValue(Object.assign(new Error('in use'), {
+      status: 409, data: { details: { profiles: listed, total: 150 } },
+    }))
+    render(<AdConnectorSection hasPermission={() => true} />)
+    await screen.findByText('forest-a')
+    fireEvent.click(screen.getAllByTitle('common.delete')[0])
+    await screen.findByTestId('refusal-profiles')
+    expect(screen.getByText('adConnector.deleteRefused|count=150')).toBeInTheDocument()
+  })
+
   it('offers no writing to a user who cannot write connectors', async () => {
     render(<AdConnectorSection hasPermission={() => false} />)
     await screen.findByText('forest-a')

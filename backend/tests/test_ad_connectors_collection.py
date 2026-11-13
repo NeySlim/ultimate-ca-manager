@@ -541,3 +541,22 @@ def test_a_save_reads_the_domain_sid_within_one_connect_timeout(auth_client, mon
     assert response.status_code in (200, 201), response.data
     assert response.get_json()['data']['domain_sid'] is None
     assert [host for _name, host in directory.binds] == ['dc1.a.example']
+
+
+def test_a_refused_deletion_counts_every_profile_but_lists_the_first_fifty(auth_client, app):
+    used = _post(auth_client, name='forest-many', servers=['dc.m.example'], base_dn='DC=m,DC=example').get_json()['data']
+    with app.app_context():
+        db.session.add_all([WindowsEnrollmentProfile(name=f'c07-many-{i:03d}', connector_id=used['id'])
+                            for i in range(51)])
+        db.session.commit()
+    try:
+        refused = auth_client.delete(f"{URL}/{used['id']}")
+        assert refused.status_code == 409
+        details = refused.get_json()['details']
+        assert details['total'] == 51 and len(details['profiles']) == 50
+    finally:
+        with app.app_context():
+            WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.name.like('c07-many-%')).delete(
+                synchronize_session=False)
+            db.session.commit()
+        auth_client.delete(f"{URL}/{used['id']}")
