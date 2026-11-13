@@ -290,6 +290,7 @@ A restore **replaces** the instance with the archive: for every section the arch
 - Rows are matched by identity (name, refid, fingerprint), never by number. Each archive carries the identifier of the database it was taken from, and row numbers are trusted only when restoring onto that same database.
 - An archive written by an older version is repaired as the migrations repaired the source: legacy EAB keys, dead and `ldap_*` settings, SAML providers, group permissions, duplicated ACME renewal orders.
 - ACME client orders: a merge keeps the order here when it is further along, was renewed or is being finalized since the archive was taken; a replacement restores the archived one and names the certificate it gives up.
+- Revocations: a merge never lowers a final revocation made here, of a certificate or a CA; a suspension is reversible, so one carried by the certificate alone (no revocation record) is lifted by an archive in which the certificate is valid.
 - Every session is revoked and a restart is requested. A restore is refused (409) while a backend migration, another restore or a backup is running.
 
 The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it; a reverse proxy in front of UCM applies its own body limit. A restore holds the whole archive in memory: plan for a peak of several times its size. Creating a backup larger than the limit warns that it cannot be restored as is.
