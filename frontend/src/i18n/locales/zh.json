@@ -1207,7 +1207,7 @@
     "adDerivedSubject": "从 Active Directory 构建主题",
     "adDerivedSubjectDescription": "用于无人值守的 GPO 自动注册：从请求者的 Active Directory 对象（通过 AD 连接器）派生此证书的主题和 SAN，而不要求客户端提供。与真实 ADCS 模板配置自动注册的方式一致。",
     "cnPattern": "Common name pattern (Windows enrollment)",
-    "cnPatternDescription": "Builds the CN of certificates issued through Windows enrollment from fixed text and directory variables in braces, for example {upn}, or {hostname}-WiFi with the directory path kept. It must tell accounts apart: {fqdn} or {upn}, or {hostname} or {username} with {domain} or the directory path. Empty keeps the built-in subject. Write {{open}} or {{close}} for a literal brace. Only the CN changes: the SAN and the SID extension stay those of the directory. A request whose directory object leaves a variable empty, or whose result exceeds 64 characters, is refused.",
+    "cnPatternDescription": "Builds the CN of certificates issued through Windows enrollment from fixed text and directory variables in braces, for example {hostname}-WiFi. Empty keeps the built-in subject. Write {{open}} or {{close}} for a literal brace. Only the CN changes: the SAN and the SID extension stay those of the directory. A request whose directory object leaves a variable empty, or whose result exceeds 64 characters, is refused.",
     "cnPatternVariables": "Variables for this template:",
     "cnPatternUnavailable": "The requester supplies the subject of this template: a pattern needs a computer template, or a user template with \"Build subject from Active Directory\" on.",
     "cnPatternNotUnique": "{{variables}} may be shared by several accounts: certificates could carry the same CN.",

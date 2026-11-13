@@ -677,7 +677,7 @@ For Windows enrollment, a template whose subject UCM builds (a computer template
 - **Keep the directory path** off: the subject is the CN alone, plus the pinned fields. On: the object's DN after its own name follows the CN (for a user, the e-mail attribute stays as without a pattern)
 - **Only the CN changes**: the SAN (the computer's DNS name, the user's UPN and e-mail) and the SID extension stay as without a pattern, and a pattern never adds a SAN
 - **Refused, never shortened**: a variable the directory leaves empty, a result longer than 64 characters or one holding a control character refuses the request; the reason names the template and the variable and is in the audit log
-- **One subject per account** (RFC 5280): the pattern needs \`{fqdn}\` or \`{upn}\`, or \`{hostname}\` or \`{username}\` with \`{domain}\` or **Keep the directory path**, else it is refused when saved. \`{displayName}\`, \`{givenName}\`, \`{surname}\` and \`{mail}\` are not unique and can only be added to those
+- \`{displayName}\`, \`{givenName}\`, \`{surname}\` and \`{mail}\` are not unique: two accounts can get the same CN
 - **Renewal** with the certificate takes the pattern in force, for the account the certificate's SID names; it is refused when no connector of the profile finds that account
 - The Username/Password endpoint has no directory identity: the pattern does not apply there and the client supplies the subject
 

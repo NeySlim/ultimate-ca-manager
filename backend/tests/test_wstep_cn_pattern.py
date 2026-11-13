@@ -408,9 +408,9 @@ def test_a_pattern_adds_no_directory_search(app, pattern_ca, ldap, principal, ek
 # The pattern's own grammar
 
 @pytest.mark.parametrize('pattern,kind,error', [
-    ('{hostname}-WiFi ({domain})', 'machine', None),
+    ('{hostname}-WiFi', 'machine', None),
     ('{username}@{domain}', 'directory', None),
-    ('{{literal}} {fqdn}', 'machine', None),
+    ('{{literal}} {realm}', 'machine', None),
     ('{nickname}', 'directory', 'Unknown variable {nickname} in the common name pattern'),
     ('{hostname}', 'directory', 'Variable {hostname} is for computer templates; this is a user template'),
     ('{displayName}', 'machine', 'Variable {displayName} is for user templates; this is a computer template'),
@@ -420,31 +420,6 @@ def test_a_pattern_adds_no_directory_search(app, pattern_ca, ldap, principal, ek
 ])
 def test_the_pattern_grammar(pattern, kind, error):
     assert cn_pattern.validation_error(pattern, kind) == error
-
-
-MACHINE_APART = ('The common name pattern does not tell computers apart (RFC 5280 \u00a74.1.2.6): it needs '
-                 '{fqdn}, or {hostname} with {domain} or "Keep the directory path"')
-USER_APART = ('The common name pattern does not tell users apart (RFC 5280 \u00a74.1.2.6): it needs '
-              '{upn}, or {username} with {domain} or "Keep the directory path"')
-
-
-@pytest.mark.parametrize('pattern,kind,keep_path,error', [
-    ('{fqdn}', 'machine', False, None),
-    ('{upn}', 'directory', False, None),
-    ('{hostname}-WiFi', 'machine', True, None),
-    ('{username}', 'directory', True, None),
-    ('{displayName} ({username}) {domain}', 'directory', False, None),
-    ('{hostname}-WiFi', 'machine', False, MACHINE_APART),
-    ('{hostname} {realm}', 'machine', False, MACHINE_APART),
-    ('Wi-Fi {domain}', 'machine', True, MACHINE_APART),
-    ('{username}', 'directory', False, USER_APART),
-    ('{displayName}', 'directory', True, USER_APART),
-    ('{givenName} {surname} {mail}', 'directory', True, USER_APART),
-    ('{{username}}', 'directory', True, USER_APART),
-])
-def test_a_pattern_must_tell_requesters_apart(pattern, kind, keep_path, error):
-    """RFC 5280 4.1.2.6: one subject per entity of a CA; a pattern of shared values alone is refused."""
-    assert cn_pattern.validation_error(pattern, kind, keep_path=keep_path) == error
 
 
 def test_literal_braces_render_as_one():

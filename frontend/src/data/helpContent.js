@@ -470,7 +470,7 @@ export const helpContent = {
           { label: 'Build subject from Active Directory', text: 'Derive the subject and SAN from the requester\'s AD object (via the AD Connector) instead of requiring the client to supply one, for unattended GPO autoenrollment. On the Kerberos endpoints a subject named in the request is ignored and computer accounts are refused; machine templates always take the computer\'s DNS name' },
           { label: 'Restrict enrollment to AD group', text: 'Only members of the configured AD group (nested membership included) may enroll over the Kerberos endpoint. Blank = any authenticated principal. Not enforced on the Username/Password endpoint' },
           { label: 'Pinned subject fields', text: 'Force C/ST/L/O/OU values onto every certificate issued over WSTEP, overriding the CSR or AD derivation for those fields. CN and SAN are never affected, leave a field blank to keep it dynamic' },
-          { label: 'Common name pattern', text: 'Builds the CN from fixed text and directory variables, e.g. {upn} or {displayName} ({username}) {domain}, for a template whose subject UCM builds; a pattern that does not tell accounts apart is refused when saved. Only the CN changes: the SAN and the SID extension stay the directory\'s. A variable left empty or a CN over 64 characters refuses the request' },
+          { label: 'Common name pattern', text: 'Builds the CN from fixed text and directory variables, e.g. {hostname}-WiFi or {displayName}, for a template whose subject UCM builds. Only the CN changes: the SAN and the SID extension stay the directory\'s. A variable left empty or a CN over 64 characters refuses the request' },
         ]
       },
     ],

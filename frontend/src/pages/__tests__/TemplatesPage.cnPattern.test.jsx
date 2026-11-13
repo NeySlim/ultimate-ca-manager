@@ -45,7 +45,7 @@ describe('TemplateForm common name pattern', () => {
   it('shows literal braces in its help, not i18next variables', () => {
     render(<TemplateForm template={template({})} onSubmit={vi.fn()} onCancel={() => {}} />)
     const help = screen.getByText(/Write \{\{ or \}\} for a literal brace/)
-    expect(help.textContent).toContain('or {hostname}-WiFi with the directory path kept')
+    expect(help.textContent).toContain('for example {hostname}-WiFi')
   })
 
   it('lists the variables of a computer template', () => {
