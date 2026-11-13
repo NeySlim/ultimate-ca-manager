@@ -1101,7 +1101,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     and that DNS name as SAN, a "Build subject from Active Directory"
     template the user's directory-path DN plus its ``userPrincipalName``
     (and ``mail`` when valid) as SAN, whatever the CSR asks, and each refuses
-    the other kind of principal. A naked CSR (see ``_is_naked_csr``), or one
+    the other kind of principal; a template's ``subject_cn_pattern`` replaces that CN
+    alone (``_pattern_subject``), the SAN and SID staying. A naked CSR (see ``_is_naked_csr``), or one
     matching no template, is built the same way, as GPO autoenrollment expects;
     a user's only when a template opted in (``_user_ad_derivation_enabled``).
     Only a matched template announcing a client-supplied subject keeps the CSR's.
