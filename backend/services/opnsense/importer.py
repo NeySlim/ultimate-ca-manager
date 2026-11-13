@@ -12,6 +12,7 @@ from typing import Dict, List
 from models import db, CA, Certificate
 from services.file_regen_service import mirror_private_key
 from utils.key_codec import store_pem_bytes
+from utils.key_type import weak_ca_key_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,11 @@ class ImportMixin:
                     if existing:
                         stats['skipped'] += 1
                         continue
+
+                if ca_data.get('prv'):
+                    weak = weak_ca_key_refusal(base64.b64decode(ca_data['prv']))
+                    if weak:
+                        raise ValueError(f"'{ca_data.get('descr', refid)}' not imported: {weak}")
 
                 ca = CA(
                     refid=refid,

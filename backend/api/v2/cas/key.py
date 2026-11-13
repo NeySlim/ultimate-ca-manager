@@ -17,6 +17,7 @@ from auth.unified import require_auth
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.cert_issuer import private_key_matches
+from utils.key_type import weak_ca_key_refusal
 from services.import_service import KeyPasswordError, load_import_private_key
 from utils.key_codec import MalformedKey, private_key_to_pem, refuse_eddsa_key
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
@@ -80,6 +81,10 @@ def import_ca_private_key(ca_id):
         return error_response('CA certificate could not be parsed', 400)
     if not private_key_matches(private_key, cert):
         return error_response('Private key does not match the CA certificate', 400)
+
+    weak = weak_ca_key_refusal(private_key)
+    if weak:
+        return error_response(weak, 400)
 
     key_pem = private_key_to_pem(private_key)
     ca.prv = encrypt_private_key(base64.b64encode(key_pem).decode('utf-8'))

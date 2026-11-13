@@ -17,6 +17,7 @@ from models import db, CA, Certificate
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.key_codec import store_pem_bytes
+from utils.key_type import weak_ca_key_refusal
 from utils.safe_requests import create_session
 from utils.ssrf_protection import (
     pin_host, validate_url_not_cloud_metadata, validated_addresses)
@@ -68,6 +69,27 @@ def _encoded_private_key(row):
     return None
 
 
+def _decoded_private_key(row):
+    """The PEM of the key ``_encoded_private_key`` stores for an OPNsense row, or None when it
+    carries none. A ``prv`` that is not base64 comes back as it is: it is a key that cannot be read."""
+    if row.get('prv'):
+        try:
+            return base64.b64decode(row['prv'])
+        except ValueError:
+            return row['prv']
+    return row.get('prv_payload') or None
+
+
+def _signing_parent(ca):
+    """The caref of the stored CA whose key signed *ca*'s certificate, None for a root or an unknown parent."""
+    from services.import_service import relink_parent_caref
+    try:
+        cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+    except ValueError:
+        return None
+    return relink_parent_caref(cert, None, exclude_ca_id=ca.id)
+
+
 def _keep_attached_key(ca, entry, stats):
     """Store the key an OPNsense cross entry carries (the counterpart's own) under the guards of the key import.
 
@@ -82,9 +104,13 @@ def _keep_attached_key(ca, entry, stats):
     try:
         from cryptography.hazmat.primitives import serialization
         from utils.key_codec import load_pem_bytes
-        serialization.load_pem_private_key(load_pem_bytes(key), password=None)
+        loaded = serialization.load_pem_private_key(load_pem_bytes(key), password=None)
     except Exception:
         stats['errors'].append(f"{label}: the key could not be read")
+        return
+    weak = weak_ca_key_refusal(loaded)
+    if weak:
+        stats['errors'].append(f"{label}: {weak}")
         return
     cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
     if ca.prv:
@@ -594,6 +620,7 @@ def import_items():
 
         # Import CAs first so certificate caref links can resolve in the same transaction;
         # self-signed ones before their cross-certificates, which attach to them.
+        created_cas = []
         attached_cross = []
         keys_stored = []
         attached_refids = {}
@@ -642,6 +669,12 @@ def import_items():
                 stats['errors'].append(f"CA '{ca_data.get('descr')}' already exists with refid {duplicate_by_name.refid}")
                 continue
             
+            weak = weak_ca_key_refusal(_decoded_private_key(ca_data))
+            if weak:
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{_display_name(ca_data, item_id)}' not imported: {weak}")
+                continue
+
             cert_info = _parse_cert(crt)
             try:
                 serial = int(ca_data.get('serial') or 0)
@@ -666,7 +699,13 @@ def import_items():
             )
             
             db.session.add(ca)
+            created_cas.append(ca)
             stats['cas_imported'] += 1
+
+        # Linked once the whole batch exists, so a CA listed before its parent is chained too
+        db.session.flush()
+        for ca in created_cas:
+            ca.caref = _signing_parent(ca)
 
         for item_id in selected_ids:
             if item_id in all_certs:

@@ -65,3 +65,5 @@ tests/test_est_fortios*.py
 tests/test_scep_get_pkioperation.py
 tests/test_scep_limited_client.py
 tests/test_scep_intune_fake_service.py
+tests/test_import_weak_ca_key.py
+tests/test_import_parent_link.py

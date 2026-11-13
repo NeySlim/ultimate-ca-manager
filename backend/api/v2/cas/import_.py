@@ -16,9 +16,11 @@ from utils.key_codec import MalformedKey
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.cert_issuer import private_key_matches
+from utils.key_type import weak_ca_key_refusal
 from services.import_service import (
     KeyPasswordError, parse_certificate_file, extract_cert_info, find_existing_ca_for_import, cross_mode_from, finish_cross_attach, AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import,
     install_on_pending_ca, find_pending_csr_for_certificate,
+    relink_parent_caref,
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from security.encryption import encrypt_private_key
@@ -82,6 +84,11 @@ def import_ca():
         # it would sign nothing anyone can verify (#347 review)
         if private_key is not None and not private_key_matches(private_key, cert):
             return error_response('Private key does not match the certificate', 400)
+
+        # A CA that would sign must clear the RSA floor; without its key it is only read
+        weak = import_key and private_key is not None and weak_ca_key_refusal(private_key)
+        if weak:
+            return error_response(weak, 400)
 
         # Extract certificate info
         cert_info = extract_cert_info(cert)
@@ -170,7 +177,11 @@ def import_ca():
         # certificates table (an intermediate requested here, signed outside):
         # the request's key becomes the CA's and the request is fulfilled
         pending_request = find_pending_csr_for_certificate(cert)
-        if pending_request is not None and not encrypted_prv:
+        if pending_request is not None and not encrypted_prv and pending_request.prv:
+            # The request's key is the certificate's (matched by SPKI): same RSA floor as a key in the file
+            weak = weak_ca_key_refusal(cert.public_key())
+            if weak:
+                return error_response(weak, 400)
             encrypted_prv = pending_request.prv
         ca = CA(
             refid=refid,
@@ -184,6 +195,7 @@ def import_ca():
             serial_number=str(cert.serial_number),
             valid_from=cert_info['valid_from'],
             valid_to=cert_info['valid_to'],
+            caref=relink_parent_caref(cert, None),
             imported_from='manual'
         )
         # Deleted after its revocation and imported again: still revoked (#343)

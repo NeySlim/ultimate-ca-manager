@@ -59,6 +59,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum, and so is a CA key that cannot be read; the same CA without a key is still imported. In a batch only that CA is skipped and named.
+- OPNsense import and smart import chain a CA under the stored CA whose key signed it, whatever the order of the batch, instead of leaving it unlinked or taking a CA of the same name. A CA whose parent signature cannot be verified here (a parent key type the server does not handle, such as SLH-DSA or GOST) is imported without a parent, where smart import used to attach it by name.
+- A CA imported after its parent is linked to it in the import itself, so SCEP `GetCACert` in chain mode serves both certificates at once instead of after the hourly backfill.
 - Behind a trusted reverse proxy, the pending Kerberos handshakes of XCEP and WSTEP are keyed by the client address instead of the proxy's, so two clients no longer share one. The keytab composed from the Windows profiles is refused above 1 MiB with a readable message.
 - Kerberos: a Kerberos Microsoft CA connection pointed `KRB5_KTNAME` at its own keytab for the whole process, so XCEP and WSTEP could accept with the wrong keys; the acceptor now names its keytab itself. A ticket for a realm without key is logged as a warning instead of an unrelated GSSAPI error.
 - ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.
@@ -119,6 +122,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- CA import: a CA with an RSA key under 2048 bits is no longer accepted together with its private key; import it without the key (read-only, for chains) or replace it.
 - Kerberos: a keytab merged for several realms is refused on upload; upload each realm's keytab on its own profile.
 - First access: scripts that logged in as `admin` / `changeme123` after a fresh install must provide the password or read the generated file; the DEB and RPM upgrade removes the `INITIAL_ADMIN_PASSWORD=changeme123` line 2.x wrote, and an existing administrator is left as it is.
 - Discovery: on PostgreSQL with a server time zone other than UTC, discovery dates stored before this release are in local time; run a scan of the discovery targets after upgrading to rewrite them.

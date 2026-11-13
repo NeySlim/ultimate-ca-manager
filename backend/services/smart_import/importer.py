@@ -25,7 +25,7 @@ from utils.key_codec import refuse_eddsa_key
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
-from .chain_builder import ChainBuilder, ChainInfo, find_ca_by_ski
+from .chain_builder import ChainBuilder, ChainInfo
 from security.encryption import encrypt_private_key
 
 
@@ -38,7 +38,7 @@ from utils.foreign_algorithms import spki_der
 from utils.cert_issuer import signing_ca_for
 from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
-from utils.key_type import unsignable_csr_key
+from utils.key_type import unsignable_csr_key, weak_ca_key_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -369,6 +369,7 @@ class SmartImporter:
         subject_to_refid: Dict[str, str] = {}
         ski_to_refid: Dict[str, str] = {}
         bundle_roots = [o for o in ca_objects if o.is_self_signed and o.ski]
+        from services.import_service import relink_parent_caref  # imported late: import_service imports this package
 
         for ca_obj in ca_objects:
             counterpart = self._cross_counterpart(ca_obj, bundle_roots)
@@ -412,31 +413,29 @@ class SmartImporter:
                         ski_to_refid[existing.ski] = existing.refid
                     continue
 
-            # Find parent CA: AKI→SKI first, then issuer DN fallback
-            caref = None
-            if not ca_obj.is_self_signed:
-                if ca_obj.aki:
-                    caref = ski_to_refid.get(ca_obj.aki)
-                    if not caref:
-                        parent = find_ca_by_ski(ca_obj.aki)
-                        if parent:
-                            caref = parent.refid
-                if not caref:
-                    caref = subject_to_refid.get(ca_obj.issuer)
-                if not caref:
-                    parent = CA.query.filter(CA.subject == ca_obj.issuer).first()
-                    if parent:
-                        caref = parent.refid
-            
+            # The parent is the stored CA whose key signed this certificate (flushed batch CAs included)
+            caref = relink_parent_caref(x509.load_pem_x509_certificate(ca_obj.raw_pem.encode()), None)
+
             # Find matching private key
             prv = None
+            refused = None
             for key_idx, cert_idx in matching.get("matched_pairs", []):
                 if objects[cert_idx] == ca_obj:
                     key_obj = objects[key_idx]
+                    weak = weak_ca_key_refusal(key_obj.raw_pem)
+                    if weak:
+                        refused = weak
+                        break
                     prv = _encrypt_prv(key_obj.raw_pem)
                     result.keys_matched += 1
                     break
             
+            if refused:
+                cn = self._get_cn(ca_obj.subject)
+                result.warnings.append(f"Skipped CA '{cn}': {refused}")
+                result.warning_details.append({'code': 'ca_key_refused', 'subject': ca_obj.subject, 'reason': refused})
+                continue
+
             # Create CA
             refid = secrets.token_hex(8)
             ca = CA(
@@ -469,6 +468,13 @@ class SmartImporter:
             
             # Audit log
             self._log_audit("import_ca", ca.id, ca.descr, username)
+
+        # A child listed before its parent found no parent at creation: relink once the whole batch is stored
+        unlinked = [ca for ca in CA.query.filter(CA.id.in_(result.imported_ids["cas"])).all() if not ca.caref]
+        for ca in unlinked:
+            ca.caref = relink_parent_caref(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), None,
+                                           exclude_ca_id=ca.id)
+        db.session.flush()
     
     @staticmethod
     def _is_self_signed_record(ca) -> bool:
