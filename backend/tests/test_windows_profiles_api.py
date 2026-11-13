@@ -18,8 +18,14 @@ URL = '/api/v2/windows-profiles'
 def _profiles_stay_in_this_module(app, drop_new_cas_and_certificates):
     with app.app_context():
         keep = {p.id for p in WindowsEnrollmentProfile.query.all()}
+        from models import User
+        users = {u.id for u in User.query.all()}
     yield
     with app.app_context():
+        # The shared viewer_client fixture leaves its account behind
+        for u in User.query.all():
+            if u.id not in users:
+                db.session.delete(u)
         Certificate.query.filter(Certificate.descr.like('wp-api-%')).delete(synchronize_session=False)
         for p in WindowsEnrollmentProfile.query.all():
             if p.id not in keep:
