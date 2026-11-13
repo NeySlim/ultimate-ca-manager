@@ -53,6 +53,18 @@ def _connector_values(connector):
     return {'id': connector.id, 'enabled': bool(connector.enabled), 'base_dn': connector.base_dn}
 
 
+def keytab_absent(profile):
+    """No keytab exists for this installation: none in *profile* (None: no profile), none
+    stored for the nodes, no file on this node. An undecryptable one is not absent."""
+    from models import SharedFile
+    from services import shared_files
+    from services.kerberos import negotiate_auth
+    if profile is not None and profile.keytab:
+        return False
+    return (db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is None
+            and not negotiate_auth.KEYTAB_PATH.exists())
+
+
 def fill_realm(profile):
     """Give a profile without a realm the one A1 determines now; never replaces a realm."""
     if profile.realm is not None:
@@ -63,7 +75,8 @@ def fill_realm(profile):
         keytab = profile.keytab_bytes()
     except ValueError:
         keytab = None
-    realm = resolve_realm(_connector_values(connector), negotiate_auth.get_spn(), keytab)
+    realm = resolve_realm(_connector_values(connector), negotiate_auth.get_spn(), keytab,
+                          keytab_absent(profile))
     taken = realm and WindowsEnrollmentProfile.query.filter(
         WindowsEnrollmentProfile.realm == realm, WindowsEnrollmentProfile.id != profile.id).first()
     if realm and not taken:

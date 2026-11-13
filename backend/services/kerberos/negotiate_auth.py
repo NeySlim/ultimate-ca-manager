@@ -251,6 +251,11 @@ def restore_keytab_at_start(app):
                     windows_profiles.publish_keytab()
                     db.session.commit()
                     logger.info("Kerberos keytab stored in the default Windows enrollment profile")
+                elif profile is not None and profile.realm is None and windows_profiles.keytab_absent(profile):
+                    # Established only here: no keytab to take, so A1's last resort applies
+                    windows_profiles.fill_realm(profile)
+                    if profile.realm is not None:
+                        db.session.commit()
             elif shared_files.read_file(shared_files.KERBEROS_KEYTAB) != profile.keytab_bytes():
                 # The profile is the source: a file it does not hold is rebuilt, everywhere
                 from services import cluster_commands

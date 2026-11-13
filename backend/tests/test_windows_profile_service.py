@@ -551,6 +551,33 @@ def test_the_profile_is_the_same_whether_the_migration_reads_the_keytab_or_not(
     assert seen[0][2] == (realm is None)
 
 
+@pytest.mark.parametrize('keytab, realm', [('absent', 'CORP.EXAMPLE'), ('unread', None), ('read', None)])
+def test_a_disabled_connector_names_the_realm_once_no_keytab_is_established(
+        app, clean_slate, two_cas, no_shared_keytab, monkeypatch, tmp_path, keytab, realm):
+    """The migration reads no keytab: the realm waits for the start, which takes the DN of the
+    disabled connector only when no keytab exists; one it cannot take or that lacks it: none."""
+    from config.settings import Config
+    from tests.test_windows_profile_migration import TWO_REALMS
+    issuing, policy, _template = two_cas
+    path = tmp_path / 'kerberos.keytab'
+    if keytab != 'absent':
+        path.write_bytes(TWO_REALMS)
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    # A node's own file is not taken in HA: the keytab exists but is not read
+    monkeypatch.setattr(Config, 'HA_MODE', keytab == 'unread')
+    with app.app_context():
+        _connector_as({'enabled': False, 'base_dn': 'DC=corp,DC=example'})
+        for key, value in {**_settings_2x(issuing, policy), 'kerberos_enabled': 'true',
+                           'kerberos_spn': 'HTTP/ucm.example'}.items():
+            _set(key, value)
+        db.session.commit()
+        _migrate_app_db(keytab=b'')
+        assert _default().realm is None
+    negotiate_auth.restore_keytab_at_start(app)
+    with app.app_context():
+        assert _default().realm == realm
+
+
 ARCHIVED_KEYTAB, TARGET_KEYTAB = b'\x05\x02keytab-of-the-archive', b'\x05\x02keytab-of-the-target'
 
 

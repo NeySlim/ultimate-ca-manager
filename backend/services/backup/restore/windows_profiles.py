@@ -7,7 +7,7 @@ A 2.x archive never carried the keytab: the one this installation holds stays wi
 """
 import base64
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from services.windows_profiles.legacy import (MIGRATED_KEYS, connector_names, has_windows_configuration,
                                               keytab_realms, profile_from_2x, switches_from_2x)
@@ -19,15 +19,16 @@ logger = logging.getLogger(__name__)
 PROFILES = 'windows_enrollment_profiles'
 
 
-def _keytab_here() -> Optional[bytes]:
-    from services.windows_profiles import default_profile
+def _keytab_here() -> Tuple[Optional[bytes], bool]:
+    """This installation's keytab, and whether there is none at all (not merely unreadable)."""
+    from services.windows_profiles import default_profile, keytab_absent
     profile = default_profile()
     try:
-        return profile.keytab_bytes() if profile is not None else None
+        return (profile.keytab_bytes() if profile is not None else None), keytab_absent(profile)
     except ValueError:
         logger.warning("Restore: the keytab of this installation cannot be decrypted; "
                        "the restored default profile has none")
-        return None
+        return None, False
 
 
 def _name_connectors(backup_data) -> list:
@@ -66,9 +67,9 @@ def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Di
     # The archive alone carries a configuration or not; the keytab here only gives the realm
     if not has_windows_configuration(archived):
         return None
-    keytab = _keytab_here()
+    keytab, absent = _keytab_here()
     settings.update(switches_from_2x(archived))
-    profile = profile_from_2x(archived, connector, keytab)
+    profile = profile_from_2x(archived, connector, keytab, absent)
     realms = keytab_realms(keytab) if keytab else None
     if keytab and profile['realm'] and profile['realm'] not in (realms or ()):
         message = (f"windows_enrollment_profiles: the realm {profile['realm']} of the default profile "

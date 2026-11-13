@@ -69,10 +69,10 @@ def _connector_realm(connector):
     return realm_of_base_dn(connector['base_dn']) if connector and connector.get('base_dn') else None
 
 
-def resolve_realm(connector, spn, keytab):
+def resolve_realm(connector, spn, keytab, keytab_absent=False):
     """A1: the realm of the enabled connector's base DN, else of the SPN, else the single
     realm of the keytab entries, else the disabled connector's when the keytab holds it
-    (or there is none); None when none of them says."""
+    (or *keytab_absent* establishes there is none); None when none of them says."""
     named = _connector_realm(connector)
     if named and connector.get('enabled'):
         return named
@@ -83,7 +83,8 @@ def resolve_realm(connector, spn, keytab):
     if realms and len(realms) == 1:
         return next(iter(realms))
     # 2.x served the SPN's or the keytab's realm while the connector was disabled
-    if named and (not keytab or (realms and named in realms)):
+    # A keytab not read is not an absent one: its realms may exclude the connector's
+    if named and ((keytab_absent and not keytab) or (realms and named in realms)):
         return named
     return None
 
@@ -123,19 +124,21 @@ def _validity(value):
         return DEFAULT_VALIDITY_DAYS
 
 
-def profile_from_2x(settings, connector=None, keytab=None):
+def profile_from_2x(settings, connector=None, keytab=None, keytab_absent=False):
     """The default profile's columns from 2.x ``settings`` (key -> value), the connector row
     (dict with ``id``, ``enabled``, ``base_dn``) and the keytab bytes; None without configuration.
+    *keytab_absent*: no keytab exists anywhere, not merely none was read.
 
     Always enabled: without a realm only Kerberos is refused (A1), the other bindings serve as in 2.x.
     """
     if not has_windows_configuration(settings, keytab):
         return None
     spn = settings.get('kerberos_spn')
-    realm = resolve_realm(connector, spn, keytab)
+    realm = resolve_realm(connector, spn, keytab, keytab_absent)
     warn_without_realm(realm, str(settings.get('kerberos_enabled') or '').lower() == 'true', spn, keytab)
     named = _connector_realm(connector)
-    if named and realm != named:
+    # Without a keytab read the realm is not chosen yet: the start or the upload sets it
+    if named and realm != named and (realm or keytab or keytab_absent):
         logger.warning("Windows enrollment: the default profile's realm %s differs from the realm of "
                        "the connector's base DN, %s", realm or 'none', named)
     return {

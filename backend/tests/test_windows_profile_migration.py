@@ -207,11 +207,11 @@ DISABLED = {**CONNECTOR_2X, 'enabled': False}
     (DISABLED, 'HTTP/ucm', ONE_REALM, 'EXAMPLE.TEST', True),
     ({**DISABLED, 'base_dn': 'DC=one,DC=example'}, 'HTTP/ucm', TWO_REALMS, 'ONE.EXAMPLE', False),
     (DISABLED, 'HTTP/ucm', TWO_REALMS, None, True),
-    (DISABLED, 'HTTP/ucm', b'', 'CORP.EXAMPLE', False),
-], ids=['spn', 'one-realm-keytab', 'dn-in-keytab', 'dn-not-in-keytab', 'dn-without-keytab'])
+    (DISABLED, 'HTTP/ucm', b'', None, False),
+], ids=['spn', 'one-realm-keytab', 'dn-in-keytab', 'dn-not-in-keytab', 'dn-keytab-not-read'])
 def test_a_disabled_connector_names_the_realm_last(base, connector, spn, keytab, realm, warned, caplog):
     """2.x served the SPN's realm, else the keytab's, while the connector was disabled: kept;
-    its base DN is the last resort, and only for a realm the keytab holds."""
+    its base DN is the last resort, only for a realm the keytab holds or once none exists (start)."""
     base.seed(settings={**SETTINGS_2X, 'kerberos_spn': spn}, connector=connector)
     with caplog.at_level('WARNING', logger='services.windows_profiles.legacy'):
         base.migrate(keytab=keytab)
