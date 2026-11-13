@@ -83,8 +83,8 @@ def test_detail_and_list_carry_the_profile_id_and_name(app, auth_client, create_
             db.session.commit()
 
 
-def test_list_statements_do_not_grow_with_profile_certificates(app, auth_client, create_ca):
-    root = create_ca(cn='WP Root 2')
+def _counts_by_size(app, auth_client, create_ca, cn, url_of):
+    root = create_ca(cn=cn)
     counts = {}
     all_certs, all_profiles = [], []
     try:
@@ -94,14 +94,28 @@ def test_list_statements_do_not_grow_with_profile_certificates(app, auth_client,
                 cids = _certs(db.session.get(CA, root['id']), n, pids)
             all_certs += cids
             all_profiles += pids
-            seen, _ = _statements(app, auth_client, '/api/v2/certificates?per_page=100')
+            seen, rows = _statements(app, auth_client, url_of(root['id']))
             counts[label] = len(seen)
+            mine = [r for r in rows if r['id'] in cids]
+            assert len(mine) == n and all(r['windows_profile_name'] for r in mine), mine
             if label == 'few':
                 _drop(app, cids, pids)
                 all_certs, all_profiles = [], []
-        assert counts['many'] == counts['few'], counts
+        return counts
     finally:
         _drop(app, all_certs, all_profiles)
         with app.app_context():
             CA.query.filter_by(id=root['id']).delete()
             db.session.commit()
+
+
+def test_list_statements_do_not_grow_with_profile_certificates(app, auth_client, create_ca):
+    counts = _counts_by_size(app, auth_client, create_ca, 'WP Root 2',
+                             lambda _ca: '/api/v2/certificates?per_page=100')
+    assert counts['many'] == counts['few'], counts
+
+
+def test_ca_list_statements_do_not_grow_with_profile_certificates(app, auth_client, create_ca):
+    counts = _counts_by_size(app, auth_client, create_ca, 'WP Root 3',
+                             lambda ca_id: f'/api/v2/cas/{ca_id}/certificates?per_page=100')
+    assert counts['many'] == counts['few'], counts
