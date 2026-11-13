@@ -16,12 +16,10 @@ from cryptography.hazmat.primitives.serialization import pkcs7
 
 from models import SystemConfig, db
 from tests.conftest import get_json
-from tests.test_scep_fips import _attrs, _envelope
 from tests.test_scep_get_pkioperation import CHALLENGE, PATHS, _issued, _message_with_both_symbols, _set, pkcs_req, scep_http  # noqa: F401
 from tests.test_scep_rfc8894_operations import (
     MESSAGE_TYPE_OID, PKI_STATUS_OID, _client_identity, _response_attributes,
 )
-from services.scep.crypto_helpers import create_signed_pkcs7
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
@@ -196,7 +194,7 @@ def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client,
     tag = uuid.uuid4().hex[:6]
     root_key, child_key = rsa.generate_private_key(65537, 2048), rsa.generate_private_key(65537, 2048)
     root_cn, child_cn = f'Import Root {tag}', f'Import Child {tag}'
-    ids = []
+    ids, refids = [], []
     with app.app_context():
         saved = {k: (row.value if (row := SystemConfig.query.filter_by(key=k).first()) else None)
                  for k in ('scep_enabled', 'scep_ca_id', 'scep_getcacert_chain')}
@@ -206,7 +204,11 @@ def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client,
             r = auth_client.post(endpoint, data={'pem_content': pem + _key_pem(key)},
                                  content_type='multipart/form-data')
             assert r.status_code in (200, 201), r.data
-            ids.append(get_json(r)['data']['id'])
+            data = get_json(r)['data']
+            # The response itself names the parent
+            assert data['caref'] == (refids[0] if refids else None)
+            ids.append(data['id'])
+            refids.append(data['refid'])
         with app.app_context():
             root, child = db.session.get(CA, ids[0]), db.session.get(CA, ids[1])
             assert child.caref == root.refid
