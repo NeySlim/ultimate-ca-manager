@@ -38,3 +38,22 @@ class TestACertificateRevokedHere:
         _restore(blob, mode='merge')
 
         assert _row_revocation('merge-tie') == (True, 'superseded', EARLY)
+
+    def test_a_graver_record_of_the_archive_sets_the_row_reason(self, target):
+        """Valid in the archive with a compromise recorded, superseded here: compromise everywhere."""
+        from models import CA, Certificate
+        from services.cert.issued_lookup import answered_revocation
+        issuer = _authority_row('merge-graver-ca')
+        row = _certificate_row('merge-graver', issuer)
+        record = _record(row, 'keyCompromise')
+        blob = _snapshot()
+        _revoke(row, 'superseded', LATER)
+        record.revoke_reason, record.revoked_at = 'superseded', LATER
+        db.session.commit()
+
+        _restore(blob, mode='merge')
+
+        assert _state('merge-graver') == (True, 'keyCompromise', ['keyCompromise'])
+        row = Certificate.query.filter_by(refid='merge-graver').one()
+        ca = CA.query.filter_by(refid=row.caref).one()
+        assert answered_revocation(row, ca).revoke_reason == 'keyCompromise'
