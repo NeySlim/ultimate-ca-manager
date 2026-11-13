@@ -13,6 +13,7 @@ from api.v2.ad_connector import (
     _ad_retarget_error, apply_fields, refresh_domain_sid, run_saved_test, run_unsaved_test,
 )
 from models import db, ADConnectorConfig, WindowsEnrollmentProfile
+from services import windows_profiles
 from services.ad_connector import lookup
 from services.audit_service import AuditService
 from services.deletion_blockers import connector_deletion_blockers, first_blocker
@@ -63,9 +64,10 @@ def _serve_default_profile(config):
         windows_profiles.fill_realm(profile)
 
 
-def _stage(config, creating):
+def _stage(config, creating, followed=()):
     """Everything of a save but its commit, which the route does before it audits."""
     config.updated_at = utc_now()
+    moved = (followed[0].realm, [p.id for p in followed]) if followed else None
     try:
         refresh_domain_sid(config)
         if creating:
@@ -74,6 +76,10 @@ def _stage(config, creating):
         db.session.flush()
     except IntegrityError:
         db.session.rollback()
+        # A concurrent save gave another profile the realm the followers were moving to
+        if moved and WindowsEnrollmentProfile.query.filter(
+                WindowsEnrollmentProfile.realm == moved[0], ~WindowsEnrollmentProfile.id.in_(moved[1])).first():
+            return error_response(f'{moved[0]} is already served by another profile', 409)
         return error_response('A connector with this name already exists', 409)
     except Exception as e:
         # A failed flush or profile update stores nothing; the password setter ran before
@@ -81,6 +87,44 @@ def _stage(config, creating):
         logger.error('Failed to save the AD connector: %s', e)
         return error_response('Failed to save configuration (encryption unavailable?)', 500)
     return None
+
+
+def _follow_realm(config, old_realm):
+    """Move the realm of the profiles of *config* to its new domain, in the caller's transaction.
+    Returns (error response, followed profiles): a profile with a keytab, or whose realm was not
+    the old domain, or a realm another profile holds, refuses the whole save."""
+    new_realm = lookup.realm_of_base_dn(config.base_dn)
+    if not old_realm or new_realm == old_realm:
+        return None, []
+    # No autoflush: the connector UPDATE must not reach the database before the DC bind
+    with db.session.no_autoflush:
+        using = WindowsEnrollmentProfile.query.filter_by(connector_id=config.id).order_by(
+            WindowsEnrollmentProfile.name).all()
+        follow, refused = [], []
+        for profile in using:
+            if profile.realm is None or profile.realm == new_realm:
+                continue
+            if profile.keytab:
+                refused.append((profile, 'its keytab fixes its realm'))
+            elif profile.realm != old_realm:
+                refused.append((profile, f'its realm is {profile.realm}, not {old_realm}'))
+            elif windows_profiles.realm_problem(new_realm, profile):
+                refused.append((profile, f'{new_realm} is already served by another profile'))
+            else:
+                follow.append(profile)
+    if refused:
+        db.session.rollback()
+        listed = '; '.join(f'profile {p.name}: {why}' for p, why in refused[:5])
+        more = f' (and {len(refused) - 5} more)' if len(refused) > 5 else ''
+        return error_response(
+            f'Cannot move connector {config.name} from {old_realm} to {new_realm}: {listed}{more}. '
+            'Change the realm of the profile, or give it another connector, first.', 409,
+            details={'profiles': [{'id': p.id, 'name': p.name, 'reason': why}
+                                  for p, why in refused[:MAX_LISTED_PROFILES]],
+                     'total': len(refused)}), []
+    for profile in follow:
+        profile.realm = new_realm
+    return None, follow
 
 
 def _requires_realm(config):
@@ -139,6 +183,7 @@ def update_connector(connector_id):
     err = _ad_retarget_error(config, data)
     if err:
         return err
+    old_realm = lookup.realm_of_base_dn(config.base_dn)
     if 'name' in data:
         name, err = _name_error(data, config)
         if err:
@@ -148,13 +193,19 @@ def update_connector(connector_id):
     if err:
         db.session.rollback()
         return err
-    err = _stage(config, False)
+    err, followed = _follow_realm(config, old_realm)
+    if err:
+        return err
+    err = _stage(config, False, followed)
     if err:
         return err
     ok, err = safe_commit(logger, 'Failed to save the AD connector')
     if not ok:
         return err
-    _audit('ad_connector_update', config, f'Updated AD connector {config.name}')
+    details = f'Updated AD connector {config.name}'
+    if followed:
+        details += f'; realm {old_realm} -> {lookup.realm_of_base_dn(config.base_dn)} of profile ' + ', '.join(p.name for p in followed)
+    _audit('ad_connector_update', config, details)
     return success_response(data=config.to_dict(), message='AD connector saved')
 
 

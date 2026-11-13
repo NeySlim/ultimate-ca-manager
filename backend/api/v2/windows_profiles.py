@@ -107,6 +107,7 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
         templates = _template_ids([profile]) if profile.id else {}
     connector = connectors.get(profile.connector_id)
     from services.ad_connector import health
+    connector_realm = lookup.realm_of_base_dn(connector.base_dn) if connector is not None else None
     data = {
         'id': profile.id,
         'name': profile.name,
@@ -118,8 +119,10 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
         'connector_name': connector.name if connector is not None else None,
         'connector_enabled': bool(connector.enabled) if connector is not None else None,
         'connector_health': health.state_of(connector.health) if connector is not None else None,
-        'connector_realm': (lookup.realm_of_base_dn(connector.base_dn)
-                            if connector is not None else None),
+        'connector_realm': connector_realm,
+        # Served all the same; the screen warns that the realm and the domain disagree
+        'connector_domain_mismatch': bool(profile.realm and connector_realm
+                                          and profile.realm != connector_realm),
         'issuing_ca_refid': profile.issuing_ca_refid,
         'issuing_ca_name': ca_names.get(profile.issuing_ca_refid),
         'policy_ca_refid': profile.policy_ca_refid,
@@ -140,14 +143,23 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
     return data
 
 
+def _binding_reason_for_caller():
+    """The binding's reason only for a caller who may read the Kerberos state (as GET /settings);
+    None otherwise, so only the profile's own refusal shows."""
+    if not has_permission('read:kerberos', getattr(g, 'permissions', None) or []):
+        return None
+    return windows_profiles.kerberos_binding_reason()
+
+
 def _render_one(profile, detail=False):
-    return _render(profile, _ca_names([profile]), detail=detail)
+    return _render(profile, _ca_names([profile]), detail=detail,
+                   binding_reason=_binding_reason_for_caller())
 
 
 def _render_page(profiles):
     names, connectors = _ca_names(profiles), _connectors(profiles)
     failing, templates = _failing_connector_ids(), _template_ids(profiles)
-    binding_reason = windows_profiles.kerberos_binding_reason()
+    binding_reason = _binding_reason_for_caller()
     return [_render(p, names, connectors, failing, templates, binding_reason=binding_reason)
             for p in profiles]
 

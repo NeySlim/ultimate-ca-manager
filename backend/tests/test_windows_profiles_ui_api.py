@@ -255,6 +255,7 @@ def test_the_kerberos_refusal_names_the_profile_or_what_the_binding_lacks(app, m
     from services.windows_profiles import kerberos_refusal, kerberos_unserved_reason
     served = WindowsEnrollmentProfile(name='k-off', realm='K.EXAMPLE', enabled=False)
     monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: None)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
     with app.app_context():
         assert kerberos_refusal(served) == 'profile k-off is disabled'
         assert kerberos_unserved_reason(served) == 'profile k-off is disabled'
@@ -266,10 +267,55 @@ def test_the_kerberos_refusal_names_the_profile_or_what_the_binding_lacks(app, m
         assert kerberos_refusal(served) is None
 
 
-def test_the_profile_api_gives_the_reason_the_binding_is_not_configured(auth_client, profiles, monkeypatch):  # noqa: F811
+def test_a_missing_kerberos_library_is_said_before_the_binding_settings(app, monkeypatch):
+    from services.windows_profiles import kerberos_binding_reason
     monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
-    for read in (auth_client.get(f'{URL}/{profiles.two}'), auth_client.get(URL)):
-        body = read.get_json()['data']
-        rows = body if isinstance(body, list) else body.get('items', body)
-        row = rows if isinstance(rows, dict) else next(r for r in rows if r['id'] == profiles.two)
-        assert row['kerberos_refusal'] == 'no SPN set'
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: False)
+    with app.app_context():
+        assert kerberos_binding_reason() == 'the Kerberos library is not installed'
+        monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+        assert kerberos_binding_reason() == 'no SPN set'
+
+
+@pytest.mark.parametrize('extra, binding_shown', [([], False), (['read:kerberos'], True)])
+def test_the_binding_reason_needs_the_kerberos_read_scope(app, auth_client, profiles, monkeypatch,  # noqa: F811
+                                                          extra, binding_shown):
+    monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    key_id, headers = _key(auth_client, ['read:xcep', *extra])
+    try:
+        client = app.test_client()
+        one = client.get(f'{URL}/{profiles.two}', headers=headers).get_json()['data']
+        listed = client.get(f'{URL}?q=c03-two', headers=headers).get_json()['data']
+        row = next(r for r in listed if r['id'] == profiles.two)
+        assert one['kerberos_refusal'] == row['kerberos_refusal'] == ('no SPN set' if binding_shown else None)
+    finally:
+        auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
+
+
+def test_a_profile_without_a_realm_is_refused_by_its_own_name(app):
+    from services.windows_profiles import kerberos_refusal
+    with app.app_context():
+        named = WindowsEnrollmentProfile(name='no-realm', realm=None, enabled=True, is_default=False)
+        assert kerberos_refusal(named) == 'profile no-realm has no realm: Kerberos refused until one is set'
+        default = WindowsEnrollmentProfile(name='no-realm', realm=None, enabled=True, is_default=True)
+        assert kerberos_refusal(default) == 'default profile has no realm: Kerberos refused until one is set'
+
+
+def test_the_profile_api_gives_the_reason_the_binding_is_not_configured(app, auth_client, profiles, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    # Rows other files left behind, sorted before ours, must not push it off the first page
+    with app.app_context():
+        db.session.add_all(WindowsEnrollmentProfile(name=f'a-pad-{i:02d}', enabled=True) for i in range(30))
+        db.session.commit()
+    try:
+        for read in (auth_client.get(f'{URL}/{profiles.two}'), auth_client.get(f'{URL}?q=c03-two')):
+            body = read.get_json()['data']
+            row = body if isinstance(body, dict) else next(r for r in body if r['id'] == profiles.two)
+            assert row['kerberos_refusal'] == 'no SPN set'
+    finally:
+        with app.app_context():
+            WindowsEnrollmentProfile.query.filter(
+                WindowsEnrollmentProfile.name.like('a-pad-%')).delete(synchronize_session=False)
+            db.session.commit()

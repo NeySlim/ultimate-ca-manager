@@ -85,6 +85,18 @@ describe('AdConnectorSection', () => {
     fireEvent.click(screen.getAllByTitle('common.delete')[0])
     await screen.findByTestId('refusal-profiles')
     expect(screen.getByText('adConnector.deleteRefused|count=150')).toBeInTheDocument()
+    expect(screen.getByText('adConnector.deleteRefusedMore|count=100')).toBeInTheDocument()
+  })
+
+  it('says nothing more when every profile is listed', async () => {
+    mocks.remove.mockRejectedValue(Object.assign(new Error('in use'), {
+      status: 409, data: { details: { profiles: [{ id: 4, name: 'corp' }], total: 1 } },
+    }))
+    render(<AdConnectorSection hasPermission={() => true} />)
+    await screen.findByText('forest-a')
+    fireEvent.click(screen.getAllByTitle('common.delete')[0])
+    await screen.findByTestId('refusal-profiles')
+    expect(screen.queryByText(/deleteRefusedMore/)).not.toBeInTheDocument()
   })
 
   it('offers no writing to a user who cannot write connectors', async () => {

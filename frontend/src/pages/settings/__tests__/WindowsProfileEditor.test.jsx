@@ -216,6 +216,28 @@ describe('checklist', () => {
     expect(templates.querySelector('.text-status-success')).not.toBeNull()
   })
 
+  it('warns in the checklist when the server says the realm and the connector domain differ', async () => {
+    mocks.get.mockResolvedValue({ data: { ...PROFILE, connector_id: 3, connector_domain_mismatch: true } })
+    renderEditor()
+    await screen.findByDisplayValue('corp')
+    await loaded()
+    const row = checklist().getByText('xcepWstep.checklist.connectorDomain').closest('div').parentElement
+    expect(row.querySelector('.text-status-warning')).not.toBeNull()
+  })
+
+  it('judges an edited realm against the connector, not by the saved flag', async () => {
+    mocks.connectors.mockResolvedValue({ data: [
+      { id: 3, name: 'forest-b', realm: 'B.EXAMPLE', enabled: true, health: { state: 'up' } },
+    ] })
+    mocks.get.mockResolvedValue({ data: { ...PROFILE, connector_id: 3, connector_domain_mismatch: true } })
+    renderEditor()
+    await screen.findByDisplayValue('corp')
+    await loaded()
+    fireEvent.change(realmInput(), { target: { value: 'B.EXAMPLE' } })
+    const row = checklist().getByText('xcepWstep.checklist.connectorDomain').closest('div').parentElement
+    expect(row.querySelector('.text-status-warning')).toBeNull()
+  })
+
   it('shows a complete profile as complete', async () => {
     renderEditor()
     await screen.findByDisplayValue('corp')

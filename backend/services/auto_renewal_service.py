@@ -137,7 +137,9 @@ class AutoRenewalService:
             # the scheduler; the device renews through its protocol
             Certificate.prv.isnot(None),
             Certificate.prv != '',
-            Certificate.source.in_(config['renewal_sources'])
+            Certificate.source.in_(config['renewal_sources']),
+            # A certificate of a Windows enrollment profile renews through Windows only
+            Certificate.windows_profile_id.is_(None),
         ).all()
 
         return [c for c in certs if AutoRenewalService._in_renewal_window(c, config['days_before_expiry'])]

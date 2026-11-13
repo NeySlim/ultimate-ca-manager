@@ -462,6 +462,7 @@ def test_an_undeterminable_realm_refuses_kerberos_only(app, client, auth_client,
                                                        settings, connector, keytab):
     """A1, the 2.x settings the review replayed: UsernamePassword (XCEP, WSTEP) and the renewal by
     certificate answer as 2.x did; Kerberos, which 2.x served with an SPN, is refused with its reason."""
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
     from api.wstep_protocol import _check_credentials, _resolve_wstep_ca, _validity_days
     from services.windows_profiles import kerberos_refusal, serving_profile
     _fixed_message_id(monkeypatch)
@@ -498,6 +499,7 @@ def test_an_undeterminable_realm_refuses_kerberos_only(app, client, auth_client,
 def test_the_realm_of_the_default_profile_is_set_through_the_profile_api(
         app, auth_client, clean_slate, two_cas, no_shared_keytab, monkeypatch, tmp_path):
     """The way out of A1's refusal: an explicit realm, in capitals, one the keytab names."""
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
     from tests.test_windows_profile_migration import TWO_REALMS
     issuing, policy, _template = two_cas
     path = tmp_path / 'kerberos.keytab'
