@@ -135,6 +135,34 @@ def test_a_probe_pass_stops_at_its_budget_and_the_next_one_resumes(app, monkeypa
     assert {i for i, state in states.items() if state == health.STATE_DOWN} == unreachable
 
 
+def test_a_pass_probes_the_never_probed_and_then_the_oldest_verdict_first(app, monkeypatch):
+    """A pass sorted by id would probe the due head again and starve the tail."""
+    from datetime import timedelta
+    from utils.datetime_utils import utc_isoformat, utc_now
+    with app.app_context():
+        ids = [add_connector(f'order-{i}', server=f'dc.o{i}.example', base_dn=f'DC=o{i},DC=example',
+                             bind_dn='svc', enabled=True).id for i in range(4)]
+        for connector_id, hours in ((ids[0], 1), (ids[1], 2)):
+            db.session.get(ADConnectorConfig, connector_id).health = {
+                'state': health.STATE_UP, 'checked_at': utc_isoformat(utc_now() - timedelta(hours=hours))}
+        db.session.commit()
+    now, probed = [0.0], []
+
+    def fake_probe(config):
+        now[0] += 1.0
+        probed.append(config.id)
+        return [(config.server, True, 'ok')]
+
+    monkeypatch.setattr(health, 'probe', fake_probe)
+    passes = []
+    for _ in range(2):
+        probed.clear()
+        with app.app_context():
+            health.run_health_probe(budget=2, clock=lambda: now[0])
+        passes.append(list(probed))
+    assert passes == [[ids[2], ids[3]], [ids[1], ids[0]]]
+
+
 # Criterion 3
 def _violations(source):
     found = []
