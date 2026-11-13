@@ -265,3 +265,16 @@ def test_an_encrypted_key_pem_is_refused_not_admitted():
                                      serialization.BestAvailableEncryption(b'pw'))
     assert 'could not be read' in weak_ca_key_refusal(sealed)
     assert weak_ca_key_refusal(None) is None
+
+
+def test_certificates_import_asks_write_cas_before_judging_the_key(app, auth_client):
+    from tests.conftest import assert_success
+    created = assert_success(auth_client.post('/api/v2/account/apikeys', json={
+        'name': f'cert-only-{uuid.uuid4().hex[:6]}',
+        'permissions': ['read:certificates', 'write:certificates']}), 201)
+    key = _weak_key()
+    cert = _ca(uuid.uuid4().hex[:8], key)
+    r = app.test_client().post('/api/v2/certificates/import', headers={'X-API-Key': created['key']},
+                               data={'pem_content': pem(cert) + key_pem(key)}, content_type='multipart/form-data')
+    assert r.status_code == 403, r.data
+    assert _stored(app, cert) == []

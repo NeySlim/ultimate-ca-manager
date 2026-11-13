@@ -112,11 +112,6 @@ def import_certificate():
         if private_key is not None and not private_key_matches(private_key, cert):
             return error_response('Private key does not match the certificate', 400)
 
-        # A CA that would sign must clear the RSA floor; without its key it is only read
-        weak = (import_key and private_key is not None and is_ca_certificate(cert) and weak_ca_key_refusal(private_key))
-        if weak:
-            return error_response(weak, 400)
-
         # Extract certificate info
         cert_info = extract_cert_info(cert)
 
@@ -135,6 +130,10 @@ def import_certificate():
             # Check for existing CA
             if not has_permission('write:cas', g.permissions):
                 return error_response('write:cas permission required to import a CA certificate', 403)
+            # A CA that would sign must clear the RSA floor; without its key it is only read
+            weak = import_key and private_key is not None and weak_ca_key_refusal(private_key)
+            if weak:
+                return error_response(weak, 400)
             username = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
             try:
                 existing_ca, attached = find_existing_ca_for_import(cert_info, cert, cross_mode, username)
