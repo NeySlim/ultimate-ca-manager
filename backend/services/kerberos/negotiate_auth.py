@@ -259,10 +259,10 @@ def restore_keytab_at_start(app):
             elif shared_files.read_file(shared_files.KERBEROS_KEYTAB) != profile.keytab_bytes():
                 # The profile is the source: a file it does not hold is rebuilt, everywhere
                 from services import cluster_commands
-                _rebuild_shared_keytab(profile.keytab_bytes())
-                cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+                if _rebuild_shared_keytab(profile.keytab_bytes()):
+                    cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+                    logger.info("Kerberos keytab rebuilt from the default Windows enrollment profile")
                 db.session.commit()
-                logger.info("Kerberos keytab rebuilt from the default Windows enrollment profile")
         except Exception as e:
             db.session.rollback()
             logger.error(f"Kerberos keytab not restored from the database: {type(e).__name__}: {e}")
@@ -279,17 +279,26 @@ def restore_keytab_at_start(app):
 
 
 def _rebuild_shared_keytab(data):
-    """The shared keytab set to the profile's *data*. A node starting at the same time may
-    insert the row first: the collision is undone alone and the row then updated."""
+    """The shared keytab set to the profile's *data*; True when this node changed it. The row
+    is read again under lock and a concurrent insert is undone alone, so a node starting at
+    the same time that rebuilt it first is neither overwritten in error nor reloaded twice."""
     from sqlalchemy.exc import IntegrityError
-    from models import db
+    from models import SharedFile, db
     from services import shared_files
-    try:
-        with db.session.begin_nested():
-            shared_files.store_file(shared_files.KERBEROS_KEYTAB, data, actor='system')
-    except IntegrityError:
-        db.session.expire_all()
-        shared_files.store_file(shared_files.KERBEROS_KEYTAB, data, actor='system')
+    name = shared_files.KERBEROS_KEYTAB
+    for attempt in (1, 2):
+        row = (db.session.query(SharedFile).filter_by(name=name)
+               .with_for_update().populate_existing().first())
+        if row is not None and shared_files.read_file(name) == data:
+            return False
+        try:
+            with db.session.begin_nested():
+                shared_files.store_file(name, data, actor='system')
+            return True
+        except IntegrityError:
+            if attempt == 2:
+                raise
+    return False
 
 
 def inspect_keytab(path=None):

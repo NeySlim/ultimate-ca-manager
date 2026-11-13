@@ -758,6 +758,46 @@ def test_the_node_that_loses_the_keytab_insert_writes_its_file(app, clean_slate,
         assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == ARCHIVED_KEYTAB
 
 
+@pytest.mark.parametrize('raced, reloads', [(False, 1), (True, 0)], ids=['alone', 'other-node-first'])
+def test_a_start_queues_a_reload_only_when_it_changed_the_keytab(app, clean_slate, no_shared_keytab,
+                                                                 monkeypatch, tmp_path, raced, reloads):
+    """HA: a node starting with a stale shared keytab rebuilds it and asks the others to reload;
+    when another node rebuilt it in the meantime, the content is unchanged and nothing is queued."""
+    from config.settings import Config
+    from models import ClusterCommand
+    from services import cluster_commands, shared_files
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    path = tmp_path / 'kerberos.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    with app.app_context():
+        profile = WindowsEnrollmentProfile(name='default', is_default=True, realm='KT.EXAMPLE')
+        profile.set_keytab(ARCHIVED_KEYTAB)
+        db.session.add(profile)
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, TARGET_KEYTAB)
+        ClusterCommand.query.filter_by(kind=cluster_commands.RELOAD_KEYTAB).delete()
+        db.session.commit()
+    real, reads = shared_files.read_file, []
+
+    def stale_then_rebuilt(name):
+        value = real(name)
+        if raced and not reads:
+            # This node saw the stale keytab; the other node's rebuild commits right after
+            _committed_elsewhere(ARCHIVED_KEYTAB, insert=False)
+        reads.append(1)
+        return value
+    monkeypatch.setattr(shared_files, 'read_file', stale_then_rebuilt)
+    try:
+        negotiate_auth.restore_keytab_at_start(app)
+        with app.app_context():
+            assert real(shared_files.KERBEROS_KEYTAB) == ARCHIVED_KEYTAB
+            assert ClusterCommand.query.filter_by(kind=cluster_commands.RELOAD_KEYTAB).count() == reloads
+        assert path.read_bytes() == ARCHIVED_KEYTAB
+    finally:
+        with app.app_context():
+            ClusterCommand.query.filter_by(kind=cluster_commands.RELOAD_KEYTAB).delete()
+            db.session.commit()
+
+
 def test_a_failed_rebuild_still_writes_the_stored_keytab_file(app, clean_slate, no_shared_keytab,
                                                               monkeypatch, tmp_path):
     from config.settings import Config
