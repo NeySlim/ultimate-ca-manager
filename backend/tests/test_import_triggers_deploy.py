@@ -88,7 +88,7 @@ class TestImportReplacementDeploys:
         with app.app_context():
             caref = db.session.get(Certificate, cert_id).caref
             db.session.add(RevokedSerial(caref=caref, serial_number=str(new.serial_number),
-                                         revoked_at=datetime(2026, 1, 2, 3, 4, 5), revoke_reason='keyCompromise',
+                                         revoked_at=datetime(2026, 1, 2, 3, 4, 5), revoke_reason='superseded',
                                          valid_to=new.not_valid_after_utc.replace(tzinfo=None)))
             db.session.commit()
         try:
