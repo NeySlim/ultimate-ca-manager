@@ -342,3 +342,34 @@ def test_an_undecryptable_keytab_names_its_own_profile(app, auth_client, monkeyp
     assert r.status_code == 409
     message = r.get_json()['message']
     assert p['name'] in message and 'default profile' not in message
+
+
+def test_the_default_name_taken_in_a_race_is_chosen_again(app, auth_client, monkeypatch):
+    from services import windows_profiles
+    with app.app_context():
+        aside = WindowsEnrollmentProfile.query.filter_by(is_default=True).all()
+        saved = [(p.id, p.name) for p in aside]
+        for p in aside:
+            p.is_default = False
+            p.name = f'wp-api-aside-{p.id}'
+        db.session.commit()
+    names = iter(['default'])
+    real = windows_profiles._unused_name
+    # The name looks free once while a profile already holds it
+    monkeypatch.setattr(windows_profiles, '_unused_name', lambda: next(names, None) or real())
+    try:
+        assert _new(auth_client, name='default').status_code == 201
+        with app.app_context():
+            profile = windows_profiles.default_for_write('tester')
+            assert profile.is_default and profile.name == 'default-2'
+            db.session.commit()
+    finally:
+        with app.app_context():
+            for p in WindowsEnrollmentProfile.query.filter_by(is_default=True).all():
+                db.session.delete(p)
+            WindowsEnrollmentProfile.query.filter_by(name='default').delete()
+            db.session.commit()
+            for pid, name in saved:
+                p = db.session.get(WindowsEnrollmentProfile, pid)
+                p.is_default, p.name = True, name
+            db.session.commit()

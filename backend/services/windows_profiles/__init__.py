@@ -109,26 +109,37 @@ def realm_problem(realm, profile):
     return None
 
 
+def _unused_name():
+    """DEFAULT_NAME, or the first ``default-N`` no profile holds."""
+    name, n = DEFAULT_NAME, 1
+    while WindowsEnrollmentProfile.query.filter_by(name=name).first() is not None:
+        n += 1
+        name = f'{DEFAULT_NAME}-{n}'
+    return name
+
+
 def default_for_write(actor=None, fill=True):
     """The default profile the configuration routes write, created by the first write.
     ``fill=False``: the caller sets a keytab first and fills the realm itself."""
     profile = default_profile()
     if profile is None:
         connector = ADConnectorConfig.get_singleton()
-        # A profile made through the API may already hold DEFAULT_NAME
-        name, n = DEFAULT_NAME, 1
-        while WindowsEnrollmentProfile.query.filter_by(name=name).first() is not None:
-            n += 1
-            name = f'{DEFAULT_NAME}-{n}'
-        try:
-            # A concurrent writer may create it first: its row is the default then
-            with db.session.begin_nested():
-                profile = WindowsEnrollmentProfile(name=name, is_default=True, enabled=True,
-                                                   connector_id=connector.id if connector else None,
-                                                   created_by=actor)
-                db.session.add(profile)
-        except IntegrityError:
-            profile = WindowsEnrollmentProfile.query.filter_by(is_default=True).one()
+        # A concurrent writer may take the default or the name first: the default row wins,
+        # a taken name is chosen again
+        for _attempt in range(10):
+            try:
+                with db.session.begin_nested():
+                    profile = WindowsEnrollmentProfile(
+                        name=_unused_name(), is_default=True, enabled=True,
+                        connector_id=connector.id if connector else None, created_by=actor)
+                    db.session.add(profile)
+                break
+            except IntegrityError:
+                profile = default_profile()
+                if profile is not None:
+                    break
+        else:
+            raise RuntimeError('no free name for the default Windows enrollment profile')
     profile.updated_by = actor
     if fill:
         fill_realm(profile)
