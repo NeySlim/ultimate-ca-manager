@@ -480,9 +480,6 @@ class SmartImporter:
         db.session.flush()
         from services.ca import parent_confirmation
         result.unverifiable_parents = parent_confirmation.notices([ca for ca in unlinked if not ca.caref])
-        for notice in result.unverifiable_parents:
-            result.warnings.append(f"CA '{notice['ca_name']}' left without a parent: probable parent "
-                                   f"'{notice['candidate']['name']}', {notice['reason']}")
     
     @staticmethod
     def _is_self_signed_record(ca) -> bool:
