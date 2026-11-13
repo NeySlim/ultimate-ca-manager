@@ -845,6 +845,10 @@ class CACreationMixin:
                 "(certificate only) to complete the chain"
             )
 
+        # A parent confirmed by hand stays only while it is still the proposal for this certificate
+        from services.ca import parent_confirmation
+        kept_confirmed = parent_confirmation.settle_confirmed_parent(ca, cert)
+
         # 7. Install — on renewal, remember the certificate being replaced so
         #    the operator can revoke it at the external root
         superseded = None
@@ -864,7 +868,7 @@ class CACreationMixin:
         ca.valid_from = cert.not_valid_before_utc
         ca.valid_to = cert.not_valid_after_utc
         ca.path_length = new_path_length
-        if caref:
+        if caref and not kept_confirmed:
             ca.caref = caref
         ca.csr = None  # the outstanding CSR is fulfilled
 

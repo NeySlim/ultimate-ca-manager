@@ -26,13 +26,13 @@ REASON = f'signature not verifiable here: {GOST}'
 
 # ---------------------------------------------------------------- builders
 
-def _gost_pem(cn, issuer_cn=None, serial=1, ski=None, aki=None):
+def _gost_pem(cn, issuer_cn=None, serial=1, ski=None, aki=None, key=None):
     """A CA certificate signed by a GOST key; a root holds one, which pyca cannot load, so no
     signature by it can be checked here."""
     key_alg, _, sig_alg = KEYS['gost']
     if issuer_cn:
         # A subordinate holds a key of its own pyca reads; only its issuer's GOST key is unreadable
-        spki = core.Sequence.load(rsa.generate_private_key(65537, 2048).public_key().public_bytes(
+        spki = core.Sequence.load((key or rsa.generate_private_key(65537, 2048)).public_key().public_bytes(
             serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo))
     else:
         spki = _spki(key_alg, uuid.uuid4().bytes * 4)  # a key of its own: two sharing one are cross-certificates
@@ -358,6 +358,68 @@ def test_a_signature_found_false_later_is_no_longer_honored(app, auth_client, mo
         stored = db.session.get(CA, child['id'])
         assert stored.issuing_ca() is None
         assert stored.revoked_in_chain is False
+
+
+# ------------------------------------------------- the external-CSR install path
+
+@pytest.fixture
+def held_gost_child(app, auth_client, made, gost_pair):
+    """A CA holding its RSA key, linked by hand under a GOST root, with a renewal request outstanding."""
+    root, _ = gost_pair
+    tag, key = _tag(), rsa.generate_private_key(65537, 2048)
+    with app.app_context():
+        root_ski = bytes.fromhex(db.session.get(CA, root['id']).ski.replace(':', ''))
+    key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                serialization.NoEncryption()).decode()
+    cn = f'Gost Held {tag}'
+    child = _import(auth_client, _gost_pem(cn, root['name'], serial=_serial(), aki=root_ski, key=key) + key_pem)
+    made.append(child['id'])
+    assert _confirm(auth_client, child['id'], root['id']).status_code == 200
+    with app.app_context():
+        db.session.get(CA, child['id']).csr = base64.b64encode(b'outstanding').decode()
+        db.session.commit()
+    return root, child, cn, key
+
+
+def _install(app, auth_client, child, pem):
+    assert _import(auth_client, pem, cross_mode='replace')['id'] == child['id']
+    with app.app_context():
+        assert db.session.get(CA, child['id']).csr is None  # went through complete_external_ca
+
+
+def test_an_installed_renewal_from_an_unknown_issuer_drops_the_confirmed_parent(app, auth_client, held_gost_child):
+    root, child, cn, key = held_gost_child
+    _install(app, auth_client, child, _rsa_pem(cn, key, f'Elsewhere {_tag()}', rsa.generate_private_key(65537, 2048),
+                                               serial=_serial()))
+    with app.app_context():
+        db.session.get(CA, root['id']).revoked = True
+        db.session.commit()
+        stored = db.session.get(CA, child['id'])
+        assert stored.caref is None and stored.parent_confirmed_by is None and stored.parent_confirmed_at is None
+        assert stored.issuing_ca() is None and stored.revoked_in_chain is False
+
+
+def test_an_installed_renewal_from_a_verified_issuer_is_no_hand_confirmed_link(app, auth_client, made, held_gost_child):
+    _, child, cn, key = held_gost_child
+    rsa_key, rsa_cn = rsa.generate_private_key(65537, 2048), f'Rsa Root {_tag()}'
+    rsa_root = _import(auth_client, _rsa_pem(rsa_cn, rsa_key, serial=_serial()))
+    made.append(rsa_root['id'])
+    _install(app, auth_client, child, _rsa_pem(cn, key, rsa_cn, rsa_key, serial=_serial()))
+    with app.app_context():
+        stored = db.session.get(CA, child['id'])
+        assert stored.caref == rsa_root['refid']
+        assert stored.parent_confirmed_by is None and stored.parent_confirmed_at is None
+    assert auth_client.delete(ROUTE.format(child['id']), json={'confirm': True}).status_code == 409
+
+
+def test_an_installed_renewal_under_the_same_unverifiable_parent_keeps_it(app, auth_client, held_gost_child):
+    root, child, cn, key = held_gost_child
+    with app.app_context():
+        root_ski = bytes.fromhex(db.session.get(CA, root['id']).ski.replace(':', ''))
+    _install(app, auth_client, child, _gost_pem(cn, root['name'], serial=_serial(), aki=root_ski, key=key))
+    with app.app_context():
+        stored = db.session.get(CA, child['id'])
+        assert stored.caref == root['refid'] and stored.parent_confirmed_by == 'admin'
 
 
 # ------------------------------------------------- withdrawal

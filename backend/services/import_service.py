@@ -416,11 +416,7 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
     existing_ca.serial_number = str(cert.serial_number)
     from services.ca import parent_confirmation
     # A parent confirmed by hand stays while it is still the proposal for the new certificate
-    if not parent_confirmation.keeps_confirmed_parent(existing_ca, cert):
-        if existing_ca.parent_confirmed_at is not None:
-            existing_ca.caref = None
-            existing_ca.parent_confirmed_by = None
-            existing_ca.parent_confirmed_at = None
+    if not parent_confirmation.settle_confirmed_parent(existing_ca, cert):
         existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
     existing_ca.path_length = path_length_of(cert)
     # Deleted after its revocation and imported again, or renewed into a serial its parent revoked (#343)

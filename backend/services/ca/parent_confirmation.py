@@ -140,3 +140,15 @@ def keeps_confirmed_parent(ca, cert):
         return False
     found = proposal_for(cert, ca.id)
     return found is not None and found.parent.refid == ca.caref
+
+
+def settle_confirmed_parent(ca, cert):
+    """Before *ca* takes *cert*: True while its parent confirmed by hand still holds, else that
+    link and its mark are cleared (a verified parent, if any, is the caller's to set)."""
+    if keeps_confirmed_parent(ca, cert):
+        return True
+    if ca.parent_confirmed_at is not None:
+        ca.caref = None
+        ca.parent_confirmed_by = None
+        ca.parent_confirmed_at = None
+    return False
