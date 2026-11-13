@@ -38,14 +38,14 @@ def _refusal_row(start):
 
 
 def test_guide_places_keyed_profile_without_realm_in_the_400_row():
-    row = _refusal_row('| A profile holds the realm')
-    assert "holds the realm's key but has no realm" in row
+    row = _refusal_row('| A key of that realm is served but no profile has the realm')
+    assert 'a keyed profile whose realm is not set' in row
     assert 'HTTP 400' in row
 
 
 def test_guide_401_row_means_no_key_for_the_realm():
-    row = _refusal_row('| No profile holds a key')
-    assert 'No profile holds a key for that realm' in row
+    row = _refusal_row('| No keytab of any profile holds a key')
+    assert 'holds a key for that realm' in row
     assert 'no audit entry' in row
 
 

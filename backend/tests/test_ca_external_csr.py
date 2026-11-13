@@ -345,7 +345,9 @@ class TestPendingGuards:
         r = auth_client.get(f"{BASE}/{data['id']}/export?format=pem")
         assert r.status_code in (400, 404, 409), r.data[:400]
 
-    def test_export_all_excludes_pending(self, auth_client):
+    def test_export_all_excludes_pending(self, auth_client, create_ca):
+        # One CA with a certificate, so the export has something to return on any worker
+        create_ca(cn=_next_cn('ExpAllIssued'))
         cn = _next_cn('ExpAllPending')
         _create_external(auth_client, cn)
         r = auth_client.get(f'{BASE}/export?format=pem')

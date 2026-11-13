@@ -67,7 +67,8 @@ def test_detail_and_list_carry_the_profile_id_and_name(app, auth_client, create_
         assert detail['windows_profile_id'] == pid and detail['windows_profile_name'] == name
         none = auth_client.get(f'/api/v2/certificates/{plain}').get_json()['data']
         assert none['windows_profile_id'] is None and none['windows_profile_name'] is None
-        _, rows = _statements(app, auth_client, '/api/v2/certificates?per_page=100')
+        # Its CA alone: certificates other files left must not push it off the page
+        _, rows = _statements(app, auth_client, f"/api/v2/certificates?per_page=100&ca_id={root['id']}")
         row = next(r for r in rows if r['id'] == cids[0])
         assert row['windows_profile_name'] == name
         # The profile is gone, the certificate keeps its id: the name is null
@@ -111,7 +112,7 @@ def _counts_by_size(app, auth_client, create_ca, cn, url_of):
 
 def test_list_statements_do_not_grow_with_profile_certificates(app, auth_client, create_ca):
     counts = _counts_by_size(app, auth_client, create_ca, 'WP Root 2',
-                             lambda _ca: '/api/v2/certificates?per_page=100')
+                             lambda ca: f'/api/v2/certificates?per_page=100&ca_id={ca}')
     assert counts['many'] == counts['few'], counts
 
 
