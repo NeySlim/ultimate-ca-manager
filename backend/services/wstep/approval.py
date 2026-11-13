@@ -38,13 +38,15 @@ def make_gate(ca, *, operation, profile, identity=None, extra=None):
             dns = protocol_approval.csr_names(csr)[1]
         data = dict(extra or {}, operation=operation, profile_id=getattr(profile, 'id', None),
                     profile_name=getattr(profile, 'name', None))
+        csr_ref = protocol_approval.csr_ref(csr)
         if signing_cert is not None:
             data['renewal_of'] = signing_cert.public_bytes(Encoding.PEM).decode()
         return protocol_approval.gate_protocol_issuance(
             'wstep', ca=ca, template_id=getattr(template, 'id', None), cn=cn, san_list=dns,
             csr_pem=csr.public_bytes(Encoding.PEM).decode(), identity=requester,
-            protocol_ref=protocol_approval.make_ref('wstep', operation, ca.id, requester,
-                                                    protocol_approval.csr_ref(csr)),
+            # By refid, which a restore keeps; the id form names requests held before it
+            protocol_ref=protocol_approval.make_ref('wstep', operation, ca.refid, requester, csr_ref),
+            former_refs=(protocol_approval.make_ref('wstep', operation, ca.id, requester, csr_ref),),
             renewal=operation == 'renew', extra=data)
     return gate
 

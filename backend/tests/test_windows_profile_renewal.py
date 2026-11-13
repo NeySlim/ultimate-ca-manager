@@ -522,3 +522,45 @@ def test_an_mtls_anchor_stored_twice_admits_the_profile_ca_under_either(app, cli
         with app.app_context():
             db.session.get(CA, world['cas']['A']['id']).caref = None
             db.session.commit()
+
+
+def _held_on_b(app, client, world, held_on_b, cn):
+    """A Kerberos enrolment of B held for approval: its RST body and the request's (id, data)."""
+    world['principal'] = 'userb@C04B.TEST'
+    body = _build_rst(_csr(cn))
+    assert b'Pending' in client.post(CES_KERBEROS_PATH, data=body, headers=NEGOTIATE).data
+    (approval_id, _status, data, _c), = requests_of(app, held_on_b, 'wstep_request')
+    return body, approval_id, data
+
+
+def test_a_held_request_is_found_again_under_another_ca_id(app, client, directory, held_on_b):
+    """The reference of a held request names the CA by refid: the same request reaching the gate
+    under the same CA restored with another id is the request already held, not a new one."""
+    from types import SimpleNamespace
+    from services.wstep.approval import make_gate
+    world = directory
+    _body, approval_id, data = _held_on_b(app, client, world, held_on_b, 'c05-ref-refid')
+    csr = x509.load_pem_x509_csr(data['csr'].encode())
+    restored = SimpleNamespace(id=10 ** 6, refid=world['cas']['B']['refid'])
+    with app.app_context():
+        gate = make_gate(restored, operation=data['operation'], profile=_profile('c04-b'),
+                         identity=data['identity'], extra={'kerberos_principal': data['kerberos_principal']})
+        held = gate(csr=csr, template=None, subject=csr.subject, san=None)
+        assert held is not None and held.id == approval_id
+
+
+def test_a_request_held_under_the_former_reference_is_still_recognised(app, client, directory, held_on_b):
+    """A request held before the reference named the CA by refid carries the id form: the client
+    sending it again gets it back, no second request opens."""
+    from services import protocol_approval
+    world = directory
+    body, approval_id, data = _held_on_b(app, client, world, held_on_b, 'c05-ref-former')
+    csr = x509.load_pem_x509_csr(data['csr'].encode())
+    former = protocol_approval.make_ref('wstep', data['operation'], world['cas']['B']['id'], data['identity'],
+                                        protocol_approval.csr_ref(csr))
+    with app.app_context():
+        row = db.session.get(ApprovalRequest, approval_id)
+        row.request_data = json.dumps(dict(data, protocol_ref=former))
+        db.session.commit()
+    assert b'Pending' in client.post(CES_KERBEROS_PATH, data=body, headers=NEGOTIATE).data
+    assert [r[0] for r in requests_of(app, held_on_b, 'wstep_request')] == [approval_id]

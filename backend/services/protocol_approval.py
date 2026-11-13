@@ -179,16 +179,19 @@ def expire_if_stale(approval) -> bool:
 
 def gate_protocol_issuance(protocol: str, *, ca, template_id=None, cn=None, san_list=(),
                            csr_pem: str, identity: str, protocol_ref: str,
-                           renewal: bool = False, extra: dict = None) -> Optional[ApprovalRequest]:
+                           renewal: bool = False, extra: dict = None,
+                           former_refs=()) -> Optional[ApprovalRequest]:
     """``None`` when the request may be issued now, else the
     ``ApprovalRequest`` holding it: the one already open for *protocol_ref*
     (pending, or decided and not yet delivered), or a new one when a policy
-    requires approval. Raises :class:`ApprovalGateUnavailable` when the
-    policies cannot be evaluated."""
+    requires approval. *former_refs*: earlier forms of the same reference, still
+    recognised for requests held under them. Raises :class:`ApprovalGateUnavailable`
+    when the policies cannot be evaluated."""
     from services.policy_service import RENEWAL_OPERATIONS, PolicyEvaluationService
-    existing = find_protocol_request(protocol, protocol_ref)
-    if existing is not None:
-        return existing
+    for ref in (protocol_ref, *former_refs):
+        existing = find_protocol_request(protocol, ref)
+        if existing is not None:
+            return existing
     policy = None
     try:
         policy = PolicyEvaluationService.check_approval_required(
