@@ -515,8 +515,8 @@ Once linked, the CA follows that parent like any other: it is revoked in chain w
 the parent's OCSP responder and revocation records find it, and the chain export, EST `/cacerts`,
 SCEP `GetCACert` (when the chain is served) and the hierarchy views include the parent. The AIA
 files serve the CA's own certificate and are not affected. The hourly chain repair keeps the link;
-a re-import keeps it while that parent is still the one proposed, and drops the confirmation
-otherwise. If a later version can check the algorithm and finds the signature false, the parent no
+a re-import or a renewal certificate installed on the CA keeps it while that parent is still the
+one proposed, and drops the confirmation otherwise (audited as `ca_parent_unconfirmed`). If a later version can check the algorithm and finds the signature false, the parent no
 longer counts for the revocation status, but the recorded link still orders the chains served:
 withdraw it.
 

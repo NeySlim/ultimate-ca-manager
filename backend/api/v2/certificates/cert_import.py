@@ -195,6 +195,8 @@ def import_certificate():
                     details=f'Updated CA via import: {existing_ca.descr}',
                     success=True
                 )
+                from services.ca import parent_confirmation
+                parent_confirmation.audit_dropped(existing_ca)
                 from services.webhook_service import emit_ca_updated
                 emit_ca_updated(existing_ca.to_dict(), actor=username, changes={'certificate': 'imported'})
 

@@ -144,11 +144,27 @@ def keeps_confirmed_parent(ca, cert):
 
 def settle_confirmed_parent(ca, cert):
     """Before *ca* takes *cert*: True while its parent confirmed by hand still holds, else that
-    link and its mark are cleared (a verified parent, if any, is the caller's to set)."""
+    link and its mark are cleared (a verified parent, if any, is the caller's to set) and the
+    caller audits it after its commit with ``audit_dropped``."""
     if keeps_confirmed_parent(ca, cert):
         return True
     if ca.parent_confirmed_at is not None:
+        ca._dropped_confirmed_parent = ca.caref
         ca.caref = None
         ca.parent_confirmed_by = None
         ca.parent_confirmed_at = None
     return False
+
+
+def audit_dropped(ca, username=None):
+    """After the caller's commit: the audit entry of a parent ``settle_confirmed_parent`` dropped."""
+    former = ca.__dict__.pop('_dropped_confirmed_parent', None)
+    if former is None:
+        return
+    from models import CA
+    from services.audit_service import AuditService
+    parent = CA.query.filter_by(refid=former).first()
+    AuditService.log_ca(
+        'ca_parent_unconfirmed', ca,
+        f'Parent "{parent.descr if parent else former}" confirmed by hand dropped: '
+        'the new certificate of this CA is not under it', username=username)

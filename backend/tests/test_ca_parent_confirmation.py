@@ -320,15 +320,18 @@ def test_the_hourly_repair_and_a_reimport_keep_the_confirmed_link(app, auth_clie
         assert stored.caref == root['refid'] and stored.parent_confirmed_by == 'admin'
 
 
-def test_a_reimport_under_another_issuer_drops_the_confirmation(app, auth_client, gost_pair):
+@pytest.mark.parametrize('route', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+def test_a_reimport_under_another_issuer_drops_the_confirmation(app, auth_client, gost_pair, route):
     root, child = gost_pair
     assert _confirm(auth_client, child['id'], root['id']).status_code == 200
     # Same subject, issued by a name nothing stored carries, replacing the stored certificate
     moved = _gost_pem(child['name'], f'Elsewhere {_tag()}', serial=_serial())
-    assert _import(auth_client, moved, cross_mode='replace')['id'] == child['id']
+    before = _audits(app, 'ca_parent_unconfirmed', child['id'])
+    _import(auth_client, moved, route=route, cross_mode='replace')
     with app.app_context():
         stored = db.session.get(CA, child['id'])
         assert stored.caref is None and stored.parent_confirmed_at is None
+    assert _audits(app, 'ca_parent_unconfirmed', child['id']) == before + 1
 
 
 def test_the_revoked_parent_revokes_the_chain_and_the_export_carries_it(app, auth_client, gost_pair):
@@ -382,15 +385,19 @@ def held_gost_child(app, auth_client, made, gost_pair):
 
 
 def _install(app, auth_client, child, pem):
-    assert _import(auth_client, pem, cross_mode='replace')['id'] == child['id']
+    data = _import(auth_client, pem, cross_mode='replace')
+    assert data['id'] == child['id']
     with app.app_context():
         assert db.session.get(CA, child['id']).csr is None  # went through complete_external_ca
+    return data
 
 
 def test_an_installed_renewal_from_an_unknown_issuer_drops_the_confirmed_parent(app, auth_client, held_gost_child):
     root, child, cn, key = held_gost_child
+    before = _audits(app, 'ca_parent_unconfirmed', child['id'])
     _install(app, auth_client, child, _rsa_pem(cn, key, f'Elsewhere {_tag()}', rsa.generate_private_key(65537, 2048),
                                                serial=_serial()))
+    assert _audits(app, 'ca_parent_unconfirmed', child['id']) == before + 1
     with app.app_context():
         db.session.get(CA, root['id']).revoked = True
         db.session.commit()
@@ -416,10 +423,30 @@ def test_an_installed_renewal_under_the_same_unverifiable_parent_keeps_it(app, a
     root, child, cn, key = held_gost_child
     with app.app_context():
         root_ski = bytes.fromhex(db.session.get(CA, root['id']).ski.replace(':', ''))
-    _install(app, auth_client, child, _gost_pem(cn, root['name'], serial=_serial(), aki=root_ski, key=key))
+    before = _audits(app, 'ca_parent_unconfirmed', child['id'])
+    data = _install(app, auth_client, child, _gost_pem(cn, root['name'], serial=_serial(), aki=root_ski, key=key))
     with app.app_context():
         stored = db.session.get(CA, child['id'])
         assert stored.caref == root['refid'] and stored.parent_confirmed_by == 'admin'
+    # The link holds: nothing is said to have failed, nothing is withdrawn
+    assert not [w for w in data['warnings'] if 'issuer' in w.lower() or 'Issuing CA' in w]
+    assert _audits(app, 'ca_parent_unconfirmed', child['id']) == before
+
+
+def test_an_installed_renewal_under_an_unconfirmed_unverifiable_parent_says_so(app, auth_client, held_gost_child):
+    root, child, cn, key = held_gost_child
+    assert auth_client.delete(ROUTE.format(child['id']), json={'confirm': True}).status_code == 200
+    with app.app_context():
+        root_ski = bytes.fromhex(db.session.get(CA, root['id']).ski.replace(':', ''))
+        db.session.get(CA, child['id']).csr = base64.b64encode(b'outstanding').decode()
+        db.session.commit()
+    data = _install(app, auth_client, child, _gost_pem(cn, root['name'], serial=_serial(), aki=root_ski, key=key))
+    said = [w for w in data['warnings'] if root['name'] in w]
+    # Unverifiable is not "verification failed": the parent is named with the way to link it
+    assert len(said) == 1 and 'signature not verifiable here' in said[0] and 'confirm' in said[0]
+    assert not [w for w in data['warnings'] if 'verification failed' in w]
+    with app.app_context():
+        assert db.session.get(CA, child['id']).caref is None
 
 
 # ------------------------------------------------- withdrawal

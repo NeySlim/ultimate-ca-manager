@@ -165,6 +165,8 @@ def import_ca():
                 details=f'Updated CA via import: {existing_ca.descr}',
                 success=True
             )
+            from services.ca import parent_confirmation
+            parent_confirmation.audit_dropped(existing_ca)
 
             message = f'CA "{existing_ca.descr}" updated (already existed)'
             if key_dropped:

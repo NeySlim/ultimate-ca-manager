@@ -835,19 +835,25 @@ class CACreationMixin:
                 continue
             caref = parent.refid
             break
-        if caref is None and any(parent.crt for parent in candidates):
+        # A parent confirmed by hand stays only while it is still the proposal for this certificate
+        from services.ca import parent_confirmation
+        kept_confirmed = parent_confirmation.settle_confirmed_parent(ca, cert)
+        proposed = None if caref or kept_confirmed else parent_confirmation.proposal_for(cert, ca.id)
+        if proposed is not None:
+            # Unverifiable is not invalid: the operator may confirm this parent by hand
+            warnings.append(
+                f'Issuing CA "{proposed.parent.descr}" is not linked, {proposed.reason}: '
+                'confirm it as the parent to complete the chain'
+            )
+        elif caref is None and not kept_confirmed and any(parent.crt for parent in candidates):
             warnings.append(
                 "A CA matching the issuer was found but signature verification failed"
             )
-        elif not candidates:
+        elif not candidates and not kept_confirmed:
             warnings.append(
                 "Issuing CA not found in UCM: import the external root "
                 "(certificate only) to complete the chain"
             )
-
-        # A parent confirmed by hand stays only while it is still the proposal for this certificate
-        from services.ca import parent_confirmation
-        kept_confirmed = parent_confirmation.settle_confirmed_parent(ca, cert)
 
         # 7. Install — on renewal, remember the certificate being replaced so
         #    the operator can revoke it at the external root
@@ -899,6 +905,7 @@ class CACreationMixin:
             + (f", superseded serial: {superseded['serial']}" if superseded else '')
             + ')'
         )
+        parent_confirmation.audit_dropped(ca)
 
         save_ca_files(ca, cert_pem, None)
 
