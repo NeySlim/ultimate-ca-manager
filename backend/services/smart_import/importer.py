@@ -25,7 +25,7 @@ from utils.key_codec import refuse_eddsa_key
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
-from .chain_builder import ChainBuilder, ChainInfo, find_ca_by_ski
+from .chain_builder import ChainBuilder, ChainInfo
 from security.encryption import encrypt_private_key
 
 
@@ -412,22 +412,10 @@ class SmartImporter:
                         ski_to_refid[existing.ski] = existing.refid
                     continue
 
-            # Find parent CA: AKI→SKI first, then issuer DN fallback
-            caref = None
-            if not ca_obj.is_self_signed:
-                if ca_obj.aki:
-                    caref = ski_to_refid.get(ca_obj.aki)
-                    if not caref:
-                        parent = find_ca_by_ski(ca_obj.aki)
-                        if parent:
-                            caref = parent.refid
-                if not caref:
-                    caref = subject_to_refid.get(ca_obj.issuer)
-                if not caref:
-                    parent = CA.query.filter(CA.subject == ca_obj.issuer).first()
-                    if parent:
-                        caref = parent.refid
-            
+            # The parent is the stored CA whose key signed this certificate (flushed batch CAs included)
+            from services.import_service import relink_parent_caref  # imported late: import_service imports this package
+            caref = relink_parent_caref(x509.load_pem_x509_certificate(ca_obj.raw_pem.encode()), None)
+
             # Find matching private key
             prv = None
             refused = None
