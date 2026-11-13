@@ -1244,7 +1244,7 @@ def renew(ca, signing_cert, csr_der, validity_days, source='wstep', require_pop=
     """Certificate-bound renewal: the RST is signed with the client's current certificate's
     private key, ``signing_cert`` from ``signed_request_certificate``. Returns (cert_pem, error).
 
-    ``require_pop`` — see ``issue()``; renewal RSTs can arrive PKCS#7/CMC-
+    ``require_pop``: see ``issue()``; renewal RSTs can arrive PKCS#7/CMC-
     wrapped too. The WS-Security signature proves the current key; a new key
     in a wrapped request proves itself through ``outer_signed_data``.
     """
