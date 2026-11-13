@@ -1103,7 +1103,20 @@
     "issuanceVisibilityChangeFailed": "Impossibile aggiornare gli elenchi di emissione",
     "showHiddenCas_one": "Mostra {{count}} CA nascosta",
     "showHiddenCas_other": "Mostra {{count}} CA nascoste",
-    "hideHiddenCas": "Nascondi le CA nascoste"
+    "hideHiddenCas": "Nascondi le CA nascoste",
+    "parentCandidateBanner": "Probable parent: {{name}}. Its signature cannot be verified here ({{algorithm}}), so this CA was not linked to it.",
+    "linkToParent": "Link to this parent",
+    "linkParentTitle": "Link to a parent that cannot be verified",
+    "linkParentWarning": "UCM cannot check that \"{{name}}\" signed this CA: a {{algorithm}} signature is not verifiable here. Once linked, this CA follows that parent for revocation, OCSP and the chains served.",
+    "linkParentConfirm": "I have checked this parent by other means and confirm the link",
+    "linkParentDone": "CA linked to its parent",
+    "linkParentFailed": "The parent could not be linked",
+    "parentConfirmedBanner": "Parent confirmed by hand by {{user}} on {{date}}: its signature cannot be verified here.",
+    "withdrawParentLink": "Withdraw the link",
+    "withdrawParentTitle": "Withdraw the parent link",
+    "withdrawParentWarning": "This CA will be left without a parent until the link is confirmed again.",
+    "withdrawParentDone": "Parent link withdrawn",
+    "withdrawParentFailed": "The parent link could not be withdrawn"
   },
   "csrs": {
     "uploadCSR": "Carica CSR",
@@ -4259,7 +4272,9 @@
     "crossAttached_one": "{{count}} certificato incrociato associato a una CA già presente",
     "crossAttached_other": "{{count}} certificati incrociati associati a CA già presenti",
     "crossSkipped_one": "{{count}} certificato incrociato escluso; la CA autofirmata viene mantenuta",
-    "crossSkipped_other": "{{count}} certificati incrociati esclusi; le CA autofirmate vengono mantenute"
+    "crossSkipped_other": "{{count}} certificati incrociati esclusi; le CA autofirmate vengono mantenute",
+    "unverifiableParentsTitle": "Parents to confirm on the CA page",
+    "unverifiableParent": "{{ca}} left without a parent: probable parent {{parent}}, signature not verifiable here ({{algorithm}})"
   },
   "webhooks": {
     "eventLabels": {

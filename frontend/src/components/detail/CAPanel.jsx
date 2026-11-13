@@ -37,6 +37,7 @@ import { ChainUsageSection } from '../cas/ChainUsageSection'
 import { SignatureSchemeField } from '../cas/SignatureSchemeField'
 import { ComplianceProfileField } from '../cas/ComplianceProfileField'
 import { IssuanceVisibilityField } from '../cas/IssuanceVisibilityField'
+import { ParentConfirmationSection } from '../cas/ParentConfirmationSection'
 import { cn } from '../../lib/utils'
 import { useClipboard } from '../../hooks/useClipboard'
 import { holdsNoKey, needsKeyImport } from '../../lib/caSelection'
@@ -235,6 +236,8 @@ export function CAPanel({
           {t('cas.chainRevokedBanner')}
         </div>
       )}
+      {/* Parent whose signature cannot be verified here: proposed, or confirmed by hand */}
+      <ParentConfirmationSection ca={ca} canWrite={canWriteCas} onChanged={onCaChanged} />
       </>)}
       {on('overview') && (<>
       {/* No key: a warning when it was expected (#348), a plain note for a root imported without it (#426) */}

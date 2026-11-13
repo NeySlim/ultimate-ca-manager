@@ -482,6 +482,9 @@ export default function OperationsPage() {
       })
       const imported = (result.imported?.cas || 0) + (result.imported?.certificates || 0)
       showSuccess(t('importExport.opnsense.importSuccess', { count: imported, skipped: result.skipped || 0 }))
+      for (const p of result.unverifiable_parents || []) {
+        showWarning(t('import.unverifiableParent', { ca: p.ca_name, parent: p.candidate?.name, algorithm: p.algorithm }))
+      }
       setTestResult(null)
       setTestItems([])
       loadCAs()
