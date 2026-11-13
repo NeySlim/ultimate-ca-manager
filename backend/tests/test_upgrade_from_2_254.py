@@ -266,6 +266,21 @@ def test_a_replay_that_fails_leaves_the_key_for_the_next_start(base, monkeypatch
     assert base.run("SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'") == []
 
 
+def test_dry_run_and_status_tell_that_a_start_replays_step_144(base, capsys):
+    """While the key stands a real start rewrites rows: neither may report "up to date"."""
+    populate(base)
+    assert base.upgrade()
+    capsys.readouterr()
+    runner = base._route()
+    before = _untouched(base)
+    assert runner.run_all_migrations(dry_run=True) is True
+    runner.show_status()
+    out = capsys.readouterr().out
+    assert _untouched(base) == before
+    assert 'up to date' not in out
+    assert out.count('step 144 runs again at each start') == 2, out
+
+
 def test_the_cleanup_never_asks_to_edit_the_registry():
     from utils.serial_duplicates import CLEANUP
     assert '_migrations' not in CLEANUP and 'restart' in CLEANUP.lower()

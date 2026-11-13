@@ -249,12 +249,12 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
-        replay = UPGRADE_MIGRATION in applied and not dry_run and _serial_steps_pending(engine)
+        serial_replay = UPGRADE_MIGRATION in applied and _serial_steps_pending(engine)
         # Pass the SQLite path derived from db_url so DATABASE_URL stays the
         # single source of truth (avoids DATABASE_URL/DATABASE_PATH mismatch).
         sqlite_path = db_url.replace("sqlite:///", "", 1) if db_url.startswith("sqlite:///") else None
 
-        if not pending and not replay:
+        if not pending and not serial_replay:
             say(f"✓ {backend} database up to date (no pending migrations)")
             return True
 
@@ -264,7 +264,10 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
                     else _run_pending_sqlite(pending, dry_run, db_path=sqlite_path))
             if not done:
                 return False
-        return _replay_serial_steps(engine, is_pg, sqlite_path) if replay else True
+        if serial_replay and dry_run:
+            say(f"  → {SERIAL_REPLAY_NOTE} (dry run)")
+            return True
+        return _replay_serial_steps(engine, is_pg, sqlite_path) if serial_replay else True
     finally:
         engine.dispose()
 
@@ -276,6 +279,7 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 # Step 144 alone: it converts, creates the index and resets the key in one commit, so a
 # replay cut short keeps the key that triggers the next one (142 commits its deletion apart)
 SERIAL_STEP = "144_canonical_certificate_serials"
+SERIAL_REPLAY_NOTE = "serial_unique_index_pending is set: upgrade step 144 runs again at each start until it clears"
 
 
 def _serial_steps_pending(engine) -> bool:
@@ -481,6 +485,8 @@ def show_status():
             say(f"  ✓ {n}")
         for n in pending:
             say(f"  ○ {n}")
+        if not refusal and UPGRADE_MIGRATION in applied and _serial_steps_pending(engine):
+            say(f"Replay:  {SERIAL_REPLAY_NOTE}")
     finally:
         engine.dispose()
 

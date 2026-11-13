@@ -39,3 +39,4 @@ restores its own backups. The flag never travels in a backup.
 While the key is set, every start runs the upgrade step 144 again, and only it, which clears
 the key in the same transaction as the conversion: once the rows are resolved, a restart creates the
 index and stores every serial in decimal, and a start cut short leaves the key for the next.
+`migration_runner.py status` and `dry-run` say so rather than report the database up to date.
