@@ -66,6 +66,14 @@ def _request(
         return exc.code, dict(exc.headers or {}), exc.read()
 
 
+def health_version(body: bytes) -> str:
+    """The version string /health reports ('' when the body is not the health JSON)."""
+    try:
+        return str(json.loads(body).get("version", ""))
+    except (ValueError, AttributeError):
+        return ""
+
+
 def smoke_one(
     target: Target,
     expected_version: str,
@@ -82,8 +90,8 @@ def smoke_one(
     snippet = body[:160].decode(errors="replace")
     print(f"  health: {status} {snippet}")
     assert status == 200, f"health endpoint returned {status}"
-    assert expected_version.encode() in body, (
-        f"version mismatch: expected {expected_version!r} in health body"
+    assert health_version(body) == expected_version, (
+        f"version mismatch: expected {expected_version!r}, health reports {health_version(body)!r}"
     )
     if not allow_rc:
         assert b"-rc" not in body, "health body contains '-rc' (release candidate built as stable?)"
@@ -141,7 +149,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--version",
         required=True,
-        help="Expected release version (e.g. 2.143). Must appear in /api/v2/health.",
+        help="Expected release version (e.g. 2.254.1). Must equal the version /api/v2/health reports.",
     )
     parser.add_argument(
         "--base-url",

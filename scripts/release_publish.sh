@@ -13,7 +13,7 @@
 #   scripts/release_publish.sh --draft           # create as draft
 #   scripts/release_publish.sh --edit            # edit existing release notes
 #
-# Requires: gh, git. Repository must be the current working directory.
+# Requires: gh, git, python3 (scripts/ci/release_version.py). Repository must be the current working directory.
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -54,26 +54,18 @@ if ! git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "$TAG"; then
     exit 1
 fi
 
-# Extract changelog section for this version.
-extract_changelog() {
-    local v="$1"
-    # Match "## [VERSION]" up to the next "## [" or EOF.
-    awk -v ver="$v" '
-        BEGIN { inblk=0 }
-        /^## \[/ {
-            if (inblk) exit
-            if ($0 ~ "^## \\[" ver "\\]") { inblk=1; next }
-        }
-        inblk { print }
-    ' CHANGELOG.md
-}
-
-NOTES="$(extract_changelog "$VERSION" | sed -e 's/[[:space:]]*$//')"
-if [[ -z "$NOTES" ]]; then
+# Extract changelog section for this version (same extractor as the workflow).
+NOTES="$(python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md | sed -e 's/[[:space:]]*$//')"
+if [[ -z "${NOTES//[[:space:]]/}" ]]; then
     echo "No CHANGELOG section found for [${VERSION}]." >&2
     echo "Add a '## [${VERSION}] - YYYY-MM-DD' block to CHANGELOG.md first." >&2
     exit 1
 fi
+
+# `latest` only for the highest stable tag on origin (same rule as the workflow).
+LATEST="$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")"
+# GitHub refuses a prerelease or a draft as latest
+[[ $PRERELEASE -eq 1 || $DRAFT -eq 1 ]] && LATEST=false
 
 NOTES_FILE="$(mktemp -t ucm-relnotes.XXXXXX.md)"
 trap 'rm -f "$NOTES_FILE"' EXIT
@@ -102,6 +94,7 @@ else
         --title "UCM ${VERSION}" \
         --notes-file "$NOTES_FILE" \
         --verify-tag \
+        "--latest=${LATEST}" \
         "${GH_FLAGS[@]}"
 fi
 

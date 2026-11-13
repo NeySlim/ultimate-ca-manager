@@ -19,8 +19,9 @@ tag. **6/6 mandatory**: 3 distros × 2 backends.
 | `<scripts>/smoke.py`            | API smoke (urllib + cookie + CSRF) |
 | `<scripts>/playwright_uc.py`    | 11 real-UI workflows (Chromium headless) |
 
-Bump the version assertion line in `smoke.py` for every release. Currently
-matches `2.X-dev`, `2.X-rcN`, and `2.X`.
+The expected version comes from `UCM_EXPECTED_VERSION` and is compared as a
+prefix, so `2.254` also accepts `2.254.1`: give the full version. It may be
+`2.X-dev`, `2.X-rcN`, `2.X`, `2.X.Y-dev`, `2.X.Y-rcN` or `2.X.Y`.
 
 ## Per-target recipe
 

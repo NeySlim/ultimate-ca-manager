@@ -32,6 +32,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate the tag grammar
+        run: python3 scripts/ci/release_version.py validate "${GITHUB_REF#refs/tags/v}"
+
       - name: Ensure tag points to the correct release branch
         run: |
           set -euo pipefail
@@ -45,15 +48,26 @@ jobs:
             EXPECTED_REF="origin/main"
           fi
 
-          git fetch origin main:refs/remotes/origin/main test:refs/remotes/origin/test
-          EXPECTED_SHA="$(git rev-parse "$EXPECTED_REF")"
+          # Full refs everywhere: a tag named like a branch must never stand for it
+          git fetch origin refs/heads/main:refs/remotes/origin/main refs/heads/test:refs/remotes/origin/test
+          EXPECTED_SHA="$(git rev-parse "refs/remotes/$EXPECTED_REF")"
+
+          # A maintenance release (X.Y.Z, RC or stable) may also sit at the tip of its v<major>.x branch
+          MAINT_BRANCH="v${VERSION%%.*}.x"
+          MAINT_SHA=""
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && git ls-remote --exit-code origin "refs/heads/$MAINT_BRANCH" > /dev/null; then
+            git fetch origin "refs/heads/$MAINT_BRANCH:refs/remotes/origin/$MAINT_BRANCH"
+            MAINT_SHA="$(git rev-parse "refs/remotes/origin/$MAINT_BRANCH")"
+          fi
 
           echo "Version: $VERSION"
           echo "Tag SHA: $TAG_SHA"
           echo "Expected $EXPECTED_REF SHA: $EXPECTED_SHA"
+          [ -z "$MAINT_SHA" ] || echo "Or origin/$MAINT_BRANCH SHA: $MAINT_SHA"
 
-          if [ "$TAG_SHA" != "$EXPECTED_SHA" ]; then
-            echo "Stable tags must point to origin/main; RC tags must point to origin/test."
+          if [ "$TAG_SHA" != "$EXPECTED_SHA" ] && [ "$TAG_SHA" != "$MAINT_SHA" ]; then
+            echo "Stable tags must point to origin/main and RC tags to origin/test;"
+            echo "a maintenance release (X.Y.Z) may also point to its v<major>.x branch."
             echo "Refusing to build release from an unexpected commit."
             exit 1
           fi
@@ -87,9 +101,9 @@ jobs:
           else
             VERSION=${GITHUB_REF#refs/tags/v}
           fi
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VERSION"; exit 1; }
-          # Convert to DEB version (2.244-rc1 -> 2.244~rc1)
-          DEB_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
+          python3 scripts/ci/release_version.py validate "$VERSION"
+          # Convert to DEB version (2.254.1-rc1 -> 2.254.1~rc1)
+          DEB_VERSION=$(python3 scripts/ci/release_version.py deb "$VERSION")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "deb_version=$DEB_VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION (DEB: $DEB_VERSION)"
@@ -104,8 +118,8 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Normalize semver for npm: 2.161-rc1 -> 2.161.0-rc1
-          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
+          # Normalize semver for npm: 2.254-rc1 -> 2.254.0-rc1
+          STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION
           export STAMP_VERSION
@@ -192,7 +206,7 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
-          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
+          STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION STAMP_VERSION
           node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
@@ -207,8 +221,8 @@ jobs:
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           # For RPM Version field (supports ~), and for tarball name (use _)
-          RPM_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
-          TAR_VERSION=$(echo "$VERSION" | sed 's/-/_/g')
+          RPM_VERSION=$(python3 scripts/ci/release_version.py rpm "$VERSION")
+          TAR_VERSION=$(python3 scripts/ci/release_version.py tar "$VERSION")
           
           mkdir -p /tmp/rpm-output /tmp/rpm-build/ucm-${TAR_VERSION}
           
@@ -294,7 +308,7 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
-          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
+          STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION STAMP_VERSION
           node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
@@ -373,6 +387,23 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # `latest` goes to the highest stable tag only (scripts/ci/release_version.py)
+      - name: Decide latest
+        id: latest
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
+          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
+            exit 0
+          fi
+          LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "latest for $VERSION: $LATEST"
+
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -418,7 +449,7 @@ jobs:
             org.opencontainers.image.licenses=AGPL-3.0-only
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}
-            type=raw,value=latest,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
+            type=raw,value=latest,enable=${{ steps.latest.outputs.latest == 'true' }}
 
       - name: Create manifest lists
         working-directory: ${{ runner.temp }}/digests
@@ -477,7 +508,7 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
-          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
+          STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION STAMP_VERSION
           node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
@@ -577,6 +608,27 @@ jobs:
     continue-on-error: true
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/ci
+
+      # `latest` goes to the highest stable tag only (scripts/ci/release_version.py)
+      - name: Decide latest
+        id: latest
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
+          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
+            exit 0
+          fi
+          LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "latest for $VERSION: $LATEST"
+
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -624,7 +676,7 @@ jobs:
             org.opencontainers.image.licenses=AGPL-3.0-only
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}-fips
-            type=raw,value=latest-fips,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
+            type=raw,value=latest-fips,enable=${{ steps.latest.outputs.latest == 'true' }}
 
       - name: Create manifest lists
         working-directory: ${{ runner.temp }}/digests
@@ -693,12 +745,7 @@ jobs:
           PREVIOUS_FILE=$(mktemp)
           if [ -f CHANGELOG.md ]; then
             # Extract content between ## [VERSION] and the next ## [
-            SECTION=$(sed -n "/^## \[${VERSION}\]/,/^## \[/p" CHANGELOG.md | head -n -1)
-            if [ -z "$SECTION" ]; then
-              SECTION=$(sed -n "/^## ${VERSION}/,/^## /p" CHANGELOG.md | head -n -1)
-            fi
-            # Remove the heading line itself, keep the content
-            echo "$SECTION" | tail -n +2 | sed '/^$/d; 1i\\' > "$CHANGES_FILE" || true
+            python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md > "$CHANGES_FILE" || true
 
             # Extract the 2 previous versioned sections (skip Unreleased and current)
             # Output is the raw markdown blocks (heading + body) so users see version + date.
@@ -829,7 +876,7 @@ jobs:
           
           # Replace placeholders (specific first, then generic)
           # File names use dots (2.1.0.rc2), not tildes (2.1.0~rc2)
-          FILE_VERSION=$(echo "$VERSION" | sed 's/-/./g')
+          FILE_VERSION=$(python3 scripts/ci/release_version.py file "$VERSION")
           sed -i "s|DEB_VERSION|${FILE_VERSION}|g" notes.md
           sed -i "s|RPM_VERSION|${FILE_VERSION}|g" notes.md
           sed -i "s|IMAGE|$IMAGE|g" notes.md
@@ -849,11 +896,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # `latest` goes to the highest stable tag only (scripts/ci/release_version.py)
+      - name: Decide latest
+        id: latest
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Only the run of the tag it builds takes latest: never a branch or a mismatched manual run
+          if [[ "$GITHUB_REF" != "refs/tags/v$VERSION" ]]; then
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "latest for $VERSION: false (not the run of tag v$VERSION)"
+            exit 0
+          fi
+          LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "latest for $VERSION: $LATEST"
+
       - name: Create release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           body_path: notes.md
           draft: false
+          make_latest: ${{ steps.latest.outputs.latest }}
           prerelease: ${{ contains(github.ref, 'rc') || contains(github.ref, 'beta') || contains(github.ref, 'alpha') || contains(github.ref, 'dev') }}
           files: |
             artifacts/*
