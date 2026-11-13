@@ -36,6 +36,6 @@ lists them, keeps them, and leaves the index pending under the `SystemConfig` ke
 migration refuses the source, and a restore of a backup taken from it is refused on an
 installation that has the index, naming the rows; the pending installation itself still
 restores its own backups. The flag never travels in a backup.
-Once they are resolved, deleting the `300_upgrade_from_2_254` row from `_migrations`
-makes the next start run the upgrade again, which creates the index; its other steps
-find nothing left to do.
+While the key is set, every start runs the upgrade steps 142 and 144 again, and only
+them: once the rows are resolved, a restart creates the index and stores every serial in
+decimal.

@@ -242,20 +242,63 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
-
-        if not pending:
-            say(f"✓ {backend} database up to date (no pending migrations)")
-            return True
-
-        say(f"Found {len(pending)} pending migration(s) for {backend}:")
-        if is_pg:
-            return _run_pending_pg(engine, pending, dry_run)
+        replay = UPGRADE_MIGRATION in applied and not dry_run and _serial_steps_pending(engine)
         # Pass the SQLite path derived from db_url so DATABASE_URL stays the
         # single source of truth (avoids DATABASE_URL/DATABASE_PATH mismatch).
         sqlite_path = db_url.replace("sqlite:///", "", 1) if db_url.startswith("sqlite:///") else None
-        return _run_pending_sqlite(pending, dry_run, db_path=sqlite_path)
+
+        if not pending and not replay:
+            say(f"✓ {backend} database up to date (no pending migrations)")
+            return True
+
+        if pending:
+            say(f"Found {len(pending)} pending migration(s) for {backend}:")
+            done = (_run_pending_pg(engine, pending, dry_run) if is_pg
+                    else _run_pending_sqlite(pending, dry_run, db_path=sqlite_path))
+            if not done:
+                return False
+        return _replay_serial_steps(engine, is_pg, sqlite_path) if replay else True
     finally:
         engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Serial steps: run again at each start while they leave the unique index pending
+# ---------------------------------------------------------------------------
+
+SERIAL_STEPS = ("142_serial_per_ca_and_proxy_links", "144_canonical_certificate_serials")
+
+
+def _serial_steps_pending(engine) -> bool:
+    from utils.serial_duplicates import PENDING_KEY
+    if "system_config" not in inspect(engine).get_table_names():
+        return False
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT 1 FROM system_config WHERE key = :k"),
+                            {"k": PENDING_KEY}).first() is not None
+
+
+def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
+    """Steps 142 and 144 alone, idempotent; the 300 row and its date stay as they are."""
+    from migrations._from_2_254 import step
+    say("  → serial_unique_index_pending is set: upgrade steps 142 and 144 run again...", end=" ")
+    try:
+        if is_pg:
+            with engine.begin() as conn:
+                for name in SERIAL_STEPS:
+                    step(name).upgrade(conn)
+        else:
+            conn = sqlite3.connect(sqlite_path or os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db"))
+            try:
+                for name in SERIAL_STEPS:
+                    step(name).upgrade(conn)
+            finally:
+                conn.close()
+    except Exception as exc:  # noqa: BLE001
+        say(f"✗ {exc}")
+        return False
+    say("✓")
+    return True
 
 
 # ---------------------------------------------------------------------------

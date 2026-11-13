@@ -23,7 +23,7 @@ def _states_the_procedure(message):
     """Packages ship no docs/: the message itself says how to clear the duplicates."""
     assert 'docs/' not in message and '.md' not in message
     assert 'Delete all but one' in message and 'revoked row still counts' in message
-    assert "'300_upgrade_from_2_254'" in message and '_migrations' in message
+    assert 'Then restart UCM' in message and '_migrations' not in message
 
 
 def test_the_database_listing_names_each_pair_and_its_rows():

@@ -213,6 +213,41 @@ def snapshot_index_names(db):
     return {k[2] for k in snapshot(db.engine) if k[0] == 'index'}
 
 
+def test_a_start_after_the_twins_are_resolved_runs_steps_142_and_144_alone(base):
+    """The documented cleanup is a restart: 142 and 144 run again, no other step, the 300 row stays."""
+    populate(base)
+    twin_crt = _material()['twin'][1]
+    # A third row spelled '255' too: 142 finds a raw duplicate and creates no index
+    base.run("INSERT INTO certificates (id, refid, descr, caref, serial_number, crt, renewed_times) "
+             "VALUES (5, 'cert-5', 'cert-5', 'ca-b', '255', :c, 0)", {'c': twin_crt})
+    assert base.upgrade()
+    assert 'uix_certificates_ca_serial' not in snapshot_index_names(base)
+    # The admin swaps the default profile for a non-default one and keeps the live key
+    # kerberos_spn: a replay of step 155 would make a default profile again
+    base.run("UPDATE certificates SET windows_profile_id = NULL")
+    base.run("DELETE FROM windows_enrollment_profiles")
+    base.run("INSERT INTO windows_enrollment_profiles (name, realm, is_default, enabled, validity_days, "
+             "created_at) VALUES ('corp', 'CORP.EXAMPLE', FALSE, TRUE, 365, '2026-01-02 03:04:05')")
+    base.run("INSERT INTO system_config (key, value) VALUES ('kerberos_spn', 'HTTP/ucm.corp.example') "
+             "ON CONFLICT (key) DO NOTHING")
+    profiles = base.run("SELECT id, name, is_default FROM windows_enrollment_profiles ORDER BY id")
+    stamp = base.run("SELECT applied_at FROM _migrations WHERE name = '300_upgrade_from_2_254'")
+    base.run("DELETE FROM certificates WHERE id IN (3, 5)")
+    assert base.upgrade()
+    assert _cert_row(base, 4, 'serial_number') == ('255',)
+    assert base.run("SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'") == []
+    assert 'uix_certificates_ca_serial' in snapshot_index_names(base)
+    assert base.run("SELECT id, name, is_default FROM windows_enrollment_profiles ORDER BY id") == profiles
+    assert base.run("SELECT applied_at FROM _migrations WHERE name = '300_upgrade_from_2_254'") == stamp
+    # Nothing pending any more: the next start runs nothing
+    assert base.upgrade()
+
+
+def test_the_cleanup_never_asks_to_edit_the_registry():
+    from utils.serial_duplicates import CLEANUP
+    assert '_migrations' not in CLEANUP and 'restart' in CLEANUP.lower()
+
+
 def test_steps_146_and_148_leave_a_2254_order_without_replaced_certificates(upgraded):
     """2.254 has no replaced_certificates column: 146 adds it empty, 148 finds nothing to name."""
     db, _ = upgraded

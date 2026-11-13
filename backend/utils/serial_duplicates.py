@@ -23,9 +23,8 @@ _ROWS = f"SELECT id, caref, serial_number, crt FROM certificates WHERE {_COVERED
 # Self-contained: packages ship no docs/, so the message is the procedure
 CLEANUP = ("Delete all but one certificate of each listed serial on the installation that holds "
            "them, found by the certificate ids and stored spellings shown with it where there are any (revoke it first if it is in use; a revoked row still counts), until each serial "
-           "appears once under its CA. Then delete the row '300_upgrade_from_2_254' from the _migrations "
-           "table, so the next start runs the upgrade from 2.254 again, which creates the index and "
-           "stores every serial in decimal (its other steps find nothing left to do).")
+           "appears once under its CA. Then restart UCM: while this warning stands, every start runs steps "
+           "142 and 144 of the upgrade from 2.254 again, which create the index and store every serial in decimal.")
 
 
 def duplicates_in_database(conn) -> List[Dict]:
