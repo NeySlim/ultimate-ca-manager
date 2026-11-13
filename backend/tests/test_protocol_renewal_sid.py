@@ -10,12 +10,12 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.x509.oid import AttributeOID, NameOID
 
-from tests.ad_connector_support import connector_row
-from models import  CA, Certificate, db
+from models import CA, Certificate, db
 from services.ad_connector import lookup as ad_lookup
 from services.ca_service import CAService
 from services.scep.scep_service import SCEPService
 from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID, _ad_security_extension
+from tests.ad_connector_support import connector_row
 from tests.protocol_approval_support import approval_policy, approve, requests_of
 from tests.test_est_rfc7030 import _post_csr, est_config  # noqa: F401
 from tests.test_scep_renewal_challenge import ROTATED, _message
@@ -369,14 +369,20 @@ def test_a_renewal_asks_the_connector_of_the_default_profile(app, create_ca, mon
     asked = []
     monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda config, sid: asked.append(config.id) or 'HOST$')
     with app.app_context():
+        made = default_profile() is None
         default_profile(create=True)
         db.session.commit()
         mount_connector(name='forest-a', server='dc.a.example', base_dn='DC=a,DC=example', bind_dn='svc', enabled=True)
         second = add_connector('forest-b', server='dc.b.example', base_dn='DC=b,DC=example',
                                bind_dn='svc', enabled=True, link=True)
         ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
-        assert renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST') == SID
-        assert asked == [second.id]
+        try:
+            assert renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST') == SID
+            assert asked == [second.id]
+        finally:
+            if made:  # the files run after this one start without a default profile, as they did
+                db.session.delete(default_profile())
+                db.session.commit()
 
 
 def test_a_scep_request_gone_before_it_is_closed_answers_404(app):
@@ -397,6 +403,7 @@ def test_an_unresolved_sid_logs_the_connector_fault(app, create_ca, monkeypatch,
     try:
         with app.app_context():
             connector_row().server = server
+            name = connector_row().name
             db.session.commit()
             if server:
                 monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
@@ -407,7 +414,7 @@ def test_an_unresolved_sid_logs_the_connector_fault(app, create_ca, monkeypatch,
     finally:
         _clear_ad_connector(app)
     logged = [r.getMessage() for r in caplog.records if r.name == renewal_identity.__name__]
-    expected = f'TEST: the AD Connector cannot resolve SID {SID} of a renewed certificate'
+    expected = f'TEST: the AD Connector {name} cannot resolve SID {SID} of a renewed certificate'
     assert logged == [expected if server else f'{expected}: no server is configured']
 
 
