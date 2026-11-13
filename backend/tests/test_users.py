@@ -18,6 +18,8 @@ import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 STRONG_PASSWORD = 'S3cure!Pass#99'

@@ -453,6 +453,29 @@ def drop_new_cas_and_certificates(app):
                 delete(row_id)
 
 
+@pytest.fixture(scope='module')
+def drop_new_users(app):
+    """Deletes, through the admin route, the accounts a module created (ids above the
+    highest one before it), so a user it made never reaches the next file."""
+    from models import User, db
+
+    def _top():
+        with app.app_context():
+            return db.session.query(db.func.max(User.id)).scalar() or 0
+    floor = _top()
+    yield
+    with app.app_context():
+        # The session admin can be seeded during the first module: never one of its own
+        made = [u.id for u in User.query.filter(User.id > floor, User.username != 'admin').order_by(User.id)]
+    if not made:
+        return
+    admin = app.test_client()
+    r = admin.post('/api/v2/auth/login', json={'username': 'admin', 'password': 'changeme123'})
+    assert r.status_code == 200, r.data
+    for user_id in made:
+        admin.delete(f'/api/v2/users/{user_id}')
+
+
 def sandbox_paths(application, replaced=None):
     """Point the file paths at a temp tree; returns it and the Config values replaced.
     `replaced` may be the caller's dict, filled as it goes, for a partial undo.

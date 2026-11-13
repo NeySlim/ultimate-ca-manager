@@ -14,6 +14,8 @@ from tests.test_cross_import_opnsense import _row, _run
 from tests.test_opnsense_import import _key_pem
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 
 def _x(b, xid=None, tail=''):
     return f'/api/v2/cas/{b}/cross-certificates' + (f'/{xid}' if xid else '') + tail

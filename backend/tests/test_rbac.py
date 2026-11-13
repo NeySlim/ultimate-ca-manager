@@ -13,6 +13,8 @@ Tests for /api/v2/rbac/* routes:
 import json
 import pytest
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 
 # ============================================================
 # Helpers

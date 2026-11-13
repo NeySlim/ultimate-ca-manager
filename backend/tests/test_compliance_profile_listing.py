@@ -1,5 +1,8 @@
 """GET /api/v2/system/compliance-profiles: what each profile leaves a form to offer."""
 import compliance_profiles
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 URL = '/api/v2/system/compliance-profiles'
 

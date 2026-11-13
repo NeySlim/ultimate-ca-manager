@@ -21,6 +21,8 @@ from api.v2.sso import saml_sp
 from models import db, User
 from models.sso import SSOProvider, SSOSession
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 IDP_ENTITY = 'https://idp.example.test/saml'
 SP_BASE = 'https://ucm.example.test'
 ACS = saml_sp.ACS_PATH

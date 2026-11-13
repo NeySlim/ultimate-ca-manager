@@ -11,6 +11,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from models import Certificate, db
 from tests.test_csr_sign_extra_names import _upload
 from tests.test_csr_windows_basic_constraints import _windows_shaped_csr
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 
 def _csr(cn):

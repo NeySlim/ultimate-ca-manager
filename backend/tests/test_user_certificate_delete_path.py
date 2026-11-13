@@ -17,6 +17,8 @@ import pytest
 from models import db
 from tests.test_user_certificate_key_export_guard import _enrolment_for
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 
 @pytest.fixture
 def an_operator(app, create_user):
