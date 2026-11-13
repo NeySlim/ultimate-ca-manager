@@ -296,3 +296,33 @@ describe('CA pickers', () => {
     expect(field).toHaveTextContent('cas.notListedForSigning|count=1')
   })
 })
+
+describe('shared accounts', () => {
+  const field = () => screen.queryByLabelText('xcepWstep.xcepTitle: common.username')
+
+  it('shows them for the default profile and sends them', async () => {
+    mocks.get.mockResolvedValue({ data: { ...PROFILE, is_default: true } })
+    renderEditor()
+    await loaded()
+    expect(field()).toBeInTheDocument()
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.update.mock.calls[0][1]).toHaveProperty('xcep_username')
+  })
+
+  it('hides them for any other profile and does not send them', async () => {
+    renderEditor()
+    await loaded()
+    expect(field()).toBeNull()
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.update.mock.calls[0][1]).not.toHaveProperty('xcep_username')
+    expect(mocks.update.mock.calls[0][1]).not.toHaveProperty('wstep_username')
+  })
+
+  it('hides them on a new profile', async () => {
+    renderEditor(null)
+    await loaded()
+    expect(field()).toBeNull()
+  })
+})

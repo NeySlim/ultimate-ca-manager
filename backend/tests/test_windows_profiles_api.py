@@ -10,6 +10,7 @@ from models import ADConnectorConfig, CA, Certificate, WindowsEnrollmentProfile,
 from models.audit_log import AuditLog
 from utils.datetime_utils import utc_now
 from utils.revocation_reasons import HOLD_REASONS
+from tests.windows_profile_support import default_profile_id, put_default_profile
 from datetime import timedelta
 
 URL = '/api/v2/windows-profiles'
@@ -56,19 +57,21 @@ def _refid(app, ca):
 
 def test_crud_never_renders_secrets_and_audits_by_name(app, auth_client, create_ca):
     refid = _refid(app, _signer(create_ca))
-    p = _created(auth_client, realm='crud.example', issuing_ca_refid=refid, xcep_username='u',
-                 xcep_password='Sup3rSecret!', wstep_username='w', wstep_password='Another#Secret1',
-                 validity_days=90)
+    p = _created(auth_client, realm='crud.example', issuing_ca_refid=refid, validity_days=90)
+    put_default_profile(auth_client, xcep_username='u', xcep_password='Sup3rSecret!',
+                        wstep_username='w', wstep_password='Another#Secret1')
     assert p['realm'] == 'CRUD.EXAMPLE'
-    assert p['xcep_password_set'] and p['wstep_password_set']
-    for blob in (json.dumps(p), auth_client.get(f"{URL}/{p['id']}").get_data(as_text=True),
-                 auth_client.get(f"{URL}?q={p['name']}").get_data(as_text=True)):
+    default_id = default_profile_id(auth_client)
+    shown = auth_client.get(f'{URL}/{default_id}').get_json()['data']
+    assert shown['xcep_password_set'] and shown['wstep_password_set']
+    for blob in (json.dumps(p), json.dumps(shown), auth_client.get(f"{URL}/{p['id']}").get_data(as_text=True),
+                 auth_client.get(f"{URL}?per_page=100").get_data(as_text=True)):
         assert 'Sup3rSecret' not in blob and 'Another#Secret1' not in blob
         assert '"xcep_password"' not in blob and '"keytab"' not in blob
     r = auth_client.put(f"{URL}/{p['id']}", json={'enabled': False, 'validity_days': 30})
     assert r.status_code == 200, r.data
     got = auth_client.get(f"{URL}/{p['id']}").get_json()['data']
-    assert got['enabled'] is False and got['validity_days'] == 30 and got['wstep_password_set']
+    assert got['enabled'] is False and got['validity_days'] == 30
     assert auth_client.delete(f"{URL}/{p['id']}").status_code == 200
     assert auth_client.get(f"{URL}/{p['id']}").status_code == 404
     with app.app_context():
@@ -419,3 +422,20 @@ def test_pinned_subject_fields_are_stored_cleaned_and_none_when_empty(app, auth_
     with app.app_context():
         saved = db.session.get(WindowsEnrollmentProfile, r.get_json()['data']['id']).pinned_subject_fields
     assert (json.loads(saved) if saved else None) == stored
+
+
+@pytest.mark.parametrize('field,value', [('xcep_username', 'u'), ('xcep_password', 'Sup3rSecret!'),
+                                         ('wstep_username', 'w'), ('wstep_password', 'Another#Secret1')])
+def test_shared_credentials_are_refused_on_a_profile_that_is_not_the_default(auth_client, field, value):
+    """Only the default profile's binding reads them: saved elsewhere they would never be used."""
+    default_profile_id(auth_client)
+    r = auth_client.post(URL, json={'name': f'wp-cred-{uuid.uuid4().hex[:5]}', field: value})
+    assert r.status_code == 400, r.data
+    assert 'default profile' in r.get_json()['message']
+    other = _created(auth_client, name=f'wp-cred-{uuid.uuid4().hex[:5]}')
+    r = auth_client.put(f"{URL}/{other['id']}", json={field: value})
+    assert r.status_code == 400, r.data
+    # Clearing one is not setting one
+    clear = {field: ''} if field.endswith('username') else {}
+    assert auth_client.put(f"{URL}/{other['id']}", json=clear).status_code == 200
+    assert put_default_profile(auth_client, **{field: value}).status_code == 200

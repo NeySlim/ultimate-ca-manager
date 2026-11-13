@@ -327,6 +327,13 @@ export function CertificatePanel({
                 : cert.template_name}
             />
           )}
+          {cert.windows_profile_id != null && (
+            <CompactField
+              icon={Stack}
+              label={t('certificates.windowsProfile')}
+              value={cert.windows_profile_name || `#${cert.windows_profile_id}`}
+            />
+          )}
         </CompactGrid>
       </CompactSection>
       

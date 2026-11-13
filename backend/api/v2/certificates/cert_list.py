@@ -9,6 +9,7 @@ from utils.response import success_response
 from utils.serial_format import serial_search_forms
 from utils.pagination import parse_request_pagination
 from models import Certificate, CA, db
+from models.windows_profile import profile_names_of
 from utils.cert_status import (
     CERTIFICATE_STATUS_FILTERS, expired_condition, expiring_condition,
     issued_certificates, normalize_status_filters, orphan_condition,
@@ -221,9 +222,10 @@ def list_certificates():
     # The records of the page in one query: a revocation they make shows as OCSP answers it
     from services.cert.issued_lookup import persisted_revocations_of, show_effective_revocation
     recorded = persisted_revocations_of(pagination.items)
+    profile_names = profile_names_of(pagination.items)
     certs = []
     for cert in pagination.items:
-        d = show_effective_revocation(cert.to_dict(), cert, recorded.get(cert.id))
+        d = show_effective_revocation(cert.to_dict(windows_profile_names=profile_names), cert, recorded.get(cert.id))
         compliance = calculate_compliance_score(d)
         d['compliance_score'] = compliance['score']
         d['compliance_grade'] = compliance['grade']

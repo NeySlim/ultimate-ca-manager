@@ -1225,6 +1225,7 @@
     "allTemplates": "Tous les modèles",
     "modifiedFromTemplate": "Modifié par rapport au modèle",
     "issuedFromTemplate": "Émis depuis le modèle : {{name}}",
+    "windowsProfile": "Profil Windows",
     "templateOverridesHint": "Diverge du modèle « {{name}} » sur : {{fields}}",
     "deleteNeedsRevoke": "Ce certificat est encore valide, il ne peut donc pas être supprimé seul : le supprimer le retirerait d'UCM alors qu'il reste approuvé par tout client qui ne vérifie pas la révocation. Révoquez-le d'abord, pour que la CRL et le répondeur OCSP portent le retrait, puis il sera supprimé.",
     "revokeThenDelete": "Révoquer, puis supprimer",

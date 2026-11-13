@@ -296,3 +296,16 @@ def test_a_smartcard_logon_only_template_adds_no_default_profile(app, subject_ca
     cert, err = _issue(app, ca_id, csr, principal)
     assert err is None, err
     assert wstep_service._eku_oids(cert) == {SMARTCARD_LOGON.dotted_string}
+
+
+@pytest.mark.parametrize('answer,reason', [
+    (None, 'found no account for the requester'),
+    (ad_lookup.NO_UPN, 'found the account but it has no userPrincipalName'),
+])
+def test_a_user_the_directory_cannot_build_says_which_way(app, subject_ca, directory, answer, reason):
+    directory['user'] = answer
+    ca_id = subject_ca(f'Subject source user {reason[:12]} CA', MIXED)
+    csr = _csr('www.bank.test', ekus=[EMAIL])
+    cert, err = _issue(app, ca_id, csr, USER)
+    assert cert is None
+    assert err == f'The certificate subject is built from Active Directory, which {reason}'

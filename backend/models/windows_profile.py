@@ -73,3 +73,12 @@ class WindowsProfileTemplate(db.Model):
     profile_id = db.Column(db.Integer, db.ForeignKey('windows_enrollment_profiles.id', ondelete='CASCADE'),
                            nullable=False, index=True)
     template_id = db.Column(db.Integer, db.ForeignKey('certificate_templates.id'), nullable=False, index=True)
+
+
+def profile_names_of(certs):
+    """Id to name of the profiles behind ``certs``, in one query, for ``Certificate.to_dict``"""
+    ids = {c.windows_profile_id for c in certs if c.windows_profile_id is not None}
+    if not ids:
+        return {}
+    return dict(db.session.query(WindowsEnrollmentProfile.id, WindowsEnrollmentProfile.name)
+                .filter(WindowsEnrollmentProfile.id.in_(ids)).all())

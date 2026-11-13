@@ -93,13 +93,31 @@ def kerberos_binding_reason():
     return negotiate_auth.not_configured_reason()
 
 
-def kerberos_unserved_reason(profile=None, binding_reason=False):
+def served_key_realms():
+    """The realms of the keys in the keytab file this node's acceptor reads, None when unreadable."""
+    from services.kerberos import negotiate_auth
+    from .legacy import keytab_realms
+    try:
+        return keytab_realms(negotiate_auth.KEYTAB_PATH.read_bytes())
+    except OSError:
+        return None
+
+
+def kerberos_unserved_reason(profile=None, binding_reason=False, key_realms=False):
     """Why Kerberos reaches no client of *profile*: the binding itself first (library, switch,
-    SPN, keytab), then the profile (``kerberos_refusal``). None when it is served. A list passes the
-    binding's reason it computed once."""
+    SPN, keytab), then the profile (``kerberos_refusal``), then its key: a realm with no key,
+    in its own keytab or in the served file, is a 401 at the acceptor. None when it is served.
+    A list passes the binding's reason and the served realms it read once."""
     if binding_reason is False:
         binding_reason = kerberos_binding_reason()
-    return binding_reason or kerberos_refusal(profile)
+    reason = binding_reason or kerberos_refusal(profile)
+    if reason is None and profile is not None and not profile.keytab:
+        if key_realms is False:
+            key_realms = served_key_realms()
+        # The served file may hold this realm's key under another profile's keytab
+        if profile.realm not in (key_realms or ()):
+            return f'no key for realm {profile.realm}: upload the keytab of this profile'
+    return reason
 
 
 UNKNOWN_REALM = 'no profile serves this realm'

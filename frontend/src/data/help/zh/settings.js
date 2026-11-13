@@ -151,7 +151,7 @@ export default {
         title: 'Windows 自动注册（XCEP/WSTEP）',
         content: '通过 MS-XCEP 策略发现和 MS-WSTEP 签发实现的原生 Windows 证书注册,, 支持 MMC/certreq 手动注册和无人值守的 GPO 自动注册。',
         items: [
-          { label: '配置文件', text: '每个 Active Directory 领域一个配置文件，按客户端 Kerberos 主体的领域路由：各有自己的签发 CA 与策略 CA、模板子集、AD 连接器、keytab 和账户。列表由服务器分页和筛选（名称或领域、CA、状态：完整、缺少 keytab、连接器故障、已禁用）' },
+          { label: '配置文件', text: '每个 Active Directory 领域一个配置文件，按客户端 Kerberos 主体的领域路由：各有自己的签发 CA 与策略 CA、模板子集、AD 连接器和 keytab；UsernamePassword 账户属于默认配置文件。列表由服务器分页和筛选（名称或领域、CA、状态：完整、缺少 keytab、连接器故障、已禁用）' },
           { label: '领域', text: '使用大写字母，与 KDC 的写法完全一致（CORP.EXAMPLE）：KDC 逐字符比较领域。没有领域的默认配置文件在设置领域前拒绝 Kerberos。已禁用的配置文件拒绝其领域的计算机；其密钥仍保留在提供的 keytab 中，以便按领域拒绝并审计' },
           { label: 'XCEP', text: '使 Windows 客户端能够在注册前发现可用的证书模板' },
           { label: 'WSTEP', text: '在发现策略后处理证书请求和续订' },
@@ -476,7 +476,7 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 
 ### 配置文件
 
-每个 Active Directory 领域一个**配置文件**。UCM 按客户端 Kerberos 主体的领域把客户端路由到其配置文件：每个配置文件都有自己的签发 CA 与策略 CA、模板、AD 连接器、keytab 和账户。列表由服务器分页和筛选（名称或领域、CA、状态），因此一百个配置文件与一个一样快：
+每个 Active Directory 领域一个**配置文件**。UCM 按客户端 Kerberos 主体的领域把客户端路由到其配置文件：每个配置文件都有自己的签发 CA 与策略 CA、模板、AD 连接器和 keytab；UsernamePassword 账户属于默认配置文件。列表由服务器分页和筛选（名称或领域、CA、状态），因此一百个配置文件与一个一样快：
 - **领域**: 使用大写字母，与 KDC 的写法完全一致（\`CORP.EXAMPLE\`）：KDC 逐字符比较领域，小写名称永远无法匹配票证。表单会拒绝并说明原因
 - **连接器**: 为该领域服务的 AD 连接器。其域与配置文件的领域不同时，表单会警告但不阻止；选择其中任一项时，服务器会检查这一组合
 - **签发 CA** 和 **策略 CA**: 负责签发的 CA，以及 XCEP 公布其策略和模板 OID 的 CA（为空时使用签发 CA）
@@ -524,7 +524,7 @@ Docker 镜像自 v2.251 起包含此后端。
 
 XML-DSig 没有 ML-DSA 签名方法，因此 **ML-DSA** 证书无法通过此方式续订：UCM 会在拒绝信息中指明该密钥，客户端需改为注册新证书。
 
-证书续期只服务通过 Windows 注册（WSTEP）签发的证书；手工签发的证书应重新注册，而不是续期。通过 TLS 时，待续期的证书即客户端证书：请启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU (v2.248)。
+证书续期只服务通过 Windows 注册（WSTEP）签发的证书；手工签发的证书应重新注册，而不是续期。通过 TLS 时，待续期的证书即客户端证书：请启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU (v2.248)。监听器不信任的证书会在 TLS 握手期间被拒绝，UCM 看不到请求，因此 UCM 不会记录审计（请查看客户端输出和服务日志）。不属于 mTLS CA 的配置文件只能通过 Kerberos 续期；若 Kerberos 拒绝（请求者已从 AD 组中移除、配置文件已禁用），则无法续期。
 
 ### SID 安全扩展 (KB5014754)
 

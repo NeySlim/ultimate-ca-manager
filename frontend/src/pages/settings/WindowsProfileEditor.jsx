@@ -154,15 +154,18 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
       allowed_ad_group: form.allowed_ad_group.trim() || null,
       pinned_subject_fields: form.pinned_subject_fields.trim() || null,
       template_ids: form.template_ids,
-      xcep_username: form.xcep_username,
-      wstep_username: form.wstep_username,
+    }
+    // Only the default profile's binding reads the shared accounts; the API refuses them elsewhere
+    if (detail?.is_default) {
+      payload.xcep_username = form.xcep_username
+      payload.wstep_username = form.wstep_username
     }
     // The API checks the realm/connector pair when either is sent: send them only when changed
     const realm = form.realm.trim()
     if (realm && (isNew || realm !== (detail?.realm || ''))) payload.realm = realm
     if (isNew || form.connector_id !== (detail?.connector_id ?? null)) payload.connector_id = form.connector_id
-    if (form.xcep_password) payload.xcep_password = form.xcep_password
-    if (form.wstep_password) payload.wstep_password = form.wstep_password
+    if (detail?.is_default && form.xcep_password) payload.xcep_password = form.xcep_password
+    if (detail?.is_default && form.wstep_password) payload.wstep_password = form.wstep_password
     return payload
   }
 
@@ -319,6 +322,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
         disabled={readOnly}
       />
 
+      {!isNew && detail?.is_default && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input label={`${t('xcepWstep.xcepTitle')}: ${t('common.username')}`} value={form.xcep_username}
           onChange={(e) => update('xcep_username')(e.target.value)} disabled={readOnly} />
@@ -331,6 +335,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
           onChange={(e) => update('wstep_password')(e.target.value)}
           placeholder={detail?.wstep_password_set ? '••••••••' : ''} disabled={readOnly} />
       </div>
+      )}
 
       <div className="space-y-2 border border-border rounded-lg p-3">
         <div className="flex items-center gap-2 text-sm font-medium text-text-primary">

@@ -63,6 +63,8 @@ class _Falsy:
 
 # No DC bound, a search failed, or the enabled connector has no server or base DN.
 UNREACHABLE = _Falsy('UNREACHABLE')
+# The account exists but has no userPrincipalName.
+NO_UPN = _Falsy('NO_UPN')
 # The account exists but its objectSid is missing or malformed.
 UNUSABLE_SID = _Falsy('UNUSABLE_SID')
 # The Kerberos principal or the SID names no account (a SID matching a non-account
@@ -664,8 +666,8 @@ def lookup_user_ad_identity(config, sam_account_name):
     (leaf to root, e.g. ``[('CN', 'Roy Hagland'), ('CN', 'Users'), ('DC',
     'hagland'), ('DC', 'domain')]``), confirmed against a real ADCS-issued
     User certificate's subject in the lab. ``None`` when the connector is not
-    configured/disabled, the entry is not found or has no ``userPrincipalName``;
-    the falsy ``UNREACHABLE`` when no DC binds or the search fails. Never raises.
+    configured/disabled or the entry is not found; the falsy ``NO_UPN`` when the entry has no
+    ``userPrincipalName``; the falsy ``UNREACHABLE`` when no DC binds or the search fails. Never raises.
 
     ``mail`` is deliberately optional (``None`` when unset), not a failure
     mode: real ADCS's own CT_FLAG_SUBJECT_REQUIRE_EMAIL hard-declines
@@ -698,7 +700,7 @@ def lookup_user_ad_identity(config, sam_account_name):
         if entry is None or entry is UNREACHABLE:
             return entry
         if 'userPrincipalName' not in entry or not entry.userPrincipalName.value:
-            return None
+            return NO_UPN
         upn = str(entry.userPrincipalName.value)
         mail = str(entry.mail.value) if 'mail' in entry and entry.mail.value else None
         dn_components = [(attr, value) for attr, value, _sep in parse_dn(entry.entry_dn)]
