@@ -420,7 +420,7 @@ def issue_kerberos():
     if cl is not None and cl > WSTEP_MAX_BODY_BYTES:
         return Response('Request body too large', status=413)
 
-    connection_key = request.environ.get('REMOTE_ADDR')
+    connection_key = client_ip()
     result = negotiate_auth.authenticate_negotiate(request.headers.get('Authorization'), connection_key)
     if result.status != 'authenticated':
         if result.status not in ('challenge', 'continue'):

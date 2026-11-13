@@ -312,6 +312,10 @@ def keytab_holders():
             .order_by(WindowsEnrollmentProfile.id).populate_existing().all())
 
 
+# The composed file is refused beyond this: 150 realms of three keys are about 40 KiB
+MAX_COMPOSED_KEYTAB_SIZE = 1024 * 1024
+
+
 def composed_keytab():
     """The keytab the acceptor reads: the entries of every profile's keytab, enabled or not, so a
     disabled profile is refused by realm after authentication (fault and audit, never a 401).
@@ -323,7 +327,7 @@ def composed_keytab():
     sources = [(p, p.keytab_bytes()) for p in keytab_holders()]
     sources = [(p, data) for p, data in sources if data]
     if len(sources) == 1:
-        return sources[0][1]
+        return _within_size(sources[0][1])
     entries = []
     for profile, data in sources:
         read = read_entries(data)
@@ -332,7 +336,14 @@ def composed_keytab():
                          profile.name)
             continue
         entries.extend(read)
-    return compose(entries) if sources else None
+    return _within_size(compose(entries)) if sources else None
+
+
+def _within_size(data):
+    if len(data) > MAX_COMPOSED_KEYTAB_SIZE:
+        raise ValueError(f'the keytabs of the profiles make {len(data)} bytes, '
+                         f'above the {MAX_COMPOSED_KEYTAB_SIZE} bytes a node serves')
+    return data
 
 
 def publish_keytab(actor='system'):
