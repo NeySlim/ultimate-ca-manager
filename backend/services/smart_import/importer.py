@@ -355,6 +355,7 @@ class SmartImporter:
         subject_to_refid: Dict[str, str] = {}
         ski_to_refid: Dict[str, str] = {}
         bundle_roots = [o for o in ca_objects if o.is_self_signed and o.ski]
+        from services.import_service import relink_parent_caref  # imported late: import_service imports this package
 
         for ca_obj in ca_objects:
             counterpart = self._cross_counterpart(ca_obj, bundle_roots)
@@ -398,9 +399,10 @@ class SmartImporter:
                         ski_to_refid[existing.ski] = existing.refid
                     continue
 
-            # Find parent CA: AKI→SKI first, then issuer DN fallback
-            caref = None
-            if not ca_obj.is_self_signed:
+            # The parent is the stored CA whose key signed this certificate (flushed batch CAs included);
+            # failing that, the former AKI then issuer DN guess, kept for parents whose signature cannot be checked
+            caref = relink_parent_caref(x509.load_pem_x509_certificate(ca_obj.raw_pem.encode()), None)
+            if not caref and not ca_obj.is_self_signed:
                 if ca_obj.aki:
                     caref = ski_to_refid.get(ca_obj.aki)
                     if not caref:

@@ -1,13 +1,18 @@
 """An imported CA is chained under the stored CA whose key signed it, whatever the order of the batch."""
+import base64
 import json
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.x509.oid import NameOID
 
 from models import CA, SystemConfig, db
 from tests.fixtures.cross_pki import key_pem, make_cert, new_key, pem
+from tests.test_opnsense_import import _Session
 
 
 @pytest.fixture(autouse=True)
@@ -75,3 +80,94 @@ def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client,
         with app.app_context():
             for k, v in saved.items():
                 _set(k, v)
+
+
+def _row(cert, descr):
+    return {'uuid': str(uuid.uuid4()), 'refid': uuid.uuid4().hex[:13], 'descr': descr,
+            'crt': base64.b64encode(pem(cert).encode()).decode(), 'serial': '1'}
+
+
+@pytest.mark.parametrize('mid_first', [True, False])
+def test_opnsense_route_links_the_chain_whatever_the_order(app, auth_client, monkeypatch, mid_first):
+    from api.v2 import import_opnsense
+    tag = uuid.uuid4().hex[:8]
+    k_root, k_mid, k_sub = new_key(), new_key(), new_key()
+    root = make_cert(f'Root {tag}', k_root)
+    mid = make_cert(f'Mid {tag}', k_mid, f'Root {tag}', k_root, path_length=1)
+    sub = make_cert(f'Sub {tag}', k_sub, f'Mid {tag}', k_mid, path_length=0)
+    rows = {'root': _row(root, f'root {tag}'), 'mid': _row(mid, f'mid {tag}'), 'sub': _row(sub, f'sub {tag}')}
+    order = ['root', 'mid', 'sub'] if mid_first else ['root', 'sub', 'mid']
+    # selected_ids is a set: make it a list so the rows are handled in the order given, and record it
+    monkeypatch.setattr(import_opnsense, 'set', list, raising=False)
+    seen = []
+    real_attach = import_opnsense.cross_certs.attach_to_counterpart
+    monkeypatch.setattr(import_opnsense.cross_certs, 'attach_to_counterpart',
+                        lambda crt, *a, **k: (seen.append(next(n for n, r in rows.items() if r['crt'] == crt)),
+                                              real_attach(crt, *a, **k))[1])
+    monkeypatch.setattr(import_opnsense, 'create_session',
+                        lambda verify_ssl=True: _Session([rows[n] for n in order], []))
+    r = auth_client.post('/api/v2/import/opnsense/import', json={
+        'host': '192.0.2.10', 'port': 443, 'api_key': 'k', 'api_secret': 's',
+        'verify_ssl': False, 'items': [rows[n]['uuid'] for n in order]})
+    assert r.status_code == 200, r.data
+    assert seen == order
+    assert json.loads(r.data)['data']['imported']['cas'] == 3
+    with app.app_context():
+        got = {n: CA.query.filter_by(descr=f'{n} {tag}').one() for n in rows}
+        assert got['root'].caref is None
+        assert got['mid'].caref == got['root'].refid
+        assert got['sub'].caref == got['mid'].refid
+
+
+def _without_aki(subject_cn, subject_key, issuer_cn, issuer_key):
+    now = datetime.now(timezone.utc)
+    name = lambda cn: x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])  # noqa: E731
+    return (x509.CertificateBuilder().subject_name(name(subject_cn)).issuer_name(name(issuer_cn))
+            .public_key(subject_key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=300))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+            .sign(issuer_key, hashes.SHA256()))
+
+
+def _store(cert, descr):
+    ca = CA(refid=uuid.uuid4().hex[:16], descr=descr, crt=base64.b64encode(pem(cert).encode()).decode(),
+            subject=cert.subject.rfc4514_string(), issuer=cert.issuer.rfc4514_string(),
+            serial_number=str(cert.serial_number), imported_from='manual')
+    db.session.add(ca)
+    db.session.commit()
+    return ca
+
+
+def test_smart_import_links_to_the_namesake_whose_key_signed(app):
+    from services.smart_import.importer import SmartImporter
+    tag = uuid.uuid4().hex[:8]
+    name = f'Twin {tag}'
+    k1, k2, k_child = new_key(), new_key(), new_key()
+    with app.app_context():
+        _store(make_cert(name, k1), 'first twin')
+        second = _store(make_cert(name, k2), 'second twin')
+        child = _without_aki(f'Child {tag}', k_child, name, k2)
+        result = SmartImporter().execute(pem(child))
+        assert result.cas_imported == 1, result.errors
+        assert CA.query.filter_by(descr=f'Child {tag}').one().caref == second.refid
+
+
+@pytest.mark.parametrize('unsupported_key', [False, True])
+def test_smart_import_keeps_the_name_link_when_no_signature_verifies(app, monkeypatch, unsupported_key):
+    """No stored CA verifies the signature (another key, or a key type not handled here):
+    the issuer name still links it, as before."""
+    from services.smart_import.importer import SmartImporter
+    from utils import cert_issuer
+    tag = uuid.uuid4().hex[:8]
+    name = f'Namesake {tag}'
+    parent_key = new_key()
+    if unsupported_key:
+        def cannot_check(cert, issuer):
+            raise cert_issuer.UnsupportedIssuerKey('key type not handled')
+        monkeypatch.setattr(cert_issuer, 'certificate_signed_by', cannot_check)
+    with app.app_context():
+        stored = _store(make_cert(name, parent_key), 'namesake')
+        child = _without_aki(f'Orphan {tag}', new_key(), name, parent_key if unsupported_key else new_key())
+        result = SmartImporter().execute(pem(child))
+        assert result.cas_imported == 1, result.errors
+        assert CA.query.filter_by(descr=f'Orphan {tag}').one().caref == stored.refid
