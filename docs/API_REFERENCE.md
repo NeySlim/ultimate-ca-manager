@@ -577,6 +577,47 @@ certificate), behind a
 "show hidden CAs" link. It is presentation only: the CA still signs whatever it is asked to. The
 CA object reads it back as `issuance_hidden`, and the change is audited.
 
+### Confirm a Parent Whose Signature Cannot Be Verified
+```http
+POST /api/v2/cas/{ca_id}/parent-confirmation
+Content-Type: application/json
+
+{
+  "parent_id": 12,
+  "confirm": true
+}
+```
+
+A CA is linked to a parent on its own only when the parent's key verifies its signature. When
+the parent's key or signature algorithm cannot be checked here (SLH-DSA, GOST), the CA is left
+without a parent and its object carries `parent_candidate` (`id`, `name`, `algorithm`, `reason`:
+`signature not verifiable here: <algorithm>`); `GET /api/v2/cas/{ca_id}` and the import responses
+fill it, the list returns `null`. The candidate is a stored CA whose subject is the CA's issuer
+(RFC 5280 name comparison) and whose SKI is the CA's AKI when both are present, the self-signed
+record first.
+
+The route needs `write:cas` and `"confirm": true` (the boolean, 400 otherwise). It checks again
+that the CA has no parent, that `parent_id` is the candidate and that the signature still cannot
+be checked, and answers 409 with the reason otherwise: a parent whose key does not verify the
+signature is refused even confirmed, and one whose key verifies needs no confirmation. On success
+it sets the parent, records `parent_confirmed_by` and `parent_confirmed_at`, writes the audit
+entry `ca_parent_confirmed` and returns the CA.
+
+```http
+DELETE /api/v2/cas/{ca_id}/parent-confirmation
+Content-Type: application/json
+
+{ "confirm": true }
+```
+
+Withdraws a parent confirmed by hand (409 for any other link), audited as `ca_parent_unconfirmed`;
+the CA is left without a parent and carries its `parent_candidate` again.
+
+`POST /api/v2/import/execute` (smart import), `POST /api/v2/import/opnsense/import` and the
+result of the OPNsense file importer list such CAs in `unverifiable_parents`: `ca_id`, `ca_name`, `candidate`
+(`id`, `name`), `algorithm` and `reason`. `POST /api/v2/cas/import` and
+`POST /api/v2/certificates/import` return the CA object with its `parent_candidate`.
+
 ### Delete CA
 ```http
 DELETE /api/v2/cas/{ca_id}

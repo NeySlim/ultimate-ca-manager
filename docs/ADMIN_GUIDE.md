@@ -494,6 +494,34 @@ With `UCM_HA=1`, every node runs against the same PostgreSQL database and names 
 
 ---
 
+## CA Hierarchy
+
+### A parent whose signature cannot be verified
+
+An imported CA is linked to a parent only when the parent's key verifies its signature. When the
+parent's key or signature algorithm is one this server cannot check (SLH-DSA, GOST), the CA is left
+without a parent, and neither the hourly chain repair nor a re-import links it.
+
+Its details then name the probable parent: a stored CA whose subject is the CA's issuer and, when
+both carry one, whose subject key identifier is the CA's authority key identifier, with the
+algorithm that could not be checked. Every import path reports it too (the CA import, the
+certificate import, the smart import, the OPNsense import). **Link to this parent** asks for an
+explicit confirmation; UCM checks everything again at that moment and refuses a CA that already has
+a parent, a parent other than the one proposed and a signature that does not verify. The link is
+recorded with who confirmed it and when, and audited (`ca_parent_confirmed`). **Withdraw the link**
+removes it (`ca_parent_unconfirmed`) and the CA is proposed its parent again. Both need `write:cas`.
+
+Once linked, the CA follows that parent like any other: it is revoked in chain when the parent is,
+the parent's OCSP responder and revocation records find it, and the chain export, EST `/cacerts`,
+SCEP `GetCACert` (when the chain is served) and the hierarchy views include the parent. The AIA
+files serve the CA's own certificate and are not affected. The hourly chain repair keeps the link;
+a re-import keeps it while that parent is still the one proposed, and drops the confirmation
+otherwise. If a later version can check the algorithm and finds the signature false, the parent no
+longer counts for the revocation status, but the recorded link still orders the chains served:
+withdraw it.
+
+---
+
 ## Protocol Administration
 
 ### CRL Distribution
