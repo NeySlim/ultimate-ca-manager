@@ -6,6 +6,7 @@ for the "ticket already verified" path. Real end-to-end verification is a
 lab AD exercise (see memory/project_xcep_wstep_lab_testing.md).
 """
 import base64
+import contextlib
 import json
 
 import pytest
@@ -25,7 +26,7 @@ from services.ad_connector import lookup as ad_lookup
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WST_NS, WSSE_NS
 from utils.upn_san import extract_upns_from_san_list
-from tests.windows_profile_support import connectors_kept, restore, set_config, snapshot
+from tests.windows_profile_support import connectors_kept, restore, set_config, snapshot, template_extension
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 ISSUE_URL = '/ADCertificateService_CES_Kerberos/service.svc'
@@ -86,14 +87,61 @@ def _make_csr(common_name='machine.hagland.domain'):
     return csr, key
 
 
-def _make_naked_csr():
+def _make_naked_csr(template=None):
     """No CN, no SAN -- what real Windows GPO machine autoenrollment
-    submits, trusting the CA to derive the subject from AD."""
+    submits, trusting the CA to derive the subject from AD; ``template``: the
+    extension naming its template, which CertEnroll copies from the policy."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    csr = x509.CertificateSigningRequestBuilder().subject_name(
-        x509.Name([])
-    ).sign(key, hashes.SHA256())
-    return csr, key
+    builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([]))
+    if template is not None:
+        builder = builder.add_extension(template, critical=False)
+    return builder.sign(key, hashes.SHA256()), key
+
+
+_NAKED_MACHINE = 'Test Naked CSR Machine'
+
+
+@contextlib.contextmanager
+def _machine_template(app, ca_id):
+    """A machine template pinned to ``ca_id``; yields the extension that names it."""
+    from models import CATemplatePin
+    with app.app_context():
+        delete_templates(template_ids_named(_NAKED_MACHINE))
+        template = CertificateTemplate(name=_NAKED_MACHINE, template_type='vpn_client', is_active=True,
+                                       extensions_template=json.dumps({'extended_key_usage': ['clientAuth']}))
+        db.session.add(template)
+        db.session.flush()
+        db.session.add(CATemplatePin(ca_id=ca_id, template_id=template.id))
+        db.session.commit()
+        extension = template_extension(db.session.get(CA, ca_id), template)
+    try:
+        yield extension
+    finally:
+        with app.app_context():
+            delete_templates(template_ids_named(_NAKED_MACHINE))
+            db.session.commit()
+
+
+def _named(app, ca_id, name):
+    with app.app_context():
+        return template_extension(db.session.get(CA, ca_id), CertificateTemplate.query.filter_by(name=name).one())
+
+
+def _template_less_renewal(app, ca_id):
+    """A naked request renewing the requester's Windows certificate issued without template (before
+    3.0, its SID): the Kerberos request still served without a matched template. Returns (body, new key)."""
+    from services.ca_service import CAService
+    from tests.test_wstep_renew_tls import _cmc_renewal, _rst
+    old_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old_csr = x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'old.hagland.domain')])).sign(old_key, hashes.SHA256())
+    with app.app_context():
+        pem, _serial = CAService.sign_csr_from_crypto(ca=db.session.get(CA, ca_id), csr=old_csr,
+                                                      validity_days=30, source='wstep',
+                                                      requester_sid='S-1-5-21-1-2-3-1000')
+    old = x509.load_pem_x509_certificate(pem.encode())
+    csr, key = _make_naked_csr()
+    return _rst(_cmc_renewal(csr, [(key, None), (old_key, old)])), key
 
 
 def _build_rst(csr, message_id='urn:uuid:test-krb-rst-1'):
@@ -278,7 +326,9 @@ def _ca_offers_only_its_templates(app, wstep_kerberos_config):
         db.session.flush()
         db.session.add(CATemplatePin(ca_id=wstep_kerberos_config['id'], template_id=anchor.id))
         db.session.commit()
-    yield
+    # The machine template GPO autoenrollment names
+    with _machine_template(app, wstep_kerberos_config['id']) as machine:
+        yield machine
     with app.app_context():
         delete_templates(template_ids_named(_NAKED_ANCHOR, 'Test AD User Template'))
         db.session.commit()
@@ -307,7 +357,7 @@ class TestNakedCsrSubjectDerivation:
         )
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
-        csr, key = _make_naked_csr()
+        csr, key = _make_naked_csr(_named(app, wstep_kerberos_config['id'], _NAKED_MACHINE))
         r = client.post(
             ISSUE_URL, data=_build_rst(csr),
             headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
@@ -336,12 +386,13 @@ class TestNakedCsrSubjectDerivation:
         )
         monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda _config, sam_account_name: None)
 
-        csr, _key = _make_naked_csr()
+        csr, _key = _make_naked_csr(_named(app, wstep_kerberos_config['id'], _NAKED_MACHINE))
         r = client.post(
             ISSUE_URL, data=_build_rst(csr),
             headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
         )
         assert r.status_code == 400
+        assert b'CSR subject must include a non-empty CN or a SubjectAltName' in r.data, r.data
 
     def test_naked_csr_with_realm_mismatch_still_rejected(
         self, client, app, wstep_kerberos_config, monkeypatch
@@ -541,7 +592,7 @@ class TestNakedCsrSubjectDerivation:
             },
         )
 
-        csr, _key = _make_naked_csr()
+        csr, _key = _make_naked_csr(_named(app, wstep_kerberos_config['id'], _NAKED_ANCHOR))
         r = client.post(
             ISSUE_URL, data=_build_rst(csr),
             headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
@@ -749,13 +800,10 @@ class TestEnrollAcl:
     def test_naked_csr_falls_back_to_ca_wide_restricted_templates_and_denies(
         self, client, app, wstep_kerberos_config, monkeypatch
     ):
-        """The real GPO machine-autoenrollment scenario: a naked CSR (no
-        EKU extension at all) never confidently matches a template that
-        itself declares an EKU (see _match_template's docstring), so
-        _match_template returns None. Without the CA-wide fallback in
-        _required_enroll_acl_groups, this template's allowed_ad_group would
-        never be checked at all -- silently defeating the ACL for exactly
-        the unattended-autoenrollment case it exists to restrict."""
+        """A naked CSR (no EKU extension at all) renewing a certificate issued
+        without template matches none, so _match_template returns None. Without
+        the CA-wide fallback in _required_enroll_acl_groups, this template's
+        allowed_ad_group would never be checked at all."""
         _configure_ad_connector(app)
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'], extended_key_usage=['clientAuth'])
@@ -772,12 +820,13 @@ class TestEnrollAcl:
         monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda _config, sam_account_name, group: False)
 
         try:
-            csr, _key = _make_naked_csr()
+            body, _key = _template_less_renewal(app, wstep_kerberos_config['id'])
             r = client.post(
-                ISSUE_URL, data=_build_rst(csr),
+                ISSUE_URL, data=body,
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
             assert r.status_code == 400
+            assert b'Requester is not authorized to enroll against this template' in r.data, r.data
         finally:
             _clear_acl_template(app)
 
@@ -806,12 +855,12 @@ class TestEnrollAcl:
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         try:
-            csr, key = _make_naked_csr()
+            body, key = _template_less_renewal(app, wstep_kerberos_config['id'])
             r = client.post(
-                ISSUE_URL, data=_build_rst(csr),
+                ISSUE_URL, data=body,
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
-            assert r.status_code == 200
+            assert r.status_code == 200, r.data
             cert = _issued_cert_from_rstr(r.data)
             assert cert.public_key().public_numbers() == key.public_key().public_numbers()
         finally:
@@ -900,9 +949,10 @@ def test_a_naked_request_the_directory_cannot_answer_is_a_receiver_fault(
                         lambda auth_header, connection_key: _authenticated_result())
     monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
     monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('DC unreachable')))
-    csr, _key = _make_naked_csr()
-    r = client.post(ISSUE_URL, data=_build_rst(csr),
-                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    with _machine_template(app, wstep_kerberos_config['id']) as machine:
+        csr, _key = _make_naked_csr(machine)
+        r = client.post(ISSUE_URL, data=_build_rst(csr),
+                        headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
     assert r.status_code == 500
     assert _fault_text_and_code(r.data) == (
         'The directory that builds the certificate subject could not be reached', 's:Receiver')

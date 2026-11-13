@@ -5504,6 +5504,8 @@
     "realmSpaces": "realm 不能包含空格。",
     "realmUnset": "无 realm",
     "defaultBadge": "默认",
+    "makeDefault": "默认配置文件",
+    "makeDefaultHelp": "目前尚无默认配置文件。默认配置文件负责 UsernamePassword 绑定并持有其账户；保存后，无法在此处取消或转移。",
     "issuingCa": "签发 CA",
     "policyCa": "策略 CA",
     "policyCaSame": "与签发 CA 相同",

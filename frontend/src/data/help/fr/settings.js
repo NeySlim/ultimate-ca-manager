@@ -484,7 +484,7 @@ Un **profil par realm Active Directory**. UCM oriente un client vers son profil 
 - **Modèles** : Le sous-ensemble proposé ; aucun coché propose les modèles de la CA. Un groupe AD exigé et des champs du sujet épinglés peuvent remplacer ceux du modèle pour tout le profil
 - **État** : Complet, Keytab manquant, Connecteur en échec ou Désactivé. Un profil désactivé refuse les postes de son realm ; ses clés restent dans le keytab servi, pour que le refus soit prononcé et audité par realm
 
-Le **profil par défaut** est celui dont une installation 2.x a hérité. Sans realm, Kerberos est refusé tant qu'un realm n'est pas renseigné (en majuscules, ou lu dans son keytab) ; l'écran le dit.
+Le **profil par défaut** est celui dont une installation 2.x a hérité ; il sert la liaison UsernamePassword et porte ses comptes. Une installation neuve n'en a pas : tant qu'aucun profil ne l'est, l'éditeur de profil propose **Profil par défaut** (sur un nouveau profil comme sur un profil enregistré), et les comptes apparaissent une fois la case cochée. Le profil par défaut n'est ensuite ni retiré ni déplacé, ni depuis cet écran ni par l'API. Sans realm, Kerberos est refusé tant qu'un realm n'est pas renseigné (en majuscules, ou lu dans son keytab) ; l'écran le dit.
 
 ### Liste de contrôle de configuration, par profil
 

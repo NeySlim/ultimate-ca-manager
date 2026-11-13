@@ -28,7 +28,7 @@ def certificate_identity(cert) -> str:
 def make_gate(ca, *, operation, profile, identity=None, extra=None):
     """The gate ``wstep_service.issue`` and the renewals call before signing.
     A renewal's identity is the certificate it renews; the decision replays *profile*."""
-    def gate(*, csr, template, subject, san, signing_cert=None):
+    def gate(*, csr, template, subject, san, signing_cert=None, renewed=None):
         requester = certificate_identity(signing_cert) if signing_cert is not None else identity
         cn_attrs = subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)
         cn = str(cn_attrs[0].value) if cn_attrs else None
@@ -39,8 +39,10 @@ def make_gate(ca, *, operation, profile, identity=None, extra=None):
         data = dict(extra or {}, operation=operation, profile_id=getattr(profile, 'id', None),
                     profile_name=getattr(profile, 'name', None), profile_realm=getattr(profile, 'realm', None))
         csr_ref = protocol_approval.csr_ref(csr)
-        if signing_cert is not None:
-            data['renewal_of'] = signing_cert.public_bytes(Encoding.PEM).decode()
+        # A Kerberos renewal exempted from the template rule keeps the requester's identity
+        renewal_of = signing_cert if signing_cert is not None else renewed
+        if renewal_of is not None:
+            data['renewal_of'] = renewal_of.public_bytes(Encoding.PEM).decode()
         return protocol_approval.gate_protocol_issuance(
             'wstep', ca=ca, template_id=getattr(template, 'id', None), cn=cn, san_list=dns,
             csr_pem=csr.public_bytes(Encoding.PEM).decode(), identity=requester,
@@ -124,9 +126,12 @@ def _issue(approval, data):
                 ca, signing_cert, db_cert, csr, validity_days, 'wstep', require_pop,
                 on_stored=protocol_approval.linker(approval), profile=profile)
     else:
+        # The template-less renewal the request was held for, decided when it came in: only a revocation
+        # since withdraws it, where the Certificate binding above also refuses an expired or superseded signer
+        renewed = x509.load_pem_x509_certificate(data['renewal_of'].encode()) if data.get('renewal_of') else None
         cert_pem, err = wstep_service.issue(
             ca, csr.public_bytes(Encoding.DER), validity_days, require_pop=require_pop,
-            kerberos_principal=data.get('kerberos_principal'),
+            kerberos_principal=data.get('kerberos_principal'), approved_renewal=renewed,
             on_stored=protocol_approval.linker(approval), profile=profile)
     if err:
         if isinstance(err, wstep_service.ServerError):

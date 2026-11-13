@@ -5507,6 +5507,8 @@
     "realmSpaces": "Le realm ne peut pas contenir d'espace.",
     "realmUnset": "sans realm",
     "defaultBadge": "par défaut",
+    "makeDefault": "Profil par défaut",
+    "makeDefaultHelp": "Aucun profil n'est encore le profil par défaut. Le profil par défaut sert la liaison UsernamePassword et porte ses comptes ; une fois enregistré, il ne peut plus être retiré ni déplacé depuis cet écran.",
     "issuingCa": "CA d'émission",
     "policyCa": "CA de politique",
     "policyCaSame": "Identique à la CA d'émission",

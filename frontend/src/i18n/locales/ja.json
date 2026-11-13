@@ -5507,6 +5507,8 @@
     "realmSpaces": "realm にスペースを含めることはできません。",
     "realmUnset": "realm なし",
     "defaultBadge": "既定",
+    "makeDefault": "既定のプロファイル",
+    "makeDefaultHelp": "既定のプロファイルはまだ設定されていません。既定のプロファイルは UsernamePassword バインディングを処理し、そのアカウントを保持します。保存後は、この画面から解除することも移動することもできません。",
     "issuingCa": "発行 CA",
     "policyCa": "ポリシー CA",
     "policyCaSame": "発行 CA と同じ",

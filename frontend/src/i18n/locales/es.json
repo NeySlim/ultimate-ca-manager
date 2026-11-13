@@ -5504,6 +5504,8 @@
     "realmSpaces": "El realm no puede contener espacios.",
     "realmUnset": "sin realm",
     "defaultBadge": "predeterminado",
+    "makeDefault": "Perfil predeterminado",
+    "makeDefaultHelp": "Todavía ningún perfil es el predeterminado. El perfil predeterminado atiende el enlace UsernamePassword y contiene sus cuentas; una vez guardado, no se puede retirar ni mover desde esta pantalla.",
     "issuingCa": "CA emisora",
     "policyCa": "CA de políticas",
     "policyCaSame": "Igual que la CA emisora",

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   uploadKeytab: vi.fn(),
+  getSettings: vi.fn(),
   connectors: vi.fn(),
   templates: vi.fn(),
   picked: { file: null },
@@ -37,6 +38,7 @@ vi.mock('../../../contexts', () => ({
 vi.mock('../../../services', () => ({
   windowsProfilesService: {
     get: mocks.get, create: mocks.create, update: mocks.update, uploadKeytab: mocks.uploadKeytab,
+    getSettings: mocks.getSettings,
   },
   adConnectorsService: { list: mocks.connectors },
   templatesService: { getAll: mocks.templates },
@@ -91,9 +93,11 @@ const renderEditor = (profile = { id: 7, name: 'corp' }, props = {}) => render(
   </MemoryRouter>)
 
 beforeEach(() => {
-  for (const m of [mocks.get, mocks.create, mocks.update, mocks.uploadKeytab, mocks.connectors, mocks.templates]) m.mockReset()
+  for (const m of [mocks.get, mocks.create, mocks.update, mocks.uploadKeytab, mocks.getSettings,
+    mocks.connectors, mocks.templates]) m.mockReset()
   Object.values(mocks.notify).forEach(m => m.mockReset())
   mocks.get.mockResolvedValue({ data: PROFILE })
+  mocks.getSettings.mockResolvedValue({ data: { default_profile: { id: 1, name: 'default' } } })
   mocks.connectors.mockResolvedValue({ data: [] })
   mocks.templates.mockResolvedValue({ data: [{ id: 1, name: 'Workstation', autoenroll_enabled: true, is_active: true }] })
   mocks.create.mockResolvedValue({ data: { id: 9 } })
@@ -324,5 +328,53 @@ describe('shared accounts', () => {
     renderEditor(null)
     await loaded()
     expect(field()).toBeNull()
+  })
+})
+
+describe('default profile', () => {
+  const box = () => screen.queryByRole('checkbox', { name: /xcepWstep\.makeDefault/ })
+  const account = () => screen.queryByLabelText('xcepWstep.xcepTitle: common.username')
+  const noDefault = () => mocks.getSettings.mockResolvedValue({ data: { default_profile: null } })
+
+  it('is offered on a new profile while none is the default, with the accounts once checked', async () => {
+    noDefault()
+    renderEditor(null)
+    await loaded()
+    await waitFor(() => expect(box()).toBeInTheDocument())
+    expect(account()).toBeNull()
+    fireEvent.change(screen.getByLabelText('xcepWstep.profileName'), { target: { value: 'first' } })
+    fireEvent.click(box())
+    fireEvent.change(account(), { target: { value: 'enroll' } })
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.create).toHaveBeenCalled())
+    expect(mocks.create.mock.calls[0][0]).toMatchObject({ is_default: true, xcep_username: 'enroll' })
+  })
+
+  it('is offered on a saved profile while none is the default', async () => {
+    noDefault()
+    renderEditor()
+    await loaded()
+    await waitFor(() => expect(box()).toBeInTheDocument())
+    fireEvent.click(box())
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.update.mock.calls[0][1]).toMatchObject({ is_default: true })
+  })
+
+  it('is not offered once a profile is the default, and not sent', async () => {
+    renderEditor()
+    await loaded()
+    await waitFor(() => expect(mocks.getSettings).toHaveBeenCalled())
+    expect(box()).toBeNull()
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.update.mock.calls[0][1]).not.toHaveProperty('is_default')
+  })
+
+  it('is not offered when the server state cannot be read', async () => {
+    mocks.getSettings.mockRejectedValue(new Error('forbidden'))
+    renderEditor(null)
+    await loaded()
+    expect(box()).toBeNull()
   })
 })

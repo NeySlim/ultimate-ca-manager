@@ -412,13 +412,14 @@ def test_each_refusal_is_audited_with_realm_profile_and_reason(app, client, worl
 
 
 def test_a_kerberos_renewal_is_audited_as_a_renewal(app, client, world):
-    """A request signed by a certificate of the profile's CA renews it: certificate.renewed with
-    the old serial; an initial enrollment stays certificate.issued, both with profile and realm."""
+    """A request signed by the requester's certificate of the profile renews it: certificate.renewed
+    with the old serial; an initial enrollment stays certificate.issued, both with profile and realm."""
     from services.ca_service import CAService
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     with app.app_context():
         pem, _serial = CAService.sign_csr_from_crypto(ca=_ca(world, 'A'), csr=_csr('c04-renewed', key),
-                                                      validity_days=30, source='test')
+                                                      validity_days=30, source='wstep', requester_sid=SID,
+                                                      windows_profile_id=_profile('c04-a').id)
     old = x509.load_pem_x509_certificate(pem.encode())
     floor = _top_audit(app)
     _as(world, 'usera@C04A.TEST')

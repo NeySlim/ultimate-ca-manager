@@ -5504,6 +5504,8 @@
     "realmSpaces": "Il realm non può contenere spazi.",
     "realmUnset": "nessun realm",
     "defaultBadge": "predefinito",
+    "makeDefault": "Profilo predefinito",
+    "makeDefaultHelp": "Nessun profilo è ancora quello predefinito. Il profilo predefinito gestisce il binding UsernamePassword e ne contiene gli account; una volta salvato, da qui non può più essere rimosso né spostato.",
     "issuingCa": "CA emittente",
     "policyCa": "CA dei criteri",
     "policyCaSame": "Uguale alla CA emittente",

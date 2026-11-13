@@ -25,7 +25,7 @@ from services.ad_connector import lookup as ad_lookup
 from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID
 from services.wstep import wstep_service
 from tests.fixtures.templates import delete_templates
-from tests.windows_profile_support import connectors_kept, default_profile, default_realm
+from tests.windows_profile_support import connectors_kept, default_profile, default_realm, template_extension
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
@@ -44,13 +44,15 @@ _REAL_SID = 'S-1-5-21-1608104657-630783805-1473387121-1105'
 KERBEROS_MACHINE_PRINCIPAL = 'WIN11$@HAGLAND.DOMAIN'
 
 
-def _make_csr(common_name=None):
+def _make_csr(common_name=None, template=None):
     """A naked (no CN, no SAN) CSR when common_name is None -- what real
     Windows GPO machine autoenrollment submits -- else a normal CSR with
     its own subject and clientAuth, e.g. a manually-typed certmgr.msc/certreq request."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     attrs = [x509.NameAttribute(NameOID.COMMON_NAME, common_name)] if common_name else []
     builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name(attrs))
+    if template is not None:
+        builder = builder.add_extension(template, critical=False)
     if common_name:
         builder = builder.add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
     return builder.sign(key, hashes.SHA256()), key
@@ -104,13 +106,25 @@ class TestStrongCertMapping:
         monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda _config, sam: 'win11.hagland.domain')
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam: _REAL_SID)
 
-        csr, _key = _make_csr()
         with app.app_context():
             ca = db.session.get(CA, ca_data['id'])
-            cert_pem, err = wstep_service.issue(
-                ca, csr.public_bytes(Encoding.DER), validity_days=30,
-                kerberos_principal=KERBEROS_MACHINE_PRINCIPAL, profile=default_profile(),
-            )
+            machine = CertificateTemplate(name=f'Strong Mapping machine {ca.id}', template_type='vpn_client',
+                                          is_active=True, extensions_template='{"extended_key_usage": ["clientAuth"]}')
+            db.session.add(machine)
+            db.session.flush()
+            db.session.add(CATemplatePin(ca_id=ca.id, template_id=machine.id))
+            db.session.commit()
+            machine_id = machine.id
+            # The machine template GPO autoenrollment names
+            csr, _key = _make_csr(template=template_extension(ca, machine))
+            try:
+                cert_pem, err = wstep_service.issue(
+                    ca, csr.public_bytes(Encoding.DER), validity_days=30,
+                    kerberos_principal=KERBEROS_MACHINE_PRINCIPAL, profile=default_profile(),
+                )
+            finally:
+                delete_templates([machine_id])
+                db.session.commit()
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
         assert cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == 'win11.hagland.domain'

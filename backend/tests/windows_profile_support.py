@@ -178,3 +178,12 @@ def windows_profiles_restored(app):
     """Imported by a test file that changes the Windows profiles: puts them back after it."""
     with profiles_kept(app):
         yield
+
+
+def template_extension(ca, template):
+    """The certificate template extension XCEP announces for *template* of *ca*, which CertEnroll
+    copies into its request (a Kerberos request naming no template that its EKUs do not match is
+    refused). Callers hold an app context."""
+    from cryptography import x509
+    from services.xcep.policy_builder import _policy_oid_for_template
+    return x509.MSCertificateTemplate(x509.ObjectIdentifier(_policy_oid_for_template(ca, template)), 100, 0)

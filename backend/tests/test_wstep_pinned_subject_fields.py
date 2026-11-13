@@ -24,7 +24,7 @@ from models.certificate_template import CertificateTemplate
 from tests.fixtures.templates import delete_templates, template_ids_named
 from services.ad_connector import lookup as ad_lookup
 from services.wstep import wstep_service
-from tests.windows_profile_support import connectors_kept, default_profile, default_realm
+from tests.windows_profile_support import connectors_kept, default_profile, default_realm, template_extension
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
@@ -40,7 +40,7 @@ def _connectors_put_back(app):
 
 
 
-def _make_csr(attrs=None, common_name=None):
+def _make_csr(attrs=None, common_name=None, template=None):
     """A CSR with an arbitrary subject (given as x509.NameAttribute list),
     or just a CN when ``common_name`` is given, or fully naked (no CN, no
     SAN -- what real Windows GPO machine autoenrollment submits) when
@@ -48,10 +48,10 @@ def _make_csr(attrs=None, common_name=None):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     if attrs is None and common_name is not None:
         attrs = [x509.NameAttribute(NameOID.COMMON_NAME, common_name)]
-    csr = x509.CertificateSigningRequestBuilder().subject_name(
-        x509.Name(attrs or [])
-    ).sign(key, hashes.SHA256())
-    return csr, key
+    builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name(attrs or []))
+    if template is not None:
+        builder = builder.add_extension(template, critical=False)
+    return builder.sign(key, hashes.SHA256()), key
 
 
 def _configure_ad_connector(app):
@@ -229,7 +229,7 @@ class TestPinnedSubjectFieldsIssuance:
         try:
             with app.app_context():
                 ca = db.session.get(CA, ca_data['id'])
-                _configure_pinned_template(
+                template_id = _configure_pinned_template(
                     app, ca.id, 'Test Pinned Template',
                     {'O': 'Acme Corp', 'OU': 'IT'}, extended_key_usage=['clientAuth'],
                 )
@@ -245,7 +245,9 @@ class TestPinnedSubjectFieldsIssuance:
                     ad_lookup, 'lookup_object_sid',
                     lambda _config, sam_account_name: 'S-1-5-21-3623811015-3361044348-30300820-1105',
                 )
-                csr, _key = _make_csr()
+                # Named by the request, as GPO autoenrollment names its template
+                template = db.session.get(CertificateTemplate, template_id)
+                csr, _key = _make_csr(template=template_extension(ca, template))
                 cert_pem, err = wstep_service.issue(
                     ca, csr.public_bytes(Encoding.DER), validity_days=30,
                     kerberos_principal='WIN11$@HAGLAND.DOMAIN', profile=default_profile(),
