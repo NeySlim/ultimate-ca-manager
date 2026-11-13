@@ -118,6 +118,8 @@ def composed_keytab():
     without any. One keytab is served as stored; one whose entries cannot be read is left out
     of a composition. Raises ValueError when a keytab cannot be decrypted here."""
     from services.kerberos.keytab_format import compose, read_entries
+    # The holders are read afresh: a keytab set and not yet flushed must reach the database first
+    db.session.flush()
     sources = [(p, p.keytab_bytes()) for p in keytab_holders() if p.enabled]
     sources = [(p, data) for p, data in sources if data]
     if len(sources) == 1:

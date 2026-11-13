@@ -229,6 +229,21 @@ def test_the_client_realm_is_the_realm_of_the_entry_that_served(monkeypatch, cli
     assert (result.status == 'authenticated') is accepted
 
 
+def test_a_keytab_set_under_no_autoflush_is_composed(app, profiles):
+    """The composition reads the profiles afresh: a keytab not yet flushed is neither left out
+    nor lost from the object."""
+    newer = keytab((f'HTTP/{HOST}@ONE.TEST', 3))
+    with app.app_context():
+        default = db.session.get(WindowsEnrollmentProfile, profiles.default)
+        default.set_keytab(ONE)
+        db.session.commit()
+        with db.session.no_autoflush:
+            default.set_keytab(newer)
+            composed = windows_profiles.composed_keytab()
+        assert composed == newer and default.keytab_bytes() == newer
+        db.session.rollback()
+
+
 def test_the_start_composes_every_enabled_profile(app, profiles):
     """A file stored before the second profile took its keytab is recomposed by the start."""
     with app.app_context():
