@@ -63,3 +63,20 @@ def test_smart_import_links_to_the_namesake_whose_key_signed(app):
         result = SmartImporter().execute(pem(child))
         assert result.cas_imported == 1, result.errors
         assert CA.query.filter_by(descr=f'Child {tag}').one().caref == second.refid
+
+
+@pytest.mark.parametrize('order', [('root', 'mid', 'sub'), ('sub', 'mid', 'root'), ('mid', 'root', 'sub')])
+def test_smart_import_links_the_chain_whatever_the_order(app, order):
+    from services.smart_import.importer import SmartImporter
+    tag = uuid.uuid4().hex[:8]
+    k_root, k_mid, k_sub = new_key(), new_key(), new_key()
+    certs = {'root': make_cert(f'Root {tag}', k_root),
+             'mid': make_cert(f'Mid {tag}', k_mid, f'Root {tag}', k_root, path_length=1),
+             'sub': make_cert(f'Sub {tag}', k_sub, f'Mid {tag}', k_mid, path_length=0)}
+    with app.app_context():
+        result = SmartImporter().execute(''.join(pem(certs[n]) for n in order))
+        assert result.cas_imported == 3, result.errors
+        got = {n: CA.query.filter_by(descr=f'{n.capitalize()} {tag}').one() for n in certs}
+        assert got['root'].caref is None
+        assert got['mid'].caref == got['root'].refid
+        assert got['sub'].caref == got['mid'].refid

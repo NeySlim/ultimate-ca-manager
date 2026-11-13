@@ -369,6 +369,7 @@ class SmartImporter:
         subject_to_refid: Dict[str, str] = {}
         ski_to_refid: Dict[str, str] = {}
         bundle_roots = [o for o in ca_objects if o.is_self_signed and o.ski]
+        from services.import_service import relink_parent_caref  # imported late: import_service imports this package
 
         for ca_obj in ca_objects:
             counterpart = self._cross_counterpart(ca_obj, bundle_roots)
@@ -413,7 +414,6 @@ class SmartImporter:
                     continue
 
             # The parent is the stored CA whose key signed this certificate (flushed batch CAs included)
-            from services.import_service import relink_parent_caref  # imported late: import_service imports this package
             caref = relink_parent_caref(x509.load_pem_x509_certificate(ca_obj.raw_pem.encode()), None)
 
             # Find matching private key
@@ -468,6 +468,13 @@ class SmartImporter:
             
             # Audit log
             self._log_audit("import_ca", ca.id, ca.descr, username)
+
+        # A child listed before its parent found no parent at creation: relink once the whole batch is stored
+        unlinked = [ca for ca in CA.query.filter(CA.id.in_(result.imported_ids["cas"])).all() if not ca.caref]
+        for ca in unlinked:
+            ca.caref = relink_parent_caref(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), None,
+                                           exclude_ca_id=ca.id)
+        db.session.flush()
     
     @staticmethod
     def _is_self_signed_record(ca) -> bool:
