@@ -88,6 +88,7 @@ The administrator is created once, by the first node to start, under the startup
 - **Update result.** The outcome of an update is read on the node that installed it, leader or not.
 - **Per-node task status.** The scheduler view shows the backup retention and update result runs of the node that answers, and Run now runs them on that node.
 - **SoftHSM tokens.** A token lives on the node's own disk, so the chart and the compose example set `HSM_AUTO_INIT=false`. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
+- **Kerberos negotiation state.** A SPNEGO handshake that takes more than one request is kept in the memory of the node that received its first leg (see [Windows enrollment](#windows-enrollment-kerberos)).
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
 - **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
 
@@ -98,6 +99,13 @@ The `certificate.expired` webhooks resume from the last pass on any node, at mos
 ## Shared encryption key
 
 Every node holds the same key-encryption key (KEK): `KEY_ENCRYPTION_KEY`, or the same `master.key` on every node. The data-encryption keys it wraps live in the database (`encryption_keys`), so enabling, disabling, encrypting all keys and rotating the data key work from any node; the others reload the keys within seconds (`reload_encryption`). Each node publishes the fingerprint of its KEK (a truncated hash, never the key) in `cluster_nodes`, and a node whose fingerprint differs from a live peer's refuses to start and names that peer, unless the database names its KEK and not the peer's. Enabling encryption is refused (409, naming the node) while a live node holds another KEK. Back up the KEK: the database without it is unreadable. See [Private-Key Encryption](ADMIN_GUIDE.md#private-key-encryption-kek-and-dek).
+
+## Windows enrollment (Kerberos)
+
+The Windows enrollment profiles, their connectors and the switches are in the database, so every node serves them. Two things are per node:
+
+- **SPNEGO state.** Some Windows clients need more than one request to complete the Negotiate handshake (a request-MIC leg). The context in progress is kept in the memory of the node that answered the first leg, under the client's source address (the address behind the trusted proxy when there is one), and expires after 30 seconds. The balancer must therefore send the requests of one client address to one node: use source-address affinity for the two Kerberos endpoints (`/ADPolicyProvider_CEP_Kerberos/` and `/ADCertificateService_CES_Kerberos/`), while the web interface keeps its cookie affinity. Two clients behind one address that negotiate at the same moment can make each other retry, never authenticate wrongly.
+- **The keytab file.** A profile's keytab is stored in the database, under the master key. UCM composes the keytabs of all profiles into one file, stores it in the database and asks every node to write it (`reload_keytab`, within seconds, and at each start); the composition is made under a lock, so two uploads at once give one result on every node. A node that cannot read the stored keytab (a different `KEY_ENCRYPTION_KEY`) cannot write the file and logs the reason. A keytab found on one node only, as 2.x kept it, is not shared in HA: upload it again.
 
 ## Refused in HA mode today
 

@@ -1673,6 +1673,26 @@ PATCH /api/v2/windows-profiles/settings
 - `PUT /api/v2/ad-connectors/{id}` that changes the domain of `base_dn` also moves the realm of the profiles that use the connector: a profile without keytab whose realm was the old domain takes the new one in the same transaction (the audit entry of `ad_connector_update` names it). A profile with no realm, or already on the new domain, is left as is. If any other profile has a keytab, has a realm other than the old domain, or the new realm is served by another profile, the answer is 409, the message names the profile and says to change its realm or connector first (`details.profiles` lists them with a `reason`, `details.total` counts them) and nothing is written.
 - Each profile carries `connector_domain_mismatch`, true when its realm and the domain of its connector differ (list and detail); it is a warning only, such a profile still serves.
 
+## Active Directory Connectors
+
+One stored LDAP connection per forest or domain; a Windows enrollment profile points at one. Reading needs `read:ad_connector`, changing and testing need `write:ad_connector`. The bind password is never returned: it reads back as `***`, and sending `***` keeps the saved one.
+
+```http
+GET /api/v2/ad-connectors
+GET /api/v2/ad-connectors/{id}
+POST /api/v2/ad-connectors
+PUT /api/v2/ad-connectors/{id}
+DELETE /api/v2/ad-connectors/{id}
+POST /api/v2/ad-connectors/{id}/test
+POST /api/v2/ad-connectors/test
+```
+
+- Writable fields: `name` (required, unique, 100 characters at most), `servers` (the domain controllers; the older single `server` string is accepted), `port` (389 by default; 3268 and 3269, the global catalog, are refused), `use_ssl`, `verify_ssl`, `ca_bundle`, `base_dn` (must name the domain with DC components, such as `DC=corp,DC=example`, else 400; its domain is the realm of the connector), `bind_dn`, `bind_password`, `enabled` (`bind_dn` and `bind_password` are required while it is true) and `health_probe_interval` (seconds, bounded).
+- Read-only fields: `id`, `domain_sid` (read from the directory on save and test, dropped when `base_dn` or the domain controllers change), `realm`, `health`, `health_fresh`, `health_stale_after`, `last_test_at`, `last_test_result`, `created_at`, `updated_at`, `created_by`.
+- `POST /{id}/test` tests the saved connector and stores the verdict and the domain SID on its row; `POST /test` tests submitted values without saving them (an `id` in the body lends the saved password to a blank one, for the target it was saved for only).
+- `DELETE` answers 204; it is refused with 409 while a profile uses the connector (`details.profiles`, `details.total`).
+- A `PUT` that changes the domain of `base_dn` moves the realm of the profiles that use the connector, or is refused with 409: see the note under Windows Enrollment Profiles.
+
 ## CRL & OCSP
 
 ### Get CRL List
