@@ -408,6 +408,7 @@ class RestoreCoreMixin:
         results['mode'] = mode
         # A merge never lowers a revocation made here (see _kept_final)
         self._merging = mode == 'merge'
+        self._kept_finals = []
 
         staged = StagedFiles()
         # What the rows had on disk before: a file no row names afterwards goes with the commit
@@ -434,7 +435,7 @@ class RestoreCoreMixin:
                 results['relinked'] = relink_references(backup_data, plan)
                 results['repairs'] = replay_repairs(backup_data, plan)
                 # The rows written take the revocation their CA records, as the hourly pass does
-                aligned = self._align_restored_revocations(plan)
+                aligned = self._align_restored_revocations(plan) + self._align_kept_finals()
                 results['revoked_from_records'] = len(aligned)
                 if plan.written.get('acme_client_orders'):
                     results['acme_client_orders_repaired'] = results['repairs'].get(
@@ -510,6 +511,20 @@ class RestoreCoreMixin:
         if not ids:
             return []
         return [_marked_entry(row, record) for row, record in apply_persisted_revocations(ids)]
+
+    def _align_kept_finals(self) -> List[Dict[str, Any]]:
+        """A final revocation a merge kept here takes its serial's gravest record when that one
+        is graver (``persisted_revocation``): the CRL and OCSP answer a final row with itself."""
+        from services.cert.issued_lookup import row_persisted_revocation
+        from services.ski_aki_backfill import _marked_entry
+        entries = []
+        for row in self.__dict__.get('_kept_finals', ()):
+            record = row_persisted_revocation(row)
+            if record is not None and _revocation_key(record) < _revocation_key(row):
+                row.revoked_at, row.revoke_reason = record.revoked_at, record.revoke_reason
+                row.invalidity_at = record.invalidity_at or row.invalidity_at
+                entries.append(_marked_entry(row, record))
+        return entries
 
     @staticmethod
     def _archived_key_mismatches(backup_data: Dict[str, Any]) -> List[str]:
@@ -918,6 +933,7 @@ class RestoreCoreMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
 
         written = []
+        kept_finals = self.__dict__.setdefault('_kept_finals', [])
         for cert_data in backup_data.get('certificates', []):
             cert = Certificate.query.filter_by(refid=cert_data['refid']).first()
 
@@ -974,6 +990,7 @@ class RestoreCoreMixin:
             if here_final is not None and (not cert.revoked or _revocation_key(cert) > _revocation_key(here_final)):
                 for field, value in vars(here_final).items():
                     setattr(cert, field, value)
+                kept_finals.append(cert)
             cert.archived = bool(cert_data.get('archived', False))
             written.append(cert)
             results['certificates'] += 1
