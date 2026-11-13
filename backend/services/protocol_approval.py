@@ -190,7 +190,9 @@ def gate_protocol_issuance(protocol: str, *, ca, template_id=None, cn=None, san_
     from services.policy_service import RENEWAL_OPERATIONS, PolicyEvaluationService
     for ref in (protocol_ref, *former_refs):
         existing = find_protocol_request(protocol, ref)
-        if existing is not None:
+        # A former form may name another CA by now: it is this request on the same CA only
+        if existing is not None and (ref == protocol_ref or request_data(existing).get('ca_refid')
+                                     in (None, getattr(ca, 'refid', None))):
             return existing
     policy = None
     try:

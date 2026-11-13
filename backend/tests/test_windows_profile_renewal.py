@@ -577,6 +577,50 @@ def test_a_held_request_follows_its_renamed_profile_by_id_and_realm(app, client,
         assert (row.caref, row.windows_profile_id) == (world['cas']['B']['refid'], _profile('c04-b-renamed').id)
 
 
+def test_a_held_request_follows_its_renamed_profile_past_a_homonym(app, client, auth_client, directory,
+                                                                  held_on_b):
+    """The name taken by another profile after a rename names that other one: the recorded realm
+    tells them apart, and the request is issued under the profile it was held for."""
+    world = directory
+    _body, approval_id, _data = _held_on_b(app, client, world, held_on_b, 'c05-homonym')
+    with app.app_context():
+        held_for = _profile('c04-b')
+        held_for.name = 'c04-b-renamed'
+        db.session.flush()
+        db.session.add(WindowsEnrollmentProfile(name='c04-b', realm='C05HOMONYM.TEST', enabled=True,
+                                                issuing_ca_refid=world['cas']['A']['refid']))
+        db.session.commit()
+    try:
+        approve(auth_client, approval_id)
+        (_id, _status, _data, cert_id), = requests_of(app, held_on_b, 'wstep_request')
+        with app.app_context():
+            row = db.session.get(Certificate, cert_id)
+            assert (row.caref, row.windows_profile_id) == (world['cas']['B']['refid'],
+                                                           _profile('c04-b-renamed').id)
+    finally:
+        with app.app_context():
+            WindowsEnrollmentProfile.query.filter_by(realm='C05HOMONYM.TEST').delete()
+            db.session.commit()
+
+
+def test_a_former_reference_of_a_request_held_on_another_ca_is_not_this_request(app, client, directory,
+                                                                               held_on_b):
+    """The id form is recognised for the CA the request was held on only: an id a restore gave
+    another CA opens a request of its own."""
+    from services import protocol_approval
+    world = directory
+    body, approval_id, data = _held_on_b(app, client, world, held_on_b, 'c05-ref-other-ca')
+    csr = x509.load_pem_x509_csr(data['csr'].encode())
+    former = protocol_approval.make_ref('wstep', data['operation'], world['cas']['B']['id'], data['identity'],
+                                        protocol_approval.csr_ref(csr))
+    with app.app_context():
+        row = db.session.get(ApprovalRequest, approval_id)
+        row.request_data = json.dumps(dict(data, protocol_ref=former, ca_refid=world['cas']['A']['refid']))
+        db.session.commit()
+    assert b'Pending' in client.post(CES_KERBEROS_PATH, data=body, headers=NEGOTIATE).data
+    assert len(requests_of(app, held_on_b, 'wstep_request')) == 2
+
+
 def test_a_held_request_whose_renamed_profile_changed_realm_is_refused(app, client, auth_client, directory,
                                                                       held_on_b):
     world = directory

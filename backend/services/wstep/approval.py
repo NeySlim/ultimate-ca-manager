@@ -70,14 +70,20 @@ def _held_realm(data):
 def _held_profile(data):
     """The profile the request was held for, by name (by id when held before names were
     recorded), the default for one held before profiles were; None when it no longer exists.
-    A name no longer found falls back on the id when that profile has the request's realm (renamed)."""
+    A name no longer found, or taken by a profile of another realm, falls back on the id when
+    that profile has the request's realm (renamed)."""
     from models import WindowsEnrollmentProfile
     from services.windows_profiles import default_profile
     if data.get('profile_name'):
         profile = WindowsEnrollmentProfile.query.filter_by(name=data['profile_name']).one_or_none()
-        if profile is None and data.get('profile_id') is not None and _held_realm(data):
-            renamed = db.session.get(WindowsEnrollmentProfile, int(data['profile_id']))
-            if renamed is not None and (renamed.realm or '').upper() == _held_realm(data):
+        realm, recorded_id = _held_realm(data), data.get('profile_id')
+        # Another row under the name and another realm than the one recorded: a homonym
+        if (profile is not None and recorded_id is not None and profile.id != int(recorded_id)
+                and data.get('profile_realm') and (profile.realm or '').upper() != realm):
+            profile = None
+        if profile is None and recorded_id is not None and realm:
+            renamed = db.session.get(WindowsEnrollmentProfile, int(recorded_id))
+            if renamed is not None and (renamed.realm or '').upper() == realm:
                 return renamed
         return profile
     if 'profile_id' not in data:
