@@ -49,6 +49,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **WSTEP Kerberos requests without template are refused.** A request on the Kerberos binding that names no template and whose EKUs match none of the profile was issued as a server certificate; it is now refused and audited (`windows_enrollment.refused`), as AD CS does. UsernamePassword and the renewal of a certificate without template are unchanged.
 - SCEP: a PKCSReq signed by a valid certificate this endpoint issued is now a renewal, as clients that renew with PKCSReq expect: the challenge is still compared but may have expired, and the old certificate is replaced; a CSR subject other than the certificate's is refused (see UPGRADE.md).
 - EST re-enrolment and SCEP renewal refuse a certificate of a Windows enrollment profile and audit the refusal (`windows_enrollment.refused`); it renews over WSTEP only.
 - Kerberos: each Windows enrollment profile holds its own keytab (`POST /api/v2/windows-profiles/{id}/keytab`, entries `HTTP/<SPN host>@<realm of the profile>`), and UCM composes the file the acceptor reads from the keytabs of every profile, disabled ones included.
@@ -137,6 +138,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - First access: scripts that logged in as `admin` / `changeme123` after a fresh install must provide the password or read the generated file; the DEB and RPM upgrade removes the `INITIAL_ADMIN_PASSWORD=changeme123` line 2.x wrote, and an existing administrator is left as it is.
 - Discovery: on PostgreSQL with a server time zone other than UTC, discovery dates stored before this release are in local time; run a scan of the discovery targets after upgrading to rewrite them.
 - Windows enrollment: the XCEP, WSTEP and Kerberos settings become the profile `default` with an explicit realm (connector base DN, else SPN, else a single-realm keytab), migrated with the same policy ID and template OIDs (migration 155); without a realm to take, Kerberos alone is refused until one is set, see UPGRADE.md.
+- Windows enrollment: a Kerberos request naming no template whose EKUs match none of the profile is refused instead of issued as a server certificate; name the template or ask for its EKUs.
 - Certificates: `serial_number` of certificates issued from the form, renewed in place, issued on policy approval, issued by a Microsoft CA or used as TSA signer is now returned in decimal like the others; the UI still shows colon hex.
 
 ## [2.252] - 2026-11-08

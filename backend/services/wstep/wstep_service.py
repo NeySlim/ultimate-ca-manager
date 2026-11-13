@@ -88,6 +88,9 @@ class ServerError(str):
 # One text for an unknown realm and a disabled profile: the client learns nothing of the profiles
 REALM_NOT_SERVED = "The requester's realm is not served"
 NOT_IN_GROUP = 'Requester is not authorized to enroll against this {what}'
+# AD CS refuses a request without template (CERTSRV_E_NO_CERT_TYPE); so does the Kerberos binding
+NO_TEMPLATE = ('The request names no certificate template and its Extended Key Usages '
+               'match none this profile offers')
 
 
 def _x509_name_from_dn_components(dn_components, email=None):
@@ -751,18 +754,10 @@ def _required_enroll_acl_groups(ca, matched_template, *, profile):
     match (a populated CSR whose EKU set scored best against exactly one
     template) is unambiguous.
 
-    When it found nothing (``matched_template is None``), this falls back
-    to every ``allowed_ad_group`` set across all templates resolvable for
-    this CA. This matters because ``matched_template is None`` is not a
-    rare edge case here -- it's what *every* naked CSR from real Windows
-    GPO machine autoenrollment produces, since a naked CSR carries no EKU
-    extension at all and therefore scores negative against any template
-    that declares EKUs (see ``_match_template``'s docstring), and it names
-    no template either (311.21.7 or 311.20.2).
-    Silently treating "no match" as "no gate" would mean the Enroll ACL
-    never actually applies to unattended autoenrollment -- the primary
-    scenario it exists to restrict -- so an unmatched naked CSR must
-    satisfy ANY restricted template's group instead of none of them.
+    When it found nothing (``matched_template is None``: on the Kerberos binding, only the
+    renewal of a certificate that names no template, see ``NO_TEMPLATE``), this falls back
+    to every ``allowed_ad_group`` set across all templates resolvable for this CA: "no match"
+    never means "no gate", so such a request must satisfy ANY restricted template's group.
 
     A group set on ``profile`` replaces the templates' for every issuance of it (A3).
     """
@@ -821,9 +816,8 @@ def _required_pinned_subject_fields(ca, matched_template, *, profile):
 
     Mirrors ``_required_enroll_acl_groups``'s template-resolution shape: a
     confident ``_match_template`` result trusts only that template's own
-    pins, while an unmatched CSR (typically naked -- see that function's
-    docstring for why this is the common case for GPO autoenrollment, not
-    an edge case) falls back to every template resolvable for this CA.
+    pins, while an unmatched CSR (UsernamePassword, or a Kerberos renewal of a
+    certificate naming no template) falls back to every template resolvable for this CA.
 
     Unlike Enroll ACL's groups, though, pinned field *values* can't be
     OR'd across multiple fallback candidates -- there's no "any of these
@@ -885,12 +879,10 @@ def _user_ad_derivation_enabled(ca, *, profile):
     """Whether any template resolvable for ``ca`` has opted into
     AD-derived user subjects (``CertificateTemplate.ad_derived_subject``).
 
-    Deliberately independent of ``_match_template``: a naked CSR (the only
-    kind this applies to without a matched template, see ``_directory_subject``)
-    usually names no template and carries no EKU extension, so it scores
-    negative against any candidate template that declares EKUs at all. This
-    only asks "did an admin opt any template into AD-derivation for this CA,"
-    mirroring how the machine branch has no template dependency either.
+    Deliberately independent of ``_match_template``: it applies without a matched template
+    (the renewal of a certificate that names none, see ``NO_TEMPLATE``) and only asks "did an
+    admin opt any template into AD-derivation for this CA," as the machine branch has no
+    template dependency either.
     """
     candidates = _ca_templates(ca, profile=profile)
     return any(getattr(t, 'ad_derived_subject', False) for t in candidates)
@@ -1115,9 +1107,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     the other kind of principal; a template's ``subject_cn_pattern`` replaces that CN
     alone (``_pattern_subject``), the SAN and SID staying, and the signing refuses a patterned
     subject a certificate of another account already carries under this CA (RFC 5280 §4.1.2.6).
-    A naked CSR (see ``_is_naked_csr``), or one
-    matching no template, is built the same way, as GPO autoenrollment expects;
-    a user's only when a template opted in (``_user_ad_derivation_enabled``).
+    A naked CSR (see ``_is_naked_csr``) is built the same way, as GPO autoenrollment expects;
+    a user's only when a template opted in (``_user_ad_derivation_enabled``). A request matching
+    no template is refused (``NO_TEMPLATE``), unless it renews a certificate that names none.
     Only a matched template announcing a client-supplied subject keeps the CSR's.
     Derivation never fails open: a naked CSR falls through to the normal
     rejection, a populated one under a CA-built template or none is refused.
@@ -1127,7 +1119,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
 
     Enroll ACL: see ``_required_enroll_acl_groups`` for exactly which
     template's ``allowed_ad_group`` applies (the matched template's own,
-    or -- for an unmatched/naked CSR -- every restricted template
+    or -- for an unmatched CSR -- every restricted template
     resolvable for ``ca``). If that set is non-empty, ``kerberos_principal``
     must resolve to a sam_account_name that ``lookup.is_member_of_group``
     confirms is a member of at least one of them (nested groups included)
@@ -1220,6 +1212,10 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
     if matched_template is None and not _ca_templates(ca, profile=profile):
         return None, ServerError('This CA offers no certificate template')
+    # A renewal of a certificate issued without template (before 3.0) keeps being served as it was
+    if (kerberos_principal and matched_template is None
+            and not _renews_template_less(ca, outer_signed_data)):
+        return None, NO_TEMPLATE
     template_oid = None
     if matched_template is not None:
         template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(csr), profile=profile)
@@ -1472,9 +1468,9 @@ def _verify_renewal_signer(outer_signed_data, cert):
     return 'Renewal request is not signed by the certificate being renewed'
 
 
-def renewed_serial(ca, outer_signed_data):
-    """The serial of a certificate of *ca* whose key signs the request envelope, as Windows
-    signs a renewal on the Kerberos binding; None for an initial enrollment. For the audit only."""
+def _renewed_certificate(ca, outer_signed_data):
+    """The certificate of *ca* whose key signs the request envelope, as Windows signs a
+    renewal on the Kerberos binding; None for an initial enrollment."""
     from services.cert.issued_lookup import issued_certificate_status
     try:
         choices = list(outer_signed_data['certificates'] or []) if outer_signed_data is not None else []
@@ -1489,8 +1485,20 @@ def renewed_serial(ca, outer_signed_data):
             continue
         row, _status = issued_certificate_status(ca, cert)
         if row is not None and _verify_renewal_signer(outer_signed_data, cert) is None:
-            return cert.serial_number
+            return cert
     return None
+
+
+def renewed_serial(ca, outer_signed_data):
+    """The serial of ``_renewed_certificate``, None for an initial enrollment. For the audit only."""
+    cert = _renewed_certificate(ca, outer_signed_data)
+    return cert.serial_number if cert is not None else None
+
+
+def _renews_template_less(ca, outer_signed_data):
+    """Whether the request renews a certificate of *ca* that names no template."""
+    cert = _renewed_certificate(ca, outer_signed_data)
+    return cert is not None and _template_ext_oid(cert) is None
 
 
 def _renewable_certificate(ca, cert):

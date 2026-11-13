@@ -21,7 +21,7 @@ from services.wstep.rst_parser import _unwrap_pkcs7_csr
 from services.xcep import policy_builder
 from tests.fixtures.templates import delete_templates
 from utils.upn_san import build_upn_other_name, extract_upns_from_san_list
-from tests.windows_profile_support import default_profile, default_realm
+from tests.windows_profile_support import default_profile, default_realm, template_extension
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 FIXTURES = Path(__file__).parent / 'fixtures'
@@ -83,10 +83,12 @@ MIXED = {
 }
 
 
-def _csr(cn=None, sans=(), ekus=(), key=None):
+def _csr(cn=None, sans=(), ekus=(), key=None, template=None):
     key = key or rsa.generate_private_key(public_exponent=65537, key_size=2048)
     attrs = [x509.NameAttribute(NameOID.COMMON_NAME, cn)] if cn else []
     builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name(attrs))
+    if template is not None:
+        builder = builder.add_extension(template, critical=False)
     if sans:
         builder = builder.add_extension(x509.SubjectAlternativeName(list(sans)), critical=False)
     if ekus:
@@ -100,6 +102,12 @@ def _issue(app, ca_id, csr, principal=None, **kwargs):
         pem, err = wstep_service.issue(db.session.get(CA, ca_id), der, 30,
                                        kerberos_principal=principal, profile=default_profile(), **kwargs)
     return (x509.load_pem_x509_certificate(pem.encode()) if pem else None), err
+
+
+def _named(app, ca_id, name):
+    """The extension naming template *name* of the CA, as GPO autoenrollment sends it."""
+    with app.app_context():
+        return template_extension(db.session.get(CA, ca_id), CertificateTemplate.query.filter_by(name=name).one())
 
 
 def _sans(cert):
@@ -156,8 +164,10 @@ def test_a_subject_the_directory_cannot_build_is_refused(app, subject_ca, direct
 def test_a_directory_that_cannot_answer_is_the_server_s_failure(app, subject_ca, directory, principal, naked):
     """Not found stays the request's refusal; no DC bound is a ServerError (env:Receiver)."""
     directory['dns'] = directory['user'] = ad_lookup.UNREACHABLE
-    ca_id = subject_ca(f'Subject source unreachable CA {principal.split("@")[0].rstrip("$")} {naked}', MIXED)
-    csr = _csr() if naked else _csr('dc01.example.test', FORGED_SANS, [SERVER_AUTH if principal == MACHINE
+    name = f'Subject source unreachable CA {principal.split("@")[0].rstrip("$")} {naked}'
+    ca_id = subject_ca(name, MIXED)
+    template = _named(app, ca_id, f'{name} {"Web" if principal == MACHINE else "Mail"}')
+    csr = _csr(template=template) if naked else _csr('dc01.example.test', FORGED_SANS, [SERVER_AUTH if principal == MACHINE
                                                                         else EMAIL])
     cert, err = _issue(app, ca_id, csr, principal)
     assert cert is None
@@ -179,9 +189,12 @@ def test_an_unresolved_principal_gets_no_requested_subject(app, subject_ca, dire
 
 
 def test_a_request_matching_no_template_of_a_ca_that_builds_every_subject(app, subject_ca, directory):
-    """No EKU, so no template: the CA announces no template the client may name itself."""
+    """No EKU, so no template: refused (AD CS: CERTSRV_E_NO_CERT_TYPE); naming it, it is built from AD."""
     ca_id = subject_ca('Subject source unmatched CA', {'Web': MIXED['Web']})
     cert, err = _issue(app, ca_id, _csr('dc01.example.test', FORGED_SANS), MACHINE)
+    assert cert is None and err == wstep_service.NO_TEMPLATE
+    template = _named(app, ca_id, 'Subject source unmatched CA Web')
+    cert, err = _issue(app, ca_id, _csr('dc01.example.test', FORGED_SANS, template=template), MACHINE)
     assert err is None, err
     assert cert.subject.rfc4514_string() == 'CN=win11.example.test'
     assert _sans(cert) == [x509.DNSName('win11.example.test')]
@@ -247,16 +260,14 @@ PINNED = {'Web': MIXED['Web'], 'User': MIXED['User']}
 
 @pytest.mark.parametrize('ekus', [(), (CODE_SIGNING,)], ids=['no-eku', 'code-signing'])
 def test_a_request_matching_no_template_never_keeps_its_subject(app, subject_ca, directory, ekus):
-    """The CA offering a template with a supplied subject does not lend it to a request naming none."""
+    """The CA offering a template with a supplied subject does not lend it to a request naming none:
+    such a request is refused, whoever asks."""
     ca_id = subject_ca(f'Subject source unmatched supplied CA {len(ekus)}', PINNED)
     csr = _csr('www.bank.test', [x509.DNSName('www.bank.test')], ekus)
-    cert, err = _issue(app, ca_id, csr, MACHINE)
-    assert err is None, err
-    assert cert.subject.rfc4514_string() == 'CN=win11.example.test'
-    assert _sans(cert) == [x509.DNSName('win11.example.test')]
-    cert, err = _issue(app, ca_id, csr, USER)
-    assert cert is None
-    assert err == 'The request matches no certificate template whose subject it may supply'
+    for principal in (MACHINE, USER):
+        cert, err = _issue(app, ca_id, csr, principal)
+        assert cert is None
+        assert err == wstep_service.NO_TEMPLATE
 
 
 def test_a_template_with_a_supplied_subject_issues_only_its_own_ekus(app, subject_ca, directory):
