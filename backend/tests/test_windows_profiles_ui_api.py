@@ -249,3 +249,27 @@ def test_a_keytab_needs_both_the_xcep_and_kerberos_write_scopes(app, auth_client
             assert r.get_json()['message'] == 'Insufficient permissions'
     finally:
         auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
+
+
+def test_the_kerberos_refusal_names_the_profile_or_what_the_binding_lacks(app, monkeypatch):
+    from services.windows_profiles import kerberos_refusal, kerberos_unserved_reason
+    served = WindowsEnrollmentProfile(name='k-off', realm='K.EXAMPLE', enabled=False)
+    monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: None)
+    with app.app_context():
+        assert kerberos_refusal(served) == 'profile k-off is disabled'
+        assert kerberos_unserved_reason(served) == 'profile k-off is disabled'
+        served.enabled = True
+        assert kerberos_unserved_reason(served) is None
+        monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no keytab uploaded')
+        assert kerberos_unserved_reason(served) == 'no keytab uploaded'
+        # A configured binding is no excuse for a profile that serves nothing
+        assert kerberos_refusal(served) is None
+
+
+def test_the_profile_api_gives_the_reason_the_binding_is_not_configured(auth_client, profiles, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
+    for read in (auth_client.get(f'{URL}/{profiles.two}'), auth_client.get(URL)):
+        body = read.get_json()['data']
+        rows = body if isinstance(body, list) else body.get('items', body)
+        row = rows if isinstance(rows, dict) else next(r for r in rows if r['id'] == profiles.two)
+        assert row['kerberos_refusal'] == 'no SPN set'

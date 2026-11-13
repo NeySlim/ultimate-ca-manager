@@ -97,7 +97,8 @@ def keytab_entries(profile):
             for e in entries], None
 
 
-def _render(profile, ca_names, connectors=None, failing=None, templates=None, detail=False):
+def _render(profile, ca_names, connectors=None, failing=None, templates=None, detail=False,
+            binding_reason=False):
     """The profile as the API shows it: passwords and keytab only as set/unset flags.
     ``detail`` adds the keytab entries, which cost a decryption per profile."""
     connectors = connectors if connectors is not None else _connectors([profile])
@@ -130,7 +131,7 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
         'pinned_subject_fields': profile.pinned_subject_fields,
         'template_ids': templates.get(profile.id, []),
         'keytab_set': bool(profile.keytab),
-        'kerberos_refusal': windows_profiles.kerberos_refusal(profile),
+        'kerberos_refusal': windows_profiles.kerberos_unserved_reason(profile, binding_reason),
         'created_at': profile.created_at.isoformat() if profile.created_at else None,
         'updated_at': profile.updated_at.isoformat() if profile.updated_at else None,
     }
@@ -146,7 +147,9 @@ def _render_one(profile, detail=False):
 def _render_page(profiles):
     names, connectors = _ca_names(profiles), _connectors(profiles)
     failing, templates = _failing_connector_ids(), _template_ids(profiles)
-    return [_render(p, names, connectors, failing, templates) for p in profiles]
+    binding_reason = windows_profiles.kerberos_binding_reason()
+    return [_render(p, names, connectors, failing, templates, binding_reason=binding_reason)
+            for p in profiles]
 
 
 def _ca_names(profiles):
