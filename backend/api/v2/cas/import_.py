@@ -19,6 +19,7 @@ from utils.cert_issuer import private_key_matches
 from services.import_service import (
     KeyPasswordError, parse_certificate_file, extract_cert_info, find_existing_ca_for_import, cross_mode_from, finish_cross_attach, AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import,
     install_on_pending_ca, find_pending_csr_for_certificate,
+    relink_parent_caref,
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from security.encryption import encrypt_private_key
@@ -184,6 +185,7 @@ def import_ca():
             serial_number=str(cert.serial_number),
             valid_from=cert_info['valid_from'],
             valid_to=cert_info['valid_to'],
+            caref=relink_parent_caref(cert, None),
             imported_from='manual'
         )
         # Deleted after its revocation and imported again: still revoked (#343)

@@ -55,6 +55,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- A CA imported after its parent is linked to it in the import itself, so SCEP `GetCACert` in chain mode serves both certificates at once instead of after the hourly backfill.
 - Behind a trusted reverse proxy, the pending Kerberos handshakes of XCEP and WSTEP are keyed by the client address instead of the proxy's, so two clients no longer share one. The keytab composed from the Windows profiles is refused above 1 MiB with a readable message.
 - Kerberos: a Kerberos Microsoft CA connection pointed `KRB5_KTNAME` at its own keytab for the whole process, so XCEP and WSTEP could accept with the wrong keys; the acceptor now names its keytab itself. A ticket for a realm without key is logged as a warning instead of an unrelated GSSAPI error.
 - ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.

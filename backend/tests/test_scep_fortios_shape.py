@@ -161,3 +161,65 @@ def test_getcacert_chain_mode_orders_certificates_by_der_encoding_not_by_chain(a
     ders = [c.public_bytes(serialization.Encoding.DER) for c in certs]
     assert ders == sorted(ders)
     assert {_cn(c) for c in certs} == {'FortiOS Chain Intermediate', 'FortiOS Chain Root'}
+
+
+# --- a CA imported after its parent is linked to it at once -----------------------------
+
+def _ca_pem(cn, key, issuer_cn=None, issuer_key=None, serial=1):
+    import datetime
+    from cryptography.x509.oid import NameOID
+    issuer_key = issuer_key or key
+    now = datetime.datetime.now(datetime.timezone.utc)
+    name = lambda v: x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, v)])  # noqa: E731
+    return (x509.CertificateBuilder().subject_name(name(cn)).issuer_name(name(issuer_cn or cn))
+            .public_key(key.public_key()).serial_number(serial)
+            .not_valid_before(now - datetime.timedelta(days=1))
+            .not_valid_after(now + datetime.timedelta(days=365))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_key.public_key()),
+                           critical=False)
+            .sign(issuer_key, hashes.SHA256()).public_bytes(serialization.Encoding.PEM).decode())
+
+
+def _key_pem(key):
+    return key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                             serialization.NoEncryption()).decode()
+
+
+def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client, auth_client):
+    """Parent known from the import response on, and GetCACert in chain mode serves both
+    certificates without waiting for the hourly backfill."""
+    import uuid
+    from models import CA
+    tag = uuid.uuid4().hex[:6]
+    root_key, child_key = rsa.generate_private_key(65537, 2048), rsa.generate_private_key(65537, 2048)
+    root_cn, child_cn = f'Import Root {tag}', f'Import Child {tag}'
+    ids = []
+    with app.app_context():
+        saved = {k: (row.value if (row := SystemConfig.query.filter_by(key=k).first()) else None)
+                 for k in ('scep_enabled', 'scep_ca_id', 'scep_getcacert_chain')}
+    try:
+        for pem, key in ((_ca_pem(root_cn, root_key, serial=11), root_key),
+                         (_ca_pem(child_cn, child_key, root_cn, root_key, serial=12), child_key)):
+            r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem + _key_pem(key)},
+                                 content_type='multipart/form-data')
+            assert r.status_code in (200, 201), r.data
+            ids.append(get_json(r)['data']['id'])
+        with app.app_context():
+            root, child = db.session.get(CA, ids[0]), db.session.get(CA, ids[1])
+            assert child.caref == root.refid
+            assert root.caref is None
+            _set('scep_enabled', 'true')
+            _set('scep_ca_id', str(ids[1]))
+            _set('scep_getcacert_chain', 'true')
+        r = client.get('/scep/pkiclient.exe?operation=GetCACert')
+        assert r.status_code == 200, r.data
+        assert {_cn(c) for c in pkcs7.load_der_pkcs7_certificates(r.data)} == {root_cn, child_cn}
+    finally:
+        with app.app_context():
+            for k, v in saved.items():
+                _set(k, v)
+            for ca_id in reversed(ids):
+                CA.query.filter_by(id=ca_id).delete()
+            db.session.commit()
