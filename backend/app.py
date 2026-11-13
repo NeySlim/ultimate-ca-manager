@@ -226,10 +226,9 @@ def create_app(config_name=None):
             auto_generate=True
         )
     
-    # Run schema migrations BEFORE SQLAlchemy init (critical for upgrades).
-    # Backend-agnostic: the runner detects FRESH/LEGACY/TRACKED state and
-    # skips legacy SQL migrations on PostgreSQL or fresh installs (schema is
-    # built by SQLAlchemy create_all() instead). See migration_runner.py.
+    # Run schema migrations BEFORE SQLAlchemy init: the runner upgrades a 2.254 or 3.0 database,
+    # refuses any other existing one without writing, and leaves a fresh one to build_fresh_schema
+    # below. See migration_runner.py.
     #
     # Failure here MUST stop startup: continuing with a broken schema causes
     # silent data corruption or 500s on every request. Operators should see
@@ -317,7 +316,7 @@ def create_app(config_name=None):
             from utils.session_store import IsolatedSqlSessionInterface
             # Same object and model, only the transaction handling differs
             app.session_interface.__class__ = IsolatedSqlSessionInterface
-            # The purge filters on expiry; fresh or switched installs never ran migration 138
+            # The purge filters on expiry; fresh or switched installs never ran upgrade step 138
             from sqlalchemy import Index
             model = app.session_interface.sql_session_model
             try:
@@ -579,7 +578,7 @@ def create_app(config_name=None):
                 
                 app.logger.info(f"✓ All critical tables verified: {', '.join(critical_tables)}")
                 
-                # Migrations already run at startup before SQLAlchemy init
+                # Pending migrations ran before SQLAlchemy init; a fresh install recorded its registry above
                 
                 # Run database health check and repair
                 app.logger.info("Running database health check...")

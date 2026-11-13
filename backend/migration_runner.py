@@ -400,18 +400,15 @@ def _migration_index(name: str) -> int:
     return int("".join(digits)) if digits else -1
 
 
-# Migrations at this index or above MUST declare pg_compatible=True (every 3.0 migration).
+# Migrations at this index or above MUST declare pg_compatible=True: every 3.0 migration (300+).
 PG_COMPATIBLE_REQUIRED_FROM = 20
 
 
 def _run_pending_pg(engine, pending, dry_run) -> bool:
-    """Run pending migrations against PostgreSQL.
+    """Run pending migrations against PostgreSQL, each in one transaction with its registry row.
 
-    A migration runs only if it declares `pg_compatible = True` and exposes
-    `upgrade(conn)`. Migrations numbered < 020 that don't declare
-    pg_compatible are silently marked applied (they are SQLite-only by
-    design). Migrations numbered >= 020 that don't declare pg_compatible
-    are a HARD ERROR — silent-skip was the root cause of issue #115.
+    Every 3.0 migration declares `pg_compatible = True`; one that does not is a hard error
+    (silent-skip was the root cause of issue #115).
     """
     for name in pending:
         path = MIGRATIONS_DIR / f"{name}.py"
