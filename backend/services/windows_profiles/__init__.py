@@ -94,7 +94,7 @@ def realm_problem(realm, profile):
     try:
         keytab = profile.keytab_bytes() if profile is not None else None
     except ValueError:
-        return 'the keytab of the default profile cannot be decrypted here', 409
+        return f'the keytab of profile {profile.name} cannot be decrypted here', 409
     if keytab:
         realms = keytab_realms(keytab)
         if realms is None:

@@ -330,3 +330,15 @@ def test_the_realm_is_cleared_by_null_only(auth_client):
     assert auth_client.get(f"{URL}/{p['id']}").get_json()['data']['realm'] == 'CLEAR.EXAMPLE'
     r = auth_client.put(f"{URL}/{p['id']}", json={'realm': None})
     assert r.status_code == 200 and r.get_json()['data']['realm'] is None
+
+
+def test_an_undecryptable_keytab_names_its_own_profile(app, auth_client, monkeypatch):
+    p = _created(auth_client, name=f"keytab-{uuid.uuid4().hex[:6]}")
+
+    def broken(self):
+        raise ValueError('no key')
+    monkeypatch.setattr(WindowsEnrollmentProfile, 'keytab_bytes', broken)
+    r = auth_client.put(f"{URL}/{p['id']}", json={'realm': 'KT.EXAMPLE'})
+    assert r.status_code == 409
+    message = r.get_json()['message']
+    assert p['name'] in message and 'default profile' not in message
