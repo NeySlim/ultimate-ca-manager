@@ -71,30 +71,9 @@ def _foreign_entries(entries, realm):
 
 
 def _realm_problem(realm):
-    """(message, status) when *realm* cannot be the default profile's, else None: capitals as
-    AD writes it, named by the keytab when there is one, held by no other profile."""
-    from models import WindowsEnrollmentProfile
+    """(message, status) when *realm* cannot be the default profile's, else None."""
     from services import windows_profiles
-    from services.windows_profiles.legacy import keytab_realms
-    if not isinstance(realm, str) or not realm.strip() or realm != realm.strip().upper():
-        return 'realm must be a non-empty name in capitals, such as CORP.EXAMPLE', 400
-    profile = windows_profiles.default_profile()
-    try:
-        keytab = profile.keytab_bytes() if profile is not None else None
-    except ValueError:
-        return 'the keytab of the default profile cannot be decrypted here', 409
-    if keytab:
-        realms = keytab_realms(keytab)
-        if realms is None:
-            return 'the realms of the keytab cannot be read', 400
-        if realm not in realms:
-            return f"realm {realm} is not in the keytab ({', '.join(sorted(realms))})", 400
-    other = WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.realm == realm)
-    if profile is not None:
-        other = other.filter(WindowsEnrollmentProfile.id != profile.id)
-    if other.first() is not None:
-        return f'realm {realm} is already served by another profile', 409
-    return None
+    return windows_profiles.realm_problem(realm, windows_profiles.default_profile())
 
 
 @bp.route('/api/v2/kerberos/config', methods=['GET'])
@@ -201,6 +180,10 @@ def upload_kerberos_keytab():
     user = getattr(g, 'current_user', None)
     profile_id = request.form.get('profile_id')
     if profile_id:
+        # A13: profiles are written with write:xcep, whichever route carries the keytab
+        from auth.unified import has_permission
+        if not has_permission('write:xcep', getattr(g, 'permissions', None) or []):
+            return error_response('Insufficient permissions', 403)
         profile = (db.session.get(WindowsEnrollmentProfile, int(profile_id))
                    if profile_id.isdigit() else None)
         if profile is None:

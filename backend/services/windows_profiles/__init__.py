@@ -122,21 +122,61 @@ def fill_realm(profile):
         profile.realm = realm
 
 
+def realm_problem(realm, profile):
+    """(message, status) when *realm* cannot be *profile*'s (None: a new one), else None:
+    capitals as AD writes it, named by its keytab when it has one, held by no other profile."""
+    from .legacy import keytab_realms
+    if not isinstance(realm, str) or not realm.strip() or realm != realm.strip().upper():
+        return 'realm must be a non-empty name in capitals, such as CORP.EXAMPLE', 400
+    try:
+        keytab = profile.keytab_bytes() if profile is not None else None
+    except ValueError:
+        return f'the keytab of profile {profile.name} cannot be decrypted here', 409
+    if keytab:
+        realms = keytab_realms(keytab)
+        if realms is None:
+            return 'the realms of the keytab cannot be read', 400
+        if realm not in realms:
+            return f"realm {realm} is not in the keytab ({', '.join(sorted(realms))})", 400
+    other = WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.realm == realm)
+    if profile is not None and profile.id is not None:
+        other = other.filter(WindowsEnrollmentProfile.id != profile.id)
+    if other.first() is not None:
+        return f'realm {realm} is already served by another profile', 409
+    return None
+
+
+def _unused_name():
+    """DEFAULT_NAME, or the first ``default-N`` no profile holds."""
+    name, n = DEFAULT_NAME, 1
+    while WindowsEnrollmentProfile.query.filter_by(name=name).first() is not None:
+        n += 1
+        name = f'{DEFAULT_NAME}-{n}'
+    return name
+
+
 def default_for_write(actor=None, fill=True):
     """The default profile the configuration routes write, created by the first write.
     ``fill=False``: the caller sets a keytab first and fills the realm itself."""
     profile = default_profile()
     if profile is None:
         connector = lowest_connector()
-        try:
-            # A concurrent writer may create it first: its row is the default then
-            with db.session.begin_nested():
-                profile = WindowsEnrollmentProfile(name=DEFAULT_NAME, is_default=True, enabled=True,
-                                                   connector_id=connector.id if connector else None,
-                                                   created_by=actor)
-                db.session.add(profile)
-        except IntegrityError:
-            profile = WindowsEnrollmentProfile.query.filter_by(is_default=True).one()
+        # A concurrent writer may take the default or the name first: the default row wins,
+        # a taken name is chosen again
+        for _attempt in range(10):
+            try:
+                with db.session.begin_nested():
+                    profile = WindowsEnrollmentProfile(
+                        name=_unused_name(), is_default=True, enabled=True,
+                        connector_id=connector.id if connector else None, created_by=actor)
+                    db.session.add(profile)
+                break
+            except IntegrityError:
+                profile = default_profile()
+                if profile is not None:
+                    break
+        else:
+            raise RuntimeError('no free name for the default Windows enrollment profile')
     profile.updated_by = actor
     if fill:
         fill_realm(profile)
