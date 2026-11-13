@@ -67,3 +67,4 @@ tests/test_scep_limited_client.py
 tests/test_scep_intune_fake_service.py
 tests/test_import_weak_ca_key.py
 tests/test_import_parent_link.py
+tests/test_relink_parent_self_signed_first.py
