@@ -52,8 +52,8 @@ jobs:
           git fetch origin refs/heads/main:refs/remotes/origin/main refs/heads/test:refs/remotes/origin/test
           EXPECTED_SHA="$(git rev-parse "refs/remotes/$EXPECTED_REF")"
 
-          # A maintenance release (X.Y.Z, RC or stable) may also sit at the tip of its <major>.x branch
-          MAINT_BRANCH="${VERSION%%.*}.x"
+          # A maintenance release (X.Y.Z, RC or stable) may also sit at the tip of its v<major>.x branch
+          MAINT_BRANCH="v${VERSION%%.*}.x"
           MAINT_SHA=""
           if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && git ls-remote --exit-code origin "refs/heads/$MAINT_BRANCH" > /dev/null; then
             git fetch origin "refs/heads/$MAINT_BRANCH:refs/remotes/origin/$MAINT_BRANCH"
@@ -67,7 +67,7 @@ jobs:
 
           if [ "$TAG_SHA" != "$EXPECTED_SHA" ] && [ "$TAG_SHA" != "$MAINT_SHA" ]; then
             echo "Stable tags must point to origin/main and RC tags to origin/test;"
-            echo "a maintenance release (X.Y.Z) may also point to its <major>.x branch."
+            echo "a maintenance release (X.Y.Z) may also point to its v<major>.x branch."
             echo "Refusing to build release from an unexpected commit."
             exit 1
           fi

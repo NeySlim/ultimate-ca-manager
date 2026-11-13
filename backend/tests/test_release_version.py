@@ -214,14 +214,14 @@ def _tagged_checkout(tmp_path, branches, tag_on):
     (['main', 'test'], 'main', '2.254.1', True),
     (['main', 'test'], 'test', '2.254.1-rc1', True),
     (['main', 'test'], 'test', '2.254.1', False),
-    (['main', 'test', '2.x'], '2.x', '2.254.2', True),
-    (['main', 'test', '2.x'], '2.x', '2.254.2-rc1', True),
-    (['main', 'test', '2.x'], 'main', '2.254.2', True),
-    (['main', 'test', '2.x'], '2.x', '2.255', False),
-    (['main', 'test', '2.x'], '2.x', '1.0.1', False),
-    (['main', 'test', '1.x'], '1.x', '1.0.1', True),
-    (['main', 'test', 'backport/2.x'], 'main', '2.254.1', True),
-    (['main', 'test', '2.x'], 'nowhere', '2.254.2', False),
+    (['main', 'test', 'v2.x'], 'v2.x', '2.254.2', True),
+    (['main', 'test', 'v2.x'], 'v2.x', '2.254.2-rc1', True),
+    (['main', 'test', 'v2.x'], 'main', '2.254.2', True),
+    (['main', 'test', 'v2.x'], 'v2.x', '2.255', False),
+    (['main', 'test', 'v2.x'], 'v2.x', '1.0.1', False),
+    (['main', 'test', 'v1.x'], 'v1.x', '1.0.1', True),
+    (['main', 'test', 'backport/v2.x'], 'main', '2.254.1', True),
+    (['main', 'test', 'v2.x'], 'nowhere', '2.254.2', False),
     (['main', 'test'], 'nowhere', '2.254.2', False),
 ])
 def test_a_tag_sits_on_its_release_branch_or_its_maintenance_branch(tmp_path, branches, tag_on, version, accepted):
@@ -231,10 +231,10 @@ def test_a_tag_sits_on_its_release_branch_or_its_maintenance_branch(tmp_path, br
     assert (result.returncode == 0) is accepted, result.stdout + result.stderr
 
 
-@pytest.mark.parametrize('name,version', [('2.x', '2.254.2'), ('main', '2.254.2'), ('main', '2.255'), ('test', '2.254.2-rc1')])
+@pytest.mark.parametrize('name,version', [('v2.x', '2.254.2'), ('main', '2.254.2'), ('main', '2.255'), ('test', '2.254.2-rc1')])
 def test_a_tag_named_like_a_release_branch_opens_nothing(tmp_path, name, version):
-    """A tag `2.x` or `main` pushed on any commit is not the branch of that name."""
-    work = _tagged_checkout(tmp_path, ['main', 'test', '2.x'], 'nowhere')
+    """A tag `v2.x` or `main` pushed on any commit is not the branch of that name."""
+    work = _tagged_checkout(tmp_path, ['main', 'test', 'v2.x'], 'nowhere')
     subprocess.run(['git', 'tag', name], cwd=work, check=True)
     subprocess.run(['git', 'push', '-q', 'origin', f'refs/tags/{name}'], cwd=work, check=True)
     step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
