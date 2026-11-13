@@ -229,16 +229,26 @@ def test_the_latest_step_reads_the_remote_tags(tmp_path, job, tags, version, exp
     work = _origin_with_tags(tmp_path, tags)
     out = tmp_path / 'gh_output'
     step = _step('build-release.yml', job, 'Decide latest')
-    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': version})
+    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': version, 'GITHUB_REF': f'refs/tags/v{version}'})
     assert result.returncode == 0, result.stderr
     assert out.read_text().strip() == f'latest={expected}'
+
+
+@pytest.mark.parametrize('job', ['docker-manifest', 'docker-fips-manifest', 'release'])
+def test_a_branch_run_never_takes_latest(tmp_path, job):
+    work = _origin_with_tags(tmp_path, ['v2.253'])
+    out = tmp_path / 'gh_output'
+    step = _step('build-release.yml', job, 'Decide latest')
+    result = _run_step(step, work, {'GITHUB_OUTPUT': str(out), 'VERSION': '2.254', 'GITHUB_REF': 'refs/heads/dev'})
+    assert result.returncode == 0, result.stderr
+    assert out.read_text().strip() == 'latest=false'
 
 
 def test_an_unreachable_remote_never_decides_latest(tmp_path):
     work = _origin_with_tags(tmp_path, ['v2.254'])
     subprocess.run(['git', 'remote', 'set-url', 'origin', str(tmp_path / 'missing.git')], cwd=work, check=True)
     step = _step('build-release.yml', 'docker-manifest', 'Decide latest')
-    result = _run_step(step, work, {'GITHUB_OUTPUT': str(tmp_path / 'o'), 'VERSION': '2.254.1'})
+    result = _run_step(step, work, {'GITHUB_OUTPUT': str(tmp_path / 'o'), 'VERSION': '2.254.1', 'GITHUB_REF': 'refs/tags/v2.254.1'})
     assert result.returncode != 0
 
 

@@ -383,6 +383,12 @@ jobs:
           VERSION: ${{ needs.build-deb.outputs.version }}
         run: |
           set -euo pipefail
+          # A manual run from a branch never takes latest
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "latest for $VERSION: false (not a tag run)"
+            exit 0
+          fi
           LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
@@ -602,6 +608,12 @@ jobs:
           VERSION: ${{ needs.build-deb.outputs.version }}
         run: |
           set -euo pipefail
+          # A manual run from a branch never takes latest
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "latest for $VERSION: false (not a tag run)"
+            exit 0
+          fi
           LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
@@ -880,6 +892,12 @@ jobs:
           VERSION: ${{ needs.build-deb.outputs.version }}
         run: |
           set -euo pipefail
+          # A manual run from a branch never takes latest
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+            echo "latest for $VERSION: false (not a tag run)"
+            exit 0
+          fi
           LATEST=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2 | python3 scripts/ci/release_version.py latest "$VERSION")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
