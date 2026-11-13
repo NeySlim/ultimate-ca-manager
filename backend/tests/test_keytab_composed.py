@@ -130,16 +130,16 @@ def test_two_kvno_of_one_principal_live_side_by_side(auth_client, profiles):
     assert sorted(kvnos) == [2, 3]
 
 
-@pytest.mark.parametrize('how', ['disabled', 'deleted'])
-def test_a_profile_disabled_or_deleted_leaves_the_file_at_reload(app, profiles, how):
+@pytest.mark.parametrize('how, realms', [('disabled', {'ONE.TEST', 'TWO.TEST'}), ('deleted', {'ONE.TEST'})])
+def test_a_disabled_profile_keeps_its_keys_and_a_deleted_one_leaves_the_file(app, profiles, how, realms):
+    """A disabled profile's hosts still authenticate, so that C-04 refuses them by realm with the
+    env:Sender fault and an audit entry rather than a GSSAPI failure answered by a 401."""
     with app.app_context():
         db.session.get(WindowsEnrollmentProfile, profiles.default).set_keytab(ONE)
         db.session.get(WindowsEnrollmentProfile, profiles.two).set_keytab(TWO)
         windows_profiles.publish_keytab()
         db.session.commit()
         assert negotiate_auth.write_stored_keytab() == 'written'
-        assert {e.realm for e in keytab_format.read_entries(negotiate_auth.KEYTAB_PATH.read_bytes())} \
-            == {'ONE.TEST', 'TWO.TEST'}
         two = db.session.get(WindowsEnrollmentProfile, profiles.two)
         if how == 'disabled':
             two.enabled = False
@@ -150,7 +150,21 @@ def test_a_profile_disabled_or_deleted_leaves_the_file_at_reload(app, profiles, 
     negotiate_auth.restore_keytab_at_start(app)
     with app.app_context():
         negotiate_auth.write_stored_keytab()
-    assert negotiate_auth.KEYTAB_PATH.read_bytes() == ONE
+    assert {e.realm for e in keytab_format.read_entries(negotiate_auth.KEYTAB_PATH.read_bytes())} == realms
+
+
+def test_the_composition_holds_a_disabled_profile_s_keytab(app, profiles):
+    with app.app_context():
+        db.session.get(WindowsEnrollmentProfile, profiles.default).set_keytab(ONE)
+        two = db.session.get(WindowsEnrollmentProfile, profiles.two)
+        two.set_keytab(TWO)
+        two.enabled = False
+        db.session.commit()
+        assert _principals(windows_profiles.composed_keytab()) == sorted(_principals(ONE) + _principals(TWO))
+        db.session.get(WindowsEnrollmentProfile, profiles.default).enabled = False
+        db.session.get(WindowsEnrollmentProfile, profiles.default).keytab = None
+        db.session.commit()
+        assert windows_profiles.composed_keytab() == TWO
 
 
 @requires_gssapi

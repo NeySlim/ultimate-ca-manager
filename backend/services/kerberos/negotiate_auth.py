@@ -67,7 +67,7 @@ from models import SystemConfig
 
 logger = logging.getLogger(__name__)
 
-# Composed from the keytabs of the enabled profiles; the acceptor names it in its credential
+# Composed from the keytabs of every profile, enabled or not; the acceptor names it in its credential
 # store, never through KRB5_KTNAME, which a Kerberos MSCA connection may rewrite (A12)
 KEYTAB_PATH = DATA_DIR / 'kerberos.keytab'
 

@@ -141,7 +141,7 @@ def upload_kerberos_keytab():
     """Upload the keytab of a Windows enrollment profile (form field ``profile_id``, else the
     default profile), replacing the one it held. Loaded with GSSAPI before it is stored; every
     entry must be ``<SPN service>/<SPN host>@<realm of the profile>``, else 400. The acceptor
-    reads the file composed from the keytabs of the enabled profiles.
+    reads the file composed from the keytabs of every profile, enabled or not.
     """
     if 'file' not in request.files:
         return error_response('No file provided', 400)

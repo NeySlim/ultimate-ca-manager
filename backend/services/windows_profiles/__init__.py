@@ -260,13 +260,14 @@ def keytab_holders():
 
 
 def composed_keytab():
-    """The keytab the acceptor reads: the entries of every enabled profile's keytab, None
-    without any. One keytab is served as stored; one whose entries cannot be read is left out
-    of a composition. Raises ValueError when a keytab cannot be decrypted here."""
+    """The keytab the acceptor reads: the entries of every profile's keytab, enabled or not, so a
+    disabled profile is refused by realm after authentication (fault and audit, never a 401).
+    None without any. One keytab is served as stored; one whose entries cannot be read is left
+    out of a composition. Raises ValueError when a keytab cannot be decrypted here."""
     from services.kerberos.keytab_format import compose, read_entries
     # The holders are read afresh: a keytab set and not yet flushed must reach the database first
     db.session.flush()
-    sources = [(p, p.keytab_bytes()) for p in keytab_holders() if p.enabled]
+    sources = [(p, p.keytab_bytes()) for p in keytab_holders()]
     sources = [(p, data) for p, data in sources if data]
     if len(sources) == 1:
         return sources[0][1]

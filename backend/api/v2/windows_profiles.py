@@ -199,7 +199,7 @@ def _connector_problem(profile):
 
 
 def _recompose_keytab():
-    """Recompose the served keytab from the enabled profiles, in the caller's transaction;
+    """Recompose the served keytab from the profiles, in the caller's transaction;
     an (message, status) pair when a keytab cannot be decrypted here."""
     from sqlalchemy.exc import SQLAlchemyError
     from services import cluster_commands
@@ -292,22 +292,14 @@ def update_windows_profile(profile_id):
     if not isinstance(data, dict):
         return error_response('A JSON object is required', 400)
     changed = sorted(k for k in data if k in WRITABLE)
-    was_enabled = bool(profile.enabled)
     problem = _apply(profile, {k: v for k, v in data.items() if k in WRITABLE})
     if problem:
         db.session.rollback()
         return error_response(problem[0], problem[1])
     profile.updated_by = _actor()
-    recompose = bool(profile.keytab) and bool(profile.enabled) != was_enabled
-    if recompose:
-        problem = _recompose_keytab()
-        if problem:
-            return error_response(problem[0], problem[1])
     ok, err = safe_commit(logger, 'Failed to update the Windows enrollment profile')
     if not ok:
         return err
-    if recompose:
-        _write_keytab_file()
     _audit('windows_profile_update', profile,
            f"Updated Windows enrollment profile {profile.name}; fields: {', '.join(changed) or 'none'}")
     return success_response(data=_render(profile, _ca_names([profile])), message='Profile updated')
