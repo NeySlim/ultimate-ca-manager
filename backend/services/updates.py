@@ -96,7 +96,7 @@ def get_installed_at():
 def parse_version(version_str):
     """Parse version string to tuple for comparison.
     
-    Supports both Major.Build (2.48) and legacy semver (2.1.6) formats.
+    Supports Major.Build (2.48), maintenance (2.254.1) and legacy semver (2.1.6) formats.
     Pre-release suffixes (-dev, -beta, -rc) are ranked lower than release.
     """
     version_str = version_str.lstrip('v')

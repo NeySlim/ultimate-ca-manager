@@ -20,7 +20,7 @@ tag. **6/6 mandatory**: 3 distros × 2 backends.
 | `<scripts>/playwright_uc.py`    | 11 real-UI workflows (Chromium headless) |
 
 Bump the version assertion line in `smoke.py` for every release. Currently
-matches `2.X-dev`, `2.X-rcN`, and `2.X`.
+matches `2.X-dev`, `2.X-rcN`, `2.X`, `2.X.Y-dev`, `2.X.Y-rcN` and `2.X.Y`.
 
 ## Per-target recipe
 

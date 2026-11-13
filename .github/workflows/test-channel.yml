@@ -4,7 +4,7 @@ name: Test Channel — RC Build Sanity
 # Builds a DEB package as a workflow artifact (NO publish, NO release).
 # This catches packaging regressions BEFORE we tag a -rcN release.
 #
-# To actually publish an RC: bump VERSION on `test` to `X.Y-rcN`, commit, then
+# To actually publish an RC: bump VERSION on `test` to `X.Y-rcN` (or `X.Y.Z-rcN`), commit, then
 # `git tag vX.Y-rcN && git push origin vX.Y-rcN`. That triggers build-release.yml
 # which publishes to GitHub Releases as a pre-release.
 
