@@ -221,3 +221,58 @@ def test_intune_profile_pkcsreq_is_unchanged(app, scep_ca, webhooks):
     stored = SCEPRequest.query.filter(SCEPRequest.subject.contains('renamed-' + cn)).one()
     assert stored.renewal_of is None
     assert webhooks == ['issued']
+
+
+@pytest.mark.parametrize('message_type', [17, 19], ids=['RenewalReq', 'PKCSReq'])
+@pytest.mark.parametrize('held', [False, True], ids=['auto', 'approved'])
+@pytest.mark.parametrize('expired', [False, True], ids=['fresh', 'expired'])
+def test_replayed_renewal_returns_the_certificate_issued(app, scep_ca, message_type, held,
+                                                         expired):
+    """The renewed certificate is archived once served: a resend still gets its answer (§5.2)."""
+    ca, ca_cert = scep_ca
+    cn = _cn('replay')
+    old_key = _new_key()
+    issued = _enroll(ca, ca_cert, old_key, cn)
+    new_key = _new_key()
+    request = _message(ca_cert, issued, old_key, message_type, _csr(new_key, cn, ORIGINAL))
+    service = _service(ca, expired=expired, auto_approve=not held)
+
+    first, _ = service.process_pkcs_req(request, '127.0.0.1')
+    if held:
+        assert _response_attributes(first)[PKI_STATUS_OID] == '3'
+        pending = SCEPRequest.query.filter_by(ca_refid=ca.refid, status='pending').filter(
+            SCEPRequest.subject.contains(cn)).one()
+        service.approve_request(pending.transaction_id, 'admin')
+    assert _row(issued).archived is True
+    before = Certificate.query.count()
+
+    response, _ = service.process_pkcs_req(request, '127.0.0.1')
+
+    attrs = _response_attributes(response)
+    assert attrs[PKI_STATUS_OID] == '0', attrs.get(FAIL_INFO_OID)
+    renewed = pkcs7.load_der_pkcs7_certificates(_decrypt_response(response, old_key, issued))[0]
+    assert renewed.public_key().public_numbers() == new_key.public_key().public_numbers()
+    assert Certificate.query.count() == before
+
+
+def test_replay_shortcut_needs_the_certificate_it_renewed(app, scep_ca, monkeypatch):
+    """Another issued certificate resending the transaction is judged as a renewal of its own."""
+    import types
+    import tests.test_scep_renewal_challenge as helpers
+    ca, ca_cert = scep_ca
+    cn = _cn('replay-other')
+    old_key, other_key, new_key = _new_key(), _new_key(), _new_key()
+    issued = _enroll(ca, ca_cert, old_key, cn)
+    other = _enroll(ca, ca_cert, other_key, 'other-' + cn)
+    csr = _csr(new_key, cn, ORIGINAL)
+    monkeypatch.setattr(helpers, 'uuid', types.SimpleNamespace(
+        uuid4=lambda: types.SimpleNamespace(hex='replay-' + cn[:24])))
+    service = _service(ca, expired=False)
+    first, _ = service.process_pkcs_req(_message(ca_cert, issued, old_key, 19, csr), '127.0.0.1')
+    assert _response_attributes(first)[PKI_STATUS_OID] == '0'
+
+    response, _ = service.process_pkcs_req(_message(ca_cert, other, other_key, 19, csr), '127.0.0.1')
+
+    attrs = _response_attributes(response)
+    assert attrs[PKI_STATUS_OID] == '2'
+    assert attrs[FAIL_INFO_OID] == BAD_MESSAGE_CHECK

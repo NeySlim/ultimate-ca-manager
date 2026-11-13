@@ -606,6 +606,18 @@ class SCEPService:
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
+            existing = SCEPRequest.query.filter_by(
+                transaction_id=transaction_id, ca_refid=self.ca_refid
+            ).first()
+            # A resent renewal already served archived its signer: answer it
+            # from the transaction, whose delivery still refuses a revoked one
+            if (renewal and existing and self._same_key_as_existing(existing, csr)
+                    and self._renews_signer(existing, signer_cert)):
+                return self._status_for_existing(
+                    existing, sender_nonce, signer_cert, challenge_pwd,
+                    response_encryption_algorithm,
+                ), 200
+
             # ---- 8. Renewal linkage validation (RFC 8894 §2.3) ----
             if renewal:
                 err = self._validate_renewal(signer_cert, csr)
@@ -628,9 +640,6 @@ class SCEPService:
                 ), 200
 
             # ---- 9. Idempotency (scoped to this CA) ----
-            existing = SCEPRequest.query.filter_by(
-                transaction_id=transaction_id, ca_refid=self.ca_refid
-            ).first()
             if existing:
                 # The certificate issued for this transaction pairs with one
                 # key only: another key is a new enrollment mislabelled, and
@@ -1221,6 +1230,18 @@ class SCEPService:
         der = serialization.Encoding.DER
         return stored.public_key().public_bytes(der, spki) == \
             csr.public_key().public_bytes(der, spki)
+
+    @staticmethod
+    def _renews_signer(existing: SCEPRequest, signer_cert: x509.Certificate) -> bool:
+        """True when *existing* is the renewal of *signer_cert*."""
+        if not existing.renewal_of:
+            return False
+        try:
+            renewed = x509.load_pem_x509_certificate(
+                base64.b64decode(existing.renewal_of), default_backend())
+        except Exception:
+            return False
+        return renewed == signer_cert
 
     def _approval_gate(self, scep_req, csr, renewal):
         """``(approval, None)`` when a policy holds the request (it stays
