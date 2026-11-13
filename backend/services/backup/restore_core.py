@@ -458,14 +458,14 @@ class RestoreCoreMixin:
 
                 if replacement is not None:
                     results.update(remove_after_writes(replacement).report())
+                # Before the warnings are reported: a keytab it cannot serve is one of them
+                keytab_published = self._publish_restored_keytab(backup_data, plan)
                 results['left_out'] = list(plan.left_out)
                 # What applying the rows had to warn about reaches the log and the result
                 for warning in dict.fromkeys(plan.warnings[built_with:]):
                     logger.warning("Restore: %s", warning)
                 results['warnings'] = list(dict.fromkeys(plan.warnings))
                 results['dropped_secrets'] = list(plan.dropped_fields)
-
-                keytab_published = self._publish_restored_keytab(backup_data, plan)
 
                 for path in sorted(files_before - _row_file_paths()):
                     staged.stage_removal(path)

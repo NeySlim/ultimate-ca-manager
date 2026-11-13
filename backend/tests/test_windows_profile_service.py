@@ -592,6 +592,29 @@ def test_the_keytab_of_a_restored_profile_is_served(app, clean_slate, no_shared_
             db.session.commit()
 
 
+def test_a_keytab_that_cannot_be_served_is_in_the_report_and_the_log(app, clean_slate, no_shared_keytab,
+                                                                    monkeypatch, tmp_path, caplog):
+    from services import windows_profiles
+    from services.backup_service import BackupService
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', tmp_path / 'kerberos.keytab')
+    with app.app_context():
+        profile = WindowsEnrollmentProfile(name='default', is_default=True, realm='KT.EXAMPLE')
+        profile.set_keytab(ARCHIVED_KEYTAB)
+        db.session.add(profile)
+        db.session.commit()
+        include = {name: name == 'windows_enrollment_profiles' for name in manifest.SECTIONS}
+        blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
+
+    def undecryptable(actor='system'):
+        raise ValueError('c01 keytab cannot be decrypted')
+    monkeypatch.setattr(windows_profiles, 'publish_keytab', undecryptable)
+    with app.app_context(), caplog.at_level('WARNING'):
+        results = BackupService().restore_backup(blob, BACKUP_PASSWORD, mode='merge')
+    expected = 'windows_enrollment_profiles: the keytab is not served: c01 keytab cannot be decrypted'
+    assert expected in results['warnings']
+    assert expected in caplog.text
+
+
 def test_startup_rebuilds_a_shared_keytab_the_profile_does_not_hold(app, clean_slate, no_shared_keytab,
                                                                      monkeypatch, tmp_path):
     from config.settings import Config
