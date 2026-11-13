@@ -258,7 +258,7 @@ def test_a_keytab_set_under_no_autoflush_is_composed(app, profiles):
         db.session.rollback()
 
 
-def test_the_start_composes_every_enabled_profile(app, profiles):
+def test_the_start_composes_every_profile(app, profiles):
     """A file stored before the second profile took its keytab is recomposed by the start."""
     with app.app_context():
         db.session.get(WindowsEnrollmentProfile, profiles.default).set_keytab(ONE)

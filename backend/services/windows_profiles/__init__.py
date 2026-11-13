@@ -84,8 +84,9 @@ def profile_for_realm(realm):
 
 
 def kerberos_route(principal):
-    """``(profile, realm, refusal)`` for an authenticated Kerberos *principal*: the enabled
-    profile of its realm, else None and why. Never the default for another realm."""
+    """``(profile, realm, refusal)`` for an authenticated Kerberos *principal*: the profile
+    of its realm, with the reason it does not serve when disabled; None and why when no
+    profile holds the realm. Never the default for another realm."""
     from services.ad_connector.lookup import parse_kerberos_principal
     parsed = parse_kerberos_principal(principal)
     if parsed is None:
