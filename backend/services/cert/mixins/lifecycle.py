@@ -34,6 +34,10 @@ _HOLD_REASONS = ('certificateHold', 'certificate_hold')
 _REVOCATION_FIELDS = ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')
 
 
+class _AlreadyRevoked(ValueError):
+    """The refusal met under the lock: answered to the caller, not an error to log."""
+
+
 def _lock_own_record(certificate):
     """Lock by id every record of ``certificate``'s serial under its CA, in the row's own spelling
     and each unambiguous one (``record_serial_clause``); return the one in the row's spelling."""
@@ -429,7 +433,7 @@ class LifecycleMixin:
             # while this one waited is seen, and only changed columns are sent
             db.session.refresh(certificate, with_for_update=True)
             if not revocable(certificate, reason):
-                raise ValueError("Certificate already revoked")
+                raise _AlreadyRevoked("Certificate already revoked")
             # A hold made final: dated now, so the delta lists the change; invalid since the hold
             # (the row's, or its record's when only the record holds it)
             held = effective_revocation(certificate)
@@ -476,7 +480,7 @@ class LifecycleMixin:
             remember_if_compromised(certificate)
         except Exception as e:
             db.session.rollback()
-            if not isinstance(e, ValueError):
+            if not isinstance(e, _AlreadyRevoked):
                 logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
             raise
         rejected_snapshots = request_snapshots(rejected_renewals)
