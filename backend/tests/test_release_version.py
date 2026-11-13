@@ -243,6 +243,32 @@ def test_a_tag_named_like_a_release_branch_opens_nothing(tmp_path, name, version
     assert 'Refusing to build release from an unexpected commit' in result.stdout
 
 
+@pytest.mark.parametrize('ref', ['refs/tags/refs/heads/v2.x', 'refs/heads/refs/heads/v2.x'])
+@pytest.mark.parametrize('version', ['2.254.2', '2.254.2-rc1'])
+def test_a_ref_that_only_ends_like_the_maintenance_branch_opens_nothing(tmp_path, ref, version):
+    work = _tagged_checkout(tmp_path, ['main', 'test'], 'nowhere')
+    subprocess.run(['git', 'push', '-q', 'origin', f'HEAD:{ref}'], cwd=work, check=True)
+    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
+    result = _run_step(step, work, {'GITHUB_REF': f'refs/tags/v{version}'})
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert 'Refusing to build release from an unexpected commit' in result.stdout
+
+
+def test_a_branch_that_only_ends_like_the_maintenance_branch_refuses_nothing(tmp_path):
+    work = _tagged_checkout(tmp_path, ['test', 'foo/refs/heads/v2.x', 'main'], 'main')
+    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
+    result = _run_step(step, work, {'GITHUB_REF': 'refs/tags/v2.254.1'})
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_an_unreachable_remote_never_validates_a_tag(tmp_path):
+    work = _tagged_checkout(tmp_path, ['main', 'test'], 'main')
+    subprocess.run(['git', 'remote', 'set-url', 'origin', str(tmp_path / 'missing.git')], cwd=work, check=True)
+    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
+    result = _run_step(step, work, {'GITHUB_REF': 'refs/tags/v2.254.1'})
+    assert result.returncode != 0
+
+
 # ---- 4. latest ---------------------------------------------------------------------------------
 
 @pytest.mark.parametrize('published,tag,expected', [

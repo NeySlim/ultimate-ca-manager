@@ -42,27 +42,28 @@ jobs:
           VERSION="${GITHUB_REF#refs/tags/v}"
           TAG_SHA="$(git rev-parse HEAD)"
 
-          if [[ "$VERSION" == *-rc* || "$VERSION" == *-beta* || "$VERSION" == *-alpha* || "$VERSION" == *-dev* ]]; then
-            EXPECTED_REF="origin/test"
-          else
-            EXPECTED_REF="origin/main"
-          fi
+          # The head of a branch is read by its exact name on the remote: a tag, or a ref
+          # that only ends like the branch, never stands for it
+          remote_head() { git ls-remote origin "refs/heads/$1" | awk -v r="refs/heads/$1" '$2 == r { print $1 }'; }
 
-          # Full refs everywhere: a tag named like a branch must never stand for it
-          git fetch origin refs/heads/main:refs/remotes/origin/main refs/heads/test:refs/remotes/origin/test
-          EXPECTED_SHA="$(git rev-parse "refs/remotes/$EXPECTED_REF")"
+          if [[ "$VERSION" == *-rc* || "$VERSION" == *-beta* || "$VERSION" == *-alpha* || "$VERSION" == *-dev* ]]; then
+            EXPECTED_BRANCH="test"
+          else
+            EXPECTED_BRANCH="main"
+          fi
+          EXPECTED_SHA="$(remote_head "$EXPECTED_BRANCH")"
+          [ -n "$EXPECTED_SHA" ] || { echo "Branch $EXPECTED_BRANCH not found on origin."; exit 1; }
 
           # A maintenance release (X.Y.Z, RC or stable) may also sit at the tip of its v<major>.x branch
           MAINT_BRANCH="v${VERSION%%.*}.x"
           MAINT_SHA=""
-          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && git ls-remote --exit-code origin "refs/heads/$MAINT_BRANCH" > /dev/null; then
-            git fetch origin "refs/heads/$MAINT_BRANCH:refs/remotes/origin/$MAINT_BRANCH"
-            MAINT_SHA="$(git rev-parse "refs/remotes/origin/$MAINT_BRANCH")"
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            MAINT_SHA="$(remote_head "$MAINT_BRANCH")"
           fi
 
           echo "Version: $VERSION"
           echo "Tag SHA: $TAG_SHA"
-          echo "Expected $EXPECTED_REF SHA: $EXPECTED_SHA"
+          echo "Expected origin/$EXPECTED_BRANCH SHA: $EXPECTED_SHA"
           [ -z "$MAINT_SHA" ] || echo "Or origin/$MAINT_BRANCH SHA: $MAINT_SHA"
 
           if [ "$TAG_SHA" != "$EXPECTED_SHA" ] && [ "$TAG_SHA" != "$MAINT_SHA" ]; then
