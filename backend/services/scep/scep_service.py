@@ -133,6 +133,10 @@ class SCEPService:
     MSG_TYPE_GET_CERT = 21
     MSG_TYPE_GET_CRL = 22
 
+    # RFC 8894 §2.4 leaves it to CA policy: a PKCSReq renewal still proves the
+    # shared secret; False would let the signature alone suffice.
+    PKCSREQ_RENEWAL_COMPARES_CHALLENGE = True
+
     CAPABILITIES = (
         "POSTPKIOperation",
         "SHA-256",
@@ -517,6 +521,10 @@ class SCEPService:
                     recipient_nonce=sender_nonce,
                 ), 200
 
+            # A RenewalReq, or a PKCSReq signed by a certificate this endpoint issued
+            issued_here = self._issued_through_this_endpoint(signer_cert)
+            renewal = self._is_renewal(message_type, issued_here)
+
             # ---- 7. Validate challenge password (constant-time), or Intune ----
             # An expired challenge is refused outright: renewals stay allowed
             # because they authenticate with the existing certificate
@@ -540,7 +548,7 @@ class SCEPService:
                         self.FAIL_BAD_MESSAGE_CHECK, "Challenge validation failed",
                         transaction_id=transaction_id, recipient_nonce=sender_nonce,
                     ), 200
-            elif self.challenge_expired and message_type != self.MSG_TYPE_RENEWAL_REQ:
+            elif self.challenge_expired and not renewal:
                 return self._create_error_response(
                     self.FAIL_BAD_MESSAGE_CHECK,
                     "Challenge password has expired",
@@ -549,10 +557,10 @@ class SCEPService:
 
             # RFC 8894 §2.4: a RenewalReq signed by a certificate this endpoint
             # issued is authenticated by it (step 8), so its challenge is not
-            # compared; any other signer still needs this endpoint's secret.
+            # compared; any other signer, and a PKCSReq, still needs the secret.
             if (self.intune_client is None and self.challenge_password
-                    and not (message_type == self.MSG_TYPE_RENEWAL_REQ
-                             and self._issued_through_this_endpoint(signer_cert))):
+                    and not (renewal and issued_here
+                             and self._renewal_waives_challenge(message_type))):
                 if not self._has_usable_challenge_password(
                     challenge_pwd
                 ) or not hmac.compare_digest(
@@ -582,7 +590,7 @@ class SCEPService:
             # above, a real per-device authenticated challenge — it's simply
             # not the local static challenge_password this guard checks for.
             if (
-                message_type != self.MSG_TYPE_RENEWAL_REQ
+                not renewal
                 and self.auto_approve
                 and not self.challenge_password
                 and self.intune_client is None
@@ -598,8 +606,20 @@ class SCEPService:
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
+            existing = SCEPRequest.query.filter_by(
+                transaction_id=transaction_id, ca_refid=self.ca_refid
+            ).first()
+            # A resent renewal already served archived its signer: answer it from
+            # the transaction; only an undelivered policy approval re-checks a revocation
+            if (renewal and existing and self._same_key_as_existing(existing, csr)
+                    and self._renews_signer(existing, signer_cert)):
+                return self._status_for_existing(
+                    existing, sender_nonce, signer_cert, challenge_pwd,
+                    response_encryption_algorithm,
+                ), 200
+
             # ---- 8. Renewal linkage validation (RFC 8894 §2.3) ----
-            if message_type == self.MSG_TYPE_RENEWAL_REQ:
+            if renewal:
                 err = self._validate_renewal(signer_cert, csr)
                 if err is not None:
                     return self._create_error_response(
@@ -610,7 +630,7 @@ class SCEPService:
             # ---- 8b. Policies, subject bounds and names, once the requester is authenticated ----
             # Before anything is stored: a manual approval must not queue what issuing refuses
             refusal = self._content_refusal(
-                csr, signer_cert if message_type == self.MSG_TYPE_RENEWAL_REQ else None)
+                csr, signer_cert if renewal else None)
             if refusal:
                 logger.warning("SCEP: request refused: %s", refusal)
                 self._notify_intune_failure(transaction_id, csr_data, refusal)
@@ -620,9 +640,6 @@ class SCEPService:
                 ), 200
 
             # ---- 9. Idempotency (scoped to this CA) ----
-            existing = SCEPRequest.query.filter_by(
-                transaction_id=transaction_id, ca_refid=self.ca_refid
-            ).first()
             if existing:
                 # The certificate issued for this transaction pairs with one
                 # key only: another key is a new enrollment mislabelled, and
@@ -654,16 +671,16 @@ class SCEPService:
                 subject=csr.subject.rfc4514_string(),
                 client_ip=client_ip,
                 profile_id=self.profile_id,
-                # A RenewalReq keeps the certificate it was signed with, so
+                # A renewal keeps the certificate it was signed with, so
                 # that a manual approval renews it (archives it) too
                 renewal_of=(base64.b64encode(signer_cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
-                            if message_type == self.MSG_TYPE_RENEWAL_REQ and signer_cert is not None else None),
+                            if renewal and signer_cert is not None else None),
             )
             db.session.add(scep_req)
 
             # A policy requiring approval holds the request whatever the
             # profile's auto-approval: the approval queue then decides
-            held, gate_error = self._approval_gate(scep_req, csr, message_type)
+            held, gate_error = self._approval_gate(scep_req, csr, renewal)
             if gate_error:
                 return self._create_error_response(
                     self.FAIL_BAD_REQUEST, "Server error evaluating the request",
@@ -674,9 +691,7 @@ class SCEPService:
                 try:
                     cert_refid = self._auto_approve_request(
                         scep_req, csr,
-                        renewal_of=(signer_cert
-                                    if message_type == self.MSG_TYPE_RENEWAL_REQ
-                                    else None),
+                        renewal_of=signer_cert if renewal else None,
                     )
                 except Exception as e:
                     db.session.rollback()
@@ -754,7 +769,7 @@ class SCEPService:
                 try:
                     from services.webhook_service import emit_cert_issued, emit_cert_renewed
                     if cert:
-                        if message_type == self.MSG_TYPE_RENEWAL_REQ:
+                        if renewal:
                             emit_cert_renewed(cert.to_dict(), ca_refid=cert.caref)
                         else:
                             emit_cert_issued(cert.to_dict(), ca_refid=cert.caref)
@@ -1053,6 +1068,20 @@ class SCEPService:
                              else SCEPRequest.profile_id == self.profile_id)
         return query.first() is not None
 
+    def _is_renewal(self, message_type, issued_here: bool) -> bool:
+        """The one rule: a RenewalReq, or a PKCSReq signed by a certificate this
+        endpoint issued (RFC 8894 §2.3 case 2 sent as PKCSReq, §2.4 leaves it to
+        CA policy). Intune validates every request itself: its PKCSReq stays an enrollment."""
+        if message_type == self.MSG_TYPE_RENEWAL_REQ:
+            return True
+        return (message_type == self.MSG_TYPE_PKI_REQ and issued_here
+                and self.intune_client is None)
+
+    def _renewal_waives_challenge(self, message_type) -> bool:
+        """Option A/B switch: whether a renewal's challenge goes uncompared."""
+        return (message_type == self.MSG_TYPE_RENEWAL_REQ
+                or not self.PKCSREQ_RENEWAL_COMPARES_CHALLENGE)
+
     def _content_refusal(self, csr, renewal_of):
         """Why issuance would refuse the request's key, hash, subject or names, else None."""
         _, policy_violations = self._policy_signing_hash(csr)
@@ -1071,7 +1100,7 @@ class SCEPService:
 
     def _validate_renewal(self, signer_cert: x509.Certificate, csr) \
             -> Optional[Tuple[int, str]]:
-        """Validate signer certificate for RenewalReq (messageType 17).
+        """Validate the signer certificate of a renewal (see _is_renewal).
 
         Returns ``(failInfo, message)`` if validation fails, ``None`` if OK.
 
@@ -1202,13 +1231,24 @@ class SCEPService:
         return stored.public_key().public_bytes(der, spki) == \
             csr.public_key().public_bytes(der, spki)
 
-    def _approval_gate(self, scep_req, csr, message_type):
+    @staticmethod
+    def _renews_signer(existing: SCEPRequest, signer_cert: x509.Certificate) -> bool:
+        """True when *existing* is the renewal of *signer_cert*."""
+        if not existing.renewal_of:
+            return False
+        try:
+            renewed = x509.load_pem_x509_certificate(
+                base64.b64decode(existing.renewal_of), default_backend())
+        except Exception:
+            return False
+        return renewed == signer_cert
+
+    def _approval_gate(self, scep_req, csr, renewal):
         """``(approval, None)`` when a policy holds the request (it stays
         pending, linked to the approval), ``(None, None)`` otherwise,
         ``(None, error)`` when the policies cannot be read (nothing stored)."""
         from services import protocol_approval
         cn, dns = protocol_approval.csr_names(csr)
-        renewal = message_type == self.MSG_TYPE_RENEWAL_REQ
         try:
             db.session.flush()
             approval = protocol_approval.gate_protocol_issuance(

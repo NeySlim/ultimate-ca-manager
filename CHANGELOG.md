@@ -40,6 +40,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- SCEP: a PKCSReq signed by a valid certificate this endpoint issued is now a renewal, as clients that renew with PKCSReq expect: the challenge is still compared but may have expired, and the old certificate is replaced; a CSR subject other than the certificate's is refused (see UPGRADE.md).
 - EST re-enrolment and SCEP renewal refuse a certificate of a Windows enrollment profile, whatever the profile's state, and audit the refusal: it renews over WSTEP only, which checks its profile.
 - Kerberos: each Windows enrollment profile holds its own keytab (`profile_id` on the upload), whose entries must all be `HTTP/<SPN host>@<realm of the profile>`; the acceptor reads one file composed from the keytabs of every profile (a disabled profile is refused by realm), and the status lists every entry with its realm and kvno.
 - XCEP and WSTEP Kerberos: a request is served by the enabled profile of its principal's realm (exact match), with that profile's CA, templates, connector, group and pinned subject fields, and a realm without one is refused with a SOAP fault and an audit entry, never served by the default profile. A Kerberos renewal is audited as `certificate.renewed`.
