@@ -396,8 +396,9 @@ def test_wstep_renewal_by_a_brainpool_certificate(app, client, protocol_config, 
     from tests.test_wstep_issue import _issued_cert_from_rstr
     key, csr = _bp_csr('wstep-renew-bp.example.test', 'EC-BP256')
     with app.app_context():
+        # Issued as Windows enrollment does: the Certificate binding renews no other certificate
         cert_pem, _ = CAService.sign_csr_from_crypto(
-            ca=db.session.get(CA, bp384_root['id']), csr=csr, validity_days=30, source='test')
+            ca=db.session.get(CA, bp384_root['id']), csr=csr, validity_days=30, source='wstep')
     old = x509.load_pem_x509_certificate(cert_pem.encode() if isinstance(cert_pem, str) else cert_pem)
     new_csr = x509.CertificateSigningRequestBuilder().subject_name(old.subject).sign(key, hashes.SHA256())
     resp = client.post(RENEW_URL, data=_signed_renewal_rst(old, key, new_csr))
