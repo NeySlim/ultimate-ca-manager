@@ -28,5 +28,6 @@ def test_guide_documents_cross_realm_refusal():
     text = GUIDE.read_text()
     assert 'one profile per realm' in text.lower()
     assert 'does not match the realm' in text
-    assert 'have not been tested' not in text
-    assert 'A forest needs one profile' not in text
+    # Child domains and trusts were never benched: the guide must say so, not promise a remedy.
+    assert 'child domains of a forest have not been tested' in text
+    assert 'give it its own service account' not in text

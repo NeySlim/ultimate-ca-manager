@@ -827,7 +827,7 @@ A **profile** is the enrollment setup of one Active Directory realm: its issuing
 3. **Create the service account and register the SPN** in the forest: `setspn -S HTTP/ucm.example.com CORP\svc-ucm`, then export a keytab for `HTTP/ucm.example.com@CORP.EXAMPLE` (`ktpass`, or `ktutil` when the account must not be modified). Check it with `kinit` and `kvno -k` on a Linux host. The keytab of each forest holds only that forest's key.
 4. **Add the profile** (**Settings → Windows Autoenrollment → Add profile**): name, realm in capitals, the connector of step 2, the issuing CA, the templates to offer, and optionally the AD group the requester must belong to, which replaces the one the template requires.
 5. **Upload the keytab** of step 3 in the profile. The checklist of the editor turns green once the realm, issuing CA, keytab, connector and templates are set; the list flags a profile whose keytab is missing, whose connector fails, or whose realm differs from the domain of its connector.
-6. **Repeat** steps 2 to 5 for each forest. No trust between the forests is needed, and a profile only serves its own realm. In a forest, only the domain whose account holds the SPN is served: a client of a child domain, or of a trusting domain without its own SPN registration, is refused (see below). To serve another domain, give it its own service account, SPN, keytab and profile.
+6. **Repeat** steps 2 to 5 for each forest. No trust between the forests is needed, and a profile only serves its own realm. In a forest, only the domain whose account holds the SPN is served, and clients of the forest's other domains are refused (see below). Domains linked by trusts and child domains of a forest have not been tested.
 7. **Check** from a domain-joined client of each forest: `Get-Certificate -Url <Kerberos policy URL> -Template <template>`, or wait for the GPO.
 
 The CA that Kerberos clients see is the policy CA of the profile that serves them; the policy and enrollment URLs are the same for every profile.
@@ -837,7 +837,7 @@ The CA that Kerberos clients see is the policy CA of the profile that serves the
 | Case | What the client gets | Where the reason is |
 | --- | --- | --- |
 | The realm has no key in the composed keytab | A 401 Negotiate challenge: the client's authentication fails and nothing reaches the profile logic | The service log only (`no key for this realm`), no audit entry |
-| The client realm differs from the realm of the key that accepted the ticket (child domain, trusting domain using another forest's SPN) | A 401 Negotiate challenge | The service log only (`client realm ... does not match the realm ... of the key that accepted it`), no audit entry |
+| The client realm differs from the realm of the key that accepted the ticket | A 401 Negotiate challenge | The service log only (`client realm ... does not match the realm ... of the key that accepted it`), no audit entry |
 | The realm has a key but no profile, the profile is disabled, or the principal names no realm | HTTP 400 with the SOAP fault `The requester's realm is not served` | The audit entry `windows_enrollment.refused` |
 | The profile has no realm (the default profile after an upgrade that could not name one) | Kerberos is not advertised in the policy and is refused | The profile screen, `kerberos_refusal` in `GET /api/v2/windows-profiles/{id}` |
 | The AD connector cannot resolve the requester, or the group is missing | A SOAP fault on issuance | The service log and the audit entry |
