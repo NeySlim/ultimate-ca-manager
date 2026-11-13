@@ -525,7 +525,7 @@ En plus de Nom d'utilisateur/Mot de passe et Kerberos, WSTEP prend en charge le 
 
 XML-DSig n'a pas de méthode de signature ML-DSA : un certificat **ML-DSA** ne peut donc pas se renouveler ainsi, UCM nomme la clé dans son refus et le client inscrit un nouveau certificat.
 
-Le renouvellement par certificat ne sert que les certificats émis par l'inscription Windows (WSTEP) ; un certificat signé à la main est remplacé par une nouvelle inscription, pas renouvelé. Sous TLS, le certificat à renouveler est le certificat client : activez mTLS avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé (v2.248).
+Le renouvellement par certificat ne sert que les certificats émis par l'inscription Windows (WSTEP) ; un certificat signé à la main est remplacé par une nouvelle inscription, pas renouvelé. Sous TLS, le certificat à renouveler est le certificat client : activez mTLS avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé (v2.248). Un certificat que l'écouteur ne reconnaît pas est refusé pendant la poignée de main TLS, avant que UCM voie une requête : UCM n'audite rien (lire la sortie du client et le journal du service). Un profil hors de l'AC mTLS ne renouvelle que par Kerberos, et si Kerberos refuse (demandeur retiré du groupe AD, profil désactivé), il ne renouvelle pas.
 
 ### Extension de sécurité SID (KB5014754)
 
