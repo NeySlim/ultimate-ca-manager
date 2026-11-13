@@ -181,6 +181,25 @@ describe('keytab permission', () => {
   })
 })
 
+describe('keytab permission lost after the pick', () => {
+  it('saves the profile without storing a file chosen while the permission was held', async () => {
+    mocks.uploadKeytab.mockResolvedValue({ data: { keytab_entries: [], realms: [], foreign_entries: [] } })
+    const element = (props) => (
+      <MemoryRouter>
+        <WindowsProfileEditor profile={{ id: 7, name: 'corp' }} cas={CAS} canWrite onSaved={vi.fn()} onCancel={vi.fn()} {...props} />
+      </MemoryRouter>)
+    const { rerender } = render(element({ canUploadKeytab: true }))
+    await screen.findByText('pick-keytab')
+    fireEvent.click(screen.getByText('pick-keytab'))
+    await waitFor(() => expect(mocks.uploadKeytab).toHaveBeenCalledTimes(1))
+    rerender(element({ canUploadKeytab: false }))
+    expect(screen.queryByText('pick-keytab')).toBeNull()
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    expect(mocks.uploadKeytab).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('checklist', () => {
   const checklist = () => within(screen.getByTestId('profile-checklist'))
 

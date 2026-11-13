@@ -129,8 +129,6 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
     { autoenrollTemplates })
 
   const pickKeytab = async (file) => {
-    // The keytab upload needs write:kerberos on top of write:xcep
-    if (!canUploadKeytab) return
     setKeytabFile(file)
     setKeytabPreview(null)
     if (!file || isNew) return
@@ -178,6 +176,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
         ? await windowsProfilesService.create(buildPayload())
         : await windowsProfilesService.update(profile.id, buildPayload())
       const saved = response.data
+      // The upload needs write:kerberos on top of write:xcep, which may be gone since the pick
       if (keytabFile && canUploadKeytab) {
         await windowsProfilesService.uploadKeytab(saved.id, keytabFile)
       }
