@@ -23,7 +23,17 @@ def test_opnsense_route_links_the_chain_whatever_the_order(app, auth_client, mon
     sub = make_cert(f'Sub {tag}', k_sub, f'Mid {tag}', k_mid, path_length=0)
     rows = {'root': _row(root, f'root {tag}'), 'mid': _row(mid, f'mid {tag}'), 'sub': _row(sub, f'sub {tag}')}
     order = ['root', 'mid', 'sub'] if mid_first else ['root', 'sub', 'mid']
-    body = _opnsense(auth_client, monkeypatch, [rows[n] for n in order])
+    # selected_ids is a set: make it a list so the rows are handled in the order given, and record it
+    from api.v2 import import_opnsense
+    monkeypatch.setattr(import_opnsense, 'set', list, raising=False)
+    seen = []
+    real_attach = import_opnsense.cross_certs.attach_to_counterpart
+    monkeypatch.setattr(import_opnsense.cross_certs, 'attach_to_counterpart',
+                        lambda crt, *a, **k: (seen.append(next(n for n, r in rows.items() if r['crt'] == crt)),
+                                              real_attach(crt, *a, **k))[1])
+    items = [rows[n]['uuid'] for n in order]
+    body = _opnsense(auth_client, monkeypatch, [rows[n] for n in order], items)
+    assert seen == order
     assert body['imported']['cas'] == 3
     with app.app_context():
         got = {n: CA.query.filter_by(descr=f'{n} {tag}').one() for n in rows}

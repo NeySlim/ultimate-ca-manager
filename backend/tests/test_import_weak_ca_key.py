@@ -134,12 +134,12 @@ def _row(cert, descr, key=None):
     return row
 
 
-def _opnsense(auth_client, monkeypatch, ca_rows):
+def _opnsense(auth_client, monkeypatch, ca_rows, items=()):
     from api.v2 import import_opnsense
     monkeypatch.setattr(import_opnsense, 'create_session', lambda verify_ssl=True: _Session(ca_rows, []))
     r = auth_client.post('/api/v2/import/opnsense/import', json={
         'host': '192.0.2.10', 'port': 443, 'api_key': 'k', 'api_secret': 's',
-        'verify_ssl': False, 'items': []})
+        'verify_ssl': False, 'items': list(items)})
     assert r.status_code == 200, r.data
     return json.loads(r.data)['data']
 
