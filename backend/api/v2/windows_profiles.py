@@ -107,6 +107,7 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
         templates = _template_ids([profile]) if profile.id else {}
     connector = connectors.get(profile.connector_id)
     from services.ad_connector import health
+    connector_realm = lookup.realm_of_base_dn(connector.base_dn) if connector is not None else None
     data = {
         'id': profile.id,
         'name': profile.name,
@@ -118,8 +119,10 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
         'connector_name': connector.name if connector is not None else None,
         'connector_enabled': bool(connector.enabled) if connector is not None else None,
         'connector_health': health.state_of(connector.health) if connector is not None else None,
-        'connector_realm': (lookup.realm_of_base_dn(connector.base_dn)
-                            if connector is not None else None),
+        'connector_realm': connector_realm,
+        # Served all the same; the screen warns that the realm and the domain disagree
+        'connector_domain_mismatch': bool(profile.realm and connector_realm
+                                          and profile.realm != connector_realm),
         'issuing_ca_refid': profile.issuing_ca_refid,
         'issuing_ca_name': ca_names.get(profile.issuing_ca_refid),
         'policy_ca_refid': profile.policy_ca_refid,
