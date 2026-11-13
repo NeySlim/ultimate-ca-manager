@@ -66,7 +66,8 @@ describe('TemplateForm common name pattern', () => {
     expect(screen.queryByTestId('cn-pattern-non-unique')).toBeNull()
     fireEvent.change(patternInput(), { target: { value: '{displayName} ({username})' } })
     expect(screen.getByTestId('cn-pattern-non-unique').textContent).toBe(
-      '{displayName} may be shared by several accounts: certificates could carry the same CN.')
+      '{displayName} may be shared by several accounts: once a certificate of the CA carries a name, '
+      + 'a second account whose pattern gives the same name is refused at issuance.')
   })
 
   it('sends the pattern trimmed and the path option, null once cleared', async () => {
