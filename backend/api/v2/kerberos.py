@@ -188,6 +188,10 @@ def upload_kerberos_keytab():
     user = getattr(g, 'current_user', None)
     profile_id = request.form.get('profile_id')
     if profile_id:
+        # A13: profiles are written with write:xcep, whichever route carries the keytab
+        from auth.unified import has_permission
+        if not has_permission('write:xcep', getattr(g, 'permissions', None) or []):
+            return error_response('Insufficient permissions', 403)
         profile = (db.session.get(WindowsEnrollmentProfile, int(profile_id))
                    if profile_id.isdigit() else None)
         if profile is None:

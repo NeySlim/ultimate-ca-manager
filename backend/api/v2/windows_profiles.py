@@ -169,6 +169,28 @@ def _connector_problem(profile):
         db.session.get(ADConnectorConfig, profile.connector_id), profile.realm)
 
 
+def _recompose_keytab():
+    """Recompose the served keytab from the enabled profiles, in the caller's transaction;
+    an (message, status) pair when a keytab cannot be decrypted here."""
+    from services import cluster_commands
+    try:
+        windows_profiles.publish_keytab(actor=_actor())
+    except ValueError as e:
+        db.session.rollback()
+        return f'Keytab not composed: {e}', 409
+    cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+    return None
+
+
+def _write_keytab_file():
+    """This node's file follows the stored keytab; a failure is left to the next reload."""
+    from services.kerberos import negotiate_auth
+    try:
+        negotiate_auth.write_stored_keytab()
+    except (OSError, ValueError) as e:
+        logger.error('Failed to write the Kerberos keytab file: %s', e)
+
+
 def _audit(action, profile, details):
     AuditService.log_action(action=action, resource_type='windows_profile',
                             resource_id=str(profile.id), resource_name=profile.name,
@@ -235,14 +257,22 @@ def update_windows_profile(profile_id):
     if not isinstance(data, dict):
         return error_response('A JSON object is required', 400)
     changed = sorted(k for k in data if k in WRITABLE)
+    was_enabled = bool(profile.enabled)
     problem = _apply(profile, {k: v for k, v in data.items() if k in WRITABLE})
     if problem:
         db.session.rollback()
         return error_response(problem[0], problem[1])
     profile.updated_by = _actor()
+    recompose = bool(profile.keytab) and bool(profile.enabled) != was_enabled
+    if recompose:
+        problem = _recompose_keytab()
+        if problem:
+            return error_response(problem[0], problem[1])
     ok, err = safe_commit(logger, 'Failed to update the Windows enrollment profile')
     if not ok:
         return err
+    if recompose:
+        _write_keytab_file()
     _audit('windows_profile_update', profile,
            f"Updated Windows enrollment profile {profile.name}; fields: {', '.join(changed) or 'none'}")
     return success_response(data=_render(profile, _ca_names([profile])), message='Profile updated')
@@ -258,15 +288,22 @@ def delete_windows_profile(profile_id):
     if blocker:
         return error_response(blocker.message, blocker.status)
     name = profile.name
+    held_keytab = bool(profile.keytab)
     # SQLite enforces no key: the template links go with their profile explicitly
     WindowsProfileTemplate.query.filter_by(profile_id=profile.id).delete()
     # No key either: a dangling id would be inherited by a later profile reusing it
     Certificate.query.filter_by(windows_profile_id=profile.id).update(
         {'windows_profile_id': None}, synchronize_session=False)
     db.session.delete(profile)
+    if held_keytab:
+        problem = _recompose_keytab()
+        if problem:
+            return error_response(problem[0], problem[1])
     ok, err = safe_commit(logger, 'Failed to delete the Windows enrollment profile')
     if not ok:
         return err
+    if held_keytab:
+        _write_keytab_file()
     AuditService.log_action(action='windows_profile_delete', resource_type='windows_profile',
                             resource_id=str(profile_id), resource_name=name,
                             details=f'Deleted Windows enrollment profile {name}', success=True)
