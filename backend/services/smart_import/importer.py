@@ -355,6 +355,7 @@ class SmartImporter:
         subject_to_refid: Dict[str, str] = {}
         ski_to_refid: Dict[str, str] = {}
         bundle_roots = [o for o in ca_objects if o.is_self_signed and o.ski]
+        unverified_ids = []
         from services.import_service import relink_parent_caref  # imported late: import_service imports this package
 
         for ca_obj in ca_objects:
@@ -402,6 +403,7 @@ class SmartImporter:
             # The parent is the stored CA whose key signed this certificate (flushed batch CAs included);
             # failing that, the former AKI then issuer DN guess, kept for parents whose signature cannot be checked
             caref = relink_parent_caref(x509.load_pem_x509_certificate(ca_obj.raw_pem.encode()), None)
+            verified = caref is not None
             if not caref and not ca_obj.is_self_signed:
                 if ca_obj.aki:
                     caref = ski_to_refid.get(ca_obj.aki)
@@ -454,9 +456,17 @@ class SmartImporter:
                 ski_to_refid[ca_obj.ski] = refid
             result.cas_imported += 1
             result.imported_ids["cas"].append(ca.id)
+            if not verified:
+                unverified_ids.append(ca.id)
             
             # Audit log
             self._log_audit("import_ca", ca.id, ca.descr, username)
+
+        # A child listed before its parent found no signer at creation: relink once the whole batch is stored
+        for ca in CA.query.filter(CA.id.in_(unverified_ids)).all() if unverified_ids else []:
+            ca.caref = relink_parent_caref(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), ca.caref,
+                                           exclude_ca_id=ca.id)
+        db.session.flush()
     
     @staticmethod
     def _is_self_signed_record(ca) -> bool:
