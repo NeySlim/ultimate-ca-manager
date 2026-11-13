@@ -233,11 +233,14 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
         if row.revoked:
             return False
         record = row_persisted_revocation(row)
-        if record is None or not _record_still_held(record):
+        if record is None:
             return False
-        # Marked as the hourly pass marks: an unhold committed since the read is never undone
+        # A stored row is marked by one statement that re-reads the record, never under a share
+        # lock on it: an import holding the row would deadlock with a revocation holding the record
         if inspect(row).persistent:
             return _mark_while_recorded(row, record)
+        if not _record_still_held(record):
+            return False
     elif row.revoked and row.revoke_reason not in HOLD_REASONS:
         return False
     row.revoked = True
