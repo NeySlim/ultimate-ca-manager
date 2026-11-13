@@ -252,10 +252,12 @@ def test_a_profile_with_valid_certificates_is_not_deleted_but_can_be_disabled(ap
     with app.app_context():
         db.session.add_all([_cert(p['id']), _cert(p['id']),
                             _cert(p['id'], revoked=True),
+                            _cert(p['id'], revoked=True, revoke_reason='certificateHold'),
                             _cert(p['id'], valid_to=utc_now() - timedelta(days=1))])
         db.session.commit()
     r = auth_client.delete(f"{URL}/{p['id']}")
-    assert r.status_code == 409 and '2 valid certificate' in r.get_json()['message']
+    # A certificate on hold may be released (RFC 5280 5.3.1): it still counts as valid
+    assert r.status_code == 409 and '3 valid certificate' in r.get_json()['message']
     assert auth_client.put(f"{URL}/{p['id']}", json={'enabled': False}).status_code == 200
     with app.app_context():
         Certificate.query.filter_by(windows_profile_id=p['id']).delete()

@@ -23,6 +23,7 @@ from typing import Iterator, Optional
 from models import CA, Certificate, db
 from models.policy import CertificatePolicy
 from utils.datetime_utils import utc_now
+from utils.revocation_reasons import HOLD_REASONS
 
 # Bulk id lists are capped so one request cannot turn into an unbounded number
 # of per-item transactions and audit entries. 100 is the cap the CA bulk routes
@@ -345,9 +346,11 @@ def windows_profile_deletion_blockers(profile) -> Iterator[DeletionBlocker]:
             'it is the default profile',
         )
     now = utc_now()
+    # A held certificate may be released (RFC 5280 5.3.1), so it counts as valid
     valid = Certificate.query.filter(
         Certificate.windows_profile_id == profile.id,
-        db.or_(Certificate.revoked.is_(None), Certificate.revoked.is_(False)),
+        db.or_(Certificate.revoked.is_(None), Certificate.revoked.is_(False),
+               Certificate.revoke_reason.in_(HOLD_REASONS)),
         db.or_(Certificate.valid_to.is_(None), Certificate.valid_to > now),
     ).count()
     if valid > 0:
