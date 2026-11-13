@@ -85,6 +85,30 @@ def fill_realm(profile):
         profile.realm = realm
 
 
+def realm_problem(realm, profile):
+    """(message, status) when *realm* cannot be *profile*'s (None: a new one), else None:
+    capitals as AD writes it, named by its keytab when it has one, held by no other profile."""
+    from .legacy import keytab_realms
+    if not isinstance(realm, str) or not realm.strip() or realm != realm.strip().upper():
+        return 'realm must be a non-empty name in capitals, such as CORP.EXAMPLE', 400
+    try:
+        keytab = profile.keytab_bytes() if profile is not None else None
+    except ValueError:
+        return 'the keytab of the default profile cannot be decrypted here', 409
+    if keytab:
+        realms = keytab_realms(keytab)
+        if realms is None:
+            return 'the realms of the keytab cannot be read', 400
+        if realm not in realms:
+            return f"realm {realm} is not in the keytab ({', '.join(sorted(realms))})", 400
+    other = WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.realm == realm)
+    if profile is not None and profile.id is not None:
+        other = other.filter(WindowsEnrollmentProfile.id != profile.id)
+    if other.first() is not None:
+        return f'realm {realm} is already served by another profile', 409
+    return None
+
+
 def default_for_write(actor=None, fill=True):
     """The default profile the configuration routes write, created by the first write.
     ``fill=False``: the caller sets a keytab first and fills the realm itself."""

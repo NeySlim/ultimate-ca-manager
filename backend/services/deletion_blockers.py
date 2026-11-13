@@ -334,3 +334,26 @@ def connector_deletion_blockers(connector) -> Iterator[DeletionBlocker]:
             'Point them at another connector first.',
             f'{profiles} Windows enrollment profile(s) use it',
         )
+
+
+def windows_profile_deletion_blockers(profile) -> Iterator[DeletionBlocker]:
+    """Why this Windows enrollment profile may not be deleted."""
+    if profile.is_default:
+        yield DeletionBlocker(
+            409,
+            'Cannot delete the default profile. Disable it instead.',
+            'it is the default profile',
+        )
+    now = utc_now()
+    valid = Certificate.query.filter(
+        Certificate.windows_profile_id == profile.id,
+        db.or_(Certificate.revoked.is_(None), Certificate.revoked.is_(False)),
+        db.or_(Certificate.valid_to.is_(None), Certificate.valid_to > now),
+    ).count()
+    if valid > 0:
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete the profile: {valid} valid certificate(s) were issued through it. '
+            'Disable it instead, or revoke them first.',
+            f'{valid} valid certificate(s) were issued through it',
+        )
