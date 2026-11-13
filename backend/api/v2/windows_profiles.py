@@ -177,12 +177,18 @@ def _connector_problem(profile):
 def _recompose_keytab():
     """Recompose the served keytab from the enabled profiles, in the caller's transaction;
     an (message, status) pair when a keytab cannot be decrypted here."""
+    from sqlalchemy.exc import SQLAlchemyError
     from services import cluster_commands
     try:
         windows_profiles.publish_keytab(actor=_actor())
     except ValueError as e:
         db.session.rollback()
         return f'Keytab not composed: {e}', 409
+    except SQLAlchemyError:
+        # The composition flushes the profile: a write the database refuses ends as a commit would
+        db.session.rollback()
+        logger.error('Windows enrollment profile not saved with its keytab', exc_info=True)
+        return 'Failed to save the Windows enrollment profile', 500
     cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
     return None
 

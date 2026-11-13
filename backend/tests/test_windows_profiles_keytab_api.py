@@ -102,3 +102,22 @@ def test_a_profile_without_keytab_leaves_the_file_alone(app, auth_client, profil
     assert _realms() == ['ONE.TEST']
     with app.app_context():
         assert ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).count() == 0
+
+
+def test_a_write_the_database_refuses_during_the_composition_is_an_answered_error(
+        app, auth_client, profiles, monkeypatch):  # noqa: F811
+    """The composition flushes the profile: a constraint lost to a concurrent write is answered,
+    the profile and the served file left as they were."""
+    from sqlalchemy.exc import IntegrityError
+    from services import windows_profiles
+    assert _upload(auth_client, ONE, profiles.default).status_code == 200
+    assert _upload(auth_client, TWO, profiles.two).status_code == 200
+
+    def refused(**_k):
+        raise IntegrityError('UPDATE windows_enrollment_profiles', {}, Exception('unique'))
+    monkeypatch.setattr(windows_profiles, 'publish_keytab', refused)
+    r = auth_client.put(f'{URL}/{profiles.two}', json={'enabled': False})
+    assert r.status_code == 500 and 'Failed to save' in r.get_json()['detail'], r.data
+    with app.app_context():
+        assert db.session.get(WindowsEnrollmentProfile, profiles.two).enabled is True
+    assert _realms() == ['ONE.TEST', 'TWO.TEST']
