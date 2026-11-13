@@ -521,14 +521,25 @@ def test_a_fresh_install_cut_short_is_never_taken_for_an_old_database(dialect, t
         assert db.upgrade() is True
 
 
-def test_a_fresh_install_that_cannot_record_its_registry_stops(dialect, tmp_path, monkeypatch):
+def test_a_fresh_install_that_cannot_record_its_registry_stops_then_starts_fresh(dialect, tmp_path,
+                                                                                  monkeypatch, capsys):
+    """Cut once `_migrations` exists but before its row: an empty registry without a business
+    table is a fresh database, which the next start builds."""
     import migration_runner
+    real = migration_runner._mark_applied
     for db in make_base(dialect, tmp_path, monkeypatch, 'fr', sql=''):
         db._route()
         monkeypatch.setattr(migration_runner, '_mark_applied', lambda *a, **k: (_ for _ in ()).throw(_Cut()))
         with pytest.raises(_Cut):
             migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
         assert 'users' not in db.tables()
+        assert db.registry() == []
+        monkeypatch.setattr(migration_runner, '_mark_applied', real)
+        assert db.upgrade() is True, capsys.readouterr().out
+        migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
+        assert db.registry() == ['300_upgrade_from_2_254']
+        assert {'users', 'certificate_authorities'} <= db.tables()
+        assert db.upgrade() is True
 
 
 def test_a_3_0_database_starts_without_running_anything(fresh, capsys):
