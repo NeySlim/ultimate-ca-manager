@@ -109,13 +109,15 @@ def _resolve_issuer_cert(cert):
     (by issuer DN). Returns the issuer x509.Certificate or None. Used to fill in
     a missing chain when it is neither stored inline nor reachable via `caref`.
     """
+    from utils.cert_issuer import self_signed_first
     issuer_dn = cert.issuer.rfc4514_string()
     aki = authority_key_identifier_hex(cert)
     candidates = []
     seen = set()
 
     def add_managed(rows):
-        for row in rows:
+        # The root before a cross or link certificate of its key, on any engine
+        for row in self_signed_first(sorted(rows, key=lambda r: r.id)):
             identity = ('ca', row.id)
             if row.crt and identity not in seen:
                 seen.add(identity)

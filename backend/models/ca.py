@@ -261,6 +261,7 @@ class CA(db.Model):
         from cryptography import x509
         from utils.cert_issuer import (
             authority_key_identifier_hex, cas_by_ski, certificate_signed_by, is_self_signed,
+            self_signed_first,
         )
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
@@ -283,7 +284,8 @@ class CA(db.Model):
         if aki:
             _add(cas_by_ski(aki))
         if self.issuer:
-            _add(CA.query.filter(CA.subject == self.issuer).all())
+            # The root before a cross or link certificate of its key, on any engine
+            _add(self_signed_first(CA.query.filter(CA.subject == self.issuer).order_by(CA.id).all()))
 
         for candidate in candidates:
             try:

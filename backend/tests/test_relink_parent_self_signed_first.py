@@ -147,3 +147,44 @@ def test_a_pending_ca_is_chained_under_the_root_not_another_record_of_its_key(
     resp = auth_client.post(f"/api/v2/cas/{pending['id']}/certificate",
                             data=json.dumps({'pem_content': signed}), content_type='application/json')
     assert assert_success(resp)['caref'] == root_refid
+
+
+@pytest.mark.parametrize('kind', ['cross', 'link'])
+def test_a_ca_without_caref_or_aki_resolves_its_issuer_to_the_root(app, rows, kind):
+    pki = build_cross_pki()
+    child = _child_without_aki(f'No AKI issuing {pki.tag}', pki.name_b, pki.key_b)
+    with app.app_context():
+        _other, root, child_row = _store(rows, (_same_key_record(pki, kind), 'other'),
+                                         (pki.root_b, 'root'), (child, 'child'))
+        assert child_row.caref is None
+        assert child_row.issuing_ca().id == root.id
+
+
+@pytest.mark.parametrize('kind', ['cross', 'link'])
+@pytest.mark.parametrize('with_aki', [True, False])
+def test_an_export_completes_a_chain_with_the_root_not_another_record_of_its_key(app, rows, kind, with_aki):
+    from api.v2.certificates.export import _resolve_issuer_cert
+    pki = build_cross_pki()
+    child = pki.int_b if with_aki else _child_without_aki(f'No AKI export {pki.tag}', pki.name_b, pki.key_b)
+    with app.app_context():
+        _store(rows, (_same_key_record(pki, kind), 'other'), (pki.root_b, 'root'))
+        assert _resolve_issuer_cert(child) == pki.root_b
+
+
+def test_the_opnsense_file_importer_chains_a_ca_listed_before_its_parent(app, rows, monkeypatch, tmp_path):
+    from services.opnsense import importer
+    monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
+    pki = build_cross_pki()
+
+    def entry(cert, is_root):
+        return {'refid': uuid.uuid4().hex[:13], 'descr': f'file import {pki.tag}', 'is_root': is_root,
+                'crt': base64.b64encode(pem(cert).encode()).decode(),
+                'subject': cert.subject.rfc4514_string(), 'issuer': cert.issuer.rfc4514_string()}
+    child, root = entry(pki.int_b, False), entry(pki.root_b, True)
+    with app.app_context():
+        assert importer.ImportMixin().import_cas([child, root])['imported'] == 2
+        stored = {e['refid']: CA.query.filter_by(refid=e['refid']).one() for e in (child, root)}
+        rows.extend(r.id for r in stored.values())
+        assert stored[child['refid']].caref == root['refid']
+        assert stored[root['refid']].caref is None
+
