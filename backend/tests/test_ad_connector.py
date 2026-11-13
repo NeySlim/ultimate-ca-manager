@@ -15,8 +15,21 @@ from tests.windows_profile_support import connectors_kept
 
 @pytest.fixture(autouse=True)
 def _connectors_put_back(app):
+    """A 2.x install: no default profile, so the screen shows the lowest-id row."""
+    from models import WindowsEnrollmentProfile
     with connectors_kept(app):
-        yield
+        with app.app_context():
+            parked = [p.id for p in WindowsEnrollmentProfile.query.filter_by(is_default=True)]
+            WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.id.in_(parked)).update(
+                {'is_default': False}, synchronize_session=False)
+            db.session.commit()
+        try:
+            yield
+        finally:
+            with app.app_context():
+                WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.id.in_(parked)).update(
+                    {'is_default': True}, synchronize_session=False)
+                db.session.commit()
 
 
 def test_bind_password_encrypted_at_rest(app):
