@@ -140,9 +140,10 @@ export default {
         content: 'Connexion LDAP propre à UCM à Active Directory, indépendante de tout fournisseur LDAP configuré sous SSO -- celui-ci sert à se connecter à UCM, celui-ci aux recherches AD liées aux certificats.',
         items: [
           { label: 'Objectif', text: "Résout un principal de machine ou d'utilisateur Kerberos vers son objet AD, afin qu'UCM puisse dériver un sujet/SAN de certificat, comme le ferait une vraie AC Windows" },
-          { label: 'Champs', text: 'Contrôleurs de domaine (un par ligne, chacun par son propre nom d\'hôte, essayés dans l\'ordre avec basculement), port, LDAPS avec vérification AC facultative, DN de base, DN de liaison et mot de passe (tous deux requis tant que le connecteur est activé)' },
-          { label: 'Tester la connexion', text: "Vérifier la connectivité et les identifiants avant d'enregistrer" },
-          { label: "URL d'inscription GPO", text: "URL de stratégie d'inscription de certificats Kerberos et Nom d'utilisateur/Mot de passe à enregistrer dans la stratégie de groupe" },
+          { label: 'Connecteurs', text: "Un par annuaire (forêt ou domaine), listé avec son realm, le SID de domaine lu et son état de santé. Un connecteur que des profils d'inscription Windows utilisent ne peut pas être supprimé, et le refus les liste" },
+          { label: 'Champs', text: 'Nom, contrôleurs de domaine (un par ligne, chacun par son propre nom d\'hôte, essayés dans l\'ordre avec basculement), port, LDAPS avec vérification AC facultative, DN de base, DN de liaison et mot de passe (tous deux requis tant que le connecteur est activé)' },
+          { label: 'Connecteur désactivé', text: "Un connecteur désactivé ne fait aucune recherche, mais son DN de base nomme encore le realm du profil par défaut en dernier recours, quand ni un connecteur activé, ni le SPN, ni le keytab ne le nomment" },
+          { label: 'Tester la connexion', text: "Vérifier la connectivité et les identifiants avant d'enregistrer ; le test lit aussi le SID du domaine" },
           { label: 'Contrôle d\'état', text: 'Chaque contrôleur de domaine est sondé par une vraie liaison à l\'intervalle de contrôle d\'état ; un contrôleur injoignable est ignoré lors de l\'inscription jusqu\'à son rétablissement. Le verdict s\'affiche sur la ligne des paramètres et pour chaque DC' },
         ]
       },
@@ -150,16 +151,19 @@ export default {
         title: 'Auto-inscription Windows (XCEP/WSTEP)',
         content: "Inscription de certificats Windows native via la découverte de stratégie MS-XCEP et l'émission MS-WSTEP -- prend en charge l'inscription manuelle MMC/certreq et l'auto-inscription GPO sans surveillance.",
         items: [
+          { label: 'Profils', text: "Un profil par realm Active Directory, choisi d'après le realm du principal Kerberos du client : ses propres CA d'émission et de politique, sous-ensemble de modèles, connecteur AD, keytab et comptes. La liste est paginée et filtrée par le serveur (nom ou realm, CA, état : complet, keytab manquant, connecteur en échec, désactivé)" },
+          { label: 'Realm', text: "En majuscules, exactement comme le KDC l'écrit (CORP.EXAMPLE) : un KDC compare les realms caractère par caractère. Le profil par défaut sans realm refuse Kerberos tant qu'aucun n'est renseigné. Un profil désactivé refuse les postes de son realm ; ses clés restent dans le keytab servi, pour que le refus soit audité par realm" },
           { label: 'XCEP', text: "Permet aux clients Windows de découvrir les modèles de certificat disponibles avant l'inscription" },
           { label: 'WSTEP', text: 'Gère la demande et le renouvellement du certificat une fois la stratégie découverte' },
-          { label: 'Kerberos/SPNEGO', text: "Lie les points de terminaison authentifiés par Kerberos utilisés pour l'auto-inscription GPO silencieuse (nécessite un SPN et un keytab du contrôleur de domaine)" },
-          { label: 'Liste de contrôle de configuration', text: "L'onglet affiche une liste de contrôle en direct de ce qui est configuré par rapport à ce qui manque encore, pour l'inscription manuelle et sans surveillance" },
+          { label: 'Kerberos/SPNEGO', text: "Lie les points de terminaison authentifiés par Kerberos utilisés pour l'auto-inscription GPO silencieuse (un SPN commun à tous les profils, et un keytab par profil issu du contrôleur de domaine de son realm ; le formulaire liste par realm les entrées du fichier choisi et signale un realm qui n'est pas celui du profil)" },
+          { label: 'Liste de contrôle de configuration', text: "Le formulaire de chaque profil liste ce qui lui manque encore : realm, CA d'émission, keytab, un connecteur joignable, un modèle qui autorise l'inscription automatique, le profil activé" },
+          { label: "URL de stratégie", text: "Les mêmes pour tous les profils : le routage se fait par realm, pas par URL" },
           { label: "Sujets dérivés d'AD", text: "Les modèles peuvent choisir de dériver leur sujet/SAN depuis Active Directory (via le connecteur AD) pour l'inscription sans surveillance" },
           { label: 'Templates ML-DSA (v2.248)', text: 'Annoncés par l\'OID de leur algorithme de clé avec le Microsoft Software Key Storage Provider, pas encore testés avec un vrai client Windows, et masqués en mode FIPS. Le renouvellement par certificat ne peut pas utiliser un certificat ML-DSA (XML-DSig n\'a pas de signature ML-DSA) : inscrivez-en un nouveau' },
           { label: "Templates ECDSA (v2.251)", text: "Annoncés en schéma de stratégie 3 avec leur courbe (ECDSA_P256, ECDSA_P384, ECDSA_P521) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe. Les templates RSA hors mode FIPS restent en schéma 2" },
           { label: 'Template nommé dans la requête (v2.252)', text: 'Chaque stratégie annonce son extension de template (szOID_CERTIFICATE_TEMPLATE), que Windows copie dans sa requête : le certificat est émis sous le template choisi sur le client, même si un autre a les mêmes EKU. Une requête qui ne nomme aucun template est appariée par ses EKU. Un template dont tous les EKU ne sont jamais émis à un inscrit, comme la signature OCSP, n\'est pas annoncé, et une requête pour lui est refusée' },
           { label: "Template et clé (v2.251)", text: "La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue. Une requête P-384 n'est donc plus émise sous un template P-256 qui partage son EKU. L'enveloppe de requête que Windows signe avec une clé ECDSA est acceptée" },
-          { label: "Renouvellement depuis Windows (v2.248)", text: "certreq ... Renew s'authentifie avec le certificat à renouveler comme certificat client TLS : mTLS doit être activé, avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé, et son SubjectAltName quand la CSR n'en porte aucun (v2.252)" },
+          { label: "Renouvellement depuis Windows (v2.248)", text: "Ne sert que les certificats émis par l'inscription Windows ; un certificat signé à la main est remplacé par une nouvelle inscription. Sous TLS, le certificat à renouveler est le certificat client : mTLS doit être activé, avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé, et son SubjectAltName quand la CSR n'en porte aucun (v2.252)" },
           { label: 'Type de certificat', text: 'Sans Server Auth, un template avec Email Protection ou EFS émet un certificat S/MIME, un avec Client Auth ou Smartcard Logon un certificat client : une requête utilisateur CN=jdoe sans SAN ne reçoit aucun nom DNS depuis son CN. Une requête sans Key Usage reçoit celui que configure le template, sinon celui du type de template : Digital Signature, Key Encipherment et Non Repudiation pour S/MIME ou EFS, Digital Signature et Key Encipherment pour Smartcard Logon, Digital Signature seul pour Client Auth. Tout autre template, ou aucun, émet un certificat serveur' },
           { label: "Kerberos dans Docker (v2.251)", text: "Les images Docker embarquent le backend Kerberos de pyspnego : la liaison Kerberos fonctionne en conteneur comme dans les installations DEB et RPM" },
         ]
@@ -456,30 +460,39 @@ Paramètres › Sauvegarde permet des sauvegardes automatiques.
 
 Connexion LDAP propre à UCM à Active Directory, indépendante de tout fournisseur LDAP configuré sous SSO. Celui-ci sert à se connecter à UCM ; celui-ci est utilisé pour les recherches AD liées aux certificats et fonctionne indépendamment du fait que le SSO soit configuré ou non.
 
+- **Connecteurs** : Un par annuaire (forêt ou domaine), listé sous Paramètres › Active Directory avec son nom, son realm, le SID de domaine lu et son état de santé. Un profil d'inscription Windows nomme le connecteur qui sert son realm ; un connecteur que des profils utilisent ne peut pas être supprimé, et le refus les liste
 - **Objectif** : Résout un principal de machine ou d'utilisateur Kerberos vers son objet AD, afin qu'UCM puisse dériver un sujet/SAN de certificat comme le ferait une vraie AC Windows
 - **Contrôleurs de domaine** : Un par ligne, chacun par son propre nom d'hôte, essayés dans l'ordre : les recherches basculent sur le suivant quand un DC est hors service. Un nom de domaine seul échoue à la vérification du certificat, car le certificat d'un contrôleur de domaine ne nomme que son propre hôte
 - **LDAPS** : Activer pour utiliser LDAP sur SSL/TLS ; **Vérifier le certificat SSL** valide le certificat du DC (éventuellement par rapport à un bundle d'AC personnalisé lorsqu'il n'est pas approuvé publiquement)
 - **DN de base** et **DN de liaison / Mot de passe** : Identifiants du compte de service utilisés pour les recherches ; le DN de liaison et le mot de passe sont tous deux requis tant que le connecteur est activé
 - **Tester la connexion** : Vérifier la connectivité et les identifiants avant d'enregistrer
-- **Intervalle de contrôle d'état** : Chaque contrôleur de domaine est sondé par une vraie liaison à cet intervalle ; un contrôleur injoignable est ignoré lors de l'inscription jusqu'à son rétablissement. Le verdict s'affiche sur la ligne des paramètres et pour chaque DC
+- **Intervalle de contrôle d'état** : Chaque contrôleur de domaine est sondé par une vraie liaison à cet intervalle ; un contrôleur injoignable est ignoré lors de l'inscription jusqu'à son rétablissement. Le verdict s'affiche sur la ligne du connecteur et pour chaque DC
+- **Connecteur désactivé** : Un connecteur désactivé ne fait aucune recherche, mais son DN de base nomme encore le realm du profil par défaut en dernier recours, quand ni un connecteur activé, ni le SPN, ni le keytab ne le nomment
 
-### URL de stratégie d'inscription GPO
-
-Une fois configuré, enregistrez l'une des URL affichées comme serveur de stratégie d'inscription de certificats dans la stratégie de groupe (Stratégies de clé publique → Client des services de certificats – Stratégie d'inscription de certificats), avec Client des services de certificats – Inscription automatique :
-- **Kerberos** : Aucune invite d'identifiants ; nécessite un client joint au domaine et le type d'authentification de la GPO défini sur Kerberos
-- **Nom d'utilisateur/Mot de passe** : Demande des identifiants ; pour l'inscription interactive « Demander un nouveau certificat » uniquement
+Les URL de stratégie d'inscription à enregistrer dans la stratégie de groupe sont les mêmes pour tous les profils ; elles s'affichent sous Paramètres › Auto-inscription Windows.
 
 ## Auto-inscription Windows (XCEP/WSTEP)
 
 Inscription de certificats Windows native via **MS-XCEP** (découverte de stratégie) et **MS-WSTEP** (émission et renouvellement de certificats) -- les mêmes protocoles qu'un vrai ADCS utilise pour l'inscription interactive « Demander un nouveau certificat » dans MMC, \`certreq\`, et l'auto-inscription GPO sans surveillance.
 
-### Liste de contrôle de configuration
+### Profils
 
-L'onglet suit ce qui est configuré par rapport à ce qui manque encore, pour les parcours d'inscription manuelle et sans surveillance -- une autorité de certification, la découverte de stratégie (XCEP), l'émission de certificats (WSTEP) et, pour l'auto-inscription GPO sans surveillance, un connecteur Active Directory, Kerberos/SPNEGO et au moins un modèle avec l'auto-inscription autorisée.
+Un **profil par realm Active Directory**. UCM oriente un client vers son profil d'après le realm de son principal Kerberos : chaque profil a ses propres CA d'émission et de politique, modèles, connecteur AD, keytab et comptes. La liste est paginée et filtrée par le serveur (nom ou realm, CA, état), si bien que cent profils s'ouvrent aussi vite qu'un seul :
+- **Realm** : En majuscules, exactement comme le KDC l'écrit (\`CORP.EXAMPLE\`) : un KDC compare les realms caractère par caractère, un nom en minuscules ne correspond jamais à un ticket. Le formulaire le refuse et dit pourquoi
+- **Connecteur** : Le connecteur AD qui sert le realm. Quand son domaine diffère du realm du profil, le formulaire avertit sans bloquer ; le serveur contrôle le couple quand l'un des deux est choisi
+- **CA d'émission** et **CA de politique** : La CA qui émet, et celle dont XCEP annonce la politique et les OID de modèles (la CA d'émission si vide)
+- **Modèles** : Le sous-ensemble proposé ; aucun coché propose les modèles de la CA. Un groupe AD exigé et des champs du sujet épinglés peuvent remplacer ceux du modèle pour tout le profil
+- **État** : Complet, Keytab manquant, Connecteur en échec ou Désactivé. Un profil désactivé refuse les postes de son realm ; ses clés restent dans le keytab servi, pour que le refus soit prononcé et audité par realm
+
+Le **profil par défaut** est celui dont une installation 2.x a hérité. Sans realm, Kerberos est refusé tant qu'un realm n'est pas renseigné (en majuscules, ou lu dans son keytab) ; l'écran le dit.
+
+### Liste de contrôle de configuration, par profil
+
+Le formulaire du profil liste ce qui lui manque encore : realm, CA d'émission, keytab, un connecteur joignable quand il y en a un, un modèle qui autorise l'inscription automatique, et le profil activé.
 
 ### Découverte de stratégie (XCEP)
 
-- **Autorité de certification** : L'AC dont les modèles sont annoncés et qui émet des certificats via cette configuration
+- **Autorité de certification** : L'AC dont les modèles sont annoncés et qui émet des certificats via le profil
 - **Validité (jours)** : Validité des certificats émis via WSTEP quand la demande ne correspond à aucun modèle ; sinon, la validité du modèle correspondant s'applique
 
 Un modèle avec un type de clé **ML-DSA** est annoncé par l'OID de son algorithme de clé, avec le Microsoft Software Key Storage Provider et une spécification de clé réservée à la signature. Il est masqué en mode FIPS, et l'inscription depuis un vrai client Windows n'a pas encore été testée.
@@ -493,8 +506,8 @@ WSTEP ne sert que le type de requête Issue, renouvellements compris, et refuse 
 ### Kerberos / SPNEGO
 
 Lie les points de terminaison XCEP/WSTEP authentifiés par Kerberos utilisés pour l'auto-inscription GPO silencieuse, afin que les machines et les utilisateurs soient authentifiés par leur ticket Kerberos plutôt que par une invite d'identifiants :
-- **Nom de principal de service (SPN)** : p. ex. \`HTTP/ucm.exemple.fr@EXEMPLE.FR\`
-- **Keytab** : Généré avec \`ktpass\` ou \`ktutil\` sur le contrôleur de domaine pour le SPN ci-dessus
+- **Nom de principal de service (SPN)** : p. ex. \`HTTP/ucm.exemple.fr@EXEMPLE.FR\`, commun à tous les profils avec les interrupteurs XCEP, WSTEP et Kerberos
+- **Keytab** : Un par profil, généré avec \`ktpass\` ou \`ktutil\` sur le contrôleur de domaine de son realm. Chaque entrée doit être \`HTTP/<hôte>@<realm du profil>\` ; le formulaire liste par realm les entrées du fichier choisi et signale un realm qui n'est pas celui du profil. Les keytabs de tous les profils sont servis comme un seul fichier
 
 > ⚠ Kerberos nécessite le **backend \`gssapi\`** côté serveur (la bibliothèque Python \`gssapi\` plus les bibliothèques Kerberos système) : le paquet SPNEGO de base seul ne suffit pas. Sans lui, l'authentification Kerberos ne fonctionnera pas même si elle est activée ici, et la liaison Kerberos n'est pas annoncée ; un avertissement s'affiche sur l'onglet.
 
@@ -502,6 +515,7 @@ Les images Docker embarquent ce backend depuis la v2.251.
 
 ### URL de stratégie d'inscription
 
+Les mêmes pour tous les profils : le routage se fait par realm, pas par URL.
 - **Nom d'utilisateur/Mot de passe** : Demande des identifiants ; pour l'inscription interactive « Demander un nouveau certificat », ne nécessite pas Active Directory
 - **Kerberos** : Aucune invite d'identifiants ; nécessite un client joint au domaine et une configuration GPO
 
@@ -511,7 +525,7 @@ En plus de Nom d'utilisateur/Mot de passe et Kerberos, WSTEP prend en charge le 
 
 XML-DSig n'a pas de méthode de signature ML-DSA : un certificat **ML-DSA** ne peut donc pas se renouveler ainsi, UCM nomme la clé dans son refus et le client inscrit un nouveau certificat.
 
-Windows peut aussi renouveler avec \`certreq ... Renew\`, authentifié par le certificat à renouveler comme certificat client TLS : activez mTLS avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé (v2.248).
+Le renouvellement par certificat ne sert que les certificats émis par l'inscription Windows (WSTEP) ; un certificat signé à la main est remplacé par une nouvelle inscription, pas renouvelé. Sous TLS, le certificat à renouveler est le certificat client : activez mTLS avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé (v2.248).
 
 ### Extension de sécurité SID (KB5014754)
 
