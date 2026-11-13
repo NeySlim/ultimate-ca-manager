@@ -31,7 +31,7 @@ def _post(client, url, body):
 
 
 class TestADConnectorTest:
-    URL = '/api/v2/ad-connector/test'
+    URL = '/api/v2/ad-connectors/test'
 
     @pytest.fixture
     def captured(self, app, monkeypatch):
@@ -39,15 +39,15 @@ class TestADConnectorTest:
         calls = []
         monkeypatch.setattr(lookup, 'test_connection',
                             lambda cfg: calls.append(cfg) or {'success': True, 'message': 'ok'})
-        # Linked to the default profile, if any: the test route reads that profile's connector
+        # The form names the saved connector by id: its password is the one a blank field reuses
         with app.app_context():
-            mount_connector(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
+            self.saved_id = mount_connector(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
                             verify_ssl=True, base_dn='DC=corp,DC=local',
-                            bind_dn='CN=svc,DC=corp,DC=local', password=SAVED_PASSWORD)
+                            bind_dn='CN=svc,DC=corp,DC=local', password=SAVED_PASSWORD).id
         return calls
 
     def _form(self, **over):
-        body = {'servers': ['dc1.corp.local'], 'port': 636, 'use_ssl': True, 'verify_ssl': True,
+        body = {'id': self.saved_id, 'servers': ['dc1.corp.local'], 'port': 636, 'use_ssl': True, 'verify_ssl': True,
                 'bind_dn': 'CN=svc,DC=corp,DC=local', 'bind_password': ''}
         body.update(over)
         return body

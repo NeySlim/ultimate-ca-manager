@@ -99,7 +99,7 @@ def _put_config(app, key, value):
 def test_wstep_toggle_in_a_ha_container_queues_the_restart_with_the_setting(app, auth_client, ha_commands):
     old = _config(app, 'wstep_enabled')
     try:
-        r = auth_client.patch('/api/v2/wstep/config', json={'enabled': old != 'true'})
+        r = auth_client.patch('/api/v2/windows-profiles/settings', json={'wstep_enabled': old != 'true'})
         assert r.status_code == 200, r.data
         assert ha_commands() == [cc.RESTART]
         assert 'requires_container_restart' not in (r.get_json().get('data') or {})
@@ -156,7 +156,7 @@ def test_admin_allowlist_not_saved_when_the_command_is_not(app, auth_client, bro
 def test_wstep_toggle_not_saved_when_its_restart_is_not(app, auth_client, broken_emit):
     old = _config(app, 'wstep_enabled')
     try:
-        r = auth_client.patch('/api/v2/wstep/config', json={'enabled': old != 'true'})
+        r = auth_client.patch('/api/v2/windows-profiles/settings', json={'wstep_enabled': old != 'true'})
         assert r.status_code != 200, r.data
         assert _config(app, 'wstep_enabled') == old and broken_emit() == []
     finally:

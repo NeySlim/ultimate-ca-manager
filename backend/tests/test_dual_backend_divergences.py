@@ -99,8 +99,6 @@ def test_a_negative_limit_no_longer_defeats_the_cap(auth_client, create_cert):
 
 @pytest.mark.parametrize('path', [
     '/api/v2/est/config',
-    '/api/v2/wstep/config',
-    '/api/v2/xcep/config',
 ])
 def test_an_integer_ca_refid_is_a_clean_refusal(auth_client, path):
     """Not a 500 from the driver: the value is text before it reaches SQL."""
@@ -118,7 +116,7 @@ def test_no_route_hands_a_refid_column_an_unconverted_request_value():
 
     root = pathlib.Path(__file__).resolve().parent.parent
     offenders = []
-    for module in ('api/v2/est.py', 'api/v2/wstep.py', 'api/v2/xcep.py',
+    for module in ('api/v2/est.py', 'api/v2/windows_profiles.py',
                    'api/v2/tsa.py', 'api/v2/scep.py'):
         for lineno, line in enumerate(
             (root / module).read_text(encoding='utf-8').splitlines(), 1

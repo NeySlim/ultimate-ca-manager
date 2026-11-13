@@ -17,6 +17,7 @@ from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS
 from services.windows_profiles.legacy import MIGRATED_KEYS, profile_from_2x
 from tests.fixtures.templates import delete_templates
+from tests.windows_profile_support import upload_keytab
 
 XCEP_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'
 XCEP_NS = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollmentpolicy'
@@ -346,11 +347,13 @@ def test_xcep_without_its_own_ca_is_switched_off(app, client, auth_client, clean
                 db.session.commit()
     r = client.post(XCEP_URL, data=_envelope())
     assert r.status_code == 503 and r.data == b'XCEP disabled'
-    data = auth_client.get('/api/v2/xcep/config').get_json()['data']
-    assert (data['enabled'], data['ca_refid'], data['effective_ca_refid']) == (False, '', issuing['refid'])
-    assert data['effective_ca_id'] == issuing['id']
+    with app.app_context():
+        from services import windows_profiles
+        profile = windows_profiles.default_profile()
+        assert not profile.policy_ca_refid
+        assert windows_profiles.policy_ca(profile).refid == issuing['refid']
     # The operator who wants the issuing CA's policy switches XCEP on (A4)
-    assert auth_client.patch('/api/v2/xcep/config', json={'enabled': True}).status_code == 200
+    assert auth_client.patch('/api/v2/windows-profiles/settings', json={'xcep_enabled': True}).status_code == 200
     assert client.post(XCEP_URL, data=_envelope()).status_code == 200
 
 
@@ -485,12 +488,14 @@ def test_an_undeterminable_realm_refuses_kerberos_only(app, client, auth_client,
     # 2.x also advertised the Kerberos CES when it served it: the only byte that differs
     r = client.post(XCEP_URL, data=_envelope())
     assert r.status_code == 200 and r.data == before
-    reason = auth_client.get('/api/v2/kerberos/config').get_json()['data']['reason']
+    with app.app_context():
+        reason = negotiate_auth.not_configured_reason() or auth_client.get(
+            f'/api/v2/windows-profiles/{_default().id}').get_json()['data']['kerberos_refusal']
     assert reason == ('default profile has no realm: Kerberos refused until one is set'
                       if served_by_2x else 'no SPN set')
 
 
-def test_the_realm_of_the_default_profile_is_set_through_the_kerberos_route(
+def test_the_realm_of_the_default_profile_is_set_through_the_profile_api(
         app, auth_client, clean_slate, two_cas, no_shared_keytab, monkeypatch, tmp_path):
     """The way out of A1's refusal: an explicit realm, in capitals, one the keytab names."""
     from tests.test_windows_profile_migration import TWO_REALMS
@@ -505,20 +510,21 @@ def test_the_realm_of_the_default_profile_is_set_through_the_kerberos_route(
             _set(key, value)
         db.session.commit()
         _migrate_app_db(keytab=TWO_REALMS)
-    # Capitals, keytab or not
-    assert auth_client.patch('/api/v2/kerberos/config', json={'realm': 'two.example'}).status_code == 400
     with app.app_context():
+        default_id = _default().id
         _default().set_keytab(TWO_REALMS)
         db.session.commit()
-    for bad, status in (('two.example', 400), ('THREE.EXAMPLE', 400), ('', 400), (None, 400)):
-        r = auth_client.patch('/api/v2/kerberos/config', json={'realm': bad})
-        assert r.status_code == status, (bad, r.data)
+    url = f'/api/v2/windows-profiles/{default_id}'
+    # A realm the keytab does not name, or none at all, leaves the profile without one
+    for bad in ('THREE.EXAMPLE', ''):
+        r = auth_client.put(url, json={'realm': bad})
+        assert r.status_code == 400, (bad, r.data)
     with app.app_context():
         from services.windows_profiles import kerberos_refusal
         assert _default().realm is None and kerberos_refusal() is not None
-    assert auth_client.patch('/api/v2/kerberos/config', json={'realm': 'TWO.EXAMPLE'}).status_code == 200
-    data = auth_client.get('/api/v2/kerberos/config').get_json()['data']
-    assert (data['realm'], data['configured'], data['reason']) == ('TWO.EXAMPLE', True, None)
+    assert auth_client.put(url, json={'realm': 'two.example'}).status_code == 200
+    data = auth_client.get(url).get_json()['data']
+    assert (data['realm'], data['kerberos_refusal']) == ('TWO.EXAMPLE', None)
 
 
 @pytest.mark.parametrize('keytab, realm', [('ONE_REALM', 'EXAMPLE.TEST'), ('TWO_REALMS', None)],
@@ -587,7 +593,6 @@ def test_an_uploaded_keytab_names_the_realm_before_a_disabled_connector(
         app, auth_client, clean_slate, no_shared_keytab, monkeypatch, tmp_path):
     """The upload reads the keytab it brings, as the migration does: its single realm wins over
     the DN of a disabled connector."""
-    import io
     from tests.test_windows_profile_migration import ONE_REALM
     monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', tmp_path / 'kerberos.keytab')
     # GSSAPI is not what names the realm: the entries are read from the bytes
@@ -597,8 +602,7 @@ def test_an_uploaded_keytab_names_the_realm_before_a_disabled_connector(
         _connector_as({'enabled': False, 'base_dn': 'DC=corp,DC=example'})
         _set('kerberos_spn', 'HTTP/testhost.example.test')
         db.session.commit()
-    r = auth_client.post('/api/v2/kerberos/keytab', data={'file': (io.BytesIO(ONE_REALM), 'k.keytab')},
-                         content_type='multipart/form-data')
+    r = upload_keytab(auth_client, ONE_REALM, filename='k.keytab')
     assert r.status_code == 200, r.data
     with app.app_context():
         assert _default().realm == 'EXAMPLE.TEST'
@@ -708,8 +712,10 @@ def test_a_concurrent_default_profile_is_the_one_written(app, auth_client, clean
         db.session.add(WindowsEnrollmentProfile(name='default', is_default=True, xcep_username='first'))
         db.session.commit()
     _another_node_created_the_default(monkeypatch, misses=1)
-    r = auth_client.patch('/api/v2/xcep/config', json={'username': 'second'})
-    assert r.status_code == 200, r.data
+    with app.app_context():
+        from services import windows_profiles
+        windows_profiles.default_for_write('test').xcep_username = 'second'
+        db.session.commit()
     with app.app_context():
         assert [p.xcep_username for p in WindowsEnrollmentProfile.query.filter_by(is_default=True)] == ['second']
 

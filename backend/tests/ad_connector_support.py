@@ -38,3 +38,25 @@ def clear_connectors():
     WindowsEnrollmentProfile.query.update({'connector_id': None})
     ADConnectorConfig.query.delete()
     db.session.commit()
+
+
+def save_connector(client, payload, name='default'):
+    """Save *payload* on the lowest-id connector (the collection route), made first if none exists."""
+    with client.application.app_context():
+        row = connector_row()
+        row_id = row.id if row is not None else None
+    if row_id is None:
+        return client.post('/api/v2/ad-connectors', json={'name': name, **payload})
+    return client.put(f'/api/v2/ad-connectors/{row_id}', json=payload)
+
+
+def connector_id():
+    row = connector_row()
+    return row.id if row is not None else None
+
+
+def saved_connector_test(client):
+    """POST the saved-connector test of the lowest-id connector."""
+    with client.application.app_context():
+        row_id = connector_id()
+    return client.post(f'/api/v2/ad-connectors/{row_id}/test')

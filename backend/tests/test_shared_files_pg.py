@@ -3,7 +3,6 @@
 Node B is a second applier on the same schema with files of its own; its restart is what
 the gunicorn master then does before opening its TLS socket (boot_config.materialize_https).
 """
-import io
 import secrets
 import time
 from datetime import timedelta
@@ -16,6 +15,7 @@ from services import shared_files
 from services.kerberos import negotiate_auth
 from tests import pg_app_harness
 from tests.keytab_support import keytab
+from tests.windows_profile_support import upload_keytab
 from utils.datetime_utils import utc_now
 
 pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
@@ -69,9 +69,7 @@ def test_a_keytab_uploaded_on_a_is_served_by_b_after_the_command(app, auth_clien
     monkeypatch.setattr(negotiate_auth, 'is_enabled', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'get_spn', lambda: 'HTTP/ucm.example.test@EXAMPLE.TEST')
     monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', tmp_path / 'a.keytab')
-    r = auth_client.post('/api/v2/kerberos/keytab',
-                         data={'file': (io.BytesIO(KEYTAB), 'ucm.keytab')},
-                         content_type='multipart/form-data')
+    r = upload_keytab(auth_client, KEYTAB)
     assert r.status_code == 200, r.data
 
     on_b = tmp_path / 'b.keytab'
@@ -115,10 +113,7 @@ def test_keytabs_of_two_profiles_uploaded_on_a_compose_the_same_file_on_b(app, a
 
 
 def _upload_keytab(client, data, profile_id=None):
-    form = {'file': (io.BytesIO(data), 'ucm.keytab')}
-    if profile_id is not None:
-        form['profile_id'] = str(profile_id)
-    return client.post('/api/v2/kerberos/keytab', data=form, content_type='multipart/form-data')
+    return upload_keytab(client, data, profile_id)
 
 
 def test_a_certificate_applied_on_a_restarts_b_which_then_serves_it(

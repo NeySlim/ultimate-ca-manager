@@ -5,10 +5,14 @@ Windows enrollment profiles v2.0
 import json
 import logging
 
+import os
+import tempfile
+
 from flask import Blueprint, g, request
 
-from auth.unified import require_auth
-from models import CA, ADConnectorConfig, Certificate, WindowsEnrollmentProfile, WindowsProfileTemplate, db
+from auth.unified import has_permission, require_auth
+from models import (CA, ADConnectorConfig, Certificate, SystemConfig, WindowsEnrollmentProfile,
+                    WindowsProfileTemplate, db)
 from services import windows_profiles
 from services.audit_service import AuditService
 from services.ad_connector import lookup
@@ -29,6 +33,7 @@ MAX_PER_PAGE = 200
 SERVICES = ('xcep', 'wstep')
 WRITABLE = ('name', 'realm', 'enabled', 'is_default', 'connector_id', 'issuing_ca_refid',
             'policy_ca_refid', 'validity_days', 'allowed_ad_group', 'pinned_subject_fields',
+            'template_ids',
             *(f'{svc}_{part}' for svc in SERVICES for part in ('username', 'password')))
 
 
@@ -36,15 +41,84 @@ def _actor():
     return getattr(getattr(g, 'current_user', None), 'username', None)
 
 
-def _render(profile, ca_names):
-    """The profile as the API shows it: passwords and keytab only as set/unset flags."""
-    return {
+STATES = ('complete', 'keytab_missing', 'connector_failing', 'disabled')
+KEYTAB_EXTENSIONS = {'.keytab', '.kt'}
+# A keytab is a few dozen bytes per key entry; the composed file has no cap
+MAX_KEYTAB_SIZE = 256 * 1024
+
+
+def _failing_connector_ids():
+    """The connectors whose last probe says down (at most a few hundred rows, read once)."""
+    from services.ad_connector import health
+    return {c.id for c in ADConnectorConfig.query.all() if health.state_of(c.health) == health.STATE_DOWN}
+
+
+def _state(profile, failing):
+    """One state per profile; a disabled profile is shown as such whatever else is missing."""
+    if not profile.enabled:
+        return 'disabled'
+    if not profile.keytab:
+        return 'keytab_missing'
+    if profile.connector_id in failing:
+        return 'connector_failing'
+    return 'complete'
+
+
+def _connectors(profiles):
+    ids = {p.connector_id for p in profiles if p.connector_id}
+    if not ids:
+        return {}
+    return {c.id: c for c in ADConnectorConfig.query.filter(ADConnectorConfig.id.in_(ids)).all()}
+
+
+def _template_ids(profiles):
+    ids = [p.id for p in profiles]
+    found = {i: [] for i in ids}
+    if ids:
+        rows = WindowsProfileTemplate.query.filter(WindowsProfileTemplate.profile_id.in_(ids)).all()
+        for row in rows:
+            found[row.profile_id].append(row.template_id)
+    return {i: sorted(v) for i, v in found.items()}
+
+
+def keytab_entries(profile):
+    """``(entries, error)``: the key entries of the profile's keytab, each with its realm."""
+    from services.kerberos.keytab_format import read_entries
+    try:
+        raw = profile.keytab_bytes()
+    except ValueError:
+        return [], 'the keytab cannot be decrypted here'
+    if raw is None:
+        return [], None
+    entries = read_entries(raw)
+    if entries is None:
+        return [], 'the entries of the keytab cannot be read'
+    return [{'principal': e.principal, 'realm': e.realm, 'kvno': e.kvno, 'enctype': e.enctype}
+            for e in entries], None
+
+
+def _render(profile, ca_names, connectors=None, failing=None, templates=None, detail=False):
+    """The profile as the API shows it: passwords and keytab only as set/unset flags.
+    ``detail`` adds the keytab entries, which cost a decryption per profile."""
+    connectors = connectors if connectors is not None else _connectors([profile])
+    failing = failing if failing is not None else _failing_connector_ids()
+    if templates is None:
+        templates = _template_ids([profile]) if profile.id else {}
+    connector = connectors.get(profile.connector_id)
+    from services.ad_connector import health
+    data = {
         'id': profile.id,
         'name': profile.name,
         'realm': profile.realm,
         'is_default': bool(profile.is_default),
         'enabled': bool(profile.enabled),
+        'state': _state(profile, failing),
         'connector_id': profile.connector_id,
+        'connector_name': connector.name if connector is not None else None,
+        'connector_enabled': bool(connector.enabled) if connector is not None else None,
+        'connector_health': health.state_of(connector.health) if connector is not None else None,
+        'connector_realm': (lookup.realm_of_base_dn(connector.base_dn)
+                            if connector is not None else None),
         'issuing_ca_refid': profile.issuing_ca_refid,
         'issuing_ca_name': ca_names.get(profile.issuing_ca_refid),
         'policy_ca_refid': profile.policy_ca_refid,
@@ -54,10 +128,25 @@ def _render(profile, ca_names):
         **{f'{svc}_password_set': bool(getattr(profile, f'{svc}_password')) for svc in SERVICES},
         'allowed_ad_group': profile.allowed_ad_group,
         'pinned_subject_fields': profile.pinned_subject_fields,
+        'template_ids': templates.get(profile.id, []),
         'keytab_set': bool(profile.keytab),
+        'kerberos_refusal': windows_profiles.kerberos_refusal(profile),
         'created_at': profile.created_at.isoformat() if profile.created_at else None,
         'updated_at': profile.updated_at.isoformat() if profile.updated_at else None,
     }
+    if detail:
+        data['keytab_entries'], data['keytab_error'] = keytab_entries(profile)
+    return data
+
+
+def _render_one(profile, detail=False):
+    return _render(profile, _ca_names([profile]), detail=detail)
+
+
+def _render_page(profiles):
+    names, connectors = _ca_names(profiles), _connectors(profiles)
+    failing, templates = _failing_connector_ids(), _template_ids(profiles)
+    return [_render(p, names, connectors, failing, templates) for p in profiles]
 
 
 def _ca_names(profiles):
@@ -137,6 +226,11 @@ def _apply(profile, data):
             return f'validity_days must be between {MIN_VALIDITY_DAYS} and {MAX_VALIDITY_DAYS}', 400
         profile.validity_days = days
 
+    if 'template_ids' in data:
+        ids, err = _template_id_list(data['template_ids'])
+        if err:
+            return err, 400
+        profile._wanted_templates = ids
     if 'pinned_subject_fields' in data:
         pinned, err = _pinned_subject_fields(data['pinned_subject_fields'])
         if err:
@@ -165,6 +259,29 @@ def _apply(profile, data):
     if 'realm' in data or 'connector_id' in data:
         return _connector_problem(profile)
     return None
+
+
+def _template_id_list(value):
+    """(ids, error): a list of existing template ids; empty: the templates of the CA."""
+    from models import CertificateTemplate
+    if not isinstance(value, list) or any(type(i) is not int for i in value):
+        return None, 'template_ids must be a list of template ids'
+    ids = sorted(set(value))
+    found = {t.id for t in CertificateTemplate.query.filter(CertificateTemplate.id.in_(ids)).all()} if ids else set()
+    if found != set(ids):
+        return None, f'template not found: {sorted(set(ids) - found)}'
+    return ids, None
+
+
+def _store_templates(profile):
+    """Replace the profile's template links by the ones validated by _apply, if it got any."""
+    wanted = getattr(profile, '_wanted_templates', None)
+    if wanted is None:
+        return
+    db.session.flush()
+    WindowsProfileTemplate.query.filter_by(profile_id=profile.id).delete()
+    for template_id in wanted:
+        db.session.add(WindowsProfileTemplate(profile_id=profile.id, template_id=template_id))
 
 
 def _pinned_subject_fields(value):
@@ -235,19 +352,37 @@ def _audit(action, profile, details):
 @bp.route('/api/v2/windows-profiles', methods=['GET'])
 @require_auth(['read:xcep'])
 def list_windows_profiles():
-    """Profiles, paginated; ``q`` matches the name or the realm."""
+    """Profiles, paginated; ``q`` matches the name or the realm, ``ca`` (a refid) the issuing or
+    policy CA, ``state`` one of complete, keytab_missing, connector_failing, disabled."""
     page, per_page = parse_request_pagination(default_per_page=25, max_per_page=MAX_PER_PAGE)
-    query = WindowsEnrollmentProfile.query
+    P = WindowsEnrollmentProfile
+    query = P.query
     q = (request.args.get('q') or '').strip()
     if q:
         like = f'%{_escape_like(q)}%'
-        query = query.filter(db.or_(WindowsEnrollmentProfile.name.ilike(like, escape='\\'),
-                                    WindowsEnrollmentProfile.realm.ilike(like, escape='\\')))
-    query = query.order_by(WindowsEnrollmentProfile.name, WindowsEnrollmentProfile.id)
+        query = query.filter(db.or_(P.name.ilike(like, escape='\\'), P.realm.ilike(like, escape='\\')))
+    ca = (request.args.get('ca') or '').strip()
+    if ca:
+        query = query.filter(db.or_(P.issuing_ca_refid == ca, P.policy_ca_refid == ca))
+    state = (request.args.get('state') or '').strip()
+    if state:
+        if state not in STATES:
+            return error_response(f"state must be one of {', '.join(STATES)}", 400)
+        failing = _failing_connector_ids()
+        if state == 'disabled':
+            query = query.filter(P.enabled.is_(False))
+        elif state == 'keytab_missing':
+            query = query.filter(P.enabled.is_(True), P.keytab.is_(None))
+        elif state == 'connector_failing':
+            query = query.filter(P.enabled.is_(True), P.keytab.is_not(None), P.connector_id.in_(failing or [0]))
+        else:
+            query = query.filter(P.enabled.is_(True), P.keytab.is_not(None))
+            if failing:
+                query = query.filter(db.or_(P.connector_id.is_(None), P.connector_id.not_in(failing)))
+    query = query.order_by(P.name, P.id)
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    names = _ca_names(pagination.items)
     return success_response(
-        data=[_render(p, names) for p in pagination.items],
+        data=_render_page(pagination.items),
         meta={'total': pagination.total, 'page': page, 'per_page': per_page,
               'total_pages': pagination.pages})
 
@@ -258,7 +393,7 @@ def get_windows_profile(profile_id):
     profile = db.session.get(WindowsEnrollmentProfile, profile_id)
     if profile is None:
         return error_response('Profile not found', 404)
-    return success_response(data=_render(profile, _ca_names([profile])))
+    return success_response(data=_render_one(profile, detail=True))
 
 
 @bp.route('/api/v2/windows-profiles', methods=['POST'])
@@ -274,11 +409,12 @@ def create_windows_profile():
         db.session.rollback()
         return error_response(problem[0], problem[1])
     db.session.add(profile)
+    _store_templates(profile)
     ok, err = safe_commit(logger, 'Failed to create the Windows enrollment profile')
     if not ok:
         return err
     _audit('windows_profile_create', profile, f'Created Windows enrollment profile {profile.name}')
-    return success_response(data=_render(profile, _ca_names([profile])),
+    return success_response(data=_render_one(profile),
                             message='Profile created', status=201)
 
 
@@ -297,12 +433,13 @@ def update_windows_profile(profile_id):
         db.session.rollback()
         return error_response(problem[0], problem[1])
     profile.updated_by = _actor()
+    _store_templates(profile)
     ok, err = safe_commit(logger, 'Failed to update the Windows enrollment profile')
     if not ok:
         return err
     _audit('windows_profile_update', profile,
            f"Updated Windows enrollment profile {profile.name}; fields: {', '.join(changed) or 'none'}")
-    return success_response(data=_render(profile, _ca_names([profile])), message='Profile updated')
+    return success_response(data=_render_one(profile, detail=True), message='Profile updated')
 
 
 @bp.route('/api/v2/windows-profiles/<int:profile_id>', methods=['DELETE'])
@@ -335,3 +472,206 @@ def delete_windows_profile(profile_id):
                             resource_id=str(profile_id), resource_name=name,
                             details=f'Deleted Windows enrollment profile {name}', success=True)
     return success_response(message='Profile deleted')
+
+
+def _read_keytab_upload():
+    """``(content, entries, error_response)`` for the multipart ``file`` field: a keytab GSSAPI
+    loads and that holds at least one entry."""
+    from services.kerberos import negotiate_auth
+    from services.kerberos.keytab_format import read_entries
+    from utils.file_validation import validate_upload
+    if 'file' not in request.files:
+        return None, None, error_response('No file provided', 400)
+    try:
+        content, _name = validate_upload(request.files['file'], KEYTAB_EXTENSIONS,
+                                         max_size=MAX_KEYTAB_SIZE)
+    except ValueError as e:
+        return None, None, error_response(str(e), 400)
+    fd, tmp_path = tempfile.mkstemp(prefix='.kerberos-keytab-check-')
+    try:
+        with os.fdopen(fd, 'wb') as f:
+            f.write(content)
+        inspection = negotiate_auth.inspect_keytab(tmp_path)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+    if not inspection['valid']:
+        return None, None, error_response(
+            f"Keytab is not a valid krb5 keytab: {inspection['error']}", 400)
+    entries = read_entries(content)
+    if not entries:
+        return None, None, error_response('Keytab holds no entry', 400)
+    return content, entries, None
+
+
+def _foreign_entries(entries, realm):
+    """The principals of *entries* that are not ``<service>/<SPN host>@<realm>``: the unnamed
+    acceptor takes a ticket for any entry, so a stray one widens what UCM accepts."""
+    from services.kerberos import negotiate_auth
+    parsed = negotiate_auth._parse_spn(negotiate_auth.get_spn())
+    service, host = parsed if parsed else ('HTTP', None)
+    hosts = {e.components[1].lower() for e in entries if len(e.components) == 2}
+    if host is None and len(hosts) == 1:
+        host = next(iter(hosts))
+    return [e.principal for e in entries
+            if e.realm != realm or len(e.components) != 2 or e.components[0] != service
+            or e.components[1].lower() != (host or '').lower()]
+
+
+@bp.route('/api/v2/windows-profiles/<int:profile_id>/keytab', methods=['POST'])
+@require_auth(['write:xcep'])
+def upload_profile_keytab(profile_id):
+    """Replace the keytab of a profile (multipart ``file``). Loaded with GSSAPI before it is
+    stored; every entry must be ``<SPN service>/<SPN host>@<realm of the profile>``, else 400.
+    With ``dry_run`` the entries are listed, per realm, and nothing is stored."""
+    from services import cluster_commands
+    from services.kerberos import negotiate_auth
+    profile = db.session.get(WindowsEnrollmentProfile, profile_id)
+    if profile is None:
+        return error_response('Profile not found', 404)
+    content, entries, err = _read_keytab_upload()
+    if err:
+        return err
+    listed = [{'principal': e.principal, 'realm': e.realm, 'kvno': e.kvno, 'enctype': e.enctype}
+              for e in entries]
+    if request.form.get('dry_run') in ('1', 'true'):
+        realms = sorted({e.realm for e in entries})
+        return success_response(data={
+            'keytab_entries': listed, 'realms': realms, 'profile_realm': profile.realm,
+            'foreign_entries': sorted(set(_foreign_entries(entries, profile.realm)))
+            if profile.realm else [],
+        })
+    profile.updated_by = _actor()
+    profile.set_keytab(content)
+    windows_profiles.fill_realm(profile)
+    if profile.realm is None:
+        db.session.rollback()
+        return error_response('the profile has no realm: set it, then upload its keytab', 400)
+    foreign = _foreign_entries(entries, profile.realm)
+    if foreign:
+        db.session.rollback()
+        return error_response(f"Keytab entries outside HTTP/<host>@{profile.realm}: "
+                              f"{', '.join(sorted(set(foreign)))}", 400)
+    try:
+        windows_profiles.publish_keytab(actor=_actor())
+    except ValueError as e:
+        db.session.rollback()
+        return error_response(f'Keytab not composed: {e}', 409)
+    cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+    ok, err = safe_commit(logger, 'Failed to store the Windows profile keytab')
+    if not ok:
+        return err
+    try:
+        negotiate_auth.write_stored_keytab()
+    except (OSError, ValueError) as e:
+        logger.error('Failed to write the Kerberos keytab: %s', e)
+        return error_response('Failed to save keytab', 500)
+    AuditService.log_action(
+        action='kerberos_keytab_upload', resource_type='windows_profile',
+        resource_id=str(profile.id), resource_name=profile.name,
+        details=f"Uploaded a Kerberos keytab for profile {profile.name} (principals: "
+                f"{', '.join(sorted({e.principal for e in entries}))})",
+        success=True)
+    return success_response(message='Keytab uploaded', data=_render_one(profile, detail=True))
+
+
+def _flag(key):
+    row = SystemConfig.query.filter_by(key=key).first()
+    return bool(row and (row.value or '').lower() == 'true')
+
+
+def _put_setting(key, value):
+    row = SystemConfig.query.filter_by(key=key).first()
+    if row is None:
+        db.session.add(SystemConfig(key=key, value=value))
+    else:
+        row.value = value
+
+
+@bp.route('/api/v2/windows-profiles/settings', methods=['GET'])
+@require_auth(['read:xcep'])
+def get_windows_settings():
+    """The switches and the SPN shared by every profile, and the state of the composed keytab.
+    The WSTEP and Kerberos parts need their own read scope."""
+    from services.kerberos import negotiate_auth
+    perms = getattr(g, 'permissions', None) or []
+    data = {'xcep_enabled': _flag('xcep_enabled')}
+    if has_permission('read:wstep', perms):
+        data['wstep_enabled'] = _flag('wstep_enabled')
+    if has_permission('read:kerberos', perms):
+        inspection = negotiate_auth.inspect_keytab()
+        data.update({
+            'kerberos_enabled': negotiate_auth.is_enabled(),
+            'kerberos_spn': negotiate_auth.get_spn(),
+            'library_available': negotiate_auth.is_library_available(),
+            'keytab_set': negotiate_auth.KEYTAB_PATH.exists(),
+            'keytab_valid': inspection['valid'],
+            'keytab_error': inspection['error'],
+            'keytab_entries': inspection['entries'],
+        })
+    return success_response(data=data)
+
+
+@bp.route('/api/v2/windows-profiles/settings', methods=['PATCH'])
+@require_auth(['write:xcep'])
+def update_windows_settings():
+    """Set the XCEP, WSTEP and Kerberos switches and the SPN. WSTEP and Kerberos need their own
+    write scope; a change of the WSTEP switch restarts the service (TLS cap read at startup)."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return error_response('A JSON object is required', 400)
+    perms = getattr(g, 'permissions', None) or []
+    for key in ('xcep_enabled', 'wstep_enabled', 'kerberos_enabled'):
+        if key in data and type(data[key]) is not bool:
+            return error_response(f'{key} must be a JSON boolean', 400)
+    if 'kerberos_spn' in data and not isinstance(data['kerberos_spn'], str):
+        return error_response('kerberos_spn must be a string', 400)
+    if 'wstep_enabled' in data and not has_permission('write:wstep', perms):
+        return error_response('Insufficient permissions', 403)
+    if ({'kerberos_enabled', 'kerberos_spn'} & set(data)) and not has_permission('write:kerberos', perms):
+        return error_response('Insufficient permissions', 403)
+
+    enabled_changed = 'wstep_enabled' in data and _flag('wstep_enabled') != data['wstep_enabled']
+    for key in ('xcep_enabled', 'wstep_enabled', 'kerberos_enabled'):
+        if key in data:
+            _put_setting(key, 'true' if data[key] else 'false')
+    if 'kerberos_spn' in data:
+        _put_setting('kerberos_spn', data['kerberos_spn'].strip())
+        default = windows_profiles.default_profile()
+        if default is not None:
+            db.session.flush()
+            windows_profiles.fill_realm(default)
+
+    from utils.ha import ha_enabled
+    rolling = enabled_changed and ha_enabled()
+    if rolling:
+        from services.cluster_commands import RESTART, emit
+        emit(RESTART)
+    ok, err = safe_commit(logger, 'Failed to save the Windows enrollment settings')
+    if not ok:
+        return err
+    AuditService.log_action(action='windows_settings_update', resource_type='windows_profile',
+                            resource_name='Windows enrollment settings',
+                            details=f"Updated Windows enrollment settings: {', '.join(sorted(data))}",
+                            success=True)
+    if rolling:
+        return success_response(message='Settings saved. Rolling restart requested: '
+                                        'the nodes restart one at a time.')
+    if enabled_changed:
+        from config.settings import is_docker
+        if is_docker():
+            return success_response(
+                message='Settings saved. Restart the container to apply the TLS behavior change.',
+                data={'requires_container_restart': True})
+        from utils.service_manager import restart_service
+        success, msg = restart_service()
+        if not success:
+            logger.warning('Settings saved but service restart failed: %s', msg)
+            return success_response(
+                message='Settings saved, but the automatic restart failed: restart UCM manually '
+                        'for the TLS behavior change to take effect.',
+                data={'restart_failed': True})
+        return success_response(message='Settings saved. Service restarting...')
+    return success_response(message='Settings saved')

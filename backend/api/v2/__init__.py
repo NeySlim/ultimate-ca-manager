@@ -36,10 +36,6 @@ from api.v2.certificates import bulk  # noqa: F401
 from api.v2.acme import bp as acme_bp
 from api.v2.scep import bp as scep_bp
 from api.v2.est import bp as est_bp
-from api.v2.xcep import bp as xcep_bp
-from api.v2.wstep import bp as wstep_bp
-from api.v2.kerberos import bp as kerberos_bp
-from api.v2.ad_connector import bp as ad_connector_bp
 from api.v2.ad_connectors import bp as ad_connectors_bp
 from api.v2.windows_profiles import bp as windows_profiles_bp
 from api.v2.tsa import bp as tsa_bp
@@ -120,10 +116,6 @@ API_V2_BLUEPRINTS = [
     acme_bp,
     scep_bp,
     est_bp,
-    xcep_bp,
-    wstep_bp,
-    kerberos_bp,
-    ad_connector_bp,
     ad_connectors_bp,
     windows_profiles_bp,
     tsa_bp,

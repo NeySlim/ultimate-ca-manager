@@ -3,7 +3,6 @@
 The upload stores it and queues reload_keytab (HA) in one transaction; the start writes it,
 and imports once the file of a single node from before it was stored.
 """
-import io
 
 import pytest
 
@@ -12,6 +11,7 @@ from services import cluster_commands as cc
 from services import shared_files
 from services.kerberos import negotiate_auth
 from tests.keytab_support import keytab
+from tests.windows_profile_support import default_profile_id, upload_keytab
 
 KEYTAB = keytab('HTTP/ucm.example.test@EXAMPLE.TEST')
 
@@ -48,8 +48,7 @@ def keytab_on(monkeypatch, tmp_path, app):
 
 
 def _upload(client, data=KEYTAB):
-    return client.post('/api/v2/kerberos/keytab', data={'file': (io.BytesIO(data), 'ucm.keytab')},
-                       content_type='multipart/form-data')
+    return upload_keytab(client, data)
 
 
 def _stored_content(app):
@@ -87,9 +86,10 @@ def test_a_failed_store_queues_nothing_and_writes_no_file(app, auth_client, keyt
 
     def broken(*a, **k):
         raise RuntimeError('database gone')
+    profile_id = default_profile_id(auth_client)
     with monkeypatch.context() as patch:
         patch.setattr('utils.db_transaction.db.session.commit', broken)
-        assert _upload(auth_client).status_code == 500
+        assert upload_keytab(auth_client, KEYTAB, profile_id).status_code == 500
     assert not path.exists()
     with app.app_context():
         assert ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).count() == 0

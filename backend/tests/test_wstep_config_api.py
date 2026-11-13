@@ -1,4 +1,4 @@
-"""Tests for the WSTEP settings API's restart-on-enable-toggle behavior.
+"""Tests for the Windows settings API's restart-on-WSTEP-toggle behavior.
 
 gunicorn_config.py reads wstep_enabled once at worker startup to decide
 whether the whole server needs the TLS-1.2-only cap some Windows
@@ -37,7 +37,7 @@ def test_enabling_wstep_triggers_restart(client, app, auth_client):
         _set_config('wstep_enabled', 'false')
     _clear_restart_signal(app)
 
-    r = auth_client.patch('/api/v2/wstep/config', json={'enabled': True})
+    r = auth_client.patch('/api/v2/windows-profiles/settings', json={'wstep_enabled': True})
     assert r.status_code == 200
     assert 'restarting' in r.get_json()['message'].lower()
 
@@ -54,7 +54,7 @@ def test_disabling_wstep_triggers_restart(client, app, auth_client):
         _set_config('wstep_enabled', 'true')
     _clear_restart_signal(app)
 
-    r = auth_client.patch('/api/v2/wstep/config', json={'enabled': False})
+    r = auth_client.patch('/api/v2/windows-profiles/settings', json={'wstep_enabled': False})
     assert r.status_code == 200
     assert 'restarting' in r.get_json()['message'].lower()
 
@@ -69,7 +69,7 @@ def test_setting_enabled_to_same_value_does_not_restart(client, app, auth_client
         _set_config('wstep_enabled', 'true')
     _clear_restart_signal(app)
 
-    r = auth_client.patch('/api/v2/wstep/config', json={'enabled': True})
+    r = auth_client.patch('/api/v2/windows-profiles/settings', json={'wstep_enabled': True})
     assert r.status_code == 200
     assert 'restarting' not in r.get_json()['message'].lower()
 
@@ -85,7 +85,7 @@ def test_unrelated_field_change_does_not_restart(client, app, auth_client):
         _set_config('wstep_enabled', 'false')
     _clear_restart_signal(app)
 
-    r = auth_client.patch('/api/v2/wstep/config', json={'validity_days': 30})
+    r = auth_client.patch('/api/v2/windows-profiles/settings', json={'kerberos_spn': ''})
     assert r.status_code == 200
     assert 'restarting' not in r.get_json()['message'].lower()
 

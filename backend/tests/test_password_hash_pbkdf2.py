@@ -112,16 +112,19 @@ def test_the_change_password_route_stores_pbkdf2(app, fips_scrypt):
         _drop(app, uid)
 
 
-@pytest.mark.parametrize('route,key', [('/api/v2/est/config', 'est_password'),
-                                       ('/api/v2/wstep/config', 'wstep_password'),
-                                       ('/api/v2/xcep/config', 'xcep_password')])
-def test_protocol_passwords_are_pbkdf2(app, auth_client, fips_scrypt, route, key):
-    from tests.windows_profile_support import get_config, restore, snapshot
+@pytest.mark.parametrize('route,field,key', [('/api/v2/est/config', 'password', 'est_password'),
+                                             ('profile', 'wstep_password', 'wstep_password'),
+                                             ('profile', 'xcep_password', 'xcep_password')])
+def test_protocol_passwords_are_pbkdf2(app, auth_client, fips_scrypt, route, field, key):
+    from tests.windows_profile_support import get_config, put_default_profile, restore, snapshot
     with app.app_context():
         before = snapshot((key,))
     try:
-        r = auth_client.patch(route, content_type=CONTENT_JSON,
-                              data=json.dumps({'password': 'Proto-pw-789!'}))
+        if route == 'profile':
+            r = put_default_profile(auth_client, **{field: 'Proto-pw-789!'})
+        else:
+            r = auth_client.patch(route, content_type=CONTENT_JSON,
+                                  data=json.dumps({field: 'Proto-pw-789!'}))
         assert r.status_code == 200, r.data
         with app.app_context():
             stored = get_config(key)

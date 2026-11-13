@@ -7,7 +7,7 @@ import pytest
 
 from models import AuditLog, WindowsEnrollmentProfile, ADConnectorConfig, db
 from services.ad_connector import health, lookup
-from tests.ad_connector_support import add_connector, clear_connectors
+from tests.ad_connector_support import add_connector, clear_connectors, save_connector
 from tests.windows_profile_support import connectors_kept
 
 DOMAIN_SID = 'S-1-5-21-1608104657-630783805-1473387121'
@@ -240,6 +240,9 @@ def _post(client, **values):
 
 
 def test_a_connector_is_created_with_the_domain_sid_and_no_secret(auth_client, app, monkeypatch):
+    with app.app_context():
+        AuditLog.query.filter_by(action='ad_connector_create', resource_name='forest-a').delete()
+        db.session.commit()
     _Directory(monkeypatch, [_Entry(objectSid=_sid_bytes(DOMAIN_SID))])
     monkeypatch.setattr(lookup, '_connect', lambda config: _Conn([_Entry(objectSid=_sid_bytes(DOMAIN_SID))]))
     response = _post(auth_client)
@@ -251,7 +254,7 @@ def test_a_connector_is_created_with_the_domain_sid_and_no_secret(auth_client, a
     assert [row['name'] for row in listing] == ['forest-a']
     assert 'sekret-pw' not in json.dumps(listing)
     with app.app_context():
-        assert AuditLog.query.filter_by(action='ad_connector_create', resource_id=str(data['id'])).count() == 1
+        assert AuditLog.query.filter_by(action='ad_connector_create', resource_name='forest-a').count() == 1
 
 
 def test_the_domain_sid_is_read_at_the_domain_head_whatever_the_base_dn_depth(auth_client, monkeypatch):
@@ -425,7 +428,7 @@ def test_the_default_profile_names_the_connector_the_protocols_search_with(app):
             db.session.commit()
 
 
-def test_the_legacy_save_reads_the_domain_sid_and_reads_it_again_for_a_new_dc_list(auth_client, app, monkeypatch):
+def test_a_save_reads_the_domain_sid_and_reads_it_again_for_a_new_dc_list(auth_client, app, monkeypatch):
     sids = [DOMAIN_SID]
     monkeypatch.setattr(lookup, '_connect', lambda config: _Conn([_Entry(objectSid=_sid_bytes(sids[0]))]))
 
@@ -433,8 +436,8 @@ def test_the_legacy_save_reads_the_domain_sid_and_reads_it_again_for_a_new_dc_li
         body = {'servers': ['dc1.a.example'], 'base_dn': 'DC=a,DC=example', 'bind_dn': 'svc',
                 'bind_password': 'sekret-pw', 'enabled': True}
         body.update(values)
-        response = auth_client.put('/api/v2/ad-connector', data=json.dumps(body), content_type='application/json')
-        assert response.status_code == 200, response.data
+        response = save_connector(auth_client, body)
+        assert response.status_code in (200, 201), response.data
         with app.app_context():
             return ADConnectorConfig.query.one().domain_sid
 
@@ -443,8 +446,8 @@ def test_the_legacy_save_reads_the_domain_sid_and_reads_it_again_for_a_new_dc_li
     assert put(servers=['dc1.a.example', 'dc2.a.example']) == 'S-1-5-21-1-2-3'
 
 
-def test_the_legacy_screen_shows_the_connector_the_protocols_use(auth_client, app, monkeypatch):
-    """A default profile naming no connector: the screen shows none, and a save gives it a new one."""
+def test_a_new_connector_is_served_by_a_default_profile_that_names_none(auth_client, app, monkeypatch):
+    """A default profile naming no connector takes the first one a save creates."""
     from services import windows_profiles
     from tests.windows_profile_support import default_profile
     monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
@@ -457,15 +460,13 @@ def test_the_legacy_screen_shows_the_connector_the_protocols_use(auth_client, ap
         existing = add_connector('default', server='dc.a.example', base_dn='DC=a,DC=example',
                                  bind_dn='svc', enabled=True).id
     try:
-        assert auth_client.get('/api/v2/ad-connector').get_json()['data']['id'] is None
-        body = {'servers': ['dc.b.example'], 'base_dn': 'DC=b,DC=example', 'bind_dn': 'svc',
-                'bind_password': 'sekret-pw', 'enabled': True}
-        response = auth_client.put('/api/v2/ad-connector', data=json.dumps(body), content_type='application/json')
-        assert response.status_code == 200, response.data
+        body = {'name': 'second', 'servers': ['dc.b.example'], 'base_dn': 'DC=b,DC=example',
+                'bind_dn': 'svc', 'bind_password': 'sekret-pw', 'enabled': True}
+        response = auth_client.post(URL, data=json.dumps(body), content_type='application/json')
+        assert response.status_code == 201, response.data
         created = response.get_json()['data']['id']
         with app.app_context():
             assert created != existing and windows_profiles.default_connector().id == created
-        assert auth_client.get('/api/v2/ad-connector').get_json()['data']['id'] == created
     finally:
         with app.app_context():
             if made:
@@ -522,8 +523,7 @@ def test_a_boolean_id_names_no_connector(auth_client, monkeypatch, connector_id)
     assert looked_up == []
 
 
-@pytest.mark.parametrize('route', ['legacy', 'collection'])
-def test_a_save_reads_the_domain_sid_within_one_connect_timeout(auth_client, monkeypatch, route):
+def test_a_save_reads_the_domain_sid_within_one_connect_timeout(auth_client, monkeypatch):
     """Every DC black-holed: the save waits the connection test's per-DC connect timeout once, not once per DC."""
     directory = _Directory(monkeypatch, [], down={'dc1.a.example', 'dc2.a.example', 'dc3.a.example'})
     now, bind = [0.0], directory._bind
@@ -535,12 +535,7 @@ def test_a_save_reads_the_domain_sid_within_one_connect_timeout(auth_client, mon
     monkeypatch.setattr(lookup, '_connect_to', slow_bind)
     monkeypatch.setattr(lookup, '_clock', lambda: now[0])
     servers = ['dc1.a.example', 'dc2.a.example', 'dc3.a.example']
-    if route == 'legacy':
-        body = {'servers': servers, 'base_dn': 'DC=a,DC=example', 'bind_dn': 'svc',
-                'bind_password': 'sekret-pw', 'enabled': True}
-        response = auth_client.put('/api/v2/ad-connector', data=json.dumps(body), content_type='application/json')
-    else:
-        response = _post(auth_client, servers=servers)
+    response = _post(auth_client, servers=servers)
     assert response.status_code in (200, 201), response.data
     assert response.get_json()['data']['domain_sid'] is None
     assert [host for _name, host in directory.binds] == ['dc1.a.example']
