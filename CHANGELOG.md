@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- CA import: an imported CA is linked at once to the stored CA whose key signed it (CA import, certificate import, OPNsense and smart import, whatever the order of a batch), so SCEP `GetCACert` in chain mode serves the chain without waiting for the hourly repair. Smart import prefers that CA over a same-name one, and still links by name when no stored CA verifies the signature.
 - Kerberos: a Kerberos Microsoft CA connection pointed `KRB5_KTNAME` at its own keytab for the whole process, so XCEP and WSTEP could then accept with the wrong keys; it now sets its client keytab only.
 - ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.
 - Backup: a revocation record archived under a hexadecimal spelling of its serial (`0x`, colons) is restored in a spelling the CRL reads, and two spellings of one serial in an archive both stay, the gravest reason answering.

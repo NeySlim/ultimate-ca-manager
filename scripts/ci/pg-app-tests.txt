@@ -13,3 +13,4 @@ tests/test_postgres_schema_of_its_own.py
 tests/test_db_error_parameters_hidden.py
 tests/test_audit_oversized_fields.py
 tests/test_sso_login_identity.py
+tests/test_import_parent_link.py

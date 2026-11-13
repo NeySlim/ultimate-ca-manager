@@ -68,6 +68,16 @@ def _encoded_private_key(row):
     return None
 
 
+def _signing_parent(ca):
+    """The caref of the stored CA whose key signed *ca*'s certificate, None for a root or an unknown parent."""
+    from services.import_service import relink_parent_caref
+    try:
+        cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+    except ValueError:
+        return None
+    return relink_parent_caref(cert, None, exclude_ca_id=ca.id)
+
+
 def _keep_attached_key(ca, entry, stats):
     """Store the key an OPNsense cross entry carries (the counterpart's own) under the guards of the key import.
 
@@ -592,6 +602,7 @@ def import_items():
 
         # Import CAs first so certificate caref links can resolve in the same transaction;
         # self-signed ones before their cross-certificates, which attach to them.
+        created_cas = []
         attached_cross = []
         keys_stored = []
         attached_refids = {}
@@ -664,7 +675,13 @@ def import_items():
             )
             
             db.session.add(ca)
+            created_cas.append(ca)
             stats['cas_imported'] += 1
+
+        # Linked once the whole batch exists, so a CA listed before its parent is chained too
+        db.session.flush()
+        for ca in created_cas:
+            ca.caref = _signing_parent(ca)
 
         for item_id in selected_ids:
             if item_id in all_certs:

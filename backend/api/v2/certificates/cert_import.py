@@ -19,7 +19,7 @@ from services.import_service import (
     find_existing_ca_for_import, cross_mode_from, finish_cross_attach,
     find_existing_certificate, find_pending_csr_for_certificate,
     AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import, install_on_pending_ca, stored_certificate_serial,
-    serialize_cert_to_pem, serialize_key_to_pem
+    serialize_cert_to_pem, serialize_key_to_pem, relink_parent_caref
 )
 from services.cert_service import CertificateService
 from services.cert.issued_lookup import apply_persisted_revocation, record_serial_clause
@@ -216,6 +216,7 @@ def import_certificate():
                 serial_number=str(cert.serial_number),
                 valid_from=cert_info['valid_from'],
                 valid_to=cert_info['valid_to'],
+                caref=relink_parent_caref(cert, None),
                 imported_from='manual'
             )
             # Deleted after its revocation and imported again: still revoked (#343)
