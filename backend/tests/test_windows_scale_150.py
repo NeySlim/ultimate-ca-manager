@@ -119,10 +119,12 @@ def test_the_profile_list_costs_the_same_statements_on_every_page(app, auth_clie
         refids = [c.refid for c in CA.query.limit(2).all()]
     _fill_profiles(app)
     with app.app_context():
-        # Every row names CAs, so a per-row CA lookup would show
+        # Every row names CAs and a connector, so a per-row lookup of either would show
+        connector_id = ADConnectorConfig.query.order_by(ADConnectorConfig.id).first().id
         for i, profile in enumerate(WindowsEnrollmentProfile.query.filter(
                 WindowsEnrollmentProfile.name.like('c04-fill-%'))):
             profile.issuing_ca_refid, profile.policy_ca_refid = refids[i % 2], refids[(i + 1) % 2]
+            profile.connector_id = connector_id
         db.session.commit()
     _list_statements(app, auth_client, '/api/v2/windows-profiles')  # warm-up
     costs = {}

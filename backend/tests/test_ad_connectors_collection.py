@@ -365,11 +365,18 @@ def test_unsaved_values_are_tested_and_a_blank_password_only_follows_its_target(
     assert elsewhere.status_code == 400 and seen == ['sekret-pw']
 
 
+def _using(connector_id):
+    return [{'id': p.id, 'name': p.name} for p in WindowsEnrollmentProfile.query.filter_by(
+        connector_id=connector_id).order_by(WindowsEnrollmentProfile.name)]
+
+
 def test_a_connector_a_profile_uses_cannot_be_deleted(auth_client, app, monkeypatch):
     monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
     used = _post(auth_client).get_json()['data']
     free = _post(auth_client, name='forest-b', servers=['dc.b.example'], base_dn='DC=b,DC=example').get_json()['data']
     with app.app_context():
+        # A default profile another file left without a connector took this one when it was created
+        already = _using(used['id'])
         profile = WindowsEnrollmentProfile(name='c02a-profile', realm='C02A.EXAMPLE', connector_id=used['id'])
         db.session.add(profile)
         db.session.commit()
@@ -378,7 +385,8 @@ def test_a_connector_a_profile_uses_cannot_be_deleted(auth_client, app, monkeypa
         refused = auth_client.delete(f"{URL}/{used['id']}")
         assert refused.status_code == 409
         # The refusal names the profiles that use the connector
-        assert refused.get_json()['details']['profiles'] == [{'id': profile_id, 'name': 'c02a-profile'}]
+        assert refused.get_json()['details']['profiles'] == sorted(
+            already + [{'id': profile_id, 'name': 'c02a-profile'}], key=lambda p: p['name'])
         assert auth_client.delete(f"{URL}/{free['id']}").status_code == 204
         assert auth_client.get(f"{URL}/{free['id']}").status_code == 404
     finally:
@@ -546,6 +554,7 @@ def test_a_save_reads_the_domain_sid_within_one_connect_timeout(auth_client, mon
 def test_a_refused_deletion_counts_every_profile_but_lists_the_first_fifty(auth_client, app):
     used = _post(auth_client, name='forest-many', servers=['dc.m.example'], base_dn='DC=m,DC=example').get_json()['data']
     with app.app_context():
+        already = len(_using(used['id']))
         db.session.add_all([WindowsEnrollmentProfile(name=f'c07-many-{i:03d}', connector_id=used['id'])
                             for i in range(51)])
         db.session.commit()
@@ -553,7 +562,7 @@ def test_a_refused_deletion_counts_every_profile_but_lists_the_first_fifty(auth_
         refused = auth_client.delete(f"{URL}/{used['id']}")
         assert refused.status_code == 409
         details = refused.get_json()['details']
-        assert details['total'] == 51 and len(details['profiles']) == 50
+        assert details['total'] == 51 + already and len(details['profiles']) == 50
     finally:
         with app.app_context():
             WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.name.like('c07-many-%')).delete(
