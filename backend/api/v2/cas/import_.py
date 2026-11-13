@@ -177,7 +177,11 @@ def import_ca():
         # certificates table (an intermediate requested here, signed outside):
         # the request's key becomes the CA's and the request is fulfilled
         pending_request = find_pending_csr_for_certificate(cert)
-        if pending_request is not None and not encrypted_prv:
+        if pending_request is not None and not encrypted_prv and pending_request.prv:
+            # The request's key is the certificate's (matched by SPKI): same RSA floor as a key in the file
+            weak = weak_ca_key_refusal(cert.public_key())
+            if weak:
+                return error_response(weak, 400)
             encrypted_prv = pending_request.prv
         ca = CA(
             refid=refid,

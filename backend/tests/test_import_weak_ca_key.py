@@ -222,3 +222,28 @@ def test_opnsense_cross_entry_cannot_carry_a_weak_key_to_its_counterpart(app, au
     assert any('2048' in e for e in body['errors'])
     with app.app_context():
         assert CA.query.filter_by(descr=f'B {tag}').one().prv is None
+
+
+@pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+def test_weak_key_of_a_pending_request_does_not_become_the_ca_key(app, auth_client, path):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.x509.oid import NameOID
+    key = _weak_key()
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'Weak pending {uuid.uuid4().hex[:8]}')])
+    csr = (x509.CertificateSigningRequestBuilder().subject_name(name)
+           .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+           .sign(key, hashes.SHA256()))
+    r = _post(auth_client, '/api/v2/csrs/import', pem_content=csr.public_bytes(serialization.Encoding.PEM).decode())
+    assert r.status_code in (200, 201), r.data
+    csr_id = json.loads(r.data)['data']['id']
+    r = auth_client.post(f'/api/v2/csrs/{csr_id}/key', json={'key': key_pem(key)})
+    assert r.status_code in (200, 201), r.data
+    cert = make_cert(name.rfc4514_string().split('=', 1)[1], key,
+                     issuer_cn=f'External root {uuid.uuid4().hex[:8]}', issuer_key=new_key('rsa'))
+
+    r = _post(auth_client, path, pem_content=pem(cert))
+    assert r.status_code == 400, r.data
+    message = json.loads(r.data)['message']
+    assert str(WEAK) in message and '2048' in message
+    assert _stored(app, cert) == []
