@@ -11,7 +11,8 @@ import uuid
 
 import pytest
 
-from models import ADConnectorConfig, db
+from models import db
+from tests.ad_connector_support import mount_connector
 from tests.windows_profile_support import connectors_kept
 
 
@@ -38,14 +39,11 @@ class TestADConnectorTest:
         calls = []
         monkeypatch.setattr(lookup, 'test_connection',
                             lambda cfg: calls.append(cfg) or {'success': True, 'message': 'ok'})
+        # Linked to the default profile, if any: the test route reads that profile's connector
         with app.app_context():
-            ADConnectorConfig.query.delete()
-            config = ADConnectorConfig(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
-                                       verify_ssl=True, base_dn='DC=corp,DC=local',
-                                       bind_dn='CN=svc,DC=corp,DC=local')
-            config.bind_password = SAVED_PASSWORD
-            db.session.add(config)
-            db.session.commit()
+            mount_connector(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
+                            verify_ssl=True, base_dn='DC=corp,DC=local',
+                            bind_dn='CN=svc,DC=corp,DC=local', password=SAVED_PASSWORD)
         return calls
 
     def _form(self, **over):
