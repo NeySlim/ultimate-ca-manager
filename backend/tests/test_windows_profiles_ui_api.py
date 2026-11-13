@@ -302,11 +302,20 @@ def test_a_profile_without_a_realm_is_refused_by_its_own_name(app):
         assert kerberos_refusal(default) == 'default profile has no realm: Kerberos refused until one is set'
 
 
-def test_the_profile_api_gives_the_reason_the_binding_is_not_configured(auth_client, profiles, monkeypatch):  # noqa: F811
+def test_the_profile_api_gives_the_reason_the_binding_is_not_configured(app, auth_client, profiles, monkeypatch):  # noqa: F811
     monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
     monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
-    for read in (auth_client.get(f'{URL}/{profiles.two}'), auth_client.get(URL)):
-        body = read.get_json()['data']
-        rows = body if isinstance(body, list) else body.get('items', body)
-        row = rows if isinstance(rows, dict) else next(r for r in rows if r['id'] == profiles.two)
-        assert row['kerberos_refusal'] == 'no SPN set'
+    # Rows other files left behind, sorted before ours, must not push it off the first page
+    with app.app_context():
+        db.session.add_all(WindowsEnrollmentProfile(name=f'a-pad-{i:02d}', enabled=True) for i in range(30))
+        db.session.commit()
+    try:
+        for read in (auth_client.get(f'{URL}/{profiles.two}'), auth_client.get(f'{URL}?q=c03-two')):
+            body = read.get_json()['data']
+            row = body if isinstance(body, dict) else next(r for r in body if r['id'] == profiles.two)
+            assert row['kerberos_refusal'] == 'no SPN set'
+    finally:
+        with app.app_context():
+            WindowsEnrollmentProfile.query.filter(
+                WindowsEnrollmentProfile.name.like('a-pad-%')).delete(synchronize_session=False)
+            db.session.commit()
