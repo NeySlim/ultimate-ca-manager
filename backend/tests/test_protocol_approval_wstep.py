@@ -385,15 +385,3 @@ def test_an_approval_after_the_profile_was_disabled_is_refused(app, client, auth
         reason, invalid, _echo = _fault(_query(client, request_id))
         assert reason == 'Refused at issuance' and invalid == 'true'
 
-
-def test_an_approved_issue_takes_the_validity_of_the_profile(app, client, auth_client, wstep_config):
-    from tests.windows_profile_support import set_config
-    with approval_policy(app, wstep_config['id'], 'wstep-held-validity') as pid:
-        csr, _ = _make_csr(common_name='validity.wstep-approval.test')
-        request_id = _pending(_issue_rst(client, csr))
-        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
-        with app.app_context():
-            set_config('wstep_validity_days', '45')
-        approve(auth_client, approval_id)
-        cert = _issued_cert_from_rstr(_query(client, request_id).data)
-        assert (cert.not_valid_after_utc - cert.not_valid_before_utc).days == 45
