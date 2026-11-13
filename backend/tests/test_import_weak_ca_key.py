@@ -207,3 +207,16 @@ def test_weak_key_cannot_be_posted_to_a_keyless_ca(app, auth_client):
     assert '2048' in json.loads(r.data)['message']
     assert _stored(app, cert)[0].prv is None
 
+
+def test_opnsense_cross_entry_cannot_carry_a_weak_key_to_its_counterpart(app, auth_client, monkeypatch):
+    tag = uuid.uuid4().hex[:8]
+    a_key, b_key = new_key(), _weak_key()
+    root_a = _ca(f'a{tag}', a_key)
+    root_b = _ca(f'b{tag}', b_key)
+    cross_b = make_cert(f'Weak CA b{tag}', b_key, issuer_cn=f'Weak CA a{tag}', issuer_key=a_key)
+    body = _opnsense(auth_client, monkeypatch, [
+        _row(root_a, f'A {tag}', a_key), _row(root_b, f'B {tag}'), _row(cross_b, f'B cross {tag}', b_key)])
+    assert body['cross_certificates_attached'] == 1
+    assert any('2048' in e for e in body['errors'])
+    with app.app_context():
+        assert CA.query.filter_by(descr=f'B {tag}').one().prv is None

@@ -103,9 +103,13 @@ def _keep_attached_key(ca, entry, stats):
     try:
         from cryptography.hazmat.primitives import serialization
         from utils.key_codec import load_pem_bytes
-        serialization.load_pem_private_key(load_pem_bytes(key), password=None)
+        loaded = serialization.load_pem_private_key(load_pem_bytes(key), password=None)
     except Exception:
         stats['errors'].append(f"{label}: the key could not be read")
+        return
+    weak = weak_ca_key_refusal(loaded)
+    if weak:
+        stats['errors'].append(f"{label}: {weak}")
         return
     cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
     if ca.prv:
