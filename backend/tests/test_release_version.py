@@ -252,14 +252,37 @@ def test_an_unreachable_remote_never_decides_latest(tmp_path):
     assert result.returncode != 0
 
 
-def test_the_image_and_release_tags_follow_the_step():
+def _evaluate(expr, outputs):
+    """Evaluate the only expression forms the workflow uses: ref, ref ==/!= 'lit', !ref."""
+    expr = expr.strip()
+    ref = r'steps\.latest\.outputs\.latest'
+    if re.fullmatch(ref, expr):
+        return outputs
+    m = re.fullmatch(ref + r"\s*(==|!=)\s*'([^']*)'", expr)
+    if m:
+        return (outputs == m.group(2)) if m.group(1) == '==' else (outputs != m.group(2))
+    m = re.fullmatch(r'!\s*' + ref, expr)
+    if m:
+        return outputs not in ('true', True)
+    raise AssertionError(f'unsupported expression: {expr}')
+
+
+def _render(text, outputs):
+    def one(m):
+        v = _evaluate(m.group(1), outputs)
+        return str(v).lower() if isinstance(v, bool) else v
+    return re.sub(r'\$\{\{(.*?)\}\}', one, text)
+
+
+@pytest.mark.parametrize('latest', ['true', 'false'])
+def test_the_image_and_release_tags_follow_the_step(latest):
     data = yaml.safe_load((WORKFLOWS / 'build-release.yml').read_text())
     for job, tag in (('docker-manifest', 'latest'), ('docker-fips-manifest', 'latest-fips')):
         meta = next(s for s in data['jobs'][job]['steps'] if s.get('id') == 'meta')
         line = next(ln for ln in meta['with']['tags'].splitlines() if f'value={tag},' in ln)
-        assert 'steps.latest.outputs.latest' in line
+        assert _render(line.strip(), latest).endswith(f'enable={latest}'), line
     rel = next(s for s in data['jobs']['release']['steps'] if s.get('name') == 'Create release')
-    assert 'steps.latest.outputs.latest' in str(rel['with']['make_latest'])
+    assert _render(str(rel['with']['make_latest']), latest) == latest
 
 
 # ---- 5. an installed instance ------------------------------------------------------------------
