@@ -294,6 +294,7 @@ def run_unsaved_test(data, saved_connector):
         ca_bundle=ca_bundle,
         bind_dn=data.get('bind_dn'),
         bind_password=bind_password,
+        base_dn=(data.get('base_dn') or '').strip() or None,
     )
     result = lookup.test_connection(cfg)
     if result.get('success'):
