@@ -118,6 +118,14 @@ def test_one_profile_that_blocks_leaves_the_one_that_follows_unchanged(app, auth
     _nothing_written(app, world, {other: 'ELSE.EXAMPLE', follower: 'OLD.EXAMPLE'})
 
 
+def test_both_ways_out_are_named_apart_when_both_kinds_of_profile_block(app, auth_client, world):
+    _profile(app, 'bound', 'OLD.EXAMPLE', world, with_keytab=True)
+    _profile(app, 'other', 'ELSE.EXAMPLE', world)
+    message = _move(auth_client, world).get_json()['message']
+    assert message.endswith('First give a profile with a keytab another connector (or none); '
+                            'change the realm of the other profiles, or give them another connector.')
+
+
 def test_a_save_that_keeps_the_domain_touches_no_profile(app, auth_client, world):
     bound = _profile(app, 'bound', 'OLD.EXAMPLE', world, with_keytab=True)
     r = auth_client.put(f'{URL}/{world}', data=json.dumps({'base_dn': 'OU=x,DC=old,DC=example'}),

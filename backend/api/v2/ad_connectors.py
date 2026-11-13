@@ -122,12 +122,12 @@ def _follow_realm(config, old_realm):
         # A keytab holds the realm of its profile: only another connector (or none) is left to it
         exits = []
         if any(why == KEYTAB_FIXES_REALM for _p, why in refused):
-            exits.append('give a profile with a keytab another connector, or none')
+            exits.append('give a profile with a keytab another connector (or none)')
         if any(why != KEYTAB_FIXES_REALM for _p, why in refused):
             exits.append('change the realm of the other profiles, or give them another connector')
         return error_response(
             f'Cannot move connector {config.name} from {old_realm} to {new_realm}: {listed}{more}. '
-            f'First {" and ".join(exits)}.', 409,
+            f'First {"; ".join(exits)}.', 409,
             details={'profiles': [{'id': p.id, 'name': p.name, 'reason': why}
                                   for p, why in refused[:MAX_LISTED_PROFILES]],
                      'total': len(refused)}), []
