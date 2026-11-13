@@ -345,8 +345,8 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     when UCM holds no such CA (an external root imported later relinks it).
     """
     from models import CA
-    from utils.cert_issuer import certificate_signed_by, authority_key_identifier_hex, is_self_signed, \
-        self_signed_first
+    from utils.cert_issuer import VERIFIED, authority_key_identifier_hex, is_self_signed, self_signed_first, \
+        signature_verdict
     if is_self_signed(cert):
         return None
     aki = authority_key_identifier_hex(cert)
@@ -358,7 +358,8 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
             continue
         try:
             parent_cert = x509.load_pem_x509_certificate(base64.b64decode(parent.crt), default_backend())
-            if certificate_signed_by(cert, parent_cert):
+            # Unverifiable here: never linked without a confirmation (services/ca/parent_confirmation)
+            if signature_verdict(cert, parent_cert)[0] == VERIFIED:
                 return parent.refid
         except Exception:
             continue
@@ -413,7 +414,10 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
         existing_ca.revoke_reason = None
         existing_ca.invalidity_at = None
     existing_ca.serial_number = str(cert.serial_number)
-    existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
+    from services.ca import parent_confirmation
+    # A parent confirmed by hand stays while it is still the proposal for the new certificate
+    if not parent_confirmation.settle_confirmed_parent(existing_ca, cert):
+        existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
     existing_ca.path_length = path_length_of(cert)
     # Deleted after its revocation and imported again, or renewed into a serial its parent revoked (#343)
     CAService.apply_persisted_revocation(existing_ca)

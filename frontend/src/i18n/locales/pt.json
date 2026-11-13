@@ -1103,7 +1103,20 @@
     "issuanceVisibilityChangeFailed": "Não foi possível atualizar os seletores de emissão",
     "showHiddenCas_one": "Mostrar {{count}} CA oculta",
     "showHiddenCas_other": "Mostrar {{count}} CAs ocultas",
-    "hideHiddenCas": "Ocultar as CAs ocultas"
+    "hideHiddenCas": "Ocultar as CAs ocultas",
+    "parentCandidateBanner": "Provável CA pai: {{name}}. A assinatura dela não pode ser verificada aqui ({{algorithm}}), por isso esta CA não foi vinculada a ela.",
+    "linkToParent": "Vincular a este pai",
+    "linkParentTitle": "Vincular a um pai não verificável",
+    "linkParentWarning": "O UCM não consegue confirmar que \"{{name}}\" assinou esta CA: uma assinatura {{algorithm}} não é verificável aqui. Depois de vinculada, esta CA passa a seguir esse pai para a revogação, o OCSP e as cadeias servidas.",
+    "linkParentConfirm": "Verifiquei este pai por outros meios e confirmo o vínculo",
+    "linkParentDone": "CA vinculada ao seu pai",
+    "linkParentFailed": "Não foi possível vincular o pai",
+    "parentConfirmedBanner": "Pai confirmado manualmente por {{user}} em {{date}}: a assinatura dele não pode ser verificada aqui.",
+    "withdrawParentLink": "Retirar o vínculo",
+    "withdrawParentTitle": "Retirar o vínculo com o pai",
+    "withdrawParentWarning": "Esta CA ficará sem pai até que o vínculo seja confirmado novamente.",
+    "withdrawParentDone": "Vínculo com o pai retirado",
+    "withdrawParentFailed": "Não foi possível retirar o vínculo com o pai"
   },
   "csrs": {
     "uploadCSR": "Carregar CSR",
@@ -4259,7 +4272,9 @@
     "crossAttached_one": "{{count}} certificado cruzado anexado a uma CA já existente",
     "crossAttached_other": "{{count}} certificados cruzados anexados a CAs já existentes",
     "crossSkipped_one": "{{count}} certificado cruzado foi omitido; a CA autoassinada é mantida",
-    "crossSkipped_other": "{{count}} certificados cruzados foram omitidos; as CAs autoassinadas são mantidas"
+    "crossSkipped_other": "{{count}} certificados cruzados foram omitidos; as CAs autoassinadas são mantidas",
+    "unverifiableParentsTitle": "Pais a confirmar na página da CA",
+    "unverifiableParent": "{{ca}} ficou sem pai: provável pai {{parent}}, assinatura não verificável aqui ({{algorithm}})"
   },
   "webhooks": {
     "eventLabels": {

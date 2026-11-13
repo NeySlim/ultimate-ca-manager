@@ -330,5 +330,7 @@ def restore_primary(ca_id: int, certificate, username: str = 'system'):
     from services.audit_service import AuditService
     AuditService.log_ca('ca_cross_repair_restored', record,
                         f'Self-signed certificate restored on CA {record.descr}', username=username)
+    from services.ca import parent_confirmation
+    parent_confirmation.audit_dropped(record, username=username)
     cross_certs.announce(record, 'attached', row, username, {'restored_primary': True})
     return record, row, warnings

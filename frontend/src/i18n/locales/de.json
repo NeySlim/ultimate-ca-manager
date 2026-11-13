@@ -1103,7 +1103,20 @@
     "issuanceVisibilityChangeFailed": "Auswahllisten für die Ausstellung konnten nicht aktualisiert werden",
     "showHiddenCas_one": "{{count}} ausgeblendete CA anzeigen",
     "showHiddenCas_other": "{{count}} ausgeblendete CAs anzeigen",
-    "hideHiddenCas": "Ausgeblendete CAs verbergen"
+    "hideHiddenCas": "Ausgeblendete CAs verbergen",
+    "parentCandidateBanner": "Wahrscheinlich übergeordnete CA: {{name}}. Ihre Signatur kann hier nicht geprüft werden ({{algorithm}}), daher wurde diese CA nicht mit ihr verknüpft.",
+    "linkToParent": "Mit dieser übergeordneten CA verknüpfen",
+    "linkParentTitle": "Mit nicht prüfbarer übergeordneter CA verknüpfen",
+    "linkParentWarning": "UCM kann nicht prüfen, ob „{{name}}“ diese CA signiert hat: Eine {{algorithm}}-Signatur ist hier nicht prüfbar. Nach der Verknüpfung folgt diese CA ihrer übergeordneten CA bei Widerruf, OCSP und den ausgelieferten Ketten.",
+    "linkParentConfirm": "Ich habe diese übergeordnete CA auf anderem Weg geprüft und bestätige die Verknüpfung",
+    "linkParentDone": "CA mit übergeordneter CA verknüpft",
+    "linkParentFailed": "Die Verknüpfung mit der übergeordneten CA ist fehlgeschlagen",
+    "parentConfirmedBanner": "Übergeordnete CA am {{date}} von {{user}} manuell bestätigt: Ihre Signatur kann hier nicht geprüft werden.",
+    "withdrawParentLink": "Verknüpfung aufheben",
+    "withdrawParentTitle": "Verknüpfung mit übergeordneter CA aufheben",
+    "withdrawParentWarning": "Diese CA bleibt ohne übergeordnete CA, bis die Verknüpfung erneut bestätigt wird.",
+    "withdrawParentDone": "Verknüpfung aufgehoben",
+    "withdrawParentFailed": "Die Verknüpfung konnte nicht aufgehoben werden"
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",
@@ -4259,7 +4272,9 @@
     "crossAttached_one": "{{count}} Cross-Zertifikat an eine bereits vorhandene CA angehängt",
     "crossAttached_other": "{{count}} Cross-Zertifikate an bereits vorhandene CAs angehängt",
     "crossSkipped_one": "{{count}} Cross-Zertifikat wurde ausgelassen; die selbstsignierte CA bleibt erhalten",
-    "crossSkipped_other": "{{count}} Cross-Zertifikate wurden ausgelassen; die selbstsignierten CAs bleiben erhalten"
+    "crossSkipped_other": "{{count}} Cross-Zertifikate wurden ausgelassen; die selbstsignierten CAs bleiben erhalten",
+    "unverifiableParentsTitle": "Übergeordnete CAs zur Bestätigung auf der CA-Seite",
+    "unverifiableParent": "{{ca}} ohne übergeordnete CA: wahrscheinlich {{parent}}, Signatur hier nicht prüfbar ({{algorithm}})"
   },
   "webhooks": {
     "eventLabels": {

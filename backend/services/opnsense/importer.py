@@ -39,7 +39,8 @@ class ImportMixin:
             'imported': 0,
             'skipped': 0,
             'failed': 0,
-            'errors': []
+            'errors': [],
+            'unverifiable_parents': [],
         }
 
         # Sort CAs: root CAs first, then intermediates
@@ -133,6 +134,10 @@ class ImportMixin:
                     x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), None, exclude_ca_id=ca.id)
             except ValueError:
                 continue
+        # Left without a parent whose signature cannot be checked here: the one proposed
+        from services.ca import parent_confirmation
+        stats['unverifiable_parents'] = parent_confirmation.notices(
+            [ca for ca in created if not ca.caref and ca.crt])
 
         try:
             db.session.commit()

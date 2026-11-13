@@ -1103,7 +1103,20 @@
     "issuanceVisibilityChangeFailed": "无法更新签发选择器",
     "showHiddenCas_one": "显示 {{count}} 个已隐藏的 CA",
     "showHiddenCas_other": "显示 {{count}} 个已隐藏的 CA",
-    "hideHiddenCas": "隐藏已隐藏的 CA"
+    "hideHiddenCas": "隐藏已隐藏的 CA",
+    "parentCandidateBanner": "可能的父 CA：{{name}}。此处无法验证其签名（{{algorithm}}），因此未将此 CA 关联到它。",
+    "linkToParent": "关联到此父 CA",
+    "linkParentTitle": "关联无法验证的父 CA",
+    "linkParentWarning": "UCM 无法确认「{{name}}」是否签署了此 CA：此处无法验证 {{algorithm}} 签名。关联后，此 CA 的吊销、OCSP 和所提供的证书链将跟随该父 CA。",
+    "linkParentConfirm": "我已通过其他方式核实此父 CA，并确认关联",
+    "linkParentDone": "CA 已关联到其父 CA",
+    "linkParentFailed": "无法关联父 CA",
+    "parentConfirmedBanner": "父 CA 已由 {{user}} 于 {{date}} 手动确认：此处无法验证其签名。",
+    "withdrawParentLink": "撤销关联",
+    "withdrawParentTitle": "撤销父 CA 关联",
+    "withdrawParentWarning": "在重新确认关联之前，此 CA 将没有父 CA。",
+    "withdrawParentDone": "父 CA 关联已撤销",
+    "withdrawParentFailed": "无法撤销父 CA 关联"
   },
   "csrs": {
     "uploadCSR": "上传CSR",
@@ -4259,7 +4272,9 @@
     "crossAttached_one": "已将 {{count}} 个交叉证书附加到已持有的 CA",
     "crossAttached_other": "已将 {{count}} 个交叉证书附加到已持有的 CA",
     "crossSkipped_one": "已排除 {{count}} 个交叉证书；自签名 CA 予以保留",
-    "crossSkipped_other": "已排除 {{count}} 个交叉证书；自签名 CA 予以保留"
+    "crossSkipped_other": "已排除 {{count}} 个交叉证书；自签名 CA 予以保留",
+    "unverifiableParentsTitle": "需在 CA 页面确认的父 CA",
+    "unverifiableParent": "{{ca}} 未关联父 CA：可能的父 CA 为 {{parent}}，此处无法验证其签名（{{algorithm}}）"
   },
   "webhooks": {
     "eventLabels": {
