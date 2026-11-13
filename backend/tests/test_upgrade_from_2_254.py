@@ -392,6 +392,40 @@ def test_an_empty_database_is_a_fresh_install(dialect, tmp_path, monkeypatch):
         assert db.tables() == set()
 
 
+class _Cut(Exception):
+    """A fresh install's start stopping where the test says."""
+
+
+@pytest.mark.parametrize('cut_after_tables', [False, True], ids=['before-tables', 'after-tables'])
+def test_a_fresh_install_cut_short_is_never_taken_for_an_old_database(dialect, tmp_path, monkeypatch,
+                                                                    cut_after_tables, capsys):
+    import migration_runner
+    for db in make_base(dialect, tmp_path, monkeypatch, 'fc', sql=''):
+        db._route()
+
+        def create_all():
+            if cut_after_tables:
+                fresh_metadata().create_all(db.engine)
+            raise _Cut()
+        with pytest.raises(_Cut):
+            migration_runner.build_fresh_schema(create_all)
+        assert db.upgrade() is True, capsys.readouterr().out
+        migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
+        assert db.registry() == ['300_upgrade_from_2_254']
+        assert {'users', 'certificate_authorities'} <= db.tables()
+        assert db.upgrade() is True
+
+
+def test_a_fresh_install_that_cannot_record_its_registry_stops(dialect, tmp_path, monkeypatch):
+    import migration_runner
+    for db in make_base(dialect, tmp_path, monkeypatch, 'fr', sql=''):
+        db._route()
+        monkeypatch.setattr(migration_runner, '_mark_applied', lambda *a, **k: (_ for _ in ()).throw(_Cut()))
+        with pytest.raises(_Cut):
+            migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
+        assert 'users' not in db.tables()
+
+
 def test_a_3_0_database_starts_without_running_anything(fresh, capsys):
     before = _untouched(fresh)
     assert fresh.upgrade() is True

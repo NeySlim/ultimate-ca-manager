@@ -532,10 +532,11 @@ def create_app(config_name=None):
                 if not fresh_install:
                     app.logger.info("✓ Database tables already exist")
                 else:
-                    # Create all tables
+                    # Registry first, then tables; a failure of either stops the start
+                    from migration_runner import build_fresh_schema
                     app.logger.info("Creating database tables...")
-                    db.create_all()
-                    app.logger.info("✓ Database tables created/verified")
+                    build_fresh_schema(db.create_all)
+                    app.logger.info("✓ Database tables created/verified, migration baseline marked")
                 
                 # ===== EXTENDED TABLES =====
                 # Import models to register them with SQLAlchemy
@@ -577,18 +578,6 @@ def create_app(config_name=None):
                     raise RuntimeError(f"Critical tables missing: {missing_tables}")
                 
                 app.logger.info(f"✓ All critical tables verified: {', '.join(critical_tables)}")
-                
-                # On fresh install, mark all current legacy migrations as applied
-                # so future migrations from this point forward are the only ones
-                # that run. The schema we just created via SQLAlchemy already
-                # matches (or supersedes) every legacy migration.
-                if fresh_install:
-                    try:
-                        from migration_runner import mark_all_applied
-                        mark_all_applied()
-                        app.logger.info("✓ Migration baseline marked (fresh install)")
-                    except Exception as e:
-                        app.logger.warning(f"Could not mark migration baseline: {e}")
                 
                 # Migrations already run at startup before SQLAlchemy init
                 

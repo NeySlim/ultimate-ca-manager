@@ -36,7 +36,8 @@ Files and packages whose name starts with ``_`` are not migrations.
 Public API
 ----------
 - `run_all_migrations(dry_run=False, verbose=False)`
-- `mark_all_applied()`  -> call after create_all() on fresh installs
+- `build_fresh_schema(create_all)` -> fresh installs: registry, then tables
+- `mark_all_applied()`
 - `show_status()`       -> CLI helper
 """
 import os
@@ -192,8 +193,8 @@ def _mark_applied(engine, names, is_pg: bool):
 def mark_all_applied():
     """Mark every current migration file as applied without running them.
 
-    Call this after `db.create_all()` on a fresh install so that future
-    migrations (added later) are the only ones that run.
+    A fresh install calls it through build_fresh_schema, before create_all, so that
+    future migrations (added later) are the only ones that run.
     """
     db_url = _get_db_url()
     is_pg = _is_postgres(db_url)
@@ -206,12 +207,18 @@ def mark_all_applied():
         engine.dispose()
 
 
+def build_fresh_schema(create_all):
+    """A fresh install records its registry first, then builds its tables: a start cut short in
+    between finds a 3.0 database whose tables create_all completes, never one older than 2.254."""
+    mark_all_applied()
+    create_all()
+
+
 def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
     """Apply pending migrations to the configured database.
 
     Returns True on success, False on failure. A no-op (FRESH state)
-    counts as success — caller is responsible for create_all() and
-    mark_all_applied().
+    counts as success — caller is responsible for build_fresh_schema().
     """
     db_url = _get_db_url()
     is_pg = _is_postgres(db_url)
