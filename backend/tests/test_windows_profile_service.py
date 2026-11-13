@@ -551,7 +551,8 @@ def test_the_profile_is_the_same_whether_the_migration_reads_the_keytab_or_not(
     assert seen[0][2] == (realm is None)
 
 
-@pytest.mark.parametrize('keytab, realm', [('absent', 'CORP.EXAMPLE'), ('unread', None), ('read', None)])
+@pytest.mark.parametrize('keytab, realm', [('absent', 'CORP.EXAMPLE'), ('absent-in-ha', None),
+                                           ('unread', None), ('read', None)])
 def test_a_disabled_connector_names_the_realm_once_no_keytab_is_established(
         app, clean_slate, two_cas, no_shared_keytab, monkeypatch, tmp_path, keytab, realm):
     """The migration reads no keytab: the realm waits for the start, which takes the DN of the
@@ -560,11 +561,11 @@ def test_a_disabled_connector_names_the_realm_once_no_keytab_is_established(
     from tests.test_windows_profile_migration import TWO_REALMS
     issuing, policy, _template = two_cas
     path = tmp_path / 'kerberos.keytab'
-    if keytab != 'absent':
+    if not keytab.startswith('absent'):
         path.write_bytes(TWO_REALMS)
     monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
-    # A node's own file is not taken in HA: the keytab exists but is not read
-    monkeypatch.setattr(Config, 'HA_MODE', keytab == 'unread')
+    # A node's own file is not taken in HA, and a node without one cannot speak for the others
+    monkeypatch.setattr(Config, 'HA_MODE', keytab in ('unread', 'absent-in-ha'))
     with app.app_context():
         _connector_as({'enabled': False, 'base_dn': 'DC=corp,DC=example'})
         for key, value in {**_settings_2x(issuing, policy), 'kerberos_enabled': 'true',
@@ -576,6 +577,27 @@ def test_a_disabled_connector_names_the_realm_once_no_keytab_is_established(
     negotiate_auth.restore_keytab_at_start(app)
     with app.app_context():
         assert _default().realm == realm
+
+
+def test_an_uploaded_keytab_names_the_realm_before_a_disabled_connector(
+        app, auth_client, clean_slate, no_shared_keytab, monkeypatch, tmp_path):
+    """The upload reads the keytab it brings, as the migration does: its single realm wins over
+    the DN of a disabled connector."""
+    import io
+    from tests.test_windows_profile_migration import ONE_REALM
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', tmp_path / 'kerberos.keytab')
+    # GSSAPI is not what names the realm: the entries are read from the bytes
+    monkeypatch.setattr(negotiate_auth, 'inspect_keytab', lambda *a, **k: {
+        'valid': True, 'principal': 'HTTP/ucm.example@EXAMPLE.TEST', 'error': None})
+    with app.app_context():
+        _connector_as({'enabled': False, 'base_dn': 'DC=corp,DC=example'})
+        _set('kerberos_spn', 'HTTP/ucm.example')
+        db.session.commit()
+    r = auth_client.post('/api/v2/kerberos/keytab', data={'file': (io.BytesIO(ONE_REALM), 'k.keytab')},
+                         content_type='multipart/form-data')
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert _default().realm == 'EXAMPLE.TEST'
 
 
 ARCHIVED_KEYTAB, TARGET_KEYTAB = b'\x05\x02keytab-of-the-archive', b'\x05\x02keytab-of-the-target'

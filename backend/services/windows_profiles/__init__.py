@@ -55,11 +55,13 @@ def _connector_values(connector):
 
 def keytab_absent(profile):
     """No keytab exists for this installation: none in *profile* (None: no profile), none
-    stored for the nodes, no file on this node. An undecryptable one is not absent."""
+    stored for the nodes, no file on this node. An undecryptable one is not absent, and in
+    HA a node cannot tell: another one may still hold the file."""
+    from config.settings import Config
     from models import SharedFile
     from services import shared_files
     from services.kerberos import negotiate_auth
-    if profile is not None and profile.keytab:
+    if (profile is not None and profile.keytab) or Config.HA_MODE:
         return False
     return (db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is None
             and not negotiate_auth.KEYTAB_PATH.exists())
@@ -83,8 +85,9 @@ def fill_realm(profile):
         profile.realm = realm
 
 
-def default_for_write(actor=None):
-    """The default profile the configuration routes write, created by the first write."""
+def default_for_write(actor=None, fill=True):
+    """The default profile the configuration routes write, created by the first write.
+    ``fill=False``: the caller sets a keytab first and fills the realm itself."""
     profile = default_profile()
     if profile is None:
         connector = ADConnectorConfig.get_singleton()
@@ -98,7 +101,8 @@ def default_for_write(actor=None):
         except IntegrityError:
             profile = WindowsEnrollmentProfile.query.filter_by(is_default=True).one()
     profile.updated_by = actor
-    fill_realm(profile)
+    if fill:
+        fill_realm(profile)
     return profile
 
 

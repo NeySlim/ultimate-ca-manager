@@ -191,7 +191,7 @@ def upload_kerberos_keytab():
     # and reload_keytab reaches the other nodes (HA)
     from services import cluster_commands, windows_profiles
     user = getattr(g, 'current_user', None)
-    profile = windows_profiles.default_for_write(getattr(user, 'username', None))
+    profile = windows_profiles.default_for_write(getattr(user, 'username', None), fill=False)
     profile.set_keytab(file_content)
     windows_profiles.fill_realm(profile)
     windows_profiles.publish_keytab(actor=getattr(user, 'username', None))

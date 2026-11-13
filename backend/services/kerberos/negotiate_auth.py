@@ -244,7 +244,7 @@ def restore_keytab_at_start(app):
                 elif KEYTAB_PATH.exists():
                     data = KEYTAB_PATH.read_bytes()
                 if data:
-                    profile = profile or windows_profiles.default_for_write('system')
+                    profile = profile or windows_profiles.default_for_write('system', fill=False)
                     profile.set_keytab(data)
                     windows_profiles.fill_realm(profile)
                     warn_without_realm(profile.realm, is_enabled(), get_spn(), data)
@@ -252,7 +252,7 @@ def restore_keytab_at_start(app):
                     db.session.commit()
                     logger.info("Kerberos keytab stored in the default Windows enrollment profile")
                 elif profile is not None and profile.realm is None and windows_profiles.keytab_absent(profile):
-                    # Established only here: no keytab to take, so A1's last resort applies
+                    # No keytab to take and none anywhere: A1's last resort applies
                     windows_profiles.fill_realm(profile)
                     if profile.realm is not None:
                         db.session.commit()
