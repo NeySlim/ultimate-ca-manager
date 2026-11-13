@@ -209,6 +209,22 @@ def test_the_domain_sid_is_read_at_the_domain_head_whatever_the_base_dn_depth(au
     assert searched == ['DC=a,DC=example']
 
 
+def test_a_created_connector_serves_a_default_profile_that_had_none(auth_client, app, monkeypatch):
+    from services import windows_profiles
+    from tests.windows_profile_support import default_profile
+
+    monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
+    with app.app_context():
+        default_profile(create=True).connector_id = None
+        db.session.commit()
+    created = _post(auth_client).get_json()['data']
+    with app.app_context():
+        assert windows_profiles.default_connector().id == created['id']
+    other = _post(auth_client, name='forest-b', servers=['dc.b.example'], base_dn='DC=b,DC=example').get_json()['data']
+    with app.app_context():
+        assert windows_profiles.default_connector().id == created['id'] != other['id']
+
+
 def test_a_second_connector_coexists_and_a_duplicate_name_is_refused(auth_client, monkeypatch):
     monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
     assert _post(auth_client).status_code == 201

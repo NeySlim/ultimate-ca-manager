@@ -57,10 +57,24 @@ def _refresh_domain_sid(config):
     config.domain_sid = lookup.fetch_domain_sid(config)
 
 
+def _serve_default_profile(config):
+    """A default profile with no connector is served by the first one created, as the
+    single-connector route does, so the protocols use what the screen shows."""
+    from services import windows_profiles
+    profile = windows_profiles.default_profile()
+    if profile is not None:
+        db.session.flush()
+        if profile.connector_id is None:
+            profile.connector_id = config.id
+        windows_profiles.fill_realm(profile)
+
+
 def _save(config, creating):
     config.updated_at = utc_now()
     try:
         _refresh_domain_sid(config)
+        if creating:
+            _serve_default_profile(config)
         ok, err = safe_commit(logger, 'Failed to save the AD connector')
         if not ok:
             return err
