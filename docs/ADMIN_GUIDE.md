@@ -811,6 +811,17 @@ systemctl restart ucm
 
 Once installed, `gssapi`/`spnego` are importable and the warning clears without any further configuration. This mirrors how `requests-kerberos` is handled for the MS CA WinRM/Kerberos admin channel (also excluded from the default install for the same reason).
 
+### Windows enrollment profiles: renewal
+
+Every certificate issued over WSTEP (Kerberos, UsernamePassword, Certificate binding, deferred approval) records the profile that issued it. A `wstep` certificate recording none, issued before profiles existed, belongs to the default profile.
+
+- **Certificate binding.** The renewal is served by the profile recorded on the presented certificate, under that profile's issuing CA, whatever the state of the default profile. It is refused when that profile was deleted or is disabled, when the certificate was not issued through Windows enrollment, or when it no longer comes from the profile's issuing CA. Each refusal of a certificate stored here is audited (`certificate.renewed`, failed) with the profile and the reason; the renewed certificate records the same profile.
+- **What is checked again.** Only the SID of the certificate, by the connector of its profile: an enabled connector of the SID's domain (or of a domain not read yet) must still find the account; a profile without enabled connector, or whose connector is of another domain, keeps the SID as it is. Group membership is not checked again: a computer or user removed from the group keeps renewing until its certificate is revoked, so revoke it when you remove it.
+- **TLS client certificate.** The TLS trust of the server is not widened for the profiles: the listener trusts the mTLS CA alone (**Settings → mTLS**). Renewal with the TLS client certificate therefore works only for a profile whose issuing CA is the mTLS CA or a CA under it; it is refused otherwise, as is mTLS authentication on EST for such a certificate. Domain-joined Windows renews over Kerberos first and only falls back to the Certificate binding when Kerberos is refused, so the other profiles renew over Kerberos (or behind a proxy that terminates TLS and forwards the verified certificate).
+- **Kerberos binding.** A renewal there is an issuance routed by the realm of the principal: when that realm belongs to another profile than the certificate being renewed, the realm's profile serves it, under its own CA, and the new certificate records that profile.
+- **Deferred approval.** A request held for approval records its profile by name and its CA by refid, and is replayed by them; after a restore on another installation, a request whose profile or CA does not exist there is closed with a message naming it.
+- **Keytab.** The keytab served to the Kerberos acceptor holds the keys of every profile, disabled ones included, so that a request of a disabled profile's realm authenticates and gets the refusal fault and its audit entry. Disabling a profile does not remove its keys from that file: to remove them, delete the profile's keytab or the profile.
+
 ---
 
 ## User Administration
