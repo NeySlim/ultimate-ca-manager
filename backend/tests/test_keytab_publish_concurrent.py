@@ -7,6 +7,7 @@ serializes the two writers instead.
 import os
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 
 import pytest
@@ -30,7 +31,8 @@ pytestmark = [pytest.mark.postgres, pytest.mark.skipif(not _PG_URL, reason='UCM_
 
 @contextmanager
 def _database(app):
-    with _a_schema_of_our_own('keytab_publish_race') as url, \
+    # One schema per run: xdist workers share the database
+    with _a_schema_of_our_own(f'keytab_publish_race_{uuid.uuid4().hex[:6]}') as url, \
             _bound_to(app, url, is_postgresql=True):
         yield
 
