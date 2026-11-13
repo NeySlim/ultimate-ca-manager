@@ -5531,6 +5531,7 @@
       "issuingCa": "Issuing CA chosen",
       "keytab": "Keytab uploaded",
       "connector": "AD connector reachable (when one is chosen)",
+      "connectorDomain": "Realm matches the domain of the AD connector",
       "templates": "At least one template allows autoenrollment ({{count}} currently)",
       "enabled": "Profile enabled"
     }

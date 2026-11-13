@@ -5534,6 +5534,7 @@
       "issuingCa": "CA d'émission choisie",
       "keytab": "Keytab envoyé",
       "connector": "Connecteur AD joignable (quand il y en a un)",
+      "connectorDomain": "Le realm est celui du domaine du connecteur AD",
       "templates": "Au moins un modèle autorise l'inscription automatique ({{count}} actuellement)",
       "enabled": "Profil activé"
     }

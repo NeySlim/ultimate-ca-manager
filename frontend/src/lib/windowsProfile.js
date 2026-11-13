@@ -50,6 +50,7 @@ export function profileChecklist(profile, { autoenrollTemplates = 0 } = {}) {
       ok: !profile.connector_id || (profile.connector_enabled !== false && !connectorDown),
       absent: !profile.connector_id,
     },
+    { key: 'connectorDomain', ok: !profile.connector_domain_mismatch },
     { key: 'templates', ok: autoenrollTemplates > 0, count: autoenrollTemplates },
     { key: 'enabled', ok: Boolean(profile.enabled) },
   ]

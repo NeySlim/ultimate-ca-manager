@@ -122,8 +122,11 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
 
   const autoenrollTemplates = useMemo(
     () => templates.filter(tpl => tpl.autoenroll_enabled && tpl.is_active !== false).length, [templates])
+  // The saved flag holds while realm and connector are as saved; an edit is judged live
+  const saved = detail && form.realm.trim() === (detail.realm || '') && form.connector_id === detail.connector_id
   const checklist = profileChecklist(
     { ...(detail || {}), ...form, keytab_set: detail?.keytab_set, connector_id: form.connector_id,
+      connector_domain_mismatch: saved ? Boolean(detail.connector_domain_mismatch) : realmMismatch,
       connector_enabled: connector?.enabled, connector_health: connector?.health?.state,
       issuing_ca_refid: form.issuing_ca_refid, realm: form.realm.trim() },
     { autoenrollTemplates })
