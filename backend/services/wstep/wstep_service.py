@@ -66,14 +66,16 @@ class HeldForApproval(Exception):
         self.approval = approval
 
 
-def _pass_gate(gate, csr, template, subject, san, signing_cert=None):
+def _pass_gate(gate, csr, template, subject, san, signing_cert=None, renewed=None):
     """None when *gate* lets the request through, else the error to answer;
-    raises :class:`HeldForApproval` when a policy holds it."""
+    raises :class:`HeldForApproval` when a policy holds it. ``renewed``: the certificate
+    a Kerberos request renews under the template-less exemption, held with the request."""
     if gate is None:
         return None
     from services.protocol_approval import ApprovalGateUnavailable
     try:
-        approval = gate(csr=csr, template=template, subject=subject, san=san, signing_cert=signing_cert)
+        approval = gate(csr=csr, template=template, subject=subject, san=san, signing_cert=signing_cert,
+                        renewed=renewed)
     except ApprovalGateUnavailable:
         return ServerError('Policy evaluation failed')
     if approval is not None:
@@ -91,6 +93,7 @@ NOT_IN_GROUP = 'Requester is not authorized to enroll against this {what}'
 # AD CS refuses a request without template (CERTSRV_E_NO_CERT_TYPE); so does the Kerberos binding
 NO_TEMPLATE = ('The request names no certificate template and its Extended Key Usages '
                'match none this profile offers')
+RENEWED_REVOKED = 'The certificate being renewed has been revoked'
 
 
 def _x509_name_from_dn_components(dn_components, email=None):
@@ -1082,7 +1085,7 @@ def _user_directory_subject(connector, sam_account_name, patterned=None, *, prof
 
 
 def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos_principal=None,
-          outer_signed_data=None, gate=None, on_stored=None, renewal=None, *, profile):
+          outer_signed_data=None, gate=None, on_stored=None, renewal=None, approved_renewal=None, *, profile):
     """UsernamePassword- or Kerberos-bound initial enrollment. Returns
     (cert_pem, error).
 
@@ -1117,7 +1120,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     ``profile``: the Windows enrollment profile serving the request; a Kerberos principal is
     issued only by the enabled profile of its own realm, with that profile's connector.
     ``renewal``: a dict that receives the ``serial`` of the certificate a Kerberos request renews
-    (``_requester_renewal``), for the audit.
+    (``_requester_renewal``), for the audit. ``approved_renewal``: that certificate, as the
+    approval of a held request replays it (the envelope is not kept); never read from a request.
 
     Enroll ACL: see ``_required_enroll_acl_groups`` for exactly which
     template's ``allowed_ad_group`` applies (the matched template's own,
@@ -1214,16 +1218,21 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
     if matched_template is None and not _ca_templates(ca, profile=profile):
         return None, ServerError('This CA offers no certificate template')
-    renewed = None
-    if kerberos_principal and outer_signed_data is not None:
+    renewed = approved_renewal
+    if renewed is None and kerberos_principal and outer_signed_data is not None:
         renewed = _requester_renewal(ca, outer_signed_data, kerberos_principal, kerberos_sam_account_name,
                                      connector, requester_sid, profile=profile)
     if renewal is not None and renewed is not None:
         renewal['serial'] = renewed.serial_number
     # Only the requester's own valid Windows certificate issued without template (before 3.0) is exempted
-    if (kerberos_principal and matched_template is None
-            and (renewed is None or _template_ext_oid(renewed) is not None)):
-        return None, NO_TEMPLATE
+    exempted = None
+    if kerberos_principal and matched_template is None:
+        if renewed is None or _template_ext_oid(renewed) is not None:
+            return None, NO_TEMPLATE
+        # Decided on arrival, the exemption travels with a held request: only a revocation since withdraws it
+        if approved_renewal is not None and _revoked(ca, approved_renewal):
+            return None, RENEWED_REVOKED
+        exempted = renewed
     template_oid = None
     if matched_template is not None:
         template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(csr), profile=profile)
@@ -1289,7 +1298,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
 
     # The approval gate sees the subject and names the certificate will carry
     err = _pass_gate(gate, csr, matched_template,
-                     override_subject if override_subject is not None else csr.subject, override_san)
+                     override_subject if override_subject is not None else csr.subject, override_san,
+                     renewed=exempted)
     if err:
         return None, err
 
@@ -1506,6 +1516,11 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
         if _requester_holds(cert, principal, sam_account_name, connector, requester_sid, profile=profile):
             return cert
     return None
+
+
+def _revoked(ca, cert):
+    from services.cert.issued_lookup import REVOKED, issued_certificate_status
+    return issued_certificate_status(ca, cert)[1] == REVOKED
 
 
 def _requester_holds(cert, principal, sam_account_name, connector, requester_sid, *, profile):

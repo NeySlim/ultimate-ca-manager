@@ -17,6 +17,7 @@ from services.ca_service import CAService
 from services.wstep import CES_KERBEROS_PATH, wstep_service
 from services.xcep.policy_builder import _policy_oid_for_template
 from tests.fixtures.templates import delete_templates
+from tests.protocol_approval_support import approval_policy, approve, requests_of
 from tests.test_wstep_kerberos_issue import _build_rst, _issued_cert_from_rstr
 from tests.test_wstep_renew_tls import _cmc_renewal, _rst
 from tests.test_windows_profile_routing import (NEGOTIATE, SID, _as, _audits, _fault, _profile,  # noqa: F401
@@ -245,3 +246,70 @@ def test_a_kerberos_renewal_of_a_certificate_with_template_follows_the_rule(app,
     r = client.post(CES_KERBEROS_PATH, data=_rst(_cmc_renewal(_csr(key=new_key), [(new_key, None), (key, old)])),
                     headers=NEGOTIATE)
     assert _fault(r) == (400, 's:Sender', NO_TEMPLATE)
+
+
+def _held(app, client, world, principal, policy_id):
+    """A held exempted renewal of hosta$'s own certificate: (RequestID, approval id, old cert)."""
+    from tests.test_protocol_approval_wstep import _pending
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old = _template_less_certificate(app, world, key)
+    request_id = _pending(_renew(client, world, principal, old, key))
+    (approval_id, status, data, _c), = requests_of(app, policy_id, 'wstep_request')
+    assert status == 'pending' and data['operation'] == 'issue'
+    return request_id, approval_id, old
+
+
+def _query(client, world, principal, request_id):
+    from tests.test_protocol_approval_wstep import _query_rst
+    _as(world, principal)
+    return client.post(CES_KERBEROS_PATH, data=_query_rst(request_id), headers=NEGOTIATE)
+
+
+def _revoke(app, cert):
+    with app.app_context():
+        Certificate.query.filter_by(serial_number=str(cert.serial_number)).one().revoked = True
+        db.session.commit()
+
+
+def test_an_exempted_renewal_held_for_approval_is_issued_once_approved(app, client, auth_client, world, realm_a):
+    """The exemption is decided when the request comes in and travels with it: the approval issues."""
+    with approval_policy(app, world['cas']['A']['id'], 'c15-held-exempted') as pid:
+        request_id, approval_id, old = _held(app, client, world, MACHINE, pid)
+        approve(auth_client, approval_id)
+        r = _query(client, world, MACHINE, request_id)
+        assert r.status_code == 200, r.data
+        assert _issued_cert_from_rstr(r.data).subject.rfc4514_string() == 'CN=hosta.c04a.test'
+        assert requests_of(app, pid, 'wstep_request')[0][1] == 'approved'
+
+
+def test_an_exempted_renewal_whose_certificate_is_revoked_before_approval_is_refused(
+        app, client, auth_client, world, realm_a):
+    """Revoked while held: the approval issues nothing and the client hears the refusal."""
+    from tests.test_protocol_approval_wstep import _fault as _held_fault
+    with approval_policy(app, world['cas']['A']['id'], 'c15-held-revoked') as pid:
+        request_id, approval_id, old = _held(app, client, world, MACHINE, pid)
+        _revoke(app, old)
+        before = _issued_count(app, world)
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.get_json()['message'] == 'Request closed'
+        assert r.get_json()['data']['issue_error'].endswith(wstep_service.RENEWED_REVOKED)
+        assert _issued_count(app, world) == before
+        reason, invalid, _echo = _held_fault(_query(client, world, MACHINE, request_id))
+        assert reason == 'Refused at issuance' and invalid == 'true'
+
+
+def test_an_exempted_renewal_whose_certificate_is_revoked_after_approval_is_not_delivered(
+        app, client, auth_client, world, realm_a):
+    from tests.test_protocol_approval_wstep import _fault as _held_fault
+    with approval_policy(app, world['cas']['A']['id'], 'c15-held-delivery') as pid:
+        request_id, approval_id, old = _held(app, client, world, MACHINE, pid)
+        approve(auth_client, approval_id)
+        _revoke(app, old)
+        reason, invalid, _echo = _held_fault(_query(client, world, MACHINE, request_id))
+        assert reason == 'Renewed certificate revoked' and invalid == 'true'
+
+
+def test_an_initial_request_without_template_is_refused_before_the_approval_gate(app, client, world, realm_a):
+    with approval_policy(app, world['cas']['A']['id'], 'c15-held-initial') as pid:
+        assert _fault(_post(client, world, MACHINE, _csr('c15-initial'))) == (400, 's:Sender', NO_TEMPLATE)
+        assert requests_of(app, pid, 'wstep_request') == []
