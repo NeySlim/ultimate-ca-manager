@@ -18,7 +18,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509.oid import NameOID
 
-from models import CA, ADConnectorConfig, CATemplatePin, db
+from models import CA, CATemplatePin, db
+from tests.ad_connector_support import mount_connector
 from models.certificate_template import CertificateTemplate
 from tests.fixtures.templates import delete_templates, template_ids_named
 from services.ad_connector import lookup as ad_lookup
@@ -54,14 +55,8 @@ def _make_csr(attrs=None, common_name=None):
 
 def _configure_ad_connector(app):
     with app.app_context():
-        ADConnectorConfig.query.delete()
-        config = ADConnectorConfig(
-            server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
-            bind_dn='svc-ucm', enabled=True,
-        )
-        config.bind_password = 'irrelevant'
-        db.session.add(config)
-        db.session.commit()
+        mount_connector(server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
+                        bind_dn='svc-ucm', enabled=True)
 
 
 def _clear_pinned_templates(app):
@@ -239,7 +234,7 @@ class TestPinnedSubjectFieldsIssuance:
                 )
                 monkeypatch.setattr(
                     ad_lookup, 'lookup_computer_dns_hostname',
-                    lambda sam_account_name: 'win11.hagland.domain',
+                    lambda _config, sam_account_name: 'win11.hagland.domain',
                 )
                 # Kerberos-bound issuance refuses when the AD Connector is
                 # enabled but the requester SID lookup fails (KB5014754
@@ -247,7 +242,7 @@ class TestPinnedSubjectFieldsIssuance:
                 # Kerberos-bound tests do.
                 monkeypatch.setattr(
                     ad_lookup, 'lookup_object_sid',
-                    lambda sam_account_name: 'S-1-5-21-3623811015-3361044348-30300820-1105',
+                    lambda _config, sam_account_name: 'S-1-5-21-3623811015-3361044348-30300820-1105',
                 )
                 csr, _key = _make_csr()
                 cert_pem, err = wstep_service.issue(

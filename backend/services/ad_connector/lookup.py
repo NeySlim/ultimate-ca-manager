@@ -24,8 +24,8 @@ Two things live here:
 
 Bind/search mechanics mirror ``api/v2/sso/connection_tests.py``'s
 ``_ldap_authenticate_user``/``api/v2/sso/helpers.py``'s ``_build_ldap_tls``
-(same ``ldap3`` conventions), but operate on this module's own
-``ADConnectorConfig`` singleton -- not ``SSOProvider`` -- and fix a leaked
+(same ``ldap3`` conventions), but operate on the ``ADConnectorConfig`` row the caller passes
+-- not ``SSOProvider`` -- and fix a leaked
 temp CA-bundle file that exists in that code (no matching cleanup there).
 
 The public lookups never raise: they answer None (or False) when the connector is
@@ -68,12 +68,9 @@ NO_ACCOUNT = _Falsy('NO_ACCOUNT')
 FOREIGN_REALM = _Falsy('FOREIGN_REALM')
 
 
-def _enabled_config():
+def _enabled_config(config):
     """(config, None) for a complete enabled connector; (None, None) when it is absent or
     disabled; (None, UNREACHABLE) when it is enabled but has no server or base DN."""
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
     if not config or not config.enabled:
         return None, None
     if not config.server or not config.base_dn:
@@ -145,7 +142,7 @@ def realm_of_base_dn(base_dn):
     return '.'.join(dc_values).upper()
 
 
-def realm_matches_connector(realm):
+def realm_matches_connector(config, realm):
     """Whether ``realm`` (from an authenticated Kerberos principal, e.g.
     ``'HAGLAND.DOMAIN'``) matches the domain this AD Connector is configured
     against, so a caller can refuse to map a principal from an unexpected
@@ -162,9 +159,6 @@ def realm_matches_connector(realm):
     """
     if not realm:
         return False
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
     if not config or not config.enabled or not config.base_dn:
         return False
     connector_realm = realm_of_base_dn(config.base_dn)
@@ -182,27 +176,21 @@ def _config_fault(config):
     return None
 
 
-def connector_config_fault():
-    """Why the enabled connector cannot resolve a principal, or None."""
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
+def connector_config_fault(config):
+    """Why the enabled connector ``config`` cannot resolve a principal, or None."""
     if not config or not config.enabled:
         return None
     return _config_fault(config)
 
 
-def connector_account(principal):
-    """The sAMAccountName an enabled connector checks ``principal`` against.
+def connector_account(config, principal):
+    """The sAMAccountName the enabled connector ``config`` checks ``principal`` against.
 
     None when the connector is absent or disabled; the falsy ``UNREACHABLE`` when it is
     enabled without a server or a base DN that names a realm; the falsy ``NO_ACCOUNT``
     or ``FOREIGN_REALM`` when the principal is malformed or of another realm, which a
     caller refuses rather than issuing without the checks the connector enforces.
     """
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
     if not config or not config.enabled:
         return None
     if _config_fault(config):
@@ -210,7 +198,7 @@ def connector_account(principal):
     parsed = parse_kerberos_principal(principal)
     if not parsed:
         return NO_ACCOUNT
-    if not realm_matches_connector(parsed[1]):
+    if not realm_matches_connector(config, parsed[1]):
         return FOREIGN_REALM
     return parsed[0]
 
@@ -443,7 +431,7 @@ def _single_entry(entries, sam_account_name, what='named'):
     return entries[0]
 
 
-def lookup_computer_dns_hostname(sam_account_name):
+def lookup_computer_dns_hostname(config, sam_account_name):
     """The AD computer object's ``dNSHostName`` for ``sam_account_name``
     (e.g. ``'WIN11$'``, trailing ``$`` included -- it's a real part of the
     attribute value, not an LDAP filter metacharacter to strip).
@@ -454,7 +442,7 @@ def lookup_computer_dns_hostname(sam_account_name):
     """
     from ldap3.utils.conv import escape_filter_chars
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault
 
@@ -514,7 +502,7 @@ def _sid_bytes_to_string(raw):
     return f"S-{revision}-{authority}-" + "-".join(str(s) for s in sub_authorities)
 
 
-def lookup_object_sid(sam_account_name):
+def lookup_object_sid(config, sam_account_name):
     """The AD object's ``objectSid`` (user or computer -- no ``objectClass``
     filter needed since ``sAMAccountName`` is domain-unique, machine
     accounts keep their trailing ``$``), as a ``"S-1-5-21-..."`` string --
@@ -535,7 +523,7 @@ def lookup_object_sid(sam_account_name):
     """
     from ldap3.utils.conv import escape_filter_chars
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault
 
@@ -577,7 +565,7 @@ def _sid_string_to_bytes(sid):
             + b''.join(s.to_bytes(4, 'little') for s in subs))
 
 
-def lookup_account_by_sid(sid):
+def lookup_account_by_sid(config, sid):
     """The ``sAMAccountName`` of the one directory object whose ``objectSid`` is ``sid``.
 
     None when the connector is off; the falsy ``NO_ACCOUNT`` when ``sid`` is malformed or
@@ -587,7 +575,7 @@ def lookup_account_by_sid(sid):
     """
     from ldap3.utils.conv import escape_bytes
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault
     raw = _sid_string_to_bytes(sid)
@@ -625,7 +613,7 @@ def lookup_account_by_sid(sid):
             pass
 
 
-def lookup_user_ad_identity(sam_account_name):
+def lookup_user_ad_identity(config, sam_account_name):
     """The AD user object's directory path (as ordered RDN components, for
     building an x509.Name matching real ADCS's directory-path subject),
     userPrincipalName, and mail (if set), for ``sam_account_name`` (no
@@ -651,7 +639,7 @@ def lookup_user_ad_identity(sam_account_name):
     from ldap3.utils.conv import escape_filter_chars
     from ldap3.utils.dn import parse_dn
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault
 
@@ -698,7 +686,7 @@ def _looks_like_dn(value):
     return '=' in value and ',' in value
 
 
-def is_member_of_group(sam_account_name, group):
+def is_member_of_group(config, sam_account_name, group):
     """Whether the AD account ``sam_account_name`` (no trailing ``$``
     stripped -- caller passes it exactly as parsed from the Kerberos
     principal, so a machine account keeps its ``$``) is a member of
@@ -722,7 +710,7 @@ def is_member_of_group(sam_account_name, group):
     if not sam_account_name or not group:
         return False
 
-    config, fault = _enabled_config()
+    config, fault = _enabled_config(config)
     if config is None:
         return fault if fault is not None else False
 
@@ -769,6 +757,44 @@ def is_member_of_group(sam_account_name, group):
             pass
 
 
+def read_domain_sid(conn, base_dn):
+    """The ``objectSid`` of the object the base DN names (the domain head), as a string,
+    None when it cannot be read. Never raises."""
+    import ldap3
+
+    if not base_dn:
+        return None
+    try:
+        conn.search(base_dn, '(objectClass=*)', search_scope=ldap3.BASE, attributes=['objectSid'])
+        entries = conn.entries if isinstance(getattr(conn, 'result', None), dict) \
+            and conn.result.get('result') == _RESULT_SUCCESS else []
+        if len(entries) != 1 or 'objectSid' not in entries[0] or not entries[0].objectSid.raw_values:
+            return None
+        return _sid_bytes_to_string(entries[0].objectSid.raw_values[0])
+    except Exception as e:
+        logger.warning('AD Connector: could not read the domain SID under %r: %s', base_dn, e)
+        return None
+
+
+def fetch_domain_sid(config):
+    """``read_domain_sid`` over a fresh bind to the first DC that accepts it; None when
+    no DC binds. Never raises."""
+    if not config_servers(config) or not has_bind_credentials(config):
+        return None
+    try:
+        conn = _connect(config)
+    except Exception as e:
+        logger.warning('AD Connector: could not bind to read the domain SID: %s', e)
+        return None
+    try:
+        return read_domain_sid(conn, getattr(config, 'base_dn', None))
+    finally:
+        try:
+            conn.unbind()
+        except Exception:
+            pass
+
+
 def test_connection(config):
     """Test connectivity + bind for a config-like object -- either the
     saved ``ADConnectorConfig`` row or an unsaved ``SimpleNamespace`` built
@@ -808,6 +834,7 @@ def test_connection(config):
                 'message': 'Connection failed: could not prepare the TLS settings', 'servers': []}
 
     results = []
+    domain_sid = None
     try:
         for host in servers:
             try:
@@ -817,6 +844,8 @@ def test_connection(config):
                 continue
             results.append({'server': host, 'success': True,
                             'message': 'Connected and bound successfully'})
+            if domain_sid is None:
+                domain_sid = read_domain_sid(conn, getattr(config, 'base_dn', None))
             try:
                 conn.unbind()
             except Exception:
@@ -830,14 +859,14 @@ def test_connection(config):
 
     if not ok_count:
         return {'success': False, 'partial': False,
-                'message': f'Connection failed: {detail}', 'servers': results}
+                'message': f'Connection failed: {detail}', 'servers': results, 'domain_sid': domain_sid}
     if failed:
         return {'success': True, 'partial': True,
                 'message': f'{ok_count} of {len(results)} servers connected -- {detail}',
-                'servers': results}
+                'servers': results, 'domain_sid': domain_sid}
     if len(results) == 1:
         return {'success': True, 'partial': False,
-                'message': 'Connected and bound successfully', 'servers': results}
+                'message': 'Connected and bound successfully', 'servers': results, 'domain_sid': domain_sid}
     return {'success': True, 'partial': False,
             'message': f'All {len(results)} servers connected and bound successfully',
-            'servers': results}
+            'servers': results, 'domain_sid': domain_sid}

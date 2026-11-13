@@ -1,7 +1,7 @@
 """
 Active Directory Connector model.
 
-A single stored LDAP connection UCM uses to query Active Directory directly
+A stored LDAP connection UCM uses to query Active Directory directly
 -- currently for one purpose: resolving a Kerberos machine principal (e.g.
 ``WIN11$@HAGLAND.DOMAIN``) to its computer object's ``dNSHostName`` attribute,
 so MS-WSTEP's Kerberos-bound CES endpoint can derive a subject/SAN for the
@@ -14,9 +14,8 @@ connector needs to be configurable independently of whether SSO is set up
 at all -- an admin using local UCM accounts would never think to look under
 SSO settings to enable AD connectivity for certificate autoenrollment.
 
-Single-row table: there's exactly one AD UCM needs to talk to for this
-purpose, the same posture as the Kerberos SPN/keytab config (one keytab per
-UCM instance, not a multi-connection list).
+One row per directory (forest or domain): a lookup always receives the row it
+searches with, from the Windows enrollment profile that names it.
 
 Secrets encrypted at rest using ``utils/encryption.py`` (fail-closed: if the
 encryption key can't be derived, saving raises rather than silently
@@ -32,7 +31,7 @@ from utils.datetime_utils import utc_now, utc_isoformat
 
 
 class ADConnectorConfig(db.Model):
-    """Active Directory connector connection configuration (single row)."""
+    """Active Directory connector connection configuration."""
     __tablename__ = 'ad_connector_config'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -85,6 +84,12 @@ class ADConnectorConfig(db.Model):
         self.server = join_servers(values) or None
 
     @property
+    def realm(self):
+        """The Kerberos realm the base DN names, None when it names none."""
+        from services.ad_connector.lookup import realm_of_base_dn
+        return realm_of_base_dn(self.base_dn)
+
+    @property
     def health(self):
         """The stored probe verdict as a dict (``{}`` when never probed)."""
         from services.ad_connector.health import parse_health
@@ -117,15 +122,13 @@ class ADConnectorConfig(db.Model):
         else:
             self._bind_password = None
 
-    @classmethod
-    def get_singleton(cls):
-        """The one connector row, or ``None`` if never configured."""
-        return cls.query.first()
-
     def to_dict(self, include_secrets=False):
         from services.ad_connector.health import is_fresh, stale_after
         data = {
             'id': self.id,
+            'name': self.name,
+            'domain_sid': self.domain_sid,
+            'realm': self.realm,
             'server': self.server or '',
             'servers': self.servers,
             'port': self.port or 389,

@@ -10,7 +10,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.x509.oid import AttributeOID, NameOID
 
-from models import CA, Certificate, db
+from tests.ad_connector_support import connector_row
+from models import  CA, Certificate, db
 from services.ad_connector import lookup as ad_lookup
 from services.ca_service import CAService
 from services.scep.scep_service import SCEPService
@@ -133,7 +134,7 @@ class TestEstReenrolment:
     def test_a_certificate_the_ca_did_not_sign_is_refused(self, client, app, auth_client,
                                                          est_config, monkeypatch):
         _row_id, forged, key = forged_import(app, auth_client, est_config['id'], 'est-sid-forged.example.test')
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: pytest.fail('unsigned SID'))
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: pytest.fail('unsigned SID'))
         _configure_ad_connector(app)
         before = _count(app)
         assert _est_reenrol(client, forged, key).status_code == 403
@@ -142,13 +143,13 @@ class TestEstReenrolment:
     def test_without_the_extension_renews_without_it(self, client, app, est_config, monkeypatch):
         old, key = _issue(app, est_config['id'], 'est-sid-none.example.test', sid=None)
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: pytest.fail('no SID'))
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: pytest.fail('no SID'))
         assert _sid_ext(_est_leaf(_est_reenrol(client, old, key, csr_sid=OTHER_SID))) is None
 
     def test_connector_without_the_account_refuses(self, client, app, est_config, monkeypatch):
         old, key = _issue(app, est_config['id'], 'est-sid-gone.example.test')
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.NO_ACCOUNT)
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.NO_ACCOUNT)
         before = _count(app)
         r = _est_reenrol(client, old, key)
         assert r.status_code == 400
@@ -160,7 +161,7 @@ class TestEstReenrolment:
         from api.est_protocol import EST_RETRY_AFTER_DEFAULT
         old, key = _issue(app, est_config['id'], 'est-sid-down.example.test')
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.UNREACHABLE)
         before = _count(app)
         r = _est_reenrol(client, old, key)
         assert r.status_code == 503
@@ -187,7 +188,7 @@ class TestEstReenrolment:
             assert _est_reenrol(client, old, key).status_code == 202
             (approval_id, *_), = requests_of(app, pid, 'est_enroll')
             _configure_ad_connector(app)
-            monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.NO_ACCOUNT)
+            monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.NO_ACCOUNT)
             r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
             assert r.get_json()['message'] == 'Request closed'
             (_id, status, _data, cert_id), = requests_of(app, pid, 'est_enroll')
@@ -234,7 +235,7 @@ class TestScepRenewal:
         (ca, ca_cert), ca_id = scep_ca
         old, old_key = _issue(app, ca_id, f"scep-sid-{answer.lower().replace('_', '-')}.example.test")
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: getattr(ad_lookup, answer))
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: getattr(ad_lookup, answer))
         before = _count(app)
         attrs, _response = _scep_renew(ca, ca_cert, old, old_key)
         assert attrs[PKI_STATUS_OID] == '2'
@@ -267,7 +268,7 @@ class TestScepRenewal:
         with approval_policy(app, ca_id, 'scep-held-renew-sid-gone', operations=['renewal']) as pid:
             approval_id = self._held(app, ca_id, 'scep-sid-held-gone.example.test', pid)
             _configure_ad_connector(app)
-            monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.NO_ACCOUNT)
+            monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.NO_ACCOUNT)
             r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
             assert r.get_json()['message'] == 'Request closed'
             (_id, status, _data, cert_id), = requests_of(app, pid, 'scep_request')
@@ -280,7 +281,7 @@ class TestScepRenewal:
         with approval_policy(app, ca_id, 'scep-held-renew-sid-down', operations=['renewal']) as pid:
             approval_id = self._held(app, ca_id, 'scep-sid-held-down.example.test', pid)
             _configure_ad_connector(app)
-            monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
+            monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.UNREACHABLE)
             r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
             assert UNRESOLVED_MESSAGE in r.get_data(as_text=True)
             (_id, status, _data, cert_id), = requests_of(app, pid, 'scep_request')
@@ -311,7 +312,7 @@ class TestScepManualApproval:
         from services.ad_connector.renewal_identity import UNRESOLVED_MESSAGE
         request_id = self._pending(app, scep_ca, 'scep-manual-sid-down.example.test')
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.UNREACHABLE)
         before = _count(app)
         r = auth_client.post(f'/api/v2/scep/{request_id}/approve', json={})
         assert r.status_code == 503
@@ -323,7 +324,7 @@ class TestScepManualApproval:
         from services.ad_connector.renewal_identity import NOT_FOUND_MESSAGE
         request_id = self._pending(app, scep_ca, 'scep-manual-sid-gone.example.test')
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.NO_ACCOUNT)
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: ad_lookup.NO_ACCOUNT)
         before = _count(app)
         r = auth_client.post(f'/api/v2/scep/{request_id}/approve', json={})
         assert r.status_code == 400
@@ -375,7 +376,7 @@ def test_an_unresolved_sid_logs_the_connector_fault(app, create_ca, monkeypatch,
     _configure_ad_connector(app)
     try:
         with app.app_context():
-            ADConnectorConfig.get_singleton().server = server
+            connector_row().server = server
             db.session.commit()
             if server:
                 monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))

@@ -40,6 +40,7 @@ from api.v2.xcep import bp as xcep_bp
 from api.v2.wstep import bp as wstep_bp
 from api.v2.kerberos import bp as kerberos_bp
 from api.v2.ad_connector import bp as ad_connector_bp
+from api.v2.ad_connectors import bp as ad_connectors_bp
 from api.v2.tsa import bp as tsa_bp
 # Settings: import package (creates bp) then all route modules
 from api.v2.settings import bp as settings_bp
@@ -122,6 +123,7 @@ API_V2_BLUEPRINTS = [
     wstep_bp,
     kerberos_bp,
     ad_connector_bp,
+    ad_connectors_bp,
     tsa_bp,
     settings_bp,
     system_bp,

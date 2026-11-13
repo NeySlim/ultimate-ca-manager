@@ -9,7 +9,8 @@ import uuid
 
 import pytest
 
-from models import db
+from tests.ad_connector_support import connector_row
+from models import  db
 from tests.windows_profile_support import connectors_kept
 
 
@@ -496,7 +497,7 @@ class TestADConnector:
     def _row(self, app):
         from models import ADConnectorConfig
         with app.app_context():
-            row = ADConnectorConfig.get_singleton()
+            row = connector_row()
             return row.server, row.port, row.verify_ssl, row.bind_dn, row.bind_password, row.base_dn
 
     @pytest.mark.parametrize('over', [

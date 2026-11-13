@@ -44,11 +44,13 @@ def renewal_requester_sid(renewed_cert, ca_cert, protocol):
         logger.warning("%s: renewed certificate serial %x was not signed by this CA, its SID is not carried over",
                        protocol, renewed_cert.serial_number)
         return None
-    account = lookup.lookup_account_by_sid(sid)
+    from services.windows_profiles import default_connector
+    connector = default_connector()
+    account = lookup.lookup_account_by_sid(connector, sid)
     if account is None or account:
         return sid
     if account is lookup.UNREACHABLE:
-        fault = lookup.connector_config_fault()
+        fault = lookup.connector_config_fault(connector)
         logger.warning("%s: the AD Connector cannot resolve SID %s of a renewed certificate%s",
                        protocol, sid, f': {fault}' if fault else '')
         raise RenewalIdentityUnresolved(UNRESOLVED_MESSAGE)

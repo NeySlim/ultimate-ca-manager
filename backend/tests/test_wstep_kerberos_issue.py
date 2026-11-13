@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509.oid import NameOID
 from lxml import etree
 
+from tests.ad_connector_support import clear_connectors, mount_connector
 from models import CA, ADConnectorConfig, AuditLog, Certificate, db
 from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
@@ -166,7 +167,7 @@ def test_issue_succeeds_with_authenticated_negotiation(client, app, wstep_kerber
     )
     # Strong cert mapping (KB5014754) is unconditional whenever AD Connector
     # is configured+enabled; no_connector_serving turns off any left by another file.
-    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
     # A template whose subject the client supplies: a machine template's comes from AD
     _configure_acl_template(app, None, wstep_kerberos_config['id'])
@@ -194,14 +195,8 @@ def test_issue_succeeds_with_authenticated_negotiation(client, app, wstep_kerber
 
 def _configure_ad_connector(app):
     with app.app_context():
-        ADConnectorConfig.query.delete()
-        config = ADConnectorConfig(
-            server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
-            bind_dn='svc-ucm', enabled=True,
-        )
-        config.bind_password = 'irrelevant'
-        db.session.add(config)
-        db.session.commit()
+        mount_connector(server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
+                        bind_dn='svc-ucm', enabled=True)
 
 
 def _clear_ad_derived_templates(app):
@@ -278,9 +273,9 @@ class TestNakedCsrSubjectDerivation:
         )
         monkeypatch.setattr(
             ad_lookup, 'lookup_computer_dns_hostname',
-            lambda sam_account_name: 'win11.hagland.domain',
+            lambda _config, sam_account_name: 'win11.hagland.domain',
         )
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         csr, key = _make_naked_csr()
         r = client.post(
@@ -302,14 +297,14 @@ class TestNakedCsrSubjectDerivation:
         self, client, app, wstep_kerberos_config, monkeypatch
     ):
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
             negotiate_auth, 'authenticate_negotiate',
             lambda auth_header, connection_key: _authenticated_result(),
         )
-        monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda sam_account_name: None)
+        monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda _config, sam_account_name: None)
 
         csr, _key = _make_naked_csr()
         r = client.post(
@@ -378,12 +373,12 @@ class TestNakedCsrSubjectDerivation:
         )
         monkeypatch.setattr(
             ad_lookup, 'lookup_user_ad_identity',
-            lambda sam_account_name: {
+            lambda _config, sam_account_name: {
                 'dn_components': self._GOLDEN_USER_DN_COMPONENTS,
                 'upn': self._GOLDEN_USER_UPN,
             },
         )
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         csr, key = _make_naked_csr()
         r = client.post(
@@ -430,13 +425,13 @@ class TestNakedCsrSubjectDerivation:
         )
         monkeypatch.setattr(
             ad_lookup, 'lookup_user_ad_identity',
-            lambda sam_account_name: {
+            lambda _config, sam_account_name: {
                 'dn_components': self._GOLDEN_USER_DN_COMPONENTS,
                 'upn': self._GOLDEN_USER_UPN,
                 'mail': self._GOLDEN_USER_UPN,
             },
         )
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         csr, key = _make_naked_csr()
         r = client.post(
@@ -472,7 +467,7 @@ class TestNakedCsrSubjectDerivation:
         ...) means the naked CSR falls through to the pre-existing
         rejection, never a crash or a bypass."""
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_ad_derived_user_template(app, wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -482,7 +477,7 @@ class TestNakedCsrSubjectDerivation:
                 status='authenticated', client_principal='alice@HAGLAND.DOMAIN',
             ),
         )
-        monkeypatch.setattr(ad_lookup, 'lookup_user_ad_identity', lambda sam_account_name: None)
+        monkeypatch.setattr(ad_lookup, 'lookup_user_ad_identity', lambda _config, sam_account_name: None)
 
         csr, _key = _make_naked_csr()
         r = client.post(
@@ -498,7 +493,7 @@ class TestNakedCsrSubjectDerivation:
         + a successful lookup -- without any ad_derived_subject template,
         derivation must not fire even if AD would have resolved the user."""
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
         _clear_ad_derived_templates(app)
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -510,7 +505,7 @@ class TestNakedCsrSubjectDerivation:
         )
         monkeypatch.setattr(
             ad_lookup, 'lookup_user_ad_identity',
-            lambda sam_account_name: {
+            lambda _config, sam_account_name: {
                 'dn_components': self._GOLDEN_USER_DN_COMPONENTS,
                 'upn': self._GOLDEN_USER_UPN,
             },
@@ -591,9 +586,9 @@ class TestEnrollAcl:
         )
         monkeypatch.setattr(
             ad_lookup, 'is_member_of_group',
-            lambda sam_account_name, group: (sam_account_name, group) == ('HOST$', 'VPN-Enroll'),
+            lambda _config, sam_account_name, group: (sam_account_name, group) == ('HOST$', 'VPN-Enroll'),
         )
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         try:
             csr, key = _make_csr()
@@ -616,8 +611,8 @@ class TestEnrollAcl:
             negotiate_auth, 'authenticate_negotiate',
             lambda auth_header, connection_key: _authenticated_result(),
         )
-        monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda sam_account_name, group: False)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda _config, sam_account_name, group: False)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         try:
             csr, _key = _make_csr()
@@ -644,8 +639,8 @@ class TestEnrollAcl:
             negotiate_auth, 'authenticate_negotiate',
             lambda auth_header, connection_key: _authenticated_result(),
         )
-        monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda sam_account_name, group: False)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda _config, sam_account_name, group: False)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         try:
             csr, _key = _make_csr()
@@ -664,7 +659,7 @@ class TestEnrollAcl:
         propagates that as a denial, not a silent bypass, when the
         connector/DC is unreachable."""
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -703,11 +698,11 @@ class TestEnrollAcl:
             lambda auth_header, connection_key: _authenticated_result(),
         )
 
-        def _fail_if_called(sam_account_name, group):
+        def _fail_if_called(_config, sam_account_name, group):
             raise AssertionError('is_member_of_group must not be called when nothing is restricted')
 
         monkeypatch.setattr(ad_lookup, 'is_member_of_group', _fail_if_called)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         try:
             csr, key = _make_csr()
@@ -732,7 +727,7 @@ class TestEnrollAcl:
         never be checked at all -- silently defeating the ACL for exactly
         the unattended-autoenrollment case it exists to restrict."""
         _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'], extended_key_usage=['clientAuth'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -742,9 +737,9 @@ class TestEnrollAcl:
         )
         monkeypatch.setattr(
             ad_lookup, 'lookup_computer_dns_hostname',
-            lambda sam_account_name: 'win11.hagland.domain',
+            lambda _config, sam_account_name: 'win11.hagland.domain',
         )
-        monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda sam_account_name, group: False)
+        monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda _config, sam_account_name, group: False)
 
         try:
             csr, _key = _make_naked_csr()
@@ -772,13 +767,13 @@ class TestEnrollAcl:
         )
         monkeypatch.setattr(
             ad_lookup, 'lookup_computer_dns_hostname',
-            lambda sam_account_name: 'win11.hagland.domain',
+            lambda _config, sam_account_name: 'win11.hagland.domain',
         )
         monkeypatch.setattr(
             ad_lookup, 'is_member_of_group',
-            lambda sam_account_name, group: (sam_account_name, group) == ('HOST$', 'VPN-Enroll'),
+            lambda _config, sam_account_name, group: (sam_account_name, group) == ('HOST$', 'VPN-Enroll'),
         )
-        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         try:
             csr, key = _make_naked_csr()
@@ -800,7 +795,7 @@ def test_an_unreachable_directory_is_a_receiver_fault(client, app, wstep_kerbero
     monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
                         lambda auth_header, connection_key: _authenticated_result())
-    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: ad_lookup.UNREACHABLE)
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: ad_lookup.UNREACHABLE)
     csr, _key = _make_csr()
     r = client.post(ISSUE_URL, data=_build_rst(csr),
                     headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
@@ -819,7 +814,7 @@ def test_a_requester_missing_from_the_directory_is_a_sender_fault(
     monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
                         lambda auth_header, connection_key: _authenticated_result())
-    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: None)
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: None)
     csr, _key = _make_csr()
     r = client.post(ISSUE_URL, data=_build_rst(csr),
                     headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
@@ -831,11 +826,7 @@ def test_an_enabled_connector_without_a_server_is_a_receiver_fault(
         client, app, wstep_kerberos_config, monkeypatch):
     """The API accepts an enabled connector with no server: a configuration fault (500), not 400."""
     with app.app_context():
-        ADConnectorConfig.query.delete()
-        config = ADConnectorConfig(server=None, base_dn='DC=hagland,DC=domain', bind_dn='svc-ucm', enabled=True)
-        config.bind_password = 'irrelevant'
-        db.session.add(config)
-        db.session.commit()
+        mount_connector(server=None, base_dn='DC=hagland,DC=domain', bind_dn='svc-ucm', enabled=True)
     monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
@@ -855,7 +846,7 @@ def test_a_requester_without_a_usable_sid_is_told_apart_from_a_missing_one(
     monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
                         lambda auth_header, connection_key: _authenticated_result())
-    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: ad_lookup.UNUSABLE_SID)
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: ad_lookup.UNUSABLE_SID)
     csr, _key = _make_csr()
     r = client.post(ISSUE_URL, data=_build_rst(csr),
                     headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
@@ -877,7 +868,7 @@ def test_a_naked_request_the_directory_cannot_answer_is_a_receiver_fault(
     monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
                         lambda auth_header, connection_key: _authenticated_result())
-    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
     monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('DC unreachable')))
     csr, _key = _make_naked_csr()
     r = client.post(ISSUE_URL, data=_build_rst(csr),
@@ -898,25 +889,19 @@ def test_an_enabled_connector_that_cannot_resolve_the_requester_faults(
         client, app, wstep_kerberos_config, monkeypatch, principal, base_dn, status, text, code):
     """Never issued without the SID extension: a foreign realm is the requester's fault, no base DN the CA's."""
     with app.app_context():
-        ADConnectorConfig.query.delete()
-        config = ADConnectorConfig(server='dc1.hagland.domain', base_dn=base_dn,
-                                   bind_dn='svc-ucm', enabled=True)
-        config.bind_password = 'irrelevant'
-        db.session.add(config)
-        db.session.commit()
+        mount_connector(server='dc1.hagland.domain', base_dn=base_dn, bind_dn='svc-ucm', enabled=True)
     monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
                         lambda auth_header, connection_key: negotiate_auth.NegotiateResult(
                             status='authenticated', client_principal=principal))
-    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
     csr, _key = _make_csr()
     try:
         r = client.post(ISSUE_URL, data=_build_rst(csr),
                         headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
     finally:
         with app.app_context():
-            ADConnectorConfig.query.delete()
-            db.session.commit()
+            clear_connectors()
     assert r.status_code == status
     assert _fault_text_and_code(r.data) == (text, code)

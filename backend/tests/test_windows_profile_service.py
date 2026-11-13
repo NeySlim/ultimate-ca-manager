@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
-from models import (CA, ADConnectorConfig, Certificate, CATemplatePin, CertificateTemplate, SystemConfig,
+from tests.ad_connector_support import connector_row as lowest_connector_row
+from models import  (CA, ADConnectorConfig, Certificate, CATemplatePin, CertificateTemplate, SystemConfig,
                     WindowsEnrollmentProfile, WindowsProfileTemplate, db)
 from services.backup import manifest
 from services.kerberos import negotiate_auth
@@ -85,7 +86,7 @@ def clean_slate(app):
             parked_state = (parked.id, parked.name, parked.realm)
             parked.is_default, parked.name, parked.realm = False, f'parked-{parked.id}', None
         SystemConfig.query.filter(SystemConfig.key.in_(MIGRATED_KEYS)).delete(synchronize_session=False)
-        connector = ADConnectorConfig.get_singleton()
+        connector = lowest_connector_row()
         connector_state = (connector.enabled, connector.base_dn) if connector is not None else None
         connectors = {c.id for c in ADConnectorConfig.query.all()}
         db.session.commit()
@@ -113,7 +114,7 @@ def clean_slate(app):
         WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.connector_id.in_(added)).update(
             {'connector_id': None}, synchronize_session=False)
         ADConnectorConfig.query.filter(ADConnectorConfig.id.in_(added)).delete(synchronize_session=False)
-        connector = ADConnectorConfig.get_singleton()
+        connector = lowest_connector_row()
         if connector is not None and connector_state is not None:
             connector.enabled, connector.base_dn = connector_state
         db.session.commit()
@@ -242,7 +243,7 @@ def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=Tr
     from services.backup_service import BackupService
     from tests.backup_v3 import as_v3
     with app.app_context():
-        connector = ADConnectorConfig.get_singleton()
+        connector = lowest_connector_row()
         if connector is None:
             connector = ADConnectorConfig(name='default', server='dc.c01.example')
             db.session.add(connector)
@@ -431,7 +432,7 @@ def no_shared_keytab(app):
 
 def _connector_as(state):
     """The shared connector row as a 2.x case wants it; None: as good as absent."""
-    connector = ADConnectorConfig.get_singleton()
+    connector = lowest_connector_row()
     if connector is None:
         connector = ADConnectorConfig(name='default', server='dc.c01.example')
         db.session.add(connector)
@@ -992,7 +993,7 @@ def test_a_2x_archive_takes_the_realm_of_its_own_connector(app, clean_slate, no_
     settings = {**_settings_2x(issuing, policy), 'kerberos_spn': 'HTTP/ucm.c01.example'}
     archive, _connector = _2x_archive(app, settings, base_dn='DC=archived,DC=example')
     with app.app_context():
-        ADConnectorConfig.get_singleton().base_dn = 'DC=target,DC=example'
+        lowest_connector_row().base_dn = 'DC=target,DC=example'
         db.session.commit()
     _restore(app, archive)
     with app.app_context():

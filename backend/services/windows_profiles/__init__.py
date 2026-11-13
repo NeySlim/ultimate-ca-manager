@@ -7,6 +7,8 @@ import logging
 
 from sqlalchemy.exc import IntegrityError
 
+from sqlalchemy import select
+
 from models import CA, ADConnectorConfig, WindowsEnrollmentProfile, db
 
 from .legacy import DEFAULT_NAME, NO_REALM, resolve_realm
@@ -16,6 +18,25 @@ logger = logging.getLogger(__name__)
 
 def default_profile():
     return WindowsEnrollmentProfile.query.filter_by(is_default=True).first()
+
+
+def lowest_connector():
+    """The connector row with the lowest id, the one a 2.x install has alone."""
+    return db.session.scalars(select(ADConnectorConfig).order_by(ADConnectorConfig.id).limit(1)).one_or_none()
+
+
+def profile_connector(profile):
+    """The connector *profile* searches the directory with, None when it names none."""
+    if profile is None or not profile.connector_id:
+        return None
+    return db.session.get(ADConnectorConfig, profile.connector_id)
+
+
+def default_connector():
+    """The default profile's connector; with no default profile, the lowest-id row, as
+    an install that never configured Windows enrollment has at most one."""
+    profile = default_profile()
+    return lowest_connector() if profile is None else profile_connector(profile)
 
 
 def serving_profile():
@@ -90,7 +111,7 @@ def default_for_write(actor=None, fill=True):
     ``fill=False``: the caller sets a keytab first and fills the realm itself."""
     profile = default_profile()
     if profile is None:
-        connector = ADConnectorConfig.get_singleton()
+        connector = lowest_connector()
         try:
             # A concurrent writer may create it first: its row is the default then
             with db.session.begin_nested():
