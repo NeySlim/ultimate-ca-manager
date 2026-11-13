@@ -47,7 +47,7 @@ def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client,
     root_cn, child_cn = f'Import Root {tag}', f'Import Child {tag}'
     root = make_cert(root_cn, root_key)
     child = make_cert(child_cn, child_key, root_cn, root_key, path_length=0)
-    ids = []
+    ids, refids = [], []
     with app.app_context():
         saved = {k: (row.value if (row := SystemConfig.query.filter_by(key=k).first()) else None)
                  for k in ('scep_enabled', 'scep_ca_id', 'scep_getcacert_chain')}
@@ -56,7 +56,11 @@ def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client,
             r = auth_client.post(endpoint, data={'pem_content': pem(cert) + key_pem(key)},
                                  content_type='multipart/form-data')
             assert r.status_code in (200, 201), r.data
-            ids.append(json.loads(r.data)['data']['id'])
+            data = json.loads(r.data)['data']
+            # The response itself names the parent
+            assert data['caref'] == (refids[0] if refids else None)
+            ids.append(data['id'])
+            refids.append(data['refid'])
         with app.app_context():
             root, child = db.session.get(CA, ids[0]), db.session.get(CA, ids[1])
             assert child.caref == root.refid
