@@ -9,7 +9,7 @@ SECTIONS = ('audit_logs', 'approval_requests')
 
 
 def advance_users_counter() -> None:
-    """Replay the 2.x users counter seeding (migration 150) inside the restore's transaction."""
+    """Replay migration 150's seeding of the users counter inside the restore's transaction."""
     conn = db.session.connection()
     inspector = inspect(conn)
     tables = set(inspector.get_table_names())

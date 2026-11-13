@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 from models import db
 from tests.test_backup_acme_orders_and_requests import _orders, _order
-from tests.test_restore_recorded_revocations import (  # noqa: F401  (fixture)
+from tests.test_restore_recorded_revocations import (
     TestAnOlderArchiveLeavesItsLiftedHoldsOut as LiftedHolds, _state as _hold_state,
 )
 from tests.test_restore_repairs import REPAIRED, _archive, _seed, _state

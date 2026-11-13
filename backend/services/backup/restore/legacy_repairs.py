@@ -1,7 +1,7 @@
-"""Corrections of the 2.x migrations that a restore replays on the rows an older archive wrote.
+"""Corrections of older migrations that a restore replays on the rows an older archive wrote.
 
 Each section carries the rule of the migration it comes from, so a restore does not read
-a migration file. The functions are pure: they take the values and return the repaired ones.
+a migration file. Nothing here imports the models or the services.
 """
 import base64
 import json
