@@ -8,8 +8,12 @@ import unicodedata
 USER_VARIABLES = ('username', 'upn', 'mail', 'displayName', 'givenName', 'surname')
 MACHINE_VARIABLES = ('hostname', 'fqdn')
 COMMON_VARIABLES = ('domain', 'realm')
-# Not unique in a directory: the editor warns, nothing enforces it
+# Not unique in a directory: the editor warns when they are added to a unique variable
 NON_UNIQUE_VARIABLES = ('displayName', 'givenName', 'surname', 'mail')
+# RFC 5280 4.1.2.6: one subject per entity of a CA. Unique across domains on their own, or
+# unique within a domain and so needing {domain} or the directory path beside them
+UNIQUE_VARIABLES = {'machine': 'fqdn', 'directory': 'upn'}
+DOMAIN_UNIQUE_VARIABLES = {'machine': 'hostname', 'directory': 'username'}
 # RFC 5280 appendix A: ub-common-name
 MAX_COMMON_NAME = 64
 MAX_PATTERN_LENGTH = 255
@@ -61,9 +65,9 @@ def allowed_variables(kind):
     return own + COMMON_VARIABLES
 
 
-def validation_error(pattern, kind):
+def validation_error(pattern, kind, keep_path=False):
     """Why ``pattern`` cannot be saved on a template whose subject source is ``kind``
-    ('machine', 'directory' or 'request'), else None."""
+    ('machine', 'directory' or 'request'), with ``keep_path`` the directory path option, else None."""
     if not pattern:
         return None
     if len(pattern) > MAX_PATTERN_LENGTH:
@@ -86,7 +90,12 @@ def validation_error(pattern, kind):
             this = 'computer' if kind == 'machine' else 'user'
             return f'Variable {{{name}}} is for {other} templates; this is a {this} template'
         return f'Unknown variable {{{name}}} in the common name pattern'
-    return None
+    unique, in_domain = UNIQUE_VARIABLES[kind], DOMAIN_UNIQUE_VARIABLES[kind]
+    if unique in names or (in_domain in names and (keep_path or 'domain' in names)):
+        return None
+    who = 'computers' if kind == 'machine' else 'users'
+    return (f'The common name pattern does not tell {who} apart (RFC 5280 \u00a74.1.2.6): it needs '
+            f'{{{unique}}}, or {{{in_domain}}} with {{domain}} or "Keep the directory path"')
 
 
 def domain_of_dn(dn_components):
@@ -117,11 +126,11 @@ def render(pattern, values):
     return result, None
 
 
-def template_error(template_type, ad_derived_subject, pattern):
+def template_error(template_type, ad_derived_subject, pattern, keep_path=False):
     """``validation_error`` for a template of these settings, as WSTEP would serve it."""
     from types import SimpleNamespace
     from services.wstep.wstep_service import _subject_source
     kind = _subject_source(SimpleNamespace(template_type=template_type,
                                            ad_derived_subject=bool(ad_derived_subject),
                                            subject_cn_pattern=pattern))
-    return validation_error(pattern, kind)
+    return validation_error(pattern, kind, keep_path=bool(keep_path))

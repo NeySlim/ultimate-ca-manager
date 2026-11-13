@@ -126,7 +126,8 @@ def _cn_pattern_error(data, template=None):
         return data[key] if key in data else (getattr(template, key) if template is not None else default)
     return cn_pattern.template_error(effective('template_type', 'custom'),
                                      effective('ad_derived_subject', False),
-                                     effective('subject_cn_pattern', None))
+                                     effective('subject_cn_pattern', None),
+                                     effective('subject_cn_keep_path', False))
 
 
 def _validate_template_payload(data, *, partial=False):
