@@ -373,12 +373,14 @@ def unhold_certificate(cert_id):
             if refused is not None:
                 db.session.rollback()
                 _restore_holds(helds)
+                _regenerate_crls(staged_cas.values(), username, 'a refused unhold')
                 return refused
             db.session.commit()
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to remove hold on certificate {cert_id}: {e}", exc_info=True)
             _restore_holds(helds)
+            _regenerate_crls(staged_cas.values(), username, 'a failed unhold')
             return error_response('Failed to remove certificate hold', 500)
 
         # Audit log
@@ -392,14 +394,7 @@ def unhold_certificate(cert_id):
                 success=True
             )
 
-        # Regenerate CRL for each issuing CA
-        for member_ca in {c.id: c for c in cas.values() if c}.values():
-            try:
-                from services.crl_service import CRLService
-                CRLService.generate_crl(member_ca.id, username=username)
-                logger.info(f"Regenerated CRL for CA {member_ca.id} after unhold")
-            except Exception as e:
-                logger.warning(f"Failed to regenerate CRL after unhold: {e}")
+        _regenerate_crls({c.id: c for c in cas.values() if c}.values(), username, 'unhold')
 
         # Invalidate all per-algorithm OCSP cache entries (RFC 6960 §2.2).
         for member in members:
@@ -465,6 +460,18 @@ def _unhold_data(cert, partner):
     if partner is not None:
         data['related_unheld'] = partner.id
     return data
+
+
+def _regenerate_crls(cas, username, after):
+    """A fresh CRL (and delta) for each of ``cas``: after a refused or failed unhold, one that
+    lists again the holds whose removeFromCRL delta was already published."""
+    from services.crl_service import CRLService
+    for member_ca in cas:
+        try:
+            CRLService.generate_crl(member_ca.id, username=username)
+            logger.info(f"Regenerated CRL for CA {member_ca.id} after {after}")
+        except Exception as e:
+            logger.warning(f"Failed to regenerate CRL of CA {member_ca.id} after {after}: {e}")
 
 
 def _restore_holds(helds):
