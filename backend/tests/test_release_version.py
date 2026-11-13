@@ -440,3 +440,45 @@ def test_smoke_release_refuses_a_version_that_only_starts_the_same(monkeypatch):
 
 def test_smoke_release_accepts_the_exact_version(monkeypatch):
     assert 'version mismatch' not in _health_run(monkeypatch, '2.254.1', '2.254.1')
+
+
+# ---- 7. the manual publisher follows the same rules ---------------------------------------------
+
+def _publish(tmp_path, tags, version, changelog):
+    work = _origin_with_tags(tmp_path, tags)
+    (work / 'scripts' / 'release_publish.sh').write_text((ROOT / 'scripts' / 'release_publish.sh').read_text())
+    (work / 'CHANGELOG.md').write_text(changelog)
+    fake = tmp_path / 'bin'
+    fake.mkdir()
+    log = tmp_path / 'gh.args'
+    gh = fake / 'gh'
+    gh.write_text(
+        '#!/bin/sh\n'
+        f'if [ "$1 $2" = "release view" ] && [ ! -e "{log}" ]; then exit 1; fi\n'
+        'if [ "$1 $2" = "release create" ]; then\n'
+        f'  for a in "$@"; do echo "$a"; done > "{log}"\n'
+        '  while [ $# -gt 0 ]; do [ "$1" = "--notes-file" ] && '
+        f'cp "$2" "{log}.notes"; shift; done\n'
+        'fi\n')
+    gh.chmod(0o755)
+    env = {**os.environ, 'PATH': f'{fake}:{os.environ["PATH"]}'}
+    result = subprocess.run([BASH, 'scripts/release_publish.sh', version], cwd=work, env=env,
+                            capture_output=True, text=True)
+    return result, log
+
+
+PUBLISH_CHANGELOG = ('## [2x254x1]\n- Dots are literal.\n\n## [2.254.1] - 2026-12-01\n- Fixed a.b thing.\n\n'
+             '## [2.254] - 2026-11-13\n- Older entry.\n')
+
+
+@pytest.mark.parametrize('tags,version,latest', [
+    (['v2.253', 'v2.254', 'v2.254.1'], '2.254.1', 'true'),
+    (['v2.254', 'v2.254.1', 'v3.0'], '2.254.1', 'false'),
+])
+def test_release_publish_passes_the_latest_rule_and_the_section(tmp_path, tags, version, latest):
+    result, log = _publish(tmp_path, tags, version, PUBLISH_CHANGELOG)
+    assert result.returncode == 0, result.stderr
+    args = log.read_text().splitlines()
+    assert f'--latest={latest}' in args
+    notes = pathlib.Path(str(log) + '.notes').read_text()
+    assert 'Fixed a.b thing.' in notes and 'Older entry' not in notes and 'Dots are literal' not in notes
