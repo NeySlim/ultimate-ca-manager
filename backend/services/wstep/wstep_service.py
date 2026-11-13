@@ -1196,6 +1196,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
+            windows_profile_id=getattr(profile, 'id', None),
         )
     except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
@@ -1211,36 +1212,43 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     return cert_pem, None
 
 
-def renew(ca, csr_der, security_header, csr_element, validity_days, source='wstep', require_pop=True,
-          outer_signed_data=None, audit=None, gate=None, *, profile):
-    """Certificate-bound renewal: the RST is signed with the client's
-    current certificate's private key. Returns (cert_pem, error).
-
-    ``require_pop`` — see ``issue()``; renewal RSTs can arrive PKCS#7/CMC-
-    wrapped too. The WS-Security signature proves the current key; a new key
-    in a wrapped request proves itself through ``outer_signed_data``.
-
-    ``audit``: a dict that receives ``renewed_serial`` once the certificate is known.
-
-    ``csr_element``: see ``rst_parser.ParsedRST.csr_element`` and
-    ``ws_security.SignedContent`` for why this must be checked against
-    the verified signature rather than trusting ``csr_der`` alone.
-    """
+def signed_request_certificate(security_header, csr_element):
+    """``(cert, error)``: the certificate whose key signs the RST (WS-Security XML-DSig), once
+    the signature verifies and covers the CSR. ``csr_element``: see ``rst_parser.ParsedRST``
+    and ``ws_security.SignedContent`` for why ``csr_der`` alone is not trusted."""
     try:
         signing_cert_der, signed_content = ws_security.verify_signed_request(security_header)
     except ws_security.WSSecurityError as e:
         return None, str(e)
-
     if not signed_content.covers(csr_element):
         return None, 'CSR is not covered by the request signature'
-
     try:
-        signing_cert = x509.load_der_x509_certificate(signing_cert_der)
+        return x509.load_der_x509_certificate(signing_cert_der), None
     except Exception:
         return None, 'Invalid signing certificate'
 
+
+def tls_client_certificate(client_cert_pem):
+    """``(cert, error)`` of the TLS client certificate a renewal on the Certificate binding needs."""
+    if not client_cert_pem:
+        return None, 'Renewal requires the certificate being renewed as TLS client certificate'
+    try:
+        return x509.load_pem_x509_certificate(
+            client_cert_pem.encode() if isinstance(client_cert_pem, str) else client_cert_pem), None
+    except Exception:
+        return None, 'Invalid client certificate'
+
+
+def renew(ca, signing_cert, csr_der, validity_days, source='wstep', require_pop=True,
+          outer_signed_data=None, gate=None, *, profile):
+    """Certificate-bound renewal: the RST is signed with the client's current certificate's
+    private key, ``signing_cert`` from ``signed_request_certificate``. Returns (cert_pem, error).
+
+    ``require_pop`` — see ``issue()``; renewal RSTs can arrive PKCS#7/CMC-
+    wrapped too. The WS-Security signature proves the current key; a new key
+    in a wrapped request proves itself through ``outer_signed_data``.
+    """
     db_cert, err = _renewable_certificate(ca, signing_cert)
-    _note_renewed_serial(audit, signing_cert, db_cert)
     if err:
         return None, err
 
@@ -1277,21 +1285,12 @@ def _new_key_proof(csr, renewed_cert, outer_signed_data):
     return _verify_pkcs7_pop(csr, outer_signed_data)
 
 
-def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_data, validity_days,
-                                  source='wstep', audit=None, gate=None, *, profile):
-    """Renewal on the Certificate binding as Windows sends it: authenticated by the
-    TLS client certificate, which must also sign the CMS request (MS-WSTEP, RFC 5272).
-    Returns (cert_pem, error); ``audit`` as in ``renew()``."""
-    if not client_cert_pem:
-        return None, 'Renewal requires the certificate being renewed as TLS client certificate'
-    try:
-        client_cert = x509.load_pem_x509_certificate(
-            client_cert_pem.encode() if isinstance(client_cert_pem, str) else client_cert_pem)
-    except Exception:
-        return None, 'Invalid client certificate'
-
+def renew_with_client_certificate(ca, client_cert, csr_der, outer_signed_data, validity_days,
+                                  source='wstep', gate=None, *, profile):
+    """Renewal on the Certificate binding as Windows sends it: authenticated by the TLS
+    client certificate (``tls_client_certificate``), which must also sign the CMS request
+    (MS-WSTEP, RFC 5272). Returns (cert_pem, error)."""
     db_cert, err = _renewable_certificate(ca, client_cert)
-    _note_renewed_serial(audit, client_cert, db_cert)
     if err:
         return None, err
 
@@ -1380,13 +1379,6 @@ def renewed_serial(ca, outer_signed_data):
     return None
 
 
-def _note_renewed_serial(audit, cert, row):
-    """Records the serial once a row holds ``cert`` byte for byte, its key proven by the
-    XML signature or the TLS handshake: a lookalike naming a public serial is never audited."""
-    if audit is not None and row is not None:
-        audit['renewed_serial'] = cert.serial_number
-
-
 def _renewable_certificate(ca, cert):
     """(row, None) when ``cert`` is, byte for byte, a certificate this CA issued
     and still holds; (row or None, error) otherwise. Serial and subject are
@@ -1407,7 +1399,15 @@ def _renewable_certificate(ca, cert):
 
 def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=None,
                   on_stored=None, *, profile):
-    """Issue the renewal once the caller has authenticated ``signing_cert``."""
+    """Issue the renewal once the caller has authenticated ``signing_cert``, under the
+    profile recorded on ``db_cert`` alone: ``profile`` must be that one."""
+    from services.windows_profiles import certificate_profile, profile_sid_connectors
+    recorded, refusal = certificate_profile(db_cert)
+    if refusal:
+        return None, refusal
+    if profile is None or recorded.id != profile.id:
+        return None, 'Signing certificate belongs to another Windows enrollment profile'
+
     err = _validate_csr(csr, require_pop=require_pop)
     if err:
         return None, err
@@ -1424,9 +1424,11 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     if matched_template is not None:
         template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert), profile=profile)
 
+    # A8: the SID alone is checked again, by the profile's connector only
     try:
         requester_sid = renewal_identity.renewal_requester_sid(
-            signing_cert, x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), 'WSTEP')
+            signing_cert, x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), 'WSTEP',
+            connectors_for=lambda sid: profile_sid_connectors(profile, sid))
     except renewal_identity.RenewalIdentityUnresolved as e:
         return None, ServerError(str(e))
     except renewal_identity.RenewalAccountGone as e:
@@ -1450,6 +1452,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
+            windows_profile_id=profile.id,
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'

@@ -95,11 +95,11 @@ def bench(tmp_path_factory):
         (root / f'{name}.pem').write_text(_pem(leaf) + ''.join(_pem(c) for c in chain))
         (root / f'{name}.key').write_text(_key_pem(key))
         clients[name] = (str(root / f'{name}.pem'), str(root / f'{name}.key'))
-    return {'root': root, 'R': r[0], 'I': i[0], 'clients': clients,
+    return {'root': root, 'R': r[0], 'I': i[0], 'I2': i2[0], 'clients': clients,
             'server': (str(root / 'server.pem'), str(root / 'server.key'))}
 
 
-def _install(data_dir, bench, trusted):
+def _install(data_dir, bench, trusted, profile_ca=None):
     data_dir.mkdir()
     db = sqlite3.connect(str(data_dir / 'ucm.db'))
     db.execute("CREATE TABLE system_config (key VARCHAR(255) PRIMARY KEY, value TEXT)")
@@ -108,10 +108,15 @@ def _install(data_dir, bench, trusted):
     for key, value in (('mtls_enabled', 'true'), ('mtls_required', 'true'),
                        ('mtls_trusted_ca_id', trusted)):
         db.execute("INSERT INTO system_config VALUES (?, ?)", (key, value))
-    for refid, cert, parent in (('ca-root', bench['R'], None), ('ca-issuing', bench['I'], 'ca-root')):
+    for refid, cert, parent in (('ca-root', bench['R'], None), ('ca-issuing', bench['I'], 'ca-root'),
+                                ('ca-sibling', bench['I2'], 'ca-root')):
         stored = base64.b64encode(_pem(cert).encode()).decode()
         db.execute("INSERT INTO certificate_authorities VALUES (?, ?, ?, ?)",
                    (refid, stored, refid, parent))
+    if profile_ca:
+        db.execute("CREATE TABLE windows_enrollment_profiles ("
+                   " id INTEGER PRIMARY KEY, name VARCHAR(64), enabled BOOLEAN, issuing_ca_refid VARCHAR(64))")
+        db.execute("INSERT INTO windows_enrollment_profiles VALUES (1, 'forest-b', 1, ?)", (profile_ca,))
     db.commit()
     db.close()
 
@@ -172,9 +177,9 @@ print(json.dumps({name: handshake(*paths) for name, paths in bench['clients'].it
 '''
 
 
-def _outcomes(tmp_path, bench, trusted, pre_313_defaults=False):
+def _outcomes(tmp_path, bench, trusted, pre_313_defaults=False, profile_ca=None):
     data_dir = tmp_path / 'data'
-    _install(data_dir, bench, trusted)
+    _install(data_dir, bench, trusted, profile_ca)
     env = {k: v for k, v in os.environ.items()
            if k not in ('DATABASE_URL', 'DATABASE_PATH')}
     env.update(DATA_DIR=str(data_dir), UCM_BASE_PATH=str(tmp_path), PYTHONPATH=BACKEND)
@@ -203,4 +208,16 @@ def test_a_trusted_root_anchors_its_whole_hierarchy(tmp_path, bench):
         'under_trusted_full_chain': 'accepted',
         'under_sibling': 'accepted',
         'under_root': 'accepted',
+    }
+
+
+def test_a_windows_profile_ca_is_no_tls_anchor(tmp_path, bench):
+    """A5: the issuing CA of an enabled Windows enrollment profile is not trusted beside the mTLS
+    CA, so its certificates open neither EST's mTLS authentication nor the WSTEP Certificate
+    binding over native TLS: both are served by this one listener."""
+    assert _outcomes(tmp_path, bench, 'ca-issuing', profile_ca='ca-sibling') == {
+        'under_trusted': 'accepted',
+        'under_trusted_full_chain': 'accepted',
+        'under_sibling': 'refused',
+        'under_root': 'refused',
     }

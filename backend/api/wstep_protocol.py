@@ -463,24 +463,48 @@ def _carries_xml_signature(security_header):
     return security_header is not None and security_header.find(f'{{{DS_NS}}}Signature') is not None
 
 
-def _certificate_binding_identity(parsed):
-    """``(identity, fault)`` of a QueryTokenStatus on the Certificate binding:
-    the certificate that signed the RST (XML-DSig) or the TLS client certificate."""
+def _presented_certificate(parsed):
+    """``(cert, username, error)``: the certificate that signed the RST (XML-DSig) or the
+    TLS client certificate, its key proven either way."""
+    if _carries_xml_signature(parsed.security_header):
+        cert, error = wstep_service.signed_request_certificate(parsed.security_header, parsed.csr_element)
+        return cert, 'wstep-ws-security', error
+    cert, error = wstep_service.tls_client_certificate(trusted_client_cert(logger, 'WSTEP'))
+    return cert, 'wstep-client-cert', error
+
+
+def _query_certificate(parsed):
+    """``(cert, fault)`` of a QueryTokenStatus on the Certificate binding: the certificate
+    that signed the RST (XML-DSig) or the TLS client certificate."""
     from services.wstep import ws_security
-    from services.wstep.approval import certificate_identity
     if _carries_xml_signature(parsed.security_header):
         try:
             signing_der, _signed = ws_security.verify_signed_request(parsed.security_header)
-            return certificate_identity(x509.load_der_x509_certificate(signing_der)), None
+            return x509.load_der_x509_certificate(signing_der), None
         except Exception as e:
             return None, _fault_response(f'Authentication failed: {e}', status=400,
                                          relates_to=parsed.message_id)
-    client_pem = trusted_client_cert(logger, 'WSTEP')
-    if not client_pem:
+    cert, error = wstep_service.tls_client_certificate(trusted_client_cert(logger, 'WSTEP'))
+    if error:
         return None, _fault_response('Authentication failed', status=400, relates_to=parsed.message_id)
-    cert = x509.load_pem_x509_certificate(
-        client_pem.encode() if isinstance(client_pem, str) else client_pem)
-    return certificate_identity(cert), None
+    return cert, None
+
+
+TLS_RENEWAL_REFUSED = ('Certificate renewal over TLS is served only for a profile whose issuing CA is the '
+                       'mTLS trusted CA or under it; renew over the Kerberos binding')
+
+
+def _query_token_status_by_certificate(parsed, cert):
+    """QueryTokenStatus on the Certificate binding: the certificate names the requester,
+    the request names its CA."""
+    from services.wstep.approval import certificate_identity, held_ca, request_for
+    from services import protocol_approval
+    approval = request_for(parsed.request_id, None, certificate_identity(cert))
+    ca = held_ca(protocol_approval.request_data(approval)) if approval is not None else None
+    if ca is None:
+        return _fault_response('Unknown RequestID', status=400, relates_to=parsed.message_id,
+                               request_id=parsed.request_id, invalid_request=False)
+    return _answer_held(ca, parsed, approval)
 
 
 @bp.route(CES_CERTIFICATE_PATH, methods=['GET', 'POST', 'HEAD'])
@@ -488,6 +512,8 @@ def renew_certificate_bound():
     """WSTEP RST over the Certificate-authenticated CES endpoint — renewal,
     authenticated either by a WS-Security XML-DSig of the RST or, as Windows
     does, by the TLS client certificate that also signs the CMS request.
+    Served by the profile recorded on the presented certificate, whatever the
+    default profile's state, under that profile's issuing CA.
 
     Accepts GET/HEAD as well as POST — same rationale as the
     UsernamePassword endpoint above, though this binding has no HTTP-level
@@ -501,13 +527,6 @@ def renew_certificate_bound():
     if request.method in ('GET', 'HEAD'):
         return Response('', status=200, content_type='text/html; charset=utf-8')
 
-    # The certificate's own profile routes its renewal in C-05; until then, the default's
-    from services.windows_profiles import serving_profile
-    profile = serving_profile()
-    ca, ca_error = _resolve_wstep_ca(profile)
-    if ca_error:
-        return ca_error
-
     body, err = _read_wstep_body()
     if err is not None:
         return err
@@ -517,58 +536,69 @@ def renew_certificate_bound():
         return fault
 
     if parsed.request_type == REQUEST_TYPE_QUERY_TOKEN_STATUS:
-        identity, fault = _certificate_binding_identity(parsed)
-        if fault is not None:
-            return fault
-        return _query_token_status(ca, parsed, identity)
+        cert, fault = _query_certificate(parsed)
+        return fault if fault is not None else _query_token_status_by_certificate(parsed, cert)
 
-    from services.wstep.approval import make_gate
-    audit = {}
-    try:
-        if _carries_xml_signature(parsed.security_header):
-            username = 'wstep-ws-security'
-            cert_pem, error = wstep_service.renew(
-                ca, parsed.csr_der, parsed.security_header, parsed.csr_element, _validity_days(profile),
-                require_pop=not parsed.was_pkcs7_wrapped, outer_signed_data=parsed.outer_signed_data,
-                audit=audit, gate=make_gate(ca, operation='renew', profile=profile,
-                                            extra={'require_pop': not parsed.was_pkcs7_wrapped}),
-                profile=profile,
-            )
-        else:
-            # Windows authenticates here with its TLS client certificate, no XML-DSig
-            username = 'wstep-client-cert'
-            cert_pem, error = wstep_service.renew_with_client_certificate(
-                ca, trusted_client_cert(logger, 'WSTEP'), parsed.csr_der, parsed.outer_signed_data,
-                _validity_days(profile), audit=audit,
-                gate=make_gate(ca, operation='renew', profile=profile, extra={'require_pop': False}),
-                profile=profile,
-            )
-    except wstep_service.HeldForApproval as held:
-        return _answer_held(ca, parsed, held.approval)
-    old_serial = audit.get('renewed_serial')
+    cert, username, error = _presented_certificate(parsed)
     if error:
         logger.warning("WSTEP renewal rejected: %s", error)
-        # Audited only for a certificate the CA issued: an anonymous refusal would fill the log
-        if old_serial is not None:
+        return _fault_response(error, status=400, relates_to=parsed.message_id)
+
+    from services.windows_profiles import presented_certificate_profile
+    from utils.client_cert import native_tls_admits
+    profile, error, stored = presented_certificate_profile(cert)
+    ca = None
+    if error is None and profile is not None:
+        ca, ca_error = _resolve_wstep_ca(profile)
+        if ca_error:
+            return ca_error
+        # A5: the native listener anchors on the mTLS CA alone; a proxy terminating TLS answers for its own
+        if username == 'wstep-client-cert' and request.environ.get('peercert') and not native_tls_admits(ca):
+            error = TLS_RENEWAL_REFUSED
+    elif error is None:
+        error = 'Signing certificate is not recognized'
+    if error is None:
+        from services.wstep.approval import make_gate
+        signed = username == 'wstep-ws-security'
+        gate = make_gate(ca, operation='renew', profile=profile,
+                         extra={'require_pop': signed and not parsed.was_pkcs7_wrapped})
+        try:
+            if signed:
+                cert_pem, error = wstep_service.renew(
+                    ca, cert, parsed.csr_der, _validity_days(profile), require_pop=not parsed.was_pkcs7_wrapped,
+                    outer_signed_data=parsed.outer_signed_data, gate=gate, profile=profile)
+            else:
+                # Windows authenticates here with its TLS client certificate, no XML-DSig
+                cert_pem, error = wstep_service.renew_with_client_certificate(
+                    ca, cert, parsed.csr_der, parsed.outer_signed_data, _validity_days(profile), gate=gate,
+                    profile=profile)
+        except wstep_service.HeldForApproval as held:
+            return _answer_held(ca, parsed, held.approval)
+    served = f'profile {profile.name}' if profile is not None else 'profile -'
+    if error:
+        logger.warning("WSTEP renewal rejected (%s): %s", served, error)
+        # Audited only for a certificate stored here, its key proven: an anonymous refusal would fill the log
+        if stored:
             _audit_issuance('certificate.renewed', None, username, success=False, details=(
-                f'WSTEP renewal refused from {client_ip()}: {error} (old serial {old_serial})'))
+                f'WSTEP renewal refused from {client_ip()}: {error} '
+                f'(old serial {cert.serial_number}, {served})'))
         return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
 
     try:
-        cert = x509.load_pem_x509_certificate(cert_pem.encode())
-        request_id = _request_id_for(cert)
+        new_cert = x509.load_pem_x509_certificate(cert_pem.encode())
+        request_id = _request_id_for(new_cert)
         response_body = build_issue_response(
-            cert, relates_to=parsed.message_id, request_id=request_id,
-            cmc_response_der=_cmc_response_der_for(ca, cert, parsed),
+            new_cert, relates_to=parsed.message_id, request_id=request_id,
+            cmc_response_der=_cmc_response_der_for(ca, new_cert, parsed),
         )
     except Exception as e:
         logger.error("WSTEP: failed to build RSTR: %s", e)
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
     _audit_issuance(
-        'certificate.renewed', cert.subject.rfc4514_string(), username,
+        'certificate.renewed', new_cert.subject.rfc4514_string(), username,
         resource_id=str(request_id) if request_id else None,
-        details=(f'WSTEP renewal from {client_ip()}: old serial {old_serial}, '
-                 f'new serial {cert.serial_number}'),
+        details=(f'WSTEP renewal from {client_ip()}: old serial {cert.serial_number}, '
+                 f'new serial {new_cert.serial_number} ({served})'),
     )
     return Response(response_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')

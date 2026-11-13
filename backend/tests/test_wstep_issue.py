@@ -37,12 +37,16 @@ def _set_config(key, value):
 @pytest.fixture(scope='module')
 def wstep_config(app, create_ca):
     ca_data = create_ca(cn='WSTEP Issue CA')
-    keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_username', 'wstep_password', 'wstep_validity_days')
+    # The issuing CA is the mTLS anchor too: native TLS renewal needs it (A5)
+    keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_username', 'wstep_password', 'wstep_validity_days',
+            'mtls_enabled', 'mtls_trusted_ca_id')
     with app.app_context():
         previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('wstep_enabled', 'true')
         _set_config('wstep_ca_refid', ca.refid)
+        _set_config('mtls_enabled', 'true')
+        _set_config('mtls_trusted_ca_id', ca.refid)
         _set_config('wstep_username', WSTEP_USER)
         _set_config('wstep_password', WSTEP_PASSWORD)
         _set_config('wstep_validity_days', '30')

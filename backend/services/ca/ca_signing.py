@@ -162,6 +162,7 @@ class CASigningMixin:
         template_id: int = None,
         template_key_usage: list = None,
         on_stored=None,
+        windows_profile_id: int = None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -207,6 +208,8 @@ class CASigningMixin:
                 bound template's do (WSTEP, for a request that carries none).
             on_stored: called with the new row once flushed, so what it
                 writes is committed with the certificate (an approval's link).
+            windows_profile_id: the Windows enrollment profile a WSTEP issuance
+                or renewal served, recorded on the row; None for other protocols.
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -331,6 +334,7 @@ class CASigningMixin:
             san_upn=json.dumps(san_upn) if san_upn else None,
             source=source,
             template_id=template_id,
+            windows_profile_id=windows_profile_id,
         )
         db.session.add(new_cert)
 

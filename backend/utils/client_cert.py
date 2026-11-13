@@ -41,3 +41,21 @@ def trusted_client_cert(log, label):
 
     from services.certificate_parser import decode_forwarded_pem
     return decode_forwarded_pem(presented)
+
+
+def native_tls_admits(ca):
+    """Whether the native TLS listener lets a client certificate of *ca* through: its one anchor is
+    the mTLS trusted CA (A5), so *ca* must be that CA or a CA under it."""
+    from models import CA, SystemConfig
+    settings = {row.key: row.value for row in SystemConfig.query.filter(
+        SystemConfig.key.in_(('mtls_enabled', 'mtls_trusted_ca_id')))}
+    anchor = settings.get('mtls_trusted_ca_id')
+    if settings.get('mtls_enabled') != 'true' or not anchor:
+        return False
+    seen = set()
+    while ca is not None and ca.refid not in seen:
+        if ca.refid == anchor:
+            return True
+        seen.add(ca.refid)
+        ca = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
+    return False

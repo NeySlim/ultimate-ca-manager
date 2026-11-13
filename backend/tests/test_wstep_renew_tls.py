@@ -50,7 +50,7 @@ def _issue(app, ca_id, cn):
            .sign(key, hashes.SHA256()))
     with app.app_context():
         ca = db.session.get(CA, ca_id)
-        cert_pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test')
+        cert_pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='wstep')
     return x509.load_pem_x509_certificate(cert_pem.encode()), key
 
 
@@ -370,7 +370,8 @@ def test_renewal_is_audited_with_both_serials(client, app, wstep_renew_config):
     assert r.status_code == 200, r.data
     new_serial = _issued_from(r).serial_number
     assert _audit_rows(app, old_cert.serial_number) == [('wstep-client-cert', True, (
-        f'WSTEP renewal from 127.0.0.1: old serial {old_cert.serial_number}, new serial {new_serial}'))]
+        f'WSTEP renewal from 127.0.0.1: old serial {old_cert.serial_number}, new serial {new_serial} '
+        '(profile default)'))]
 
 
 def test_refused_renewal_is_audited(client, app, wstep_renew_config):
@@ -382,7 +383,7 @@ def test_refused_renewal_is_audited(client, app, wstep_renew_config):
     assert _post(client, signed).status_code == 400
     assert _audit_rows(app, old_cert.serial_number) == [('wstep-ws-security', False, (
         'WSTEP renewal refused from 127.0.0.1: Signing certificate has been revoked '
-        f'(old serial {old_cert.serial_number})'))]
+        f'(old serial {old_cert.serial_number}, profile default)'))]
 
 
 def _refusal_count(app):
@@ -425,7 +426,8 @@ def test_lookalike_of_a_revoked_and_deleted_certificate_is_not_audited(client, a
     before = _refusal_count(app)
     r = _post(client, _build_signed_rst(lookalike, key, _renewal_csr(lookalike, key)))
     assert r.status_code == 400
-    assert b'revoked' in r.data, r.data
+    # Stored nowhere, it names no profile and so no CA: refused before any record is read
+    assert b'not recognized' in r.data, r.data
     assert _refusal_count(app) == before
 
 
@@ -611,11 +613,12 @@ def _renew(app, ca_id, path, old_cert, old_key, csr):
         if path == 'tls':
             csr_der, _part, signed = _unwrap_pkcs7_csr(_cmc_renewal(csr, [(old_key, old_cert)]))
             pem, err = wstep_service.renew_with_client_certificate(
-                ca, old_cert.public_bytes(serialization.Encoding.PEM), csr_der, signed, 30, profile=default_profile())
+                ca, old_cert, csr_der, signed, 30, profile=default_profile())
         else:
             parsed = parse_rst(_build_signed_rst(old_cert, old_key, csr))
-            pem, err = wstep_service.renew(ca, parsed.csr_der, parsed.security_header,
-                                           parsed.csr_element, 30, profile=default_profile())
+            signer, err = wstep_service.signed_request_certificate(parsed.security_header, parsed.csr_element)
+            assert err is None, err
+            pem, err = wstep_service.renew(ca, signer, parsed.csr_der, 30, profile=default_profile())
     return (x509.load_pem_x509_certificate(pem.encode()) if pem else None), err
 
 
@@ -752,7 +755,7 @@ def test_legacy_certificate_with_any_eku_renews_at_par(app, templated_ca):
         ca = db.session.get(CA, ca_id)
         template, extra, issued, err = wstep_service._renewal_template(ca, renewed, csr, profile=None)
         assert (template, err) == (None, None)
-        pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test',
+        pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='wstep',
                                                       extra_ekus=extra, template_ekus=issued)
     assert _ekus(x509.load_pem_x509_certificate(pem.encode())) == {ExtendedKeyUsageOID.CLIENT_AUTH}
 

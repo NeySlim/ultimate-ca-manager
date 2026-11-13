@@ -1,6 +1,7 @@
-"""EST, SCEP and WSTEP renewals ask the connector of the renewed SID's domain, and only it (A9):
-a domain no connector serves carries the SID over as is; a connector whose domain is unknown
-(a migrated row never tested) is asked only for a SID of no known domain."""
+"""EST and SCEP renewals ask the connector of the renewed SID's domain, and only it (A9): a
+domain no connector serves carries the SID over as is; a connector whose domain is unknown
+(a migrated row never tested) is asked only for a SID of no known domain. WSTEP applies the
+same rule within the connector of the certificate's profile, never another (C-05)."""
 import base64
 
 import pytest
@@ -96,13 +97,17 @@ def test_a_scep_renewal_asks_the_connector_of_the_sid_domain_only(app, scep_ca, 
     assert asked == [forests['b']]
 
 
-def test_a_wstep_renewal_asks_the_connector_of_the_sid_domain_only(client, app, wstep_renew_config, forests,
-                                                                   monkeypatch):
+def test_a_wstep_renewal_asks_the_connector_of_its_profile_only(client, app, wstep_renew_config, forests,
+                                                                monkeypatch):
+    """The default profile's connector is A's: a SID of A is checked there; one of B is carried
+    over, since no connector of the profile serves B, and B's connector is never asked."""
     asked = _asked(monkeypatch)
-    old, key = _wstep_issue(app, wstep_renew_config['id'], 'route-wstep-b.example.test', sid=SID_B)
-    renewed = _issued(_renew_tls(client, old, key))
-    assert _wstep_sid_ext(renewed).value.value == _ad_security_extension(SID_B).value
-    assert asked == [forests['b']]
+    for sid, expected in ((DOMAIN_A + '-1105', [forests['a']]), (SID_B, [])):
+        old, key = _wstep_issue(app, wstep_renew_config['id'], f'route-wstep-{len(expected)}.example.test', sid=sid)
+        renewed = _issued(_renew_tls(client, old, key))
+        assert _wstep_sid_ext(renewed).value.value == _ad_security_extension(sid).value
+        assert asked == expected
+        asked.clear()
 
 
 # Criterion 2: a domain no connector serves
@@ -153,12 +158,12 @@ def test_a_scep_renewal_whose_account_is_gone_from_its_domain_is_refused(app, sc
 
 def test_a_wstep_renewal_whose_account_is_gone_from_its_domain_is_refused(client, app, wstep_renew_config, forests,
                                                                           monkeypatch):
-    asked = _asked(monkeypatch, lambda config: 'HOST$' if config.id == forests['a'] else ad_lookup.NO_ACCOUNT)
-    old, key = _wstep_issue(app, wstep_renew_config['id'], 'route-wstep-gone.example.test', sid=SID_B)
+    asked = _asked(monkeypatch, lambda config: 'HOST$' if config.id == forests['b'] else ad_lookup.NO_ACCOUNT)
+    old, key = _wstep_issue(app, wstep_renew_config['id'], 'route-wstep-gone.example.test', sid=DOMAIN_A + '-1105')
     before = _count(app)
     r = _renew_tls(client, old, key)
     assert r.status_code == 400 and renewal_identity.NOT_FOUND_MESSAGE.encode() in r.data
-    assert asked == [forests['b']] and _count(app) == before
+    assert asked == [forests['a']] and _count(app) == before
 
 
 # Criterion 4: the rule for disabled connectors and connectors of unknown domain

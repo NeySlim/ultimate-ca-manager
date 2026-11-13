@@ -331,7 +331,7 @@ def test_an_approval_issues_under_the_profile_it_was_held_for(app, client, auth_
     r = auth_client.post(f'/api/v2/approvals/{second[0][0]}/approve', json={'comment': 'ok'})
     body = r.get_json()
     assert body['message'] == 'Request closed', body
-    assert body['data']['issue_error'] == 'The Windows enrollment profile of the request no longer exists'
+    assert body['data']['issue_error'] == 'The Windows enrollment profile c04-b no longer exists'
 
 
 def test_a_request_held_before_profiles_were_recorded_replays_the_default(app, world):
