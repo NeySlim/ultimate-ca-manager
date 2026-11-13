@@ -72,16 +72,8 @@ def _foreign_entries(entries, realm):
 
 def _realm_problem(realm):
     """(message, status) when *realm* cannot be the default profile's, else None."""
-    from models import ADConnectorConfig
     from services import windows_profiles
-    profile = windows_profiles.default_profile()
-    problem = windows_profiles.realm_problem(realm, profile)
-    if problem:
-        return problem
-    connector = (db.session.get(ADConnectorConfig, profile.connector_id)
-                 if profile is not None and profile.connector_id else ADConnectorConfig.get_singleton())
-    return windows_profiles.connector_domain_problem(connector, realm,
-                                                     f'profile {profile.name}' if profile else 'the default profile')
+    return windows_profiles.realm_problem(realm, windows_profiles.default_profile())
 
 
 @bp.route('/api/v2/kerberos/config', methods=['GET'])

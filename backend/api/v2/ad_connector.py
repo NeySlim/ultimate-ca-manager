@@ -165,13 +165,6 @@ def update_config():
         if base_dn and not lookup.realm_of_base_dn(base_dn):
             return error_response('base_dn must name the domain with DC components, '
                                   'such as DC=corp,DC=example', 400)
-        if config.id is not None:
-            from services import windows_profiles
-            off = windows_profiles.profiles_off_domain(config.id, base_dn)
-            if off:
-                return error_response(
-                    f'profile {off[0].name} uses this connector with the realm {off[0].realm}, '
-                    f'not the domain {lookup.realm_of_base_dn(base_dn)}', 409)
         config.base_dn = base_dn or None
     if 'bind_dn' in data:
         bind_dn = (data['bind_dn'] or '').strip()
