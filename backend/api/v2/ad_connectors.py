@@ -68,6 +68,8 @@ def _save(config, creating):
         refresh_domain_sid(config)
         if creating:
             _serve_default_profile(config)
+        # A name a concurrent save took is refused here: safe_commit would answer 500
+        db.session.flush()
         ok, err = safe_commit(logger, 'Failed to save the AD connector')
         if not ok:
             return err
@@ -75,7 +77,7 @@ def _save(config, creating):
         db.session.rollback()
         return error_response('A connector with this name already exists', 409)
     except Exception as e:
-        # bind_password's setter raises if encryption is unavailable: never store plaintext
+        # A failed flush or profile update stores nothing; the password setter ran before
         db.session.rollback()
         logger.error('Failed to save the AD connector: %s', e)
         return error_response('Failed to save configuration (encryption unavailable?)', 500)

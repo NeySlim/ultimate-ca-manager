@@ -439,3 +439,33 @@ def test_the_legacy_screen_shows_the_connector_the_protocols_use(auth_client, ap
             else:
                 db.session.get(WindowsEnrollmentProfile, profile_id).connector_id = saved
             db.session.commit()
+
+
+@pytest.mark.parametrize('route', ['create', 'rename'])
+def test_a_name_taken_by_a_concurrent_save_answers_409(auth_client, app, monkeypatch, route):
+    """The name check passed before the other writer committed: the unique key decides."""
+    from api.v2 import ad_connectors
+    from services import windows_profiles
+    monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
+    with app.app_context():
+        parked = windows_profiles.default_profile()
+        if parked is not None:
+            parked.is_default = False
+        db.session.commit()
+        parked_id = parked.id if parked is not None else None
+    try:
+        mine = _post(auth_client, name='race-mine').get_json()['data'] if route == 'rename' else None
+        with app.app_context():
+            add_connector('race-taken', server='dc.r.example', base_dn='DC=r,DC=example')
+        monkeypatch.setattr(ad_connectors, '_name_error', lambda data, current=None: (data['name'], None))
+        if route == 'create':
+            response = _post(auth_client, name='race-taken')
+        else:
+            response = auth_client.put(f"{URL}/{mine['id']}", data=json.dumps({'name': 'race-taken'}),
+                                       content_type='application/json')
+        assert response.status_code == 409, response.data
+    finally:
+        if parked_id is not None:
+            with app.app_context():
+                db.session.get(WindowsEnrollmentProfile, parked_id).is_default = True
+                db.session.commit()
