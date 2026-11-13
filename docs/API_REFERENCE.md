@@ -1669,7 +1669,7 @@ PATCH /api/v2/windows-profiles/settings
 - A profile through which valid certificates were issued cannot be deleted (409 with the count); disable it instead.
 - `POST /{id}/keytab` takes a multipart `file` (a keytab GSSAPI loads, 256 KiB at most; every entry must be `HTTP/<SPN host>@<realm of the profile>`, else 400) and replaces the profile's keytab; with the form field `dry_run=1` it stores nothing and lists the entries by realm, `foreign_entries` being those the server would refuse. It needs `write:xcep` and `write:kerberos`, the scope of the retired `POST /api/v2/kerberos/keytab`.
 - `settings` holds what every profile shares: `xcep_enabled`, `wstep_enabled` (needs `read:wstep` / `write:wstep`; changing it restarts the service, the TLS cap being read at startup), `kerberos_enabled`, `kerberos_spn` (`read:kerberos` / `write:kerberos`), the state of the served keytab, and the `default_profile` with its realm.
-- The single-row routes `/api/v2/xcep/config`, `/api/v2/wstep/config`, `/api/v2/kerberos/config`, `/api/v2/kerberos/keytab` and `/api/v2/ad-connector` (with `/test` and `/test-saved`) are gone since 3.0; the connectors are under `/api/v2/ad-connectors`. A refused connector deletion (409) lists the profiles that use it in `details.profiles`.
+- The single-row routes `/api/v2/xcep/config`, `/api/v2/wstep/config`, `/api/v2/kerberos/config`, `/api/v2/kerberos/keytab` and `/api/v2/ad-connector` (with `/test` and `/test-saved`) are gone since 3.0; the connectors are under `/api/v2/ad-connectors`. A refused connector deletion (409) lists the profiles that use it in `details.profiles` (50 names at most, by name) and their number in `details.total`.
 
 ## CRL & OCSP
 
