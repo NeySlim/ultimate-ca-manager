@@ -1043,6 +1043,22 @@ class TestARecordedHoldIsShownAndLifted:
         with app.app_context():
             assert db.session.get(RevokedSerial, record_id).revoke_reason == 'removeFromCRL'
 
+    def test_a_final_record_beside_a_hold_record_is_no_interrupted_lift(self, app, auth_client, issuer, twin):
+        """Every record of the serial must be a hold: one final record under a twin refuses."""
+        from services.cert.issued_lookup import interrupted_lift
+        _, row_id, _ = self._recorded(app, issuer, 'hold-beside-final.example.test')
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', LATER
+            db.session.commit()
+            real = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        _record(app, twin[1], real, reason='keyCompromise', certificate_id=row_id)
+        with app.app_context():
+            assert interrupted_lift(db.session.get(Certificate, row_id)) is False
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 409, r.data
+        assert _row(app, row_id) == (True, 'removeFromCRL', LATER)
+
     def test_a_lift_of_a_row_only_hold_left_half_done_completes(self, app, auth_client, issuer):
         """The hold was on the row alone: stopped mid-lift, no record is left and it still completes."""
         _, refid, ca_cert, ca_key = issuer
@@ -1207,14 +1223,19 @@ def _on_postgresql(app):
 
 
 def _wait_for_a_lock_waiter(conn, seconds=5.0):
-    """Whether another session of this database waits on a lock within ``seconds`` (polled)."""
+    """Whether another session of this worker waits on a lock within ``seconds`` (polled).
+    The workers share the database: a waiter is ours when it holds locks on our schema's tables."""
     import time
     from sqlalchemy import text
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         conn.execute(text('SELECT pg_stat_clear_snapshot()'))  # the view is cached per transaction
-        if conn.execute(text("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
-                             "AND datname = current_database() AND pid <> pg_backend_pid()")).scalar():
+        if conn.execute(text(
+                "SELECT count(*) FROM pg_stat_activity a WHERE a.wait_event_type = 'Lock' "
+                "AND a.datname = current_database() AND a.pid <> pg_backend_pid() AND EXISTS ("
+                "SELECT 1 FROM pg_locks l JOIN pg_class c ON c.oid = l.relation "
+                "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE l.pid = a.pid AND l.granted AND n.nspname = current_schema())")).scalar():
             return True
         time.sleep(0.02)
     return False
@@ -1361,14 +1382,14 @@ def test_a_lift_committed_after_the_pass_reread_still_wins(app, issuer, monkeypa
     real, key = _leaf('lift-after-reread.example.test', ca_cert, ca_key, days=200)
     row_id = _store(app, real, refid, key=key)
     record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
-    reread = issued_lookup._record_still_held
+    reread = issued_lookup._records_still_held
 
-    def then_lifted(record):
-        still = reread(record)
+    def then_lifted(records):
+        still = reread(records)
         with db.engine.begin() as other:
             other.execute(delete(RevokedSerial).where(RevokedSerial.id == record_id))
         return still
-    monkeypatch.setattr(issued_lookup, '_record_still_held', then_lifted)
+    monkeypatch.setattr(issued_lookup, '_records_still_held', then_lifted)
     with app.app_context():
         assert issued_lookup.apply_persisted_revocations({row_id}) == []
         db.session.commit()
