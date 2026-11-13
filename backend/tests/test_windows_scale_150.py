@@ -229,3 +229,38 @@ def test_a_keytab_of_450_entries_is_composed_inspected_and_refused_above_its_lim
         monkeypatch.setattr(windows_profiles, 'MAX_COMPOSED_KEYTAB_SIZE', len(data) - 1)
         with pytest.raises(ValueError, match=f'above the {len(data) - 1} bytes a node serves'):
             windows_profiles.composed_keytab()
+
+
+def test_one_keytab_above_the_limit_is_refused_as_a_composition_is(app, profiles, monkeypatch):
+    """A single keytab is served as stored: the size a node serves bounds it too."""
+    from tests.keytab_support import keytab
+    from tests.test_keytab_composed import HOST
+    with app.app_context():
+        default = db.session.get(WindowsEnrollmentProfile, profiles.default)
+        default.set_keytab(keytab(f'HTTP/{HOST}@ONE.TEST'))
+        db.session.commit()
+        size = len(windows_profiles.composed_keytab())
+        monkeypatch.setattr(windows_profiles, 'MAX_COMPOSED_KEYTAB_SIZE', size - 1)
+        with pytest.raises(ValueError, match=f'above the {size - 1} bytes a node serves'):
+            windows_profiles.composed_keytab()
+
+
+def test_the_probe_connects_with_its_own_timeout_and_a_lookup_with_the_usual_one(app, monkeypatch):
+    """What reaches ldap3: 3 s for a probe, 10 s for a lookup."""
+    import types
+    import ldap3
+    from services.ad_connector import health
+    asked = []
+
+    def server(host, **kwargs):
+        asked.append(kwargs['connect_timeout'])
+        return object()
+    monkeypatch.setattr(ldap3, 'Server', server)
+    monkeypatch.setattr(ldap3, 'Connection', lambda *a, **k: types.SimpleNamespace(unbind=lambda: None))
+    monkeypatch.setattr(lookup, '_build_tls', lambda config: (None, lambda: None))
+    with connectors_kept(app), app.app_context():
+        config = add_connector('scale-timeout', server='dc.timeout.test', base_dn='DC=timeout,DC=test',
+                               bind_dn='svc', enabled=True)
+        health.probe(config)
+        lookup._connect(config)
+    assert asked == [health.PROBE_CONNECT_TIMEOUT_SECONDS, lookup._LDAP_CONNECT_TIMEOUT_SECONDS] == [3, 10]
