@@ -69,9 +69,9 @@ class ADConnectorConfig(db.Model):
         """The configured domain controllers as a list, in failover order.
 
         Stored newline-separated in the one ``server`` column rather than a
-        child table: this is a single-row config whose server list is read
-        whole on every use and never queried by member, so a table would
-        buy nothing and cost a migration plus a backup-manifest section.
+        child table: each connector's server list is read whole on every use
+        and never queried by member, so a table would buy nothing and cost a
+        migration plus a backup-manifest section.
         A config written before the field accepted more than one DC holds a
         bare hostname, which parses as a one-element list unchanged.
         """

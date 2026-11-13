@@ -1,8 +1,8 @@
 """
 Active Directory Connector settings routes
-/api/v2/ad-connector/* -- single stored LDAP connection UCM uses to query
-Active Directory directly, kept deliberately separate from SSO's own LDAP
-provider config (see models/ad_connector.py's module docstring for why).
+/api/v2/ad-connector/* -- the 2.x single-connector routes, on the connector the default
+Windows profile uses (the collection is /api/v2/ad-connectors), kept deliberately separate
+from SSO's own LDAP provider config (see models/ad_connector.py's module docstring for why).
 """
 import logging
 import re
@@ -197,7 +197,8 @@ def apply_fields(config, data):
 
 
 def refresh_domain_sid(config):
-    """Read the domain SID of the base DN when the row has none; a failed read leaves it empty.
+    """Read the SID of the domain head the base DN sits under when the row has none; a failed
+    read leaves it empty.
     Every save route calls it, so renewals routed on the SID see the saved connector."""
     if config.domain_sid or not config.base_dn:
         return
