@@ -761,6 +761,8 @@ The audit log entry gives the cause in the field `reason` of its details:
 
 ### SCEP Administration
 
+A renewal is a RenewalReq, or a PKCSReq signed by a valid certificate issued through the same SCEP endpoint: both are checked as renewals (subject and SANs kept, signer not revoked, expired, superseded or of a Windows enrollment profile) and replace the old certificate, a PKCSReq still needs the endpoint's challenge, expired or not, and Intune-bound profiles treat a PKCSReq as a new enrollment.
+
 View pending SCEP requests in the SCEP page, or via API:
 
 ```bash
