@@ -117,7 +117,7 @@ These operations answer `409` with code `ha_mode`, because they only change the 
 
 ## Upgrading
 
-Upgrade the nodes one at a time. Migrations run under a PostgreSQL advisory lock: the first node to start applies them, the others wait and find nothing to do. Keep the nodes on adjacent versions during the roll, and do not run an older version after a newer one migrated the schema.
+Upgrade the nodes one at a time. Migrations run under a PostgreSQL advisory lock: the first node to start applies them, the others wait and find nothing to do. Keep the nodes on adjacent versions during the roll, and do not run an older version after a newer one migrated the schema. A cluster moves to 3.0 from 2.254 only: roll every node to 2.254 first; a 3.0 node refuses to start, without writing, on a database 2.254 has not started (see UPGRADE.md).
 
 - **Helm:** `helm upgrade` rolls the pods with no unavailable pod; the PodDisruptionBudget protects them from node drains.
 - **Compose:** `docker compose -f docker-compose.ha.yml pull`, then `up -d ucm-1`, wait until it is healthy, then `up -d ucm-2`.

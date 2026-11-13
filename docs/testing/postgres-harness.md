@@ -38,6 +38,23 @@ The role only needs `CREATE` on the database: no superuser rights, and the
 `public` schema is never touched. Under xdist each worker is its own process
 and gets its own schema, so `-n 4 --dist loadfile` works.
 
+## The upgrade from 2.254
+
+`tests/test_upgrade_from_2_254.py` loads the schema of 2.254 with its migration
+registry (`tests/fixtures/schema_v2254_{sqlite,postgresql}.sql`) into a database of
+its own, runs the migration runner on it and compares the result with a fresh
+`create_all()`: tables, columns, indexes and their predicates, constraints, foreign
+keys, sequences and `AUTOINCREMENT`. Every accepted difference is listed with its
+reason in `TOLERATED`. The same file checks the data steps, an upgrade interrupted
+after each step, and the refusal of a database older than 2.254. On PostgreSQL it
+uses `UCM_TEST_PG_URL`, one schema `up2254_<name>_<worker>` per database.
+
+The fixtures are generated from a tag, never edited by hand:
+
+```bash
+python3 scripts/schema_fixture.py v2.254-rc1 2.254
+```
+
 ## `sqlite_only`
 
 A test that only makes sense on SQLite (it opens the database file, or builds

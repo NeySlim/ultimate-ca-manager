@@ -384,6 +384,7 @@ The migration is **bidirectional** (SQLite ↔ PostgreSQL) and:
 
 - Backs up the source first (`/opt/ucm/data/backups/db_migration/`)
 - Creates the schema on the target via SQLAlchemy
+- Copies the migration registry (`_migrations`), so the target starts as the source would
 - Disables FK checks during bulk load
 - Intersects source/target columns (legacy columns are skipped with a warning)
 - Resets PostgreSQL sequences after load

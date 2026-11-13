@@ -75,8 +75,12 @@ the only way to know the fix does anything, and it keeps the bug from coming bac
 - **Translations.** UCM ships in 9 languages. A new user-facing string goes into all
   of `frontend/src/i18n/locales/*.json`, and `node scripts/check-i18n-sync.js` tells
   you if one is missing.
-- **Migrations** work on SQLite *and* PostgreSQL. See the existing files in
-  `backend/migrations/` for the pattern.
+- **Migrations** work on SQLite *and* PostgreSQL: a file
+  `backend/migrations/NNN_name.py` numbered from 301 (300 is the upgrade from
+  2.254), with `pg_compatible = True` and an `upgrade(conn)` that takes a
+  `sqlite3.Connection` or a SQLAlchemy connection. The runner refuses a migration
+  without `pg_compatible` on PostgreSQL. It must be safe to run twice: SQLite
+  commits as it goes, so a start after an interruption runs it again.
 - **Commit subjects** as `type(scope): summary`, in the imperative, under 72
   characters.
 
