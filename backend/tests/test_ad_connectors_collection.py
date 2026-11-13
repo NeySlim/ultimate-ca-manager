@@ -215,14 +215,25 @@ def test_a_created_connector_serves_a_default_profile_that_had_none(auth_client,
 
     monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
     with app.app_context():
-        default_profile(create=True).connector_id = None
+        made = default_profile() is None
+        profile = default_profile(create=True)
+        profile.connector_id = None
         db.session.commit()
-    created = _post(auth_client).get_json()['data']
-    with app.app_context():
-        assert windows_profiles.default_connector().id == created['id']
-    other = _post(auth_client, name='forest-b', servers=['dc.b.example'], base_dn='DC=b,DC=example').get_json()['data']
-    with app.app_context():
-        assert windows_profiles.default_connector().id == created['id'] != other['id']
+        profile_id = profile.id
+    try:
+        created = _post(auth_client).get_json()['data']
+        with app.app_context():
+            assert windows_profiles.default_connector().id == created['id']
+        other = _post(auth_client, name='forest-b', servers=['dc.b.example'],
+                      base_dn='DC=b,DC=example').get_json()['data']
+        with app.app_context():
+            assert windows_profiles.default_connector().id == created['id'] != other['id']
+    finally:
+        # A profile this test made would hide the no-profile fallback from later tests
+        if made:
+            with app.app_context():
+                WindowsEnrollmentProfile.query.filter_by(id=profile_id).delete()
+                db.session.commit()
 
 
 def test_a_second_connector_coexists_and_a_duplicate_name_is_refused(auth_client, monkeypatch):
@@ -321,8 +332,16 @@ def test_the_default_profile_names_the_connector_the_protocols_search_with(app):
     from services import windows_profiles
     a, b = _pair(app)
     with app.app_context():
-        if windows_profiles.default_profile() is None:
+        existing = windows_profiles.default_profile()
+        if existing is not None:
+            existing.is_default = False
+            db.session.commit()
+        try:
             assert windows_profiles.default_connector().id == a  # no default profile: the lowest row
+        finally:
+            if existing is not None:
+                existing.is_default = True
+                db.session.commit()
         profile = windows_profiles.default_profile()
         created = profile is None
         if created:
