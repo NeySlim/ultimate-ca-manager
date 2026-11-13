@@ -10,7 +10,7 @@ import pytest
 from lxml import etree
 
 from tests.ad_connector_support import connector_row as lowest_connector_row
-from models import  (CA, ADConnectorConfig, Certificate, CATemplatePin, CertificateTemplate, SystemConfig,
+from models import (CA, ADConnectorConfig, Certificate, CATemplatePin, CertificateTemplate, SystemConfig,
                     WindowsEnrollmentProfile, WindowsProfileTemplate, db)
 from services.backup import manifest
 from services.kerberos import negotiate_auth

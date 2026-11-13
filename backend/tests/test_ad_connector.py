@@ -9,7 +9,7 @@ import json
 import pytest
 
 from tests.ad_connector_support import connector_row
-from models import  db, ADConnectorConfig
+from models import db, ADConnectorConfig
 from tests.windows_profile_support import connectors_kept
 
 

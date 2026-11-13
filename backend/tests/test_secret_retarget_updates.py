@@ -9,8 +9,8 @@ import uuid
 
 import pytest
 
+from models import db
 from tests.ad_connector_support import connector_row, mount_connector
-from models import  db
 from tests.windows_profile_support import connectors_kept
 
 
