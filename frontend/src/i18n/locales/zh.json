@@ -843,6 +843,7 @@
     },
     "allTemplates": "所有模板",
     "issuedFromTemplate": "由模板签发：{{name}}",
+    "windowsProfile": "Windows 配置文件",
     "modifiedFromTemplate": "偏离模板",
     "template": "模板",
     "templateOverridesHint": "与模板 '{{name}}' 的差异项：{{fields}}",

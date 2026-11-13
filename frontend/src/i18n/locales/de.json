@@ -845,6 +845,7 @@
     "allTemplates": "Alle Vorlagen",
     "modifiedFromTemplate": "Von Vorlage abweichend",
     "issuedFromTemplate": "Ausgestellt aus Vorlage: {{name}}",
+    "windowsProfile": "Windows-Profil",
     "templateOverridesHint": "Weicht von Vorlage '{{name}}' ab in: {{fields}}",
     "deleteNeedsRevoke": "Dieses Zertifikat ist noch gültig und kann daher nicht allein gelöscht werden: Es würde aus UCM verschwinden, während jeder Client, der den Sperrstatus nicht prüft, ihm weiter vertraut. Widerrufen Sie es zuerst, damit CRL und OCSP-Responder den Widerruf tragen, danach wird es gelöscht.",
     "revokeThenDelete": "Widerrufen, dann löschen",

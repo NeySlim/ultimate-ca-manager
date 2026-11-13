@@ -845,6 +845,7 @@
     "allTemplates": "Todas las plantillas",
     "modifiedFromTemplate": "Modificado respecto a la plantilla",
     "issuedFromTemplate": "Emitido desde la plantilla: {{name}}",
+    "windowsProfile": "Perfil de Windows",
     "templateOverridesHint": "Difiere de la plantilla '{{name}}' en: {{fields}}",
     "deleteNeedsRevoke": "Este certificado sigue siendo válido, por lo que no puede eliminarse por sí solo: se retiraría de UCM mientras sigue siendo de confianza para cualquier cliente que no compruebe la revocación. Revóquelo primero, para que la CRL y el respondedor OCSP reflejen la retirada, y luego se eliminará.",
     "revokeThenDelete": "Revocar y luego eliminar",

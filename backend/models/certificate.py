@@ -408,8 +408,17 @@ class Certificate(db.Model):
             return ""
         return self.valid_to.strftime("%Y-%m-%d %H:%M:%S UTC")
     
-    def to_dict(self, include_private=False):
-        """Convert to dictionary"""
+    def _windows_profile_name(self, names):
+        if self.windows_profile_id is None:
+            return None
+        if names is not None:
+            return names.get(self.windows_profile_id)
+        from models.windows_profile import WindowsEnrollmentProfile
+        profile = db.session.get(WindowsEnrollmentProfile, self.windows_profile_id)
+        return profile.name if profile else None
+
+    def to_dict(self, include_private=False, windows_profile_names=None):
+        """Convert to dictionary; a list passes ``windows_profile_names`` (id to name) read once"""
         from datetime import datetime, timedelta
         
         # Calculate status
@@ -495,6 +504,9 @@ class Certificate(db.Model):
             "template_id": self.template_id,
             "template_name": self.template.name if self.template_id and self.template else None,
             "template_overrides": self.template_overrides_list,
+            # Windows enrollment profile that issued it; the name is null once the profile is gone
+            "windows_profile_id": self.windows_profile_id,
+            "windows_profile_name": self._windows_profile_name(windows_profile_names),
             # Related certificate pair (RFC 9763)
             "related_certificate_id": self.related_certificate_id,
             "hybrid_role": self.hybrid_role,

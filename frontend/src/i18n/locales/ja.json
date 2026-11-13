@@ -845,6 +845,7 @@
     "allTemplates": "すべてのテンプレート",
     "modifiedFromTemplate": "テンプレートから変更済み",
     "issuedFromTemplate": "テンプレートから発行: {{name}}",
+    "windowsProfile": "Windowsプロファイル",
     "templateOverridesHint": "テンプレート '{{name}}' との相違: {{fields}}",
     "deleteNeedsRevoke": "この証明書はまだ有効なため、単独では削除できません。削除すると UCM からは消えますが、失効を確認しないクライアントからは引き続き信頼されます。まず失効させて CRL と OCSP レスポンダに反映させ、そのうえで削除します。",
     "revokeThenDelete": "失効させてから削除",

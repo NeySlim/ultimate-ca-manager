@@ -845,6 +845,7 @@
     "allTemplates": "All templates",
     "modifiedFromTemplate": "Modified from template",
     "issuedFromTemplate": "Issued from template: {{name}}",
+    "windowsProfile": "Windows profile",
     "templateOverridesHint": "Diverges from template '{{name}}' on: {{fields}}",
     "deleteNeedsRevoke": "This certificate is still valid, so it cannot be deleted on its own: deleting it would remove it from UCM while it stays trusted by every client that does not check revocation. Revoke it first, so the CRL and the OCSP responder carry the withdrawal, and it is then deleted.",
     "revokeThenDelete": "Revoke, then delete",
