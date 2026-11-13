@@ -81,12 +81,14 @@ def restore(saved):
 
 @contextmanager
 def connectors_kept(app):
-    """The AD connector rows, and the profiles' links to them, put back as they were:
-    a connector left enabled would serve its realm to the next file's Kerberos tests."""
+    """The AD connector rows, and the profiles' links to them and realms, put back as they
+    were: a connector left enabled, or the realm a saved one gave a profile, would reach the
+    next file's Kerberos tests."""
     connectors, profiles = ADConnectorConfig.__table__, WindowsEnrollmentProfile.__table__
     with app.app_context():
         rows = [dict(r._mapping) for r in db.session.execute(select(connectors))]
-        links = dict(db.session.execute(select(profiles.c.id, profiles.c.connector_id)).all())
+        links = {i: (c, realm) for i, c, realm in db.session.execute(
+            select(profiles.c.id, profiles.c.connector_id, profiles.c.realm))}
         db.session.commit()
     try:
         yield
@@ -96,8 +98,7 @@ def connectors_kept(app):
             db.session.execute(delete(connectors))
             if rows:
                 db.session.execute(insert(connectors), rows)
-            for profile_id, connector_id in links.items():
-                if connector_id is not None:
-                    db.session.execute(update(profiles).where(profiles.c.id == profile_id)
-                                       .values(connector_id=connector_id))
+            for profile_id, (connector_id, realm) in links.items():
+                db.session.execute(update(profiles).where(profiles.c.id == profile_id)
+                                   .values(connector_id=connector_id, realm=realm))
             db.session.commit()
