@@ -1349,8 +1349,8 @@ def _on_postgresql(app):
         return db.engine.dialect.name == 'postgresql'
 
 
-def _wait_for_a_lock_waiter(conn, seconds=5.0):
-    """Whether another session of this worker waits on a lock within ``seconds`` (polled).
+def _wait_for_a_lock_waiter(conn, seconds=5.0, at_least=1):
+    """Whether ``at_least`` other sessions of this worker wait on a lock within ``seconds`` (polled).
     The workers share the database: a waiter is ours when it holds locks on our schema's tables."""
     import time
     from sqlalchemy import text
@@ -1362,7 +1362,7 @@ def _wait_for_a_lock_waiter(conn, seconds=5.0):
                 "AND a.datname = current_database() AND a.pid <> pg_backend_pid() AND EXISTS ("
                 "SELECT 1 FROM pg_locks l JOIN pg_class c ON c.oid = l.relation "
                 "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                "WHERE l.pid = a.pid AND l.granted AND n.nspname = current_schema())")).scalar():
+                "WHERE l.pid = a.pid AND l.granted AND n.nspname = current_schema())")).scalar() >= at_least:
             return True
         time.sleep(0.02)
     return False

@@ -279,11 +279,12 @@ def _mark_while_recorded(row: Certificate, record) -> bool:
 
 def lock_serial_records(ca: CA, serial: int) -> list:
     """``revocation_records`` locked for update (PostgreSQL) to the commit: taken before the
-    certificate row, the order the hourly pass and a revocation follow, so none deadlocks."""
+    certificate row, the order the hourly pass and a revocation follow, so none deadlocks.
+    Locked by id like a revocation's own records, then sorted gravest first."""
     from utils.cert_issuer import same_key_refids
     return sorted(RevokedSerial.query.filter(
         RevokedSerial.caref.in_(same_key_refids(ca)), record_serial_clause(serial))
-        .with_for_update().populate_existing().all(), key=revocation_order)
+        .order_by(RevokedSerial.id).with_for_update().populate_existing().all(), key=revocation_order)
 
 
 def apply_persisted_revocations(ids=None) -> list:
