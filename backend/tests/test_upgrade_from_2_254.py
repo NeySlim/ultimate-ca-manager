@@ -501,19 +501,31 @@ class _Cut(Exception):
     """A fresh install's start stopping where the test says."""
 
 
-@pytest.mark.parametrize('cut_after_tables', [False, True], ids=['before-tables', 'after-tables'])
-def test_a_fresh_install_cut_short_is_never_taken_for_an_old_database(dialect, tmp_path, monkeypatch,
-                                                                    cut_after_tables, capsys):
+def test_a_fresh_install_cut_after_its_tables_is_never_taken_for_an_old_database(dialect, tmp_path,
+                                                                                 monkeypatch, capsys):
+    """Tables without a registry would be refused as older than 2.254: the registry comes first."""
     import migration_runner
     for db in make_base(dialect, tmp_path, monkeypatch, 'fc', sql=''):
         db._route()
 
         def create_all():
-            if cut_after_tables:
-                fresh_metadata().create_all(db.engine)
+            fresh_metadata().create_all(db.engine)
             raise _Cut()
         with pytest.raises(_Cut):
             migration_runner.build_fresh_schema(create_all)
+        assert db.upgrade() is True, capsys.readouterr().out
+        migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
+        assert db.registry() == ['300_upgrade_from_2_254']
+        assert db.upgrade() is True
+
+
+def test_a_3_0_registry_without_tables_is_accepted_and_completed(dialect, tmp_path, monkeypatch, capsys):
+    """A fresh install cut between its registry and its tables: the next start accepts it and
+    create_all builds the tables."""
+    import migration_runner
+    for db in make_base(dialect, tmp_path, monkeypatch, 'fb', sql=''):
+        db.mark_all_applied()
+        assert db.tables() == {'_migrations'}
         assert db.upgrade() is True, capsys.readouterr().out
         migration_runner.build_fresh_schema(lambda: fresh_metadata().create_all(db.engine))
         assert db.registry() == ['300_upgrade_from_2_254']
@@ -575,15 +587,31 @@ def test_a_failed_step_leaves_the_upgrade_unrecorded(base, monkeypatch, capsys):
     assert '300_upgrade_from_2_254' in base.registry()
 
 
-def test_the_decimal_serial_date_is_that_of_the_upgrade_row(base, fresh):
-    """utils.serial_format dates the decimal serials by the 300 row, on both ends."""
-    from datetime import datetime, timezone
-    import migration_runner
-    from utils.serial_format import CANONICAL_MIGRATION
-    assert CANONICAL_MIGRATION == migration_runner.UPGRADE_MIGRATION
-    before = datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
-    assert base.upgrade()
-    for db in (base, fresh):
-        (applied,), = db.run("SELECT applied_at FROM _migrations WHERE name = :n", {'n': CANONICAL_MIGRATION})
-        applied = applied if isinstance(applied, datetime) else datetime.fromisoformat(str(applied))
-        assert abs((applied - before).total_seconds()) < 120
+def _canonical_since(db, recorded_at, monkeypatch):
+    """utils.serial_format.recorded_before_canonical, its query run on *db*."""
+    import types
+    from sqlalchemy.orm import Session
+    import models
+    from utils.serial_format import recorded_before_canonical
+    with Session(db.engine) as session:
+        monkeypatch.setattr(models, 'db', types.SimpleNamespace(session=session))
+        return recorded_before_canonical(recorded_at)
+
+
+def test_the_hex_reading_ends_when_the_upgrade_or_the_fresh_install_ran(dialect, tmp_path, monkeypatch):
+    """A serial recorded before the 300 row may still read as hex, one recorded after may not,
+    on an upgraded database and on a fresh install alike."""
+    from datetime import datetime, timedelta, timezone
+
+    def now():
+        return datetime.now(timezone.utc).replace(tzinfo=None)
+    for label, sql in (('du', None), ('df', '')):
+        for db in make_base(dialect, tmp_path, monkeypatch, label, sql=sql):
+            before = now().replace(microsecond=0)
+            assert db.upgrade() if sql is None else db.mark_all_applied() is None
+            after = now() + timedelta(seconds=1)
+            (applied,), = db.run("SELECT applied_at FROM _migrations WHERE name = '300_upgrade_from_2_254'")
+            applied = applied if isinstance(applied, datetime) else datetime.fromisoformat(str(applied))
+            assert before <= applied <= after, (label, before, applied, after)
+            assert _canonical_since(db, before - timedelta(seconds=2), monkeypatch) is True
+            assert _canonical_since(db, after + timedelta(seconds=2), monkeypatch) is False
