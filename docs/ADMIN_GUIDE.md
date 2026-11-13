@@ -822,6 +822,12 @@ Every certificate issued over WSTEP (Kerberos, UsernamePassword, Certificate bin
 - **Deferred approval.** A request held for approval records its profile by name and its CA by refid, and is replayed by them; after a restore on another installation, a request whose profile or CA does not exist there is closed with a message naming it.
 - **Keytab.** The keytab served to the Kerberos acceptor holds the keys of every profile, disabled ones included, so that a request of a disabled profile's realm authenticates and gets the refusal fault and its audit entry. Disabling a profile does not remove its keys from that file: to remove them, delete the profile's keytab or the profile.
 
+### Windows enrollment profiles: changing the domain of a connector
+
+When a save of an AD connector (**Settings → AD connectors**) changes the domain of its base DN, each profile that uses the connector is looked at first. A profile without keytab whose realm was the old domain takes the new domain as its realm, in the same save, and the audit entry of the connector names it. Any other profile refuses the save (409) with its name: a profile with a keytab, whose keytab fixes its realm; a profile whose realm was not the old domain; a profile that cannot take the new realm because another profile serves it. Nothing is written then, not even for the profiles that could follow. Change the realm of the profile or give it another connector first, then move the connector.
+
+Nothing is refused at the moment of serving: a profile whose realm differs from the domain of its connector (for example after the connector was disabled and the realm came from the SPN) keeps serving. The profile list and the editor flag it (`connector_domain_mismatch`), and the setup checklist of the editor warns.
+
 ---
 
 ## User Administration
