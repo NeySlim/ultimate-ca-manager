@@ -125,7 +125,7 @@ ENFORCED_PERMISSIONS = set()
 INLINE_CHECKED_PERMISSIONS = frozenset({
     'admin:key_recovery', 'admin:settings', 'admin:system', 'read:audit',
     'read:cas', 'read:certificates', 'read:deploy', 'read:private_keys', 'read:system',
-    'read:users', 'write:approvals', 'write:cas',
+    'read:users', 'write:approvals', 'write:cas', 'write:xcep',
 })
 
 # Kept for administrators, beyond `*`, wildcards and every `admin:*` action.

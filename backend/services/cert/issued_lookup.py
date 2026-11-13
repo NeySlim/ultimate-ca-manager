@@ -277,12 +277,13 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
 def _records_still_held(records) -> set:
     """The ids of ``records`` still stored, read again under share locks (PostgreSQL) held to the
     commit and taken by ascending id, the order an unhold locks a pair's records in: an unhold
-    that deleted one first wins, and one deleting it later waits for the mark."""
+    that deleted one first wins, and one deleting it later waits for the mark. The records take
+    the values they hold under the lock: a revocation committed meanwhile is what gets marked."""
     ids, held = sorted({record.id for record in records}), set()
     for start in range(0, len(ids), 500):
-        held.update(i for (i,) in db.session.query(RevokedSerial.id).filter(
+        held.update(r.id for r in RevokedSerial.query.filter(
             RevokedSerial.id.in_(ids[start:start + 500])).order_by(RevokedSerial.id)
-            .with_for_update(read=True))
+            .with_for_update(read=True).populate_existing())
     return held
 
 
