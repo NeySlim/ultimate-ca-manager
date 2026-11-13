@@ -49,7 +49,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- **WSTEP Kerberos requests without template are refused.** A request on the Kerberos binding that names no template and whose EKUs match none of the profile was issued as a server certificate; it is now refused and audited (`windows_enrollment.refused`), as AD CS does. UsernamePassword and the renewal of a certificate without template are unchanged.
+- **WSTEP Kerberos requests without template are refused.** A request on the Kerberos binding that names no template and whose EKUs match none of the profile was issued as a server certificate; it is now refused and audited (`windows_enrollment.refused`), as AD CS does. UsernamePassword is unchanged, and so is the renewal of the requester's own valid certificate issued without template by Windows enrollment.
+- **WSTEP Kerberos renewals are audited for the requester's own certificate only.** `certificate.renewed` names a renewed certificate only when it is valid, of the same profile and the requester's; a request signed by another certificate is audited as `certificate.issued`.
 - SCEP: a PKCSReq signed by a valid certificate this endpoint issued is now a renewal, as clients that renew with PKCSReq expect: the challenge is still compared but may have expired, and the old certificate is replaced; a CSR subject other than the certificate's is refused (see UPGRADE.md).
 - EST re-enrolment and SCEP renewal refuse a certificate of a Windows enrollment profile and audit the refusal (`windows_enrollment.refused`); it renews over WSTEP only.
 - Kerberos: each Windows enrollment profile holds its own keytab (`POST /api/v2/windows-profiles/{id}/keytab`, entries `HTTP/<SPN host>@<realm of the profile>`), and UCM composes the file the acceptor reads from the keytabs of every profile, disabled ones included.
