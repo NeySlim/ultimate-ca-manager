@@ -584,8 +584,9 @@ def _key_fields_follow_crt(target, value, oldvalue, initiator):
     except Exception:
         pass
     target.sig_hash = sig_hash_for_certificate(cert)
-    from utils.dn_match import name_key
     try:
+        # Inside the guard: a certificate is stored even when its subject cannot be keyed
+        from utils.dn_match import name_key
         target.subject_key = name_key(cert.subject)
     except Exception:
         target.subject_key = None

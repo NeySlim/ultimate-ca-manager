@@ -34,9 +34,8 @@ def _prepared_value(attribute):
         # RFC 5280 §7.3: a domain label, compared without regard to ASCII case
         return value.translate(_ASCII_LOWER)
     if attribute.oid == NameOID.EMAIL_ADDRESS:
-        # RFC 5280 §7.5: the local part is exact, the host is not case sensitive
-        local, at, host = value.rpartition('@')
-        return f'{local}{at}{host.lower()}'
+        # RFC 2985 §5.2.1: the attribute's matching rule is pkcs9CaseIgnoreMatch, local part included
+        return value.translate(_ASCII_LOWER)
     if getattr(attribute, '_type', None) in _DIRECTORY_STRINGS:
         return _directory_string(value)
     return value

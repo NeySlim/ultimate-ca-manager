@@ -26,9 +26,10 @@ def _name(*attrs):
     (_name((CN, 'PC1')), _name((CN, 'pc1', _ASN1Type.PrintableString))),
     (_name((CN, 'pc1'), (DC, 'Example'), (DC, 'TEST')), _name((CN, 'PC1'), (DC, 'example'), (DC, 'test'))),
     (_name((EMAIL, 'alice@EXAMPLE.test')), _name((EMAIL, 'alice@example.TEST'))),
+    (_name((EMAIL, 'Alice@example.test')), _name((EMAIL, 'alice@example.test'))),
     (x509.Name([x509.RelativeDistinguishedName([x509.NameAttribute(CN, 'a'), x509.NameAttribute(OU, 'b')])]),
      x509.Name([x509.RelativeDistinguishedName([x509.NameAttribute(OU, 'B'), x509.NameAttribute(CN, 'A')])])),
-], ids=['case', 'spaces', 'nbsp', 'fold', 'nfkc', 'soft-hyphen', 'string-type', 'dc', 'email-host', 'rdn-set'])
+], ids=['case', 'spaces', 'nbsp', 'fold', 'nfkc', 'soft-hyphen', 'string-type', 'dc', 'email-host', 'email-local', 'rdn-set'])
 def test_names_equal_under_rfc_5280(a, b):
     assert same_name(a, b) and name_key(a) == name_key(b)
 
@@ -39,11 +40,11 @@ def test_names_equal_under_rfc_5280(a, b):
     (_name((CN, 'a'), (OU, 'b')), _name((OU, 'b'), (CN, 'a'))),
     (_name((CN, 'a')), _name((CN, 'a'), (OU, 'b'))),
     (_name((CN, 'a')), _name((OU, 'a'))),
-    (_name((EMAIL, 'Alice@example.test')), _name((EMAIL, 'alice@example.test'))),
+    (_name((EMAIL, 'alice@example.test')), _name((EMAIL, 'alicia@example.test'))),
     (_name((SERIAL, 'ab12', _ASN1Type.IA5String)), _name((SERIAL, 'AB12', _ASN1Type.IA5String))),
     (_name((CN, 'a'), (OU, 'b')),
      x509.Name([x509.RelativeDistinguishedName([x509.NameAttribute(CN, 'a'), x509.NameAttribute(OU, 'b')])])),
-], ids=['letter', 'space-removed', 'rdn-order', 'one-more-rdn', 'type', 'email-local', 'ia5-exact', 'rdn-split'])
+], ids=['letter', 'space-removed', 'rdn-order', 'one-more-rdn', 'type', 'email-other', 'ia5-exact', 'rdn-split'])
 def test_names_that_differ(a, b):
     assert not same_name(a, b) and name_key(a) != name_key(b)
 
