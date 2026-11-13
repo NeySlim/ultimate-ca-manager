@@ -140,12 +140,6 @@ def profile_group(profile):
     return group or None
 
 
-def profile_pinned_fields(profile):
-    """The raw JSON of the pinned subject fields replacing the template's, None when unset (A3)."""
-    value = (profile.pinned_subject_fields or '').strip() if profile is not None else ''
-    return value or None
-
-
 def _ca(refid):
     return CA.query.filter_by(refid=refid).first() if refid else None
 

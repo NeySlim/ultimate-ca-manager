@@ -2,6 +2,7 @@
 Windows enrollment profiles v2.0
 /api/v2/windows-profiles - one realm each, served by XCEP, WSTEP and Kerberos
 """
+import json
 import logging
 
 from flask import Blueprint, g, request
@@ -136,8 +137,12 @@ def _apply(profile, data):
             return f'validity_days must be between {MIN_VALIDITY_DAYS} and {MAX_VALIDITY_DAYS}', 400
         profile.validity_days = days
 
-    for field in ('allowed_ad_group', 'pinned_subject_fields',
-                  *(f'{svc}_username' for svc in SERVICES)):
+    if 'pinned_subject_fields' in data:
+        pinned, err = _pinned_subject_fields(data['pinned_subject_fields'])
+        if err:
+            return err, 400
+        profile.pinned_subject_fields = pinned
+    for field in ('allowed_ad_group', *(f'{svc}_username' for svc in SERVICES)):
         if field in data:
             value = data[field]
             if value is not None and not isinstance(value, str):
@@ -160,6 +165,25 @@ def _apply(profile, data):
     if 'realm' in data or 'connector_id' in data:
         return _connector_problem(profile)
     return None
+
+
+def _pinned_subject_fields(value):
+    """(stored JSON or None, error): an object or its JSON text, checked as a template's pins."""
+    from api.v2.templates import _clean_pinned_subject_fields
+    if isinstance(value, str):
+        try:
+            value = json.loads(value) if value.strip() else None
+        except ValueError:
+            return None, 'pinned_subject_fields must be a JSON object'
+    if value is not None and not isinstance(value, dict):
+        return None, 'pinned_subject_fields must be an object'
+    try:
+        cleaned, err = _clean_pinned_subject_fields(value)
+    except AttributeError:
+        return None, 'pinned_subject_fields values must be strings'
+    if err:
+        return None, err
+    return (json.dumps(cleaned) if cleaned else None), None
 
 
 def _connector_problem(profile):

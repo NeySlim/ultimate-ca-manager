@@ -809,7 +809,9 @@ def _template_pinned_fields(template):
         raw = json.loads(template.pinned_subject_fields)
     except (TypeError, ValueError):
         return {}
-    return {k: v for k, v in raw.items() if k in _PINNED_FIELD_OIDS and v}
+    if not isinstance(raw, dict):
+        return {}
+    return {k: v for k, v in raw.items() if k in _PINNED_FIELD_OIDS and v and isinstance(v, str)}
 
 
 def _required_pinned_subject_fields(ca, matched_template, *, profile):
@@ -833,9 +835,10 @@ def _required_pinned_subject_fields(ca, matched_template, *, profile):
 
     Fields pinned on ``profile`` replace the templates' for every issuance of it (A3).
     """
-    from services.windows_profiles import profile_pinned_fields
-    if profile_pinned_fields(profile):
-        return _template_pinned_fields(profile)
+    # Decided on the parsed result: a profile pinning nothing usable keeps the templates' pins
+    fields = _template_pinned_fields(profile)
+    if fields:
+        return fields
     if matched_template is not None:
         return _template_pinned_fields(matched_template)
 

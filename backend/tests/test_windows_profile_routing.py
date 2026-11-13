@@ -498,3 +498,12 @@ def test_upgrade_note_says_other_realms_are_refused():
 
 REFUSAL_SENTENCE = ('Kerberos clients of any other realm, such as a trusted forest served while the connector '
                     'was disabled, are refused until a profile serves their realm.')
+
+
+@pytest.mark.parametrize('raw', ['{}', '{"O": ""}', '{"CN": "x"}', 'not json', '[]', '"O"'])
+def test_a_profile_pinning_nothing_usable_keeps_the_template_s_pins(raw):
+    """A3: only parsed, known, non-empty fields replace the template's; anything else never raises."""
+    from services.wstep.wstep_service import _required_pinned_subject_fields
+    template = types.SimpleNamespace(pinned_subject_fields=json.dumps({'O': 'Template Org'}))
+    profile = types.SimpleNamespace(pinned_subject_fields=raw)
+    assert _required_pinned_subject_fields(None, template, profile=profile) == {'O': 'Template Org'}
