@@ -1,4 +1,4 @@
-"""Migration 149: websocket_relay, the WebSocket events of the scheduler process.
+"""Upgrade step 149: websocket_relay, the WebSocket events of the scheduler process.
 
 Without a message queue the scheduler process appends its events here and every web
 worker emits the rows newer than its own cursor. Ids are never reused (AUTOINCREMENT on

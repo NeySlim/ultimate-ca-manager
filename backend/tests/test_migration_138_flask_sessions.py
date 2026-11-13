@@ -13,7 +13,7 @@ PG_URL = os.getenv('UCM_TEST_PG_URL')
 
 
 def _migration():
-    return importlib.import_module('migrations.138_flask_sessions')
+    return importlib.import_module('migrations._from_2_254.138_flask_sessions')
 
 
 def _library_columns():

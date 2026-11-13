@@ -1,4 +1,4 @@
-"""Migration 145: the page an SP-initiated SAML login returns to, kept with its AuthnRequest id."""
+"""Upgrade step 145: the page an SP-initiated SAML login returns to, kept with its AuthnRequest id."""
 import sqlite3
 
 pg_compatible = True

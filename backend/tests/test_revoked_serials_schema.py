@@ -1,6 +1,5 @@
-"""Migration 078 and the RevokedSerial model: revoked_serials table and the
-renewal columns of certificates, on SQLite and PostgreSQL."""
-import importlib
+"""The RevokedSerial model: revoked_serials table and the renewal columns of certificates,
+on SQLite and PostgreSQL."""
 import json
 import os
 import sqlite3
@@ -16,12 +15,13 @@ INDEXES = {
     'ix_revoked_serials_caref': ['caref'],
     'ix_revoked_serials_serial_number': ['serial_number'],
     'ix_revoked_serials_certificate_id': ['certificate_id'],
+    'ix_revoked_serials_public_key_sha256': ['public_key_sha256'],
 }
 COLUMNS = ['id', 'caref', 'serial_number', 'revoked_at', 'revoke_reason',
-           'invalidity_at', 'valid_to', 'created_at', 'certificate_id']
+           'invalidity_at', 'valid_to', 'created_at', 'certificate_id', 'public_key_sha256']
 NOT_NULL = {'id', 'caref', 'serial_number', 'revoked_at', 'valid_to'}
 
-# Schema as it stood before 078: no revoked_serials, no renewal columns
+# A CA and one of its certificates, for the records the constraint checks write
 PRE_078_SQLITE = (
     "CREATE TABLE certificate_authorities (id INTEGER PRIMARY KEY,"
     " refid VARCHAR(36) NOT NULL UNIQUE)",
@@ -38,15 +38,6 @@ PRE_078_PG = (
     "INSERT INTO certificate_authorities (id, refid) VALUES (1, 'ca-1')",
     "INSERT INTO certificates (id, refid, caref, serial_number) VALUES (1, 'cert-1', 'ca-1', '42')",
 )
-
-
-def _migration():
-    return importlib.import_module('migrations.078_revoked_serials')
-
-
-def _key_digest_migration():
-    # 128 adds the key digest a fresh install has from the model
-    return importlib.import_module('migrations.128_revoked_key_digest_upstream_revocations')
 
 
 def _snapshot(conn, table='revoked_serials'):
@@ -90,16 +81,6 @@ def _assert_spec_table(snap, datetime_type):
     assert snap['pk'] == ('id',)
 
 
-def _assert_renewal_columns(conn, datetime_type):
-    cols = {c['name']: c for c in inspect(conn).get_columns('certificates')}
-    assert _type_name(cols['renewed_at']['type']) == datetime_type
-    assert cols['renewed_at']['nullable'] is True
-    assert cols['renewed_at'].get('default') is None
-    assert str(cols['renewed_times']['type']) == 'INTEGER'
-    assert cols['renewed_times']['nullable'] is False
-    assert str(cols['renewed_times']['default']).strip("'") == '0'
-
-
 # --------------------------------------------------------------------------
 # SQLite
 # --------------------------------------------------------------------------
@@ -128,67 +109,24 @@ def _sqlite_snapshot(engine, table='revoked_serials'):
         return _snapshot(conn, table)
 
 
-class TestSqliteUpgrade:
-    def test_creates_the_table_the_indexes_and_the_columns(self, tmp_path):
-        with _sqlite_db(tmp_path) as (raw, engine):
-            _migration().upgrade(raw)
-            _assert_spec_table(_sqlite_snapshot(engine), 'DATETIME')
-            with engine.connect() as conn:
-                _assert_renewal_columns(conn, 'DATETIME')
-            # An existing certificate was never renewed
-            assert raw.execute(
-                "SELECT renewed_at, renewed_times FROM certificates WHERE id = 1").fetchone() == (None, 0)
-            sql = raw.execute("SELECT sql FROM sqlite_master WHERE name = 'revoked_serials'").fetchone()[0]
-            assert 'AUTOINCREMENT' in sql.upper()
-
-    def test_a_second_upgrade_changes_nothing(self, tmp_path):
-        with _sqlite_db(tmp_path) as (raw, engine):
-            _migration().upgrade(raw)
-            before = _sqlite_master(raw)
-            _migration().upgrade(raw)
-            assert _sqlite_master(raw) == before
-
-    def test_a_table_without_its_indexes_gets_them(self, tmp_path):
-        with _sqlite_db(tmp_path) as (raw, engine):
-            _migration().upgrade(raw)
-            for name in INDEXES:
-                raw.execute(f"DROP INDEX {name}")
-            raw.commit()
-            assert _sqlite_snapshot(engine)['indexes'] == {}
-            _migration().upgrade(raw)
-            _assert_spec_table(_sqlite_snapshot(engine), 'DATETIME')
-
-    def test_downgrade_then_upgrade_returns_to_the_same_schema(self, tmp_path):
-        with _sqlite_db(tmp_path) as (raw, engine):
-            _migration().upgrade(raw)
-            before = _sqlite_master(raw)
-            _migration().downgrade(raw)
-            assert _sqlite_snapshot(engine) is None
-            _migration().upgrade(raw)
-            assert _sqlite_master(raw) == before
-
-    def test_the_table_matches_a_fresh_install(self, tmp_path):
+class TestSqliteSchema:
+    def test_the_model_creates_the_table_the_indexes_and_the_columns(self, tmp_path):
         """Fresh installs build the schema from the models (create_all)."""
         from models import db
 
-        with _sqlite_db(tmp_path) as (raw, migrated), _sqlite_db(tmp_path, (), 'fresh.db') as (_r, fresh):
-            _migration().upgrade(raw)
-            _key_digest_migration().upgrade(raw)
-            db.metadata.create_all(bind=fresh)
-            assert _sqlite_snapshot(migrated) == _sqlite_snapshot(fresh)
-            for engine in (migrated, fresh):
-                _assert_renewal_columns_in(_sqlite_snapshot(engine, 'certificates'), 'DATETIME')
+        with _sqlite_db(tmp_path, ()) as (raw, engine):
+            db.metadata.create_all(bind=engine)
+            _assert_spec_table(_sqlite_snapshot(engine), 'DATETIME')
+            _assert_renewal_columns_in(_sqlite_snapshot(engine, 'certificates'), 'DATETIME')
+            sql = raw.execute("SELECT sql FROM sqlite_master WHERE name = 'revoked_serials'").fetchone()[0]
+            assert 'AUTOINCREMENT' in sql.upper()
 
-    @pytest.mark.parametrize('source', ['migration', 'model'])
-    def test_constraints_hold(self, tmp_path, source):
+    def test_constraints_hold(self, tmp_path):
         """valid_to is required, caref must name a CA, certificate_id is free."""
         from models.revoked_serial import RevokedSerial
 
         with _sqlite_db(tmp_path) as (raw, engine):
-            if source == 'migration':
-                _migration().upgrade(raw)
-            else:
-                RevokedSerial.__table__.create(bind=engine)
+            RevokedSerial.__table__.create(bind=engine)
             raw.execute("PRAGMA foreign_keys = ON")
             _check_constraints(raw.execute, raw.commit, sqlite3.IntegrityError)
             # A deleted row id is never handed out again (AUTOINCREMENT)
@@ -260,77 +198,27 @@ def _pg_schema(suffix, statements=PRE_078_PG):
         engine.dispose()
 
 
-def _pg_upgrade(conn, step='upgrade'):
-    # The runner hands one transaction to the migration and commits it itself
-    getattr(_migration(), step)(conn)
-    conn.commit()
-
-
 pg = pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 
 
 @pytest.mark.postgres
 @pg
-class TestPostgresUpgrade:
-    def test_creates_the_table_the_indexes_and_the_columns(self):
-        with _pg_schema('create') as conn:
-            _pg_upgrade(conn)
-            _assert_spec_table(_snapshot(conn), 'TIMESTAMP')
-            _assert_renewal_columns(conn, 'TIMESTAMP')
-            assert conn.execute(text(
-                "SELECT renewed_at, renewed_times FROM certificates WHERE id = 1")).fetchone() == (None, 0)
-
-    def test_a_second_upgrade_changes_nothing(self):
-        with _pg_schema('twice') as conn:
-            _pg_upgrade(conn)
-            before = (_snapshot(conn), _snapshot(conn, 'certificates'))
-            _pg_upgrade(conn)
-            assert (_snapshot(conn), _snapshot(conn, 'certificates')) == before
-
-    def test_a_table_without_its_indexes_gets_them(self):
-        with _pg_schema('noidx') as conn:
-            _pg_upgrade(conn)
-            for name in INDEXES:
-                conn.execute(text(f"DROP INDEX {name}"))
-            conn.commit()
-            assert _snapshot(conn)['indexes'] == {}
-            _pg_upgrade(conn)
-            _assert_spec_table(_snapshot(conn), 'TIMESTAMP')
-
-    def test_downgrade_then_upgrade_returns_to_the_same_schema(self):
-        with _pg_schema('down') as conn:
-            _pg_upgrade(conn)
-            before = (_snapshot(conn), _snapshot(conn, 'certificates'))
-            _pg_upgrade(conn, 'downgrade')
-            assert _snapshot(conn) is None
-            cols = {c['name'] for c in inspect(conn).get_columns('certificates')}
-            assert not cols & {'renewed_at', 'renewed_times'}
-            _pg_upgrade(conn)
-            assert (_snapshot(conn), _snapshot(conn, 'certificates')) == before
-
-    def test_the_table_matches_a_fresh_install(self):
+class TestPostgresSchema:
+    def test_the_model_creates_the_table_the_indexes_and_the_columns(self):
         from models import db
 
-        with _pg_schema('mig') as migrated, _pg_schema('fresh', ()) as fresh:
-            _pg_upgrade(migrated)
-            _key_digest_migration().upgrade(migrated)
-            migrated.commit()
-            db.metadata.create_all(bind=fresh)
-            fresh.commit()
-            assert _snapshot(migrated) == _snapshot(fresh)
-            for conn in (migrated, fresh):
-                _assert_renewal_columns_in(_snapshot(conn, 'certificates'), 'TIMESTAMP')
+        with _pg_schema('fresh', ()) as conn:
+            db.metadata.create_all(bind=conn)
+            conn.commit()
+            _assert_spec_table(_snapshot(conn), 'TIMESTAMP')
+            _assert_renewal_columns_in(_snapshot(conn, 'certificates'), 'TIMESTAMP')
 
-    @pytest.mark.parametrize('source', ['migration', 'model'])
-    def test_constraints_hold(self, source):
+    def test_constraints_hold(self):
         from models.revoked_serial import RevokedSerial
 
-        with _pg_schema(f'cons_{source}') as conn:
-            if source == 'migration':
-                _pg_upgrade(conn)
-            else:
-                RevokedSerial.__table__.create(bind=conn)
-                conn.commit()
+        with _pg_schema('cons_model') as conn:
+            RevokedSerial.__table__.create(bind=conn)
+            conn.commit()
             _check_constraints(_PgExec(conn), conn.commit, IntegrityError)
 
 

@@ -1,4 +1,4 @@
-"""Migration 151: a deploy binding a renewal left on the previous certificate says so.
+"""Upgrade step 151: a deploy binding a renewal left on the previous certificate says so.
 
 Two nullable columns, empty on every existing binding: the reason and the id of the
 successor certificate the binding could not follow (it has no key in UCM).

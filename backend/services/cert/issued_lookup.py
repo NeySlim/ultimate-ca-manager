@@ -76,7 +76,7 @@ def _rows_holding(cert: x509.Certificate, *criteria) -> list:
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(
         *criteria,
-        # Every spelling: rows migration 144 left pending may hold the revoked twin
+        # Every spelling: rows the upgrade step 144 left pending may hold the revoked twin
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
     ).all()
@@ -122,7 +122,7 @@ def gravest_revocation(*holders):
 
 
 def record_serial_clause(serial):
-    """The records of ``serial``: the column is canonical decimal (migration 144), so only
+    """The records of ``serial``: the column is canonical decimal (upgrade step 144), so only
     equality names it; another serial's all-digit hex spelling never does."""
     return RevokedSerial.serial_number == canonical_serial(serial)
 
@@ -345,7 +345,7 @@ def apply_persisted_revocations(ids=None) -> list:
     # Read afresh: a revocation or hold another worker made since this session loaded it counts
     db.session.flush()
     db.session.expire_all()
-    # Both columns are canonical (migration 144): a record names the rows of its own serial only
+    # Both columns are canonical (upgrade step 144): a record names the rows of its own serial only
     columns = sorted({column for (column,) in RevokedSerial.query.with_entities(
         RevokedSerial.serial_number).distinct() if column})
     found = []

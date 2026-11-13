@@ -1,4 +1,4 @@
-"""Migration 155: Windows enrollment profiles, and the 2.x configuration as the default one.
+"""Upgrade step 155: Windows enrollment profiles, and the 2.x configuration as the default one.
 
 Creates windows_enrollment_profiles and windows_profile_templates, names the AD connector
 rows, adds certificates.windows_profile_id. The 2.x XCEP/WSTEP settings become the default

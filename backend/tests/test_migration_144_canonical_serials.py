@@ -33,7 +33,7 @@ _DDL = [f"CREATE TABLE {CERTS} (id INTEGER PRIMARY KEY, caref VARCHAR(50), seria
 
 
 def _migration():
-    return importlib.import_module('migrations.144_canonical_certificate_serials')
+    return importlib.import_module('migrations._from_2_254.144_canonical_certificate_serials')
 
 
 def _certificate(serial):

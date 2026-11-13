@@ -12,7 +12,7 @@ NEW_COLUMNS = {'attention_reason', 'attention_successor_id'}
 
 
 def _migration():
-    return importlib.import_module('migrations.151_deploy_binding_attention')
+    return importlib.import_module('migrations._from_2_254.151_deploy_binding_attention')
 
 
 def test_sqlite_adds_the_columns_keeps_rows_unflagged_and_is_idempotent():

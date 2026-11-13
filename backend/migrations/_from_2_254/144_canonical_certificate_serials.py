@@ -1,10 +1,10 @@
-"""Migration 144: one stored spelling per certificate serial (RFC 5280 §4.1.2.2).
+"""Upgrade step 144: one stored spelling per certificate serial (RFC 5280 §4.1.2.2).
 
 certificates.serial_number and revoked_serials.serial_number become the decimal string
 of the integer (utils/serial_format.py), read back from the row's certificate when the
-text is ambiguous, so the unique (caref, serial_number) index of migration 142 sees one
+text is ambiguous, so the unique (caref, serial_number) index of step 142 sees one
 spelling per serial. Rows of one CA that would end up sharing a serial are left as they
-are and listed under ``serial_unique_index_pending``, as migration 142 does, with any row
+are and listed under ``serial_unique_index_pending``, as step 142 does, with any row
 whose decimal is still a held row's spelling; no row is ever deleted. Running it again
 changes nothing.
 """
@@ -27,7 +27,7 @@ CREATE_INDEX = (f"CREATE UNIQUE INDEX IF NOT EXISTS {INDEX} ON {TABLE} (caref, s
 CLEAR_PENDING = f"DELETE FROM {CONFIG} WHERE key = '{PENDING_KEY}'"
 SET_PENDING = (f"INSERT INTO {CONFIG} (key, value, encrypted, description, updated_at) "
                "VALUES ('" + PENDING_KEY + "', {value}, {false}, "
-               "'Migrations 142/144 pending: certificates of one CA share a serial number', "
+               "'Upgrade steps 142/144 pending: certificates of one CA share a serial number', "
                "CURRENT_TIMESTAMP)")
 _CERTS = (f"SELECT id, caref, serial_number, crt FROM {TABLE} "
           "WHERE serial_number IS NOT NULL AND serial_number <> '' ORDER BY id")
@@ -95,7 +95,7 @@ def _apply(execute, executemany, stream, tables, value_param, false_literal):
     executemany(f"UPDATE {REVOKED} SET serial_number = {{p}}s WHERE id = {{p}}i",
                 [{'s': new, 'i': row_id} for row_id, new in revoked_updates])
     if cert_updates or revoked_updates:
-        logger.info("Migration 144: %d certificate and %d revocation serial(s) rewritten in decimal",
+        logger.info("Upgrade step 144: %d certificate and %d revocation serial(s) rewritten in decimal",
                     len(cert_updates), len(revoked_updates))
     if not execute(DUPLICATES, None).fetchall():
         execute(CREATE_INDEX, None)
@@ -104,8 +104,8 @@ def _apply(execute, executemany, stream, tables, value_param, false_literal):
     if not pending:
         return
     for d in pending:
-        logger.warning("Migration 144: %s (left as stored)", describe_pending(d))
-    logger.warning("Migration 144: these serials stay outside the unique index. %s", CLEANUP)
+        logger.warning("Upgrade step 144: %s (left as stored)", describe_pending(d))
+    logger.warning("Upgrade step 144: these serials stay outside the unique index. %s", CLEANUP)
     if CONFIG in tables:
         execute(SET_PENDING.format(value=value_param, false=false_literal),
                 json.dumps({'duplicates': pending}))

@@ -432,7 +432,7 @@ class LifecycleMixin:
         rejected_renewals = []
         try:
             # The record is locked before the row is written, the order unholds and the hourly
-            # pass follow (PostgreSQL), so none of them deadlocks. A row migration 144 left
+            # pass follow (PostgreSQL), so none of them deadlocks. A row the upgrade step 144 left
             # pending keeps its spelling; records never do
             record = RevokedSerial.query.filter_by(
                 caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)

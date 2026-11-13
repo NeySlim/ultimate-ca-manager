@@ -1,4 +1,4 @@
-"""Migration 150: a user id is never handed out again.
+"""Upgrade step 150: a user id is never handed out again.
 
 SQLite gave a new account the id of the last one deleted (INTEGER PRIMARY KEY
 without AUTOINCREMENT), and every row still holding that id followed it. The

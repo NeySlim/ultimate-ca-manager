@@ -12,7 +12,7 @@ NEW_COLUMNS = {'parent_confirmed_by', 'parent_confirmed_at'}
 
 
 def _migration():
-    return importlib.import_module('migrations.158_ca_parent_confirmation')
+    return importlib.import_module('migrations._from_2_254.158_ca_parent_confirmation')
 
 
 def test_the_table_is_the_model_s():

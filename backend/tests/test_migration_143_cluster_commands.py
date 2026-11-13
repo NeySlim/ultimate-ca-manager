@@ -13,7 +13,7 @@ NODES_141 = ("CREATE TABLE cluster_nodes (node_id VARCHAR(255) NOT NULL PRIMARY 
 
 
 def _migration():
-    return importlib.import_module('migrations.143_cluster_commands')
+    return importlib.import_module('migrations._from_2_254.143_cluster_commands')
 
 
 def test_sqlite_creates_the_table_and_column_and_is_idempotent():

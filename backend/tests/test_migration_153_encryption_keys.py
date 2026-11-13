@@ -14,7 +14,7 @@ NODES_143 = ("CREATE TABLE cluster_nodes (node_id VARCHAR(255) NOT NULL PRIMARY 
 
 
 def _m153():
-    return importlib.import_module('migrations.153_encryption_keys')
+    return importlib.import_module('migrations._from_2_254.153_encryption_keys')
 
 
 def test_sqlite_creates_the_table_and_is_idempotent():

@@ -3,6 +3,7 @@ import importlib
 import json
 import os
 import sqlite3
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -10,6 +11,8 @@ from sqlalchemy.dialects import sqlite as sqlite_dialect
 from sqlalchemy.schema import CreateIndex, CreateTable
 
 from models import User
+
+FIXTURES = Path(__file__).parent / 'fixtures'
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 TABLE = User.__tablename__
@@ -44,7 +47,7 @@ _USERS = [(1, 'admin', 'a@x', 'local', None, None), (2, 'bob', 'b@x', 'ldap', No
 
 
 def _migration():
-    return importlib.import_module('migrations.150_users_id_never_reused')
+    return importlib.import_module('migrations._from_2_254.150_users_id_never_reused')
 
 
 def _legacy_database(enforce_foreign_keys=True):
@@ -195,9 +198,8 @@ def test_a_fresh_install_and_an_upgraded_one_have_the_same_users_table():
 
 def test_the_baseline_table_shape_is_accepted():
     """The 2.52 baseline declares the id inline (``id INTEGER PRIMARY KEY NOT NULL``)."""
-    baseline = importlib.import_module('migrations.000_baseline_v252')
     conn = sqlite3.connect(':memory:')
-    conn.executescript(baseline.SCHEMA_SQL)
+    conn.executescript((FIXTURES / 'schema_v252_baseline_sqlite.sql').read_text())
     conn.execute(f"INSERT INTO {TABLE} (id, username, email, password_hash, role) VALUES (3, 'a', 'a@x', 'h', 'admin')")
     conn.commit()
     before = _schema(conn)
@@ -257,24 +259,24 @@ def test_the_runner_applies_it_to_a_database_file(tmp_path):
     conn = _legacy_database(enforce_foreign_keys=False)
     conn.execute(f"VACUUM INTO '{path}'")
     conn.close()
-    assert migration_runner._run_pending_sqlite(['150_users_id_never_reused'], False, db_path=str(path))
+    assert migration_runner._run_pending_sqlite(['300_upgrade_from_2_254'], False, db_path=str(path))
     conn = sqlite3.connect(path)
     assert 'AUTOINCREMENT' in _table_sql(conn).upper()
     assert conn.execute(f"SELECT * FROM {TABLE} ORDER BY id").fetchall() == _USERS
-    assert conn.execute("SELECT name FROM _migrations").fetchall() == [('150_users_id_never_reused',)]
+    assert conn.execute("SELECT name FROM _migrations").fetchall() == [('300_upgrade_from_2_254',)]
 
 
-def test_a_legacy_install_upgraded_through_every_migration_never_reuses_an_id(tmp_path):
-    """Baseline plus every migration, as an installation without tracking upgrades."""
+def test_a_2254_install_upgraded_by_the_runner_never_reuses_an_id(tmp_path):
+    """The 2.254 schema with its registry, upgraded as a start upgrades it."""
     import migration_runner
-    baseline = importlib.import_module('migrations.000_baseline_v252')
-    path = tmp_path / 'legacy.db'
+    path = tmp_path / 'ucm2254.db'
     conn = sqlite3.connect(path)
-    conn.executescript(baseline.SCHEMA_SQL)
-    conn.execute(f"INSERT INTO {TABLE} (id, username, email, password_hash, role) VALUES (4, 'a', 'a@x', 'h', 'admin')")
+    conn.executescript((FIXTURES / 'schema_v2254_sqlite.sql').read_text())
+    conn.execute(f"INSERT INTO {TABLE} (id, username, email, password_hash, role, auth_source) "
+                 "VALUES (4, 'a', 'a@x', 'h', 'admin', 'local')")
     conn.commit()
     conn.close()
-    assert migration_runner._run_pending_sqlite(migration_runner._list_migration_names(), False, db_path=str(path))
+    assert migration_runner._run_pending_sqlite(['300_upgrade_from_2_254'], False, db_path=str(path))
 
     conn, fresh = sqlite3.connect(path), _schema(_create_all_users_schema())
     upgraded = _schema(conn)
@@ -283,5 +285,5 @@ def test_a_legacy_install_upgraded_through_every_migration_never_reuses_an_id(tm
         assert upgraded[part] == fresh[part]
     assert [c for c in upgraded['columns'] if c[0] == 'id'] == [c for c in fresh['columns'] if c[0] == 'id']
     conn.execute(f"DELETE FROM {TABLE}")
-    assert conn.execute(f"INSERT INTO {TABLE} (username, email, password_hash, role) "
-                        "VALUES ('b', 'b@x', 'h', 'admin')").lastrowid == 5
+    assert conn.execute(f"INSERT INTO {TABLE} (username, email, password_hash, role, auth_source) "
+                        "VALUES ('b', 'b@x', 'h', 'admin', 'local')").lastrowid == 5

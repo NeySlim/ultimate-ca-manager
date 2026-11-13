@@ -1,4 +1,4 @@
-"""Migration 156: common name pattern of a certificate template (WSTEP issuance).
+"""Upgrade step 156: common name pattern of a certificate template (WSTEP issuance).
 
 Two columns on certificate_templates: the pattern (NULL, every existing template keeps
 its subject) and whether the directory path follows the CN (false).

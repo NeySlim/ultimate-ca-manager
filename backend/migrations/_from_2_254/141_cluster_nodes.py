@@ -1,4 +1,4 @@
-"""Migration 141: HA node registry and cross-node scheduler requests.
+"""Upgrade step 141: HA node registry and cross-node scheduler requests.
 
 ``cluster_nodes`` holds one row per node, refreshed by its scheduler process, with the
 fingerprint of its key-encryption key (never the key);

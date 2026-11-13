@@ -244,9 +244,9 @@ def create_app(config_name=None):
         migrated = run_all_migrations(dry_run=False, verbose=False)
     if not migrated:
         raise RuntimeError(
-            "Schema migration failed at startup. Refusing to start with an "
-            "inconsistent database. Check the migration log and fix the issue "
-            "before restarting the service."
+            "Schema migration failed or the database was refused at startup. "
+            "Refusing to start with an inconsistent database. Check the migration "
+            "log above and fix the issue before restarting the service."
         )
     
     # A backend switch that asked for this restart has now been applied: the

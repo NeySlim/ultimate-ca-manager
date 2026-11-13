@@ -619,22 +619,6 @@ class TestReviewFindings:
                           headers={'X-API-Key': delete_key})
         assert r.status_code == 200, r.data[:300]
 
-    def test_migration_creates_foreign_keys(self):
-        """F-11: an upgraded schema must carry the model's FKs, not just a
-        fresh db.create_all() one."""
-        import sqlite3
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            'm081', 'migrations/081_deploy_hooks.py')
-        m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(m)
-        conn = sqlite3.connect(':memory:')
-        m.upgrade(conn)
-        fks = conn.execute('PRAGMA foreign_key_list(deploy_bindings)').fetchall()
-        referenced = {(row[2], row[3]) for row in fks}  # (table, from_column)
-        assert ('deploy_targets', 'target_id') in referenced
-        assert ('certificates', 'certificate_id') in referenced
-
 
 class TestCertDeleteCleanup:
     def test_cert_delete_removes_bindings(self, app, auth_client, create_cert):

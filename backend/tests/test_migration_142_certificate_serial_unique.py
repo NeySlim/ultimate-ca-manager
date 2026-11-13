@@ -23,7 +23,7 @@ DUPLICATE = CLEAN + [(10, 'ca-b', '11')]
 
 
 def _migration():
-    return importlib.import_module('migrations.142_serial_per_ca_and_proxy_links')
+    return importlib.import_module('migrations._from_2_254.142_serial_per_ca_and_proxy_links')
 
 
 def _pending(rows):

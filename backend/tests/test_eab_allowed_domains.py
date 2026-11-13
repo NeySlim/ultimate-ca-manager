@@ -455,67 +455,6 @@ class TestProxyNewOrder:
 
 # --- Migration 069 -----------------------------------------------------------------------
 
-def _migration():
-    return importlib.import_module('migrations.069_eab_allowed_domains')
-
 
 _LEGACY_TABLE = ("CREATE TABLE acme_eab_credentials (id {pk}, kid VARCHAR(255) NOT NULL,"
                  " hmac_key_b64 TEXT NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'active')")
-
-
-def test_migration_069_sqlite_backfills_existing_rows():
-    conn = sqlite3.connect(':memory:')
-    conn.execute(_LEGACY_TABLE.format(pk='INTEGER PRIMARY KEY'))
-    conn.execute("INSERT INTO acme_eab_credentials (kid, hmac_key_b64) VALUES ('a', 'x'), ('b', 'y')")
-    _migration().upgrade(conn)
-    assert conn.execute("SELECT allowed_domains FROM acme_eab_credentials").fetchall() == [
-        ('["*"]',), ('["*"]',)]
-    # A later NULL (migration 101 import) survives a re-run.
-    conn.execute("INSERT INTO acme_eab_credentials (kid, hmac_key_b64) VALUES ('c', 'z')")
-    _migration().upgrade(conn)
-    assert conn.execute("SELECT allowed_domains FROM acme_eab_credentials WHERE kid = 'c'").fetchone() == (None,)
-
-
-def test_migration_069_sqlalchemy_path_backfills_existing_rows():
-    # Same code path as PostgreSQL, through a SQLAlchemy connection.
-    engine = create_engine('sqlite:///:memory:')
-    with engine.begin() as conn:
-        conn.execute(text(_LEGACY_TABLE.format(pk='INTEGER PRIMARY KEY')))
-        conn.execute(text("INSERT INTO acme_eab_credentials (kid, hmac_key_b64) VALUES ('a', 'x')"))
-        _migration().upgrade(conn)
-        conn.execute(text("INSERT INTO acme_eab_credentials (kid, hmac_key_b64) VALUES ('c', 'z')"))
-        _migration().upgrade(conn)
-        rows = conn.execute(text("SELECT kid, allowed_domains FROM acme_eab_credentials ORDER BY id")).fetchall()
-    assert [tuple(r) for r in rows] == [('a', '["*"]'), ('c', None)]
-
-
-def test_migration_069_sqlite_without_table_is_a_noop():
-    conn = sqlite3.connect(':memory:')
-    _migration().upgrade(conn)
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_migration_069_postgres_backfills_existing_rows():
-    schema = f"migtest_069_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    engine = create_engine(PG_URL)
-    conn = engine.connect()
-    try:
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.execute(text(f"CREATE SCHEMA {schema}"))
-        conn.execute(text(f"SET search_path TO {schema}"))
-        conn.execute(text(_LEGACY_TABLE.format(pk='SERIAL PRIMARY KEY')))
-        conn.execute(text("INSERT INTO acme_eab_credentials (kid, hmac_key_b64) VALUES ('a', 'x'), ('b', 'y')"))
-        _migration().upgrade(conn)
-        rows = conn.execute(text("SELECT allowed_domains FROM acme_eab_credentials ORDER BY id")).fetchall()
-        assert [r[0] for r in rows] == ['["*"]', '["*"]']
-        conn.execute(text("INSERT INTO acme_eab_credentials (kid, hmac_key_b64) VALUES ('c', 'z')"))
-        _migration().upgrade(conn)
-        row = conn.execute(text("SELECT allowed_domains FROM acme_eab_credentials WHERE kid = 'c'")).fetchone()
-        assert row[0] is None
-    finally:
-        conn.rollback()
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.commit()
-        conn.close()
-        engine.dispose()

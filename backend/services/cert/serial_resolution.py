@@ -1,6 +1,6 @@
 """The integer serial a stored record actually carries.
 
-Since migration 144, ``Certificate.serial_number`` and ``RevokedSerial.serial_number``
+Since the upgrade step 144, ``Certificate.serial_number`` and ``RevokedSerial.serial_number``
 hold the decimal string (``utils/serial_format.canonical_serial``); rows that
 migration left pending, ``CA.serial_number`` and older archives may still hold
 what the historical writers stored:

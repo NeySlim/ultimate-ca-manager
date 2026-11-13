@@ -1,4 +1,4 @@
-"""Migration 148: the certificates an ACME order's renewals moved off, named by fingerprint.
+"""Upgrade step 148: the certificates an ACME order's renewals moved off, named by fingerprint.
 
 Entries of ``acme_client_orders.replaced_certificates`` written before it name a row by
 number, which a restore on another installation changes; each gets the SHA-256

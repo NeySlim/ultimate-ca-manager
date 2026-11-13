@@ -1,10 +1,10 @@
-"""Migration 142: one certificate per (issuing CA, serial number); proxy challenge links.
+"""Upgrade step 142: one certificate per (issuing CA, serial number); proxy challenge links.
 
 RFC 5280 §4.1.2.2: a CA never issues two certificates with the same serial.
 Existing duplicates are listed, never deleted: the index is created only on a
 clean table; otherwise the pairs are logged and kept under the SystemConfig key
-``serial_unique_index_pending``. Once they are resolved, deleting this migration's
-row from ``_migrations`` makes the next start run it again.
+``serial_unique_index_pending``. Once they are resolved, deleting the row of migration
+300 from ``_migrations`` makes the next start run the upgrade again.
 
 ``acme_proxy_challenge_links`` records which proxy order a challenge belongs to, so
 any worker or node answers the challenge POST that another one's authz fetch prepared.
@@ -28,7 +28,7 @@ CREATE_INDEX = (f"CREATE UNIQUE INDEX IF NOT EXISTS {INDEX} ON {TABLE} (caref, s
 CLEAR_PENDING = f"DELETE FROM {CONFIG} WHERE key = '{PENDING_KEY}'"
 SET_PENDING = (f"INSERT INTO {CONFIG} (key, value, encrypted, description, updated_at) "
                "VALUES ('" + PENDING_KEY + "', {value}, {false}, "
-               "'Migration 142 pending: the unique serial index per CA waits for duplicate certificates to be resolved', "
+               "'Upgrade step 142 pending: the unique serial index per CA waits for duplicate certificates to be resolved', "
                "CURRENT_TIMESTAMP)")
 
 LINKS = 'acme_proxy_challenge_links'
@@ -65,8 +65,8 @@ def _apply(execute, tables, value_param, false_literal):
     for d in duplicates:
         held = ids.get((d['caref'], d['serial_number']), [])
         d['rows'] = stored_rows(held, dict.fromkeys(held, d['serial_number']))
-        logger.warning("Migration 142: %s", describe_pending(d))
-    logger.warning("Migration 142: unique serial index not created. %s", CLEANUP)
+        logger.warning("Upgrade step 142: %s", describe_pending(d))
+    logger.warning("Upgrade step 142: unique serial index not created. %s", CLEANUP)
     if CONFIG in tables:
         execute(SET_PENDING.format(value=value_param, false=false_literal),
                 json.dumps({'duplicates': duplicates}))

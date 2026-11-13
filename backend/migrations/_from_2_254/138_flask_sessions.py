@@ -1,4 +1,4 @@
-"""Migration 138: the server-side session table of the SQL store.
+"""Upgrade step 138: the server-side session table of the SQL store.
 
 Same shape as the table Flask-Session 0.8 creates itself (``flask_sessions``).
 SQLite: nothing is done, sessions stay in files. Existing PostgreSQL: table and

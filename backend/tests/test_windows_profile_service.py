@@ -45,7 +45,7 @@ def _envelope(username=USER, password=PASSWORD):
 
 def _migrate_app_db(keytab=b''):
     """Migration 155 on the application's own database, as a 2.x upgrade runs it."""
-    migration = importlib.import_module('migrations.155_windows_enrollment_profiles')
+    migration = importlib.import_module('migrations._from_2_254.155_windows_enrollment_profiles')
     db.session.commit()
     if db.engine.dialect.name == 'sqlite':
         raw = db.engine.raw_connection()

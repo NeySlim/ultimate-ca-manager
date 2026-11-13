@@ -12,7 +12,7 @@ from utils.datetime_utils import utc_now, utc_isoformat
 class Certificate(db.Model):
     """Certificate model"""
     __tablename__ = "certificates"
-    # RFC 5280 §4.1.2.2: one serial per issuing CA (migration 142 on existing installations)
+    # RFC 5280 §4.1.2.2: one serial per issuing CA (upgrade step 142 on an upgraded 2.254 database)
     __table_args__ = (
         db.Index('uix_certificates_ca_serial', 'caref', 'serial_number', unique=True,
                  sqlite_where=text("caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''"),

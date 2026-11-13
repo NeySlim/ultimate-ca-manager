@@ -1,4 +1,4 @@
-"""Migration 153: data-encryption keys (DEK) wrapped by the key-encryption key (KEK).
+"""Upgrade step 153: data-encryption keys (DEK) wrapped by the key-encryption key (KEK).
 
 One row per DEK version: state 'active' (encrypts; after a disable, decrypts only until
 retire_after), 'previous' (decrypts only: rewritten

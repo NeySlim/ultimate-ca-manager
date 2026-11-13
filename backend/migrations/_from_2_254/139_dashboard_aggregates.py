@@ -1,4 +1,4 @@
-"""Migration 139: columns and indexes for the dashboard aggregates.
+"""Upgrade step 139: columns and indexes for the dashboard aggregates.
 
 ``certificates.key_bits`` and ``certificates.sig_hash`` hold the key size and
 the signature hash, filled from ``crt`` here once and on every write after, so

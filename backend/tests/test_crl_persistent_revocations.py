@@ -720,7 +720,7 @@ class TestAutoDeleteEndToEnd:
 def _migrate_rows_of(ca):
     """Migration 144's conversion, run on this CA's rows only (the session database is shared)."""
     import importlib
-    migration = importlib.import_module('migrations.144_canonical_certificate_serials')
+    migration = importlib.import_module('migrations._from_2_254.144_canonical_certificate_serials')
     certs = db.session.execute(text(
         f"SELECT id, caref, serial_number, crt FROM {Certificate.__tablename__} "
         "WHERE caref = :c AND serial_number IS NOT NULL AND serial_number <> ''"), {'c': ca.refid}).fetchall()

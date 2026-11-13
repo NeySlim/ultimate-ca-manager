@@ -1,4 +1,4 @@
-"""Migration 143: HA cluster commands and the last one each node applied.
+"""Upgrade step 143: HA cluster commands and the last one each node applied.
 
 ``cluster_commands`` carries a reload or restart from the node where a setting
 changed to every node (``node_id`` set: that node only); ``cluster_nodes.command_seen``

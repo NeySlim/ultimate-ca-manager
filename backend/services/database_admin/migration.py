@@ -286,7 +286,7 @@ def _check_source_integrity() -> Dict[str, object]:
 
 
 def _check_serial_duplicates() -> None:
-    """Refuse a source whose migration 142 is pending: the target's unique
+    """Refuse a source whose unique serial index is pending: the target's unique
     (caref, serial_number) index would stop the copy halfway."""
     from models import db as _db
     from utils.serial_duplicates import CLEANUP, describe, duplicates_in_database

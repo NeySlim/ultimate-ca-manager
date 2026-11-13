@@ -1,4 +1,4 @@
-"""Migration 158: who confirmed a CA's parent by hand, and when.
+"""Upgrade step 158: who confirmed a CA's parent by hand, and when.
 
 Two nullable columns on certificate_authorities, NULL on every existing row: no link
 was confirmed by hand before this migration.

@@ -1,4 +1,4 @@
-"""Migration 152: files every node writes from the database (Kerberos keytab, HTTPS pair).
+"""Upgrade step 152: files every node writes from the database (Kerberos keytab, HTTPS pair).
 
 ``shared_files`` holds one row per file, its bytes under the master key like a
 certificate's private key. Created on SQLite too: a single node restores them as well.

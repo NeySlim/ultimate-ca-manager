@@ -1,4 +1,4 @@
-"""Migration 157: certificates.subject_key and its index with caref.
+"""Upgrade step 157: certificates.subject_key and its index with caref.
 
 ``subject_key`` is ``utils.dn_match.name_key`` of the certificate's subject, filled from ``crt``
 here once and by the listener on every write after: an issuance under a common name pattern

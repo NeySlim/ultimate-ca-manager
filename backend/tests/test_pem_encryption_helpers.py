@@ -14,8 +14,6 @@ Affected sites (originally only #105 was patched, this test also guards):
   - ``services/acme/acme_proxy_service.py`` (#105)
   - ``services/acme/acme_client_service.py`` (latent: ACME client account key)
   - ``api/v2/acme/accounts.py``              (latent: server-side ACME account key)
-  - ``migrations/029_encrypt_acme_account_keys.py``
-    (latent: would crash on every DB upgrade with encryption enabled)
 """
 from __future__ import annotations
 
@@ -62,42 +60,6 @@ def test_module_uses_text_encryption_for_pem(module_path, must_use, must_not_use
             f"That helper b64-decodes its input and crashes on PEM. "
             f"Use encrypt_text/decrypt_text instead."
         )
-
-
-def test_migration_029_uses_text_encryption():
-    """Migration 029 walks ACME PEM rows — must use the text helpers, otherwise
-    the migration crashes on its own data when encryption is enabled."""
-    import ast
-
-    path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "migrations",
-        "029_encrypt_acme_account_keys.py",
-    )
-    src = open(path).read()
-    tree = ast.parse(src)
-
-    # Collect all imported names from security.encryption
-    imported = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "security.encryption":
-            for alias in node.names:
-                imported.add(alias.asname or alias.name)
-
-    assert "encrypt_text" in imported, (
-        "Migration 029 must import encrypt_text from security.encryption"
-    )
-    assert "decrypt_text" in imported, (
-        "Migration 029 must import decrypt_text from security.encryption"
-    )
-    assert "encrypt_private_key" not in imported, (
-        "Migration 029 must NOT import encrypt_private_key (b64-decodes input, "
-        "crashes on PEM)"
-    )
-    assert "decrypt_private_key" not in imported, (
-        "Migration 029 must NOT import decrypt_private_key (wrong primitive for PEM)"
-    )
 
 
 # ---------------------------------------------------------------------------

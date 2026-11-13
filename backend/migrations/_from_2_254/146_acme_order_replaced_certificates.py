@@ -1,4 +1,4 @@
-"""Migration 146: the certificates an ACME order's renewals moved off, kept with the order.
+"""Upgrade step 146: the certificates an ACME order's renewals moved off, kept with the order.
 
 A renewal that cannot write into the order's row (revoked or on hold) imports a new one; the
 old row must still lead to the CA account that obtained it, to be revoked there later.
