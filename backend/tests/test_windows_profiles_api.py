@@ -254,3 +254,16 @@ def test_a_profile_with_valid_certificates_is_not_deleted_but_can_be_disabled(ap
         Certificate.query.filter_by(windows_profile_id=p['id']).delete()
         db.session.commit()
     assert auth_client.delete(f"{URL}/{p['id']}").status_code == 200
+
+
+def test_deleting_a_profile_releases_its_certificates(app, auth_client):
+    p = _created(auth_client)
+    with app.app_context():
+        c = _cert(p['id'], revoked=True)
+        db.session.add(c)
+        db.session.commit()
+        cid = c.id
+    assert auth_client.delete(f"{URL}/{p['id']}").status_code == 200
+    with app.app_context():
+        assert db.session.get(Certificate, cid).windows_profile_id is None
+

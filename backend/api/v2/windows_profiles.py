@@ -7,7 +7,7 @@ import logging
 from flask import Blueprint, g, request
 
 from auth.unified import require_auth
-from models import CA, ADConnectorConfig, WindowsEnrollmentProfile, WindowsProfileTemplate, db
+from models import CA, ADConnectorConfig, Certificate, WindowsEnrollmentProfile, WindowsProfileTemplate, db
 from services import windows_profiles
 from services.audit_service import AuditService
 from services.ad_connector import lookup
@@ -253,6 +253,9 @@ def delete_windows_profile(profile_id):
     name = profile.name
     # SQLite enforces no key: the template links go with their profile explicitly
     WindowsProfileTemplate.query.filter_by(profile_id=profile.id).delete()
+    # No key either: a dangling id would be inherited by a later profile reusing it
+    Certificate.query.filter_by(windows_profile_id=profile.id).update(
+        {'windows_profile_id': None}, synchronize_session=False)
     db.session.delete(profile)
     ok, err = safe_commit(logger, 'Failed to delete the Windows enrollment profile')
     if not ok:
