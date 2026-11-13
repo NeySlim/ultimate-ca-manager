@@ -949,9 +949,10 @@ def simple_reenroll(label=None):
             # (a revoked one, or one from another CA sharing the names,
             # used to be re-enrolled and even graced its EKUs and names)
             from services.cert.issued_lookup import (
-                OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
+                OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, WINDOWS_PROFILE,
+                protocol_renewal_status,
             )
-            renewed_row, status = issued_certificate_status(ca, client_cert_obj)
+            renewed_row, status = protocol_renewal_status(ca, client_cert_obj)
             # An approved re-enrolment is delivered whatever the presented certificate
             # became (superseded, expired, no longer on record); only a revocation closes it
             delivered = _approved_delivery(ca, csr, 'reenroll', _est_identity(None),
@@ -963,6 +964,12 @@ def simple_reenroll(label=None):
                     'EST reenroll: client certificate refused (%s), serial=%s',
                     status, client_cert_obj.serial_number,
                 )
+                if status == WINDOWS_PROFILE:
+                    from services.windows_profiles import (
+                        PROTOCOL_RENEWAL_REFUSED, audit_protocol_renewal_refusal,
+                    )
+                    audit_protocol_renewal_refusal('EST', renewed_row, 'mtls-client')
+                    return Response(PROTOCOL_RENEWAL_REFUSED, status=403)
                 return Response({
                     REVOKED: 'Client certificate has been revoked',
                     EXPIRED: 'Client certificate has expired',
