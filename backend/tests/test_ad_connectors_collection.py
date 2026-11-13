@@ -407,3 +407,35 @@ def test_the_legacy_save_reads_the_domain_sid_and_reads_it_again_for_a_new_dc_li
     assert put() == DOMAIN_SID
     sids[0] = 'S-1-5-21-1-2-3'
     assert put(servers=['dc1.a.example', 'dc2.a.example']) == 'S-1-5-21-1-2-3'
+
+
+def test_the_legacy_screen_shows_the_connector_the_protocols_use(auth_client, app, monkeypatch):
+    """A default profile naming no connector: the screen shows none, and a save gives it a new one."""
+    from services import windows_profiles
+    from tests.windows_profile_support import default_profile
+    monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
+    with app.app_context():
+        made = default_profile() is None
+        profile = default_profile(create=True)
+        saved, profile.connector_id = profile.connector_id, None
+        db.session.commit()
+        profile_id = profile.id
+        existing = add_connector('default', server='dc.a.example', base_dn='DC=a,DC=example',
+                                 bind_dn='svc', enabled=True).id
+    try:
+        assert auth_client.get('/api/v2/ad-connector').get_json()['data']['id'] is None
+        body = {'servers': ['dc.b.example'], 'base_dn': 'DC=b,DC=example', 'bind_dn': 'svc',
+                'bind_password': 'sekret-pw', 'enabled': True}
+        response = auth_client.put('/api/v2/ad-connector', data=json.dumps(body), content_type='application/json')
+        assert response.status_code == 200, response.data
+        created = response.get_json()['data']['id']
+        with app.app_context():
+            assert created != existing and windows_profiles.default_connector().id == created
+        assert auth_client.get('/api/v2/ad-connector').get_json()['data']['id'] == created
+    finally:
+        with app.app_context():
+            if made:
+                WindowsEnrollmentProfile.query.filter_by(id=profile_id).delete()
+            else:
+                db.session.get(WindowsEnrollmentProfile, profile_id).connector_id = saved
+            db.session.commit()

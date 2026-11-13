@@ -1027,3 +1027,24 @@ def test_the_keytab_column_is_stored_under_the_master_key(app, clean_slate, no_s
         raw = _raw_keytab(_default().id)
         assert raw != plain and is_encrypted(raw)
         assert _default().keytab_bytes() == ARCHIVED_KEYTAB
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_a_restore_of_the_connectors_alone_gives_them_to_a_default_profile_without_one(
+        app, clean_slate, no_shared_keytab, mode):
+    """As a created connector does: the protocols must not be left without the connector the screen shows."""
+    from services import windows_profiles
+    from services.backup_service import BackupService
+    with app.app_context():
+        db.session.add(ADConnectorConfig(name='c02b-restored', server='dc.restored.example',
+                                         base_dn='DC=restored,DC=example'))
+        db.session.commit()
+        include = {name: name == 'ad_connector' for name in manifest.SECTIONS}
+        blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
+        ADConnectorConfig.query.filter_by(name='c02b-restored').delete()
+        db.session.add(WindowsEnrollmentProfile(name='default', is_default=True, realm='RESTORED.EXAMPLE'))
+        db.session.commit()
+    _restore(app, blob, mode=mode)
+    with app.app_context():
+        lowest = windows_profiles.lowest_connector()
+        assert lowest is not None and _default().connector_id == lowest.id

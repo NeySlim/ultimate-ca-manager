@@ -88,3 +88,15 @@ def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Di
     logger.info("Restore: the 2.x Windows enrollment settings became the default profile (realm %s)",
                 profile['realm'])
     return row
+
+
+def link_restored_connectors(backup_data) -> None:
+    """Connectors restored without the profiles: a default profile naming none takes the
+    lowest-id row, as a connector created by the API does, so the protocols and the screen agree."""
+    from services.windows_profiles import default_profile, lowest_connector
+    from ..restore_core import _carries
+    if not _carries(backup_data, 'ad_connector') or _carries(backup_data, PROFILES):
+        return
+    profile, connector = default_profile(), lowest_connector()
+    if profile is not None and profile.connector_id is None and connector is not None:
+        profile.connector_id = connector.id

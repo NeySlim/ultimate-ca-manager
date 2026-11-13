@@ -72,16 +72,22 @@ def _parse_servers(data):
 
 
 def _legacy_connector():
-    """The connector the single-connector routes show: the default profile's, else the
-    lowest-id row. Retired with these routes."""
+    """The connector the single-connector routes show: the one the protocols use. Retired
+    with these routes."""
     from services import windows_profiles
-    return windows_profiles.default_connector() or windows_profiles.lowest_connector()
+    return windows_profiles.default_connector()
+
+
+def _free_name():
+    taken = set(db.session.scalars(db.select(ADConnectorConfig.name)))
+    return next(name for name in ('default', *(f'connector-{n}' for n in range(2, len(taken) + 3)))
+                if name not in taken)
 
 
 def _get_or_create():
     config = _legacy_connector()
     if config is None:
-        config = ADConnectorConfig()
+        config = ADConnectorConfig(name=_free_name())
         db.session.add(config)
     return config
 
