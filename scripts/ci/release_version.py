@@ -46,7 +46,9 @@ def file_version(version):
 
 
 def npm_version(version):
-    """Valid semver: X.Y gets a .0 patch, X.Y.Z is kept."""
+    """Valid semver: X.Y gets a .0 patch, X.Y.Z is kept. A development `-dev` suffix is kept (not a tag form)."""
+    if version.endswith('-dev'):
+        return npm_version(version[:-4]) + '-dev'
     m = parse(version)
     base = f"{m.group('major')}.{m.group('minor')}.{m.group('patch') or 0}"
     return base + (f"-{m.group('rc')}" if m.group('rc') else '')

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Centralized version bump
 # Source of truth: git tag (CI) → VERSION file (dev/runtime)
-# Usage: ./scripts/bump-version.sh 2.1.0-beta5
+# Usage: ./scripts/bump-version.sh 2.254.1-dev   (X.Y, X.Y.Z, -rcN or -dev)
 #
 # In CI (build-release.yml), the tag drives VERSION automatically.
 # This script is for local dev to keep VERSION + package.json in sync.
@@ -19,14 +19,17 @@ fi
 
 VERSION="$1"
 
+# package.json and the lock take the npm form, as the release workflow writes it
+NPM_VERSION="$(python3 "$SCRIPT_DIR/ci/release_version.py" npm "$VERSION")"
+
 # 1. VERSION file at repo root (read by backend at runtime)
 echo "$VERSION" > "$ROOT_DIR/VERSION"
 
 # 2. frontend/package.json (read by vite at build time)
-sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$ROOT_DIR/frontend/package.json"
+sed -i "s/\"version\": \".*\"/\"version\": \"$NPM_VERSION\"/" "$ROOT_DIR/frontend/package.json"
 
 # 2b. frontend/package-lock.json: both occurrences follow package.json
-VERSION="$VERSION" LOCK="$ROOT_DIR/frontend/package-lock.json" node -e "const fs=require('fs'); const f=process.env.LOCK; const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=process.env.VERSION; if (p.packages && p.packages['']) p.packages[''].version=process.env.VERSION; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n');"
+VERSION="$NPM_VERSION" LOCK="$ROOT_DIR/frontend/package-lock.json" node -e "const fs=require('fs'); const f=process.env.LOCK; const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=process.env.VERSION; if (p.packages && p.packages['']) p.packages[''].version=process.env.VERSION; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n');"
 
 # 3. Helm chart appVersion: the image tag the chart deploys by default.
 #    Stable versions only (a -dev/-rc image tag is not published for the chart).

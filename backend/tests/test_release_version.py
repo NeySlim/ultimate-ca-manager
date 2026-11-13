@@ -362,6 +362,7 @@ def _scratch_tree(tmp_path):
     for rel in ('scripts', 'frontend', 'charts/ucm'):
         (root / rel).mkdir(parents=True)
     shutil.copy(ROOT / 'scripts' / 'bump-version.sh', root / 'scripts')
+    (root / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
     shutil.copy(ROOT / 'frontend' / 'package.json', root / 'frontend')
     shutil.copy(ROOT / 'frontend' / 'package-lock.json', root / 'frontend')
     shutil.copy(ROOT / 'charts' / 'ucm' / 'Chart.yaml', root / 'charts' / 'ucm')
@@ -369,16 +370,33 @@ def _scratch_tree(tmp_path):
 
 
 @pytest.mark.skipif(shutil.which('node') is None, reason='node is required')
-@pytest.mark.parametrize('v,chart', [('2.254', True), ('2.254.1', True), ('2.254.1-rc1', False)])
-def test_bump_version_updates_every_file(tmp_path, v, chart):
+@pytest.mark.parametrize('v,npm,chart', [
+    ('2.254', '2.254.0', True), ('2.254.1', '2.254.1', True), ('2.254.2-rc1', '2.254.2-rc1', False),
+    ('2.254.1-dev', '2.254.1-dev', False), ('2.254-dev', '2.254.0-dev', False),
+])
+def test_bump_version_updates_every_file(tmp_path, v, npm, chart):
     root = _scratch_tree(tmp_path)
     r = subprocess.run([BASH, str(root / 'scripts' / 'bump-version.sh'), v], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     lock = json.loads((root / 'frontend' / 'package-lock.json').read_text())
     assert (root / 'VERSION').read_text().strip() == v
-    assert json.loads((root / 'frontend' / 'package.json').read_text())['version'] == v
-    assert lock['version'] == lock['packages']['']['version'] == v
+    assert json.loads((root / 'frontend' / 'package.json').read_text())['version'] == npm
+    assert lock['version'] == lock['packages']['']['version'] == npm
     assert (f'appVersion: "{v}"' in (root / 'charts/ucm/Chart.yaml').read_text()) is chart
+
+
+def test_bump_version_refuses_a_version_the_release_grammar_refuses(tmp_path):
+    root = _scratch_tree(tmp_path)
+    r = subprocess.run([BASH, str(root / 'scripts' / 'bump-version.sh'), '2.254-1'], capture_output=True, text=True)
+    assert r.returncode != 0
+    assert not (root / 'VERSION').exists()
+
+
+def test_npm_form_of_a_dev_version_and_tags_still_refuse_dev():
+    assert _cli('npm', '2.254.1-dev').stdout.strip() == '2.254.1-dev'
+    assert _cli('npm', '2.254-dev').stdout.strip() == '2.254.0-dev'
+    assert _cli('validate', '2.254.1-dev').returncode != 0
+    assert _cli('deb', '2.254.1-dev').returncode != 0
 
 
 def test_wiki_versions_follow_a_three_segment_release(tmp_path):
