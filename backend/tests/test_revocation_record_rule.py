@@ -1043,6 +1043,22 @@ class TestARecordedHoldIsShownAndLifted:
         with app.app_context():
             assert db.session.get(RevokedSerial, record_id).revoke_reason == 'removeFromCRL'
 
+    def test_a_final_record_beside_a_hold_record_is_no_interrupted_lift(self, app, auth_client, issuer, twin):
+        """Every record of the serial must be a hold: one final record under a twin refuses."""
+        from services.cert.issued_lookup import interrupted_lift
+        _, row_id, _ = self._recorded(app, issuer, 'hold-beside-final.example.test')
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', LATER
+            db.session.commit()
+            real = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        _record(app, twin[1], real, reason='keyCompromise', certificate_id=row_id)
+        with app.app_context():
+            assert interrupted_lift(db.session.get(Certificate, row_id)) is False
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 409, r.data
+        assert _row(app, row_id) == (True, 'removeFromCRL', LATER)
+
     def test_a_lift_of_a_row_only_hold_left_half_done_completes(self, app, auth_client, issuer):
         """The hold was on the row alone: stopped mid-lift, no record is left and it still completes."""
         _, refid, ca_cert, ca_key = issuer
