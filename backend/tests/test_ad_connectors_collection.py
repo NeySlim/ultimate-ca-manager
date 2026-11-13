@@ -164,12 +164,23 @@ def test_a_pass_probes_the_never_probed_and_then_the_oldest_verdict_first(app, m
 
 
 # Criterion 3
-def _violations(source):
+_SINGLE_ROW = {'first', 'one', 'one_or_none', 'scalar', 'scalar_one', 'scalar_one_or_none'}
+# The one implicit read allowed: the lowest-id row a 2.x install without a profile has alone
+_ALLOWED = {('services/windows_profiles/__init__.py', 'lowest_connector')}
+
+
+def _violations(source, path=''):
     found = []
-    for node in ast.walk(ast.parse(source)):
+    tree = ast.parse(source)
+    allowed = {id(node) for fn in ast.walk(tree)
+               if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) and (path, fn.name) in _ALLOWED
+               for node in ast.walk(fn)}
+    for node in ast.walk(tree):
+        if id(node) in allowed:
+            continue
         if isinstance(node, ast.Attribute) and node.attr == 'get_singleton':
             found.append(node.lineno)
-        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == 'first'
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _SINGLE_ROW
                 and any(isinstance(n, ast.Name) and n.id == 'ADConnectorConfig' for n in ast.walk(node.func.value))):
             found.append(node.lineno)
     return found
@@ -179,6 +190,11 @@ def test_the_guard_sees_an_implicit_connector_read():
     assert _violations('x = ADConnectorConfig.get_singleton()') == [1]
     assert _violations('x = ADConnectorConfig.query.first()') == [1]
     assert _violations('x = ADConnectorConfig.query.filter_by(a=1).first()') == [1]
+    limited = 'x = db.session.scalars(select(ADConnectorConfig).order_by(ADConnectorConfig.id).limit(1)).one_or_none()'
+    assert _violations(limited) == [1]
+    assert _violations(f'def lowest_connector():\n    {limited}', 'api/v2/other.py') == [2]
+    assert _violations(f'def other():\n    {limited}', 'services/windows_profiles/__init__.py') == [2]
+    assert _violations(f'def lowest_connector():\n    {limited}', 'services/windows_profiles/__init__.py') == []
     assert _violations('x = Other.query.first()\ny = ADConnectorConfig.query.all()') == []
 
 
@@ -189,7 +205,8 @@ def test_no_code_reads_the_connector_without_naming_it():
         relative = path.relative_to(root).parts
         if relative[0] in ('tests', 'data') or any(part.startswith('.') or part == 'node_modules' for part in relative):
             continue
-        offenders += [f'{"/".join(relative)}:{line}' for line in _violations(path.read_text())]
+        name = '/'.join(relative)
+        offenders += [f'{name}:{line}' for line in _violations(path.read_text(), name)]
     assert offenders == []
 
 
