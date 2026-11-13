@@ -27,7 +27,7 @@ from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
 from tests.fixtures.templates import delete_templates
 from services.wstep import wstep_service
-from tests.windows_profile_support import restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored, restore, set_config, snapshot  # noqa: F401
 
 SMARTCARD_LOGON = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.2')
 

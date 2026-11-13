@@ -480,8 +480,11 @@ def drop_new_users(app):
     admin = app.test_client()
     r = admin.post('/api/v2/auth/login', json={'username': 'admin', 'password': 'changeme123'})
     assert r.status_code == 200, r.data
+    import warnings
     for user_id in made:
-        admin.delete(f'/api/v2/users/{user_id}')
+        r = admin.delete(f'/api/v2/users/{user_id}')
+        if r.status_code != 200:
+            warnings.warn(f'drop_new_users could not delete user {user_id}: HTTP {r.status_code}')
 
 
 def sandbox_paths(application, replaced=None):
