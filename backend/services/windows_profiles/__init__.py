@@ -86,14 +86,16 @@ def kerberos_refusal(profile=None):
 
 
 def kerberos_binding_reason():
-    """Why the Kerberos binding authenticates nobody (switch, SPN, keytab), None when it is set up."""
+    """Why the Kerberos binding authenticates nobody (library, switch, SPN, keytab), None when set up."""
     from services.kerberos import negotiate_auth
+    if not negotiate_auth.is_library_available():
+        return 'the Kerberos library is not installed'
     return negotiate_auth.not_configured_reason()
 
 
 def kerberos_unserved_reason(profile=None, binding_reason=False):
-    """Why Kerberos reaches no client of *profile*: the binding itself first (switch, SPN,
-    keytab), then the profile (``kerberos_refusal``). None when it is served. A list passes the
+    """Why Kerberos reaches no client of *profile*: the binding itself first (library, switch,
+    SPN, keytab), then the profile (``kerberos_refusal``). None when it is served. A list passes the
     binding's reason it computed once."""
     if binding_reason is False:
         binding_reason = kerberos_binding_reason()

@@ -255,6 +255,7 @@ def test_the_kerberos_refusal_names_the_profile_or_what_the_binding_lacks(app, m
     from services.windows_profiles import kerberos_refusal, kerberos_unserved_reason
     served = WindowsEnrollmentProfile(name='k-off', realm='K.EXAMPLE', enabled=False)
     monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: None)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
     with app.app_context():
         assert kerberos_refusal(served) == 'profile k-off is disabled'
         assert kerberos_unserved_reason(served) == 'profile k-off is disabled'
@@ -264,6 +265,16 @@ def test_the_kerberos_refusal_names_the_profile_or_what_the_binding_lacks(app, m
         assert kerberos_unserved_reason(served) == 'no keytab uploaded'
         # A configured binding is no excuse for a profile that serves nothing
         assert kerberos_refusal(served) is None
+
+
+def test_a_missing_kerberos_library_is_said_before_the_binding_settings(app, monkeypatch):
+    from services.windows_profiles import kerberos_binding_reason
+    monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: False)
+    with app.app_context():
+        assert kerberos_binding_reason() == 'the Kerberos library is not installed'
+        monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+        assert kerberos_binding_reason() == 'no SPN set'
 
 
 def test_a_profile_without_a_realm_is_refused_by_its_own_name(app):
@@ -277,6 +288,7 @@ def test_a_profile_without_a_realm_is_refused_by_its_own_name(app):
 
 def test_the_profile_api_gives_the_reason_the_binding_is_not_configured(auth_client, profiles, monkeypatch):  # noqa: F811
     monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
     for read in (auth_client.get(f'{URL}/{profiles.two}'), auth_client.get(URL)):
         body = read.get_json()['data']
         rows = body if isinstance(body, list) else body.get('items', body)
