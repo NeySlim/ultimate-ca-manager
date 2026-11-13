@@ -31,6 +31,7 @@ import {
 } from '../lib/templateExtensions'
 import { customExtensionsPayload, rowsFromStored, truncateHex } from '../lib/customExtensions'
 import { CustomExtensionsEditor } from '../components/CustomExtensionsEditor'
+import { CN_PATTERN_VARIABLES, cnPatternNonUnique, cnPatternSource } from '../lib/cnPattern'
 const SHOW_SYSTEM_KEY = 'ucm-templates-show-system'
 
 export default function TemplatesPage() {
@@ -489,6 +490,9 @@ export default function TemplatesPage() {
           <CompactField autoIcon="commonName" label={t('templates.commonName')} value={selectedTemplate.dn_template?.CN || '—'} />
           <CompactField autoIcon="email" label={t('common.email')} value={selectedTemplate.dn_template?.emailAddress || '—'} />
           <CompactField autoIcon="default" label={t('templates.adDerivedSubject')} value={selectedTemplate.ad_derived_subject ? t('common.enabled') : t('common.disabled')} />
+          <CompactField autoIcon="commonName" label={t('templates.cnPattern')} value={selectedTemplate.subject_cn_pattern
+            ? `${selectedTemplate.subject_cn_pattern}${selectedTemplate.subject_cn_keep_path ? ` (${t('templates.cnPatternKeepPath')})` : ''}`
+            : '—'} />
           <CompactField autoIcon="default" label={t('templates.enforceSanTypes')} value={selectedTemplate.enforce_san_types ? t('common.enabled') : t('common.disabled')} />
         </CompactGrid>
       </CompactSection>
@@ -802,6 +806,8 @@ function buildInitialState(template) {
       autoenroll_enabled: false,
       allowed_ad_group: '',
       pinned_subject_fields: { O: '', OU: '', C: '', ST: '', L: '' },
+      subject_cn_pattern: '',
+      subject_cn_keep_path: false,
       qc: emptyQcForm(),
       policy_oids: '',
       custom_extensions: []
@@ -834,6 +840,8 @@ function buildInitialState(template) {
       O: pinned.O || '', OU: pinned.OU || '', C: pinned.C || '',
       ST: pinned.ST || '', L: pinned.L || ''
     },
+    subject_cn_pattern: template.subject_cn_pattern || '',
+    subject_cn_keep_path: template.subject_cn_keep_path || false,
     qc: qcFormFromStored(ext.qc_statements),
     policy_oids: Array.isArray(ext.certificate_policies) ? ext.certificate_policies.join('\n') : '',
     custom_extensions: rowsFromStored(template.custom_extensions)
@@ -848,6 +856,50 @@ function StoredExtensionsError({ error }) {
       data-testid="custom-extensions-stored-error">
       <div>{t('customExtensions.storedInvalid')}</div>
       <div className="font-mono mt-1 break-all">{error}</div>
+    </div>
+  )
+}
+
+function CnPatternFields({ formData, set, checkboxCls }) {
+  const { t } = useTranslation()
+  const source = cnPatternSource(formData.template_type, formData.ad_derived_subject)
+  const nonUnique = cnPatternNonUnique(formData.subject_cn_pattern)
+  return (
+    <div className="mt-4" data-testid="cn-pattern">
+      <Input
+        label={t('templates.cnPattern')}
+        value={formData.subject_cn_pattern}
+        onChange={(e) => set('subject_cn_pattern', e.target.value)}
+        placeholder="{hostname}-WiFi"
+        maxLength={255}
+      />
+      {/* Braces go in as values: i18next reads {{x}} in a string as its own variable */}
+      <p className="text-xs text-text-secondary mt-1">
+        {t('templates.cnPatternDescription', { open: '{{', close: '}}' })}
+      </p>
+      {source === 'request' ? (
+        <p className="text-xs text-text-tertiary mt-1" data-testid="cn-pattern-unavailable">{t('templates.cnPatternUnavailable')}</p>
+      ) : (
+        <p className="text-xs text-text-secondary mt-1" data-testid="cn-pattern-variables">
+          {t('templates.cnPatternVariables')}{' '}
+          <span className="font-mono">{CN_PATTERN_VARIABLES[source].map(v => `{${v}}`).join(' ')}</span>
+        </p>
+      )}
+      {nonUnique.length > 0 && (
+        <p className="text-xs text-status-warning mt-1" role="note" data-testid="cn-pattern-non-unique">
+          {t('templates.cnPatternNotUnique', { variables: nonUnique.join(', ') })}
+        </p>
+      )}
+      <label className={`${checkboxCls} mt-2`}>
+        <input
+          type="checkbox"
+          checked={formData.subject_cn_keep_path}
+          onChange={(e) => set('subject_cn_keep_path', e.target.checked)}
+          className="accent-accent-primary"
+        />
+        {t('templates.cnPatternKeepPath')}
+      </label>
+      <p className="text-xs text-text-secondary mt-1">{t('templates.cnPatternKeepPathDescription')}</p>
     </div>
   )
 }
@@ -932,6 +984,8 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
             .map(([k, v]) => [k, v.trim()])
             .filter(([, v]) => v)
         ),
+        subject_cn_pattern: formData.subject_cn_pattern.trim() || null,
+        subject_cn_keep_path: formData.subject_cn_keep_path,
         custom_extensions: customExt.entries
       })
     } finally {
@@ -1025,6 +1079,7 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
           {t('templates.adDerivedSubject')}
         </label>
         <p className="text-xs text-text-secondary mt-1">{t('templates.adDerivedSubjectDescription')}</p>
+        <CnPatternFields formData={formData} set={set} checkboxCls={checkboxCls} />
       </div>
 
       {/* Enrollment */}
