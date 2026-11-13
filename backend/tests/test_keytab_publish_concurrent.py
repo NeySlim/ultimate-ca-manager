@@ -100,12 +100,12 @@ THREE = keytab((f'HTTP/{HOST}@THREE.TEST', 2))
 
 
 @pytest.mark.parametrize('uploaded, expected', [
-    ('two', [('ONE.TEST', 2), ('TWO.TEST', 2)]),
-    ('default', [('ONE.TEST', 3)]),
+    ('two', [('ONE.TEST', 2), ('THREE.TEST', 2), ('TWO.TEST', 2)]),
+    ('default', [('ONE.TEST', 3), ('THREE.TEST', 2)]),
 ], ids=['new realm', 'replaced keytab'])
 def test_a_start_racing_an_upload_keeps_the_upload(app, monkeypatch, tmp_path, uploaded, expected):
-    """A disabled profile leaves the stored file stale, so the start rebuilds it: it must
-    compose after the concurrent upload commits, from the profiles as committed then."""
+    """A stored file the profiles do not compose is rebuilt at start: it must compose after
+    the concurrent upload commits, from the profiles as committed then."""
     from config.settings import Config
     from services.kerberos import negotiate_auth
     monkeypatch.setattr(Config, 'HA_MODE', False)
@@ -118,9 +118,8 @@ def test_a_start_racing_an_upload_keeps_the_upload(app, monkeypatch, tmp_path, u
             db.session.add_all([one, two, three])
             one.set_keytab(ONE_2)
             three.set_keytab(THREE)
-            db.session.flush()
-            windows_profiles.publish_keytab()
-            three.enabled = False
+            # Stale stored file: THREE's keys are missing from it
+            shared_files.store_file(shared_files.KERBEROS_KEYTAB, ONE_2)
             db.session.commit()
             target_id, data = (two.id, TWO) if uploaded == 'two' else (one.id, ONE_3)
             db.session.remove()
