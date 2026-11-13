@@ -62,7 +62,8 @@ def _serve_default_profile(config):
         windows_profiles.fill_realm(profile)
 
 
-def _save(config, creating):
+def _stage(config, creating):
+    """Everything of a save but its commit, which the route does before it audits."""
     config.updated_at = utc_now()
     try:
         refresh_domain_sid(config)
@@ -70,9 +71,6 @@ def _save(config, creating):
             _serve_default_profile(config)
         # A name a concurrent save took is refused here: safe_commit would answer 500
         db.session.flush()
-        ok, err = safe_commit(logger, 'Failed to save the AD connector')
-        if not ok:
-            return err
     except IntegrityError:
         db.session.rollback()
         return error_response('A connector with this name already exists', 409)
@@ -120,8 +118,11 @@ def create_connector():
     if err:
         db.session.rollback()
         return err
-    err = _save(config, True)
+    err = _stage(config, True)
     if err:
+        return err
+    ok, err = safe_commit(logger, 'Failed to save the AD connector')
+    if not ok:
         return err
     _audit('ad_connector_create', config, f'Created AD connector {config.name}')
     return success_response(data=config.to_dict(), message='AD connector created', status=201)
@@ -146,8 +147,11 @@ def update_connector(connector_id):
     if err:
         db.session.rollback()
         return err
-    err = _save(config, False)
+    err = _stage(config, False)
     if err:
+        return err
+    ok, err = safe_commit(logger, 'Failed to save the AD connector')
+    if not ok:
         return err
     _audit('ad_connector_update', config, f'Updated AD connector {config.name}')
     return success_response(data=config.to_dict(), message='AD connector saved')
