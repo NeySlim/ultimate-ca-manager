@@ -29,6 +29,7 @@ from tests.protocol_approval_support import approval_policy, approve, requests_o
 from tests.test_wstep_kerberos_issue import _build_rst, _issued_cert_from_rstr
 from tests.test_wstep_renew_tls import _cmc_renewal, _renewal_csr, _rst
 from tests.windows_profile_support import connectors_kept, default_profile, restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 CEP_KERBEROS = '/ADPolicyProvider_CEP_Kerberos/service.svc'
 CEP_USERNAME = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'

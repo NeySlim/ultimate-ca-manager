@@ -17,6 +17,7 @@ from models.system_config import SystemConfig
 from tests.fixtures.templates import delete_templates, template_ids_named, templates_created_here_removed
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS
 from tests.windows_profile_support import restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
 ISSUE_URL = '/ADCertificateService_CES_UsernamePassword/service.svc'

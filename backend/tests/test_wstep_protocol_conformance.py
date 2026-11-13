@@ -17,6 +17,7 @@ from tests.test_wstep_renew import wstep_renew_config  # noqa: F401
 from tests.test_wstep_renew_tls import _cmc_renewal, _signer_info
 from tests.test_wstep_renew_tls import _issue as _ca_issued, _post as _post_renewal, _renewal_csr
 from tests.test_wstep_renew_tls import _rst as _renewal_rst
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 PKCS7 = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'
 PKCS10 = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10'

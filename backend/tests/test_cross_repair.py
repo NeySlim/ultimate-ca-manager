@@ -12,6 +12,7 @@ from services.ca import cross_certs
 from services.ski_aki_backfill import backfill_ski_aki
 from tests.fixtures.cross_pki import build_cross_pki, key_pem, openssl_verify, pem
 from utils.key_codec import store_pem_bytes
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
 

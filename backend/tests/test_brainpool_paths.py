@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
 from models import CA, Certificate, db
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 OPENSSL = shutil.which('openssl')
 CURVES = {'EC-BP256': ec.BrainpoolP256R1, 'EC-BP384': ec.BrainpoolP384R1, 'EC-BP512': ec.BrainpoolP512R1}

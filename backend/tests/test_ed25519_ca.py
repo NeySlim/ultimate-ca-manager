@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 
 from models import CA, Certificate, db
 from tests.fixtures.templates import templates_created_here_removed
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
 @pytest.fixture(autouse=True, scope='module')

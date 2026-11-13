@@ -33,6 +33,7 @@ from services.wstep.rst_parser import _PKIData, _TaggedRequest, _unwrap_pkcs7_cs
 from tests.pqc_fixtures import fixture_bytes
 from tests.windows_profile_support import default_profile
 from tests.test_wstep_renew import RENEW_URL, _build_signed_rst, wstep_renew_config  # noqa: F401
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 PKIDATA_OID = '1.3.6.1.5.5.7.12.2'
 PKCS7_VALUE_TYPE = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'

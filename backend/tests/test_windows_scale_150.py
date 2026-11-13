@@ -17,6 +17,7 @@ from tests.test_windows_profile_routing import (CEP_KERBEROS, _issue, _policy, _
                                                 world)
 from tests.test_keytab_composed import profiles  # noqa: F401
 from tests.windows_profile_support import connectors_kept
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 TOTAL = 150

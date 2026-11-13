@@ -18,6 +18,7 @@ from tests.test_wstep_issue import (  # noqa: F401
     ISSUE_URL, _basic_auth, _build_rst, _issued_cert_from_rstr, _make_csr, wstep_config,
 )
 from tests.test_wstep_renew_tls import _cmc_renewal, _issue, _post, _renewal_csr, _rst
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 QUERY_TOKEN_STATUS = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment/QueryTokenStatus'
 

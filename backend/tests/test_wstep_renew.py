@@ -15,6 +15,7 @@ from models.system_config import SystemConfig
 from services.ca_service import CAService
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSU_NS
 from tests.windows_profile_support import restore, set_config, snapshot
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
 RENEW_URL = '/ADCertificateService_CES_Certificate/service.svc'

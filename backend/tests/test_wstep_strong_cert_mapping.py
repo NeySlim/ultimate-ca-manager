@@ -26,6 +26,7 @@ from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID
 from services.wstep import wstep_service
 from tests.fixtures.templates import delete_templates
 from tests.windows_profile_support import connectors_kept, default_profile, default_realm
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 
 # The CAs and certificates this file issues are removed after it
