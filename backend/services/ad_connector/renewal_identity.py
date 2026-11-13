@@ -22,13 +22,14 @@ class RenewalIdentityUnresolved(ValueError):
     A ValueError so an approval shows the approver this message, the request left pending."""
 
 
-def renewal_requester_sid(renewed_cert, ca_cert, protocol, connectors_for=None):
+def renewal_requester_sid(renewed_cert, ca_cert, protocol, connectors_for=None, found=None):
     """The SID ``renewed_cert``'s extension carries, None without a readable one or
     when ``ca_cert`` did not sign it (an import sets the issuer without checking).
 
     The enabled connectors serving the SID's domain must still find that account, as
     issuance refuses an unresolved requester; a domain none serves carries the SID over (A9).
     ``connectors_for(sid)``: the connectors to ask in their place (WSTEP: its profile's).
+    ``found``: a dict that receives the ``connector`` and the ``account`` that answered.
     """
     from services.ad_connector import lookup
     from services.trust_store.csr_operations_mixin import ad_security_extension_sid
@@ -51,6 +52,8 @@ def renewal_requester_sid(renewed_cert, ca_cert, protocol, connectors_for=None):
     for connector in connectors:
         account = lookup.lookup_account_by_sid(connector, sid)
         if account:
+            if found is not None:
+                found.update(connector=connector, account=account)
             return sid
         if account is lookup.UNREACHABLE and unreachable is None:
             unreachable = connector

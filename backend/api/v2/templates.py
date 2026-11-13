@@ -113,7 +113,20 @@ def _coerce_json_object_fields(tpl_data):
 
 
 # bool("false") is True: a switch sent as text would silently turn on
-_BOOLEAN_FIELDS = ('is_active', 'enforce_san_types', 'ad_derived_subject', 'autoenroll_enabled')
+_BOOLEAN_FIELDS = ('is_active', 'enforce_san_types', 'ad_derived_subject', 'autoenroll_enabled',
+                   'subject_cn_keep_path')
+
+
+def _cn_pattern_error(data, template=None):
+    """Why the common name pattern of ``template`` once ``data`` is applied cannot be saved,
+    else None: judged on the resulting type and subject source, whichever field changes."""
+    from services.wstep import cn_pattern
+
+    def effective(key, default):
+        return data[key] if key in data else (getattr(template, key) if template is not None else default)
+    return cn_pattern.template_error(effective('template_type', 'custom'),
+                                     effective('ad_derived_subject', False),
+                                     effective('subject_cn_pattern', None))
 
 
 def _validate_template_payload(data, *, partial=False):
@@ -129,6 +142,11 @@ def _validate_template_payload(data, *, partial=False):
         if err:
             return False, err
         data['pinned_subject_fields'] = cleaned
+    if 'subject_cn_pattern' in data:
+        pattern = data['subject_cn_pattern']
+        if pattern is not None and not isinstance(pattern, str):
+            return False, 'subject_cn_pattern must be text'
+        data['subject_cn_pattern'] = (pattern or '').strip() or None
     if 'custom_extensions' in data:
         cleaned, err = validate_custom_extensions(data['custom_extensions'])
         if err:
@@ -299,6 +317,9 @@ def create_template():
     ok, err = _validate_template_payload(data)
     if not ok:
         return error_response(err, 400)
+    err = _cn_pattern_error(data)
+    if err:
+        return error_response(err, 400)
     
     # Prepare extensions template
     extensions = data.get('extensions_template', {})
@@ -352,6 +373,8 @@ def create_template():
         autoenroll_enabled=bool(data.get('autoenroll_enabled', False)),
         allowed_ad_group=(data.get('allowed_ad_group') or '').strip()[:255] or None,
         pinned_subject_fields=json.dumps(data.get('pinned_subject_fields') or {}),
+        subject_cn_pattern=data.get('subject_cn_pattern'),
+        subject_cn_keep_path=data.get('subject_cn_keep_path', False),
         custom_extensions=_stored_custom_extensions(data.get('custom_extensions')),
         created_by=g.current_user.username
     )
@@ -445,6 +468,9 @@ def update_template(template_id):
     ok, err = _validate_template_payload(data, partial=True)
     if not ok:
         return error_response(err, 400)
+    err = _cn_pattern_error(data, template)
+    if err:
+        return error_response(err, 400)
 
     # Update fields
     if 'name' in data:
@@ -495,6 +521,12 @@ def update_template(template_id):
 
     if 'pinned_subject_fields' in data:
         template.pinned_subject_fields = json.dumps(data['pinned_subject_fields'] or {})
+
+    if 'subject_cn_pattern' in data:
+        template.subject_cn_pattern = data['subject_cn_pattern']
+
+    if 'subject_cn_keep_path' in data:
+        template.subject_cn_keep_path = data['subject_cn_keep_path']
 
     if 'custom_extensions' in data:
         template.custom_extensions = _stored_custom_extensions(data['custom_extensions'])
@@ -644,6 +676,8 @@ def duplicate_template(template_id):
         autoenroll_enabled=template.autoenroll_enabled,
         allowed_ad_group=template.allowed_ad_group,
         pinned_subject_fields=template.pinned_subject_fields,
+        subject_cn_pattern=template.subject_cn_pattern,
+        subject_cn_keep_path=bool(template.subject_cn_keep_path),
         custom_extensions=template.custom_extensions,
         created_by=g.current_user.username
     )
@@ -693,6 +727,8 @@ def _template_export_dict(template):
             json.loads(template.pinned_subject_fields)
             if template.pinned_subject_fields else {}
         ),
+        'subject_cn_pattern': template.subject_cn_pattern,
+        'subject_cn_keep_path': bool(template.subject_cn_keep_path),
         'custom_extensions': template.custom_extensions_list(),
     }
 
@@ -804,6 +840,10 @@ def import_template():
                 if not update_existing:
                     skipped.append(f"{tpl_data['name']} (already exists)")
                     continue
+                err = _cn_pattern_error(tpl_data, existing)
+                if err:
+                    skipped.append(f"{tpl_data['name']} ({err})")
+                    continue
                 
                 # Update existing
                 existing.description = tpl_data.get('description', existing.description)
@@ -826,10 +866,18 @@ def import_template():
                     existing.allowed_ad_group = (tpl_data['allowed_ad_group'] or '').strip()[:255] or None
                 if 'pinned_subject_fields' in tpl_data:
                     existing.pinned_subject_fields = json.dumps(tpl_data['pinned_subject_fields'] or {})
+                if 'subject_cn_pattern' in tpl_data:
+                    existing.subject_cn_pattern = tpl_data['subject_cn_pattern']
+                if 'subject_cn_keep_path' in tpl_data:
+                    existing.subject_cn_keep_path = tpl_data['subject_cn_keep_path']
                 if 'custom_extensions' in tpl_data:
                     existing.custom_extensions = _stored_custom_extensions(tpl_data['custom_extensions'])
                 updated.append(existing.name)
             else:
+                err = _cn_pattern_error(tpl_data)
+                if err:
+                    skipped.append(f"{tpl_data['name']} ({err})")
+                    continue
                 # Create new — _validate_template_payload already enforced enums + bounds.
                 # Default template_type=custom (was 'server', not in valid set).
                 template = CertificateTemplate(
@@ -850,6 +898,8 @@ def import_template():
                     autoenroll_enabled=bool(tpl_data.get('autoenroll_enabled', False)),
                     allowed_ad_group=(tpl_data.get('allowed_ad_group') or '').strip()[:255] or None,
                     pinned_subject_fields=json.dumps(tpl_data.get('pinned_subject_fields') or {}),
+                    subject_cn_pattern=tpl_data.get('subject_cn_pattern'),
+                    subject_cn_keep_path=tpl_data.get('subject_cn_keep_path', False),
                     custom_extensions=_stored_custom_extensions(tpl_data.get('custom_extensions')),
                 )
                 db.session.add(template)

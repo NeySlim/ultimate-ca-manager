@@ -467,6 +467,19 @@ def lookup_computer_dns_hostname(config, sam_account_name):
     is not found or the attribute is empty/missing, and the falsy ``UNREACHABLE``
     when no DC binds or the search fails. Never raises.
     """
+    identity = lookup_computer_identity(config, sam_account_name)
+    return identity['dns_hostname'] if identity else identity
+
+
+def lookup_computer_identity(config, sam_account_name):
+    """``{'dns_hostname', 'sam_account_name', 'dn_components'}`` of the AD computer object, from
+    one search; ``dn_components`` (leaf to root, as ``lookup_user_ad_identity``'s) is None when
+    the DN does not parse.
+
+    Same answers as ``lookup_computer_dns_hostname`` otherwise: ``None`` when the connector is off,
+    the entry is not found or has no ``dNSHostName``, the falsy ``UNREACHABLE`` when the directory
+    cannot answer. Never raises.
+    """
     from ldap3.utils.conv import escape_filter_chars
 
     config, fault = _enabled_config(config)
@@ -482,14 +495,16 @@ def lookup_computer_dns_hostname(config, sam_account_name):
     try:
         safe_sam = escape_filter_chars(sam_account_name)
         entries = _search(conn, config.base_dn, f'(&(objectClass=computer)(sAMAccountName={safe_sam}))',
-                          ['dNSHostName'])
+                          ['dNSHostName', 'sAMAccountName'])
         entry = _single_entry(entries, sam_account_name)
         # Compared by identity: None and UNREACHABLE are the only non-entry answers
         if entry is None or entry is UNREACHABLE:
             return entry
         if 'dNSHostName' not in entry or not entry.dNSHostName.value:
             return None
-        return str(entry.dNSHostName.value)
+        return {'dns_hostname': str(entry.dNSHostName.value),
+                'sam_account_name': _text_attribute(entry, 'sAMAccountName'),
+                'dn_components': _dn_components(getattr(entry, 'entry_dn', None))}
     except Exception as e:
         logger.warning("AD Connector: computer lookup failed: %s", e)
         return UNREACHABLE
@@ -498,6 +513,23 @@ def lookup_computer_dns_hostname(config, sam_account_name):
             conn.unbind()
         except Exception:
             pass
+
+
+def _dn_components(dn):
+    """``[(attr, value), ...]`` of ``dn`` leaf to root, None when it is empty or does not parse."""
+    from ldap3.utils.dn import parse_dn
+    try:
+        return [(attr, value) for attr, value, _sep in parse_dn(dn)] or None if dn else None
+    except Exception:
+        return None
+
+
+def _text_attribute(entry, name):
+    """The single text value of ``name`` on ``entry``, None when absent or empty."""
+    if name not in entry:
+        return None
+    value = getattr(entry, name).value
+    return str(value) if value else None
 
 
 def _sid_bytes_to_string(raw):
@@ -662,7 +694,8 @@ def lookup_user_ad_identity(config, sam_account_name):
     ``is_machine_principal``).
 
     Returns ``{'dn_components': [(attr, value), ...], 'upn': str, 'mail':
-    str | None}`` -- the DN components ordered exactly as AD returns them
+    str | None, 'sam_account_name', 'display_name', 'given_name', 'surname'}`` (the last four
+    None when unset) -- the DN components ordered exactly as AD returns them
     (leaf to root, e.g. ``[('CN', 'Roy Hagland'), ('CN', 'Users'), ('DC',
     'hagland'), ('DC', 'domain')]``), confirmed against a real ADCS-issued
     User certificate's subject in the lab. ``None`` when the connector is not
@@ -694,7 +727,7 @@ def lookup_user_ad_identity(config, sam_account_name):
         safe_sam = escape_filter_chars(sam_account_name)
         entries = _search(conn, config.base_dn,
                           f'(&(objectCategory=person)(objectClass=user)(sAMAccountName={safe_sam}))',
-                          ['userPrincipalName', 'mail'])
+                          ['userPrincipalName', 'mail', 'sAMAccountName', 'displayName', 'givenName', 'sn'])
         entry = _single_entry(entries, sam_account_name)
         # Compared by identity: None and UNREACHABLE are the only non-entry answers
         if entry is None or entry is UNREACHABLE:
@@ -706,7 +739,12 @@ def lookup_user_ad_identity(config, sam_account_name):
         dn_components = [(attr, value) for attr, value, _sep in parse_dn(entry.entry_dn)]
         if not dn_components:
             return None
-        return {'dn_components': dn_components, 'upn': upn, 'mail': mail}
+        # The other attributes feed a template's common name pattern only, from the same search
+        return {'dn_components': dn_components, 'upn': upn, 'mail': mail,
+                'sam_account_name': _text_attribute(entry, 'sAMAccountName'),
+                'display_name': _text_attribute(entry, 'displayName'),
+                'given_name': _text_attribute(entry, 'givenName'),
+                'surname': _text_attribute(entry, 'sn')}
     except Exception as e:
         logger.warning("AD Connector: user identity lookup failed: %s", e)
         return UNREACHABLE

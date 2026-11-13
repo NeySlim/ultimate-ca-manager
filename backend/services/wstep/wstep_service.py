@@ -919,7 +919,7 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
     MUST ignore the request's subject) takes it from AD, never from the CSR, and
     only for its kind of principal. A naked CSR, or one matching no template, is
     built from AD too: only a matched template announcing a client-supplied
-    subject keeps the request's."""
+    subject keeps the request's. A template's common name pattern replaces the CN alone."""
     from services.ad_connector import lookup
 
     is_machine = lookup.is_machine_principal(principal)
@@ -934,17 +934,30 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
     if not (naked or built_by_ca):
         return None, None, None
 
+    patterned = template if _cn_pattern_applies(template) else None
     subject, san, reached = None, None, True
     unresolved = 'could not resolve the requester'
     if sam_account_name and is_machine:
-        dns_hostname = lookup.lookup_computer_dns_hostname(connector, sam_account_name)
+        if patterned is not None:
+            computer = lookup.lookup_computer_identity(connector, sam_account_name)
+            dns_hostname = computer['dns_hostname'] if computer else computer
+        else:
+            dns_hostname = lookup.lookup_computer_dns_hostname(connector, sam_account_name)
         reached = dns_hostname is not lookup.UNREACHABLE
         if dns_hostname:
             subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, dns_hostname)])
             # MS-WCCE: the dNSHostName is the DNS SAN; a CSR without SAN gets it from the CN
             san = [x509.DNSName(dns_hostname)] if _san_values(csr) is not None else None
+            if patterned is not None:
+                subject, refusal = _machine_pattern_subject(patterned, computer, profile=profile)
+                if refusal:
+                    return None, None, refusal
+                # The CN no longer names the host: the SAN it implied is given as such
+                san = san if san is not None else _cn_implied_dns_san(patterned, csr, dns_hostname)
     elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca, profile=profile)):
-        subject, san = _user_directory_subject(connector, sam_account_name)
+        subject, san = _user_directory_subject(connector, sam_account_name, patterned, profile=profile)
+        if isinstance(subject, _PatternRefusal):
+            return None, None, str(subject)
         if subject is lookup.UNREACHABLE:
             reached, subject = False, None
         elif subject is lookup.NO_UPN:
@@ -967,10 +980,74 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
 _UNUSABLE_DN = object()
 
 
-def _user_directory_subject(connector, sam_account_name):
+class _PatternRefusal(str):
+    """The requester's directory object cannot fill the template's common name pattern."""
+
+
+def _cn_pattern_applies(template):
+    """Whether ``template`` carries a common name pattern for a subject the CA builds."""
+    return (template is not None and bool(getattr(template, 'subject_cn_pattern', None))
+            and _subject_source(template) in ('machine', 'directory'))
+
+
+def _pattern_subject(template, values, dn_components, email=None):
+    """``(x509.Name, None)`` built from ``template``'s pattern, or ``(None, refusal)``.
+
+    The rendered value is one CN attribute, never parsed as a DN; with
+    ``subject_cn_keep_path`` the object's DN follows, its own leaf RDN replaced."""
+    from services.wstep import cn_pattern
+    name, why = cn_pattern.render(template.subject_cn_pattern, values)
+    if why:
+        return None, _PatternRefusal(f"Template '{template.name}' cannot build its common name: {why}")
+    if not template.subject_cn_keep_path:
+        return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)]), None
+    subject = (_x509_name_from_dn_components([('CN', name)] + list(dn_components[1:]), email=email)
+               if dn_components else None)
+    if subject is None:
+        return None, _PatternRefusal(f"Template '{template.name}' cannot build its common name: "
+                                     'the directory path of the requester cannot be read')
+    return subject, None
+
+
+def _common_values(dn_components, profile):
+    from services.wstep import cn_pattern
+    return {'domain': cn_pattern.domain_of_dn(dn_components or []), 'realm': getattr(profile, 'realm', None)}
+
+
+def _machine_pattern_subject(template, computer, *, profile):
+    """The patterned subject of a computer from ``lookup_computer_identity``'s answer."""
+    sam = computer.get('sam_account_name') or ''
+    values = dict(_common_values(computer.get('dn_components'), profile),
+                  hostname=sam[:-1] if sam.endswith('$') else sam, fqdn=computer.get('dns_hostname'))
+    return _pattern_subject(template, values, computer.get('dn_components'))
+
+
+def _user_pattern_subject(template, identity, email, *, profile):
+    """The patterned subject of a user from ``lookup_user_ad_identity``'s answer; ``email``
+    is its mail once validated, kept in the subject only with the directory path."""
+    values = dict(_common_values(identity['dn_components'], profile),
+                  username=identity.get('sam_account_name'), upn=identity.get('upn'), mail=email,
+                  displayName=identity.get('display_name'), givenName=identity.get('given_name'),
+                  surname=identity.get('surname'))
+    return _pattern_subject(template, values, identity['dn_components'], email=email)
+
+
+def _cn_implied_dns_san(template, csr, dns_hostname):
+    """The SAN that ``CN=<dns_hostname>`` gives a request without SAN in ``TrustStoreService.sign_csr``
+    (``cn_implied_names``, then the template's SAN types), for a CN that no longer is the host."""
+    from services.template_service import allowed_san_types, san_type_of
+    from utils.request_names import cn_implied_names
+    cert_type, _ku = _template_profile(template, csr)
+    implied = cn_implied_names(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, dns_hostname)]), cert_type)
+    allowed = allowed_san_types(template)
+    return [n for n in implied if allowed is None or san_type_of(n) in allowed]
+
+
+def _user_directory_subject(connector, sam_account_name, patterned=None, *, profile):
     """(subject, SAN) from the AD user object: its DN, its UPN, its mail when valid;
     (``lookup.UNREACHABLE``, None) when the directory could not answer, (``lookup.NO_UPN``, None)
-    when the account has no userPrincipalName."""
+    when the account has no userPrincipalName, (:class:`_PatternRefusal`, None) when the
+    ``patterned`` template's common name cannot be built."""
     from services.ad_connector import lookup
 
     identity = lookup.lookup_user_ad_identity(connector, sam_account_name)
@@ -987,7 +1064,12 @@ def _user_directory_subject(connector, sam_account_name):
         logger.warning("AD Connector: ignoring malformed mail attribute %r for %r",
                        email, sam_account_name)
         email = None
-    subject = _x509_name_from_dn_components(identity['dn_components'], email=email)
+    if patterned is not None:
+        subject, refusal = _user_pattern_subject(patterned, identity, email, profile=profile)
+        if refusal:
+            return refusal, None
+    else:
+        subject = _x509_name_from_dn_components(identity['dn_components'], email=email)
     if subject is None:
         return _UNUSABLE_DN, None
     san = [build_upn_other_name(identity['upn'])]
@@ -1411,6 +1493,36 @@ def _renewable_certificate(ca, cert):
     return db_cert, None
 
 
+def _renewal_pattern_subject(template, found, *, profile):
+    """``(subject, refusal)`` of a renewal under ``template``'s common name pattern, from the
+    account its SID names (``found``, filled by ``renewal_requester_sid``): one more search."""
+    from services.ad_connector import lookup
+    account, connector = found.get('account'), found.get('connector')
+    if not account:
+        return None, (f"Template '{template.name}' builds its common name from the directory, "
+                      'which cannot name the account of the certificate being renewed')
+    machine = account.endswith('$')
+    if (_subject_source(template) == 'machine') != machine:
+        what = 'computers, not users' if not machine else 'users, not computers'
+        return None, f"Template '{template.name}' is issued to {what}"
+    if machine:
+        identity = lookup.lookup_computer_identity(connector, account)
+    else:
+        identity = lookup.lookup_user_ad_identity(connector, account)
+    if identity is lookup.UNREACHABLE:
+        return None, ServerError('The directory that builds the certificate subject could not be reached')
+    if identity is lookup.NO_UPN:
+        return None, ('The certificate subject is built from Active Directory, which found the '
+                      'account but it has no userPrincipalName')
+    if not identity:
+        return None, renewal_identity.NOT_FOUND_MESSAGE
+    if machine:
+        return _machine_pattern_subject(template, identity, profile=profile)
+    email = identity.get('mail')
+    return _user_pattern_subject(template, identity, email if email and is_valid_san_email(email) else None,
+                                 profile=profile)
+
+
 def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=None,
                   on_stored=None, *, profile):
     """Issue the renewal once the caller has authenticated ``signing_cert``, under the
@@ -1439,16 +1551,28 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
         template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert), profile=profile)
 
     # A8: the SID alone is checked again, by the profile's connector only
+    found = {}
     try:
         requester_sid = renewal_identity.renewal_requester_sid(
             signing_cert, x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), 'WSTEP',
-            connectors_for=lambda sid: profile_sid_connectors(profile, sid))
+            connectors_for=lambda sid: profile_sid_connectors(profile, sid), found=found)
     except renewal_identity.RenewalIdentityUnresolved as e:
         return None, ServerError(str(e))
     except renewal_identity.RenewalAccountGone as e:
         return None, str(e)
 
-    err = _pass_gate(gate, csr, matched_template, csr.subject, None, signing_cert=signing_cert)
+    # The pattern in force names the renewed certificate, as on issuance; its SAN stays the request's
+    override_subject = None
+    if _cn_pattern_applies(matched_template):
+        override_subject, refusal = _renewal_pattern_subject(matched_template, found, profile=profile)
+        if refusal:
+            return None, refusal
+        override_subject = _merge_pinned_subject_fields(
+            override_subject, _required_pinned_subject_fields(ca, matched_template, profile=profile))
+
+    err = _pass_gate(gate, csr, matched_template,
+                     override_subject if override_subject is not None else csr.subject, None,
+                     signing_cert=signing_cert)
     if err:
         return None, err
 
@@ -1459,6 +1583,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             source=source, renewal_of=signing_cert, require_pop=require_pop,
             supersedes=db_cert,
             ms_certificate_template_oid=template_oid,
+            override_subject=override_subject,
             requester_sid=requester_sid,
             # See issue()'s matching kwarg for why.
             extra_ekus=extra_ekus,

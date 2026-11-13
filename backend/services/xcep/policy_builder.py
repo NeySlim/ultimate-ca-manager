@@ -186,6 +186,8 @@ _GENERAL_MACHINE_TYPE = 0x00000040
 _MACHINE_TEMPLATE_TYPES = {'web_server', 'vpn_server', 'vpn_client', 'ocsp_signing'}
 
 CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT = 0x00000001
+CT_FLAG_SUBJECT_REQUIRE_DNS_AS_CN = 0x10000000
+CT_FLAG_SUBJECT_REQUIRE_DIRECTORY_PATH = 0x80000000
 
 
 def is_machine_template(template):
@@ -197,10 +199,15 @@ def subject_name_flags(template, ad_identity=True):
     Without an AD identity (UsernamePassword binding) the client supplies every subject."""
     if not ad_identity:
         return _SUBJECT_NAME_FLAGS
+    # A common name pattern is neither the dNSHostName, the cn nor the DN (MS-WCCE
+    # 3.2.2.6.2.1.4.5.9): only the SAN flags stay, the CA still ignores the request's subject
+    patterned = bool(getattr(template, 'subject_cn_pattern', None))
     if is_machine_template(template):
-        return _MACHINE_SUBJECT_NAME_FLAGS
+        return _MACHINE_SUBJECT_NAME_FLAGS & ~CT_FLAG_SUBJECT_REQUIRE_DNS_AS_CN if patterned \
+            else _MACHINE_SUBJECT_NAME_FLAGS
     if getattr(template, 'ad_derived_subject', False):
-        return _USER_AD_DERIVED_SUBJECT_NAME_FLAGS
+        return _USER_AD_DERIVED_SUBJECT_NAME_FLAGS & ~CT_FLAG_SUBJECT_REQUIRE_DIRECTORY_PATH if patterned \
+            else _USER_AD_DERIVED_SUBJECT_NAME_FLAGS
     return _SUBJECT_NAME_FLAGS
 
 # Stable namespace for deriving per-CA policy OIDs and policyIDs via uuid5,
