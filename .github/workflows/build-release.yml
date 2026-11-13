@@ -48,15 +48,16 @@ jobs:
             EXPECTED_REF="origin/main"
           fi
 
-          git fetch origin main:refs/remotes/origin/main test:refs/remotes/origin/test
-          EXPECTED_SHA="$(git rev-parse "$EXPECTED_REF")"
+          # Full refs everywhere: a tag named like a branch must never stand for it
+          git fetch origin refs/heads/main:refs/remotes/origin/main refs/heads/test:refs/remotes/origin/test
+          EXPECTED_SHA="$(git rev-parse "refs/remotes/$EXPECTED_REF")"
 
           # A maintenance release (X.Y.Z, RC or stable) may also sit at the tip of its <major>.x branch
           MAINT_BRANCH="${VERSION%%.*}.x"
           MAINT_SHA=""
-          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && git ls-remote --exit-code --heads origin "$MAINT_BRANCH" > /dev/null; then
-            git fetch origin "$MAINT_BRANCH:refs/remotes/origin/$MAINT_BRANCH"
-            MAINT_SHA="$(git rev-parse "origin/$MAINT_BRANCH")"
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && git ls-remote --exit-code origin "refs/heads/$MAINT_BRANCH" > /dev/null; then
+            git fetch origin "refs/heads/$MAINT_BRANCH:refs/remotes/origin/$MAINT_BRANCH"
+            MAINT_SHA="$(git rev-parse "refs/remotes/origin/$MAINT_BRANCH")"
           fi
 
           echo "Version: $VERSION"

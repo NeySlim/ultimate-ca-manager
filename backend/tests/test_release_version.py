@@ -218,8 +218,9 @@ def _tagged_checkout(tmp_path, branches, tag_on):
     (['main', 'test', '2.x'], '2.x', '2.254.2-rc1', True),
     (['main', 'test', '2.x'], 'main', '2.254.2', True),
     (['main', 'test', '2.x'], '2.x', '2.255', False),
-    (['main', 'test', '2.x'], '2.x', '3.0.1', False),
-    (['main', 'test', '3.x'], '3.x', '3.0.1', True),
+    (['main', 'test', '2.x'], '2.x', '1.0.1', False),
+    (['main', 'test', '1.x'], '1.x', '1.0.1', True),
+    (['main', 'test', 'backport/2.x'], 'main', '2.254.1', True),
     (['main', 'test', '2.x'], 'nowhere', '2.254.2', False),
     (['main', 'test'], 'nowhere', '2.254.2', False),
 ])
@@ -230,14 +231,26 @@ def test_a_tag_sits_on_its_release_branch_or_its_maintenance_branch(tmp_path, br
     assert (result.returncode == 0) is accepted, result.stdout + result.stderr
 
 
+@pytest.mark.parametrize('name,version', [('2.x', '2.254.2'), ('main', '2.254.2'), ('main', '2.255'), ('test', '2.254.2-rc1')])
+def test_a_tag_named_like_a_release_branch_opens_nothing(tmp_path, name, version):
+    """A tag `2.x` or `main` pushed on any commit is not the branch of that name."""
+    work = _tagged_checkout(tmp_path, ['main', 'test', '2.x'], 'nowhere')
+    subprocess.run(['git', 'tag', name], cwd=work, check=True)
+    subprocess.run(['git', 'push', '-q', 'origin', f'refs/tags/{name}'], cwd=work, check=True)
+    step = _step('build-release.yml', 'validate-tag', 'Ensure tag points to the correct release branch')
+    result = _run_step(step, work, {'GITHUB_REF': f'refs/tags/v{version}'})
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert 'Refusing to build release from an unexpected commit' in result.stdout
+
+
 # ---- 4. latest ---------------------------------------------------------------------------------
 
 @pytest.mark.parametrize('published,tag,expected', [
     (['v2.253', 'v2.254'], '2.254.1', 'true'),
-    (['v2.254', 'v3.0'], '2.254.2', 'false'),
+    (['v2.254', 'v9.0'], '2.254.2', 'false'),
     (['v2.254', 'v2.254.1-rc1'], '2.254.1-rc1', 'false'),
-    (['v3.0'], '3.1', 'true'),
-    (['v2.254', 'v2.254.1', 'v2.254.2-rc1', 'v3.0-rc1'], '2.254.1', 'true'),
+    (['v9.0'], '9.1', 'true'),
+    (['v2.254', 'v2.254.1', 'v2.254.2-rc1', 'v9.0-rc1'], '2.254.1', 'true'),
     (['v2.254.1'], '2.254', 'false'),
     (['v2.254', 'v2.254.1'], '2.254.1', 'true'),
     (['v2.9', 'v2.10'], '2.9', 'false'),
@@ -265,7 +278,7 @@ def _origin_with_tags(tmp_path, tags):
 @pytest.mark.parametrize('job', ['docker-manifest', 'docker-fips-manifest', 'release'])
 @pytest.mark.parametrize('tags,version,expected', [
     (['v2.253', 'v2.254', 'v2.254.1'], '2.254.1', 'true'),
-    (['v2.254', 'v3.0', 'v2.254.2'], '2.254.2', 'false'),
+    (['v2.254', 'v9.0', 'v2.254.2'], '2.254.2', 'false'),
     (['v2.254', 'v2.254.1-rc1'], '2.254.1-rc1', 'false'),
 ])
 def test_the_latest_step_reads_the_remote_tags(tmp_path, job, tags, version, expected):
@@ -543,7 +556,7 @@ PUBLISH_CHANGELOG = ('## [2x254x1]\n- Dots are literal.\n\n## [2.254.1] - 2026-1
 
 @pytest.mark.parametrize('tags,version,latest', [
     (['v2.253', 'v2.254', 'v2.254.1'], '2.254.1', 'true'),
-    (['v2.254', 'v2.254.1', 'v3.0'], '2.254.1', 'false'),
+    (['v2.254', 'v2.254.1', 'v9.0'], '2.254.1', 'false'),
 ])
 def test_release_publish_passes_the_latest_rule_and_the_section(tmp_path, tags, version, latest):
     result, log = _publish(tmp_path, tags, version, PUBLISH_CHANGELOG)
