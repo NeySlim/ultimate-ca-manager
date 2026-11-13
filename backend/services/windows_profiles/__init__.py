@@ -106,11 +106,36 @@ def default_for_write(actor=None, fill=True):
     return profile
 
 
+def keytab_holders():
+    """The profiles holding a keytab, enabled or not, by id."""
+    return (WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.keytab.isnot(None))
+            .order_by(WindowsEnrollmentProfile.id).all())
+
+
+def composed_keytab():
+    """The keytab the acceptor reads: the entries of every enabled profile's keytab, None
+    without any. One keytab is served as stored; one whose entries cannot be read is left out
+    of a composition. Raises ValueError when a keytab cannot be decrypted here."""
+    from services.kerberos.keytab_format import compose, read_entries
+    sources = [(p, p.keytab_bytes()) for p in keytab_holders() if p.enabled]
+    sources = [(p, data) for p, data in sources if data]
+    if len(sources) == 1:
+        return sources[0][1]
+    entries = []
+    for profile, data in sources:
+        read = read_entries(data)
+        if read is None:
+            logger.error("Kerberos: the keytab of profile %s cannot be read, its realm is not served",
+                         profile.name)
+            continue
+        entries.extend(read)
+    return compose(entries) if sources else None
+
+
 def publish_keytab(actor='system'):
-    """The node keytab file (shared_files) rebuilt from the profiles, in the caller's transaction."""
+    """The node keytab file (shared_files) recomposed from the profiles, in the caller's transaction."""
     from services import shared_files
-    profile = default_profile()
-    data = profile.keytab_bytes() if profile is not None else None
+    data = composed_keytab()
     if data:
         shared_files.store_file(shared_files.KERBEROS_KEYTAB, data, actor=actor)
     else:

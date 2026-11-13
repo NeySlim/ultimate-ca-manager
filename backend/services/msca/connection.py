@@ -52,8 +52,7 @@ class MicrosoftCAConnectionMixin:
                         "Install with: pip install requests-kerberos"
                     )
 
-                if msca.kerberos_keytab_path:
-                    os.environ['KRB5_KTNAME'] = msca.kerberos_keytab_path
+                # KRB5_KTNAME is the acceptor's keytab: a client never writes it (A12)
                 if msca.kerberos_principal:
                     os.environ['KRB5_CLIENT_KTNAME'] = msca.kerberos_keytab_path or ''
 

@@ -591,7 +591,7 @@ def test_an_uploaded_keytab_names_the_realm_before_a_disabled_connector(
         'valid': True, 'principal': 'HTTP/ucm.example@EXAMPLE.TEST', 'error': None})
     with app.app_context():
         _connector_as({'enabled': False, 'base_dn': 'DC=corp,DC=example'})
-        _set('kerberos_spn', 'HTTP/ucm.example')
+        _set('kerberos_spn', 'HTTP/testhost.example.test')
         db.session.commit()
     r = auth_client.post('/api/v2/kerberos/keytab', data={'file': (io.BytesIO(ONE_REALM), 'k.keytab')},
                          content_type='multipart/form-data')
