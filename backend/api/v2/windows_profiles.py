@@ -597,7 +597,13 @@ def get_windows_settings():
     The WSTEP and Kerberos parts need their own read scope."""
     from services.kerberos import negotiate_auth
     perms = getattr(g, 'permissions', None) or []
-    data = {'xcep_enabled': _flag('xcep_enabled')}
+    default = windows_profiles.default_profile()
+    data = {
+        'xcep_enabled': _flag('xcep_enabled'),
+        # Kerberos is refused until the default profile names a realm (A1): the screen says so
+        'default_profile': ({'id': default.id, 'name': default.name, 'realm': default.realm,
+                             'enabled': bool(default.enabled)} if default is not None else None),
+    }
     if has_permission('read:wstep', perms):
         data['wstep_enabled'] = _flag('wstep_enabled')
     if has_permission('read:kerberos', perms):

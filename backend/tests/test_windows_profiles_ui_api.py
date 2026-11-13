@@ -167,6 +167,11 @@ def test_settings_round_trip_and_the_kerberos_part_needs_its_scope(app, auth_cli
         assert got['xcep_enabled'] is True and got['kerberos_enabled'] is True
         assert got['kerberos_spn'] == f'HTTP/{HOST}@ONE.TEST'
         assert 'keytab_entries' in got and 'library_available' in got
+        default = got['default_profile']
+        with app.app_context():
+            expected = WindowsEnrollmentProfile.query.filter_by(is_default=True).first()
+            assert default == ({'id': expected.id, 'name': expected.name, 'realm': expected.realm,
+                                'enabled': bool(expected.enabled)} if expected else None)
         assert auth_client.patch(f'{URL}/settings', json={'xcep_enabled': 'yes'}).status_code == 400
         assert viewer_client.patch(f'{URL}/settings', json={'kerberos_enabled': False}).status_code in (401, 403)
     finally:

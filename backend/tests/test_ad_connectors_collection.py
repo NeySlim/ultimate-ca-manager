@@ -377,6 +377,8 @@ def test_a_connector_a_profile_uses_cannot_be_deleted(auth_client, app, monkeypa
     try:
         refused = auth_client.delete(f"{URL}/{used['id']}")
         assert refused.status_code == 409
+        # The refusal names the profiles that use the connector
+        assert refused.get_json()['details']['profiles'] == [{'id': profile_id, 'name': 'c02a-profile'}]
         assert auth_client.delete(f"{URL}/{free['id']}").status_code == 204
         assert auth_client.get(f"{URL}/{free['id']}").status_code == 404
     finally:

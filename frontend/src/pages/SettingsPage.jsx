@@ -27,7 +27,7 @@ import { SmartImportModal } from '../components/SmartImport'
 import CertificatePickerModal from '../components/CertificatePickerModal'
 import CertificateInput from '../components/CertificateInput'
 import LanguageSelector from '../components/ui/LanguageSelector'
-import { settingsService, systemService, casService, ssoService, mtlsService, mscaService, adConnectorService } from '../services'
+import { settingsService, systemService, casService, ssoService, mtlsService, mscaService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission } from '../hooks'
@@ -50,7 +50,6 @@ import MscaConnectionForm from './settings/MscaConnectionForm'
 import MscaCaControlModal from '../components/MscaCaControlModal'
 import AdConnectorSection from './settings/AdConnectorSection'
 import XcepWstepSection from './settings/XcepWstepSection'
-import AdConnectorForm from './settings/AdConnectorForm'
 import GeneralSection from './settings/GeneralSection'
 import EmailSection from './settings/EmailSection'
 import SecuritySection from './settings/SecuritySection'
@@ -233,10 +232,6 @@ export default function SettingsPage() {
   const [mscaCaControl, setMscaCaControl] = useState(null)
 
   // Active Directory Connector state
-  const [adConnectorConfig, setAdConnectorConfig] = useState(null)
-  const [adConnectorLoading, setAdConnectorLoading] = useState(false)
-  const [adConnectorTesting, setAdConnectorTesting] = useState(false)
-  const [showAdConnectorModal, setShowAdConnectorModal] = useState(false)
 
   // Encryption states
   const [encryptionStatus, setEncryptionStatus] = useState(null)
@@ -304,7 +299,6 @@ export default function SettingsPage() {
     loadSsoProviders()
     loadWebhooks()
     loadMscaConnections()
-    loadAdConnectorConfig()
     loadEncryptionStatus()
     loadAnomalies()
     loadExpiryAlerts()
@@ -710,63 +704,6 @@ export default function SettingsPage() {
       showError(error.message || t('msca.inventorySyncFailed'))
     } finally {
       setMscaTesting(false)
-    }
-  }
-
-  // Active Directory Connector handlers
-  const loadAdConnectorConfig = async () => {
-    setAdConnectorLoading(true)
-    try {
-      const response = await adConnectorService.get()
-      setAdConnectorConfig(response.data || null)
-    } catch (error) { reportSilentFailure('loadAdConnectorConfig', error) } finally {
-      setAdConnectorLoading(false)
-    }
-  }
-
-  const handleAdConnectorEdit = () => {
-    setShowAdConnectorModal(true)
-  }
-
-  const handleAdConnectorSave = async (formData) => {
-    try {
-      await adConnectorService.save(formData)
-      showSuccess(t('messages.success.update.settings'))
-      setShowAdConnectorModal(false)
-      loadAdConnectorConfig()
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-    }
-  }
-
-  const handleAdConnectorToggle = async () => {
-    if (!adConnectorConfig) return
-    try {
-      await adConnectorService.save({ enabled: !adConnectorConfig.enabled })
-      loadAdConnectorConfig()
-    } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.settings'))
-    }
-  }
-
-  const handleAdConnectorTest = async () => {
-    setAdConnectorTesting(true)
-    try {
-      const response = await adConnectorService.testSaved()
-      const message = response.data?.message || t('adConnector.testSuccess')
-      // A partial pass is not a pass -- the connector works today only
-      // because the reachable DC happens to be up. Same call the dialog's
-      // own Test Connection makes, so it says the same thing.
-      if (response.data?.partial) showWarning(message)
-      else showSuccess(message)
-    } catch (error) {
-      showError(error.message || t('adConnector.testFailed'))
-    } finally {
-      setAdConnectorTesting(false)
-      // test-saved records last_test_at/last_test_result server-side
-      // regardless of outcome -- refresh so the section's status badge
-      // doesn't keep showing whatever the previous test left behind.
-      loadAdConnectorConfig()
     }
   }
 
@@ -1773,19 +1710,9 @@ export default function SettingsPage() {
           />
         )
       case 'adConnector':
-        return (
-          <AdConnectorSection
-            adConnectorConfig={adConnectorConfig}
-            adConnectorLoading={adConnectorLoading}
-            adConnectorTesting={adConnectorTesting}
-            handleAdConnectorEdit={handleAdConnectorEdit}
-            handleAdConnectorToggle={handleAdConnectorToggle}
-            handleAdConnectorTest={handleAdConnectorTest}
-            hasPermission={hasPermission}
-          />
-        )
+        return <AdConnectorSection hasPermission={hasPermission} />
       case 'xcepWstep':
-        return <XcepWstepSection />
+        return <XcepWstepSection hasPermission={hasPermission} />
       case 'about':
         return <AboutSection />
 
@@ -2034,20 +1961,6 @@ export default function SettingsPage() {
         open={!!mscaCaControl}
         onClose={() => setMscaCaControl(null)}
       />
-
-      {/* Active Directory Connector Modal */}
-      <Modal
-        open={showAdConnectorModal}
-        onClose={() => setShowAdConnectorModal(false)}
-        title={t('adConnector.title')}
-        size="lg"
-      >
-        <AdConnectorForm
-          config={adConnectorConfig}
-          onSave={handleAdConnectorSave}
-          onCancel={() => setShowAdConnectorModal(false)}
-        />
-      </Modal>
 
       {/* Enable Encryption Modal */}
       <Modal
