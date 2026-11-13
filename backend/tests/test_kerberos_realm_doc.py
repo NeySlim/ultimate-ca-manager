@@ -31,3 +31,25 @@ def test_guide_documents_cross_realm_refusal():
     # Child domains and trusts were never benched: the guide must say so, not promise a remedy.
     assert 'child domains of a forest have not been tested' in text
     assert 'give it its own service account' not in text
+
+
+def _refusal_row(start):
+    return next(line for line in GUIDE.read_text().splitlines() if line.startswith(start))
+
+
+def test_guide_places_keyed_profile_without_realm_in_the_400_row():
+    row = _refusal_row('| A profile holds the realm')
+    assert "holds the realm's key but has no realm" in row
+    assert 'HTTP 400' in row
+
+
+def test_guide_401_row_means_no_key_for_the_realm():
+    row = _refusal_row('| No profile holds a key')
+    assert 'No profile holds a key for that realm' in row
+    assert 'no audit entry' in row
+
+
+def test_guide_connector_409_says_realm_can_be_cleared():
+    text = GUIDE.read_text()
+    assert 'whose realm can only be moved to another realm of its keytab or cleared' in text
+    assert 'whose realm only its keytab can change' not in text
