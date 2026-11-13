@@ -1521,3 +1521,27 @@ def test_a_lift_committed_after_the_pass_reread_still_wins(app, issuer, monkeypa
         assert issued_lookup.apply_persisted_revocations({row_id}) == []
         db.session.commit()
     assert _row(app, row_id) == (False, None, None)
+
+
+def test_the_pass_marks_a_row_from_its_record_as_locked_not_as_collected(app, issuer, monkeypatch):
+    """A revocation that made the record final between the collection and the lock is what the
+    row is marked with: never the hold read before."""
+    from sqlalchemy import update
+    from services.cert import issued_lookup
+    _, refid, ca_cert, ca_key = issuer
+    real, key = _leaf('record-changed-before-lock.example.test', ca_cert, ca_key, days=200)
+    row_id = _store(app, real, refid, key=key)
+    record_id = _record(app, refid, real, reason='certificateHold', at=EARLY, certificate_id=row_id)
+    lock = issued_lookup._records_still_held
+
+    def made_final_then_locked(records):
+        records = list(records)
+        with db.engine.begin() as other:
+            other.execute(update(RevokedSerial).where(RevokedSerial.id == record_id).values(
+                revoke_reason='keyCompromise', revoked_at=LATER))
+        return lock(records)
+    monkeypatch.setattr(issued_lookup, '_records_still_held', made_final_then_locked)
+    with app.app_context():
+        assert len(issued_lookup.apply_persisted_revocations({row_id})) == 1
+        db.session.commit()
+    assert _row(app, row_id)[:2] == (True, 'keyCompromise')
