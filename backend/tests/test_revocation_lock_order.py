@@ -120,3 +120,49 @@ def test_an_unhold_of_a_pair_takes_its_records_by_id(app, auth_client, issuer):
     assert 'taker' not in outcome and outcome.get('waited'), outcome
     assert r.status_code == 200, r.data
     assert [_row(app, row_id) for row_id in (first, second)] == [(False, None, None)] * 2
+
+
+def test_an_import_mark_during_a_revocation_does_not_deadlock(app, issuer):
+    """An import has written the stored row (its lock held) when it marks it from the record, while
+    a revocation holds that record and waits on the row: the mark must not wait on the record."""
+    from services.cert.issued_lookup import apply_persisted_revocation
+    from services.cert.mixins.lifecycle import LifecycleMixin
+    if not _on_postgresql(app):
+        pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+    _, refid, ca_cert, ca_key = issuer
+    real, key = _leaf('order-import.example.test', ca_cert, ca_key, days=200)
+    row_id = _store(app, real, refid, key=key)
+    _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+    outcome = {}
+    with app.app_context():
+        engine = db.engine
+
+    def revocation():
+        with app.app_context():
+            try:
+                LifecycleMixin.revoke_certificate(row_id, reason='keyCompromise')
+                db.session.commit()
+                outcome['revoke'] = 'ok'
+            except Exception as e:  # noqa: BLE001  (the deadlock victim, if any)
+                db.session.rollback()
+                outcome['revoke'] = repr(e)
+            finally:
+                db.session.remove()
+
+    with app.app_context():
+        row = db.session.get(Certificate, row_id)
+        row.descr = 'imported again'
+        db.session.flush()
+        worker = threading.Thread(target=revocation)
+        worker.start()
+        with engine.connect() as conn:
+            assert _wait_for_a_lock_waiter(conn, 10)
+        try:
+            outcome['mark'] = apply_persisted_revocation(row)
+            db.session.commit()
+        except Exception as e:  # noqa: BLE001
+            db.session.rollback()
+            outcome['mark'] = repr(e)
+        worker.join(30)
+    assert outcome == {'mark': True, 'revoke': 'ok'}, outcome
+    assert _row(app, row_id)[:2] == (True, 'keyCompromise')

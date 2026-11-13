@@ -66,13 +66,17 @@ class TestALiftBetweenTheImportsReadAndItsMark:
             assert not row.revoked
             db.session.rollback()
 
-    def test_a_lift_after_the_reread_still_wins(self, app, issuer, monkeypatch):
-        """SQLite takes its write lock at the mark: the mark itself checks the record."""
+    def test_a_lift_just_before_the_mark_still_wins(self, app, issuer, monkeypatch):
+        """A stored row takes no lock on the record: the mark statement itself checks it."""
+        from services.cert import issued_lookup
         from services.cert.issued_lookup import apply_persisted_revocation
-        if _on_postgresql(app):
-            pytest.skip("PostgreSQL: the re-read's share lock makes such a lift wait")
         _, row_id, record_id = _recorded_hold(app, issuer, 'import-lift-reread.example.test')
-        _lift_after(monkeypatch, '_record_still_held', row_id, record_id)
+        mark = issued_lookup._mark_while_recorded
+
+        def lifted_then_marked(row, record):
+            _lifted(row_id, record_id)
+            return mark(row, record)
+        monkeypatch.setattr(issued_lookup, '_mark_while_recorded', lifted_then_marked)
         with app.app_context():
             assert apply_persisted_revocation(db.session.get(Certificate, row_id)) is False
             db.session.commit()
