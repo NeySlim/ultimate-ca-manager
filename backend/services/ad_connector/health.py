@@ -11,7 +11,9 @@ gets a turn. A WSTEP enrollment would sit there wearing that delay, and
 nothing anywhere would say why.
 
 So the same bind this connector actually uses is run on a schedule instead,
-and the verdict is written to the config row. ``_connect`` then skips a DC
+with a shorter connect timeout (a DC slower than that is noted down, an
+advisory state that only orders the list), and the verdict is written to
+the config row. ``_connect`` then skips a DC
 already known to be down, and an operator learns about it from the log and
 the settings page rather than from a slow enrollment.
 
@@ -277,7 +279,7 @@ def probe(config):
     try:
         for host in servers:
             try:
-                conn = lookup._connect_to(config, host, tls)
+                conn = lookup._connect_to(config, host, tls, PROBE_CONNECT_TIMEOUT_SECONDS)
             except Exception as e:
                 results.append((host, False, str(e)))
                 continue
@@ -310,6 +312,10 @@ def _is_due(config, previous):
 # One pass probes for at most this long; the connectors it did not reach wait for
 # the next one, so unreachable forests cannot hold the scheduler's thread.
 PROBE_BUDGET_SECONDS = 30
+# A probe gives up sooner than a lookup on a DC that drops the connection attempt: with 150
+# one-DC connectors, 15 down, three budgeted passes reach every one (15 * 3 s + 135 * 0.25 s
+# fits in 90 s). A DC that accepts and then stays silent still costs the receive timeout.
+PROBE_CONNECT_TIMEOUT_SECONDS = 3
 
 
 def _probe_one(config):

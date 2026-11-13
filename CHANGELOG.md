@@ -55,6 +55,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Behind a trusted reverse proxy, the pending Kerberos handshakes of XCEP and WSTEP are keyed by the client address instead of the proxy's, so two clients no longer share one. The keytab composed from the Windows profiles is refused above 1 MiB with a readable message.
 - Kerberos: a Kerberos Microsoft CA connection pointed `KRB5_KTNAME` at its own keytab for the whole process, so XCEP and WSTEP could accept with the wrong keys; the acceptor now names its keytab itself. A ticket for a realm without key is logged as a warning instead of an unrelated GSSAPI error.
 - ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.
 - SCEP with Intune: the Entra token and the discovered service endpoint are kept between enrolments (one client per app registration), and a 401 or 403 from Graph or the validation service makes the next request ask for a new token.

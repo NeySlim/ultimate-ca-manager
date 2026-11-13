@@ -35,6 +35,7 @@ from services.kerberos import negotiate_auth
 from services.wstep import CES_CERTIFICATE_PATH, CES_KERBEROS_PATH, CES_USERNAME_PASSWORD_PATH
 from services.wstep.soap_envelope import build_soap_fault, extract_username_token
 from services.xcep.request_parser import GetPoliciesParseError, parse_get_policies
+from utils.trusted_proxy import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +248,7 @@ def get_policies_kerberos():
     if cl is not None and cl > XCEP_MAX_BODY_BYTES:
         return Response('Request body too large', status=413)
 
-    connection_key = request.environ.get('REMOTE_ADDR')
+    connection_key = client_ip()
     result = negotiate_auth.authenticate_negotiate(request.headers.get('Authorization'), connection_key)
     if result.status in ('challenge', 'continue'):
         # 'continue': an intermediate SPNEGO leg (e.g. a request-mic round) --

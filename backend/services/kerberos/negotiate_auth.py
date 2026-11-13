@@ -23,8 +23,8 @@ RFC 4178 anti-downgrade rule kicked in and the acceptor had to respond with
 (client sends a mechListMIC, acceptor confirms) is mandatory in that case,
 not an artifact of any configurable pyspnego option. So this module keeps
 in-progress ``spnego`` contexts across requests, keyed by the client's source
-IP (``REMOTE_ADDR`` -- gunicorn here runs a single worker, so an in-process
-dict is safe). Confirmed against the lab that a real WCF client
+IP (``client_ip()``: the client behind a trusted proxy, else the peer -- gunicorn here runs a single
+worker, so an in-process dict is safe). Confirmed against the lab that a real WCF client
 (``MS-WebServices/1.0``, what GPMC's policy-server "Validate" and GPO
 autoenrollment both use) opens a *new* TCP connection -- a new ``REMOTE_PORT``
 every time -- for each leg of the handshake rather than reusing one, unlike
@@ -481,7 +481,7 @@ def authenticate_negotiate(auth_header, connection_key):
     request's ``Authorization`` value, or ``None``).
 
     ``connection_key`` identifies the client for the purpose of continuing an
-    in-progress ``spnego`` context across legs (``request.environ['REMOTE_ADDR']``
+    in-progress ``spnego`` context across legs (``utils.trusted_proxy.client_ip()``
     -- see the module docstring for why this is keyed on source IP rather than
     the full connection tuple, and why a multi-leg exchange is sometimes
     unavoidable even for Kerberos-only). Result status is one of:
