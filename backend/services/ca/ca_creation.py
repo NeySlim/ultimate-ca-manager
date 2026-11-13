@@ -885,7 +885,8 @@ class CACreationMixin:
                     ca.set_cdp_urls([f"{base_url}/cdp/{ca.url_ref}.crl"])
                     db.session.commit()
             except Exception:
-                pass
+                # The certificate is installed: a CDP that could not be set is not left for the audit to commit
+                db.session.rollback()
 
         AuditService.log_ca(
             'ca_certificate_installed', ca,
