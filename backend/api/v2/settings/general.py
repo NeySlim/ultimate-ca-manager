@@ -26,6 +26,7 @@ from utils.hsts import hsts_env_locked
 from utils import admin_allowlist
 import compliance_profiles
 from utils.public_endpoints import validate_admin_base_url, validate_protocol_base_url
+from api.v2.sso.helpers import MIN_LOGIN_ATTEMPTS, _get_lockout_settings
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 
 logger = logging.getLogger(__name__)
@@ -109,7 +110,7 @@ def get_general_settings():
         'metrics_enabled': bool(get_config('metrics_token', '')),
         'session_timeout': int(get_config('session_timeout', '28800')),
         'session_max_lifetime': int(get_config('session_max_lifetime', '86400')),
-        'max_login_attempts': int(get_config('max_login_attempts', '5')),
+        'max_login_attempts': _get_lockout_settings()[0],
         'lockout_duration': effective('lockout_duration'),
         'protocol_base_url': get_config('protocol_base_url', ''),
         # The port really bound: the environment, when it sets one, wins over the stored value
@@ -216,6 +217,19 @@ def update_general_settings():
         'audit_retention_days',
         'compliance_profile_default',
     ]
+
+    if 'max_login_attempts' in data:
+        raw = data['max_login_attempts']
+        try:
+            # A boolean or a fractional number is not a count of attempts
+            if isinstance(raw, bool) or (isinstance(raw, float) and not raw.is_integer()):
+                raise ValueError(raw)
+            attempts = int(raw)
+        except (TypeError, ValueError):
+            return error_response('max_login_attempts must be an integer', 400)
+        if attempts < MIN_LOGIN_ATTEMPTS:
+            return error_response(f'max_login_attempts must be at least {MIN_LOGIN_ATTEMPTS}', 400)
+        data['max_login_attempts'] = str(attempts)
 
     if 'ocsp_response_validity_hours' in data:
         try:

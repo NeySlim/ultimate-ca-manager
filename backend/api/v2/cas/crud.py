@@ -23,6 +23,7 @@ from utils.validity import coerce_validity_days
 from utils.db_transaction import safe_commit
 import fips_mode
 from fips_mode import FipsRestricted
+from utils.ha import HaRestricted
 from services.ca_service import CAService
 from services.audit_service import AuditService
 from services.smart_import.parser import PasswordNotTried, inspected_key
@@ -723,7 +724,7 @@ def create_ca():
             message='CA created successfully',
             meta=notices_mod.meta_with_notices(notices),
         )
-    except FipsRestricted:
+    except (FipsRestricted, HaRestricted):
         raise
     except ValueError as e:
         # Validation errors (HSM key conflicts, missing fields, etc.) -- surface to user

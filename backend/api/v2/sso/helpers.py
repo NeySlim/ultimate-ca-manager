@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 # Shared lockout helpers (used by auth.py, auth_methods.py, sso/*)
 # ============================================================================
 
+# The settings screen's minimum: under it every login locks at its first failure
+MIN_LOGIN_ATTEMPTS = 3
+
+
 def _get_lockout_settings():
     """Read lockout settings from DB config, fallback to defaults.
     
@@ -29,7 +33,7 @@ def _get_lockout_settings():
     except Exception:
         max_attempts = 5
         lockout_seconds = 900
-    return max_attempts, lockout_seconds
+    return max(max_attempts, MIN_LOGIN_ATTEMPTS), lockout_seconds
 
 def _get_ssl_verify(provider, protocol):
     """Get SSL verification parameter for requests library.
