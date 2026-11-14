@@ -154,7 +154,7 @@ UPGRADE_TEMPLATE_OIDS = (
     'offered by this CA`; the renewal of a certificate carrying such an OID is accepted as before.')
 
 
-def test_an_upgraded_profile_issues_the_oid_2254_announced_and_refuses_the_issuing_ca_one(
+def test_a_profile_holding_the_2254_identity_refuses_the_issuing_ca_oid(
         app, create_ca, template, profiles):
     """The upgrade note, frozen: 2.254 announced the XCEP CA's OIDs; the WSTEP CA's one, which only
     a hand-written request could name, is refused at issuance (renewal: the CA-derived test below)."""
