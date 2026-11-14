@@ -73,9 +73,9 @@ def _dedupe_live_records(records: list) -> list:
 
 class CRLQueryMixin:
     @staticmethod
-    def get_revoked_certificates(ca_id: int) -> list:
-        """Revoked entries the full CRL of this CA carries; the revoked child
-        CAs come from ``_revoked_child_cas``."""
+    def get_revoked_certificates(ca_id: int, delta: bool = False) -> list:
+        """Revoked entries the full CRL (or with ``delta``, the delta CRL) of this CA
+        carries; the revoked child CAs come from ``_revoked_child_cas``."""
         ca = db.session.get(CA, ca_id)
         if not ca:
             raise ValueError(f"CA with id {ca_id} not found")
@@ -93,7 +93,7 @@ class CRLQueryMixin:
         records = RevokedSerial.query.filter(RevokedSerial.caref.in_(refids)).all()
         by_serial = gravest_records_by_serial(records)
         # A held row under a final record of its serial is listed with the graver reason, as OCSP
-        certificates = [answered_revocation(c, ca, by_serial) for c in certificates]
+        certificates = [answered_revocation(c, ca, by_serial, delta=delta) for c in certificates]
         # The certificate record comes first: it carries the invalidity date
         live = _dedupe_live_records(certificates + child_cas)
         # Gravest record of a serial first, as persisted_revocation answers OCSP
