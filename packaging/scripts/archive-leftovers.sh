@@ -201,6 +201,11 @@ if [ -z "$DB_PATH" ]; then
     DB_PATH=$(env_value "$ENV_FILE" DATA_DIR)
     DB_PATH=${DB_PATH:-$DATA}/ucm.db
 fi
+# An install choice, not instance data: the venv was already built from it
+case $(env_value "$ENV_FILE" UCM_FIPS_BUILD | tr '[:upper:]' '[:lower:]') in
+    1|true|yes|on) FIPS_BUILD=1 ;;
+    *) FIPS_BUILD="" ;;
+esac
 # No configuration and no database left: a new host, nothing to ask the runner about
 if [ ! -e "$ENV_FILE" ] && [ ! -e "$DB_PATH" ] && [ ! -L "$DB_PATH" ]; then
     exit 0
@@ -309,5 +314,14 @@ rm -f -- "$JOURNAL"
 
 say "Moved, unchanged, everything it left in $DATA and $CONFIG${DB_RESTORE:+ and $DB_FILE}"
 say "to $DEST (root only; README.txt there says how to restore it)."
+if [ -n "$FIPS_BUILD" ]; then
+    if printf 'UCM_FIPS_BUILD=1\n' > "$ENV_FILE"; then
+        say "UCM_FIPS_BUILD=1, set in the archived ucm.env, is kept in the new $ENV_FILE:"
+        say "this installation stays built against the system OpenSSL."
+    else
+        say "Warning: UCM_FIPS_BUILD=1 could not be written into the new $ENV_FILE: add it, then"
+        say "reinstall this package, to keep the build against the system OpenSSL."
+    fi
+fi
 say "This installation starts empty, with a new configuration."
 exit 0

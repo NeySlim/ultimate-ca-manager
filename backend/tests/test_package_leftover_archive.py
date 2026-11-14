@@ -269,6 +269,27 @@ def test_the_readme_puts_each_file_where_the_packages_write_it(tmp_path):
     assert '-keyout "$UCM_DATA/https_key.pem"' in postinst
 
 
+@pytest.mark.parametrize('line, kept', [('UCM_FIPS_BUILD=1', True), ('export UCM_FIPS_BUILD="yes"', True),
+                                        ('UCM_FIPS_BUILD=True', True), ('UCM_FIPS_BUILD=0', False)])
+def test_a_fips_build_request_is_carried_into_the_new_configuration(tmp_path, line, kept):
+    """The venv was built from the archived ucm.env: the new one keeps that install choice."""
+    box = Box(tmp_path)
+    env = box.config / 'ucm.env'
+    env.write_text(env.read_text() + line + '\n')
+    config = files(box.config)
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert files(box.archive / 'config') == config
+    if kept:
+        assert env.read_text() == 'UCM_FIPS_BUILD=1\n'
+        assert stat.S_IMODE(env.stat().st_mode) == 0o600
+        assert 'UCM_FIPS_BUILD=1' in out.stdout
+        assert SECRET not in out.stdout
+    else:
+        assert list(box.config.iterdir()) == []
+        assert 'UCM_FIPS_BUILD' not in out.stdout
+
+
 def test_a_purged_install_without_configuration_is_archived_too(tmp_path):
     """apt purge removes /etc/ucm and leaves /opt/ucm/data: the default database path applies."""
     box = Box(tmp_path)
