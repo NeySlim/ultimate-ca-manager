@@ -230,6 +230,47 @@ class TestExistingSoftHsmKeyInHa:
         assert cert.status_code in (200, 201), cert.data
 
 
+def _boot_in_ha(monkeypatch, caplog, name):
+    """Start a fresh app in HA mode whose database already holds a SoftHSM provider `name`;
+    the auto-registration step fails, which must not skip the warning."""
+    from unittest.mock import patch
+    from models import db
+    from models.hsm import HsmProvider
+    from tests.fresh_app import fresh_app
+
+    def seed(app):  # a startup step that runs before the SoftHSM one
+        with app.app_context():
+            db.session.add(HsmProvider(type='pkcs11', name=name, config=json.dumps({'module_path': SOFT})))
+            db.session.commit()
+
+    def broken():
+        raise RuntimeError('auto-register failed')
+
+    import contextlib
+    from tests import pg_app_harness
+    if not pg_app_harness.ENABLED:  # SQLite: no advisory lock, the rest of the boot is the same
+        monkeypatch.setattr('services.scheduler_leader.boot_lock', lambda *_: contextlib.nullcontext())
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    with patch('utils.ha.validate_ha_config'), \
+            patch('utils.serial_duplicates.check_pending_serial_index', side_effect=seed), \
+            patch('services.hsm.hsm_service.HsmService.auto_register_softhsm', side_effect=broken), \
+            caplog.at_level('WARNING'), fresh_app():
+        pass
+    return [r for r in caplog.records if name in r.getMessage()]
+
+
+def test_the_boot_warns_of_an_existing_softhsm_provider(monkeypatch, caplog):
+    monkeypatch.delenv('UCM_SCHEDULER_PROCESS', raising=False)
+    found = _boot_in_ha(monkeypatch, caplog, f'boot-softhsm-{uuid.uuid4().hex[:6]}')
+    assert len(found) == 1 and 'this node only' in found[0].getMessage()
+
+
+def test_the_scheduler_process_does_not_repeat_the_warning(monkeypatch, caplog):
+    # The gunicorn master writes it; the scheduler process builds the app again
+    monkeypatch.setenv('UCM_SCHEDULER_PROCESS', '1')
+    assert _boot_in_ha(monkeypatch, caplog, f'boot-softhsm-{uuid.uuid4().hex[:6]}') == []
+
+
 @pytest.mark.skipif(not os.getenv('UCM_TEST_APP_PG_URL'), reason='UCM_TEST_APP_PG_URL not set')
 def test_these_refusals_ran_on_postgresql(app):
     # HA mode exists only on PostgreSQL: the CI PostgreSQL step runs this whole file there

@@ -1035,9 +1035,16 @@ def create_app(config_name=None):
         with app.app_context():
             from services.hsm.hsm_service import HsmService
             HsmService.auto_register_softhsm()
-            HsmService.warn_local_softhsm()
     except Exception as e:
         app.logger.debug(f"SoftHSM auto-register skipped: {e}")
+    # Once per node: the gunicorn master warns, the scheduler process it starts does not
+    if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':
+        try:
+            with app.app_context():
+                from services.hsm.hsm_service import HsmService
+                HsmService.warn_local_softhsm()
+        except Exception as e:
+            app.logger.debug(f"SoftHSM HA warning skipped: {e}")
     
     # Load syslog forwarder config
     try:
