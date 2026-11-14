@@ -235,8 +235,8 @@ class _ArchiveReader(io.RawIOBase):
                 super().close()
 
 
-def open_archive(filename: str):
-    """A seekable binary stream over a stored archive (what a restore reads), or None."""
+def _open(filename: str):
+    """(seekable stream, archive row) from one snapshot, or None when it is not in the store."""
     archives = _tables()[0]
     conn = _snapshot(_engine())
     try:
@@ -247,8 +247,15 @@ def open_archive(filename: str):
     if row is None:
         conn.close()
         return None
-    return io.BufferedReader(_ArchiveReader(conn, row.id, int(row.size), row.chunk_size),
-                             buffer_size=row.chunk_size)
+    reader = io.BufferedReader(_ArchiveReader(conn, row.id, int(row.size), row.chunk_size),
+                               buffer_size=row.chunk_size)
+    return reader, row
+
+
+def open_archive(filename: str):
+    """A seekable binary stream over a stored archive (what a restore reads), or None."""
+    opened = _open(filename)
+    return opened[0] if opened is not None else None
 
 
 def archive_heads(length: int) -> list:
@@ -351,19 +358,28 @@ def apply_retention(retention_days: int, *, min_keep: int, max_total_bytes: int,
 def download_response(filename: str):
     """A streamed attachment of a stored archive, or None when it is not in the store.
 
+    The body is a file, so closing the response closes its connection, iterated or not.
     ``Repr-Digest`` (RFC 9530) carries the SHA-256 the listing shows, for the client to check.
     """
     import base64
 
-    from flask import Response
+    from flask import Response, request
+    from werkzeug.wsgi import wrap_file
 
-    record = get_archive(filename)
-    body = iter_archive(filename) if record is not None else None
-    if body is None:
+    opened = _open(filename)
+    if opened is None:
         return None
-    digest = base64.b64encode(bytes.fromhex(record['sha256'])).decode()
-    return Response(body, mimetype='application/octet-stream', direct_passthrough=True, headers={
-        'Content-Disposition': f'attachment; filename={filename}',
-        'Content-Length': str(record['size']),
-        'Repr-Digest': f'sha-256=:{digest}:',
-    })
+    reader, row = opened
+    try:
+        digest = base64.b64encode(bytes.fromhex(row.sha256)).decode()
+        response = Response(
+            wrap_file(request.environ, reader, buffer_size=row.chunk_size),
+            mimetype='application/octet-stream', direct_passthrough=True, headers={
+                'Content-Disposition': f'attachment; filename={filename}',
+                'Repr-Digest': f'sha-256=:{digest}:',
+            })
+        response.content_length = int(row.size)
+    except Exception:
+        reader.close()
+        raise
+    return response

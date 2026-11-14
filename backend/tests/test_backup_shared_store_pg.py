@@ -145,6 +145,38 @@ def test_an_archive_made_on_a_downloads_from_b_after_a_is_gone(app, auth_client,
         assert auth_client.get('/api/v2/system/backup/..%2Fx.ucmbkp/download').status_code in (400, 404)
 
 
+def _checked_out(app):
+    from models import db
+    with app.app_context():
+        return db.engine.pool.checkedout()
+
+
+def test_a_head_request_gives_its_connection_back(app, auth_client, nodes):
+    data = _payload(shared_store.CHUNK_SIZE + 9)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+    before = _checked_out(app)
+    with nodes('b'):
+        r = auth_client.head(f'/api/v2/system/backup/{name}/download')
+        assert r.status_code == 200 and r.data == b''
+        assert r.headers['Content-Length'] == str(len(data))
+        r.close()
+    gc.collect()
+    assert _checked_out(app) == before
+
+
+def test_a_download_closed_before_its_first_chunk_gives_its_connection_back(app, nodes):
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(_payload(2 * shared_store.CHUNK_SIZE))
+    before = _checked_out(app)
+    with app.test_request_context(f'/api/v2/system/backup/{name}/download'):
+        response = shared_store.download_response(name)
+        assert _checked_out(app) == before + 1
+        response.close()
+        assert _checked_out(app) == before
+        del response
+
+
 def test_the_restore_reader_streams_and_seeks_a_stored_archive(app, nodes):
     data = b'UCMB' + bytes([4]) + _payload(3 * shared_store.CHUNK_SIZE)
     with app.app_context(), nodes('a'):
