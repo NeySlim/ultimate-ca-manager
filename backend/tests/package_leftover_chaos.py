@@ -53,7 +53,7 @@ def _chaos(box, layout):
             f'                trunc) [ -z "$cut" ] || {shutil.which("truncate")} -s 1 "$cut" ;;\n'
             f'                meta|alone) [ -z "$cut" ] || {shutil.which("touch")} -d @5 "$cut" ;;\n'
             f'                mode) [ -z "$cut" ] || {shutil.which("chmod")} 0604 "$cut" ;;\n'
-            f'                top) [ ! -d "$last" ] || {shutil.which("chmod")} 0705 "$last" ;;\n'
+            f'                top) [ -L "$last" ] || [ ! -d "$last" ] || {shutil.which("chmod")} 0705 "$last" ;;\n'
             f'            esac\n'
             f'        fi\n'
             f'        case $mode in alone|late) exit 1 ;; esac\n'
@@ -91,6 +91,9 @@ def _chaos_box(tmp_path, layout, env='full'):
     box = Box(tmp_path, python='stub')
     path = box.config / 'ucm.env'
     path.write_text('UCM_FIPS_BUILD=1\n' if env == 'fips only' else path.read_text() + 'UCM_FIPS_BUILD=1\n')
+    # A file, a directory and a link in updates: each kind of copy in every layout that copies
+    (box.data / 'updates' / 'manifest.json').write_text('{}')
+    os.symlink('nested', box.data / 'updates' / 'latest')
     _chaos(box, layout)
     return box, whole(box.data, _kept(layout)), whole(box.config)
 
@@ -106,10 +109,24 @@ class Run:
 
     def __init__(self, box, out, count):
         self.out, self.count, self.parent = out, count, box.parent
+        self.tops = {'data': f'{box.data}/', 'config': f'{box.config}/'}
         self.calls = []
         for line in (box.state / 'names').read_text().splitlines():
             n, name, *args = line.split('\t')
             self.calls.append((int(n), name, args))
+
+    def item(self, path):
+        """(top, path relative to it) of a path in the data or the configuration."""
+        for top, prefix in self.tops.items():
+            if path.startswith(prefix):
+                return top, path[len(prefix):].rstrip('/').removesuffix('/.')
+        return None, path
+
+    def kind(self, n):
+        """What cp call n copies: 'file', 'dir' or 'link' (its arguments: -a -- from to)."""
+        args = dict((c[0], c[2]) for c in self.calls)[n]
+        top, rel = next(self.item(a) for a in args[2:] if self.item(a)[0])
+        return self.shape[top][rel][0], (top, rel)
 
 
 class Lab:
@@ -133,6 +150,7 @@ class Lab:
             box, data, config, before = self._new()
             out, count = _chaos_run(box, plan)
             run = Run(box, out, count)
+            run.shape = {'data': before[str(box.data)], 'config': before[str(box.config)]}
             saved = self.root / f's{self.n}'
             shutil.copytree(box.tmp, saved, symlinks=True)
             self.first[key] = (box, data, config, before, run, saved)
@@ -155,6 +173,7 @@ class Lab:
             if check:
                 check(box, data, config, before, runs[-1])
             runs.append(Run(box, *_chaos_run(box, plan)))
+            runs[-1].shape = run.shape
         return box, data, config, before, runs
 
 
@@ -277,31 +296,46 @@ class ChaosSuite:
             self._scenario(lab, first, second)
 
     def test_a_retry_converges_after_any_copy_of_the_archiving_is_cut_short(self, lab):
-        for at in _copies(lab.first_run()):
+        run = lab.first_run()
+        kinds = {run.kind(at)[0] for at in _copies(run)}
+        assert kinds == ({'file', 'dir', 'link'} if self.layout != 'one filesystem' else set())
+        for at in _copies(run):
             for mode in CUT_SHORT:
                 self._scenario(lab, (at, mode), None)
 
     def _put_backs(self, lab):
-        """Every (fault i of the archiving run, cp its put-back then runs)."""
+        """Every (fault i of the archiving run, cp its put-back then runs, what it copies:
+        (kind, item))."""
         if not _copies(lab.first_run()):
             # No copy in the archiving run: no copy line, so no put-back ever copies
             assert self.layout == 'one filesystem'
             return []
         pairs = []
         for at in range(1, self._calls(lab) + 1):
-            pairs += [(at, back) for back in _copies(lab.first_run([(at, 'fail')]), put_back=True)]
+            run = lab.first_run([(at, 'fail')])
+            pairs += [(at, back, *run.kind(back)) for back in _copies(run, put_back=True)]
         assert pairs
         return pairs
 
     def test_a_retry_converges_after_any_copy_of_the_put_back_is_cut_short(self, lab):
-        """Every cp of every put-back is cut short, each way in turn along the pairs, so every
-        way meets every kind of copy; then a run without fault."""
-        for n, (at, back) in enumerate(self._put_backs(lab)):
-            mode = CUT_SHORT[n % len(CUT_SHORT)]
-            self._scenario(lab, (at, 'fail'), (back, mode))
+        """Every cp of every put-back is cut short, the ways in turn along the pairs of each
+        kind of copy (file, directory, link), as many times as it takes for every way to
+        meet every kind; then a run without fault."""
+        pairs = self._put_backs(lab)
+        by_kind, covered = {}, set()
+        for at, back, kind, _item in pairs:
+            by_kind.setdefault(kind, []).append((at, back))
+        for kind, of_kind in by_kind.items():
+            for n in range(max(len(of_kind), len(CUT_SHORT))):
+                at, back = of_kind[n % len(of_kind)]
+                mode = CUT_SHORT[n % len(CUT_SHORT)]
+                covered.add((kind, mode))
+                self._scenario(lab, (at, 'fail'), (back, mode))
+        kinds = {'file', 'dir', 'link'} if pairs else set()
+        assert covered == {(kind, mode) for kind in kinds for mode in CUT_SHORT}, covered
 
     def test_a_put_back_whose_copy_failed_is_never_reported_as_done(self, lab):
-        for at, back in self._put_backs(lab)[::3]:
+        for at, back, *_ in self._put_backs(lab)[::3]:
             why = (self.layout, at, back)
 
             def check(box, data, config, before, run, why=why):
