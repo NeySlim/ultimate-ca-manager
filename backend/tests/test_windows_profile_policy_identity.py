@@ -146,6 +146,39 @@ def test_a_template_oid_derived_from_a_ca_is_not_offered_at_issuance(app, create
     assert err == f'Certificate template {derived} is not offered by this CA'
 
 
+UPGRADE_TEMPLATE_OIDS = (
+    'Windows enrollment, template OIDs: with an XCEP CA apart from the WSTEP CA, 2.x also issued a request '
+    'naming the template OID derived from the WSTEP CA, which its policy never announced. 3.0 issues only '
+    'the template OIDs the policy of the profile announces (for the profile `default` of an upgrade, those '
+    '2.x announced, derived from its XCEP CA) and refuses any other with `Certificate template <OID> is not '
+    'offered by this CA`; the renewal of a certificate carrying such an OID is accepted as before.')
+
+
+def test_an_upgraded_profile_issues_the_oid_2254_announced_and_refuses_the_issuing_ca_one(
+        app, create_ca, template, profiles):
+    """The upgrade note, frozen: 2.254 announced the XCEP CA's OIDs; the WSTEP CA's one, which only
+    a hand-written request could name, is refused at issuance (renewal: the CA-derived test below)."""
+    from pathlib import Path
+    policy, issuing = (create_ca(cn=f'C16 split {n} {uuid.uuid4().hex[:5]}') for n in ('policy', 'issuing'))
+    policy_refid, issuing_refid = _refid(app, policy), _refid(app, issuing)
+    profile_id = profiles(template, issuing_ca_refid=issuing_refid, policy_ca_refid=policy_refid,
+                          policy_id=derived_policy_id(policy_refid), policy_oid_root=derived_oid_root(policy_refid))
+    with app.app_context():
+        t = db.session.get(CertificateTemplate, template)
+        record = db.session.get(CA, issuing['id'])
+        announced = _policy_oid_for_template(db.session.get(CA, policy['id']), t)
+        assert _served(profile_id)[1] == {t.name: announced}
+        results = {}
+        for oid in (announced, _policy_oid_for_template(record, t)):
+            csr, _key = _csr(oid)
+            results[oid] = wstep_service.issue(record, csr.public_bytes(serialization.Encoding.DER), 30,
+                                               profile=db.session.get(WindowsEnrollmentProfile, profile_id))[1]
+    refused = _policy_oid_for_template(record, t)
+    assert results == {announced: None, refused: f'Certificate template {refused} is not offered by this CA'}
+    note = ' '.join((Path(__file__).resolve().parents[2] / 'UPGRADE.md').read_text().split())
+    assert UPGRADE_TEMPLATE_OIDS in note
+
+
 def test_two_profiles_on_one_policy_ca_serve_distinct_identities(app, create_ca, template, profiles):
     """Criterion 2: the same policyID requires the same response (MS-XCEP 3.1.4.1.3.23)."""
     refid = _refid(app, create_ca(cn=f'C16 shared {uuid.uuid4().hex[:5]}'))
