@@ -110,8 +110,9 @@ class Box:
             (self.bin / name).write_text(f'#!/bin/sh\n{check}{run}\n')
         cases = ''.join(f'    "{p}"|"{p}"/*) echo {700 + i}; exit 0 ;;\n'
                         for i, p in enumerate(sorted(other_fs, key=lambda p: -len(str(p)))))
+        # Only the device question is answered here: every other stat is the real one
         (self.bin / 'stat').write_text(
-            f'#!/bin/sh\nfor last; do :; done\ncase $last in\n{cases}esac\n'
+            f'#!/bin/sh\nfor last; do :; done\n[ "$1 $2" != "-c %d" ] || case $last in\n{cases}esac\n'
             f'exec {REAL["stat"]} "$@"\n')
         (self.bin / 'date').write_text(
             f'#!/bin/sh\ncase "$*" in *%Y%m%dT*) echo {STAMP} ;; *) exec {shutil.which("date")} "$@" ;; esac\n')

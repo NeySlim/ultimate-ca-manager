@@ -481,10 +481,11 @@ def test_the_rpm_post_marks_a_new_install_before_the_venv_is_built(tmp_path):
 
 
 def test_the_rpm_post_marks_a_new_install_before_anything_else(tmp_path):
-    """A %post killed at its first command still leaves the mark for the reinstall."""
+    """A %post killed at %systemd_post, its first command after the mark, leaves the mark."""
     env, log, home, data, config = _post_sandbox(tmp_path, 0)
-    (tmp_path / 'bin' / 'rm').write_text(f'#!{POSIX_SH}\nkill -9 $PPID; sleep 5\n')
     body = _post_body(tmp_path, home, data, config)
+    assert body.count(': systemd_post\n') == 1
+    body = body.replace(': systemd_post\n', 'kill -9 $$\n')
     out = subprocess.run([POSIX_SH, '-c', body, 'post', '1'], capture_output=True, text=True,
                          timeout=20, env=env)
     assert out.returncode == -9

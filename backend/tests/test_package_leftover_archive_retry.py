@@ -27,29 +27,33 @@ SEED, PAIRS = 20261114, 120
 def _chaos(box, layout):
     """Every file command counts its calls in one sequence and names them; the plan fails
     ('fail') or kills the whole run without any clean-up ('kill') at the calls it names.
-    On a cp, 'torn', 'trunc' and 'meta' kill it as a copy cut short would leave its target:
-    other content, part of the content, or the whole content before its attributes."""
+    On a cp, 'torn', 'trunc', 'meta' and 'mode' kill it as a copy cut short would leave its
+    target: other content, part of the content, or the whole content before its date or its
+    mode. 'alone' leaves the date wrong and fails that cp only, the run goes on; 'late' fails
+    a cp that copied everything."""
     box.wrap(other_fs=LAYOUTS[layout](box))
     s = box.state
     find, sort, head = (shutil.which(t) for t in ('find', 'sort', 'head'))
     for name in CHAOS:
         (box.bin / name).write_text(
             f'#!/bin/sh\nn=$(( $(cat {s}/count) + 1 )); echo $n > {s}/count\n'
-            f'echo "$n {name}" >> {s}/names\n'
+            f'(IFS="\t"; echo "$n\t{name}\t$*") >> {s}/names\n'
             f'mode=$(grep -x "$n [a-z]*" {s}/plan); mode=${{mode#* }}\n'
             f'case $mode in\n'
             f'    fail) echo "{name}: injected failure" >&2; exit 1 ;;\n'
             f'    kill) kill -9 0 ;;\n'
-            f'    torn|trunc|meta)\n'
+            f'    torn|trunc|meta|mode|alone|late)\n'
             f'        if [ {name} = cp ]; then\n'
             f'            {shutil.which(name)} "$@"; for last; do :; done\n'
             f'            cut=$({find} "$last" -type f | {sort} | {head} -n 1)\n'
             f'            case $mode in\n'
             f'                torn) [ -z "$cut" ] || printf torn > "$cut" ;;\n'
             f'                trunc) [ -z "$cut" ] || {shutil.which("truncate")} -s 1 "$cut" ;;\n'
-            f'                meta) [ -z "$cut" ] || {shutil.which("touch")} -d @5 "$cut" ;;\n'
+            f'                meta|alone) [ -z "$cut" ] || {shutil.which("touch")} -d @5 "$cut" ;;\n'
+            f'                mode) [ -z "$cut" ] || {shutil.which("chmod")} 0604 "$cut" ;;\n'
             f'            esac\n'
             f'        fi\n'
+            f'        case $mode in alone|late) exit 1 ;; esac\n'
             f'        kill -9 0 ;;\n'
             f'esac\nexec {shutil.which(name)} "$@"\n')
         (box.bin / name).chmod(0o755)
@@ -168,13 +172,18 @@ def test_a_retry_converges_after_a_fault_while_putting_back(tmp_path, layout):
         _scenario(tmp_path / f'p{n}', layout, first, second)
 
 
-CUT_SHORT = ('torn', 'trunc', 'meta')
+CUT_SHORT = ('torn', 'trunc', 'meta', 'mode', 'alone')
 
 
-def _copies(box, after=0):
-    """The calls of the last run that were a cp, past call *after*."""
-    names = (line.split() for line in (box.state / 'names').read_text().splitlines())
-    return [int(n) for n, name in names if name == 'cp' and int(n) > after]
+def _copies(box, put_back=False):
+    """The calls of the last run that were a cp; with put_back, those out of the archive."""
+    out = []
+    for line in (box.state / 'names').read_text().splitlines():
+        n, name, *args = line.split('\t')
+        source = args[args.index('--') + 1] if '--' in args else ''
+        if name == 'cp' and (not put_back or source.startswith(f'{box.parent}/')):
+            out.append(int(n))
+    return out
 
 
 @pytest.mark.parametrize('layout', list(LAYOUTS))
@@ -186,17 +195,33 @@ def test_a_retry_converges_after_any_copy_of_the_archiving_is_cut_short(tmp_path
             _scenario(tmp_path / f'{at}-{mode}', layout, (at, mode), None)
 
 
-@pytest.mark.parametrize('layout', list(LAYOUTS))
-def test_a_retry_converges_after_any_copy_of_the_put_back_is_cut_short(tmp_path, layout):
-    """For every fault i of the archiving run, every cp its put-back runs is cut short in
-    turn, in each way a killed copy leaves its target; then a run without fault."""
-    seen = 0
+def _put_backs(tmp_path, layout):
+    """Every (fault i of the archiving run, cp its put-back then runs)."""
+    pairs = []
     for at in range(1, _calls(tmp_path / 'count', layout) + 1):
         box, *_ = _chaos_box(tmp_path / f'f{at}', layout)
         _chaos_run(box, [(at, 'fail')])
-        for back in _copies(box, after=at):
-            for mode in CUT_SHORT:
-                seen += 1
-                _scenario(tmp_path / f'{at}-{back}-{mode}', layout, (at, 'fail'), (back, mode))
+        pairs += [(at, back) for back in _copies(box, put_back=True)]
     # Only a move across filesystems copies, so only those layouts put back with cp
-    assert seen or layout == 'one filesystem'
+    assert pairs or layout == 'one filesystem'
+    return pairs
+
+
+@pytest.mark.parametrize('layout', list(LAYOUTS))
+def test_a_retry_converges_after_any_copy_of_the_put_back_is_cut_short(tmp_path, layout):
+    """Every cp of every put-back is cut short, each way in turn along the pairs, so every
+    way meets every kind of copy; then a run without fault."""
+    for n, (at, back) in enumerate(_put_backs(tmp_path, layout)):
+        mode = CUT_SHORT[n % len(CUT_SHORT)]
+        _scenario(tmp_path / f'{at}-{back}-{mode}', layout, (at, 'fail'), (back, mode))
+
+
+@pytest.mark.parametrize('layout', list(LAYOUTS))
+def test_a_put_back_whose_copy_failed_is_never_reported_as_done(tmp_path, layout):
+    for at, back in _put_backs(tmp_path, layout)[::3]:
+        box, data, config = _chaos_box(tmp_path / f'{at}-{back}', layout)
+        before, why = snapshot(box), (layout, at, back)
+        out, _ = _chaos_run(box, [(at, 'fail'), (back, 'late')])
+        assert out.returncode == 2, (why, out.stdout, out.stderr)
+        _while_failing(box, out, before, data, config, why)
+        _converged(box, data, config, layout, why)

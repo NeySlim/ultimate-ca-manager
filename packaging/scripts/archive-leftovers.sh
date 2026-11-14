@@ -44,16 +44,18 @@ present() { [ -e "$1" ] || [ -L "$1" ]; }
 # $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
 normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
 
-# A comparable digest of a file, a symbolic link or a whole tree (names, types, contents)
+# A comparable digest of a file, a symbolic link or a whole tree: names, types, contents, and
+# what a copy carries over last (mode, owner, date of the files). Equal means whole.
 digest() {
     if [ -L "$1" ]; then
         printf 'link %s\n' "$(readlink -- "$1")"
     elif [ -d "$1" ]; then
         (cd -- "$1" && find . \( -type f -exec cksum {} + \) -o \( -type l -exec sh -c \
             'for l; do printf "link %s %s\n" "$l" "$(readlink -- "$l")"; done' sh {} + \) \
-            -o -print) | LC_ALL=C sort
+            -o -print && find . ! -type l -printf 'attr %m %U %G %p\n' \
+            && find . -type f -printf 'date %Ts %p\n') | LC_ALL=C sort
     else
-        cksum < "$1"
+        cksum < "$1" && stat -c 'attr %a %u %g %Y' -- "$1"
     fi
 }
 
@@ -142,8 +144,9 @@ roll_back() {
                     # Always redone: a put-back cut short leaves a source that only looks whole
                     rm -f -- "$src" && cp -a -- "$dst" "$src"
                 fi
-                # Whole again: its copy line, undone next, removes the copy
-                if [ "$(digest "$src" 2>/dev/null)" != "$(digest "$dst")" ] \
+                put=$?
+                # Whole again, and the copy said so: its copy line, undone next, removes the copy
+                if [ "$put" -ne 0 ] || [ "$(digest "$src" 2>/dev/null)" != "$(digest "$dst")" ] \
                         || ! drop_line "remove$TAB$src$TAB$dst"; then
                     unsettled "$dst"
                 fi ;;
