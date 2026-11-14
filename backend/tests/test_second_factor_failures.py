@@ -274,3 +274,34 @@ def test_expired_rows_are_purged_on_the_next_failure(nodes):
     assert _code(_webauthn(b, user['username'])) == 401
     assert set(_rows(a)) == {('webauthn', user['username']), ('2fa', 'live-lock'),
                              ('webauthn', 'recent-count')}
+
+
+# Backups: runtime state, never carried nor restored
+
+
+def test_a_backup_neither_carries_nor_restores_a_lock(app, tmp_path):
+    from tests.test_backup_cross_installation import Keys, _installation
+    from services.backup_service import BackupService
+    password = 'Backup-Lock-Pass-2026!'
+    locked = utc_now() + timedelta(minutes=10)
+    with _installation(app, f"sqlite:///{tmp_path / 'source.db'}", Keys(tmp_path, 'source')), \
+            app.app_context():
+        owner = User(username='carried', role='admin', email='carried@example.test')
+        owner.set_password(PASSWORD)
+        db.session.add(owner)
+        db.session.flush()
+        db.session.add_all([SecondFactorFailure(kind=kind, target=target, failures=5,
+                                                locked_until=locked, updated_at=utc_now())
+                            for kind, target in (('webauthn', 'carried'), ('2fa', str(owner.id)))])
+        db.session.commit()
+        blob = BackupService().create_backup(password)
+        _master, payload = BackupService()._decrypt_framed(blob, password)
+        db.session.remove()
+    assert 'second_factor_failures' not in payload and 'carried' in repr(payload)
+    with _installation(app, f"sqlite:///{tmp_path / 'target.db'}", Keys(tmp_path, 'target')), \
+            app.app_context():
+        results = BackupService().restore_backup(blob, password)
+        assert not results.get('errors'), results
+        assert User.query.filter_by(username='carried').count() == 1
+        assert SecondFactorFailure.query.count() == 0
+        db.session.remove()
