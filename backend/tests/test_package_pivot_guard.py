@@ -302,7 +302,8 @@ def _post_sandbox(tmp_path, archive_rc):
         'bash': record + '\n[ "$2" != fips-requested ] || grep -qx "UCM_FIPS_BUILD=1" "$3"',
         # The archiver's answer, or the scriptlet killed while it runs; whether the
         # configuration existed when it ran
-        'sh': record + f'\n[ -e "{config}/ucm.env" ] && echo "sh saw ucm.env" >> "$LOG"\n'
+        # The archiver is called with the interpreter it renames with
+        'sh': record.replace('$*', '${UCM_PYTHON:+UCM_PYTHON=$UCM_PYTHON }$*') + f'\n[ -e "{config}/ucm.env" ] && echo "sh saw ucm.env" >> "$LOG"\n'
               + {'kill': 'kill -9 $PPID; sleep 5',
                  # Puts back an archived ucm.env, archives it, carries UCM_FIPS_BUILD=1 over
                  'fips': f'printf "UCM_FIPS_BUILD=1\\n" > "{config}/ucm.env"'}.get(
@@ -370,7 +371,7 @@ def _check_order(calls, home, data, config):
     assert venv < archive < first_data
     assert 'sh saw ucm.env' not in calls
     assert _archiver_calls(calls) == [
-        f'sh {home}/scripts/{ARCHIVER} {home} {data} {config}']
+        f'sh UCM_PYTHON=python3 {home}/scripts/{ARCHIVER} {home} {data} {config}']
 
 
 @pytest.mark.parametrize('previous', ['', '2.253', '1.8.3'])

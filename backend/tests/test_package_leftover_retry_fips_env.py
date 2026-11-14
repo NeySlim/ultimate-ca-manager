@@ -10,8 +10,8 @@ class TestTheLeftConfigurationIsTheFipsLine(ChaosSuite):
     test_a_retry_converges_after_any_copy_of_the_archiving_is_cut_short = None
     test_a_retry_converges_after_any_copy_of_the_put_back_is_cut_short = None
     test_a_put_back_whose_copy_failed_is_never_reported_as_done = None
-    test_a_retry_converges_after_a_move_that_fell_back_on_a_copy_is_cut_short = None
-    test_a_retry_converges_after_a_put_back_move_that_fell_back_is_cut_short = None
+    test_a_retry_converges_after_a_kill_right_after_any_rename = None
+    test_mv_never_moves_an_item = None
 
     def test_the_new_configuration_is_taken_back_once_never_the_old_one(self, lab):
         """Killed on removing the journal, then killed again once the old ucm.env is back

@@ -15,7 +15,7 @@ import pytest
 from tests.test_package_leftover_archive import KEPT, STAMP, Box, files, snapshot, tree, whole
 
 
-CHAOS = ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod')
+CHAOS = ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'rename')
 LAYOUTS = {
     'one filesystem': lambda box: (),
     'data and config are mount points': lambda box: (box.data, box.config),
@@ -30,12 +30,16 @@ def _chaos(box, layout):
     ('fail') or kills the whole run without any clean-up ('kill') at the calls it names.
     On a cp, 'torn', 'trunc', 'meta' and 'mode' kill it as a copy cut short would leave its
     target: other content, part of the content, or the whole content before its date or its
-    mode, of the first file in it; 'top' before the mode of the copied directory itself. 'alone' leaves the date wrong and fails that cp only, the run goes on; 'late' fails
-    a cp that copied everything."""
+    mode, of the first file in it; 'top' before the mode of the copied directory itself.
+    'alone' leaves the date wrong and fails that cp only, the run goes on; 'late' fails a
+    cp that copied everything; 'done' kills the run right after the call."""
     box.wrap(other_fs=LAYOUTS[layout](box))
     s = box.state
     find, sort, head = (shutil.which(t) for t in ('find', 'sort', 'head'))
     for name in CHAOS:
+        # mv and rename run what Box.wrap set: the journal-only mv, the rename(2) that
+        # refuses to cross a mount; every other command the real one
+        target = box.inner / name if name in ('mv', 'rename') else shutil.which(name)
         # Builtins only up to the real command: a run makes hundreds of these calls
         (box.bin / name).write_text(
             f'#!/bin/sh\nread n < {s}/count; n=$((n + 1)); echo $n > {s}/count\n'
@@ -44,6 +48,7 @@ def _chaos(box, layout):
             f'case $mode in\n'
             f'    fail) echo "{name}: injected failure" >&2; exit 1 ;;\n'
             f'    kill) kill -9 0 ;;\n'
+            f'    done) {target} "$@"; kill -9 0 ;;\n'
             f'    torn|trunc|meta|mode|top|alone|late)\n'
             f'        if [ {name} = cp ]; then\n'
             f'            {shutil.which(name)} "$@"; for last; do :; done\n'
@@ -58,22 +63,7 @@ def _chaos(box, layout):
             f'        fi\n'
             f'        case $mode in alone|late) exit 1 ;; esac\n'
             f'        kill -9 0 ;;\n'
-            f'    xcopy|xremove)\n'
-            # A mv falling back on a copy, as across filesystems, is cut short while it
-            # copies (a file short, the last one missing) or while it removes its source
-            f'        if [ {name} = mv ]; then\n'
-            f'            {shutil.which("cp")} -a -- "$2" "$3"\n'
-            f'            if [ $mode = xcopy ] && [ ! -L "$3" ]; then\n'
-            f'                set -- $({find} "$3" -type f | {sort})\n'
-            f'                [ $# = 0 ] || {shutil.which("truncate")} -s 0 "$1"\n'
-            f'                for last; do :; done; [ $# -lt 2 ] || {shutil.which("rm")} -f -- "$last"\n'
-            f'            elif [ $mode = xremove ] && [ -d "$2" ] && [ ! -L "$2" ]; then\n'
-            f'                set -- $({find} "$2" -type f | {sort})\n'
-            f'                [ $# = 0 ] || {shutil.which("rm")} -f -- "$1"\n'
-            f'            fi\n'
-            f'        fi\n'
-            f'        kill -9 0 ;;\n'
-            f'esac\nexec {shutil.which(name)} "$@"\n')
+            f'esac\nexec {target} "$@"\n')
         (box.bin / name).chmod(0o755)
 
 
@@ -85,9 +75,10 @@ def _chaos_run(box, plan=()):
     return out, int((box.state / 'count').read_text())
 
 
-def _chaos_box(tmp_path, layout, env='full'):
+def _chaos_box(tmp_path, layout, env='full', refused=False):
     """env 'full': the ucm.env of an install, with UCM_FIPS_BUILD=1; 'fips only': that
-    line alone, the very file the new configuration is."""
+    line alone, the very file the new configuration is. refused: the kernel refuses to
+    rename a file, a directory and a link that would be renamed (REFUSED)."""
     box = Box(tmp_path, python='stub')
     path = box.config / 'ucm.env'
     path.write_text('UCM_FIPS_BUILD=1\n' if env == 'fips only' else path.read_text() + 'UCM_FIPS_BUILD=1\n')
@@ -95,7 +86,16 @@ def _chaos_box(tmp_path, layout, env='full'):
     (box.data / 'updates' / 'manifest.json').write_text('{}')
     os.symlink('nested', box.data / 'updates' / 'latest')
     _chaos(box, layout)
+    if refused:
+        (box.state / 'refused').write_text(''.join(f'{box.data}/{name}\n' for name in _refused(layout)))
     return box, whole(box.data, _kept(layout)), whole(box.config)
+
+
+def _refused(layout):
+    """A file, a directory and a link moved as items in `layout`."""
+    if layout == 'a mount point inside the data':
+        return ('https_key.pem', 'updates/nested', 'updates/latest')
+    return ('https_key.pem', 'updates', 'current.key')
 
 
 def _kept(layout):
@@ -134,14 +134,14 @@ class Lab:
     from the state its first run left, saved once: the runs that open each scenario
     ('fault at call i') are the same across the tests of a layout."""
 
-    def __init__(self, root, layout, env='full'):
-        self.root, self.layout, self.env = root, layout, env
+    def __init__(self, root, layout, env='full', refused=False):
+        self.root, self.layout, self.env, self.refused = root, layout, env, refused
         self.first = {}
         self.n = 0
 
     def _new(self):
         self.n += 1
-        box, data, config = _chaos_box(self.root / f'b{self.n}', self.layout, self.env)
+        box, data, config = _chaos_box(self.root / f'b{self.n}', self.layout, self.env, self.refused)
         return box, data, config, snapshot(box)
 
     def _first(self, plan):
@@ -233,14 +233,10 @@ def _copies(run, put_back=False):
     return out
 
 
-FELL_BACK = ('xcopy', 'xremove')
-
-
-def _moves(run, put_back=False):
-    """The calls of `run` that were a mv of an item, not of the journal; with put_back,
-    those out of the archive."""
-    return [n for n, name, args in run.calls if name == 'mv' and '.journal' not in args[1]
-            and (not put_back or args[1].startswith(f'{run.parent}/'))]
+def _renames(run, put_back=False):
+    """The calls of `run` that were a rename; with put_back, those out of the archive."""
+    return [n for n, name, args in run.calls if name == 'rename'
+            and (not put_back or args[3].startswith(f'{run.parent}/'))]
 
 
 class ChaosSuite:
@@ -344,25 +340,54 @@ class ChaosSuite:
             box, data, config, before, runs = lab.chain([(at, 'fail'), (back, 'late')], (), check=check)
             _converged(box, runs[1].out, data, config, self.layout, why)
 
-    def test_a_retry_converges_after_a_move_that_fell_back_on_a_copy_is_cut_short(self, lab):
-        """A rename refused by the kernel (an overlayfs directory, a mount the table does not
-        show) makes GNU mv copy then remove, unjournalled: cut short there, either way."""
-        for at in _moves(lab.first_run()):
-            for mode in FELL_BACK:
-                self._scenario(lab, (at, mode), None)
-
-    def test_a_retry_converges_after_a_put_back_move_that_fell_back_is_cut_short(self, lab):
-        """Each item's put-back by mv is cut short each way, after the first and the last
-        archiving fault that has it put back."""
-        by_item = {}
+    def test_a_retry_converges_after_a_kill_right_after_any_rename(self, lab):
+        """Killed once rename(2) moved an item into the archive, or back out of it."""
+        for at in _renames(lab.first_run()):
+            self._scenario(lab, (at, 'done'), None)
+        backs = set()
         for at in range(1, self._calls(lab) + 1):
-            run = lab.first_run([(at, 'fail')])
-            moves = _moves(run, put_back=True)
-            for n, _name, args in run.calls:
-                if n in moves:
-                    by_item.setdefault(args[1].replace(str(run.parent), ''), []).append((at, n))
-        assert by_item or not _moves(lab.first_run())
-        for pairs in by_item.values():
-            for at, back in {pairs[0], pairs[-1]}:
-                for mode in FELL_BACK:
-                    self._scenario(lab, (at, 'fail'), (back, mode))
+            for back in _renames(lab.first_run([(at, 'fail')]), put_back=True):
+                backs.add((at, back))
+        # Every rename is refused when the data and configuration are mounts of their own
+        assert bool(backs) == (self.layout != 'data and config are mount points')
+        for at, back in sorted(backs)[::4]:
+            self._scenario(lab, (at, 'fail'), (back, 'done'))
+
+    def test_mv_never_moves_an_item(self, lab):
+        """mv falls back on a copy outside the journal: only the journal is ever mv'd (the
+        mv of Box.wrap fails and records any other call)."""
+        runs = [lab.first_run()] + [lab.chain([(at, 'fail')], ())[4][-1]
+                                    for at in range(1, self._calls(lab) + 1, 3)]
+        assert all(r.out.returncode in (0, 1, 2) for r in runs)
+        assert not any(name == 'mv' and not args[1].endswith('/.journal.new')
+                       for r in runs for _n, name, args in r.calls)
+        assert not (lab.first[()][0].state / 'mv-items').exists()
+
+
+class RefusedRenameSuite:
+    """Subclassed once per layout: a file, a directory and a link are refused rename(2)
+    (EXDEV), at the archiving and at the put-back alike."""
+
+    layout = None
+
+    @pytest.fixture(scope='class')
+    def lab(self, tmp_path_factory):
+        return Lab(tmp_path_factory.mktemp('lab'), self.layout, refused=True)
+
+    def test_each_refused_item_is_archived_by_a_verified_copy(self, lab):
+        run = lab.first_run()
+        box = lab.first[()][0]
+        _converged(box, run.out, *lab.first[()][1:3], self.layout, 'refused')
+        copied = {run.item(args[2])[1] for _n, name, args in run.calls if name == 'cp'}
+        assert set(_refused(self.layout)) <= copied, copied
+
+    def test_a_retry_converges_after_a_fault_around_a_refused_rename(self, lab):
+        """Failed or killed before the rename, killed right after it refused, at each call
+        that follows up to its copy."""
+        run = lab.first_run()
+        refused = {f'{lab.first[()][0].data}/{name}' for name in _refused(self.layout)}
+        for at, name, args in run.calls:
+            if name == 'rename' and args[3] in refused:
+                for k in range(at, at + 6):
+                    for mode in ('fail', 'kill', 'done'):
+                        ChaosSuite._scenario(self, lab, (k, mode), None)

@@ -153,7 +153,7 @@ LEFT_REFUSED=""
 if [ -n "$ARCHIVE_DUE" ]; then
     : > "$ARCHIVE_PENDING"
     ARCHIVE_RC=0
-    sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG" || ARCHIVE_RC=$?
+    UCM_PYTHON=%{ucm_python} sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG" || ARCHIVE_RC=$?
     case $ARCHIVE_RC in
         0) ;;
         3) LEFT_REFUSED=1 ;;

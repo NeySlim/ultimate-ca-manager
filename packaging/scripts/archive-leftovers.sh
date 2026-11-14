@@ -5,7 +5,8 @@
 # archive, so the install goes on as on a new machine. Nothing is ever deleted: a failed
 # step puts back what was moved, and the service is then not started.
 #
-# Usage: archive-leftovers.sh <ucm home> <data dir> <config dir> [<archive parent> [<log>]]
+# Usage: UCM_PYTHON=<python> archive-leftovers.sh <ucm home> <data dir> <config dir>
+#            [<archive parent> [<log>]]
 # Exit 0: nothing to archive, or archived; 3: a database it must not archive is left in
 # place, and the service will refuse to start on it; 1: not archived, everything is back
 # in place; 2: not archived, some files are still in the archive (the next run tries to
@@ -18,6 +19,8 @@ CONFIG=$3
 # Beside the home (/opt/ucm-archive): outside every path the service may write or back up
 PARENT=${4:-${UCM_HOME%/*}/ucm-archive}
 LOG=${5:-/var/log/ucm/leftover-archive.log}
+# Renames with rename(2) alone; without it, every move is a verified copy
+PYTHON=${UCM_PYTHON:-}
 # The data directories the packages own or create: kept in place, their contents archived
 KEEP_DIRS="ca certs private crl scep backups sessions"
 TAB=$(printf '\t')
@@ -37,20 +40,18 @@ env_value() {
         | tail -n 1 | sed -E 's/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/'
 }
 
-device() { stat -c %d -- "$1"; }
+# $1 is a mount point, from the mount table (a bind mount of the same filesystem too):
+# kept in place, as rm -rf would empty it then fail (EBUSY)
+is_mount() {
+    mnt=$(findmnt -n -o TARGET -T "$1" 2>/dev/null) && [ "$mnt" = "$(normal "$1")" ]
+}
 
-# The mount holding $1 and its type, from the mount table: a bind mount of the same
-# filesystem is a mount of its own (stat %m misses one above $1). Empty when unknown.
-mount_of() { findmnt -n -o TARGET,FSTYPE -T "$1" 2>/dev/null; }
-
-is_mount() { mnt=$(mount_of "$1") && [ "${mnt% *}" = "$(normal "$1")" ]; }
-
-# rename(2) of $1 to $2 succeeds: one device and one mount, and no directory on overlayfs
-# (one from a lower layer is refused). Otherwise mv would copy, outside the journal.
-renames() {
-    [ "$(device "$1")" = "$(device "${2%/*}")" ] || return 1
-    mnt=$(mount_of "${1%/*}") && [ -n "$mnt" ] && [ "$mnt" = "$(mount_of "${2%/*}")" ] || return 1
-    [ ! -d "$1" ] || [ -L "$1" ] || [ "${mnt##* }" != overlay ]
+# rename(2) of $1 to $2 (absent), never a copy: GNU mv copies when it is refused (EXDEV),
+# outside the journal. Fails, moving nothing, without an interpreter.
+rename_item() {
+    [ -n "$PYTHON" ] && "$PYTHON" -I -c \
+        'import os, sys; a, b = sys.argv[1:]; os.path.lexists(b) and sys.exit(1); os.rename(a, b)' \
+        "$1" "$2" 2>/dev/null
 }
 
 present() { [ -e "$1" ] || [ -L "$1" ]; }
@@ -83,18 +84,17 @@ digest() {
 # $1 and $2 have one digest, and both could be taken
 same() { d1=$(digest "$1") && d2=$(digest "$2") && [ -n "$d1" ] && [ "$d1" = "$d2" ]; }
 
-# Moves $1 to $2 (absent): a rename on one filesystem, else a verified copy whose source
-# is removed only once every item is in the archive (remove_copied)
+# Moves $1 to $2 (absent): a rename, else a verified copy whose source is removed only
+# once every item is in the archive (remove_copied). A refused rename moved nothing: its
+# line leaves the journal before the copy line comes.
 move_item() {
-    if [ -e "$2" ] || [ -L "$2" ]; then return 1; fi
-    if renames "$1" "$2"; then
-        printf 'rename\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
-        mv -- "$1" "$2" || return 1
-    else
-        printf 'copy\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
-        cp -a -- "$1" "$2" || return 1
-        same "$1" "$2" || return 1
-    fi
+    if present "$2"; then return 1; fi
+    printf 'rename\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
+    rename_item "$1" "$2" && return 0
+    { present "$1" && ! present "$2" && drop_line "rename$TAB$1$TAB$2"; } || return 1
+    printf 'copy\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
+    cp -a -- "$1" "$2" || return 1
+    same "$1" "$2" || return 1
 }
 
 is_kept() {
@@ -111,7 +111,7 @@ archive_contents() {
     for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
         [ -e "$entry" ] || [ -L "$entry" ] || continue
         if [ -d "$entry" ] && [ ! -L "$entry" ] && { is_kept "$1" "${entry##*/}" \
-                || [ "$(device "$entry")" != "$(device "$1")" ] || is_mount "$entry"; }; then
+                || is_mount "$entry"; }; then
             archive_contents "$entry" "$2/${entry##*/}" || return 1
         else
             move_item "$entry" "$2/${entry##*/}" || return 1
@@ -139,48 +139,14 @@ fips_written() {
         && case $FIPS_LINE in "$(cat -- "$1")"*) true ;; *) false ;; esac
 }
 
-# The names in tree $1, sorted
-names() { list=$(cd -- "$1" && find . -print) && printf '%s\n' "$list" | LC_ALL=C sort; }
-
-# Every line of $1 is a line of $2
-within() {
-    printf '%s\n' "$1" | while IFS= read -r line; do
-        case "
-$2
-" in *"
-$line
-"*) ;; *) exit 1 ;; esac
-    done
-}
-
-# $1 and $2 both left by a mv cut short after it fell back on a copy (from $2 when a back
-# line says so): its source stays whole until its target is. The side that is not whole
-# goes; nothing goes when neither can be shown to hold all the other has.
-settle() {
-    if grep -qxF "back$TAB$1$TAB$2" "$JOURNAL"; then from=$2 to=$1; else from=$1 to=$2; fi
-    a=$(digest "$from") && b=$(digest "$to") || return 1
-    if [ "$a" = "$b" ]; then
-        rm -rf -- "$2"
-    elif [ ! -d "$from" ] || [ -L "$from" ]; then
-        # A file leaves its source in one unlink: still there, it is whole
-        rm -rf -- "$to"
-    elif na=$(names "$from") && nb=$(names "$to") && within "$nb" "$na"; then
-        rm -rf -- "$to"
-    elif within "$a" "$b"; then
-        # Removing its source: what is left of it is in the target, unchanged
-        rm -rf -- "$from"
-    else
-        return 1
-    fi
-}
-
-# $1 could not be undone; named in $stuck only while it is really there. A failed line
-# remembers it in the journal: met again at the next attempt, retrying alone will not do.
+# $1 could not be undone (nor $2, found beside it); named in $stuck only while it is
+# really there. A failed line remembers it in the journal: met again at the next attempt,
+# retrying alone will not do.
 unsettled() {
     left=1
     case " $seen " in *" $1 "*) return 0 ;; esac
     seen="$seen $1"
-    if present "$1"; then stuck="$stuck $1"; fi
+    if present "$1"; then stuck="$stuck $1${2:+ $2}"; fi
     if grep -qxF "failed$TAB$1" "$JOURNAL" 2>/dev/null; then
         again=1
     else
@@ -207,13 +173,11 @@ roll_back() {
     while IFS="$TAB" read -r op src dst; do
         case $op in
             rename)
+                # A rename is atomic: both there, the source was made again since
                 if present "$dst" && present "$src"; then
-                    settle "$src" "$dst" || unsettled "$dst"
-                fi
-                # A back line first: a put-back that falls back on a copy is settled the other way
-                if present "$dst" && ! present "$src"; then
-                    { printf 'back\t%s\t%s\n' "$src" "$dst" >> "$JOURNAL" && mv -- "$dst" "$src"; } \
-                        || unsettled "$dst"
+                    unsettled "$dst" "$src"
+                elif present "$dst"; then
+                    rename_item "$dst" "$src" || unsettled "$dst"
                 fi ;;
             remove)
                 # Undone already when the copy is gone: its source was whole again first
