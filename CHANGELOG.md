@@ -117,6 +117,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Login: failed second-factor (TOTP, recovery code, security key) and passkey attempts are counted in the database, so the lockout applies on every node, survives a restart, and parallel attempts never get more tries than `max_login_attempts`. An attempt counts when it is made rather than when it fails, and a count left idle for `lockout_duration` is forgotten.
 - Dependencies: dnspython 2.9.2, which bounds the services of a WKS record (CVE-2026-128089). UCM parses record text only for TXT values it computes, so no UCM path was exposed.
 - Backup: a merge restore no longer turns a certificate or a CA revoked for good here back into a hold or a valid one, nor its revocation record into a hold.
 - Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.

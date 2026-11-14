@@ -91,9 +91,10 @@ def make_user(app):
 
     yield _make
 
-    from api.v2.auth_methods import _2fa_failed_attempts
-    _2fa_failed_attempts.clear()
+    from models.second_factor_failure import SecondFactorFailure
     with app.app_context():
+        SecondFactorFailure.query.filter(
+            SecondFactorFailure.target.in_([str(uid) for uid in created])).delete()
         for uid in created:
             WebAuthnChallenge.query.filter_by(user_id=uid).delete()
             WebAuthnCredential.query.filter_by(user_id=uid).delete()
