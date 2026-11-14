@@ -138,10 +138,12 @@ def test_a_row_of_a_crashed_run_is_taken_once_its_heartbeat_expires(app, ha):
 def test_a_restart_of_the_same_node_is_never_refused_nor_delayed(app, ha, token, age):
     node = PREFIX + 'again'
     _put(app, node, token, age=age)
+    polls = []
     with app.app_context():
         waited = scheduler_leader.claim_node_at_start(node, 'same', stale_seconds=3, poll=0.05,
-                                                      release_at_exit=False)
-    assert waited < 0.05 and _row(app, node)[0] == 'same'
+                                                      sleep=polls.append, release_at_exit=False)
+    # Taken at the first try: not one poll, whatever the database's round trip costs
+    assert polls == [] and waited < 3 and _row(app, node)[0] == 'same'
 
 
 def test_a_claim_alone_does_not_make_the_node_ready(app, ha):
@@ -358,8 +360,12 @@ BOOT = textwrap.dedent('''
     scheduler_leader.CLAIM_POLL_SECONDS = 0.1
     claim = scheduler_leader.claim_node_at_start
     def timed(*a, **k):
-        waited = claim(*a, **k)
-        print(f'CLAIMED {time.time():.3f} {waited:.3f}', flush=True)
+        polls = []
+        def sleep(s):
+            polls.append(s)
+            time.sleep(s)
+        waited = claim(*a, sleep=sleep, **k)
+        print(f'CLAIMED {time.time():.3f} {waited:.3f} {len(polls)}', flush=True)
         return waited
     scheduler_leader.claim_node_at_start = timed
     from config import settings
@@ -433,21 +439,34 @@ def test_real_nodes_under_one_identifier(boot):
     holder.send_signal(signal.SIGKILL)
     killed = time.time()
     holder.wait(10)
+    from sqlalchemy import create_engine
+    from utils.db_url import sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(boot.url))
+    try:
+        asked = time.time()
+        with engine.connect() as conn:  # the dead run's heartbeat age, on the server's clock
+            age = conn.execute(text(
+                "SELECT extract(epoch FROM (clock_timestamp() AT TIME ZONE 'UTC') - heartbeat_at)"
+                " FROM cluster_nodes WHERE node_id = 'same-node'")).scalar()
+    finally:
+        engine.dispose()
+    expires = asked + 3 * wake - float(age)
     restart = boot('once', 2, wake)
     line, out = _read_until(restart, 'CLAIMED')
     claimed_at, waited = float(line.split()[1]), float(line.split()[2])
-    assert waited > 0 and 3 * wake - 0.5 <= claimed_at - killed <= 3 * wake + 0.5, out
+    # Not before that heartbeat expires; bounded above by the stale window plus a start
+    assert expires - 0.2 <= claimed_at <= killed + 3 * wake + 30, out
     out += restart.communicate(timeout=180)[0]
     assert restart.returncode == 0 and 'BOOTED' in out, out[-3000:]
-    print(f'restart after SIGKILL claimed the row {claimed_at - killed:.2f}s after the kill '
-          f'(stale window {3 * wake:.0f}s)')
+    print(f'restart after SIGKILL claimed the row {claimed_at - killed:.2f}s after the kill, '
+          f'{claimed_at - expires:.2f}s after expiry, waited {waited:.2f}s (stale window {3 * wake:.0f}s)')
 
     # That run stopped cleanly: the row is free, the next one starts at once
     again = boot('once', 3, wake)
     out = again.communicate(timeout=180)[0]
     assert again.returncode == 0, out[-3000:]
-    waited = float(next(l for l in out.splitlines() if l.startswith('CLAIMED')).split()[2])
-    assert waited < 0.1, out
+    claimed = next(ln for ln in out.splitlines() if ln.startswith('CLAIMED')).split()
+    assert claimed[3] == '0' and float(claimed[2]) < 3 * wake, out  # no poll: taken at once
 
 
 def test_a_refused_duplicate_leaves_the_live_node_scans_alone(boot):
