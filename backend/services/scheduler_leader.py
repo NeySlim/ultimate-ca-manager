@@ -251,13 +251,14 @@ _HEARTBEAT_SQL = text(
     f" WHERE {_FREE_FOR}").bindparams(
     bindparam('started', type_=DateTime), bindparam('now', type_=DateTime),
     bindparam('fresh_from', type_=DateTime), bindparam('leader', type_=Boolean))
-# Taken from another token: what the previous process published is reset until the first heartbeat
+# Taken from another token: what the previous process published is reset until the first heartbeat.
+# No version: a row only claimed is not registered yet (node_registered, readiness)
 _SAME = "cluster_nodes.instance_token = excluded.instance_token"
 _CLAIM_SQL = text(
-    "INSERT INTO cluster_nodes (node_id, started_at, heartbeat_at, is_leader, version, pid, instance_token)"
-    " VALUES (:n, :now, :now, :false, :version, :pid, :token)"
+    "INSERT INTO cluster_nodes (node_id, started_at, heartbeat_at, is_leader, pid, instance_token)"
+    " VALUES (:n, :now, :now, :false, :pid, :token)"
     " ON CONFLICT (node_id) DO UPDATE SET heartbeat_at = excluded.heartbeat_at,"
-    " instance_token = excluded.instance_token, version = excluded.version, pid = excluded.pid,"
+    " instance_token = excluded.instance_token, pid = excluded.pid,"
     f" started_at = CASE WHEN {_SAME} THEN cluster_nodes.started_at ELSE excluded.started_at END,"
     f" is_leader = CASE WHEN {_SAME} THEN cluster_nodes.is_leader ELSE :false END,"
     f" kek_fingerprint = CASE WHEN {_SAME} THEN cluster_nodes.kek_fingerprint ELSE NULL END"
@@ -311,11 +312,10 @@ def write_heartbeat(node_id, leader, started_at, token=None, wake_interval=None)
 
 
 def _claim(node_id, token, stale_seconds) -> bool:
-    from config.settings import Config
     from models import db
     now = cluster_utc_now()
     taken = db.session.execute(_CLAIM_SQL, {
-        'n': node_id, 'now': now, 'false': False, 'version': Config.APP_VERSION, 'pid': os.getpid(),
+        'n': node_id, 'now': now, 'false': False, 'pid': os.getpid(),
         'token': token, 'fresh_from': now - timedelta(seconds=stale_seconds)}).rowcount
     db.session.commit()
     return bool(taken)
@@ -441,8 +441,10 @@ def cluster_nodes_detail(wake_interval) -> list:
 
 
 def node_registered(node_id) -> bool:
+    """A scheduler heartbeat wrote this node's row, in this run or an earlier one."""
     from models import ClusterNode, db
-    return db.session.get(ClusterNode, node_id) is not None
+    node = db.session.get(ClusterNode, node_id)
+    return node is not None and node.version is not None
 
 
 def node_is_leader(node_id, wake_interval) -> bool:

@@ -142,6 +142,16 @@ def test_a_restart_of_the_same_node_is_never_refused_nor_delayed(app, ha, token,
     assert waited < 0.05 and _row(app, node)[0] == 'same'
 
 
+def test_a_claim_alone_does_not_make_the_node_ready(app, ha):
+    """Readiness waits for the scheduler process's first heartbeat, as before the claim."""
+    node = PREFIX + 'fresh'
+    with app.app_context():
+        scheduler_leader.claim_node_at_start(node, 'mine', release_at_exit=False)
+        assert scheduler_leader.node_registered(node) is False
+        assert scheduler_leader.write_heartbeat(node, False, scheduler_leader.cluster_utc_now(), 'mine')
+        assert scheduler_leader.node_registered(node) is True
+
+
 def test_a_clean_stop_releases_the_row(app, ha):
     node = PREFIX + 'clean'
     _put(app, node, 'mine')
