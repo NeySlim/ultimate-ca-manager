@@ -362,6 +362,47 @@ class TestSshAndHsm:
                 db.session.delete(provider)
                 db.session.commit()
 
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_hsm_sign_refuses_ml_dsa_in_fips_mode(self, monkeypatch, app, approves):
+        # A CA bound to an HSM ML-DSA key before the switch must not keep signing after it
+        from models.hsm import HsmKey, HsmProvider
+        from services.hsm import HsmService
+        _module(monkeypatch, approves)
+
+        class _Stub:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def sign(self, *args, **kwargs):
+                return b'signature'
+
+        monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: _Stub()))
+        pq = mldsa.MLDSA65PrivateKey.generate().public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        suffix = uuid.uuid4().hex[:6]
+        with app.app_context():
+            provider = HsmProvider(name=f'bao-{suffix}', type='openbao', config='{}')
+            db.session.add(provider)
+            db.session.commit()
+            key = HsmKey(provider_id=provider.id, key_identifier=f'pq-{suffix}', label=f'pq-{suffix}',
+                         algorithm='ML-DSA-65', key_type='asymmetric', purpose='signing',
+                         public_key_pem=pq)
+            db.session.add(key)
+            db.session.commit()
+            try:
+                monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+                with pytest.raises(FipsRestricted, match='^ML-DSA-65 keys not available in FIPS mode$'):
+                    HsmService.sign(key.id, b'tbs')
+                monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
+                assert HsmService.sign(key.id, b'tbs') == b'signature'
+            finally:
+                db.session.delete(key)
+                db.session.delete(provider)
+                db.session.commit()
+
 
 # ----------------------------------------------------------- renewal and imports
 

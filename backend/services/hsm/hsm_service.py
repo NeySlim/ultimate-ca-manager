@@ -672,6 +672,8 @@ class HsmService:
         if key.purpose not in ('signing', 'all'):
             raise ValueError(f"Key {key.label} is not for signing")
         registered = cls._registered_algorithm(key)
+        # A key bound before the switch or restored from a backup must not sign in FIPS mode
+        cls.refuse_in_fips_mode(registered.label if registered else key.algorithm)
         pure = registered is not None and not registered.needs_digest
         if pure and (hash_algorithm or padding):
             raise ValueError(f"{registered.label} signs the data itself: no digest or padding applies")
