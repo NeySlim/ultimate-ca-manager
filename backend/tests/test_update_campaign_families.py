@@ -21,7 +21,8 @@ def _asset(name):
     return {'name': name, 'browser_download_url': f'https://x/{name}'}
 
 
-ASSETS = [_asset(n) for n in (DEB, EL9, EL10, FC)] + [_asset(f'{n}.sha256') for n in (DEB, EL9, EL10, FC)]
+ASSETS = ([_asset(n) for n in (DEB, EL9, EL10, FC)] + [_asset(f'{n}.sha256') for n in (DEB, EL9, EL10, FC)]
+          + [_asset('full-stop-migrations.json')])
 
 
 def _clean(app):
@@ -38,6 +39,7 @@ def ha(app, monkeypatch, tmp_path):
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(updates, 'DATA_DIR', tmp_path)
     monkeypatch.setattr(updates, 'fetch_expected_sha256', lambda url, name: SHAS.get(name))
+    monkeypatch.setattr(updates, 'fetch_full_stop_marks', lambda url: {})
     _clean(app)
     yield
     _clean(app)

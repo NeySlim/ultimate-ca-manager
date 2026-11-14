@@ -246,6 +246,33 @@ def families_without_package(assets):
                   and updates.family_package(assets or [], f) is None)
 
 
+def _full_stop_refusal(assets, target):
+    """None, or why ``target`` cannot roll: the release's full-stop manifest names a migration
+    this database has not applied. A release without a readable manifest is refused too."""
+    from sqlalchemy import inspect, text
+    from migration_marks import FULL_STOP_ASSET
+    from models import db
+    from services import updates
+    asset = next((a for a in assets if a.get('name') == FULL_STOP_ASSET), None)
+    if asset is None:
+        return (f"the release publishes no {FULL_STOP_ASSET}: a rolling update cannot tell "
+                f"whether {target} requires every node stopped")
+    try:
+        marks = updates.fetch_full_stop_marks(asset['browser_download_url'])
+    except Exception as e:
+        return f"{FULL_STOP_ASSET} of the release not read ({e})"
+    applied = set()
+    if inspect(db.engine).has_table('_migrations'):
+        applied = {r[0] for r in db.session.execute(text("SELECT name FROM _migrations"))}
+    pending = sorted(set(marks) - applied)
+    if not pending:
+        return None
+    more = f" (and {len(pending) - 1} more)" if len(pending) > 1 else ""
+    return (f"{target} brings migration {pending[0]}{more}, which requires every node stopped: "
+            f"{marks[pending[0]]}. Stop every node, install {target} on each, then start them. "
+            f"Nothing was installed")
+
+
 def start_campaign(target, assets, initiated_by):
     """(started, message, campaign): one campaign at a time, over the nodes beating now,
     each to get the package of its family from ``assets`` (the release's assets)."""
@@ -261,6 +288,9 @@ def start_campaign(target, assets, initiated_by):
         return False, "No node beats in the cluster", None
     families = {n: nodes[n].family for n in order}
     packages, refusal = _catalog(assets or [], families)
+    if refusal:
+        return False, refusal, None
+    refusal = _full_stop_refusal(assets or [], target)
     if refusal:
         return False, refusal, None
     campaign = {'id': uuid.uuid4().hex, 'status': RUNNING, 'target': target,

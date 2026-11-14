@@ -45,6 +45,20 @@ class _FakeResponse:
             yield self.content[i:i + chunk_size]
 
 
+class TestFetchFullStopMarks:
+    def test_reads_the_marks(self, monkeypatch):
+        monkeypatch.setattr(updates.requests, 'get', lambda *a, **k: _FakeResponse(
+            text='{"full_stop": {"399_x": "why"}}'))
+        assert updates.fetch_full_stop_marks('http://x/full-stop-migrations.json') == {'399_x': 'why'}
+
+    @pytest.mark.parametrize('body', ['[]', '{}', '{"full_stop": ["399_x"]}',
+                                      '{"full_stop": {"399_x": 1}}', 'not json'])
+    def test_refuses_anything_else(self, monkeypatch, body):
+        monkeypatch.setattr(updates.requests, 'get', lambda *a, **k: _FakeResponse(text=body))
+        with pytest.raises(ValueError):
+            updates.fetch_full_stop_marks('http://x/full-stop-migrations.json')
+
+
 class TestFetchExpectedSha256:
     def test_parses_sha256sum_output(self, monkeypatch):
         digest = 'a' * 64

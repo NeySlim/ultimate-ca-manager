@@ -386,6 +386,24 @@ def fetch_expected_sha256(checksum_url, package_name):
     return expected
 
 
+def fetch_full_stop_marks(url):
+    """{migration name: reason} from a release's full-stop manifest (migration_marks.manifest)."""
+    import json
+    response = requests.get(url, timeout=30, allow_redirects=True, verify=_ca_bundle or True)
+    response.raise_for_status()
+    if len(response.text) > 1 << 20:
+        raise ValueError("the full-stop manifest is over 1 MiB")
+    try:
+        data = json.loads(response.text)
+    except ValueError:
+        raise ValueError("the full-stop manifest is not JSON") from None
+    marks = data.get('full_stop') if isinstance(data, dict) else None
+    if not isinstance(marks, dict) or not all(isinstance(k, str) and isinstance(v, str)
+                                              for k, v in marks.items()):
+        raise ValueError('the full-stop manifest is not {"full_stop": {name: reason}}')
+    return marks
+
+
 def download_update(download_url, package_name, expected_sha256=None):
     """
     Download update package to DATA_DIR/updates (accessible by ucm-watcher.service)
