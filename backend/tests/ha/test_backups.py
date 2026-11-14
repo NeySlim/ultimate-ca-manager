@@ -43,9 +43,18 @@ def test_a_backup_on_a_is_listed_on_b_and_downloads_after_a_is_gone(cluster, adm
     assert task_runs(follower.app_log_text(), 'backup_retention') == 0
     assert task_runs(leader.app_log_text(), 'backup_retention') >= 1
 
+    # Resumed at mid-archive from B, through gunicorn's own wsgi.file_wrapper
+    url = f'/api/v2/system/backup/{name}/download'
+    cut = item['size_bytes'] // 2
+    first = on_b.get(url, headers={'Range': f'bytes=0-{cut - 1}'})
+    rest = on_b.get(url, headers={'Range': f'bytes={cut}-', 'If-Range': f'"{item["sha256"]}"'})
+    assert (first.status_code, rest.status_code) == (206, 206), (first.text[:200], rest.text[:200])
+    assert rest.headers['Content-Range'] == f'bytes {cut}-{item["size_bytes"] - 1}/{item["size_bytes"]}'
+    assert hashlib.sha256(first.content + rest.content).hexdigest() == item['sha256']
+
     a.kill()
     wait_until(lambda: not a.alive(), 30, f'{a.name} gone')
-    r = on_b.get(f'/api/v2/system/backup/{name}/download')
+    r = on_b.get(url)
     assert r.status_code == 200, r.text[:500]
     assert hashlib.sha256(r.content).hexdigest() == item['sha256']
     assert len(r.content) == item['size_bytes']
