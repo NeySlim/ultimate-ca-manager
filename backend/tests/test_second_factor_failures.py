@@ -359,3 +359,77 @@ def test_the_three_routes_count_alike_without_insert_returning(nodes, monkeypatc
             event.remove(engine, 'before_cursor_execute', _refuse_returning)
     one_route = [(401, n) for n in range(1, max_attempts + 1)] + [(429, max_attempts)]
     assert seen == one_route * 3, seen
+
+
+# Codes checked inside an open session share the login's counter: one budget per secret
+
+RECOVERY = 'AAAA-BBBB-CCCC-DDDD'
+SESSION_ROUTES = {
+    'disable-totp': ('/api/v2/account/2fa/disable', 'code'),
+    'disable-recovery': ('/api/v2/account/2fa/disable', 'backup_code'),
+    'regenerate': ('/api/v2/account/2fa/recovery-codes/regenerate', 'code'),
+}
+
+
+def _open_session(application, user):
+    """A full session after password and TOTP, with its CSRF header; the user gets a recovery code."""
+    from utils.backup_codes import hash_codes
+    with application.app_context():
+        row = db.session.get(User, user['id'])
+        row.backup_codes = hash_codes([RECOVERY])
+        db.session.commit()
+        db.session.remove()
+    c = application.test_client()
+    assert c.post('/api/v2/auth/login/password', json={'username': user['username'],
+                                                       'password': PASSWORD}).status_code == 200
+    r = c.post('/api/v2/auth/login/2fa', json={'code': pyotp.TOTP(user['secret']).now()})
+    assert r.status_code == 200, r.data
+    token = r.get_json()['data'].get('csrf_token')
+    return c, {'X-CSRF-Token': token} if token else {}
+
+
+def _right_value(user, field):
+    import time
+    return RECOVERY if field == 'backup_code' else pyotp.TOTP(user['secret']).at(time.time() + 30)
+
+
+def _totp_still_on(application, user):
+    with application.app_context():
+        on = db.session.get(User, user['id']).totp_confirmed
+        db.session.remove()
+        return on
+
+
+@pytest.mark.parametrize('route', sorted(SESSION_ROUTES))
+def test_codes_checked_in_a_session_are_bounded_with_the_login(nodes, route):
+    a, b, user = nodes
+    max_attempts, _ = _max_attempts(a)
+    url, field = SESSION_ROUTES[route]
+    c, headers = _open_session(a, user)
+    for n in range(1, max_attempts + 1):
+        r = c.post(url, json={field: '00000000'}, headers=headers)
+        assert r.status_code == 400, r.data
+        assert _rows(b)[('2fa', str(user['id']))][0] == n
+    for value in ('00000000', _right_value(user, field)):
+        r = c.post(url, json={field: value}, headers=headers)
+        assert (r.status_code, r.get_json()['message']) == LOCKED
+    assert _totp_still_on(a, user)
+    # The same budget: the holder's next login waits for the lock to expire
+    other = b.test_client()
+    assert other.post('/api/v2/auth/login/password', json={
+        'username': user['username'], 'password': PASSWORD}).status_code == 200
+    r = other.post('/api/v2/auth/login/2fa', json={'code': '00000000'})
+    assert (r.status_code, r.get_json()['message']) == LOCKED
+
+
+@pytest.mark.parametrize('route', sorted(SESSION_ROUTES))
+def test_a_session_code_check_that_succeeds_clears_the_counter(nodes, route):
+    a, b, user = nodes
+    max_attempts, _ = _max_attempts(a)
+    url, field = SESSION_ROUTES[route]
+    c, headers = _open_session(a, user)
+    for _ in range(max_attempts - 1):
+        assert c.post(url, json={field: '00000000'}, headers=headers).status_code == 400
+    r = c.post(url, json={field: _right_value(user, field)}, headers=headers)
+    assert r.status_code == 200, r.data
+    assert ('2fa', str(user['id'])) not in _rows(b)

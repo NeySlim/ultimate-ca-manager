@@ -271,6 +271,7 @@ Two guards, because the two jobs have different answers.
 WebAuthn authentication includes rate limiting:
 
 - Attempts counted per username in the database, as are second-factor attempts per pending login: the count and the lockout apply on every node and survive a restart
+- A code checked in an open session (disabling 2FA, regenerating recovery codes) counts against the same per-account budget as the login's second step
 - Account lockout after repeated failures
 - Separate rate limit from password login
 

@@ -26,6 +26,22 @@ from . import bp
 logger = logging.getLogger(__name__)
 
 
+def _reserve_code_check(user_id):
+    """The 429 to answer, or None once this check is counted on the login's budget.
+
+    One counter per account (the pending login's): the secret guessed is the same,
+    so a stolen session gets no tries beyond what the login allows."""
+    from api.v2.auth_methods import TWO_FA, _reserve_2fa_attempt
+    if _reserve_2fa_attempt(TWO_FA, str(user_id)):
+        return None
+    return error_response('Too many failed attempts. Try again later.', 429)
+
+
+def _clear_code_checks(user_id):
+    from api.v2.auth_methods import TWO_FA, _clear_2fa_failures
+    _clear_2fa_failures(TWO_FA, str(user_id))
+
+
 # ============================================================================
 # 2FA Management
 # ============================================================================
@@ -138,6 +154,11 @@ def disable_2fa():
     if not code and not backup_code:
         return error_response('Code or backup code required', 400)
 
+    # Counted before the row lock below, which the reservation's commit would release
+    locked = _reserve_code_check(g.current_user.id)
+    if locked:
+        return locked
+
     # Required 2FA (#141, or a key turned on as second factor) keeps one factor;
     # checked under the user row lock so a concurrent key removal cannot race it.
     user, refused = lock_for_factor_change(g.current_user.id, dropping_totp=True)
@@ -168,6 +189,7 @@ def disable_2fa():
     ok, _err = safe_commit(logger, "Failed to disable 2FA")
     if not ok:
         return _err
+    _clear_code_checks(user.id)
 
     AuditService.log_action(
         action='mfa_disable',
@@ -252,6 +274,9 @@ def regenerate_recovery_codes():
     user = db.session.get(User, g.current_user.id)
     if not user or not user.totp_confirmed:
         return error_response('2FA not enabled', 400)
+    locked = _reserve_code_check(user.id)
+    if locked:
+        return locked
 
     # Verify code, once only
     if not consume_totp(user, code):
@@ -264,6 +289,7 @@ def regenerate_recovery_codes():
     ok, _err = safe_commit(logger, "Failed to regenerate backup codes")
     if not ok:
         return _err
+    _clear_code_checks(user.id)
 
     return success_response(
         data={'backup_codes': new_codes},
