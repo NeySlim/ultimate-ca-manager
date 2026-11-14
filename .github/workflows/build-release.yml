@@ -793,8 +793,8 @@ jobs:
           sudo dnf install ./ucm-el10-RPM_VERSION-1.el10.noarch.rpm
           ```
           
-          ### FIPS mode (preview)
-          FIPS mode is a preview: feedback is welcome on [#399](https://github.com/REPO/issues/399). Full guide: [FIPS Mode](https://github.com/REPO/wiki/FIPS-Mode).
+          ### FIPS mode
+          The `-fips` image runs on the OpenSSL FIPS Provider 3.5.9 (CMVP certificate #5586), which approves ML-DSA, Ed25519 and Ed448; the packages run on the FIPS module of RHEL 9 (#5573) or Ubuntu 24.04 (#5115), which do not. Full guide: [FIPS Mode](https://github.com/REPO/wiki/FIPS-Mode).
           
           Docker, any Linux host (amd64, arm64):
           ```bash
