@@ -1,4 +1,6 @@
-"""HA backup archives kept in the database, in fixed-size chunks (upgrade step 159)."""
+"""HA backup archives kept in the database, in fixed-size chunks (upgrade step 160)."""
+from sqlalchemy import DDL, event
+
 from models import db
 
 _ID = db.BigInteger().with_variant(db.Integer, 'sqlite')
@@ -27,3 +29,9 @@ class BackupArchiveChunk(db.Model):
                            primary_key=True)
     seq = db.Column(db.Integer, primary_key=True)
     data = db.Column(db.LargeBinary, nullable=False)
+
+
+# Encrypted chunks do not compress: stored out of line as they are, as step 160 does
+event.listen(BackupArchiveChunk.__table__, 'after_create', DDL(
+    'ALTER TABLE backup_archive_chunks ALTER COLUMN data SET STORAGE EXTERNAL'
+).execute_if(dialect='postgresql'))

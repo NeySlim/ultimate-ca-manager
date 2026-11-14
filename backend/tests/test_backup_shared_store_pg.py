@@ -235,6 +235,46 @@ def test_a_download_honours_suffix_ranges_validators_and_refusals(app, auth_clie
     assert _checked_out(app) == before
 
 
+@pytest.fixture
+def short_idle_timeout(app, monkeypatch):
+    """The store's connections under a server that ends a transaction idle for 300 ms."""
+    from sqlalchemy import create_engine, event
+    from models import db
+    with app.app_context():
+        engine = create_engine(db.engine.url, pool_size=2)
+
+    @event.listens_for(engine, 'connect')
+    def _short(dbapi_conn, _record):
+        with dbapi_conn.cursor() as cur:
+            cur.execute("SET idle_in_transaction_session_timeout = 300")
+    monkeypatch.setattr(shared_store, '_engine', lambda: engine)
+    yield engine
+    engine.dispose()
+
+
+def test_a_slow_write_and_a_slow_read_outlive_an_idle_transaction_timeout(
+        app, nodes, short_idle_timeout):
+    import time
+    pieces = [_payload(shared_store.CHUNK_SIZE) for _ in range(2)]
+
+    def slow():
+        for piece in pieces:
+            yield piece
+            time.sleep(1)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(slow())
+    with app.test_request_context(f'/api/v2/system/backup/{name}/download'):
+        response = shared_store.download_response(name)
+        got = bytearray()
+        try:
+            for part in response.response:
+                got += part
+                time.sleep(0.5)
+        finally:
+            response.close()
+    assert bytes(got) == b''.join(pieces)
+
+
 def test_the_restore_reader_streams_and_seeks_a_stored_archive(app, nodes):
     data = b'UCMB' + bytes([4]) + _payload(3 * shared_store.CHUNK_SIZE)
     with app.app_context(), nodes('a'):
@@ -636,3 +676,14 @@ def test_the_fips_preflight_reads_the_kdf_of_the_stored_archives(app, nodes):
         names = [storage.create_archive(data)[1] for data in (argon, pbkdf2)]
         found = fips_preflight._backup_archives()
     assert names[0] in found and names[1] not in found
+
+
+def test_chunks_are_stored_out_of_line_uncompressed(app):
+    # Encrypted bytes do not compress: EXTERNAL spares PostgreSQL the attempt
+    from models import db
+    with app.app_context(), db.engine.connect() as conn:
+        storage_kind = conn.execute(text(
+            "SELECT a.attstorage FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = current_schema() "
+            "WHERE c.relname = 'backup_archive_chunks' AND a.attname = 'data'")).scalar()
+    assert storage_kind == 'e'

@@ -213,6 +213,14 @@ def snapshot(engine):
                     "JOIN pg_namespace n ON n.oid = t.relnamespace AND n.nspname = current_schema() "
                     "WHERE d.deptype IN ('a', 'i')")):
                 out[('sequence', table, column)] = seq_type
+            # A column stored otherwise than its type's default (SET STORAGE)
+            for table, column, storage in conn.execute(text(
+                    "SELECT c.relname, a.attname, a.attstorage FROM pg_attribute a "
+                    "JOIN pg_class c ON c.oid = a.attrelid AND c.relkind = 'r' "
+                    "JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = current_schema() "
+                    "JOIN pg_type ty ON ty.oid = a.atttypid "
+                    "WHERE a.attnum > 0 AND NOT a.attisdropped AND a.attstorage <> ty.typstorage")):
+                out[('storage', table, column)] = storage
     return out
 
 

@@ -83,6 +83,7 @@ def store_archive(data, filename_factory) -> tuple:
 
     archives, chunks = _tables()
     with _engine().connect() as conn:
+        _long_transaction(conn)
         for _ in range(_NAME_ATTEMPTS):
             filename = filename_factory()
             try:
@@ -162,9 +163,20 @@ def timestamp(created_at) -> float:
     return created_at.replace(tzinfo=timezone.utc).timestamp()
 
 
+def _long_transaction(conn):
+    """A write or a read that may idle between chunks outlives idle_in_transaction_session_timeout."""
+    conn.execute(text("SET LOCAL idle_in_transaction_session_timeout = 0"))
+    return conn
+
+
 def _snapshot(engine):
     # One snapshot for the whole read: a deletion meanwhile cannot cut an archive short
-    return engine.connect().execution_options(isolation_level='REPEATABLE READ')
+    conn = engine.connect().execution_options(isolation_level='REPEATABLE READ')
+    try:
+        return _long_transaction(conn)
+    except Exception:
+        conn.close()
+        raise
 
 
 def iter_archive(filename: str):

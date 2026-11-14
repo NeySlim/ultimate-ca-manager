@@ -17,6 +17,8 @@ ARCHIVES = ("CREATE TABLE IF NOT EXISTS backup_archives ("
 CHUNKS = ("CREATE TABLE IF NOT EXISTS backup_archive_chunks ("
           "archive_id {bigint} NOT NULL REFERENCES backup_archives (id) ON DELETE CASCADE, "
           "seq INTEGER NOT NULL, data {blob} NOT NULL, PRIMARY KEY (archive_id, seq))")
+# Encrypted chunks do not compress: out of line, never through pglz
+EXTERNAL = "ALTER TABLE backup_archive_chunks ALTER COLUMN data SET STORAGE EXTERNAL"
 INDEX = ("CREATE INDEX IF NOT EXISTS ix_backup_archives_created_at "
          "ON backup_archives (created_at)")
 
@@ -32,6 +34,7 @@ def upgrade(conn):
     from sqlalchemy import text
     conn.execute(text(ARCHIVES.format(serial='BIGSERIAL PRIMARY KEY', timestamp='TIMESTAMP WITHOUT TIME ZONE')))
     conn.execute(text(CHUNKS.format(bigint='BIGINT', blob='BYTEA')))
+    conn.execute(text(EXTERNAL))
     conn.execute(text(INDEX))
     logger.info("[160] backup_archives (PostgreSQL)")
 
