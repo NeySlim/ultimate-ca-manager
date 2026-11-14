@@ -422,6 +422,37 @@ def test_codes_checked_in_a_session_are_bounded_with_the_login(nodes, route):
     assert (r.status_code, r.get_json()['message']) == LOCKED
 
 
+def test_a_disable_refused_before_any_code_is_checked_uses_no_attempt(nodes):
+    """Required 2FA with no key left refuses the request whatever the code: nothing is counted."""
+    from models import SystemConfig
+    a, b, user = nodes
+    c, headers = _open_session(a, user)
+    with a.app_context():
+        row = SystemConfig.query.filter_by(key='enforce_2fa').first()
+        previous = row.value if row else None
+        if row:
+            row.value = 'true'
+        else:
+            db.session.add(SystemConfig(key='enforce_2fa', value='true'))
+        db.session.commit()
+        db.session.remove()
+    try:
+        for _ in range(_max_attempts(a)[0] + 1):
+            r = c.post('/api/v2/account/2fa/disable', json={'backup_code': RECOVERY}, headers=headers)
+            assert r.status_code == 403, r.data
+        assert ('2fa', str(user['id'])) not in _rows(b)
+    finally:
+        with a.app_context():
+            row = SystemConfig.query.filter_by(key='enforce_2fa').first()
+            if previous is None:
+                db.session.delete(row)
+            else:
+                row.value = previous
+            db.session.commit()
+            db.session.remove()
+    assert _totp_still_on(a, user)
+
+
 @pytest.mark.parametrize('route', sorted(SESSION_ROUTES))
 def test_a_session_code_check_that_succeeds_clears_the_counter(nodes, route):
     a, b, user = nodes

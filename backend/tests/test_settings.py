@@ -183,7 +183,7 @@ class TestGeneralSettings:
         assert data['session_timeout'] == 7200
         assert data['max_login_attempts'] == 3
 
-    @pytest.mark.parametrize('value', [0, 2, -1, 'many'])
+    @pytest.mark.parametrize('value', [0, 2, -1, 'many', 4.5, True])
     def test_patch_max_login_attempts_under_the_minimum_is_refused(self, auth_client, value):
         """Under 3 every login would lock at its first failure: refused, nothing stored."""
         before = assert_success(auth_client.get('/api/v2/settings/general'))['max_login_attempts']

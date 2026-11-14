@@ -139,6 +139,18 @@ def confirm_2fa():
     )
 
 
+def _disable_refusal(user, refused, code):
+    """The answer of a disable request that no code can make succeed, or None."""
+    if not user:
+        return error_response('User not found', 404)
+    if refused:
+        return error_response(
+            'Your account requires a second factor: register a security key before disabling TOTP', 403)
+    if code and not user.totp_secret:
+        return error_response('2FA not enabled', 400)
+    return None
+
+
 @bp.route('/api/v2/account/2fa/disable', methods=['POST'])
 @require_auth(session_only=True)
 def disable_2fa():
@@ -154,7 +166,14 @@ def disable_2fa():
     if not code and not backup_code:
         return error_response('Code or backup code required', 400)
 
-    # Counted before the row lock below, which the reservation's commit would release
+    # A request refused whatever its code checks none: it must not use up an attempt
+    user, refused = lock_for_factor_change(g.current_user.id, dropping_totp=True)
+    answer = _disable_refusal(user, refused, code)
+    if answer:
+        db.session.rollback()
+        return answer
+
+    # Counted before the row lock below, which the reservation's commit releases
     locked = _reserve_code_check(g.current_user.id)
     if locked:
         return locked
@@ -162,16 +181,12 @@ def disable_2fa():
     # Required 2FA (#141, or a key turned on as second factor) keeps one factor;
     # checked under the user row lock so a concurrent key removal cannot race it.
     user, refused = lock_for_factor_change(g.current_user.id, dropping_totp=True)
-    if not user:
-        return error_response('User not found', 404)
-    if refused:
-        return error_response(
-            'Your account requires a second factor: register a security key before disabling TOTP', 403)
+    answer = _disable_refusal(user, refused, code)
+    if answer:
+        return answer
 
     # Verify with TOTP code
     if code:
-        if not user.totp_secret:
-            return error_response('2FA not enabled', 400)
         if not consume_totp(user, code):
             return error_response('Invalid verification code', 400)
     # Or verify with backup code

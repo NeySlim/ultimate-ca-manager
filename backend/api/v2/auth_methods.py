@@ -96,7 +96,7 @@ def _reserve_2fa_attempt(kind: str, key: str) -> bool:
     failures = case((expired, 1), else_=F.failures + 1)
     stmt = insert(F).values(
         kind=kind, target=key, failures=1,
-        locked_until=until if max_attempts <= 1 else None, updated_at=now,
+        locked_until=None, updated_at=now,
     ).on_conflict_do_update(
         index_elements=[F.kind, F.target],
         set_={'failures': failures,

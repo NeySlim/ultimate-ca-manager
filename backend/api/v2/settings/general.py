@@ -219,8 +219,12 @@ def update_general_settings():
     ]
 
     if 'max_login_attempts' in data:
+        raw = data['max_login_attempts']
         try:
-            attempts = int(data['max_login_attempts'])
+            # A boolean or a fractional number is not a count of attempts
+            if isinstance(raw, bool) or (isinstance(raw, float) and not raw.is_integer()):
+                raise ValueError(raw)
+            attempts = int(raw)
         except (TypeError, ValueError):
             return error_response('max_login_attempts must be an integer', 400)
         if attempts < MIN_LOGIN_ATTEMPTS:
