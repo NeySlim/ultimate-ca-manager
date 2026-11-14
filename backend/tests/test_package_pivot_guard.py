@@ -480,6 +480,36 @@ def test_the_rpm_post_marks_a_new_install_before_the_venv_is_built(tmp_path):
     assert len(_archiver_calls(_calls(log))) == 1
 
 
+def test_the_rpm_post_marks_a_new_install_before_anything_else(tmp_path):
+    """A %post killed at its first command still leaves the mark for the reinstall."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    (tmp_path / 'bin' / 'rm').write_text(f'#!{POSIX_SH}\nkill -9 $PPID; sleep 5\n')
+    body = _post_body(tmp_path, home, data, config)
+    out = subprocess.run([POSIX_SH, '-c', body, 'post', '1'], capture_output=True, text=True,
+                         timeout=20, env=env)
+    assert out.returncode == -9
+    assert (home / PENDING).exists()
+
+
+@pytest.mark.parametrize('count, kept', [('0', False), ('1', True)])
+def test_the_rpm_postun_drops_the_mark_on_erase_only(tmp_path, count, kept):
+    m = re.search(r'^%postun\n(.*?)^%files\n', SPEC.read_text(), re.M | re.S)
+    assert m, 'no %postun section'
+    body = m.group(1)
+    macro = '%systemd_postun_with_restart %{name}.service\n'
+    assert body.count(macro) == 1
+    body = _expand(body.replace(macro, ': systemd_postun\n'))
+    home = tmp_path / 'opt' / 'ucm'
+    home.mkdir(parents=True)
+    (home / PENDING).write_text('')
+    assert body.count('/opt/ucm') == 1
+    body = body.replace('/opt/ucm', str(home))
+    out = subprocess.run([POSIX_SH, '-c', body, 'postun', count], capture_output=True, text=True,
+                         timeout=20)
+    assert out.returncode == 0, out.stderr
+    assert (home / PENDING).exists() is kept
+
+
 def test_both_packages_ship_the_archiver_and_the_deb_its_guard():
     rules = subprocess.run(['make', '-n', '-f', 'packaging/debian/rules', 'override_dh_auto_install'],
                            cwd=ROOT, capture_output=True, text=True, timeout=10)

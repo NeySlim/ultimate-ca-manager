@@ -3,7 +3,7 @@ without fault converges to one complete archive, no file lost or duplicated, no 
 
 Every file command the script runs is wrapped: one sequence numbers all their calls, and
 a plan fails or kills the run (SIGKILL to its process group, no clean-up) at given calls,
-or kills it in the middle of a copy ('torn': the target exists with other content).
+or kills a copy as if cut short ('torn', 'trunc', 'meta': see _chaos).
 """
 import os
 import random
@@ -21,30 +21,43 @@ LAYOUTS = {
     'a mount point inside the data': lambda box: (box.data / 'updates',),
 }
 # Pairs drawn per layout from every (fault i while archiving, fault j while putting back)
-SEED, PAIRS, TORN_PAIRS = 20261114, 120, 60
+SEED, PAIRS = 20261114, 120
 
 
 def _chaos(box, layout):
-    """Every file command counts its calls in one sequence; the plan fails ('fail') or
-    kills the whole run without any clean-up ('kill') at the calls it names."""
+    """Every file command counts its calls in one sequence and names them; the plan fails
+    ('fail') or kills the whole run without any clean-up ('kill') at the calls it names.
+    On a cp, 'torn', 'trunc' and 'meta' kill it as a copy cut short would leave its target:
+    other content, part of the content, or the whole content before its attributes."""
     box.wrap(other_fs=LAYOUTS[layout](box))
     s = box.state
+    find, sort, head = (shutil.which(t) for t in ('find', 'sort', 'head'))
     for name in CHAOS:
         (box.bin / name).write_text(
             f'#!/bin/sh\nn=$(( $(cat {s}/count) + 1 )); echo $n > {s}/count\n'
-            f'case $(grep -x "$n [a-z]*" {s}/plan) in\n'
-            f'    *" fail") echo "{name}: injected failure" >&2; exit 1 ;;\n'
-            f'    *" kill") kill -9 0 ;;\n'
-            # A copy cut short while it writes: its target is there, with other content
-            f'    *" torn") [ {name} = cp ] && {{ {shutil.which(name)} "$@"; for last; do :; done\n'
-            f'        torn=$({shutil.which("find")} "$last" -type f | {shutil.which("sort")} | {shutil.which("head")} -n 1)\n'
-            f'        [ -z "$torn" ] || printf torn > "$torn"; }}; kill -9 0 ;;\n'
+            f'echo "$n {name}" >> {s}/names\n'
+            f'mode=$(grep -x "$n [a-z]*" {s}/plan); mode=${{mode#* }}\n'
+            f'case $mode in\n'
+            f'    fail) echo "{name}: injected failure" >&2; exit 1 ;;\n'
+            f'    kill) kill -9 0 ;;\n'
+            f'    torn|trunc|meta)\n'
+            f'        if [ {name} = cp ]; then\n'
+            f'            {shutil.which(name)} "$@"; for last; do :; done\n'
+            f'            cut=$({find} "$last" -type f | {sort} | {head} -n 1)\n'
+            f'            case $mode in\n'
+            f'                torn) [ -z "$cut" ] || printf torn > "$cut" ;;\n'
+            f'                trunc) [ -z "$cut" ] || {shutil.which("truncate")} -s 1 "$cut" ;;\n'
+            f'                meta) [ -z "$cut" ] || {shutil.which("touch")} -d @5 "$cut" ;;\n'
+            f'            esac\n'
+            f'        fi\n'
+            f'        kill -9 0 ;;\n'
             f'esac\nexec {shutil.which(name)} "$@"\n')
         (box.bin / name).chmod(0o755)
 
 
 def _chaos_run(box, plan=()):
     (box.state / 'count').write_text('0')
+    (box.state / 'names').write_text('')
     (box.state / 'plan').write_text(''.join(f'{n} {mode}\n' for n, mode in plan))
     out = box.run()
     return out, int((box.state / 'count').read_text())
@@ -155,21 +168,35 @@ def test_a_retry_converges_after_a_fault_while_putting_back(tmp_path, layout):
         _scenario(tmp_path / f'p{n}', layout, first, second)
 
 
-@pytest.mark.parametrize('layout', list(LAYOUTS))
-def test_a_retry_converges_after_a_copy_cut_short_at_any_call(tmp_path, layout):
-    """Each call of the archiving run is killed in turn, a copy in the middle of its write."""
-    for at in range(1, _calls(tmp_path / 'count', layout) + 1):
-        _scenario(tmp_path / f'{at}', layout, (at, 'torn'), None)
+CUT_SHORT = ('torn', 'trunc', 'meta')
+
+
+def _copies(box, after=0):
+    """The calls of the last run that were a cp, past call *after*."""
+    names = (line.split() for line in (box.state / 'names').read_text().splitlines())
+    return [int(n) for n, name in names if name == 'cp' and int(n) > after]
 
 
 @pytest.mark.parametrize('layout', list(LAYOUTS))
-def test_a_retry_converges_after_a_put_back_cut_short_in_a_copy(tmp_path, layout):
-    """Pairs (fault i while archiving, the put-back killed at call j, a copy in the middle
-    of its write), drawn with a fixed seed, then a run without fault."""
-    product = []
+def test_a_retry_converges_after_any_copy_of_the_archiving_is_cut_short(tmp_path, layout):
+    box, *_ = _chaos_box(tmp_path / 'count', layout)
+    _chaos_run(box)
+    for at in _copies(box):
+        for mode in CUT_SHORT:
+            _scenario(tmp_path / f'{at}-{mode}', layout, (at, mode), None)
+
+
+@pytest.mark.parametrize('layout', list(LAYOUTS))
+def test_a_retry_converges_after_any_copy_of_the_put_back_is_cut_short(tmp_path, layout):
+    """For every fault i of the archiving run, every cp its put-back runs is cut short in
+    turn, in each way a killed copy leaves its target; then a run without fault."""
+    seen = 0
     for at in range(1, _calls(tmp_path / 'count', layout) + 1):
-        after_fail = _calls(tmp_path / f'f{at}', layout, [(at, 'fail')])
-        product += [((at, 'fail'), (j, 'torn')) for j in range(at + 1, after_fail + 1)]
-    draw = random.Random(f'{SEED}-torn-{layout}')  # noqa: S311 - a fixed seed, a replayable draw
-    for n, (first, second) in enumerate(draw.sample(product, min(TORN_PAIRS, len(product)))):
-        _scenario(tmp_path / f'p{n}', layout, first, second)
+        box, *_ = _chaos_box(tmp_path / f'f{at}', layout)
+        _chaos_run(box, [(at, 'fail')])
+        for back in _copies(box, after=at):
+            for mode in CUT_SHORT:
+                seen += 1
+                _scenario(tmp_path / f'{at}-{back}-{mode}', layout, (at, 'fail'), (back, mode))
+    # Only a move across filesystems copies, so only those layouts put back with cp
+    assert seen or layout == 'one filesystem'

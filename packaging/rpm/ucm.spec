@@ -95,6 +95,12 @@ getent group %{name} >/dev/null || groupadd -r %{name}
 getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbin/nologin -c "UCM Service Account" %{name}
 
 %post
+# Set first on a new install: a scriptlet that fails or is killed anywhere below leaves
+# it, so the reinstall that retries ($1 = 2) still archives what a removed UCM left
+UCM_HOME=%{ucm_home}
+ARCHIVE_PENDING=$UCM_HOME/.leftover-archive-pending
+[ "$1" -ne 1 ] || : > "$ARCHIVE_PENDING"
+
 %systemd_post %{name}.service
 
 # sudoers-cleanup: no sudo grant any more (the watcher restarts the service);
@@ -108,7 +114,6 @@ systemctl enable ucm-watcher.path
 systemctl start ucm-watcher.path
 
 # Paths (same as DEB)
-UCM_HOME=%{ucm_home}
 UCM_DATA=%{ucm_data}
 UCM_CONFIG=/etc/%{name}
 UCM_SETUP=$UCM_HOME/scripts/native-setup.sh
@@ -116,11 +121,6 @@ NEW_CONFIG=""
 mkdir -p /var/log/%{name}
 # Resumed after a failed first attempt: the service never had a working venv
 bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
-
-# Set on a new install before the venv is built: a build that fails or is killed leaves
-# it, so the reinstall that retries ($1 = 2) still archives what a removed UCM left
-ARCHIVE_PENDING=$UCM_HOME/.leftover-archive-pending
-[ "$1" -ne 1 ] || : > "$ARCHIVE_PENDING"
 
 # Built before anything is written to the data or the configuration: the archiving
 # below asks this release's runner about the database left there
