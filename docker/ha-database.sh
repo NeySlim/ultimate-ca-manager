@@ -78,9 +78,9 @@ ucm_export_database_path() {
     export DATABASE_PATH="${UCM_DATABASE_PATH}"
 }
 
-# Default SoftHSM token: never created in HA mode (a token lives on one node's disk).
-# Prints the notice and returns 0 when the default token must not be initialized.
-ucm_ha_skip_softhsm_token() {
-    ucm_ha_active || return 1
-    echo "SoftHSM default token not created in HA mode (a token stays on one node)"
+# Default SoftHSM token: returns 0 only when HA is off and HSM_AUTO_INIT (default true) is true.
+# In HA mode no token is created (a token stays on one node's disk).
+ucm_softhsm_auto_init() {
+    ucm_ha_active && return 1
+    [ "${HSM_AUTO_INIT:-true}" = "true" ]
 }

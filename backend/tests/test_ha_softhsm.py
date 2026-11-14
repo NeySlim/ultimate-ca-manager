@@ -131,26 +131,27 @@ class TestWithoutHa:
         assert 'this node only' not in caplog.text
 
 
-def _skip(env):
-    return subprocess.run(['bash', '-c', f'. {HELPER}; ucm_ha_skip_softhsm_token'],
+def _auto_init(env):
+    return subprocess.run(['bash', '-c', f'. {HELPER}; ucm_softhsm_auto_init'],
                           env={'PATH': '/usr/bin:/bin', **env}, capture_output=True, text=True)
 
 
 @pytest.mark.parametrize('flag', ['1', 'true', ' YES '])
 @pytest.mark.parametrize('auto', ['true', 'false', None])
-def test_entrypoint_skips_the_default_token_in_ha(flag, auto):
+def test_no_default_token_in_ha(flag, auto):
     env = {'UCM_HA': flag, **({'HSM_AUTO_INIT': auto} if auto else {})}
-    r = _skip(env)
-    assert r.returncode == 0 and 'not created in HA mode' in r.stdout
+    assert _auto_init(env).returncode == 1
 
 
 @pytest.mark.parametrize('flag', [None, '0', 'false', ''])
-def test_entrypoint_keeps_the_default_token_without_ha(flag):
-    r = _skip({'UCM_HA': flag} if flag is not None else {})
-    assert r.returncode == 1 and r.stdout == ''
+@pytest.mark.parametrize('auto,expected', [('true', 0), (None, 0), ('false', 1)])
+def test_default_token_without_ha_follows_hsm_auto_init(flag, auto, expected):
+    env = {**({'UCM_HA': flag} if flag is not None else {}),
+           **({'HSM_AUTO_INIT': auto} if auto else {})}
+    assert _auto_init(env).returncode == expected
 
 
-def test_entrypoint_branch_uses_the_helper_before_hsm_auto_init():
+def test_entrypoint_gates_token_init_on_the_helper():
     text = (ROOT / 'docker' / 'entrypoint.sh').read_text()
     block = text[text.index('HSM / SoftHSM AUTO-INIT'):]
-    assert block.index('ucm_ha_active') < block.index('HSM_AUTO_INIT:-true')
+    assert 'ucm_softhsm_auto_init' in block and 'init-token' in block
