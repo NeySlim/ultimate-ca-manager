@@ -152,7 +152,21 @@ def _checked_out(app):
         return db.engine.pool.checkedout()
 
 
-def test_a_head_request_gives_its_connection_back(app, auth_client, nodes, server):
+def _closes(monkeypatch):
+    """Every archive reader closed, as it is closed: a reader holds no connection between two
+    chunks, so the pool figure alone cannot see a close that never came."""
+    seen = []
+    real = shared_store._ArchiveReader.close
+
+    def close(self):
+        if not self.closed:
+            seen.append(self)
+        return real(self)
+    monkeypatch.setattr(shared_store._ArchiveReader, 'close', close)
+    return seen
+
+
+def test_a_head_request_gives_its_connection_back(app, auth_client, nodes, server, monkeypatch):
     data = _payload(shared_store.CHUNK_SIZE + 9)
     with app.app_context(), nodes('a'):
         _path, name = storage.create_archive(data)
@@ -161,7 +175,9 @@ def test_a_head_request_gives_its_connection_back(app, auth_client, nodes, serve
         r = auth_client.head(f'/api/v2/system/backup/{name}/download', environ_base=server)
         assert r.status_code == 200 and r.data == b''
         assert r.headers['Content-Length'] == str(len(data))
+        closed = _closes(monkeypatch)
         r.close()
+        assert len(closed) == 1
     gc.collect()
     assert _checked_out(app) == before
 
@@ -229,7 +245,7 @@ def test_a_resumed_download_reads_from_its_chunk_on(app, auth_client, nodes, ser
     ('GET', {}),
 ])
 def test_closing_an_unread_download_gives_its_connection_back(
-        app, auth_client, nodes, server, method, headers):
+        app, auth_client, nodes, server, method, headers, monkeypatch):
     with app.app_context(), nodes('a'):
         _path, name = storage.create_archive(_payload(2 * shared_store.CHUNK_SIZE))
     before = _checked_out(app)
@@ -237,7 +253,9 @@ def test_closing_an_unread_download_gives_its_connection_back(
         r = auth_client.open(DOWNLOADS[0].format(name), method=method, headers=headers,
                              environ_base=server)
         assert r.status_code == (206 if headers else 200)
+        closed = _closes(monkeypatch)
         r.close()  # no iteration and no garbage collection
+        assert len(closed) == 1
     assert _checked_out(app) == before
 
 

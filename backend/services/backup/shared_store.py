@@ -5,7 +5,8 @@ fixed-size chunks (``backup_archive_chunks``) under one row (``backup_archives``
 and its chunks are written in a single transaction and read back before it commits: an
 archive is listed only once it is whole, and an interrupted write leaves nothing behind.
 Writing and reading go one chunk at a time, so memory stays bounded whatever the archive
-size; a reader takes each chunk in a short transaction and holds no connection between two. The bytes are the encrypted container, as on disk.
+size; a reader takes each chunk in a short transaction and holds no connection between two.
+The bytes are the encrypted container, as on disk.
 """
 import hashlib
 import io
@@ -266,7 +267,7 @@ def _open(filename: str):
 
 
 def open_archive(filename: str):
-    """A seekable binary stream over a stored archive (what a restore reads), or None.
+    """A seekable binary stream over a stored archive, or None.
 
     Each chunk is read in a short transaction; an archive deleted meanwhile raises
     ArchiveGoneError at the next chunk.
