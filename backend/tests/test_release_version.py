@@ -439,10 +439,31 @@ def test_the_requested_package_is_the_published_one(instance, tag, kind, deb, el
 
 # ---- 6. version files and helper scripts -------------------------------------------------------
 
+def _npm_of(version):
+    """VERSION as package.json spells it: X.Y[.Z] with -dev (dev), -rcN (test) or nothing (main)."""
+    m = re.fullmatch(r'((?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(\.[1-9]\d*)?(-dev|-rc\d+)?', version)
+    assert m, version
+    return f'{m.group(1)}{m.group(2) or ".0"}{m.group(3) or ""}'
+
+
+@pytest.mark.parametrize('version,npm', [
+    ('2.254.1-dev', '2.254.1-dev'), ('2.254-dev', '2.254.0-dev'),
+    ('2.254.1-rc1', '2.254.1-rc1'), ('2.254-rc2', '2.254.0-rc2'),
+    ('2.254.1', '2.254.1'), ('2.254', '2.254.0'),
+])
+def test_npm_spelling_of_each_branch_version(version, npm):
+    assert _npm_of(version) == npm == rv.npm_version(version)
+
+
+@pytest.mark.parametrize('version', ['2.254.1-beta', '2.254.1.2', 'v2.254', '2.254-rc', '', '2.254.0',
+                                     '2.254.0-rc1', '02.254', '2.254.01', '2.254.1-dev-dev'])
+def test_npm_spelling_refuses_another_grammar(version):
+    with pytest.raises(AssertionError):
+        _npm_of(version)
+
+
 def test_version_files_agree():
-    version = (ROOT / 'VERSION').read_text().strip()
-    assert re.fullmatch(r'\d+\.\d+(\.\d+)?-dev', version)
-    npm = re.sub(r'^(\d+\.\d+)-', r'\1.0-', version)
+    npm = _npm_of((ROOT / 'VERSION').read_text().strip())
     pkg = json.loads((ROOT / 'frontend' / 'package.json').read_text())
     lock = json.loads((ROOT / 'frontend' / 'package-lock.json').read_text())
     assert pkg['version'] == lock['version'] == lock['packages']['']['version'] == npm
