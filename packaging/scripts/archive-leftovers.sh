@@ -108,11 +108,15 @@ move_item() {
     cp -a -- "$1" "$2$PART" && same "$1" "$2$PART" && rename_here "$2$PART" "$2"
 }
 
-# Removes $1 so that its path holds it whole or not at all: renamed aside, then removed.
+# Removes $1, copied at $2, so that its path holds it whole or not at all: renamed aside,
+# then removed.
 # Where that rename is refused, removed in place behind an inplace line, which marks a
 # half-removed $1 as ours until it is gone.
 discard() {
-    if present "$1$PART"; then rm -rf -- "$1$PART" || return 1; fi
+    if present "$1$PART"; then
+        # Removed only while the item stands at $1 or $2, its other path
+        { present "$1" || present "$2"; } && rm -rf -- "$1$PART" || return 1
+    fi
     if rename_item "$1" "$1$PART"; then
         rm -rf -- "$1$PART"
     elif present "$1" && ! present "$1$PART"; then
@@ -120,6 +124,12 @@ discard() {
     else
         return 1
     fi
+}
+
+# Our temporary $1 of $2, with no item at its real paths: perhaps all that is left of it
+kept_aside() {
+    twice=1
+    unsettled "$1" "what may be all that is left of $2: check it, move it back to $2 to keep it or remove it, then retry"
 }
 
 # Never ours (no journal names it), yet named as our temporaries are: nothing is archived
@@ -155,7 +165,7 @@ archive_contents() {
 remove_copied() {
     grep "^copy$TAB" "$JOURNAL" | while IFS="$TAB" read -r _op src dst; do
         printf 'remove\t%s\t%s\n' "$src" "$dst" >> "$JOURNAL" || exit 1
-        discard "$src" || exit 1
+        discard "$src" "$dst" || exit 1
     done
 }
 
@@ -230,11 +240,16 @@ roll_back() {
                     rename_item "$dst" "$src" || unsettled "$dst" "not put back to $src"
                 fi ;;
             remove)
-                # Undone already when the copy is gone: its source was whole again first
-                present "$dst" || continue
                 # Beside $src only our own leftovers: the source renamed aside, a partial put-back
                 if present "$src$PART"; then
+                    if ! present "$src" && ! present "$dst"; then kept_aside "$src$PART" "$src"; continue; fi
                     rm -rf -- "$src$PART" || { unsettled "$src$PART" "a partial copy of $dst could not be removed"; continue; }
+                fi
+                if ! present "$dst"; then
+                    # Its copy gone by hand: nothing to put back, unless half removed in place
+                    grep -qxF "inplace$TAB$src" "$JOURNAL" || drop_line "remove$TAB$src$TAB$dst" \
+                        || unsettled "$JOURNAL" "could not be updated"
+                    continue
                 fi
                 ours=""
                 if grep -qxF "inplace$TAB$src" "$JOURNAL"; then ours=1; fi
@@ -252,14 +267,19 @@ roll_back() {
                         && { [ -z "$ours" ] || rm -rf -- "$src"; } \
                         && rename_here "$src$PART" "$src" \
                         && drop_line "inplace$TAB$src" "remove$TAB$src$TAB$dst"; } || {
-                        rm -rf -- "$src$PART" 2>/dev/null
-                        unsettled "$dst" "not put back to $src"
+                        if present "$src" || present "$dst"; then
+                            rm -rf -- "$src$PART" 2>/dev/null
+                            unsettled "$dst" "not put back to $src"
+                        else
+                            kept_aside "$src$PART" "$src"
+                        fi
                     }
                 fi ;;
             copy)
                 # A partial copy is ours and never whole; $dst is whole, and goes only while
                 # $src is the same (both there and different: the source changed since)
                 if present "$dst$PART"; then
+                    if ! present "$src" && ! present "$dst"; then kept_aside "$dst$PART" "$src"; continue; fi
                     rm -rf -- "$dst$PART" || unsettled "$dst$PART" "a partial copy of $src could not be removed"
                 fi
                 if grep -qxF "remove$TAB$src$TAB$dst" "$JOURNAL"; then
@@ -275,7 +295,7 @@ roll_back() {
                     twice=1
                     unsettled "$dst" "the only copy of $src, which is gone: put it back there or remove it, then retry"
                 elif same "$src" "$dst"; then
-                    discard "$dst" || unsettled "$(here "$dst")" "a copy of $src, which is back in place, could not be removed"
+                    discard "$dst" "$src" || unsettled "$(here "$dst")" "a copy of $src, which is back in place, could not be removed"
                 else
                     twice=1
                     unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"

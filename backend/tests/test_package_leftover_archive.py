@@ -1137,3 +1137,161 @@ def test_a_fips_line_stuck_in_the_journal_says_whether_the_new_configuration_wen
     else:
         assert said == f'could not be updated once {env} was removed, so nothing it lists was put back'
         assert not env.exists()
+
+
+# -- a temporary goes only while its item stands at a real path ------------------------
+
+LEFT = 'what may be all that is left of {src}: check it, move it back to {src} to keep it or remove it, then retry'
+
+
+def _lost_nothing(box, data, out, why=''):
+    from tests.package_leftover_chaos import _nothing_lost
+    _nothing_lost(box, data, {}, why, out)
+
+
+def _rm_kills(box, path, after=False):
+    """rm kills the run on `path`: before removing it, or once it is gone."""
+    real = f'{REAL["rm"]} "$@"'
+    kill = f'for last; do :; done\n[ "$last" != "{path}" ] || kill -9 0\n'
+    (box.bin / 'rm').write_text(f'#!/bin/sh\n{real} || exit 1\n{kill}' if after else f'#!/bin/sh\n{kill}exec {real}\n')
+
+
+def _then(box, part, src, then):
+    """The operator's choice over a temporary named as all that may be left of src."""
+    if then == 'moved back':
+        os.rename(part, src)
+    else:
+        _gone(part)
+
+
+def _left_alone(box, part, src, data, held, why):
+    """Two runs: each exits 2, names the temporary alone as all that may be left of src,
+    and keeps it as it was."""
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 2, (why, out.stdout, out.stderr)
+        assert reported(out.stdout)[str(part)] == LEFT.format(src=src), out.stdout
+        assert named(out.stdout) == [str(part)], out.stdout
+        assert 'wait for your choice' in out.stdout or 'retrying alone will not' in out.stdout
+        assert _shape(part) == held and not os.path.lexists(src)
+        if data is not None:
+            _lost_nothing(box, data, out, why)
+
+
+def _converges_after(box, part, src, name, original, then):
+    _then(box, part, src, then)
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert not os.path.lexists(src)
+    if then == 'moved back':
+        assert _shape(box.archive / 'data' / name) == original
+    else:
+        assert not os.path.lexists(box.archive / 'data' / name)
+    assert not any(p.name.endswith(PART) for p in box.tmp.rglob('*'))
+
+
+@pytest.mark.parametrize('kind', ITEMS)
+@pytest.mark.parametrize('then', ['moved back', 'removed'])
+def test_a_copy_set_aside_whose_source_went_since_is_kept_and_named(tmp_path, kind, then):
+    """A copy proved the same as its source is renamed aside to go, and the run killed on
+    its removal; the source is then removed: that temporary is all that may be left."""
+    box = Box(tmp_path, python='stub')
+    name = ITEMS[kind]
+    src, dst = box.data / name, box.archive / 'data' / name
+    part = pathlib.Path(f'{dst}{PART}')
+    data, original = whole(box.data, KEPT), _shape(src)
+    _killed_once_copied(box, name)
+    _rm_kills(box, part)
+    assert box.run().returncode == -9
+    assert _shape(part) == original and not os.path.lexists(dst)
+    box.wrap(other_fs=(box.data,))
+    _gone(src)
+    _left_alone(box, part, src, data, original, kind)
+    _converges_after(box, part, src, name, original, then)
+
+
+@pytest.mark.parametrize('kind', ITEMS)
+@pytest.mark.parametrize('then', ['moved back', 'removed'])
+def test_a_source_set_aside_whose_copy_went_since_is_kept_and_named(tmp_path, kind, then):
+    """A copied source is renamed aside to go, and the run killed on its removal; its copy
+    is then removed from the archive: that temporary is all that may be left."""
+    box = Box(tmp_path, python='stub')
+    name = ITEMS[kind]
+    src, dst = box.data / name, box.archive / 'data' / name
+    part = pathlib.Path(f'{src}{PART}')
+    data, original = whole(box.data, KEPT), _shape(src)
+    box.wrap(other_fs=(box.data,))
+    _rm_kills(box, part)
+    assert box.run().returncode == -9
+    assert _shape(part) == original and _shape(dst) == original and not os.path.lexists(src)
+    box.wrap(other_fs=(box.data,))
+    _gone(dst)
+    _left_alone(box, part, src, data, original, kind)
+    _converges_after(box, part, src, name, original, then)
+
+
+@pytest.mark.parametrize('kind', ITEMS)
+def test_a_partial_copy_whose_source_went_since_is_kept_and_named(tmp_path, kind):
+    """Killed while copying an item into the archive, then its source removed: the partial
+    copy is kept and named, never removed as a leftover, until the operator chooses."""
+    box = Box(tmp_path, python='stub')
+    name = ITEMS[kind]
+    src = box.data / name
+    part = pathlib.Path(f'{box.archive}/data/{name}{PART}')
+    box.wrap(other_fs=(box.data,))
+    cut = (f'{shutil.which("truncate")} -s 1 "$last"' if kind == 'file' else
+           f'{REAL["rm"]} -f "$last/nested/f"' if kind == 'directory' else ':')
+    (box.bin / 'cp').write_text(
+        f'#!/bin/sh\n{REAL["cp"]} "$@" || exit 1\nfor last; do :; done\n'
+        f'[ "$last" != "{part}" ] || {{ {cut}; kill -9 0; }}\n')
+    assert box.run().returncode == -9
+    box.wrap(other_fs=(box.data,))
+    _gone(src)
+    held = _shape(part)
+    _left_alone(box, part, src, None, held, kind)
+    _converges_after(box, part, src, name, None, 'removed')
+
+
+def test_a_source_whose_two_paths_went_during_its_removal_is_kept_aside(tmp_path):
+    """While the sources of the copies go, one of them is found only under its temporary:
+    it is kept and named, the others put back."""
+    box = Box(tmp_path, python='stub')
+    src, dst = box.data / 'ucm.db', box.archive / 'data' / 'ucm.db'
+    part = pathlib.Path(f'{src}{PART}')
+    data, original = whole(box.data, KEPT), _shape(src)
+    box.wrap(other_fs=(box.data,))
+    # Once the last item is copied, ucm.db is set aside and its copy gone
+    (box.bin / 'cp').write_text(
+        f'#!/bin/sh\n{REAL["cp"]} "$@" || exit 1\nfor last; do :; done\n'
+        f'[ "$last" != "{box.archive}/data/updates{PART}" ] || '
+        f'{{ {REAL["mv"]} -- "{src}" "{part}" && {REAL["rm"]} -f -- "{dst}"; }}\n')
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert reported(out.stdout)[str(part)] == LEFT.format(src=src), out.stdout
+    assert _shape(part) == original
+    _lost_nothing(box, data, out)
+
+
+def test_a_put_back_whose_copy_went_while_copying_is_kept_aside(tmp_path):
+    """A put-back fails once its copy is gone from the archive: what it copied beside the
+    source is kept and named, never removed as a partial copy."""
+    box = Box(tmp_path, python='stub')
+    src, dst = box.data / 'ucm.db', box.archive / 'data' / 'ucm.db'
+    part = pathlib.Path(f'{src}{PART}')
+    data, original = whole(box.data, KEPT), _shape(src)
+    box.wrap(other_fs=(box.data,))
+    once = box.state / 'once'
+    # The last source cannot go, once: everything is put back
+    (box.bin / 'rm').write_text(
+        f'#!/bin/sh\nfor last; do :; done\n'
+        f'if [ "$last" = "{box.data}/updates{PART}" ] && [ ! -e {once} ]; then : > {once}; exit 1; fi\n'
+        f'exec {REAL["rm"]} "$@"\n')
+    (box.bin / 'cp').write_text(
+        f'#!/bin/sh\n{REAL["cp"]} "$@" || exit 1\n'
+        f'[ "$3" != "{dst}" ] || {{ {REAL["rm"]} -f -- "{dst}"; exit 1; }}\n')
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert reported(out.stdout)[str(part)] == LEFT.format(src=src), out.stdout
+    assert _shape(part) == original
+    _lost_nothing(box, data, out)
+

@@ -7,12 +7,14 @@ or kills a copy as if cut short ('torn', 'trunc', 'meta': see _chaos). The suite
 per layout, one test file each (test_package_leftover_retry_*.py), so they run in parallel.
 """
 import os
+import pathlib
 import random
 import shutil
 
 import pytest
 
-from tests.test_package_leftover_archive import KEPT, PART, STAMP, Box, files, named, snapshot, tree, whole
+from tests.test_package_leftover_archive import (
+    KEPT, PART, STAMP, Box, files, named, reported, snapshot, tree, whole)
 
 
 CHAOS = ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'rename')
@@ -178,25 +180,45 @@ class Lab:
         return box, data, config, before, runs
 
 
-def _nothing_lost(box, data, config, why):
+def _declared(top, archives, sub, out):
+    """What the temporaries a run that exits 2 names as all that may be left of an item
+    hold, by the path of that item under `top`: the only place a temporary counts."""
+    found = {}
+    if out is None or out.returncode != 2:
+        return found
+    for path, what in reported(out.stdout).items():
+        if not (path.endswith(PART) and what.startswith('what may be all that is left of ')):
+            continue
+        real = pathlib.Path(path.removesuffix(PART))
+        for base in (top, *(a / sub for a in archives)):
+            if real.parent == base or base in real.parents:
+                rel, name = str(real.relative_to(base)), pathlib.Path(path).name
+                for key, entry in tree(real.parent).items():
+                    if key == name or key.startswith(f'{name}/'):
+                        found[str(pathlib.Path(rel).parent / (real.name + key[len(name):]))] = entry
+    return found
+
+
+def _nothing_lost(box, data, config, why, out=None):
     """Every original file, link and moved directory is whole (attributes included) in its
-    place or in an archive."""
+    place or in an archive; under a temporary only where the run `out` names that temporary
+    as what may be all that is left of it."""
     archives = [a for a in box.parent.iterdir()] if box.parent.exists() else []
     for top, originals, sub in ((box.data, data, 'data'), (box.config, config, 'config')):
         here = tree(top)
-        there = [tree(a / sub) for a in archives]
+        there = [tree(a / sub) for a in archives] + [_declared(top, archives, sub, out)]
         for rel, entry in originals.items():
             assert here.get(rel) == entry or any(t.get(rel) == entry for t in there), (why, sub, rel)
 
 
 def _while_failing(box, out, before, data, config, why):
-    """_nothing_lost compares real paths only: an original kept under a temporary alone
-    counts as lost."""
+    """An original kept under a temporary alone counts as lost, unless the run names that
+    temporary as what may be all that is left of it."""
     if out.returncode == -9:
         _nothing_lost(box, data, config, why)
         return
     assert out.returncode in (0, 1, 2), (why, out.stdout, out.stderr)
-    _nothing_lost(box, data, config, why)
+    _nothing_lost(box, data, config, why, out)
     if out.returncode == 1:
         assert snapshot(box) == before, (why, out.stdout)
         assert not box.parent.exists() or not any(box.parent.iterdir()), (why, out.stdout)
