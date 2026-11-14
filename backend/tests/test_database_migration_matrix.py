@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import Table, create_engine, event, inspect, text
+from sqlalchemy.engine import Engine
 
 from config.settings import DATA_DIR
 from models import db
@@ -747,6 +748,20 @@ class TestNothingSwitchesUnlessEverythingPassed:
         assert message.endswith(advice), message
         assert 'carries a schema' not in message
 
+    def test_a_refused_plan_does_not_promise_a_resume(self, auth_client, sqlite_target, monkeypatch):
+        """A table or column the plan refuses is refused again by a retry."""
+        import api.v2.database as route_module
+
+        monkeypatch.setattr(
+            route_module.svc, 'bootstrap_auth_to_target',
+            lambda url: (False, "Bootstrap failed: Column 'users.x' has no counterpart on the target",
+                         {'refusal': 'preflight', 'target_written': True}))
+
+        response = self._post(auth_client, 'switch', {'database_url': sqlite_target})
+
+        message = json.loads(response.data)['message']
+        assert message.endswith('has no counterpart on the target'), message
+
     def test_a_configuration_that_could_not_be_written_forbids_the_restart(
             self, auth_client, sqlite_target, restart_signal, monkeypatch):
         import api.v2.database as route_module
@@ -1035,7 +1050,7 @@ def _cut_points():
     """Before and after every step the switch runs, and inside the two that write in bulk."""
     points = [(step.__name__, where) for step in migration._BOOTSTRAP_STEPS
               for where in ('before', 'after')]
-    return points + [('_step_schema', 'during'), ('_step_copy', 'during')]
+    return points + [('_step_schema', 'during'), ('_step_schema', 'index'), ('_step_copy', 'during')]
 
 
 @contextlib.contextmanager
@@ -1062,6 +1077,17 @@ def _cut(step_name, where):
             finally:
                 event.remove(Table, 'after_create', on_create)
             return
+        if where == 'index':
+            def on_execute(conn, cursor, statement, *rest):
+                # SQLite commits each statement: the table is there, its index is not
+                if not fired and statement.lstrip().startswith('CREATE UNIQUE INDEX'):
+                    stop()
+            event.listen(Engine, 'before_cursor_execute', on_execute)
+            try:
+                yield fired
+            finally:
+                event.remove(Engine, 'before_cursor_execute', on_execute)
+            return
         if where == 'during':
             assert step_name == '_step_copy', step_name
             real_copy_one, calls = copy_module._copy_one, []
@@ -1084,6 +1110,18 @@ def _cut(step_name, where):
             steps[index] = cut_step
             patch.setattr(migration, '_BOOTSTRAP_STEPS', tuple(steps))
         yield fired
+
+
+def _missing_indexes(url):
+    """The indexes the models declare that the target does not have."""
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        inspector = inspect(engine)
+        return sorted(index.name for table in db.metadata.sorted_tables for index in table.indexes
+                      if index.name not in {i['name'] for i in inspector.get_indexes(table.name)})
+    finally:
+        engine.dispose()
 
 
 def _usernames(url):
@@ -1120,6 +1158,7 @@ class TestASwitchCutShortCanBeResumed:
         assert _starts(url, monkeypatch) is True
         _boots(url, tmp_path)
         assert _usernames(url) == source_names
+        assert _missing_indexes(url) == []
         _assert_new_ids_above(url, highest, gone)
 
     @_needs_pg
@@ -1136,6 +1175,39 @@ class TestASwitchCutShortCanBeResumed:
             ok, message, _ = migration.bootstrap_auth_to_target(pg_target)
         assert ok is True and 'skipped' in message, message
         assert _next_user_id(pg_target) > 1000
+
+
+    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
+    def test_a_2_254_target_with_accounts_is_left_as_it_is(self, request, backend, app,
+                                                            auth_client, create_user):
+        """Not a copy of this switch: its upgrade has not run, nothing is written to it."""
+        from migrations._from_2_254 import PIVOT_NAMES
+        url = request.getfixturevalue(f'{backend}_target')
+        _provision(url, set(PIVOT_NAMES))
+        before = _user_counter(url)
+        assert _deleted_last_user(app, auth_client, create_user) > 1    # past the target's one account
+
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(url)
+
+        assert ok is True and 'skipped' in message, message
+        assert _user_counter(url) == before
+
+
+def _user_counter(url):
+    """What the target recorded as the last users id it handed out."""
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        with engine.connect() as conn:
+            if url.startswith('postgresql'):
+                return conn.execute(text(
+                    "SELECT last_value FROM pg_sequences WHERE sequencename = 'users_id_seq' "
+                    "AND schemaname = current_schema()")).scalar()
+            return conn.execute(text(
+                "SELECT name, seq FROM sqlite_sequence WHERE name = 'users'")).fetchall()
+    finally:
+        engine.dispose()
 
 
 class TestARevertNeverNamesAFileTheStartRefuses:

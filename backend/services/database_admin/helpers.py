@@ -466,7 +466,8 @@ def _pg_raise_stmt(schema_name, table_name, column_name):
 def _reset_pg_sequences(engine, raise_only=False):
     """Realign every serial sequence of the current schema on its table's data.
 
-    ``raise_only`` never moves a sequence down, so a target already in use keeps its counters."""
+    ``raise_only`` moves a sequence up to its table's highest id and leaves one already past
+    it alone; a sequence that never handed out a value counts as behind."""
     if not str(getattr(engine.dialect, "name", "")).startswith("postgres"):
         return
     done = failed = 0

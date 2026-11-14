@@ -178,10 +178,11 @@ def _switch_backend():
         # this, the new DB has no users and the operator is locked out.
         ok_boot, boot_msg, boot_stats = svc.bootstrap_auth_to_target(database_url)
         if not ok_boot:
-            # Every step before the verification is resumed on the same target; a copy that
-            # failed its verification is not, the next attempt would take its accounts as they are.
+            # A step cut short is resumed on the same target. A copy that failed its verification
+            # is not (the next attempt would take its accounts as they are), and a table or column
+            # the plan refused is refused again.
             reset = ''
-            if boot_stats.get('target_written'):
+            if boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
                 reset = (
                     ' The copy on the target failed its verification; reset the target before retrying.'
                     if boot_stats.get('refusal') == 'verification'

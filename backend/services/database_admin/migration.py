@@ -182,6 +182,11 @@ def _step_registry(run: _Bootstrap) -> None:
 def _step_schema(run: _Bootstrap) -> None:
     from models import db as _db
     _db.metadata.create_all(run.target)
+    # create_all skips a table that exists: an index a cut left out (SQLite commits each
+    # statement) is created here
+    for table in _db.metadata.sorted_tables:
+        for index in table.indexes:
+            index.create(run.target, checkfirst=True)
 
 
 def _step_copy(run: _Bootstrap) -> None:
@@ -421,8 +426,8 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
 
     Safe to call against an empty target. If the target already has any users,
     bootstrap is skipped (we assume the operator manages that DB themselves),
-    once its registry shows that this release will start on it; its counters
-    are still moved up to the source's, never down.
+    once its registry shows that this release will start on it; the counters
+    of a target already upgraded are still moved up to the source's.
 
     Every table goes over in **one** transaction. It used to be one
     transaction per table, with each failure appended to a ``skipped`` list
@@ -453,11 +458,13 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         if refusal:
             raise PreflightError(refusal)
         if has_users:
-            # A copy committed by an attempt cut short before its counters: they are moved up now
-            run = _Bootstrap(target_engine, target_is_pg)
-            run.high_water = _source_high_water()
-            for step in _RESUME_STEPS:
-                step(run)
+            # A copy committed by an attempt cut short before its counters: they are moved up
+            # now. A target still awaiting its upgrade is no such copy and is left as it is.
+            if UPGRADE_MIGRATION in _get_state(target_engine)[1]:
+                run = _Bootstrap(target_engine, target_is_pg)
+                run.high_water = _source_high_water()
+                for step in _RESUME_STEPS:
+                    step(run)
             return True, "Target already has users; bootstrap skipped.", stats
 
         # From here on the target carries a schema, which changes what the
