@@ -903,8 +903,8 @@ def test_renewal_of_a_subject_another_holds_is_a_fault_once_the_option_is_on(cli
         assert _fault(_post(client, body, tls_cert=old_cert)) == (
             400, 's:Sender',
             'The subject CN=tls-renew-taken.example.test is already carried by a certificate of another account')
-        # The renewal route's own entries, as for a pattern's refusal: no certificate.subject_taken
-        assert [a[0] for a in _audits(app, floor)] == ['certificate.renewed', 'windows_enrollment.refused']
+        # One entry, as for a pattern's refusal: no certificate.subject_taken
+        assert [a[0] for a in _audits(app, floor)] == ['windows_enrollment.refused']
     finally:
         with app.app_context():
             db.session.get(CA, wstep_renew_config['id']).enforce_unique_subject = False

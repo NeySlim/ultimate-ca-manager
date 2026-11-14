@@ -166,6 +166,22 @@ def audit_kerberos_refusal(binding, principal, realm, profile, reason):
     safe_commit(logger, 'Windows enrollment refusal audit commit failed')
 
 
+def audit_account_refusal(binding, username, profile, reason):
+    """The ``windows_enrollment.refused`` entry of a UsernamePassword request refused for a reason
+    the client is told only in part (its ``audited`` form names more), committed at once."""
+    from services.audit.staging import stage_audit_entry
+    from utils.db_transaction import safe_commit
+    from utils.trusted_proxy import client_ip
+    name = profile.name if profile is not None else None
+    stage_audit_entry(
+        action='windows_enrollment.refused', resource_type='windows_profile',
+        resource_id=str(profile.id) if profile is not None else None, resource_name=name,
+        username=username, success=False,
+        details=(f'{binding} UsernamePassword request from {client_ip()} refused: '
+                 f'{getattr(reason, "audited", reason)} (account {username}, profile {name or "-"})'))
+    safe_commit(logger, 'Windows enrollment refusal audit commit failed')
+
+
 def audit_renewal_refusal(binding, renewed_serial, profile, reason):
     """The ``windows_enrollment.refused`` entry of a renewal refused for a reason the client is
     told only in part (its ``audited`` form names more), committed at once."""
