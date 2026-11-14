@@ -1,6 +1,7 @@
 """Upgrade step 159: second-factor and WebAuthn lockout counters, shared by every node.
 
-``second_factor_failures`` holds one row per locked-out target, purged once expired.
+``second_factor_failures`` holds one row per target attempted, locked or not; a lock is
+purged once expired, a count once idle for a whole lockout window.
 Created on SQLite too: a single node keeps its lockouts across a restart.
 """
 import logging
