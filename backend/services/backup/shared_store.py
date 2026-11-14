@@ -365,21 +365,37 @@ def apply_retention(retention_days: int, *, min_keep: int, max_total_bytes: int,
     return removed
 
 
+def _single_byte_range(environ) -> dict:
+    """The environ to answer from: a Range other than one byte range is ignored (RFC 9110, 14.2)."""
+    from werkzeug.http import parse_range_header
+
+    value = environ.get('HTTP_RANGE')
+    if value is None:
+        return environ
+    parsed = parse_range_header(value)
+    if parsed is not None and parsed.units == 'bytes' and len(parsed.ranges) == 1:
+        return environ
+    return {k: v for k, v in environ.items() if k != 'HTTP_RANGE'}
+
+
 def download_response(filename: str):
     """A streamed attachment of a stored archive, or None when it is not in the store.
 
-    The body is a file, so closing the response closes its connection, iterated or not.
-    ``Repr-Digest`` (RFC 9530) carries the SHA-256 the listing shows, for the client to check.
+    As on disk: Range (one byte range, 206 or 416), a strong ETag (the SHA-256),
+    If-None-Match and If-Range. The body is a file, so closing the response closes its
+    connection, iterated or not. ``Repr-Digest`` (RFC 9530) names the whole archive.
     """
     import base64
 
     from flask import Response, request
+    from werkzeug.exceptions import RequestedRangeNotSatisfiable
     from werkzeug.wsgi import wrap_file
 
     opened = _open(filename)
     if opened is None:
         return None
     reader, row = opened
+    size = int(row.size)
     try:
         digest = base64.b64encode(bytes.fromhex(row.sha256)).decode()
         response = Response(
@@ -388,8 +404,17 @@ def download_response(filename: str):
                 'Content-Disposition': f'attachment; filename={filename}',
                 'Repr-Digest': f'sha-256=:{digest}:',
             })
-        response.content_length = int(row.size)
+        response.content_length = size
+        response.last_modified = row.created_at.replace(tzinfo=timezone.utc)
+        response.cache_control.no_cache = True
+        response.set_etag(row.sha256)
+        try:
+            return response.make_conditional(_single_byte_range(request.environ),
+                                             accept_ranges=True, complete_length=size)
+        except RequestedRangeNotSatisfiable:
+            reader.close()
+            return Response(status=416, headers={'Content-Range': f'bytes */{size}',
+                                                 'Accept-Ranges': 'bytes'})
     except Exception:
         reader.close()
         raise
-    return response

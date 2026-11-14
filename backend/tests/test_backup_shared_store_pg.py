@@ -177,6 +177,64 @@ def test_a_download_closed_before_its_first_chunk_gives_its_connection_back(app,
         del response
 
 
+DOWNLOADS = ('/api/v2/system/backup/{}/download', '/api/v2/settings/backup/{}/download')
+
+
+@pytest.mark.parametrize('route', DOWNLOADS)
+def test_an_interrupted_download_resumes_at_its_byte(app, auth_client, nodes, route):
+    data = _payload(3 * shared_store.CHUNK_SIZE + 333)
+    whole = hashlib.sha256(data)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+    url, size, cut = route.format(name), len(data), shared_store.CHUNK_SIZE + 4321
+    before = _checked_out(app)
+    with nodes('b'):
+        full = auth_client.get(url)
+        assert full.status_code == 200 and full.headers['Accept-Ranges'] == 'bytes'
+        etag = full.headers['ETag']
+        assert etag == f'"{whole.hexdigest()}"'
+        first = auth_client.get(url, headers={'Range': f'bytes=0-{cut - 1}'})
+        rest = auth_client.get(url, headers={'Range': f'bytes={cut}-', 'If-Range': etag})
+    assert (first.status_code, rest.status_code) == (206, 206)
+    assert first.headers['Content-Range'] == f'bytes 0-{cut - 1}/{size}'
+    assert rest.headers['Content-Range'] == f'bytes {cut}-{size - 1}/{size}'
+    assert rest.headers['Content-Length'] == str(size - cut)
+    assert hashlib.sha256(first.data + rest.data).digest() == whole.digest()
+    # Repr-Digest names the whole representation, whatever part is sent
+    assert rest.headers['Repr-Digest'] == full.headers['Repr-Digest']
+    for response in (full, first, rest):
+        response.close()  # what the WSGI server does once it has sent the body
+    gc.collect()
+    assert _checked_out(app) == before
+
+
+def test_a_download_honours_suffix_ranges_validators_and_refusals(app, auth_client, nodes):
+    data = _payload(2 * shared_store.CHUNK_SIZE + 77)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+    url, size = DOWNLOADS[0].format(name), len(data)
+    etag = f'"{hashlib.sha256(data).hexdigest()}"'
+    before = _checked_out(app)
+    with nodes('b'):
+        tail = auth_client.get(url, headers={'Range': 'bytes=-1000'})
+        assert tail.status_code == 206 and tail.data == data[-1000:]
+        assert tail.headers['Content-Range'] == f'bytes {size - 1000}-{size - 1}/{size}'
+        refused = auth_client.get(url, headers={'Range': f'bytes={size}-'})
+        assert refused.status_code == 416
+        assert refused.headers['Content-Range'] == f'bytes */{size}'
+        same = auth_client.get(url, headers={'If-None-Match': etag})
+        assert same.status_code == 304 and same.data == b''
+        # A changed representation, or several ranges: the whole archive
+        changed = auth_client.get(url, headers={'Range': 'bytes=10-', 'If-Range': '"other"'})
+        assert changed.status_code == 200 and changed.data == data
+        several = auth_client.get(url, headers={'Range': 'bytes=0-9,20-29'})
+        assert several.status_code == 200 and several.data == data
+    for response in (tail, refused, same, changed, several):
+        response.close()  # what the WSGI server does once it has sent the body
+    gc.collect()
+    assert _checked_out(app) == before
+
+
 def test_the_restore_reader_streams_and_seeks_a_stored_archive(app, nodes):
     data = b'UCMB' + bytes([4]) + _payload(3 * shared_store.CHUNK_SIZE)
     with app.app_context(), nodes('a'):

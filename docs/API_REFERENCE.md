@@ -2387,7 +2387,7 @@ POST /api/v2/settings/backup/create
 # List backups (in HA, each item carries "node" and "sha256")
 GET /api/v2/settings/backup/history
 
-# Download backup
+# Download backup (Range, ETag and Repr-Digest as for /api/v2/system/backup/{filename}/download)
 GET /api/v2/settings/backup/{backup_id}/download
 
 # Restore backup
@@ -2463,6 +2463,9 @@ GET /api/v2/system/backup/list
 POST /api/v2/system/backup/create
 
 # Download backup (in HA from any node, with a Repr-Digest: sha-256=:...: header)
+# Resumable: a Range of one byte range answers 206 with Content-Range, 416 past the end;
+# ETag, If-None-Match (304) and If-Range apply. In HA the ETag is the archive's SHA-256
+# and a Range of several ranges gets the whole archive (200).
 GET /api/v2/system/backup/{filename}/download
 
 # Restore backup
