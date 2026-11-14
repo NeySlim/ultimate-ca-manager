@@ -225,7 +225,7 @@ say_stuck() {
 # Undoes the journal, last step first. Every line replays as a no-op once undone, so a
 # retry from any interrupted state converges. A copy goes only once its source is whole
 # again and its remove line is out of the journal. The temporaries beside the paths a
-# line names are ours, never whole: each line removes its own.
+# line names are ours; each line removes its own, only while the item stands at a real path.
 roll_back() {
     stuck="" left="" seen="" again="" twice=""
     undo=$(sed -n '1!G;h;$p' "$JOURNAL") || { unsettled "$JOURNAL" "could not be read"; return 1; }
@@ -277,8 +277,8 @@ roll_back() {
                     }
                 fi ;;
             copy)
-                # A partial copy is ours and never whole; $dst is whole, and goes only while
-                # $src is the same (both there and different: the source changed since)
+                # $dst$PART is ours; removed only while the item stands at a real path. $dst is
+                # whole, and goes only while $src is the same (else the source changed since)
                 if present "$dst$PART"; then
                     if ! present "$src" && ! present "$dst"; then kept_aside "$dst$PART" "$src"; continue; fi
                     rm -rf -- "$dst$PART" || unsettled "$dst$PART" "a partial copy of $src could not be removed"
