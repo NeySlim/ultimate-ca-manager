@@ -96,8 +96,18 @@ def fips_key_type_refusal(label):
 
 
 def fips_private_key_refusal(private_key):
-    """Why FIPS mode refuses signing with *private_key* (a reused key), or None."""
-    return fips_key_type_refusal(key_algorithms.label_for_private_key(private_key))
+    """Why FIPS mode refuses signing with *private_key* (a reused key), or None.
+    RSA is judged by its size alone, so a size outside the registry is still judged."""
+    if not fips_mode.enabled() or key_algorithms.fips_approved_for_key(private_key):
+        return None
+    alg = key_algorithms.get(key_algorithms.label_for_private_key(private_key))
+    if alg is not None:
+        name = alg.display
+    elif isinstance(private_key, rsa.RSAPrivateKey):
+        name = f'RSA {private_key.key_size}'
+    else:
+        name = type(private_key).__name__
+    return f'{name} keys not available in FIPS mode'
 
 
 def fips_csr_refusal(csr):

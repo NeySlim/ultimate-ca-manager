@@ -133,3 +133,39 @@ def test_a_policy_is_saved_by_the_rule(app, auth_client, fips, bits, approved):
     assert (r.status_code in (200, 201)) is approved, r.data
     assert (row is not None) is approved
 
+
+@pytest.mark.parametrize('bits', [1024, 2049, 16386])
+def test_a_reused_key_outside_the_rule_is_refused(fips, bits):
+    from services.acme.acme_client_service import fips_private_key_refusal
+    key = _fake_private(bits)
+    refusal = fips_private_key_refusal(key)
+    assert refusal and f'RSA {bits}' in refusal
+
+
+@pytest.mark.parametrize('bits', [2048, 2050, 8192])
+def test_a_reused_key_inside_the_rule_is_accepted(fips, bits):
+    from services.acme.acme_client_service import fips_private_key_refusal
+    assert fips_private_key_refusal(_fake_private(bits)) is None
+
+
+def _pem(key):
+    return key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                             serialization.NoEncryption()).decode()
+
+
+@pytest.mark.parametrize('bits', [1024, 2049, 16386])
+def test_an_imported_account_key_outside_the_rule_is_refused(fips, monkeypatch, bits):
+    from api.v2.acme_client.accounts import _validate_imported_account_key
+    key = _fake_private(bits)
+    monkeypatch.setattr(serialization, 'load_pem_private_key', lambda *a, **k: key)
+    with pytest.raises(ValueError) as caught:
+        _validate_imported_account_key(_pem(key))
+    assert 'FIPS' in str(caught.value)
+
+
+@pytest.mark.parametrize('bits', [2049, 2050])
+def test_an_imported_account_key_outside_fips(monkeypatch, bits):
+    from api.v2.acme_client.accounts import _validate_imported_account_key
+    key = _fake_private(bits)
+    monkeypatch.setattr(serialization, 'load_pem_private_key', lambda *a, **k: key)
+    assert _validate_imported_account_key(_pem(key)) == 'RS256'
