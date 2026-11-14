@@ -74,6 +74,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Settings: `max_login_attempts` under 3, the settings screen's minimum, is refused (400) instead of locking every login at its first failure, and a lower value already stored is applied as 3.
 - CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum, and so is a CA key that cannot be read; the same CA without a key is still imported. In a batch only that CA is skipped and named.
 - OPNsense import and smart import chain a CA under the stored CA whose key signed it, whatever the order of the batch, instead of leaving it unlinked or taking a CA of the same name. A CA whose parent signature cannot be verified here (a parent key type the server does not handle, such as SLH-DSA or GOST) is imported without a parent, where smart import used to attach it by name.
 - CA import: a CA or certificate whose issuer is stored both as a root and as a cross or link certificate of the same key is now chained under the self-signed root, on SQLite and PostgreSQL alike, including a certificate installed on a pending CA and certificates linked by Smart Import, OPNsense import and the hourly chain repair. The chain status of a CA with no recorded parent and the chain added to an export follow the same rule.
@@ -118,6 +119,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Account: disabling 2FA or regenerating recovery codes now checks its TOTP or recovery code against the login's second-factor lockout, so a stolen session can no longer guess the code without limit; past `max_login_attempts` both answer 429 and the account's next login waits for the lock to expire.
+- Login: failed second-factor (TOTP, recovery code, security key) and passkey attempts are counted in the database, so the lockout applies on every node, survives a restart, and parallel attempts never get more tries than `max_login_attempts`. An attempt counts when it is made rather than when it fails, and a count left idle for `lockout_duration` is forgotten.
 - Dependencies: dnspython 2.9.2, which bounds the services of a WKS record (CVE-2026-128089). UCM parses record text only for TXT values it computes, so no UCM path was exposed.
 - Backup: a merge restore no longer turns a certificate or a CA revoked for good here back into a hold or a valid one, nor its revocation record into a hold.
 - Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.

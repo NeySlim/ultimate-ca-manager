@@ -564,6 +564,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'shared_files': ('the Kerberos keytab file every node writes, rebuilt from the profiles '
                      'when their section is restored and at startup, and the HTTPS pair, '
                      'carried as the https_server files instead'),
+    'second_factor_failures': 'second-factor and WebAuthn lockout counters: runtime state, never restored',
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }
