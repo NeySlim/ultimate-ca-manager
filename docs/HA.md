@@ -87,7 +87,7 @@ The administrator is created once, by the first node to start, under the startup
 - **Backups.** Scheduled backups are written under its data directory by the leader, a manual one by the node that serves the request. They are not replicated: copy them off the host, and also back PostgreSQL up with its own tools. Retention runs on every node, so a former leader prunes its own archives.
 - **Update result.** The outcome of an update is read on the node that installed it, leader or not.
 - **Per-node task status.** The scheduler view shows the backup retention and update result runs of the node that answers, and Run now runs them on that node.
-- **SoftHSM tokens.** A token lives on the node's own disk, so the chart and the compose example set `HSM_AUTO_INIT=false`. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
+- **SoftHSM tokens.** A token lives on the node's own disk, so UCM refuses to create one in HA mode (see [Refused in HA mode today](#refused-in-ha-mode-today)). A SoftHSM provider already in the database stays visible, a warning at start names it, and its keys sign only on the node that holds the token. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
 - **Kerberos negotiation state.** A SPNEGO handshake that takes more than one request is kept in the memory of the node that received its first leg (see [Windows enrollment](#windows-enrollment-kerberos)).
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
 - **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
@@ -113,7 +113,8 @@ These operations answer `409` with code `ha_mode`, because they only change the 
 
 - backend switch and data migration between databases (`database.py`): change `DATABASE_URL` by hand, then restart;
 - session key rotation without encryption (it would write `ucm.env`); with the KEK every HA node holds, it is stored in the database and works from any node, see [Session key rotation](ADMIN_GUIDE.md#session-key-rotation);
-- backup restore, both from System and from Settings (restored files land on one node).
+- backup restore, both from System and from Settings (restored files land on one node);
+- creating a SoftHSM provider, pointing a provider at SoftHSM, generating a key on a SoftHSM provider, syncing the keys of a SoftHSM provider, and creating a CA (root, intermediate or external CSR) on a new or an existing SoftHSM key (the token is on one node's disk). A CA already bound to a SoftHSM key keeps signing on the node that holds the token. The image does not initialize its default token when `UCM_HA` is set, whatever `HSM_AUTO_INIT` says. Network PKCS#11, OpenBao and cloud KMS providers are not affected.
 
 ## Upgrading
 

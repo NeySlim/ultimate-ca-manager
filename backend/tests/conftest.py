@@ -401,7 +401,7 @@ def _seeded_rows_stay_in_their_module():
 _LEAK_TABLES = (
     'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
     'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
-    'windows_enrollment_profiles',
+    'windows_enrollment_profiles', 'hsm_providers',
 )
 # Tables whose rows are compared too: a default profile edited in place keeps the count.
 _LEAK_CONTENT = {'windows_enrollment_profiles': ('updated_at', 'updated_by')}
