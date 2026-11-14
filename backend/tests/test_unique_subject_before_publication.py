@@ -211,3 +211,53 @@ def test_the_scep_approval_route_answers_409_naming_the_serial(app, auth_client,
     with app.app_context():
         assert db.session.get(SCEPRequest, request_id).status == 'pending'
         assert Certificate.query.filter_by(caref=ca['refid']).count() == 1
+
+
+# --- RFC 9763: A counts for B only when B names it -----------------------------------------------
+
+def _a_and_its_request(app, ca, cn):
+    """Certificate A of *cn* under *ca*, and a CSR of another key whose relatedCertRequest names A."""
+    from services.ca_service import CAService
+    from utils import related_cert
+    key_a, key_b = _key(), _key()
+    san = x509.SubjectAlternativeName([x509.DNSName(cn)])
+    with app.app_context():
+        pem, _serial = CAService.sign_csr_from_crypto(
+            db.session.get(CA, ca['id']), x509.CertificateSigningRequestBuilder().subject_name(
+                x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])).add_extension(san, critical=False)
+            .sign(key_a, hashes.SHA256()), validity_days=30, source='test')
+    cert_a = x509.load_pem_x509_certificate(pem.encode())
+    csr = (x509.CertificateSigningRequestBuilder().subject_name(cert_a.subject).add_extension(san, critical=False)
+           .sign(key_b, hashes.SHA256()))
+    request = related_cert.build_request(cert_a, key_a, related_cert.data_url_for([cert_a]))
+    return related_cert.csr_with_request(csr, key_b, request)
+
+
+@pytest.mark.parametrize('path', ['csr', 'trunk'])
+def test_a_related_certificate_the_issued_one_does_not_name_proves_nothing_before_ct(
+        app, auth_client, create_ca, ct_logs, monkeypatch, path):
+    """The early check counts A as designated only as the check under the lock does: when B
+    names A (RFC 9763 §4.2). B not naming it, the taken subject is refused before the CT logs."""
+    from services.cert import related_pair
+    from services.cert.unique_subject import SubjectTaken
+    seen, armed = ct_logs
+    ca = unique_ca(app, create_ca, f'Unique CT related {path} CA')
+    cn = f'ct-related-{path}.unique.test'
+
+    def issue(csr):
+        if path == 'csr':
+            return _sign(auth_client, app, ca, csr).status_code
+        try:
+            with app.app_context():
+                from services.ca_service import CAService
+                CAService.sign_csr_from_crypto(db.session.get(CA, ca['id']), csr, validity_days=30, source='test')
+            return 200
+        except SubjectTaken:
+            return 409
+    named, unnamed = _a_and_its_request(app, ca, cn), _a_and_its_request(app, ca, f'other-{cn}')
+    armed.append(True)
+    assert issue(named) == 200 and seen == [f'CN={cn}']  # B names A: A's entity
+    seen.clear()
+    monkeypatch.setattr(related_pair, 'linked_builder', lambda builder, cert_a: builder)
+    assert issue(unnamed) == 409
+    assert seen == []

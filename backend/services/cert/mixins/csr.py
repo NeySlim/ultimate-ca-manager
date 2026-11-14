@@ -306,7 +306,7 @@ class CSRMixin:
             raise ValueError(f"Failed to verify CSR signature: {e}")
 
         # RFC 9763: A is found before signing; linking refuses only an A renewed since
-        from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
+        from services.cert.related_pair import link_issued, named_by, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr_obj.public_bytes(serialization.Encoding.DER))
 
         # Sign CSR
@@ -375,7 +375,7 @@ class CSRMixin:
             not_after=not_after,
             # Without the lock, before the CT logs see a pre-certificate; checked again under it
             before_publication=None if override_unique_subject else (lambda leaf: refuse_taken_subject(
-                ca, leaf, own=[certificate], renews=[related_a[0] if related_a else None],
+                ca, leaf, own=[certificate], renews=[named_by(leaf, related_a)],
                 holder=subject_holder, source=source, requester=username, locked=False)),
         )
 

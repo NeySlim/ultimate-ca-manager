@@ -231,7 +231,7 @@ class CASigningMixin:
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
         # RFC 9763: A is found before signing; linking refuses only an A renewed since
-        from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
+        from services.cert.related_pair import link_issued, named_by, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr.public_bytes(serialization.Encoding.DER))
 
         # Load CA cert and key (local or HSM-backed)
@@ -283,7 +283,7 @@ class CASigningMixin:
             custom_extensions=template_custom_extensions(policy_template),
             # Without the lock, before the CT logs see a pre-certificate; checked again below
             before_publication=lambda leaf: refuse_taken_subject(
-                ca, leaf, renews=[related_a[0] if related_a else None, supersedes, *(renews or ())],
+                ca, leaf, renews=[named_by(leaf, related_a), supersedes, *(renews or ())],
                 holder=subject_holder, requester_sid=requester_sid, pattern=unique_subject,
                 source=source, locked=False, audited=audit_subject_refusal),
         )
