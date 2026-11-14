@@ -103,8 +103,16 @@ def _reserve_2fa_attempt(kind: str, key: str) -> bool:
               'locked_until': case((failures >= max_attempts, until), else_=None),
               'updated_at': now},
         where=or_(F.locked_until.is_(None), F.locked_until <= now),
-    ).returning(F.failures)
-    counted = db.session.execute(stmt).scalar_one_or_none()
+    )
+    if db.session.get_bind().dialect.insert_returning:
+        counted = db.session.execute(stmt.returning(F.failures)).scalar_one_or_none()
+    else:
+        # SQLite before 3.35: no RETURNING; the upsert holds the write lock until the
+        # commit, so the read sees this attempt's count. No row changed = target locked.
+        counted = None
+        if db.session.execute(stmt.execution_options(preserve_rowcount=True)).rowcount:
+            counted = db.session.execute(
+                db.select(F.failures).filter_by(kind=kind, target=key)).scalar_one()
     db.session.commit()
     return counted is not None and counted <= max_attempts
 

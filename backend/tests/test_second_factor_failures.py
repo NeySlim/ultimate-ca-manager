@@ -305,3 +305,48 @@ def test_a_backup_neither_carries_nor_restores_a_lock(app, tmp_path):
         assert User.query.filter_by(username='carried').count() == 1
         assert SecondFactorFailure.query.count() == 0
         db.session.remove()
+
+
+# SQLite before 3.35 (EL9 system library) has no INSERT ... RETURNING
+
+
+def _refuse_returning(conn, cursor, statement, *args):
+    if 'RETURNING' in statement.upper():
+        raise RuntimeError('RETURNING is not available on this database')
+
+
+@pytest.mark.parametrize('returning', [True, False])
+def test_the_three_routes_count_alike_without_insert_returning(nodes, monkeypatch, returning):
+    """TOTP, security key and passwordless WebAuthn give the same codes and counts
+    whether or not the database supports INSERT ... RETURNING."""
+    from sqlalchemy import event
+    from api.v2.auth_methods import TWO_FA, _clear_2fa_failures
+    a, _b, user = nodes
+    max_attempts, _ = _max_attempts(a)
+    with a.app_context():
+        engine = db.engine
+        db.session.remove()
+    if not returning:
+        monkeypatch.setattr(engine.dialect, 'insert_returning', False)
+        event.listen(engine, 'before_cursor_execute', _refuse_returning)
+    seen = []
+    try:
+        c = a.test_client()
+        assert c.post('/api/v2/auth/login/password', json={
+            'username': user['username'], 'password': PASSWORD}).status_code == 200
+        for url, body in (('/api/v2/auth/login/2fa', {'code': '00000000'}),
+                          ('/api/v2/auth/login/2fa/webauthn/verify', {'response': {'id': 'x'}})):
+            for _ in range(max_attempts + 1):
+                r = c.post(url, json=body)
+                seen.append((r.status_code, _rows(a).get(('2fa', str(user['id'])), (0,))[0]))
+            with a.app_context():
+                _clear_2fa_failures(TWO_FA, str(user['id']))
+                db.session.remove()
+        for _ in range(max_attempts + 1):
+            seen.append((_code(_webauthn(a, user['username'])),
+                         _rows(a)[('webauthn', user['username'])][0]))
+    finally:
+        if not returning:
+            event.remove(engine, 'before_cursor_execute', _refuse_returning)
+    one_route = [(401, n) for n in range(1, max_attempts + 1)] + [(429, max_attempts)]
+    assert seen == one_route * 3, seen
