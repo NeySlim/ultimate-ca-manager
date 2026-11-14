@@ -41,6 +41,7 @@ from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.serial_format import canonical_serial
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
 from utils.db_transaction import commit_or_rollback
+from services.cert.unique_subject import SubjectTaken, refuse_taken_subject
 from utils.ca_serial_counter import next_ca_serial
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
@@ -255,6 +256,15 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             raise RenewalError('Failed to renew certificate', 500) from e
         for s in sorted(staged_all, key=lambda s: s['ca'].id):
             next_ca_serial(s['ca'])
+        # The renewed row is the same entity (RFC 5280 §4.1.2.6), and so is its pair partner
+        rows = [s['cert'] for s in staged_all]
+        for s in staged_all:
+            try:
+                refuse_taken_subject(s['ca'], x509.load_pem_x509_certificate(s['cert_pem']), own=rows,
+                                     source=f'renewal ({trigger})', requester=username)
+            except SubjectTaken as e:
+                raise RenewalError(f'{e.audited[:1].upper()}{e.audited[1:]}, issued by this CA to '
+                                   'another entity: the CA requires a unique subject', 409) from e
     except Exception:
         db.session.rollback()
         raise

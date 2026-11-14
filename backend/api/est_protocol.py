@@ -6,7 +6,7 @@ from flask import Blueprint, request, Response
 from models import db, CA
 from services.ad_connector import renewal_identity
 from services.ca_service import CAService
-from services.ca.ca_signing import AlreadySuperseded
+from services.ca.ca_signing import AlreadySuperseded, SubjectTaken
 from services.est_key_generator import DelegateRenewedMeanwhile
 from services.policy_service import PolicyViolation
 from utils.request_names import RequestRejected
@@ -880,7 +880,7 @@ def simple_enroll(label=None):
     except PolicyViolation as e:
         logger.warning(f"EST simpleenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
-    except RequestRejected as e:
+    except (RequestRejected, SubjectTaken) as e:  # RFC 7030 §4.2.3: a 4xx with a plaintext reason
         logger.warning(f"EST simpleenroll refused: {e}")
         return Response(str(e), status=400)
     except Exception as e:
@@ -1013,7 +1013,7 @@ def simple_reenroll(label=None):
     except PolicyViolation as e:
         logger.warning(f"EST simplereenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
-    except RequestRejected as e:
+    except (RequestRejected, SubjectTaken) as e:  # RFC 7030 §4.2.3: a 4xx with a plaintext reason
         logger.warning(f"EST simplereenroll refused: {e}")
         return Response(str(e), status=400)
     except Exception as e:
@@ -1299,7 +1299,7 @@ Content-Transfer-Encoding: base64\r
         logger.warning(f"EST serverkeygen refused by policy: {e}")
         _refuse_claim(approved)
         return Response(f"Policy violation: {e}", status=400)
-    except RequestRejected as e:
+    except (RequestRejected, SubjectTaken) as e:  # RFC 7030 §4.2.3: a 4xx with a plaintext reason
         logger.warning(f"EST serverkeygen refused: {e}")
         _refuse_claim(approved)
         return Response(str(e), status=400)

@@ -12,6 +12,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, CertificateTemplate, Certificate, SystemConfig
+from services.cert.unique_subject import SubjectTaken, refuse_taken_subject
 from utils.ca_serial_counter import (
     log_commit_failure, next_ca_serial, retry_on_serial_collision,
     rollback_unless_serial_collision)
@@ -109,6 +110,7 @@ class LifecycleMixin:
         template_id: Optional[int] = None,
         username: str = 'system',
         ocsp_must_staple: bool = False,
+        subject_holder: Optional[str] = None,
     ) -> Certificate:
         """
         Create a certificate signed by a CA
@@ -130,6 +132,7 @@ class LifecycleMixin:
             template_id: Certificate template ID (optional)
             username: User creating certificate
             ocsp_must_staple: Enable OCSP Must-Staple extension
+            subject_holder: who the subject is certified to (mTLS: 'user:<id>')
 
         Returns:
             Certificate model instance
@@ -337,12 +340,18 @@ class LifecycleMixin:
             # Other fields
             revoked=False,
             imported_from='generated',
-            created_by=username
+            created_by=username,
+            subject_holder=subject_holder,
         )
 
         db.session.add(certificate)
         try:
+            # The CA row was locked by next_ca_serial above; the pre-certificate is never stored
+            refuse_taken_subject(ca, cert, own=[certificate], holder=subject_holder,
+                                 source='mtls', requester=username)
             db.session.commit()
+        except SubjectTaken:
+            raise
         except Exception as _commit_err:
             rollback_unless_serial_collision(_commit_err)
             log_commit_failure(logger, "Certificate creation not committed", _commit_err)

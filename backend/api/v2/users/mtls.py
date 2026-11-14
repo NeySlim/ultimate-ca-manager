@@ -191,6 +191,7 @@ def create_user_mtls_certificate(user_id):
                 cert_type='usr_cert',
                 key_type=browser_key_type(ca, name),
                 validity_days=validity_days,
+                subject_holder=f'user:{target_user.id}',
                 username=target_user.username,
             )
         except ValueError as e:

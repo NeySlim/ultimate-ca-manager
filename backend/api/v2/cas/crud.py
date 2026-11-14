@@ -867,6 +867,12 @@ def update_ca(ca_id):
         if not isinstance(new_hidden, bool):
             return error_response('issuanceHidden must be true or false', 400)
 
+    new_unique = None
+    if 'enforceUniqueSubject' in data or 'enforce_unique_subject' in data:
+        new_unique = data.get('enforceUniqueSubject', data.get('enforce_unique_subject'))
+        if not isinstance(new_unique, bool):
+            return error_response('enforceUniqueSubject must be true or false', 400)
+
     # Track which fields actually changed for the audit log
     changed = []
 
@@ -998,6 +1004,10 @@ def update_ca(ca_id):
     if new_hidden is not None and new_hidden != bool(ca.issuance_hidden):
         ca.issuance_hidden = new_hidden
         changed.append('hidden from issuance pickers' if new_hidden else 'listed in issuance pickers')
+    unique_turned_on = new_unique is True and not ca.enforce_unique_subject
+    if new_unique is not None and new_unique != bool(ca.enforce_unique_subject):
+        ca.enforce_unique_subject = new_unique
+        changed.append('unique subject enforced' if new_unique else 'unique subject no longer enforced')
     for forbidden in ('offline', 'offline_reason', 'offline_mode'):
         if forbidden in data:
             logger.warning(
@@ -1027,6 +1037,10 @@ def update_ca(ca_id):
         ca_dict = ca.to_dict()
         from services.webhook_service import emit_ca_updated
         emit_ca_updated(ca_dict, actor=username, changes={k: v for k, v in data.items()})
+        if unique_turned_on:
+            # Checked at issuance only: subjects already shared stay, their holders are refused
+            from services.cert.unique_subject import shared_subjects
+            ca_dict['shared_subjects'] = shared_subjects(ca)
 
         return success_response(data=ca_dict, message='CA updated successfully')
     except Exception as e:

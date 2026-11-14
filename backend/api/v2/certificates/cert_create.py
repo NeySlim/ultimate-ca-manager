@@ -30,6 +30,8 @@ from websocket.emitters import on_certificate_issued
 from utils.datetime_utils import utc_now, utc_isoformat, cert_not_before
 from security.encryption import encrypt_private_key
 from utils.ca_serial_counter import next_ca_serial
+from services.cert.unique_subject import (
+    SubjectTaken, audit_override, lineage, override_requested, refuse_taken_subject, taken_response)
 from utils.db_transaction import safe_commit
 from . import bp
 from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
@@ -70,6 +72,9 @@ def create_certificate():
 
     if not data.get('ca_id'):
         return error_response('CA ID is required', 400)
+    override, override_refusal = override_requested(data)
+    if override_refusal:
+        return override_refusal
 
     # SECURITY: Validate DN fields
     dn_validations = [
@@ -677,15 +682,22 @@ def create_certificate():
             db_pq = _row(pq_cert, pq_key, f'{descr} ({pair[1]})', compute_template_overrides(
                 template, key_type=pair[1], validity_days=validity_days))
             db_pq.related_certificate_id, db_pq.hybrid_role = db_cert.id, 'pq'
+            db_pq.subject_holder = lineage(db_cert)  # one entity: B is issued with A
             db.session.add(db_pq)
             db.session.flush()
             db_cert.related_certificate_id, db_cert.hybrid_role = db_pq.id, 'classical'
         # One count per certificate issued, committed with the certificates
         for _issued in filter(None, (db_cert, db_pq)):
             next_ca_serial(ca)
+        overridden = refuse_taken_subject(
+            ca, new_cert, own=[db_cert, db_pq], override=override, source='manual',
+            requester=g.current_user.username if hasattr(g, 'current_user') else None)
         ok, err = safe_commit(logger, "Failed to create certificate")
         if not ok:
             return err
+        if overridden is not None:
+            audit_override(ca, db_cert, overridden,
+                           g.current_user.username if hasattr(g, 'current_user') else 'system')
 
         # Audit log
         for row in [db_cert] + ([db_pq] if db_pq is not None else []):
@@ -729,6 +741,8 @@ def create_certificate():
             meta=notices_mod.meta_with_notices(notices),
         )
 
+    except SubjectTaken as e:
+        return taken_response(e)
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
