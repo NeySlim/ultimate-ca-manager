@@ -13,7 +13,7 @@ import uuid
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed448, ed25519, mldsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, mldsa, rsa
 from cryptography.x509.oid import NameOID
 
 import fips_mode
@@ -402,6 +402,99 @@ class TestSshAndHsm:
                 db.session.delete(key)
                 db.session.delete(provider)
                 db.session.commit()
+
+
+def _pem(public_key):
+    return public_key.public_bytes(serialization.Encoding.PEM,
+                                   serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+
+
+def _rsa_public(bits):
+    # Any odd modulus of the size: the stub signs, nothing is computed with it
+    return rsa.RSAPublicNumbers(65537, (1 << (bits - 1)) | 1).public_key()
+
+
+def _ec_public(curve):
+    return ec.generate_private_key(curve).public_key()
+
+
+class _SigningStub:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def sign(self, *args, **kwargs):
+        return b'signature'
+
+
+@pytest.fixture
+def hsm_signing_key(monkeypatch, app):
+    """Factory of HSM signing keys on a stub provider; rows removed afterwards."""
+    from models.hsm import HsmKey, HsmProvider
+    from services.hsm import HsmService
+    monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: _SigningStub()))
+    created = []
+
+    def make(algorithm, public_pem):
+        suffix = uuid.uuid4().hex[:6]
+        provider = HsmProvider(name=f'tok-{suffix}', type='pkcs11', config='{}')
+        db.session.add(provider)
+        db.session.commit()
+        key = HsmKey(provider_id=provider.id, key_identifier=f'k-{suffix}', label=f'k-{suffix}',
+                     algorithm=algorithm, key_type='asymmetric', purpose='signing',
+                     public_key_pem=public_pem)
+        db.session.add(key)
+        db.session.commit()
+        created.append((key, provider))
+        return key
+
+    with app.app_context():
+        yield make
+        for key, provider in created:
+            db.session.delete(key)
+            db.session.delete(provider)
+        db.session.commit()
+
+
+class TestHsmSigningInFipsMode:
+    """An HSM signs outside the module: only RSA 2048+ and NIST curves sign in FIPS mode."""
+
+    @pytest.mark.parametrize('algorithm,public,name', [
+        ('RSA-1024', lambda: _rsa_public(1024), 'RSA 1024'),
+        ('RSA-2047', lambda: _rsa_public(2047), 'RSA 2047'),
+        ('UNKNOWN', lambda: _ec_public(ec.SECP256K1()), 'EC secp256k1'),
+        ('EC-BP256', lambda: _ec_public(ec.BrainpoolP256R1()), 'EC Brainpool P256r1'),
+        ('UNKNOWN', lambda: None, 'UNKNOWN'),
+    ])
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_unapproved_keys_are_refused(self, monkeypatch, hsm_signing_key, approves,
+                                         algorithm, public, name):
+        from services.hsm import HsmService
+        _module(monkeypatch, approves)
+        pem = public()
+        key = hsm_signing_key(algorithm, _pem(pem) if pem is not None else None)
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        with pytest.raises(FipsRestricted, match=f'^{name} keys not available in FIPS mode$'):
+            HsmService.sign(key.id, b'tbs', hash_algorithm='sha256')
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
+        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
+
+    @pytest.mark.parametrize('algorithm,bits', [
+        ('RSA-2048', 2048), ('RSA-3072', 3072), ('RSA-4096', 4096), ('RSA-8192', 8192),
+        ('EC-P256', 256), ('EC-P384', 384), ('EC-P521', 521),
+    ])
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_classical_keys_sign(self, monkeypatch, hsm_signing_key, fips_on, approves, algorithm, bits):
+        from services.hsm import HsmService
+        _module(monkeypatch, approves)
+        if algorithm.startswith('RSA'):
+            public = _rsa_public(bits)
+        else:
+            public = _ec_public({256: ec.SECP256R1, 384: ec.SECP384R1, 521: ec.SECP521R1}[bits]())
+        key = hsm_signing_key(algorithm, _pem(public))
+        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
 
 
 # ----------------------------------------------------------- renewal and imports

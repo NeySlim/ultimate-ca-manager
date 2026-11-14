@@ -10,6 +10,7 @@ import json
 import logging
 
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from sqlalchemy import or_
 
 import fips_mode
@@ -643,15 +644,41 @@ class HsmService:
         return name
 
     @staticmethod
-    def _registered_algorithm(key: HsmKey):
-        """Registry entry of *key*, read off its public key before its stored label."""
+    def _cached_public_key(key: HsmKey):
         try:
             pem = key.public_key_pem
-            public = serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
-            label = key_algorithms.label_for_public_key(public)
+            return serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
         except Exception:
-            label = None
+            return None
+
+    @classmethod
+    def _registered_algorithm(cls, key: HsmKey):
+        """Registry entry of *key*, read off its public key before its stored label."""
+        public = cls._cached_public_key(key)
+        label = key_algorithms.label_for_public_key(public) if public is not None else None
         return key_algorithms.get(label) or key_algorithms.get(key.algorithm)
+
+    @classmethod
+    def refuse_signing_in_fips_mode(cls, key: HsmKey) -> None:
+        """Refused by default in FIPS mode: an HSM key signs only if it is RSA 2048+ or
+        a registered algorithm every module approves (NIST curves), judged on its public key."""
+        if not fips_mode.enabled():
+            return
+        public = cls._cached_public_key(key)
+        if isinstance(public, rsa.RSAPublicKey):
+            if public.key_size >= 2048:
+                return
+            fips_mode.refuse(f'RSA {public.key_size} keys')
+        registered = cls._registered_algorithm(key)
+        if registered is not None and registered.fips_static:
+            return
+        if registered is not None:
+            name = registered.display
+        elif isinstance(public, ec.EllipticCurvePublicKey):
+            name = f'EC {public.curve.name}'
+        else:
+            name = key.algorithm or 'UNKNOWN'
+        fips_mode.refuse(f'{name} keys')
 
     @classmethod
     def sign(cls, key_id: int, data: bytes, algorithm: Optional[str] = None,
@@ -676,9 +703,9 @@ class HsmService:
         
         if key.purpose not in ('signing', 'all'):
             raise ValueError(f"Key {key.label} is not for signing")
-        registered = cls._registered_algorithm(key)
         # A key bound before the switch or restored from a backup must not sign in FIPS mode
-        cls.refuse_in_fips_mode(registered.label if registered else key.algorithm)
+        cls.refuse_signing_in_fips_mode(key)
+        registered = cls._registered_algorithm(key)
         pure = registered is not None and not registered.needs_digest
         if pure and (hash_algorithm or padding):
             raise ValueError(f"{registered.label} signs the data itself: no digest or padding applies")
