@@ -995,6 +995,22 @@ class TestASwitchCutShortCanBeResumed:
         assert _starts(url, monkeypatch) is True
 
     @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
+    def test_cut_while_the_registry_is_recorded(self, request, backend, app, monkeypatch):
+        url = request.getfixturevalue(f'{backend}_target')
+
+        def cut(*args, **kwargs):
+            raise RuntimeError('the service stopped here')
+
+        with app.app_context():
+            with monkeypatch.context() as patch:
+                patch.setattr(migration, 'record_fresh_registry', cut)
+                ok, _, _ = migration.bootstrap_auth_to_target(url)
+            assert ok is False
+            ok, message, _ = migration.bootstrap_auth_to_target(url)
+        assert ok is True, message
+        assert _starts(url, monkeypatch) is True
+
+    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
     def test_cut_during_the_copy(self, request, backend, app, monkeypatch):
         url = request.getfixturevalue(f'{backend}_target')
         from services.database_admin.copy import CopyError

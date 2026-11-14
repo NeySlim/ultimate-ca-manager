@@ -160,6 +160,53 @@ def _create_target_schema(target_engine, target_is_pg: bool) -> None:
         tx.execute(text(_migrations_ddl(target_is_pg)))
 
 
+class _Bootstrap:
+    """What the steps of a switch without data hand each other."""
+
+    def __init__(self, target_engine, target_is_pg: bool):
+        self.target = target_engine
+        self.is_pg = target_is_pg
+        self.result = None
+        self.high_water: Dict[str, int] = {}
+        self.source_view = ''
+
+
+def _step_registry(run: _Bootstrap) -> None:
+    # Before the tables, as build_fresh_schema: a cut before them leaves a 3.0 target, never
+    # tables beside an empty registry, which the start refuses as older than 2.254.
+    with run.target.begin() as tx:
+        tx.execute(text(_migrations_ddl(run.is_pg)))
+    record_fresh_registry(run.target, run.is_pg)
+
+
+def _step_schema(run: _Bootstrap) -> None:
+    from models import db as _db
+    _db.metadata.create_all(run.target)
+
+
+def _step_copy(run: _Bootstrap) -> None:
+    with consistent_live_source() as (src, source_view, source_is_pg):
+        plan = _bootstrap_plan(src.engine, run.target)
+        run.result = copy_tables(
+            src, run.target, plan,
+            source_is_pg=source_is_pg, target_is_pg=run.is_pg)
+        run.high_water = read_id_high_water(src, source_is_pg)
+        run.source_view = source_view
+
+
+def _step_sequences(run: _Bootstrap) -> None:
+    if run.is_pg:
+        _reset_pg_sequences(run.target)
+
+
+def _step_high_water(run: _Bootstrap) -> None:
+    carry_id_high_water(run.target, run.high_water, run.is_pg)
+
+
+# Each step is idempotent: a switch cut short anywhere is resumed by the next one on the target
+_BOOTSTRAP_STEPS = (_step_registry, _step_schema, _step_copy, _step_sequences, _step_high_water)
+
+
 def _bootstrap_plan(source_engine, target_engine) -> List[TablePlan]:
     """Which columns of the auth tables are copied by a backend switch.
 
@@ -402,27 +449,15 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         # From here on the target carries a schema, which changes what the
         # operator has to do before retrying.
         stats["target_written"] = True
-        _create_target_schema(target_engine, target_is_pg)
-        # Registry before accounts: a switch cut short leaves a 3.0 target the next one resumes,
-        # never accounts beside an empty registry, which the start refuses as older than 2.254.
-        # A full migration copies the source's registry instead.
-        record_fresh_registry(target_engine, target_is_pg)
-
-        with consistent_live_source() as (src, source_view, source_is_pg):
-            plan = _bootstrap_plan(src.engine, target_engine)
-            result = copy_tables(
-                src, target_engine, plan,
-                source_is_pg=source_is_pg, target_is_pg=target_is_pg)
-            high_water = read_id_high_water(src, source_is_pg)
-
-        if target_is_pg:
-            _reset_pg_sequences(target_engine)
-        carry_id_high_water(target_engine, high_water, target_is_pg)
+        run = _Bootstrap(target_engine, target_is_pg)
+        for step in _BOOTSTRAP_STEPS:
+            step(run)
+        result = run.result
 
         stats["tables"] = dict(result.tables)
         stats["tables_bootstrapped"] = len(result.tables)
         stats["rows_copied"] = result.rows
-        stats["source_view"] = source_view
+        stats["source_view"] = run.source_view
 
         if not result.tables.get('users'):
             stats["refusal"] = "verification"
