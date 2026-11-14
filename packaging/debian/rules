@@ -73,6 +73,11 @@ override_dh_auto_install:
 	chmod +x debian/ucm/opt/ucm/scripts/*.sh
 	chmod +x debian/ucm/opt/ucm/backend/app.py || true
 
+override_dh_installdeb:
+	dh_installdeb
+	# The preinst runs before the package unpacks: the version guard goes inside it
+	sh packaging/scripts/embed-pivot-guard.sh debian/ucm/DEBIAN/preinst
+
 override_dh_installinit:
 	# Skip - we install service manually
 

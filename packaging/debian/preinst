@@ -4,6 +4,13 @@
 
 set -e
 
+# Refused over a UCM older than 2.254 before anything below writes a file; $2 is the
+# installed version (or the one whose config files remain), empty on a first install.
+# @UCM_PIVOT_GUARD@
+case "$1" in
+    install|upgrade) ucm_pivot_guard "$2" || exit 1 ;;
+esac
+
 # The rotation configuration became a package file in 2.230. Where an operator
 # had written one by hand, following documentation that promised the packages
 # shipped it, dpkg would stop and ask what to do, and an unattended upgrade

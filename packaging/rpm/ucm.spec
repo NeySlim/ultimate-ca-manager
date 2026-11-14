@@ -76,6 +76,15 @@ install -m 644 packaging/systemd/ucm-watcher.path %{buildroot}%{_unitdir}/%{name
 install -m 644 packaging/systemd/ucm-watcher.service %{buildroot}%{_unitdir}/%{name}-watcher.service
 
 %pre
+# Refused over a UCM older than 2.254 before the account or any file is written;
+# the guard is embedded by packaging/scripts/embed-pivot-guard.sh before rpmbuild
+# @UCM_PIVOT_GUARD@
+command -v ucm_pivot_guard >/dev/null || exit 1
+# rpm -q prints "package ucm is not installed" and fails on a first install
+ucm_installed=$(rpm -q --qf '%%{VERSION}\n' %{name} 2>/dev/null) || ucm_installed=""
+for ucm_version in $ucm_installed; do
+    ucm_pivot_guard "$ucm_version" || exit 1
+done
 getent group %{name} >/dev/null || groupadd -r %{name}
 getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbin/nologin -c "UCM Service Account" %{name}
 
