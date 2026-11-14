@@ -401,6 +401,39 @@ def test_a_copy_whose_source_removal_failed_is_restored_before_it_goes(tmp_path)
     assert 'Everything was put back' in out.stdout
 
 
+def _all_files(*tops):
+    """The files under several trees, by path relative to each, whichever tree holds them."""
+    out = {}
+    for top in tops:
+        for rel, entry in files(top).items():
+            assert rel not in out, rel
+            out[rel] = entry
+    return out
+
+
+def test_a_copy_is_kept_while_its_source_cannot_be_completed_again(tmp_path):
+    """Removing a copied source fails halfway, then putting it back fails too: the archive
+    keeps every copy whose source is not whole again, so no file is lost."""
+    box = Box(tmp_path, python='stub')
+    data = files(box.data)
+    box.wrap(other_fs=(box.data,))
+    failed = box.state / 'rm-failed'
+    (box.bin / 'rm').write_text(
+        f'#!/bin/sh\nfor last; do :; done\ncase $last in */updates)\n'
+        f'    {REAL["rm"]} -f -- "$last/nested/f"; : > {failed}; exit 1 ;;\nesac\n'
+        f'exec {REAL["rm"]} "$@"\n')
+    (box.bin / 'cp').write_text(f'#!/bin/sh\n[ ! -e {failed} ] || exit 1\nexec {REAL["cp"]} "$@"\n')
+
+    out = box.run()
+
+    assert out.returncode != 0, out.stdout
+    assert failed.exists()
+    assert not (box.data / 'updates' / 'nested' / 'f').exists()
+    assert 'could not be put back' in out.stdout and str(box.archive) in out.stdout
+    assert 'Everything was put back' not in out.stdout
+    assert _all_files(box.data, box.archive / 'data') == data
+
+
 def test_a_copy_that_differs_from_its_source_is_never_kept_in_its_place(tmp_path):
     box = Box(tmp_path, python='stub')
     before = snapshot(box)
