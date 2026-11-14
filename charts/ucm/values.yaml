@@ -194,7 +194,7 @@ startupProbe:
   enabled: true
   periodSeconds: 10
   timeoutSeconds: 10
-  failureThreshold: 30
+  failureThreshold: 36
 readinessProbe:
   enabled: true
   initialDelaySeconds: 20

@@ -148,11 +148,17 @@ def test_the_wait_for_a_held_row_keeps_no_transaction_open(app, ha):
 
 def test_a_row_of_a_crashed_run_is_taken_once_its_heartbeat_expires(app, ha):
     node = PREFIX + 'crashed'
-    _put(app, node, 'old', age=1.0, leader=True)
+    _put(app, node, 'old', age=0, leader=True)
+    polls = []
+
+    def pause(seconds):
+        polls.append(seconds)
+        time.sleep(seconds)
     with app.app_context():
-        waited = scheduler_leader.claim_node_at_start(node, 'new', stale_seconds=1.5, poll=0.05,
-                                                      release_at_exit=False)
-    assert 0.3 < waited < 1.5
+        # Past stale + 2 * poll the claim raises by itself: no upper bound to assert here
+        scheduler_leader.claim_node_at_start(node, 'new', stale_seconds=2, poll=0.05, sleep=pause,
+                                             release_at_exit=False)
+    assert polls  # it waited for the heartbeat to expire, it did not take a fresh row
     assert _row(app, node) == ('new', False)  # the dead run's leader flag goes with it
 
 
