@@ -178,10 +178,14 @@ def _switch_backend():
         # this, the new DB has no users and the operator is locked out.
         ok_boot, boot_msg, boot_stats = svc.bootstrap_auth_to_target(database_url)
         if not ok_boot:
-            reset = (
-                ' The target now carries a schema; reset it before retrying.'
-                if boot_stats.get('target_written') else ''
-            )
+            # Every step before the verification is resumed on the same target; a copy that
+            # failed its verification is not, the next attempt would take its accounts as they are.
+            reset = ''
+            if boot_stats.get('target_written'):
+                reset = (
+                    ' The copy on the target failed its verification; reset the target before retrying.'
+                    if boot_stats.get('refusal') == 'verification'
+                    else ' Retrying on the same target resumes the switch.')
             return error_response(
                 'Pre-flight bootstrap failed, so the backend was not '
                 f'switched. {svc._redact_uri(boot_msg)}{reset}',

@@ -726,6 +726,27 @@ class TestNothingSwitchesUnlessEverythingPassed:
         assert env_file.read_text() == before
         assert not restart_signal.exists()
 
+    @pytest.mark.parametrize('refusal,advice', [
+        ('error', 'Retrying on the same target resumes the switch.'),
+        ('copy', 'Retrying on the same target resumes the switch.'),
+        ('verification', 'failed its verification; reset the target before retrying.'),
+    ])
+    def test_a_bootstrap_cut_short_says_how_to_retry(
+            self, auth_client, sqlite_target, env_file, refusal, advice, monkeypatch):
+        import api.v2.database as route_module
+
+        monkeypatch.setattr(
+            route_module.svc, 'bootstrap_auth_to_target',
+            lambda url: (False, 'Bootstrap failed: stopped',
+                         {'refusal': refusal, 'target_written': True}))
+
+        response = self._post(auth_client, 'switch', {'database_url': sqlite_target})
+
+        assert response.status_code == 500, response.data
+        message = json.loads(response.data)['message']
+        assert message.endswith(advice), message
+        assert 'carries a schema' not in message
+
     def test_a_configuration_that_could_not_be_written_forbids_the_restart(
             self, auth_client, sqlite_target, restart_signal, monkeypatch):
         import api.v2.database as route_module
