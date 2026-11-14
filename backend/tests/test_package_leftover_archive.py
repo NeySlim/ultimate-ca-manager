@@ -355,7 +355,7 @@ def test_a_database_it_cannot_archive_is_left_and_named(tmp_path, python, code, 
     box.python(python, code=code, first=first)
     before = snapshot(box)
     out = box.run()
-    assert out.returncode == 0
+    assert out.returncode == 3, out.stdout
     assert says in out.stdout and '2.254' in out.stdout
     # Which database: the SQLite file, or the backend alone (never a URL)
     assert (first if python == 'stub' and code != 1 else 'could not read') in out.stdout
@@ -373,7 +373,7 @@ def test_a_database_a_later_release_wrote_is_left_and_never_called_older(tmp_pat
         box.python('stub', code=6)
     before = snapshot(box)
     out = box.run()
-    assert out.returncode == 0, out.stderr
+    assert out.returncode == 3, out.stderr
     assert snapshot(box) == before
     assert not box.parent.exists()
     assert 'release that wrote' in out.stdout

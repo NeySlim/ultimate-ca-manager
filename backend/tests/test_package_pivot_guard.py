@@ -504,3 +504,19 @@ def test_a_retry_archives_while_a_mark_or_a_journal_is_left(tmp_path, package, r
     _check_order(calls, home, data, config)
     assert f'rm -f {home}/{PENDING}' in calls
 
+
+@pytest.mark.parametrize('package', ['deb', 'rpm'])
+@pytest.mark.parametrize('archive_rc, banner', [(0, True), (3, False)])
+def test_no_success_banner_after_a_database_left_for_the_service_to_refuse(tmp_path, package,
+                                                                          archive_rc, banner):
+    """3: the archiver said the service will refuse the database it left; the install goes
+    on as before, but never ends on "UCM INSTALLED", and no retry is asked for."""
+    if package == 'deb':
+        out, calls, home, *_ = _run_postinst(tmp_path, 'configure', '', archive_rc=archive_rc)
+    else:
+        out, calls, home, *_ = _run_post(tmp_path, '1', archive_rc=archive_rc)
+    assert out.returncode == 0, out.stderr
+    assert any(' banner ' in c for c in calls if c.startswith('bash ')) is banner
+    assert f'rm -f {home}/{PENDING}' in calls
+    assert 'not set up' not in out.stdout
+

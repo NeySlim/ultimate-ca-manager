@@ -6,9 +6,10 @@
 # step puts back what was moved, and the service is then not started.
 #
 # Usage: archive-leftovers.sh <ucm home> <data dir> <config dir> [<archive parent> [<log>]]
-# Exit 0: nothing to archive, archived, or left in place for the service to refuse;
-# 1: not archived, everything is back in place; 2: not archived, some files are still in
-# the archive (the next run puts them back first). On 1 and 2 the install must stop.
+# Exit 0: nothing to archive, or archived; 3: a database it must not archive is left in
+# place, and the service will refuse to start on it; 1: not archived, everything is back
+# in place; 2: not archived, some files are still in the archive (the next run puts them
+# back first). On 1 and 2 the install must stop; on 3 it must not announce a success.
 set -u
 
 UCM_HOME=$1
@@ -262,7 +263,7 @@ case $code in
         say "Nothing was moved, and the service will refuse to start on it."
         say "Reinstall the release that wrote this database, or move $CONFIG and $DATA aside"
         say "and reinstall this package to start empty."
-        exit 0 ;;
+        exit 3 ;;
     4) case $backend in
            "sqlite "/*) DB_FILE=${backend#sqlite } ;;
            *)
@@ -272,14 +273,14 @@ case $code in
                say "will refuse to start."
                say "Install 2.254 and start it once on that database, then install this release again;"
                say "or move $CONFIG and $DATA aside and reinstall this package to start empty."
-               exit 0 ;;
+               exit 3 ;;
        esac ;;
     *)
         say "UCM: an earlier UCM left a configuration or database here that this release could not read"
         say "(${backend:+$backend: }${REASON:-check exited with code $code})."
         say "Nothing was moved; if the service refuses to start,"
         say "install 2.254 and start it once on that data, or move $CONFIG and $DATA aside and reinstall."
-        exit 0 ;;
+        exit 3 ;;
 esac
 
 # -- 2. Archive ------------------------------------------------------------------

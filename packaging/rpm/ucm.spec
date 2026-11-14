@@ -137,14 +137,20 @@ fi
 for journal in "${UCM_HOME%%/*}"/ucm-archive/*/.journal; do
     [ ! -e "$journal" ] || ARCHIVE_DUE=1
 done
+# 3: a database left in place that the service will refuse, which the archiver has
+# explained: no success banner follows that
+LEFT_REFUSED=""
 if [ -n "$ARCHIVE_DUE" ]; then
     : > "$ARCHIVE_PENDING"
-    if sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG"; then
-        rm -f "$ARCHIVE_PENDING"
-    else
-        echo "UCM was not set up. Fix the cause, then run: dnf reinstall ucm"
-        exit 1
-    fi
+    ARCHIVE_RC=0
+    sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG" || ARCHIVE_RC=$?
+    case $ARCHIVE_RC in
+        0) ;;
+        3) LEFT_REFUSED=1 ;;
+        *) echo "UCM was not set up. Fix the cause, then run: dnf reinstall ucm"
+           exit 1 ;;
+    esac
+    rm -f "$ARCHIVE_PENDING"
 fi
 
 # Listed one by one for the same reason as in %%install: this scriptlet
@@ -207,7 +213,7 @@ chmod 750 $UCM_DATA
 # Host FIPS state, UCM_FIPS and readiness report (UCM_FIPS_BUILD=1 only)
 bash "$UCM_SETUP" fips-finish "$UCM_HOME" "$UCM_CONFIG/ucm.env" "$UCM_DATA" %{name}
 # Shown once the venv is built, so a failed build never follows the banner
-if [ -n "$NEW_CONFIG" ]; then
+if [ -n "$NEW_CONFIG" ] && [ -z "$LEFT_REFUSED" ]; then
     bash "$UCM_SETUP" banner "$UCM_CONFIG/ucm.env" rpm
 fi
 
