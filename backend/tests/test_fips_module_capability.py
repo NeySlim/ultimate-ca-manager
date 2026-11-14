@@ -776,6 +776,23 @@ class TestPreflight:
         found = fips_preflight._hsm_keys()
         assert f'{key.label} (#{key.id}): EC-BP256' in found, found
 
+    @pytest.mark.parametrize('purpose', ['signing', 'all', 'encryption'])
+    def test_a_symmetric_hsm_key_is_not_listed_whatever_its_purpose(self, hsm_signing_key, fips_on, purpose):
+        """The key form defaults the purpose to signing for AES keys too: they sign nothing."""
+        from services import fips_preflight
+        key = hsm_signing_key('AES-256', None)
+        key.key_type, key.purpose = 'symmetric', purpose
+        db.session.commit()
+        assert not [f for f in fips_preflight._hsm_keys() if f.startswith(f'{key.label} (#{key.id})')]
+
+    def test_a_cached_public_key_decides_against_its_label(self, hsm_signing_key, fips_on):
+        """A curve the registry does not know is refused even under an approved label."""
+        from services.hsm import HsmService
+        key = hsm_signing_key('EC-P256', _pem(_ec_public(ec.SECP256K1())))
+        assert HsmService.fips_signing_refusal(key) == 'EC secp256k1 keys'
+        with pytest.raises(FipsRestricted, match='^EC secp256k1 keys not available in FIPS mode$'):
+            HsmService.sign(key.id, b'tbs')
+
     @pytest.mark.parametrize('approves', [(), ALL])
     def test_hsm_keys_listed_are_those_sign_refuses(self, monkeypatch, hsm_signing_key, fips_on, approves):
         from services import fips_preflight
@@ -916,6 +933,15 @@ class TestHsmCaKeyLoadInFipsMode:
         self._load(monkeypatch, ValueError('unsupported curve'))
         key = hsm_signing_key(algorithm, public())
         with pytest.raises(FipsRestricted, match='keys not available in FIPS mode$'):
+            get_ca_signing_key(self._ca(key))
+
+    def test_a_curve_the_module_cannot_build_gets_the_label_refusal(self, monkeypatch, hsm_signing_key,
+                                                                    fips_on):
+        from cryptography.exceptions import UnsupportedAlgorithm
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        self._load(monkeypatch, UnsupportedAlgorithm('Curve 1.3.132.0.10 is not supported'))
+        key = hsm_signing_key('UNKNOWN', None)
+        with pytest.raises(FipsRestricted, match='^UNKNOWN keys not available in FIPS mode$'):
             get_ca_signing_key(self._ca(key))
 
     def test_a_public_key_fetched_by_the_load_is_judged(self, monkeypatch, hsm_signing_key, fips_on):

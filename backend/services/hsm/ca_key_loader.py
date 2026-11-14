@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
@@ -62,7 +63,8 @@ def get_ca_signing_key(ca, *, allow_revoked: bool = False):
         _refuse_hsm_key_in_fips_mode(ca.hsm_key_id, cached_only=True)
         try:
             key = load_hsm_private_key(ca.hsm_key_id)
-        except ValueError:
+        except (ValueError, UnsupportedAlgorithm):
+            # UnsupportedAlgorithm: a curve the module cannot build, not a ValueError
             _refuse_hsm_key_in_fips_mode(ca.hsm_key_id)
             raise
         _refuse_hsm_key_in_fips_mode(ca.hsm_key_id)

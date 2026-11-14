@@ -427,12 +427,12 @@ def _gcp():
           'Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao '
           'and Vault Transit keys of these types are no longer listed.')
 def _hsm_keys():
-    # A signing key is listed iff HsmService.sign refuses it (cached public key, then label, no
-    # provider call); a key that does not sign is listed only for ChaCha20, the cipher FIPS refuses.
+    # An asymmetric signing key is listed iff HsmService.sign refuses it on its cached public key,
+    # else its label (no provider call); any other key only for ChaCha20, the cipher FIPS refuses.
     from services.hsm import HsmService
     found = []
     for key in HsmKey.query.order_by(HsmKey.id).all():
-        if key.purpose in ('signing', 'all'):
+        if key.key_type != 'symmetric' and key.purpose in ('signing', 'all'):
             refused = HsmService.fips_signing_refusal(key) is not None
         else:
             refused = 'CHACHA' in str(key.algorithm or '').upper()

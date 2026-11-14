@@ -665,7 +665,9 @@ class HsmService:
         public = cls._cached_public_key(key)
         if isinstance(public, rsa.RSAPublicKey):
             return None if public.key_size >= 2048 else f'RSA {public.key_size} keys'
-        registered = cls._registered_algorithm(key)
+        # A public key that can be read decides alone: its label may say anything
+        label = key.algorithm if public is None else key_algorithms.label_for_public_key(public)
+        registered = key_algorithms.get(label)
         if registered is not None:
             return None if registered.fips_static else f'{registered.display} keys'
         if isinstance(public, ec.EllipticCurvePublicKey):
