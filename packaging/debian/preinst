@@ -35,8 +35,8 @@ case "$1" in
         PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
         PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
         
-        if [ "$PYTHON_MAJOR" -lt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]; }; then
-            echo "Error: Python 3.10 or higher is required (found $PYTHON_VERSION)" >&2
+        if [ "$PYTHON_MAJOR" -lt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 12 ]; }; then
+            echo "Error: Python 3.12 or higher is required (found $PYTHON_VERSION)" >&2
             exit 1
         fi
         

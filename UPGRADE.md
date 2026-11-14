@@ -298,7 +298,7 @@ No action required — all migration happens automatically.
 
 ### Upgrading from v1.8.x
 
-Install 2.254 first: its packages carry the 1.x to 2.0 upgrade (database moved from `/var/lib/ucm/` to `/opt/ucm/data/`), and 3.0 starts only on a database 2.254 has started. Then follow [Upgrading to v3.0](#upgrading-to-v30).
+Bring the installation to 2.254 first: 3.0 starts only on a database 2.254 has started, and its packages no longer handle a 1.x installation. Then follow [Upgrading to v3.0](#upgrading-to-v30).
 
 ---
 

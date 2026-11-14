@@ -82,6 +82,11 @@ install -m 644 packaging/systemd/ucm-watcher.service %{buildroot}%{_unitdir}/%{n
 command -v ucm_pivot_guard >/dev/null || exit 1
 # rpm -q prints "package ucm is not installed" and fails on a first install
 ucm_installed=$(rpm -q --qf '%%{VERSION}\n' %{name} 2>/dev/null) || ucm_installed=""
+# $1 is 2 or more on an upgrade: a version that cannot be read is no reason to go on
+if [ "$1" -ge 2 ] && [ -z "$ucm_installed" ]; then
+    echo "The installed UCM version could not be read: this package was not installed." >&2
+    exit 1
+fi
 for ucm_version in $ucm_installed; do
     ucm_pivot_guard "$ucm_version" || exit 1
 done

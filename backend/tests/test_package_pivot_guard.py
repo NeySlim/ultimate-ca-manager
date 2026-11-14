@@ -110,9 +110,17 @@ def preinst(tmp_path):
     return _embed(PREINST, tmp_path, 'preinst')
 
 
-def _run_preinst(script, tmp_path, *args):
-    env, log = _fakebin(tmp_path)
-    out = subprocess.run(['/bin/bash', str(script), *args], capture_output=True, text=True,
+def _run_preinst(script, tmp_path, *args, python='3.12'):
+    """Runs the preinst where a log rotation file no package owns exists, so its `mv` is due."""
+    rotation = tmp_path / 'logrotate-ucm'
+    rotation.write_text('')
+    text = script.read_text()
+    assert text.count('LOGROTATE_CONF=/etc/logrotate.d/ucm\n') == 1
+    sandboxed = tmp_path / 'preinst.sandboxed'
+    sandboxed.write_text(text.replace('LOGROTATE_CONF=/etc/logrotate.d/ucm\n',
+                                      f'LOGROTATE_CONF={rotation}\n'))
+    env, log = _fakebin(tmp_path, {'dpkg-query': 'exit 1', 'python3': f'echo {python}'})
+    out = subprocess.run(['/bin/bash', str(sandboxed), *args], capture_output=True, text=True,
                          timeout=20, env=env)
     return out, _calls(log)
 
@@ -130,7 +138,14 @@ def test_the_deb_preinst_refuses_before_any_write(preinst, tmp_path, args):
 def test_the_deb_preinst_upgrades_a_2_254(preinst, tmp_path):
     out, calls = _run_preinst(preinst, tmp_path, 'upgrade', '2.254')
     assert out.returncode == 0, out.stderr
+    assert calls[0] == f'mv -f {tmp_path}/logrotate-ucm {tmp_path}/logrotate-ucm.dpkg-bak'
     assert 'mkdir -p /var/lib/ucm/backups' in calls
+
+
+def test_the_deb_preinst_asks_for_the_python_its_control_file_requires(preinst, tmp_path):
+    out, _ = _run_preinst(preinst, tmp_path, 'install', python='3.11')
+    assert out.returncode != 0
+    assert 'Python 3.12 or higher is required (found 3.11)' in out.stderr
 
 
 @pytest.mark.parametrize('args', [('install',), ('upgrade', '2.254.1~rc1'),
@@ -194,6 +209,14 @@ def test_the_rpm_pre_accepts_a_new_install(rpm_pre, tmp_path):
                              count='1')
     assert out.returncode == 0, out.stderr
     assert calls[0].startswith('groupadd -r ucm')
+
+
+def test_the_rpm_pre_refuses_an_upgrade_whose_installed_version_it_cannot_read(rpm_pre, tmp_path):
+    """$1 is 2 or more on an upgrade: a UCM is installed, whatever rpm -q answered."""
+    out, calls, _ = _run_pre(rpm_pre, tmp_path, 'exit 1', count='2')
+    assert out.returncode != 0
+    assert 'could not be read' in out.stderr
+    assert calls == []
 
 
 def test_a_spec_built_without_the_guard_fails_every_install(tmp_path):
