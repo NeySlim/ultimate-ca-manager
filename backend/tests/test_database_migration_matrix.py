@@ -6,12 +6,13 @@ all, and a failure of the snapshot, the verification, the bootstrap or the
 configuration write — each of which must forbid the switch rather than
 produce a half-migrated installation nobody was told about.
 """
+import contextlib
 import json
 import os
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import Table, create_engine, event, inspect, text
 
 from config.settings import DATA_DIR
 from models import db
@@ -341,6 +342,21 @@ print('BOOTED')
 '''
 
 
+def _boots(target, tmp_path):
+    """The application starts on *target*, in a child that reads nothing of the host."""
+    import subprocess
+    import sys
+    data = tmp_path / 'node'
+    data.mkdir()
+    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+    env.update(DATA_DIR=str(data), DATABASE_PATH=str(data / 'ucm.db'), DATABASE_URL=target,
+               UCM_SKIP_SECRET_VALIDATION='1', UCM_HA='0')
+    backend = Path(__file__).resolve().parents[1]
+    run = subprocess.run([sys.executable, '-c', _BOOT_ON_TARGET], cwd=backend, env=env,
+                         capture_output=True, text=True, timeout=180)
+    assert run.returncode == 0 and 'BOOTED' in run.stdout, run.stdout[-3000:] + run.stderr[-3000:]
+
+
 @pytest.fixture
 def a_3_0_source(app):
     """The session database carries the registry of a started 3.0 database, as a real source does."""
@@ -369,8 +385,6 @@ class TestASwitchedTargetStarts:
 
     def _switch_then_start(self, app, target, tmp_path, monkeypatch,
                            switch=migration.bootstrap_auth_to_target):
-        import subprocess
-        import sys
         import migration_runner
         from utils.db_url import postgres_connect_args, sqlalchemy_url
 
@@ -388,16 +402,7 @@ class TestASwitchedTargetStarts:
 
         monkeypatch.setattr(migration_runner, '_get_db_url', lambda: target)
         assert migration_runner.run_all_migrations() is True
-
-        data = tmp_path / 'node'
-        data.mkdir()
-        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
-        env.update(DATA_DIR=str(data), DATABASE_PATH=str(data / 'ucm.db'), DATABASE_URL=target,
-                   UCM_SKIP_SECRET_VALIDATION='1', UCM_HA='0')
-        backend = Path(__file__).resolve().parents[1]
-        run = subprocess.run([sys.executable, '-c', _BOOT_ON_TARGET], cwd=backend, env=env,
-                             capture_output=True, text=True, timeout=180)
-        assert run.returncode == 0 and 'BOOTED' in run.stdout, run.stdout[-3000:] + run.stderr[-3000:]
+        _boots(target, tmp_path)
 
     def test_without_data_to_sqlite(self, app, sqlite_target, tmp_path, monkeypatch):
         self._switch_then_start(app, sqlite_target, tmp_path, monkeypatch)
@@ -1005,66 +1010,96 @@ def _assert_new_ids_above(url, highest, gone):
         engine.dispose()
 
 
+def _cut_points():
+    """Before and after every step the switch runs, and inside the two that write in bulk."""
+    points = [(step.__name__, where) for step in migration._BOOTSTRAP_STEPS
+              for where in ('before', 'after')]
+    return points + [('_step_schema', 'during'), ('_step_copy', 'during')]
+
+
+@contextlib.contextmanager
+def _cut(step_name, where):
+    """One failure armed at that point of the attempt run inside; yields the list it fills."""
+    from services.database_admin import copy as copy_module
+    fired = []
+
+    def stop():
+        fired.append(f'{where} {step_name}')
+        raise RuntimeError('the service stopped here')
+
+    with pytest.MonkeyPatch.context() as patch:
+        if where == 'during' and step_name == '_step_schema':
+            created = []
+
+            def on_create(table, connection, **kwargs):
+                created.append(table.name)
+                if len(created) == 3:      # some tables exist, the others do not
+                    stop()
+            event.listen(Table, 'after_create', on_create)
+            try:
+                yield fired
+            finally:
+                event.remove(Table, 'after_create', on_create)
+            return
+        if where == 'during':
+            assert step_name == '_step_copy', step_name
+            real_copy_one, calls = copy_module._copy_one, []
+
+            def copy_one(*args, **kwargs):
+                calls.append(real_copy_one(*args, **kwargs))
+                if len(calls) == 2:        # the DEKs and the accounts are in, uncommitted
+                    stop()
+                return calls[-1]
+            patch.setattr(copy_module, '_copy_one', copy_one)
+        else:
+            steps = list(migration._BOOTSTRAP_STEPS)
+            index = [step.__name__ for step in steps].index(step_name)
+            real = steps[index]
+
+            def cut_step(run):
+                if where == 'after':
+                    real(run)
+                stop()
+            steps[index] = cut_step
+            patch.setattr(migration, '_BOOTSTRAP_STEPS', tuple(steps))
+        yield fired
+
+
+def _usernames(url):
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            return sorted(r[0] for r in conn.execute(text('SELECT username FROM users')))
+    finally:
+        engine.dispose()
+
+
 class TestASwitchCutShortCanBeResumed:
-    """The registry goes in before the accounts: a switch cut short anywhere leaves a
-    target the next attempt takes over, never accounts the start refuses."""
+    """Every step of a switch without data is idempotent: cut short at any of them, the next
+    attempt on the same target succeeds, and the target starts with counters past the source's."""
 
     @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
-    def test_cut_after_the_copy(self, request, backend, app, auth_client, create_user,
-                                monkeypatch):
+    @pytest.mark.parametrize('step_name,where', _cut_points(),
+                             ids=[f'{w}{s[5:]}' for s, w in _cut_points()])
+    def test_a_cut_is_resumed(self, request, backend, step_name, where, app, auth_client,
+                              create_user, tmp_path, monkeypatch):
         url = request.getfixturevalue(f'{backend}_target')
         gone = _deleted_last_user(app, auth_client, create_user)
         highest = _source_highest_ids(app)
-
-        def cut(*args, **kwargs):
-            raise RuntimeError('the service stopped here')
+        with app.app_context():
+            source_names = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
 
         with app.app_context():
-            with monkeypatch.context() as patch:
-                patch.setattr(migration, '_reset_pg_sequences', cut)
-                patch.setattr(migration, 'carry_id_high_water', cut)
+            with _cut(step_name, where) as fired:
                 ok, _, _ = migration.bootstrap_auth_to_target(url)
-            assert ok is False
-            assert _counts(url, ['users'])['users'] > 0
+            assert fired and ok is False
             ok, message, _ = migration.bootstrap_auth_to_target(url)
         assert ok is True, message
+
         assert _starts(url, monkeypatch) is True
+        _boots(url, tmp_path)
+        assert _usernames(url) == source_names
         _assert_new_ids_above(url, highest, gone)
-
-    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
-    def test_cut_while_the_registry_is_recorded(self, request, backend, app, monkeypatch):
-        url = request.getfixturevalue(f'{backend}_target')
-
-        def cut(*args, **kwargs):
-            raise RuntimeError('the service stopped here')
-
-        with app.app_context():
-            with monkeypatch.context() as patch:
-                patch.setattr(migration, 'record_fresh_registry', cut)
-                ok, _, _ = migration.bootstrap_auth_to_target(url)
-            assert ok is False
-            ok, message, _ = migration.bootstrap_auth_to_target(url)
-        assert ok is True, message
-        assert _starts(url, monkeypatch) is True
-
-    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
-    def test_cut_during_the_copy(self, request, backend, app, monkeypatch):
-        url = request.getfixturevalue(f'{backend}_target')
-        from services.database_admin.copy import CopyError
-
-        def cut(*args, **kwargs):
-            raise CopyError('the copy stopped here')
-
-        with app.app_context():
-            with monkeypatch.context() as patch:
-                patch.setattr(migration, 'copy_tables', cut)
-                ok, _, _ = migration.bootstrap_auth_to_target(url)
-            assert ok is False
-            ok, message, stats = migration.bootstrap_auth_to_target(url)
-        assert ok is True, message
-        assert stats['tables']['users'] > 0
-        assert _starts(url, monkeypatch) is True
-
 
     @_needs_pg
     def test_a_target_in_use_keeps_counters_above_its_data(self, app, pg_target, monkeypatch):
