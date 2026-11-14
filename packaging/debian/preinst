@@ -4,11 +4,11 @@
 
 set -e
 
-# Refused over a UCM older than 2.254 before anything below writes a file; $2 is the
-# installed version (or the one whose config files remain), empty on a first install.
+# An upgrade of a UCM older than 2.254 is refused before anything below writes a file.
+# `install <version>` (removed, config files kept) is not: the postinst archives what it left.
 # @UCM_PIVOT_GUARD@
+command -v ucm_pivot_guard >/dev/null || exit 1
 case "$1" in
-    install) ucm_pivot_guard "$2" removed || exit 1 ;;
     upgrade) ucm_pivot_guard "$2" || exit 1 ;;
 esac
 
@@ -47,18 +47,10 @@ case "$1" in
             exit 1
         fi
         
-        # On upgrade, backup existing database and config
+        # On upgrade, backup the configuration
         if [ "$1" = "upgrade" ]; then
             BACKUP_DIR="/var/lib/ucm/backups"
             mkdir -p "$BACKUP_DIR"
-            
-            # Backup database
-            if [ -f "/var/lib/ucm/ucm.db" ]; then
-                echo "Creating backup of existing database..."
-                BACKUP_FILE="$BACKUP_DIR/ucm-pre-upgrade-$(date +%Y%m%d-%H%M%S).db"
-                cp "/var/lib/ucm/ucm.db" "$BACKUP_FILE"
-                echo "✓ Database backup: $BACKUP_FILE"
-            fi
             
             # Backup configuration
             if [ -f "/etc/ucm/ucm.env" ]; then

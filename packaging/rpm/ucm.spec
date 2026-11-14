@@ -67,6 +67,7 @@ install -m 755 packaging/debian/start-ucm.sh %{buildroot}%{ucm_home}/start-ucm.s
 install -m 755 packaging/scripts/configure-firewall.sh %{buildroot}%{ucm_home}/scripts/
 install -m 755 packaging/scripts/ucm-watcher.sh %{buildroot}%{ucm_home}/scripts/
 install -m 755 packaging/scripts/native-setup.sh %{buildroot}%{ucm_home}/scripts/
+install -m 755 packaging/scripts/archive-leftovers.sh %{buildroot}%{ucm_home}/scripts/
 install -m 644 packaging/firewall/ucm.xml %{buildroot}/usr/lib/firewalld/services/
 # Log rotation for the gunicorn streams (#350)
 install -d %{buildroot}%{_sysconfdir}/logrotate.d
@@ -111,13 +112,33 @@ UCM_HOME=%{ucm_home}
 UCM_DATA=%{ucm_data}
 UCM_CONFIG=/etc/%{name}
 UCM_SETUP=$UCM_HOME/scripts/native-setup.sh
+NEW_CONFIG=""
+mkdir -p /var/log/%{name}
+# Resumed after a failed first attempt: the service never had a working venv
+bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
+
+# Built before anything is written to the data or the configuration: the archiving
+# below asks this release's runner about the database left there
+echo "Creating Python virtual environment..."
+# A failed UCM_FIPS_BUILD=1 build fails the scriptlet; the standard install keeps going as before
+if ! bash "$UCM_SETUP" venv "$UCM_HOME" %{ucm_python} rpm "$UCM_CONFIG/ucm.env"; then
+    bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" && exit 1
+fi
+
+# $1 is 1 when no UCM package was installed: archive what a removed one left
+# when this release refuses it
+ARCHIVE_FAILED=""
+if [ "$1" -eq 1 ]; then
+    sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG" \
+        || ARCHIVE_FAILED=1
+fi
 
 # Listed one by one for the same reason as in %%install: this scriptlet
 # runs under /bin/sh, which does not always expand braces
 for d in ca certs private crl scep backups sessions; do
     mkdir -p $UCM_DATA/$d
 done
-mkdir -p /var/log/%{name}
+mkdir -p $UCM_CONFIG
 
 # SoftHSM setup: add ucm user to softhsm/ods group and prepare token directory
 HSM_GROUP=""
@@ -137,7 +158,6 @@ fi
 SECRET_KEY=$(openssl rand -hex 32)
 
 # Create config if not exists
-NEW_CONFIG=""
 if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
     NEW_CONFIG=1
     cat > "$UCM_CONFIG/ucm.env" << ENVEOF
@@ -163,15 +183,6 @@ fi
 # A file written before the install (UCM_FIPS_BUILD=1 alone) gets its secrets and defaults
 ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 [ "$ENV_STATE" != new ] || NEW_CONFIG=1
-# Resumed after a failed first attempt: the service never had a working venv
-bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
-
-# Create venv and install dependencies
-echo "Creating Python virtual environment..."
-# A failed UCM_FIPS_BUILD=1 build fails the scriptlet; the standard install keeps going as before
-if ! bash "$UCM_SETUP" venv "$UCM_HOME" %{ucm_python} rpm "$UCM_CONFIG/ucm.env"; then
-    bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" && exit 1
-fi
 
 # Set permissions
 chown -R %{name}:%{name} $UCM_HOME
@@ -210,7 +221,9 @@ fi
 # Start/restart service
 systemctl daemon-reload
 systemctl enable %{name}
-if systemctl is-active --quiet %{name}; then
+if [ -n "$ARCHIVE_FAILED" ]; then
+    echo "UCM was not started: the files an earlier UCM left are still in place (see above)."
+elif systemctl is-active --quiet %{name}; then
     systemctl restart %{name} || true
 else
     systemctl start %{name} || true

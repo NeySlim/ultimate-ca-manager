@@ -391,3 +391,14 @@ def test_a_copy_that_differs_from_its_source_is_never_kept_in_its_place(tmp_path
     assert out.returncode == 1, out.stdout
     assert snapshot(box) == before
     assert not box.parent.exists() or not any(box.parent.iterdir())
+
+
+
+def test_the_kept_directories_are_those_the_packages_create():
+    """RPM owns these directories and the DEB postinst creates them: the archive leaves them."""
+    import re
+    spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
+    postinst = (ROOT / 'packaging' / 'debian' / 'postinst').read_text()
+    assert {frozenset(m.split()) for m in re.findall(r'for d in ([a-z ]+); do', spec)} == {frozenset(KEPT)}
+    assert re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst) and all(
+        set(m.split(',')) == set(KEPT) for m in re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst))

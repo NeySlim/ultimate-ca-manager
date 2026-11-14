@@ -45,6 +45,8 @@ override_dh_auto_install:
 	install -m 755 packaging/scripts/configure-firewall.sh debian/ucm/opt/ucm/scripts/
 	install -m 755 packaging/scripts/ucm-watcher.sh debian/ucm/opt/ucm/scripts/
 	install -m 755 packaging/scripts/native-setup.sh debian/ucm/opt/ucm/scripts/
+	install -m 755 packaging/scripts/archive-leftovers.sh debian/ucm/opt/ucm/scripts/
+	install -m 644 packaging/scripts/pivot-guard.sh debian/ucm/opt/ucm/scripts/
 	
 	# Install firewall service definitions
 	install -d debian/ucm/usr/lib/firewalld/services

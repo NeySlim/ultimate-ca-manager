@@ -23,9 +23,6 @@ case "$1" in
                     --shell /bin/false "$UCM_USER" >/dev/null
         fi
         
-        # Create directories
-        mkdir -p "$UCM_DATA"/{ca,certs,private,crl,scep,backups,sessions}
-        mkdir -p "$UCM_CONFIG"
         mkdir -p /var/log/ucm
         
         # SoftHSM setup: add ucm user to softhsm/ods group and prepare token directory
@@ -57,6 +54,27 @@ case "$1" in
         
         UCM_SETUP="$UCM_HOME/scripts/native-setup.sh"
         NEW_CONFIG=""
+        # Resumed after a failed first attempt: the service never had a working venv
+        # ($2 is empty for a first configure, so an upgrade never shows the banner)
+        [ -n "$2" ] || bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
+
+        # Built before anything is written to the data or the configuration: the archiving
+        # below asks this release's runner about the database left there
+        echo "Creating/updating Python virtual environment..."
+        bash "$UCM_SETUP" venv "$UCM_HOME" python3 deb "$UCM_CONFIG/ucm.env"
+
+        # A new install (nothing configured, or a removed UCM older than 2.254, which no
+        # upgrade reaches) archives what a removed UCM left when this release refuses it
+        ARCHIVE_FAILED=""
+        . "$UCM_HOME/scripts/pivot-guard.sh"
+        if [ -z "$2" ] || ! ucm_pivot_version_ok "$2"; then
+            sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG" \
+                || ARCHIVE_FAILED=1
+        fi
+
+        # Create directories
+        mkdir -p "$UCM_DATA"/{ca,certs,private,crl,scep,backups,sessions}
+        mkdir -p "$UCM_CONFIG"
 
         # Create config if not exists (fresh install)
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
@@ -127,9 +145,6 @@ ENVEOF
         # A file written before the install (UCM_FIPS_BUILD=1 alone) gets its secrets and defaults
         ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA")
         [ "$ENV_STATE" != new ] || NEW_CONFIG=1
-        # Resumed after a failed first attempt: the service never had a working venv
-        # ($2 is empty for a first configure, so an upgrade never shows the banner)
-        [ -n "$2" ] || bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
         
         # Always ensure config has correct paths (for upgrades from older versions)
         if [ -f "$UCM_CONFIG/ucm.env" ]; then
@@ -137,11 +152,6 @@ ENVEOF
             grep -q "^DATA_DIR=" "$UCM_CONFIG/ucm.env" || echo "DATA_DIR=$UCM_DATA" >> "$UCM_CONFIG/ucm.env"
         fi
         
-        # Always recreate venv to ensure correct dependencies
-        # This handles both fresh install and upgrades
-        echo "Creating/updating Python virtual environment..."
-        bash "$UCM_SETUP" venv "$UCM_HOME" python3 deb "$UCM_CONFIG/ucm.env"
-
         # Set permissions
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_HOME"
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_DATA"
@@ -180,7 +190,9 @@ ENVEOF
         # Enable and start/restart service
         systemctl daemon-reload 2>/dev/null || true
         systemctl enable ucm || true
-        if systemctl is-active --quiet ucm; then
+        if [ -n "$ARCHIVE_FAILED" ]; then
+            echo "UCM was not started: the files an earlier UCM left are still in place (see above)."
+        elif systemctl is-active --quiet ucm; then
             systemctl restart ucm || true
         else
             systemctl start ucm || true

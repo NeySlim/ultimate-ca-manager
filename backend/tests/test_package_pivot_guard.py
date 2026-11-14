@@ -125,10 +125,9 @@ def _run_preinst(script, tmp_path, *args, python='3.12'):
     return out, _calls(log)
 
 
-@pytest.mark.parametrize('args', [('upgrade', '2.253'), ('upgrade', '1.8.3'),
-                                  ('install', '2.253')])
+@pytest.mark.parametrize('args', [('upgrade', '2.253'), ('upgrade', '1.8.3')])
 def test_the_deb_preinst_refuses_before_any_write(preinst, tmp_path, args):
-    """dpkg passes the installed version as $2; `install` with one means its config was kept."""
+    """dpkg passes the installed version as $2."""
     out, calls = _run_preinst(preinst, tmp_path, *args)
     assert out.returncode != 0
     assert WHAT_TO_DO in out.stderr.lower()
@@ -141,13 +140,11 @@ def test_the_refusal_of_an_upgrade_says_the_old_version_is_still_installed(prein
     assert 'Nothing was changed: UCM 2.253 is still installed.' in out.stderr
 
 
-def test_the_refusal_over_a_removed_package_does_not_call_it_installed(preinst, tmp_path):
-    """`install <version>`: the package was removed, dpkg kept its configuration files."""
+def test_the_deb_preinst_installs_over_what_a_removed_package_left(preinst, tmp_path):
+    """`install <version>`: removed, its configuration files kept; the postinst archives them."""
     out, _ = _run_preinst(preinst, tmp_path, 'install', '2.253')
-    assert 'UCM 2.253 was removed, its configuration and data remain' in out.stderr
-    assert 'installed' not in out.stderr.replace('then install this package', '').replace(
-        'Install 2.254', '')
-    assert out.stderr.rstrip().endswith('Nothing was changed.')
+    assert out.returncode == 0, out.stderr
+    assert out.stderr == ''
 
 
 def test_the_deb_preinst_upgrades_a_2_254(preinst, tmp_path):
@@ -280,3 +277,141 @@ def test_no_package_or_image_runs_the_1_x_upgrade_any_more():
         if (ROOT / name).exists() and 'migrate_v1_to_v2' in (ROOT / name).read_text():
             found.append(name)
     assert found == []
+
+
+# -- the post-installation scripts archive what a removed UCM left -------------------
+
+POSTINST = ROOT / 'packaging' / 'debian' / 'postinst'
+ARCHIVER = 'archive-leftovers.sh'
+
+
+def _post_sandbox(tmp_path, archive_rc):
+    """Paths moved under tmp_path; every command that writes outside it is a recorder."""
+    home, data, config = tmp_path / 'opt' / 'ucm', tmp_path / 'opt' / 'ucm' / 'data', tmp_path / 'etc' / 'ucm'
+    (home / 'scripts').mkdir(parents=True)
+    data.mkdir()
+    config.mkdir(parents=True)
+    shutil.copy(GUARD, home / 'scripts' / 'pivot-guard.sh')
+    record = 'echo "$(basename "$0") $*" >> "$LOG"'
+    fakes = {name: record for name in ('mkdir', 'chown', 'chmod', 'rm', 'addgroup', 'adduser',
+                                        'usermod', 'groupadd', 'useradd', 'openssl')}
+    fakes.update({
+        'getent': 'case "$1 $2" in "group softhsm"|"group ods") exit 2 ;; esac; exit 0',
+        'systemctl': record + '\n[ "$1" != is-active ]',
+        'bash': record,
+        # The archiver's answer; whether the configuration existed when it ran
+        'sh': record + f'\n[ -e "{config}/ucm.env" ] && echo "sh saw ucm.env" >> "$LOG"\nexit {archive_rc}',
+        'python3': 'echo 00', 'hostname': 'echo host',
+    })
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    for name, body in fakes.items():
+        (bin_dir / name).write_text(f'#!{POSIX_SH}\n{body}\n')
+        (bin_dir / name).chmod(0o755)
+    for tool in ('cat', 'grep', 'basename', 'dirname'):
+        os.symlink(shutil.which(tool), bin_dir / tool)
+    log = tmp_path / 'calls.log'
+    return {'PATH': str(bin_dir), 'LOG': str(log)}, log, home, data, config
+
+
+def _paths(text, home, data, config, quoted):
+    q = '"' if quoted else ''
+    for name, value, path in (('UCM_HOME', '/opt/ucm', home), ('UCM_DATA', '/opt/ucm/data', data),
+                              ('UCM_CONFIG', '/etc/ucm', config)):
+        line = f'{name}={q}{value}{q}\n'
+        assert text.count(line) == 1, line
+        text = text.replace(line, f'{name}={q}{path}{q}\n')
+    return text
+
+
+def _run_postinst(tmp_path, *args, archive_rc=0):
+    env, log, home, data, config = _post_sandbox(tmp_path, archive_rc)
+    script = tmp_path / 'postinst.sandboxed'
+    script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+    out = subprocess.run(['/bin/bash', str(script), *args], capture_output=True, text=True,
+                         timeout=20, env=env)
+    return out, _calls(log), home, data, config
+
+
+def _post_body(tmp_path, home, data, config):
+    m = re.search(r'^%post\n(.*?)^%preun\n', SPEC.read_text(), re.M | re.S)
+    assert m, 'no %post section'
+    body = m.group(1)
+    assert body.count('%systemd_post %{name}.service\n') == 1
+    body = body.replace('%systemd_post %{name}.service\n', ': systemd_post\n')
+    body = body.replace('%{ucm_data}', '/opt/ucm/data').replace('%{ucm_python}', 'python3')
+    body = _expand(body)
+    return _paths(body, home, data, config, quoted=False)
+
+
+def _run_post(tmp_path, count, archive_rc=0):
+    env, log, home, data, config = _post_sandbox(tmp_path, archive_rc)
+    body = _post_body(tmp_path, home, data, config)
+    out = subprocess.run([POSIX_SH, '-c', body, 'post', count], capture_output=True, text=True,
+                         timeout=20, env=env)
+    return out, _calls(log), home, data, config
+
+
+def _archiver_calls(calls):
+    return [c for c in calls if c.startswith('sh ') and ARCHIVER in c]
+
+
+def _check_order(calls, home, data, config):
+    """After the venv is built, before the data directories and the configuration are written."""
+    archive = calls.index(_archiver_calls(calls)[0])
+    venv = next(i for i, c in enumerate(calls) if c.startswith('bash ') and ' venv ' in f'{c} ')
+    first_data = next(i for i, c in enumerate(calls) if c.startswith('mkdir') and str(data) in c)
+    assert venv < archive < first_data
+    assert 'sh saw ucm.env' not in calls
+    assert _archiver_calls(calls) == [
+        f'sh {home}/scripts/{ARCHIVER} {home} {data} {config}']
+
+
+@pytest.mark.parametrize('previous', ['', '2.253', '1.8.3'])
+def test_the_deb_postinst_archives_on_a_new_install(tmp_path, previous):
+    """Nothing configured, or a removed version older than 2.254 that no upgrade reaches."""
+    out, calls, home, data, config = _run_postinst(tmp_path, 'configure', previous)
+    assert out.returncode == 0, out.stderr
+    _check_order(calls, home, data, config)
+    assert 'systemctl start ucm' in calls
+
+
+@pytest.mark.parametrize('previous', ['2.254', '2.254.1', '3.0~rc1', '3.0'])
+def test_the_deb_postinst_never_archives_on_an_upgrade_or_a_reconfigure(tmp_path, previous):
+    out, calls, *_ = _run_postinst(tmp_path, 'configure', previous)
+    assert out.returncode == 0, out.stderr
+    assert _archiver_calls(calls) == []
+    assert 'systemctl start ucm' in calls
+
+
+def test_the_deb_postinst_does_not_start_ucm_when_archiving_failed(tmp_path):
+    out, calls, *_ = _run_postinst(tmp_path, 'configure', '', archive_rc=1)
+    assert out.returncode == 0, out.stderr
+    assert not [c for c in calls if c in ('systemctl start ucm', 'systemctl restart ucm')]
+    assert 'UCM was not started' in out.stdout
+
+
+def test_the_rpm_post_archives_on_a_new_install_only(tmp_path):
+    out, calls, home, data, config = _run_post(tmp_path / 'new', '1')
+    assert out.returncode == 0, out.stderr
+    _check_order(calls, home, data, config)
+    assert 'systemctl start ucm' in calls
+    out, calls, *_ = _run_post(tmp_path / 'upgrade', '2')
+    assert out.returncode == 0, out.stderr
+    assert _archiver_calls(calls) == []
+
+
+def test_the_rpm_post_does_not_start_ucm_when_archiving_failed(tmp_path):
+    out, calls, *_ = _run_post(tmp_path, '1', archive_rc=1)
+    assert out.returncode == 0, out.stderr
+    assert not [c for c in calls if c in ('systemctl start ucm', 'systemctl restart ucm')]
+    assert 'UCM was not started' in out.stdout
+
+
+def test_both_packages_ship_the_archiver_and_the_deb_its_guard():
+    rules = subprocess.run(['make', '-n', '-f', 'packaging/debian/rules', 'override_dh_auto_install'],
+                           cwd=ROOT, capture_output=True, text=True, timeout=10)
+    assert rules.returncode == 0, rules.stderr
+    for name in (ARCHIVER, 'pivot-guard.sh'):
+        assert f'packaging/scripts/{name} debian/ucm/opt/ucm/scripts/' in rules.stdout
+    assert f'packaging/scripts/{ARCHIVER} %{{buildroot}}%{{ucm_home}}/scripts/' in SPEC.read_text()
