@@ -50,10 +50,12 @@ class TestSwitchApproves:
         monkeypatch.setattr(fips_mode, 'module_approves', lambda alg: alg == 'ED25519')
         assert fips_mode.switch_approves('ED25519')
 
-    def test_unreadable_capability_approves_nothing(self, fips_off):
+    def test_an_unreadable_capability_falls_back_to_the_loaded_module(self, fips_off, monkeypatch):
         fips_off.write_text('{not json')
         assert fips_mode.build_capability() is None
         assert not fips_mode.switch_approves('ED25519')
+        monkeypatch.setattr(fips_mode, 'module_approves', lambda alg: alg == 'ED25519')
+        assert fips_mode.switch_approves('ED25519')
 
     def test_in_fips_mode_the_loaded_module_answers_not_the_file(self, fips_off, monkeypatch):
         _built(fips_off, ALL)

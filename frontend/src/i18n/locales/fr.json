@@ -3556,7 +3556,7 @@
           "remedy": "Préférez un fournisseur PKCS#11, Azure Key Vault ou OpenBao pour les clés qui doivent rester dans le périmètre FIPS."
         },
         "hsm_unapproved_keys": {
-          "title": "Clés HSM d'un algorithme hors mode FIPS (Ed25519, Ed448, ChaCha20-Poly1305)",
+          "title": "Clés HSM d'un algorithme hors mode FIPS (Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305)",
           "remedy": "Remplacez-les par des clés RSA, ECDSA ou AES ; en mode FIPS, les clés de ces types d'OpenBao et de Vault Transit ne sont plus listées."
         },
         "dns_tsig_hmac_md5": {

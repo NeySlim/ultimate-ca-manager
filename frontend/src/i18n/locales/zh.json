@@ -3410,7 +3410,7 @@
           "remedy": "对于必须保持在 FIPS 范围内的密钥，请优先选择 PKCS#11、Azure Key Vault 或 OpenBao 提供商。"
         },
         "hsm_unapproved_keys": {
-          "title": "使用 FIPS 模式之外算法（Ed25519、Ed448、ChaCha20-Poly1305）的 HSM 密钥",
+          "title": "使用 FIPS 模式之外算法（Ed25519、Ed448、ML-DSA、ChaCha20-Poly1305）的 HSM 密钥",
           "remedy": "请将其替换为 RSA、ECDSA 或 AES 密钥；在 FIPS 模式下，这些类型的 OpenBao 和 Vault Transit 密钥将不再列出。"
         },
         "dns_tsig_hmac_md5": {

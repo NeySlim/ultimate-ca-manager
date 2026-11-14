@@ -3410,7 +3410,7 @@
           "remedy": "Prefira um provedor PKCS#11, Azure Key Vault ou OpenBao para as chaves que devem permanecer no âmbito do FIPS."
         },
         "hsm_unapproved_keys": {
-          "title": "Chaves HSM de um algoritmo fora do modo FIPS (Ed25519, Ed448, ChaCha20-Poly1305)",
+          "title": "Chaves HSM de um algoritmo fora do modo FIPS (Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305)",
           "remedy": "Substitua-as por chaves RSA, ECDSA ou AES; no modo FIPS, as chaves OpenBao e Vault Transit destes tipos deixam de ser listadas."
         },
         "dns_tsig_hmac_md5": {
