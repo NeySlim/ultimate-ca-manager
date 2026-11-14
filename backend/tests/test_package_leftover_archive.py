@@ -262,8 +262,8 @@ def test_the_readme_puts_each_file_where_the_packages_write_it(tmp_path):
     box = Box(tmp_path)
     assert box.run().returncode == 0
     lines = (box.archive / 'README.txt').read_text().splitlines()
-    data_line = next(l for l in lines if l.lstrip().startswith('data/'))
-    config_line = next(l for l in lines if l.lstrip().startswith('config/'))
+    data_line = next(line for line in lines if line.lstrip().startswith('data/'))
+    config_line = next(line for line in lines if line.lstrip().startswith('config/'))
     assert 'HTTPS' in data_line and 'HTTPS' not in config_line
     postinst = (ROOT / 'packaging' / 'debian' / 'postinst').read_text()
     assert '-keyout "$UCM_DATA/https_key.pem"' in postinst
