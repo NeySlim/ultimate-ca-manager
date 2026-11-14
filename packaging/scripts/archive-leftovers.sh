@@ -179,6 +179,10 @@ if [ -z "$DB_PATH" ]; then
     DB_PATH=$(env_value "$ENV_FILE" DATA_DIR)
     DB_PATH=${DB_PATH:-$DATA}/ucm.db
 fi
+# No configuration and no database left: a new host, nothing to ask the runner about
+if [ ! -e "$ENV_FILE" ] && [ ! -e "$DB_PATH" ] && [ ! -L "$DB_PATH" ]; then
+    exit 0
+fi
 # Bytecode is not written: the probe runs as root in a tree the service account owns
 probe=$(cd "$UCM_HOME/backend" 2>/dev/null && PYTHONDONTWRITEBYTECODE=1 \
     DATABASE_URL=$DB_URL DATABASE_PATH=$DB_PATH \

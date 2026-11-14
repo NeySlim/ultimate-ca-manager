@@ -275,6 +275,23 @@ def test_a_new_machine_creates_nothing(tmp_path):
     assert not box.parent.exists() and not box.data.exists() and not box.config.exists()
 
 
+@pytest.mark.parametrize('leftovers', ['none', 'empty directories'])
+def test_without_a_database_or_a_configuration_nothing_is_probed(tmp_path, leftovers):
+    """A new host whose venv could not be built: no answer to ask for, nothing to announce."""
+    box = Box(tmp_path, registry=None, python='missing')
+    shutil.rmtree(box.config)
+    shutil.rmtree(box.data)
+    if leftovers == 'empty directories':
+        box.config.mkdir()
+        for d in KEPT:
+            (box.data / d).mkdir(parents=True)
+    before = snapshot(box)
+    out = box.run()
+    assert (out.returncode, out.stdout, out.stderr) == (0, '', '')
+    assert snapshot(box) == before
+    assert not box.parent.exists() and not box.log.exists()
+
+
 @pytest.mark.parametrize('python, code, first, says', [
     ('stub', 4, 'postgresql', 'not a SQLite file'),
     ('stub', 5, 'sqlite /x/ucm.db', 'could not read'),
