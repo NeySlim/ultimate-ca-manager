@@ -165,10 +165,16 @@ def _protocol_secrets_scrypt():
 
 
 def _ca_keys():
-    for ca in CA.query.with_entities(CA.id, CA.descr, CA.crt).order_by(CA.id).all():
+    for ca in CA.query.with_entities(CA.id, CA.descr, CA.crt, CA.hsm_key_id).order_by(CA.id).all():
         cert = load_stored_certificate(ca.crt)
-        if cert is not None:
-            yield ca, certificate_key(cert)
+        if cert is None:
+            continue
+        name, approved = certificate_key(cert)
+        # An HSM signs outside the module: what only the module approves stays unapproved there
+        registered = key_algorithms.get(name)
+        if ca.hsm_key_id and registered is not None and registered.fips_by_module:
+            approved = False
+        yield ca, (name, approved)
 
 
 @detector('ca.eddsa_key', BLOCKER,

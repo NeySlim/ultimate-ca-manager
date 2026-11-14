@@ -586,6 +586,48 @@ class TestPreflight:
                     db.session.delete(row)
                 db.session.commit()
 
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_hsm_ml_dsa_ca_blocks_whatever_the_module(self, monkeypatch, app, fips_on, approves):
+        # The HSM signs, not the module: an HSM ML-DSA CA is a blocker even when the module approves
+        from models.hsm import HsmKey, HsmProvider
+        from services import fips_preflight
+        _module(monkeypatch, approves)
+        suffix = uuid.uuid4().hex[:6]
+        with app.app_context():
+            soft = _self_signed_ca(mldsa.MLDSA65PrivateKey.generate(), f'pf soft PQ {suffix}')
+            hard = _self_signed_ca(mldsa.MLDSA65PrivateKey.generate(), f'pf hsm PQ {suffix}')
+            provider = HsmProvider(name=f'bao-{suffix}', type='openbao', config='{}')
+            db.session.add(provider)
+            db.session.commit()
+            key = HsmKey(provider_id=provider.id, key_identifier=f'pq-{suffix}', label=f'pq-{suffix}',
+                         algorithm='ML-DSA-65', key_type='asymmetric', purpose='signing',
+                         public_key_pem=hard.public_key().public_bytes(
+                             serialization.Encoding.PEM,
+                             serialization.PublicFormat.SubjectPublicKeyInfo).decode())
+            db.session.add(key)
+            db.session.commit()
+            rows = []
+            for cert, hsm_key_id in ((soft, None), (hard, key.id)):
+                row = CA(refid=str(uuid.uuid4()), descr=cert.subject.rfc4514_string(), serial=0,
+                         hsm_key_id=hsm_key_id,
+                         crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode())
+                db.session.add(row)
+                rows.append(row)
+            db.session.commit()
+            try:
+                soft_id, hard_id = (f'(#{r.id})' for r in rows)
+                found = fips_preflight._ca_unapproved_algorithm()
+                assert any(hard_id in f for f in found), found
+                assert any(soft_id in f for f in found) is (not approves), found
+                assert not any(hard_id in f for f in fips_preflight._ca_weak())
+            finally:
+                for row in rows:
+                    db.session.delete(row)
+                db.session.commit()
+                db.session.delete(key)
+                db.session.delete(provider)
+                db.session.commit()
+
     def test_ssh_and_hsm_detectors(self, monkeypatch, fips_on):
         from services import fips_preflight
         _module(monkeypatch, ())
