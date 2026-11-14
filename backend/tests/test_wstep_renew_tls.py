@@ -890,18 +890,21 @@ def test_renewal_keeps_the_key_usage_of_its_template(app, templated_ca, ekus):
 
 def test_renewal_of_a_subject_another_holds_is_a_fault_once_the_option_is_on(client, app, wstep_renew_config):
     """No pattern names the subject: the refusal names it, as a fault the requester can read."""
-    from tests.test_windows_profile_routing import _fault
+    from tests.test_windows_profile_routing import _audits, _fault, _top_audit
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-taken.example.test')
     _issue(app, wstep_renew_config['id'], 'tls-renew-taken.example.test')  # another key, no holder
     with app.app_context():
         db.session.get(CA, wstep_renew_config['id']).enforce_unique_subject = True
         db.session.commit()
+    floor = _top_audit(app)
     try:
         new_key = _key()
         body = _rst(_cmc_renewal(_renewal_csr(old_cert, new_key), [(new_key, None), (old_key, old_cert)]))
         assert _fault(_post(client, body, tls_cert=old_cert)) == (
             400, 's:Sender',
             'The subject CN=tls-renew-taken.example.test is already carried by a certificate of another account')
+        # The renewal route's own entries, as for a pattern's refusal: no certificate.subject_taken
+        assert [a[0] for a in _audits(app, floor)] == ['certificate.renewed', 'windows_enrollment.refused']
     finally:
         with app.app_context():
             db.session.get(CA, wstep_renew_config['id']).enforce_unique_subject = False
