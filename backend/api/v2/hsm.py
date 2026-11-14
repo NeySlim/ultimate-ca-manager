@@ -698,8 +698,19 @@ def sign_data(key_id):
 
         return success_response(data={'signature': signature_b64})
 
-    except FipsRestricted:
-        raise  # the app handler answers 400 with the FIPS problem type
+    except FipsRestricted as e:
+        # Audited like any failed signature; the app handler answers 400 with the FIPS problem type
+        AuditService.log_action(
+            action='hsm_key_used_sign',
+            resource_type='hsm_key',
+            resource_id=key_id,
+            resource_name=key.label,
+            details=f'Sign refused: {e}',
+            success=False,
+            user_id=user_id,
+            username=username,
+        )
+        raise
     except HsmError as e:
         logger.error(f"HSM signing error: {e}")
         AuditService.log_action(

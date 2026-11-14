@@ -947,6 +947,17 @@ class TestHsmSignApiInFipsMode:
                   {'data': base64.b64encode(b'tbs').decode()})
         _assert_fips_problem(r, 'RSA 1024')
 
+    def test_refusal_is_audited(self, auth_client, hsm_signing_key, fips_on):
+        from models.audit_log import AuditLog
+        key = hsm_signing_key('RSA-1024', _pem(_rsa_public(1024)))
+        r = _post(auth_client, f'/api/v2/hsm/keys/{key.id}/sign', {'data': base64.b64encode(b'tbs').decode()})
+        assert r.status_code == 400
+        entries = AuditLog.query.filter_by(action='hsm_key_used_sign', resource_name=key.label).all()
+        assert [(e.success, e.details) for e in entries] == [
+            (False, 'Sign refused: RSA 1024 keys not available in FIPS mode')]
+        AuditLog.query.filter_by(action='hsm_key_used_sign', resource_name=key.label).delete()
+        db.session.commit()
+
     @pytest.fixture
     def weak_hsm_ca(self, monkeypatch, app, hsm_signing_key):
         """A root CA whose HSM key is RSA 1024, bound before the switch; the stub signs for real."""
