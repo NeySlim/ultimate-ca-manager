@@ -93,9 +93,10 @@ class Box:
         exe.write_text(f'#!/bin/sh\n{body}\n')
         exe.chmod(0o755)
 
-    def wrap(self, fail=None, at=0, other_fs=(), corrupt_copies=False):
+    def wrap(self, fail=None, at=0, other_fs=(), corrupt_copies=False, other_mount=()):
         """Wrappers first in PATH: `fail` fails at its `at`-th call; `stat` reports the
-        paths under each prefix of other_fs on a filesystem of their own."""
+        paths under each prefix of other_fs on a filesystem of their own, and `findmnt` on
+        a mount of their own; other_mount is a mount of the same filesystem (a bind mount)."""
         (self.state / 'count').write_text('0')
         for name in ('mv', 'cp', 'rm', 'mkdir', 'chmod'):
             check = ''
@@ -117,6 +118,10 @@ class Box:
         (self.bin / 'stat').write_text(
             f'#!/bin/sh\nfor last; do :; done\n[ "$1 $2" != "-c %d" ] || case $last in\n{cases}esac\n'
             f'exec {REAL["stat"]} "$@"\n')
+        mounts = ''.join(f'    "{p}"|"{p}"/*) echo "{p} testfs"; exit 0 ;;\n'
+                         for p in sorted((*other_fs, *other_mount), key=lambda p: -len(str(p))))
+        (self.bin / 'findmnt').write_text(
+            f'#!/bin/sh\nfor last; do :; done\ncase $last in\n{mounts}esac\necho "/ testfs"\n')
         (self.bin / 'date').write_text(
             f'#!/bin/sh\ncase "$*" in *%Y%m%dT*) echo {STAMP} ;; *) exec {shutil.which("date")} "$@" ;; esac\n')
         for f in self.bin.iterdir():
@@ -473,6 +478,23 @@ def test_a_copy_whose_source_removal_failed_is_restored_before_it_goes(tmp_path)
     assert out.returncode == 1, out.stdout
     assert snapshot(box) == before
     assert 'Everything was put back' in out.stdout
+
+
+def test_a_bind_mount_of_the_same_filesystem_is_crossed_by_a_copy_never_a_rename(tmp_path):
+    """rename(2) cannot cross a bind mount even on one device, and GNU mv then copies with
+    no line in the journal: a move across it is a journalled, verified copy."""
+    box = Box(tmp_path, python='stub')
+    data, config = files(box.data), files(box.config)
+    box.wrap(other_mount=(box.data,))
+    # A mv out of the bind mount falls back on a copy, as GNU mv does, and is cut short
+    (box.bin / 'mv').write_text(
+        f'#!/bin/sh\ncase $2 in {box.data}/*) case $3 in {box.data}/*) ;; *)\n'
+        f'    {REAL["cp"]} -a -- "$2" "$3"; kill -9 0 ;; esac ;; esac\nexec {REAL["mv"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
+    assert files(box.archive / 'data') == data
+    assert files(box.archive / 'config') == config
+    assert sorted(p.name for p in box.data.iterdir()) == KEPT
 
 
 def _all_files(*tops):

@@ -39,6 +39,20 @@ env_value() {
 
 device() { stat -c %d -- "$1"; }
 
+# The mount holding $1 and its type, from the mount table: a bind mount of the same
+# filesystem is a mount of its own (stat %m misses one above $1). Empty when unknown.
+mount_of() { findmnt -n -o TARGET,FSTYPE -T "$1" 2>/dev/null; }
+
+is_mount() { mnt=$(mount_of "$1") && [ "${mnt% *}" = "$(normal "$1")" ]; }
+
+# rename(2) of $1 to $2 succeeds: one device and one mount, and no directory on overlayfs
+# (one from a lower layer is refused). Otherwise mv would copy, outside the journal.
+renames() {
+    [ "$(device "$1")" = "$(device "${2%/*}")" ] || return 1
+    mnt=$(mount_of "${1%/*}") && [ -n "$mnt" ] && [ "$mnt" = "$(mount_of "${2%/*}")" ] || return 1
+    [ ! -d "$1" ] || [ -L "$1" ] || [ "${mnt##* }" != overlay ]
+}
+
 present() { [ -e "$1" ] || [ -L "$1" ]; }
 
 # $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
@@ -63,7 +77,7 @@ digest() {
 # is removed only once every item is in the archive (remove_copied)
 move_item() {
     if [ -e "$2" ] || [ -L "$2" ]; then return 1; fi
-    if [ "$(device "$1")" = "$(device "${2%/*}")" ]; then
+    if renames "$1" "$2"; then
         printf 'rename\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
         mv -- "$1" "$2" || return 1
     else
@@ -87,7 +101,7 @@ archive_contents() {
     for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
         [ -e "$entry" ] || [ -L "$entry" ] || continue
         if [ -d "$entry" ] && [ ! -L "$entry" ] && { is_kept "$1" "${entry##*/}" \
-                || [ "$(device "$entry")" != "$(device "$1")" ]; }; then
+                || [ "$(device "$entry")" != "$(device "$1")" ] || is_mount "$entry"; }; then
             archive_contents "$entry" "$2/${entry##*/}" || return 1
         else
             move_item "$entry" "$2/${entry##*/}" || return 1
@@ -115,6 +129,41 @@ fips_written() {
         && case $FIPS_LINE in "$(cat -- "$1")"*) true ;; *) false ;; esac
 }
 
+# The names in tree $1, sorted
+names() { list=$(cd -- "$1" && find . -print) && printf '%s\n' "$list" | LC_ALL=C sort; }
+
+# Every line of $1 is a line of $2
+within() {
+    printf '%s\n' "$1" | while IFS= read -r line; do
+        case "
+$2
+" in *"
+$line
+"*) ;; *) exit 1 ;; esac
+    done
+}
+
+# $1 and $2 both left by a mv cut short after it fell back on a copy (from $2 when a back
+# line says so): its source stays whole until its target is. The side that is not whole
+# goes; nothing goes when neither can be shown to hold all the other has.
+settle() {
+    if grep -qxF "back$TAB$1$TAB$2" "$JOURNAL"; then from=$2 to=$1; else from=$1 to=$2; fi
+    a=$(digest "$from") && b=$(digest "$to") || return 1
+    if [ "$a" = "$b" ]; then
+        rm -rf -- "$2"
+    elif [ ! -d "$from" ] || [ -L "$from" ]; then
+        # A file leaves its source in one unlink: still there, it is whole
+        rm -rf -- "$to"
+    elif na=$(names "$from") && nb=$(names "$to") && within "$nb" "$na"; then
+        rm -rf -- "$to"
+    elif within "$a" "$b"; then
+        # Removing its source: what is left of it is in the target, unchanged
+        rm -rf -- "$from"
+    else
+        return 1
+    fi
+}
+
 # $1 could not be undone; named in $stuck only while it is really there
 unsettled() {
     left=1
@@ -132,8 +181,13 @@ roll_back() {
     while IFS="$TAB" read -r op src dst; do
         case $op in
             rename)
-                if present "$dst"; then
-                    { ! present "$src" && mv -- "$dst" "$src"; } || unsettled "$dst"
+                if present "$dst" && present "$src"; then
+                    settle "$src" "$dst" || unsettled "$dst"
+                fi
+                # A back line first: a put-back that falls back on a copy is settled the other way
+                if present "$dst" && ! present "$src"; then
+                    { printf 'back\t%s\t%s\n' "$src" "$dst" >> "$JOURNAL" && mv -- "$dst" "$src"; } \
+                        || unsettled "$dst"
                 fi ;;
             remove)
                 # Undone already when the copy is gone: its source was whole again first

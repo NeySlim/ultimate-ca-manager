@@ -57,6 +57,21 @@ def _chaos(box, layout):
             f'        fi\n'
             f'        case $mode in alone|late) exit 1 ;; esac\n'
             f'        kill -9 0 ;;\n'
+            f'    xcopy|xremove)\n'
+            # A mv falling back on a copy, as across filesystems, is cut short while it
+            # copies (a file short, the last one missing) or while it removes its source
+            f'        if [ {name} = mv ]; then\n'
+            f'            {shutil.which("cp")} -a -- "$2" "$3"\n'
+            f'            if [ $mode = xcopy ] && [ ! -L "$3" ]; then\n'
+            f'                set -- $({find} "$3" -type f | {sort})\n'
+            f'                [ $# = 0 ] || {shutil.which("truncate")} -s 0 "$1"\n'
+            f'                for last; do :; done; [ $# -lt 2 ] || {shutil.which("rm")} -f -- "$last"\n'
+            f'            elif [ $mode = xremove ] && [ -d "$2" ] && [ ! -L "$2" ]; then\n'
+            f'                set -- $({find} "$2" -type f | {sort})\n'
+            f'                [ $# = 0 ] || {shutil.which("rm")} -f -- "$1"\n'
+            f'            fi\n'
+            f'        fi\n'
+            f'        kill -9 0 ;;\n'
             f'esac\nexec {shutil.which(name)} "$@"\n')
         (box.bin / name).chmod(0o755)
 
@@ -191,6 +206,16 @@ def _copies(run, put_back=False):
     return out
 
 
+FELL_BACK = ('xcopy', 'xremove')
+
+
+def _moves(run, put_back=False):
+    """The calls of `run` that were a mv of an item, not of the journal; with put_back,
+    those out of the archive."""
+    return [n for n, name, args in run.calls if name == 'mv' and '.journal' not in args[1]
+            and (not put_back or args[1].startswith(f'{run.parent}/'))]
+
+
 class ChaosSuite:
     """Subclassed once per layout, which sets `layout`."""
 
@@ -275,3 +300,25 @@ class ChaosSuite:
                 _while_failing(box, run.out, before, data, config, why)
             box, data, config, before, runs = lab.chain([(at, 'fail'), (back, 'late')], (), check=check)
             _converged(box, runs[1].out, data, config, self.layout, why)
+
+    def test_a_retry_converges_after_a_move_that_fell_back_on_a_copy_is_cut_short(self, lab):
+        """A rename refused by the kernel (an overlayfs directory, a mount the table does not
+        show) makes GNU mv copy then remove, unjournalled: cut short there, either way."""
+        for at in _moves(lab.first_run()):
+            for mode in FELL_BACK:
+                self._scenario(lab, (at, mode), None)
+
+    def test_a_retry_converges_after_a_put_back_move_that_fell_back_is_cut_short(self, lab):
+        """Each item's put-back by mv is cut short each way, after the first and the last
+        archiving fault that has it put back."""
+        by_item = {}
+        for at in range(1, self._calls(lab) + 1):
+            run = lab.first_run([(at, 'fail')])
+            for n, name, args in run.calls:
+                if n in _moves(run, put_back=True):
+                    by_item.setdefault(args[1].replace(str(run.parent), ''), []).append((at, n))
+        assert by_item or not _moves(lab.first_run())
+        for pairs in by_item.values():
+            for at, back in {pairs[0], pairs[-1]}:
+                for mode in FELL_BACK:
+                    self._scenario(lab, (at, 'fail'), (back, mode))
