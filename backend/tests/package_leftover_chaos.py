@@ -84,10 +84,12 @@ def _chaos_run(box, plan=()):
     return out, int((box.state / 'count').read_text())
 
 
-def _chaos_box(tmp_path, layout):
+def _chaos_box(tmp_path, layout, env='full'):
+    """env 'full': the ucm.env of an install, with UCM_FIPS_BUILD=1; 'fips only': that
+    line alone, the very file the new configuration is."""
     box = Box(tmp_path, python='stub')
-    env = box.config / 'ucm.env'
-    env.write_text(env.read_text() + 'UCM_FIPS_BUILD=1\n')
+    path = box.config / 'ucm.env'
+    path.write_text('UCM_FIPS_BUILD=1\n' if env == 'fips only' else path.read_text() + 'UCM_FIPS_BUILD=1\n')
     _chaos(box, layout)
     return box, files(box.data), files(box.config)
 
@@ -109,14 +111,14 @@ class Lab:
     from the state its first run left, saved once: the runs that open each scenario
     ('fault at call i') are the same across the tests of a layout."""
 
-    def __init__(self, root, layout):
-        self.root, self.layout = root, layout
+    def __init__(self, root, layout, env='full'):
+        self.root, self.layout, self.env = root, layout, env
         self.first = {}
         self.n = 0
 
     def _new(self):
         self.n += 1
-        box, data, config = _chaos_box(self.root / f'b{self.n}', self.layout)
+        box, data, config = _chaos_box(self.root / f'b{self.n}', self.layout, self.env)
         return box, data, config, snapshot(box)
 
     def _first(self, plan):
@@ -220,10 +222,11 @@ class ChaosSuite:
     """Subclassed once per layout, which sets `layout`."""
 
     layout = None
+    env = 'full'
 
     @pytest.fixture(scope='class')
     def lab(self, tmp_path_factory):
-        return Lab(tmp_path_factory.mktemp('lab'), self.layout)
+        return Lab(tmp_path_factory.mktemp('lab'), self.layout, self.env)
 
     def _scenario(self, lab, first, second):
         """`first` = (call, mode) of the archiving run; `second` = (call, mode) of the same
@@ -295,7 +298,7 @@ class ChaosSuite:
         for at, back in self._put_backs(lab)[::3]:
             why = (self.layout, at, back)
 
-            def check(box, data, config, before, run):
+            def check(box, data, config, before, run, why=why):
                 assert run.out.returncode == 2, (why, run.out.stdout, run.out.stderr)
                 _while_failing(box, run.out, before, data, config, why)
             box, data, config, before, runs = lab.chain([(at, 'fail'), (back, 'late')], (), check=check)
@@ -314,8 +317,9 @@ class ChaosSuite:
         by_item = {}
         for at in range(1, self._calls(lab) + 1):
             run = lab.first_run([(at, 'fail')])
-            for n, name, args in run.calls:
-                if n in _moves(run, put_back=True):
+            moves = _moves(run, put_back=True)
+            for n, _name, args in run.calls:
+                if n in moves:
                     by_item.setdefault(args[1].replace(str(run.parent), ''), []).append((at, n))
         assert by_item or not _moves(lab.first_run())
         for pairs in by_item.values():

@@ -212,10 +212,12 @@ roll_back() {
                     rm -rf -- "$dst" || unsettled "$dst"
                 fi ;;
             fips)
-                # The new ucm.env goes while the archived one can take its place
+                # The new ucm.env goes while the archived one can take its place, once: the
+                # line goes too, or an old ucm.env put back since could pass for the new one
                 if present "$dst" && fips_written "$src"; then
-                    rm -f -- "$src" || unsettled "$src"
-                fi ;;
+                    rm -f -- "$src" || { unsettled "$src"; break; }
+                fi
+                drop_line "fips$TAB$src$TAB$dst" || { unsettled "$src"; break; } ;;
             mkdir)
                 if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || unsettled "$dst"; fi ;;
         esac
