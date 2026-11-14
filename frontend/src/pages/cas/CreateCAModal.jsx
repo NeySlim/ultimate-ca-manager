@@ -220,12 +220,12 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormKeyUsage(createFormType === 'root' && !mldsaKey ? ROOT_KEY_USAGE : INTERMEDIATE_KEY_USAGE)
     setCreateFormEkuServerAuth(false)
   }, [createFormType, mldsaKey])
-  const { fips, mldsa } = policyLimits
+  const { fips, fipsKeys, mldsa } = policyLimits
   const allowedLocalKeys = useMemo(
     () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))
-      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, mldsa })
+      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, fipsKeys, mldsa })
       && !(pqStandalone && isPostQuantum(caKeyLabel(algo, size)))),
-    [allowedKeyTypes, fips, mldsa, pqStandalone],
+    [allowedKeyTypes, fips, fipsKeys, mldsa, pqStandalone],
   )
   const allowedDigestChoices = useMemo(
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
@@ -270,7 +270,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const rsa2048PastHorizon = createFormType !== 'external' && usesShortRsa
     && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= SHORT_RSA_HORIZON
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
-  // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
+  // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen. An HSM key
+  // signs outside the loaded module: in FIPS mode only what every module approves (no fipsKeys)
   const hsmAlgorithms = useMemo(
     () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, mldsa })
       .filter(a => isAllowed(allowedKeyTypes, a.label) && !(pqStandalone && isPostQuantum(a.label))),

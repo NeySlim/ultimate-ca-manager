@@ -119,12 +119,13 @@ activate = 1
 [algorithm_sect]
 default_properties = fips=yes
 
-# Every TLS context of the process: X25519 and X448 are not allowed by the module's policy
+# Every TLS context of the process: X25519 and X448 alone are not allowed by the module's
+# policy; the ML-KEM hybrids are, and "?" skips them on a module without ML-KEM (3.1.2)
 [ssl_sect]
 system_default = system_default_sect
 
 [system_default_sect]
-Groups = P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
+Groups = ?X25519MLKEM768:?SecP256r1MLKEM768:P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
 EOF
     export OPENSSL_CONF="$FIPS_RUN_DIR/openssl-fips.cnf"
     # libpq: no GSSAPI encryption (Kerberos library, outside the module) for any process

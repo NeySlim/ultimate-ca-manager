@@ -5,7 +5,8 @@
     "(ACME_CLIENT_LABELS in frontend/src/lib/keyAlgorithms.js), in form order.",
     "",
     "`ml_dsa` rows exist only on a build with ML-DSA; `fips` says whether FIPS",
-    "mode keeps the key type.",
+    "mode keeps the key type: true or false on every module, null when the",
+    "loaded FIPS module decides (kept where it approves the algorithm).",
     "",
     "Read by backend/tests/test_acme_client_key_types_contract.py and",
     "frontend/src/lib/__tests__/acmeClientKeyTypes.test.js."
@@ -17,8 +18,8 @@
     { "label": "EC-P384", "fips": true, "ml_dsa": false },
     { "label": "EC-BP256", "fips": false, "ml_dsa": false },
     { "label": "EC-BP384", "fips": false, "ml_dsa": false },
-    { "label": "ML-DSA-44", "fips": false, "ml_dsa": true },
-    { "label": "ML-DSA-65", "fips": false, "ml_dsa": true },
-    { "label": "ML-DSA-87", "fips": false, "ml_dsa": true }
+    { "label": "ML-DSA-44", "fips": null, "ml_dsa": true },
+    { "label": "ML-DSA-65", "fips": null, "ml_dsa": true },
+    { "label": "ML-DSA-87", "fips": null, "ml_dsa": true }
   ]
 }

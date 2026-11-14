@@ -68,8 +68,8 @@ def _require_paramiko():
 
 
 def generate_keypair() -> Tuple[str, str]:
-    """Generate an Ed25519 keypair, ECDSA P-256 in FIPS mode where Ed25519 is
-    not approved. Returns (private_openssh, public_openssh)."""
+    """Generate an Ed25519 keypair, ECDSA P-256 in FIPS mode, where paramiko would sign
+    Ed25519 outside the module. Returns (private_openssh, public_openssh)."""
     from cryptography.hazmat.primitives import serialization
     from utils import key_algorithms
 
@@ -88,7 +88,8 @@ def generate_keypair() -> Tuple[str, str]:
 
 def load_private_key(text: str):
     """Parse an SSH private key (OpenSSH or PEM; ed25519/ECDSA/RSA)."""
-    refuse_eddsa_key(text, 'the deploy target')
+    # paramiko signs Ed25519 with PyNaCl (libsodium), outside the module: refused whatever it approves
+    refuse_eddsa_key(text, 'the deploy target', signed_in_module=False)
     paramiko = _require_paramiko()
     last_error = None
     for key_cls in (paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.RSAKey):

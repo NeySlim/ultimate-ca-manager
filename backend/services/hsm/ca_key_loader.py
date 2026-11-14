@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
@@ -57,7 +58,17 @@ def get_ca_signing_key(ca, *, allow_revoked: bool = False):
 
     scheme = getattr(ca, 'signature_scheme', None)
     if getattr(ca, 'hsm_key_id', None):
-        return bind_signature_scheme(load_hsm_private_key(ca.hsm_key_id), scheme)
+        # Refused on load as a software key is (HsmService.sign still refuses on its own): before
+        # loading when a public key is cached, and by label when a module cannot load it
+        _refuse_hsm_key_in_fips_mode(ca.hsm_key_id, cached_only=True)
+        try:
+            key = load_hsm_private_key(ca.hsm_key_id)
+        except (ValueError, UnsupportedAlgorithm):
+            # UnsupportedAlgorithm: a curve the module cannot build, not a ValueError
+            _refuse_hsm_key_in_fips_mode(ca.hsm_key_id)
+            raise
+        _refuse_hsm_key_in_fips_mode(ca.hsm_key_id)
+        return bind_signature_scheme(key, scheme)
 
     if not ca.prv:
         raise ValueError(
@@ -70,6 +81,17 @@ def get_ca_signing_key(ca, *, allow_revoked: bool = False):
     return bind_signature_scheme(serialization.load_pem_private_key(
         pem, password=None, backend=default_backend()
     ), scheme)
+
+
+def _refuse_hsm_key_in_fips_mode(hsm_key_id, cached_only: bool = False) -> None:
+    # Never asks the provider: the load fetches the public key, and a failed load has none
+    from models import db
+    from models.hsm import HsmKey
+    from services.hsm import HsmService
+    key = db.session.get(HsmKey, hsm_key_id)
+    if key is None or (cached_only and not key.public_key_pem):
+        return
+    HsmService.refuse_signing_in_fips_mode(key, fetch=False)
 
 
 def bind_signature_scheme(key, scheme):

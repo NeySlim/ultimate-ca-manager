@@ -99,14 +99,14 @@ Flat table with sortable columns.
 The form flags an RSA-2048 CA that would outlive 2030: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026. Choose RSA-3072 or larger. Under **Advanced Constraints (RFC 5280)**, permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify.
 
 ### Post-quantum CAs (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, or on an HSM provider that holds ML-DSA (see HSM-backed CAs), and the algorithm is hidden in FIPS mode.
+**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, or on an HSM provider that holds ML-DSA (see HSM-backed CAs); in FIPS mode only a software key is offered, when the FIPS module approves ML-DSA (the \`-fips\` Docker image does, RHEL 9 and Ubuntu 24.04 do not).
 
 - An ML-DSA key signs without a separate digest: the digest field disappears, and a digest sent through the API is ignored with a notice. CRLs and OCSP responses of the CA follow the same rule.
 - Hierarchies can mix: an ML-DSA root can sign an RSA or EC intermediate, and an RSA or EC CA can sign an ML-DSA intermediate, which then uses its parent's digest.
 - An ML-DSA CA exports as PEM or DER, not as PKCS#12 or JKS. Clients without ML-DSA support (OpenSSL before 3.5, most browsers today) cannot verify what it signs.
 
 ### EdDSA CAs (Ed25519, Ed448)
-**Ed25519** and **Ed448** keys can be generated for a root, intermediate or external CA, or imported with or after the CA certificate. The key is a software key (no HSM provider signs EdDSA), and the algorithm is hidden in FIPS mode.
+**Ed25519** and **Ed448** keys can be generated for a root, intermediate or external CA, or imported with or after the CA certificate. The key is a software key (no HSM provider signs EdDSA), and in FIPS mode the algorithm is offered only when the FIPS module approves it (the \`-fips\` Docker image does, RHEL 9 and Ubuntu 24.04 do not).
 
 - An EdDSA key signs without a digest, like ML-DSA: the digest field disappears and CRLs and OCSP responses follow the same rule.
 - Hierarchies can mix: an EdDSA CA can sign RSA, EC or ML-DSA intermediates and leaves, and the reverse.
@@ -894,7 +894,7 @@ Displays the SCEP endpoint URL and integration instructions.
 6. If auto-approve is off, an admin reviews and approves/rejects
 
 ### Device keys
-The device signs its PKCSReq with its own key: RSA, ECDSA, Ed25519 or ML-DSA. An ML-DSA signature is checked per RFC 9882 (SHA-512 digest, the key's own algorithm identifier, no parameters). Ed448 signatures are refused, and ML-DSA ones too in FIPS mode. The request is still encrypted to the RSA signing CA.
+The device signs its PKCSReq with its own key: RSA, ECDSA, Ed25519 or ML-DSA. An ML-DSA signature is checked per RFC 9882 (SHA-512 digest, the key's own algorithm identifier, no parameters). Ed448 signatures are refused, and ML-DSA ones too in FIPS mode when the FIPS module does not approve ML-DSA. The request is still encrypted to the RSA signing CA.
 
 ## SCEP URLs
 
@@ -964,7 +964,7 @@ Manage your ACME client configuration:
 - **Environment**: Staging (testing) or Production (live certificates)
 - **Contact Email**: Required for account registration
 - **Auto-Renewal**: Automatically renew certificates before expiry
-- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87. ML-DSA is not offered in FIPS mode or on a build without it. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
+- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87. ML-DSA is not offered on a build without it, nor in FIPS mode when the FIPS module does not approve it. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
 - **Account Key Algorithm**: ES256, ES384, or RS256 for ACME account signing
 - **Renewal in place** (v2.251): a renewal keeps the certificate's id and refid, so its HTTPS binding, deployment bindings and webhooks follow it
 - **Failed renewals** (v2.251): the order list shows the failure count and the last error; after 5 failed scheduled renewals an order is retried once a day. The **Automatic renewal** switch of a selected order stops or resumes its renewal
@@ -2263,7 +2263,7 @@ The profile form lists what that profile still lacks: realm, issuing CA, keytab,
 - **Certificate Authority**: The CA whose templates are advertised and that issues certificates through the profile
 - **Validity (days)**: Validity of certificates issued via WSTEP when the request matches no template; a matched template's own validity applies otherwise
 
-A template with an **ML-DSA** key type is announced by its key algorithm OID, with the Microsoft Software Key Storage Provider and a signature-only key spec. It is hidden in FIPS mode, and enrollment from a real Windows client has not been tested yet.
+A template with an **ML-DSA** key type is announced by its key algorithm OID, with the Microsoft Software Key Storage Provider and a signature-only key spec. It is hidden in FIPS mode when the FIPS module does not approve ML-DSA, and enrollment from a real Windows client has not been tested yet.
 
 An **ECDSA** template is announced in policy schema 3 with its curve (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) as a signature key and a request hash, the stronger of the template digest and the one matching the curve; RSA templates outside FIPS mode stay schema 2, which names no request hash: Windows then signs its CMC request with SHA-1, which UCM accepts as those clients require; a plain PKCS#10 signed with SHA-1 is still refused. The request key must fit the template it is issued under: the same curve or ML-DSA set, or an RSA key at least as long (v2.251).
 
@@ -2308,7 +2308,7 @@ A certificate template can opt into **Build subject from Active Directory** (Tem
 ## About
 
 - **System Information**, **Links & Resources** and the **Support UCM** link to Ko-fi. Administrators also see a dismissible Ko-fi card once per UCM version
-- **Check FIPS readiness** (admin:system): lists what FIPS mode would refuse on this instance (scrypt password hashes, Ed25519 authorities, Argon2id backups, PostgreSQL without TLS...), with a remedy for each. Nothing is changed
+- **Check FIPS readiness** (admin:system): lists what FIPS mode would refuse on this instance (scrypt password hashes, Ed25519 authorities on a module without EdDSA, Argon2id backups, PostgreSQL without TLS, HMAC secrets under 14 bytes...), with a remedy for each. Nothing is changed
 `
   },
 
@@ -2975,7 +2975,7 @@ Restrict which key algorithms and sizes can be used:
 - **EC-P256**: Modern, fast, recommended
 - **EC-P384**: Higher security elliptic curve
 - **EC-P521**: Maximum security (rarely needed)
-- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-quantum (FIPS 204), NIST levels 2, 3 and 5; removed in FIPS mode
+- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-quantum (FIPS 204), NIST levels 2, 3 and 5; removed in FIPS mode when the FIPS module does not approve them
 
 **Allowed Signature Schemes** restricts how the signing CA signs (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest.
 

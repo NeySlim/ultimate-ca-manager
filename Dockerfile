@@ -5,8 +5,10 @@
 # --build-arg UCM_FIPS_BUILD=1 builds the -fips variant: OpenSSL FIPS provider
 # plus crypto libraries compiled against the system libcrypto. Default 0 = standard.
 ARG UCM_FIPS_BUILD=0
-ARG FIPS_PROVIDER_VERSION=3.1.2
-ARG FIPS_PROVIDER_SHA256=a0ce69b8b97ea6a35b96875235aa453b966ba3cba8af2de23657d8b6767d6539
+# OpenSSL FIPS Provider 3.5.9, CMVP certificate #5586; 3.1.2 (#4985, SHA-256
+# a0ce69b8b97ea6a35b96875235aa453b966ba3cba8af2de23657d8b6767d6539) still builds with these args
+ARG FIPS_PROVIDER_VERSION=3.5.9
+ARG FIPS_PROVIDER_SHA256=603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
 
 # Stage 1: Builder - Install dependencies and build environment
 FROM python:3.13-slim-trixie AS builder-0
@@ -164,6 +166,25 @@ WORKDIR /opt/ucm
 COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
 COPY --chown=ucm:ucm LICENSE NOTICE COMMERCIAL-LICENSE.md /opt/ucm/
 COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
+# FIPS variant: what the module approves, asked of it under the configuration the
+# entrypoint writes, so the readiness check judges keys by it before the switch
+RUN if [ "$UCM_FIPS_BUILD" = 1 ]; then \
+        set -eu; \
+        tmp="$(mktemp -d)"; \
+        moddir="$(openssl version -m | sed -E 's/^MODULESDIR: "(.*)"$/\1/')"; \
+        openssl fipsinstall -pedantic -module "$moddir/fips.so" -provider_name fips \
+            -out "$tmp/fipsmodule.cnf" >/dev/null; \
+        printf '%s\n' 'config_diagnostics = 1' 'openssl_conf = openssl_init' \
+            ".include $tmp/fipsmodule.cnf" '[openssl_init]' 'providers = provider_sect' \
+            '[provider_sect]' 'fips = fips_sect' 'base = base_sect' '[base_sect]' 'activate = 1' \
+            > "$tmp/openssl.cnf"; \
+        install -d -m 0755 /usr/share/ucm; \
+        OPENSSL_CONF="$tmp/openssl.cnf" python3 -I -c 'import sys; sys.path.insert(0, "/opt/ucm/backend"); \
+import fips_mode; fips_mode.write_build_capability(sys.argv[1])' /usr/share/ucm/fips-module.json; \
+        chmod 0644 /usr/share/ucm/fips-module.json; \
+        cat /usr/share/ucm/fips-module.json; \
+        rm -rf "$tmp"; \
+    fi
 # Only the built interface: the server serves frontend/dist, while frontend/
 # as a whole carries the sources and node_modules, several hundred megabytes
 # of build-time dependencies that have no place in a runtime image

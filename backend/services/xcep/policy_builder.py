@@ -280,8 +280,9 @@ def _key_type_info(key_type, ca_id=None, template_id=None):
     if alg.family == 'EC' and alg.param not in _XCEP_EC_CURVES:
         return None
     if alg.family == 'ML-DSA':
-        # Refused at enrollment in FIPS mode; no key length (FIPS 204 fixes it per set)
-        return None if fips_mode.enabled() else (alg.label, 0)
+        # Refused at enrollment in FIPS mode unless the module approves it; no key length
+        # (FIPS 204 fixes it per set)
+        return None if fips_mode.enabled() and not alg.fips_approved else (alg.label, 0)
     return ('RSA' if alg.family == 'RSA' else f'ECDSA_{alg.param}'), alg.key_size
 
 

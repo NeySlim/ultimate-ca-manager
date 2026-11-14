@@ -99,6 +99,12 @@ describe('SSHCertificatesPage generated key type (#399)', () => {
     expect(payload.key_type).toBe('ecdsa-p256')
   })
 
+  it('keeps Ed25519 in FIPS mode when the server module approves it', async () => {
+    getEffective.mockResolvedValue({ data: { fips: true, fips_key_types: ['EC-P256', 'ED25519', 'ED448'] } })
+    const payload = await generateWithDefaults(false)
+    expect(payload.key_type).toBe('ed25519')
+  })
+
   it('keeps Ed25519 outside FIPS mode', async () => {
     getEffective.mockResolvedValue({ data: {} })
     const payload = await generateWithDefaults(false)

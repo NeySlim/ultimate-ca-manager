@@ -3354,7 +3354,7 @@
           "remedy": "Inserisci di nuovo la password nelle impostazioni del protocollo: verrà memorizzata come hash PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Autorità di certificazione con chiave Ed25519 o Ed448: non possono firmare in modalità FIPS",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
           "remedy": "Crea un'autorità RSA o ECDSA (P-256/P-384/P-521) e sposta l'emissione su di essa prima del passaggio; la chiave di un'autorità non può essere convertita."
         },
         "ca_weak_key": {
@@ -3362,11 +3362,11 @@
           "remedy": "Crea un'autorità con RSA 2048+ o ECDSA P-256/P-384/P-521 e sposta l'emissione su di essa."
         },
         "ca_unapproved_algorithm": {
-          "title": "Autorità di certificazione con chiave ML-DSA: il modulo FIPS fornito da UCM non offre ML-DSA, quindi non possono firmare in modalità FIPS",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
           "remedy": "Crea un'autorità RSA 2048+ o ECDSA P-256/P-384/P-521 e sposta l'emissione su di essa prima del passaggio, oppure lascia disattivata la modalità FIPS finché serve l'emissione ML-DSA."
         },
         "ssh_ca_eddsa_key": {
-          "title": "Autorità di certificazione SSH con chiave Ed25519: non possono firmare in modalità FIPS",
+          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
           "remedy": "Crea un'autorità SSH ECDSA o RSA e distribuisci la sua chiave pubblica agli host prima del passaggio."
         },
         "ssh_certificates_eddsa_key": {
@@ -3414,12 +3414,16 @@
           "remedy": "Preferisci un provider PKCS#11, Azure Key Vault o OpenBao per le chiavi che devono restare nell'ambito FIPS."
         },
         "hsm_unapproved_keys": {
-          "title": "Chiavi HSM di un algoritmo non ammesso dalla modalità FIPS (Ed25519, Ed448, ChaCha20-Poly1305)",
-          "remedy": "Sostituiscile con chiavi RSA, ECDSA o AES; in modalità FIPS le chiavi di questi tipi di OpenBao e Vault Transit non vengono più elencate."
+          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
         },
         "dns_tsig_hmac_md5": {
           "title": "Provider DNS RFC 2136 che firmano con TSIG hmac-md5: gli aggiornamenti DNS-01 vengono rifiutati in modalità FIPS",
           "remedy": "Crea una chiave TSIG hmac-sha256 sul server DNS e inseriscila nel provider."
+        },
+        "hmac_short_secret": {
+          "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
+          "remedy": "Regenerate the webhook secrets and create TSIG keys of at least 14 bytes (hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers."
         },
         "msca_winrm_ntlm": {
           "title": "Connessioni CA Microsoft il cui canale WinRM usa NTLM: il canale viene rifiutato in modalità FIPS",

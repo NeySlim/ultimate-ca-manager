@@ -250,7 +250,7 @@ def validate_enrollment_public_key(public_key) -> str | None:
     """Return an error string if *public_key* is too weak to certify, else None.
 
     Accepts a cryptography public-key object (from a parsed CSR). Ed25519 /
-    Ed448 and, outside FIPS mode, ML-DSA are accepted. Unknown key types are rejected — an
+    Ed448 and ML-DSA are accepted (in FIPS mode, ML-DSA when the loaded module approves it). Unknown key types are rejected — an
     enrollment endpoint should not sign a key it cannot assess.
     """
     family = key_algorithms.family_for_public_key(public_key)
@@ -276,7 +276,7 @@ def validate_enrollment_public_key(public_key) -> str | None:
         return None
 
     if family == 'ML-DSA':
-        if fips_mode.enabled():
+        if fips_mode.enabled() and not key_algorithms.fips_approved_for_key(public_key):
             return f'{key_algorithms.label_for_public_key(public_key)} keys are not available in FIPS mode'
         return None
 

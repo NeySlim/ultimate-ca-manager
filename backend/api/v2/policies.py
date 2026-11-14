@@ -1052,6 +1052,8 @@ def effective_policy_algorithms():
             'ml_dsa': key_algorithms.mldsa_supported()}  # whether this build can use ML-DSA keys
     if fips_mode.enabled():
         data['fips'] = True  # the FIPS system policy is part of the result
+        # What the loaded module approves, so forms offer EdDSA and ML-DSA only where it does
+        data['fips_key_types'] = list(key_algorithms.fips_approved_labels())
     # The key issued when neither the request nor the template names one
     data['baseline_key_type'] = issuance_defaults.BASELINE_ISSUE_KEY
     try:

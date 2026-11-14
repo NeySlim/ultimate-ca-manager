@@ -3354,7 +3354,7 @@
           "remedy": "请在协议设置中重新输入密码：之后将以 PBKDF2 哈希存储。"
         },
         "ca_eddsa_key": {
-          "title": "使用 Ed25519 或 Ed448 密钥的证书颁发机构：在 FIPS 模式下无法签名",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
           "remedy": "请在切换前创建 RSA 或 ECDSA（P-256/P-384/P-521）颁发机构并将签发迁移过去；颁发机构密钥无法转换。"
         },
         "ca_weak_key": {
@@ -3362,11 +3362,11 @@
           "remedy": "请创建使用 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 的颁发机构，并将签发迁移过去。"
         },
         "ca_unapproved_algorithm": {
-          "title": "使用 ML-DSA 密钥的证书颁发机构：UCM 附带的 FIPS 模块不提供 ML-DSA，因此它们无法在 FIPS 模式下签名",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
           "remedy": "请在切换前创建 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 的颁发机构并将签发迁移过去；若仍需签发 ML-DSA，请保持 FIPS 模式关闭。"
         },
         "ssh_ca_eddsa_key": {
-          "title": "使用 Ed25519 密钥的 SSH 证书颁发机构：在 FIPS 模式下无法签名",
+          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
           "remedy": "请在切换前创建 ECDSA 或 RSA 的 SSH 颁发机构，并将其公钥分发到各主机。"
         },
         "ssh_certificates_eddsa_key": {
@@ -3414,12 +3414,16 @@
           "remedy": "对于必须保持在 FIPS 范围内的密钥，请优先选择 PKCS#11、Azure Key Vault 或 OpenBao 提供商。"
         },
         "hsm_unapproved_keys": {
-          "title": "使用 FIPS 模式之外算法（Ed25519、Ed448、ChaCha20-Poly1305）的 HSM 密钥",
-          "remedy": "请将其替换为 RSA、ECDSA 或 AES 密钥；在 FIPS 模式下，这些类型的 OpenBao 和 Vault Transit 密钥将不再列出。"
+          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
         },
         "dns_tsig_hmac_md5": {
           "title": "使用 TSIG hmac-md5 签名的 RFC 2136 DNS 提供商：FIPS 模式下 DNS-01 更新将被拒绝",
           "remedy": "请在 DNS 服务器上创建 hmac-sha256 TSIG 密钥，并在提供商中填写。"
+        },
+        "hmac_short_secret": {
+          "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
+          "remedy": "Regenerate the webhook secrets and create TSIG keys of at least 14 bytes (hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers."
         },
         "msca_winrm_ntlm": {
           "title": "WinRM 通道使用 NTLM 的 Microsoft CA 连接：FIPS 模式下该通道将被拒绝",

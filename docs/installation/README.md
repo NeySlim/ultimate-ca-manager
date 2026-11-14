@@ -142,6 +142,23 @@ The packages install pre-built Python wheels, and the `cryptography` and `psycop
 
 TLS follows the host's configuration: with the FIPS crypto policy of RHEL 9 and the FIPS module of Ubuntu 24.04, X25519 and X448 are not offered, and UCM refuses to start in FIPS mode when its TLS contexts still accept them.
 
+#### What FIPS mode allows on each installation
+
+In FIPS mode UCM asks the loaded module whether it approves ML-DSA, Ed25519 and Ed448, and allows them only when it does; RSA 2048+ and ECDSA on P-256, P-384 and P-521 are allowed everywhere.
+
+| Installation | FIPS module (CMVP certificate) | ML-DSA-44/65/87 | Ed25519, Ed448 |
+|---|---|---|---|
+| Docker image `-fips` | OpenSSL FIPS Provider 3.5.9 (#5586) | allowed | allowed |
+| DEB, Ubuntu 24.04 Pro | Ubuntu 24.04 OpenSSL Cryptographic Module (#5115) | refused | refused |
+| RPM, RHEL 9 | Red Hat Enterprise Linux 9 OpenSSL FIPS Provider (#5573) | refused | refused |
+
+- The binary certified under #5115 is the one of Ubuntu Pro's `fips` stream; `fips-updates` carries later, patched versions that are not the certified binary.
+- The image is built on Debian 13, and also for arm64: neither is among the tested configurations of certificate #5586.
+- Still refused with the image: Ed25519 SSH keys of deployment targets and Ed25519 host keys (paramiko signs and verifies them with libsodium, outside the module), HSM and OpenBao keys other than RSA 2048+ and ECDSA P-256, P-384 and P-521, ML-DSA and EdDSA among them (the provider signs, not the module), and SLH-DSA, which the module approves but the Python cryptography library does not provide.
+- The readiness check of the image, run before the switch, judges these keys by the image's module, asked when the image was built.
+- With the image, TLS 1.2 without Extended Master Secret is refused in both directions, and TLS also offers the hybrid groups X25519MLKEM768 and SecP256r1MLKEM768; X25519 and X448 alone stay refused.
+- A webhook secret or TSIG key under 14 bytes is refused when saved in FIPS mode.
+
 A standard package installed on a host in FIPS mode prints a reminder to set `UCM_FIPS_BUILD=1`. To return to the standard build, remove the line from `ucm.env` and reinstall.
 
 ---

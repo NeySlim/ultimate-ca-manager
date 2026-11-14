@@ -531,12 +531,14 @@ are sent. An intermediate CA never outlives its parent. A CA of type
 and `keyType` is an alias of `keyAlgo`. An unknown `keyAlgo`, or a `keySize` that does not
 belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048, `ECDSA` P-256 and `EdDSA`
 Ed25519; a request without any key field gets RSA-2048. An EdDSA CA key is generated in software
-only (no HSM provider holds one), is refused in FIPS mode and signs without a separate digest,
+only (no HSM provider holds one), is refused in FIPS mode unless the loaded FIPS module approves
+EdDSA (the `-fips` Docker image does) and signs without a separate digest,
 like ML-DSA below. Web browsers (Chrome, Firefox, Safari), Windows (CryptoAPI/CNG) and SCEP clients
 do not verify an Ed25519 or Ed448 signature on a certificate, so they reject anything such a CA issues,
 whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP and XCEP
 refuse an EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
-OpenSSL 3.5 or later and is refused in FIPS mode; `keyAlgo` generates it in software, and
+OpenSSL 3.5 or later and is refused in FIPS mode unless the loaded FIPS module approves it (the
+`-fips` Docker image does); `keyAlgo` generates it in software, and
 an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
 An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named
 in `meta.notices`. An intermediate under an ML-DSA parent likewise takes no digest; an
@@ -2745,7 +2747,7 @@ GET /api/v2/system/service/status
   "fips_active": true,
   "provider_active": true,
   "library": "OpenSSL 3.5.7 9 Jun 2026",
-  "provider": {"name": "OpenSSL FIPS Provider", "version": "3.1.2", "buildinfo": "3.1.2"},
+  "provider": {"name": "OpenSSL FIPS Provider", "version": "3.5.9", "buildinfo": "3.5.9"},
   "module_settings": {"security-checks": 1, "tls1-prf-ems-check": 1, "drbg-no-trunc-md": 1}
 }
 
@@ -2888,7 +2890,10 @@ GET /api/v2/policies/effective?ca_id=3&template_id=1
     "ml_dsa": true,              # false when this build's OpenSSL has no ML-DSA
     "default_key_type": "RSA-3072",  # key issued when neither the request nor the template names one
     "baseline_key_type": "RSA-2048", # the starting candidate of that rule
-    "fips": true                 # only present in FIPS mode
+    "fips": true,                # only present in FIPS mode
+    "fips_key_types": ["RSA-2048", "RSA-3072", "RSA-4096", "EC-P256", "EC-P384", "EC-P521",
+                       "ED25519", "ED448", "ML-DSA-44", "ML-DSA-65", "ML-DSA-87"]
+                                 # FIPS mode only: what the loaded module approves (here 3.5.9)
   }
 }
 ```
@@ -3373,7 +3378,7 @@ any order is opened at the CA.
 `EC-P384`, `EC-BP256`, `EC-BP384`, or `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87` when this build
 has ML-DSA. Without it the `key_type` client setting applies (RSA-2048 when unset); a value
 this instance cannot generate answers `400` and is never replaced by another type. FIPS mode
-refuses ML-DSA and Brainpool with `400`, both as `key_type` and as the key of
+refuses Brainpool, and ML-DSA unless the loaded FIPS module approves it, with `400`, both as `key_type` and as the key of
 `source_certificate_id` (`key_source: "reuse"`).
 
 ### Verify Challenge
@@ -3722,7 +3727,7 @@ Content-Type: application/json
 PKCS#11 3.2 token with the ML-DSA mechanisms), `openbao` (Transit `mldsa-*` keys) and
 `google-kms` (`PQ_SIGN_ML_DSA_*` versions, mapped from the KMS API but not tested against the
 service). `azure-keyvault` and `aws-cloudhsm` answer `400` for both families, and FIPS mode
-refuses ML-DSA on every provider. An ML-DSA key signs the data itself: no digest applies.
+refuses ML-DSA on every provider, whatever the loaded FIPS module approves: the provider signs, not the module. An ML-DSA key signs the data itself: no digest applies.
 Google Cloud KMS signs at most 64 KiB of data with it, so a larger CRL fails with a message
 that says so.
 
@@ -3753,6 +3758,10 @@ Content-Type: application/json
   "algorithm": "SHA256withRSA"
 }
 ```
+
+In FIPS mode only an RSA 2048+ or ECDSA P-256/P-384/P-521 key signs: any other key answers `400`
+with the `urn:ucm:problem:fips-restricted` problem type, as do certificate issuance and CRL
+regeneration for a CA on such a key; its OCSP responder answers `unauthorized`.
 
 ### List Provider Types
 ```http
@@ -3931,8 +3940,9 @@ Content-Type: application/json
 
 `rules.allowed_key_types` takes registry labels: `RSA-2048`, `RSA-3072`, `RSA-4096`,
 `EC-P256`, `EC-P384`, `EC-P521`, `EC-BP256`, `EC-BP384`, `EC-BP512`, `ML-DSA-44`,
-`ML-DSA-65` and `ML-DSA-87`. In FIPS mode a rule allowing ML-DSA is refused, and
-`GET /api/v2/policies/effective` leaves it out. `allowed_digests` does not bind an ML-DSA CA,
+`ML-DSA-65` and `ML-DSA-87`. In FIPS mode a rule allowing ML-DSA, Ed25519 or Ed448 is refused
+unless the loaded FIPS module approves it, and `GET /api/v2/policies/effective` leaves such a key
+type out. `allowed_digests` does not bind an ML-DSA CA,
 which signs without a separate digest; use
 `allowed_signature_schemes` (`ml_dsa`) for that.
 

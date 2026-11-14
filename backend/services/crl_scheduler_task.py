@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
+from fips_mode import FipsRestricted
 from models import db, CA
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
@@ -122,7 +123,11 @@ class CRLSchedulerTask:
                 f"(#{ crl_metadata.crl_number}, {crl_metadata.revoked_count} revoked certs)"
             )
             return True
-        
+
+        except FipsRestricted as e:
+            # Expected state, repeated every pass until the CA changes: one line, no trace
+            logger.warning(f"CRL of CA {ca_id} not signed: {e}")
+            return False
         except Exception as e:
             logger.error(
                 f"Error regenerating CRL for CA {ca_id}: {e}",
@@ -265,6 +270,10 @@ class CRLSchedulerTask:
                     if CRLSchedulerTask._delta_interval_if_due(ca_id) is not None \
                             and CRLSchedulerTask._under_lease(ca_id, CRLSchedulerTask._delta_if_due, retries):
                         delta_count += 1
+                except FipsRestricted as e:
+                    # As for the base CRL: an expected state, one line, no trace
+                    db.session.rollback()
+                    logger.warning(f"Delta CRL of CA {ca_id} not signed: {e}")
                 except Exception as e:
                     db.session.rollback()
                     logger.error(f"Error generating delta CRL for CA {ca_id}: {e}")
