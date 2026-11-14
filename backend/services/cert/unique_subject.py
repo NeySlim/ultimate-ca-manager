@@ -69,10 +69,9 @@ class _Requester:
         self.identities = set().union(*(_identities(r) for r in rows)) if rows else set()
         if holder:
             self.identities.add(holder)
-        # The key and the SID the rows being renewed carry are this entity's too
-        held = [issued, *(_held(r) for r in own if r is not None)]
-        self.spkis = {_spki(c) for c in held if c is not None} - {None}
-        self.sids = ({sid} | {ad_security_extension_sid(c) for c in held if c is not None}) - {None}
+        self.spki = _spki(issued)
+        # The issuer writes the SID extension (never copied from a request): an in-place renewal's copy
+        self.sids = {sid, ad_security_extension_sid(issued)} - {None}
 
     def same_as(self, row, held, full):
         from services.trust_store.csr_operations_mixin import ad_security_extension_sid
@@ -80,7 +79,8 @@ class _Requester:
             return True
         if not full:  # a common name pattern alone: the SID extension is the only proof
             return False
-        return bool(_identities(row) & self.identities) or _spki(held) in self.spkis
+        return (bool(_identities(row) & self.identities)
+                or (self.spki is not None and _spki(held) == self.spki))
 
 
 def _held(row):
