@@ -602,6 +602,20 @@ def create_app(config_name=None):
     app.logger.info("✓ DATABASE INITIALIZATION COMPLETE - Safe to proceed")
     app.logger.info("=" * 60)
     
+    # ===== HA NODE IDENTIFIER =====
+    # Right after the schema, before anything this node's start changes (housekeeping, scan
+    # recovery, master key): a second live process under this identifier stops here (NodeIdTaken
+    # is a SystemExit); a registry that cannot be read leaves it to the heartbeat
+    from utils.ha import ha_enabled
+    if ha_enabled():
+        with app.app_context():
+            from services.scheduler_leader import claim_node_at_start
+            try:
+                claim_node_at_start()
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"HA: node identifier not claimed at start: {type(e).__name__}: {e}")
+
     # Under gunicorn the scheduler process does this before its loop: the master
     # leaves the database alone once the workers are forked
     from services.scheduler_service import supervised
@@ -994,19 +1008,6 @@ def create_app(config_name=None):
     # Register blueprints
     register_blueprints(app)
     
-    # ===== HA NODE IDENTIFIER =====
-    # Before the master key check: a second live process with this node's identifier stops
-    # here (NodeIdTaken is a SystemExit); a registry that cannot be read leaves it to the heartbeat
-    from utils.ha import ha_enabled
-    if ha_enabled():
-        with app.app_context():
-            from services.scheduler_leader import claim_node_at_start
-            try:
-                claim_node_at_start()
-            except Exception as e:
-                db.session.rollback()
-                app.logger.error(f"HA: node identifier not claimed at start: {type(e).__name__}: {e}")
-
     # ===== MASTER KEY AND SAFE MODE =====
     # A new installation gets its master key here; encrypted keys without one
     # put the API in safe mode

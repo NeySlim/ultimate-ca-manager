@@ -355,6 +355,7 @@ def boot(tmp_path):
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         procs.append(p)
         return p
+    start.url = pg_app_harness.app_url(name)
     yield start
     for p in procs:
         if p.poll() is None:
@@ -404,3 +405,28 @@ def test_real_nodes_under_one_identifier(boot):
     assert again.returncode == 0, out[-3000:]
     waited = float(next(l for l in out.splitlines() if l.startswith('CLAIMED')).split()[2])
     assert waited < 0.1, out
+
+
+def test_a_refused_duplicate_leaves_the_live_node_scans_alone(boot):
+    """The claim comes before anything this node's start would change, such as failing the
+    discovery scans recorded under its identifier."""
+    from sqlalchemy import create_engine
+    from utils.db_url import sqlalchemy_url
+    holder = boot('hold', 0, 4.0)
+    _read_until(holder, 'BOOTED')
+    engine = create_engine(sqlalchemy_url(boot.url))
+    try:
+        with engine.begin() as conn:
+            run = conn.execute(text(
+                "INSERT INTO discovery_scan_runs (started_at, status, total_targets, targets_scanned,"
+                " certs_found, new_certs, changed_certs, errors, triggered_by, timeout, max_workers,"
+                " resolve_dns, node_id) VALUES (now(), 'running', 1, 0, 0, 0, 0, 0, 'manual', 5, 20,"
+                " false, 'same-node') RETURNING id")).scalar()
+        duplicate = boot('once', 1, 4.0)
+        out = duplicate.communicate(timeout=180)[0]
+        assert duplicate.returncode != 0 and 'distinct UCM_NODE_ID' in out, out[-3000:]
+        with engine.connect() as conn:
+            assert conn.execute(text("SELECT status FROM discovery_scan_runs WHERE id = :i"),
+                                {'i': run}).scalar() == 'running'
+    finally:
+        engine.dispose()
