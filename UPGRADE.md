@@ -164,6 +164,8 @@ Database migrations run automatically at startup.
 
 - **Start from 2.254.** 3.0 upgrades a database last started by UCM 2.254, nothing older. From an earlier 2.x, install 2.254 first (package or image), start it once so it completes its own migrations, then install 3.0. The same applies to every node of a shared PostgreSQL database and to a database copied from SQLite to PostgreSQL: it is the database that must have been started by 2.254. A 2.x backup archive of any version still restores on 3.0.
 - **What a refused start looks like.** On a database that 2.254 has not started, 3.0 stops before writing anything: `This database was last started by a release older than 2.254 (N migration(s) of 2.254 are missing from its registry, first ...). Install 2.254, start it once, then upgrade. Nothing was changed: 2.254 still starts on this database.` A database without a migration registry gives the same message with `it has no migration registry`. A package installation shows it in the service journal (`journalctl -u ucm`) and the service does not come up; a container shows it in its log (`docker logs <container>`) and exits. Since nothing was written, put 2.254 back (the 2.254 package, or the 2.254 image on the same volume), start it once, then upgrade to 3.0 again. The 2.254.x security updates add no migration, so a database they started upgrades like a 2.254 one; a database whose registry names a migration that neither 2.254 nor this release knows (started by a later release, or edited by hand) is refused the same way, without writing, by `This database names N migration(s) this release does not know, first ...`.
+- **The DEB and RPM packages check the installed version first.** Installing 3.0 over a UCM package older than 2.254 (1.x included, and a DEB removed but not purged) stops in the pre-installation script, before any file is written: `UCM 2.253 is installed, and this package upgrades UCM 2.254 or later only: its database must have been started by 2.254 first. Install 2.254, start it once, then install this package. Nothing was changed: UCM 2.253 is still installed.` The installed version stays installed, and the 3.0 package stops nothing. Release candidates of 2.254 (`2.254~rc1`) and the 2.254.x security updates are accepted. The 3.0 packages no longer carry the 1.x to 2.0 upgrade: a 1.x installation goes through 2.254 too.
+- **Docker has no package step.** The 3.0 image starts and refuses a database older than 2.254 as described above. A container that still mounts its volume at a path used by images before 2.70 (`/opt/ucm/backend/data` or `/app/backend/data`) has those files copied into `/opt/ucm/data` at startup, as before; a database carried over that way is checked the same way.
 - In-app help is available in English, French and Chinese only; with the interface in German, Spanish, Italian, Japanese, Portuguese or Ukrainian the help panel shows the English text. The interface itself keeps its nine languages.
 - Private-key encryption becomes an envelope: the key in `master.key` or `KEY_ENCRYPTION_KEY` (the KEK) wraps a data key stored in the database. Nothing is re-encrypted at the upgrade and the KEK stays the only secret to back up. A KEK is now changed by hand with the previous one in `master.key.previous` or `KEY_ENCRYPTION_KEY_PREVIOUS` (see the Admin Guide); swapping the key without it puts UCM in safe mode while encryption is enabled, and in HA also once it was disabled. Disabling encryption with `KEY_ENCRYPTION_KEY` set no longer answers 409: the variable stays configured and unused.
 - No default administrator password: a new installation no longer creates `admin` / `changeme123`. Automation that logged in with `changeme123` after a fresh install must provide the password (`INITIAL_ADMIN_PASSWORD_FILE` or `INITIAL_ADMIN_PASSWORD`) or read the generated one from `DATA_DIR/initial-admin-password` and change it, as the first login requires for a generated password. An existing installation is not touched: its administrator, its password and its sessions stay as they are, and no file is generated.
@@ -294,19 +296,9 @@ No manual action required — updates are triggered from the Settings > System p
 
 No action required — all migration happens automatically.
 
-### Upgrading from v1.8.x to v2.0.x
+### Upgrading from v1.8.x
 
-**Major version upgrade** -- data is automatically migrated.
-
-- Database path moved from `/var/lib/ucm/` to `/opt/ucm/data/`
-- Frontend replaced: HTMX -> React 18
-- Authentication: JWT -> session cookies
-- A backup is created automatically during upgrade
-
-Steps:
-1. Standard upgrade procedure (install new package)
-2. No configuration changes required
-3. Check logs: `journalctl -u ucm -n 50`
+Install 2.254 first: its packages carry the 1.x to 2.0 upgrade (database moved from `/var/lib/ucm/` to `/opt/ucm/data/`), and 3.0 starts only on a database 2.254 has started. Then follow [Upgrading to v3.0](#upgrading-to-v30).
 
 ---
 

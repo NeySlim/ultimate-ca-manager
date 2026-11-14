@@ -108,6 +108,12 @@ sudo systemctl status ucm
 
 ---
 
+### Upgrading a DEB or RPM installation
+
+The 3.0 packages install over UCM 2.254 or later only. Over an older version, the pre-installation script refuses before writing anything and leaves that version installed and running: install 2.254, start it once, then install 3.0. See the [Upgrade Guide](../../UPGRADE.md#upgrading-to-v30).
+
+---
+
 ### FIPS hosts: DEB and RPM built against the system OpenSSL
 
 The packages install pre-built Python wheels, and the `cryptography` and `psycopg-binary` wheels carry their own OpenSSL, which ignores the FIPS mode of the host. On RHEL 9 (or AlmaLinux and Rocky Linux 9) and on Ubuntu 24.04 (Ubuntu Pro for the FIPS module), `UCM_FIPS_BUILD=1` makes the package compile `cryptography`, `psycopg`, `lxml` and `xmlsec` against the system OpenSSL instead. Other distributions refuse the option.
