@@ -698,6 +698,8 @@ def sign_data(key_id):
 
         return success_response(data={'signature': signature_b64})
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except HsmError as e:
         logger.error(f"HSM signing error: {e}")
         AuditService.log_action(

@@ -56,7 +56,7 @@ def _assert_fips_problem(r, name):
     assert name in body['detail'] and 'not available in FIPS mode' in body['detail'], body
 
 
-def _self_signed_ca(key, cn):
+def _self_signed_ca(key, cn, digest=None):
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     now = datetime.datetime.now(datetime.timezone.utc)
     builder = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
@@ -64,7 +64,7 @@ def _self_signed_ca(key, cn):
                .not_valid_before(now - datetime.timedelta(minutes=5))
                .not_valid_after(now + datetime.timedelta(days=30))
                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True))
-    return builder.sign(key, None)
+    return builder.sign(key, digest)
 
 
 # ---------------------------------------------------------------- the capability
@@ -767,4 +767,50 @@ class TestPreflight:
             finally:
                 db.session.delete(target)
                 db.session.commit()
+
+
+
+class TestHsmSignApiInFipsMode:
+    def test_refusal_is_the_fips_problem(self, monkeypatch, auth_client, hsm_signing_key, fips_on):
+        key = hsm_signing_key('RSA-1024', _pem(_rsa_public(1024)))
+        r = _post(auth_client, f'/api/v2/hsm/keys/{key.id}/sign',
+                  {'data': base64.b64encode(b'tbs').decode()})
+        _assert_fips_problem(r, 'RSA 1024')
+
+    @pytest.fixture
+    def weak_hsm_ca(self, monkeypatch, app, hsm_signing_key):
+        """A root CA whose HSM key is RSA 1024, bound before the switch; the stub signs for real."""
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        private = rsa.generate_private_key(65537, 1024)
+
+        class _Signer(_SigningStub):
+            def sign(self, key_identifier, data, algorithm=None, hash_algorithm=None, **kwargs):
+                return private.sign(data, padding.PKCS1v15(), hashes.SHA256())
+
+        from services.hsm import HsmService
+        monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: _Signer()))
+        key = hsm_signing_key('RSA-1024', _pem(private.public_key()))
+        cert = _self_signed_ca(private, f'weak hsm {uuid.uuid4().hex[:6]}', hashes.SHA256())
+        row = CA(refid=str(uuid.uuid4()), descr=cert.subject.rfc4514_string(), serial=0, hsm_key_id=key.id,
+                 crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode())
+        db.session.add(row)
+        db.session.commit()
+        yield row.id
+        from models import Certificate, CRLMetadata
+        Certificate.query.filter_by(caref=row.refid).delete()
+        CRLMetadata.query.filter_by(ca_id=row.id).delete()
+        db.session.delete(row)
+        db.session.commit()
+
+    def test_issuance_and_crl_are_refused(self, monkeypatch, auth_client, weak_hsm_ca, fips_on):
+        r = _post(auth_client, '/api/v2/certificates',
+                  {'cn': 'weak.example.test', 'ca_id': weak_hsm_ca, 'validity_days': 7})
+        _assert_fips_problem(r, 'RSA 1024')
+        r = _post(auth_client, f'/api/v2/crl/{weak_hsm_ca}/regenerate', {})
+        _assert_fips_problem(r, 'RSA 1024')
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
+        r = _post(auth_client, f'/api/v2/crl/{weak_hsm_ca}/regenerate', {})
+        assert r.status_code == 200, r.get_json()
 
