@@ -3711,7 +3711,7 @@ Content-Type: application/json
 PKCS#11 3.2 token with the ML-DSA mechanisms), `openbao` (Transit `mldsa-*` keys) and
 `google-kms` (`PQ_SIGN_ML_DSA_*` versions, mapped from the KMS API but not tested against the
 service). `azure-keyvault` and `aws-cloudhsm` answer `400` for both families, and FIPS mode
-refuses ML-DSA on every provider unless the loaded FIPS module approves it. An ML-DSA key signs the data itself: no digest applies.
+refuses ML-DSA on every provider, whatever the loaded FIPS module approves: the provider signs, not the module. An ML-DSA key signs the data itself: no digest applies.
 Google Cloud KMS signs at most 64 KiB of data with it, so a larger CRL fails with a message
 that says so.
 

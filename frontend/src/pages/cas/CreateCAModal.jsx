@@ -270,18 +270,19 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const rsa2048PastHorizon = createFormType !== 'external' && usesShortRsa
     && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= SHORT_RSA_HORIZON
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
-  // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
+  // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen. An HSM key
+  // signs outside the loaded module: in FIPS mode only what every module approves (no fipsKeys)
   const hsmAlgorithms = useMemo(
-    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, fipsKeys, mldsa })
+    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, mldsa })
       .filter(a => isAllowed(allowedKeyTypes, a.label) && !(pqStandalone && isPostQuantum(a.label))),
-    [allowedKeyTypes, hsmProviderType, fips, fipsKeys, mldsa, pqStandalone])
+    [allowedKeyTypes, hsmProviderType, fips, mldsa, pqStandalone])
   const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
   // Existing keys pass the same filters; one outside the registry (RSA-8192) is refused only in FIPS mode
   const usableHsmKeys = useMemo(() => hsmKeys.filter(k => {
     const row = findAlgorithm(k.algorithm)
-    return isAllowed(allowedKeyTypes, k.algorithm) && (row ? isUsable(row, { fips, fipsKeys, mldsa }) : !fips)
+    return isAllowed(allowedKeyTypes, k.algorithm) && (row ? isUsable(row, { fips, mldsa }) : !fips)
       && !(pqStandalone && isPostQuantum(k.algorithm))
-  }), [hsmKeys, allowedKeyTypes, fips, fipsKeys, mldsa, pqStandalone])
+  }), [hsmKeys, allowedKeyTypes, fips, mldsa, pqStandalone])
   // An HSM key synced from the token may be an RSA size the registry does not list ('RSA-8192')
   const keyIsRsa = keyRow?.family === 'RSA' || /^RSA-\d+$/.test(keyLabel ?? '')
   const pssAvailable = keyIsRsa && (keyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))

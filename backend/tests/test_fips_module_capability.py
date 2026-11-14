@@ -303,14 +303,64 @@ class TestSshAndHsm:
         assert r.status_code == 201, r.get_json()
         assert r.get_json()['data']['key_type'] == 'ed25519'
 
-    def test_openbao_inventory(self, monkeypatch, fips_on):
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_ca_on_an_hsm_ml_dsa_key(self, monkeypatch, app, auth_client, fips_on, approves):
+        from models.hsm import HsmKey, HsmProvider
+        _module(monkeypatch, approves)
+        public = mldsa.MLDSA65PrivateKey.generate().public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        suffix = uuid.uuid4().hex[:6]
+        with app.app_context():
+            provider = HsmProvider(name=f'tok-{suffix}', type='pkcs11', config='{}')
+            db.session.add(provider)
+            db.session.commit()
+            key = HsmKey(provider_id=provider.id, key_identifier=f'pq-{suffix}', label=f'pq-{suffix}',
+                         algorithm='ML-DSA-65', key_type='asymmetric', purpose='signing',
+                         public_key_pem=public)
+            db.session.add(key)
+            db.session.commit()
+            provider_id, key_id = provider.id, key.id
+        try:
+            base = {'type': 'root', 'commonName': f'FIPS HSM PQ {suffix}', 'validityYears': 2}
+            for body in ({'hsmKeyId': key_id}, {'hsmProviderId': provider_id, 'hsmKeyLabel': f'new-{suffix}',
+                                                'hsmKeyAlgorithm': 'ML-DSA-65'}):
+                r = _post(auth_client, '/api/v2/cas', {**base, **body})
+                if approves:
+                    _assert_fips_problem(r, 'ML-DSA-65')
+                else:  # the FIPS mode policy refuses it first, as before
+                    assert r.status_code == 400 and 'Key type ML-DSA-65 is not allowed by policy "FIPS mode"' \
+                        in r.get_json()['detail'], r.get_json()
+        finally:
+            with app.app_context():
+                db.session.delete(db.session.get(HsmKey, key_id))
+                db.session.delete(db.session.get(HsmProvider, provider_id))
+                db.session.commit()
+
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_openbao_inventory(self, monkeypatch, fips_on, approves):
+        # OpenBao signs, not the loaded module: its EdDSA and ML-DSA keys stay out either way
         from services.hsm.openbao_provider import fips_hides_transit
-        _module(monkeypatch, ())
-        assert all(fips_hides_transit(t) for t in ('ed25519', 'mldsa-65', 'chacha20-poly1305'))
-        _module(monkeypatch, ALL)
-        assert not fips_hides_transit('ed25519') and not fips_hides_transit('mldsa-87')
-        assert fips_hides_transit('chacha20-poly1305')
+        _module(monkeypatch, approves)
+        assert all(fips_hides_transit(t) for t in ('ed25519', 'mldsa-65', 'mldsa-87', 'chacha20-poly1305'))
         assert not fips_hides_transit('rsa-2048')
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
+        assert not fips_hides_transit('mldsa-65')
+
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_hsm_ml_dsa_key_signed_outside_the_module(self, monkeypatch, app, fips_on, approves):
+        from models.hsm import HsmProvider
+        from services.hsm import HsmService
+        _module(monkeypatch, approves)
+        with app.app_context():
+            provider = HsmProvider(name=f'bao-{uuid.uuid4().hex[:6]}', type='openbao', config='{}')
+            db.session.add(provider)
+            db.session.commit()
+            try:
+                with pytest.raises(FipsRestricted, match='^ML-DSA-65 keys not available in FIPS mode$'):
+                    HsmService.generate_key(provider.id, 'pq-key', 'ML-DSA-65')
+            finally:
+                db.session.delete(provider)
+                db.session.commit()
 
 
 # ----------------------------------------------------------- renewal and imports
@@ -505,7 +555,8 @@ class TestPreflight:
         assert fips_preflight._ssh_eddsa('ed25519', None) is None
         assert not fips_preflight._ssh_cert_key_refused('ed25519')
         assert not fips_preflight._ssh_cert_key_refused('ecdsa-p256')
-        assert fips_preflight._hsm_unapproved_words() == ('CHACHA',)
+        # HSM keys sign outside the loaded module: listed whatever it approves
+        assert {'ED25519', 'ED448', 'ML-DSA', 'CHACHA'} <= set(fips_preflight._hsm_unapproved_words())
 
     def test_short_hmac_secrets_are_listed(self, app, auth_client, monkeypatch):
         from services import fips_preflight

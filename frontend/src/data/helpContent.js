@@ -127,7 +127,7 @@ export const helpContent = {
           { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
           { label: 'Import private key', text: 'Attach the private key of a CA that holds only its certificate, so it can sign' },
           { label: 'Key and validity', text: 'RSA-3072 by default, local or HSM. Validity of 1, 2, 3, 5, 10, 15 or 20 years, or Custom (days) up to 50 years. An RSA-2048 CA that would outlive 2030 is flagged: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026' },
-          { label: 'Post-quantum (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 or ML-DSA-87 (FIPS 204, NIST levels 2, 3 and 5), generated in software or on an HSM provider that holds ML-DSA, and hidden in FIPS mode unless the FIPS module approves ML-DSA (the -fips Docker image does). An ML-DSA key signs without a separate digest, so the CA, its CRLs and its OCSP responses have no digest to choose. An ML-DSA CA can sign RSA or EC certificates, and an RSA or EC CA can sign an ML-DSA intermediate' },
+          { label: 'Post-quantum (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 or ML-DSA-87 (FIPS 204, NIST levels 2, 3 and 5), generated in software or on an HSM provider that holds ML-DSA; in FIPS mode only a software key, offered when the FIPS module approves ML-DSA (the -fips Docker image does). An ML-DSA key signs without a separate digest, so the CA, its CRLs and its OCSP responses have no digest to choose. An ML-DSA CA can sign RSA or EC certificates, and an RSA or EC CA can sign an ML-DSA intermediate' },
           { label: 'EdDSA (Ed25519, Ed448)', text: 'Ed25519 or Ed448 keys for a root, intermediate or external CA, in software only (no HSM provider signs EdDSA) and hidden in FIPS mode unless the FIPS module approves EdDSA (the -fips Docker image does). Like ML-DSA, an EdDSA key signs without a digest, and the hierarchy can mix with RSA, EC or ML-DSA. Browsers, Windows (CryptoAPI/CNG) and SCEP clients do not accept what an EdDSA CA signs, whatever the leaf key: reserve it for OpenSSL, Go or Java 15+ consumers. SCEP and XCEP refuse such a CA' },
           { label: 'EdDSA import (v2.251)', text: 'An Ed25519 or Ed448 CA key can be imported with its certificate, or afterwards with Import private key' },
           { label: 'Default digest (v2.251)', text: 'Under a P-384 or P-521 CA, what is signed without a chosen digest (EST, SCEP, WSTEP, Sign CSR, the issue form, ACME orders without one, CRLs) uses SHA-384 or SHA-512; the policies bound the certificates, not the CRLs. CRLs already issued are unchanged: the next one follows' },
@@ -1521,7 +1521,7 @@ export const helpContent = {
           { label: 'PKCS#11', text: 'A token implementing PKCS#11 3.2 with the ML-DSA mechanisms' },
           { label: 'OpenBao / Vault Transit', text: 'Transit key types mldsa-44, mldsa-65 and mldsa-87' },
           { label: 'Google Cloud KMS', text: 'PQ_SIGN_ML_DSA key versions, mapped from the KMS API but not yet tested against the service. KMS signs at most 64 KiB of data, so a CRL larger than that cannot be signed' },
-          { label: 'Not available', text: 'Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider when the FIPS module does not approve it' },
+          { label: 'Not available', text: 'Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider' },
         ]
       },
     ],

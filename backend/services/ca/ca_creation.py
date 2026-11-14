@@ -196,6 +196,7 @@ class CACreationMixin:
                 raise ValueError(
                     f"HSM key {hsm_key.label} is already bound to another CA"
                 )
+            HsmService.refuse_in_fips_mode(hsm_key.algorithm)
         else:
             if not (hsm_provider_id and hsm_key_label and hsm_key_algorithm):
                 raise ValueError(

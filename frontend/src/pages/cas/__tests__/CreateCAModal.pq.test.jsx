@@ -150,6 +150,18 @@ describe('CreateCAModal ML-DSA', () => {
     return provider
   }
 
+  it('offers ML-DSA in FIPS mode locally when the module approves it, never on an HSM', async () => {
+    const fipsKeys = ['RSA-2048', 'EC-P256', ...PQ_ROWS.map(a => a.label)]
+    await onHsm([{ id: 1, name: 'tokens', provider_type: 'pkcs11', enabled: true }],
+      { allowed_key_types: null, allowed_digests: null, fips: true, fips_key_types: fipsKeys })
+    fireEvent.change(screen.getByLabelText('cas.create.hsmProvider'), { target: { value: '1' } })
+    const hsmOffered = optionValues('cas.create.hsmKeyAlgorithm')
+    expect(hsmOffered).toContain('EC-P256')
+    expect(hsmOffered.filter(l => PQ_ROWS.some(a => a.label === l))).toEqual([])
+    fireEvent.click(screen.getByLabelText('cas.create.keyStorageLocal'))
+    expect(optionValues('common.keyAlgorithm')).toContain('ML-DSA')
+  })
+
   it('generates ML-DSA keys on the providers that hold them, not on Azure', async () => {
     const provider = await onHsm([
       { id: 1, name: 'tokens', provider_type: 'pkcs11', enabled: true },

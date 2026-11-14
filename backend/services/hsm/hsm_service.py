@@ -104,6 +104,14 @@ class HsmService:
         return mldsa_refusal(f"provider type '{provider_type}'", algorithm, supported, library)
 
     @staticmethod
+    def refuse_in_fips_mode(algorithm: Optional[str]) -> None:
+        """The HSM signs, not the loaded module: FIPS mode takes only what every module
+        approves (RSA, NIST curves), whatever the loaded one approves on top."""
+        registered = key_algorithms.get(algorithm) if algorithm else None
+        if registered is not None and not registered.fips_static:
+            fips_mode.refuse(f'{registered.display} keys')
+
+    @staticmethod
     def eddsa_refusal(algorithm: Optional[str]) -> Optional[str]:
         """Why an EdDSA *algorithm* key is not used on any HSM, or None: no provider wrapper signs with one."""
         alg = key_algorithms.get(algorithm) if algorithm else None
@@ -441,8 +449,7 @@ class HsmService:
         if registered is None and key_algorithms.is_post_quantum(algorithm):
             raise ValueError(f'{algorithm} keys are not available on this build: '
                              'they need OpenSSL 3.5 or later')
-        if registered is not None and not registered.fips_approved:
-            fips_mode.refuse(f'{registered.display} keys')
+        cls.refuse_in_fips_mode(algorithm)
         
         # Validate purpose
         if purpose not in HsmKey.VALID_PURPOSES:

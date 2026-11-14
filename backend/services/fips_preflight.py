@@ -414,18 +414,16 @@ def _gcp():
     return [_named(p.name, p.id) for p in rows]
 
 
-_HSM_UNAPPROVED = ('CHACHA',)
-# EdDSA spellings of HSM key types, unapproved while the loaded module does not approve Ed25519
-_HSM_EDDSA = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS')
+# HSM keys sign outside the loaded module: EdDSA and ML-DSA stay refused whatever it approves
+_HSM_UNAPPROVED = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS', 'ML-DSA', 'CHACHA')
 
 
 def _hsm_unapproved_words():
-    eddsa = () if fips_mode.switch_approves('ED25519') and fips_mode.switch_approves('ED448') else _HSM_EDDSA
-    return _HSM_UNAPPROVED + eddsa
+    return _HSM_UNAPPROVED
 
 
 @detector('hsm.unapproved_keys', WARNING,
-          'HSM keys of an algorithm outside FIPS mode (Ed25519, Ed448, ChaCha20-Poly1305)',
+          'HSM keys of an algorithm outside FIPS mode (Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305)',
           'Replace them with RSA, ECDSA or AES keys; in FIPS mode, OpenBao and Vault Transit '
           'keys of these types are no longer listed.')
 def _hsm_keys():

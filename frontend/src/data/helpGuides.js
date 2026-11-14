@@ -99,7 +99,7 @@ Flat table with sortable columns.
 The form flags an RSA-2048 CA that would outlive 2030: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026. Choose RSA-3072 or larger. Under **Advanced Constraints (RFC 5280)**, permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify.
 
 ### Post-quantum CAs (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, or on an HSM provider that holds ML-DSA (see HSM-backed CAs), and in FIPS mode the algorithm is offered only when the FIPS module approves it (the \`-fips\` Docker image does, RHEL 9 and Ubuntu 24.04 do not).
+**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, or on an HSM provider that holds ML-DSA (see HSM-backed CAs); in FIPS mode only a software key is offered, when the FIPS module approves ML-DSA (the \`-fips\` Docker image does, RHEL 9 and Ubuntu 24.04 do not).
 
 - An ML-DSA key signs without a separate digest: the digest field disappears, and a digest sent through the API is ignored with a notice. CRLs and OCSP responses of the CA follow the same rule.
 - Hierarchies can mix: an ML-DSA root can sign an RSA or EC intermediate, and an RSA or EC CA can sign an ML-DSA intermediate, which then uses its parent's digest.
@@ -2703,7 +2703,7 @@ ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are offered only on providers that
 - **OpenBao / Vault Transit**: key types \`mldsa-44\`, \`mldsa-65\` and \`mldsa-87\`
 - **Google Cloud KMS**: \`PQ_SIGN_ML_DSA_*\` key versions, mapped from the KMS API but not yet tested against the service. KMS signs at most 64 KiB of data, so a CRL larger than that cannot be signed
 
-Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider when the FIPS module does not approve it. An ML-DSA key signs the data itself, so no digest is chosen.
+Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider. An ML-DSA key signs the data itself, so no digest is chosen.
 
 ### Using HSM Keys
 When creating a CA, select an HSM provider and key instead of generating a software key. The CA's signing operations are performed on the HSM.
