@@ -667,9 +667,10 @@ def test_a_put_back_that_differs_from_the_archive_is_never_taken_for_whole(tmp_p
     assert whole(box.archive / 'data', KEPT) == {k: v for k, v in data.items() if k not in KEPT}
     assert tree(box.archive / 'config') == config
 
-@pytest.mark.parametrize('tool', ['find', 'cksum', 'stat'])
+@pytest.mark.parametrize('tool', ['find', 'find dates', 'cksum', 'stat'])
 def test_a_digest_that_cannot_be_taken_never_passes_for_a_match(tmp_path, tool):
-    """find missing (a minimal image), cksum or stat failing: no copy is taken for whole."""
+    """find missing (a minimal image), failing on its last question only, cksum or stat
+    failing: no copy is taken for whole."""
     box = Box(tmp_path, python='stub')
     before = snapshot(box)
     box.wrap(other_fs=(box.data,))
@@ -678,6 +679,8 @@ def test_a_digest_that_cannot_be_taken_never_passes_for_a_match(tmp_path, tool):
         # stat still says which device a path is on: only the digest's question fails
         (box.bin / 'stat').rename(box.bin / 'stat-device')
         fails = f'[ "$1 $2" != "-c %d" ] || exec {box.bin}/stat-device "$@"\n'
+    if tool == 'find dates':
+        tool, fails = 'find', f'case "$*" in *"date "*) ;; *) exec {shutil.which("find")} "$@" ;; esac\n'
     (box.bin / tool).write_text(f'#!/bin/sh\n{fails}echo "{tool}: not found" >&2; exit 127\n')
     (box.bin / tool).chmod(0o755)
     out = box.run()
