@@ -195,12 +195,14 @@ def test_no_copy_means_no_upgrade_and_a_database_left_as_it_was(failure, base, m
     assert 'Nothing was changed' in out
 
 
-# --- 4. Never truncated, never multiplied -----------------------------------------------------
+# --- 4. Never truncated, never multiplied: the decision table -------------------------------
+# No marker: the database is 2.254, a fresh copy replaces any other. A marker: the upgrade
+# started, a valid copy is kept, and a missing or invalid one is never made from the database.
 
-def _schema(path):
+def _marked(path):
     conn = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
     try:
-        return pre_upgrade_copy._schema(conn)
+        return pre_upgrade_copy._started(conn)
     finally:
         conn.close()
 
@@ -213,35 +215,189 @@ def _roll_back(db):
     Path(db.sqlite_path).write_bytes(_copy(db).read_bytes())
 
 
-def test_a_retry_after_a_rollback_replaces_the_previous_copy(base, monkeypatch):
-    """A start that failed after its copy, the copy put back, 2.254 ran again: the next start copies anew."""
+def _holds(path, key):
+    conn = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+    try:
+        return conn.execute("SELECT 1 FROM system_config WHERE key = ?", (key,)).fetchall() == [(1,)]
+    finally:
+        conn.close()
+
+
+def _written_by_2254(db, key):
+    """2.254 started on this database: a setting written, then the ANALYZE that adds sqlite_stat1."""
+    db.run(f"INSERT INTO system_config (key, value) VALUES ('{key}', '1')")
+    db.run("ANALYZE")
+
+
+def _break_index(path):
+    """A copy that opens and keeps its 2.254 registry but fails the integrity check."""
+    conn = sqlite3.connect(path)
+    conn.executescript("CREATE TABLE t(a, b); CREATE INDEX t_a ON t(a); INSERT INTO t VALUES (1, 2), (3, 4);")
+    conn.execute("PRAGMA writable_schema=ON")
+    conn.execute("UPDATE sqlite_master SET sql = 'CREATE INDEX t_a ON t(b)' WHERE name = 't_a'")
+    conn.commit()
+    conn.close()
+
+
+def _add_300(path):
+    conn = sqlite3.connect(path)
+    conn.execute("INSERT INTO _migrations (name) VALUES ('300_upgrade_from_2_254')")
+    conn.commit()
+    conn.close()
+
+
+def test_the_marker_is_set_after_the_copy_and_before_the_first_step(base, monkeypatch):
+    import migrations._from_2_254 as package
+    from migrations._from_2_254 import STEPS
+    real, seen = package.step, []
+
+    def step(name):
+        if name == STEPS[0] and not seen:
+            seen.append((_marked(base.sqlite_path), _marked(_copy(base))))
+        return real(name)
+    monkeypatch.setattr(package, 'step', step)
+    assert base.upgrade()
+    assert seen == [(True, False)]
+
+
+def test_a_successful_upgrade_removes_the_marker(base):
+    assert base.upgrade()
+    assert not _marked(base.sqlite_path)
+    assert pre_upgrade_copy.MARKER_TABLE not in base.tables()
+
+
+def test_the_marker_goes_with_the_registry_row_of_300(base, capsys):
+    """Removed in the transaction that records 300: a start cut short there keeps it."""
+    base.run("CREATE TRIGGER cut BEFORE INSERT ON _migrations WHEN NEW.name = '300_upgrade_from_2_254' "
+             "BEGIN SELECT RAISE(ABORT, 'cut before the registry row'); END")
+    assert base.upgrade() is False
+    assert 'cut before the registry row' in capsys.readouterr().out
+    assert _marked(base.sqlite_path)
+
+
+# No marker, a copy already there -------------------------------------------------------------
+
+def test_after_a_rollback_and_2254_running_again_the_copy_is_replaced(base, monkeypatch):
+    """Failed at step 143, the copy put back, 2.254 wrote a row then ran ANALYZE: a new copy holds the row."""
     populate(base)
     restore = _broken_step(monkeypatch)
     assert base.upgrade() is False
     first = _sha(_copy(base))
     _roll_back(base)
-    base.run("INSERT INTO system_config (key, value) VALUES ('written_by_2254_meanwhile', '1')")
+    assert not _marked(base.sqlite_path)
+    _written_by_2254(base, 'written_by_2254_meanwhile')
     restore()
     assert base.upgrade()
     assert _sha(_copy(base)) != first
-    conn = sqlite3.connect(_copy(base))
-    assert conn.execute("SELECT 1 FROM system_config WHERE key = 'written_by_2254_meanwhile'").fetchall() == [(1,)]
-    conn.close()
+    assert _holds(_copy(base), 'written_by_2254_meanwhile')
     assert _leftovers(base) == [_copy(base).name]
 
 
-def test_a_restart_loop_after_a_partial_upgrade_keeps_the_pristine_copy(base, monkeypatch):
-    """Steps commit one by one: the next start finds a half-upgraded database, its copy stays 2.254."""
+@pytest.mark.parametrize('spoil', [_break_index, _add_300], ids=['integrity', 'registry'])
+def test_without_a_marker_an_invalid_copy_is_replaced(spoil, base):
+    _copy(base).write_bytes(Path(base.sqlite_path).read_bytes())
+    spoil(_copy(base))
+    assert base.upgrade()
+    assert _is_2254(_copy(base))
+    assert _leftovers(base) == [_copy(base).name]
+
+
+def test_a_start_cut_between_the_copy_and_the_marker_copies_again(base, monkeypatch):
+    """The database is still 2.254 then: the next start replaces the copy with an equal one."""
     populate(base)
-    pristine = _schema(base.sqlite_path)
+    real = pre_upgrade_copy.mark_started
+    monkeypatch.setattr(pre_upgrade_copy, 'mark_started', lambda path: (_ for _ in ()).throw(OSError('cut')))
+    before = _untouched(base)
+    assert base.upgrade() is False
+    assert _untouched(base) == before
+    monkeypatch.setattr(pre_upgrade_copy, 'mark_started', real)
+    expected = _counts(base.sqlite_path)
+    assert base.upgrade()
+    assert _counts(_copy(base)) == expected
+
+
+# A marker and a valid copy: kept -------------------------------------------------------------
+
+def test_a_restart_loop_after_a_partial_upgrade_keeps_the_copy_and_says_so(base, monkeypatch, capsys):
+    """Steps commit one by one: the next start finds a half-upgraded database, its copy stays."""
+    populate(base)
     _broken_step(monkeypatch, '150_users_id_never_reused')
     assert base.upgrade() is False
-    assert _schema(base.sqlite_path) != pristine
     kept = _sha(_copy(base))
+    capsys.readouterr()
     assert base.upgrade() is False
-    assert _schema(_copy(base)) == pristine
+    out = capsys.readouterr().out
+    assert f'kept the copy taken by an earlier start: {_copy(base).resolve()}' in out, out
+    assert '✓ ' + str(_copy(base).resolve()) not in out
     assert _sha(_copy(base)) == kept
+    assert _is_2254(_copy(base))
     assert _leftovers(base) == [_copy(base).name]
+
+
+def test_2254_restarted_on_a_half_upgraded_database_keeps_the_original_copy(base, monkeypatch):
+    """No rollback: the marker is still there, so the copy is kept, without what 2.254 wrote since."""
+    populate(base)
+    restore = _broken_step(monkeypatch)
+    assert base.upgrade() is False
+    kept = _sha(_copy(base))
+    _written_by_2254(base, 'written_on_a_half_upgraded_database')
+    restore()
+    assert base.upgrade()
+    assert _sha(_copy(base)) == kept
+    assert not _holds(_copy(base), 'written_on_a_half_upgraded_database')
+
+
+def test_a_start_cut_between_the_marker_and_the_first_step_keeps_the_copy(base, monkeypatch):
+    import migrations._from_2_254 as package
+    from migrations._from_2_254 import STEPS
+    populate(base)
+    real = package.step
+
+    def step(name):
+        if name == STEPS[0]:
+            raise RuntimeError('cut before the first statement')
+        return real(name)
+    monkeypatch.setattr(package, 'step', step)
+    assert base.upgrade() is False
+    kept = _sha(_copy(base))
+    monkeypatch.setattr(package, 'step', real)
+    assert base.upgrade()
+    assert _sha(_copy(base)) == kept
+
+
+# A marker and no valid copy: none is made from the database ----------------------------------
+
+def _started_without_a_copy(base, monkeypatch, spoil):
+    populate(base)
+    restore = _broken_step(monkeypatch)
+    assert base.upgrade() is False
+    restore()
+    if spoil is None:
+        _copy(base).unlink()
+        return None
+    spoil(_copy(base))
+    return _sha(_copy(base))
+
+
+@pytest.mark.parametrize('spoil', [None, _break_index, _add_300], ids=['missing', 'integrity', 'registry'])
+def test_a_started_upgrade_without_a_valid_copy_resumes_without_copying(spoil, base, monkeypatch, capsys):
+    left = _started_without_a_copy(base, monkeypatch, spoil)
+    capsys.readouterr()
+    assert base.upgrade()
+    out = capsys.readouterr().out
+    assert 'no copy of the 2.254 database exists' in out, out
+    assert 'kept the copy' not in out
+    if left is None:
+        assert not _copy(base).exists()
+        assert _leftovers(base) == []
+    else:
+        assert _sha(_copy(base)) == left
+    assert _upgraded(base)
+
+
+def _upgraded(db):
+    import migration_runner
+    return migration_runner.UPGRADE_MIGRATION in db.registry()
 
 
 def test_a_partial_copy_left_by_a_killed_start_is_replaced(base):
@@ -361,6 +517,45 @@ def test_dry_run_and_status_tell_where_the_copy_goes_without_taking_it(base, cap
     assert _untouched(base) == before
     assert _leftovers(base) == []
     assert out.count(f'a copy of the 2.254 database is taken first: {_copy(base).resolve()}') == 2, out
+
+
+def _rolled_back(base, monkeypatch):
+    populate(base)
+    restore = _broken_step(monkeypatch)
+    assert base.upgrade() is False
+    restore()
+    _roll_back(base)
+
+
+def _half_upgraded(base, monkeypatch):
+    populate(base)
+    restore = _broken_step(monkeypatch)
+    assert base.upgrade() is False
+    restore()
+
+
+def _half_upgraded_without_copy(base, monkeypatch):
+    _half_upgraded(base, monkeypatch)
+    _copy(base).unlink()
+
+
+@pytest.mark.parametrize('state, says', [
+    (_rolled_back, 'a copy of the 2.254 database is taken first, replacing the one there: {copy}'),
+    (_half_upgraded, 'the upgrade resumes with the copy taken by an earlier start: {copy}'),
+    (_half_upgraded_without_copy, 'no copy of the 2.254 database exists'),
+], ids=['replaced', 'kept', 'none'])
+def test_dry_run_and_status_tell_which_case_applies_without_writing(state, says, base, monkeypatch, capsys):
+    state(base, monkeypatch)
+    base.engine.dispose()
+    runner = base._route()
+    copy = _copy(base)
+    files = {p.name: _sha(p) for p in Path(base.sqlite_path).parent.iterdir() if p.is_file()}
+    capsys.readouterr()
+    assert runner.run_all_migrations(dry_run=True) is True
+    runner.show_status()
+    out = capsys.readouterr().out
+    assert out.count(says.format(copy=copy.resolve())) == 2, out
+    assert {p.name: _sha(p) for p in Path(base.sqlite_path).parent.iterdir() if p.is_file()} == files
 
 
 def test_status_of_a_3_0_database_announces_no_copy(base, capsys):

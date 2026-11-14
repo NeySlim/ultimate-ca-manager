@@ -293,7 +293,8 @@ def _sqlite_file(sqlite_path):
 
 
 def _copy_before_upgrade(is_pg: bool, sqlite_path, dry_run: bool) -> bool:
-    """SQLite: migration 300 starts only once a verified copy of the 2.254 database exists."""
+    """SQLite: migration 300 starts once a verified copy exists and the marker is set, or the
+    marker shows an earlier start began it (pre_upgrade_copy.prepare)."""
     import pre_upgrade_copy
     if is_pg:
         say(f"  ! {pre_upgrade_copy.PG_NOTE}")
@@ -301,13 +302,11 @@ def _copy_before_upgrade(is_pg: bool, sqlite_path, dry_run: bool) -> bool:
     if dry_run:
         say(f"  → {pre_upgrade_copy.plan(_sqlite_file(sqlite_path))} (dry run)")
         return True
-    say("  → copying the 2.254 database before the upgrade...", end=" ")
     try:
-        target = pre_upgrade_copy.take(_sqlite_file(sqlite_path))
+        say(f"  {pre_upgrade_copy.prepare(_sqlite_file(sqlite_path))}")
     except pre_upgrade_copy.CopyFailed as exc:
-        say(f"✗ {exc}")
+        say(f"  ✗ {exc}")
         return False
-    say(f"✓ {target}")
     return True
 
 
@@ -409,6 +408,9 @@ def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
         else:
             say("SKIP (no upgrade)")
             return False
+        if name == UPGRADE_MIGRATION:
+            import pre_upgrade_copy
+            pre_upgrade_copy.clear_started(conn)
         conn.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (name,))
         conn.commit()
         say("✓")
