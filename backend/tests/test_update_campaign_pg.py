@@ -21,7 +21,8 @@ pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
 PREFIX = 'ucpg-'
 SHA = 'cd' * 32
 ASSETS = [{'name': 'p.deb', 'browser_download_url': 'https://x/p.deb'},
-          {'name': 'p.deb.sha256', 'browser_download_url': 'https://x/p.deb.sha256'}]
+          {'name': 'p.deb.sha256', 'browser_download_url': 'https://x/p.deb.sha256'},
+          {'name': 'full-stop-migrations.json', 'browser_download_url': 'https://x/full-stop-migrations.json'}]
 
 
 def _clean(app):
@@ -39,6 +40,7 @@ def ha(app, monkeypatch):
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(updates, 'package_family', lambda: 'deb')
     monkeypatch.setattr(updates, 'fetch_expected_sha256', lambda url, name: SHA)
+    monkeypatch.setattr(updates, 'fetch_full_stop_marks', lambda url: {})
     _clean(app)
     now = utc_now()
     with app.app_context():
@@ -115,3 +117,15 @@ def test_two_processes_of_the_dispatched_node_download_once(app, ha, monkeypatch
     payload = _commands(app)[0][1]
     _together(app, monkeypatch, lambda i: uc.run_local_turn(payload, node_id=PREFIX + 'a', version='3.0'))
     assert calls == [SHA, '/nowhere/p.deb']
+
+
+def test_a_pending_migration_that_needs_a_full_stop_refuses_the_campaign(app, ha, monkeypatch):
+    """The registry read is PostgreSQL's: a marked name it lacks refuses, one it holds does not."""
+    monkeypatch.setattr(updates, 'fetch_full_stop_marks', lambda url: {
+        '300_upgrade_from_2_254': 'applied long ago', '399_drop_relay_payload': 'moved to Redis'})
+    with app.app_context():
+        ok, message, _ = uc.start_campaign('3.1', ASSETS, 'admin')
+        assert uc.read_campaign()[1] is None
+    assert not ok and '399_drop_relay_payload' in message and 'moved to Redis' in message
+    assert '300_upgrade_from_2_254' not in message
+    assert _commands(app) == []

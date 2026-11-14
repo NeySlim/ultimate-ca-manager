@@ -854,6 +854,10 @@ jobs:
           rm -f "$CHANGES_FILE" "$PREVIOUS_FILE"
           cat notes.md
       
+      - name: Publish the full-stop marks of the migrations
+        # A rolling update reads it and refuses a release whose pending migrations need every node stopped
+        run: python3 backend/migration_marks.py backend/migrations > artifacts/full-stop-migrations.json
+
       - name: Delete existing release assets
         run: |
           TAG=${GITHUB_REF#refs/tags/}

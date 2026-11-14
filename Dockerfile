@@ -227,4 +227,5 @@ USER ucm
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command - Gunicorn from /opt/ucm/backend (same as packages)
-CMD ["sh", "-c", "cd /opt/ucm/backend && gunicorn -c gunicorn_config.py wsgi:app"]
+# exec: gunicorn is PID 1 and receives the stop signal; under sh it was killed without a clean stop
+CMD ["sh", "-c", "cd /opt/ucm/backend && exec gunicorn -c gunicorn_config.py wsgi:app"]

@@ -386,6 +386,24 @@ def fetch_expected_sha256(checksum_url, package_name):
     return expected
 
 
+def fetch_full_stop_marks(url):
+    """{migration name: reason} from a release's full-stop manifest (migration_marks.manifest)."""
+    import json
+    response = requests.get(url, timeout=30, allow_redirects=True, verify=_ca_bundle or True)
+    response.raise_for_status()
+    if len(response.text) > 1 << 20:
+        raise ValueError("the full-stop manifest is over 1 MiB")
+    try:
+        data = json.loads(response.text)
+    except ValueError:
+        raise ValueError("the full-stop manifest is not JSON") from None
+    marks = data.get('full_stop') if isinstance(data, dict) else None
+    if not isinstance(marks, dict) or not all(isinstance(k, str) and isinstance(v, str)
+                                              for k, v in marks.items()):
+        raise ValueError('the full-stop manifest is not {"full_stop": {name: reason}}')
+    return marks
+
+
 def download_update(download_url, package_name, expected_sha256=None):
     """
     Download update package to DATA_DIR/updates (accessible by ucm-watcher.service)
@@ -735,10 +753,13 @@ def _auto_install(result):
         return
     if in_ha:
         from services import update_campaign
+        from migration_marks import FULL_STOP_ASSET
         missing = update_campaign.families_without_package(result.get('assets'))
+        if not any(a.get('name') == FULL_STOP_ASSET for a in result.get('assets') or []):
+            missing.append(FULL_STOP_ASSET)
         if missing:
             # Before the marker: the next check tries again once the release has them
-            logger.info(f"Auto-update to {latest} waits: no package yet for {', '.join(missing)}")
+            logger.info(f"Auto-update to {latest} waits: not published yet: {', '.join(missing)}")
             return
     if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
         return  # one attempt per version — no overnight crash loops

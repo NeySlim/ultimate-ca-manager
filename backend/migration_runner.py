@@ -34,6 +34,11 @@ Numbered from 300. Every migration is multi-backend:
 
 Files and packages whose name starts with ``_`` are not migrations.
 
+A migration only adds to what the release before it reads or writes (CONTRIBUTING.md,
+"Migrations and rolling updates"). One that removes or narrows sets ``requires_full_stop = "<why>"``
+(``migration_marks``): in HA the runner refuses to apply it while another node beats fresh on
+another version, and a rolling update refuses the release before installing anything.
+
 Public API
 ----------
 - `run_all_migrations(dry_run=False, verbose=False)`
@@ -49,6 +54,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text, inspect
 
+from migration_marks import full_stop_reason
 from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
 
 
@@ -150,6 +156,138 @@ def pivot_refusal(state, applied):
     return (f"This database was last started by a release older than {PIVOT_VERSION} ({what}). "
             f"Install {PIVOT_VERSION}, start it once, then upgrade. Nothing was changed: "
             f"{PIVOT_VERSION} still starts on this database.")
+
+
+# ---------------------------------------------------------------------------
+# Full stop: a marked migration waits until no node of another version beats
+# ---------------------------------------------------------------------------
+
+def _instant(value):
+    from datetime import datetime
+    return datetime.fromisoformat(value) if isinstance(value, str) else value
+
+
+FULL_STOP_POLL_SECONDS = 5
+FULL_STOP_LOG_SECONDS = 15
+# Past the stale window: the last beat of a killed node has aged out by then
+FULL_STOP_MARGIN_SECONDS = 15
+
+
+def _stale_seconds():
+    from services.scheduler_leader import STALE_PASSES
+    from services.scheduler_service import WAKE_INTERVAL_SECONDS
+    return STALE_PASSES * WAKE_INTERVAL_SECONDS
+
+
+def _full_stop_hold(engine, pending):
+    """({marked migration: reason}, ["node (version)"...]): HA, the marked migrations among
+    *pending*, and the other nodes beating fresh on another version that hold them."""
+    from utils.ha import ha_enabled
+    if not ha_enabled():
+        return {}, []
+    marked = {n: r for n in pending if (r := full_stop_reason(MIGRATIONS_DIR / f"{n}.py"))}
+    if not marked or "cluster_nodes" not in inspect(engine).get_table_names():
+        return marked, []
+    from config.settings import Config
+    from services.scheduler_leader import cluster_utc_now
+    from services.updates import versions_match
+    own, stale = Config.APP_VERSION, _stale_seconds()
+    with engine.connect() as conn:
+        now = cluster_utc_now(conn)
+        rows = conn.execute(text("SELECT node_id, version, heartbeat_at, pid FROM cluster_nodes")).fetchall()
+    # This node's own row still holds the version it ran before this start; pid NULL: stopped cleanly
+    others = sorted(f"{node} ({version or 'unknown version'})" for node, version, beat, pid in rows
+                    if node != Config.NODE_ID and beat is not None and pid is not None
+                    and (now - _instant(beat)).total_seconds() <= stale
+                    and not (versions_match(version, own) or versions_match(own, version)))
+    return marked, others
+
+
+def full_stop_refusal(engine, pending):
+    """None, or why this node may not apply *pending* now: HA, a pending migration marked
+    requires_full_stop, and another node with a fresh heartbeat on another version."""
+    from config.settings import Config
+    marked, others = _full_stop_hold(engine, pending)
+    if not others:
+        return None
+    first = sorted(marked)[0]
+    more = f" (and {len(marked) - 1} more)" if len(marked) > 1 else ""
+    return (f"Migration {first}{more} requires every node stopped: {marked[first]}. "
+            f"Still running with a fresh heartbeat: {', '.join(others)}. Stop every node, then "
+            f"start them on {Config.APP_VERSION}; a node stopped cleanly counts as gone at once, "
+            f"one that was killed {_stale_seconds()}s after its last heartbeat. Nothing was changed.")
+
+
+def _full_stop_holders_now():
+    """The nodes holding a pending marked migration now, on a connection closed on return;
+    [] when anything else is in the way (run_all_migrations then says what)."""
+    from utils.ha import ha_enabled
+    if not ha_enabled():
+        return []
+    db_url = _get_db_url()
+    try:
+        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
+                               connect_args=postgres_connect_args(db_url))
+    except Exception:
+        return []
+    try:
+        state, applied = _get_state(engine)
+        if state != "tracked" or pivot_refusal(state, applied):
+            return []
+        return _full_stop_hold(engine, [n for n in _list_migration_names() if n not in applied])[1]
+    except Exception:
+        return []
+    finally:
+        engine.dispose()
+
+
+def wait_for_full_stop(clock=None, sleep=None):
+    """Before the startup lock: while other nodes hold a pending marked migration, wait at most
+    the stale window plus a margin (a killed node ages out), logging them every 15s, holding no
+    connection between polls. Returns the nodes still holding it, [] to go on."""
+    import time
+    clock, sleep = clock or time.monotonic, sleep or time.sleep
+    start = clock()
+    deadline, next_log = start + _stale_seconds() + FULL_STOP_MARGIN_SECONDS, start
+    while True:
+        holders = _full_stop_holders_now()
+        now = clock()
+        if not holders or now >= deadline:
+            return holders
+        if now >= next_log:
+            say(f"Waiting for {', '.join(holders)} to stop before a migration that requires every "
+                f"node stopped: at most {deadline - now:.0f}s more")
+            next_log = now + FULL_STOP_LOG_SECONDS
+        sleep(min(FULL_STOP_POLL_SECONDS, deadline - now))
+
+
+def run_at_startup(lock, clock=None, sleep=None) -> bool:
+    """create_app: the full-stop wait outside the startup lock, then the migrations under it."""
+    wait_for_full_stop(clock=clock, sleep=sleep)
+    with lock(_get_db_url()):
+        return run_all_migrations(dry_run=False, verbose=False)
+
+
+def mark_node_stopped(node_id=None) -> None:
+    """HA, gunicorn master on exit, once its workers and scheduler process are gone: the node's
+    row keeps its last heartbeat with pid NULL, which _full_stop_hold reads as stopped."""
+    from utils.ha import ha_enabled
+    if not ha_enabled():
+        return
+    from config.settings import Config
+    db_url = _get_db_url()
+    try:
+        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
+                               connect_args=postgres_connect_args(db_url))
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE cluster_nodes SET pid = NULL WHERE node_id = :n"),
+                             {"n": node_id or Config.NODE_ID})
+        finally:
+            engine.dispose()
+    except Exception as exc:
+        say(f"Node not marked stopped in cluster_nodes ({type(exc).__name__}): a node that "
+            f"starts a full-stop migration waits up to {_stale_seconds()}s for this one")
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +401,13 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
+        try:
+            refusal = full_stop_refusal(engine, pending)
+        except ValueError as exc:
+            refusal = str(exc)
+        if refusal:
+            say(f"✗ {refusal}")
+            return False
         serial_replay = UPGRADE_MIGRATION in applied and _serial_steps_pending(engine)
         # Pass the SQLite path derived from db_url so DATABASE_URL stays the
         # single source of truth (avoids DATABASE_URL/DATABASE_PATH mismatch).
@@ -490,6 +635,13 @@ def show_status():
             say(f"Refused: {refusal}")
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
+        if not refusal:
+            try:
+                held = full_stop_refusal(engine, pending)
+            except ValueError as exc:
+                held = str(exc)
+            if held:
+                say(f"Refused: {held}")
         say(f"Applied: {len(applied)}")
         say(f"Pending: {len(pending)}")
         for n in sorted(applied):

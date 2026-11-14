@@ -18,8 +18,9 @@ SHA = 'ab' * 32
 
 
 DEB = {'download_url': 'https://x/p.deb', 'package_name': 'p.deb', 'sha256': SHA}
+MANIFEST = {'name': 'full-stop-migrations.json', 'browser_download_url': 'https://x/full-stop-migrations.json'}
 ASSETS = [{'name': 'p.deb', 'browser_download_url': 'https://x/p.deb'},
-          {'name': 'p.deb.sha256', 'browser_download_url': 'https://x/p.deb.sha256'}]
+          {'name': 'p.deb.sha256', 'browser_download_url': 'https://x/p.deb.sha256'}, MANIFEST]
 
 
 def _node(started_ago, beat_ago, version, now=T0, family='deb'):
@@ -142,9 +143,15 @@ def ha(app, monkeypatch, tmp_path):
     monkeypatch.setattr(updates, 'DATA_DIR', tmp_path)
     monkeypatch.setattr(updates, 'package_family', lambda: 'deb')
     monkeypatch.setattr(updates, 'fetch_expected_sha256', lambda url, name: SHA)
+    monkeypatch.setattr(updates, 'fetch_full_stop_marks', lambda url: dict(FULL_STOP))
+    FULL_STOP.clear()
     _clean(app)
     yield
     _clean(app)
+
+
+# What the release's full-stop manifest names, per test
+FULL_STOP = {}
 
 
 def _rows(app, **versions):
@@ -191,6 +198,78 @@ def test_a_campaign_without_a_checksum_is_refused(app, ha):
     ok, message, _ = _start(app, assets=ASSETS[:1])
     assert not ok and 'SHA-256' in message
     assert _state(app) is None
+
+
+def test_a_release_whose_pending_migration_needs_a_full_stop_is_refused_before_any_install(
+        app, ha, no_install):
+    _rows(app, a='3.0', b='3.0')
+    FULL_STOP['399_drop_relay_payload'] = 'the relay payload moved to Redis'
+    ok, message, _ = _start(app)
+    assert not ok
+    assert '399_drop_relay_payload' in message and 'the relay payload moved to Redis' in message
+    assert 'every node stopped' in message and 'Nothing was installed' in message
+    assert _state(app) is None and _commands(app) == []
+
+
+@pytest.fixture
+def registry(app):
+    """The app database's own _migrations (the in-memory test database has none): names added."""
+    from sqlalchemy import inspect, text
+    from models import db
+    names = []
+    with app.app_context():
+        created = not inspect(db.engine).has_table('_migrations')
+        db.session.execute(text("CREATE TABLE IF NOT EXISTS _migrations (id INTEGER PRIMARY KEY, "
+                                "name VARCHAR(255) NOT NULL UNIQUE)"))
+        db.session.commit()
+    yield names.append
+    with app.app_context():
+        for name in names:
+            db.session.execute(text("DELETE FROM _migrations WHERE name = :n"), {'n': name})
+        if created:
+            db.session.execute(text("DROP TABLE _migrations"))
+        db.session.commit()
+
+
+def test_a_marked_migration_already_applied_lets_the_campaign_start(app, ha, registry):
+    from sqlalchemy import text
+    from models import db
+    with app.app_context():
+        db.session.execute(text("INSERT INTO _migrations (name) VALUES ('399_applied_here')"))
+        db.session.commit()
+    registry('399_applied_here')
+    _rows(app, a='3.0', b='3.0')
+    FULL_STOP['399_applied_here'] = 'applied by the first node of an earlier full stop'
+    ok, message, _ = _start(app)
+    assert ok, message
+
+
+def test_a_release_without_the_manifest_is_refused(app, ha):
+    _rows(app, a='3.0', b='3.0')
+    ok, message, _ = _start(app, assets=ASSETS[:2])
+    assert not ok and 'full-stop-migrations.json' in message
+    assert _state(app) is None
+
+
+def test_a_manifest_that_cannot_be_read_is_refused(app, ha, monkeypatch):
+    def broken(url):
+        raise ValueError('not JSON')
+    monkeypatch.setattr(updates, 'fetch_full_stop_marks', broken)
+    _rows(app, a='3.0', b='3.0')
+    ok, message, _ = _start(app)
+    assert not ok and 'full-stop-migrations.json' in message and 'not JSON' in message
+    assert _state(app) is None
+
+
+def test_the_install_route_says_why_a_full_stop_is_needed(app, auth_client, ha, monkeypatch, no_install):
+    monkeypatch.delenv('UCM_DOCKER', raising=False)
+    monkeypatch.setattr(updates, 'check_for_updates', lambda **k: _release())
+    _rows(app, a='3.0', b='3.0')
+    FULL_STOP['399_drop_relay_payload'] = 'the relay payload moved to Redis'
+    r = auth_client.post('/api/v2/system/updates/install', json={})
+    assert r.status_code == 409, r.data
+    assert '399_drop_relay_payload' in r.get_json()['detail']
+    assert _state(app) is None and _commands(app) == []
 
 
 def test_a_second_campaign_while_one_runs_is_refused(app, ha):
