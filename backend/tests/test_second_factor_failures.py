@@ -453,6 +453,25 @@ def test_a_disable_refused_before_any_code_is_checked_uses_no_attempt(nodes):
     assert _totp_still_on(a, user)
 
 
+def test_confirming_a_confirmed_totp_checks_no_code(nodes):
+    """The confirmation of an enrolment is no third way to try codes of the login's secret,
+    nor to draw fresh recovery codes with one."""
+    a, b, user = nodes
+    c, headers = _open_session(a, user)
+    with a.app_context():
+        before = db.session.get(User, user['id']).backup_codes
+        db.session.remove()
+    refused = (409, '2FA is already enabled; disable it first')
+    for code in ['00000000'] * (_max_attempts(a)[0] + 1) + [_right_value(user, 'code')]:
+        r = c.post('/api/v2/account/2fa/confirm', json={'code': code}, headers=headers)
+        assert (r.status_code, r.get_json()['message']) == refused
+        assert 'backup_codes' not in (r.get_json().get('data') or {})
+    with a.app_context():
+        assert db.session.get(User, user['id']).backup_codes == before
+        db.session.remove()
+    assert ('2fa', str(user['id'])) not in _rows(b)
+
+
 def test_a_code_checked_against_an_unconfirmed_secret_uses_no_attempt(nodes):
     """A TOTP enrolment not confirmed yet is no factor of the login: its codes are not counted."""
     a, b, user = nodes
