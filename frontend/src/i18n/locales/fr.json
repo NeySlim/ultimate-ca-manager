@@ -1085,8 +1085,8 @@
     "stopEnforcingUniqueSubject": "Ne plus imposer",
     "uniqueSubjectChanged": "Réglage du sujet unique mis à jour",
     "uniqueSubjectChangeFailed": "Le réglage du sujet unique n'a pas pu être mis à jour",
-    "uniqueSubjectShared_one": "{{count}} sujet est déjà porté par plusieurs entités : {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : toute émission suivante de ce sujet demande une dérogation, renouvellements de ses certificats compris",
-    "uniqueSubjectShared_other": "{{count}} sujets sont déjà portés par plusieurs entités, dont {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : toute émission suivante de ces sujets demande une dérogation, renouvellements de leurs certificats compris"
+    "uniqueSubjectShared_one": "{{count}} sujet est déjà porté par plusieurs entités : {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : les renouvellements de ses certificats sont refusés tels quels, seules une émission manuelle ou une signature de CSR de ce sujet passent, avec la dérogation",
+    "uniqueSubjectShared_other": "{{count}} sujets sont déjà portés par plusieurs entités, dont {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : les renouvellements de leurs certificats sont refusés tels quels, seules une émission manuelle ou une signature de CSR de ces sujets passent, avec la dérogation"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",

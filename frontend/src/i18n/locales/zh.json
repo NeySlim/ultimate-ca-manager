@@ -1128,8 +1128,8 @@
     "stopEnforcingUniqueSubject": "Stop enforcing",
     "uniqueSubjectChanged": "Unique subject setting updated",
     "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
-    "uniqueSubjectShared_one": "{{count}} subject is already carried by several entities: {{examples}}. Nothing tells which one a new certificate is for, so every later issuance of it asks for an override, renewals of its certificates included",
-    "uniqueSubjectShared_other": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for, so every later issuance of them asks for an override, renewals of their certificates included"
+    "uniqueSubjectShared_one": "{{count}} subject is already carried by several entities: {{examples}}. Nothing tells which one a new certificate is for: renewals of its certificates are refused as they are, and only a manual issuance or a CSR signing of it goes through, with the override",
+    "uniqueSubjectShared_other": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for: renewals of their certificates are refused as they are, and only a manual issuance or a CSR signing of them goes through, with the override"
   },
   "csrs": {
     "uploadCSR": "上传CSR",

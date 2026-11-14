@@ -589,10 +589,11 @@ certificate of another entity already carries under it, whatever its status (RFC
 see the user guide for what makes the same entity). The CA object reads it back as
 `enforce_unique_subject`, and the change is audited. The answer that turns it on carries
 `shared_subjects`, the number of subjects certificates of the CA already carry for more than one
-entity, and `shared_subject_examples`, the first 20 of them in issuance order:
-`[{"subject": "CN=…", "serial_numbers": ["…", "…"]}]`. Those certificates stay; every later
-issuance of such a subject, the renewal (in place or automatic) of any of its certificates
-included, is refused unless the override below is sent.
+entity (rows joined by a shared key, lineage, recorded identity or SID being one entity), and
+`shared_subject_examples`, the first 20 of them in issuance order:
+`[{"subject": "CN=…", "serial_numbers": ["…", "…"]}]`. Those certificates stay. A renewal of any
+of them (in place, automatic or by a protocol) is refused as it is; only a manual issuance or a
+CSR signing of such a subject goes through, with the override below.
 
 With the option on, `POST /api/v2/certificates` and `POST /api/v2/csrs/{id}/sign` answer `409`
 when the subject is taken, with `details` `{"subject", "serial_number", "override_field":
