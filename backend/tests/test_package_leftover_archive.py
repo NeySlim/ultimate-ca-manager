@@ -104,9 +104,12 @@ class Box:
                          f'[ "$n" != {at} ] || {{ echo "{name}: injected failure" >&2; exit 1; }}\n')
             run = f'exec {REAL[name]} "$@"'
             if name == 'cp' and corrupt_copies:
-                # Reports success over a copy that differs: a key gains a byte
+                # Reports success over a copy that differs: a key gains a byte, or loses
+                # the mode or the date of its source
+                harm = {'mode': 'chmod 0604 "$1"', 'date': 'touch -d @5 "$1"'}.get(
+                    corrupt_copies, 'printf x >> "$1"')
                 run = (f'{REAL[name]} "$@" || exit 1\nfor last; do :; done\n'
-                       'find "$last" -name "*.key" -type f -exec sh -c \'printf x >> "$1"\' sh {} \\;')
+                       f'find "$last" -name "*.key" -type f -exec sh -c \'{harm}\' sh {{}} \\;')
             (self.bin / name).write_text(f'#!/bin/sh\n{check}{run}\n')
         cases = ''.join(f'    "{p}"|"{p}"/*) echo {700 + i}; exit 0 ;;\n'
                         for i, p in enumerate(sorted(other_fs, key=lambda p: -len(str(p)))))
@@ -550,10 +553,11 @@ def test_the_next_attempt_after_a_complete_roll_back_starts_over(tmp_path):
     assert files(box.archive / 'data') == data
 
 
-def test_a_copy_that_differs_from_its_source_is_never_kept_in_its_place(tmp_path):
+@pytest.mark.parametrize('differs', ['content', 'mode', 'date'])
+def test_a_copy_that_differs_from_its_source_is_never_kept_in_its_place(tmp_path, differs):
     box = Box(tmp_path, python='stub')
     before = snapshot(box)
-    box.wrap(other_fs=(box.data,), corrupt_copies=True)
+    box.wrap(other_fs=(box.data,), corrupt_copies=differs)
     out = box.run()
     assert out.returncode == 1, out.stdout
     assert snapshot(box) == before
