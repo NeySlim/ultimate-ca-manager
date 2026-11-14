@@ -452,7 +452,7 @@ def _backup_schedule():
 
 
 @detector('backup.archives_argon2id', WARNING,
-          'Backup archives on disk encrypted with Argon2id: they cannot be restored in FIPS mode',
+          'Backup archives encrypted with Argon2id: they cannot be restored in FIPS mode',
           'Keep them for a standard instance, and take a manual backup with kdf "pbkdf2" '
           'before the switch.')
 def _backup_archives():

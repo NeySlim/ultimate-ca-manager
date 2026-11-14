@@ -3574,7 +3574,7 @@
           "remedy": "Réglez la KDF des sauvegardes planifiées sur PBKDF2, et faites une sauvegarde manuelle avec kdf \"pbkdf2\" avant la bascule."
         },
         "backup_archives_argon2id": {
-          "title": "Archives de sauvegarde sur disque chiffrées avec Argon2id : elles ne peuvent pas être restaurées en mode FIPS",
+          "title": "Archives de sauvegarde chiffrées avec Argon2id : elles ne peuvent pas être restaurées en mode FIPS",
           "remedy": "Conservez-les pour une instance standard, et faites une sauvegarde manuelle avec kdf \"pbkdf2\" avant la bascule."
         },
         "database_postgres_without_tls": {

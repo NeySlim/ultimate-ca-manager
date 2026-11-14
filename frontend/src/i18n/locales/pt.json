@@ -3428,7 +3428,7 @@
           "remedy": "Defina a KDF do backup agendado como PBKDF2 e faça um backup manual com kdf \"pbkdf2\" antes da mudança."
         },
         "backup_archives_argon2id": {
-          "title": "Arquivos de backup em disco cifrados com Argon2id: não podem ser restaurados no modo FIPS",
+          "title": "Arquivos de backup cifrados com Argon2id: não podem ser restaurados no modo FIPS",
           "remedy": "Mantenha-os para uma instância padrão e faça um backup manual com kdf \"pbkdf2\" antes da mudança."
         },
         "database_postgres_without_tls": {

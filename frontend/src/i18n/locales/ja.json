@@ -3428,7 +3428,7 @@
           "remedy": "スケジュールバックアップの KDF を PBKDF2 に設定し、切り替え前に kdf \"pbkdf2\" で手動バックアップを取得してください。"
         },
         "backup_archives_argon2id": {
-          "title": "ディスク上の Argon2id で暗号化されたバックアップアーカイブ：FIPS モードでは復元できません",
+          "title": "Argon2id で暗号化されたバックアップアーカイブ：FIPS モードでは復元できません",
           "remedy": "標準のインスタンス用に保管し、切り替え前に kdf \"pbkdf2\" で手動バックアップを取得してください。"
         },
         "database_postgres_without_tls": {

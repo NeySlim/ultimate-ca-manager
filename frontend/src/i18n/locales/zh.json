@@ -3428,7 +3428,7 @@
           "remedy": "请将计划备份的 KDF 设为 PBKDF2，并在切换前使用 kdf \"pbkdf2\" 手动备份一次。"
         },
         "backup_archives_argon2id": {
-          "title": "磁盘上使用 Argon2id 加密的备份归档：它们在 FIPS 模式下无法恢复",
+          "title": "使用 Argon2id 加密的备份归档：它们在 FIPS 模式下无法恢复",
           "remedy": "请将其保留给标准实例使用，并在切换前使用 kdf \"pbkdf2\" 手动备份一次。"
         },
         "database_postgres_without_tls": {

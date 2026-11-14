@@ -3428,7 +3428,7 @@
           "remedy": "Das KDF der geplanten Sicherung auf PBKDF2 setzen und vor dem Umschalten eine manuelle Sicherung mit kdf \"pbkdf2\" erstellen."
         },
         "backup_archives_argon2id": {
-          "title": "Auf dem Datenträger liegende Sicherungsarchive mit Argon2id-Verschlüsselung: Sie lassen sich im FIPS-Modus nicht wiederherstellen",
+          "title": "Sicherungsarchive mit Argon2id-Verschlüsselung: Sie lassen sich im FIPS-Modus nicht wiederherstellen",
           "remedy": "Für eine Standardinstanz aufbewahren und vor dem Umschalten eine manuelle Sicherung mit kdf \"pbkdf2\" erstellen."
         },
         "database_postgres_without_tls": {

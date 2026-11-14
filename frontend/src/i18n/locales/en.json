@@ -3429,7 +3429,7 @@
           "remedy": "Set the scheduled backup KDF to PBKDF2, and take a manual backup with kdf \"pbkdf2\" before the switch."
         },
         "backup_archives_argon2id": {
-          "title": "Backup archives on disk encrypted with Argon2id: they cannot be restored in FIPS mode",
+          "title": "Backup archives encrypted with Argon2id: they cannot be restored in FIPS mode",
           "remedy": "Keep them for a standard instance, and take a manual backup with kdf \"pbkdf2\" before the switch."
         },
         "database_postgres_without_tls": {

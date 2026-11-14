@@ -3428,7 +3428,7 @@
           "remedy": "Imposta il KDF dei backup pianificati su PBKDF2 ed esegui un backup manuale con kdf \"pbkdf2\" prima del passaggio."
         },
         "backup_archives_argon2id": {
-          "title": "Archivi di backup su disco cifrati con Argon2id: non possono essere ripristinati in modalità FIPS",
+          "title": "Archivi di backup cifrati con Argon2id: non possono essere ripristinati in modalità FIPS",
           "remedy": "Conservali per un'istanza standard ed esegui un backup manuale con kdf \"pbkdf2\" prima del passaggio."
         },
         "database_postgres_without_tls": {
