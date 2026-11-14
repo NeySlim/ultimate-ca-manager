@@ -11,6 +11,7 @@ class ClusterNode(db.Model):
     heartbeat_at = db.Column(db.DateTime, nullable=False)
     is_leader = db.Column(db.Boolean, nullable=False, default=False)
     version = db.Column(db.String(32))
+    # NULL once the node stopped cleanly (gunicorn on_exit): a full-stop migration does not wait for it
     pid = db.Column(db.Integer)
     # deb, rpm-el9, rpm-fedora, container or unknown: the package a rolling update gives this node
     package_family = db.Column(db.String(32))

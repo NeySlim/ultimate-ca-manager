@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
+from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
 
@@ -117,7 +118,7 @@ def cluster(request, tmp_path, monkeypatch):
         yield db
 
 
-def _beat(db, node, version, age=5):
+def _beat(db, node, version, age=5, pid=4242):
     with db.engine.begin() as conn:
         now = (conn.execute(text("SELECT clock_timestamp() AT TIME ZONE 'UTC'")).scalar()
                if db.dialect == 'postgresql' else None)
@@ -126,8 +127,10 @@ def _beat(db, node, version, age=5):
         now = utc_now()
     at = now - timedelta(seconds=age)
     with db.engine.begin() as conn:
-        conn.execute(text("INSERT INTO cluster_nodes (node_id, started_at, heartbeat_at, is_leader, version) "
-                          "VALUES (:n, :at, :at, :f, :v)"), {'n': node, 'at': at, 'f': False, 'v': version})
+        conn.execute(text("DELETE FROM cluster_nodes WHERE node_id = :n"), {'n': node})
+        conn.execute(text("INSERT INTO cluster_nodes (node_id, started_at, heartbeat_at, is_leader, version, pid) "
+                          "VALUES (:n, :at, :at, :f, :v, :p)"),
+                     {'n': node, 'at': at, 'f': False, 'v': version, 'p': pid})
 
 
 def _pending(db, body=MARKED, name='301_probe'):
@@ -169,6 +172,132 @@ def test_a_marked_migration_applies_once_no_other_version_beats(cluster, monkeyp
     assert _applied(cluster)
 
 
+def test_a_node_stopped_cleanly_lets_the_next_start_apply_at_once(cluster):
+    """Stop every node, upgrade one, start it: the others' rows are fresh but say stopped."""
+    import migration_runner
+    _beat(cluster, 'node-a', '3.0')
+    cluster._route()
+    migration_runner.mark_node_stopped('node-a')
+    assert cluster.run("SELECT pid FROM cluster_nodes WHERE node_id = 'node-a'") == [(None,)]
+    _pending(cluster)
+    assert cluster.upgrade() is True
+    assert _applied(cluster)
+
+
+_ON_EXIT = r'''
+import boot_config
+boot_config.wstep_enabled = lambda data_path: False
+boot_config.mtls_client_ca = lambda data_path: None
+import gunicorn_config
+import scheduler_supervisor
+from sqlalchemy import create_engine, text
+
+engine = create_engine(__import__('os').environ['DATABASE_URL'])
+
+
+def stop():
+    # The scheduler process writes its last heartbeat while it stops: the mark comes after it
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE cluster_nodes SET pid = 7 WHERE node_id = 'node-a'"))
+scheduler_supervisor.supervisor.stop = stop
+gunicorn_config.on_exit(None)
+with engine.connect() as conn:
+    print(conn.execute(text("SELECT pid FROM cluster_nodes WHERE node_id = 'node-a'")).scalar())
+'''
+
+
+def test_the_gunicorn_master_marks_its_node_stopped_on_exit(tmp_path, monkeypatch):
+    backend = str(ROOT / 'backend')
+    for db in make_base('sqlite', tmp_path, monkeypatch, 'exit'):
+        assert db.upgrade()
+        _beat(db, 'node-a', '3.0')
+        (tmp_path / 'etc').mkdir()
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        env.update(DATA_DIR=str(tmp_path), UCM_BASE_PATH=str(tmp_path), UCM_CONFIG_DIR=str(tmp_path / 'etc'),
+                   PYTHONPATH=backend, UCM_HA='1', UCM_NODE_ID='node-a', DATABASE_URL=db.url,
+                   DATABASE_PATH=db.sqlite_path)
+        run = subprocess.run([sys.executable, '-c', _ON_EXIT], cwd=backend, env=env,
+                             capture_output=True, text=True, timeout=60)
+        assert run.returncode == 0, run.stderr
+        assert run.stdout.strip().splitlines()[-1] == 'None'
+
+
+class _Time:
+    """The monotonic clock and sleep of the wait; while it sleeps, node-a either beats on
+    (alive) or ages (killed), and no engine the runner opened may hold a connection."""
+
+    def __init__(self, db, monkeypatch, killed):
+        import migration_runner
+        self.db, self.killed, self.t, self.engines = db, killed, 0.0, []
+        self.locked = False
+        made = migration_runner.create_engine
+
+        def record(*a, **k):
+            engine = made(*a, **k)
+            self.engines.append(engine)
+            return engine
+        monkeypatch.setattr(migration_runner, 'create_engine', record)
+
+    def __call__(self):
+        return self.t
+
+    def sleep(self, seconds):
+        assert 0 < seconds <= 15 and not self.locked
+        assert all(e.pool.checkedout() == 0 and e.pool.checkedin() == 0 for e in self.engines)
+        self.t += seconds
+        assert self.t < 600, 'the wait is not bounded'
+        _beat(self.db, 'node-a', '3.0', age=5 + self.t if self.killed else 5)
+
+
+def _waits(out):
+    return [line for line in out.splitlines() if line.startswith('Waiting')]
+
+
+def test_a_killed_node_is_waited_for_then_the_migration_applies(cluster, monkeypatch, capsys):
+    import migration_runner
+    _beat(cluster, 'node-a', '3.0')
+    _pending(cluster)
+    cluster._route()
+    clock = _Time(cluster, monkeypatch, killed=True)
+
+    @contextmanager
+    def lock(url):
+        clock.locked = True
+        yield
+        clock.locked = False
+    assert migration_runner.run_at_startup(lock, clock=clock, sleep=clock.sleep) is True
+    assert 170 <= clock.t <= 185
+    waits = _waits(capsys.readouterr().out)
+    assert 11 <= len(waits) <= 13 and all('node-a (3.0)' in w for w in waits)
+    assert _applied(cluster)
+
+
+def test_a_live_node_of_another_version_is_refused_after_the_wait(cluster, monkeypatch, capsys):
+    import migration_runner
+    from services.scheduler_leader import STALE_PASSES
+    from services.scheduler_service import WAKE_INTERVAL_SECONDS
+    _beat(cluster, 'node-a', '3.0')
+    _pending(cluster)
+    cluster._route()
+    clock = _Time(cluster, monkeypatch, killed=False)
+    assert migration_runner.wait_for_full_stop(clock=clock, sleep=clock.sleep) == ['node-a (3.0)']
+    stale = STALE_PASSES * WAKE_INTERVAL_SECONDS
+    assert stale <= clock.t <= stale + migration_runner.FULL_STOP_MARGIN_SECONDS
+    assert all('node-a (3.0)' in w for w in _waits(capsys.readouterr().out))
+    assert cluster.upgrade() is False
+    assert not _applied(cluster)
+
+
+def test_nothing_is_waited_for_without_a_holder(cluster, monkeypatch):
+    import migration_runner
+    _beat(cluster, 'node-a', '3.0', age=3600)
+    _pending(cluster)
+    cluster._route()
+    clock = _Time(cluster, monkeypatch, killed=True)
+    assert migration_runner.wait_for_full_stop(clock=clock, sleep=clock.sleep) == []
+    assert clock.t == 0
+
+
 def test_a_mark_that_cannot_be_read_refuses_the_start_in_ha(cluster, capsys):
     _pending(cluster, MARKED.replace(f'requires_full_stop = "{REASON}"', 'requires_full_stop = True'))
     assert cluster.upgrade() is False
@@ -194,3 +323,6 @@ def test_the_ha_guide_names_the_asset_and_the_delay_the_code_uses():
     assert f'`{migration_marks.FULL_STOP_ASSET}`' in upgrading
     assert STALE_PASSES * WAKE_INTERVAL_SECONDS == 180 and 'three minutes' in upgrading
     assert 'The move from 2.x to 3.0 is a full stop' in upgrading
+    import migration_runner
+    assert (migration_runner.FULL_STOP_LOG_SECONDS, migration_runner.FULL_STOP_MARGIN_SECONDS) == (15, 15)
+    assert 'every 15 seconds' in upgrading and 'three minutes and 15 seconds' in upgrading

@@ -275,6 +275,9 @@ def on_reload(server):
 def on_exit(server):
     from scheduler_supervisor import supervisor
     supervisor.stop()
+    # After the scheduler process's last heartbeat: a full-stop migration need not wait for this node
+    from migration_runner import mark_node_stopped
+    mark_node_stopped()
 
 def worker_int(worker):
     worker.log.info("Worker received INT or QUIT signal")
