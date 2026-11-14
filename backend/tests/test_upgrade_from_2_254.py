@@ -470,6 +470,29 @@ def test_an_upgrade_interrupted_after_any_step_ends_in_the_same_state(dialect, t
             assert changed == {}, f'interrupted after {STEPS[count - 1]}'
 
 
+def test_a_start_cut_after_the_profiles_table_ends_with_the_2254_identity(dialect, tmp_path, monkeypatch):
+    """SQLite commits the DDL of step 155 apart: a start cut there leaves the table empty; the next
+    start makes the default profile with the identity 2.254 served, and a further start keeps it."""
+    from migrations._from_2_254 import STEPS, step
+    from utils.policy_identity import derived_oid_root, derived_policy_id
+    for db in make_base(dialect, tmp_path, monkeypatch, 'cut155'):
+        populate(db)
+        _interrupt_after(db, STEPS.index('155_windows_enrollment_profiles'))
+        ddl = step('155_windows_enrollment_profiles')
+        with db.engine.begin() as conn:
+            from sqlalchemy import text
+            for sql in (ddl._SQLITE_DDL if dialect == 'sqlite' else ddl._PG_DDL) + ddl._INDEXES:
+                conn.execute(text(sql))
+        assert db.run("SELECT COUNT(*) FROM windows_enrollment_profiles") == [(0,)]
+        assert db.upgrade()
+        served = [(True, derived_policy_id('ca-a'), derived_oid_root('ca-a'))]
+        query = "SELECT is_default, policy_id, policy_oid_root FROM windows_enrollment_profiles"
+        assert db.run(query) == served
+        db.run("DELETE FROM _migrations WHERE name = '300_upgrade_from_2_254'")
+        assert db.upgrade()
+        assert db.run(query) == served
+
+
 # --- Pivot guard ------------------------------------------------------------------------------
 
 def _untouched(db):

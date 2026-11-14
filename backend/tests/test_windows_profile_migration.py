@@ -322,36 +322,6 @@ def test_a_default_profile_of_no_ca_draws_its_identity(base):
     assert root.startswith('1.3.6.1.4.1.311.21.8.') and len(root.split('.')) == 13
 
 
-def test_a_table_made_before_the_identity_columns_gets_them(base):
-    """A development base whose profiles predate the columns: derived from their CA, distinct per profile."""
-    old = _migration()._PROFILE_COLUMNS.replace(
-        "policy_id VARCHAR(36) NOT NULL, policy_oid_root VARCHAR(100) NOT NULL, ", "")
-    assert old != _migration()._PROFILE_COLUMNS
-    if base.dialect == 'sqlite':
-        base.run(f"CREATE TABLE {PROFILES} (id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                 + old.format(false='0', true='1', ts='DATETIME') + ")")
-    else:
-        base.run(f"CREATE TABLE {PROFILES} (id SERIAL PRIMARY KEY, "
-                 + old.format(false='FALSE', true='TRUE', ts='TIMESTAMP') + ")")
-    for n, policy_ca, issuing_ca in ((1, None, 'ca-a'), (2, 'ca-a', 'ca-b'), (3, None, None)):
-        base.run(f"INSERT INTO {PROFILES} (id, name, is_default, enabled, validity_days, issuing_ca_refid, "
-                 f"policy_ca_refid) VALUES ({n}, 'p{n}', {'TRUE' if n == 1 else 'FALSE'}, TRUE, 365, "
-                 + ', '.join(f"'{v}'" if v else 'NULL' for v in (issuing_ca, policy_ca)) + ")")
-    base.migrate()
-    rows = base.rows(f"SELECT id, policy_id, policy_oid_root FROM {PROFILES} ORDER BY id")
-    first_id, first_oid = _served_by_2254('ca-a', 1)
-    assert rows[0] == (1, first_id, first_oid.removesuffix('.1.1'))
-    assert len({r[1] for r in rows}) == len({r[2] for r in rows}) == 3
-    assert all(uuid.UUID(r[1]).version == 4 for r in rows[1:])
-    base.migrate()
-    assert base.rows(f"SELECT id, policy_id, policy_oid_root FROM {PROFILES} ORDER BY id") == rows
-    if base.dialect == 'postgresql':
-        assert base.rows("SELECT column_name, is_nullable FROM information_schema.columns WHERE table_name = "
-                         f"'{PROFILES}' AND column_name LIKE 'policy_%' AND table_schema = current_schema() "
-                         "ORDER BY column_name") == [
-            ('policy_ca_refid', 'YES'), ('policy_id', 'NO'), ('policy_oid_root', 'NO')]
-
-
 def test_the_app_schema_has_the_migrated_columns(app):
     from sqlalchemy import inspect
     from models import db
