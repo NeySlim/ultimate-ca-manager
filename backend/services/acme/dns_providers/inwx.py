@@ -102,10 +102,10 @@ class InwxDnsProvider(BaseDnsProvider):
     
     def _generate_totp(self, secret: str) -> str:
         """Generate TOTP code from shared secret"""
-        # Base32 decode the secret
+        # Base32 decode the secret, padded to a multiple of 8 characters (none when it is one)
         import base64
         try:
-            key = base64.b32decode(secret.upper() + '=' * (8 - len(secret) % 8))
+            key = base64.b32decode(secret.upper() + '=' * (-len(secret) % 8))
         except Exception:
             key = secret.encode()
         
