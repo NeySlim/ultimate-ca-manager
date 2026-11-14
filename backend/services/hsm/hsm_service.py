@@ -703,7 +703,8 @@ class HsmService:
         
         if key.purpose not in ('signing', 'all'):
             raise ValueError(f"Key {key.label} is not for signing")
-        # A key bound before the switch or restored from a backup must not sign in FIPS mode
+        # The HSM signs, not the module: a key bound before the switch or restored after it
+        # signs in FIPS mode only if every module approves its algorithm
         cls.refuse_signing_in_fips_mode(key)
         registered = cls._registered_algorithm(key)
         pure = registered is not None and not registered.needs_digest

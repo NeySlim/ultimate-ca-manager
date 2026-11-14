@@ -721,6 +721,12 @@ class TestPreflight:
                 db.session.delete(provider)
                 db.session.commit()
 
+    def test_hsm_brainpool_keys_are_listed(self, hsm_signing_key, fips_on):
+        from services import fips_preflight
+        key = hsm_signing_key('EC-BP256', _pem(ec.generate_private_key(ec.BrainpoolP256R1()).public_key()))
+        found = fips_preflight._hsm_keys()
+        assert f'{key.label} (#{key.id}): EC-BP256' in found, found
+
     def test_ssh_and_hsm_detectors(self, monkeypatch, fips_on):
         from services import fips_preflight
         _module(monkeypatch, ())
@@ -835,3 +841,4 @@ class TestHsmSignApiInFipsMode:
         assert [r.getMessage() for r in ours] == [
             f'CRL of CA {weak_hsm_ca} not signed: RSA 1024 keys not available in FIPS mode'], caplog.text
         assert all(r.exc_info is None and r.levelno == logging.WARNING for r in ours)
+

@@ -3350,7 +3350,7 @@
           "remedy": "Introduza novamente a palavra-passe nas definições do protocolo: ela passa a ser armazenada como hash PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
           "remedy": "Crie uma autoridade RSA ou ECDSA (P-256/P-384/P-521) e passe a emissão para ela antes da mudança; a chave de uma autoridade não pode ser convertida."
         },
         "ca_weak_key": {
@@ -3358,7 +3358,7 @@
           "remedy": "Crie uma autoridade com RSA 2048+ ou ECDSA P-256/P-384/P-521 e passe a emissão para ela."
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module that does not approve ML-DSA",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
           "remedy": "Crie uma autoridade RSA 2048+ ou ECDSA P-256/P-384/P-521 e passe a emissão para ela antes da mudança, ou mantenha o modo FIPS desativado enquanto precisar de emissão ML-DSA."
         },
         "ssh_ca_eddsa_key": {
@@ -3410,7 +3410,7 @@
           "remedy": "Prefira um provedor PKCS#11, Azure Key Vault ou OpenBao para as chaves que devem permanecer no âmbito do FIPS."
         },
         "hsm_unapproved_keys": {
-          "title": "Chaves HSM de um algoritmo fora do modo FIPS (Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305)",
+          "title": "Chaves HSM de um algoritmo fora do modo FIPS (Ed25519, Ed448, ML-DSA, Brainpool, ChaCha20-Poly1305)",
           "remedy": "Substitua-as por chaves RSA, ECDSA ou AES; no modo FIPS, as chaves OpenBao e Vault Transit destes tipos deixam de ser listadas."
         },
         "dns_tsig_hmac_md5": {

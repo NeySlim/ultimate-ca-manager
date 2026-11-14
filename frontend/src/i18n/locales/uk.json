@@ -3394,7 +3394,7 @@
           "remedy": "Введіть пароль повторно в налаштуваннях протоколу: тоді він зберігається як хеш PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
           "remedy": "Створіть центр сертифікації RSA або ECDSA (P-256/P-384/P-521) і перенесіть на нього видачу до перемикання; ключ центру сертифікації не можна перетворити."
         },
         "ca_weak_key": {
@@ -3402,7 +3402,7 @@
           "remedy": "Створіть центр сертифікації з RSA 2048+ або ECDSA P-256/P-384/P-521 і перенесіть на нього видачу."
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module that does not approve ML-DSA",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
           "remedy": "Створіть центр сертифікації RSA 2048+ або ECDSA P-256/P-384/P-521 і перенесіть на нього видачу до перемикання або залиште режим FIPS вимкненим, поки потрібна видача ML-DSA."
         },
         "ssh_ca_eddsa_key": {
@@ -3454,7 +3454,7 @@
           "remedy": "Для ключів, що мають залишатися в межах FIPS, віддайте перевагу провайдеру PKCS#11, Azure Key Vault або OpenBao."
         },
         "hsm_unapproved_keys": {
-          "title": "Ключі HSM з алгоритмом поза режимом FIPS (Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305)",
+          "title": "Ключі HSM з алгоритмом поза режимом FIPS (Ed25519, Ed448, ML-DSA, Brainpool, ChaCha20-Poly1305)",
           "remedy": "Замініть їх ключами RSA, ECDSA або AES; у режимі FIPS ключі цих типів в OpenBao і Vault Transit більше не перелічуються."
         },
         "dns_tsig_hmac_md5": {

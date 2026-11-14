@@ -3350,7 +3350,7 @@
           "remedy": "Vuelva a introducir la contraseña en la configuración del protocolo: se almacenará entonces como hash PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
           "remedy": "Cree una autoridad RSA o ECDSA (P-256/P-384/P-521) y traslade la emisión a ella antes del cambio; la clave de una autoridad no se puede convertir."
         },
         "ca_weak_key": {
@@ -3358,7 +3358,7 @@
           "remedy": "Cree una autoridad con RSA 2048+ o ECDSA P-256/P-384/P-521 y traslade la emisión a ella."
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module that does not approve ML-DSA",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
           "remedy": "Cree una autoridad RSA 2048+ o ECDSA P-256/P-384/P-521 y traslade la emisión a ella antes del cambio, o mantenga el modo FIPS desactivado mientras necesite emitir con ML-DSA."
         },
         "ssh_ca_eddsa_key": {
@@ -3410,7 +3410,7 @@
           "remedy": "Prefiera un proveedor PKCS#11, Azure Key Vault u OpenBao para las claves que deben permanecer dentro del alcance de FIPS."
         },
         "hsm_unapproved_keys": {
-          "title": "Claves HSM de un algoritmo fuera del modo FIPS (Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305)",
+          "title": "Claves HSM de un algoritmo fuera del modo FIPS (Ed25519, Ed448, ML-DSA, Brainpool, ChaCha20-Poly1305)",
           "remedy": "Reemplácelas por claves RSA, ECDSA o AES; en modo FIPS, las claves de estos tipos de OpenBao y Vault Transit ya no se listan."
         },
         "dns_tsig_hmac_md5": {

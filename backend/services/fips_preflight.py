@@ -5,7 +5,8 @@ encodings (certificate SPKI, OpenSSH type names), never from loading a
 private key: an EdDSA key fails to load on a FIPS provider without EdDSA.
 EdDSA and ML-DSA count as approved only when the module FIPS mode runs on approves
 them (fips_mode.switch_approves: before the switch, the -fips image's module as queried
-at build; elsewhere none, so they are listed).
+at build; elsewhere none, so they are listed). On an HSM they never count: it signs
+outside the module, so only RSA 2048+ and NIST curves pass there.
 """
 from __future__ import annotations
 
@@ -179,7 +180,7 @@ def _ca_keys():
 
 @detector('ca.eddsa_key', BLOCKER,
           'Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode '
-          'on a module that does not approve EdDSA',
+          'on an HSM, or on a module that does not approve EdDSA',
           'Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it '
           'before the switch; an authority key cannot be converted.')
 def _ca_eddsa():
@@ -202,8 +203,8 @@ def _ca_weak():
 
 
 @detector('ca.unapproved_algorithm', BLOCKER,
-          'Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module '
-          'that does not approve ML-DSA',
+          'Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, '
+          'or on a module that does not approve ML-DSA',
           'Create an RSA 2048+ or ECDSA P-256/P-384/P-521 authority and move issuance to it '
           'before the switch, or keep FIPS mode off while ML-DSA issuance is needed.')
 def _ca_unapproved_algorithm():
@@ -420,8 +421,8 @@ def _gcp():
     return [_named(p.name, p.id) for p in rows]
 
 
-# HSM keys sign outside the loaded module: EdDSA and ML-DSA stay refused whatever it approves
-_HSM_UNAPPROVED = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS', 'ML-DSA', 'CHACHA')
+# HSM keys sign outside the loaded module: EdDSA, ML-DSA and Brainpool stay refused whatever it approves
+_HSM_UNAPPROVED = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS', 'ML-DSA', 'EC-BP', 'BRAINPOOL', 'CHACHA')
 
 
 def _hsm_unapproved_words():
@@ -429,7 +430,7 @@ def _hsm_unapproved_words():
 
 
 @detector('hsm.unapproved_keys', WARNING,
-          'HSM keys of an algorithm outside FIPS mode (Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305)',
+          'HSM keys of an algorithm outside FIPS mode (Ed25519, Ed448, ML-DSA, Brainpool, ChaCha20-Poly1305)',
           'Replace them with RSA, ECDSA or AES keys; in FIPS mode, OpenBao and Vault Transit '
           'keys of these types are no longer listed.')
 def _hsm_keys():

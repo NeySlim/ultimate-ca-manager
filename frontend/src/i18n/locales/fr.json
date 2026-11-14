@@ -3496,7 +3496,7 @@
           "remedy": "Saisissez à nouveau le mot de passe dans les paramètres du protocole : il est alors stocké en hash PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
           "remedy": "Créez une CA RSA ou ECDSA (P-256/P-384/P-521) et déplacez-y l'émission avant la bascule ; la clé d'une CA ne peut pas être convertie."
         },
         "ca_weak_key": {
@@ -3504,7 +3504,7 @@
           "remedy": "Créez une CA en RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission."
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module that does not approve ML-DSA",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
           "remedy": "Créez une CA RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission avant la bascule, ou laissez le mode FIPS désactivé tant que l'émission ML-DSA est nécessaire."
         },
         "ssh_ca_eddsa_key": {
@@ -3556,7 +3556,7 @@
           "remedy": "Préférez un fournisseur PKCS#11, Azure Key Vault ou OpenBao pour les clés qui doivent rester dans le périmètre FIPS."
         },
         "hsm_unapproved_keys": {
-          "title": "Clés HSM d'un algorithme hors mode FIPS (Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305)",
+          "title": "Clés HSM d'un algorithme hors mode FIPS (Ed25519, Ed448, ML-DSA, Brainpool, ChaCha20-Poly1305)",
           "remedy": "Remplacez-les par des clés RSA, ECDSA ou AES ; en mode FIPS, les clés de ces types d'OpenBao et de Vault Transit ne sont plus listées."
         },
         "dns_tsig_hmac_md5": {
