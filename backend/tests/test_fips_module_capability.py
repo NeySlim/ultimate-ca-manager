@@ -918,6 +918,20 @@ class TestHsmCaKeyLoadInFipsMode:
         with pytest.raises(FipsRestricted, match='keys not available in FIPS mode$'):
             get_ca_signing_key(self._ca(key))
 
+    def test_a_public_key_fetched_by_the_load_is_judged(self, monkeypatch, hsm_signing_key, fips_on):
+        from services.hsm import HsmService
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        pem = _pem(_rsa_public(1024))
+
+        class _Publishing(_SigningStub):
+            def get_public_key(self, key_identifier):
+                return pem
+
+        monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: _Publishing()))
+        key = hsm_signing_key('RSA-2048', None)
+        with pytest.raises(FipsRestricted, match='^RSA 1024 keys not available in FIPS mode$'):
+            get_ca_signing_key(self._ca(key))
+
     def test_a_load_error_of_an_approved_key_stays(self, monkeypatch, hsm_signing_key, fips_on):
         from services.hsm.ca_key_loader import get_ca_signing_key
         self._load(monkeypatch, ValueError('unsupported curve'))
