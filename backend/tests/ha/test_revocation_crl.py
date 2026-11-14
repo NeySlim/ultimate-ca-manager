@@ -48,7 +48,8 @@ def test_revocations_on_both_nodes_then_crl(cluster, admin):
     crl, number = _crl_number(r.json()['data']['crl_pem'])
     assert number == max(numbers)
     listed = {entry.serial_number for entry in crl}
-    assert {int(c['serial_number'].replace(':', ''), 16) for c in certs} <= listed
+    # The API returns the stored spelling of a serial: one decimal string
+    assert {int(c['serial_number']) for c in certs} <= listed
 
     stored = [n for (n,) in cluster.sql('SELECT crl_number FROM crl_metadata WHERE ca_id = %s', (ca['id'],))]
     assert len(set(stored)) == len(stored) and max(stored) == number, stored
