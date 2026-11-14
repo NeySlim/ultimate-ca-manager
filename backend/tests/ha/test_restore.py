@@ -7,6 +7,7 @@ import time
 import pytest
 import requests
 
+from services.cluster_maintenance import OBSERVE_TTL_SECONDS
 from tests.ha.cluster import READY_TIMEOUT, Client, create_ca, issue, wait_until
 
 pytestmark = pytest.mark.ha
@@ -68,8 +69,10 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
     # From B's acknowledgement on, every write was refused, with a delay to retry after
     assert set(codes[first:]) == {503}, codes
     assert all(retry == '30' for _, code, retry in outcomes if code == 503)
-    assert b.health()['maintenance']['phase'] == 'restarting'
     assert b.ready() is None  # out of the load balancer's rotation
+    # Each process of B reads the row again once its view is older than OBSERVE_TTL_SECONDS
+    wait_until(lambda: b.health()['maintenance']['phase'] == 'restarting',
+               3 * OBSERVE_TTL_SECONDS, 'node B shows the restore as done')
 
     # The rolling restart, as the watchers would run it: node A, then node B
     for node in cluster.nodes:
