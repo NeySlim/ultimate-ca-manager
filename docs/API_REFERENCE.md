@@ -3766,7 +3766,7 @@ Content-Type: application/json
 }
 ```
 
-In FIPS mode only an RSA 2048+ or ECDSA P-256/P-384/P-521 key signs: any other key answers `400`
+In FIPS mode only an RSA key of an even length from 2048 to 16384 bits or an ECDSA P-256/P-384/P-521 key signs: any other key answers `400`
 with the `urn:ucm:problem:fips-restricted` problem type, as do certificate issuance and CRL
 regeneration for a CA on such a key; its OCSP responder answers `unauthorized`.
 

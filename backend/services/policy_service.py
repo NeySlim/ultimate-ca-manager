@@ -141,7 +141,7 @@ def _certification_messages(rules, name, req, verb):
     return []
 
 
-def _rule_messages(rules, name, req, advisory=False, key_rule=None):
+def _rule_messages(rules, name, req, advisory=False, key_rule=None, key_rule_rsa=None):
     """Why the request *req* breaks the key, hash, scheme, date, HSM and TSA
     rules of one policy; with *advisory* the wording is a recommendation."""
     from services.template_service import _normalize_key_type_label
@@ -159,8 +159,11 @@ def _rule_messages(rules, name, req, advisory=False, key_rule=None):
                     f'Policy "{name}" lists no known key type in allowed_key_types '
                     f'({", ".join(str(a) for a in allowed)}): issuance is refused until it is corrected')
         elif not (key_rule(requested) if key_rule else requested in labels):
+            shown = sorted(labels)
+            if key_rule_rsa:  # the rule admits RSA sizes no list holds: say the rule instead
+                shown = [key_rule_rsa] + [label for label in shown if not label.startswith('RSA-')]
             out.append(f'Key type {requested or key_type} {verb} policy "{name}" '
-                       f'(allowed: {", ".join(sorted(labels))})')
+                       f'(allowed: {", ".join(shown)})')
 
     allowed_digests = _rule_digests(rules)
     digest = req.get('digest')
@@ -214,12 +217,14 @@ class SystemPolicy:
     priority = 0
     requires_approval = False
 
-    def __init__(self, name, rules, kind=None, key_rule=None):
+    def __init__(self, name, rules, kind=None, key_rule=None, key_rule_rsa=None):
         self.name = name
         self._rules = rules
         self.kind = kind  # 'profile' for a compliance profile
-        # Predicate on a requested label, in place of membership in allowed_key_types
+        # Predicate on a requested label, in place of membership in allowed_key_types,
+        # and the RSA sizes it admits as a refusal states them
         self.key_rule = key_rule
+        self.key_rule_rsa = key_rule_rsa
 
     def get_rules(self):
         return copy.deepcopy(self._rules)
@@ -233,7 +238,9 @@ def fips_policy():
     return SystemPolicy('FIPS mode', {
         'allowed_key_types': list(key_algorithms.fips_approved_labels()),
         'allowed_digests': list(POLICY_DIGESTS),
-    }, key_rule=key_algorithms.fips_approved_key_label)
+    }, key_rule=key_algorithms.fips_approved_key_label,
+        key_rule_rsa=f'RSA of an even length from {key_algorithms.FIPS_RSA_MIN_BITS} to '
+                     f'{key_algorithms.FIPS_RSA_MAX_BITS} bits')
 
 
 def with_system_policies(policies, ca_id=None):
@@ -401,7 +408,8 @@ class PolicyEvaluationService:
         by_policy = {}
         for policy, rules in zip(checked, rules_of):
             before = len(violations)
-            violations += _rule_messages(rules, policy.name, req, key_rule=getattr(policy, 'key_rule', None))
+            violations += _rule_messages(rules, policy.name, req, key_rule=getattr(policy, 'key_rule', None),
+                                         key_rule_rsa=getattr(policy, 'key_rule_rsa', None))
             advisories = rules.get('advisories')
             if notices is not None and isinstance(advisories, dict):
                 for text in _rule_messages(advisories, policy.name, req, advisory=True):

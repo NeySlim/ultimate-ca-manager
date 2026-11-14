@@ -169,3 +169,14 @@ def test_an_imported_account_key_outside_fips(monkeypatch, bits):
     key = _fake_private(bits)
     monkeypatch.setattr(serialization, 'load_pem_private_key', lambda *a, **k: key)
     assert _validate_imported_account_key(_pem(key)) == 'RS256'
+
+
+def test_the_refusal_states_the_rsa_rule(fips):
+    """An RSA size outside the rule is refused with the rule, not a list of three sizes."""
+    from services.policy_service import PolicyEvaluationService, fips_policy
+    violations = PolicyEvaluationService.enforce_rules([fips_policy()], key_type='RSA-2049', notify=False)[0]
+    assert len(violations) == 1, violations
+    text = violations[0]
+    assert 'RSA of an even length from 2048 to 16384 bits' in text, text
+    assert 'RSA-2048' not in text and 'RSA-4096' not in text, text
+    assert 'EC-P256' in text, text
