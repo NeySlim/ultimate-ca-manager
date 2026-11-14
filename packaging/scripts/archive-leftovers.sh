@@ -200,7 +200,8 @@ case $code in
        esac ;;
     *)
         say "UCM: an earlier UCM left a configuration or database here that this release could not read"
-        say "(${REASON:-check exited with code $code}). Nothing was moved; if the service refuses to start,"
+        say "(${backend:+$backend: }${REASON:-check exited with code $code})."
+        say "Nothing was moved; if the service refuses to start,"
         say "install 2.254 and start it once on that data, or move $CONFIG and $DATA aside and reinstall."
         exit 0 ;;
 esac
