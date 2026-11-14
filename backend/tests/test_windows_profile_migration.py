@@ -5,6 +5,8 @@ import base64
 import importlib
 import os
 import sqlite3
+import struct
+import uuid
 from pathlib import Path
 
 import pytest
@@ -50,8 +52,9 @@ def _schema_2x(dialect):
 class _Base:
     """A 2.x base on one backend: ``run`` executes SQL, ``migrate`` runs 155 alone."""
 
-    def __init__(self, run, migrate, upgrade_all):
+    def __init__(self, run, migrate, upgrade_all, dialect):
         self.run, self.migrate, self.upgrade_all = run, migrate, upgrade_all
+        self.dialect = dialect
 
     def seed(self, settings=SETTINGS_2X, connector=CONNECTOR_2X):
         for refid in ('ca-issue', 'ca-policy'):
@@ -93,7 +96,7 @@ def sqlite_base(tmp_path):
         pending = [n for n in migration_runner._list_migration_names() if n not in applied]
         assert migration_runner._run_pending_sqlite(pending, False, db_path=str(path))
 
-    yield _Base(run, lambda keytab=b'': _migration().upgrade_sqlite(conn, keytab=keytab), upgrade_all)
+    yield _Base(run, lambda keytab=b'': _migration().upgrade_sqlite(conn, keytab=keytab), upgrade_all, 'sqlite')
     conn.close()
 
 
@@ -127,7 +130,7 @@ def pg_base():
         assert migration_runner._run_pending_pg(engine, pending, False)
 
     try:
-        yield _Base(run, migrate, upgrade_all)
+        yield _Base(run, migrate, upgrade_all, 'postgresql')
     finally:
         engine.dispose()
         with admin.begin() as conn:
@@ -278,6 +281,45 @@ def test_upgrading_a_real_2x_base_gives_the_direct_conversion(base):
     direct = profile_from_2x(SETTINGS_2X, CONNECTOR_2X, None)
     assert _normalised(base.profiles()) == [{k: direct[k] for k in PROFILE_COLUMNS}]
     assert base.rows("SELECT name FROM _migrations WHERE name = '300_upgrade_from_2_254'")
+
+
+def _served_by_2254(refid, template_id):
+    """policyID and template OID of the 2.254 policy builder for the XCEP CA *refid*, verbatim."""
+    namespace = uuid.UUID('a12b3c4d-5e6f-4789-9abc-def012345678')
+    chunks = struct.unpack('>4I', uuid.uuid5(namespace, f'ucm-ca-{refid}').bytes)
+    return (str(uuid.uuid5(namespace, f'ucm-ca-policy-{refid}')),
+            '1.3.6.1.4.1.311.21.8.{}.{}.{}.{}.1.{}'.format(*chunks, template_id))
+
+
+def _served_now(base):
+    """policyID and the OID of template 7 the default profile serves after the upgrade."""
+    (policy_id, root), = base.rows(f"SELECT policy_id, policy_oid_root FROM {PROFILES} WHERE is_default")
+    from types import SimpleNamespace
+    from services.xcep.policy_builder import served_template_oid
+    profile = WindowsEnrollmentProfile(policy_id=policy_id, policy_oid_root=root)
+    return profile.policy_id, served_template_oid(profile, None, SimpleNamespace(id=7))
+
+
+@pytest.mark.parametrize('changes, served_ca', [
+    ({}, 'ca-policy'),
+    ({'xcep_ca_refid': None}, 'ca-issue'),
+], ids=['xcep-ca', 'wstep-ca-only'])
+def test_the_default_profile_serves_the_policy_identity_2254_served(base, changes, served_ca):
+    """policyID and template OIDs unchanged by the upgrade: enrolled clients keep their registration.
+    Without an XCEP CA, 2.254 stamped the OIDs of its WSTEP CA: the profile keeps those."""
+    base.seed(settings={k: v for k, v in {**SETTINGS_2X, **changes}.items() if v is not None})
+    base.upgrade_all()
+    assert _served_now(base) == _served_by_2254(served_ca, 7)
+
+
+def test_a_default_profile_of_no_ca_draws_its_identity(base):
+    """2.254 served no policy without a CA: nothing to keep, the identity is drawn at random."""
+    settings = {k: v for k, v in SETTINGS_2X.items() if k not in ('xcep_ca_refid', 'wstep_ca_refid')}
+    base.seed(settings=settings)
+    base.migrate()
+    (policy_id, root), = base.rows(f"SELECT policy_id, policy_oid_root FROM {PROFILES}")
+    assert uuid.UUID(policy_id).version == 4
+    assert root.startswith('1.3.6.1.4.1.311.21.8.') and len(root.split('.')) == 13
 
 
 def test_the_app_schema_has_the_migrated_columns(app):

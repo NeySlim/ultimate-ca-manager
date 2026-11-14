@@ -29,8 +29,6 @@ whether real clients tolerate the nil.
 import base64
 import json
 import logging
-import struct
-import uuid
 
 from asn1crypto import x509 as asn1_x509
 from lxml import etree
@@ -38,6 +36,7 @@ from lxml import etree
 import fips_mode
 from services.wstep.soap_envelope import build_envelope
 from utils import key_algorithms
+from utils.policy_identity import derived_oid_root, derived_policy_id, template_oid
 
 XCEP_NS = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollmentpolicy'
 SOAP_NS = 'http://www.w3.org/2003/05/soap-envelope'
@@ -210,11 +209,6 @@ def subject_name_flags(template, ad_identity=True):
             else _USER_AD_DERIVED_SUBJECT_NAME_FLAGS
     return _SUBJECT_NAME_FLAGS
 
-# Stable namespace for deriving per-CA policy OIDs and policyIDs via uuid5,
-# which keeps derived values stable across requests -- matters both for a
-# client's policiesNotChanged caching and for the OID shape built in
-# _policy_oid_for_template below.
-_POLICY_OID_NAMESPACE = uuid.UUID('a12b3c4d-5e6f-4789-9abc-def012345678')
 
 
 class _OidTable:
@@ -311,39 +305,22 @@ def _request_hash(template, key_label=None, ca_id=None):
 
 
 def _policy_oid_for_template(ca, template):
-    """A stable per-(CA, template) policy OID.
-
-    Must not be a single arc holding a full 128-bit value (e.g. the
-    ITU-T X.667 ``2.25.<uuid-as-decimal>`` form) -- valid ASN.1, but a
-    real Windows client's ``CX509EnrollmentPolicyWebService.GetTemplates()``
-    silently aborts building the rest of the collection when a non-first
-    policy's OID has an arc that large (a certenroll.dll limitation,
-    confirmed by enumerating the COM collection directly and watching
-    Count stay at 1 regardless of which/how many templates were pinned).
-    Real ADCS's own template OIDs avoid this by using Microsoft's private
-    arc with several smaller components, each within uint32
-    (e.g. ``1.3.6.1.4.1.311.21.8.12100116.9312244.4475799.14553909.6134364.73.1.7``).
-    This mirrors that shape: a per-CA stable prefix (four uint32 chunks
-    derived from the CA's refid) plus the template's own integer id.
-    """
-    seed = uuid.uuid5(_POLICY_OID_NAMESPACE, f'ucm-ca-{ca.refid}')
-    chunks = struct.unpack('>4I', seed.bytes)
-    return '1.3.6.1.4.1.311.21.8.{}.{}.{}.{}.1.{}'.format(*chunks, template.id)
+    """The template OID 2.x derived from *ca* (``utils.policy_identity``), which certificates
+    issued before the profiles held their identity carry; renewal still recognises it."""
+    return template_oid(derived_oid_root(ca.refid), template.id)
 
 
 def _policy_id_for_ca(ca):
-    """A stable ``response/policyID`` for this CA -- must be deterministic,
-    not a fresh random UUID per response.
+    """The policyID 2.x derived from *ca*."""
+    return derived_policy_id(ca.refid)
 
-    Real ADCS uses a stable ID (Windows caches a policy server's
-    ``PolicyID`` in the registry at enrollment-policy-registration time).
-    A randomized policyID broke real-client template resolution outright
-    (Windows appears to key its per-response template collection off
-    policyID), independent of the OID-arc-size issue fixed in
-    ``_policy_oid_for_template``.
-    """
-    derived = uuid.uuid5(_POLICY_OID_NAMESPACE, f'ucm-ca-policy-{ca.refid}')
-    return str(derived)
+
+def served_template_oid(profile, ca, template):
+    """The template OID announced and stamped: under the profile's root, which no CA change
+    moves; without a profile, the one derived from *ca*."""
+    if profile is None:
+        return _policy_oid_for_template(ca, template)
+    return profile.template_oid(template.id)
 
 
 def _build_extensions_element(attributes, extensions, oids, template_extension):
@@ -417,7 +394,8 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             matters to a real client).
         ad_identity: False on the UsernamePassword binding, whose requests
             carry no AD identity to build a subject from (``subject_name_flags``).
-        profile: the Windows enrollment profile served, whose template list narrows the CA's.
+        profile: the Windows enrollment profile served: its policyID and template OID root,
+            and its template list, which narrows the CA's.
 
     Returns:
         bytes: UTF-8 encoded, well-formed SOAP XML.
@@ -431,7 +409,9 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
     response_root = etree.Element('{%s}GetPoliciesResponse' % XCEP_NS, nsmap=NSMAP)
 
     response = etree.SubElement(response_root, '{%s}response' % XCEP_NS)
-    etree.SubElement(response, '{%s}policyID' % XCEP_NS).text = _policy_id_for_ca(ca)
+    # Stable and per profile (MS-XCEP 3.1.4.1.3.23): Windows registers it, a change gives 0x8007000D
+    etree.SubElement(response, '{%s}policyID' % XCEP_NS).text = (
+        profile.policy_id if profile is not None else _policy_id_for_ca(ca))
     etree.SubElement(response, '{%s}policyFriendlyName' % XCEP_NS).text = (
         f'Ultimate CA Manager - {ca.descr or ca.refid}'
     )
@@ -479,7 +459,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             except (TypeError, ValueError):
                 pass
 
-        policy_oid = _policy_oid_for_template(ca, template)
+        policy_oid = served_template_oid(profile, ca, template)
         policy_ref = oids.ref(policy_oid, group=_GROUP_POLICY, default_name=template.name)
 
         policy = etree.SubElement(policies, '{%s}policy' % XCEP_NS)

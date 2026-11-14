@@ -250,7 +250,8 @@ def test_a_start_after_the_twins_are_resolved_runs_step_144_alone(base):
     base.run("UPDATE certificates SET windows_profile_id = NULL")
     base.run("DELETE FROM windows_enrollment_profiles")
     base.run("INSERT INTO windows_enrollment_profiles (name, realm, is_default, enabled, validity_days, "
-             "created_at) VALUES ('corp', 'CORP.EXAMPLE', FALSE, TRUE, 365, '2026-01-02 03:04:05')")
+             "policy_id, policy_oid_root, created_at) VALUES ('corp', 'CORP.EXAMPLE', FALSE, TRUE, 365, "
+             "'00000000-0000-4000-8000-000000000001', '1.3.6.1.4.1.311.21.8.1.2.3.4', '2026-01-02 03:04:05')")
     base.run("INSERT INTO system_config (key, value) VALUES ('kerberos_spn', 'HTTP/ucm.corp.example') "
              "ON CONFLICT (key) DO NOTHING")
     profiles = base.run("SELECT id, name, is_default FROM windows_enrollment_profiles ORDER BY id")
@@ -467,6 +468,29 @@ def test_an_upgrade_interrupted_after_any_step_ends_in_the_same_state(dialect, t
             changed = {t: (rows.get(t), expected[1].get(t)) for t in set(rows) | set(expected[1])
                        if rows.get(t) != expected[1].get(t)}
             assert changed == {}, f'interrupted after {STEPS[count - 1]}'
+
+
+def test_a_start_cut_after_the_profiles_table_ends_with_the_2254_identity(dialect, tmp_path, monkeypatch):
+    """SQLite commits the DDL of step 155 apart: a start cut there leaves the table empty; the next
+    start makes the default profile with the identity 2.254 served, and a further start keeps it."""
+    from migrations._from_2_254 import STEPS, step
+    from utils.policy_identity import derived_oid_root, derived_policy_id
+    for db in make_base(dialect, tmp_path, monkeypatch, 'cut155'):
+        populate(db)
+        _interrupt_after(db, STEPS.index('155_windows_enrollment_profiles'))
+        ddl = step('155_windows_enrollment_profiles')
+        with db.engine.begin() as conn:
+            from sqlalchemy import text
+            for sql in (ddl._SQLITE_DDL if dialect == 'sqlite' else ddl._PG_DDL) + ddl._INDEXES:
+                conn.execute(text(sql))
+        assert db.run("SELECT COUNT(*) FROM windows_enrollment_profiles") == [(0,)]
+        assert db.upgrade()
+        served = [(True, derived_policy_id('ca-a'), derived_oid_root('ca-a'))]
+        query = "SELECT is_default, policy_id, policy_oid_root FROM windows_enrollment_profiles"
+        assert db.run(query) == served
+        db.run("DELETE FROM _migrations WHERE name = '300_upgrade_from_2_254'")
+        assert db.upgrade()
+        assert db.run(query) == served
 
 
 # --- Pivot guard ------------------------------------------------------------------------------

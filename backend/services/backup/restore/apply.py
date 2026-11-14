@@ -33,6 +33,7 @@ from models import db
 from ..export_generic import CHAIN_VARIANT_FINGERPRINT, REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS
 from .plan import RestorePlan, RestoreValidationError, row_label
+from .windows_profiles import IDENTITY as _PROFILE_IDENTITY, PROFILES as _PROFILES, restored_identity
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +230,8 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
             continue          # the dedicated restorer owns this column
         if name == 'id':
             continue          # the target keeps its own key
+        if section_name == _PROFILES and name in _PROFILE_IDENTITY:
+            continue          # restored_identity decides, below
         column = columns.get(name)
         if column is None and name in section.secrets and isinstance(
                 getattr(type(instance), name, None), property):
@@ -264,6 +267,10 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
                 _coerce(value, column, f"{section_name}.{name}"))
     for column, value in legacy_defaults(section_name, row, plan).items():
         setattr(instance, attribute_of.get(column, column), value)
+    if section_name == _PROFILES:
+        for column, value in restored_identity(instance, row, new=new, replacing=_PROFILES in plan.pruned,
+                                               warnings=plan.warnings).items():
+            setattr(instance, column, value)
 
 
 def _restored_chain_variant(row, value, plan):

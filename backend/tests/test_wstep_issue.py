@@ -476,12 +476,12 @@ def test_a_bare_csr_is_not_issued_under_a_template_of_capped_ekus_only(client, a
     """`openssl req -new` with a CN alone: OCSP Signing, whose only EKU is never issued,
     scores as a perfect match but is no template for it; the server pair is kept."""
     from models import CA
-    from services.xcep.policy_builder import _policy_oid_for_template
+    from tests.windows_profile_support import template_oid
     with app.app_context():
         ca = db.session.get(CA, wstep_config['id'])
         ocsp = CertificateTemplate.query.filter_by(name='OCSP Signing').first()
         assert ocsp is not None and ocsp.is_active
-        ocsp_oid = _policy_oid_for_template(ca, ocsp)
+        ocsp_oid = template_oid(ca, ocsp)
     csr, _key = _make_csr(common_name='bare.example.test')
     r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
     assert r.status_code == 200, r.data
@@ -520,11 +520,11 @@ def test_a_template_of_capped_ekus_only_is_refused(client, app, wstep_config, _c
     """OCSP Signing would be signed under the server profile, its only EKU dropped: the
     request asking for it, or naming it, is refused as the client's fault."""
     from models import CA
-    from services.xcep.policy_builder import _policy_oid_for_template
     from tests.test_wstep_protocol_conformance import _fault, _fault_code
+    from tests.windows_profile_support import template_oid
     with app.app_context():
         ca = db.session.get(CA, wstep_config['id'])
-        ocsp_oid = _policy_oid_for_template(ca, CertificateTemplate.query.filter_by(name='OCSP Signing').first())
+        ocsp_oid = template_oid(ca, CertificateTemplate.query.filter_by(name='OCSP Signing').first())
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     builder = (x509.CertificateSigningRequestBuilder()
                .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ocsp.example.test')]))

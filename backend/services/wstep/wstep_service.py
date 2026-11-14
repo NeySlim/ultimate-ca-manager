@@ -410,7 +410,7 @@ def _named_template(ca, csr, *, profile):
     """``(template, refusal, named)`` for the template the request names by OID or
     name (MS-WCCE 3.2.2.6.2.1.4.1): an identifier this CA does not offer, two that
     disagree, or EKUs or a key the template does not issue are refused."""
-    from services.xcep.policy_builder import _policy_oid_for_template
+    from services.xcep.policy_builder import served_template_oid
 
     try:
         oid, name = _template_identifiers(csr)
@@ -421,8 +421,8 @@ def _named_template(ca, csr, *, profile):
     offered = _ca_templates(ca, profile=profile)
     found = []
     if oid is not None:
-        cas = _policy_oid_cas(ca, profile=profile)
-        by_oid = [t for t in offered if oid in {_policy_oid_for_template(c, t) for c in cas}]
+        # Under the profile's root only: the OID XCEP announced, whichever CA issues now
+        by_oid = [t for t in offered if oid == served_template_oid(profile, ca, t)]
         if not by_oid:
             return None, f'Certificate template {oid} is not offered by this CA', True
         found.append(by_oid[0])
@@ -446,22 +446,11 @@ def _named_template(ca, csr, *, profile):
     return template, None, True
 
 
-def _policy_oid_cas(ca, *, profile):
-    """The CAs whose policy OIDs a request may name: *ca*, and the profile's policy CA when set apart."""
-    from models import CA
-    refid = profile.policy_ca_refid if profile is not None else None
-    xcep_ca = CA.query.filter_by(refid=refid).first() if refid and refid != ca.refid else None
-    return [ca, xcep_ca] if xcep_ca is not None else [ca]
-
-
-def _template_oid_for(ca, template, wanted, *, profile):
-    """The template OID a certificate carries: ``wanted`` when it is one of the template's,
-    else the one XCEP announces (another CA's on a split setup), which autoenrollment looks for."""
-    from services.xcep.policy_builder import _policy_oid_for_template
-    cas = _policy_oid_cas(ca, profile=profile)
-    if wanted is not None and wanted in {_policy_oid_for_template(c, template) for c in cas}:
-        return wanted
-    return _policy_oid_for_template(cas[-1], template)
+def _template_oid_for(ca, template, *, profile):
+    """The template OID a certificate carries: the one XCEP announces, which autoenrollment
+    looks for, also on a renewal of a certificate carrying an older one."""
+    from services.xcep.policy_builder import served_template_oid
+    return served_template_oid(profile, ca, template)
 
 
 _POLICY_OID_SHAPE = re.compile(r'1\.3\.6\.1\.4\.1\.311\.21\.8\.\d+\.\d+\.\d+\.\d+\.1\.(\d+)')
@@ -488,6 +477,17 @@ def _eku_oids(cert_or_csr):
                 for oid in extensions_of(cert_or_csr).get_extension_for_class(x509.ExtendedKeyUsage).value}
     except x509.ExtensionNotFound:
         return None
+
+
+def _instance_template_oids(template):
+    """Every OID this instance has announced for *template*: under each profile's root, and
+    derived from each CA as before the profiles held their identity."""
+    from models import CA, WindowsEnrollmentProfile, db
+    from services.xcep.policy_builder import _policy_oid_for_template
+    from utils.policy_identity import template_oid
+    roots = db.session.scalars(db.select(WindowsEnrollmentProfile.policy_oid_root)).all()
+    return ({template_oid(root, template.id) for root in roots}
+            | {_policy_oid_for_template(c, template) for c in CA.query.all()})
 
 
 def _renewal_template(ca, renewed_cert, csr, *, profile):
@@ -525,14 +525,11 @@ def _renewal_template(ca, renewed_cert, csr, *, profile):
             return None, [oid for oid in extra if oid in prior], _issuable_ekus(prior), None
         return matched, extra, extra, None
 
-    # The OID was derived from one of this instance's CAs (the XCEP CA of the time, which
-    # xcep_ca_refid may no longer name); another instance's prefix names no template here
-    from models import CA
-    from services.xcep.policy_builder import _policy_oid_for_template
+    # The OID is under the root of one of this instance's profiles, or derived from one of its
+    # CAs (issued before the profiles held their identity); another instance's names nothing here
     template_id = _template_id_of_policy_oid(template_oid)
     template = next((t for t in _ca_templates(ca, profile=profile) if t.id == template_id), None)
-    if template is not None and template_oid not in {
-            _policy_oid_for_template(c, template) for c in CA.query.all()}:
+    if template is not None and template_oid not in _instance_template_oids(template):
         template = None
     if template is None:
         return None, [], None, ('The certificate template of the certificate being renewed '
@@ -1250,7 +1247,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         exempted = renewed
     template_oid = None
     if matched_template is not None:
-        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(csr), profile=profile)
+        template_oid = _template_oid_for(ca, matched_template, profile=profile)
 
     if kerberos_principal:
         override_subject, override_san, refusal = _directory_subject(
@@ -1645,7 +1642,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
         return None, refusal
     template_oid = None
     if matched_template is not None:
-        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert), profile=profile)
+        template_oid = _template_oid_for(ca, matched_template, profile=profile)
 
     # A8: the SID alone is checked again, by the profile's connector only
     found = {}

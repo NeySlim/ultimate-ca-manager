@@ -6,6 +6,8 @@ profile (services.windows_profiles.legacy, shared with the restore of a 2.x arch
 are deleted in the same transaction; the WSTEP certificates are attached to it. XCEP without
 a CA of its own is switched off, as it served no policy (legacy.switches_from_2x).
 The keytab is read for its realm only; it is stored in the profile at startup.
+Each profile holds its policy identity (policyID, template OID root): the default one the
+values 2.254 served.
 Idempotent, dual-backend (SQLite + PostgreSQL).
 """
 import logging
@@ -26,6 +28,7 @@ _PROFILE_COLUMNS = (
     "is_default BOOLEAN NOT NULL DEFAULT {false}, enabled BOOLEAN NOT NULL DEFAULT {true}, "
     f"connector_id INTEGER REFERENCES {CONNECTORS}(id) ON DELETE SET NULL, "
     "issuing_ca_refid VARCHAR(36), policy_ca_refid VARCHAR(36), "
+    "policy_id VARCHAR(36) NOT NULL, policy_oid_root VARCHAR(100) NOT NULL, "
     "validity_days INTEGER NOT NULL DEFAULT 365, xcep_username TEXT, xcep_password TEXT, "
     "wstep_username TEXT, wstep_password TEXT, allowed_ad_group VARCHAR(255), "
     "pinned_subject_fields TEXT, keytab TEXT, created_at {ts}, created_by VARCHAR(80), "
@@ -55,8 +58,8 @@ _INDEXES = (
 _CONNECTOR_NAME_INDEX = f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{CONNECTORS}_name ON {CONNECTORS} (name)"
 _CERT_INDEX = f"CREATE INDEX IF NOT EXISTS ix_{CERTS}_windows_profile_id ON {CERTS} (windows_profile_id)"
 _INSERT_FIELDS = ('name', 'realm', 'is_default', 'enabled', 'connector_id', 'issuing_ca_refid',
-                  'policy_ca_refid', 'validity_days', 'xcep_username', 'xcep_password',
-                  'wstep_username', 'wstep_password', 'created_at', 'created_by')
+                  'policy_ca_refid', 'policy_id', 'policy_oid_root', 'validity_days', 'xcep_username',
+                  'xcep_password', 'wstep_username', 'wstep_password', 'created_at', 'created_by')
 
 
 def _keytab_on_disk():

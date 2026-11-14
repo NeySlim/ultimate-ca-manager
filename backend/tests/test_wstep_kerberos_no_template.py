@@ -11,13 +11,13 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
-from models import CA, CATemplatePin, Certificate, CertificateTemplate, db
+from models import CA, CATemplatePin, Certificate, CertificateTemplate, WindowsEnrollmentProfile, db
 from services.ad_connector import lookup as ad_lookup
 from services import protocol_approval
 from services.ad_connector.renewal_identity import UNRESOLVED_MESSAGE
 from services.ca_service import CAService
 from services.wstep import CES_KERBEROS_PATH, wstep_service
-from services.xcep.policy_builder import _policy_oid_for_template
+from services.xcep.policy_builder import served_template_oid
 from tests.fixtures.templates import delete_templates
 from tests.protocol_approval_support import approval_policy, approve, requests_of
 from tests.test_wstep_kerberos_issue import _build_rst, _issued_cert_from_rstr
@@ -48,7 +48,8 @@ def realm_a(app, world, monkeypatch):
         db.session.add(CATemplatePin(ca_id=world['cas']['A']['id'], template_id=machine.id))
         db.session.commit()
         ca = db.session.get(CA, world['cas']['A']['id'])
-        oids = {'user': _policy_oid_for_template(ca, user), 'machine': _policy_oid_for_template(ca, machine)}
+        profile = WindowsEnrollmentProfile.query.filter_by(name='c04-a').one()
+        oids = {'user': served_template_oid(profile, ca, user), 'machine': served_template_oid(profile, ca, machine)}
         machine_id = machine.id
     monkeypatch.setattr(ad_lookup, 'lookup_computer_dns_hostname', lambda config, sam: 'hosta.c04a.test')
     monkeypatch.setattr(ad_lookup, 'lookup_user_ad_identity', lambda config, sam: {

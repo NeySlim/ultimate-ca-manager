@@ -11,12 +11,15 @@ from typing import Any, Dict, Optional, Tuple
 
 from services.windows_profiles.legacy import (MIGRATED_KEYS, connector_names, has_windows_configuration,
                                               keytab_realms, profile_from_2x, switches_from_2x)
+from utils.policy_identity import identity_for
 
 from ..export_generic import REFERENCE_SUFFIX
 
 logger = logging.getLogger(__name__)
 
 PROFILES = 'windows_enrollment_profiles'
+# The policy identity a profile serves (policyID, template OID root), applied by restored_identity
+IDENTITY = ('policy_id', 'policy_oid_root')
 
 
 def _keytab_here() -> Tuple[Optional[bytes], bool]:
@@ -100,3 +103,36 @@ def link_restored_connectors(backup_data) -> None:
     profile, connector = default_profile(), lowest_connector()
     if profile is not None and profile.connector_id is None and connector is not None:
         profile.connector_id = connector.id
+
+
+def _held_elsewhere(instance):
+    """The policy identities of the other profiles, flushed or still pending in this restore."""
+    from models import WindowsEnrollmentProfile, db
+    with db.session.no_autoflush:
+        rows = WindowsEnrollmentProfile.query.all()
+    others = [p for p in {*rows, *db.session.new} if isinstance(p, WindowsEnrollmentProfile) and p is not instance]
+    return {p.policy_id for p in others}, {p.policy_oid_root for p in others}
+
+
+def restored_identity(instance, row, *, new, replacing, warnings=None) -> Dict[str, Any]:
+    """The identity columns a restored profile takes, so a restore never moves what clients registered.
+    A replacement takes the archive's (it becomes the instance); a merge keeps an existing profile's.
+    An archive from before these columns derives them from the CA, as migration 155 does; an
+    identity another profile here already serves is drawn again, two never share one."""
+    archived = tuple(row.get(column) for column in IDENTITY)
+    complete = all(isinstance(v, str) and v for v in archived)
+    if not new and not (replacing and complete):
+        return {}
+    taken_ids, taken_roots = _held_elsewhere(instance)
+    if complete and archived[0] not in taken_ids and archived[1] not in taken_roots:
+        return dict(zip(IDENTITY, archived, strict=True))
+    if complete:
+        message = (f"windows_enrollment_profiles: profile {row.get('name')} gets a new policy identity, "
+                   "another profile here serves the archived one: its clients register the policy server again")
+        logger.warning("Restore: %s", message)
+        if warnings is not None:
+            warnings.append(message)
+        refid = None
+    else:
+        refid = row.get('policy_ca_refid') or row.get('issuing_ca_refid')
+    return dict(zip(IDENTITY, identity_for(refid, taken_ids, taken_roots), strict=True))

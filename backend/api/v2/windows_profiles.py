@@ -128,6 +128,9 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
         'issuing_ca_name': ca_names.get(profile.issuing_ca_refid),
         'policy_ca_refid': profile.policy_ca_refid,
         'policy_ca_name': ca_names.get(profile.policy_ca_refid),
+        # Read-only: fixed at creation, outside WRITABLE
+        'policy_id': profile.policy_id,
+        'policy_oid_root': profile.policy_oid_root,
         'validity_days': profile.validity_days,
         **{f'{svc}_username': getattr(profile, f'{svc}_username') or '' for svc in SERVICES},
         **{f'{svc}_password_set': bool(getattr(profile, f'{svc}_password')) for svc in SERVICES},
