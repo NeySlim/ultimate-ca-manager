@@ -12,7 +12,10 @@ from sqlalchemy.orm.attributes import set_committed_value
 def next_ca_serial(ca) -> int:
     """Count one more issuance under *ca* in the current transaction; return the new count."""
     from models import CA, db
+    from services.cert.unique_subject import lock_issuer_records
     table = CA.__table__
+    # CA rows are locked in id order: a twin record's lowest one first (unique subject)
+    lock_issuer_records(ca)
     # The row lock (PostgreSQL) is held until the commit
     bump = (update(table).where(table.c.id == ca.id)
             .values(serial=func.coalesce(table.c.serial, 0) + 1))

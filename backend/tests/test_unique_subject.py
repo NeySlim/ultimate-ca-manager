@@ -797,6 +797,54 @@ def test_two_twin_records_at_once_get_one_certificate(app, twins, monkeypatch, t
             assert Certificate.query.filter(Certificate.caref.in_(refids)).count() == 1
 
 
+def test_an_issuance_by_a_twin_record_locks_the_lowest_twin_before_its_own(app, twins, monkeypatch):
+    """Every issuance locks the CA rows of one issuer in id order, as a pair renewal across two
+    twin records does: the cross record's issuance holds the root's row once it holds its own,
+    so the two never wait on each other (PostgreSQL row locks; SQLite serialises every write)."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    from tests.test_revocation_record_rule import _on_postgresql
+    if not _on_postgresql(app):
+        pytest.skip('row locks: PostgreSQL only')
+    from services.ca import ca_signing
+    root, cross = twins
+    with app.app_context():
+        db.session.get(CA, cross).enforce_unique_subject = True
+        db.session.commit()
+    paused, release, outcome = threading.Event(), threading.Event(), {}
+    bump = ca_signing.next_ca_serial
+
+    def hold(ca):
+        count = bump(ca)
+        paused.set()
+        release.wait(30)
+        return count
+    monkeypatch.setattr(ca_signing, 'next_ca_serial', hold)
+
+    def issue():
+        try:
+            _trunk_issue(app, cross, 'twin-order.unique.test')
+            outcome['cross'] = 'issued'
+        except Exception as e:  # noqa: BLE001
+            outcome['cross'] = repr(e)
+        finally:
+            paused.set()
+    worker = threading.Thread(target=issue)
+    worker.start()
+    try:
+        assert paused.wait(30)
+        with app.app_context():
+            with db.engine.connect() as conn:
+                with pytest.raises(OperationalError, match='could not obtain lock'):
+                    conn.execute(text('SELECT id FROM certificate_authorities WHERE id = :id FOR UPDATE NOWAIT'),
+                                 {'id': root})
+                conn.rollback()
+    finally:
+        release.set()
+        worker.join(60)
+    assert outcome['cross'] == 'issued', outcome
+
+
 # --- CA API --------------------------------------------------------------------------------------
 
 def test_the_option_is_read_written_and_audited(app, auth_client, create_ca):

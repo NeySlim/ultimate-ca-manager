@@ -103,12 +103,22 @@ def issuer_refids(ca):
 
 
 def _lock_twins(ca, refids):
-    """Serialise the issuances of twin records on the lowest-id one, *ca*'s own row being locked
-    already: two twins never wait on each other, both wait on that one."""
+    """Serialise the issuances of twin records on the lowest-id one: two twins never wait on
+    each other, both wait on that one (a no-op once held in this transaction)."""
     from models import CA, db
     anchor = db.session.query(CA.id).filter(CA.refid.in_(refids)).order_by(CA.id).first()
     if anchor is not None and anchor[0] != ca.id:
         db.session.query(CA.id).filter(CA.id == anchor[0]).with_for_update().first()
+
+
+def lock_issuer_records(ca):
+    """Before *ca*'s own row: lock the lowest-id record of its issuer when the option applies, so
+    an issuance and a pair renewal across twin records lock in one order (no query when off)."""
+    if not getattr(ca, 'enforce_unique_subject', False):
+        return
+    refids = issuer_refids(ca)
+    if len(refids) > 1:
+        _lock_twins(ca, refids)
 
 
 def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requester_sid=None,
