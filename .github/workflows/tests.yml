@@ -589,12 +589,12 @@ jobs:
           
           docker stop ucm-test && docker rm ucm-test
 
-  # Pushes to dev only: the source build is too slow for every PR
+  # Pushes to dev and sextant only: the source build is too slow for every PR
   build-test-fips:
     name: Docker Build Test (FIPS)
     runs-on: ubuntu-24.04
     needs: [test-frontend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/sextant')
     timeout-minutes: 60
 
     steps:

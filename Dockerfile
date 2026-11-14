@@ -5,8 +5,10 @@
 # --build-arg UCM_FIPS_BUILD=1 builds the -fips variant: OpenSSL FIPS provider
 # plus crypto libraries compiled against the system libcrypto. Default 0 = standard.
 ARG UCM_FIPS_BUILD=0
-ARG FIPS_PROVIDER_VERSION=3.1.2
-ARG FIPS_PROVIDER_SHA256=a0ce69b8b97ea6a35b96875235aa453b966ba3cba8af2de23657d8b6767d6539
+# OpenSSL FIPS Provider 3.5.9, CMVP certificate #5586; 3.1.2 (#4985, SHA-256
+# a0ce69b8b97ea6a35b96875235aa453b966ba3cba8af2de23657d8b6767d6539) still builds with these args
+ARG FIPS_PROVIDER_VERSION=3.5.9
+ARG FIPS_PROVIDER_SHA256=603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
 
 # Stage 1: Builder - Install dependencies and build environment
 FROM python:3.13-slim-trixie AS builder-0
