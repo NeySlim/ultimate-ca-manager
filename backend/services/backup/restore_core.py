@@ -480,6 +480,10 @@ class RestoreCoreMixin:
 
                 if replacement is not None:
                     results.update(remove_after_writes(replacement).report())
+                # Lockouts are keyed by user id and name, which either mode may hand to
+                # another account; the sessions they guard are revoked after any restore
+                from models.second_factor_failure import SecondFactorFailure
+                db.session.execute(db.delete(SecondFactorFailure))
                 # Before the warnings are reported: a keytab it cannot serve is one of them
                 keytab_published = self._publish_restored_keytab(backup_data, plan)
                 results['left_out'] = list(plan.left_out)

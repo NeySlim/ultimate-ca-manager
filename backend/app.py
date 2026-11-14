@@ -1037,6 +1037,14 @@ def create_app(config_name=None):
             HsmService.auto_register_softhsm()
     except Exception as e:
         app.logger.debug(f"SoftHSM auto-register skipped: {e}")
+    # Once per node: the gunicorn master warns, the scheduler process it starts does not
+    if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':
+        try:
+            with app.app_context():
+                from services.hsm.hsm_service import HsmService
+                HsmService.warn_local_softhsm()
+        except Exception as e:
+            app.logger.debug(f"SoftHSM HA warning skipped: {e}")
     
     # Load syslog forwarder config
     try:
@@ -1274,6 +1282,9 @@ def create_app(config_name=None):
             response.headers.extend(
                 (k, v) for k, v in e.get_headers() if k.lower() != 'content-type')
             return response, code
+        from utils.ha import HaRestricted, ha_refusal
+        if isinstance(e, HaRestricted):
+            return ha_refusal(str(e))
         from fips_mode import FipsRestricted, PROBLEM_TYPE as FIPS_PROBLEM
         if isinstance(e, FipsRestricted):
             from compliance_profiles import ProfileRestricted, PROBLEM_TYPE as PROFILE_PROBLEM

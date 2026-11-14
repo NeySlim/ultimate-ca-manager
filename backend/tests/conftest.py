@@ -180,6 +180,17 @@ for _var in ('KEY_ENCRYPTION_KEY', 'KEY_ENCRYPTION_KEY_FILE'):
     os.environ.pop(_var, None)
 _encryption.key_encryption.reload()
 
+# One database key for the whole session: without /etc/machine-id (containers)
+# the fallback key is random per derivation, so a cipher cache_clear() made
+# every row written before it undecryptable. The fallback never writes /opt.
+from cryptography.fernet import Fernet as _Fernet  # noqa: E402
+from utils import encryption as _db_encryption  # noqa: E402
+
+os.environ['UCM_DB_ENCRYPTION_KEY'] = _Fernet.generate_key().decode('ascii')
+_db_encryption.MACHINE_KEY_PATH = str(UCM_TEST_ENV_FILE.parent / '.machine-key')
+_db_encryption.MACHINE_ID_PATHS = (*_db_encryption.MACHINE_ID_PATHS[:-1], _db_encryption.MACHINE_KEY_PATH)
+_db_encryption.get_cipher.cache_clear()
+
 
 class _GuardResolverProxy:
     """Stand-in for utils.ssrf_protection's `socket` module (and ONLY its):
@@ -390,7 +401,7 @@ def _seeded_rows_stay_in_their_module():
 _LEAK_TABLES = (
     'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
     'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
-    'windows_enrollment_profiles',
+    'windows_enrollment_profiles', 'hsm_providers',
 )
 # Tables whose rows are compared too: a default profile edited in place keeps the count.
 _LEAK_CONTENT = {'windows_enrollment_profiles': ('updated_at', 'updated_by')}
@@ -436,6 +447,53 @@ def _shared_tables_stay_in_their_module(request):
         return
     message = f'{name} left the shared tables changed: ' + ', '.join(
         t if t.endswith(' content') else f'{t} {after[t] - before[t]:+d}' for t in changed)
+    if os.environ.get('UCM_TEST_LEAK_MODE', 'warn') == 'fail':
+        pytest.fail(message)
+    import warnings
+    warnings.warn(message, stacklevel=1)
+
+
+def _secret_state():
+    """A token under the current database key, and the encrypted values it cannot read."""
+    if not _SESSION_APP:
+        return None
+    from sqlalchemy import text as _text
+    from models import db
+    from services.database_admin.verify import _probe_secret_value, encrypted_columns
+    unreadable = set()
+    with _SESSION_APP[0].app_context():
+        present = set(db.inspect(db.engine).get_table_names())
+        for table, column in encrypted_columns():
+            if table not in present:
+                continue
+            rows = db.session.execute(_text(
+                f'SELECT id, "{column}" FROM "{table}" WHERE "{column}" IS NOT NULL'))
+            unreadable.update((table, column, row_id) for row_id, value in rows
+                              if _probe_secret_value(value)[0] == 'unreadable')
+        db.session.rollback()
+    return _db_encryption.encrypt_value('session key probe'), unreadable
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _database_key_stays_readable(request):
+    """A file must leave the database key it found, and no stored secret that key
+    cannot decrypt: either breaks every later backup or migration of the worker."""
+    name = os.path.basename(str(request.fspath))
+    before = _secret_state()
+    yield
+    if before is None:
+        return
+    token, unreadable = before
+    _, after = _secret_state()
+    problems = []
+    if _db_encryption.decrypt_value(token) != 'session key probe':
+        problems.append('changed the database encryption key')
+    if after - unreadable:
+        problems.append('left secrets the database key cannot decrypt: ' + ', '.join(
+            f'{t}.{c} id={i}' for t, c, i in sorted(after - unreadable)))
+    if not problems:
+        return
+    message = f'{name} ' + '; '.join(problems)
     if os.environ.get('UCM_TEST_LEAK_MODE', 'warn') == 'fail':
         pytest.fail(message)
     import warnings

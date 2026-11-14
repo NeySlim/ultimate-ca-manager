@@ -483,7 +483,7 @@ export INITIAL_ADMIN_PASSWORD_FILE="${UCM_INITIAL_ADMIN_PASSWORD_FILE}"
 if command -v softhsm2-util >/dev/null 2>&1; then
     if softhsm2-util --show-slots 2>/dev/null | grep -qE '^ *Label: +UCM-Default *$'; then
         echo -e "${GREEN}🔐 SoftHSM tokens found${NC}"
-    elif [ "${HSM_AUTO_INIT:-true}" = "true" ]; then
+    elif ucm_softhsm_auto_init; then
         echo -e "${CYAN}🔐 Initializing SoftHSM default token...${NC}"
         HSM_PIN="${HSM_PIN:-$(openssl rand -hex 8)}"
         HSM_SO_PIN="${HSM_SO_PIN:-$(openssl rand -hex 8)}"
@@ -496,6 +496,8 @@ if command -v softhsm2-util >/dev/null 2>&1; then
         else
             echo -e "${YELLOW}   ⚠️  SoftHSM token init failed${NC}"
         fi
+    elif ucm_ha_active; then
+        echo -e "${YELLOW}🔐 SoftHSM default token not created in HA mode (a token stays on one node)${NC}"
     else
         echo -e "${YELLOW}🔐 No SoftHSM token 'UCM-Default' and HSM_AUTO_INIT is off${NC}"
     fi

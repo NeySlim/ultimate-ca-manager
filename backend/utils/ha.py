@@ -44,6 +44,19 @@ def ha_refusal(reason):
     return resp, 409
 
 
+class HaRestricted(Exception):
+    """Raised by a service for an operation HA mode refuses; the app answers 409 ha_mode."""
+
+
+SOFTHSM_LOCAL = ("Not available in HA mode: a SoftHSM token lives on one node only, "
+                 "use a network HSM or a KMS provider")
+
+
+def refuse_softhsm_in_ha():
+    if ha_enabled():
+        raise HaRestricted(SOFTHSM_LOCAL)
+
+
 LOCAL_ONLY = "Not available in HA mode: this operation only changes the local host"
 
 

@@ -192,6 +192,11 @@ class CACreationMixin:
                 hsm_key = db.session.get(HsmKey, hsm_key_id)
             if not hsm_key:
                 raise ValueError(f"HSM key {hsm_key_id} not found")
+            # A new CA never binds a SoftHSM key in HA: its token is on one node's disk
+            from services import compliance_signer
+            from utils.ha import refuse_softhsm_in_ha
+            if compliance_signer.softhsm_provider(hsm_key.provider):
+                refuse_softhsm_in_ha()
             if CA.query.filter_by(hsm_key_id=hsm_key.id).first():
                 raise ValueError(
                     f"HSM key {hsm_key.label} is already bound to another CA"
