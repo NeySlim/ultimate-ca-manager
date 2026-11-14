@@ -985,12 +985,15 @@ class _PatternRefusal(str):
 
 
 class SubjectHeldByAnother(str):
-    """A patterned subject a certificate of another account of the CA carries: the requester's
-    fault, naming no account; ``audited`` adds the serial of that certificate, for the audit only."""
+    """A subject a certificate of another account of the CA carries: the requester's fault, naming
+    no account; *template* is the one whose pattern built it, None when no pattern applied.
+    ``audited`` adds the serial of that certificate, for the audit only."""
 
     def __new__(cls, template, taken):
-        refusal = super().__new__(cls, f"Template '{template.name}' builds the subject {taken.subject}, "
-                                       'which a certificate of another account already carries')
+        refusal = super().__new__(cls, (
+            f"Template '{template.name}' builds the subject {taken.subject}, "
+            'which a certificate of another account already carries' if template is not None else
+            f'The subject {taken.subject} is already carried by a certificate of another account'))
         refusal.audited = f'{refusal} (serial {taken.serial})'
         return refusal
 
@@ -1339,7 +1342,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             subject_holder=sid_holder(requester_sid),
         )
     except SubjectTaken as e:
-        return None, SubjectHeldByAnother(matched_template, e)
+        return None, SubjectHeldByAnother(matched_template if patterned else None, e)
     except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
     except RequestRejected as e:
@@ -1693,7 +1696,8 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'
     except SubjectTaken as e:
-        return None, SubjectHeldByAnother(matched_template, e)
+        return None, SubjectHeldByAnother(
+            matched_template if override_subject is not None else None, e)
     except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
     except RequestRejected as e:

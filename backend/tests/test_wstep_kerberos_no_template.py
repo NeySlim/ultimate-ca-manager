@@ -358,3 +358,48 @@ def test_a_request_whose_ekus_match_only_a_template_of_another_key_is_told_so(
     assert (status, code) == (400, 's:Sender') and reason != NO_TEMPLATE, reason
     assert 'key' in reason.lower(), reason
     assert [a[0] for a in _audits(app, floor)] == ['windows_enrollment.refused']
+
+
+# --- The CA option enforce_unique_subject without a matched template ----------------------------
+
+@pytest.fixture
+def unique_a(app, world):
+    """Turns the option on for CA A once the test has written what it finds; off afterwards."""
+    def enforce(on=True):
+        with app.app_context():
+            db.session.get(CA, world['cas']['A']['id']).enforce_unique_subject = on
+            db.session.commit()
+    yield enforce
+    enforce(False)
+
+
+def _held_by_another(app, world, cn):
+    """A certificate of CA A carrying CN=*cn* for another entity: no SID, no holder, its own key."""
+    with app.app_context():
+        pem, _serial = CAService.sign_csr_from_crypto(
+            ca=db.session.get(CA, world['cas']['A']['id']), csr=_csr(cn), validity_days=30, source='est')
+    return x509.load_pem_x509_certificate(pem.encode())
+
+
+def test_a_taken_subject_matching_no_template_is_refused_as_held_by_another(app, world, realm_a, unique_a):
+    """The UsernamePassword binding issues without template: the refusal names no template."""
+    taken = _held_by_another(app, world, 'c17-taken.example.test')
+    unique_a()
+    with app.app_context():
+        pem, err = wstep_service.issue(db.session.get(CA, world['cas']['A']['id']),
+                                       _csr('c17-taken.example.test').public_bytes(serialization.Encoding.DER),
+                                       30, profile=_profile('c04-a'))
+    assert pem is None and isinstance(err, wstep_service.SubjectHeldByAnother), err
+    assert str(err) == ('The subject CN=c17-taken.example.test is already carried by a certificate '
+                        'of another account')
+    assert err.audited.endswith(f'(serial {taken.serial_number})')
+
+
+def test_a_kerberos_renewal_without_template_of_a_subject_another_holds_is_a_fault(
+        app, client, world, realm_a, unique_a):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old = _template_less_certificate(app, world, key, sid=None)
+    _held_by_another(app, world, 'hosta.c04a.test')
+    unique_a()
+    assert _fault(_renew(client, world, MACHINE, old, key)) == (
+        400, 's:Sender', 'The subject CN=hosta.c04a.test is already carried by a certificate of another account')
