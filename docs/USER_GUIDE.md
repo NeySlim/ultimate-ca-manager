@@ -117,6 +117,28 @@ The CA list shows an **Offline** badge while offline. Existing CRLs continue to 
 
 ⚠️ Lose the password (or the file in file-exported mode) and the CA is unrecoverable: there is no master override.
 
+### Unique Subject
+
+RFC 5280 §4.1.2.6 requires a CA to give each distinct entity it certifies a distinct subject name. **Enforce** next to **Unique subject**, in the CA details (`write:cas`), makes the CA refuse a certificate whose subject a certificate of another entity already carries under that CA. It is off by default, including on CAs carried over from 2.254.
+
+Every certificate of the CA counts, whatever its status: valid, expired, revoked or superseded. A name once certified stays bound to its entity, so that a relying party that saw it on one certificate never finds it on another entity's later.
+
+The issuance is the same entity's, and goes through, when one of these holds:
+
+| Proof | Paths |
+|-------|-------|
+| The request carries the public key of a certificate of that subject | every path |
+| It renews a certificate of that subject, or one renewed from it | **Renew**, automatic renewal, EST `simplereenroll`, SCEP `RenewalReq`, WSTEP renewal |
+| The same ACME account | ACME |
+| The same Windows SID | XCEP/WSTEP |
+| The same UCM user | user mTLS certificates |
+
+A certificate recorded without an identity (imported, issued from a CSR or the issue form, or by 2.x outside ACME, whose certificates take their order's account at the upgrade) belongs to another entity unless the key or a renewal links it. Not checked: an empty subject, CA certificates (sub-CAs and cross-signing), the pre-certificate submitted to Certificate Transparency logs next to its final certificate, the two certificates of a hybrid pair, and the certificates UCM issues to its own services (OCSP responder, TSA signer, EST key generation signer).
+
+A refused manual issuance or CSR signing names the certificate that carries the subject (serial number) and offers **Issue anyway**: the certificate is then issued and the audit log records who did it, the subject and the certificate already carrying it. Protocols have no override: ACME answers `badCSR`, SCEP a failure with `badRequest`, EST a `400` with the reason, WSTEP a fault. Every refusal is audited (`certificate.subject_taken`), and a request held for approval is checked again when it is approved.
+
+Turning the option on is allowed when subjects are already shared: the check applies to the next issuance only, and UCM says how many subjects are in that case.
+
 ---
 
 ## CSR Management

@@ -584,6 +584,20 @@ certificate), behind a
 "show hidden CAs" link. It is presentation only: the CA still signs whatever it is asked to. The
 CA object reads it back as `issuance_hidden`, and the change is audited.
 
+`enforceUniqueSubject` (`true` or `false`) makes the CA refuse a certificate whose subject a
+certificate of another entity already carries under it, whatever its status (RFC 5280 §4.1.2.6,
+see the user guide for what makes the same entity). The CA object reads it back as
+`enforce_unique_subject`, and the change is audited. The answer that turns it on carries
+`shared_subjects`, the number of subjects certificates of the CA already carry for more than one
+entity: they stay, and their next issuance to another entity is refused.
+
+With the option on, `POST /api/v2/certificates` and `POST /api/v2/csrs/{id}/sign` answer `409`
+when the subject is taken, with `details` `{"subject", "serial_number", "override_field":
+"override_unique_subject"}`. Sent again with `"override_unique_subject": true` (`write:certificates`),
+the request issues and writes a `certificate.subject_override` audit entry naming the operator,
+the subject and the serial of the certificate already carrying it. A renewal refused for the same
+reason answers `409`.
+
 ### Confirm a Parent Whose Signature Cannot Be Verified
 ```http
 POST /api/v2/cas/{ca_id}/parent-confirmation
