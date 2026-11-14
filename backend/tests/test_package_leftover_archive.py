@@ -995,10 +995,11 @@ def _killed_once_copied(box, name):
 
 
 @pytest.mark.parametrize('kind', ITEMS)
-@pytest.mark.parametrize('then', ['removed', 'changed'])
-def test_a_copy_whose_source_went_or_changed_since_is_never_removed(tmp_path, kind, then):
+@pytest.mark.parametrize('then, keep', [('removed', 'copy'), ('changed', 'source'), ('changed', 'copy')])
+def test_a_copy_whose_source_went_or_changed_since_is_never_removed(tmp_path, kind, then, keep):
     """Killed once an item is copied, before its source goes; the source is then removed,
-    or replaced: the archive keeps the copy, names it, and exits 2 until the operator chooses."""
+    or replaced: the archive keeps the copy, names it, and exits 2 until the operator
+    chooses; each choice the text offers ends in a whole archive."""
     box = Box(tmp_path, python='stub')
     name = ITEMS[kind]
     src, dst = box.data / name, box.archive / 'data' / name
@@ -1012,7 +1013,7 @@ def test_a_copy_whose_source_went_or_changed_since_is_never_removed(tmp_path, ki
     for _ in range(2):
         out = box.run()
         assert out.returncode == 2, (out.stdout, out.stderr)
-        text = (BOTH if then == 'changed' else ONLY).format(src=src)
+        text = (DIFFERS if then == 'changed' else ONLY).format(src=src)
         assert reported(out.stdout)[str(dst)] == text, out.stdout
         assert named(out.stdout) == [str(dst)], out.stdout
         assert _shape(dst) == original
@@ -1021,8 +1022,10 @@ def test_a_copy_whose_source_went_or_changed_since_is_never_removed(tmp_path, ki
         else:
             assert not os.path.lexists(src)
 
-    # The operator's choice: the copy back in place, or the source as it is now
-    if then == 'removed':
+    # The operator's choice: the copy back in place of the source, or the source as it is
+    if keep == 'copy':
+        if then == 'changed':
+            _gone(src)
         os.rename(dst, src)
         archived = original
     else:
@@ -1142,6 +1145,8 @@ def test_a_fips_line_stuck_in_the_journal_says_whether_the_new_configuration_wen
 # -- a temporary goes only while its item stands at a real path ------------------------
 
 LEFT = 'what may be all that is left of {src}: check it, move it back to {src} to keep it or remove it, then retry'
+DIFFERS = ('not put back to {src}, which differs from its copy: to keep {src}, remove this copy; '
+           'to keep this copy, put it back in place of {src}; then retry')
 
 
 def _lost_nothing(box, data, out, why=''):
@@ -1295,3 +1300,38 @@ def test_a_put_back_whose_copy_went_while_copying_is_kept_aside(tmp_path):
     assert _shape(part) == original
     _lost_nothing(box, data, out)
 
+
+def test_a_source_set_aside_that_cannot_be_removed_is_named_as_such(tmp_path):
+    box = Box(tmp_path, python='stub')
+    src = box.data / 'ucm.db'
+    part = f'{src}{PART}'
+    box.wrap(other_fs=(box.data,))
+    _rm_kills(box, part)
+    assert box.run().returncode == -9
+    box.wrap(other_fs=(box.data,))
+    (box.bin / 'rm').write_text(
+        f'#!/bin/sh\nfor last; do :; done\n[ "$last" != "{part}" ] || exit 1\nexec {REAL["rm"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert reported(out.stdout)[part] == f'what is left of {src}, renamed aside, could not be removed'
+
+
+def test_a_put_back_over_a_source_removed_in_place_says_it_replaces_it(tmp_path):
+    """While its inplace line stays, the next attempt puts the copy back over whatever
+    stands at the source: the stop says so before the operator retries."""
+    box = Box(tmp_path, python='stub')
+    src = box.data / 'updates'
+    box.wrap(refused=(str(src),))
+    once = box.state / 'once'
+    (box.bin / 'rm').write_text(
+        f'#!/bin/sh\nfor last; do :; done\n'
+        f'if [ "$last" = {src} ] && [ ! -e {once} ]; then : > {once}; '
+        f'{REAL["rm"]} -f -- "$last/nested/f"; kill -9 0; fi\nexec {REAL["rm"]} "$@"\n')
+    assert box.run().returncode == -9
+    box.wrap(refused=(str(src),))
+    (box.bin / 'cp').write_text(
+        f'#!/bin/sh\ncase $3 in {box.parent}/*) exit 1 ;; esac\nexec {REAL["cp"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert reported(out.stdout)[f'{box.archive}/data/updates'] == (
+        f'not put back to {src}: the next attempt puts its copy back at {src}, replacing what is there')

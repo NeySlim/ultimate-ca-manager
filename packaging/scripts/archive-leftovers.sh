@@ -243,7 +243,7 @@ roll_back() {
                 # Beside $src only our own leftovers: the source renamed aside, a partial put-back
                 if present "$src$PART"; then
                     if ! present "$src" && ! present "$dst"; then kept_aside "$src$PART" "$src"; continue; fi
-                    rm -rf -- "$src$PART" || { unsettled "$src$PART" "a partial copy of $dst could not be removed"; continue; }
+                    rm -rf -- "$src$PART" || { unsettled "$src$PART" "what is left of $src, renamed aside, could not be removed"; continue; }
                 fi
                 if ! present "$dst"; then
                     # Its copy gone by hand: nothing to put back, unless half removed in place
@@ -269,7 +269,8 @@ roll_back() {
                         && drop_line "inplace$TAB$src" "remove$TAB$src$TAB$dst"; } || {
                         if present "$src" || present "$dst"; then
                             rm -rf -- "$src$PART" 2>/dev/null
-                            unsettled "$dst" "not put back to $src"
+                            # While the inplace line stays, whatever stands at $src then is replaced
+                            unsettled "$dst" "not put back to $src${ours:+: the next attempt puts its copy back at $src, replacing what is there}"
                         else
                             kept_aside "$src$PART" "$src"
                         fi
@@ -298,7 +299,7 @@ roll_back() {
                     discard "$dst" "$src" || unsettled "$(here "$dst")" "a copy of $src, which is back in place, could not be removed"
                 else
                     twice=1
-                    unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"
+                    unsettled "$dst" "not put back to $src, which differs from its copy: to keep $src, remove this copy; to keep this copy, put it back in place of $src; then retry"
                 fi ;;
             fips)
                 # The new ucm.env goes while the archived one can take its place, once: the
