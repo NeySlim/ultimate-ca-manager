@@ -313,6 +313,13 @@ def _entrypoint_groups():
         return re.search(r'^Groups = (\S+)$', handle.read(), re.MULTILINE).group(1)
 
 
+def test_entrypoint_offers_the_three_approved_hybrids_first():
+    """Policy #5586 §2.7 and IG D.S name three hybrid schemes; each optional, ahead of ECDHE."""
+    groups = _entrypoint_groups().split(':')
+    assert groups[:3] == ['?X25519MLKEM768', '?SecP256r1MLKEM768', '?SecP384r1MLKEM1024']
+    assert 'X25519' not in groups and 'X448' not in groups
+
+
 GROUPS_CNF = f"""openssl_conf = openssl_init
 
 [openssl_init]
@@ -442,7 +449,7 @@ class TestEntrypointGroupsOnTheWire:
                               stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=20,
                               env=env, check=False).stdout
 
-    @pytest.mark.parametrize('group', ['X25519MLKEM768', 'SecP256r1MLKEM768'])
+    @pytest.mark.parametrize('group', ['X25519MLKEM768', 'SecP256r1MLKEM768', 'SecP384r1MLKEM1024'])
     def test_hybrids_are_negotiated(self, server, group):
         assert f'Negotiated TLS1.3 group: {group}' in self._handshake(server, group)
 

@@ -120,12 +120,13 @@ activate = 1
 default_properties = fips=yes
 
 # Every TLS context of the process: X25519 and X448 alone are not allowed by the module's
-# policy; the ML-KEM hybrids are, and "?" skips them on a module without ML-KEM (3.1.2)
+# policy; the three ML-KEM hybrids it approves are, and "?" skips them on a module without
+# ML-KEM (3.1.2). Cheapest first: X25519MLKEM768 is what clients send by default
 [ssl_sect]
 system_default = system_default_sect
 
 [system_default_sect]
-Groups = ?X25519MLKEM768:?SecP256r1MLKEM768:P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
+Groups = ?X25519MLKEM768:?SecP256r1MLKEM768:?SecP384r1MLKEM1024:P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
 EOF
     export OPENSSL_CONF="$FIPS_RUN_DIR/openssl-fips.cnf"
     # libpq: no GSSAPI encryption (Kerberos library, outside the module) for any process
