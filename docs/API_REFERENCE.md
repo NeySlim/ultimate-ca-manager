@@ -540,6 +540,9 @@ An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored
 in `meta.notices`. An intermediate under an ML-DSA parent likewise takes no digest; an
 ML-DSA intermediate under an RSA or EC parent uses its parent's digest.
 
+In HA mode, a CA on a SoftHSM key (`hsm_key_id` of a key on a SoftHSM provider, or a new key
+through `hsm_provider_id`) answers `409` with code `ha_mode`, whatever the CA type.
+
 Optional `namedUrls: true` gives the CA an immutable unique slug derived from
 its name, used instead of the random id in CDP/AIA URL paths (both forms keep
 resolving). Returned as `url_slug` (null when not opted in).
@@ -3642,6 +3645,9 @@ Content-Type: application/json
 }
 ```
 
+In HA mode a SoftHSM provider (a PKCS#11 module path or a name that says `softhsm`) answers `409`
+with code `ha_mode`, and so does an update that points a provider at SoftHSM (see [HA](HA.md)).
+
 `certification` is optional: the certification the operator declares for the hardware
 (`cc-eal4+`, `eucc-high`, `fips-140-3-l3`, `fips-140-2-l3` or `other`; `null`, absent or `""` means
 not declared). UCM does not verify it. Any other value is a 400. Providers return it as
@@ -3682,6 +3688,8 @@ POST /api/v2/hsm/providers/{provider_id}/test
 POST /api/v2/hsm/providers/{provider_id}/sync
 ```
 
+In HA mode, syncing a SoftHSM provider answers `409` with code `ha_mode`: its keys exist on one node only.
+
 ### List HSM Keys
 ```http
 GET /api/v2/hsm/keys
@@ -3709,6 +3717,8 @@ service). `azure-keyvault` and `aws-cloudhsm` answer `400` for both families, an
 refuses ML-DSA on every provider. An ML-DSA key signs the data itself: no digest applies.
 Google Cloud KMS signs at most 64 KiB of data with it, so a larger CRL fails with a message
 that says so.
+
+In HA mode, a key on a SoftHSM provider answers `409` with code `ha_mode`.
 
 ### Get HSM Key
 ```http
