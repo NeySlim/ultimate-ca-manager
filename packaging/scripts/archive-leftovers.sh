@@ -179,7 +179,9 @@ if [ -z "$DB_PATH" ]; then
     DB_PATH=$(env_value "$ENV_FILE" DATA_DIR)
     DB_PATH=${DB_PATH:-$DATA}/ucm.db
 fi
-probe=$(cd "$UCM_HOME/backend" 2>/dev/null && DATABASE_URL=$DB_URL DATABASE_PATH=$DB_PATH \
+# Bytecode is not written: the probe runs as root in a tree the service account owns
+probe=$(cd "$UCM_HOME/backend" 2>/dev/null && PYTHONDONTWRITEBYTECODE=1 \
+    DATABASE_URL=$DB_URL DATABASE_PATH=$DB_PATH \
     "$UCM_HOME/venv/bin/python" migration_runner.py check 2>&1)
 code=$?
 backend=$(printf '%s\n' "$probe" | head -n 1)
