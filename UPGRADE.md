@@ -68,7 +68,7 @@ docker run -d \
 # Download new version (replace VERSION, e.g. 2.48)
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_VERSION_all.deb
 
-# Install (automatically backs up database)
+# Install
 sudo dpkg -i ucm_VERSION_all.deb
 
 # Fix dependencies if needed
@@ -76,7 +76,7 @@ sudo apt-get install -f
 ```
 
 **What happens during upgrade:**
-1. Pre-upgrade backup created automatically
+1. No backup is taken by the package: make one first (below). From 2.254 to 3.0, UCM copies a SQLite database itself at its first start (see Upgrading to v3.0)
 2. Service stopped gracefully
 3. Files updated
 4. Database migrated (if schema changed)
@@ -97,8 +97,8 @@ sudo systemctl start ucm
 ```bash
 sudo systemctl stop ucm
 
-# Restore database
-sudo cp /opt/ucm/data/backups/ucm-pre-upgrade-*.db /opt/ucm/data/ucm.db
+# Restore the database from the manual backup taken above
+sudo cp ~/ucm-backup-YYYYMMDD.db /opt/ucm/data/ucm.db
 
 # Reinstall previous version
 sudo dpkg -i ucm_<previous-version>_all.deb
@@ -164,6 +164,15 @@ Database migrations run automatically at startup.
 
 - **Start from 2.254.** 3.0 upgrades a database last started by UCM 2.254, nothing older. From an earlier 2.x, install 2.254 first (package or image), start it once so it completes its own migrations, then install 3.0. The same applies to every node of a shared PostgreSQL database and to a database copied from SQLite to PostgreSQL: it is the database that must have been started by 2.254. A 2.x backup archive of any version still restores on 3.0.
 - **What a refused start looks like.** On a database that 2.254 has not started, 3.0 stops before writing anything: `This database was last started by a release older than 2.254 (N migration(s) of 2.254 are missing from its registry, first ...). Install 2.254, start it once, then upgrade. Nothing was changed: 2.254 still starts on this database.` A database without a migration registry gives the same message with `it has no migration registry`. A package installation shows it in the service journal (`journalctl -u ucm`) and the service does not come up; a container shows it in its log (`docker logs <container>`) and exits. Since nothing was written, put 2.254 back (the 2.254 package, or the 2.254 image on the same volume), start it once, then upgrade to 3.0 again. The 2.254.x security updates add no migration, so a database they started upgrades like a 2.254 one; a database whose registry names a migration that neither 2.254 nor this release knows (started by a later release, or edited by hand) is refused the same way, without writing, by `This database names N migration(s) this release does not know, first ...`.
+- **A copy of the SQLite database before the upgrade.** At its first start on a 2.254 SQLite database, before changing anything, 3.0 copies it next to itself as `ucm.db.2.254-before-3.0` (`/opt/ucm/data/` for the packages and the image, so the Docker data volume keeps it), mode 0600 and with the owner of the database. The copy goes through SQLite's online backup, so it includes what the WAL holds, and is checked (integrity, the 2.254 migration registry, the row count of every table). It takes about the size of the database: the start checks that this size plus 8 MB is free. When the copy cannot be taken or checked, the start stops, the database is left as it was and the log says why, how much space is needed and where. A start that tries the upgrade again replaces the copy; once the upgrade is recorded no copy is taken any more. UCM never deletes it and it is not listed among the backup archives: remove it yourself once 3.0 suits you. The `dry-run` and `status` commands of `migration_runner.py` say where it will go without taking it.
+- **Going back to 2.254 with that copy.** Stop UCM, put the copy back in place of the database, remove the `-wal` and `-shm` files left by 3.0, then reinstall the 2.254 package or start the 2.254 image on the same volume. Everything written by 3.0 since the upgrade is lost. On a package installation:
+
+  ```bash
+  sudo systemctl stop ucm
+  sudo cp -p /opt/ucm/data/ucm.db.2.254-before-3.0 /opt/ucm/data/ucm.db
+  sudo rm -f /opt/ucm/data/ucm.db-wal /opt/ucm/data/ucm.db-shm
+  ```
+- **PostgreSQL: back the database up yourself.** No copy is taken on PostgreSQL, single node or HA; the upgrade log says so. Run `pg_dump` on the database before installing 3.0, and stop every node first in a cluster.
 - In-app help is available in English, French and Chinese only; with the interface in German, Spanish, Italian, Japanese, Portuguese or Ukrainian the help panel shows the English text. The interface itself keeps its nine languages.
 - Private-key encryption becomes an envelope: the key in `master.key` or `KEY_ENCRYPTION_KEY` (the KEK) wraps a data key stored in the database. Nothing is re-encrypted at the upgrade and the KEK stays the only secret to back up. A KEK is now changed by hand with the previous one in `master.key.previous` or `KEY_ENCRYPTION_KEY_PREVIOUS` (see the Admin Guide); swapping the key without it puts UCM in safe mode while encryption is enabled, and in HA also once it was disabled. Disabling encryption with `KEY_ENCRYPTION_KEY` set no longer answers 409: the variable stays configured and unused.
 - No default administrator password: a new installation no longer creates `admin` / `changeme123`. Automation that logged in with `changeme123` after a fresh install must provide the password (`INITIAL_ADMIN_PASSWORD_FILE` or `INITIAL_ADMIN_PASSWORD`) or read the generated one from `DATA_DIR/initial-admin-password` and change it, as the first login requires for a generated password. An existing installation is not touched: its administrator, its password and its sessions stay as they are, and no file is generated.
