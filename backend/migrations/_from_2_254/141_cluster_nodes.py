@@ -1,7 +1,8 @@
 """Upgrade step 141: HA node registry and cross-node scheduler requests.
 
 ``cluster_nodes`` holds one row per node, refreshed by its scheduler process, with the
-fingerprint of its key-encryption key (never the key);
+fingerprint of its key-encryption key (never the key) and the random token of the process
+that holds the node identifier (instance_token);
 ``scheduler_requests`` carries "run now" from any node to the leader;
 ``discovery_scan_runs.node_id`` names the node whose process runs a scan;
 ``cluster_nodes.package_family`` is the package a rolling update gives the node.
@@ -18,9 +19,10 @@ NODES_DDL = ("CREATE TABLE IF NOT EXISTS cluster_nodes ("
              "node_id VARCHAR(255) NOT NULL PRIMARY KEY, "
              "started_at TIMESTAMP NOT NULL, heartbeat_at TIMESTAMP NOT NULL, "
              "is_leader BOOLEAN NOT NULL DEFAULT {false}, version VARCHAR(32), pid INTEGER, "
-             "package_family VARCHAR(32), kek_fingerprint VARCHAR(16))")
+             "package_family VARCHAR(32), kek_fingerprint VARCHAR(16), instance_token VARCHAR(64))")
 # Columns added to this migration after it first ran on development databases
-LATE_COLUMNS = (('package_family', 'VARCHAR(32)'), ('kek_fingerprint', 'VARCHAR(16)'))
+LATE_COLUMNS = (('package_family', 'VARCHAR(32)'), ('kek_fingerprint', 'VARCHAR(16)'),
+                ('instance_token', 'VARCHAR(64)'))
 LATE_COLUMN = "ALTER TABLE cluster_nodes ADD COLUMN {name} {type}"
 REQUESTS_DDL = ("CREATE TABLE IF NOT EXISTS scheduler_requests ("
                 "id {serial} PRIMARY KEY, task_name VARCHAR(100) NOT NULL, "

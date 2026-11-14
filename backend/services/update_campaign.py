@@ -74,9 +74,10 @@ def _stale_seconds():
 
 
 def _nodes():
+    """Nodes a scheduler heartbeat registered; a row only claimed at start has no version yet."""
     from models import ClusterNode
     return {n.node_id: NodeView(n.started_at, n.heartbeat_at, n.version, n.package_family)
-            for n in ClusterNode.query.all()}
+            for n in ClusterNode.query.filter(ClusterNode.version.isnot(None)).all()}
 
 
 def _fresh(view, now, stale_seconds):

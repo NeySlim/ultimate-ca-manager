@@ -77,6 +77,20 @@ def test_ha_redis_url_reaches_the_pod_pos():
     assert env['REDIS_URL'] == 'redis://r:6379/0'
 
 
+def test_ha_startup_probe_outlasts_the_node_identifier_wait_pos():
+    """A container killed and restarted in its pod may wait for the startup lock, then for
+    its old heartbeat to expire: the liveness probe must not kill it meanwhile."""
+    from services.scheduler_leader import BOOT_LOCK_TIMEOUT_SECONDS, CLAIM_POLL_SECONDS, STALE_PASSES
+    from services.scheduler_service import WAKE_INTERVAL_SECONDS
+    container = _docs(*HA)['Deployment']['spec']['template']['spec']['containers'][0]
+    probe = container['startupProbe']
+    assert probe['httpGet']['path'] == '/health/live'
+    longest_wait = STALE_PASSES * WAKE_INTERVAL_SECONDS + 2 * CLAIM_POLL_SECONDS
+    longest_wait += BOOT_LOCK_TIMEOUT_SECONDS
+    assert probe['periodSeconds'] * probe['failureThreshold'] >= longest_wait + 30
+    assert 'startupProbe' not in _docs()['Deployment']['spec']['template']['spec']['containers'][0]
+
+
 def test_ha_existing_claim_keeps_the_data_pvc_pos():
     dep = _docs(*HA, '--set', 'persistence.data.existingClaim=shared')['Deployment']
     vol = dep['spec']['template']['spec']['volumes'][0]

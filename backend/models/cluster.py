@@ -21,6 +21,8 @@ class ClusterNode(db.Model):
     restart_seen = db.Column(db.Integer)
     # Fingerprint of the node's key-encryption key, never the key itself
     kek_fingerprint = db.Column(db.String(16))
+    # Random per node process: a fresh row with another token means the identifier is taken
+    instance_token = db.Column(db.String(64))
 
 
 class ClusterCommand(db.Model):

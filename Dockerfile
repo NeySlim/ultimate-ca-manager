@@ -226,6 +226,6 @@ USER ucm
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command - Gunicorn from /opt/ucm/backend (same as packages)
-# exec: gunicorn is PID 1 and receives the stop signal; under sh it was killed without a clean stop
+# Default command - Gunicorn from /opt/ucm/backend (same as packages); exec makes it
+# PID 1, so docker stop's SIGTERM reaches it instead of a shell that ignores it
 CMD ["sh", "-c", "cd /opt/ucm/backend && exec gunicorn -c gunicorn_config.py wsgi:app"]

@@ -382,19 +382,23 @@ def rewrap_under_new_kek() -> str:
 
 
 def live_peers_with_another_kek() -> list:
-    """HA: (node_id, fingerprint) of each live peer that publishes another KEK than this node's."""
+    """HA: (node_id, fingerprint) of each live peer that publishes another KEK than this node's,
+    a process holding this node's identifier under another token included."""
     from utils.ha import ha_enabled
     if not ha_enabled():
         return []
+    from sqlalchemy import and_, or_
     from config.settings import Config
     from models import ClusterNode
-    from services.scheduler_leader import STALE_PASSES, cluster_utc_now
+    from services.scheduler_leader import STALE_PASSES, cluster_utc_now, instance_token
     from services.scheduler_service import WAKE_INTERVAL_SECONDS
     mine = _encryption.key_encryption.configured_kek_fingerprint()
     now = cluster_utc_now()
+    # Another process under this node's identifier is a peer too
+    others = or_(ClusterNode.node_id != Config.NODE_ID,
+                 and_(ClusterNode.instance_token.isnot(None), ClusterNode.instance_token != instance_token()))
     return [(peer.node_id, peer.kek_fingerprint)
-            for peer in ClusterNode.query.filter(ClusterNode.node_id != Config.NODE_ID)
-            .order_by(ClusterNode.node_id).all()
+            for peer in ClusterNode.query.filter(others).order_by(ClusterNode.node_id).all()
             if (now - peer.heartbeat_at).total_seconds() <= STALE_PASSES * WAKE_INTERVAL_SECONDS
             and peer.kek_fingerprint and peer.kek_fingerprint != mine]
 
