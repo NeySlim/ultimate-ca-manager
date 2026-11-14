@@ -395,6 +395,7 @@ The migration is **bidirectional** (SQLite ↔ PostgreSQL) and:
 - **Migrate** refuses if the target already contains UCM data (rows in `users`, `cas`, or `certificates`). Reset the target first:
   - PostgreSQL: `psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'`
   - SQLite: delete the target `.db` file
+- **Switch backend** refuses (409, `ucm.env` unchanged) a target the service would refuse to start: accounts without a migration registry, a registry missing migrations of 2.254, or a 2.254 database without accounts. Switching back to SQLite checks the file `DATABASE_PATH` names the same way. A switch cut short can be retried on the same target.
 - If a migration fails mid-way, the source is untouched and a backup is available under `/opt/ucm/data/backups/db_migration/`. Reset the target before retrying.
 
 > ⚠ Docker installs cannot persist `/etc/ucm/ucm.env` from inside the container. After running **Migrate** on Docker, the API returns the target URL: set `DATABASE_URL` in your `docker-compose.yml` or `docker run -e` and restart the container manually.

@@ -24,7 +24,13 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy import create_engine, inspect, text
 
-from migration_runner import record_fresh_registry
+from migration_runner import (
+    PIVOT_VERSION,
+    UPGRADE_MIGRATION,
+    _get_state,
+    pivot_refusal,
+    record_fresh_registry,
+)
 from utils.db_url import postgres_connect_args, sqlalchemy_url
 
 from .copy import (
@@ -322,6 +328,34 @@ def _target_has_users(target_engine) -> bool:
             f"({_short_err(str(exc))}); the backend switch was not started.")
 
 
+def _start_refusal(engine, has_users: bool):
+    """Why the next start would refuse the database behind *engine*, or None; read-only."""
+    state, applied = _get_state(engine)
+    refusal = pivot_refusal(state, applied)
+    if refusal:
+        return f"The target would not start with this release. {refusal}"
+    # A 2.254 registry awaits its upgrade: a fresh 3.0 registry over it would skip that upgrade
+    if not has_users and state != "fresh" and UPGRADE_MIGRATION not in applied:
+        return (f"The target is a {PIVOT_VERSION} database without user accounts: switching to it "
+                "would skip its upgrade. Empty it before retrying. Nothing was changed.")
+    return None
+
+
+def start_refusal(database_url: str):
+    """Why the next start would refuse *database_url*, or None. A missing SQLite file is a fresh install."""
+    if database_url.startswith("sqlite:///"):
+        from pathlib import Path
+        if not Path(database_url[len("sqlite:///"):]).exists():
+            return None
+    engine = create_engine(sqlalchemy_url(database_url), hide_parameters=True,
+                           connect_args=postgres_connect_args(database_url))
+    try:
+        state, applied = _get_state(engine)
+        return pivot_refusal(state, applied)
+    finally:
+        engine.dispose()
+
+
 def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     """
     Copy auth/RBAC/SSO/MFA tables from the current DB to a fresh target so
@@ -331,7 +365,8 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     Without this, the new DB has no users → nobody can log in → lockout.
 
     Safe to call against an empty target. If the target already has any users,
-    bootstrap is skipped (we assume the operator manages that DB themselves).
+    bootstrap is skipped (we assume the operator manages that DB themselves),
+    once its registry shows that this release will start on it.
 
     Every table goes over in **one** transaction. It used to be one
     transaction per table, with each failure appended to a ``skipped`` list
@@ -356,13 +391,22 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
                                       connect_args=postgres_connect_args(target_url))
         target_is_pg = target_url.startswith("postgresql")
 
-        if _target_has_users(target_engine):
+        has_users = _target_has_users(target_engine)
+        # Read before anything is written, ucm.env included: the start must accept the target
+        refusal = _start_refusal(target_engine, has_users)
+        if refusal:
+            raise PreflightError(refusal)
+        if has_users:
             return True, "Target already has users; bootstrap skipped.", stats
 
         # From here on the target carries a schema, which changes what the
         # operator has to do before retrying.
         stats["target_written"] = True
         _create_target_schema(target_engine, target_is_pg)
+        # Registry before accounts: a switch cut short leaves a 3.0 target the next one resumes,
+        # never accounts beside an empty registry, which the start refuses as older than 2.254.
+        # A full migration copies the source's registry instead.
+        record_fresh_registry(target_engine, target_is_pg)
 
         with consistent_live_source() as (src, source_view, source_is_pg):
             plan = _bootstrap_plan(src.engine, target_engine)
@@ -374,9 +418,6 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         if target_is_pg:
             _reset_pg_sequences(target_engine)
         carry_id_high_water(target_engine, high_water, target_is_pg)
-        # The target is a fresh 3.0 database: an empty registry beside `users` is refused at
-        # start as older than 2.254. A full migration copies the source's registry instead.
-        record_fresh_registry(target_engine, target_is_pg)
 
         stats["tables"] = dict(result.tables)
         stats["tables_bootstrapped"] = len(result.tables)
@@ -597,4 +638,5 @@ __all__ = [
     'bootstrap_auth_to_target',
     'database_migration_lock',
     'migrate_data',
+    'start_refusal',
 ]

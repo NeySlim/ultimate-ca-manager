@@ -28,7 +28,7 @@ from services.database_admin.lock import (
     pending_switch_refusal,
 )
 from services.audit_service import AuditService
-from config.settings import is_docker, restart_ucm_service
+from config.settings import Config, is_docker, restart_ucm_service
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +188,11 @@ def _switch_backend():
                 _refusal_status(boot_stats),
             )
     else:
+        # The file DATABASE_PATH names may be left by an older release: the start must accept it
+        refusal = svc.start_refusal(f'sqlite:///{Config.DATABASE_PATH}')
+        if refusal:
+            return error_response(
+                f'The backend was not switched back to SQLite. {refusal}', 409)
         boot_msg = 'Reverting to SQLite default, no bootstrap needed'
         boot_stats = {}
 
