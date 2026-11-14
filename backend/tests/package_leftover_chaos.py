@@ -12,7 +12,7 @@ import shutil
 
 import pytest
 
-from tests.test_package_leftover_archive import KEPT, STAMP, Box, files, snapshot, tree, whole
+from tests.test_package_leftover_archive import KEPT, STAMP, Box, files, named, snapshot, tree, whole
 
 
 CHAOS = ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'rename')
@@ -198,11 +198,11 @@ def _while_failing(box, out, before, data, config, why):
         assert snapshot(box) == before, (why, out.stdout)
         assert not box.parent.exists() or not any(box.parent.iterdir()), (why, out.stdout)
     if out.returncode == 2:
-        lines = [line for line in out.stdout.splitlines() if 'are still in ' in line]
-        assert lines, (why, out.stdout)
-        for line in lines:
-            for path in line.split(':', 1)[1].split():
-                assert os.path.lexists(path), (why, path, out.stdout)
+        # Never an empty list: each path named is really there
+        paths = named(out.stdout)
+        assert paths, (why, out.stdout)
+        for path in paths:
+            assert os.path.lexists(path), (why, path, out.stdout)
     if out.returncode:
         assert 'was not started' in out.stdout, (why, out.stdout)
 

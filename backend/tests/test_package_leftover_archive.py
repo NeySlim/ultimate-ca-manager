@@ -187,6 +187,12 @@ def tree(top):
     return out
 
 
+def named(stdout):
+    """The paths a run that exits 2 names as not put back or cleared."""
+    lines = [line for line in stdout.splitlines() if 'are still in ' in line]
+    return [path for line in lines for path in line.split(':', 1)[1].split()]
+
+
 def files(top):
     return {k: v for k, v in tree(top).items() if v[0] != 'dir'}
 

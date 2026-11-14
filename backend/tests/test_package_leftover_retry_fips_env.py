@@ -1,6 +1,7 @@
 """archive-leftovers.sh retried after any fault, the left ucm.env being exactly the line the
 new one is (UCM_FIPS_BUILD=1), on another filesystem (see package_leftover_chaos)."""
-from tests.package_leftover_chaos import ChaosSuite, _converged, _nothing_lost
+from tests.test_package_leftover_archive import named
+from tests.package_leftover_chaos import ChaosSuite, _converged, _nothing_lost, _while_failing
 
 
 class TestTheLeftConfigurationIsTheFipsLine(ChaosSuite):
@@ -43,4 +44,12 @@ class TestTheLeftConfigurationIsTheFipsLine(ChaosSuite):
                          if name == 'rm' and args[-1].endswith('/config/ucm.env') and n > line_goes)
         box, data, config, before, runs = lab.chain(
             [(journal, 'fail'), (line_goes, 'fail'), (copy_goes, 'kill')], ())
+        _converged(box, runs[-1].out, data, config, self.layout, 'last run')
+
+        # Stopped there, it names what is left: the journal still holding the fips line
+        def check(box, data, config, before, run):
+            assert run.out.returncode == 2, run.out.stdout
+            assert f'{box.archive}/.journal' in named(run.out.stdout), run.out.stdout
+            _while_failing(box, run.out, before, data, config, 'stopped')
+        box, data, config, before, runs = lab.chain([(journal, 'fail'), (line_goes, 'fail')], (), check=check)
         _converged(box, runs[-1].out, data, config, self.layout, 'last run')

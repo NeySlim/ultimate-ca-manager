@@ -207,7 +207,8 @@ roll_back() {
                 if present "$dst" && fips_written "$src"; then
                     rm -f -- "$src" || { unsettled "$src"; break; }
                 fi
-                drop_line "fips$TAB$src$TAB$dst" || { unsettled "$src"; break; } ;;
+                # Stopped here, what is left is the journal with that line and the archive
+                drop_line "fips$TAB$src$TAB$dst" || { unsettled "$JOURNAL"; break; } ;;
             mkdir)
                 if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || unsettled "$dst"; fi ;;
         esac
