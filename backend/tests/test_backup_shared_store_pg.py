@@ -126,7 +126,7 @@ def test_an_archive_made_on_a_is_listed_the_same_on_b_with_its_node(app, auth_cl
 
 # --- 2. Downloadable from every node, byte for byte --------------------------------------------
 
-def test_an_archive_made_on_a_downloads_from_b_after_a_is_gone(app, auth_client, nodes):
+def test_an_archive_made_on_a_downloads_from_b_after_a_is_gone(app, auth_client, nodes, server):
     data = _payload(2 * shared_store.CHUNK_SIZE + 5)
     with app.app_context(), nodes('a'):
         _path, name = storage.create_archive(data)
@@ -134,7 +134,7 @@ def test_an_archive_made_on_a_downloads_from_b_after_a_is_gone(app, auth_client,
     with nodes('b'):
         for url in (f'/api/v2/system/backup/{name}/download',
                     f'/api/v2/settings/backup/{name}/download'):
-            r = auth_client.get(url)
+            r = auth_client.get(url, environ_base=server)
             assert r.status_code == 200, r.data
             assert r.data == data
             assert r.headers['Content-Length'] == str(len(data))
@@ -151,13 +151,13 @@ def _checked_out(app):
         return db.engine.pool.checkedout()
 
 
-def test_a_head_request_gives_its_connection_back(app, auth_client, nodes):
+def test_a_head_request_gives_its_connection_back(app, auth_client, nodes, server):
     data = _payload(shared_store.CHUNK_SIZE + 9)
     with app.app_context(), nodes('a'):
         _path, name = storage.create_archive(data)
     before = _checked_out(app)
     with nodes('b'):
-        r = auth_client.head(f'/api/v2/system/backup/{name}/download')
+        r = auth_client.head(f'/api/v2/system/backup/{name}/download', environ_base=server)
         assert r.status_code == 200 and r.data == b''
         assert r.headers['Content-Length'] == str(len(data))
         r.close()
@@ -180,8 +180,68 @@ def test_a_download_closed_before_its_first_chunk_gives_its_connection_back(app,
 DOWNLOADS = ('/api/v2/system/backup/{}/download', '/api/v2/settings/backup/{}/download')
 
 
+@pytest.fixture(params=['test-client', 'gunicorn'])
+def server(request):
+    """The environ a download meets: the test client's, or gunicorn's (its own wsgi.file_wrapper)."""
+    if request.param == 'test-client':
+        return {}
+    from gunicorn.http.wsgi import FileWrapper
+    return {'wsgi.file_wrapper': FileWrapper}
+
+
+@contextmanager
+def _chunk_reads(app):
+    """The `seq` of every chunk read from the store while the block runs."""
+    from sqlalchemy import event
+    from models import db
+    seen = []
+
+    def record(_conn, _cursor, statement, parameters, _context, _many):
+        if 'backup_archive_chunks' in statement and statement.lstrip().upper().startswith('SELECT'):
+            params = parameters if isinstance(parameters, dict) else {}
+            seen.extend(v for k, v in params.items() if k.startswith('seq'))
+    with app.app_context():
+        engine = db.engine
+    event.listen(engine, 'before_cursor_execute', record)
+    try:
+        yield seen
+    finally:
+        event.remove(engine, 'before_cursor_execute', record)
+
+
+def test_a_resumed_download_reads_from_its_chunk_on(app, auth_client, nodes, server):
+    data = _payload(5 * shared_store.CHUNK_SIZE + 99)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+    start = 3 * shared_store.CHUNK_SIZE + 10
+    with nodes('b'), _chunk_reads(app) as seqs:
+        r = auth_client.get(DOWNLOADS[0].format(name), headers={'Range': f'bytes={start}-'},
+                            environ_base=server)
+        assert r.status_code == 206 and r.data == data[start:]
+        r.close()
+    assert sorted(set(seqs)) == [3, 4, 5], seqs
+
+
+@pytest.mark.parametrize('method, headers', [
+    ('GET', {'Range': 'bytes=10-'}),
+    ('HEAD', {'Range': 'bytes=10-'}),
+    ('GET', {}),
+])
+def test_closing_an_unread_download_gives_its_connection_back(
+        app, auth_client, nodes, server, method, headers):
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(_payload(2 * shared_store.CHUNK_SIZE))
+    before = _checked_out(app)
+    with nodes('b'):
+        r = auth_client.open(DOWNLOADS[0].format(name), method=method, headers=headers,
+                             environ_base=server)
+        assert r.status_code == (206 if headers else 200)
+        r.close()  # no iteration and no garbage collection
+    assert _checked_out(app) == before
+
+
 @pytest.mark.parametrize('route', DOWNLOADS)
-def test_an_interrupted_download_resumes_at_its_byte(app, auth_client, nodes, route):
+def test_an_interrupted_download_resumes_at_its_byte(app, auth_client, nodes, route, server):
     data = _payload(3 * shared_store.CHUNK_SIZE + 333)
     whole = hashlib.sha256(data)
     with app.app_context(), nodes('a'):
@@ -189,12 +249,13 @@ def test_an_interrupted_download_resumes_at_its_byte(app, auth_client, nodes, ro
     url, size, cut = route.format(name), len(data), shared_store.CHUNK_SIZE + 4321
     before = _checked_out(app)
     with nodes('b'):
-        full = auth_client.get(url)
+        full = auth_client.get(url, environ_base=server)
         assert full.status_code == 200 and full.headers['Accept-Ranges'] == 'bytes'
         etag = full.headers['ETag']
         assert etag == f'"{whole.hexdigest()}"'
-        first = auth_client.get(url, headers={'Range': f'bytes=0-{cut - 1}'})
-        rest = auth_client.get(url, headers={'Range': f'bytes={cut}-', 'If-Range': etag})
+        first = auth_client.get(url, headers={'Range': f'bytes=0-{cut - 1}'}, environ_base=server)
+        rest = auth_client.get(url, headers={'Range': f'bytes={cut}-', 'If-Range': etag},
+                               environ_base=server)
     assert (first.status_code, rest.status_code) == (206, 206)
     assert first.headers['Content-Range'] == f'bytes 0-{cut - 1}/{size}'
     assert rest.headers['Content-Range'] == f'bytes {cut}-{size - 1}/{size}'
@@ -208,7 +269,7 @@ def test_an_interrupted_download_resumes_at_its_byte(app, auth_client, nodes, ro
     assert _checked_out(app) == before
 
 
-def test_a_download_honours_suffix_ranges_validators_and_refusals(app, auth_client, nodes):
+def test_a_download_honours_suffix_ranges_validators_and_refusals(app, auth_client, nodes, server):
     data = _payload(2 * shared_store.CHUNK_SIZE + 77)
     with app.app_context(), nodes('a'):
         _path, name = storage.create_archive(data)
@@ -216,18 +277,19 @@ def test_a_download_honours_suffix_ranges_validators_and_refusals(app, auth_clie
     etag = f'"{hashlib.sha256(data).hexdigest()}"'
     before = _checked_out(app)
     with nodes('b'):
-        tail = auth_client.get(url, headers={'Range': 'bytes=-1000'})
+        tail = auth_client.get(url, headers={'Range': 'bytes=-1000'}, environ_base=server)
         assert tail.status_code == 206 and tail.data == data[-1000:]
         assert tail.headers['Content-Range'] == f'bytes {size - 1000}-{size - 1}/{size}'
-        refused = auth_client.get(url, headers={'Range': f'bytes={size}-'})
+        refused = auth_client.get(url, headers={'Range': f'bytes={size}-'}, environ_base=server)
         assert refused.status_code == 416
         assert refused.headers['Content-Range'] == f'bytes */{size}'
-        same = auth_client.get(url, headers={'If-None-Match': etag})
+        same = auth_client.get(url, headers={'If-None-Match': etag}, environ_base=server)
         assert same.status_code == 304 and same.data == b''
         # A changed representation, or several ranges: the whole archive
-        changed = auth_client.get(url, headers={'Range': 'bytes=10-', 'If-Range': '"other"'})
+        changed = auth_client.get(url, headers={'Range': 'bytes=10-', 'If-Range': '"other"'},
+                                  environ_base=server)
         assert changed.status_code == 200 and changed.data == data
-        several = auth_client.get(url, headers={'Range': 'bytes=0-9,20-29'})
+        several = auth_client.get(url, headers={'Range': 'bytes=0-9,20-29'}, environ_base=server)
         assert several.status_code == 200 and several.data == data
     for response in (tail, refused, same, changed, several):
         response.close()  # what the WSGI server does once it has sent the body

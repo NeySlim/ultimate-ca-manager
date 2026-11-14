@@ -402,7 +402,7 @@ def download_response(filename: str):
 
     from flask import Response, request
     from werkzeug.exceptions import RequestedRangeNotSatisfiable
-    from werkzeug.wsgi import wrap_file
+    from werkzeug.wsgi import FileWrapper
 
     opened = _open(filename)
     if opened is None:
@@ -411,8 +411,10 @@ def download_response(filename: str):
     size = int(row.size)
     try:
         digest = base64.b64encode(bytes.fromhex(row.sha256)).decode()
+        # Never the server's wsgi.file_wrapper: gunicorn's cannot seek, so a 206 would read
+        # every chunk before the range, and a Range response could not close the reader
         response = Response(
-            wrap_file(request.environ, reader, buffer_size=row.chunk_size),
+            FileWrapper(reader, buffer_size=row.chunk_size),
             mimetype='application/octet-stream', direct_passthrough=True, headers={
                 'Content-Disposition': f'attachment; filename={filename}',
                 'Repr-Digest': f'sha-256=:{digest}:',
