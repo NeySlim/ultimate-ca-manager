@@ -317,6 +317,58 @@ def test_the_size_ceiling_drops_the_oldest_and_keeps_the_restore_points(app, nod
     assert _stored_names(app) & set(names) == {names[-1]}
 
 
+def _db_now(app):
+    from models import db
+    with app.app_context(), db.engine.connect() as conn:
+        return conn.execute(text("SELECT clock_timestamp() AT TIME ZONE 'UTC'")).scalar()
+
+
+@pytest.fixture
+def node_clock(monkeypatch):
+    """`skew(seconds)`: this node's clock (utc_now, time.time) runs that far from the server's."""
+    import time as real_time
+    import types
+
+    def skew(seconds):
+        fake = types.SimpleNamespace(**{k: getattr(real_time, k) for k in dir(real_time)
+                                        if not k.startswith('__')})
+        fake.time = lambda: real_time.time() + seconds
+        for module in (shared_store, schedule):
+            monkeypatch.setattr(module, 'time', fake)
+            monkeypatch.setattr(module, 'utc_now', lambda: utc_now() + timedelta(seconds=seconds),
+                                raising=False)
+    return skew
+
+
+def test_an_archive_is_dated_on_the_cluster_clock(app, nodes, node_clock):
+    node_clock(40 * 86400)
+    with app.app_context(), nodes('a'):
+        name = storage.create_archive(_payload(1000))[1]
+        created = shared_store.get_archive(name)['created_at']
+    assert abs((created - _db_now(app)).total_seconds()) < 60
+
+
+def test_retention_compares_ages_on_the_cluster_clock(app, nodes, retention_settings, node_clock):
+    retention_settings(backup_retention_days='30', backup_min_keep='1', backup_max_total_mb='0')
+    names = _make(app, nodes, 3, 'a')
+    archives = _tables()[0]
+    from models import db
+    with app.app_context(), db.engine.begin() as conn:
+        conn.execute(archives.update().where(archives.c.filename.in_(names[:2])).values(
+            created_at=text("clock_timestamp() AT TIME ZONE 'UTC' - interval '40 days'")))
+    node_clock(-40 * 86400)
+    with app.app_context(), nodes('a'):
+        assert schedule.run_backup_retention() == 2
+    assert _stored_names(app) & set(names) == {names[-1]}
+
+
+def test_the_age_of_the_last_archive_is_read_on_the_cluster_clock(app, nodes, node_clock):
+    _make(app, nodes, 1, 'a')
+    node_clock(86400)
+    with app.app_context(), nodes('b'):
+        assert schedule.get_schedule()['last_archive_age_seconds'] < 600
+
+
 def test_two_nodes_running_retention_together_delete_once(app, nodes, retention_settings, monkeypatch):
     retention_settings(backup_retention_days='30', backup_min_keep='1', backup_max_total_mb='0')
     old = _make(app, nodes, 3, 'a')

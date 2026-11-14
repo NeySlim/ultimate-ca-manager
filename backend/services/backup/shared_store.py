@@ -11,14 +11,12 @@ import hashlib
 import io
 import logging
 import time
-from datetime import timezone
+from datetime import timedelta, timezone
 
 from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 
 from config.settings import Config
-from utils.datetime_utils import utc_now
-
 from .locking import BackupBusyError
 
 logger = logging.getLogger(__name__)
@@ -38,6 +36,12 @@ def enabled() -> bool:
 def _tables():
     from models.backup_archive import BackupArchive, BackupArchiveChunk
     return BackupArchive.__table__, BackupArchiveChunk.__table__
+
+
+def _now(conn):
+    # Every node writes and compares archive times on the server's clock, never its own
+    from services.scheduler_leader import cluster_utc_now
+    return cluster_utc_now(conn)
 
 
 def _engine():
@@ -84,7 +88,7 @@ def store_archive(data, filename_factory) -> tuple:
             try:
                 with conn.begin_nested():
                     archive_id = conn.execute(insert(archives).values(
-                        filename=filename, node_id=Config.NODE_ID, created_at=utc_now(),
+                        filename=filename, node_id=Config.NODE_ID, created_at=_now(conn),
                         size=0, sha256='', chunk_size=CHUNK_SIZE, chunk_count=0,
                     ).returning(archives.c.id)).scalar_one()
                 break
@@ -114,7 +118,7 @@ def store_archive(data, filename_factory) -> tuple:
                 f"({checked} bytes stored for {size} written)")
 
         conn.execute(update(archives).where(archives.c.id == archive_id).values(
-            size=size, sha256=sha256, chunk_count=count, created_at=utc_now()))
+            size=size, sha256=sha256, chunk_count=count, created_at=_now(conn)))
         conn.commit()
     logger.info("Backup %s stored in the database (%d bytes, %d chunks)", filename, size, count)
     return filename, size, sha256
@@ -128,6 +132,12 @@ def _as_dict(row) -> dict:
         'size': int(row.size),
         'sha256': row.sha256,
     }
+
+
+def age_seconds(created_at) -> int:
+    """Seconds since a stored creation time, on the server's clock."""
+    with _engine().connect() as conn:
+        return max(0, int((_now(conn) - created_at).total_seconds()))
 
 
 def list_archives() -> list:
@@ -323,15 +333,15 @@ def apply_retention(retention_days: int, *, min_keep: int, max_total_bytes: int,
     if not retention_days or retention_days < 1:
         return 0
     archives, chunks = _tables()
-    cutoff = time.time() - retention_days * 86400
     with _engine().connect() as conn:
         _take_lock(conn, wait, 'backup retention')
+        cutoff = _now(conn) - timedelta(days=retention_days)
         rows = conn.execute(select(archives.c.id, archives.c.created_at, archives.c.size)
                             .order_by(archives.c.created_at.desc(), archives.c.id.desc())).all()
         keep = {row.id for row in rows[:max(1, min_keep)]}
         oldest_first = list(reversed(rows))
         victims = [row.id for row in oldest_first
-                   if row.id not in keep and timestamp(row.created_at) < cutoff]
+                   if row.id not in keep and row.created_at < cutoff]
         remaining = [row for row in oldest_first if row.id not in set(victims)]
         if max_total_bytes > 0:
             total = sum(int(row.size) for row in remaining)

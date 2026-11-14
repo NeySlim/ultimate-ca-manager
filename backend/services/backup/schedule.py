@@ -121,7 +121,7 @@ def _newest_validated_archive():
         if not stored:
             return None, None
         newest = stored[0]
-        return newest['filename'], max(0, int(time.time() - shared_store.timestamp(newest['created_at'])))
+        return newest['filename'], shared_store.age_seconds(newest['created_at'])
     paths = _existing_archives()
     newest = storage.newest_validated(paths) if paths else None
     if newest is None:
