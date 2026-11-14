@@ -2741,14 +2741,18 @@ GET /api/v2/system/service/status
 # approved-mode settings it reports (each null when the provider does not
 # report it; the block is null without an active provider). UCM refuses
 # to start when one is not 1 on the OpenSSL FIPS Provider; a distribution
-# module follows its own security policy.
+# module follows its own security policy. "blockers": the blocker findings
+# (id, severity, title, count, examples, remedy) of the FIPS readiness check
+# this node last ran in FIPS mode, at startup or through fips-preflight; null
+# outside FIPS mode or before any check.
 "crypto": {
   "fips_requested": true,
   "fips_active": true,
   "provider_active": true,
   "library": "OpenSSL 3.5.7 9 Jun 2026",
   "provider": {"name": "OpenSSL FIPS Provider", "version": "3.5.9", "buildinfo": "3.5.9"},
-  "module_settings": {"security-checks": 1, "tls1-prf-ems-check": 1, "drbg-no-trunc-md": 1}
+  "module_settings": {"security-checks": 1, "tls1-prf-ems-check": 1, "drbg-no-trunc-md": 1},
+  "blockers": []
 }
 
 # "cluster.nodes" in the response (HA mode): every registered node with node_id, leader,

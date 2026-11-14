@@ -14,6 +14,7 @@ import base64
 import json
 import logging
 import os
+import time
 import warnings
 from typing import Iterable, List, Optional, Tuple
 
@@ -24,7 +25,7 @@ from flask import current_app
 import fips_mode
 from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, DeployTarget,
                     DnsProvider, AcmeClientOrder, HsmKey, HsmProvider, MicrosoftCA,
-                    SSHCertificate, SSHCertificateAuthority, SystemConfig, User)
+                    SSHCertificate, SSHCertificateAuthority, SystemConfig, User, db)
 from security import encryption
 from security.encryption import decrypt_text
 from services.backup import container
@@ -589,10 +590,51 @@ def _https():
 
 # --- run --------------------------------------------------------------------
 
+# Blockers of the last check this process ran in FIPS mode (startup, then the route); None before
+_startup = {'blockers': None}
+
+
+def _blocker_findings(result) -> list:
+    return [f for f in result['findings'] if f['severity'] == BLOCKER]
+
+
 def run(detectors: Optional[Iterable[Detector]] = None) -> dict:
     """Every detector's findings, blockers first; a detector that fails is listed in errors."""
     result = run_detectors(DETECTORS if detectors is None else detectors, label='FIPS preflight')
+    if detectors is None and fips_mode.enabled():
+        _startup['blockers'] = _blocker_findings(result)
     return {'fips_active': fips_mode.enabled(),
             'ready': not result['summary'][BLOCKER] and not result['errors'],
             'summary': result['summary'], 'findings': result['findings'],
             'errors': result['errors'], 'checked': result['checked']}
+
+
+def startup_blockers() -> Optional[list]:
+    """Blocker findings of the last check in FIPS mode, None when none ran."""
+    return _startup['blockers']
+
+
+def log_startup_blockers(log) -> None:
+    """In FIPS mode, one ERROR line per blocker with its remedy; never raises, never stops.
+    Blocker detectors only: none reads certificates but by key, so the cost is one query or a
+    few per family whatever the number of certificates."""
+    if not fips_mode.enabled():
+        return
+    try:
+        started = time.monotonic()
+        result = run_detectors([d for d in DETECTORS if d.severity == BLOCKER],
+                               label='FIPS startup check')
+        db.session.rollback()
+    except Exception as e:
+        log.error('FIPS mode: the readiness check could not run at startup: %s: %s',
+                  type(e).__name__, e)
+        return
+    blockers = _blocker_findings(result)
+    _startup['blockers'] = blockers
+    for f in blockers:
+        log.error('FIPS mode blocker %s: %s (%d: %s). Remedy: %s', f['id'], f['title'], f['count'],
+                  '; '.join(f['examples']), f['remedy'])
+    for e in result['errors']:
+        log.error('FIPS mode: readiness check %s failed at startup: %s', e['id'], e['error'])
+    log.info('FIPS readiness check at startup: %d blocker(s) in %.2f s', len(blockers),
+             time.monotonic() - started)

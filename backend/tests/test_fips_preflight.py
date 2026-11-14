@@ -6,6 +6,7 @@ this file's own on the PostgreSQL bench) inside a transaction it rolls back.
 """
 import base64
 import json
+import logging
 import os
 import uuid
 from contextlib import contextmanager
@@ -18,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519, mldsa, rsa
 from cryptography.x509.oid import NameOID
 from sqlalchemy import create_engine, text
 
+import fips_mode
 from config.settings import Config
 from models import (CA, AcmeClientOrder, Certificate, CertificatePolicy, CertificateTemplate,
                     DeployTarget, DnsProvider, HsmKey, HsmProvider, MicrosoftCA, SSHCertificate,
@@ -634,3 +636,98 @@ def test_every_check_has_its_english_strings_in_the_interface():
     for item in fips_preflight.DETECTORS:
         key = item.id.replace('.', '_')
         assert checks.get(key) == {'title': item.title, 'remedy': item.remedy}, item.id
+
+
+# --- at startup in FIPS mode -----------------------------------------------------
+
+def _seed_two_blockers(session):
+    session.add(User(username='scrypt-at-start', email='start@example.com', password_hash=SCRYPT_HASH))
+    provider = DnsProvider(name='md5-at-start', provider_type='rfc2136')
+    provider.credentials = json.dumps({'server': 'ns', 'tsig_key_name': 'k', 'tsig_key_secret': 's',
+                                       'tsig_algorithm': 'hmac-md5'})
+    session.add(provider)
+    session.flush()
+
+
+def _errors(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+
+
+class TestStartupBlockers:
+    @pytest.fixture(autouse=True)
+    def _forget(self, monkeypatch):
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': None})
+
+    def test_each_blocker_is_an_error_line_with_its_remedy(self, session, monkeypatch, caplog):
+        _seed_two_blockers(session)
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        caplog.set_level(logging.INFO)
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        by_id = {d.id: d for d in fips_preflight.DETECTORS}
+        for detector_id, name in (('users.password_scrypt', 'scrypt-at-start'),
+                                  ('dns.tsig_hmac_md5', 'md5-at-start')):
+            lines = [m for m in _errors(caplog) if detector_id in m]
+            assert len(lines) == 1, _errors(caplog)
+            assert name in lines[0] and by_id[detector_id].remedy in lines[0], lines[0]
+        assert {b['id'] for b in fips_preflight.startup_blockers()} == {
+            'users.password_scrypt', 'dns.tsig_hmac_md5'}
+
+    def test_only_blockers_run_and_their_cost_does_not_grow_with_certificates(self, session,
+                                                                               monkeypatch):
+        from sqlalchemy import event
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        statements = []
+
+        def count(*args):
+            statements.append(args[2])
+
+        event.listen(db.engine, 'before_cursor_execute', count)
+        try:
+            fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+            empty = len(statements)
+            for i in range(25):
+                _leaf(f'many-{i}', _ed25519())
+            del statements[:]
+            fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        finally:
+            event.remove(db.engine, 'before_cursor_execute', count)
+        assert 0 < empty == len(statements)
+        # The certificate table is read only by key (the TSA signer), never scanned
+        scans = [s for s in statements if 'FROM certificates' in s
+                 and 'certificates.id = ' not in s and 'certificates.refid = ' not in s]
+        assert scans == [], scans
+
+    def test_outside_fips_mode_nothing_runs(self, session, monkeypatch, caplog):
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
+        monkeypatch.setattr(fips_preflight, 'run_detectors', lambda *a, **k: pytest.fail('ran'))
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        assert fips_preflight.startup_blockers() is None and _errors(caplog) == []
+
+    def test_a_failure_is_logged_never_raised(self, session, monkeypatch, caplog):
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+
+        def broken(*args, **kwargs):
+            raise RuntimeError('database gone')
+        monkeypatch.setattr(fips_preflight, 'run_detectors', broken)
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        assert any('database gone' in m for m in _errors(caplog)), _errors(caplog)
+        assert fips_preflight.startup_blockers() is None
+
+    def test_a_detector_that_fails_is_an_error_line(self, session, monkeypatch, caplog):
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+
+        def broken():
+            raise RuntimeError('unreadable table')
+        failing = fips_preflight.Detector('users.password_scrypt', fips_preflight.BLOCKER, 't', 'r', broken)
+        monkeypatch.setattr(fips_preflight, 'DETECTORS', [failing])
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        assert any('users.password_scrypt' in m and 'unreadable table' in m for m in _errors(caplog))
+
+    def test_the_preflight_route_refreshes_what_the_status_shows(self, session, monkeypatch):
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        assert fips_preflight.startup_blockers() == []
+        _seed_two_blockers(session)
+        fips_preflight.run()
+        assert {b['id'] for b in fips_preflight.startup_blockers()} == {
+            'users.password_scrypt', 'dns.tsig_hmac_md5'}

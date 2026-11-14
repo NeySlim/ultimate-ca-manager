@@ -615,6 +615,15 @@ def create_app(config_name=None):
                 db.session.rollback()
                 app.logger.error(f"HA: node identifier not claimed at start: {type(e).__name__}: {e}")
 
+    # FIPS mode: each blocker of the readiness check as an ERROR line, on every node; the
+    # operations it names are refused at use, the service itself always starts
+    with app.app_context():
+        try:
+            from services import fips_preflight
+            fips_preflight.log_startup_blockers(app.logger)
+        except Exception as e:
+            app.logger.error(f"FIPS readiness check at startup failed: {type(e).__name__}: {e}")
+
     # Under gunicorn the scheduler process does this before its loop: the master
     # leaves the database alone once the workers are forked
     from services.scheduler_service import supervised

@@ -294,7 +294,15 @@ class TestApi:
         crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
         assert crypto == {'fips_requested': False, 'fips_active': False, 'provider_active': False,
                           'library': fips_mode.library_version(), 'provider': None,
-                          'module_settings': None}
+                          'module_settings': None, 'blockers': None}
+
+    def test_status_carries_the_blockers_found_at_startup(self, auth_client, monkeypatch):
+        from services import fips_preflight
+        found = [{'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1,
+                  'examples': ['alice (#3)'], 'remedy': 'r'}]
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': found})
+        crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
+        assert crypto['blockers'] == found
 
     @pytest.mark.parametrize('active', [True, False])
     def test_health_says_whether_fips_is_on_without_versions(self, client, monkeypatch, active):
@@ -459,3 +467,32 @@ class TestEntrypointGroupsOnTheWire:
     @pytest.mark.parametrize('group', ['X25519', 'X448'])
     def test_refused_alone(self, server, group):
         assert 'Cipher is TLS_' not in self._handshake(server, group)
+
+
+class TestStartupBlockersWiring:
+    """create_app runs the blocker check once the database is ready; its failure never stops it."""
+
+    def test_it_runs_on_the_ready_database(self, monkeypatch):
+        from services import fips_preflight
+        from tests.fresh_app import fresh_app
+        seen = []
+
+        def spy(log):
+            from models import User
+            seen.append(User.query.count())
+        monkeypatch.setattr(fips_preflight, 'log_startup_blockers', spy)
+        with fresh_app():
+            pass
+        assert len(seen) == 1 and seen[0] >= 0
+
+    def test_its_failure_never_stops_the_start(self, monkeypatch, caplog):
+        from services import fips_preflight
+        from tests.fresh_app import fresh_app
+
+        def broken(log):
+            raise RuntimeError('check broken')
+        monkeypatch.setattr(fips_preflight, 'log_startup_blockers', broken)
+        with fresh_app() as application:
+            assert application is not None
+        assert any('check broken' in r.getMessage() for r in caplog.records
+                   if r.levelno == logging.ERROR)

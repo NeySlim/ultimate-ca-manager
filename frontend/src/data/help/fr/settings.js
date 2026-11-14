@@ -540,7 +540,7 @@ Un modèle de certificat peut choisir **Construire le sujet depuis Active Direct
 ## À propos
 
 - **Informations système**, **Liens & Ressources** et le lien **Soutenir UCM** mènent à Ko-fi. Les administrateurs voient aussi une carte Ko-fi masquable une fois par version d'UCM
-- **Vérifier la préparation à FIPS** (admin:system) : liste ce que le mode FIPS refuserait sur cette instance (hachages de mots de passe scrypt, autorités Ed25519, sauvegardes Argon2id, PostgreSQL sans TLS...), avec un remède pour chacun. Rien n'est modifié
+- **Vérifier la préparation à FIPS** (admin:system) : liste ce que le mode FIPS refuserait sur cette instance (hachages de mots de passe scrypt, autorités Ed25519, sauvegardes Argon2id, PostgreSQL sans TLS...), avec un remède pour chacun. Rien n'est modifié. En mode FIPS, ses points bloquants sont aussi écrits dans le journal à chaque démarrage, une ligne d'erreur chacun avec son remède, et l'état du service les porte ; UCM démarre quand même et refuse chaque opération concernée à son usage
 `
   }
 }
