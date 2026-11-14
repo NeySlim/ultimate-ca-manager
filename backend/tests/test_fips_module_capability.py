@@ -776,18 +776,39 @@ class TestPreflight:
         found = fips_preflight._hsm_keys()
         assert f'{key.label} (#{key.id}): EC-BP256' in found, found
 
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_hsm_keys_listed_are_those_sign_refuses(self, monkeypatch, hsm_signing_key, fips_on, approves):
+        from services import fips_preflight
+        from services.hsm import HsmService
+        _module(monkeypatch, approves)
+        keys = [hsm_signing_key(label, _pem(public) if public is not None else None) for label, public in (
+            ('RSA-1024', _rsa_public(1024)), ('RSA-2048', _rsa_public(2048)),
+            ('EC-P256', _ec_public(ec.SECP256R1())), ('UNKNOWN', _ec_public(ec.SECP256K1())),
+            ('EC-BP256', _ec_public(ec.BrainpoolP256R1())),
+            ('ML-DSA-65', mldsa.MLDSA65PrivateKey.generate().public_key()),
+            ('Ed25519', ed25519.Ed25519PrivateKey.generate().public_key()), ('UNKNOWN', None),
+        )]
+        found = fips_preflight._hsm_keys()
+        for key in keys:
+            try:
+                HsmService.sign(key.id, b'tbs')
+                refused = False
+            except FipsRestricted:
+                refused = True
+            listed = any(f.startswith(f'{key.label} (#{key.id})') for f in found)
+            assert listed == refused, (key.algorithm, refused, found)
+        assert [k.algorithm for k in keys if any(f.startswith(f'{k.label} (#') for f in found)] == [
+            'RSA-1024', 'UNKNOWN', 'EC-BP256', 'ML-DSA-65', 'Ed25519', 'UNKNOWN']
+
     def test_ssh_and_hsm_detectors(self, monkeypatch, fips_on):
         from services import fips_preflight
         _module(monkeypatch, ())
         assert fips_preflight._ssh_eddsa('ed25519', None) == 'Ed25519'
         assert fips_preflight._ssh_cert_key_refused('ed25519')
-        assert 'ED25519' in fips_preflight._hsm_unapproved_words()
         _module(monkeypatch, ALL)
         assert fips_preflight._ssh_eddsa('ed25519', None) is None
         assert not fips_preflight._ssh_cert_key_refused('ed25519')
         assert not fips_preflight._ssh_cert_key_refused('ecdsa-p256')
-        # HSM keys sign outside the loaded module: listed whatever it approves
-        assert {'ED25519', 'ED448', 'ML-DSA', 'CHACHA'} <= set(fips_preflight._hsm_unapproved_words())
 
     def test_short_hmac_secrets_are_listed(self, app, auth_client, monkeypatch):
         from services import fips_preflight

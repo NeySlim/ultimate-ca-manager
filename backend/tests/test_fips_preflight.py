@@ -421,16 +421,18 @@ def test_hsm_gcp_grpc(session):
 
 
 def test_hsm_unapproved_keys(session):
+    # Signing keys are judged as HsmService.sign judges them; other keys only for ChaCha20
     provider = HsmProvider(name='Bao', type='openbao', config='{}')
     session.add(provider)
     session.flush()
-    for label, algorithm in (('ed-key', 'Ed25519'), ('chacha-key', 'ChaCha20'),
-                             ('rsa-key', 'RSA-3072'), ('aes-key', 'AES-256'),
-                             ('unreadable', 'UNKNOWN'), ('azure-oct', 'oct-HSM')):
-        session.add(HsmKey(provider_id=provider.id, key_identifier=label, label=label,
-                           algorithm=algorithm, key_type='asymmetric', purpose='signing'))
+    for label, algorithm, purpose in (('ed-key', 'Ed25519', 'signing'), ('chacha-key', 'ChaCha20', 'encryption'),
+                                      ('rsa-key', 'RSA-3072', 'signing'), ('aes-key', 'AES-256', 'encryption'),
+                                      ('unreadable', 'UNKNOWN', 'signing'), ('azure-oct', 'oct-HSM', 'signing')):
+        session.add(HsmKey(provider_id=provider.id, key_identifier=label, label=label, algorithm=algorithm,
+                           key_type='asymmetric' if purpose == 'signing' else 'symmetric', purpose=purpose))
     session.flush()
-    _assert_found('hsm.unapproved_keys', 2, 'ed-key', 'chacha-key')
+    finding = _assert_found('hsm.unapproved_keys', 4, 'ed-key', 'chacha-key', 'unreadable', 'azure-oct')
+    assert not any(e.startswith(('rsa-key', 'aes-key')) for e in finding['examples']), finding['examples']
 
 
 def test_dns_tsig_hmac_md5(session):

@@ -421,24 +421,24 @@ def _gcp():
     return [_named(p.name, p.id) for p in rows]
 
 
-# HSM keys sign outside the loaded module: EdDSA, ML-DSA and Brainpool stay refused whatever it approves
-_HSM_UNAPPROVED = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS', 'ML-DSA', 'EC-BP', 'BRAINPOOL', 'CHACHA')
-
-
-def _hsm_unapproved_words():
-    return _HSM_UNAPPROVED
-
-
 @detector('hsm.unapproved_keys', WARNING,
-          'HSM keys of an algorithm outside FIPS mode (Ed25519, Ed448, ML-DSA, Brainpool, ChaCha20-Poly1305)',
-          'Replace them with RSA, ECDSA or AES keys; in FIPS mode, OpenBao and Vault Transit '
-          'keys of these types are no longer listed.')
+          'HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, '
+          'Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)',
+          'Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao '
+          'and Vault Transit keys of these types are no longer listed.')
 def _hsm_keys():
-    # Only algorithms known to be refused: UNKNOWN or provider-specific types stay out.
-    rows = HsmKey.query.with_entities(HsmKey.id, HsmKey.label, HsmKey.algorithm).order_by(HsmKey.id)
-    words = _hsm_unapproved_words()
-    return [_named(r.label, r.id, r.algorithm) for r in rows.all()
-            if any(word in str(r.algorithm or '').upper() for word in words)]
+    # A signing key is listed iff HsmService.sign refuses it (cached public key, then label, no
+    # provider call); a key that does not sign is listed only for ChaCha20, the cipher FIPS refuses.
+    from services.hsm import HsmService
+    found = []
+    for key in HsmKey.query.order_by(HsmKey.id).all():
+        if key.purpose in ('signing', 'all'):
+            refused = HsmService.fips_signing_refusal(key) is not None
+        else:
+            refused = 'CHACHA' in str(key.algorithm or '').upper()
+        if refused:
+            found.append(_named(key.label, key.id, key.algorithm))
+    return found
 
 
 @detector('dns.tsig_hmac_md5', BLOCKER,

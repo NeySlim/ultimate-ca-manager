@@ -3410,8 +3410,8 @@
           "remedy": "对于必须保持在 FIPS 范围内的密钥，请优先选择 PKCS#11、Azure Key Vault 或 OpenBao 提供商。"
         },
         "hsm_unapproved_keys": {
-          "title": "使用 FIPS 模式之外算法（Ed25519、Ed448、ML-DSA、Brainpool、ChaCha20-Poly1305）的 HSM 密钥",
-          "remedy": "请将其替换为 RSA、ECDSA 或 AES 密钥；在 FIPS 模式下，这些类型的 OpenBao 和 Vault Transit 密钥将不再列出。"
+          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
         },
         "dns_tsig_hmac_md5": {
           "title": "使用 TSIG hmac-md5 签名的 RFC 2136 DNS 提供商：FIPS 模式下 DNS-01 更新将被拒绝",

@@ -3410,8 +3410,8 @@
           "remedy": "FIPS の範囲内に置く必要がある鍵には、PKCS#11、Azure Key Vault、OpenBao のプロバイダーを使用してください。"
         },
         "hsm_unapproved_keys": {
-          "title": "FIPS モードの対象外のアルゴリズム（Ed25519、Ed448、ML-DSA、Brainpool、ChaCha20-Poly1305）の HSM 鍵",
-          "remedy": "RSA、ECDSA、AES の鍵に置き換えてください。FIPS モードでは、これらの種類の OpenBao および Vault Transit の鍵は一覧に表示されなくなります。"
+          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
         },
         "dns_tsig_hmac_md5": {
           "title": "TSIG hmac-md5 で署名する RFC 2136 DNS プロバイダー：FIPS モードでは DNS-01 の更新が拒否されます",

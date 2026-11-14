@@ -3410,8 +3410,8 @@
           "remedy": "Für Schlüssel, die im FIPS-Bereich bleiben müssen, einen PKCS#11-, Azure-Key-Vault- oder OpenBao-Provider bevorzugen."
         },
         "hsm_unapproved_keys": {
-          "title": "HSM-Schlüssel eines Algorithmus außerhalb des FIPS-Modus (Ed25519, Ed448, ML-DSA, Brainpool, ChaCha20-Poly1305)",
-          "remedy": "Durch RSA-, ECDSA- oder AES-Schlüssel ersetzen; im FIPS-Modus werden OpenBao- und Vault-Transit-Schlüssel dieser Typen nicht mehr aufgelistet."
+          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
         },
         "dns_tsig_hmac_md5": {
           "title": "RFC-2136-DNS-Provider mit TSIG-hmac-md5-Signatur: DNS-01-Updates werden im FIPS-Modus abgelehnt",
