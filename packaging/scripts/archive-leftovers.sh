@@ -226,8 +226,10 @@ fail() {
         [ -z "$MADE_PARENT" ] || rmdir -- "$PARENT" 2>/dev/null
         say "Nothing was moved."
     fi
-    say "UCM was not started. Free space or fix the cause, then run as root:"
-    say "  sh $UCM_HOME/scripts/archive-leftovers.sh $UCM_HOME $DATA $CONFIG && systemctl start ucm"
+    say "UCM was not started. Fix the cause, then run as root:"
+    say "  sh $UCM_HOME/scripts/archive-leftovers.sh $UCM_HOME $DATA $CONFIG"
+    say "and set up the new installation: dpkg-reconfigure ucm (Debian, Ubuntu) or"
+    say "dnf reinstall ucm (RHEL, Fedora)."
     exit 1
 }
 if [ ! -d "$PARENT" ]; then
