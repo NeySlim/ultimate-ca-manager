@@ -4,7 +4,7 @@ Settings - Backup management + schedule + history routes
 
 from flask import request, send_file
 from auth.unified import require_auth
-from utils.ha import reject_in_ha
+from services import cluster_maintenance
 from utils.sanitize import client_filename
 from utils.pagination import parse_request_pagination
 from utils.response import success_response, error_response, no_content_response
@@ -17,7 +17,8 @@ from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
 from services.backup.restore_report import safe_restore_audit_details
 from services.backup.restore_completion import (
-    record_failure, record_request_refusal, record_restore, request_restart, restore_message)
+    maintenance_refusal, record_failure, record_request_refusal, record_restore, request_restart,
+    restore_actor, restore_message)
 from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
@@ -154,7 +155,6 @@ def create_backup():
 
 @bp.route('/api/v2/settings/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])
-@reject_in_ha()
 def restore_backup():
     """Restore from backup file.
 
@@ -226,82 +226,91 @@ def restore_backup():
         # A restore rewrites the whole database, which is the largest
         # concurrent write a migration could be reading through. Both take the
         # same lock so one never sees the other half-done.
-        service = BackupService()
-        try:
-            with database_migration_lock(purpose='the restore'), \
-                    backup_operation_lock(purpose='the restore'):
-                results = service.restore_backup_from_stream(file.stream, password)
-        except MigrationBusyError as busy:
-            record_request_refusal(audited_name, 'a backend migration or another restore is running')
-            return error_response(
-                f"{busy} A backend migration or another restore is still "
-                "running.", 409)
-        except BackupBusyError as busy:
-            record_request_refusal(audited_name, 'a backup or another restore is running')
-            return error_response(f"{busy} Retry once it has finished.", 409)
+        # HA: every node refuses writes from here until the restore ends (services.cluster_maintenance)
+        with cluster_maintenance.restore_window(restore_actor()) as maintenance:
+            service = BackupService()
+            try:
+                with database_migration_lock(purpose='the restore'), \
+                        backup_operation_lock(purpose='the restore'):
+                    results = service.restore_backup_from_stream(file.stream, password)
+            except MigrationBusyError as busy:
+                record_request_refusal(audited_name, 'a backend migration or another restore is running')
+                return error_response(
+                    f"{busy} A backend migration or another restore is still "
+                    "running.", 409)
+            except BackupBusyError as busy:
+                record_request_refusal(audited_name, 'a backup or another restore is running')
+                return error_response(f"{busy} Retry once it has finished.", 409)
 
-        # Recorded before the archive is judged empty or not, as the system
-        # route does: a file that restored nothing was still uploaded and
-        # still deserves a line, and returning first meant it left no trace
-        # on one page and a trace on the other. What the line says depends on
-        # which of the two happened, because an entry reading "Restored from
-        # backup" beside a response reading "nothing was restored" is a trail
-        # that has to be argued with.
-        try:
-            _carried = bool((results or {}).get('sections_carried'))
-            record_restore(
-                action='system_restore',
-                resource_type='system',
-                resource_name=audited_name,
-                details=safe_restore_audit_details(audited_name, results),
-                success=True
-            )
-
-            # An archive that carried no section changed nothing, so there is
-            # nothing to invalidate and no reason to sign everyone out and ask for
-            # a restart. Announced as a restore, it revoked every session that was
-            # open, the caller's included, for a file that touched not one row.
-            if not _carried:
-                logger.warning('Restore: the archive carried no data section')
-                return success_response(
-                    data=results,
-                    message=('The archive carried no data: nothing was restored, '
-                             'no session was revoked and no restart is needed.'),
+            # Recorded before the archive is judged empty or not, as the system
+            # route does: a file that restored nothing was still uploaded and
+            # still deserves a line, and returning first meant it left no trace
+            # on one page and a trace on the other. What the line says depends on
+            # which of the two happened, because an entry reading "Restored from
+            # backup" beside a response reading "nothing was restored" is a trail
+            # that has to be argued with.
+            try:
+                _carried = bool((results or {}).get('sections_carried'))
+                record_restore(
+                    action='system_restore',
+                    resource_type='system',
+                    resource_name=audited_name,
+                    details=safe_restore_audit_details(audited_name, results),
+                    success=True
                 )
 
-            from services.backup.restore.invalidate import invalidate_after_restore
-            try:
-                invalidated = invalidate_after_restore()
+                # An archive that carried no section changed nothing, so there is
+                # nothing to invalidate and no reason to sign everyone out and ask for
+                # a restart. Announced as a restore, it revoked every session that was
+                # open, the caller's included, for a file that touched not one row.
+                if not _carried:
+                    if maintenance:
+                        maintenance.lift_unchanged()
+                    logger.warning('Restore: the archive carried no data section')
+                    return success_response(
+                        data=results,
+                        message=('The archive carried no data: nothing was restored, '
+                                 'no session was revoked and no restart is needed.'),
+                    )
+
+                from services.backup.restore.invalidate import invalidate_after_restore
+                try:
+                    invalidated = invalidate_after_restore()
+                except Exception:
+                    logger.exception("Restore: sessions could not be revoked")
+                    return error_response(
+                        'Backup restored, but the sessions opened before it could not '
+                        'be revoked. Restart the application before using it.', 500)
+
+                # The restart is part of the restore, not homework for the operator:
+                # the workers hold the authorities, the keys and the identities the
+                # restore has just replaced. The System route had always asked for it
+                # while this one told the operator to do it themselves, so the same
+                # archive left the service running or not depending on the page.
+                results['invalidated'] = invalidated
+                restart_ok, restart_detail = (maintenance.finish() if maintenance
+                                              else request_restart())
+                results['restart_requested'] = restart_ok
+                results['restart_detail'] = restart_detail
+
+                # And the whole of `results`, not a two-key summary: what the archive
+                # said about itself, the sections this version does not restore
+                # included, reached a client from one page and not the other.
+                results['filename'] = file.filename
+                return success_response(
+                    data=results,
+                    message=restore_message(results),
+                )
             except Exception:
-                logger.exception("Restore: sessions could not be revoked")
+                # The restore is committed and already audited as a success: no second, contradicting line
+                logger.exception('Restore: finishing after the restore failed')
                 return error_response(
-                    'Backup restored, but the sessions opened before it could not '
-                    'be revoked. Restart the application before using it.', 500)
-
-            # The restart is part of the restore, not homework for the operator:
-            # the workers hold the authorities, the keys and the identities the
-            # restore has just replaced. The System route had always asked for it
-            # while this one told the operator to do it themselves, so the same
-            # archive left the service running or not depending on the page.
-            results['invalidated'] = invalidated
-            restart_ok, restart_detail = request_restart()
-            results['restart_requested'] = restart_ok
-            results['restart_detail'] = restart_detail
-
-            # And the whole of `results`, not a two-key summary: what the archive
-            # said about itself, the sections this version does not restore
-            # included, reached a client from one page and not the other.
-            results['filename'] = file.filename
-            return success_response(
-                data=results,
-                message=restore_message(results),
-            )
-        except Exception:
-            # The restore is committed and already audited as a success: no second, contradicting line
-            logger.exception('Restore: finishing after the restore failed')
-            return error_response(
-                'Backup restored, but finishing the restore failed. '
-                'Restart the application before using it.', 500)
+                    'Backup restored, but finishing the restore failed. '
+                    'Restart the application before using it.', 500)
+    except cluster_maintenance.MaintenanceRefused as refused:
+        logger.warning(f"Settings restore refused: {refused}")
+        record_request_refusal(audited_name, 'the cluster maintenance could not be held')
+        return maintenance_refusal(refused)
     except FipsRestricted:
         record_failure('system_restore', audited_name, 'Restore refused: not allowed in FIPS mode')
         raise  # the app maps it to its problem type, message unchanged

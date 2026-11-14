@@ -2390,7 +2390,7 @@ GET /api/v2/settings/backup/history
 # Download backup (Range, ETag and Repr-Digest as for /api/v2/system/backup/{filename}/download)
 GET /api/v2/settings/backup/{backup_id}/download
 
-# Restore backup
+# Restore backup (in HA, as POST /api/v2/system/backup/restore: see Backup Operations)
 POST /api/v2/settings/backup/restore
 Content-Type: multipart/form-data
 
@@ -2468,8 +2468,35 @@ POST /api/v2/system/backup/create
 # and a Range of several ranges gets the whole archive (200).
 GET /api/v2/system/backup/{filename}/download
 
-# Restore backup
+# Restore backup (also POST /api/v2/system/restore; multipart "file", "password", optional "mode")
 POST /api/v2/system/backup/restore
+```
+
+In HA mode a restore holds the cluster maintenance (see [HA](HA.md#restoring-a-backup)). It answers `409` with
+code `maintenance_in_progress` while another maintenance holds, `maintenance_not_acknowledged` when a node with a
+fresh heartbeat did not acknowledge it within 30 s (`nodes` maps each one to the processes missing, `web` or
+`scheduler`), and `maintenance_lost` when the maintenance ended or was lifted before the commit; in each case
+nothing is restored. A successful restore answers `restart_detail` "Rolling restart requested: the nodes
+restart one at a time".
+
+### Cluster Maintenance (HA)
+`admin:system`. A node in maintenance answers its writes with `503`, `Retry-After: 30` and code `maintenance`;
+these three routes stay served. Outside HA, `POST` and `DELETE` answer `409`.
+```http
+# The maintenance (reason, phase, node_id, actor, started_at, expires_at, restored_at, or null),
+# whether the answering node refuses writes, and each node's acknowledgement
+GET /api/v2/system/maintenance
+
+# Set it by hand (or extend a manual one), once every fresh node acknowledged it;
+# 409 maintenance_not_acknowledged (with "nodes") or maintenance_in_progress otherwise
+POST /api/v2/system/maintenance
+Content-Type: application/json
+
+{"lease_minutes": 60}
+
+# Lift it, from any node; a restore that committed is completed first (sessions revoked,
+# rolling restart requested)
+DELETE /api/v2/system/maintenance
 ```
 
 ### Chain Repair

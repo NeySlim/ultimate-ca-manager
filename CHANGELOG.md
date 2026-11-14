@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- **Backup restore in HA.** A restore runs from any node: every node first acknowledges a cluster maintenance, during which it refuses writes with 503 and `Retry-After` and leaves `/health/ready`, then the restore commits or rolls back as on a single node and each node serves the restored state after its turn of the rolling restart (see docs/HA.md). `/api/v2/system/maintenance` sets, shows and lifts the same maintenance by hand around a restore with PostgreSQL's own tools.
 - **HA backups are shared.** In HA, scheduled and manual backup archives are stored in PostgreSQL: every node lists the same ones with the node that wrote them, downloads any of them byte for byte even once that node is gone, and retention runs once, on the leader. Settings > Backup says that these archives are lost with the database and are to be downloaded out of the cluster (see docs/HA.md).
 - **No SoftHSM token in HA mode.** With `UCM_HA` the image no longer creates its default token, and creating a SoftHSM provider, pointing one at SoftHSM, generating or syncing its keys, or creating a CA on a new or existing SoftHSM key answers `409` `ha_mode`. A SoftHSM provider already in the database is kept, named in a warning at start, and keeps signing on the node that holds its token.
 - **3.0 upgrades a database last started by 2.254.** Install 2.254 and start it once before installing 3.0: a database whose registry lacks a migration of 2.254, or has no registry, is refused at startup with the number of missing migrations, and nothing in it is changed (see UPGRADE.md). A registry naming a migration that neither 2.254 nor this release knows, recorded by a later release or by hand, is refused the same way.
@@ -75,6 +76,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Restore: a request or task that committed on the same node while a restore ran had its commit silently turned into a flush and lost; only the restore's own session is now held to one transaction.
 - Settings: `max_login_attempts` under 3, the settings screen's minimum, is refused (400) instead of locking every login at its first failure, and a lower value already stored is applied as 3.
 - CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum, and so is a CA key that cannot be read; the same CA without a key is still imported. In a batch only that CA is skipped and named.
 - OPNsense import and smart import chain a CA under the stored CA whose key signed it, whatever the order of the batch, instead of leaving it unlinked or taking a CA of the same name. A CA whose parent signature cannot be verified here (a parent key type the server does not handle, such as SLH-DSA or GOST) is imported without a parent, where smart import used to attach it by name.

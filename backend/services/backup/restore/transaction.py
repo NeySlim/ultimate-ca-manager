@@ -37,6 +37,9 @@ def single_transaction():
     session.rollback = refuse_rollback
     try:
         yield session
+        # HA: the cluster maintenance is still this restore's, or everything rolls back
+        from services.cluster_maintenance import before_restore_commit
+        before_restore_commit(session)
         session.commit = real_commit
         session.rollback = real_rollback
         session.commit()

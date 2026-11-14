@@ -46,6 +46,7 @@ resort; a failed test's report carries both nodes' logs.
 | `test_startup.py` | both nodes started on an empty schema: the schema is built once, every migration recorded, both ready |
 | `test_health.py` | each `/health` reports its own `node_id` and the same `cluster` state |
 | `test_bench.py` | a closed cluster leaves no process, schema or database session |
+| `test_restore.py` | a restore on node A while node B issues: B refuses from its acknowledgement of the maintenance on, both nodes restart in turn, then B serves the restored state and issues again |
 
 The leader lock is database-wide: run the bench on a database no other UCM
 instance or PostgreSQL test uses at the same time.

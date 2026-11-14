@@ -9,11 +9,13 @@ ROUTES = [
     '/api/v2/database/switch',
     '/api/v2/database/migrate',
     '/api/v2/system/security/rotate-secrets',
+]
+# A restore holds the cluster maintenance in HA (services.cluster_maintenance), never 409 ha_mode
+RESTORE_ROUTES = [
     '/api/v2/system/restore',
     '/api/v2/system/backup/restore',
     '/api/v2/settings/backup/restore',
 ]
-RESTORE_ROUTES = [r for r in ROUTES if 'restore' in r]
 
 
 @pytest.mark.parametrize('path', ROUTES)
@@ -26,11 +28,13 @@ def test_route_refused_in_ha(auth_client, monkeypatch, path):
     assert body['status'] == 409
 
 
+@pytest.mark.parametrize('ha', [False, True])
 @pytest.mark.parametrize('path', RESTORE_ROUTES)
-def test_restore_route_keeps_its_usual_answer_without_ha(auth_client, monkeypatch, path):
-    monkeypatch.setattr(Config, 'HA_MODE', False)
+def test_restore_route_keeps_its_usual_answer_with_or_without_ha(auth_client, monkeypatch, path, ha):
+    monkeypatch.setattr(Config, 'HA_MODE', ha)
     r = auth_client.post(path, data={})
     assert r.status_code == 400, r.data
+    assert (r.get_json() or {}).get('code') != 'ha_mode'
 
 
 def test_decorator_passes_through_without_ha(monkeypatch):
