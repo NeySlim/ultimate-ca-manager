@@ -6,6 +6,7 @@ from typing import Optional, Tuple, List
 from datetime import datetime, timedelta
 import secrets
 import base64
+import hashlib
 import hmac
 import json
 
@@ -26,6 +27,7 @@ from webauthn.helpers.structs import (
 )
 from webauthn.helpers.cose import COSEAlgorithmIdentifier
 
+import fips_mode
 from models import db, User
 from models.webauthn import WebAuthnCredential, WebAuthnChallenge
 import logging
@@ -288,8 +290,12 @@ class WebAuthnService:
         """
         rp_id = get_rp_id(hostname)
         challenge_bytes = secrets.token_bytes(32)
+        key = secret or b'ucm-webauthn-decoy'
+        # The FIPS module refuses a key under 14 bytes: condensed, or a 500 would name the phantom
+        if fips_mode.enabled() and len(key) < fips_mode.MIN_HMAC_KEY_BYTES:
+            key = hashlib.sha256(key).digest()
         decoy_id = hmac.digest(
-            secret or b'ucm-webauthn-decoy',
+            key,
             b'webauthn-decoy:' + username.strip().lower().encode('utf-8'),
             'sha256',
         )

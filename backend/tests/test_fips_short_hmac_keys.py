@@ -173,3 +173,44 @@ def test_a_sign_in_with_a_short_secret_key_answers_the_fips_problem(app, create_
         'username': 'fips-short-key', 'password': 'Short-Key-Pass-123!'})
     assert r.status_code == 400 and r.get_json()['type'] == fips_mode.PROBLEM_TYPE, r.get_json()
     _fips_refusal(r.get_json().get('detail') or r.get_json(), 'SECRET_KEY')
+
+
+def test_inwx_refuses_before_the_password_leaves(module_refusal, monkeypatch):
+    from services.acme.dns_providers.inwx import InwxDnsProvider
+    secret = base64.b32encode(b'\x01' * 10).decode()
+    provider = InwxDnsProvider({'username': 'u', 'password': 'p', 'shared_secret': secret})
+    sent = []
+    monkeypatch.setattr(provider, '_rpc_call', lambda method, params: sent.append(method) or (True, {'tfa': 1}))
+    with pytest.raises(fips_mode.FipsRestricted) as refused:
+        provider._login()
+    _fips_refusal(refused.value, 'INWX shared secret')
+    assert sent == []
+
+
+def _decoy_id(app, username):
+    r = app.test_client().post('/api/v2/auth/login/webauthn/start', json={'username': username})
+    assert r.status_code == 200, r.get_data(as_text=True)
+    return r.get_json()['data']['options']['allowCredentials'][0]['id']
+
+
+def test_a_phantom_user_gets_a_decoy_with_a_short_secret_key(module_refusal, app, monkeypatch):
+    """A 500 here would tell a phantom user from one holding a key."""
+    monkeypatch.setattr(app, 'secret_key', 'short-key')
+    first = _decoy_id(app, 'nobody-here')
+    assert first == _decoy_id(app, 'nobody-here')  # stable per username
+    assert first != _decoy_id(app, 'nobody-else')
+
+
+def test_the_decoy_of_a_long_secret_key_is_unchanged_in_fips_mode(module_refusal, app, monkeypatch):
+    import hashlib
+    monkeypatch.setattr(app, 'secret_key', 'k' * 32)
+    expected = hmac.new(b'k' * 32, b'webauthn-decoy:nobody-here', hashlib.sha256).digest()
+    assert _decoy_id(app, 'nobody-here') == base64.urlsafe_b64encode(expected).rstrip(b'=').decode()
+
+
+def test_the_decoy_of_a_short_secret_key_is_unchanged_outside_fips_mode(app, monkeypatch):
+    import hashlib
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
+    monkeypatch.setattr(app, 'secret_key', 'short-key')
+    expected = hmac.new(b'short-key', b'webauthn-decoy:nobody-here', hashlib.sha256).digest()
+    assert _decoy_id(app, 'nobody-here') == base64.urlsafe_b64encode(expected).rstrip(b'=').decode()

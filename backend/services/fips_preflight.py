@@ -666,8 +666,8 @@ def startup_state() -> dict:
 
 def log_startup_blockers(log) -> None:
     """In FIPS mode, one ERROR line per blocker with its remedy; never raises, never stops.
-    Blocker detectors only: none reads certificates but by key, so the cost is one query or a
-    few per family whatever the number of certificates."""
+    Blocker detectors only: none reads certificates but by key, so the cost is about one
+    query per check whatever the number of certificates."""
     if not fips_mode.enabled():
         return
     try:

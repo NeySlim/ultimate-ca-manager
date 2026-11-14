@@ -507,6 +507,35 @@ def test_session_secret_key_under_14_bytes(session, app, monkeypatch, env, store
         assert finding is None, finding
 
 
+def test_session_secret_key_from_the_environment_is_judged_when_the_stored_one_did_not_open(
+        session, app, monkeypatch):
+    """At start a stored key that does not open leaves the environment's key signing."""
+    from security import encryption, session_key
+    monkeypatch.setitem(app.config, 'SECRET_KEY', 'short-key')
+    monkeypatch.setitem(app.extensions, 'ucm_session_key', {'env': 'short-key', 'source': 'environment'})
+    monkeypatch.setattr(encryption.key_encryption, 'is_encrypted', lambda value: True)
+
+    def decrypt(value, kind):
+        raise ValueError('another key')
+    monkeypatch.setattr(encryption, 'decrypt_master_key_value', decrypt)
+    _config(session_key.ACTIVE_KEY, 'sealed')
+    finding = _finding(fips_preflight.run(), 'session.short_secret_key')
+    assert finding and finding['examples'] == ['9 bytes'], finding
+
+
+def test_a_session_key_read_that_fails_leaves_the_session_usable(session, app, monkeypatch):
+    """PostgreSQL aborts the transaction of a failed statement: the next check must not inherit it."""
+    from sqlalchemy import text
+    from models import db
+    from security import session_key
+
+    def broken():
+        db.session.execute(text('SELECT missing FROM no_such_table_fips36'))
+    monkeypatch.setattr(session_key, '_read_rows', broken)
+    assert session_key.signing_key(app) is None
+    assert db.session.execute(text('SELECT 1')).scalar() == 1
+
+
 def test_msca_winrm_ntlm(session):
     for name, transport, enabled in (('ntlm-ca', 'ntlm', True), ('krb-ca', 'kerberos', True),
                                      ('off-ca', 'ntlm', False)):

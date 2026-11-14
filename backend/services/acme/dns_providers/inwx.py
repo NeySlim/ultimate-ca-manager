@@ -88,6 +88,8 @@ class InwxDnsProvider(BaseDnsProvider):
             'pass': self.credentials['password']
         }
         
+        if self.credentials.get('shared_secret'):  # refused before the password leaves
+            fips_mode.refuse_short_hmac_key(self.hmac_key(self.credentials), self.HMAC_SECRET_NAME)
         success, result = self._rpc_call('account.login', params)
         if not success:
             return False, result
