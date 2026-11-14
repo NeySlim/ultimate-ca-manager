@@ -502,13 +502,63 @@ def show_status():
         engine.dispose()
 
 
+# Exit codes of `check`; any other code (a crash) means the answer is unknown
+CHECK_STARTABLE, CHECK_FRESH, CHECK_REFUSED, CHECK_UNREADABLE = 0, 3, 4, 5
+
+
+def _read_only_engine(db_url: str):
+    """An engine that never writes: SQLite opened mode=ro, so a missing file is never created."""
+    if db_url.startswith("sqlite:///"):
+        from urllib.parse import quote
+        uri = f"file:{quote(db_url[len('sqlite:///'):])}?mode=ro"
+        return create_engine("sqlite://", creator=lambda: sqlite3.connect(uri, uri=True))
+    args = dict(postgres_connect_args(db_url))
+    if _is_postgres(db_url) and "connect_timeout" not in db_url:
+        args["connect_timeout"] = 10
+    return create_engine(sqlalchemy_url(db_url), hide_parameters=True, connect_args=args)
+
+
+def check_database() -> int:
+    """For the package scripts: whether this release starts on the configured database.
+
+    Prints the backend first ("sqlite <path>" or "postgresql"), then the reason of a
+    refusal or of an unreadable database, and returns one of the CHECK_* codes.
+    """
+    db_url = _get_db_url()
+    sqlite_path = db_url[len("sqlite:///"):] if db_url.startswith("sqlite:///") else None
+    say(f"sqlite {sqlite_path}" if sqlite_path else
+        "postgresql" if _is_postgres(db_url) else "other")
+    if sqlite_path is not None and not os.path.lexists(sqlite_path):
+        return CHECK_FRESH
+    try:
+        engine = _read_only_engine(db_url)
+        try:
+            # _get_state takes a table listing that fails for an empty file: read it here first
+            with engine.connect() as conn:
+                if sqlite_path is not None:
+                    conn.execute(text("SELECT name FROM sqlite_master LIMIT 1")).fetchall()
+            state, applied = _get_state(engine)
+        finally:
+            engine.dispose()
+    except Exception as exc:  # noqa: BLE001
+        cause = getattr(exc, "orig", None) or exc
+        # Never the URL: only the driver's first line, which names no password
+        say(f"unreadable: {type(cause).__name__}: {str(cause).splitlines()[0] if str(cause) else ''}")
+        return CHECK_UNREADABLE
+    refusal = pivot_refusal(state, applied)
+    if refusal:
+        say(refusal)
+        return CHECK_REFUSED
+    return CHECK_FRESH if state == "fresh" else CHECK_STARTABLE
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="UCM Database Migration Runner")
     parser.add_argument(
         "command",
-        choices=["run", "status", "dry-run", "mark-applied"],
+        choices=["run", "status", "dry-run", "mark-applied", "check"],
         nargs="?",
         default="status",
     )
@@ -517,6 +567,8 @@ if __name__ == "__main__":
 
     if args.command == "status":
         show_status()
+    elif args.command == "check":
+        sys.exit(check_database())
     elif args.command == "dry-run":
         run_all_migrations(dry_run=True, verbose=args.verbose)
     elif args.command == "run":
