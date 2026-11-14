@@ -1142,3 +1142,16 @@ def test_an_override_on_a_shared_subject_keeps_b_with_its_a(app, auth_client, ce
         with app.app_context():
             db.session.get(CA, ca_id).enforce_unique_subject = False
             db.session.commit()
+
+
+def test_b_signed_for_an_acme_account_keeps_the_account_as_its_holder(app, cert_a, unique_subject_on):
+    """The path's identity wins over A's lineage (``successor_holder``): B is the account's."""
+    from services.cert_service import CertificateService
+    row_id = cert_a[0]
+    csr_id = _generate_b(app, row_id)
+    with app.app_context():
+        signed = CertificateService.sign_csr(
+            cert_id=csr_id, caref=_signing_ca(row_id)[0].refid, validity_days=30, cert_type='server_cert',
+            username='acme', subject_holder='acme:b-account', source='acme')
+        b = db.session.get(Certificate, signed.id)
+        assert (b.related_certificate_id, b.subject_holder) == (row_id, 'acme:b-account')

@@ -1407,7 +1407,8 @@ def approve_approval_request(request_id, comment=None):
             from services.policy_service import PolicyViolation
             from services.cert.renewal import RenewalError
             from services.cert.related_pair import RelatedCertificateRefused
-            if isinstance(e, RelatedCertificateRefused) or (
+            from services.cert.unique_subject import SubjectTaken
+            if isinstance(e, (RelatedCertificateRefused, SubjectTaken)) or (
                     isinstance(e, RenewalError) and e.status < 500):
                 # A refusal the approver is told about, not a failure
                 logger.warning(f"Certificate for approval #{approval.id} refused: {e}")
@@ -1415,7 +1416,6 @@ def approve_approval_request(request_id, comment=None):
                 logger.error(f"Failed to issue certificate for approval #{approval.id}: {e}",
                              exc_info=True)
             from services.protocol_approval import GENERIC_ISSUE_ERROR, is_key_material_error
-            from services.cert.unique_subject import SubjectTaken
             from utils.custom_extensions import TemplateConfigError
             if isinstance(e, SubjectTaken):
                 issue_error = e.audited[:1].upper() + e.audited[1:]  # the approver may know the serial

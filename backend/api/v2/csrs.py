@@ -1030,9 +1030,7 @@ def sign_csr(csr_id):
         return error_response('CSR already signed', 400)
     
     data = request.get_json(silent=True) or {}
-    override, override_refusal = override_requested(data)
-    if override_refusal:
-        return override_refusal
+    override = override_requested(data)
     ca_id = data.get('ca_id')
     validity_days = coerce_validity_days(data.get('validity_days', 365))
     if validity_days is None:

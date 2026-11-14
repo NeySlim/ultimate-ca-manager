@@ -398,13 +398,19 @@ def test_a_taken_subject_matching_no_template_is_refused_as_held_by_another(app,
 @pytest.mark.parametrize('sid', [SID, None], ids=['sid', 'no-sid'])
 def test_a_kerberos_renewal_without_template_is_its_own_holder_once_the_option_is_on(
         app, client, world, realm_a, unique_a, sid):
-    """The renewed template-less certificate proves the same entity, a new key and no SID notwithstanding."""
+    """The renewed template-less certificate proves the same entity, a new key and no SID notwithstanding.
+    With a SID on the old certificate the SID alone proves it (this case passes without the renewed
+    rows); without, only the renewed rows do. The directory's SID is the new row's holder either way."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     old = _template_less_certificate(app, world, key, sid=sid)
     unique_a()
     r = _renew(client, world, MACHINE, old, key)
     assert r.status_code == 200, r.data
-    assert _issued_cert_from_rstr(r.data).subject.rfc4514_string() == 'CN=hosta.c04a.test'
+    issued = _issued_cert_from_rstr(r.data)
+    assert issued.subject.rfc4514_string() == 'CN=hosta.c04a.test'
+    with app.app_context():
+        new_row = Certificate.query.filter_by(serial_number=str(issued.serial_number)).one()
+        assert new_row.subject_holder == f'sid:{SID}'
 
 
 def test_a_kerberos_renewal_without_template_of_a_subject_another_holds_is_a_fault(
@@ -413,5 +419,29 @@ def test_a_kerberos_renewal_without_template_of_a_subject_another_holds_is_a_fau
     old = _template_less_certificate(app, world, key, sid=None)
     _held_by_another(app, world, 'hosta.c04a.test')
     unique_a()
+    floor = _top_audit(app)
     assert _fault(_renew(client, world, MACHINE, old, key)) == (
         400, 's:Sender', 'The subject CN=hosta.c04a.test is already carried by a certificate of another account')
+    # One entry, as the common name pattern's own check writes
+    assert [a[0] for a in _audits(app, floor)] == ['windows_enrollment.refused']
+
+
+def test_the_option_off_looks_up_no_renewed_row_on_the_wstep_trunk(
+        app, client, world, realm_a, unique_a, monkeypatch):
+    """The renewed certificate's rows are read for the subject rule only: none with the option off."""
+    from services.cert import issued_lookup
+    looked_up, real = [], issued_lookup.find_issued_rows
+
+    def counted(ca, cert):
+        looked_up.append(cert.serial_number)
+        return real(ca, cert)
+    monkeypatch.setattr(issued_lookup, 'find_issued_rows', counted)
+    counts = []
+    for on in (True, False):
+        unique_a(on)
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        old = _template_less_certificate(app, world, key, sid=None)
+        looked_up.clear()
+        assert _renew(client, world, MACHINE, old, key).status_code == 200
+        counts.append(looked_up.count(old.serial_number))
+    assert counts[0] - counts[1] == 1, counts

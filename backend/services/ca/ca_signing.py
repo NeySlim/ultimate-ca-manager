@@ -167,6 +167,7 @@ class CASigningMixin:
         unique_subject: bool = False,
         subject_holder: str = None,
         renews: list = None,
+        audit_subject_refusal: bool = True,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -220,6 +221,7 @@ class CASigningMixin:
             subject_holder: the requester's identity recorded on the row (WSTEP: its SID).
             renews: rows of a designated renewal that ``supersedes`` does not archive (WSTEP's
                 template-less Kerberos renewal): the same entity, whose lineage the row inherits.
+            audit_subject_refusal: False when the caller audits a SubjectTaken itself (WSTEP).
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -283,7 +285,7 @@ class CASigningMixin:
             before_publication=lambda leaf: refuse_taken_subject(
                 ca, leaf, renews=[related_a[0] if related_a else None, supersedes, *(renews or ())],
                 holder=subject_holder, requester_sid=requester_sid, pattern=unique_subject,
-                source=source, locked=False),
+                source=source, locked=False, audited=audit_subject_refusal),
         )
 
         # Extract serial number
@@ -381,7 +383,8 @@ class CASigningMixin:
             # (SQLite, since the flush): a concurrent issuance under this CA commits before or after
             refuse_taken_subject(ca, cert_obj, own=[new_cert], renews=designated,
                                  holder=subject_holder, requester_sid=requester_sid,
-                                 pattern=unique_subject, source=source)
+                                 pattern=unique_subject, source=source,
+                                 audited=audit_subject_refusal)
             db.session.commit()
         except (AlreadySuperseded, SubjectTaken):
             raise

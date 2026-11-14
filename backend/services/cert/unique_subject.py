@@ -103,11 +103,13 @@ def _lock_twins(ca, refids):
 
 
 def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requester_sid=None,
-                         pattern=False, override=False, source='manual', requester=None, locked=True):
+                         pattern=False, override=False, source='manual', requester=None, locked=True,
+                         audited=True):
     """Raise :class:`SubjectTaken` (session rolled back, refusal audited) when another entity's
     certificate of *ca* carries *issued*'s subject; called under the CA row lock. With *override*
     (manual issuance and CSR signing), return an :class:`Override` instead. ``locked=False``: the
-    early check before anything is published, without the lock, repeated under it."""
+    early check before anything is published, without the lock, repeated under it.
+    ``audited=False``: the caller writes the refusal's one audit entry (WSTEP)."""
     if not applies(ca, pattern) or len(issued.subject) == 0:
         return None
     from models import Certificate, db
@@ -143,7 +145,7 @@ def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requeste
         return _attested(own, carriers, taken)
     refusal = SubjectTaken(issued.subject.rfc4514_string(), taken.serial_number)
     db.session.rollback()
-    if full:
+    if full and audited:
         _audit_refusal(ca, refusal, source, requester)
     raise refusal
 
@@ -239,21 +241,12 @@ def shared_subjects(ca):
 
 
 OVERRIDE_FIELD = 'override_unique_subject'
-OVERRIDE_PERMISSION = 'write:certificates'
 
 
 def override_requested(data):
-    """``(override, refusal)`` of a manual issuance or CSR signing request: the override is
-    ``override_unique_subject: true``, granted only with the permission to issue certificates."""
-    if (data or {}).get(OVERRIDE_FIELD) is not True:
-        return False, None
-    from flask import g
-    from auth.unified import has_permission
-    from utils.response import error_response
-    if not has_permission(OVERRIDE_PERMISSION, getattr(g, 'permissions', None) or []):
-        return False, error_response(
-            f'Issuing despite a taken subject requires the {OVERRIDE_PERMISSION} permission', 403)
-    return True, None
+    """Whether a manual issuance or CSR signing asks for the override: ``override_unique_subject:
+    true`` only. Both routes already require write:certificates, the permission to issue."""
+    return (data or {}).get(OVERRIDE_FIELD) is True
 
 
 def taken_response(taken):

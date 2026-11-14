@@ -23,7 +23,7 @@ from cryptography.x509.oid import NameOID
 from models import Certificate
 from services.ad_connector import renewal_identity
 from services.ca.ca_signing import AlreadySuperseded, SubjectTaken
-from services.cert.unique_subject import sid_holder
+from services.cert.unique_subject import applies as applies_unique_subject, sid_holder
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
 from services.protocol_approval import RENEWED_REVOKED, AlreadyIssued
@@ -1340,9 +1340,10 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
             windows_profile_id=getattr(profile, 'id', None), unique_subject=patterned,
-            subject_holder=sid_holder(requester_sid),
+            subject_holder=sid_holder(requester_sid), audit_subject_refusal=False,
             # The renewed template-less certificate proves the same entity (designated renewal)
-            renews=find_issued_rows(ca, exempted) if exempted is not None else None,
+            renews=(find_issued_rows(ca, exempted)
+                    if exempted is not None and applies_unique_subject(ca, patterned) else None),
         )
     except SubjectTaken as e:
         return None, SubjectHeldByAnother(matched_template if patterned else None, e)
@@ -1694,7 +1695,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
             windows_profile_id=profile.id, unique_subject=override_subject is not None,
-            subject_holder=sid_holder(requester_sid),
+            subject_holder=sid_holder(requester_sid), audit_subject_refusal=False,
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'

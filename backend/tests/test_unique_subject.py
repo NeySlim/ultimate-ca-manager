@@ -419,6 +419,7 @@ def _scoped_client(app, permissions):
 
 
 def test_the_override_needs_the_permission_to_issue(app, client, create_ca):
+    """The route's own write:certificates requirement: the override adds no check of its own."""
     ca = unique_ca(app, create_ca, 'Unique override perm CA')
     headers = _scoped_client(app, ['read:certificates', 'write:csrs'])
     r = client.post('/api/v2/certificates', headers=headers, json={
@@ -426,8 +427,10 @@ def test_the_override_needs_the_permission_to_issue(app, client, create_ca):
     assert r.status_code == 403
 
 
-def test_an_approved_request_is_checked_again_at_approval(app, auth_client, create_ca):
-    """The subject was free when the CSR was queued, taken when it is approved."""
+def test_an_approved_request_is_checked_again_at_approval(app, auth_client, create_ca, caplog):
+    """The subject was free when the CSR was queued, taken when it is approved: a refusal the
+    approver is told about, logged as a warning, not a failure with its trace."""
+    import logging
     from models.policy import ApprovalRequest
     from tests.protocol_approval_support import approval_policy
     ca = unique_ca(app, create_ca, 'Unique approval CA')
@@ -440,7 +443,11 @@ def test_an_approved_request_is_checked_again_at_approval(app, auth_client, crea
         first = _data(_issue(auth_client, ca, 'held.unique.test'), 201)  # admins bypass the policy
         with app.app_context():
             approval_id = ApprovalRequest.query.filter_by(policy_id=pid).one().id
-        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        with caplog.at_level(logging.WARNING, logger='api.v2.policies'):
+            r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        logged = [(rec.levelname, rec.exc_info is not None) for rec in caplog.records
+                  if rec.name == 'api.v2.policies' and f'approval #{approval_id}' in rec.getMessage()]
+        assert logged == [('WARNING', False)], logged
         body = r.get_json()
         assert r.status_code == 200 and body['data'].get('certificate_issued') is not True, body
         with app.app_context():

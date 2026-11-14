@@ -72,9 +72,7 @@ def create_certificate():
 
     if not data.get('ca_id'):
         return error_response('CA ID is required', 400)
-    override, override_refusal = override_requested(data)
-    if override_refusal:
-        return override_refusal
+    override = override_requested(data)
 
     # SECURITY: Validate DN fields
     dn_validations = [
