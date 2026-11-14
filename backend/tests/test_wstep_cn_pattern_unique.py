@@ -178,7 +178,8 @@ def test_a_certificate_of_another_ca_does_not_count(app, pattern_ca, accounts):
 
 
 def test_a_template_without_a_pattern_runs_no_more_query(app, pattern_ca, accounts):
-    """The patterned issuance runs the plain one's statements and one lookup by subject key."""
+    """The patterned issuance runs the plain one's statements and two lookups by subject key: one
+    before anything is published (the CT logs), one under the CA row lock."""
     statements = []
 
     def record(conn, cursor, statement, *args):
@@ -199,7 +200,7 @@ def test_a_template_without_a_pattern_runs_no_more_query(app, pattern_ca, accoun
         lookups = [s for s in statements if re.search(r'WHERE.*subject_key\s*=', s, re.S)]
         counts.append((len(statements), len(lookups)))
     (plain, plain_lookups), (patterned, patterned_lookups) = counts
-    assert (plain_lookups, patterned_lookups, patterned - plain) == (0, 1, 1)
+    assert (plain_lookups, patterned_lookups, patterned - plain) == (0, 2, 2)
 
 
 def test_two_accounts_at_once_get_one_certificate(app, pattern_ca, accounts, monkeypatch):
