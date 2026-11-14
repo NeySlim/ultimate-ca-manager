@@ -243,6 +243,32 @@ def test_a_database_placed_elsewhere_goes_with_its_journal_files(tmp_path):
     assert f'{elsewhere}/pki.db' in (box.archive / 'README.txt').read_text()
 
 
+@pytest.mark.parametrize('spelling', ['{data}/./ucm.db', '{data}//ucm.db', '{home}/../ucm/data/ucm.db'])
+def test_a_database_path_spelled_otherwise_under_the_data_goes_with_the_data(tmp_path, spelling):
+    box = Box(tmp_path)
+    data = files(box.data)
+    env = box.config / 'ucm.env'
+    env.write_text(env.read_text().replace(f'DATABASE_PATH={box.data}/ucm.db',
+                                           'DATABASE_PATH=' + spelling.format(data=box.data, home=box.home)))
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert files(box.archive / 'data') == data
+    assert not (box.archive / 'database').exists()
+    assert 'placed outside' not in (box.archive / 'README.txt').read_text()
+
+
+def test_the_readme_puts_each_file_where_the_packages_write_it(tmp_path):
+    """The packages write the HTTPS key and certificate into the data directory."""
+    box = Box(tmp_path)
+    assert box.run().returncode == 0
+    lines = (box.archive / 'README.txt').read_text().splitlines()
+    data_line = next(l for l in lines if l.lstrip().startswith('data/'))
+    config_line = next(l for l in lines if l.lstrip().startswith('config/'))
+    assert 'HTTPS' in data_line and 'HTTPS' not in config_line
+    postinst = (ROOT / 'packaging' / 'debian' / 'postinst').read_text()
+    assert '-keyout "$UCM_DATA/https_key.pem"' in postinst
+
+
 def test_a_purged_install_without_configuration_is_archived_too(tmp_path):
     """apt purge removes /etc/ucm and leaves /opt/ucm/data: the default database path applies."""
     box = Box(tmp_path)
@@ -306,6 +332,8 @@ def test_a_database_it_cannot_archive_is_left_and_named(tmp_path, python, code, 
     out = box.run()
     assert out.returncode == 0
     assert says in out.stdout and '2.254' in out.stdout
+    # Which database: the SQLite file, or the backend alone (never a URL)
+    assert (first if python == 'stub' and code != 1 else 'could not read') in out.stdout
     assert snapshot(box) == before
     assert not box.parent.exists()
 

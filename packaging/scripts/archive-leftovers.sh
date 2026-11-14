@@ -37,6 +37,9 @@ env_value() {
 
 device() { stat -c %d -- "$1"; }
 
+# $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
+normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
+
 # A comparable digest of a file, a symbolic link or a whole tree (names, types, contents)
 digest() {
     if [ -L "$1" ]; then
@@ -151,8 +154,9 @@ So the package moved that installation's files here, unchanged, and set up a new
 empty UCM in their place.
 
 Contents
-  data/       what was in $DATA (database, CA files, private keys, backups, sessions)
-  config/     what was in $CONFIG (ucm.env, master.key, HTTPS key and certificate)
+  data/       what was in $DATA (database, CA files, private keys, HTTPS key and
+              certificate, backups, sessions)
+  config/     what was in $CONFIG (ucm.env, master.key)
 $DB_LINE
 This directory holds private keys and the key that decrypts the database: keep it
 readable by root only. Nothing here is used or removed by UCM.
@@ -222,8 +226,8 @@ case $code in
     4) case $backend in
            "sqlite "/*) DB_FILE=${backend#sqlite } ;;
            *)
-               say "UCM: the configuration an earlier UCM left in $CONFIG names a database this release"
-               say "cannot start on: $REASON"
+               say "UCM: the configuration an earlier UCM left in $CONFIG names a database"
+               say "(${backend:-unknown}) this release cannot start on: $REASON"
                say "It is not a SQLite file at an absolute path, so nothing was moved: the service"
                say "will refuse to start."
                say "Install 2.254 and start it once on that database, then install this release again;"
@@ -286,8 +290,8 @@ if [ -d "$CONFIG" ]; then
     archive_contents "$CONFIG" "$DEST/config" || fail "moving $CONFIG"
 fi
 # A database DATABASE_PATH placed elsewhere, with what SQLite keeps beside it
-case $DB_FILE in
-    "$DATA"/*|"$CONFIG"/*) ;;
+case $(normal "$DB_FILE") in
+    "$(normal "$DATA")"/*|"$(normal "$CONFIG")"/*) ;;
     *)
         printf 'mkdir\t%s\t%s\n' "${DB_FILE%/*}" "$DEST/database" >> "$JOURNAL" \
             && mkdir -- "$DEST/database" || fail "creating $DEST/database"

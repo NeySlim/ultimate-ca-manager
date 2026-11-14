@@ -26,9 +26,9 @@ ucm_pivot_version_ok() {
 # Refuses, on stderr, an installed version older than 2.254
 ucm_pivot_guard() {
     ucm_pivot_version_ok "$1" && return 0
-        echo "UCM $1 is installed, and this package upgrades UCM 2.254 or later only:" >&2
+    echo "UCM $1 is installed, and this package upgrades UCM 2.254 or later only:" >&2
     echo "its database must have been started by 2.254 first." >&2
     echo "Install 2.254, start it once, then install this package." >&2
-        echo "Nothing was changed: UCM $1 is still installed." >&2
+    echo "Nothing was changed: UCM $1 is still installed." >&2
     return 1
 }
