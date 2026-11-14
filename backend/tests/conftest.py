@@ -413,6 +413,9 @@ _LEAK_EXEMPT = {
 }
 
 
+_ORPHAN_RECORDS = 'revocation records of a deleted certificate'
+
+
 def _leak_counts():
     if not _SESSION_APP:
         return None
@@ -424,6 +427,12 @@ def _leak_counts():
         for table in _LEAK_TABLES:
             if table in present:
                 counts[table] = db.session.execute(_text(f'SELECT COUNT(*) FROM "{table}"')).scalar()
+        if {'revoked_serials', 'certificates'} <= present:
+            # Deleting a certificate detaches its revocation records; a row deleted behind the
+            # service leaves them on an id the next certificate of the worker takes over
+            counts[_ORPHAN_RECORDS] = db.session.execute(_text(
+                'SELECT COUNT(*) FROM revoked_serials r WHERE r.certificate_id IS NOT NULL AND NOT EXISTS'
+                ' (SELECT 1 FROM certificates c WHERE c.id = r.certificate_id)')).scalar()
         for table, ignored in _LEAK_CONTENT.items():
             if table in present:
                 rows = db.session.execute(_text(f'SELECT * FROM "{table}" ORDER BY id')).mappings()
@@ -433,6 +442,29 @@ def _leak_counts():
     return counts
 
 
+def _detach_orphan_records():
+    """What deleting a certificate through the service does, for the rows a file deleted
+    behind it: SQLite gives their ids to the next certificates of the worker."""
+    if not _SESSION_APP:
+        return
+    from sqlalchemy import text as _text
+    from models import db
+    with _SESSION_APP[0].app_context():
+        try:
+            if {'revoked_serials', 'certificates'} <= set(db.inspect(db.engine).get_table_names()):
+                db.session.execute(_text(
+                    'UPDATE revoked_serials SET certificate_id = NULL WHERE certificate_id IS NOT NULL'
+                    ' AND NOT EXISTS (SELECT 1 FROM certificates c WHERE c.id = revoked_serials.certificate_id)'))
+                db.session.commit()
+        except Exception as exc:
+            # Rolled back: a write refused once must not fail every later file of the worker
+            db.session.rollback()
+            import warnings
+            warnings.warn(f'orphan revocation records not detached: {type(exc).__name__}', stacklevel=1)
+        finally:
+            db.session.remove()
+
+
 @pytest.fixture(autouse=True, scope='module')
 def _shared_tables_stay_in_their_module(request):
     """Row counts of the shared tables before and after each file. UCM_TEST_LEAK_MODE
@@ -440,9 +472,10 @@ def _shared_tables_stay_in_their_module(request):
     name = os.path.basename(str(request.fspath))
     before = _leak_counts()
     yield
+    after = _leak_counts() or {}
+    _detach_orphan_records()
     if name in _LEAK_EXEMPT or before is None:
         return
-    after = _leak_counts() or {}
     changed = sorted(t for t in before if t in after and after[t] != before[t])
     if not changed:
         return
