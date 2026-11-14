@@ -304,6 +304,43 @@ def test_the_two_certificates_of_a_hybrid_pair_are_one_entity(app, auth_client, 
     assert r.get_json()['data'].get('related') in (None, []), r.get_json()
 
 
+def test_a_renewal_naming_a_related_certificate_keeps_the_renewed_row_s_lineage(app, create_ca):
+    """B (no lineage) renewed with a relatedCertRequest naming A keeps B's lineage: its archived
+    predecessor stays its entity, and the next renewal of the same shape goes through."""
+    from services.ca_service import CAService
+    from utils import related_cert
+    ca = unique_ca(app, create_ca, 'Unique related renewal CA', on=False)
+    cn = 'related-renewal.unique.test'
+    san = x509.SubjectAlternativeName([x509.DNSName(cn)])
+
+    def request(key, names=None):
+        csr = x509.CertificateSigningRequestBuilder().subject_name(_name(cn)).add_extension(
+            san, critical=False).sign(key, hashes.SHA256())
+        if names is None:
+            return csr
+        cert_a, key_a = names
+        return related_cert.csr_with_request(csr, key, related_cert.build_request(
+            cert_a, key_a, related_cert.data_url_for([cert_a])))
+
+    def sign(csr, renewed=None):
+        with app.app_context():
+            row = db.session.get(Certificate, renewed) if renewed else None
+            held = x509.load_pem_x509_certificate(base64.b64decode(row.crt)) if row else None
+            pem, serial = CAService.sign_csr_from_crypto(db.session.get(CA, ca['id']), csr, validity_days=30,
+                                                         source='test', supersedes=row, renewal_of=held)
+            return (Certificate.query.filter_by(serial_number=str(int(serial, 16))).one().id,
+                    x509.load_pem_x509_certificate(pem.encode()))
+    key_a = _key()
+    _a_id, cert_a = sign(request(key_a))
+    b_id, _cert_b = sign(request(_key()))  # another key, no lineage
+    with app.app_context():
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    first, _ = sign(request(_key(), (cert_a, key_a)), renewed=b_id)
+    assert _row(app, first).subject_holder == f"cert:{_row(app, b_id).refid}"
+    sign(request(_key(), (cert_a, key_a)), renewed=first)
+
+
 def test_a_certificate_transparency_precertificate_does_not_count(app, create_ca, monkeypatch):
     """The pre-certificate is signed with the final certificate and never stored."""
     from services.cert_service import CertificateService

@@ -370,7 +370,8 @@ class CASigningMixin:
                 raise AlreadySuperseded('the renewed certificate is already superseded')
             # A verified relatedCertRequest proves A's key: B is A's entity (RFC 9763 pair)
             a_row = link_issued(new_cert, cert_obj, related_a)
-            designated = [a_row, supersedes, *(renews or ())]
+            # The renewed row's lineage first: its archived predecessor stays this entity
+            designated = [supersedes, a_row, *(renews or ())]
             new_cert.subject_holder = successor_holder(subject_holder, designated)
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
