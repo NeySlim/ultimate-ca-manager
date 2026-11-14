@@ -4,8 +4,8 @@ PostgreSQL is the one store every node of a cluster shares, so an archive lives 
 fixed-size chunks (``backup_archive_chunks``) under one row (``backup_archives``). The row
 and its chunks are written in a single transaction and read back before it commits: an
 archive is listed only once it is whole, and an interrupted write leaves nothing behind.
-Writing and reading go one chunk at a time on a connection of their own, so memory stays
-bounded whatever the archive size. The bytes are the encrypted container, as on disk.
+Writing and reading go one chunk at a time, so memory stays bounded whatever the archive
+size; a reader takes each chunk in a short transaction and holds no connection between two. The bytes are the encrypted container, as on disk.
 """
 import hashlib
 import io
@@ -166,55 +166,63 @@ def timestamp(created_at) -> float:
 
 
 def _long_transaction(conn):
-    """A write or a read that may idle between chunks outlives idle_in_transaction_session_timeout."""
+    """A write that may idle between chunks outlives idle_in_transaction_session_timeout."""
     conn.execute(text("SET LOCAL idle_in_transaction_session_timeout = 0"))
     return conn
 
 
-def _snapshot(engine):
-    # One snapshot for the whole read: a deletion meanwhile cannot cut an archive short
-    conn = engine.connect().execution_options(isolation_level='REPEATABLE READ')
-    try:
-        return _long_transaction(conn)
-    except Exception:
-        conn.close()
-        raise
+class ArchiveGoneError(IOError):
+    """The archive was deleted while it was being read."""
+
+
+def _fetch_chunk(engine, row, seq):
+    """One chunk in a transaction of its own, the connection back in the pool on return.
+
+    An archive never changes once written, so its id and SHA-256 are its identity: a
+    deleted archive gives no chunk, never another archive's bytes.
+    """
+    archives, chunks = _tables()
+    with engine.connect() as conn:
+        data = conn.execute(select(chunks.c.data).join(archives, archives.c.id == chunks.c.archive_id)
+                            .where(archives.c.id == row.id, archives.c.sha256 == row.sha256,
+                                   chunks.c.seq == seq)).scalar()
+    if data is None:
+        logger.warning("Backup %s was deleted while it was being read (chunk %d of %d)",
+                       row.filename, seq, row.chunk_count)
+        raise ArchiveGoneError(f'chunk {seq} of backup {row.filename} is gone')
+    return bytes(data)
+
+
+def _find(engine, filename):
+    archives = _tables()[0]
+    with engine.connect() as conn:
+        return conn.execute(select(archives).where(archives.c.filename == filename)).first()
 
 
 def iter_archive(filename: str):
     """The archive's bytes, chunk by chunk, or None when it is not in the store.
 
-    The generator holds its own connection, so it can outlive the request that made it.
+    No connection is held between two chunks, so the generator can outlive its request.
     """
-    archives = _tables()[0]
     engine = _engine()
-    conn = _snapshot(engine)
-    try:
-        row = conn.execute(select(archives.c.id, archives.c.chunk_count).where(
-            archives.c.filename == filename)).first()
-    except Exception:
-        conn.close()
-        raise
+    row = _find(engine, filename)
     if row is None:
-        conn.close()
         return None
 
     def generate():
-        try:
-            yield from _read_chunks(conn, row.id, row.chunk_count)
-        finally:
-            conn.close()
+        for seq in range(row.chunk_count):
+            yield _fetch_chunk(engine, row, seq)
     return generate()
 
 
 class _ArchiveReader(io.RawIOBase):
     """A seekable read-only view of one stored archive, one chunk in memory at a time."""
 
-    def __init__(self, conn, archive_id, size, chunk_size):
-        self._conn = conn
-        self._id = archive_id
-        self._size = size
-        self._chunk_size = chunk_size
+    def __init__(self, engine, row):
+        self._engine = engine
+        self._row = row
+        self._size = int(row.size)
+        self._chunk_size = row.chunk_size
         self._pos = 0
         self._cached = (None, b'')
 
@@ -234,12 +242,7 @@ class _ArchiveReader(io.RawIOBase):
 
     def _chunk(self, seq):
         if self._cached[0] != seq:
-            chunks = _tables()[1]
-            data = self._conn.execute(select(chunks.c.data).where(
-                chunks.c.archive_id == self._id, chunks.c.seq == seq)).scalar()
-            if data is None:
-                raise IOError(f'chunk {seq} of archive {self._id} is missing')
-            self._cached = (seq, bytes(data))
+            self._cached = (seq, _fetch_chunk(self._engine, self._row, seq))
         return self._cached[1]
 
     def readinto(self, buffer):
@@ -251,33 +254,23 @@ class _ArchiveReader(io.RawIOBase):
         self._pos += len(piece)
         return len(piece)
 
-    def close(self):
-        if not self.closed:
-            try:
-                self._conn.close()
-            finally:
-                super().close()
-
 
 def _open(filename: str):
-    """(seekable stream, archive row) from one snapshot, or None when it is not in the store."""
-    archives = _tables()[0]
-    conn = _snapshot(_engine())
-    try:
-        row = conn.execute(select(archives).where(archives.c.filename == filename)).first()
-    except Exception:
-        conn.close()
-        raise
+    """(seekable stream, archive row), or None when it is not in the store."""
+    engine = _engine()
+    row = _find(engine, filename)
     if row is None:
-        conn.close()
         return None
-    reader = io.BufferedReader(_ArchiveReader(conn, row.id, int(row.size), row.chunk_size),
-                               buffer_size=row.chunk_size)
+    reader = io.BufferedReader(_ArchiveReader(engine, row), buffer_size=row.chunk_size)
     return reader, row
 
 
 def open_archive(filename: str):
-    """A seekable binary stream over a stored archive (what a restore reads), or None."""
+    """A seekable binary stream over a stored archive (what a restore reads), or None.
+
+    Each chunk is read in a short transaction; an archive deleted meanwhile raises
+    ArchiveGoneError at the next chunk.
+    """
     opened = _open(filename)
     return opened[0] if opened is not None else None
 
@@ -395,8 +388,9 @@ def download_response(filename: str):
     """A streamed attachment of a stored archive, or None when it is not in the store.
 
     As on disk: Range (one byte range, 206 or 416), a strong ETag (the SHA-256),
-    If-None-Match and If-Range. The body is a file, so closing the response closes its
-    connection, iterated or not. ``Repr-Digest`` (RFC 9530) names the whole archive.
+    If-None-Match and If-Range. ``Repr-Digest`` (RFC 9530) names the whole archive.
+    Each chunk is read on its own: no connection or snapshot waits on a slow client, and
+    an archive deleted meanwhile ends the body short of its Content-Length.
     """
     import base64
 

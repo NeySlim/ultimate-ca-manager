@@ -4,6 +4,7 @@ Node A and node B are the same application under two node ids and two archive
 directories, on one database: whatever B lists or serves came through the database.
 """
 import base64
+import contextlib
 import gc
 import hashlib
 import io
@@ -171,7 +172,7 @@ def test_a_download_closed_before_its_first_chunk_gives_its_connection_back(app,
     before = _checked_out(app)
     with app.test_request_context(f'/api/v2/system/backup/{name}/download'):
         response = shared_store.download_response(name)
-        assert _checked_out(app) == before + 1
+        assert _checked_out(app) == before
         response.close()
         assert _checked_out(app) == before
         del response
@@ -349,6 +350,87 @@ def test_the_restore_reader_streams_and_seeks_a_stored_archive(app, nodes):
             reader.seek(0)
             assert hashlib.sha256(reader.read()).digest() == hashlib.sha256(data).digest()
         assert shared_store.open_archive('ucm_backup_absent.ucmbkp') is None
+
+
+def _in_transaction_on_chunks(app):
+    """Other sessions of this role idle inside a transaction whose last query read chunks."""
+    from models import db
+    with app.app_context(), db.engine.connect() as conn:
+        return conn.execute(text(
+            "SELECT count(*) FROM pg_stat_activity WHERE pid <> pg_backend_pid() "
+            "AND usename = current_user AND datname = current_database() "
+            "AND state LIKE 'idle in transaction%' AND query LIKE '%backup_archive_chunks%'")).scalar()
+
+
+@contextmanager
+def _suspended_download(app, name, server=None):
+    """A download that has sent its first chunk and waits for the client: yields (body, first)."""
+    with app.test_request_context(f'/api/v2/system/backup/{name}/download',
+                                  environ_base=server or {}):
+        response = shared_store.download_response(name)
+    body = iter(response.response)
+    try:
+        yield body, next(body)
+    finally:
+        response.close()
+
+
+def test_a_suspended_download_holds_no_connection_and_no_transaction(app, nodes, server):
+    data = _payload(3 * shared_store.CHUNK_SIZE)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+    before = _checked_out(app)
+    with _suspended_download(app, name, server) as (body, first):
+        assert _checked_out(app) == before
+        assert _in_transaction_on_chunks(app) == 0
+        got = first + b''.join(body)
+    assert got == data
+
+
+def test_a_restore_reader_holds_no_connection_between_two_reads(app, nodes):
+    data = _payload(2 * shared_store.CHUNK_SIZE)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+        before = _checked_out(app)
+        with shared_store.open_archive(name) as reader:
+            head = reader.read(100)
+            assert _checked_out(app) == before
+            assert _in_transaction_on_chunks(app) == 0
+            assert head + reader.read() == data
+
+
+def test_an_archive_deleted_mid_download_cuts_the_stream_short(app, nodes, server, caplog):
+    data = _payload(3 * shared_store.CHUNK_SIZE)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+    got = bytearray()
+    with _suspended_download(app, name, server) as (body, first):
+        got += first
+        with app.app_context():
+            assert shared_store.delete_archives([name], wait=5) == [name]
+        with pytest.raises(OSError):
+            for piece in body:
+                got += piece
+    assert len(got) < len(data) and data.startswith(bytes(got))
+    assert any(name in record.getMessage() and 'deleted' in record.getMessage()
+               for record in caplog.records)
+
+
+def test_fifteen_suspended_downloads_leave_the_pool_to_other_requests(
+        app, auth_client, nodes, monkeypatch):
+    from models import db
+    data = _payload(2 * shared_store.CHUNK_SIZE)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+        # A pool short of connections fails in 2 s instead of 30
+        monkeypatch.setattr(db.engine.pool, '_timeout', 2)
+    with contextlib.ExitStack() as stack:
+        for _ in range(15):
+            stack.enter_context(_suspended_download(app, name))
+        with nodes('b'):
+            r = auth_client.get('/api/v2/system/backups?per_page=100')
+        assert r.status_code == 200, r.data
+        assert name in {i['filename'] for i in json.loads(r.data)['data']['items']}
 
 
 # --- 3. An archive appears once whole, an interrupted write leaves nothing -------------------
