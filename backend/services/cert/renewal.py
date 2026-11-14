@@ -234,7 +234,8 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                 staged_member = _stage_renewal(
                     member, ca if is_cert else None, rekey=rekey, trigger=trigger,
                     known_serial=known_serial if is_cert else SERIAL_UNSET,
-                    validity_days=validity_days, related_to=related_to)
+                    validity_days=validity_days, related_to=related_to,
+                    precheck=lambda signer, issued: _refuse_taken(signer, issued, members, trigger, username))
             except RenewalError as e:
                 if is_cert:
                     raise
@@ -259,12 +260,7 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         # The renewed row is the same entity (RFC 5280 §4.1.2.6), and so is its pair partner
         rows = [s['cert'] for s in staged_all]
         for s in staged_all:
-            try:
-                refuse_taken_subject(s['ca'], x509.load_pem_x509_certificate(s['cert_pem']), own=rows,
-                                     source=f'renewal ({trigger})', requester=username)
-            except SubjectTaken as e:
-                raise RenewalError(f'{e.audited[:1].upper()}{e.audited[1:]}, issued by this CA to '
-                                   'another entity: the CA requires a unique subject', 409) from e
+            _refuse_taken(s['ca'], x509.load_pem_x509_certificate(s['cert_pem']), rows, trigger, username)
     except Exception:
         db.session.rollback()
         raise
@@ -295,6 +291,15 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                       trigger=trigger)
         crl_done.add(s['ca'].id)
     return outcome
+
+
+def _refuse_taken(ca, issued, rows, trigger, username):
+    """RFC 5280 §4.1.2.6: the renewed rows are the same entity; another one's subject is a 409."""
+    try:
+        refuse_taken_subject(ca, issued, own=rows, source=f'renewal ({trigger})', requester=username)
+    except SubjectTaken as e:
+        raise RenewalError(f'{e.audited[:1].upper()}{e.audited[1:]}, issued by this CA to '
+                           'another entity: the CA requires a unique subject', 409) from e
 
 
 def _renewal_members(cert):
@@ -346,7 +351,8 @@ def _current_related(row):
     return cert_a
 
 
-def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None) -> dict:
+def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,
+                   precheck=None) -> dict:
     """Every check, the signature and the writes, left uncommitted; *related_to*
     is the certificate A the renewed one names (RFC 9763)."""
     cert = _reread(cert, known_serial, trigger)
@@ -381,6 +387,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
                        _template_custom_extensions(getattr(cert, 'template_id', None)))
     renewed = builder.sign(private_key=ca_key, algorithm=sign_hash,
                            rsa_padding=rsa_padding_for(ca_key, sign_hash))
+    if precheck is not None:  # without the lock, before the CT logs see a pre-certificate
+        precheck(ca, renewed)
     renewed, scts = _apply_ct(renewed, ca_cert, ca_key)
 
     old_serial, old_valid_to = cert.serial_number, cert.valid_to

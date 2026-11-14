@@ -297,6 +297,8 @@ class LifecycleMixin:
         # internal template: when enabled it is replaced by a CA-signed
         # pre-certificate for CT submission, then by the final SCT-bearing
         # certificate before anything is persisted or returned.
+        # Refused before the CT logs see a pre-certificate, and again under the CA row lock
+        refuse_taken_subject(ca, cert, holder=subject_holder, source='mtls', requester=username)
         from utils.ct_client import apply_ct_policy
         signed_cert, embedded_scts = apply_ct_policy(cert, ca_cert, ca_private_key)
         if signed_cert is not cert:

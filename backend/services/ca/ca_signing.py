@@ -279,6 +279,11 @@ class CASigningMixin:
                           'digest_explicit': False},
             san_template=policy_template,
             custom_extensions=template_custom_extensions(policy_template),
+            # Without the lock, before the CT logs see a pre-certificate; checked again below
+            before_publication=lambda leaf: refuse_taken_subject(
+                ca, leaf, renews=[related_a[0] if related_a else None, supersedes, *(renews or ())],
+                holder=subject_holder, requester_sid=requester_sid, pattern=unique_subject,
+                source=source),
         )
 
         # Extract serial number

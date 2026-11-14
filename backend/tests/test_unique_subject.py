@@ -138,20 +138,42 @@ def _lookups(app, issue):
     return len([s for s in statements if re.search(r'WHERE.*subject_key\s*=', s, re.S)])
 
 
-def test_the_option_off_runs_no_lookup_on_any_trunk(app, auth_client, create_ca):
-    """The two signing trunks of the API (manual issuance, CSR signing) and the protocol one."""
+def test_the_option_off_runs_no_lookup_on_any_trunk(app, auth_client, create_ca, monkeypatch):
+    """Manual issuance, CSR signing, the protocol trunk, the service mTLS calls, renewal in place
+    and SCEP; on, each looks up twice: before the CT logs and under the CA row lock."""
     from services.ca_service import CAService
+    from services.cert_service import CertificateService
+    from tests.test_unique_subject_before_publication import _pkcs_req
+    from services.scep.scep_service import SCEPService
+    monkeypatch.setenv('UCM_SCEP_ALLOW_NO_CHALLENGE', '1')
     off, on = create_ca(cn='Unique counted off CA'), unique_ca(app, create_ca, 'Unique counted on CA')
 
     def trunk(ca):
         with app.app_context():
             CAService.sign_csr_from_crypto(db.session.get(CA, ca['id']), _csr('trunk.unique.test', _key()),
                                            validity_days=30, source='test')
-    counts = [(_lookups(app, lambda: _data(_issue(auth_client, ca, 'counted.unique.test'), 201)),
-               _lookups(app, lambda: _data(_sign(auth_client, app, ca, _csr('signed.unique.test', _key())), 200)),
-               _lookups(app, lambda: trunk(ca)))
-              for ca in (off, on)]
-    assert counts == [(0, 0, 0), (1, 1, 1)]
+
+    def mtls(ca):
+        with app.app_context():
+            CertificateService.create_certificate(descr='mtls', caref=ca['refid'], dn={'CN': 'mtls.unique.test'},
+                                                  validity_days=30, subject_holder='user:1')
+
+    def scep(ca):
+        request = _pkcs_req(app, ca['id'], 'scep-count.unique.test', secrets.token_hex(8))
+        with app.app_context():
+            assert SCEPService(ca['refid'], auto_approve=True).process_pkcs_req(request, '127.0.0.1')[1] == 200
+
+    counts = []
+    for ca in (off, on):
+        held = _data(_issue(auth_client, ca, 'renewed.unique.test'), 201)
+        counts.append((
+            _lookups(app, lambda: _data(_issue(auth_client, ca, 'counted.unique.test'), 201)),
+            _lookups(app, lambda: _data(_sign(auth_client, app, ca, _csr('signed.unique.test', _key())), 200)),
+            _lookups(app, lambda: trunk(ca)),
+            _lookups(app, lambda: mtls(ca)),
+            _lookups(app, lambda: _data(auth_client.post(f"/api/v2/certificates/{held['id']}/renew", json={}), 200)),
+            _lookups(app, lambda: scep(ca))))
+    assert counts == [(0,) * 6, (2,) * 6]
 
 
 # --- Refused, audited, nothing stored ------------------------------------------------------------

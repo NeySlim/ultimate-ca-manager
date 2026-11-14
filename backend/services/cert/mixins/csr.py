@@ -373,6 +373,10 @@ class CSRMixin:
             notices=notices,
             not_before=not_before,
             not_after=not_after,
+            # Without the lock, before the CT logs see a pre-certificate; checked again under it
+            before_publication=None if override_unique_subject else (lambda leaf: refuse_taken_subject(
+                ca, leaf, own=[certificate], renews=[related_a[0] if related_a else None],
+                holder=subject_holder, source=source, requester=username)),
         )
 
         # Parse signed certificate
