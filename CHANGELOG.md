@@ -77,6 +77,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- FIPS mode: a CA on an HSM key other than RSA 2048+ or ECDSA P-256/P-384/P-521 (RSA under 2048 bits, Brainpool, secp256k1) kept signing after the switch; its certificates and CRLs are now refused, OCSP answers `unauthorized`, and `POST /api/v2/hsm/keys/<id>/sign` answers the 400 FIPS problem instead of 500.
+- FIPS readiness check: HSM Brainpool keys are listed with the other HSM keys FIPS mode refuses.
 - FIPS mode: a CA or certificate imported with an ML-DSA key was accepted where generating one was refused; it now gets the same FIPS refusal unless the loaded module approves ML-DSA (upload, CA import, smart import).
 - Settings: `max_login_attempts` under 3, the settings screen's minimum, is refused (400) instead of locking every login at its first failure, and a lower value already stored is applied as 3.
 - CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum, and so is a CA key that cannot be read; the same CA without a key is still imported. In a batch only that CA is skipped and named.

@@ -154,7 +154,7 @@ In FIPS mode UCM asks the loaded module whether it approves ML-DSA, Ed25519 and 
 
 - The binary certified under #5115 is the one of Ubuntu Pro's `fips` stream; `fips-updates` carries later, patched versions that are not the certified binary.
 - The image is built on Debian 13, and also for arm64: neither is among the tested configurations of certificate #5586.
-- Still refused with the image: Ed25519 SSH keys of deployment targets and Ed25519 host keys (paramiko signs and verifies them with libsodium, outside the module), ML-DSA and EdDSA keys on an HSM or OpenBao provider (the provider signs, not the module), and SLH-DSA, which the module approves but the Python cryptography library does not provide.
+- Still refused with the image: Ed25519 SSH keys of deployment targets and Ed25519 host keys (paramiko signs and verifies them with libsodium, outside the module), HSM and OpenBao keys other than RSA 2048+ and ECDSA P-256, P-384 and P-521, ML-DSA and EdDSA among them (the provider signs, not the module), and SLH-DSA, which the module approves but the Python cryptography library does not provide.
 - The readiness check of the image, run before the switch, judges these keys by the image's module, asked when the image was built.
 - With the image, TLS 1.2 without Extended Master Secret is refused in both directions, and TLS also offers the hybrid groups X25519MLKEM768 and SecP256r1MLKEM768; X25519 and X448 alone stay refused.
 - A webhook secret or TSIG key under 14 bytes is refused when saved in FIPS mode.
