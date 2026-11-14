@@ -3424,7 +3424,7 @@
         },
         "session_short_secret_key": {
           "title": "The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be issued or checked with it, so every sign-in fails",
-          "remedy": "Set a SECRET_KEY of 32 characters or more in the service environment and restart; existing sessions end."
+          "remedy": "Set a SECRET_KEY of 32 characters or more in the service environment and restart."
         },
         "hmac_short_secret": {
           "title": "HMAC secrets under 14 bytes (webhook secrets, RFC 2136 TSIG keys, Constellix, DNS Made Easy, INWX and Tencent Cloud secrets, external EAB keys of ACME accounts): the FIPS module does not approve them; FIPS mode refuses to save a webhook secret or TSIG key this short, and every one of them but a TSIG key fails when used",

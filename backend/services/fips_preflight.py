@@ -472,8 +472,7 @@ def _short(key: bytes) -> bool:
 @detector('session.short_secret_key', BLOCKER,
           'The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be '
           'issued or checked with it, so every sign-in fails',
-          'Set a SECRET_KEY of 32 characters or more in the service environment and restart; '
-          'existing sessions end.')
+          'Set a SECRET_KEY of 32 characters or more in the service environment and restart.')
 def _short_session_key():
     from security import session_key
     key = session_key.signing_key(current_app)

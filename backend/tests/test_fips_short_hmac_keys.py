@@ -157,3 +157,19 @@ def test_outside_fips_mode_short_keys_sign(monkeypatch):
     from services.acme.dns_providers.constellix import ConstellixDnsProvider
     monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
     assert ConstellixDnsProvider({'api_key': 'a', 'secret_key': 'short'})._get_headers()['Authorization']
+
+
+def test_a_sign_in_with_a_short_secret_key_answers_the_fips_problem(app, create_user, request,
+                                                                    auth_client, monkeypatch):
+    user = create_user(username='fips-short-key', password='Short-Key-Pass-123!', role='viewer')
+    def remove():
+        monkeypatch.undo()
+        assert auth_client.delete(f"/api/v2/users/{user['id']}").status_code == 200
+    request.addfinalizer(remove)
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    monkeypatch.setattr(hmac, 'digest', _module_digest)
+    monkeypatch.setitem(app.config, 'SECRET_KEY', 'short-key')
+    r = app.test_client().post('/api/v2/auth/login', json={
+        'username': 'fips-short-key', 'password': 'Short-Key-Pass-123!'})
+    assert r.status_code == 400 and r.get_json()['type'] == fips_mode.PROBLEM_TYPE, r.get_json()
+    _fips_refusal(r.get_json().get('detail') or r.get_json(), 'SECRET_KEY')
