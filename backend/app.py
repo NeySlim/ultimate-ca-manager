@@ -994,6 +994,19 @@ def create_app(config_name=None):
     # Register blueprints
     register_blueprints(app)
     
+    # ===== HA NODE IDENTIFIER =====
+    # Before the master key check: a second live process with this node's identifier stops
+    # here (NodeIdTaken is a SystemExit); a registry that cannot be read leaves it to the heartbeat
+    from utils.ha import ha_enabled
+    if ha_enabled():
+        with app.app_context():
+            from services.scheduler_leader import claim_node_at_start
+            try:
+                claim_node_at_start()
+            except Exception as e:
+                db.session.rollback()
+                app.logger.error(f"HA: node identifier not claimed at start: {type(e).__name__}: {e}")
+
     # ===== MASTER KEY AND SAFE MODE =====
     # A new installation gets its master key here; encrypted keys without one
     # put the API in safe mode

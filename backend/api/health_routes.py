@@ -39,10 +39,15 @@ def _cluster():
 
 
 def _check_cluster():
-    """HA only: 503 until this node has ever registered; a row left by an earlier run counts."""
+    """HA only: 503 until this node has ever registered (a row left by an earlier run counts),
+    and while another live process holds this node's identifier."""
     from config.settings import Config
     try:
-        from services.scheduler_leader import node_registered
+        from services.scheduler_leader import node_held_elsewhere, node_registered
+        from services.scheduler_service import get_scheduler
+        if node_held_elsewhere(Config.NODE_ID, get_scheduler().wake_interval):
+            return {'status': 'error', 'message': f'Node identifier {Config.NODE_ID} is used by another '
+                    'live process: give each node a distinct UCM_NODE_ID'}
         if node_registered(Config.NODE_ID):
             return {'status': 'ok'}
         return {'status': 'error', 'message': 'Node not registered yet (no scheduler heartbeat)'}

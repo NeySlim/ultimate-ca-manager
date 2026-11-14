@@ -5,9 +5,12 @@ node whose dedicated connection still holds it; nothing on disk is shared.
 """
 import logging
 import os
+import secrets
+import time
 from contextlib import contextmanager
+from datetime import timedelta
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import Boolean, DateTime, bindparam, create_engine, text
 from sqlalchemy.pool import NullPool
 
 logger = logging.getLogger(__name__)
@@ -229,30 +232,182 @@ def to_cluster_clock(local_instant, local_now, executor=None):
     return local_instant + (cluster_utc_now(executor) - local_now)
 
 
-def write_heartbeat(node_id, leader, started_at) -> None:
-    """Refresh this node's row; the leader also takes the flag off every other row.
+# Carries the node process's token to the scheduler process it spawns (scheduler_supervisor)
+INSTANCE_TOKEN_ENV = 'UCM_NODE_INSTANCE_TOKEN'
+# How often a starting node looks again at its row while another token holds it
+CLAIM_POLL_SECONDS = 5.0
+
+# A row is free for ``token`` when nobody holds it, the token already does, or its heartbeat is stale
+_FREE_FOR = ("cluster_nodes.instance_token IS NULL OR cluster_nodes.instance_token = excluded.instance_token"
+             " OR cluster_nodes.heartbeat_at < :fresh_from")
+_HEARTBEAT_SQL = text(
+    "INSERT INTO cluster_nodes (node_id, started_at, heartbeat_at, is_leader, version, pid,"
+    " kek_fingerprint, package_family, instance_token)"
+    " VALUES (:n, :started, :now, :leader, :version, :pid, :kek, :family, :token)"
+    " ON CONFLICT (node_id) DO UPDATE SET started_at = excluded.started_at,"
+    " heartbeat_at = excluded.heartbeat_at, is_leader = excluded.is_leader,"
+    " version = excluded.version, pid = excluded.pid, kek_fingerprint = excluded.kek_fingerprint,"
+    " package_family = excluded.package_family, instance_token = excluded.instance_token"
+    f" WHERE {_FREE_FOR}").bindparams(
+    bindparam('started', type_=DateTime), bindparam('now', type_=DateTime),
+    bindparam('fresh_from', type_=DateTime), bindparam('leader', type_=Boolean))
+# Taken from another token: what the previous process published is reset until the first heartbeat
+_SAME = "cluster_nodes.instance_token = excluded.instance_token"
+_CLAIM_SQL = text(
+    "INSERT INTO cluster_nodes (node_id, started_at, heartbeat_at, is_leader, version, pid, instance_token)"
+    " VALUES (:n, :now, :now, :false, :version, :pid, :token)"
+    " ON CONFLICT (node_id) DO UPDATE SET heartbeat_at = excluded.heartbeat_at,"
+    " instance_token = excluded.instance_token, version = excluded.version, pid = excluded.pid,"
+    f" started_at = CASE WHEN {_SAME} THEN cluster_nodes.started_at ELSE excluded.started_at END,"
+    f" is_leader = CASE WHEN {_SAME} THEN cluster_nodes.is_leader ELSE :false END,"
+    f" kek_fingerprint = CASE WHEN {_SAME} THEN cluster_nodes.kek_fingerprint ELSE NULL END"
+    f" WHERE {_FREE_FOR}").bindparams(
+    bindparam('now', type_=DateTime), bindparam('fresh_from', type_=DateTime),
+    bindparam('false', type_=Boolean))
+_RELEASE_SQL = text("UPDATE cluster_nodes SET instance_token = NULL WHERE node_id = :n AND instance_token = :token")
+
+
+def instance_token() -> str:
+    """This node process's random token, drawn once and inherited by the processes it starts."""
+    token = os.environ.get(INSTANCE_TOKEN_ENV)
+    if not token:
+        token = secrets.token_hex(16)
+        os.environ[INSTANCE_TOKEN_ENV] = token
+    return token
+
+
+def _stale_seconds(wake_interval=None) -> float:
+    if wake_interval is None:
+        from services.scheduler_service import WAKE_INTERVAL_SECONDS
+        wake_interval = WAKE_INTERVAL_SECONDS
+    return STALE_PASSES * wake_interval
+
+
+def write_heartbeat(node_id, leader, started_at, token=None, wake_interval=None) -> bool:
+    """Refresh this node's row unless another token holds it fresh (False, nothing written);
+    the leader also takes the flag off every other row. One conditional statement: no race.
 
     ``started_at`` is on the cluster clock (to_cluster_clock), as heartbeat_at is.
     """
     from config.settings import Config
     from models import ClusterNode, db
-    now = cluster_utc_now()
-    node = db.session.get(ClusterNode, node_id)
-    if node is None:
-        node = ClusterNode(node_id=node_id, started_at=started_at)
-        db.session.add(node)
-    # Unconditional: a restarted container often reuses its pid, and one process always passes the same value
-    node.started_at = started_at
-    node.heartbeat_at, node.is_leader = now, bool(leader)
-    node.version, node.pid = Config.APP_VERSION, os.getpid()
     from security.encryption import key_encryption
-    node.kek_fingerprint = key_encryption.configured_kek_fingerprint()
     from services.updates import package_family
-    node.package_family = package_family()
+    now = cluster_utc_now()
+    written = db.session.execute(_HEARTBEAT_SQL, {
+        'n': node_id, 'started': started_at, 'now': now, 'leader': bool(leader),
+        'version': Config.APP_VERSION, 'pid': os.getpid(),
+        'kek': key_encryption.configured_kek_fingerprint(), 'family': package_family(),
+        'token': token or instance_token(),
+        'fresh_from': now - timedelta(seconds=_stale_seconds(wake_interval))}).rowcount
+    if not written:
+        db.session.rollback()
+        return False
     if leader:
         ClusterNode.query.filter(ClusterNode.node_id != node_id, ClusterNode.is_leader.is_(True)) \
             .update({'is_leader': False}, synchronize_session=False)
     db.session.commit()
+    return True
+
+
+def _claim(node_id, token, stale_seconds) -> bool:
+    from config.settings import Config
+    from models import db
+    now = cluster_utc_now()
+    taken = db.session.execute(_CLAIM_SQL, {
+        'n': node_id, 'now': now, 'false': False, 'version': Config.APP_VERSION, 'pid': os.getpid(),
+        'token': token, 'fresh_from': now - timedelta(seconds=stale_seconds)}).rowcount
+    db.session.commit()
+    return bool(taken)
+
+
+def _holder(node_id):
+    """(instance_token, heartbeat_at) of the row, as last committed."""
+    from models import ClusterNode, db
+    db.session.expire_all()
+    node = db.session.get(ClusterNode, node_id)
+    return None if node is None else (node.instance_token, node.heartbeat_at)
+
+
+class NodeIdTaken(SystemExit):
+    """Another live process holds this node identifier."""
+
+
+def claim_node_at_start(node_id=None, token=None, stale_seconds=None, poll=None, sleep=time.sleep,
+                        release_at_exit=True) -> float:
+    """HA: take this node's row for this process's token, or refuse to start.
+
+    A row another token holds fresh is waited on: its heartbeat moving on means a live process
+    (refused), its heartbeat expiring means a previous run of this node (taken), so at most the
+    stale window. Returns the seconds waited.
+    """
+    from config.settings import Config
+    node_id = node_id or Config.NODE_ID
+    token = token or instance_token()
+    stale = _stale_seconds() if stale_seconds is None else stale_seconds
+    poll = CLAIM_POLL_SECONDS if poll is None else poll
+    began = time.monotonic()
+    seen = None
+    while not _claim(node_id, token, stale):
+        row = _holder(node_id)
+        if seen is None:
+            seen = row
+            logger.warning(f"HA: node identifier {node_id} is held by another process: waiting at most "
+                           f"{stale:.0f}s for its heartbeat to expire")
+        elif row is not None and row[0] is not None and (row[0] != seen[0] or row[1] != seen[1]):
+            raise NodeIdTaken(
+                f"HA: node identifier {node_id} is already used by another live UCM process. "
+                "Give each node a distinct UCM_NODE_ID. Refusing to start.")
+        if time.monotonic() - began > stale + 2 * poll:
+            raise NodeIdTaken(
+                f"HA: node identifier {node_id} stayed held by another process for more than "
+                f"{stale:.0f}s. Give each node a distinct UCM_NODE_ID. Refusing to start.")
+        sleep(poll)
+    waited = time.monotonic() - began
+    if seen is not None:
+        logger.info(f"HA: node identifier {node_id} taken over after {waited:.0f}s: the previous "
+                    "process's heartbeat expired")
+    if release_at_exit:
+        _release_at_exit(node_id, token)
+    return waited
+
+
+def release_node(node_id, token, executor=None) -> bool:
+    """Give the row up (clean stop): the next start of this node takes it at once."""
+    from models import db
+    executor = executor or db.session
+    released = executor.execute(_RELEASE_SQL, {'n': node_id, 'token': token}).rowcount
+    executor.commit()
+    return bool(released)
+
+
+def _release_at_exit(node_id, token) -> None:
+    import atexit
+    url, pid = application_url(), os.getpid()
+    if url.get_backend_name() != 'postgresql':
+        return  # HA runs on PostgreSQL only (validate_ha_config)
+
+    def release():
+        # Forked web workers inherit the handler: only the process that claimed the row gives it up
+        if os.getpid() != pid:
+            return
+        engine = _dedicated_engine(url)
+        try:
+            with engine.connect() as conn:
+                release_node(node_id, token, conn)
+        except Exception as e:
+            logger.warning(f"HA: node identifier {node_id} not released at exit: {type(e).__name__}")
+        finally:
+            engine.dispose()
+    atexit.register(release)
+
+
+def node_held_elsewhere(node_id, wake_interval) -> bool:
+    """This node's row carries another process's token and a fresh heartbeat."""
+    from models import ClusterNode, db
+    node = db.session.get(ClusterNode, node_id)
+    return bool(node and node.instance_token is not None and node.instance_token != instance_token()
+                and not _is_stale(node, wake_interval, cluster_utc_now()))
 
 
 def _is_stale(node, wake_interval, now) -> bool:
@@ -294,7 +449,8 @@ def node_is_leader(node_id, wake_interval) -> bool:
     """Whether this node's scheduler process holds the lock, as its last fresh heartbeat says."""
     from models import ClusterNode, db
     node = db.session.get(ClusterNode, node_id)
-    return bool(node and node.is_leader and not _is_stale(node, wake_interval, cluster_utc_now()))
+    return bool(node and node.is_leader and node.instance_token in (None, instance_token())
+                and not _is_stale(node, wake_interval, cluster_utc_now()))
 
 
 def fresh_node_ids(wake_interval) -> set:

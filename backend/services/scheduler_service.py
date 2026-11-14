@@ -148,16 +148,22 @@ class SchedulerService:
     - Integration with Flask app context
     """
     
-    def __init__(self, wake_interval: int = 60, node_id: Optional[str] = None):
+    def __init__(self, wake_interval: int = 60, node_id: Optional[str] = None,
+                 instance_token: Optional[str] = None):
         """
         Initialize scheduler
         
         Args:
             wake_interval: How often scheduler wakes up to check tasks (in seconds)
             node_id: This node's name in HA mode (default: Config.NODE_ID)
+            instance_token: HA, the token this process writes with its heartbeat
+                (default: scheduler_leader.instance_token())
         """
         self.wake_interval = wake_interval
         self._node_id = node_id
+        self._instance_token = instance_token
+        # HA: another live process holds this node's row; never leader while set
+        self.deposed = False
         # HA: the PostgreSQL leader lock; None means the host lock (flock / pid file)
         self._leader_lock = None
         self._leader_lock_pid = None
@@ -679,16 +685,19 @@ class SchedulerService:
                 if self._owns_lock:
                     self._still_leader(lock)
                 lost, self._lost_lock = self._lost_lock, False
-                if not lost and not self._owns_lock and lock.acquire():
+                if not self._owns_lock:
+                    self._heartbeat()  # a process whose row another one holds never takes the lock
+                if not lost and not self._owns_lock and not self.deposed and lock.acquire():
                     self._owns_lock, self._owner_pid = True, os.getpid()
                     logger.info(f"Scheduler lock acquired: pid {os.getpid()} on node {self.node_id} "
                                 "runs the scheduled tasks")
                     self._heartbeat(force=True)
-                    self._took_leadership()
-                    self._publish_state()
+                    if self._owns_lock:  # a deposed process gave the lock straight back
+                        self._took_leadership()
+                        self._publish_state()
                 self._heartbeat(force=lost)
                 if not self._owns_lock:
-                    if _ha():
+                    if _ha() and not self.deposed:
                         self._start_node_tasks()
                         self._publish_state()  # this node's per-node runs, for its web workers
                     self._wake.wait(LOCK_RETRY_SECONDS)
@@ -799,14 +808,38 @@ class SchedulerService:
         try:
             if self._started_cluster is None:
                 self._started_cluster = self._in_app(to_cluster_clock, self._started_at, utc_now())
-            self._in_app(write_heartbeat, self.node_id, self._owns_lock, self._started_cluster)
+            written = self._in_app(write_heartbeat, self.node_id, self._owns_lock, self._started_cluster,
+                                   self.instance_token, self.wake_interval)
             self._last_heartbeat = now
             self._heartbeat_error_logged = False
+            self._set_deposed(not written)
         except Exception as e:
             self._in_app(_rollback)
             if not self._heartbeat_error_logged:
                 logger.error(f"Node heartbeat not written: {type(e).__name__}: {e}")
                 self._heartbeat_error_logged = True
+
+    @property
+    def instance_token(self) -> str:
+        if self._instance_token:
+            return self._instance_token
+        from services.scheduler_leader import instance_token
+        return instance_token()
+
+    def _set_deposed(self, deposed: bool) -> None:
+        """HA: a row held fresh by another token is left alone; this process stops leading."""
+        if deposed == self.deposed:
+            return
+        self.deposed = deposed
+        if not deposed:
+            logger.warning(f"Node identifier {self.node_id}: the other process's heartbeat expired, "
+                           "this process holds the row again")
+            return
+        logger.error(f"Node identifier {self.node_id} is held by another live process: this one "
+                     "writes no heartbeat, runs no task and never leads. Give each node a distinct "
+                     "UCM_NODE_ID.")
+        if self._owns_lock:
+            self._release_lock()
 
     def _in_app(self, fn, *args):
         if self._app is not None:
