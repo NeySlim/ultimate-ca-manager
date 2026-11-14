@@ -170,19 +170,23 @@ def disable_2fa():
     # Refused whatever the code, so checked before the lockout: no attempt is used up
     if not user.totp_secret:
         return error_response('2FA not enabled', 400)
-    locked = _code_checks_locked(user.id)
+    # A secret not confirmed yet is no factor of the login: its codes are not counted
+    counted = bool(user.totp_confirmed)
+    locked = _code_checks_locked(user.id) if counted else None
     if locked:
         return locked
 
     # Verify with TOTP code
     if code:
         if not consume_totp(user, code):
-            _code_check_failed(user.id)
+            if counted:
+                _code_check_failed(user.id)
             return error_response('Invalid verification code', 400)
     # Or verify with backup code
     elif backup_code:
         if not backup_verify(user.backup_codes, backup_code):
-            _code_check_failed(user.id)
+            if counted:
+                _code_check_failed(user.id)
             return error_response('Invalid backup code', 400)
 
     # Disable 2FA. Under enforcement the remaining key becomes the user's own
@@ -195,7 +199,8 @@ def disable_2fa():
     ok, _err = safe_commit(logger, "Failed to disable 2FA")
     if not ok:
         return _err
-    _code_check_passed(user.id)
+    if counted:
+        _code_check_passed(user.id)
 
     AuditService.log_action(
         action='mfa_disable',

@@ -184,3 +184,15 @@ def test_a_check_without_2fa_enabled_uses_no_attempt(app, make_user, route):
     for _ in range(_max_attempts(app) + 1):
         assert _reply(_post(c, url, {field: '00000000'})) == (400, '2FA not enabled')
     assert _failures(user['id']) == 0
+
+
+def test_a_code_checked_against_an_unconfirmed_secret_uses_no_attempt(app, make_user):
+    """A TOTP enrolment not confirmed yet is no factor of the login: its codes are not counted,
+    so a key-only account cannot lock its own security-key login with them."""
+    user = make_user(totp=False, key=True)
+    c = _session(app, user)
+    assert _post(c, '/api/v2/account/2fa/enable', {}).status_code == 200
+    for _ in range(_max_attempts(app) + 1):
+        assert _reply(_post(c, '/api/v2/account/2fa/disable', {'code': '00000000'})) == (
+            400, 'Invalid verification code')
+    assert _failures(user['id']) == 0
