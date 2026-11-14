@@ -11,6 +11,7 @@ from migrations._from_2_254 import STEPS, step
 
 logger = logging.getLogger(__name__)
 pg_compatible = True
+requires_full_stop = "a 2.x node cannot run against the 3.0 schema: upgrade from 2.254 with every node stopped"
 
 
 def upgrade(conn):

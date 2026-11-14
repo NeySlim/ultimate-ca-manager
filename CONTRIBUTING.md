@@ -84,6 +84,34 @@ the only way to know the fix does anything, and it keeps the bug from coming bac
 - **Commit subjects** as `type(scope): summary`, in the imperative, under 72
   characters.
 
+## Migrations and rolling updates
+
+An HA cluster upgrades one node at a time: the nodes still on version N run against the
+schema the first node on N+1 migrated. A migration of N+1 therefore only adds: a table, a
+nullable column or one with a default, an index, or a unique index or constraint on new
+columns. It never drops or renames a table or a column N reads or writes, never changes a
+column's type, never makes a column `NOT NULL` without a default or adds a `NOT NULL` column
+without one, never puts a new check, unique or foreign key constraint on columns N writes,
+never deletes rows, and never stops accepting an enumeration value N writes.
+
+The removal comes in a later release, once no version that can share the cluster reads the
+object, in a migration that says so at module level:
+
+```python
+requires_full_stop = "why the release before cannot run against it"
+```
+
+The value is a string literal: it is read from the source without running it. A rolling
+update refuses a release that brings a pending marked migration before installing anything,
+and in HA a node refuses to apply one while another node beats fresh on another version. Say
+in the CHANGELOG entry of that release that it requires every node stopped.
+
+`tests/test_migration_expand_only.py` applies every migration numbered after 300 to a
+populated database of each backend and fails on one without the mark that removes or narrows
+any of the above. It compares the schema and the row counts, so it does not see a value
+rewritten in place or an enumeration value the code stops accepting: those stay for the
+author and the reviewer to check.
+
 ## Security
 
 Please do not open a public issue for a vulnerability. See [SECURITY.md](SECURITY.md)

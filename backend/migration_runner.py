@@ -34,6 +34,11 @@ Numbered from 300. Every migration is multi-backend:
 
 Files and packages whose name starts with ``_`` are not migrations.
 
+A migration only adds to what the release before it reads or writes (CONTRIBUTING.md,
+"Migrations"). One that removes or narrows sets ``requires_full_stop = "<why>"``
+(``migration_marks``): in HA the runner refuses to apply it while another node beats fresh on
+another version, and a rolling update refuses the release before installing anything.
+
 Public API
 ----------
 - `run_all_migrations(dry_run=False, verbose=False)`
@@ -49,6 +54,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text, inspect
 
+from migration_marks import full_stop_reason
 from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
 
 
@@ -150,6 +156,48 @@ def pivot_refusal(state, applied):
     return (f"This database was last started by a release older than {PIVOT_VERSION} ({what}). "
             f"Install {PIVOT_VERSION}, start it once, then upgrade. Nothing was changed: "
             f"{PIVOT_VERSION} still starts on this database.")
+
+
+# ---------------------------------------------------------------------------
+# Full stop: a marked migration waits until no node of another version beats
+# ---------------------------------------------------------------------------
+
+def _instant(value):
+    from datetime import datetime
+    return datetime.fromisoformat(value) if isinstance(value, str) else value
+
+
+def full_stop_refusal(engine, pending):
+    """None, or why this node may not apply *pending* now: HA, a pending migration marked
+    requires_full_stop, and another node with a fresh heartbeat on another version."""
+    from utils.ha import ha_enabled
+    if not ha_enabled():
+        return None
+    marked = {n: r for n in pending if (r := full_stop_reason(MIGRATIONS_DIR / f"{n}.py"))}
+    if not marked or "cluster_nodes" not in inspect(engine).get_table_names():
+        return None
+    from config.settings import Config
+    from services.scheduler_leader import STALE_PASSES, cluster_utc_now
+    from services.scheduler_service import WAKE_INTERVAL_SECONDS
+    from services.updates import versions_match
+    own = Config.APP_VERSION
+    stale = STALE_PASSES * WAKE_INTERVAL_SECONDS
+    with engine.connect() as conn:
+        now = cluster_utc_now(conn)
+        rows = conn.execute(text("SELECT node_id, version, heartbeat_at FROM cluster_nodes")).fetchall()
+    # This node's own row still holds the version it ran before this start
+    others = sorted(f"{node} ({version or 'unknown version'})" for node, version, beat in rows
+                    if node != Config.NODE_ID and beat is not None
+                    and (now - _instant(beat)).total_seconds() <= stale
+                    and not (versions_match(version, own) or versions_match(own, version)))
+    if not others:
+        return None
+    first = sorted(marked)[0]
+    more = f" (and {len(marked) - 1} more)" if len(marked) > 1 else ""
+    return (f"Migration {first}{more} requires every node stopped: {marked[first]}. "
+            f"Still running with a fresh heartbeat: {', '.join(others)}. Stop every node, then "
+            f"start them on {own}; a stopped node counts as gone {stale}s after its last "
+            f"heartbeat. Nothing was changed.")
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +311,13 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
+        try:
+            refusal = full_stop_refusal(engine, pending)
+        except ValueError as exc:
+            refusal = str(exc)
+        if refusal:
+            say(f"✗ {refusal}")
+            return False
         serial_replay = UPGRADE_MIGRATION in applied and _serial_steps_pending(engine)
         # Pass the SQLite path derived from db_url so DATABASE_URL stays the
         # single source of truth (avoids DATABASE_URL/DATABASE_PATH mismatch).
@@ -490,6 +545,13 @@ def show_status():
             say(f"Refused: {refusal}")
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
+        if not refusal:
+            try:
+                held = full_stop_refusal(engine, pending)
+            except ValueError as exc:
+                held = str(exc)
+            if held:
+                say(f"Refused: {held}")
         say(f"Applied: {len(applied)}")
         say(f"Pending: {len(pending)}")
         for n in sorted(applied):
