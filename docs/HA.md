@@ -7,7 +7,7 @@ UCM can run on two or more nodes that share one PostgreSQL database. This page c
 - **PostgreSQL 13 or later**, reachable by every node (`DATABASE_URL`). SQLite is refused at startup.
 - **The same `SECRET_KEY` on every node** (`UCM_SECRET_KEY` in the Docker image). It signs the CSRF tokens until the session key is rotated from the web interface, which stores the new key in the database for every node; it then stays the fallback (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md#session-key-rotation)).
 - **The same `KEY_ENCRYPTION_KEY` on every node**, a Fernet key. It decrypts every private key in the database: losing it makes them unrecoverable. Do not keep a different `master.key` file on a node: a local file overrides the variable.
-- **A distinct `UCM_NODE_ID` per node** (default: the host name).
+- **A distinct `UCM_NODE_ID` per node** (default: the host name). Two VMs cloned from one image keep the same host name: set it explicitly. A node whose identifier a live node already uses refuses to start, see [Node identifier](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
 - **`UCM_HA=1`** on every node.
 - **A load balancer** in front of the nodes. Probe `/health/ready`. Without Redis (see [REDIS.md](REDIS.md)) UI sessions are kept per node: use cookie affinity so a user stays on one node.
 - **One gunicorn worker per node**, which is the default (`workers = 1`). Do not raise it.
@@ -74,7 +74,7 @@ The network uses the fixed subnet `172.28.0.0/24`, trusted as the proxy. When `u
 ## Deployment 3: DEB or RPM on two hosts
 
 1. Install the package on both hosts.
-2. In `/etc/ucm/ucm.env` on each host set the same `DATABASE_URL`, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, `UCM_HA=1`, and a different `UCM_NODE_ID`. The packages generate a random key per node at install: replace it on both hosts.
+2. In `/etc/ucm/ucm.env` on each host set the same `DATABASE_URL`, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, `UCM_HA=1`, and a different `UCM_NODE_ID` (a host cloned from the other keeps its host name, the default). The packages generate a random key per node at install: replace it on both hosts.
 3. Every node must hold the same encryption key: either no `/etc/ucm/master.key` and `KEY_ENCRYPTION_KEY` in `ucm.env`, or the same `master.key` copied to every node (a local file wins over the variable).
 4. Restart `ucm` on each host, one at a time, and check `/health/ready` through the balancer (HAProxy, nginx or any layer 7 balancer with cookie affinity).
 
