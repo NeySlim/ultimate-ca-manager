@@ -210,10 +210,15 @@ def mark_all_applied():
     engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
                            connect_args=postgres_connect_args(db_url))
     try:
-        _ensure_tracking_table(engine, is_pg)
-        _mark_applied(engine, _list_migration_names(), is_pg)
+        record_fresh_registry(engine, is_pg)
     finally:
         engine.dispose()
+
+
+def record_fresh_registry(engine, is_pg: bool):
+    """The registry of a fresh 3.0 database on *engine*: every current migration, applied."""
+    _ensure_tracking_table(engine, is_pg)
+    _mark_applied(engine, _list_migration_names(), is_pg)
 
 
 def build_fresh_schema(create_all):

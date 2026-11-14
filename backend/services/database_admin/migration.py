@@ -24,6 +24,7 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy import create_engine, inspect, text
 
+from migration_runner import record_fresh_registry
 from utils.db_url import postgres_connect_args, sqlalchemy_url
 
 from .copy import (
@@ -373,6 +374,9 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         if target_is_pg:
             _reset_pg_sequences(target_engine)
         carry_id_high_water(target_engine, high_water, target_is_pg)
+        # The target is a fresh 3.0 database: an empty registry beside `users` is refused at
+        # start as older than 2.254. A full migration copies the source's registry instead.
+        record_fresh_registry(target_engine, target_is_pg)
 
         stats["tables"] = dict(result.tables)
         stats["tables_bootstrapped"] = len(result.tables)

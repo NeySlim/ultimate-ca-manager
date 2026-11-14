@@ -323,6 +323,67 @@ class TestTheDataKeysCrossTheSwitch:
         self._bootstrap(app, pg_target)
 
 
+# The child reads neither the host's env file nor its master key, as under conftest
+_BOOT_ON_TARGET = '''
+import os
+import dotenv
+dotenv.load_dotenv = lambda *a, **k: False
+from pathlib import Path
+from security import encryption
+encryption.MASTER_KEY_PATH = Path(os.environ['DATA_DIR']) / 'master.key'
+encryption.key_encryption.reload()
+from config import settings
+from utils.db_url import sqlalchemy_url
+settings.TestingConfig.SQLALCHEMY_DATABASE_URI = sqlalchemy_url(os.environ['DATABASE_URL'])
+from app import create_app
+create_app('testing')
+print('BOOTED')
+'''
+
+
+class TestASwitchWithoutDataStartsOnTheTarget:
+    """The target of a switch without data is a 3.0 database: its registry names every
+    current migration, so the pivot accepts it and the next start goes to the end."""
+
+    def _switch_then_start(self, app, target, tmp_path, monkeypatch):
+        import subprocess
+        import sys
+        import migration_runner
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is True, message
+
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with engine.connect() as conn:
+                registry = sorted(r[0] for r in conn.execute(text('SELECT name FROM _migrations')))
+        finally:
+            engine.dispose()
+        assert registry == migration_runner._list_migration_names()
+
+        monkeypatch.setattr(migration_runner, '_get_db_url', lambda: target)
+        assert migration_runner.run_all_migrations() is True
+
+        data = tmp_path / 'node'
+        data.mkdir()
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        env.update(DATA_DIR=str(data), DATABASE_PATH=str(data / 'ucm.db'), DATABASE_URL=target,
+                   UCM_SKIP_SECRET_VALIDATION='1', UCM_HA='0')
+        backend = Path(__file__).resolve().parents[1]
+        run = subprocess.run([sys.executable, '-c', _BOOT_ON_TARGET], cwd=backend, env=env,
+                             capture_output=True, text=True, timeout=180)
+        assert run.returncode == 0 and 'BOOTED' in run.stdout, run.stdout[-3000:] + run.stderr[-3000:]
+
+    def test_sqlite(self, app, sqlite_target, tmp_path, monkeypatch):
+        self._switch_then_start(app, sqlite_target, tmp_path, monkeypatch)
+
+    @_needs_pg
+    def test_postgresql(self, app, pg_target, tmp_path, monkeypatch):
+        self._switch_then_start(app, pg_target, tmp_path, monkeypatch)
+
+
 class TestTheSourceKeepsBeingWrittenTo:
     def test_a_row_written_during_the_copy_is_wholly_in_or_wholly_out(
             self, app, create_ca, create_cert, sqlite_target, monkeypatch):
