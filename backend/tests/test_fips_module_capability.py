@@ -496,6 +496,28 @@ class TestHsmSigningInFipsMode:
         key = hsm_signing_key(algorithm, _pem(public))
         assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
 
+    @pytest.mark.parametrize('label,bits,signs', [
+        ('RSA-8192', 2048, True), ('UNKNOWN', 3072, True), ('RSA-2048', 1024, False),
+    ])
+    def test_uncached_key_is_judged_on_the_fetched_public_key(self, monkeypatch, hsm_signing_key,
+                                                             fips_on, label, bits, signs):
+        # A synced key without a cached public key (Google KMS) is judged on the one its provider returns
+        from services.hsm import HsmService
+        pem = _pem(_rsa_public(bits))
+
+        class _Publishing(_SigningStub):
+            def get_public_key(self, key_identifier):
+                return pem
+
+        monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: _Publishing()))
+        key = hsm_signing_key(label, None)
+        if signs:
+            assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
+        else:
+            with pytest.raises(FipsRestricted, match=f'^RSA {bits} keys not available in FIPS mode$'):
+                HsmService.sign(key.id, b'tbs', hash_algorithm='sha256')
+        assert key.public_key_pem == pem
+
 
 # ----------------------------------------------------------- renewal and imports
 

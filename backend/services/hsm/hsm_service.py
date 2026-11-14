@@ -659,26 +659,33 @@ class HsmService:
         return key_algorithms.get(label) or key_algorithms.get(key.algorithm)
 
     @classmethod
-    def refuse_signing_in_fips_mode(cls, key: HsmKey) -> None:
-        """Refused by default in FIPS mode: an HSM key signs only if it is RSA 2048+ or
-        a registered algorithm every module approves (NIST curves), judged on its public key."""
-        if not fips_mode.enabled():
-            return
+    def fips_signing_refusal(cls, key: HsmKey) -> Optional[str]:
+        """What FIPS mode refuses to sign with *key* ('RSA 1024 keys'), or None: only RSA 2048+
+        and the registered algorithms every module approves sign. Cached public key, then label."""
         public = cls._cached_public_key(key)
         if isinstance(public, rsa.RSAPublicKey):
-            if public.key_size >= 2048:
-                return
-            fips_mode.refuse(f'RSA {public.key_size} keys')
+            return None if public.key_size >= 2048 else f'RSA {public.key_size} keys'
         registered = cls._registered_algorithm(key)
-        if registered is not None and registered.fips_static:
-            return
         if registered is not None:
-            name = registered.display
-        elif isinstance(public, ec.EllipticCurvePublicKey):
-            name = f'EC {public.curve.name}'
-        else:
-            name = key.algorithm or 'UNKNOWN'
-        fips_mode.refuse(f'{name} keys')
+            return None if registered.fips_static else f'{registered.display} keys'
+        if isinstance(public, ec.EllipticCurvePublicKey):
+            return f'EC {public.curve.name} keys'
+        return f'{key.algorithm or "UNKNOWN"} keys'
+
+    @classmethod
+    def refuse_signing_in_fips_mode(cls, key: HsmKey, fetch: bool = True) -> None:
+        """FipsRestricted unless *key* signs in FIPS mode; with *fetch*, a public key missing
+        from the cache is asked of the provider first, and its label decides if none comes."""
+        if not fips_mode.enabled():
+            return
+        if fetch and not key.public_key_pem:
+            try:
+                cls.get_public_key(key.id)
+            except Exception as e:
+                logger.debug(f"Public key of HSM key {key.id} unavailable, judged on its label: {e}")
+        refusal = cls.fips_signing_refusal(key)
+        if refusal:
+            fips_mode.refuse(refusal)
 
     @classmethod
     def sign(cls, key_id: int, data: bytes, algorithm: Optional[str] = None,
