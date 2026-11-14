@@ -135,9 +135,9 @@ The issuance is the same entity's, and goes through, when one of these holds:
 
 A certificate recorded without an identity (imported, issued from a CSR or the issue form, or by 2.x outside ACME, whose certificates take their order's account at the upgrade) belongs to another entity unless the key or a renewal links it. Not checked: an empty subject, CA certificates (sub-CAs and cross-signing), the pre-certificate submitted to Certificate Transparency logs next to its final certificate, the two certificates of a hybrid pair, and the certificates UCM issues to its own services (OCSP responder, TSA signer, EST key generation signer).
 
-A refused manual issuance or CSR signing names the certificate that carries the subject (serial number) and offers **Issue anyway**: the certificate is then issued and the audit log records who did it, the subject and the certificate already carrying it. Protocols have no override: ACME answers `badCSR`, SCEP a failure with `badRequest`, EST a `400` with the reason, WSTEP a fault. Every refusal is audited (`certificate.subject_taken`), and a request held for approval is checked again when it is approved.
+A refused manual issuance or CSR signing names the certificate that carries the subject (serial number) and offers **Issue anyway**: the certificate is then issued and the audit log records who did it, the subject and the certificate already carrying it. The subject is then shared by two entities, so neither the existing certificate nor the new one can be renewed any more, automatic renewal included. Protocols have no override: ACME answers `badCSR`, SCEP a failure with `badRequest`, EST a `400` with the reason, WSTEP a fault. Every refusal is audited (`certificate.subject_taken`), and a request held for approval is checked again when it is approved.
 
-Turning the option on is allowed when subjects are already shared: the check applies to the next issuance only, and UCM says how many subjects are in that case.
+Turning the option on is allowed when subjects are already shared, and UCM says how many subjects are in that case. The certificates already issued stay, but every later issuance of such a subject is refused, the renewal of any of its certificates (**Renew**, automatic renewal, protocol renewals) included: only **Issue anyway** goes past it.
 
 ---
 

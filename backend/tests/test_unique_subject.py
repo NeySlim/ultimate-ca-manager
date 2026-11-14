@@ -317,6 +317,22 @@ def test_renewal_in_place_is_the_same_entity_but_not_another_one(app, auth_clien
     assert _row(app, other['id']).serial_number == other['serial_number']
 
 
+def test_after_an_override_neither_certificate_renews_automatic_renewal_included(
+        app, auth_client, create_ca):
+    """An overridden subject is shared by two entities: each later issuance of it is refused."""
+    from services.auto_renewal_service import AutoRenewalService
+    ca = unique_ca(app, create_ca, 'Unique override renewal CA')
+    first = _data(_issue(auth_client, ca, 'override-renew.unique.test'), 201)
+    forced = _data(_issue(auth_client, ca, 'override-renew.unique.test', override_unique_subject=True), 201)
+    for held in (first, forced):
+        r = auth_client.post(f"/api/v2/certificates/{held['id']}/renew", json={})
+        assert r.status_code == 409, r.get_json()
+        with app.app_context():
+            renewed, message = AutoRenewalService.renew_certificate(db.session.get(Certificate, held['id']))
+            assert renewed is False and 'override-renew.unique.test' in message
+        assert _row(app, held['id']).serial_number == held['serial_number']
+
+
 def test_the_override_issues_and_audits_operator_subject_and_certificate(app, auth_client, create_ca):
     ca = unique_ca(app, create_ca, 'Unique override CA')
     first = _data(_issue(auth_client, ca, 'override.unique.test'), 201)

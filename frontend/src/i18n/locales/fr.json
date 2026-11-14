@@ -1085,8 +1085,8 @@
     "stopEnforcingUniqueSubject": "Ne plus imposer",
     "uniqueSubjectChanged": "Réglage du sujet unique mis à jour",
     "uniqueSubjectChangeFailed": "Le réglage du sujet unique n'a pas pu être mis à jour",
-    "uniqueSubjectShared_one": "{{count}} sujet est déjà partagé par plusieurs entités : sa prochaine émission pour une autre entité sera refusée",
-    "uniqueSubjectShared_other": "{{count}} sujets sont déjà partagés par plusieurs entités : leur prochaine émission pour une autre entité sera refusée"
+    "uniqueSubjectShared_one": "{{count}} sujet est déjà partagé par plusieurs entités : toute émission suivante de ce sujet est refusée, renouvellements de ses certificats compris",
+    "uniqueSubjectShared_other": "{{count}} sujets sont déjà partagés par plusieurs entités : toute émission suivante de ces sujets est refusée, renouvellements de leurs certificats compris"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",

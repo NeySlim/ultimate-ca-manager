@@ -1146,10 +1146,10 @@
     "stopEnforcingUniqueSubject": "Stop enforcing",
     "uniqueSubjectChanged": "Unique subject setting updated",
     "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
-    "uniqueSubjectShared_one": "{{count}} subject is already shared by several entities: its next issuance to another entity is refused",
-    "uniqueSubjectShared_few": "{{count}} subjects are already shared by several entities: their next issuance to another entity is refused",
-    "uniqueSubjectShared_many": "{{count}} subjects are already shared by several entities: their next issuance to another entity is refused",
-    "uniqueSubjectShared_other": "{{count}} subjects are already shared by several entities: their next issuance to another entity is refused"
+    "uniqueSubjectShared_one": "{{count}} subject is already shared by several entities: every later issuance of it is refused, renewals of its certificates included",
+    "uniqueSubjectShared_few": "{{count}} subjects are already shared by several entities: every later issuance of them is refused, renewals of their certificates included",
+    "uniqueSubjectShared_many": "{{count}} subjects are already shared by several entities: every later issuance of them is refused, renewals of their certificates included",
+    "uniqueSubjectShared_other": "{{count}} subjects are already shared by several entities: every later issuance of them is refused, renewals of their certificates included"
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",
