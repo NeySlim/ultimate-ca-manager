@@ -1180,32 +1180,31 @@ class TestASwitchCutShortCanBeResumed:
     @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
     def test_a_2_254_target_with_accounts_is_left_as_it_is(self, request, backend, app,
                                                             auth_client, create_user):
-        """Not a copy of this switch: its upgrade has not run, nothing is written to it."""
+        """Not a copy of this switch, its upgrade has not run: registry and counters stay as they were."""
         from migrations._from_2_254 import PIVOT_NAMES
         url = request.getfixturevalue(f'{backend}_target')
         _provision(url, set(PIVOT_NAMES))
-        before = _user_counter(url)
+        before = _registry_of(url), _counters(url)
         assert _deleted_last_user(app, auth_client, create_user) > 1    # past the target's one account
 
         with app.app_context():
             ok, message, _ = migration.bootstrap_auth_to_target(url)
 
         assert ok is True and 'skipped' in message, message
-        assert _user_counter(url) == before
+        assert (_registry_of(url), _counters(url)) == before
 
 
-def _user_counter(url):
-    """What the target recorded as the last users id it handed out."""
+def _counters(url):
+    """What the target recorded as the last id each table handed out."""
     from utils.db_url import postgres_connect_args, sqlalchemy_url
     engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
     try:
         with engine.connect() as conn:
             if url.startswith('postgresql'):
                 return conn.execute(text(
-                    "SELECT last_value FROM pg_sequences WHERE sequencename = 'users_id_seq' "
-                    "AND schemaname = current_schema()")).scalar()
-            return conn.execute(text(
-                "SELECT name, seq FROM sqlite_sequence WHERE name = 'users'")).fetchall()
+                    "SELECT sequencename, last_value FROM pg_sequences "
+                    "WHERE schemaname = current_schema() ORDER BY 1")).fetchall()
+            return conn.execute(text("SELECT name, seq FROM sqlite_sequence ORDER BY 1")).fetchall()
     finally:
         engine.dispose()
 
