@@ -252,9 +252,10 @@ Contents
   config/     what was in $CONFIG (ucm.env, master.key)
 $DB_LINE
 This directory holds private keys and the key that decrypts the database: keep it
-readable by root only. Nothing here is used or removed by UCM. What was copied from
-another filesystem was checked: contents, mode, owner, group, and the dates of files;
-extended attributes and ACLs were copied where this filesystem keeps them, unchecked.
+readable by root only. Nothing here is used or removed by UCM. What could not be renamed
+(another filesystem, a bind mount, overlayfs) was copied, then checked: contents, mode,
+owner, group and the dates of files, symbolic links by their target only; extended
+attributes and ACLs were copied where this filesystem keeps them, unchecked.
 
 To put that installation back in service
   1. Stop UCM: sudo systemctl stop ucm

@@ -258,6 +258,10 @@ def test_the_archive_is_root_only_and_says_how_to_restore(tmp_path):
     assert '—' not in readme and '–' not in readme
     assert STAMP in readme and str(box.data) in readme and str(box.config) in readme
     assert '136_lifted_hold_leftovers' in readme
+    # Copied whenever a rename is refused, not only across filesystems
+    flat = ' '.join(readme.split())
+    assert 'could not be renamed (another filesystem, a bind mount, overlayfs) was copied' in flat
+    assert 'symbolic links by their target only' in flat
     for step in ('Install UCM 2.254', 'systemctl stop ucm', 'systemctl start ucm',
                  'Install this release again'):
         assert step in readme
