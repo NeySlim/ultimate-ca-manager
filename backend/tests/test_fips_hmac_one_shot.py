@@ -2,8 +2,9 @@
 
 On the OpenSSL FIPS Provider 3.5 only that call reaches the module's HMAC service and
 its key-length check; ``hmac.new`` assembles HMAC in libcrypto around the module's
-digests. Each site keeps producing the same bytes: the reference is computed with
-``hmac.new`` before it is made unavailable.
+digests. Each site keeps producing the same bytes: the reference is a published vector
+(RFC 4231, RFC 6238) or ``hmac.new`` called here with the digest written out, never a
+value the code under test computed.
 """
 import base64
 import hashlib
@@ -73,26 +74,34 @@ def test_a_short_webhook_secret_does_not_sign_in_fips_mode(app, monkeypatch):
         assert webhook_service.WebhookService._perform_delivery(endpoint, 'test', '{}')[0] is True
 
 
+def _b64url(data):
+    return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
+
+
 def test_csrf_token(app):
     from security.csrf import CSRFProtection
-    with app.test_request_context(), patch('security.csrf.time.time', return_value=1700000000), \
+    secret = 'k' * 32
+    expected = hmac.new(secret.encode(), b'1700000000:' + b'ab' * 16 + b':7', hashlib.sha256).hexdigest()
+    with app.test_request_context(), patch.dict(app.config, {'SECRET_KEY': secret}), \
+            patch('security.csrf.time.time', return_value=1700000000), \
             patch('security.csrf.secrets.token_hex', return_value='ab' * 16):
-        reference = CSRFProtection.generate_token(7)
         with _without_hmac_new():
-            assert CSRFProtection.generate_token(7) == reference
-            assert CSRFProtection.validate_token(reference, 7)[0] is True
+            token = CSRFProtection.generate_token(7)
+            assert token == f"1700000000:{'ab' * 16}:{expected}"
+            assert CSRFProtection.validate_token(token, 7)[0] is True
 
 
 def test_webauthn_decoy_id():
     from services.webauthn_service import WebAuthnService
-
-    def decoy():
-        options = WebAuthnService.generate_decoy_authentication_options('alice', 'ucm.test', b's' * 32)
-        return options['allowCredentials'][0]['id']
-
-    reference = decoy()
+    expected = hmac.new(b's' * 32, b'webauthn-decoy:alice', hashlib.sha256).digest()
     with _without_hmac_new():
-        assert decoy() == reference
+        options = WebAuthnService.generate_decoy_authentication_options('Alice', 'ucm.test', b's' * 32)
+    assert options['allowCredentials'][0]['id'] == _b64url(expected)
+
+
+def _assert_eab_signed(eab, key):
+    signing_input = f"{eab['protected']}.{eab['payload']}".encode()
+    assert eab['signature'] == _b64url(hmac.new(key, signing_input, hashlib.sha256).digest())
 
 
 def test_acme_client_and_proxy_eab():
@@ -102,15 +111,13 @@ def test_acme_client_and_proxy_eab():
     client = SimpleNamespace(_get_account_key=lambda: key,
                              _build_jwk=lambda k: AcmeClientService._build_jwk(None, k))
     proxy = SimpleNamespace(account_jwk={'kty': 'EC', 'crv': 'P-256', 'x': 'x', 'y': 'y'})
-    hmac_key = base64.urlsafe_b64encode(b'e' * 32).rstrip(b'=').decode()
-
-    def both():
-        return (AcmeClientService._build_eab_payload(client, 'kid', hmac_key, 'https://ca.test/new'),
-                AcmeProxyService._build_eab(proxy, 'kid', hmac_key, 'https://ca.test/new'))
-
-    reference = both()
+    raw = bytes(range(32))
     with _without_hmac_new():
-        assert both() == reference
+        both = (AcmeClientService._build_eab_payload(client, 'kid', _b64url(raw), 'https://ca.test/new'),
+                AcmeProxyService._build_eab(proxy, 'kid', _b64url(raw), 'https://ca.test/new'))
+    for eab in both:
+        assert json.loads(base64.urlsafe_b64decode(eab['protected'] + '=='))['alg'] == 'HS256'
+        _assert_eab_signed(eab, raw)
 
 
 @pytest.mark.parametrize('alg, digest', [('HS256', hashlib.sha256), ('HS384', hashlib.sha384),
@@ -144,24 +151,50 @@ def test_acme_server_eab_verification(app, alg, digest):
             db.session.commit()
 
 
-def test_dns_provider_signatures():
-    from services.acme.dns_providers.constellix import ConstellixDnsProvider
-    from services.acme.dns_providers.dnsmadeeasy import DnsMadeEasyDnsProvider
-    from services.acme.dns_providers.inwx import InwxDnsProvider
-    from services.acme.dns_providers.tencentcloud import TencentCloudDnsProvider
-    creds = {'api_key': 'a', 'secret_key': 's' * 32, 'secret_id': 'i', 'username': 'u',
+DNS_CREDS = {'api_key': 'a', 'secret_key': 's' * 32, 'secret_id': 'i', 'username': 'u',
              'password': 'p'}
 
-    def all_of():
-        with patch('time.time', return_value=1700000000.0):
-            return (DnsMadeEasyDnsProvider(creds)._get_headers()['x-dnsme-hmac'],
-                    ConstellixDnsProvider(creds)._get_headers(),
-                    TencentCloudDnsProvider(creds)._make_headers('Action', '{}')['Authorization'],
-                    InwxDnsProvider(creds)._generate_totp('JBSWY3DPEHPK3PXPJBSWY3DPEH'))
 
-    reference = all_of()
+def test_dnsmadeeasy_signature():
+    from services.acme.dns_providers.dnsmadeeasy import DnsMadeEasyDnsProvider
     with _without_hmac_new():
-        assert all_of() == reference
+        headers = DnsMadeEasyDnsProvider(DNS_CREDS)._get_headers()
+    expected = hmac.new(b's' * 32, headers['x-dnsme-requestDate'].encode(), hashlib.sha1).hexdigest()
+    assert headers['x-dnsme-hmac'] == expected
+
+
+def test_constellix_signature():
+    from services.acme.dns_providers.constellix import ConstellixDnsProvider
+    with patch('time.time', return_value=1700000000.0), _without_hmac_new():
+        token = ConstellixDnsProvider(DNS_CREDS)._get_headers()['Authorization']
+    expected = base64.b64encode(hmac.new(b's' * 32, b'1700000000000', hashlib.sha1).digest()).decode()
+    assert token == f'Bearer a:{expected}:1700000000000'
+
+
+def test_tencentcloud_signature():
+    """TC3-HMAC-SHA256: the key chain and the string to sign of Tencent Cloud API 3.0."""
+    from services.acme.dns_providers.tencentcloud import TencentCloudDnsProvider
+    provider = TencentCloudDnsProvider(DNS_CREDS)
+    with patch('time.time', return_value=1700000000.0), _without_hmac_new():
+        authorization = provider._make_headers('DescribeDomain', '{}')['Authorization']
+
+    def sign(key, msg):
+        return hmac.new(key, msg.encode(), hashlib.sha256).digest()
+    host = provider.BASE_URL.split('://')[1]
+    canonical = '\n'.join(['POST', '/', '', f'content-type:application/json\nhost:{host}\n',
+                           'content-type;host', hashlib.sha256(b'{}').hexdigest()])
+    scope = f'2023-11-14/{provider.SERVICE}/tc3_request'
+    to_sign = '\n'.join(['TC3-HMAC-SHA256', '1700000000', scope,
+                         hashlib.sha256(canonical.encode()).hexdigest()])
+    key = sign(sign(sign(b'TC3' + b's' * 32, '2023-11-14'), provider.SERVICE), 'tc3_request')
+    expected = hmac.new(key, to_sign.encode(), hashlib.sha256).hexdigest()
+    assert authorization.endswith(f'Signature={expected}'), authorization
+
+
+def test_inwx_totp_is_the_rfc_6238_vector():
+    from services.acme.dns_providers.inwx import InwxDnsProvider
+    with patch('time.time', return_value=59.0), _without_hmac_new():
+        assert InwxDnsProvider(DNS_CREDS)._generate_totp('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ') == '287082'
 
 
 def test_pkcs12_mac_check():
