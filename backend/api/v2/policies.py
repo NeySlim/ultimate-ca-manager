@@ -949,7 +949,7 @@ def _validated_algorithm_rules(rules, *, fips_check=True):
             return error
     if fips_check:
         refused = [label for label in rules.get('allowed_key_types') or []
-                   if not key_algorithms.fips_approved(label)]
+                   if not key_algorithms.fips_approved_key_label(label)]
         if refused:
             fips_mode.refuse(f'{refused[0]} keys')
     digests = rules.get('allowed_digests')

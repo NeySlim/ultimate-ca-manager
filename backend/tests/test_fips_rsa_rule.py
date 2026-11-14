@@ -106,3 +106,30 @@ def test_an_rsa_8192_csr_is_signed_in_fips_mode(app, auth_client, create_ca, mon
             if row is not None:
                 db.session.delete(row)
                 db.session.commit()
+
+
+def _fake_private(bits):
+    # Unchecked key of exactly *bits* bits: only its size is judged, no prime search
+    p, q = (1 << (bits // 2 - 1)) + 1, (1 << (bits - bits // 2)) + 1
+    numbers = rsa.RSAPrivateNumbers(p=p, q=q, d=3, dmp1=1, dmq1=1, iqmp=1,
+                                    public_numbers=rsa.RSAPublicNumbers(65537, p * q))
+    key = numbers.private_key(unsafe_skip_rsa_key_validation=True)
+    assert key.key_size == bits
+    return key
+
+
+@pytest.mark.parametrize('bits, approved', [(2048, True), (2050, True), (8192, True), (16384, True),
+                                            (2049, False), (16386, False)])
+def test_a_policy_is_saved_by_the_rule(app, auth_client, fips, bits, approved):
+    from models.policy import CertificatePolicy
+    name = f'fips-rsa-{bits}-{uuid.uuid4().hex[:6]}'
+    r = auth_client.post('/api/v2/policies', content_type='application/json', data=json.dumps({
+        'name': name, 'is_active': False, 'rules': {'allowed_key_types': [f'RSA-{bits}']}}))
+    with app.app_context():
+        row = CertificatePolicy.query.filter_by(name=name).first()
+        if row is not None:
+            db.session.delete(row)
+            db.session.commit()
+    assert (r.status_code in (200, 201)) is approved, r.data
+    assert (row is not None) is approved
+
