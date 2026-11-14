@@ -128,6 +128,26 @@ def test_a_lock_in_the_database_outlives_the_process_until_it_expires(nodes):
     assert _rows(a)[('webauthn', user['username'])] == (1, None)
 
 
+def test_a_lock_set_by_one_node_holds_on_a_node_started_after_it(nodes):
+    """Locks armed through the routes of A refuse on an application created afterwards."""
+    from api.v2.auth_methods import TWO_FA, _check_2fa_lockout
+    a, _b, user = nodes
+    max_attempts, _ = _max_attempts(a)
+    for _ in range(max_attempts):
+        assert _code(_webauthn(a, user['username'])) == 401
+    c = a.test_client()
+    assert c.post('/api/v2/auth/login/password', json={'username': user['username'],
+                                                       'password': PASSWORD}).status_code == 200
+    for _ in range(max_attempts):
+        assert c.post('/api/v2/auth/login/2fa', json={'code': '00000000'}).status_code == 401
+    with fresh_app() as restarted, _bound_to(restarted, user['url'], is_postgresql=user['pg'],
+                                             create_schema=False):
+        assert _webauthn(restarted, user['username']) == LOCKED
+        with restarted.app_context():
+            assert _check_2fa_lockout(TWO_FA, str(user['id']))
+            db.session.remove()
+
+
 def test_a_pending_second_factor_is_refused_when_the_database_says_locked(nodes):
     a, b, user = nodes
     max_attempts, _ = _max_attempts(a)
