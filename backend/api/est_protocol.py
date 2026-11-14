@@ -655,8 +655,9 @@ def _est_identity(username):
     return f'basic:{username or ""}'
 
 
-def sign_est_csr(ca, csr, *, renewal_of=None, supersedes=None, on_stored=None):
-    """Sign an EST request (direct or approved): ``(cert_pem, serial)``."""
+def sign_est_csr(ca, csr, *, renewal_of=None, supersedes=None, on_stored=None, renews=None):
+    """Sign an EST request (direct or approved): ``(cert_pem, serial)``. *renews*: rows of the
+    entity the request designates without renewing them (serverkeygen by its client certificate)."""
     from models import SystemConfig
     validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
     days = int(validity_days.value) if validity_days else 365
@@ -667,8 +668,20 @@ def sign_est_csr(ca, csr, *, renewal_of=None, supersedes=None, on_stored=None):
     return CAService.sign_csr_from_crypto(
         ca=ca, csr=csr, validity_days=days, source='est', cert_type='device_cert',
         renewal_of=renewal_of, supersedes=supersedes, on_stored=on_stored,
-        requester_sid=requester_sid,
+        requester_sid=requester_sid, renews=renews,
     )
+
+
+def _client_certificate_entity(ca, client_cert, csr):
+    """The rows of the TLS client certificate when *ca* issued it with the subject asked for: the
+    serverkeygen request is that entity's (a designated replacement, as simplereenroll's)."""
+    if client_cert is None or not getattr(ca, 'enforce_unique_subject', False):
+        return None
+    from services.cert.issued_lookup import find_issued_rows
+    from utils.dn_match import same_name
+    if not same_name(client_cert.subject, csr.subject):
+        return None
+    return find_issued_rows(ca, client_cert) or None
 
 
 def _request_ref(ca, csr, operation, identity):
@@ -1259,7 +1272,8 @@ def server_keygen(label=None):
         new_csr = new_csr_builder.sign(key, HASH_BY_NAME[csr_digest]() if csr_digest else None,
                                        default_backend())
         
-        cert_pem, serial = sign_est_csr(ca, new_csr)
+        cert_pem, serial = sign_est_csr(ca, new_csr,
+                                        renews=_client_certificate_entity(ca, mtls_cert_obj, csr))
 
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         if approved is not None:

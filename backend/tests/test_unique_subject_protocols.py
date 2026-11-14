@@ -134,6 +134,31 @@ def test_an_est_request_held_for_approval_is_checked_again_and_closed(app, clien
     assert _rows(app, est_unique['id'], 'est-held.unique.test') == 1
 
 
+def _serverkeygen_cert(response):
+    from tests.test_est_rfc7030 import _multipart_parts
+    assert response.status_code == 200, response.data
+    part = _multipart_parts(response)[0]
+    return pkcs7.load_der_pkcs7_certificates(part.get_payload(decode=True))[0]
+
+
+def test_est_serverkeygen_authenticated_by_the_subject_s_certificate_is_its_entity(app, client, est_unique):
+    """A fresh key each time and no renewal: the client certificate of this CA carrying the subject
+    designates the entity (as simplereenroll); Basic authentication proves no entity."""
+    issued = _est_cert(_post_csr(client, 'simpleenroll', _csr('skg.unique.test', _rsa()), headers=_basic_auth()))
+    r = _post_csr(client, 'serverkeygen', _csr('skg.unique.test', _rsa()), headers=_basic_auth())
+    assert r.status_code == 400 and b'already carried' in r.data, r.data
+    pem = issued.public_bytes(serialization.Encoding.PEM).decode()
+    generated = _serverkeygen_cert(_post_csr(client, 'serverkeygen', _csr('skg.unique.test', _rsa()),
+                                             client_cert_pem=pem))
+    # ... and so is a client certificate generated that way
+    _serverkeygen_cert(_post_csr(client, 'serverkeygen', _csr('skg.unique.test', _rsa()),
+                                 client_cert_pem=generated.public_bytes(serialization.Encoding.PEM).decode()))
+    with app.app_context():
+        rows = Certificate.query.filter_by(subject='CN=skg.unique.test').order_by(Certificate.id).all()
+        assert [r.subject_holder for r in rows] == [None, f'cert:{rows[0].refid}', f'cert:{rows[0].refid}']
+        assert not any(r.archived for r in rows)  # not a renewal: nothing superseded
+
+
 # --- SCEP (RFC 8894 §3.2.1.4: FAILURE, failInfo badRequest) --------------------------------------
 
 def _scep(app, ca_id, signer_cert, signer_key, message_type, csr):
