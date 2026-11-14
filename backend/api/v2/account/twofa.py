@@ -107,6 +107,9 @@ def confirm_2fa():
     user = db.session.get(User, g.current_user.id)
     if not user or not user.totp_secret:
         return error_response('2FA setup not initiated', 400)
+    # A confirmed secret is the login's factor: no code of it is checked here
+    if user.totp_confirmed:
+        return error_response('2FA is already enabled; disable it first', 409)
 
     # Verify code, once only
     if not consume_totp(user, code):

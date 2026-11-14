@@ -196,3 +196,65 @@ def test_a_code_checked_against_an_unconfirmed_secret_uses_no_attempt(app, make_
         assert _reply(_post(c, '/api/v2/account/2fa/disable', {'code': '00000000'})) == (
             400, 'Invalid verification code')
     assert _failures(user['id']) == 0
+
+
+def _recovery_codes(app, user):
+    with app.app_context():
+        return db.session.get(User, user['id']).backup_codes
+
+
+def test_confirming_a_confirmed_totp_checks_no_code(app, make_user):
+    """The confirmation of an enrolment is no third way to try codes of the login's secret,
+    nor to draw fresh recovery codes with one."""
+    user = make_user()
+    c = _session(app, user)
+    before = _recovery_codes(app, user)
+    refused = (409, '2FA is already enabled; disable it first')
+    for _ in range(_max_attempts(app) + 1):
+        assert _reply(_post(c, '/api/v2/account/2fa/confirm', {'code': '00000000'})) == refused
+    r = _post(c, '/api/v2/account/2fa/confirm', {'code': _right_value(user, 'code')})
+    assert _reply(r) == refused and 'backup_codes' not in (r.get_json().get('data') or {})
+    assert _recovery_codes(app, user) == before
+    assert _failures(user['id']) == 0
+
+
+def _pending_secret(app, c, user):
+    """A key-only account that started a TOTP enrolment and has not confirmed it."""
+    r = _post(c, '/api/v2/account/2fa/enable', {})
+    assert r.status_code == 200, r.data
+    return r.get_json()['data']['secret']
+
+
+def test_a_code_of_an_unconfirmed_secret_leaves_the_login_counter(app, make_user):
+    """Passing with the secret just handed out proves no factor: failures already counted stay."""
+    from api.v2.auth_methods import _2fa_failed_attempts
+    user = make_user(totp=False, key=True)
+    c = _session(app, user)
+    _2fa_failed_attempts[str(user['id'])] = {'count': 2, 'locked_until': None}
+    secret = _pending_secret(app, c, user)
+    r = _post(c, '/api/v2/account/2fa/disable', {'code': pyotp.TOTP(secret).now()})
+    assert r.status_code == 200, r.data
+    assert _failures(user['id']) == 2
+
+
+def test_a_recovery_code_against_an_unconfirmed_secret_uses_no_attempt(app, make_user):
+    user = make_user(totp=False, key=True)
+    c = _session(app, user)
+    _pending_secret(app, c, user)
+    for _ in range(_max_attempts(app) + 1):
+        assert _reply(_post(c, '/api/v2/account/2fa/disable', {'backup_code': RECOVERY})) == (
+            400, 'Invalid backup code')
+    assert _failures(user['id']) == 0
+
+
+def test_a_locked_counter_does_not_lock_the_codes_of_an_unconfirmed_secret(app, make_user):
+    from datetime import timedelta
+    from api.v2.auth_methods import _2fa_failed_attempts
+    from utils.datetime_utils import utc_now
+    user = make_user(totp=False, key=True)
+    c = _session(app, user)
+    _pending_secret(app, c, user)
+    _2fa_failed_attempts[str(user['id'])] = {'count': _max_attempts(app),
+                                             'locked_until': utc_now() + timedelta(minutes=5)}
+    assert _reply(_post(c, '/api/v2/account/2fa/disable', {'code': '00000000'})) == (
+        400, 'Invalid verification code')
