@@ -59,6 +59,7 @@ from api.v2.system import alerts  # noqa: F401
 from api.v2.system import updates  # noqa: F401
 from api.v2.system import service  # noqa: F401
 from api.v2.system import logs  # noqa: F401
+from api.v2.system import maintenance  # noqa: F401
 from api.v2.dashboard import bp as dashboard_bp
 from api.v2.dashboard_overview import bp as dashboard_overview_bp
 from api.v2.crl import bp as crl_bp

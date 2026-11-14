@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 @contextmanager
 def single_transaction():
     """Run a block where every commit is a flush, and commit once at the end."""
-    session = db.session
+    # This scope's Session, not the scoped proxy: another thread's commits stay commits
+    session = db.session()
     real_commit = session.commit
     real_rollback = session.rollback
 
@@ -36,6 +37,9 @@ def single_transaction():
     session.rollback = refuse_rollback
     try:
         yield session
+        # HA: the cluster maintenance is still this restore's, or everything rolls back
+        from services.cluster_maintenance import before_restore_commit
+        before_restore_commit(session)
         session.commit = real_commit
         session.rollback = real_rollback
         session.commit()

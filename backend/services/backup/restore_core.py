@@ -189,6 +189,12 @@ class RestoreCoreMixin:
         metadata = backup_data.get('metadata')
         if metadata is None:
             return
+        self._check_schema_version(metadata)
+        self._check_section_counts(backup_data, metadata.get('sections'))
+        self._check_section_digests(backup_data, metadata.get('section_digests'))
+
+    def _check_schema_version(self, metadata: Any) -> None:
+        """Refuse the metadata of an archive written for a later reader than this one."""
         if not isinstance(metadata, dict):
             raise BackupSchemaError("Invalid backup format: metadata is not an object")
 
@@ -214,9 +220,6 @@ class RestoreCoreMixin:
                     f"this server reads up to {self.SCHEMA_VERSION}. Nothing has "
                     "been changed."
                 )
-
-        self._check_section_counts(backup_data, metadata.get('sections'))
-        self._check_section_digests(backup_data, metadata.get('section_digests'))
 
     @staticmethod
     def _check_section_digests(backup_data: Dict[str, Any], digests: Any) -> None:

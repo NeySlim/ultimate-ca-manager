@@ -266,7 +266,7 @@ class CommandApplier:
 
     def __init__(self, app, node_id, *, started_at=None, record=True, restart_action=None,
                  handlers=None, tick=None, guard=None, stale_seconds=None, clock=None,
-                 monotonic=None):
+                 monotonic=None, scheduler_ack=None):
         from services.scheduler_leader import STALE_PASSES
         self.app = app
         self.node_id = node_id
@@ -294,6 +294,10 @@ class CommandApplier:
         self._engine = None
         self._conn = None
         self._error_logged = False
+        # None: this process acknowledges for the scheduled tasks when it runs them
+        self.scheduler_ack = scheduler_ack
+        self._acked = {}  # cluster_nodes column -> maintenance token written there
+        self._maintenance_error_logged = False
         self._stop = threading.Event()
         self._stopping = False  # stop() was called: a failed restart does not resume the loop
         self._thread = None
@@ -380,6 +384,15 @@ class CommandApplier:
             if self.seen is None:
                 self.seen = conn.execute(_INITIAL_SQL, {'t': self.started_at - START_REPLAY}).scalar() or 0
                 self._mark_seen(conn, self.seen)
+            # Before the commands: a held restart or a slow handler never delays it
+            try:
+                self._maintenance(conn)
+                self._maintenance_error_logged = False
+            except Exception as e:
+                if not self._maintenance_error_logged:
+                    logger.error(f"Cluster maintenance not read on node {self.node_id}: "
+                                 f"{type(e).__name__}: {e}")
+                    self._maintenance_error_logged = True
             self._drain(conn)
             self._error_logged = False
         except _ClaimNotGivenBack:
@@ -389,6 +402,39 @@ class CommandApplier:
             if not self._error_logged:
                 logger.error(f"Cluster commands not read on node {self.node_id}: {type(e).__name__}: {e}")
                 self._error_logged = True
+
+    def _maintenance(self, conn):
+        """This process's view of the cluster maintenance, then its acknowledgement: written
+        only once the view refuses writes here. The web worker also ends leases and lifts."""
+        from services import cluster_maintenance as cm
+        view = cm.view_of(self.app)
+        if view.process_started is None:
+            view.process_started = self.started_at
+        row = cm.read_row(conn)
+        from services.scheduler_leader import cluster_utc_now
+        view.set(row, cluster_utc_now(conn))
+        if row is not None and view.active():
+            for column in self._ack_columns():
+                if self._acked.get(column) != row['token'] and conn.execute(
+                        cm._ACK_SQL[column], {'t': row['token'], 'n': self.node_id}).rowcount:
+                    self._acked[column] = row['token']
+        if self.record and row is not None:
+            with self.app.app_context():
+                try:
+                    cm.tend(self.stale_seconds)
+                finally:
+                    from models import db
+                    db.session.remove()
+
+    def _ack_columns(self):
+        columns = ['web'] if self.record else []
+        runs_tasks = self.scheduler_ack
+        if runs_tasks is None:
+            from services.scheduler_service import get_scheduler
+            runs_tasks = bool(get_scheduler()._running)
+        if runs_tasks:
+            columns.append('scheduler')
+        return columns
 
     def _drain(self, conn):
         if self._give_back_pending is not None:

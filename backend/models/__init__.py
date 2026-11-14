@@ -43,7 +43,7 @@ from models.revoked_serial import RevokedSerial
 from models.compromised_key import CompromisedKeyRecord
 from models.est_signer_cert import EstSignerCert
 from models.deploy import DeployTarget, DeployBinding, CRLDeployBinding, DeployDelivery
-from models.cluster import ClusterCommand, ClusterNode, SchedulerRequest
+from models.cluster import ClusterCommand, ClusterMaintenance, ClusterNode, SchedulerRequest
 from models.encryption_key import EncryptionKey
 from models.websocket_relay import WebsocketRelayEvent
 from models.shared_file import SharedFile
@@ -73,6 +73,6 @@ __all__ = [
     "ADConnectorConfig", "WindowsEnrollmentProfile", "WindowsProfileTemplate",
     "RevokedSerial", "CompromisedKeyRecord", "EstSignerCert",
     "DeployTarget", "DeployBinding", "CRLDeployBinding", "DeployDelivery",
-    "ClusterCommand", "ClusterNode", "SchedulerRequest", "EncryptionKey", "WebsocketRelayEvent",
+    "ClusterCommand", "ClusterMaintenance", "ClusterNode", "SchedulerRequest", "EncryptionKey", "WebsocketRelayEvent",
     "SharedFile", "BackupArchive", "BackupArchiveChunk", "SecondFactorFailure",
 ]

@@ -20,7 +20,6 @@ from services.backup.settings_contract import (
 from . import bp
 from flask import send_file, request
 from auth.unified import require_auth
-from utils.ha import reject_in_ha
 from utils.sanitize import client_filename
 from utils.response import success_response, error_response
 from utils.pagination import parse_request_pagination
@@ -36,6 +35,7 @@ from services.backup_service import (
 )
 from datetime import datetime, timezone
 import logging
+from services import cluster_maintenance
 from utils.file_validation import validate_upload_name, BACKUP_EXTENSIONS
 
 logger = logging.getLogger(__name__)
@@ -47,8 +47,10 @@ logger = logging.getLogger(__name__)
 from services.backup.restore_completion import (
     record_failure as _audit_failure,
     record_request_refusal,
+    maintenance_refusal,
     record_restore as _safe_audit_log,
     request_restart as _request_restart_after_restore,
+    restore_actor as _actor,
     restore_message,
 )
 # Bounds of a listing or a bulk request; a restore's upload ceiling is
@@ -465,7 +467,6 @@ def run_retention_now():
 @bp.route('/api/v2/system/restore', methods=['POST'])
 @bp.route('/api/v2/system/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])
-@reject_in_ha()
 def restore_backup():
     """Restore an uploaded archive, replacing (default) or merging.
 
@@ -514,60 +515,71 @@ def restore_backup():
             record_request_refusal(audited_name, 'a backend switch is pending')
             return error_response(pending, 409)
 
-        try:
-            # The backup lock too: an archive written meanwhile would read half of the restore
-            with database_migration_lock(purpose='the restore'), \
-                    backup_operation_lock(purpose='the restore'):
-                results = BackupService().restore_backup_from_stream(
-                    file.stream, password, mode=mode)
-        except MigrationBusyError as busy:
-            record_request_refusal(audited_name, 'a backend migration or another restore is running')
-            return error_response(
-                f'{busy} A backend migration or another restore is still '
-                'running.', 409)
-        except BackupBusyError as busy:
-            record_request_refusal(audited_name, 'a backup or another restore is running')
-            return error_response(f'{busy} Retry once it has finished.', 409)
+        # HA: every node refuses writes from here until the restore ends (services.cluster_maintenance)
+        with cluster_maintenance.restore_window(
+                _actor(), preflight=lambda: BackupService().check_archive_opens(
+                    file.stream, password)) as maintenance:
+            try:
+                # The backup lock too: an archive written meanwhile would read half of the restore
+                with database_migration_lock(purpose='the restore'), \
+                        backup_operation_lock(purpose='the restore'):
+                    results = BackupService().restore_backup_from_stream(
+                        file.stream, password, mode=mode)
+            except MigrationBusyError as busy:
+                record_request_refusal(audited_name, 'a backend migration or another restore is running')
+                return error_response(
+                    f'{busy} A backend migration or another restore is still '
+                    'running.', 409)
+            except BackupBusyError as busy:
+                record_request_refusal(audited_name, 'a backup or another restore is running')
+                return error_response(f'{busy} Retry once it has finished.', 409)
 
-        try:
-            carried = bool((results or {}).get('sections_carried'))
-            _safe_audit_log(
-                action='system_restore',
-                resource_type='system',
-                resource_name=audited_name,
-                details=safe_restore_audit_details(audited_name, results),
-                success=True,
-            )
-
-            # Nothing changed, so no session is revoked and no restart is asked.
-            if not carried:
-                logger.warning('Restore: the archive carried no data section')
-                return success_response(
-                    data=results,
-                    message=('The archive carried no data: nothing was restored, '
-                             'no session was revoked and no restart is needed.'),
+            try:
+                carried = bool((results or {}).get('sections_carried'))
+                _safe_audit_log(
+                    action='system_restore',
+                    resource_type='system',
+                    resource_name=audited_name,
+                    details=safe_restore_audit_details(audited_name, results),
+                    success=True,
                 )
 
-            from services.backup.restore.invalidate import invalidate_after_restore
-            try:
-                results['invalidated'] = invalidate_after_restore()
-            except Exception:
-                logger.exception('Restore: sessions could not be revoked')
-                return error_response(
-                    'Backup restored, but the sessions opened before it could not '
-                    'be revoked. Restart the application before using it.', 500)
+                # Nothing changed, so no session is revoked and no restart is asked.
+                if not carried:
+                    if maintenance:
+                        maintenance.lift_unchanged()
+                    logger.warning('Restore: the archive carried no data section')
+                    return success_response(
+                        data=results,
+                        message=('The archive carried no data: nothing was restored, '
+                                 'no session was revoked and no restart is needed.'),
+                    )
 
-            restart_ok, restart_detail = _request_restart_after_restore()
-            results['restart_requested'] = restart_ok
-            results['restart_detail'] = restart_detail
-            results['filename'] = file.filename
-            return success_response(data=results, message=restore_message(results))
-        except Exception:
-            # The restore is committed and already audited as a success: no second, contradicting line
-            logger.exception('Restore: finishing after the restore failed')
-            return error_response(
-                'Backup restored, but finishing the restore failed. '
-                'Restart the application before using it.', 500)
+                from services.backup.restore.invalidate import invalidate_after_restore
+                try:
+                    results['invalidated'] = invalidate_after_restore()
+                except Exception:
+                    logger.exception('Restore: sessions could not be revoked')
+                    return error_response(
+                        'Backup restored, but the sessions opened before it could not '
+                        'be revoked. Restart the application before using it.', 500)
+
+                restart_ok, restart_detail = (maintenance.finish() if maintenance
+                                              else _request_restart_after_restore())
+                results['restart_requested'] = restart_ok
+                results['restart_detail'] = restart_detail
+                results['filename'] = file.filename
+                return success_response(data=results, message=restore_message(results))
+            except Exception:
+                # The restore is committed and already audited as a success: no second, contradicting line
+                logger.exception('Restore: finishing after the restore failed')
+                return error_response(
+                    'Backup restored, but finishing the restore failed. '
+                    'Restart the application before using it.', 500)
+    except cluster_maintenance.MaintenanceRefused as refused:
+        logger.warning('Restore refused: %s', refused)
+        record_request_refusal(audited_name, 'the cluster maintenance could not be held')
+        return maintenance_refusal(refused)
     except FipsRestricted:
         _audit_failure('system_restore', audited_name, 'Restore refused: not allowed in FIPS mode')
         raise  # the application maps it to its problem type, message unchanged

@@ -40,8 +40,16 @@ class IsolatedSqlSessionInterface(SqlAlchemySessionInterface):
     def _store(self):
         return sessionmaker(bind=self._engine())()
 
+    @staticmethod
+    def _writes_paused():
+        # HA maintenance: a session row written now would outlive the restore's revocation
+        from services.cluster_maintenance import blocks_writes
+        return blocks_writes()
+
     @retry_query()
     def _delete_expired_sessions(self):
+        if self._writes_paused():
+            return
         model = self.sql_session_model
         with self._store() as s:
             s.query(model).filter(model.expiry <= datetime.utcnow()).delete(synchronize_session=False)
@@ -53,8 +61,9 @@ class IsolatedSqlSessionInterface(SqlAlchemySessionInterface):
         with self._store() as s:
             record = s.query(model).filter_by(session_id=store_id).first()
             if record and (record.expiry is None or record.expiry <= datetime.utcnow()):
-                s.delete(record)
-                s.commit()
+                if not self._writes_paused():
+                    s.delete(record)
+                    s.commit()
                 return None
             if record:
                 return self.serializer.decode(want_bytes(record.data))
@@ -62,6 +71,8 @@ class IsolatedSqlSessionInterface(SqlAlchemySessionInterface):
 
     @retry_query()
     def _delete_session(self, store_id):
+        if self._writes_paused():
+            return
         model = self.sql_session_model
         with self._store() as s:
             s.query(model).filter_by(session_id=store_id).delete()
@@ -69,6 +80,8 @@ class IsolatedSqlSessionInterface(SqlAlchemySessionInterface):
 
     @retry_query()
     def _upsert_session(self, session_lifetime, session, store_id):
+        if self._writes_paused():
+            return
         model = self.sql_session_model
         expiry = datetime.utcnow() + session_lifetime
         data = self.serializer.encode(session)

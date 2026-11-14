@@ -23,6 +23,10 @@ class ClusterNode(db.Model):
     kek_fingerprint = db.Column(db.String(16))
     # Random per node process: a fresh row with another token means the identifier is taken
     instance_token = db.Column(db.String(64))
+    # Token of the cluster maintenance the web worker, and the process running the
+    # scheduled tasks, last refused writes for (services.cluster_maintenance)
+    maintenance_ack = db.Column(db.String(36))
+    maintenance_ack_scheduler = db.Column(db.String(36))
 
 
 class ClusterCommand(db.Model):
@@ -36,6 +40,22 @@ class ClusterCommand(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, index=True)
     created_by = db.Column(db.String(255))
     node_id = db.Column(db.String(255))
+
+
+class ClusterMaintenance(db.Model):
+    """At most one row (id 1): while it holds and its lease runs, no node writes."""
+    __tablename__ = 'cluster_maintenance'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=False)
+    token = db.Column(db.String(36), nullable=False)
+    reason = db.Column(db.String(16), nullable=False)  # restore or manual
+    phase = db.Column(db.String(16), nullable=False)
+    started_at = db.Column(db.DateTime, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    # Set when the rolling restart is asked: a process started after it serves again
+    restored_at = db.Column(db.DateTime)
+    node_id = db.Column(db.String(255))
+    actor = db.Column(db.String(255))
 
 
 class SchedulerRequest(db.Model):

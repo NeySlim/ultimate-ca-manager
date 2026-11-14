@@ -238,6 +238,11 @@ def create_app(config_name=None):
     db_path = config.DATABASE_PATH
     if db_path:
         os.environ.setdefault('DATABASE_PATH', str(db_path))
+    from utils.ha import ha_enabled as _ha_on
+    if _ha_on():
+        # A restore that has not committed holds the cluster: no migration or write before it ends
+        from services.cluster_maintenance import wait_while_restoring
+        wait_while_restoring(_get_db_url())
     # HA: one node at a time migrates; the next one finds nothing left to apply
     migrated = run_at_startup(boot_lock)
     if not migrated:
@@ -1027,6 +1032,9 @@ def create_app(config_name=None):
     from security.session_key import load_keys as load_session_key, reload_if_pending
     with app.app_context():
         load_session_key(app, at_start=True)
+    # HA cluster maintenance: first hook, so a node in maintenance refuses before any other work
+    from services import cluster_maintenance
+    cluster_maintenance.init_app(app)
     # Before the CSRF check registered below: a failed load is retried before a token is checked
     app.before_request(reload_if_pending)
     

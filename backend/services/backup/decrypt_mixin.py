@@ -7,6 +7,7 @@ profile, the decompressed size, the shape of the JSON.
 """
 import io
 import logging
+from contextlib import contextmanager
 from typing import Dict, Any, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -35,6 +36,18 @@ logger = logging.getLogger(__name__)
 class BackupDecryptionError(ValueError):
     """The backup could not be decrypted: wrong password or corrupted file.
     Distinct from other ValueErrors so the operator is told which."""
+
+
+@contextmanager
+def _first_chunk_is_the_password():
+    """A v4 whose first chunk does not open was sealed under another password."""
+    try:
+        yield
+    except container.ChunkAuthError as exc:
+        if exc.counter == 0:
+            raise BackupDecryptionError(
+                "Decryption failed - wrong password or corrupted file") from None
+        raise
 
 
 class DecryptMixin:
@@ -115,28 +128,57 @@ class DecryptMixin:
             )
         return self._derive_pbkdf2(password, salt, kdf_params['iterations'])
 
-    def _read_v4(self, stream, password: str, store) -> bytes:
-        """Decrypt a v4 archive chunk by chunk into `store`; returns the master key.
-
-        The payload metadata is completed from the end record: the counts of
-        every section and the key mismatches known only once all were written.
-        """
+    def _open_v4(self, stream, password: str):
+        """Read and bound a v4 header, derive its key: (master key, chunk reader)."""
         metadata, header = container.read_header(stream)
         kdf_id = metadata['kdf_id']
         salt, nonce_base, kdf_params = container.validate_kdf(
             kdf_id, metadata, nonce_field='nonce_base_b64', nonce_size=container.NONCE_BASE_SIZE)
         container.validate_v4_metadata(metadata)
         master_key = self._derive_archive_key(password, kdf_id, salt, kdf_params)
+        return master_key, container.ChunkReader(stream, master_key, header, metadata, nonce_base)
 
-        reader = container.ChunkReader(stream, master_key, header, metadata, nonce_base)
+    def check_archive_opens(self, stream, password: str) -> None:
+        """Raise what a restore raises for a wrong password, a bad header or KDF, FIPS, or a
+        later schema, writing nothing: a v4's header and first chunk, an older archive whole.
+        The stream is put back where it was."""
+        start = stream.tell()
         try:
+            head = stream.read(container.HEADER_PREFIX_SIZE)
+            stream.seek(start)
+            if container.format_version_of(head) == container.FORMAT_VERSION_V4:
+                _key, reader = self._open_v4(stream, password)
+                parts = reader.parts()
+                try:
+                    with _first_chunk_is_the_password():
+                        first = next(parts, None)
+                finally:
+                    parts.close()
+                # The first chunk is the metadata: an archive of a later release stops here
+                if first is not None and first[0] == 'metadata':
+                    self._check_schema_version(first[2])
+                return
+            size = stream.seek(0, io.SEEK_END) - start
+            stream.seek(start)
+            container.refuse_oversized_size(size)
+            data = stream.read()
+            if len(data) >= 4 and data[:4] == self.MAGIC:
+                self._decrypt_framed(data, password)
+            else:
+                self._decrypt_v1(data, password)
+        finally:
+            stream.seek(start)
+
+    def _read_v4(self, stream, password: str, store) -> bytes:
+        """Decrypt a v4 archive chunk by chunk into `store`; returns the master key.
+
+        The payload metadata is completed from the end record: the counts of
+        every section and the key mismatches known only once all were written.
+        """
+        master_key, reader = self._open_v4(stream, password)
+        with _first_chunk_is_the_password():
             for name, part, rows in reader.parts():
                 store.add_part(name, part, rows)
-        except container.ChunkAuthError as exc:
-            if exc.counter == 0:
-                raise BackupDecryptionError(
-                    "Decryption failed - wrong password or corrupted file") from None
-            raise
         store.seal()
 
         payload_metadata = store.get('metadata')

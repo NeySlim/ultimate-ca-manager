@@ -61,6 +61,7 @@ export default {
         items: [
           { label: "替换或合并", text: "从备份恢复会用归档中的数据替换此处的数据，并移除归档中没有的内容；审计条目会列出被移除的内容。API 还接受 mode=merge，将归档添加到此处的数据中" },
           { label: "共享锁", text: "备份和恢复共用一个锁：备份运行期间恢复会被拒绝 (409)，手动备份则等待正在运行的恢复完成" },
+          { label: "HA mode", text: "In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer's rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted" },
           { label: "上传限制", text: "3.0 起创建的归档按分块方式恢复，除非通过 BACKUP_MAX_ARCHIVE_MB 设置上限，否则不限制大小。更早的归档最大接受 BACKUP_MAX_UPLOAD_MB（默认 512 MB）。两者均在服务器环境中设置，被拒绝时会指明对应的参数。UCM 前面的反向代理仍保留其自身的请求体大小限制" },
           { label: "归档包含的内容", text: "归档包含 ACME 客户端订单、批准请求和密钥恢复请求。恢复在此版本之前写入的归档时，这些行会保持此处的原样" },
           { label: "同名", text: "其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook，会恢复为“名称 (2)”，API 返回的恢复结果会列出它" },
@@ -307,6 +308,7 @@ export default {
 上传备份文件将 UCM 恢复到之前的状态。
 
 - 备份和恢复共用一个锁：备份运行期间恢复会被拒绝 (409)，手动备份则等待正在运行的恢复完成
+- In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer's rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted
 - 3.0 起创建的归档按分块方式恢复，除非通过 \`BACKUP_MAX_ARCHIVE_MB\` 设置上限，否则不限制大小；更早的归档最大接受 \`BACKUP_MAX_UPLOAD_MB\`（默认 512 MB）。两者均在服务器环境中设置，被拒绝时会指明对应的参数；UCM 前面的反向代理仍保留其自身的请求体大小限制
 - 归档包含 ACME 客户端订单、批准请求和密钥恢复请求 (v2.251)
 - 其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook 会恢复为 \`名称 (2)\`

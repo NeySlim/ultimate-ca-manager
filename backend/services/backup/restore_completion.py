@@ -81,3 +81,23 @@ def restore_message(results) -> str:
                f"Backup restored successfully. Restart the service to "
                f"finish: {detail}")
     return with_restore_warnings(opening, results)
+
+
+def restore_actor():
+    """The account asking for the restore, named in the cluster maintenance it holds."""
+    from flask import g
+    return getattr(getattr(g, 'current_user', None), 'username', None)
+
+
+def maintenance_refusal(refused):
+    """409 for a restore the HA cluster maintenance refused: nothing was restored."""
+    from flask import jsonify
+    from utils.response import PROBLEM_CONTENT_TYPE, build_problem
+    body = build_problem(str(refused), 409)
+    body['code'] = refused.code
+    missing = getattr(refused, 'missing', None)
+    if missing:
+        body['nodes'] = missing
+    response = jsonify(body)
+    response.mimetype = PROBLEM_CONTENT_TYPE
+    return response, 409

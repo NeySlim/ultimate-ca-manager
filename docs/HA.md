@@ -87,7 +87,42 @@ The administrator is created once, by the first node to start, under the startup
 
 Scheduled and manual archives are stored in PostgreSQL (`backup_archives`, and the archive itself in chunks of 1 MiB in `backup_archive_chunks`), encrypted as on disk, with the node that wrote it, its date, size and SHA-256. Every node lists the same archives (Settings > Backup shows the node) and downloads any of them, also when the node that wrote it is gone; the download carries the SHA-256 in a `Repr-Digest` header. An archive appears once it is whole: an export that fails or a node that dies mid-write leaves nothing behind. Retention runs once, on the leader (and on demand from any node, one at a time across the cluster), over the whole set, with the rules of a single node (age, the newest archives always kept); each archive is read back before it is stored, so none counts as unproven. Archives a node kept on its disk before HA are no longer listed; copy them off the host. Writing an archive holds one transaction for as long as it lasts, so its connection lifts `idle_in_transaction_session_timeout` for that transaction: a server that sets it, as managed PostgreSQL services often do, does not cut a slow backup short. A download reads each chunk in a short transaction of its own and holds no connection between two, so slow clients do not exhaust a node's connection pool; an archive deleted during a download ends it short of its `Content-Length`, never with other bytes.
 
-An archive kept in the database does not survive the loss of that database: download the archives you keep to a place outside the cluster, and back PostgreSQL up with its own tools. Each archive adds about its own size to the database and to its dumps, so the database holds what retention keeps: with the default 30 days and daily backups, about 30 archives, and never fewer than the 2 newest. `pg_dump --exclude-table-data=backup_archives --exclude-table-data=backup_archive_chunks` leaves them out of a dump.
+An archive kept in the database does not survive the loss of that database: download the archives you keep to a place outside the cluster, and back PostgreSQL up with its own tools (to restore such a dump, see [Restoring with PostgreSQL's tools](#restoring-with-postgresqls-tools)). Each archive adds about its own size to the database and to its dumps, so the database holds what retention keeps: with the default 30 days and daily backups, about 30 archives, and never fewer than the 2 newest. `pg_dump --exclude-table-data=backup_archives --exclude-table-data=backup_archive_chunks` leaves them out of a dump.
+
+## Restoring a backup
+
+An archive is restored from any node, from Settings > Backup or `POST /api/v2/system/restore`. The node that receives it holds a cluster maintenance (one row in `cluster_maintenance`) for the whole restore. Before setting it, that node checks the password, the archive's header and its first chunk (an archive in an older format is read whole): a wrong password, a file that is not a backup, an archive written by a later release, or an Argon2id archive in FIPS mode answers `400` without touching the other nodes. An archive damaged further on, or one whose checksum does not match, is refused under the maintenance, which is then lifted with nothing changed.
+
+1. Every process of every node reads the maintenance within about 2 seconds and from then on refuses writes, then records it in `cluster_nodes` (`maintenance_ack` for the web worker, `maintenance_ack_scheduler` for the process that runs the scheduled tasks).
+2. The restore starts once both processes of every node with a fresh heartbeat have recorded it. After 30 seconds without, it is refused with `409` and code `maintenance_not_acknowledged`, the silent nodes listed in `nodes` with the process missing; nothing is changed and the maintenance is lifted. A node that died counts until its heartbeat is stale (3 minutes).
+3. The restore is one transaction, as on a single node. Just before its commit it checks, in that transaction, that the maintenance is still its own and within its lease; otherwise everything is rolled back (`409`, code `maintenance_lost`).
+4. Once it commits, the sessions are revoked and the CRLs signed again, as on a single node, then a rolling restart is requested. A process started after that request serves again; every node not restarted yet keeps refusing writes and answering 503 on `/health/ready`. The maintenance is lifted once every node with a fresh heartbeat has restarted.
+
+A restore that fails leaves the database as it was, lifts the maintenance and answers the error. An archive that carries no data lifts it with no restart. Sessions, archives encrypted by another installation and archives of older versions follow the single-node rules (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md#restoring-backups)).
+
+### What a node in maintenance serves
+
+- Writes are refused with `503`, `Retry-After: 30` and code `maintenance`: every `POST`, `PUT`, `PATCH` and `DELETE` of the API (sign-in included) and every request to ACME, EST, SCEP, MS-XCEP, MS-WSTEP and TSA, whatever its method. A write the node's own code still sends (a read that writes, a task already running) fails the same way, and so does the commit of a transaction that wrote before the node saw the maintenance.
+- No scheduled task starts, on the leader as on the others; a "run now" waits for the end. The heartbeat goes on, and no session is saved.
+- `/health/ready` answers `503` with `status: "maintenance"`, so the balancer takes the node out of rotation; `/health` and `/health/live` answer 200, and `/health` reports `maintenance` (reason, phase, node, lease).
+- Reads of the API and the web interface are served, as are `GET` and `DELETE /api/v2/system/maintenance`.
+- OCSP, CRL distribution points and AIA keep answering from the state before the restore: relying parties keep validating certificates, a client that fails hard on a missing revocation answer is not cut off, and the answer is at most one restore old. Meanwhile no OCSP response is stored and no CRL is signed: a CRL past its next update is served as it is, and a CA with no stored CRL answers `503` with `Retry-After`.
+- Socket.IO connections are answered before the request hooks and are not covered.
+
+A node that starts while a restore has not committed yet waits for its end before migrating or writing, and says so in its log.
+
+### When the restoring node dies
+
+The maintenance has a lease of 5 minutes, renewed every 30 seconds while the restore runs. A restore that had not committed is rolled back by PostgreSQL with the node's connection, and the first node that sees the lease ended lifts the maintenance. A restore that had committed is completed by the first node that sees its lease ended: it revokes the sessions and requests the rolling restart, as the restoring node would have. The rolling restart phase has a lease of 30 minutes. An administrator lifts the maintenance at once from any node with `DELETE /api/v2/system/maintenance`, which first completes a committed restore the same way.
+
+### Restoring with PostgreSQL's tools
+
+`POST /api/v2/system/maintenance` with `{"lease_minutes": 60}` (1 to 1440) sets the same maintenance by hand. It answers once every node with a fresh heartbeat has recorded it, or `409` naming the others and lifts it; posting again extends it, `GET` shows it with each node's acknowledgement, `DELETE` lifts it. A manual maintenance survives a restart of the nodes.
+
+Before restoring a `pg_dump`, make sure every node runs with the key-encryption key of the installation that was dumped (`KEY_ENCRYPTION_KEY` or `master.key`): the data-encryption keys in `encryption_keys` are wrapped by it. The tables that describe the running cluster are not data to restore: `cluster_nodes`, `cluster_commands`, `cluster_maintenance`, `scheduler_requests`, `websocket_relay` and the sessions (`user_sessions`, `pro_sso_sessions`, and `flask_sessions` on PostgreSQL without Redis).
+
+- **Nodes stopped** (simplest): stop every node, run `pg_restore --clean --if-exists`, empty the tables above (`TRUNCATE`), and with Redis sessions delete the keys under `SESSION_KEY_PREFIX` (default `ucm:session:`). Start the nodes one at a time: a dump of an earlier release is migrated by the first one.
+- **Nodes running**: set the maintenance, list the dump (`pg_restore -l dump > list`), remove the lines of the tables above from `list`, run `pg_restore --clean --if-exists -L list`, empty the session tables, restart every node with its service manager (`systemctl restart ucm`, `kubectl rollout restart`, `docker compose restart`), then lift the maintenance. The nodes refuse writes until it is lifted, and `--clean` drops the tables they read while it runs, so expect errors on reads meanwhile.
 
 ## What stays local to a node
 
@@ -119,7 +154,6 @@ These operations answer `409` with code `ha_mode`, because they only change the 
 
 - backend switch and data migration between databases (`database.py`): change `DATABASE_URL` by hand, then restart;
 - session key rotation without encryption (it would write `ucm.env`); with the KEK every HA node holds, it is stored in the database and works from any node, see [Session key rotation](ADMIN_GUIDE.md#session-key-rotation);
-- backup restore, both from System and from Settings (restored files land on one node);
 - creating a SoftHSM provider, pointing a provider at SoftHSM, generating a key on a SoftHSM provider, syncing the keys of a SoftHSM provider, and creating a CA (root, intermediate or external CSR) on a new or an existing SoftHSM key (the token is on one node's disk). A CA already bound to a SoftHSM key keeps signing on the node that holds the token. The image does not initialize its default token when `UCM_HA` is set, whatever `HSM_AUTO_INIT` says. Network PKCS#11, OpenBao and cloud KMS providers are not affected.
 
 ## Upgrading
