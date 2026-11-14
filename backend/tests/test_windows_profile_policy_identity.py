@@ -213,6 +213,29 @@ def test_the_api_shows_the_identity_and_never_changes_it(app, auth_client, creat
         assert auth_client.delete(f"{URL}/{created['id']}").status_code == 200
 
 
+@pytest.mark.parametrize('method', ['put', 'patch'])
+def test_a_write_naming_the_identity_leaves_what_xcep_serves(app, auth_client, create_ca, template, method):
+    """No route applies the two fields, at creation or on an update: XCEP serves what was drawn."""
+    refid = _refid(app, create_ca(cn=f'C16 write {method} {uuid.uuid4().hex[:5]}'))
+    forged = {'policy_id': str(uuid.uuid4()), 'policy_oid_root': f'{TEMPLATE_OID_ARC}.1.2.3.4'}
+    r = auth_client.post(URL, json={'name': f'c16-w-{uuid.uuid4().hex[:6]}', 'issuing_ca_refid': refid,
+                                    'template_ids': [template], **forged})
+    assert r.status_code == 201, r.data
+    created = r.get_json()['data']
+    try:
+        with app.app_context():
+            served = _served(created['id'])
+        assert served[0] == created['policy_id'] != forged['policy_id']
+        assert all(o.startswith(created['policy_oid_root'] + '.') for o in served[1].values()) and served[1]
+        r = getattr(auth_client, method)(f"{URL}/{created['id']}", json={**forged, 'validity_days': 40})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert db.session.get(WindowsEnrollmentProfile, created['id']).validity_days == 40
+            assert _served(created['id']) == served
+    finally:
+        assert auth_client.delete(f"{URL}/{created['id']}").status_code == 200
+
+
 def test_the_default_profile_made_by_a_settings_write_has_an_identity(app):
     """The configuration routes create the default profile at their first write."""
     from services import windows_profiles
