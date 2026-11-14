@@ -22,6 +22,10 @@ Requires:       python3 >= 3.12
 Requires:       systemd
 Requires:       openssl >= 1.1.1
 Requires:       logrotate
+# The archiving of a removed UCM's files compares its copies and tells a bind mount
+Requires:       coreutils
+Requires:       findutils
+Requires:       /usr/bin/findmnt
 Recommends:     softhsm
 Suggests:       openldap-clients
 

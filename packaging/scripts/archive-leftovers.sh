@@ -8,8 +8,8 @@
 # Usage: archive-leftovers.sh <ucm home> <data dir> <config dir> [<archive parent> [<log>]]
 # Exit 0: nothing to archive, or archived; 3: a database it must not archive is left in
 # place, and the service will refuse to start on it; 1: not archived, everything is back
-# in place; 2: not archived, some files are still in the archive (the next run puts them
-# back first). On 1 and 2 the install must stop; on 3 it must not announce a success.
+# in place; 2: not archived, some files are still in the archive (the next run tries to
+# put them back first). On 1 and 2 the install must stop; on 3 it must not announce a success.
 set -u
 
 UCM_HOME=$1
@@ -58,20 +58,30 @@ present() { [ -e "$1" ] || [ -L "$1" ]; }
 # $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
 normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
 
-# A comparable digest of a file, a symbolic link or a whole tree: names, types, contents, and
-# what a copy carries over last (mode, owner, date of the files). Equal means whole.
+# A comparable digest of a file, a symbolic link, a special file or a whole tree: names,
+# types, contents, and what a copy carries over last (mode, owner, group, date of the
+# files). Equal means whole; fails, printing nothing usable, when a command it runs fails.
 digest() {
     if [ -L "$1" ]; then
-        printf 'link %s\n' "$(readlink -- "$1")"
+        target=$(readlink -- "$1") || return 1
+        printf 'link %s\n' "$target"
     elif [ -d "$1" ]; then
-        (cd -- "$1" && find . \( -type f -exec cksum {} + \) -o \( -type l -exec sh -c \
-            'for l; do printf "link %s %s\n" "$l" "$(readlink -- "$l")"; done' sh {} + \) \
-            -o -print && find . ! -type l -printf 'attr %m %U %G %p\n' \
-            && find . -type f -printf 'date %Ts %p\n') | LC_ALL=C sort
+        list=$(cd -- "$1" && find . \( -type f -exec cksum {} + \) -o \( -type l -exec sh -c \
+            'for l; do t=$(readlink -- "$l") || exit 1; printf "link %s %s\n" "$l" "$t"; done' sh {} + \) \
+            -o -print && find . ! -type l -printf 'attr %y %m %U %G %p\n' \
+            && find . -type f -printf 'date %Ts %p\n') || return 1
+        printf '%s\n' "$list" | LC_ALL=C sort
+    elif [ -f "$1" ]; then
+        sum=$(cksum < "$1") && attr=$(stat -c 'attr %a %u %g %Y' -- "$1") || return 1
+        printf '%s\n%s\n' "$sum" "$attr"
     else
-        cksum < "$1" && stat -c 'attr %a %u %g %Y' -- "$1"
+        # A FIFO or a device is never read (a FIFO would block): its kind and attributes
+        stat -c 'special %F %t %T %a %u %g' -- "$1"
     fi
 }
+
+# $1 and $2 have one digest, and both could be taken
+same() { d1=$(digest "$1") && d2=$(digest "$2") && [ -n "$d1" ] && [ "$d1" = "$d2" ]; }
 
 # Moves $1 to $2 (absent): a rename on one filesystem, else a verified copy whose source
 # is removed only once every item is in the archive (remove_copied)
@@ -83,7 +93,7 @@ move_item() {
     else
         printf 'copy\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
         cp -a -- "$1" "$2" || return 1
-        [ "$(digest "$1")" = "$(digest "$2")" ] || return 1
+        same "$1" "$2" || return 1
     fi
 }
 
@@ -164,11 +174,27 @@ settle() {
     fi
 }
 
-# $1 could not be undone; named in $stuck only while it is really there
+# $1 could not be undone; named in $stuck only while it is really there. A failed line
+# remembers it in the journal: met again at the next attempt, retrying alone will not do.
 unsettled() {
     left=1
-    if present "$1"; then
-        case " $stuck " in *" $1 "*) ;; *) stuck="$stuck $1" ;; esac
+    case " $seen " in *" $1 "*) return 0 ;; esac
+    seen="$seen $1"
+    if present "$1"; then stuck="$stuck $1"; fi
+    if grep -qxF "failed$TAB$1" "$JOURNAL" 2>/dev/null; then
+        again=1
+    else
+        printf 'failed\t%s\n' "$1" >> "$JOURNAL" 2>/dev/null || true
+    fi
+}
+
+# What the next attempt does with what is still in the archive
+say_next() {
+    if [ -n "$again" ]; then
+        say "Putting them back failed at the previous attempt too: a new attempt will not"
+        say "succeed until the cause shown above is fixed. They stay in the archive meanwhile."
+    else
+        say "The next attempt tries again to put them back before anything else."
     fi
 }
 
@@ -176,7 +202,7 @@ unsettled() {
 # retry from any interrupted state converges. A copy goes only once its source is whole
 # again and its remove line is out of the journal: no retry meets a half-deleted copy.
 roll_back() {
-    stuck="" left=""
+    stuck="" left="" seen="" again=""
     undo=$(sed -n '1!G;h;$p' "$JOURNAL") || { unsettled "$JOURNAL"; return 1; }
     while IFS="$TAB" read -r op src dst; do
         case $op in
@@ -200,7 +226,7 @@ roll_back() {
                 fi
                 put=$?
                 # Whole again, and the copy said so: its copy line, undone next, removes the copy
-                if [ "$put" -ne 0 ] || [ "$(digest "$src" 2>/dev/null)" != "$(digest "$dst")" ] \
+                if [ "$put" -ne 0 ] || ! same "$src" "$dst" \
                         || ! drop_line "remove$TAB$src$TAB$dst"; then
                     unsettled "$dst"
                 fi ;;
@@ -250,7 +276,9 @@ Contents
   config/     what was in $CONFIG (ucm.env, master.key)
 $DB_LINE
 This directory holds private keys and the key that decrypts the database: keep it
-readable by root only. Nothing here is used or removed by UCM.
+readable by root only. Nothing here is used or removed by UCM. What was copied from
+another filesystem was checked for its contents, mode, owner, group and dates; its
+extended attributes and ACLs were copied where this filesystem keeps them, unchecked.
 
 To put that installation back in service
   1. Stop UCM: sudo systemctl stop ucm
@@ -283,6 +311,7 @@ for j in "$PARENT"/*/.journal; do
     else
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete, and"
         say "some files could not be put back or cleared and are still in $DEST:$stuck"
+        say_next
         say "The installation stops here: nothing else is written, and UCM was not started."
         exit 2
     fi
@@ -356,7 +385,7 @@ fail() {
             say "Everything was put back in place."
         else
             say "Some files could not be put back or cleared and are still in $DEST:$stuck"
-            say "The next attempt puts them back before anything else."
+            say_next
             rc=2
         fi
     else

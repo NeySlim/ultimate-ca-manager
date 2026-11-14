@@ -134,7 +134,7 @@ class Box:
         for f in self.bin.iterdir():
             f.chmod(0o755)
 
-    def run(self, default_parent=False):
+    def run(self, default_parent=False, timeout=60):
         if not any(self.bin.iterdir()):
             self.wrap()
         env = {'PATH': f'{self.bin}:/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
@@ -142,7 +142,7 @@ class Box:
         return subprocess.run(
             [POSIX_SH, str(SCRIPT), str(self.home), str(self.data), str(self.config),
              '' if default_parent else str(self.parent), str(self.log)],
-            capture_output=True, text=True, timeout=60, env=env, start_new_session=True)
+            capture_output=True, text=True, timeout=timeout, env=env, start_new_session=True)
 
     @property
     def archive(self):
@@ -666,6 +666,73 @@ def test_a_put_back_that_differs_from_the_archive_is_never_taken_for_whole(tmp_p
     assert out.returncode == 0, (out.stdout, out.stderr)
     assert whole(box.archive / 'data', KEPT) == {k: v for k, v in data.items() if k not in KEPT}
     assert tree(box.archive / 'config') == config
+
+@pytest.mark.parametrize('tool', ['find', 'cksum', 'stat'])
+def test_a_digest_that_cannot_be_taken_never_passes_for_a_match(tmp_path, tool):
+    """find missing (a minimal image), cksum or stat failing: no copy is taken for whole."""
+    box = Box(tmp_path, python='stub')
+    before = snapshot(box)
+    box.wrap(other_fs=(box.data,))
+    fails = ''
+    if tool == 'stat':
+        # stat still says which device a path is on: only the digest's question fails
+        (box.bin / 'stat').rename(box.bin / 'stat-device')
+        fails = f'[ "$1 $2" != "-c %d" ] || exec {box.bin}/stat-device "$@"\n'
+    (box.bin / tool).write_text(f'#!/bin/sh\n{fails}echo "{tool}: not found" >&2; exit 127\n')
+    (box.bin / tool).chmod(0o755)
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert snapshot(box) == before
+    assert 'Everything was put back' in out.stdout
+
+
+def test_a_fifo_is_compared_by_its_kind_never_read(tmp_path):
+    """Reading a FIFO left in the data would block the installation."""
+    box = Box(tmp_path, python='stub')
+    os.mkfifo(box.data / 'ucm.sock', 0o600)
+    data = files(box.data)
+    box.wrap(other_fs=(box.data,))
+    out = box.run(timeout=20)
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert files(box.archive / 'data') == data
+    assert files(box.archive / 'data')['ucm.sock'][0] == 'special'
+
+
+def test_a_put_back_refused_twice_the_same_way_says_a_retry_will_not_help(tmp_path):
+    """The source filesystem refuses what a put-back sets (an owner, as root on a share):
+    the first failure says the next attempt tries again, the second one that it will not
+    succeed before the cause is fixed. Then, fixed, the retry converges."""
+    box = Box(tmp_path / 'count', python='stub')
+    box.wrap(fail='rm', at=10 ** 6, other_fs=(box.data,))
+    assert box.run().returncode == 0
+    last_rm = int((box.state / 'count').read_text())
+    box = Box(tmp_path / 'box', python='stub')
+    data, config = files(box.data), files(box.config)
+    box.wrap(fail='rm', at=last_rm, other_fs=(box.data,))
+    (box.bin / 'cp').write_text(
+        f'#!/bin/sh\ncase $3 in {box.parent}/*) echo "cp: failed to preserve ownership" >&2; exit 1 ;; esac\n'
+        f'exec {REAL["cp"]} "$@"\n')
+    first = box.run()
+    assert first.returncode == 2, first.stdout
+    assert 'next attempt tries again' in first.stdout and 'will not' not in first.stdout
+    second = box.run()
+    assert second.returncode == 2, second.stdout
+    assert 'previous attempt too' in second.stdout and 'until the cause' in second.stdout
+    assert 'tries again' not in second.stdout
+    assert _all_files(box.data, box.archive / 'data') == data
+    box.wrap(other_fs=(box.data,))
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert files(box.archive / 'data') == data and files(box.archive / 'config') == config
+
+
+def test_the_rpm_requires_what_the_archiving_runs():
+    """find, cksum and stat compare the copies (a minimal RHEL image lacks find); findmnt
+    tells a bind mount. On Debian these are essential packages, never named."""
+    spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
+    requires = {line.split(':', 1)[1].split()[0] for line in spec.splitlines()
+                if line.startswith('Requires:')}
+    assert {'findutils', 'coreutils', '/usr/bin/findmnt'} <= requires
 
 def test_the_kept_directories_are_those_the_packages_create():
     """RPM owns these directories and the DEB postinst creates them: the archive leaves them."""
