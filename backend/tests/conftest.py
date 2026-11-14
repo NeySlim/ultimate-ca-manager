@@ -450,12 +450,19 @@ def _detach_orphan_records():
     from sqlalchemy import text as _text
     from models import db
     with _SESSION_APP[0].app_context():
-        if {'revoked_serials', 'certificates'} <= set(db.inspect(db.engine).get_table_names()):
-            db.session.execute(_text(
-                'UPDATE revoked_serials SET certificate_id = NULL WHERE certificate_id IS NOT NULL'
-                ' AND NOT EXISTS (SELECT 1 FROM certificates c WHERE c.id = revoked_serials.certificate_id)'))
-            db.session.commit()
-        db.session.remove()
+        try:
+            if {'revoked_serials', 'certificates'} <= set(db.inspect(db.engine).get_table_names()):
+                db.session.execute(_text(
+                    'UPDATE revoked_serials SET certificate_id = NULL WHERE certificate_id IS NOT NULL'
+                    ' AND NOT EXISTS (SELECT 1 FROM certificates c WHERE c.id = revoked_serials.certificate_id)'))
+                db.session.commit()
+        except Exception as exc:
+            # Rolled back: a write refused once must not fail every later file of the worker
+            db.session.rollback()
+            import warnings
+            warnings.warn(f'orphan revocation records not detached: {type(exc).__name__}', stacklevel=1)
+        finally:
+            db.session.remove()
 
 
 @pytest.fixture(autouse=True, scope='module')
