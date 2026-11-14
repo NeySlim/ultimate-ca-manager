@@ -251,15 +251,15 @@ _HEARTBEAT_SQL = text(
     f" WHERE {_FREE_FOR}").bindparams(
     bindparam('started', type_=DateTime), bindparam('now', type_=DateTime),
     bindparam('fresh_from', type_=DateTime), bindparam('leader', type_=Boolean))
-# Taken from another token: what the previous process published is reset until the first heartbeat.
-# No version: a row only claimed is not registered yet (node_registered, readiness)
+# Taken from another token: the leader flag and fingerprint are reset until the first heartbeat.
+# started_at, version and family stay the previous run's: the claim is not the node back
+# (rolling update and restart); a row only claimed has no version (node_registered, readiness)
 _SAME = "cluster_nodes.instance_token = excluded.instance_token"
 _CLAIM_SQL = text(
     "INSERT INTO cluster_nodes (node_id, started_at, heartbeat_at, is_leader, pid, instance_token)"
     " VALUES (:n, :now, :now, :false, :pid, :token)"
     " ON CONFLICT (node_id) DO UPDATE SET heartbeat_at = excluded.heartbeat_at,"
     " instance_token = excluded.instance_token, pid = excluded.pid,"
-    f" started_at = CASE WHEN {_SAME} THEN cluster_nodes.started_at ELSE excluded.started_at END,"
     f" is_leader = CASE WHEN {_SAME} THEN cluster_nodes.is_leader ELSE :false END,"
     f" kek_fingerprint = CASE WHEN {_SAME} THEN cluster_nodes.kek_fingerprint ELSE NULL END"
     f" WHERE {_FREE_FOR}").bindparams(

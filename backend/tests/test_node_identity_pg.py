@@ -152,6 +152,51 @@ def test_a_claim_alone_does_not_make_the_node_ready(app, ha):
         assert scheduler_leader.node_registered(node) is True
 
 
+def _campaign(current=None, order=(), done=()):
+    from services import update_campaign as uc
+    return {'id': 'c1', 'status': uc.RUNNING, 'target': '99.0', 'order': list(order),
+            'done': list(done), 'skipped': [], 'current': current,
+            'packages': {'deb': {'name': 'ucm.deb'}}}
+
+
+def _own_nodes():
+    from services import update_campaign
+    return {k: v for k, v in update_campaign._nodes().items() if k.startswith(PREFIX)}
+
+
+def test_a_claim_after_a_clean_stop_is_not_the_node_back(app, ha):
+    """Until the scheduler's first heartbeat, a claimed row still reads as the previous run:
+    neither a rolling update nor a rolling restart takes it for the new process."""
+    from models import db
+    from services import cluster_commands, update_campaign as uc
+    node = PREFIX + 'roll'
+    with app.app_context():
+        before = scheduler_leader.cluster_utc_now() - timedelta(seconds=30)
+        assert scheduler_leader.write_heartbeat(node, False, before, 'old')
+        scheduler_leader.release_node(node, 'old')
+        since = scheduler_leader.cluster_utc_now()
+        scheduler_leader.claim_node_at_start(node, 'new', release_at_exit=False)
+        now = scheduler_leader.cluster_utc_now()
+        current = {'node': node, 'since': uc._iso(since), 'state': uc.DISPATCHED}
+        step = uc.plan_step(_campaign(current, order=[node]), _own_nodes(), now,
+                            stale_seconds=60, guard=600)
+        assert step == (None, None)
+        rows = [r for r in db.session.execute(cluster_commands._NODES_SQL).fetchall()
+                if r[0].startswith(PREFIX)]
+        assert cluster_commands.pending_predecessors(node + 'z', rows, since, now, 60) == [node]
+
+
+def test_a_node_joining_during_a_campaign_waits_for_its_first_heartbeat(app, ha):
+    from services import update_campaign as uc
+    done = PREFIX + 'done'
+    with app.app_context():
+        assert scheduler_leader.write_heartbeat(done, False, scheduler_leader.cluster_utc_now(), 'd')
+        scheduler_leader.claim_node_at_start(PREFIX + 'joiner', 'j', release_at_exit=False)
+        _, event = uc.plan_step(_campaign(order=[done], done=[done]), _own_nodes(),
+                                scheduler_leader.cluster_utc_now(), stale_seconds=60, guard=600)
+    assert event == ('finished', None, None)
+
+
 def test_a_clean_stop_releases_the_row(app, ha):
     node = PREFIX + 'clean'
     _put(app, node, 'mine')
