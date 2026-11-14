@@ -191,7 +191,7 @@ def answered_revocation(row: Certificate, ca: CA, records: Optional[dict] = None
         return row
     serial = resolve_record_serial(row)
     if serial is None:
-        return row if delta or not lifting else _HeldThroughLift(row)
+        return row  # no serial to read: listed by no CRL, matched by no OCSP request
     record = records.get(canonical_serial(serial)) if records is not None else persisted_revocation(ca, serial)
     if lifting:
         return _lift_in_progress(row, record, delta)
@@ -268,7 +268,10 @@ def persisted_revocations_of(rows) -> dict:
 def show_effective_revocation(data: dict, row: Certificate, record) -> dict:
     """``data`` (``row.to_dict()``) with the revocation ``record`` makes when it is graver
     than the row's own, as OCSP and the CRL answer it."""
-    holder = gravest_revocation(row if row.revoked else None, record)
+    if row.revoked and row.revoke_reason == 'removeFromCRL':
+        holder = _lift_in_progress(row, record, False)
+    else:
+        holder = gravest_revocation(row if row.revoked else None, record)
     if holder is not None and holder is not row:
         data.update(revoked=True, status='revoked', revoke_reason=holder.revoke_reason,
                     revoked_at=utc_isoformat(holder.revoked_at), invalidity_at=utc_isoformat(holder.invalidity_at))

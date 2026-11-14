@@ -581,7 +581,7 @@ class RestoreCoreMixin:
 
     def _align_kept_revocations(self) -> List[Dict[str, Any]]:
         """A revocation a merge kept here takes its serial's gravest record when that one is
-        graver (``persisted_revocation``): the CRL and OCSP answer a final row with itself."""
+        graver (``persisted_revocation``): a final row answers the CRL and OCSP with itself."""
         from services.cert.issued_lookup import row_persisted_revocation
         from services.ski_aki_backfill import _marked_entry
         entries = []

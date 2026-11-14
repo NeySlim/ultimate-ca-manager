@@ -136,6 +136,19 @@ class TestALiftStoppedBetweenItsCommits:
         assert _full_crl(app, ca_id, real) == (HOLD, EARLY)
         assert _delta_reason(app, ca_id, real) == REMOVE
 
+    @pytest.mark.parametrize('record', [True, False])
+    def test_the_api_says_hold_too(self, app, auth_client, delta_issuer, record):
+        """The detail and the list answer as OCSP and the full CRL do, record or not."""
+        _, row_id, _ = _held_leaf(app, delta_issuer, f'lift-api-{record}.example.test', record=record)
+        _staged(app, row_id)
+        detail = auth_client.get(f'/api/v2/certificates/{row_id}').get_json()['data']
+        listed = auth_client.get('/api/v2/certificates?search=lift-api-' + str(record)).get_json()['data']
+        listed = next(c for c in listed if c['id'] == row_id)
+        for shown in (detail, listed):
+            assert (shown['revoked'], shown['status'], shown['revoke_reason']) == (
+                True, 'revoked', 'certificateHold')
+            assert shown['revoked_at'].startswith(EARLY.strftime('%Y-%m-%dT%H:%M:%S'))
+
     def test_a_row_and_record_revoked_as_remove_from_crl_is_no_lift(self, app, delta_issuer):
         """Reason 8 on the record too (an old ACME revocation): not a hold, answered as before."""
         ca_id = delta_issuer[0]
