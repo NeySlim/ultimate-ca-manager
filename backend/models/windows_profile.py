@@ -12,6 +12,8 @@ class WindowsEnrollmentProfile(db.Model):
         # At most one default, enforced by the database on both backends
         db.Index('uq_windows_enrollment_profiles_default', 'is_default', unique=True,
                  sqlite_where=db.text('is_default'), postgresql_where=db.text('is_default')),
+        # A deleted profile's id is never handed out again, as step 155 creates the table
+        {'sqlite_autoincrement': True},
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -67,7 +69,8 @@ class WindowsProfileTemplate(db.Model):
     """The templates a profile offers; none listed: the templates of its CA."""
     __tablename__ = 'windows_profile_templates'
     __table_args__ = (db.UniqueConstraint('profile_id', 'template_id',
-                                          name='uq_windows_profile_templates'),)
+                                          name='uq_windows_profile_templates'),
+                      {'sqlite_autoincrement': True})
 
     id = db.Column(db.Integer, primary_key=True)
     profile_id = db.Column(db.Integer, db.ForeignKey('windows_enrollment_profiles.id', ondelete='CASCADE'),

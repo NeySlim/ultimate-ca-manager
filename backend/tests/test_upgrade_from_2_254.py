@@ -39,13 +39,6 @@ TOLERATED = {
         "the unique index that carries the rule above",
     ('postgresql', 'index', 'ad_connector_config', 'ad_connector_config_name_key'):
         "the index behind the UNIQUE constraint of a fresh install, the rule above",
-    ('sqlite', 'autoincrement', 'acme_proxy_challenge_links', ''):
-        "step 142 creates the table with AUTOINCREMENT, the model without: the upgraded "
-        "table never reuses an id, which is stricter",
-    ('sqlite', 'autoincrement', 'windows_enrollment_profiles', ''):
-        "step 155 creates the table with AUTOINCREMENT, the model without: stricter",
-    ('sqlite', 'autoincrement', 'windows_profile_templates', ''):
-        "step 155 creates the table with AUTOINCREMENT, the model without: stricter",
     ('postgresql', 'column default', '_migrations', 'applied_at'):
         "the registry table was created by 2.254; every 3.0 write passes applied_at in UTC",
     ('postgresql', '*', 'flask_sessions', '*'):
@@ -105,6 +98,36 @@ def test_an_upgraded_2254_database_has_the_schema_of_a_fresh_install(base, fresh
     used = {_tolerated(base.dialect, d) for d in diffs}
     unused = [k for k in TOLERATED if k[0] in (None, base.dialect) and k not in used]
     assert unused == [], f'TOLERATED entries no difference uses any more: {unused}'
+
+
+def _filler(column, n):
+    """Row n's value for a required column: distinct per row, so unique columns accept it."""
+    from sqlalchemy import Boolean, DateTime, Integer
+    if isinstance(column.type, Boolean):
+        return False
+    if isinstance(column.type, Integer):
+        return n
+    if isinstance(column.type, DateTime):
+        return datetime(2026, 1, 1)
+    return f'{column.name}{n}'
+
+
+@pytest.mark.parametrize('table', ['windows_enrollment_profiles', 'windows_profile_templates',
+                                   'acme_proxy_challenge_links', 'users', 'websocket_relay'])
+def test_a_fresh_sqlite_install_never_hands_a_deleted_id_out_again(table, tmp_path, monkeypatch):
+    """The same AUTOINCREMENT as the upgrade creates: a deleted last row keeps its id."""
+    for db in make_base('sqlite', tmp_path, monkeypatch, 'ai', sql=''):
+        model = fresh_metadata().tables[table]
+        model.metadata.create_all(db.engine, tables=[model])
+        required = [c for c in model.columns if not c.primary_key and not c.nullable]
+        with db.engine.begin() as conn:
+            def add(n):
+                values = {c.name: _filler(c, n) for c in required}
+                return conn.execute(model.insert().values(**values)).inserted_primary_key[0]
+            add(1)
+            last = add(2)
+            conn.execute(model.delete().where(model.c.id == last))
+            assert add(3) > last
 
 
 def test_the_registry_of_both_ends_names_the_upgrade(base, fresh):
