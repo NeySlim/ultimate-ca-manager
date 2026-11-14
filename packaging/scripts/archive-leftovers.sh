@@ -139,14 +139,15 @@ fips_written() {
         && case $FIPS_LINE in "$(cat -- "$1")"*) true ;; *) false ;; esac
 }
 
-# $1 could not be undone (nor $2, found beside it); named in $stuck only while it is
+# $1 could not be undone, $2 says how; named in $stuck, one line each, only while it is
 # really there. A failed line remembers it in the journal: met again at the next attempt,
 # retrying alone will not do.
 unsettled() {
     left=1
     case " $seen " in *" $1 "*) return 0 ;; esac
     seen="$seen $1"
-    if present "$1"; then stuck="$stuck $1${2:+ $2}"; fi
+    if present "$1"; then stuck="$stuck
+  $1: $2"; fi
     if grep -qxF "failed$TAB$1" "$JOURNAL" 2>/dev/null; then
         again=1
     else
@@ -154,11 +155,19 @@ unsettled() {
     fi
 }
 
-# What the next attempt does with what is still in the archive
-say_next() {
+# The paths not put back or cleared, then what the next attempt does with them
+say_stuck() {
+    say "Some files could not be put back or cleared (archive: $DEST):"
+    printf '%s\n' "${stuck:-
+  $DEST: still holds what could not be put back}" | sed 1d | while IFS= read -r line; do
+        say "$line"
+    done
     if [ -n "$again" ]; then
-        say "Putting them back failed at the previous attempt too: a new attempt will not"
-        say "succeed until the cause shown above is fixed. They stay in the archive meanwhile."
+        say "These failed the same way at the previous attempt: retrying alone will not put"
+        say "them back. Fix what each line names, then retry; they stay where they are meanwhile."
+    elif [ -n "$twice" ]; then
+        say "The next attempt tries again to put them back before anything else, except where"
+        say "both paths exist: those wait for your choice."
     else
         say "The next attempt tries again to put them back before anything else."
     fi
@@ -168,16 +177,17 @@ say_next() {
 # retry from any interrupted state converges. A copy goes only once its source is whole
 # again and its remove line is out of the journal: no retry meets a half-deleted copy.
 roll_back() {
-    stuck="" left="" seen="" again=""
-    undo=$(sed -n '1!G;h;$p' "$JOURNAL") || { unsettled "$JOURNAL"; return 1; }
+    stuck="" left="" seen="" again="" twice=""
+    undo=$(sed -n '1!G;h;$p' "$JOURNAL") || { unsettled "$JOURNAL" "could not be read"; return 1; }
     while IFS="$TAB" read -r op src dst; do
         case $op in
             rename)
                 # A rename is atomic: both there, the source was made again since
                 if present "$dst" && present "$src"; then
-                    unsettled "$dst" "$src"
+                    twice=1
+                    unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"
                 elif present "$dst"; then
-                    rename_item "$dst" "$src" || unsettled "$dst"
+                    rename_item "$dst" "$src" || unsettled "$dst" "not put back to $src"
                 fi ;;
             remove)
                 # Undone already when the copy is gone: its source was whole again first
@@ -192,35 +202,36 @@ roll_back() {
                 # Whole again, and the copy said so: its copy line, undone next, removes the copy
                 if [ "$put" -ne 0 ] || ! same "$src" "$dst" \
                         || ! drop_line "remove$TAB$src$TAB$dst"; then
-                    unsettled "$dst"
+                    unsettled "$dst" "not put back to $src"
                 fi ;;
             copy)
                 # While its remove line stays, the copy may be all that is left of a file
                 if grep -qxF "remove$TAB$src$TAB$dst" "$JOURNAL"; then
-                    unsettled "$dst"
+                    unsettled "$dst" "not put back to $src"
                 elif present "$dst"; then
-                    rm -rf -- "$dst" || unsettled "$dst"
+                    rm -rf -- "$dst" || unsettled "$dst" "a copy of $src, which is back in place, could not be removed"
                 fi ;;
             fips)
                 # The new ucm.env goes while the archived one can take its place, once: the
                 # line goes too, or an old ucm.env put back since could pass for the new one
                 if present "$dst" && fips_written "$src"; then
-                    rm -f -- "$src" || { unsettled "$src"; break; }
+                    rm -f -- "$src" || { unsettled "$src" "the new configuration could not be removed for $dst to be put back"; break; }
                 fi
                 # Stopped here, what is left is the journal with that line and the archive
-                drop_line "fips$TAB$src$TAB$dst" || { unsettled "$JOURNAL"; break; } ;;
+                drop_line "fips$TAB$src$TAB$dst" \
+                    || { unsettled "$JOURNAL" "could not be updated once $src was removed, so nothing it lists was put back"; break; } ;;
             mkdir)
-                if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || unsettled "$dst"; fi ;;
+                if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || unsettled "$dst" "could not be removed"; fi ;;
         esac
     done <<EOF
 $undo
 EOF
     for f in "$DEST/README.txt" "$JOURNAL.new"; do
-        if present "$f"; then rm -f -- "$f" || unsettled "$f"; fi
+        if present "$f"; then rm -f -- "$f" || unsettled "$f" "could not be removed"; fi
     done
     [ -z "$left" ] || return 1
-    rm -f -- "$JOURNAL" || { unsettled "$JOURNAL"; return 1; }
-    rmdir -- "$DEST" 2>/dev/null || { unsettled "$DEST"; return 1; }
+    rm -f -- "$JOURNAL" || { unsettled "$JOURNAL" "could not be removed"; return 1; }
+    rmdir -- "$DEST" 2>/dev/null || { unsettled "$DEST" "could not be removed"; return 1; }
     [ -z "$MADE_PARENT" ] || rmdir -- "$PARENT" 2>/dev/null || true
 }
 
@@ -274,9 +285,8 @@ for j in "$PARENT"/*/.journal; do
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete:"
         say "the files it could not put back are in place again."
     else
-        say "UCM: an earlier attempt to archive what a removed UCM left did not complete, and"
-        say "some files could not be put back or cleared and are still in $DEST:$stuck"
-        say_next
+        say "UCM: an earlier attempt to archive what a removed UCM left did not complete."
+        say_stuck
         say "The installation stops here: nothing else is written, and UCM was not started."
         exit 2
     fi
@@ -349,8 +359,7 @@ fail() {
         if roll_back; then
             say "Everything was put back in place."
         else
-            say "Some files could not be put back or cleared and are still in $DEST:$stuck"
-            say_next
+            say_stuck
             rc=2
         fi
     else

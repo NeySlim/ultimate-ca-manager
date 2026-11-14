@@ -187,10 +187,25 @@ def tree(top):
     return out
 
 
+def reported(stdout):
+    """{path: what failed} of a run that exits 2: one line each under the header, no
+    reference to a cause printed elsewhere."""
+    assert 'shown above' not in stdout and '\u2014' not in stdout
+    lines = stdout.splitlines()
+    heads = [i for i, line in enumerate(lines) if line.startswith('Some files could not be put back or cleared')]
+    out = {}
+    for i in heads:
+        for line in lines[i + 1:]:
+            if not line.startswith('  '):
+                break
+            path, what = line[2:].split(': ', 1)
+            out[path] = what
+    return out
+
+
 def named(stdout):
     """The paths a run that exits 2 names as not put back or cleared."""
-    lines = [line for line in stdout.splitlines() if 'are still in ' in line]
-    return [path for line in lines for path in line.split(':', 1)[1].split()]
+    return list(reported(stdout))
 
 
 def files(top):
@@ -628,7 +643,10 @@ def test_a_source_made_again_after_its_rename_is_never_removed_nor_its_archive(t
     for _ in range(2):
         out = box.run()
         assert out.returncode == 2, (out.stdout, out.stderr)
-        assert str(box.data / name) in out.stdout and f'{box.archive}/data/{name}' in out.stdout
+        assert reported(out.stdout)[f'{box.archive}/data/{name}'] == (
+            f'not put back to {box.data}/{name}, which exists again: keep one of the two, '
+            'remove the other, then retry')
+        assert 'wait for your choice' in out.stdout or 'retrying alone will not' in out.stdout
         if made_again == 'a file':
             assert (box.data / name).read_bytes() == b'made again'
         else:
@@ -785,6 +803,8 @@ def test_a_put_back_that_differs_from_the_archive_is_never_taken_for_whole(tmp_p
     box.wrap(fail='rm', at=last_rm, other_fs=(box.data,), corrupt_copies=differs, corrupt_back=True)
     out = box.run()
     assert out.returncode == 2, (out.stdout, out.stderr)
+    # cp said nothing: the line alone says which put-back failed
+    assert any(what.startswith('not put back to ') for what in reported(out.stdout).values()), out.stdout
     box.wrap(other_fs=(box.data,))
     out = box.run()
     assert out.returncode == 0, (out.stdout, out.stderr)
@@ -838,9 +858,12 @@ def test_a_put_back_refused_twice_the_same_way_says_a_retry_will_not_help(tmp_pa
     first = box.run()
     assert first.returncode == 2, first.stdout
     assert 'next attempt tries again' in first.stdout and 'will not' not in first.stdout
+    lines = reported(first.stdout)
+    assert lines[f'{box.archive}/data/updates'] == f'not put back to {box.data}/updates'
     second = box.run()
     assert second.returncode == 2, second.stdout
-    assert 'previous attempt too' in second.stdout and 'until the cause' in second.stdout
+    assert 'same way at the previous attempt' in second.stdout and 'retrying alone will not' in second.stdout
+    assert reported(second.stdout) == lines
     assert 'tries again' not in second.stdout
     assert _all_files(box.data, box.archive / 'data') == data
     box.wrap(other_fs=(box.data,))
@@ -883,7 +906,8 @@ def test_a_copy_half_removed_while_putting_back_is_removed_on_the_retry(tmp_path
         f'exec {REAL["rm"]} "$@"\n')
     out = box.run()
     assert out.returncode == 2, out.stdout
-    assert f'{box.archive}/data/updates' in out.stdout
+    assert reported(out.stdout)[f'{box.archive}/data/updates'] == (
+        f'a copy of {box.data}/updates, which is back in place, could not be removed')
     assert files(box.data) == data
     box.wrap(other_fs=(box.data,))
     out = box.run()
@@ -891,3 +915,18 @@ def test_a_copy_half_removed_while_putting_back_is_removed_on_the_retry(tmp_path
     assert [p.name for p in box.parent.iterdir()] == [STAMP]
     assert files(box.archive / 'data') == data
     assert files(box.archive / 'config') == config
+
+
+def test_a_rename_back_that_is_refused_is_named_with_where_it_goes(tmp_path):
+    """The last step fails once every item is renamed; renaming ucm.db back is refused."""
+    box = Box(tmp_path / 'count', python='stub')
+    box.wrap(fail='rm', at=10 ** 6)
+    assert box.run().returncode == 0
+    last_rm = int((box.state / 'count').read_text())
+    box = Box(tmp_path / 'box', python='stub')
+    data = files(box.data)
+    box.wrap(fail='rm', at=last_rm, refused=(f'{box.archive}/data/ucm.db',))
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert reported(out.stdout)[f'{box.archive}/data/ucm.db'] == f'not put back to {box.data}/ucm.db', out.stdout
+    assert _all_files(box.data, box.archive / 'data') == data
