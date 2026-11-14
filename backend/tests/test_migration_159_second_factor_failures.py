@@ -11,6 +11,8 @@ from models import SecondFactorFailure
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 TABLE = SecondFactorFailure.__tablename__
 COLUMNS = {'kind', 'target', 'failures', 'locked_until', 'updated_at'}
+# Serves the purge run before each reservation: an expired lock, or an idle count
+PURGE_INDEX = {'ix_second_factor_failures_purge': ['locked_until', 'updated_at']}
 
 
 def _migration():
@@ -35,6 +37,13 @@ def test_sqlite_creates_the_table_and_is_idempotent():
                  "VALUES ('2fa', 'alice', 1, '2026-01-01 00:00:00')")
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(f"INSERT INTO {TABLE} (kind, target, failures) VALUES ('2fa', 'bob', 1)")
+    indexes = {row[1]: [c[2] for c in conn.execute(f"PRAGMA index_info({row[1]})")]
+               for row in conn.execute(f"PRAGMA index_list({TABLE})") if row[3] == 'c'}
+    assert indexes == PURGE_INDEX
+    plan = ' '.join(str(r) for r in conn.execute(
+        f"EXPLAIN QUERY PLAN DELETE FROM {TABLE} WHERE locked_until <= '2026-01-01' OR "
+        "(locked_until IS NULL AND updated_at < '2026-01-01')"))
+    assert 'ix_second_factor_failures_purge' in plan and 'SCAN' not in plan, plan
 
 
 @pytest.mark.postgres
@@ -56,6 +65,8 @@ def test_postgres_creates_the_table_and_is_idempotent():
         assert set(cols) == COLUMNS
         assert cols['locked_until']['nullable'] is True and cols['failures']['nullable'] is False
         assert insp.get_pk_constraint(TABLE, schema=schema)['constrained_columns'] == ['kind', 'target']
+        assert {i['name']: i['column_names'] for i in insp.get_indexes(TABLE, schema=schema)} \
+            == PURGE_INDEX
     finally:
         conn.rollback()
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
@@ -67,4 +78,6 @@ def test_postgres_creates_the_table_and_is_idempotent():
 def test_the_app_schema_matches_the_migration(app):
     from models import db
     with app.app_context():
-        assert COLUMNS == {c['name'] for c in inspect(db.engine).get_columns(TABLE)}
+        insp = inspect(db.engine)
+        assert COLUMNS == {c['name'] for c in insp.get_columns(TABLE)}
+        assert {i['name']: i['column_names'] for i in insp.get_indexes(TABLE)} == PURGE_INDEX
