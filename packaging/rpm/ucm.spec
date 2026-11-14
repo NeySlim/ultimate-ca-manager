@@ -128,26 +128,6 @@ if [ -n "$HSM_GROUP" ]; then
     chmod 1770 /var/lib/softhsm/tokens
 fi
 
-# Check for v1.8.x data to migrate
-V1_DB=""
-if [ -f "$UCM_HOME/backend/data/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
-    V1_DB="$UCM_HOME/backend/data/ucm.db"
-elif [ -f "/var/lib/ucm/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
-    V1_DB="/var/lib/ucm/ucm.db"
-fi
-
-if [ -n "$V1_DB" ]; then
-    echo "Migrating v1.8.x data to v2.0..."
-    cp "$V1_DB" "$UCM_DATA/ucm.db"
-    V1_DIR=$(dirname "$V1_DB")
-    for dir in ca certs private crl; do
-        [ -d "$V1_DIR/$dir" ] && cp -r "$V1_DIR/$dir"/* "$UCM_DATA/$dir/" 2>/dev/null || true
-    done
-    # Update config if exists
-    [ -f "$UCM_CONFIG/ucm.env" ] && sed -i "s|DATABASE_PATH=.*|DATABASE_PATH=$UCM_DATA/ucm.db|" "$UCM_CONFIG/ucm.env"
-    echo "✓ Migration complete"
-fi
-
 # Generate secrets
 SECRET_KEY=$(openssl rand -hex 32)
 
@@ -220,15 +200,6 @@ if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
     chown %{name}:%{name} "$UCM_DATA"/https_*.pem
     chmod 600 "$UCM_DATA/https_key.pem"
     chmod 644 "$UCM_DATA/https_cert.pem"
-fi
-
-# Automatic migration from v1.8.x
-V1_DATA="$UCM_HOME/backend/data"
-if [ -f "$V1_DATA/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
-    echo "Detected UCM v1.8.x - running automatic migration..."
-    if [ -f "$UCM_HOME/backend/migrate_v1_to_v2.py" ]; then
-        %{ucm_python} "$UCM_HOME/backend/migrate_v1_to_v2.py" "$UCM_HOME" 2>&1 | tee /var/log/%{name}/migration.log
-    fi
 fi
 
 # Start/restart service

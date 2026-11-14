@@ -224,3 +224,21 @@ def test_every_package_build_embeds_the_guard():
         text = (ROOT / builder).read_text()
         spec_ready = text.index('rpmbuild -bb')
         assert re.search(r'embed-pivot-guard\.sh\S*\s+\S*spec', text[:spec_ready], re.I), builder
+
+
+def test_no_package_or_image_runs_the_1_x_upgrade_any_more():
+    """A 1.x goes through 2.254, whose packages still carry its upgrade; 3.0 has none."""
+    assert not (ROOT / 'backend' / 'migrate_v1_to_v2.py').exists()
+    found = []
+    for top in ('packaging', 'docker', 'backend', '.github', 'scripts', 'charts'):
+        for path in (ROOT / top).rglob('*'):
+            parts = path.relative_to(ROOT).parts
+            if not path.is_file() or 'tests' in parts or '__pycache__' in parts:
+                continue
+            text = path.read_text(errors='ignore')
+            if re.search(r'migrate_v1_to_v2|V1_DB\b|v1\.8\.x', text):
+                found.append(str(path.relative_to(ROOT)))
+    for name in ('Dockerfile', 'Dockerfile.fips'):
+        if (ROOT / name).exists() and 'migrate_v1_to_v2' in (ROOT / name).read_text():
+            found.append(name)
+    assert found == []
