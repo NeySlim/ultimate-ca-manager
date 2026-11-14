@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- Dependencies: dnspython 2.9.2, which bounds the service number of a WKS record read from zone text (CVE-2026-128089). UCM reads no zone text from a third party, so no UCM path was exposed.
+- Dependencies: dnspython 2.9.2, which bounds the services of a WKS record (CVE-2026-128089). UCM parses record text only for TXT values it computes, so no UCM path was exposed.
 
 ## [2.254] - 2026-11-13
 
