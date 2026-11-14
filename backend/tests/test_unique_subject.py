@@ -123,8 +123,8 @@ def test_a_new_ca_does_not_enforce_and_issues_a_subject_twice(app, auth_client, 
     _data(_sign(auth_client, app, ca, _csr('twice.unique.test', _key())), 200)
 
 
-def _lookups(app, issue):
-    statements = []
+def _lookups(app, issue, statements=None):
+    statements = [] if statements is None else statements
 
     def record(conn, cursor, statement, *args):
         statements.append(statement)
@@ -444,16 +444,22 @@ def test_a_subject_two_groups_carry_stays_refused(app, auth_client, create_ca):
 
 
 def test_the_lookup_count_does_not_grow_with_the_rows_carrying_the_subject(app, auth_client, create_ca):
-    """The grouping reads the subject's rows in one query: two per issuance, whatever their number."""
+    """The grouping reads the subject's rows in one query: two lookups per issuance, and as many
+    statements with six rows carrying the subject as with one."""
     ca = unique_ca(app, create_ca, 'Unique grouped count CA', on=False)
     key = _key()
     for _ in range(6):
-        _data(_sign(auth_client, app, ca, _csr('grouped-count.unique.test', key)), 200)
+        _data(_sign(auth_client, app, ca, _csr('six.grouped.unique.test', key)), 200)
+    _data(_sign(auth_client, app, ca, _csr('one.grouped.unique.test', key)), 200)
     with app.app_context():
         db.session.get(CA, ca['id']).enforce_unique_subject = True
         db.session.commit()
-    assert _lookups(app, lambda: _data(_sign(auth_client, app, ca, _csr('grouped-count.unique.test', key)),
-                                       200)) == 2
+    counts = []
+    for cn in ('one.grouped.unique.test', 'six.grouped.unique.test'):
+        statements = []
+        counts.append((_lookups(app, lambda: _data(_sign(auth_client, app, ca, _csr(cn, key)), 200),
+                                statements), len(statements)))
+    assert counts[0][0] == 2 and counts[0] == counts[1], counts
 
 
 def test_an_override_on_a_subject_several_entities_carry_keeps_it_shared(app, auth_client, create_ca):
