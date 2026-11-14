@@ -387,7 +387,7 @@ class CRLGenerationMixin:
             # so a revocation dated before it but committed after it is not lost
             on_base = {entry.serial_number: _entry_reason(entry)
                        for entry in x509.load_der_x509_crl(base_crl.crl_der)}
-            revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
+            revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id, delta=True)
 
             builder = x509.CertificateRevocationListBuilder()
             builder = builder.issuer_name(ca_cert.subject)

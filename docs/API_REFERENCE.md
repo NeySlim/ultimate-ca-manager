@@ -938,7 +938,7 @@ message asking to revoke it separately.
 POST /api/v2/certificates/{cert_id}/unhold
 ```
 
-Requires reason `certificateHold` / `certificate_hold`. When the issuing CA has delta CRL enabled, UCM emits a delta entry with reason `removeFromCRL` (RFC 5280 §5.3.1) before regenerating the full CRL.
+Requires reason `certificateHold` / `certificate_hold`. When the issuing CA has delta CRL enabled, UCM emits a delta entry with reason `removeFromCRL` (RFC 5280 §5.3.1) before regenerating the full CRL. Until the hold is lifted, OCSP and the full CRL still answer `certificateHold`.
 
 **`unhold_related`** (JSON boolean, default `true`): lifting the hold on a member of a related pair also lifts
 the other member when it is on hold for `certificateHold`; a partner revoked for another reason stays revoked.

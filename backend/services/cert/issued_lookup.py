@@ -168,19 +168,46 @@ def gravest_records_by_serial(records) -> dict:
     return gravest
 
 
-def answered_revocation(row: Certificate, ca: CA, records: Optional[dict] = None):
+class _HeldThroughLift:
+    """A row staged removeFromCRL with no record of its serial: the hold it was, row's date."""
+    revoke_reason = 'certificateHold'
+
+    def __init__(self, row):
+        self._row = row
+
+    def __getattr__(self, name):
+        return getattr(self._row, name)
+
+
+def answered_revocation(row: Certificate, ca: CA, records: Optional[dict] = None, *, delta: bool = False):
     """What the CRL and OCSP say of the revoked ``row``: itself, or when it is only held, the
     final record of its serial under ``ca`` (or a record of its key), the graver of the two.
-    ``records`` (``gravest_records_by_serial`` of the key's records) spares a query per row."""
+    ``records`` (``gravest_records_by_serial`` of the key's records) spares a query per row.
+    A lift in progress (``removeFromCRL``) is said only by a ``delta`` CRL (``_lift_in_progress``)."""
     from utils.revocation_reasons import HOLD_REASONS
     from services.cert.serial_resolution import resolve_record_serial
-    if row.revoke_reason not in HOLD_REASONS:
+    lifting = row.revoke_reason == 'removeFromCRL'
+    if not lifting and row.revoke_reason not in HOLD_REASONS:
         return row
     serial = resolve_record_serial(row)
     if serial is None:
-        return row
+        return row  # no serial to read: listed by no CRL, matched by no OCSP request
     record = records.get(canonical_serial(serial)) if records is not None else persisted_revocation(ca, serial)
+    if lifting:
+        return _lift_in_progress(row, record, delta)
     return gravest_revocation(row, record)
+
+
+def _lift_in_progress(row: Certificate, record, delta: bool):
+    """An unhold is still a hold until it is lifted (RFC 5280 §5.3.1: removeFromCRL only on a
+    delta): its hold ``record`` (or the row as held) answers; a final record always prevails."""
+    from utils.revocation_reasons import HOLD_REASONS
+    if record is not None and reason_rank(record.revoke_reason) < reason_rank('certificateHold'):
+        return record
+    if delta or (record is not None and record.revoke_reason not in HOLD_REASONS):
+        # The delta's instruction, or reason 8 recorded too (no lift: ``interrupted_lift``)
+        return row
+    return record if record is not None else _HeldThroughLift(row)
 
 
 def _row_serial(row: Certificate) -> Optional[int]:
@@ -241,7 +268,10 @@ def persisted_revocations_of(rows) -> dict:
 def show_effective_revocation(data: dict, row: Certificate, record) -> dict:
     """``data`` (``row.to_dict()``) with the revocation ``record`` makes when it is graver
     than the row's own, as OCSP and the CRL answer it."""
-    holder = gravest_revocation(row if row.revoked else None, record)
+    if row.revoked and row.revoke_reason == 'removeFromCRL':
+        holder = _lift_in_progress(row, record, False)
+    else:
+        holder = gravest_revocation(row if row.revoked else None, record)
     if holder is not None and holder is not row:
         data.update(revoked=True, status='revoked', revoke_reason=holder.revoke_reason,
                     revoked_at=utc_isoformat(holder.revoked_at), invalidity_at=utc_isoformat(holder.invalidity_at))

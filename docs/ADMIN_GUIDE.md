@@ -340,7 +340,7 @@ A restore **replaces** the instance with the archive: for every section the arch
 - Rows are matched by identity (name, refid, fingerprint), never by number. Each archive carries the identifier of the database it was taken from, and row numbers are trusted only when restoring onto that same database.
 - An archive written by an older version is repaired as the migrations repaired the source: legacy EAB keys, dead and `ldap_*` settings, SAML providers, group permissions, duplicated ACME renewal orders.
 - ACME client orders: a merge keeps the order here when it is further along, was renewed or is being finalized since the archive was taken; a replacement restores the archived one and names the certificate it gives up.
-- Revocations: a merge never lowers a final revocation made here, of a certificate or a CA; a suspension is reversible, so one carried by the certificate alone (no revocation record) is lifted by an archive in which the certificate is valid.
+- Revocations: a merge never lowers a revocation made here, final or a suspension, of a certificate or a CA, with or without its revocation record; an archive that revokes it for good replaces a suspension, and between two revocations of the same weight the earlier date stays.
 - Every session is revoked and a restart is requested. A restore is refused (409) while a backend migration, another restore or a backup is running.
 - In HA mode the other nodes refuse writes for the whole restore and restart in turn after it: see [HA.md](HA.md#restoring-a-backup).
 
@@ -612,7 +612,7 @@ openssl x509 -in intermediate.pem -noout -text | grep -A1 'Subject Key Identifie
 - **FreshestCRL** points at the delta URL when CDP + delta CRL are enabled (§5.2.6).
 - Reason `unspecified` is omitted; `removeFromCRL` appears only on delta CRLs (§5.3.1).
 - Optional revoke field **`invalidity_date`** is emitted as CRL entry `invalidityDate` (§5.3.2).
-- Lifting a **certificateHold** (unhold) regenerates the full CRL; with delta CRL enabled, UCM first emits a delta entry with reason `removeFromCRL`.
+- Lifting a **certificateHold** (unhold) regenerates the full CRL; with delta CRL enabled, UCM first emits a delta entry with reason `removeFromCRL`. Until the hold is lifted, OCSP and any full CRL generated meanwhile still answer `certificateHold` with the date of the hold.
 
 **Certificate issuance profile:**
 - CSR-supplied SKI/AKI extensions are **ignored**; SKI comes from the subject public key and AKI from the issuing CA’s SKI.
