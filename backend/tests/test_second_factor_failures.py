@@ -281,7 +281,10 @@ def test_expired_rows_are_purged_on_the_next_failure(nodes):
 # Backups: runtime state, never carried nor restored
 
 
-def test_a_backup_neither_carries_nor_restores_a_lock(app, tmp_path):
+@pytest.mark.parametrize('mode', ['replace', 'merge'])
+def test_a_backup_neither_carries_nor_restores_a_lock(app, tmp_path, mode):
+    """The rows are keyed by user id and name, which a restore may give to another
+    account: the target's own locks go with the restore, in either mode."""
     from tests.test_backup_cross_installation import Keys, _installation
     from services.backup_service import BackupService
     password = 'Backup-Lock-Pass-2026!'
@@ -302,7 +305,11 @@ def test_a_backup_neither_carries_nor_restores_a_lock(app, tmp_path):
     assert 'second_factor_failures' not in payload and 'carried' in repr(payload)
     with _installation(app, f"sqlite:///{tmp_path / 'target.db'}", Keys(tmp_path, 'target')), \
             app.app_context():
-        results = BackupService().restore_backup(blob, password)
+        db.session.add_all([SecondFactorFailure(kind=kind, target=target, failures=5,
+                                                locked_until=locked, updated_at=utc_now())
+                            for kind, target in (('webauthn', 'target-user'), ('2fa', '1'))])
+        db.session.commit()
+        results = BackupService().restore_backup(blob, password, mode=mode)
         assert not results.get('errors'), results
         assert User.query.filter_by(username='carried').count() == 1
         assert SecondFactorFailure.query.count() == 0
