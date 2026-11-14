@@ -282,6 +282,21 @@ def test_a_running_node_whose_row_is_taken_stops_leading_and_fails_readiness(app
     assert client.get('/health/ready').status_code == 200
 
 
+def test_a_leader_flag_written_by_another_token_is_not_this_node_leading(app, client, ha, monkeypatch):
+    """A web worker reads leadership from the row: an intruder's leader flag is not its own."""
+    node = PREFIX + 'flag'
+    monkeypatch.setattr(Config, 'NODE_ID', node)
+    monkeypatch.setattr(scheduler_service, '_scheduler', SchedulerService(wake_interval=60, node_id=node))
+    _put(app, node, 'intruder', leader=True)
+    with app.app_context():
+        assert scheduler_leader.node_is_leader(node, 60) is False
+    assert client.get('/health').get_json()['leader'] is False
+    _put(app, node, scheduler_leader.instance_token(), leader=True)  # its own flag still counts
+    with app.app_context():
+        assert scheduler_leader.node_is_leader(node, 60) is True
+    assert client.get('/health').get_json()['leader'] is True
+
+
 def test_a_leader_whose_row_is_taken_gives_the_lock_up(app, ha):
     """A deposed leader releases the leader lock, so another node takes the lead."""
     node = PREFIX + 'deposed'
