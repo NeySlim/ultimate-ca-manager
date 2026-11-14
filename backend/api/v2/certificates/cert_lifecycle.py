@@ -2,6 +2,7 @@
 import logging
 from datetime import datetime, timedelta
 from flask import request, g
+from sqlalchemy import func
 from auth.unified import require_auth
 from utils.datetime_utils import to_naive_utc, utc_now
 from utils.serial_format import serial_to_hex
@@ -347,9 +348,11 @@ def unhold_certificate(cert_id):
                 if not (member_ca and member_ca.delta_crl_enabled and member_ca.cdp_enabled):
                     continue
                 # A hold its record alone carries is listed from the row while the delta says
-                # removeFromCRL; staged only over a hold, a final revocation made since stays
+                # removeFromCRL; staged only over a hold, a final revocation made since stays.
+                # The hold's own date is kept: OCSP and a full CRL answer it until the lift.
                 if not _liftable_row(member.id).update(
-                        {'revoked': True, 'revoke_reason': 'removeFromCRL', 'revoked_at': utc_now()},
+                        {'revoked': True, 'revoke_reason': 'removeFromCRL',
+                         'revoked_at': func.coalesce(Certificate.revoked_at, utc_now())},
                         synchronize_session='fetch'):
                     db.session.rollback()
                     return _revoked_for_good(member, db.session.get(Certificate, member.id).revoke_reason)

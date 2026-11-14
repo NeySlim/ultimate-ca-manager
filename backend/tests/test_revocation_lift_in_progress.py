@@ -48,11 +48,13 @@ def _held_leaf(app, issuer, cn, record=True):
     return real, row_id, record_id
 
 
-def _staged(app, row_id, at=LATER):
-    """The row as the unhold's first commit leaves it."""
+def _staged(app, row_id, at=None):
+    """The row as the unhold's first commit leaves it: the hold's date is kept unless ``at``."""
     with app.app_context():
         row = db.session.get(Certificate, row_id)
-        row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', at
+        row.revoked, row.revoke_reason = True, 'removeFromCRL'
+        if at is not None:
+            row.revoked_at = at
         db.session.commit()
 
 
@@ -126,19 +128,19 @@ class TestALiftStoppedBetweenItsCommits:
         assert _delta_reason(app, ca_id, real) is None  # unchanged since the base, which says it
 
     def test_a_row_only_hold_answers_hold_with_the_row_date(self, app, delta_issuer):
-        """No record keeps the hold's date: the row's own, set when the lift was staged."""
+        """No record: the row keeps the hold's own date through the staging."""
         ca_id = delta_issuer[0]
         real, row_id, _ = _held_leaf(app, delta_issuer, 'lift-row-only.example.test', record=False)
         _staged(app, row_id)
-        assert _ocsp(app, ca_id, real) == ('revoked', LATER, HOLD)
-        assert _full_crl(app, ca_id, real) == (HOLD, LATER)
+        assert _ocsp(app, ca_id, real) == ('revoked', EARLY, HOLD)
+        assert _full_crl(app, ca_id, real) == (HOLD, EARLY)
         assert _delta_reason(app, ca_id, real) == REMOVE
 
     def test_a_row_and_record_revoked_as_remove_from_crl_is_no_lift(self, app, delta_issuer):
         """Reason 8 on the record too (an old ACME revocation): not a hold, answered as before."""
         ca_id = delta_issuer[0]
         real, row_id, record_id = _held_leaf(app, delta_issuer, 'lift-reason-eight.example.test')
-        _staged(app, row_id)
+        _staged(app, row_id, at=LATER)
         with app.app_context():
             db.session.get(RevokedSerial, record_id).revoke_reason = 'removeFromCRL'
             db.session.commit()
@@ -166,6 +168,25 @@ class TestTheWindowOfARealUnhold:
         monkeypatch.setattr(CRLService, 'generate_delta_crl', staticmethod(generate_delta_crl))
         assert auth_client.post(f'/api/v2/certificates/{row_id}/unhold').status_code == 200
         assert seen == [(REMOVE, ('revoked', EARLY, HOLD))]
+        assert _ocsp(app, ca_id, real)[0] == 'good'
+
+    def test_a_hold_without_a_record_keeps_its_date_while_the_delta_goes_out(
+            self, app, auth_client, delta_issuer, monkeypatch):
+        """The staging does not move the hold's date: OCSP and a full CRL keep saying it."""
+        from services.crl_service import CRLService
+        ca_id = delta_issuer[0]
+        real, row_id, _ = _held_leaf(app, delta_issuer, 'lift-window-row.example.test', record=False)
+        assert _full_crl(app, ca_id, real) == (HOLD, EARLY)  # the base the delta builds on
+        seen, delta = [], CRLService.generate_delta_crl
+
+        def generate_delta_crl(target, *args, **kwargs):
+            out = delta(target, *args, **kwargs)
+            if not seen:
+                seen.append((_ocsp(app, ca_id, real), _full_crl(app, ca_id, real)))
+            return out
+        monkeypatch.setattr(CRLService, 'generate_delta_crl', staticmethod(generate_delta_crl))
+        assert auth_client.post(f'/api/v2/certificates/{row_id}/unhold').status_code == 200
+        assert seen == [(('revoked', EARLY, HOLD), (HOLD, EARLY))]
         assert _ocsp(app, ca_id, real)[0] == 'good'
 
 
