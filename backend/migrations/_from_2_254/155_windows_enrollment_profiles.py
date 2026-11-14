@@ -6,6 +6,8 @@ profile (services.windows_profiles.legacy, shared with the restore of a 2.x arch
 are deleted in the same transaction; the WSTEP certificates are attached to it. XCEP without
 a CA of its own is switched off, as it served no policy (legacy.switches_from_2x).
 The keytab is read for its realm only; it is stored in the profile at startup.
+Each profile holds its policy identity (policyID, template OID root): the default one the
+values 2.254 served. A table created before these columns gets them, derived from its CA.
 Idempotent, dual-backend (SQLite + PostgreSQL).
 """
 import logging
@@ -26,6 +28,7 @@ _PROFILE_COLUMNS = (
     "is_default BOOLEAN NOT NULL DEFAULT {false}, enabled BOOLEAN NOT NULL DEFAULT {true}, "
     f"connector_id INTEGER REFERENCES {CONNECTORS}(id) ON DELETE SET NULL, "
     "issuing_ca_refid VARCHAR(36), policy_ca_refid VARCHAR(36), "
+    "policy_id VARCHAR(36) NOT NULL, policy_oid_root VARCHAR(100) NOT NULL, "
     "validity_days INTEGER NOT NULL DEFAULT 365, xcep_username TEXT, xcep_password TEXT, "
     "wstep_username TEXT, wstep_password TEXT, allowed_ad_group VARCHAR(255), "
     "pinned_subject_fields TEXT, keytab TEXT, created_at {ts}, created_by VARCHAR(80), "
@@ -55,8 +58,9 @@ _INDEXES = (
 _CONNECTOR_NAME_INDEX = f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{CONNECTORS}_name ON {CONNECTORS} (name)"
 _CERT_INDEX = f"CREATE INDEX IF NOT EXISTS ix_{CERTS}_windows_profile_id ON {CERTS} (windows_profile_id)"
 _INSERT_FIELDS = ('name', 'realm', 'is_default', 'enabled', 'connector_id', 'issuing_ca_refid',
-                  'policy_ca_refid', 'validity_days', 'xcep_username', 'xcep_password',
-                  'wstep_username', 'wstep_password', 'created_at', 'created_by')
+                  'policy_ca_refid', 'policy_id', 'policy_oid_root', 'validity_days', 'xcep_username',
+                  'xcep_password', 'wstep_username', 'wstep_password', 'created_at', 'created_by')
+IDENTITY = ('policy_id', 'policy_oid_root')
 
 
 def _keytab_on_disk():
@@ -91,10 +95,35 @@ def _connector_names(rows):
     return connector_names(rows)
 
 
+def _identities(rows):
+    """``(id, policy_id, oid_root)`` for the rows ``(id, policy CA, issuing CA)`` of a table
+    created without the identity columns, in id order: derived from the CA, as 2.254 did."""
+    from utils.policy_identity import identity_for
+    taken_ids, taken_roots, out = set(), set(), []
+    for row_id, policy_ca, issuing_ca in sorted(rows):
+        policy_id, root = identity_for(policy_ca or issuing_ca, taken_ids, taken_roots)
+        taken_ids.add(policy_id)
+        taken_roots.add(root)
+        out.append((row_id, policy_id, root))
+    return out
+
+
+_UNSET = f"SELECT id, policy_ca_refid, issuing_ca_refid FROM {PROFILES} WHERE policy_id IS NULL"
+
+
 def upgrade_sqlite(conn, keytab=None):
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     for ddl in _SQLITE_DDL + _INDEXES:
         conn.execute(ddl)
+    if PROFILES in tables:
+        columns = {r[1] for r in conn.execute(f"PRAGMA table_info({PROFILES})")}
+        for column, size in (('policy_id', 36), ('policy_oid_root', 100)):
+            if column not in columns:
+                # Nullable: SQLite adds no NOT NULL column without a default
+                conn.execute(f"ALTER TABLE {PROFILES} ADD COLUMN {column} VARCHAR({size})")
+        for row_id, policy_id, root in _identities(conn.execute(_UNSET).fetchall()):
+            conn.execute(f"UPDATE {PROFILES} SET policy_id = ?, policy_oid_root = ? WHERE id = ?",
+                         (policy_id, root, row_id))
     if CONNECTORS in tables:
         columns = {r[1] for r in conn.execute(f"PRAGMA table_info({CONNECTORS})")}
         if 'name' not in columns:
@@ -140,6 +169,14 @@ def upgrade_pg(conn, keytab=None):
     tables = set(inspect(conn).get_table_names())
     for ddl in _PG_DDL + _INDEXES:
         conn.execute(text(ddl))
+    if PROFILES in tables:
+        for column, size in (('policy_id', 36), ('policy_oid_root', 100)):
+            conn.execute(text(f"ALTER TABLE {PROFILES} ADD COLUMN IF NOT EXISTS {column} VARCHAR({size})"))
+        for row_id, policy_id, root in _identities(conn.execute(text(_UNSET)).fetchall()):
+            conn.execute(text(f"UPDATE {PROFILES} SET policy_id = :p, policy_oid_root = :r WHERE id = :i"),
+                         {'p': policy_id, 'r': root, 'i': row_id})
+        for column in IDENTITY:
+            conn.execute(text(f"ALTER TABLE {PROFILES} ALTER COLUMN {column} SET NOT NULL"))
     if CONNECTORS in tables:
         conn.execute(text(f"ALTER TABLE {CONNECTORS} ADD COLUMN IF NOT EXISTS name VARCHAR(100)"))
         conn.execute(text(f"ALTER TABLE {CONNECTORS} ADD COLUMN IF NOT EXISTS domain_sid VARCHAR(255)"))

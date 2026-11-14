@@ -22,7 +22,7 @@ from services.ad_connector import lookup as ad_lookup
 from services.kerberos import negotiate_auth
 from services.wstep import CES_CERTIFICATE_PATH, CES_KERBEROS_PATH, CES_USERNAME_PASSWORD_PATH
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS
-from services.xcep.policy_builder import _policy_id_for_ca, _policy_oid_for_template
+from utils.policy_identity import derived_oid_root, derived_policy_id
 from tests.ad_connector_support import add_connector
 from tests.fixtures.templates import delete_templates
 from tests.protocol_approval_support import approval_policy, approve, requests_of
@@ -175,7 +175,7 @@ def test_each_realm_gets_the_policy_and_the_ca_of_its_own_profile(app, client, w
     for key, other in (('A', 'B'), ('B', 'A')):
         policy_id, names = _policy(_policy_of(client, world, f'host{key}$@C04{key}.TEST'))
         with app.app_context():
-            assert policy_id == _policy_id_for_ca(_ca(world, key)) != _policy_id_for_ca(_ca(world, other))
+            assert policy_id == _profile(f'c04-{key.lower()}').policy_id != _profile(f'c04-{other.lower()}').policy_id
         assert names == [f'C04 {key} User']
         r = _issue(client, world, f'user{key}@C04{key}.TEST')
         cert = _issued_cert_from_rstr(r.data)
@@ -183,7 +183,7 @@ def test_each_realm_gets_the_policy_and_the_ca_of_its_own_profile(app, client, w
             ca = _ca(world, key)
             assert cert.issuer == x509.load_pem_x509_certificate(base64.b64decode(ca.crt)).subject
             template = db.session.get(CertificateTemplate, world['templates'][f'{key} User'])
-            assert _template_oid(cert) == _policy_oid_for_template(ca, template)
+            assert _template_oid(cert) == _profile(f'c04-{key.lower()}').template_oid(template.id)
         assert world['asked'] == [(world['connectors'][key], 'sid')]
         world['asked'].clear()
 
@@ -249,10 +249,10 @@ def test_two_profiles_on_one_ca_never_lend_each_other_templates_groups_or_pins(a
         assert names == [f'C04 {template}']
         cert = _issued_cert_from_rstr(_issue(client, world, f'user{key}@C04{key}.TEST', cn=f'c04-{key}').data)
         with app.app_context():
-            ca = _ca(world, 'S')
-            assert policy_id == _policy_id_for_ca(ca)
-            assert _template_oid(cert) == _policy_oid_for_template(
-                ca, db.session.get(CertificateTemplate, world['templates'][template]))
+            # One CA, two policies: an identity each (MS-XCEP 3.1.4.1.3.23)
+            profile = _profile(f'c04-{key.lower()}')
+            assert policy_id == profile.policy_id
+            assert _template_oid(cert) == profile.template_oid(world['templates'][template])
         pinned = cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
         assert [a.value for a in pinned] == (['B Org'] if key == 'B' else [])
         groups = [group for _id, group in world['asked'] if group != 'sid']
@@ -261,7 +261,7 @@ def test_two_profiles_on_one_ca_never_lend_each_other_templates_groups_or_pins(a
 
 
 # The functions that recompute the templates of a CA or read a connector, with what calls them
-_GUARDED = {'_match_template', '_named_template', '_ca_templates', '_policy_oid_cas', '_template_oid_for',
+_GUARDED = {'_match_template', '_named_template', '_ca_templates', '_template_oid_for',
             '_renewal_template', '_required_enroll_acl_groups', '_required_pinned_subject_fields',
             '_user_ad_derivation_enabled', '_directory_subject', '_resolve_templates_for_ca', '_sign_renewal',
             'issue', 'renew', 'renew_with_client_certificate', 'make_gate', 'build_get_policies_response'}
@@ -366,7 +366,7 @@ def test_a_default_profile_without_realm_refuses_kerberos_and_serves_its_account
             assert _fault(response) == (400, 's:Sender', REALM_NOT_SERVED)
     r = client.post(CEP_USERNAME, data=_get_policies(username='c04-cep', password='c04-cep-password'))
     with app.app_context():
-        assert _policy(r)[0] == _policy_id_for_ca(_ca(world, 'S'))
+        assert _policy(r)[0] == default_profile().policy_id
     # The Kerberos CES is not announced by a profile that serves no Kerberos client
     auths = {e.text for e in etree.fromstring(r.data).iter(f'{{{XCEP_NS}}}clientAuthentication')}
     assert auths == {'4', '8'}
@@ -445,7 +445,11 @@ def single_profile(app, create_ca):
     keys = ('windows_realm', 'xcep_ca_refid', 'xcep_enabled', 'wstep_enabled')
     with app.app_context():
         saved = snapshot(keys)
-        default_profile(create=True).enabled = True
+        profile = default_profile(create=True)
+        profile.enabled = True
+        # As the upgrade from 2.x leaves it: the identity 2.x derived from its XCEP CA
+        identity = (profile.policy_id, profile.policy_oid_root)
+        profile.policy_id, profile.policy_oid_root = derived_policy_id(ca['refid']), derived_oid_root(ca['refid'])
         for key, value in (('windows_realm', 'C04ONE.TEST'), ('xcep_ca_refid', ca['refid']),
                            ('xcep_enabled', 'true'), ('wstep_enabled', 'true')):
             set_config(key, value, commit=False)
@@ -460,6 +464,7 @@ def single_profile(app, create_ca):
     yield ca
     with app.app_context():
         delete_templates([template_id])
+        default_profile().policy_id, default_profile().policy_oid_root = identity
         db.session.commit()
         restore(saved)
 

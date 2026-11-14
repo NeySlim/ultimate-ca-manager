@@ -250,7 +250,8 @@ def test_a_start_after_the_twins_are_resolved_runs_step_144_alone(base):
     base.run("UPDATE certificates SET windows_profile_id = NULL")
     base.run("DELETE FROM windows_enrollment_profiles")
     base.run("INSERT INTO windows_enrollment_profiles (name, realm, is_default, enabled, validity_days, "
-             "created_at) VALUES ('corp', 'CORP.EXAMPLE', FALSE, TRUE, 365, '2026-01-02 03:04:05')")
+             "policy_id, policy_oid_root, created_at) VALUES ('corp', 'CORP.EXAMPLE', FALSE, TRUE, 365, "
+             "'00000000-0000-4000-8000-000000000001', '1.3.6.1.4.1.311.21.8.1.2.3.4', '2026-01-02 03:04:05')")
     base.run("INSERT INTO system_config (key, value) VALUES ('kerberos_spn', 'HTTP/ucm.corp.example') "
              "ON CONFLICT (key) DO NOTHING")
     profiles = base.run("SELECT id, name, is_default FROM windows_enrollment_profiles ORDER BY id")

@@ -180,10 +180,16 @@ def windows_profiles_restored(app):
         yield
 
 
-def template_extension(ca, template):
-    """The certificate template extension XCEP announces for *template* of *ca*, which CertEnroll
-    copies into its request (a Kerberos request naming no template that its EKUs do not match is
-    refused). Callers hold an app context."""
+def template_extension(ca, template, profile=None):
+    """The certificate template extension XCEP announces for *template* in *profile*'s policy (the
+    default profile's when None), which CertEnroll copies into its request (a Kerberos request
+    naming no template that its EKUs do not match is refused). Callers hold an app context."""
     from cryptography import x509
-    from services.xcep.policy_builder import _policy_oid_for_template
-    return x509.MSCertificateTemplate(x509.ObjectIdentifier(_policy_oid_for_template(ca, template)), 100, 0)
+    return x509.MSCertificateTemplate(x509.ObjectIdentifier(template_oid(ca, template, profile)), 100, 0)
+
+
+def template_oid(ca, template, profile=None):
+    """The template OID XCEP announces for *template* in *profile*'s policy (the default one's
+    when None; derived from *ca* without any profile). Callers hold an app context."""
+    from services.xcep.policy_builder import served_template_oid
+    return served_template_oid(profile if profile is not None else default_profile(), ca, template)

@@ -5,6 +5,8 @@ from a 2.x archive. One conversion, so both produce the same profile.
 """
 import logging
 
+from utils.policy_identity import identity_for
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_NAME = 'default'
@@ -118,6 +120,9 @@ def profile_from_2x(settings, connector=None, keytab=None, keytab_absent=False):
     if named and realm != named and (realm or keytab or keytab_absent):
         logger.warning("Windows enrollment: the default profile's realm %s differs from the realm of "
                        "the connector's base DN, %s", realm or 'none', named)
+    # What 2.254 served: derived from XCEP's CA, else from WSTEP's, whose template OIDs it
+    # stamped without one; at random without either, as nothing was served
+    policy_id, oid_root = identity_for(settings.get('xcep_ca_refid') or settings.get('wstep_ca_refid'))
     return {
         'name': DEFAULT_NAME,
         'realm': realm,
@@ -126,6 +131,8 @@ def profile_from_2x(settings, connector=None, keytab=None, keytab_absent=False):
         'connector_id': connector.get('id') if connector else None,
         'issuing_ca_refid': settings.get('wstep_ca_refid') or None,
         'policy_ca_refid': settings.get('xcep_ca_refid') or None,
+        'policy_id': policy_id,
+        'policy_oid_root': oid_root,
         'validity_days': _validity(settings.get('wstep_validity_days')),
         'xcep_username': settings.get('xcep_username') or None,
         'xcep_password': settings.get('xcep_password') or None,

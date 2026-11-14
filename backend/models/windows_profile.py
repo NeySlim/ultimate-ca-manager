@@ -4,6 +4,7 @@ Migration 155 turns a 2.x installation's single configuration into the profile `
 """
 from models import db
 from utils.datetime_utils import utc_now
+from utils.policy_identity import random_oid_root, random_policy_id, template_oid
 
 
 class WindowsEnrollmentProfile(db.Model):
@@ -28,8 +29,12 @@ class WindowsEnrollmentProfile(db.Model):
                              nullable=True)
     # Refids as the 2.x settings held them; deletion_blockers keeps a used CA in place
     issuing_ca_refid = db.Column(db.String(36), index=True)
-    # NULL: the issuing CA; set apart, it keeps the policyID and template OIDs it derives
+    # NULL: the issuing CA, whose templates XCEP announces
     policy_ca_refid = db.Column(db.String(36), index=True)
+    # The policy's identity (MS-XCEP policyID, template OID root): fixed once, no route writes
+    # it and no CA change moves it, so enrolled clients keep the policy server they registered
+    policy_id = db.Column(db.String(36), nullable=False, default=random_policy_id)
+    policy_oid_root = db.Column(db.String(100), nullable=False, default=random_oid_root)
     validity_days = db.Column(db.Integer, nullable=False, default=365)
     # Shared UsernamePassword accounts; the passwords are hashes (utils.password_hash)
     xcep_username = db.Column(db.Text)
@@ -48,8 +53,12 @@ class WindowsEnrollmentProfile(db.Model):
 
     @property
     def policy_refid(self):
-        """The refid of the CA whose policyID and template OIDs XCEP announces."""
+        """The refid of the CA XCEP announces."""
         return self.policy_ca_refid or self.issuing_ca_refid
+
+    def template_oid(self, template_id):
+        """The OID XCEP announces for the template of *template_id* in this profile's policy."""
+        return template_oid(self.policy_oid_root, template_id)
 
     def keytab_bytes(self):
         """The keytab, or None. Raises ValueError when it cannot be decrypted here."""

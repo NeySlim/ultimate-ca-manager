@@ -50,6 +50,8 @@ class RestorePlan:
         self._archived_by_identity: Dict[str, Dict[Tuple, Dict[str, Any]]] = {}
         # Source row numbers mean something here only on the same database.
         self.same_installation = False
+        # The sections a replacing restore prunes; empty in a merge
+        self.pruned = frozenset()
         # Rows an older archive cannot place, and secrets it carries under a
         # key this installation does not hold: both told in the result.
         self.left_out: List[str] = []
@@ -73,6 +75,7 @@ class RestorePlan:
         from ..installation import same_installation
 
         plan = cls()
+        plan.pruned = frozenset(pruned)
         plan.same_installation = same_installation(backup_data)
         plan._validate_shape(backup_data)
         plan._index_target_rows(backup_data)
