@@ -144,7 +144,7 @@ TLS follows the host's configuration: with the FIPS crypto policy of RHEL 9 and 
 
 #### What FIPS mode allows on each installation
 
-In FIPS mode UCM asks the loaded module whether it approves ML-DSA, Ed25519 and Ed448, and allows them only when it does; RSA 2048+ and ECDSA on P-256, P-384 and P-521 are allowed everywhere.
+In FIPS mode UCM asks the loaded module whether it approves ML-DSA, Ed25519 and Ed448, and allows them only when it does; RSA keys of an even length from 2048 to 16384 bits and ECDSA on P-256, P-384 and P-521 are allowed everywhere, at issuance, for HSM signatures and in the readiness check. FIPS 186-5 approves every such RSA length, but the module validations test only 2048, 3072 and 4096 bits (the security policy of #5586 lists the others as approved and untested).
 
 | Installation | FIPS module (CMVP certificate) | ML-DSA-44/65/87 | Ed25519, Ed448 |
 |---|---|---|---|

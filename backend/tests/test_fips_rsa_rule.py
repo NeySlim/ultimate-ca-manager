@@ -1,0 +1,108 @@
+"""FIPS mode approves an RSA key by one rule (FIPS 186-5 §5.1, IG C.F, OpenSSL's cap):
+an even modulus of 2048 to 16384 bits, at issuance, for HSM signing and in the preflight.
+Outside FIPS mode nothing changes."""
+import base64
+import json
+import uuid
+
+import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
+
+import fips_mode
+from models import Certificate, db
+from services import fips_preflight
+from services.policy_service import PolicyEvaluationService
+from utils import key_algorithms
+
+SIZES = [(1024, False), (2046, False), (2047, False), (2048, True), (2049, False), (2050, True),
+         (3072, True), (8192, True), (8193, False), (16384, True), (16385, False), (16386, False)]
+
+
+def _public(bits):
+    # Any odd modulus of exactly *bits* bits: only its length is judged
+    return rsa.RSAPublicNumbers(65537, (1 << (bits - 1)) | 1).public_key()
+
+
+@pytest.fixture
+def fips(monkeypatch):
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+
+
+@pytest.mark.parametrize('bits, approved', SIZES)
+def test_the_rule(bits, approved):
+    assert key_algorithms.fips_rsa_bits_approved(bits) is approved
+
+
+@pytest.mark.parametrize('bits, approved', SIZES)
+def test_every_path_applies_it(app, fips, bits, approved):
+    assert key_algorithms.fips_approved_for_key(_public(bits)) is approved
+    assert fips_preflight.stored_label_approved(f'RSA {bits}') is approved
+    assert fips_preflight.stored_label_approved(f'RSA-{bits}') is approved
+    with app.app_context():
+        violations, _, _ = PolicyEvaluationService.enforce_rules([], key_type=f'RSA-{bits}')
+        assert (violations == []) is approved, violations
+        by_key = PolicyEvaluationService.algorithm_violations(None, public_key=_public(bits))
+        assert (by_key == []) is approved, by_key
+
+
+@pytest.mark.parametrize('bits', [1024, 2049, 8192, 16386])
+def test_outside_fips_nothing_changes(app, bits):
+    with app.app_context():
+        assert PolicyEvaluationService.enforce_rules([], key_type=f'RSA-{bits}')[0] == []
+        assert PolicyEvaluationService.algorithm_violations(None, public_key=_public(bits)) == []
+
+
+def test_forms_still_offer_the_registered_sizes(app, fips):
+    """Only issuance widens: what UCM generates and proposes stays 2048, 3072 and 4096."""
+    with app.app_context():
+        key_types, _ = PolicyEvaluationService.effective_algorithms(None)
+    assert [k for k in key_types if k.startswith('RSA-')] == ['RSA-2048', 'RSA-3072', 'RSA-4096']
+
+
+def test_an_operator_policy_still_narrows(app, fips):
+    from models.policy import CertificatePolicy
+    with app.app_context():
+        pol = CertificatePolicy(name=f'rsa2048-{uuid.uuid4().hex[:6]}', policy_type='issuance',
+                                is_active=True, priority=100)
+        pol.set_rules({'allowed_key_types': ['RSA-2048']})
+        db.session.add(pol)
+        db.session.commit()
+        try:
+            violations, _, _ = PolicyEvaluationService.enforce_rules([pol], key_type='RSA-8192')
+            assert len(violations) == 1 and pol.name in violations[0], violations
+        finally:
+            db.session.delete(pol)
+            db.session.commit()
+
+
+@pytest.fixture(scope='module')
+def rsa8192():
+    return rsa.generate_private_key(public_exponent=65537, key_size=8192)
+
+
+def test_an_rsa_8192_csr_is_signed_in_fips_mode(app, auth_client, create_ca, monkeypatch, rsa8192):
+    ca = create_ca(cn='FIPS RSA-8192 CA')
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'big.fips.test')]))
+           .add_extension(x509.SubjectAlternativeName([x509.DNSName('big.fips.test')]), critical=False)
+           .sign(rsa8192, hashes.SHA256()))
+    with app.app_context():
+        row = Certificate(refid=str(uuid.uuid4()), descr='fips-rsa8192-csr', source='manual',
+                          csr=base64.b64encode(csr.public_bytes(serialization.Encoding.PEM)).decode())
+        db.session.add(row)
+        db.session.commit()
+        csr_id = row.id
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    try:
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', content_type='application/json',
+                             data=json.dumps({'ca_id': ca['id']}))
+        assert r.status_code in (200, 201), r.data
+    finally:
+        with app.app_context():
+            row = db.session.get(Certificate, csr_id)
+            if row is not None:
+                db.session.delete(row)
+                db.session.commit()

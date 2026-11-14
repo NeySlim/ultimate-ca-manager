@@ -14,7 +14,6 @@ import base64
 import json
 import logging
 import os
-import re
 import warnings
 from typing import Iterable, List, Optional, Tuple
 
@@ -59,8 +58,8 @@ def stored_label_approved(text) -> bool:
     alg = key_algorithms.get(text)
     if alg is not None:
         return alg.fips_static or (alg.fips_by_module and fips_mode.switch_approves(alg.label))
-    match = re.fullmatch(r'\s*RSA[\s:_-]*(\d+)\s*', str(text), re.IGNORECASE)
-    return bool(match) and int(match.group(1)) >= 2048
+    bits = key_algorithms.rsa_bits_of_label(str(text))
+    return bits is not None and key_algorithms.fips_rsa_bits_approved(bits)
 
 
 def certificate_key(cert) -> Tuple[str, bool]:
@@ -195,7 +194,7 @@ def _is_mldsa(name) -> bool:
 
 
 @detector('ca.weak_key', BLOCKER,
-          'Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
+          'Certificate authorities with a DSA key, RSA of an odd length or outside 2048 to 16384 bits or a curve other than P-256/384/521',
           'Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it.')
 def _ca_weak():
     return [_named(ca.descr, ca.id, name) for ca, (name, approved) in _ca_keys()
@@ -323,7 +322,7 @@ def _tsa_signer():
 
 
 @detector('certificates.unapproved_key', INFO,
-          'Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA under 2048 bits or another curve',
+          'Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA of an odd length or outside 2048 to 16384 bits or another curve',
           'They stay valid; renew them with a new RSA 2048+ or ECDSA P-256/P-384/P-521 key, '
           'since renewing with the same key is refused in FIPS mode.')
 def _certificates():
@@ -422,7 +421,7 @@ def _gcp():
 
 
 @detector('hsm.unapproved_keys', WARNING,
-          'HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, '
+          'HSM keys FIPS mode refuses (RSA of an odd length or outside 2048 to 16384 bits, curves other than P-256/P-384/P-521, '
           'Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)',
           'Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao '
           'and Vault Transit keys of these types are no longer listed.')

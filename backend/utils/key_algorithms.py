@@ -63,7 +63,7 @@ def generate_rsa(bits: int):
     if not fips_mode.enabled():
         return rsa.generate_private_key(public_exponent=65537, key_size=bits)
     bits = int(bits)
-    if bits < 2048:
+    if not fips_rsa_bits_approved(bits):
         fips_mode.refuse(f'RSA-{bits} keys')
     key = _genpkey(['-algorithm', 'RSA', '-pkeyopt', f'rsa_keygen_bits:{bits}'])
     if not (isinstance(key, rsa.RSAPrivateKey) and key.key_size == bits
@@ -150,6 +150,17 @@ class KeyAlgorithm:
         return True
 
 
+# FIPS 186-5 §5.1 (even, 2048+) and IG C.F (no upper limit); OpenSSL caps the modulus at 16384
+FIPS_RSA_MIN_BITS = 2048
+FIPS_RSA_MAX_BITS = 16384
+
+
+def fips_rsa_bits_approved(bits) -> bool:
+    """The one FIPS rule for an RSA modulus: even, 2048 to 16384 bits."""
+    return (isinstance(bits, int) and not isinstance(bits, bool) and bits % 2 == 0
+            and FIPS_RSA_MIN_BITS <= bits <= FIPS_RSA_MAX_BITS)
+
+
 def _rsa(bits: int) -> KeyAlgorithm:
     return KeyAlgorithm(
         label=f'RSA-{bits}', family='RSA', param=str(bits),
@@ -157,7 +168,7 @@ def _rsa(bits: int) -> KeyAlgorithm:
         generator=lambda: generate_rsa(bits),
         needs_digest=True, default_digest='sha256',
         display=f'RSA {bits}', legacy_key_algo=f'RSA {bits}', trust_store_id=str(bits),
-        fips_static=bits >= 2048, key_size=bits,
+        fips_static=fips_rsa_bits_approved(bits), key_size=bits,
     )
 
 
@@ -471,12 +482,30 @@ def fips_approved(label) -> bool:
     return bool(alg and alg.fips_approved)
 
 
+_RSA_SPELLING = re.compile(r'\s*RSA[\s:_-]*(\d+)\s*', re.IGNORECASE)
+
+
+def rsa_bits_of_label(text) -> int | None:
+    """Modulus size an RSA spelling names ('RSA 8192', 'RSA-2048', 'rsa:4096'), else None."""
+    match = _RSA_SPELLING.fullmatch(str(text)) if isinstance(text, str) else None
+    return int(match.group(1)) if match else None
+
+
 def fips_approved_for_key(key) -> bool:
-    """Whether a public or private *key* is FIPS approved; any RSA modulus of 2048+ bits counts."""
+    """Whether a public or private *key* is FIPS approved; RSA by ``fips_rsa_bits_approved``."""
+    if isinstance(key, (rsa.RSAPublicKey, rsa.RSAPrivateKey)):
+        return fips_rsa_bits_approved(key.key_size)
     for alg in _REGISTRY.algorithms:
         if alg.matches_key(key):
             return alg.fips_approved
-    return isinstance(key, (rsa.RSAPublicKey, rsa.RSAPrivateKey)) and key.key_size >= 2048
+    return False
+
+
+def fips_approved_key_label(label) -> bool:
+    """Whether FIPS mode approves the key *label* names: any RSA size the rule admits,
+    otherwise the registry's verdict."""
+    bits = rsa_bits_of_label(label)
+    return fips_rsa_bits_approved(bits) if bits is not None else fips_approved(label)
 
 
 def fips_approved_labels() -> tuple[str, ...]:

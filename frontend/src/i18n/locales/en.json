@@ -3359,7 +3359,7 @@
           "remedy": "Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it before the switch; an authority key cannot be converted."
         },
         "ca_weak_key": {
-          "title": "Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521",
+          "title": "Certificate authorities with a DSA key, RSA of an odd length or outside 2048 to 16384 bits or a curve other than P-256/384/521",
           "remedy": "Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it."
         },
         "ca_unapproved_algorithm": {
@@ -3391,7 +3391,7 @@
           "remedy": "Issue a new RSA or ECDSA timestamping certificate and select it in the TSA settings."
         },
         "certificates_unapproved_key": {
-          "title": "Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA under 2048 bits or another curve",
+          "title": "Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA of an odd length or outside 2048 to 16384 bits or another curve",
           "remedy": "They stay valid; renew them with a new RSA 2048+ or ECDSA P-256/P-384/P-521 key, since renewing with the same key is refused in FIPS mode."
         },
         "templates_unapproved_key_type": {
@@ -3415,7 +3415,7 @@
           "remedy": "Prefer a PKCS#11, Azure Key Vault or OpenBao provider for keys that must stay in FIPS scope."
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "title": "HSM keys FIPS mode refuses (RSA of an odd length or outside 2048 to 16384 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
           "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
         },
         "dns_tsig_hmac_md5": {

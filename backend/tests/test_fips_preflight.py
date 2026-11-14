@@ -355,6 +355,14 @@ def test_certificates_unapproved_key(session):
     assert finding['severity'] == 'info'
 
 
+def test_certificates_rsa_sizes_follow_the_fips_rule(session):
+    """key_algo decides: odd lengths and moduli over 16384 bits are listed, RSA 8192 is not."""
+    for descr, key_algo in (('odd-rsa', 'RSA 2049'), ('huge-rsa', 'RSA 16386'),
+                            ('big-rsa', 'RSA 8192'), ('max-rsa', 'RSA 16384')):
+        _leaf(descr, key_algo=key_algo)
+    _assert_found('certificates.unapproved_key', 2, 'odd-rsa', 'huge-rsa')
+
+
 def test_templates_unapproved_key_type(session):
     for name, key_type in (('ed-template', 'ED25519'), ('rsa-template', 'RSA-2048'),
                            ('rsa1024-template', 'RSA-1024')):

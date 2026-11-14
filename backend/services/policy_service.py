@@ -141,7 +141,7 @@ def _certification_messages(rules, name, req, verb):
     return []
 
 
-def _rule_messages(rules, name, req, advisory=False):
+def _rule_messages(rules, name, req, advisory=False, key_rule=None):
     """Why the request *req* breaks the key, hash, scheme, date, HSM and TSA
     rules of one policy; with *advisory* the wording is a recommendation."""
     from services.template_service import _normalize_key_type_label
@@ -158,7 +158,7 @@ def _rule_messages(rules, name, req, advisory=False):
                 out.append(
                     f'Policy "{name}" lists no known key type in allowed_key_types '
                     f'({", ".join(str(a) for a in allowed)}): issuance is refused until it is corrected')
-        elif requested not in labels:
+        elif not (key_rule(requested) if key_rule else requested in labels):
             out.append(f'Key type {requested or key_type} {verb} policy "{name}" '
                        f'(allowed: {", ".join(sorted(labels))})')
 
@@ -214,10 +214,12 @@ class SystemPolicy:
     priority = 0
     requires_approval = False
 
-    def __init__(self, name, rules, kind=None):
+    def __init__(self, name, rules, kind=None, key_rule=None):
         self.name = name
         self._rules = rules
         self.kind = kind  # 'profile' for a compliance profile
+        # Predicate on a requested label, in place of membership in allowed_key_types
+        self.key_rule = key_rule
 
     def get_rules(self):
         return copy.deepcopy(self._rules)
@@ -227,10 +229,11 @@ def fips_policy():
     """The policy FIPS mode puts ahead of all others, None outside FIPS mode."""
     if not fips_mode.enabled():
         return None
+    # allowed_key_types is what forms offer; issuance admits every RSA size the FIPS rule does
     return SystemPolicy('FIPS mode', {
         'allowed_key_types': list(key_algorithms.fips_approved_labels()),
         'allowed_digests': list(POLICY_DIGESTS),
-    })
+    }, key_rule=key_algorithms.fips_approved_key_label)
 
 
 def with_system_policies(policies, ca_id=None):
@@ -398,7 +401,7 @@ class PolicyEvaluationService:
         by_policy = {}
         for policy, rules in zip(checked, rules_of):
             before = len(violations)
-            violations += _rule_messages(rules, policy.name, req)
+            violations += _rule_messages(rules, policy.name, req, key_rule=getattr(policy, 'key_rule', None))
             advisories = rules.get('advisories')
             if notices is not None and isinstance(advisories, dict):
                 for text in _rule_messages(advisories, policy.name, req, advisory=True):
