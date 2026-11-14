@@ -282,6 +282,32 @@ def test_a_running_node_whose_row_is_taken_stops_leading_and_fails_readiness(app
     assert client.get('/health/ready').status_code == 200
 
 
+def test_a_leader_whose_row_is_taken_gives_the_lock_up(app, ha):
+    """A deposed leader releases the leader lock, so another node takes the lead."""
+    node = PREFIX + 'deposed'
+    s = ha('deposed')
+    s.start(app=app)
+    assert wait_for(lambda: s._owns_lock and _row(app, node)[1] is True, timeout=10)
+    stop = threading.Event()
+
+    def intruder():
+        while not stop.is_set():
+            _put(app, node, 'intruder', leader=True)
+            time.sleep(0.05)
+    beat = threading.Thread(target=intruder, daemon=True)
+    beat.start()
+    try:
+        assert wait_for(lambda: s.deposed, timeout=10)
+        assert wait_for(lambda: not s._owns_lock)
+        other = ha('successor')
+        other.start(app=app)
+        assert wait_for(lambda: other._owns_lock, timeout=10)
+        assert not s._owns_lock
+    finally:
+        stop.set()
+        beat.join(5)
+
+
 # ------------------------------------------------------------ 5. KEK fingerprint check
 
 def test_the_kek_check_sees_another_process_under_this_identifier(app, ha, monkeypatch):
