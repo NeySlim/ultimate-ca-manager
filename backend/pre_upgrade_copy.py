@@ -47,8 +47,13 @@ def _size(conn) -> int:
     return page_count * page_size
 
 
+def _read_only(path):
+    # as_uri escapes '#', '?' and '%': a raw path would open another file
+    return sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
+
+
 def required_bytes(db_path) -> int:
-    conn = sqlite3.connect(f"file:{Path(db_path).resolve()}?mode=ro", uri=True)
+    conn = _read_only(db_path)
     try:
         return _size(conn) + MARGIN_BYTES
     finally:
@@ -66,7 +71,7 @@ def _valid_copy(target: Path) -> bool:
     if not target.is_file():
         return False
     try:
-        conn = sqlite3.connect(f"file:{target}?mode=ro", uri=True)
+        conn = _read_only(target)
         try:
             if _integrity(conn) != "ok":
                 return False
@@ -82,7 +87,7 @@ def situation(db_path) -> str:
     """FRESH: no marker, the database is 2.254 and is copied. KEPT: the upgrade started and a
     valid copy exists. NONE: the upgrade started and no valid copy exists. Writes nothing."""
     source_path = Path(db_path).resolve()
-    conn = sqlite3.connect(f"file:{source_path}?mode=ro", uri=True)
+    conn = _read_only(source_path)
     try:
         started = _started(conn)
     finally:
@@ -133,7 +138,7 @@ def _integrity(conn) -> str:
 
 def _verify(path: Path, counts: dict, registry: set) -> None:
     from migration_runner import UPGRADE_MIGRATION, pivot_refusal
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    conn = _read_only(path)
     try:
         integrity = _integrity(conn)
         if integrity != "ok":
@@ -201,6 +206,8 @@ def take(db_path) -> Path:
             dest = sqlite3.connect(str(partial))
             try:
                 source.backup(dest)
+                # A WAL source gives a WAL copy, whose readers leave -wal and -shm beside it
+                dest.execute("PRAGMA journal_mode=DELETE")
             finally:
                 dest.close()
             source.execute("COMMIT")

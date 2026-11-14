@@ -46,7 +46,7 @@ def _counts(path):
 def _is_2254(path):
     """Opens, passes the integrity check, and holds a registry the pivot accepts as 2.254."""
     import migration_runner
-    conn = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+    conn = pre_upgrade_copy._read_only(path)
     try:
         names = pre_upgrade_copy._registry(conn)
         return (pre_upgrade_copy._integrity(conn) == 'ok' and migration_runner.UPGRADE_MIGRATION not in names
@@ -503,6 +503,38 @@ def test_postgresql_dry_run_and_status_say_no_copy_is_taken(tmp_path, monkeypatc
         runner.show_status()
         assert capsys.readouterr().out.count('no automatic copy is taken') == 2
         assert '300_upgrade_from_2_254' not in db.registry()
+
+
+def test_a_data_directory_with_uri_characters_is_read_and_copied_in_place(tmp_path):
+    """'#' and '%' in the path reach SQLite escaped: nothing is opened or created elsewhere."""
+    folder = tmp_path / 'a#b %41'
+    folder.mkdir()
+    db = folder / 'ucm.db'
+    conn = sqlite3.connect(db)
+    conn.executescript(schema_2254('sqlite'))
+    conn.commit()
+    conn.close()
+    assert pre_upgrade_copy.situation(db) == pre_upgrade_copy.FRESH
+    assert 'unknown size' not in pre_upgrade_copy.plan(db)
+    copy = pre_upgrade_copy.take(db)
+    assert copy.parent == folder and pre_upgrade_copy._valid_copy(copy)
+    pre_upgrade_copy.mark_started(db)
+    assert pre_upgrade_copy.situation(db) == pre_upgrade_copy.KEPT
+    assert sorted(p.name for p in tmp_path.iterdir()) == [folder.name]
+    assert sorted(p.name for p in folder.iterdir()) == [db.name, copy.name]
+
+
+def test_the_copy_of_a_wal_database_is_one_file(base):
+    """A database switched to WAL by hand: reading its copy leaves no -wal or -shm beside it."""
+    populate(base)
+    base.engine.dispose()
+    conn = sqlite3.connect(base.sqlite_path)
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.close()
+    assert base.upgrade()
+    copy = _copy(base)
+    assert pre_upgrade_copy._valid_copy(copy) and _is_2254(copy)
+    assert [n for n in _leftovers(base) if n.startswith(copy.name)] == [copy.name]
 
 
 # --- 8. Faithful simulation -------------------------------------------------------------------
