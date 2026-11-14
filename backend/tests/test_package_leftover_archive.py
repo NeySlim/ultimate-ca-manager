@@ -649,10 +649,11 @@ def test_a_refused_rename_leaves_the_journal_before_its_copy(tmp_path):
         f'#!/bin/sh\nfor last; do :; done\ncase $last in */.journal) exit 1 ;; esac\n'
         f'exec {REAL["rm"]} "$@"\n')
     (box.bin / 'cp').write_text(
-        f'#!/bin/sh\ncase $3 in {box.parent}/*) ;; *) [ -e {first} ] || {{ : > {first}; exit 1; }} ;; esac\n'
+        f'#!/bin/sh\ncase $3 in {box.parent}/*) [ -e {first} ] || {{ : > {first}; exit 1; }} ;; esac\n'
         f'exec {REAL["cp"]} "$@"\n')
     out = box.run()
     assert out.returncode == 2, (out.stdout, out.stderr)
+    assert first.exists() and 'ucm-2026.ucmbkp' in out.stdout
     box.wrap()
     out = box.run()
     assert out.returncode == 0, (out.stdout, out.stderr)
