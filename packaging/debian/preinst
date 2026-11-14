@@ -8,7 +8,8 @@ set -e
 # installed version (or the one whose config files remain), empty on a first install.
 # @UCM_PIVOT_GUARD@
 case "$1" in
-    install|upgrade) ucm_pivot_guard "$2" || exit 1 ;;
+    install) ucm_pivot_guard "$2" removed || exit 1 ;;
+    upgrade) ucm_pivot_guard "$2" || exit 1 ;;
 esac
 
 # The rotation configuration became a package file in 2.230. Where an operator

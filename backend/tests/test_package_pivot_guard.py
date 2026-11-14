@@ -131,8 +131,23 @@ def test_the_deb_preinst_refuses_before_any_write(preinst, tmp_path, args):
     """dpkg passes the installed version as $2; `install` with one means its config was kept."""
     out, calls = _run_preinst(preinst, tmp_path, *args)
     assert out.returncode != 0
-    assert f'UCM {args[1]} is installed' in out.stderr
+    assert WHAT_TO_DO in out.stderr.lower()
     assert calls == []
+
+
+def test_the_refusal_of_an_upgrade_says_the_old_version_is_still_installed(preinst, tmp_path):
+    out, _ = _run_preinst(preinst, tmp_path, 'upgrade', '2.253')
+    assert 'UCM 2.253 is installed' in out.stderr
+    assert 'Nothing was changed: UCM 2.253 is still installed.' in out.stderr
+
+
+def test_the_refusal_over_a_removed_package_does_not_call_it_installed(preinst, tmp_path):
+    """`install <version>`: the package was removed, dpkg kept its configuration files."""
+    out, _ = _run_preinst(preinst, tmp_path, 'install', '2.253')
+    assert 'UCM 2.253 was removed, its configuration and data remain' in out.stderr
+    assert 'installed' not in out.stderr.replace('then install this package', '').replace(
+        'Install 2.254', '')
+    assert out.stderr.rstrip().endswith('Nothing was changed.')
 
 
 def test_the_deb_preinst_upgrades_a_2_254(preinst, tmp_path):
