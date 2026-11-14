@@ -116,8 +116,10 @@ def test_a_fresh_row_of_another_live_token_refuses_the_start(app, ha):
         beats.append(1)
         _put(app, node, 'live')  # the other process keeps heartbeating
     with app.app_context():
-        with pytest.raises(scheduler_leader.NodeIdTaken, match=f'{node}.*distinct UCM_NODE_ID'):
-            scheduler_leader.claim_node_at_start(node, 'mine', stale_seconds=60, poll=0, sleep=beat,
+        # The timeout message would also name the identifier: only the live-process one counts
+        with pytest.raises(scheduler_leader.NodeIdTaken,
+                           match=f'{node} is already used by another live.*distinct UCM_NODE_ID'):
+            scheduler_leader.claim_node_at_start(node, 'mine', stale_seconds=2, poll=0.05, sleep=beat,
                                                  release_at_exit=False)
     assert beats and _row(app, node)[0] == 'live'
 
