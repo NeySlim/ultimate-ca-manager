@@ -54,6 +54,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **A Windows profile keeps its policy identity.** The MS-XCEP policy identifier and template OIDs belong to the profile, not to its CA: changing the policy or issuing CA no longer changes the identifier and OIDs registered clients cached (such a change made them fail with `0x8007000d`), two profiles on one CA no longer share an identifier, and the default profile upgraded from 2.254 keeps the values 2.254 served.
 - **FIPS mode allows what the loaded FIPS module approves.** The `-fips` image moves to the OpenSSL FIPS Provider 3.5.9 (CMVP certificate #5586), and ML-DSA, Ed25519 and Ed448 are allowed in FIPS mode when the module answers that it approves them, refused as before otherwise (RHEL 9, Ubuntu 24.04, 3.1.2); Ed25519 deployment keys and ML-DSA keys on an HSM or OpenBao stay refused, as they are signed outside the module.
 - **FIPS image: hybrid post-quantum TLS.** In FIPS mode the image's TLS offers X25519MLKEM768 and SecP256r1MLKEM768, which the 3.5.9 module approves; X25519 and X448 alone stay refused.
 - **FIPS mode refuses HMAC secrets under 14 bytes.** A webhook secret or TSIG key shorter than 112 bits is refused when saved, as the 3.5 module refuses such HMAC keys, and the readiness check lists the ones already saved.

@@ -482,7 +482,7 @@ Inscription de certificats Windows native via **MS-XCEP** (découverte de strat�
 Un **profil par realm Active Directory**. UCM oriente un client vers son profil d'après le realm de son principal Kerberos : chaque profil a ses propres CA d'émission et de politique, modèles, connecteur AD et keytab ; les comptes UsernamePassword appartiennent au profil par défaut. La liste est paginée et filtrée par le serveur (nom ou realm, CA, état), si bien que cent profils s'ouvrent aussi vite qu'un seul :
 - **Realm** : En majuscules, exactement comme le KDC l'écrit (\`CORP.EXAMPLE\`) : un KDC compare les realms caractère par caractère, un nom en minuscules ne correspond jamais à un ticket. Le formulaire le refuse et dit pourquoi
 - **Connecteur** : Le connecteur AD qui sert le realm. Quand son domaine diffère du realm du profil, le formulaire avertit sans bloquer ; le serveur contrôle le couple quand l'un des deux est choisi
-- **CA d'émission** et **CA de politique** : La CA qui émet, et celle dont XCEP annonce la politique et les OID de modèles (la CA d'émission si vide)
+- **CA d'émission** et **CA de politique** : La CA qui émet, et celle qu'XCEP annonce (la CA d'émission si vide). L'identifiant de politique et les OID de modèles appartiennent au profil : fixés à sa création, ils ne changent pas quand l'une ou l'autre CA change
 - **Modèles** : Le sous-ensemble proposé ; aucun coché propose les modèles de la CA. Un groupe AD exigé et des champs du sujet épinglés peuvent remplacer ceux du modèle pour tout le profil
 - **État** : Complet, Keytab manquant, Connecteur en échec ou Désactivé. Un profil désactivé refuse les postes de son realm ; ses clés restent dans le keytab servi, pour que le refus soit prononcé et audité par realm
 

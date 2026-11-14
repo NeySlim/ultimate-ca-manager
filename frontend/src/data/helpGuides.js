@@ -2248,7 +2248,7 @@ Native Windows certificate enrollment via **MS-XCEP** (policy discovery) and **M
 One **profile per Active Directory realm**. UCM routes a client to its profile by the realm of its Kerberos principal, so every profile has its own issuing CA, policy CA, templates, AD connector and keytab; the UsernamePassword accounts belong to the default profile. The list is paginated and filtered by the server (name or realm, CA, state), so a hundred profiles open as fast as one:
 - **Realm**: In capital letters, exactly as the KDC writes it (\`CORP.EXAMPLE\`): a KDC compares realms character by character, so a lowercase name never matches a ticket. The form refuses it and says why
 - **Connector**: The AD connector that serves the realm. When its domain differs from the realm of the profile, the form warns, without blocking; the server checks the pair when either is chosen
-- **Issuing CA** and **Policy CA**: The CA that issues, and the one whose policy and template OIDs XCEP announces (the issuing CA when empty)
+- **Issuing CA** and **Policy CA**: The CA that issues, and the one XCEP announces (the issuing CA when empty). The policy identifier and the template OIDs belong to the profile: set at its creation, they do not change when either CA does
 - **Templates**: The subset offered; none selected offers the templates of the CA. A required AD group and pinned subject fields can replace the template's own for the whole profile
 - **State**: Complete, Keytab missing, Connector failing or Disabled. A disabled profile refuses the machines of its realm; its keys stay in the served keytab so that the refusal is made and audited by realm
 
