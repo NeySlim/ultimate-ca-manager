@@ -397,12 +397,14 @@ def run_backup_retention(wait: float = 0) -> int:
     except (ValueError, TypeError):
         retention = 30
 
+    if shared_store.enabled():
+        # An archive in the database is invisible until committed whole: the store lock alone
+        # serialises deleters, and the node's disk lock would only add its own wait
+        return _apply_shared_retention(retention, wait)
     try:
         # Retention deletes; a backup being written at the same moment is not
         # yet recorded, and would look like an archive nothing vouches for.
         with backup_operation_lock(timeout=wait, purpose='backup retention'):
-            if shared_store.enabled():
-                return _apply_shared_retention(retention, wait)
             return _apply_retention(retention)
     except BackupBusyError as busy:
         # The scheduled pass (wait=0) simply tries again in a day; a person

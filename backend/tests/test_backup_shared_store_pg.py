@@ -657,6 +657,80 @@ def test_retention_asked_while_another_node_prunes_waits_then_answers_409(
     assert r.status_code == 409, r.data
 
 
+@contextmanager
+def _export_running(nodes, node='b'):
+    """This node's disk lock held by another thread, as an export in progress holds it.
+
+    Yields `release()`, which lets the holder go and returns once it has.
+    """
+    from services.backup.locking import backup_operation_lock
+    held, release, released = threading.Event(), threading.Event(), threading.Event()
+
+    def hold():
+        try:
+            with backup_operation_lock(purpose='exporting a backup'):
+                held.set()
+                assert release.wait(30)
+        finally:
+            released.set()
+
+    def let_go():
+        release.set()
+        assert released.wait(30)
+    with nodes(node):
+        holder = threading.Thread(target=hold)
+        holder.start()
+        try:
+            assert held.wait(30)
+            yield let_go
+        finally:
+            release.set()
+            holder.join(30)
+
+
+def test_retention_asked_in_ha_waits_once_for_the_store_lock(app, auth_client, nodes, monkeypatch):
+    """A disk lock freed just before the deadline, then a busy store: one wait, not two."""
+    import time as real_time
+    import types
+    from api.v2.system import backup as routes
+    from models import db
+    from utils import process_lock
+    wait = 10.0
+    monkeypatch.setattr(routes, 'RETENTION_LOCK_WAIT', wait)
+    clock = {'now': 0.0}
+    fake = types.SimpleNamespace(**{k: getattr(real_time, k) for k in dir(real_time)
+                                    if not k.startswith('__')})
+    fake.monotonic = lambda: clock['now']
+    with _export_running(nodes) as let_go, app.app_context(), db.engine.connect() as other:
+        def sleep(seconds):
+            clock['now'] += seconds
+            if clock['now'] >= 0.9 * wait:
+                let_go()
+        fake.sleep = sleep
+        for module in (process_lock, shared_store):
+            monkeypatch.setattr(module, 'time', fake)
+        shared_store._take_lock(other, 0, 'node A')
+        try:
+            r = auth_client.post('/api/v2/system/backups/run-retention')
+        finally:
+            other.rollback()
+    assert r.status_code == 409, r.data
+    assert clock['now'] <= wait + 2 * shared_store._LOCK_POLL, clock['now']
+
+
+def test_retention_asked_in_ha_runs_during_an_export_on_its_node(
+        app, auth_client, nodes, monkeypatch, retention_settings):
+    from api.v2.system import backup as routes
+    retention_settings(backup_retention_days='30', backup_min_keep='1', backup_max_total_mb='0')
+    old = _make(app, nodes, 2, 'a')
+    _aged(app, old, 40)
+    monkeypatch.setattr(routes, 'RETENTION_LOCK_WAIT', 0.5)
+    with _export_running(nodes):
+        r = auth_client.post('/api/v2/system/backups/run-retention')
+    assert r.status_code == 200, r.data
+    assert _stored_names(app) & set(old) == {old[-1]}
+
+
 def test_an_archive_that_does_not_read_back_is_not_stored(app, nodes, monkeypatch):
     from services.backup.errors import BackupValidationError
     archives, chunks = _tables()
