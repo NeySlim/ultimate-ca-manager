@@ -6,6 +6,7 @@ the first line of stdout, and nothing written: the probe runs as root over anoth
 import hashlib
 import os
 import pathlib
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -117,19 +118,28 @@ class TestSQLite:
         assert _fingerprint(tmp_path) == before
 
 
-    def test_the_probe_engine_refuses_to_write(self, tmp_path):
-        """Root opens it, over files another release owns: a write must be impossible, not avoided."""
-        sys.path.insert(0, str(BACKEND))
-        from migration_runner import _read_only_engine
-        db = tmp_path / 'ucm.db'
-        _sqlite(db, _registry('short'))
-        engine = _read_only_engine(f'sqlite:///{db}')
-        try:
-            with pytest.raises(Exception, match='readonly'):
-                with engine.begin() as conn:
-                    conn.execute(text('CREATE TABLE written (id INTEGER)'))
-        finally:
-            engine.dispose()
+    def test_rows_still_in_the_write_ahead_log_are_read_without_writing_beside_it(self, tmp_path):
+        """A -wal left by a stopped service holds committed rows: read, and no -shm appears."""
+        live = tmp_path / 'live'
+        left = tmp_path / 'left'
+        live.mkdir()
+        left.mkdir()
+        conn = sqlite3.connect(live / 'ucm.db')
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA wal_autocheckpoint=0')
+        conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY)')
+        conn.execute('CREATE TABLE _migrations (id INTEGER PRIMARY KEY, name TEXT UNIQUE)')
+        conn.commit()
+        conn.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+        conn.executemany('INSERT INTO _migrations (name) VALUES (?)',
+                         [(n,) for n in _registry('2.254')])
+        conn.commit()
+        shutil.copy(live / 'ucm.db', left / 'ucm.db')
+        shutil.copy(live / 'ucm.db-wal', left / 'ucm.db-wal')
+        conn.close()
+        before = _fingerprint(left)
+        assert _check(path=left / 'ucm.db')[0] == STARTABLE
+        assert _fingerprint(left) == before
 
 
 @pytest.fixture

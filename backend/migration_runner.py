@@ -45,6 +45,7 @@ import os
 import sys
 import sqlite3
 import importlib.util
+from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import create_engine, text, inspect
@@ -506,16 +507,34 @@ def show_status():
 CHECK_STARTABLE, CHECK_FRESH, CHECK_REFUSED, CHECK_UNREADABLE = 0, 3, 4, 5
 
 
-def _read_only_engine(db_url: str):
-    """An engine that never writes: SQLite opened mode=ro, so a missing file is never created."""
+@contextmanager
+def _probe_engine(db_url: str):
+    """An engine on *db_url* that writes nothing there: SQLite is read from a private copy
+    (with its -wal and -journal, which a read-only open would still pair with a new -shm)."""
     if db_url.startswith("sqlite:///"):
-        from urllib.parse import quote
-        uri = f"file:{quote(db_url[len('sqlite:///'):])}?mode=ro"
-        return create_engine("sqlite://", creator=lambda: sqlite3.connect(uri, uri=True))
+        import shutil
+        import tempfile
+        path = db_url[len("sqlite:///"):]
+        with tempfile.TemporaryDirectory(prefix="ucm-check-") as tmp:
+            copy = os.path.join(tmp, "probe.db")
+            shutil.copyfile(path, copy)
+            for suffix in ("-wal", "-journal"):
+                if os.path.isfile(path + suffix):
+                    shutil.copyfile(path + suffix, copy + suffix)
+            engine = create_engine(f"sqlite:///{copy}")
+            try:
+                yield engine
+            finally:
+                engine.dispose()
+        return
     args = dict(postgres_connect_args(db_url))
     if _is_postgres(db_url) and "connect_timeout" not in db_url:
         args["connect_timeout"] = 10
-    return create_engine(sqlalchemy_url(db_url), hide_parameters=True, connect_args=args)
+    engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True, connect_args=args)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
 
 def check_database() -> int:
@@ -531,15 +550,12 @@ def check_database() -> int:
     if sqlite_path is not None and not os.path.lexists(sqlite_path):
         return CHECK_FRESH
     try:
-        engine = _read_only_engine(db_url)
-        try:
+        with _probe_engine(db_url) as engine:
             # _get_state takes a table listing that fails for an empty file: read it here first
             with engine.connect() as conn:
                 if sqlite_path is not None:
                     conn.execute(text("SELECT name FROM sqlite_master LIMIT 1")).fetchall()
             state, applied = _get_state(engine)
-        finally:
-            engine.dispose()
     except Exception as exc:  # noqa: BLE001
         cause = getattr(exc, "orig", None) or exc
         # Never the URL: only the driver's first line, which names no password
