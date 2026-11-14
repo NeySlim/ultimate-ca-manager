@@ -2832,6 +2832,8 @@
     "backupCount": "{{count}} Backup(s)",
     "backupTotalSize": "Gesamtgröße",
     "diskFree": "Freier Speicher",
+    "backupNode": "Node",
+    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "Backups suchen…",
     "backupSortNewest": "Neueste zuerst",
     "backupSortOldest": "Älteste zuerst",

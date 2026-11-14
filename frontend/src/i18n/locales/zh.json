@@ -2832,6 +2832,8 @@
     "backupCount": "{{count}} 个备份",
     "backupTotalSize": "总大小",
     "diskFree": "可用磁盘",
+    "backupNode": "Node",
+    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "搜索备份…",
     "backupSortNewest": "最新优先",
     "backupSortOldest": "最旧优先",

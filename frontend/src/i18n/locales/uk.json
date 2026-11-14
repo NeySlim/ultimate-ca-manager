@@ -2870,6 +2870,8 @@
     "backupCount": "{{count}} копій",
     "backupTotalSize": "Загальний розмір",
     "diskFree": "Вільно на диску",
+    "backupNode": "Node",
+    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "Пошук копій…",
     "backupSortNewest": "Спочатку новіші",
     "backupSortOldest": "Спочатку старіші",

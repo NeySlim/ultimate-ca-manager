@@ -2222,6 +2222,7 @@ Settings › Backup enables automatic backups.
 - **Daily / weekly / monthly** cadence
 - **Retention**: backups older than the set number of days are pruned
 - Backups are **encrypted** with the backup password
+- **High availability**: the archives are stored in PostgreSQL, so every node lists them, with the node that wrote them, and downloads them; retention runs on the leader. They are lost with the database: download the ones you keep out of the cluster, and back PostgreSQL up with its own tools
 
 ## Active Directory Connector
 

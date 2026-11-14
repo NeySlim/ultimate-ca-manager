@@ -19,6 +19,8 @@ export default function BackupSection({
   const canWriteSettings = Boolean(hasPermission('write:settings'))
   const allSelected = backups.length > 0 && selectedBackups.length === backups.length
   const diskHigh = typeof backupMeta.disk_used_pct === 'number' && backupMeta.disk_used_pct >= 85
+  // HA: the archives live in the shared database, listed the same from every node
+  const sharedStore = backupMeta.storage === 'database'
 
   const sortOptions = [
     { value: 'created_desc', label: t('settings.backupSortNewest') },
@@ -159,6 +161,12 @@ export default function BackupSection({
             </Badge>
           )}
         </div>
+        {sharedStore && (
+          <p className="flex items-start gap-2 mb-4 text-xs text-text-secondary">
+            <WarningCircle size={14} className="flex-shrink-0 mt-0.5" />
+            <span>{t('settings.backupSharedStoreNote')}</span>
+          </p>
+        )}
 
         {/* Toolbar */}
         {(backups.length > 0 || backupQuery.search) && (
@@ -214,6 +222,11 @@ export default function BackupSection({
                       <div className="flex gap-4 mt-1">
                         <p className="text-xs text-text-secondary">{backup.size}</p>
                         <p className="text-xs text-text-secondary">{backup.created_at}</p>
+                        {backup.node && (
+                          <p className="text-xs text-text-secondary truncate" title={backup.sha256 || undefined}>
+                            {t('settings.backupNode')}: {backup.node}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

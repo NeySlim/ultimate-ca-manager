@@ -52,6 +52,7 @@ export default {
           { label: "Cadence", text: "Quotidienne / hebdomadaire / mensuelle" },
           { label: "Rétention", text: "Les sauvegardes plus anciennes que le nombre de jours défini (30 par défaut) sont purgées" },
           { label: "Chiffrement", text: "Les sauvegardes sont chiffrées avec le mot de passe de sauvegarde configuré" },
+          { label: "Haute disponibilité", text: "En HA, les archives sont stockées dans PostgreSQL : chaque nœud les liste, avec le nœud qui les a écrites, et les télécharge, et la rétention s'exécute sur le leader. Elles disparaissent avec la base : téléchargez celles que vous gardez hors du cluster, et sauvegardez PostgreSQL avec ses propres outils" },
           { label: "Dérivation de clé", text: "Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS" },
         ]
       },
@@ -454,6 +455,7 @@ Paramètres › Sauvegarde permet des sauvegardes automatiques.
 - Cadence **quotidienne / hebdomadaire / mensuelle**
 - **Rétention** : les sauvegardes plus anciennes que le nombre de jours défini sont purgées
 - Sauvegardes **chiffrées** avec le mot de passe de sauvegarde
+- **Haute disponibilité** : les archives sont stockées dans PostgreSQL, si bien que chaque nœud les liste, avec le nœud qui les a écrites, et les télécharge ; la rétention s'exécute sur le leader. Elles disparaissent avec la base : téléchargez celles que vous gardez hors du cluster, et sauvegardez PostgreSQL avec ses propres outils
 
 
 ## Connecteur Active Directory

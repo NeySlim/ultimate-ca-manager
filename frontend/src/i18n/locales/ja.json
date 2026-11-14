@@ -2832,6 +2832,8 @@
     "backupCount": "{{count}} 件のバックアップ",
     "backupTotalSize": "合計サイズ",
     "diskFree": "ディスク空き",
+    "backupNode": "Node",
+    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "バックアップを検索…",
     "backupSortNewest": "新しい順",
     "backupSortOldest": "古い順",
