@@ -885,6 +885,47 @@ class TestHsmCaBindingInFipsMode:
         db.session.commit()
 
 
+class TestHsmCaKeyLoadInFipsMode:
+    """A CA key the module cannot load still gets the FIPS refusal, not a load error."""
+
+    @staticmethod
+    def _load(monkeypatch, error):
+        from services.hsm import ca_key_loader
+
+        def failing(key_id):
+            raise error
+        monkeypatch.setattr(ca_key_loader, 'load_hsm_private_key', failing)
+
+    @staticmethod
+    def _ca(key):
+        import types
+        return types.SimpleNamespace(id=1, hsm_key_id=key.id, revoked_in_chain=False, signature_scheme=None)
+
+    def test_a_cached_public_key_is_judged_before_loading(self, monkeypatch, hsm_signing_key, fips_on):
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        self._load(monkeypatch, RuntimeError('provider unreachable'))
+        key = hsm_signing_key('UNKNOWN', _pem(_ec_public(ec.SECP256K1())))
+        with pytest.raises(FipsRestricted, match='^EC secp256k1 keys not available in FIPS mode$'):
+            get_ca_signing_key(self._ca(key))
+
+    @pytest.mark.parametrize('algorithm,public', [
+        ('EC-BP256', lambda: None), ('UNKNOWN', lambda: '-----BEGIN PUBLIC KEY-----\nnot read\n'),
+    ])
+    def test_a_load_error_gets_the_label_refusal(self, monkeypatch, hsm_signing_key, fips_on, algorithm, public):
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        self._load(monkeypatch, ValueError('unsupported curve'))
+        key = hsm_signing_key(algorithm, public())
+        with pytest.raises(FipsRestricted, match='keys not available in FIPS mode$'):
+            get_ca_signing_key(self._ca(key))
+
+    def test_a_load_error_of_an_approved_key_stays(self, monkeypatch, hsm_signing_key, fips_on):
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        self._load(monkeypatch, ValueError('unsupported curve'))
+        key = hsm_signing_key('EC-P256', None)
+        with pytest.raises(ValueError, match='^unsupported curve$'):
+            get_ca_signing_key(self._ca(key))
+
+
 class TestHsmSignApiInFipsMode:
     def test_refusal_is_the_fips_problem(self, monkeypatch, auth_client, hsm_signing_key, fips_on):
         key = hsm_signing_key('RSA-1024', _pem(_rsa_public(1024)))
