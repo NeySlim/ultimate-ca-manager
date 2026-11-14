@@ -2769,14 +2769,21 @@ GET /api/v2/system/service/status
 # approved-mode settings it reports (each null when the provider does not
 # report it; the block is null without an active provider). UCM refuses
 # to start when one is not 1 on the OpenSSL FIPS Provider; a distribution
-# module follows its own security policy.
+# module follows its own security policy. "blockers": the blocker findings
+# (id, severity, title, count, examples, remedy) of the FIPS readiness check
+# this node ran when it started in FIPS mode, and "blockers_checked_at" when
+# (ISO 8601 UTC); the same in every worker, never changed by fips-preflight,
+# which answers a fresh report. Both null outside FIPS mode. Without
+# admin:system each finding keeps only id, severity, title and count.
 "crypto": {
   "fips_requested": true,
   "fips_active": true,
   "provider_active": true,
   "library": "OpenSSL 3.5.7 9 Jun 2026",
   "provider": {"name": "OpenSSL FIPS Provider", "version": "3.5.9", "buildinfo": "3.5.9"},
-  "module_settings": {"security-checks": 1, "tls1-prf-ems-check": 1, "drbg-no-trunc-md": 1}
+  "module_settings": {"security-checks": 1, "tls1-prf-ems-check": 1, "drbg-no-trunc-md": 1},
+  "blockers": [],
+  "blockers_checked_at": "2026-11-14T08:00:00Z"
 }
 
 # "cluster.nodes" in the response (HA mode): every registered node with node_id, leader,
@@ -2822,10 +2829,10 @@ GET /api/v2/system/fips-preflight
 
 Check ids: `users.password_scrypt`, `protocols.secret_scrypt`, `ca.eddsa_key`, `ca.weak_key`,
 `ca.unapproved_algorithm`, `ssh_ca.eddsa_key`, `deploy.ssh_eddsa_key`, `tsa.signer_unapproved_key`, `dns.tsig_hmac_md5`,
-`msca.winrm_ntlm`, `database.postgres_without_tls`, `https.unapproved_key` (blockers);
+`session.short_secret_key`, `msca.winrm_ntlm`, `database.postgres_without_tls`, `https.unapproved_key` (blockers);
 `users.backup_codes_scrypt`, `ocsp.responder_unapproved_key`, `templates.unapproved_key_type`,
 `policies.unapproved_key_type`, `acme_client.unapproved_key_type`, `hsm.softhsm`, `hsm.gcp_grpc`,
-`hsm.unapproved_keys`, `backup.schedule_argon2id`, `backup.archives_argon2id` (warnings);
+`hsm.unapproved_keys`, `hmac.short_secret`, `backup.schedule_argon2id`, `backup.archives_argon2id` (warnings);
 `certificates.unapproved_key`, `ssh_certificates.eddsa_key` (information).
 
 
@@ -3787,7 +3794,7 @@ Content-Type: application/json
 }
 ```
 
-In FIPS mode only an RSA 2048+ or ECDSA P-256/P-384/P-521 key signs: any other key answers `400`
+In FIPS mode only an RSA key of an even length from 2048 to 16384 bits or an ECDSA P-256/P-384/P-521 key signs: any other key answers `400`
 with the `urn:ucm:problem:fips-restricted` problem type, as do certificate issuance and CRL
 regeneration for a CA on such a key; its OCSP responder answers `unauthorized`.
 

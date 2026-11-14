@@ -32,7 +32,8 @@ class Rfc2136DnsProvider(BaseDnsProvider):
 
     @classmethod
     def refuse_short_secret(cls, credentials):
-        """At save time, in FIPS mode: a TSIG secret under 14 bytes is not an HMAC key the module takes."""
+        """At save time, in FIPS mode: a TSIG secret under 14 bytes is refused; dnspython computes
+        TSIG with hmac.new, which the module's key check never sees."""
         text = credentials.get('tsig_key_secret')
         if not isinstance(text, str) or not text.strip():
             return

@@ -158,6 +158,24 @@ def load_keys(app, at_start=False) -> str:
     return source
 
 
+def signing_key(app):
+    """The key that signs once loaded: the stored active key, else the environment's; None
+    when this process cannot tell (a stored key it cannot open and did not start on the
+    environment's, no SECRET_KEY). Reads only."""
+    state = app.extensions.get(_STATE) or {}
+    env = state.get('env', app.config.get('SECRET_KEY'))
+    try:
+        stored = _read_rows().get(ACTIVE_KEY)
+    except Exception:
+        from models import db
+        db.session.rollback()  # PostgreSQL: the failed read must not abort what follows
+        return None
+    if stored:
+        # Not opened at start: load_keys left the environment's key signing
+        return _open(stored, 'session key') or (env if state.get('source') == 'environment' else None)
+    return env or None
+
+
 def reload_pending(app) -> bool:
     return 'retry' in (app.extensions.get(_STATE) or {})
 

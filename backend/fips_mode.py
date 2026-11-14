@@ -73,7 +73,8 @@ REFUSED_TLS_GROUPS = ('X25519', 'X448')
 # Ubuntu 24.04 modules do not): allowed only when the loaded module answers for them
 MODULE_DEPENDENT_SIGNATURES = ('ED25519', 'ED448', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87')
 _APPROVED_QUERY = b'provider=fips,fips=yes'
-# HMAC keys under 112 bits are refused by the 3.5 module (hmac-key-check)
+# HMAC keys under 112 bits are disallowed (SP 800-131A r2 §10). The 3.5 module checks it only
+# for the one-shot hmac.digest; hmac.new and third-party HMAC skip it, so UCM refuses them itself
 MIN_HMAC_KEY_BYTES = 14
 
 
@@ -169,7 +170,7 @@ def switch_approves(algorithm: str) -> bool:
 
 
 def refuse_short_hmac_key(key: bytes, what: str) -> None:
-    """In FIPS mode, refuse an HMAC key the module would not take (under 14 bytes)."""
+    """In FIPS mode, refuse an HMAC key under 14 bytes (112 bits), on every module."""
     if enabled() and len(key) < MIN_HMAC_KEY_BYTES:
         raise FipsRestricted(f'{what} of {len(key)} bytes not available in FIPS mode: the module '
                              f'takes HMAC keys of {MIN_HMAC_KEY_BYTES} bytes (112 bits) or more')

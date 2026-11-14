@@ -17,13 +17,14 @@ No route ever carried it. Anything that needs a narrower rule belongs in
 
 import os
 import hmac
-import hashlib
 import secrets
 import time
 import logging
 from typing import Optional, Tuple
 from functools import wraps
 from flask import request, g, session, current_app
+
+import fips_mode
 
 from auth.unified import presented_api_key
 
@@ -104,11 +105,8 @@ class CSRFProtection:
         # Create signature using SECRET_KEY + user_id
         secret = current_app.config.get('SECRET_KEY', '')
         message = f"{timestamp}:{nonce}:{user_id}"
-        signature = hmac.new(
-            secret.encode('utf-8'),
-            message.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()  # Full 256-bit signature (no truncation)
+        fips_mode.refuse_short_hmac_key(secret.encode('utf-8'), 'Session key (SECRET_KEY)')
+        signature = hmac.digest(secret.encode('utf-8'), message.encode('utf-8'), 'sha256').hex()  # Full 256-bit signature (no truncation)
         
         return f"{timestamp}:{nonce}:{signature}"
     
@@ -142,15 +140,14 @@ class CSRFProtection:
             from security.session_key import verification_keys
             message = f"{timestamp}:{nonce}:{user_id}"
             for secret in verification_keys(current_app):
-                expected_sig = hmac.new(
-                    secret.encode('utf-8'),
-                    message.encode('utf-8'),
-                    hashlib.sha256
-                ).hexdigest()
+                fips_mode.refuse_short_hmac_key(secret.encode('utf-8'), 'Session key (SECRET_KEY)')
+                expected_sig = hmac.digest(secret.encode('utf-8'), message.encode('utf-8'), 'sha256').hex()
                 if hmac.compare_digest(provided_sig, expected_sig):
                     return True, ""
             return False, "Invalid CSRF token"
-            
+
+        except fips_mode.FipsRestricted as e:
+            return False, str(e)
         except Exception as e:
             logger.warning(f"CSRF validation error: {e}")
             return False, "Token validation failed"

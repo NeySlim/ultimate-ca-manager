@@ -2441,12 +2441,13 @@ class AcmeProxyService:
 
     def _build_eab(self, kid, hmac_key_b64, account_url):
         """Build External Account Binding JWS (RFC 8555 §7.3.4)"""
-        import hashlib
         import hmac as hmac_mod
 
         # Decode HMAC key (base64url-encoded)
         hmac_key_padded = hmac_key_b64 + '=' * (4 - len(hmac_key_b64) % 4)
         hmac_key = base64.urlsafe_b64decode(hmac_key_padded)
+        import fips_mode
+        fips_mode.refuse_short_hmac_key(hmac_key, 'EAB HMAC key of the upstream account')
 
         # Protected header for EAB
         protected = {
@@ -2464,7 +2465,7 @@ class AcmeProxyService:
 
         # HMAC-SHA256 signature
         signing_input = f"{protected_b64}.{payload_b64}".encode()
-        sig = hmac_mod.new(hmac_key, signing_input, hashlib.sha256).digest()
+        sig = hmac_mod.digest(hmac_key, signing_input, 'sha256')
         sig_b64 = base64.urlsafe_b64encode(sig).rstrip(b'=').decode()
 
         return {

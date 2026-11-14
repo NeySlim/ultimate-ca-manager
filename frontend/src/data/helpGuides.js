@@ -2309,7 +2309,7 @@ A certificate template can opt into **Build subject from Active Directory** (Tem
 ## About
 
 - **System Information**, **Links & Resources** and the **Support UCM** link to Ko-fi. Administrators also see a dismissible Ko-fi card once per UCM version
-- **Check FIPS readiness** (admin:system): lists what FIPS mode would refuse on this instance (scrypt password hashes, Ed25519 authorities on a module without EdDSA, Argon2id backups, PostgreSQL without TLS, HMAC secrets under 14 bytes...), with a remedy for each. Nothing is changed
+- **Check FIPS readiness** (admin:system): lists what FIPS mode would refuse on this instance (scrypt password hashes, Ed25519 authorities on a module without EdDSA, Argon2id backups, PostgreSQL without TLS, HMAC secrets under 14 bytes...), with a remedy for each. Nothing is changed. In FIPS mode its blockers are also written to the log at each start, one error line each with its remedy, and the service status carries them; UCM starts anyway and refuses each affected operation when it is used
 `
   },
 

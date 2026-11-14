@@ -53,6 +53,10 @@ def _validate_imported_account_key(pem: str) -> str:
         raise ValueError(
             'Invalid account key: expected an unencrypted RSA or ECDSA private key in PEM format'
         )
+    from services.acme.acme_client_service import fips_private_key_refusal
+    refusal = fips_private_key_refusal(key)
+    if refusal:
+        raise ValueError(refusal)
     if isinstance(key, rsa.RSAPrivateKey):
         if key.key_size < 2048:
             raise ValueError('RSA account keys must be at least 2048 bits')

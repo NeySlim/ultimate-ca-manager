@@ -464,6 +464,10 @@ class TestHsmSigningInFipsMode:
     @pytest.mark.parametrize('algorithm,public,name', [
         ('RSA-1024', lambda: _rsa_public(1024), 'RSA 1024'),
         ('RSA-2047', lambda: _rsa_public(2047), 'RSA 2047'),
+        ('RSA-2049', lambda: _rsa_public(2049), 'RSA 2049'),
+        ('RSA-16386', lambda: _rsa_public(16386), 'RSA 16386'),
+        ('RSA-2049', lambda: None, 'RSA-2049'),
+        ('RSA-16386', lambda: None, 'RSA-16386'),
         ('UNKNOWN', lambda: _ec_public(ec.SECP256K1()), 'EC secp256k1'),
         ('EC-BP256', lambda: _ec_public(ec.BrainpoolP256R1()), 'EC Brainpool P256r1'),
         ('UNKNOWN', lambda: None, 'UNKNOWN'),
@@ -483,7 +487,7 @@ class TestHsmSigningInFipsMode:
 
     @pytest.mark.parametrize('algorithm,bits', [
         ('RSA-2048', 2048), ('RSA-3072', 3072), ('RSA-4096', 4096), ('RSA-8192', 8192),
-        ('EC-P256', 256), ('EC-P384', 384), ('EC-P521', 521),
+        ('RSA-16384', 16384), ('EC-P256', 256), ('EC-P384', 384), ('EC-P521', 521),
     ])
     @pytest.mark.parametrize('approves', [(), ALL])
     def test_classical_keys_sign(self, monkeypatch, hsm_signing_key, fips_on, approves, algorithm, bits):
@@ -494,6 +498,13 @@ class TestHsmSigningInFipsMode:
         else:
             public = _ec_public({256: ec.SECP256R1, 384: ec.SECP384R1, 521: ec.SECP521R1}[bits]())
         key = hsm_signing_key(algorithm, _pem(public))
+        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
+
+    @pytest.mark.parametrize('label', ['RSA-8192', 'RSA 16384', 'RSA-2050'])
+    def test_an_approved_rsa_label_signs_without_a_public_key(self, monkeypatch, hsm_signing_key,
+                                                               fips_on, label):
+        from services.hsm import HsmService
+        key = hsm_signing_key(label, None)
         assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
 
     @pytest.mark.parametrize('label,bits,signs', [
@@ -804,6 +815,8 @@ class TestPreflight:
             ('EC-BP256', _ec_public(ec.BrainpoolP256R1())),
             ('ML-DSA-65', mldsa.MLDSA65PrivateKey.generate().public_key()),
             ('Ed25519', ed25519.Ed25519PrivateKey.generate().public_key()), ('UNKNOWN', None),
+            ('RSA-2049', _rsa_public(2049)), ('RSA-16386', _rsa_public(16386)),
+            ('RSA-16384', _rsa_public(16384)), ('RSA-8192', None), ('RSA-2049', None),
         )]
         found = fips_preflight._hsm_keys()
         for key in keys:
@@ -815,7 +828,8 @@ class TestPreflight:
             listed = any(f.startswith(f'{key.label} (#{key.id})') for f in found)
             assert listed == refused, (key.algorithm, refused, found)
         assert [k.algorithm for k in keys if any(f.startswith(f'{k.label} (#') for f in found)] == [
-            'RSA-1024', 'UNKNOWN', 'EC-BP256', 'ML-DSA-65', 'Ed25519', 'UNKNOWN']
+            'RSA-1024', 'UNKNOWN', 'EC-BP256', 'ML-DSA-65', 'Ed25519', 'UNKNOWN',
+            'RSA-2049', 'RSA-16386', 'RSA-2049']
 
     def test_ssh_and_hsm_detectors(self, monkeypatch, fips_on):
         from services import fips_preflight

@@ -6,6 +6,7 @@ this file's own on the PostgreSQL bench) inside a transaction it rolls back.
 """
 import base64
 import json
+import logging
 import os
 import uuid
 from contextlib import contextmanager
@@ -18,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519, mldsa, rsa
 from cryptography.x509.oid import NameOID
 from sqlalchemy import create_engine, text
 
+import fips_mode
 from config.settings import Config
 from models import (CA, AcmeClientOrder, Certificate, CertificatePolicy, CertificateTemplate,
                     DeployTarget, DnsProvider, HsmKey, HsmProvider, MicrosoftCA, SSHCertificate,
@@ -355,6 +357,14 @@ def test_certificates_unapproved_key(session):
     assert finding['severity'] == 'info'
 
 
+def test_certificates_rsa_sizes_follow_the_fips_rule(session):
+    """key_algo decides: odd lengths and moduli over 16384 bits are listed, RSA 8192 is not."""
+    for descr, key_algo in (('odd-rsa', 'RSA 2049'), ('huge-rsa', 'RSA 16386'),
+                            ('big-rsa', 'RSA 8192'), ('max-rsa', 'RSA 16384')):
+        _leaf(descr, key_algo=key_algo)
+    _assert_found('certificates.unapproved_key', 2, 'odd-rsa', 'huge-rsa')
+
+
 def test_templates_unapproved_key_type(session):
     for name, key_type in (('ed-template', 'ED25519'), ('rsa-template', 'RSA-2048'),
                            ('rsa1024-template', 'RSA-1024')):
@@ -443,6 +453,87 @@ def test_dns_tsig_hmac_md5(session):
         session.add(provider)
     session.flush()
     _assert_found('dns.tsig_hmac_md5', 1, 'md5-dns')
+
+
+def test_short_dns_provider_secrets_and_eab_keys(session):
+    """Secrets readable as stored: a provider or account whose secret does not decrypt is not
+    listed; the TSIG and webhook cases are covered with the save-time refusal."""
+    from models.acme_client_account import AcmeClientAccount
+    short_totp = base64.b32encode(b'\x01' * 10).decode()  # 80 bits
+    for name, kind, credentials in (
+            ('short-constellix', 'constellix', {'api_key': 'a', 'secret_key': 'short'}),
+            ('long-constellix', 'constellix', {'api_key': 'a', 'secret_key': 's' * 14}),
+            ('short-dme', 'dnsmadeeasy', {'api_key': 'a', 'secret_key': 'short'}),
+            ('short-tencent', 'tencentcloud', {'secret_id': 'i', 'secret_key': 's' * 10}),
+            ('long-tencent', 'tencentcloud', {'secret_id': 'i', 'secret_key': 's' * 11}),
+            ('short-inwx', 'inwx', {'username': 'u', 'password': 'p', 'shared_secret': short_totp}),
+            ('plain-inwx', 'inwx', {'username': 'u', 'password': 'p'})):
+        provider = DnsProvider(name=name, provider_type=kind)
+        provider.credentials = json.dumps(credentials)
+        session.add(provider)
+    for label, key in (('short-eab', b'e' * 10), ('long-eab', b'e' * 14)):
+        session.add(AcmeClientAccount(
+            directory_url=f'https://{label}.example/directory', label=label, email='a@example.test',
+            eab_kid='kid',
+            eab_hmac_key=base64.urlsafe_b64encode(key).rstrip(b'=').decode()))
+    session.flush()
+    finding = _assert_found('hmac.short_secret', 5, 'short-constellix', 'short-dme',
+                            'short-tencent', 'short-inwx', 'short-eab')
+    assert not any(e.startswith(('long-', 'plain-')) for e in finding['examples']), finding['examples']
+
+
+@pytest.mark.parametrize('env, stored, flagged', [
+    ('short-key', None, True), ('short-key', 's' * 32, False), ('k' * 32, None, False),
+    # Not readable here: a stored key this process cannot open, no SECRET_KEY at all
+    ('short-key', 'unopenable', False), (None, None, False)])
+def test_session_secret_key_under_14_bytes(session, app, monkeypatch, env, stored, flagged):
+    """The key that signs: the stored one, else the environment's."""
+    from security import encryption, session_key
+    monkeypatch.setitem(app.config, 'SECRET_KEY', env)
+    monkeypatch.setitem(app.extensions, 'ucm_session_key', {'env': env})
+    if stored:
+        monkeypatch.setattr(encryption.key_encryption, 'is_encrypted', lambda value: True)
+
+        def decrypt(value, kind):
+            if stored == 'unopenable':
+                raise ValueError('another key')
+            return stored
+        monkeypatch.setattr(encryption, 'decrypt_master_key_value', decrypt)
+        _config(session_key.ACTIVE_KEY, 'sealed')
+    finding = _finding(fips_preflight.run(), 'session.short_secret_key')
+    if flagged:
+        assert finding['severity'] == 'blocker' and finding['examples'] == ['9 bytes'], finding
+    else:
+        assert finding is None, finding
+
+
+def test_session_secret_key_from_the_environment_is_judged_when_the_stored_one_did_not_open(
+        session, app, monkeypatch):
+    """At start a stored key that does not open leaves the environment's key signing."""
+    from security import encryption, session_key
+    monkeypatch.setitem(app.config, 'SECRET_KEY', 'short-key')
+    monkeypatch.setitem(app.extensions, 'ucm_session_key', {'env': 'short-key', 'source': 'environment'})
+    monkeypatch.setattr(encryption.key_encryption, 'is_encrypted', lambda value: True)
+
+    def decrypt(value, kind):
+        raise ValueError('another key')
+    monkeypatch.setattr(encryption, 'decrypt_master_key_value', decrypt)
+    _config(session_key.ACTIVE_KEY, 'sealed')
+    finding = _finding(fips_preflight.run(), 'session.short_secret_key')
+    assert finding and finding['examples'] == ['9 bytes'], finding
+
+
+def test_a_session_key_read_that_fails_leaves_the_session_usable(session, app, monkeypatch):
+    """PostgreSQL aborts the transaction of a failed statement: the next check must not inherit it."""
+    from sqlalchemy import text
+    from models import db
+    from security import session_key
+
+    def broken():
+        db.session.execute(text('SELECT missing FROM no_such_table_fips36'))
+    monkeypatch.setattr(session_key, '_read_rows', broken)
+    assert session_key.signing_key(app) is None
+    assert db.session.execute(text('SELECT 1')).scalar() == 1
 
 
 def test_msca_winrm_ntlm(session):
@@ -626,3 +717,104 @@ def test_every_check_has_its_english_strings_in_the_interface():
     for item in fips_preflight.DETECTORS:
         key = item.id.replace('.', '_')
         assert checks.get(key) == {'title': item.title, 'remedy': item.remedy}, item.id
+
+
+# --- at startup in FIPS mode -----------------------------------------------------
+
+def _seed_two_blockers(session):
+    session.add(User(username='scrypt-at-start', email='start@example.com', password_hash=SCRYPT_HASH))
+    provider = DnsProvider(name='md5-at-start', provider_type='rfc2136')
+    provider.credentials = json.dumps({'server': 'ns', 'tsig_key_name': 'k', 'tsig_key_secret': 's',
+                                       'tsig_algorithm': 'hmac-md5'})
+    session.add(provider)
+    session.flush()
+
+
+def _errors(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+
+
+class TestStartupBlockers:
+    @pytest.fixture(autouse=True)
+    def _forget(self, monkeypatch):
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': None, 'checked_at': None})
+
+    def test_each_blocker_is_an_error_line_with_its_remedy(self, session, monkeypatch, caplog):
+        _seed_two_blockers(session)
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        caplog.set_level(logging.INFO)
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        by_id = {d.id: d for d in fips_preflight.DETECTORS}
+        for detector_id, name in (('users.password_scrypt', 'scrypt-at-start'),
+                                  ('dns.tsig_hmac_md5', 'md5-at-start')):
+            lines = [m for m in _errors(caplog) if detector_id in m]
+            assert len(lines) == 1, _errors(caplog)
+            assert name in lines[0] and by_id[detector_id].remedy in lines[0], lines[0]
+        assert {b['id'] for b in fips_preflight.startup_blockers()} == {
+            'users.password_scrypt', 'dns.tsig_hmac_md5'}
+
+    def test_only_blockers_run_and_their_cost_does_not_grow_with_certificates(self, session,
+                                                                               monkeypatch):
+        from sqlalchemy import event
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        statements = []
+
+        def count(*args):
+            statements.append(args[2])
+
+        event.listen(db.engine, 'before_cursor_execute', count)
+        try:
+            fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+            empty = len(statements)
+            for i in range(25):
+                _leaf(f'many-{i}', _ed25519())
+            del statements[:]
+            fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        finally:
+            event.remove(db.engine, 'before_cursor_execute', count)
+        assert 0 < empty == len(statements)
+        # At most one statement per blocker check (14 for 15 checks when this was written)
+        assert empty <= len([d for d in fips_preflight.DETECTORS if d.severity == 'blocker'])
+        # The certificate table is read only by key (the TSA signer), never scanned
+        scans = [s for s in statements if 'FROM certificates' in s
+                 and 'certificates.id = ' not in s and 'certificates.refid = ' not in s]
+        assert scans == [], scans
+
+    def test_outside_fips_mode_nothing_runs(self, session, monkeypatch, caplog):
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
+        monkeypatch.setattr(fips_preflight, 'run_detectors', lambda *a, **k: pytest.fail('ran'))
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        assert fips_preflight.startup_blockers() is None and _errors(caplog) == []
+
+    def test_a_failure_is_logged_never_raised(self, session, monkeypatch, caplog):
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+
+        def broken(*args, **kwargs):
+            raise RuntimeError('database gone')
+        monkeypatch.setattr(fips_preflight, 'run_detectors', broken)
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        assert any('database gone' in m for m in _errors(caplog)), _errors(caplog)
+        assert fips_preflight.startup_blockers() is None
+
+    def test_a_detector_that_fails_is_an_error_line(self, session, monkeypatch, caplog):
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+
+        def broken():
+            raise RuntimeError('unreadable table')
+        failing = fips_preflight.Detector('users.password_scrypt', fips_preflight.BLOCKER, 't', 'r', broken)
+        monkeypatch.setattr(fips_preflight, 'DETECTORS', [failing])
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        assert any('users.password_scrypt' in m and 'unreadable table' in m for m in _errors(caplog))
+
+    def test_an_on_demand_check_leaves_the_startup_state(self, session, app, monkeypatch):
+        """The status shows the check of the start, the same in every worker forked after it;
+        the route answers a fresh report without changing it."""
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
+        state = fips_preflight.startup_state()
+        assert state['blockers'] == [] and state['checked_at'].endswith('Z')
+        _seed_two_blockers(session)
+        report = fips_preflight.run()
+        assert {f['id'] for f in report['findings'] if f['severity'] == 'blocker'} == {
+            'users.password_scrypt', 'dns.tsig_hmac_md5'}
+        assert fips_preflight.startup_state() == state

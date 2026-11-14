@@ -91,9 +91,11 @@ if [ "$module_pq" = 1 ]; then
     genpkey ED25519 || fail "genpkey ED25519 failed"
     [ "$capability" = "ED25519,ED448,ML-DSA-44,ML-DSA-65,ML-DSA-87" ] \
         || fail "UCM does not see ML-DSA and EdDSA approved: $capability"
-    hybrid=$(docker exec "$name" sh -c \
-        'timeout 10 openssl s_client -connect 127.0.0.1:8443 -groups X25519MLKEM768 </dev/null 2>&1' || true)
-    grep -q 'Negotiated TLS1.3 group: X25519MLKEM768' <<<"$hybrid" || fail "TLS refuses X25519MLKEM768"
+    for group in X25519MLKEM768 SecP256r1MLKEM768 SecP384r1MLKEM1024; do
+        hybrid=$(docker exec "$name" sh -c \
+            "timeout 10 openssl s_client -connect 127.0.0.1:8443 -groups $group </dev/null 2>&1" || true)
+        grep -q "Negotiated TLS1.3 group: $group" <<<"$hybrid" || fail "TLS refuses $group"
+    done
 else
     genpkey ML-DSA-65 && fail "genpkey ML-DSA-65 works on $expected"
     genpkey ED25519 && fail "genpkey ED25519 works on $expected"

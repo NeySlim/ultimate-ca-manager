@@ -3359,7 +3359,7 @@
           "remedy": "Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it before the switch; an authority key cannot be converted."
         },
         "ca_weak_key": {
-          "title": "Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521",
+          "title": "Certificate authorities with a DSA key, RSA of an odd length or outside 2048 to 16384 bits or a curve other than P-256/384/521",
           "remedy": "Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it."
         },
         "ca_unapproved_algorithm": {
@@ -3391,7 +3391,7 @@
           "remedy": "Issue a new RSA or ECDSA timestamping certificate and select it in the TSA settings."
         },
         "certificates_unapproved_key": {
-          "title": "Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA under 2048 bits or another curve",
+          "title": "Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA of an odd length or outside 2048 to 16384 bits or another curve",
           "remedy": "They stay valid; renew them with a new RSA 2048+ or ECDSA P-256/P-384/P-521 key, since renewing with the same key is refused in FIPS mode."
         },
         "templates_unapproved_key_type": {
@@ -3415,16 +3415,20 @@
           "remedy": "Prefer a PKCS#11, Azure Key Vault or OpenBao provider for keys that must stay in FIPS scope."
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
+          "title": "HSM keys FIPS mode refuses (RSA of an odd length or outside 2048 to 16384 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
           "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
         },
         "dns_tsig_hmac_md5": {
           "title": "RFC 2136 DNS providers signing with TSIG hmac-md5: DNS-01 updates are refused in FIPS mode",
           "remedy": "Create an hmac-sha256 TSIG key on the DNS server and enter it in the provider."
         },
+        "session_short_secret_key": {
+          "title": "The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be issued or checked with it, so every sign-in fails",
+          "remedy": "Set a SECRET_KEY of 32 characters or more in the service environment and restart."
+        },
         "hmac_short_secret": {
-          "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
-          "remedy": "Regenerate the webhook secrets and create TSIG keys of at least 14 bytes (hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers."
+          "title": "HMAC secrets under 14 bytes (webhook secrets, RFC 2136 TSIG keys, Constellix, DNS Made Easy, INWX and Tencent Cloud secrets, external EAB keys of ACME accounts): the FIPS module does not approve them; FIPS mode refuses to save a webhook secret or TSIG key this short, and every one of them but a TSIG key fails when used",
+          "remedy": "Regenerate the webhook secrets and create TSIG keys of at least 14 bytes (hmac-sha256 keys of 32 bytes are the usual size), ask the DNS provider or the ACME CA for a secret or EAB key of 14 bytes or more, then update the receivers, DNS servers, providers and accounts."
         },
         "msca_winrm_ntlm": {
           "title": "Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode",

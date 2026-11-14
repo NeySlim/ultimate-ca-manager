@@ -14,7 +14,7 @@ import base64
 import json
 import logging
 import os
-import re
+import time
 import warnings
 from typing import Iterable, List, Optional, Tuple
 
@@ -25,7 +25,7 @@ from flask import current_app
 import fips_mode
 from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, DeployTarget,
                     DnsProvider, AcmeClientOrder, HsmKey, HsmProvider, MicrosoftCA,
-                    SSHCertificate, SSHCertificateAuthority, SystemConfig, User)
+                    SSHCertificate, SSHCertificateAuthority, SystemConfig, User, db)
 from security import encryption
 from security.encryption import decrypt_text
 from services.backup import container
@@ -59,8 +59,8 @@ def stored_label_approved(text) -> bool:
     alg = key_algorithms.get(text)
     if alg is not None:
         return alg.fips_static or (alg.fips_by_module and fips_mode.switch_approves(alg.label))
-    match = re.fullmatch(r'\s*RSA[\s:_-]*(\d+)\s*', str(text), re.IGNORECASE)
-    return bool(match) and int(match.group(1)) >= 2048
+    bits = key_algorithms.rsa_bits_of_label(str(text))
+    return bits is not None and key_algorithms.fips_rsa_bits_approved(bits)
 
 
 def certificate_key(cert) -> Tuple[str, bool]:
@@ -195,7 +195,7 @@ def _is_mldsa(name) -> bool:
 
 
 @detector('ca.weak_key', BLOCKER,
-          'Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
+          'Certificate authorities with a DSA key, RSA of an odd length or outside 2048 to 16384 bits or a curve other than P-256/384/521',
           'Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it.')
 def _ca_weak():
     return [_named(ca.descr, ca.id, name) for ca, (name, approved) in _ca_keys()
@@ -323,7 +323,7 @@ def _tsa_signer():
 
 
 @detector('certificates.unapproved_key', INFO,
-          'Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA under 2048 bits or another curve',
+          'Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA of an odd length or outside 2048 to 16384 bits or another curve',
           'They stay valid; renew them with a new RSA 2048+ or ECDSA P-256/P-384/P-521 key, '
           'since renewing with the same key is refused in FIPS mode.')
 def _certificates():
@@ -422,7 +422,7 @@ def _gcp():
 
 
 @detector('hsm.unapproved_keys', WARNING,
-          'HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, '
+          'HSM keys FIPS mode refuses (RSA of an odd length or outside 2048 to 16384 bits, curves other than P-256/P-384/P-521, '
           'Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)',
           'Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao '
           'and Vault Transit keys of these types are no longer listed.')
@@ -465,12 +465,38 @@ def _short_tsig_secret(text) -> bool:
     return 0 < len(secret) < fips_mode.MIN_HMAC_KEY_BYTES
 
 
+def _short(key: bytes) -> bool:
+    return 0 < len(key) < fips_mode.MIN_HMAC_KEY_BYTES
+
+
+@detector('session.short_secret_key', BLOCKER,
+          'The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be '
+          'issued or checked with it, so every sign-in fails',
+          'Set a SECRET_KEY of 32 characters or more in the service environment and restart.')
+def _short_session_key():
+    from security import session_key
+    key = session_key.signing_key(current_app)
+    if key is None:
+        return []  # not readable here: not listed
+    return [f'{len(key.encode())} bytes'] if len(key.encode()) < fips_mode.MIN_HMAC_KEY_BYTES else []
+
+
+# DNS providers that sign their API calls with an HMAC of a secret the operator entered
+_HMAC_DNS_PROVIDERS = ('constellix', 'dnsmadeeasy', 'inwx', 'tencentcloud')
+
+
 @detector('hmac.short_secret', WARNING,
-          'Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve '
-          'HMAC keys this short, and FIPS mode refuses to save them',
+          'HMAC secrets under 14 bytes (webhook secrets, RFC 2136 TSIG keys, Constellix, DNS Made '
+          'Easy, INWX and Tencent Cloud secrets, external EAB keys of ACME accounts): the FIPS module '
+          'does not approve them; FIPS mode refuses to save a webhook secret or TSIG key this short, '
+          'and every one of them but a TSIG key fails when used',
           'Regenerate the webhook secrets and create TSIG keys of at least 14 bytes '
-          '(hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers.')
+          '(hmac-sha256 keys of 32 bytes are the usual size), ask the DNS provider or the ACME CA '
+          'for a secret or EAB key of 14 bytes or more, then update the receivers, DNS servers, '
+          'providers and accounts.')
 def _short_hmac_secrets():
+    from models.acme_client_account import AcmeClientAccount
+    from services.acme.dns_providers import get_provider_class
     from services.webhook_service import WebhookEndpoint
     from utils.encryption import decrypt_if_needed
     found = []
@@ -488,6 +514,26 @@ def _short_hmac_secrets():
             continue
         if isinstance(credentials, dict) and _short_tsig_secret(credentials.get('tsig_key_secret')):
             found.append(_named(provider.name, provider.id, 'TSIG key'))
+    # A secret that does not decrypt is not read as JSON, so it is not listed
+    for provider in DnsProvider.query.filter(DnsProvider.provider_type.in_(_HMAC_DNS_PROVIDERS)) \
+            .order_by(DnsProvider.id).all():
+        provider_class = get_provider_class(provider.provider_type)
+        try:
+            credentials = json.loads(provider.credentials or '{}')
+        except (TypeError, ValueError):
+            continue
+        if isinstance(credentials, dict) and provider_class is not None and \
+                _short(provider_class.hmac_key(credentials)):
+            found.append(_named(provider.name, provider.id, provider_class.HMAC_SECRET_NAME))
+    for account in AcmeClientAccount.query.filter(AcmeClientAccount._eab_hmac_key.isnot(None)) \
+            .order_by(AcmeClientAccount.id).all():
+        try:
+            text = account.eab_hmac_key or ''
+            key = base64.urlsafe_b64decode(text + '=' * (-len(text) % 4))
+        except Exception:
+            continue
+        if _short(key):
+            found.append(_named(account.label, account.id, 'EAB HMAC key'))
     return found
 
 
@@ -590,6 +636,15 @@ def _https():
 
 # --- run --------------------------------------------------------------------
 
+# Blockers found by the startup check in FIPS mode and when it ran; set once, before gunicorn
+# forks its workers (preload_app), so every worker shows the same; an on-demand run leaves it
+_startup = {'blockers': None, 'checked_at': None}
+
+
+def _blocker_findings(result) -> list:
+    return [f for f in result['findings'] if f['severity'] == BLOCKER]
+
+
 def run(detectors: Optional[Iterable[Detector]] = None) -> dict:
     """Every detector's findings, blockers first; a detector that fails is listed in errors."""
     result = run_detectors(DETECTORS if detectors is None else detectors, label='FIPS preflight')
@@ -597,3 +652,40 @@ def run(detectors: Optional[Iterable[Detector]] = None) -> dict:
             'ready': not result['summary'][BLOCKER] and not result['errors'],
             'summary': result['summary'], 'findings': result['findings'],
             'errors': result['errors'], 'checked': result['checked']}
+
+
+def startup_blockers() -> Optional[list]:
+    """Blocker findings of the startup check in FIPS mode, None when it did not run."""
+    return _startup['blockers']
+
+
+def startup_state() -> dict:
+    """{'blockers', 'checked_at' (ISO 8601 UTC)} of the startup check; both None without one."""
+    return dict(_startup)
+
+
+def log_startup_blockers(log) -> None:
+    """In FIPS mode, one ERROR line per blocker with its remedy; never raises, never stops.
+    Blocker detectors only: none reads certificates but by key, so the cost is about one
+    query per check whatever the number of certificates."""
+    if not fips_mode.enabled():
+        return
+    try:
+        started = time.monotonic()
+        result = run_detectors([d for d in DETECTORS if d.severity == BLOCKER],
+                               label='FIPS startup check')
+        db.session.rollback()
+    except Exception as e:
+        log.error('FIPS mode: the readiness check could not run at startup: %s: %s',
+                  type(e).__name__, e)
+        return
+    blockers = _blocker_findings(result)
+    _startup.update(blockers=blockers,
+                    checked_at=utc_now().isoformat(timespec='seconds') + 'Z')
+    for f in blockers:
+        log.error('FIPS mode blocker %s: %s (%d: %s). Remedy: %s', f['id'], f['title'], f['count'],
+                  '; '.join(f['examples']), f['remedy'])
+    for e in result['errors']:
+        log.error('FIPS mode: readiness check %s failed at startup: %s', e['id'], e['error'])
+    log.info('FIPS readiness check at startup: %d blocker(s) in %.2f s', len(blockers),
+             time.monotonic() - started)

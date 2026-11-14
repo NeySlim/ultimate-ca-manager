@@ -660,11 +660,16 @@ class HsmService:
 
     @classmethod
     def fips_signing_refusal(cls, key: HsmKey) -> Optional[str]:
-        """What FIPS mode refuses to sign with *key* ('RSA 1024 keys'), or None: only RSA 2048+
-        and the registered algorithms every module approves sign. Cached public key, then label."""
+        """What FIPS mode refuses to sign with *key* ('RSA 1024 keys'), or None: only RSA keys
+        ``fips_rsa_bits_approved`` admits and the registered algorithms every module approves sign.
+        Cached public key, then label."""
         public = cls._cached_public_key(key)
         if isinstance(public, rsa.RSAPublicKey):
-            return None if public.key_size >= 2048 else f'RSA {public.key_size} keys'
+            approved = key_algorithms.fips_rsa_bits_approved(public.key_size)
+            return None if approved else f'RSA {public.key_size} keys'
+        if public is None and key_algorithms.rsa_bits_of_label(key.algorithm) is not None:
+            approved = key_algorithms.fips_rsa_bits_approved(key_algorithms.rsa_bits_of_label(key.algorithm))
+            return None if approved else f'{key.algorithm} keys'
         # A public key that can be read decides alone: its label may say anything
         label = key.algorithm if public is None else key_algorithms.label_for_public_key(public)
         registered = key_algorithms.get(label)

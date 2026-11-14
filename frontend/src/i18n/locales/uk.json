@@ -3465,6 +3465,10 @@
           "title": "DNS-провайдери RFC 2136 з підписом TSIG hmac-md5: оновлення DNS-01 відхиляються в режимі FIPS",
           "remedy": "Створіть ключ TSIG hmac-sha256 на DNS-сервері та введіть його в провайдері."
         },
+        "session_short_secret_key": {
+          "title": "The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be issued or checked with it, so every sign-in fails",
+          "remedy": "Set a SECRET_KEY of 32 characters or more in the service environment and restart."
+        },
         "hmac_short_secret": {
           "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
           "remedy": "Regenerate the webhook secrets and create TSIG keys of at least 14 bytes (hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers."

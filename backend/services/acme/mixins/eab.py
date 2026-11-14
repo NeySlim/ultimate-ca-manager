@@ -1,6 +1,5 @@
 """External Account Binding (EAB) mixin for ACME service"""
 import json
-import hashlib
 import base64
 import logging
 from typing import Dict, Any, Optional, Tuple
@@ -96,12 +95,8 @@ class EabMixin:
             # Verify HMAC signature
             signing_input = f"{protected_b64}.{payload_b64}".encode('ascii')
             
-            if alg == 'HS256':
-                mac = hmac_lib.new(hmac_key, signing_input, hashlib.sha256).digest()
-            elif alg == 'HS384':
-                mac = hmac_lib.new(hmac_key, signing_input, hashlib.sha384).digest()
-            else:  # HS512
-                mac = hmac_lib.new(hmac_key, signing_input, hashlib.sha512).digest()
+            digest = {'HS256': 'sha256', 'HS384': 'sha384', 'HS512': 'sha512'}[alg]
+            mac = hmac_lib.digest(hmac_key, signing_input, digest)
             
             expected_sig = base64.urlsafe_b64encode(mac).rstrip(b'=').decode('ascii')
             actual_sig = eab_data['signature']

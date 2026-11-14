@@ -6,11 +6,11 @@ https://www.inwx.de/en/help/apidoc
 import requests
 from typing import Tuple, Dict, Any, Optional
 import logging
-import hashlib
 import time
 import hmac
 import base64
 
+import fips_mode
 from .base import BaseDnsProvider
 
 logger = logging.getLogger(__name__)
@@ -88,6 +88,8 @@ class InwxDnsProvider(BaseDnsProvider):
             'pass': self.credentials['password']
         }
         
+        if self.credentials.get('shared_secret'):  # refused before the password leaves
+            fips_mode.refuse_short_hmac_key(self.hmac_key(self.credentials), self.HMAC_SECRET_NAME)
         success, result = self._rpc_call('account.login', params)
         if not success:
             return False, result
@@ -101,21 +103,28 @@ class InwxDnsProvider(BaseDnsProvider):
         
         return True, "Logged in"
     
+    HMAC_SECRET_NAME = 'INWX shared secret'
+
+    @classmethod
+    def hmac_key(cls, credentials) -> bytes:
+        """The TOTP key: the shared secret in base32, padded to a multiple of 8 characters."""
+        secret = str(credentials.get('shared_secret') or '')
+        try:
+            return base64.b32decode(secret.upper() + '=' * (-len(secret) % 8))
+        except Exception:
+            return secret.encode()
+
     def _generate_totp(self, secret: str) -> str:
         """Generate TOTP code from shared secret"""
-        # Base32 decode the secret
-        import base64
-        try:
-            key = base64.b32decode(secret.upper() + '=' * (8 - len(secret) % 8))
-        except Exception:
-            key = secret.encode()
+        key = self.hmac_key({'shared_secret': secret})
         
         # Time-based counter
         counter = int(time.time() // 30)
         counter_bytes = counter.to_bytes(8, 'big')
         
         # HMAC-SHA1
-        hmac_result = hmac.new(key, counter_bytes, hashlib.sha1).digest()
+        fips_mode.refuse_short_hmac_key(key, self.HMAC_SECRET_NAME)
+        hmac_result = hmac.digest(key, counter_bytes, 'sha1')
         
         # Dynamic truncation
         offset = hmac_result[-1] & 0x0F
