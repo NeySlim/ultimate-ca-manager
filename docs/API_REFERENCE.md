@@ -289,6 +289,8 @@ GET /api/v2/account/2fa/recovery-codes
 POST /api/v2/account/2fa/recovery-codes/regenerate
 ```
 
+A code checked by `2fa/disable` or `2fa/recovery-codes/regenerate` counts against the same `max_login_attempts` as the second step of a login for that account; past it, both answer 429 until `lockout_duration` has passed, and a code accepted resets the count.
+
 ### API Keys
 
 ```http
@@ -539,6 +541,9 @@ an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has
 An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named
 in `meta.notices`. An intermediate under an ML-DSA parent likewise takes no digest; an
 ML-DSA intermediate under an RSA or EC parent uses its parent's digest.
+
+In HA mode, a CA on a SoftHSM key (`hsm_key_id` of a key on a SoftHSM provider, or a new key
+through `hsm_provider_id`) answers `409` with code `ha_mode`, whatever the CA type.
 
 Optional `namedUrls: true` gives the CA an immutable unique slug derived from
 its name, used instead of the random id in CDP/AIA URL paths (both forms keep
@@ -3644,6 +3649,9 @@ Content-Type: application/json
 }
 ```
 
+In HA mode a SoftHSM provider (a PKCS#11 module path or a name that says `softhsm`) answers `409`
+with code `ha_mode`, and so does an update that points a provider at SoftHSM (see [HA](HA.md)).
+
 `certification` is optional: the certification the operator declares for the hardware
 (`cc-eal4+`, `eucc-high`, `fips-140-3-l3`, `fips-140-2-l3` or `other`; `null`, absent or `""` means
 not declared). UCM does not verify it. Any other value is a 400. Providers return it as
@@ -3684,6 +3692,8 @@ POST /api/v2/hsm/providers/{provider_id}/test
 POST /api/v2/hsm/providers/{provider_id}/sync
 ```
 
+In HA mode, syncing a SoftHSM provider answers `409` with code `ha_mode`: its keys exist on one node only.
+
 ### List HSM Keys
 ```http
 GET /api/v2/hsm/keys
@@ -3711,6 +3721,8 @@ service). `azure-keyvault` and `aws-cloudhsm` answer `400` for both families, an
 refuses ML-DSA on every provider. An ML-DSA key signs the data itself: no digest applies.
 Google Cloud KMS signs at most 64 KiB of data with it, so a larger CRL fails with a message
 that says so.
+
+In HA mode, a key on a SoftHSM provider answers `409` with code `ha_mode`.
 
 ### Get HSM Key
 ```http

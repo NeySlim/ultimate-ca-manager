@@ -1,4 +1,4 @@
-"""Upgrade step 159: backup_archives and backup_archive_chunks, the HA archive store.
+"""Upgrade step 160: backup_archives and backup_archive_chunks, the HA archive store.
 
 In HA every archive is written to the database in fixed-size chunks, so any node lists
 and serves it. Created on SQLite too, where it stays empty (HA runs on PostgreSQL only).
@@ -27,13 +27,13 @@ def upgrade(conn):
         conn.execute(CHUNKS.format(bigint='INTEGER', blob='BLOB'))
         conn.execute(INDEX)
         conn.commit()
-        logger.info("[159] backup_archives (SQLite)")
+        logger.info("[160] backup_archives (SQLite)")
         return
     from sqlalchemy import text
     conn.execute(text(ARCHIVES.format(serial='BIGSERIAL PRIMARY KEY', timestamp='TIMESTAMP WITHOUT TIME ZONE')))
     conn.execute(text(CHUNKS.format(bigint='BIGINT', blob='BYTEA')))
     conn.execute(text(INDEX))
-    logger.info("[159] backup_archives (PostgreSQL)")
+    logger.info("[160] backup_archives (PostgreSQL)")
 
 
 def downgrade(conn):
