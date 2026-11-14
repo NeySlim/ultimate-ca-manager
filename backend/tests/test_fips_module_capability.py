@@ -814,3 +814,24 @@ class TestHsmSignApiInFipsMode:
         r = _post(auth_client, f'/api/v2/crl/{weak_hsm_ca}/regenerate', {})
         assert r.status_code == 200, r.get_json()
 
+    def test_ocsp_answers_unauthorized_without_error(self, monkeypatch, caplog, weak_hsm_ca, fips_on):
+        # Refused when the key is loaded, as a software key is: UNAUTHORIZED and a warning
+        import logging
+        from services.ocsp_service import OCSPService
+        ca = db.session.get(CA, weak_hsm_ca)
+        with caplog.at_level(logging.WARNING):
+            _, status = OCSPService().generate_response(ca, 12345)
+        assert status == 'unauthorized'
+        assert 'RSA 1024 keys not available in FIPS mode' in caplog.text
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR
+                    and r.name == 'services.ocsp_service'], caplog.text
+
+    def test_scheduled_crl_logs_one_line(self, caplog, weak_hsm_ca, fips_on):
+        import logging
+        from services.crl_scheduler_task import CRLSchedulerTask
+        with caplog.at_level(logging.WARNING):
+            assert CRLSchedulerTask.regenerate_crl(weak_hsm_ca) is False
+        ours = [r for r in caplog.records if r.name.startswith(('services.crl', 'services.hsm'))]
+        assert [r.getMessage() for r in ours] == [
+            f'CRL of CA {weak_hsm_ca} not signed: RSA 1024 keys not available in FIPS mode'], caplog.text
+        assert all(r.exc_info is None and r.levelno == logging.WARNING for r in ours)
