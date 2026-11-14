@@ -10,7 +10,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, Certificate
-from services.cert.unique_subject import SubjectTaken, audit_override, refuse_taken_subject
+from services.cert.unique_subject import (SubjectTaken, audit_override, refuse_taken_subject,
+                                          successor_holder)
 from utils.ca_serial_counter import (
     log_commit_failure, next_ca_serial, retry_on_serial_collision,
     rollback_unless_serial_collision)
@@ -449,10 +450,13 @@ class CSRMixin:
 
         # RFC 9763: the A the request named and the certificate now names, refused if renewed since
         try:
-            link_issued(certificate, cert, related_a)
+            a_row = link_issued(certificate, cert, related_a)
         except Exception:
             db.session.rollback()
             raise
+        # A verified relatedCertRequest proves A's key: B is A's entity (RFC 9763 pair)
+        if a_row is not None:
+            certificate.subject_holder = successor_holder(subject_holder, [a_row])
 
         # Store SANs
         if san_dns_list:
@@ -515,7 +519,7 @@ class CSRMixin:
             overridden = None
             if new_ca is None:  # a CA certificate is out of the subject rule's scope
                 overridden = refuse_taken_subject(
-                    ca, cert, own=[certificate], holder=subject_holder,
+                    ca, cert, own=[certificate], renews=[a_row], holder=subject_holder,
                     override=override_unique_subject, source=source,
                     requester=username)
             db.session.commit()

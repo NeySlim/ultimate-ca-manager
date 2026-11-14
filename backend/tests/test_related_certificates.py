@@ -1078,3 +1078,41 @@ def test_the_csr_route_refuses_a_bad_related_to(auth_client, related_to, message
     r = auth_client.post('/api/v2/csrs', json={'cn': 'bad-related.example.com', 'key_type': 'EC P-256',
                                                'related_to': related_to})
     assert r.status_code == 400 and message in r.data, r.data
+
+
+# ---- a unique subject (RFC 5280 §4.1.2.6) and the pair -------------------------
+
+@pytest.fixture
+def unique_subject_on(app, cert_a):
+    with app.app_context():
+        ca = _signing_ca(cert_a[0])[0]
+        ca.enforce_unique_subject = True
+        db.session.commit()
+    yield
+    with app.app_context():
+        ca = _signing_ca(cert_a[0])[0]
+        ca.enforce_unique_subject = False
+        db.session.commit()
+
+
+def test_est_issues_b_although_a_carries_its_subject(app, cert_a, unique_subject_on):
+    """The verified relatedCertRequest proves A's key: B is A's entity, not another one."""
+    from services.ca_service import CAService
+    row_id, cert, key = cert_a
+    with app.app_context():
+        ca = _signing_ca(row_id)[0]
+        csr = x509.load_pem_x509_csr(_csr_b(cert, key))
+        CAService.sign_csr_from_crypto(ca, csr, validity_days=30, source='est')
+        b_row = Certificate.query.filter_by(related_certificate_id=row_id).order_by(
+            Certificate.id.desc()).first()
+        assert b_row is not None and b_row.related_certificate_id == row_id
+        assert b_row.subject_holder == f'cert:{db.session.get(Certificate, row_id).refid}'
+
+
+def test_csr_signing_issues_b_although_a_carries_its_subject(app, auth_client, cert_a, unique_subject_on):
+    """Without an override: the pair is one entity, the 409 is not for it."""
+    row_id = cert_a[0]
+    b_id = _sign_b(app, auth_client, row_id)
+    with app.app_context():
+        assert db.session.get(Certificate, b_id).subject_holder == \
+            f'cert:{db.session.get(Certificate, row_id).refid}'

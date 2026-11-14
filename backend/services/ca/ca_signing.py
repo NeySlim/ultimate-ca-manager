@@ -361,7 +361,10 @@ class CASigningMixin:
             if supersedes is not None and not _claim_superseded(supersedes, renewal_of, new_cert):
                 db.session.rollback()
                 raise AlreadySuperseded('the renewed certificate is already superseded')
-            link_issued(new_cert, cert_obj, related_a)
+            # A verified relatedCertRequest proves A's key: B is A's entity (RFC 9763 pair)
+            a_row = link_issued(new_cert, cert_obj, related_a)
+            designated = [a_row, supersedes, *(renews or ())]
+            new_cert.subject_holder = successor_holder(subject_holder, designated)
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
             if on_stored is not None:
@@ -371,7 +374,7 @@ class CASigningMixin:
             next_ca_serial(ca)
             # Read once the CA row is locked (PostgreSQL) or the database write lock held
             # (SQLite, since the flush): a concurrent issuance under this CA commits before or after
-            refuse_taken_subject(ca, cert_obj, own=[new_cert], renews=[supersedes, *(renews or ())],
+            refuse_taken_subject(ca, cert_obj, own=[new_cert], renews=designated,
                                  holder=subject_holder, requester_sid=requester_sid,
                                  pattern=unique_subject, source=source)
             db.session.commit()
