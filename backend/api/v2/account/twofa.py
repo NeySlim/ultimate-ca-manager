@@ -173,8 +173,11 @@ def disable_2fa():
         db.session.rollback()
         return answer
 
+    # A secret not confirmed yet is no factor of the login: its codes are not counted
+    counted = bool(user.totp_confirmed)
+    db.session.rollback()
     # Counted before the row lock below, which the reservation's commit releases
-    locked = _reserve_code_check(g.current_user.id)
+    locked = _reserve_code_check(g.current_user.id) if counted else None
     if locked:
         return locked
 
@@ -204,7 +207,8 @@ def disable_2fa():
     ok, _err = safe_commit(logger, "Failed to disable 2FA")
     if not ok:
         return _err
-    _clear_code_checks(user.id)
+    if counted:
+        _clear_code_checks(user.id)
 
     AuditService.log_action(
         action='mfa_disable',

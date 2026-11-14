@@ -453,6 +453,20 @@ def test_a_disable_refused_before_any_code_is_checked_uses_no_attempt(nodes):
     assert _totp_still_on(a, user)
 
 
+def test_a_code_checked_against_an_unconfirmed_secret_uses_no_attempt(nodes):
+    """A TOTP enrolment not confirmed yet is no factor of the login: its codes are not counted."""
+    a, b, user = nodes
+    c, headers = _open_session(a, user)
+    with a.app_context():
+        db.session.get(User, user['id']).totp_confirmed = False
+        db.session.commit()
+        db.session.remove()
+    for _ in range(_max_attempts(a)[0] + 1):
+        r = c.post('/api/v2/account/2fa/disable', json={'code': '00000000'}, headers=headers)
+        assert (r.status_code, r.get_json()['message']) == (400, 'Invalid verification code')
+    assert ('2fa', str(user['id'])) not in _rows(b)
+
+
 @pytest.mark.parametrize('route', sorted(SESSION_ROUTES))
 def test_a_session_code_check_that_succeeds_clears_the_counter(nodes, route):
     a, b, user = nodes
