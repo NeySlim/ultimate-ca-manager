@@ -96,9 +96,27 @@ def observe(engine):
     return shot
 
 
+_BARE = re.compile(r'"?([A-Za-z_][A-Za-z0-9_]*)"?(\s+(asc|desc))?$', re.I)
+
+
 def _columns_of(index_def):
-    found = re.search(r'\(([^)]*)\)', index_def or '')
-    return [c.strip() for c in found.group(1).split(',')] if found else None
+    """The column names an index keys on, or None when a key is not a bare column (an expression)."""
+    start = (index_def or '').find('(')
+    if start < 0:
+        return None
+    depth, keys, key = 0, [], ''
+    for ch in index_def[start + 1:]:
+        if ch == ')' and depth == 0:
+            break
+        depth += {'(': 1, ')': -1}.get(ch, 0)
+        if ch == ',' and depth == 0:
+            keys.append(key)
+            key = ''
+        else:
+            key += ch
+    keys.append(key)
+    bare = [_BARE.match(k.strip()) for k in keys]
+    return [m.group(1) for m in bare] if all(bare) else None
 
 
 def violations(before, after):

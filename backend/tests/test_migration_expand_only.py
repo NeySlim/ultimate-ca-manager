@@ -147,6 +147,11 @@ def upgrade(conn):
 def upgrade(conn):
     run(conn, "CREATE UNIQUE INDEX ux_scheduler_requests_task ON scheduler_requests (task_name)")
 ''',
+    # Its key is an expression: no column name to compare, the new uniqueness still binds 3.0
+    'adds_a_unique_expression_index': '''
+def upgrade(conn):
+    run(conn, "CREATE UNIQUE INDEX ux_websocket_relay_note_ci ON websocket_relay (lower(note))")
+''',
     'adds_a_check': '''
 def upgrade(conn):
     if lite(conn):
@@ -177,6 +182,7 @@ EXPECTED = {
     'deletes_rows': [('delete rows', 'websocket_relay', '')],
     'drops_a_column_out_of_sight': [('drop column', 'encryption_keys', 'retire_after')],
     'adds_a_unique_index': [('unique', 'scheduler_requests', 'ux_scheduler_requests_task')],
+    'adds_a_unique_expression_index': [('unique', 'websocket_relay', 'ux_websocket_relay_note_ci')],
     'adds_a_check': [('check', 'crl_number_counters', 'last_number >= 0')],
     'drops_a_column_marked': [('drop column', 'websocket_relay', 'payload')],
 }
