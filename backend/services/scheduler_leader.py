@@ -234,6 +234,12 @@ def write_heartbeat(node_id, leader, started_at) -> None:
 
     ``started_at`` is on the cluster clock (to_cluster_clock), as heartbeat_at is.
     """
+    from services.cluster_maintenance import exempt
+    with exempt():  # a node in maintenance keeps its heartbeat, or it would count as gone
+        _write_heartbeat(node_id, leader, started_at)
+
+
+def _write_heartbeat(node_id, leader, started_at) -> None:
     from config.settings import Config
     from models import ClusterNode, db
     now = cluster_utc_now()

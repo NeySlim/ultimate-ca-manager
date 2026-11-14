@@ -38,6 +38,13 @@ def _cluster():
         return None
 
 
+def _maintenance():
+    """HA: the cluster maintenance this process refuses writes for, or None."""
+    from services import cluster_maintenance
+    view = cluster_maintenance.current(refresh=True)
+    return view.public() if view is not None else None
+
+
 def _check_cluster():
     """HA only: 503 until this node has ever registered; a row left by an earlier run counts."""
     from config.settings import Config
@@ -84,6 +91,7 @@ def health():
     from config.settings import Config
     if Config.HA_MODE:
         result['cluster'] = _cluster()
+        result['maintenance'] = _maintenance()
     if current_app.config.get('SAFE_MODE'):
         result['safe_mode'] = True
         result['safe_mode_reason'] = current_app.config.get('SAFE_MODE_REASON',
@@ -117,6 +125,11 @@ def readiness():
         checks['cluster'] = _check_cluster()
 
     all_ok = all(c.get('status') in ('ok', 'skipped') for c in checks.values())
+    maintenance = _maintenance() if Config.HA_MODE else None
+    if maintenance is not None:
+        # Out of the load balancer's rotation until the maintenance ends for this process
+        return jsonify({'status': 'maintenance', 'maintenance': maintenance, 'checks': checks,
+                        **_ha_fields()}), 503
 
     if current_app.config.get('SAFE_MODE'):
         # Single node stays in the Service so the safe-mode UI remains reachable,

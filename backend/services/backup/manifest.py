@@ -557,6 +557,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'cluster_nodes': 'heartbeats of the running HA nodes: runtime state of one cluster, never restored',
     'scheduler_requests': 'pending run-now requests of one cluster: runtime state, never restored',
     'cluster_commands': 'HA reload and restart queue of one cluster: runtime state, never restored',
+    'cluster_maintenance': 'the HA maintenance a restore holds while it runs: runtime state, never restored',
     'encryption_keys': ('data-encryption keys wrapped by this installation\'s key-encryption key: '
                         'the archive carries the values in the clear and the target encrypts them '
                         'under its own key'),

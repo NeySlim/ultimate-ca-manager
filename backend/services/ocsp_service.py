@@ -1114,6 +1114,9 @@ class OCSPService:
         revocation_reason: Optional[int]
     ):
         """Cache OCSP response in database"""
+        from services.cluster_maintenance import blocks_writes
+        if blocks_writes():
+            return  # HA maintenance: answered from the state before it, never stored
         try:
             # Check if response already exists
             existing = OCSPResponse.query.filter_by(

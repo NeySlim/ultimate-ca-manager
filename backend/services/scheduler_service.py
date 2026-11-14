@@ -525,6 +525,11 @@ class SchedulerService:
             if requested:
                 self._defer(task)
             return False
+        if self._in_maintenance():
+            task._run_lock.release()
+            if requested:
+                self._defer(task)  # run once the maintenance is over
+            return False
         try:
             if on_follower and (self._owns_lock or not self._running):
                 if requested:
@@ -687,6 +692,10 @@ class SchedulerService:
                     self._took_leadership()
                     self._publish_state()
                 self._heartbeat(force=lost)
+                if self._in_maintenance():
+                    # Nothing claimed, run or published; the heartbeat above goes on
+                    self._wake.wait(LOCK_RETRY_SECONDS)
+                    continue
                 if not self._owns_lock:
                     if _ha():
                         self._start_node_tasks()
@@ -807,6 +816,17 @@ class SchedulerService:
             if not self._heartbeat_error_logged:
                 logger.error(f"Node heartbeat not written: {type(e).__name__}: {e}")
                 self._heartbeat_error_logged = True
+
+    def _in_maintenance(self) -> bool:
+        """HA: this process refuses writes for a cluster maintenance, so no task starts."""
+        if not _ha() or self._app is None:
+            return False
+        from services import cluster_maintenance
+        try:
+            self._in_app(cluster_maintenance.current)
+        except Exception as e:
+            logger.error(f"Cluster maintenance not read by the scheduler: {type(e).__name__}")
+        return cluster_maintenance.blocks_writes(self._app)
 
     def _in_app(self, fn, *args):
         if self._app is not None:
