@@ -40,11 +40,11 @@ PROFILE_COLUMNS = ('name', 'realm', 'is_default', 'enabled', 'connector_id', 'is
 
 
 def _migration():
-    return importlib.import_module('migrations.155_windows_enrollment_profiles')
+    return importlib.import_module('migrations._from_2_254.155_windows_enrollment_profiles')
 
 
 def _schema_2x(dialect):
-    return (FIXTURES / f'schema_v2253_{dialect}.sql').read_text()
+    return (FIXTURES / f'schema_v2254_{dialect}.sql').read_text()
 
 
 class _Base:
@@ -272,12 +272,12 @@ def test_xcep_without_its_own_ca_is_switched_off(base, changes, switch):
 
 
 def test_upgrading_a_real_2x_base_gives_the_direct_conversion(base):
-    """Every migration after 2.253, on its schema: the profile is the conversion of the settings."""
+    """The upgrade from 2.254, on its schema: the profile is the conversion of the settings."""
     base.seed()
     base.upgrade_all()
     direct = profile_from_2x(SETTINGS_2X, CONNECTOR_2X, None)
     assert _normalised(base.profiles()) == [{k: direct[k] for k in PROFILE_COLUMNS}]
-    assert base.rows("SELECT name FROM _migrations WHERE name = '155_windows_enrollment_profiles'")
+    assert base.rows("SELECT name FROM _migrations WHERE name = '300_upgrade_from_2_254'")
 
 
 def test_the_app_schema_has_the_migrated_columns(app):

@@ -12,7 +12,7 @@ RUNS = 'discovery_scan_runs'
 
 
 def _migration():
-    return importlib.import_module('migrations.141_cluster_nodes')
+    return importlib.import_module('migrations._from_2_254.141_cluster_nodes')
 
 
 def test_sqlite_creates_the_tables_and_column_and_is_idempotent():

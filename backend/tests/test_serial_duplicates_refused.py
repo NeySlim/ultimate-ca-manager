@@ -16,14 +16,14 @@ SERIAL = '424242'
 
 
 def _migration():
-    return importlib.import_module('migrations.142_serial_per_ca_and_proxy_links')
+    return importlib.import_module('migrations._from_2_254.142_serial_per_ca_and_proxy_links')
 
 
 def _states_the_procedure(message):
     """Packages ship no docs/: the message itself says how to clear the duplicates."""
     assert 'docs/' not in message and '.md' not in message
     assert 'Delete all but one' in message and 'revoked row still counts' in message
-    assert "'142_serial_per_ca_and_proxy_links'" in message and '_migrations' in message
+    assert 'Then restart UCM' in message and '_migrations' not in message
 
 
 def test_the_database_listing_names_each_pair_and_its_rows():
@@ -84,7 +84,7 @@ def test_a_backend_migration_refuses_a_source_with_duplicate_serials(app, duplic
     assert not ok and stats['refusal'] == 'preflight' and stats['target_written'] is False
     assert caref in message and SERIAL in message
     assert all(f"{i} (stored as '{SERIAL}')" in message for i in ids)
-    assert 'migration 142' in message
+    assert 'upgrade from 2.254' in message
     _states_the_procedure(message)
 
 
@@ -101,7 +101,7 @@ def test_a_restore_refuses_an_archive_with_duplicate_serials(app, create_ca):
                 _service().restore_backup(blob, PASSWORD, mode='merge')
             assert caref in str(refusal.value) and SERIAL in str(refusal.value)
             assert all(f"{r} (stored as '{SERIAL}')" in str(refusal.value) for r in refids)
-            assert 'migration 142' in str(refusal.value)
+            assert 'upgrade from 2.254' in str(refusal.value)
             _states_the_procedure(str(refusal.value))
             assert Certificate.query.filter(Certificate.refid.in_(refids)).count() == 0
         finally:

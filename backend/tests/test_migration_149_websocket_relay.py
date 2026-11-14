@@ -11,7 +11,7 @@ INSERT = "INSERT INTO websocket_relay (created_at, room, payload) VALUES ('2026-
 
 
 def _migration():
-    return importlib.import_module('migrations.149_websocket_relay')
+    return importlib.import_module('migrations._from_2_254.149_websocket_relay')
 
 
 def test_sqlite_creates_the_table_and_is_idempotent():

@@ -18,41 +18,6 @@ from services.notification_service import NotificationService
 from utils.datetime_utils import utc_now
 
 
-def _migration():
-    return importlib.import_module('migrations.082_expiry_alert_thresholds')
-
-
-def test_migration_082_adds_columns_and_keeps_single_threshold():
-    conn = sqlite3.connect(':memory:')
-    conn.execute(
-        'CREATE TABLE notification_config (id INTEGER PRIMARY KEY, type TEXT, '
-        'enabled BOOLEAN, days_before INTEGER, recipients TEXT)'
-    )
-    conn.execute(
-        'CREATE TABLE notification_log (id INTEGER PRIMARY KEY, type TEXT, '
-        'resource_type TEXT, resource_id TEXT, status TEXT, sent_at DATETIME)'
-    )
-    conn.execute(
-        "INSERT INTO notification_config (type, enabled, days_before, recipients) "
-        "VALUES ('cert_expiring', 1, 14, '[]')"
-    )
-    conn.commit()
-
-    migration = _migration()
-    migration.upgrade(conn)
-    migration.upgrade(conn)  # idempotent
-
-    cols = {row[1] for row in conn.execute('PRAGMA table_info(notification_config)')}
-    assert {'alert_days', 'include_revoked'} <= cols
-    log_cols = {row[1] for row in conn.execute('PRAGMA table_info(notification_log)')}
-    assert 'threshold_days' in log_cols
-    row = conn.execute(
-        "SELECT alert_days, days_before FROM notification_config WHERE type = 'cert_expiring'"
-    ).fetchone()
-    assert json.loads(row[0]) == [14]
-    assert row[1] == 14
-
-
 class _SmtpConfig:
     enabled = True
     smtp_host = 'smtp.example.com'
@@ -307,17 +272,6 @@ class TestModelIgnoresOutOfRangeThresholds:
             db.session.rollback()
 
 
-def test_migration_094_adds_exclude_acme_off_by_default():
-    conn = sqlite3.connect(':memory:')
-    conn.execute('CREATE TABLE notification_config (id INTEGER PRIMARY KEY, type TEXT)')
-    conn.execute("INSERT INTO notification_config (type) VALUES ('cert_expiring')")
-    conn.commit()
-    migration = importlib.import_module('migrations.094_expiry_alerts_exclude_acme')
-    migration.upgrade(conn)
-    migration.upgrade(conn)  # idempotent
-    assert conn.execute('SELECT exclude_acme FROM notification_config').fetchone() == (0,)
-
-
 def test_exclude_acme_is_saved_and_validated(app, auth_client, expiry_config):
     url = '/api/v2/system/alerts/expiry'
     r = auth_client.put(url, json={'exclude_acme': 'yes'})
@@ -327,26 +281,3 @@ def test_exclude_acme_is_saved_and_validated(app, auth_client, expiry_config):
     assert auth_client.get(url).get_json()['data']['exclude_acme'] is True
     with app.app_context():
         assert db.session.get(NotificationConfig, expiry_config).exclude_acme is True
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not os.getenv('UCM_TEST_PG_URL'), reason='UCM_TEST_PG_URL not set')
-def test_migration_094_on_postgresql():
-    from sqlalchemy import create_engine, text
-    schema = f'mig094_{os.getpid()}'
-    engine = create_engine(os.environ['UCM_TEST_PG_URL'])
-    try:
-        with engine.begin() as conn:
-            conn.execute(text(f'CREATE SCHEMA {schema}'))
-        with engine.begin() as conn:
-            conn.execute(text(f'SET LOCAL search_path TO {schema}'))
-            conn.execute(text('CREATE TABLE notification_config (id SERIAL PRIMARY KEY, type TEXT)'))
-            conn.execute(text("INSERT INTO notification_config (type) VALUES ('cert_expiring')"))
-            migration = importlib.import_module('migrations.094_expiry_alerts_exclude_acme')
-            migration.upgrade(conn)
-            migration.upgrade(conn)  # idempotent
-            assert conn.execute(text('SELECT exclude_acme FROM notification_config')).scalar() is False
-    finally:
-        with engine.begin() as conn:
-            conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        engine.dispose()

@@ -645,6 +645,8 @@ class AcmeProxyChallengeLink(db.Model):
     """Which proxy order, identifier and authorization an upstream challenge belongs to,
     per requester: shared by every worker and node, unlike a process cache."""
     __tablename__ = 'acme_proxy_challenge_links'
+    # Ids never reused, as step 142 creates the table
+    __table_args__ = {'sqlite_autoincrement': True}
 
     id = db.Column(db.Integer, primary_key=True)
     # SHA-256 of (challenge URL, requester account, requester thumbprint)

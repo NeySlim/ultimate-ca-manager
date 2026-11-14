@@ -62,39 +62,3 @@ def test_backups_export_the_flag(app, auth_client, create_ca):
     with app.app_context():
         exported = next(r for r in BackupService()._export_cas(True) if r['refid'] == ca['refid'])
     assert exported['issuance_hidden'] is True
-
-
-def test_sqlite_migration_lists_existing_cas():
-    m = importlib.import_module('migrations.118_ca_issuance_hidden')
-    conn = sqlite3.connect(':memory:')
-    conn.execute(f"CREATE TABLE {CA.__tablename__} (id INTEGER PRIMARY KEY, descr TEXT)")
-    conn.execute(f"INSERT INTO {CA.__tablename__} VALUES (1, 'old')")
-    m.upgrade(conn)
-    m.upgrade(conn)
-    assert conn.execute(f"SELECT issuance_hidden FROM {CA.__tablename__}").fetchone()[0] == 0
-    m.upgrade(sqlite3.connect(':memory:'))  # no table: a no-op
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_migration_lists_existing_cas():
-    m = importlib.import_module('migrations.118_ca_issuance_hidden')
-    schema = f"migtest_118_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    engine = create_engine(PG_URL)
-    conn = engine.connect()
-    try:
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.execute(text(f"CREATE SCHEMA {schema}"))
-        conn.execute(text(f"SET search_path TO {schema}"))
-        table = CA.__tablename__
-        conn.execute(text(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY, descr TEXT)"))
-        conn.execute(text(f"INSERT INTO {table} VALUES (1, 'old')"))
-        m.upgrade(conn)
-        m.upgrade(conn)
-        assert conn.execute(text(f"SELECT issuance_hidden FROM {table}")).scalar() is False
-    finally:
-        conn.rollback()
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.commit()
-        conn.close()
-        engine.dispose()

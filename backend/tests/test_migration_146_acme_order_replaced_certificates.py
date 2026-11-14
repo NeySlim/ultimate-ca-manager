@@ -14,7 +14,7 @@ VALUE = '[{"certificate_id": 7, "serial": "12"}]'
 
 def _migration():
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'migrations', '146_acme_order_replaced_certificates.py')
+                        'migrations', '_from_2_254', '146_acme_order_replaced_certificates.py')
     spec = importlib.util.spec_from_file_location('m146', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

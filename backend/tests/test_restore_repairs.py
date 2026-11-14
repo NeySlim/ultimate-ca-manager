@@ -107,6 +107,6 @@ def test_a_current_archive_is_left_as_it_is(target):
     assert set(results['repairs']) == {'102_dead_settings'}
 
 
-def test_every_declared_repair_is_a_migration_of_this_version():
-    from migration_runner import MIGRATIONS_DIR
-    assert all((MIGRATIONS_DIR / f'{repair.migration}.py').exists() for repair in REPAIRS)
+def test_every_declared_repair_is_characterised():
+    # 121 is characterised in test_backup_acme_orders_and_requests (doubled renewals restored)
+    assert {repair.migration for repair in REPAIRS} == set(REPAIRED) | {'121_acme_renewal_order_duplicates'}

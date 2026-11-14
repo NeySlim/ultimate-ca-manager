@@ -19,7 +19,7 @@ TABLES = ('CREATE TABLE certificates (id INTEGER PRIMARY KEY, serial_number TEXT
 
 def _migration():
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'migrations', '148_acme_replaced_certificate_fingerprints.py')
+                        'migrations', '_from_2_254', '148_acme_replaced_certificate_fingerprints.py')
     spec = importlib.util.spec_from_file_location('m148', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

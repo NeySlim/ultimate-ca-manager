@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 CONFIG_KEY = 'backup_installation_id'
 METADATA_KEY = 'installation_id'
 # Settings about this installation or cluster itself (scheduler state, the pending
-# serial index of migration 142, the scheduled backup's reservation and conclusion,
+# serial index of the upgrade from 2.254, the scheduled backup's reservation and conclusion,
 # services/backup/schedule.py, the expiry webhooks mark, the scheduled passes' leases, the
 # session key that signs this installation's tokens, the node holding the generated
 # initial password): never exported, never restored

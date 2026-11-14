@@ -6,12 +6,14 @@ all, and a failure of the snapshot, the verification, the bootstrap or the
 configuration write — each of which must forbid the switch rather than
 produce a half-migrated installation nobody was told about.
 """
+import contextlib
 import json
 import os
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import Table, create_engine, event, inspect, text
+from sqlalchemy.engine import Engine
 
 from config.settings import DATA_DIR
 from models import db
@@ -323,6 +325,132 @@ class TestTheDataKeysCrossTheSwitch:
         self._bootstrap(app, pg_target)
 
 
+# The child reads neither the host's env file nor its master key, as under conftest
+_BOOT_ON_TARGET = '''
+import os
+import dotenv
+dotenv.load_dotenv = lambda *a, **k: False
+from pathlib import Path
+from security import encryption
+encryption.MASTER_KEY_PATH = Path(os.environ['DATA_DIR']) / 'master.key'
+encryption.key_encryption.reload()
+from config import settings
+from utils.db_url import sqlalchemy_url
+settings.TestingConfig.SQLALCHEMY_DATABASE_URI = sqlalchemy_url(os.environ['DATABASE_URL'])
+from app import create_app
+create_app('testing')
+print('BOOTED')
+'''
+
+
+def _boots(target, tmp_path):
+    """The application starts on *target*, in a child that reads nothing of the host."""
+    import subprocess
+    import sys
+    data = tmp_path / 'node'
+    data.mkdir()
+    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+    env.update(DATA_DIR=str(data), DATABASE_PATH=str(data / 'ucm.db'), DATABASE_URL=target,
+               UCM_SKIP_SECRET_VALIDATION='1', UCM_HA='0')
+    backend = Path(__file__).resolve().parents[1]
+    run = subprocess.run([sys.executable, '-c', _BOOT_ON_TARGET], cwd=backend, env=env,
+                         capture_output=True, text=True, timeout=180)
+    assert run.returncode == 0 and 'BOOTED' in run.stdout, run.stdout[-3000:] + run.stderr[-3000:]
+
+
+@pytest.fixture
+def a_3_0_source(app):
+    """The session database carries the registry of a started 3.0 database, as a real source does."""
+    import migration_runner
+    with app.app_context():
+        engine, pg = db.engine, db.engine.dialect.name == 'postgresql'
+        created = '_migrations' not in inspect(engine).get_table_names()
+        migration_runner._ensure_tracking_table(engine, pg)
+        with engine.connect() as conn:
+            present = {r[0] for r in conn.execute(text('SELECT name FROM _migrations'))}
+        added = [n for n in migration_runner._list_migration_names() if n not in present]
+        migration_runner._mark_applied(engine, added, pg)
+    yield
+    with app.app_context():
+        with db.engine.begin() as conn:
+            if created:
+                conn.execute(text('DROP TABLE _migrations'))
+                return
+            for name in added:
+                conn.execute(text('DELETE FROM _migrations WHERE name = :n'), {'n': name})
+
+
+class TestASwitchedTargetStarts:
+    """The target of a switch, with or without its data, is a 3.0 database: its registry
+    names every current migration, so the pivot accepts it and the next start goes to the end."""
+
+    def _switch_then_start(self, app, target, tmp_path, monkeypatch,
+                           switch=migration.bootstrap_auth_to_target):
+        import migration_runner
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        with app.app_context():
+            ok, message, _ = switch(target)
+        assert ok is True, message
+
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with engine.connect() as conn:
+                registry = sorted(r[0] for r in conn.execute(text('SELECT name FROM _migrations')))
+        finally:
+            engine.dispose()
+        assert registry == migration_runner._list_migration_names()
+
+        monkeypatch.setattr(migration_runner, '_get_db_url', lambda: target)
+        assert migration_runner.run_all_migrations() is True
+        _boots(target, tmp_path)
+
+    def test_without_data_to_sqlite(self, app, sqlite_target, tmp_path, monkeypatch):
+        self._switch_then_start(app, sqlite_target, tmp_path, monkeypatch)
+
+    @_needs_pg
+    def test_without_data_to_postgresql(self, app, pg_target, tmp_path, monkeypatch):
+        self._switch_then_start(app, pg_target, tmp_path, monkeypatch)
+
+    def test_with_data_to_sqlite(self, app, a_3_0_source, sqlite_target, tmp_path, monkeypatch):
+        self._switch_then_start(app, sqlite_target, tmp_path, monkeypatch, migration.migrate_data)
+
+    @_needs_pg
+    def test_with_data_to_postgresql(self, app, a_3_0_source, pg_target, tmp_path, monkeypatch):
+        self._switch_then_start(app, pg_target, tmp_path, monkeypatch, migration.migrate_data)
+
+    @_needs_pg
+    def test_with_data_from_postgresql_to_sqlite(self, app, a_3_0_source, pg_target, sqlite_target,
+                                                tmp_path, monkeypatch):
+        try:
+            _require_a_dumpable_bench()
+            dumpable = True
+        except pytest.skip.Exception:
+            dumpable = False
+        with app.app_context():
+            ok, message, _ = migration.migrate_data(pg_target)
+        assert ok is True, message
+
+        def from_postgresql(target):
+            if not dumpable:
+                # A PostgreSQL source's dump only restores the source: the target's start never reads it
+                monkeypatch.setattr(migration, 'create_source_snapshot', lambda: snapshot.SourceSnapshot(
+                    path=tmp_path / 'stub.dump', backend='postgresql', size_bytes=0, sha256='0' * 64,
+                    created_at='', verified='stubbed', method='stubbed'))
+            pg_engine = create_engine(pg_target, pool_pre_ping=True)
+            engines = db._app_engines[app]
+            original, engines[None] = engines[None], pg_engine
+            db.session.remove()
+            try:
+                return migration.migrate_data(target)
+            finally:
+                engines[None] = original
+                db.session.remove()
+                pg_engine.dispose()
+
+        self._switch_then_start(app, sqlite_target, tmp_path, monkeypatch, from_postgresql)
+
+
 class TestTheSourceKeepsBeingWrittenTo:
     def test_a_row_written_during_the_copy_is_wholly_in_or_wholly_out(
             self, app, create_ca, create_cert, sqlite_target, monkeypatch):
@@ -599,6 +727,41 @@ class TestNothingSwitchesUnlessEverythingPassed:
         assert env_file.read_text() == before
         assert not restart_signal.exists()
 
+    @pytest.mark.parametrize('refusal,advice', [
+        ('error', 'Retrying on the same target resumes the switch.'),
+        ('copy', 'Retrying on the same target resumes the switch.'),
+        ('verification', 'failed its verification; reset the target before retrying.'),
+    ])
+    def test_a_bootstrap_cut_short_says_how_to_retry(
+            self, auth_client, sqlite_target, env_file, refusal, advice, monkeypatch):
+        import api.v2.database as route_module
+
+        monkeypatch.setattr(
+            route_module.svc, 'bootstrap_auth_to_target',
+            lambda url: (False, 'Bootstrap failed: stopped',
+                         {'refusal': refusal, 'target_written': True}))
+
+        response = self._post(auth_client, 'switch', {'database_url': sqlite_target})
+
+        assert response.status_code == 500, response.data
+        message = json.loads(response.data)['message']
+        assert message.endswith(advice), message
+        assert 'carries a schema' not in message
+
+    def test_a_refused_plan_does_not_promise_a_resume(self, auth_client, sqlite_target, monkeypatch):
+        """A table or column the plan refuses is refused again by a retry."""
+        import api.v2.database as route_module
+
+        monkeypatch.setattr(
+            route_module.svc, 'bootstrap_auth_to_target',
+            lambda url: (False, "Bootstrap failed: Column 'users.x' has no counterpart on the target",
+                         {'refusal': 'preflight', 'target_written': True}))
+
+        response = self._post(auth_client, 'switch', {'database_url': sqlite_target})
+
+        message = json.loads(response.data)['message']
+        assert message.endswith('has no counterpart on the target'), message
+
     def test_a_configuration_that_could_not_be_written_forbids_the_restart(
             self, auth_client, sqlite_target, restart_signal, monkeypatch):
         import api.v2.database as route_module
@@ -734,3 +897,357 @@ class TestTheProofIsReturnedEitherWay:
         assert proof['snapshot']['sha256']
         assert proof['validation']
         assert proof['rows'] > 0
+
+
+def _provision(url, registry, with_user=True):
+    """A target that already holds the schema, an account unless told otherwise, and
+    *registry* as its `_migrations` (None: no registry table at all)."""
+    import migration_runner
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+    migration._force_register_all_models()
+    is_pg = url.startswith('postgresql')
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        db.metadata.create_all(engine)
+        if with_user:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "INSERT INTO users (username, email, password_hash, role, auth_source) "
+                    "VALUES ('target_owner', 'owner@target', 'x', 'admin', 'local')"))
+        if registry is not None:
+            migration_runner._ensure_tracking_table(engine, is_pg)
+            migration_runner._mark_applied(engine, sorted(registry), is_pg)
+    finally:
+        engine.dispose()
+
+
+def _registry_of(url):
+    """The target's registry, or None when it has no `_migrations` table."""
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        if '_migrations' not in inspect(engine).get_table_names():
+            return None
+        with engine.connect() as conn:
+            return sorted(r[0] for r in conn.execute(text('SELECT name FROM _migrations')))
+    finally:
+        engine.dispose()
+
+
+def _starts(url, monkeypatch):
+    import migration_runner
+    monkeypatch.setattr(migration_runner, '_get_db_url', lambda: url)
+    return migration_runner.run_all_migrations()
+
+
+def _pivot_registry_but(missing):
+    from migrations._from_2_254 import PIVOT_NAMES
+    return set(PIVOT_NAMES) - {missing}
+
+
+def _the_3_0_registry():
+    import migration_runner
+    return set(migration_runner._list_migration_names())
+
+
+class TestASwitchNeverNamesATargetTheStartRefuses:
+    """The switch reads the target's registry before ucm.env is written: a target the
+    pivot would refuse at start is refused here, with the pivot's own message."""
+
+    def _post_switch(self, auth_client, url):
+        return auth_client.post('/api/v2/database/switch',
+                                data=json.dumps({'database_url': url}),
+                                content_type='application/json')
+
+    def _refused(self, auth_client, url, env_file, restart_signal, monkeypatch, expected):
+        before = env_file.read_text()
+        registry = _registry_of(url)
+
+        response = self._post_switch(auth_client, url)
+
+        assert response.status_code == 409, response.data
+        assert expected in json.loads(response.data)['message']
+        assert env_file.read_text() == before
+        assert not restart_signal.exists()
+        assert switch_pending() is None
+        assert _registry_of(url) == registry, 'the refused target was written to'
+
+    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
+    def test_accounts_without_a_registry(self, request, backend, auth_client, env_file,
+                                         restart_signal, monkeypatch):
+        url = request.getfixturevalue(f'{backend}_target')
+        _provision(url, None)
+        assert _starts(url, monkeypatch) is False
+        self._refused(auth_client, url, env_file, restart_signal, monkeypatch,
+                      'it has no migration registry')
+
+    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
+    def test_accounts_with_a_registry_short_of_2_254(self, request, backend, auth_client,
+                                                     env_file, restart_signal, monkeypatch):
+        url = request.getfixturevalue(f'{backend}_target')
+        _provision(url, _pivot_registry_but('001_fix_dn_format'))
+        assert _starts(url, monkeypatch) is False
+        self._refused(auth_client, url, env_file, restart_signal, monkeypatch,
+                      '001_fix_dn_format')
+
+    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
+    def test_a_2_254_database_without_accounts(self, request, backend, auth_client,
+                                               env_file, restart_signal, monkeypatch):
+        """Its upgrade has not run: recording a 3.0 registry over it would skip it."""
+        url = request.getfixturevalue(f'{backend}_target')
+        _provision(url, _pivot_registry_but(None), with_user=False)
+        self._refused(auth_client, url, env_file, restart_signal, monkeypatch,
+                      'without user accounts')
+
+    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
+    def test_a_3_0_database_with_accounts_is_taken_as_it_is(self, request, backend, app,
+                                                            monkeypatch):
+        url = request.getfixturevalue(f'{backend}_target')
+        _provision(url, _the_3_0_registry())
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(url)
+        assert ok is True, message
+        assert 'skipped' in message
+        assert stats['target_written'] is False
+        assert _counts(url, ['users']) == {'users': 1}
+        assert _starts(url, monkeypatch) is True
+
+
+def _source_highest_ids(app):
+    """{copied table: its highest id on the source}, for the tables that hold rows."""
+    with app.app_context():
+        with db.engine.connect() as conn:
+            insp = inspect(conn)
+            highest = {}
+            for table in migration.BOOTSTRAP_AUTH_TABLES:
+                if 'id' in {c['name'] for c in insp.get_columns(table)}:
+                    top = conn.execute(text(f'SELECT MAX(id) FROM "{table}"')).scalar()
+                    if top is not None:
+                        highest[table] = top
+    assert set(highest) - {'users'}, 'no copied table but users holds a row'
+    return highest
+
+
+def _assert_new_ids_above(url, highest, gone):
+    """A new account takes an id above every one the source handed out, and on PostgreSQL
+    every copied table's next id is above the source's highest."""
+    assert _next_user_id(url) > max(gone, highest['users'])
+    if not url.startswith('postgresql'):
+        return
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            for table, top in highest.items():
+                nxt = conn.execute(text("SELECT nextval(pg_get_serial_sequence(:t, 'id'))"),
+                                   {'t': table}).scalar()
+                assert nxt > top, f'{table}: next id {nxt}, source reached {top}'
+    finally:
+        engine.dispose()
+
+
+def _cut_points():
+    """Before and after every step the switch runs, and inside the two that write in bulk."""
+    points = [(step.__name__, where) for step in migration._BOOTSTRAP_STEPS
+              for where in ('before', 'after')]
+    return points + [('_step_schema', 'during'), ('_step_schema', 'index'), ('_step_copy', 'during')]
+
+
+@contextlib.contextmanager
+def _cut(step_name, where):
+    """One failure armed at that point of the attempt run inside; yields the list it fills."""
+    from services.database_admin import copy as copy_module
+    fired = []
+
+    def stop():
+        fired.append(f'{where} {step_name}')
+        raise RuntimeError('the service stopped here')
+
+    with pytest.MonkeyPatch.context() as patch:
+        if where == 'during' and step_name == '_step_schema':
+            created = []
+
+            def on_create(table, connection, **kwargs):
+                created.append(table.name)
+                if len(created) == 3:      # some tables exist, the others do not
+                    stop()
+            event.listen(Table, 'after_create', on_create)
+            try:
+                yield fired
+            finally:
+                event.remove(Table, 'after_create', on_create)
+            return
+        if where == 'index':
+            def on_execute(conn, cursor, statement, *rest):
+                # SQLite commits each statement: the table is there, its index is not
+                if not fired and statement.lstrip().startswith('CREATE UNIQUE INDEX'):
+                    stop()
+            event.listen(Engine, 'before_cursor_execute', on_execute)
+            try:
+                yield fired
+            finally:
+                event.remove(Engine, 'before_cursor_execute', on_execute)
+            return
+        if where == 'during':
+            assert step_name == '_step_copy', step_name
+            real_copy_one, calls = copy_module._copy_one, []
+
+            def copy_one(*args, **kwargs):
+                calls.append(real_copy_one(*args, **kwargs))
+                if len(calls) == 2:        # the DEKs and the accounts are in, uncommitted
+                    stop()
+                return calls[-1]
+            patch.setattr(copy_module, '_copy_one', copy_one)
+        else:
+            steps = list(migration._BOOTSTRAP_STEPS)
+            index = [step.__name__ for step in steps].index(step_name)
+            real = steps[index]
+
+            def cut_step(run):
+                if where == 'after':
+                    real(run)
+                stop()
+            steps[index] = cut_step
+            patch.setattr(migration, '_BOOTSTRAP_STEPS', tuple(steps))
+        yield fired
+
+
+def _missing_indexes(url):
+    """The indexes the models declare that the target does not have."""
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        inspector = inspect(engine)
+        return sorted(index.name for table in db.metadata.sorted_tables for index in table.indexes
+                      if index.name not in {i['name'] for i in inspector.get_indexes(table.name)})
+    finally:
+        engine.dispose()
+
+
+def _usernames(url):
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            return sorted(r[0] for r in conn.execute(text('SELECT username FROM users')))
+    finally:
+        engine.dispose()
+
+
+class TestASwitchCutShortCanBeResumed:
+    """Every step of a switch without data is idempotent: cut short at any of them, the next
+    attempt on the same target succeeds, and the target starts with counters past the source's."""
+
+    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
+    @pytest.mark.parametrize('step_name,where', _cut_points(),
+                             ids=[f'{w}{s[5:]}' for s, w in _cut_points()])
+    def test_a_cut_is_resumed(self, request, backend, step_name, where, app, auth_client,
+                              create_user, tmp_path, monkeypatch):
+        url = request.getfixturevalue(f'{backend}_target')
+        gone = _deleted_last_user(app, auth_client, create_user)
+        highest = _source_highest_ids(app)
+        with app.app_context():
+            source_names = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
+
+        with app.app_context():
+            with _cut(step_name, where) as fired:
+                ok, _, _ = migration.bootstrap_auth_to_target(url)
+            assert fired and ok is False
+            ok, message, _ = migration.bootstrap_auth_to_target(url)
+        assert ok is True, message
+
+        assert _starts(url, monkeypatch) is True
+        _boots(url, tmp_path)
+        assert _usernames(url) == source_names
+        assert _missing_indexes(url) == []
+        _assert_new_ids_above(url, highest, gone)
+
+    @_needs_pg
+    def test_a_target_in_use_keeps_counters_above_its_data(self, app, pg_target, monkeypatch):
+        """The replay on a target that already holds accounts never moves a counter down."""
+        _provision(pg_target, _the_3_0_registry())
+        engine = create_engine(pg_target)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("SELECT setval(pg_get_serial_sequence('users', 'id'), 1000)"))
+        finally:
+            engine.dispose()
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(pg_target)
+        assert ok is True and 'skipped' in message, message
+        assert _next_user_id(pg_target) > 1000
+
+
+    @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
+    def test_a_2_254_target_with_accounts_is_left_as_it_is(self, request, backend, app,
+                                                            auth_client, create_user):
+        """Not a copy of this switch, its upgrade has not run: registry and counters stay as they were."""
+        from migrations._from_2_254 import PIVOT_NAMES
+        url = request.getfixturevalue(f'{backend}_target')
+        _provision(url, set(PIVOT_NAMES))
+        before = _registry_of(url), _counters(url)
+        assert _deleted_last_user(app, auth_client, create_user) > 1    # past the target's one account
+
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(url)
+
+        assert ok is True and 'skipped' in message, message
+        assert (_registry_of(url), _counters(url)) == before
+
+
+def _counters(url):
+    """What the target recorded as the last id each table handed out."""
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        with engine.connect() as conn:
+            if url.startswith('postgresql'):
+                return conn.execute(text(
+                    "SELECT sequencename, last_value FROM pg_sequences "
+                    "WHERE schemaname = current_schema() ORDER BY 1")).fetchall()
+            return conn.execute(text("SELECT name, seq FROM sqlite_sequence ORDER BY 1")).fetchall()
+    finally:
+        engine.dispose()
+
+
+class TestARevertNeverNamesAFileTheStartRefuses:
+    """Back to SQLite means the file at DATABASE_PATH, possibly left by an older release."""
+
+    def _post_revert(self, auth_client):
+        return auth_client.post('/api/v2/database/switch', data=json.dumps({}),
+                                content_type='application/json')
+
+    def test_a_file_older_than_2_254_is_refused(self, auth_client, tmp_path, env_file,
+                                                restart_signal, monkeypatch):
+        from config.settings import Config
+        path = tmp_path / 'ucm.db'
+        _provision(f'sqlite:///{path}', None)
+        monkeypatch.setattr(Config, 'DATABASE_PATH', path)
+        before = env_file.read_text()
+
+        response = self._post_revert(auth_client)
+
+        assert response.status_code == 409, response.data
+        assert 'it has no migration registry' in json.loads(response.data)['message']
+        assert env_file.read_text() == before
+        assert not restart_signal.exists()
+
+    def test_a_3_0_file_is_accepted(self, auth_client, tmp_path, env_file, restart_signal,
+                                    monkeypatch):
+        from config.settings import Config
+        path = tmp_path / 'ucm.db'
+        _provision(f'sqlite:///{path}', _the_3_0_registry())
+        monkeypatch.setattr(Config, 'DATABASE_PATH', path)
+
+        response = self._post_revert(auth_client)
+
+        assert response.status_code == 200, response.data
+        assert restart_signal.exists()
+
+    def test_no_file_yet_is_accepted_and_not_created(self, auth_client, tmp_path, env_file,
+                                                     restart_signal, monkeypatch):
+        from config.settings import Config
+        path = tmp_path / 'ucm.db'
+        monkeypatch.setattr(Config, 'DATABASE_PATH', path)
+
+        assert self._post_revert(auth_client).status_code == 200
+        assert not path.exists()

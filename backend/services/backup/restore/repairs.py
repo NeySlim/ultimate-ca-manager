@@ -14,14 +14,11 @@ from sqlalchemy import bindparam, text
 
 from models import db
 
+from . import legacy_repairs as legacy
+
 logger = logging.getLogger(__name__)
 
 _ORDER_DUPLICATES = '121_acme_renewal_order_duplicates'
-
-
-def _migration(stem: str):
-    from migration_runner import MIGRATIONS_DIR, _load_module
-    return _load_module(MIGRATIONS_DIR / f'{stem}.py')
 
 
 def restored_setting_keys(backup_data: Dict[str, Any]) -> Set[str]:
@@ -62,15 +59,14 @@ def replay_order_repairs(ids: Iterable[int]) -> Dict[str, int]:
     """Migration 121 on the ACME client orders a restore wrote: renewal schedule and leftovers.
 
     A row it did not write is left alone, as a merge leaves it."""
-    migration = _migration(_ORDER_DUPLICATES)
     db.session.flush()
     ids = sorted(ids)
     if not ids:
         return {'reissued': 0, 'dropped': 0}
     restored = ' AND acme_client_orders.id IN :ids'
-    reissued = db.session.execute(text(migration._REISSUE + restored).bindparams(
+    reissued = db.session.execute(text(legacy.REISSUE + restored).bindparams(
         bindparam('ids', expanding=True)), {'ids': ids}).rowcount
-    dropped = db.session.execute(text(migration._DROP_LEFTOVERS + restored).bindparams(
+    dropped = db.session.execute(text(legacy.DROP_LEFTOVERS + restored).bindparams(
         bindparam('ids', expanding=True)), {'ids': ids}).rowcount
     # A renewal of a dropped row names nothing: same outcome as ON DELETE SET NULL, on every engine
     db.session.execute(text(
@@ -127,7 +123,7 @@ def archived_lifted_holds(backup_data) -> Set[int]:
     def ca_crt(refid):
         pem = pems.get(refid)
         return base64.b64encode(pem.encode()).decode() if isinstance(pem, str) else None
-    return set(_migration('154_lifted_hold_leftovers').leftovers(candidates, ca_crt))
+    return set(legacy.leftovers(candidates, ca_crt))
 
 
 def _eab_keys_blob(backup_data, plan) -> int:
@@ -135,14 +131,13 @@ def _eab_keys_blob(backup_data, plan) -> int:
     if 'acme_eab_keys' not in restored_setting_keys(backup_data):
         return 0
     from models.acme_models import AcmeEabCredential
-    migration = _migration('101_acme_eab_keys_import')
-    entries, leftover = migration._entries(_settings_here().get('acme_eab_keys'))
+    entries, leftover = legacy.eab_entries(_settings_here().get('acme_eab_keys'))
     imported = 0
     for kid, key in entries:
         if AcmeEabCredential.query.filter_by(kid=kid).first() is not None:
             continue
-        db.session.add(AcmeEabCredential(kid=kid, hmac_key_b64=migration._encrypt(key),
-                                         label=migration.LABEL, status='active'))
+        db.session.add(AcmeEabCredential(kid=kid, hmac_key_b64=legacy.encrypt(key),
+                                         label=legacy.LABEL, status='active'))
         imported += 1
     if leftover is None:
         _delete_settings(['acme_eab_keys'])
@@ -153,21 +148,20 @@ def _eab_keys_blob(backup_data, plan) -> int:
 
 def _dead_settings(backup_data, plan) -> int:
     """102: dead settings, dead policy rule keys, the built-in templates' SAN types."""
-    migration = _migration('102_dead_settings')
     changed = 0
     carried = restored_setting_keys(backup_data)
-    if carried & set(migration.DEAD_KEYS):
+    if carried & set(legacy.DEAD_KEYS):
         here = _settings_here()
-        for key, value in {**migration._legacy_schedules(here), **migration._system_name(here)}.items():
+        for key, value in {**legacy.legacy_schedules(here), **legacy.system_name(here)}.items():
             _set(key, value)
             changed += 1
-        changed += _delete_settings(carried & set(migration.DEAD_KEYS))
+        changed += _delete_settings(carried & set(legacy.DEAD_KEYS))
 
     from models.certificate_template import CertificateTemplate
     from models.policy import CertificatePolicy
     for row in _archived_rows(backup_data, 'certificate_policies'):
         policy = CertificatePolicy.query.filter_by(name=row.get('name')).first()
-        cleaned = migration._cleaned_rules(policy.rules) if policy is not None else None
+        cleaned = legacy.cleaned_rules(policy.rules) if policy is not None else None
         if cleaned is not None:
             policy.rules = cleaned
             changed += 1
@@ -176,7 +170,7 @@ def _dead_settings(backup_data, plan) -> int:
         if 'enforce_san_types' in row:
             continue
         template = CertificateTemplate.query.filter_by(name=row.get('name')).first()
-        widened = (migration._widened_system_extensions(
+        widened = (legacy.widened_system_extensions(
             template.name, template.is_system, template.extensions_template)
             if template is not None else None)
         if widened is not None:
@@ -203,18 +197,17 @@ def _saml_strict(backup_data, plan) -> int:
 def _group_permission_lists(backup_data, plan) -> int:
     """104: a group archived with its permissions as JSON text gets the list of grantable scopes."""
     from models.group import Group
-    migration = _migration('104_group_permissions_lists')
-    grantable = migration._grantable()
+    grantable = legacy.grantable_scopes()
     changed = 0
     for row in _archived_rows(backup_data, 'groups'):
         if not isinstance(row.get('permissions'), str):
             continue    # a list: written after 104
         group = Group.query.filter_by(name=row.get('name')).first()
-        fixed = migration._grantable_list(group.permissions, grantable) if group is not None else None
+        fixed = legacy.grantable_list(group.permissions, grantable) if group is not None else None
         if fixed is None or fixed == group.permissions:
             continue
-        if group.description == migration.ADMIN_GROUP_SEEDED and not fixed:
-            group.description = migration.ADMIN_GROUP_NOW
+        if group.description == legacy.ADMIN_GROUP_SEEDED and not fixed:
+            group.description = legacy.ADMIN_GROUP_NOW
         group.permissions = fixed
         changed += 1
     return changed
@@ -222,8 +215,7 @@ def _group_permission_lists(backup_data, plan) -> int:
 
 def _legacy_ldap_settings(backup_data, plan) -> int:
     """105: the global `ldap_*` keys, a bind password among them, are not kept."""
-    migration = _migration('105_legacy_ldap_settings')
-    return _delete_settings(restored_setting_keys(backup_data) & set(migration.LEGACY_LDAP_KEYS))
+    return _delete_settings(restored_setting_keys(backup_data) & set(legacy.LEGACY_LDAP_KEYS))
 
 
 def _order_duplicates(backup_data, plan):

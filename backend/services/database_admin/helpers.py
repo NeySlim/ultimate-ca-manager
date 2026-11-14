@@ -453,8 +453,21 @@ def _pg_setval_stmt(schema_name, table_name, column_name):
     )).select_from(tbl)
 
 
-def _reset_pg_sequences(engine):
-    """Realign every serial sequence of the current schema on its table's data."""
+def _pg_raise_stmt(schema_name, table_name, column_name):
+    """setval() to MAX only when the sequence is behind it: no row is returned otherwise."""
+    col = sa_column(column_name)
+    tbl = sa_table(table_name, col, schema=schema_name)
+    seq = cast(bindparam("seq", type_=Text()), REGCLASS)
+    highest = func.max(col)
+    return select(func.setval(seq, highest, True)).select_from(tbl).having(
+        highest > func.coalesce(func.pg_sequence_last_value(seq), 0))
+
+
+def _reset_pg_sequences(engine, raise_only=False):
+    """Realign every serial sequence of the current schema on its table's data.
+
+    ``raise_only`` moves a sequence up to its table's highest id and leaves one already past
+    it alone; a sequence that never handed out a value counts as behind."""
     if not str(getattr(engine.dialect, "name", "")).startswith("postgres"):
         return
     done = failed = 0
@@ -473,7 +486,8 @@ def _reset_pg_sequences(engine):
             try:
                 # One savepoint each: a refused setval() leaves the others intact.
                 with conn.begin_nested():
-                    conn.execute(_pg_setval_stmt(schema_name, table_name, column_name),
+                    stmt = _pg_raise_stmt if raise_only else _pg_setval_stmt
+                    conn.execute(stmt(schema_name, table_name, column_name),
                                  {"seq": sequence_name})
                 done += 1
             except Exception as e:

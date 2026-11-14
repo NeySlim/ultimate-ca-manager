@@ -14,7 +14,7 @@ ROW = ("INSERT INTO pro_sso_saml_message_ids (id, kind, message_id, provider_id,
 
 def _migration():
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        'migrations', '145_saml_request_next_path.py')
+                        'migrations', '_from_2_254', '145_saml_request_next_path.py')
     spec = importlib.util.spec_from_file_location('m145', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

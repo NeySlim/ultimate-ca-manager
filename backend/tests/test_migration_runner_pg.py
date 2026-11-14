@@ -54,6 +54,20 @@ def test_run_pending_pg_uses_connection_not_engine():
     )
 
 
+def _migration_sources():
+    """Every migration file and every step of migration 300, which shares its PostgreSQL transaction."""
+    import pathlib
+    migrations_dir = pathlib.Path(__file__).resolve().parent.parent / "migrations"
+    files = list(migrations_dir.glob("*.py")) + list((migrations_dir / "_from_2_254").glob("*.py"))
+    return sorted(p for p in files if not p.name.startswith("__"))
+
+
+def test_the_guards_read_the_steps_of_migration_300():
+    from migrations._from_2_254 import STEPS
+    names = {p.stem for p in _migration_sources()}
+    assert set(STEPS) <= names and "300_upgrade_from_2_254" in names
+
+
 # ---------------------------------------------------------------------------
 # Static guard — every pg_compatible migration must NOT open a nested tx
 # (regression #111: `_upgrade_pg(engine)` did `with engine.begin() as conn`
@@ -67,13 +81,9 @@ def test_pg_migrations_do_not_open_nested_transactions():
     because the runner already opens the transaction.
     """
     import ast
-    import pathlib
 
-    migrations_dir = pathlib.Path(__file__).resolve().parent.parent / "migrations"
     offenders = []
-    for path in sorted(migrations_dir.glob("*.py")):
-        if path.name.startswith("__"):
-            continue
+    for path in _migration_sources():
         src = path.read_text()
         if "pg_compatible = True" not in src:
             continue
@@ -107,14 +117,10 @@ def test_modern_migrations_declare_pg_compatible():
     silently skipped on PostgreSQL. From 020 onward, every migration MUST be
     multi-backend or it will silently no-op on PG and corrupt the schema.
     """
-    import pathlib
     import re
 
-    migrations_dir = pathlib.Path(__file__).resolve().parent.parent / "migrations"
     offenders = []
-    for path in sorted(migrations_dir.glob("*.py")):
-        if path.name.startswith("__"):
-            continue
+    for path in _migration_sources():
         # Extract leading numeric index
         m = re.match(r"^(\d+)_", path.name)
         if not m:
@@ -131,6 +137,39 @@ def test_modern_migrations_declare_pg_compatible():
         "(silent-skip on PG corrupts the schema — issue #115). "
         f"Offenders: {offenders}"
     )
+
+
+def _on_sqlite_path(stack):
+    """True inside a function named for SQLite or the body of `if isinstance(x, sqlite3.Connection)`."""
+    import ast
+    for parent, child in zip(stack, stack[1:]):
+        if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)) and "sqlite" in parent.name:
+            return True
+        if (isinstance(parent, ast.If) and child in parent.body and isinstance(parent.test, ast.Call)
+                and getattr(parent.test.func, "id", None) == "isinstance" and len(parent.test.args) == 2
+                and ast.unparse(parent.test.args[1]) == "sqlite3.Connection"):
+            return True
+    return False
+
+
+def test_pg_paths_never_commit_or_roll_back():
+    """Migration 300 runs every step in one PostgreSQL transaction: a commit or rollback on the
+    PostgreSQL path would end it halfway. Only the SQLite path may call them."""
+    import ast
+
+    offenders = []
+
+    def walk(node, stack, path):
+        stack = stack + [node]
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr in ("commit", "rollback") and not _on_sqlite_path(stack)):
+            offenders.append(f"{path.name}:{node.lineno}")
+        for child in ast.iter_child_nodes(node):
+            walk(child, stack, path)
+
+    for path in _migration_sources():
+        walk(ast.parse(path.read_text()), [], path)
+    assert not offenders, f"commit or rollback outside the SQLite path: {offenders}"
 
 
 def test_runner_rejects_modern_migration_without_pg_compatible():

@@ -36,7 +36,7 @@ def relay_db(tmp_path):
     import importlib
     path = tmp_path / 'relay.db'
     conn = sqlite3.connect(path)
-    importlib.import_module('migrations.149_websocket_relay').upgrade(conn)
+    importlib.import_module('migrations._from_2_254.149_websocket_relay').upgrade(conn)
     conn.close()
     engine = create_engine(f'sqlite:///{path}')
     yield path, engine

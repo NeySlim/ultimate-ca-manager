@@ -18,7 +18,7 @@ INDEX = 'ix_certificates_caref_subject_key'
 
 
 def _migration():
-    return importlib.import_module('migrations.157_certificate_subject_key')
+    return importlib.import_module('migrations._from_2_254.157_certificate_subject_key')
 
 
 def _key(cn):

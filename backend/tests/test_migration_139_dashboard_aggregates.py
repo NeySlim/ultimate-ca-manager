@@ -19,7 +19,7 @@ INDEXES = {
 
 
 def _migration():
-    return importlib.import_module('migrations.139_dashboard_aggregates')
+    return importlib.import_module('migrations._from_2_254.139_dashboard_aggregates')
 
 
 def _rows():

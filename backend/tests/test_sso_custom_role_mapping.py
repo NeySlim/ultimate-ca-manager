@@ -97,40 +97,6 @@ def _post(client, **body):
 
 # ---- migration -----------------------------------------------------------------
 
-def test_sqlite_migration_adds_the_column_and_leaves_users_manual():
-    m = importlib.import_module('migrations.109_user_custom_role_source')
-    conn = sqlite3.connect(':memory:')
-    conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT)')
-    conn.execute("INSERT INTO users VALUES (1, 'old')")
-    m.upgrade(conn)
-    m.upgrade(conn)
-    assert conn.execute('SELECT custom_role_source FROM users').fetchone()[0] is None
-    m.upgrade(sqlite3.connect(':memory:'))  # no table: a no-op
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_migration_adds_the_column_and_leaves_users_manual():
-    m = importlib.import_module('migrations.109_user_custom_role_source')
-    schema = f"migtest_109_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    engine = create_engine(PG_URL)
-    conn = engine.connect()
-    try:
-        conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        conn.execute(text(f'CREATE SCHEMA {schema}'))
-        conn.execute(text(f'SET search_path TO {schema}'))
-        conn.execute(text('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT)'))
-        conn.execute(text("INSERT INTO users VALUES (1, 'old')"))
-        m.upgrade(conn)
-        m.upgrade(conn)
-        assert conn.execute(text('SELECT custom_role_source FROM users')).scalar() is None
-    finally:
-        conn.rollback()
-        conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        conn.commit()
-        conn.close()
-        engine.dispose()
-
 
 # ---- resolution ----------------------------------------------------------------
 

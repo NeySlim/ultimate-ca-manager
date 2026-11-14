@@ -13,65 +13,6 @@ from models.group import DEFAULT_GROUPS, Group, GroupMember, seed_default_groups
 from models.rbac import CustomRole
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
-SEEDED = [
-    (1, json.dumps('["*"]'), 'Full system administrators with all permissions'),
-    (2, json.dumps('["read:certificates", "write:certificates"]'), 'ops'),
-    (3, '["read:cas"]', 'already a list'),
-    (4, 'not json', 'unreadable'),
-    (5, json.dumps('["read:audit", "read:dashboard", "read:certificates", "read:cas"]'), 'auditors'),
-]
-
-
-def _migration():
-    return importlib.import_module('migrations.104_group_permissions_lists')
-
-
-def _check(rows):
-    assert rows[1] == ([], _migration().ADMIN_GROUP_NOW)
-    assert rows[2] == (['read:certificates', 'write:certificates'], 'ops')
-    assert rows[3] == (['read:cas'], 'already a list')
-    # read:dashboard is held by built-in roles, hence grantable to groups: kept.
-    assert rows[5] == (['read:audit', 'read:dashboard', 'read:certificates', 'read:cas'], 'auditors')
-
-
-def test_sqlite_decodes_string_permissions():
-    m = _migration()
-    conn = sqlite3.connect(':memory:')
-    conn.execute("CREATE TABLE groups (id INTEGER PRIMARY KEY, name TEXT, description TEXT, permissions TEXT)")
-    conn.executemany("INSERT INTO groups (id, permissions, description) VALUES (?, ?, ?)", SEEDED)
-    m.upgrade(conn)
-    m.upgrade(conn)
-    rows = {i: (p, d) for i, p, d in conn.execute("SELECT id, permissions, description FROM groups")}
-    assert rows[4] == ('not json', 'unreadable')
-    _check({i: (json.loads(p), d) for i, (p, d) in rows.items() if i != 4})
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_decodes_string_permissions():
-    m = _migration()
-    schema = f"migtest_104_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    engine = create_engine(PG_URL)
-    conn = engine.connect()
-    try:
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.execute(text(f"CREATE SCHEMA {schema}"))
-        conn.execute(text(f"SET search_path TO {schema}"))
-        conn.execute(text("CREATE TABLE groups (id INTEGER PRIMARY KEY, name VARCHAR(100), "
-                          "description TEXT, permissions JSON)"))
-        for gid, perms, desc in SEEDED[:3] + SEEDED[4:]:
-            conn.execute(text("INSERT INTO groups (id, permissions, description) "
-                              "VALUES (:i, CAST(:p AS json), :d)"), {'i': gid, 'p': perms, 'd': desc})
-        m.upgrade(conn)
-        m.upgrade(conn)
-        _check({i: (p, d) for i, p, d in conn.execute(
-            text("SELECT id, permissions, description FROM groups"))})
-    finally:
-        conn.rollback()
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.commit()
-        conn.close()
-        engine.dispose()
 
 
 def test_default_groups_hold_grantable_lists():

@@ -28,7 +28,7 @@ from services.database_admin.lock import (
     pending_switch_refusal,
 )
 from services.audit_service import AuditService
-from config.settings import is_docker, restart_ucm_service
+from config.settings import Config, is_docker, restart_ucm_service
 
 logger = logging.getLogger(__name__)
 
@@ -178,16 +178,26 @@ def _switch_backend():
         # this, the new DB has no users and the operator is locked out.
         ok_boot, boot_msg, boot_stats = svc.bootstrap_auth_to_target(database_url)
         if not ok_boot:
-            reset = (
-                ' The target now carries a schema; reset it before retrying.'
-                if boot_stats.get('target_written') else ''
-            )
+            # A step cut short is resumed on the same target. A copy that failed its verification
+            # is not (the next attempt would take its accounts as they are), and a table or column
+            # the plan refused is refused again.
+            reset = ''
+            if boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
+                reset = (
+                    ' The copy on the target failed its verification; reset the target before retrying.'
+                    if boot_stats.get('refusal') == 'verification'
+                    else ' Retrying on the same target resumes the switch.')
             return error_response(
                 'Pre-flight bootstrap failed, so the backend was not '
                 f'switched. {svc._redact_uri(boot_msg)}{reset}',
                 _refusal_status(boot_stats),
             )
     else:
+        # The file DATABASE_PATH names may be left by an older release: the start must accept it
+        refusal = svc.start_refusal(f'sqlite:///{Config.DATABASE_PATH}')
+        if refusal:
+            return error_response(
+                f'The backend was not switched back to SQLite. {refusal}', 409)
         boot_msg = 'Reverting to SQLite default, no bootstrap needed'
         boot_stats = {}
 

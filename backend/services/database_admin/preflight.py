@@ -81,10 +81,10 @@ INTERNAL_TABLES = frozenset({"_migrations"})
 #
 # They are the only columns allowed to be left behind, and the same rule as
 # ``services/backup/manifest.py`` applies: a column is copied unless someone
-# wrote down why it is not. They all come from the consolidated baseline
-# (``migrations/000_baseline_v252.py``), and
-# ``tests/test_database_migration_preflight.py`` compares this list to it: a
-# column dropped from a model without a line here fails the suite.
+# wrote down why it is not. They all come from the 2.52 baseline schema, which a
+# 2.254 database upgraded from it still carries, and
+# ``tests/test_database_migration_preflight.py`` compares this list to it (frozen
+# as a fixture): a column dropped from a model without a line here fails the suite.
 #
 # The reason says what became of the value, and that is NOT always "another
 # column carries it". Three of these were replaced by a column that was added

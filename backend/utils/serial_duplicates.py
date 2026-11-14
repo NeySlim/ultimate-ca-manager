@@ -1,7 +1,7 @@
 """Certificates sharing one serial under one CA (RFC 5280 §4.1.2.2).
 
-Migration 142 creates ``uix_certificates_ca_serial`` only when this finds nothing, and
-migration 144 leaves unconverted the rows that would share a serial once canonical.
+The upgrade from 2.254 (migration 300, steps 142 and 144) creates ``uix_certificates_ca_serial``
+only when this finds nothing, and leaves unconverted the rows that would share a serial once canonical.
 A backend migration checks its source, and a restore its archive only when the target
 carries the index, refusing with the rows named rather than failing on the index; both
 compare canonical serials (utils/serial_format.py), whatever spelling a row holds.
@@ -12,7 +12,7 @@ from typing import Dict, Iterable, List
 from utils.serial_format import canonical_stored_serial
 
 INDEX = 'uix_certificates_ca_serial'
-# SystemConfig key migration 142 leaves while duplicates keep it from creating the index
+# SystemConfig key the upgrade from 2.254 leaves while duplicates keep it from creating the index
 PENDING_KEY = 'serial_unique_index_pending'
 # Rows the index covers: CSRs carry no serial, imported certificates no CA
 _COVERED = "caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''"
@@ -23,17 +23,15 @@ _ROWS = f"SELECT id, caref, serial_number, crt FROM certificates WHERE {_COVERED
 # Self-contained: packages ship no docs/, so the message is the procedure
 CLEANUP = ("Delete all but one certificate of each listed serial on the installation that holds "
            "them, found by the certificate ids and stored spellings shown with it where there are any (revoke it first if it is in use; a revoked row still counts), until each serial "
-           "appears once under its CA. Then delete the rows '142_serial_per_ca_and_proxy_links' "
-           "and '144_canonical_certificate_serials' from the _migrations table, so the next start "
-           "runs migration 142 and migration 144 again, which create the index and store every "
-           "serial in decimal.")
+           "appears once under its CA. Then restart UCM: while this warning stands, every start runs step "
+           "144 of the upgrade from 2.254 again, which creates the index and stores every serial in decimal.")
 
 
 def duplicates_in_database(conn) -> List[Dict]:
     """(caref, serial_number, ids) of every serial held twice under one CA, read through *conn*."""
     from sqlalchemy import text
     groups: Dict = {}
-    # Streamed: one batch of PEMs in memory at a time, as in migration 144
+    # Streamed: one batch of PEMs in memory at a time, as in the upgrade step 144
     for row_id, caref, serial, crt in conn.execute(text(_ROWS), execution_options={'yield_per': 500}):
         groups.setdefault((caref, canonical_stored_serial(serial, crt)), []).append((row_id, serial))
     return _shared(groups)
@@ -85,7 +83,7 @@ def describe(duplicates: List[Dict], limit: int = 10) -> str:
 
 
 def check_pending_serial_index(app) -> int:
-    """At start: log the pairs migration 142 left pending and keep their count for /health.
+    """At start: log the pairs the upgrade from 2.254 left pending and keep their count for /health.
     The flag changes only when migrations run, that is at start."""
     import json
     import logging
@@ -101,7 +99,7 @@ def check_pending_serial_index(app) -> int:
             count = len(pairs) or 1
     app.config['SERIAL_INDEX_PENDING'] = count
     if count:
-        listed = '; '.join(describe_pending(d) for d in pairs[:10]) or 'see the migration 142 and 144 log'
+        listed = '; '.join(describe_pending(d) for d in pairs[:10]) or 'see the log of migration 300_upgrade_from_2_254'
         logging.getLogger(__name__).warning(
             "%s: %d serial number(s) are shared by certificates of one CA or wait for one that is (%s), so the unique "
             "serial index does not cover them. %s", PENDING_KEY, count, listed, CLEANUP)

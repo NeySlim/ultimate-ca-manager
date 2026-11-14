@@ -226,10 +226,9 @@ def create_app(config_name=None):
             auto_generate=True
         )
     
-    # Run schema migrations BEFORE SQLAlchemy init (critical for upgrades).
-    # Backend-agnostic: the runner detects FRESH/LEGACY/TRACKED state and
-    # skips legacy SQL migrations on PostgreSQL or fresh installs (schema is
-    # built by SQLAlchemy create_all() instead). See migration_runner.py.
+    # Run schema migrations BEFORE SQLAlchemy init: the runner upgrades a 2.254 or 3.0 database,
+    # refuses any other existing one without writing, and leaves a fresh one to build_fresh_schema
+    # below. See migration_runner.py.
     #
     # Failure here MUST stop startup: continuing with a broken schema causes
     # silent data corruption or 500s on every request. Operators should see
@@ -244,9 +243,9 @@ def create_app(config_name=None):
         migrated = run_all_migrations(dry_run=False, verbose=False)
     if not migrated:
         raise RuntimeError(
-            "Schema migration failed at startup. Refusing to start with an "
-            "inconsistent database. Check the migration log and fix the issue "
-            "before restarting the service."
+            "Schema migration failed or the database was refused at startup. "
+            "Refusing to start with an inconsistent database. Check the migration "
+            "log above and fix the issue before restarting the service."
         )
     
     # A backend switch that asked for this restart has now been applied: the
@@ -317,7 +316,7 @@ def create_app(config_name=None):
             from utils.session_store import IsolatedSqlSessionInterface
             # Same object and model, only the transaction handling differs
             app.session_interface.__class__ = IsolatedSqlSessionInterface
-            # The purge filters on expiry; fresh or switched installs never ran migration 138
+            # The purge filters on expiry; fresh or switched installs never ran upgrade step 138
             from sqlalchemy import Index
             model = app.session_interface.sql_session_model
             try:
@@ -532,10 +531,11 @@ def create_app(config_name=None):
                 if not fresh_install:
                     app.logger.info("✓ Database tables already exist")
                 else:
-                    # Create all tables
+                    # Registry first, then tables; a failure of either stops the start
+                    from migration_runner import build_fresh_schema
                     app.logger.info("Creating database tables...")
-                    db.create_all()
-                    app.logger.info("✓ Database tables created/verified")
+                    build_fresh_schema(db.create_all)
+                    app.logger.info("✓ Database tables created/verified, migration baseline marked")
                 
                 # ===== EXTENDED TABLES =====
                 # Import models to register them with SQLAlchemy
@@ -578,19 +578,7 @@ def create_app(config_name=None):
                 
                 app.logger.info(f"✓ All critical tables verified: {', '.join(critical_tables)}")
                 
-                # On fresh install, mark all current legacy migrations as applied
-                # so future migrations from this point forward are the only ones
-                # that run. The schema we just created via SQLAlchemy already
-                # matches (or supersedes) every legacy migration.
-                if fresh_install:
-                    try:
-                        from migration_runner import mark_all_applied
-                        mark_all_applied()
-                        app.logger.info("✓ Migration baseline marked (fresh install)")
-                    except Exception as e:
-                        app.logger.warning(f"Could not mark migration baseline: {e}")
-                
-                # Migrations already run at startup before SQLAlchemy init
+                # Pending migrations ran before SQLAlchemy init; a fresh install recorded its registry above
                 
                 # Run database health check and repair
                 app.logger.info("Running database health check...")

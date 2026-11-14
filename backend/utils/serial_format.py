@@ -6,7 +6,7 @@ UCM stores certificate serial numbers in these forms:
 - **certificates.serial_number and revoked_serials.serial_number**: the decimal
   string of the integer (``"182716277442602097566978062183857154669354824224"``),
   written only through ``canonical_serial`` (a model validator enforces it), so the
-  unique (caref, serial_number) index sees one spelling per serial (migration 144).
+  unique (caref, serial_number) index sees one spelling per serial (upgrade step 144).
 - **est_signer_certs.serial_number**: a copy of its certificate row's serial, compared
   to it by string equality, so the same decimal ``str(int)``.
 - **OCSP cache (OCSPResponse.cert_serial)**: lowercase hexadecimal string
@@ -101,11 +101,12 @@ def canonical_stored_serial(stored: str | int | None, crt=None) -> str | None:
     return canonical_serial(stored)
 
 
-CANONICAL_MIGRATION = '144_canonical_certificate_serials'
+# Its step 144 stores every serial in decimal; a fresh 3.0 install records it when created
+CANONICAL_MIGRATION = '300_upgrade_from_2_254'
 
 
 def recorded_before_canonical(recorded_at) -> bool:
-    """True when *recorded_at* (naive UTC) precedes migration 144 on this database, or
+    """True when *recorded_at* (naive UTC) precedes the decimal serials on this database, or
     when either date is unknown: the hex reading of digits is then still allowed."""
     if recorded_at is None:
         return True
@@ -133,7 +134,7 @@ def recorded_before_canonical(recorded_at) -> bool:
 def names_certificate(recorded: str | int | None, cert, recorded_at=None) -> bool:
     """True when *recorded* is the serial of *cert*, whose column is canonical. Its decimal
     reading decides; the certificate settles an all-digit hex spelling only for a value
-    recorded before migration 144, when every writer still stored the row's own spelling."""
+    recorded before the upgrade step 144, when every writer still stored the row's own spelling."""
     if canonical_serial(recorded) == cert.serial_number:
         return True
     if not recorded_before_canonical(recorded_at):

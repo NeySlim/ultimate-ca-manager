@@ -24,6 +24,13 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy import create_engine, inspect, text
 
+from migration_runner import (
+    PIVOT_VERSION,
+    UPGRADE_MIGRATION,
+    _get_state,
+    pivot_refusal,
+    record_fresh_registry,
+)
 from utils.db_url import postgres_connect_args, sqlalchemy_url
 
 from .copy import (
@@ -151,6 +158,66 @@ def _create_target_schema(target_engine, target_is_pg: bool) -> None:
     # than one that looks half-created.
     with target_engine.begin() as tx:
         tx.execute(text(_migrations_ddl(target_is_pg)))
+
+
+class _Bootstrap:
+    """What the steps of a switch without data hand each other."""
+
+    def __init__(self, target_engine, target_is_pg: bool):
+        self.target = target_engine
+        self.is_pg = target_is_pg
+        self.result = None
+        self.high_water: Dict[str, int] = {}
+        self.source_view = ''
+
+
+def _step_registry(run: _Bootstrap) -> None:
+    # Before the tables, as build_fresh_schema: a cut before them leaves a 3.0 target, never
+    # tables beside an empty registry, which the start refuses as older than 2.254.
+    with run.target.begin() as tx:
+        tx.execute(text(_migrations_ddl(run.is_pg)))
+    record_fresh_registry(run.target, run.is_pg)
+
+
+def _step_schema(run: _Bootstrap) -> None:
+    from models import db as _db
+    _db.metadata.create_all(run.target)
+    # create_all skips a table that exists: an index a cut left out (SQLite commits each
+    # statement) is created here
+    for table in _db.metadata.sorted_tables:
+        for index in table.indexes:
+            index.create(run.target, checkfirst=True)
+
+
+def _step_copy(run: _Bootstrap) -> None:
+    with consistent_live_source() as (src, source_view, source_is_pg):
+        plan = _bootstrap_plan(src.engine, run.target)
+        run.result = copy_tables(
+            src, run.target, plan,
+            source_is_pg=source_is_pg, target_is_pg=run.is_pg)
+        run.high_water = read_id_high_water(src, source_is_pg)
+        run.source_view = source_view
+
+
+def _step_sequences(run: _Bootstrap) -> None:
+    if run.is_pg:
+        _reset_pg_sequences(run.target, raise_only=True)
+
+
+def _step_high_water(run: _Bootstrap) -> None:
+    carry_id_high_water(run.target, run.high_water, run.is_pg)
+
+
+# Each step is idempotent: a switch cut short anywhere is resumed by the next one on the target
+_BOOTSTRAP_STEPS = (_step_registry, _step_schema, _step_copy, _step_sequences, _step_high_water)
+# Replayed on a target that already holds accounts: they only ever raise a counter
+_RESUME_STEPS = (_step_sequences, _step_high_water)
+
+
+def _source_high_water() -> Dict[str, int]:
+    from models import db as _db
+    with _db.engine.connect() as conn:
+        return read_id_high_water(conn, _db.engine.dialect.name == 'postgresql')
 
 
 def _bootstrap_plan(source_engine, target_engine) -> List[TablePlan]:
@@ -286,7 +353,7 @@ def _check_source_integrity() -> Dict[str, object]:
 
 
 def _check_serial_duplicates() -> None:
-    """Refuse a source whose migration 142 is pending: the target's unique
+    """Refuse a source whose unique serial index is pending: the target's unique
     (caref, serial_number) index would stop the copy halfway."""
     from models import db as _db
     from utils.serial_duplicates import CLEANUP, describe, duplicates_in_database
@@ -321,6 +388,34 @@ def _target_has_users(target_engine) -> bool:
             f"({_short_err(str(exc))}); the backend switch was not started.")
 
 
+def _start_refusal(engine, has_users: bool):
+    """Why the next start would refuse the database behind *engine*, or None; read-only."""
+    state, applied = _get_state(engine)
+    refusal = pivot_refusal(state, applied)
+    if refusal:
+        return f"The target would not start with this release. {refusal}"
+    # A 2.254 registry awaits its upgrade: a fresh 3.0 registry over it would skip that upgrade
+    if not has_users and state != "fresh" and UPGRADE_MIGRATION not in applied:
+        return (f"The target is a {PIVOT_VERSION} database without user accounts: switching to it "
+                "would skip its upgrade. Empty it before retrying. Nothing was changed.")
+    return None
+
+
+def start_refusal(database_url: str):
+    """Why the next start would refuse *database_url*, or None. A missing SQLite file is a fresh install."""
+    if database_url.startswith("sqlite:///"):
+        from pathlib import Path
+        if not Path(database_url[len("sqlite:///"):]).exists():
+            return None
+    engine = create_engine(sqlalchemy_url(database_url), hide_parameters=True,
+                           connect_args=postgres_connect_args(database_url))
+    try:
+        state, applied = _get_state(engine)
+        return pivot_refusal(state, applied)
+    finally:
+        engine.dispose()
+
+
 def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     """
     Copy auth/RBAC/SSO/MFA tables from the current DB to a fresh target so
@@ -330,7 +425,9 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     Without this, the new DB has no users → nobody can log in → lockout.
 
     Safe to call against an empty target. If the target already has any users,
-    bootstrap is skipped (we assume the operator manages that DB themselves).
+    bootstrap is skipped (we assume the operator manages that DB themselves),
+    once its registry shows that this release will start on it; the counters
+    of a target already upgraded are still moved up to the source's.
 
     Every table goes over in **one** transaction. It used to be one
     transaction per table, with each failure appended to a ``skipped`` list
@@ -355,29 +452,33 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
                                       connect_args=postgres_connect_args(target_url))
         target_is_pg = target_url.startswith("postgresql")
 
-        if _target_has_users(target_engine):
+        has_users = _target_has_users(target_engine)
+        # Read before anything is written, ucm.env included: the start must accept the target
+        refusal = _start_refusal(target_engine, has_users)
+        if refusal:
+            raise PreflightError(refusal)
+        if has_users:
+            # A copy committed by an attempt cut short before its counters: they are moved up
+            # now. A target still awaiting its upgrade is no such copy and is left as it is.
+            if UPGRADE_MIGRATION in _get_state(target_engine)[1]:
+                run = _Bootstrap(target_engine, target_is_pg)
+                run.high_water = _source_high_water()
+                for step in _RESUME_STEPS:
+                    step(run)
             return True, "Target already has users; bootstrap skipped.", stats
 
         # From here on the target carries a schema, which changes what the
         # operator has to do before retrying.
         stats["target_written"] = True
-        _create_target_schema(target_engine, target_is_pg)
-
-        with consistent_live_source() as (src, source_view, source_is_pg):
-            plan = _bootstrap_plan(src.engine, target_engine)
-            result = copy_tables(
-                src, target_engine, plan,
-                source_is_pg=source_is_pg, target_is_pg=target_is_pg)
-            high_water = read_id_high_water(src, source_is_pg)
-
-        if target_is_pg:
-            _reset_pg_sequences(target_engine)
-        carry_id_high_water(target_engine, high_water, target_is_pg)
+        run = _Bootstrap(target_engine, target_is_pg)
+        for step in _BOOTSTRAP_STEPS:
+            step(run)
+        result = run.result
 
         stats["tables"] = dict(result.tables)
         stats["tables_bootstrapped"] = len(result.tables)
         stats["rows_copied"] = result.rows
-        stats["source_view"] = source_view
+        stats["source_view"] = run.source_view
 
         if not result.tables.get('users'):
             stats["refusal"] = "verification"
@@ -593,4 +694,5 @@ __all__ = [
     'bootstrap_auth_to_target',
     'database_migration_lock',
     'migrate_data',
+    'start_refusal',
 ]

@@ -16,7 +16,6 @@ The bugs these pin down all shipped as "successful" migrations:
 Every one of those is now a refusal, and every refusal names what blocks it.
 """
 import contextlib
-import importlib.util
 import os
 import sqlite3
 import tempfile
@@ -128,21 +127,14 @@ def _add_legacy_columns(engine, columns_by_table=None):
     ])
 
 
-def _baseline_schema():
-    """``{table: {column}}`` of the consolidated baseline schema.
+FIXTURES = Path(__file__).resolve().parent / 'fixtures'
 
-    Loaded from `migrations/000_baseline_v252.py` and executed into an
-    in-memory database rather than parsed: it is the schema every installation
-    upgraded from v2.52 carries, and it is where the legacy columns come from.
-    """
-    path = Path(__file__).resolve().parent.parent / 'migrations' / '000_baseline_v252.py'
-    spec = importlib.util.spec_from_file_location('ucm_baseline_v252', path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
 
+def _schema_of(sql):
+    """``{table: {column}}`` of a schema script, executed into an in-memory database."""
     conn = sqlite3.connect(':memory:')
     try:
-        conn.executescript(module.SCHEMA_SQL)
+        conn.executescript(sql)
         tables = [
             row[0] for row in
             conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -153,6 +145,20 @@ def _baseline_schema():
         }
     finally:
         conn.close()
+
+
+def _baseline_schema():
+    """The 2.52 baseline every installation upgraded from it still carries, where the legacy
+    columns come from (fixture taken from the 2.254 tag by scripts/schema_fixture.py)."""
+    return _schema_of((FIXTURES / 'schema_v252_baseline_sqlite.sql').read_text())
+
+
+def _carried_schema():
+    """What a 2.254 database may hold: the baseline's columns and those 2.254 creates."""
+    carried = _baseline_schema()
+    for table, columns in _schema_of((FIXTURES / 'schema_v2254_sqlite.sql').read_text()).items():
+        carried.setdefault(table, set()).update(columns)
+    return carried
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +222,7 @@ def test_row_in_the_internal_migrations_ledger_is_refused(app, sqlite_target):
         _execute(
             engine,
             _MIGRATIONS_DDL,
-            "INSERT INTO _migrations (name) VALUES ('000_baseline_v252')",
+            "INSERT INTO _migrations (name) VALUES ('300_upgrade_from_2_254')",
         )
 
         with pytest.raises(PreflightError) as excinfo:
@@ -622,7 +628,7 @@ def test_legacy_columns_match_the_baseline_schema(app):
     schema = expected_schema()
 
     unapproved = {}
-    for table, columns in baseline.items():
+    for table, columns in _carried_schema().items():
         if table not in schema:
             continue
         extra = columns - schema[table] - set(LEGACY_COLUMNS.get(table, {}))
@@ -630,7 +636,7 @@ def test_legacy_columns_match_the_baseline_schema(app):
             unapproved[table] = sorted(extra)
 
     assert unapproved == {}, (
-        "columns carried by the baseline schema, dropped from the models, and "
+        "columns a 2.254 database may carry, dropped from the models, and "
         f"not approved in LEGACY_COLUMNS: {unapproved}"
     )
 

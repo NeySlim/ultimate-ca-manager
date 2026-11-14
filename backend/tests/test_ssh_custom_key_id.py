@@ -107,46 +107,6 @@ def test_an_imported_ca_starts_with_the_setting_off_unless_asked(auth_client):
         assert r.get_json()['data']['allow_custom_key_id'] is want
 
 
-def _migration():
-    return importlib.import_module('migrations.119_ssh_ca_allow_custom_key_id')
-
-
-def test_sqlite_turns_the_setting_off_for_existing_cas_and_runs_twice():
-    connection = sqlite3.connect(':memory:')
-    connection.execute("CREATE TABLE ssh_cas (id INTEGER PRIMARY KEY, descr TEXT)")
-    connection.executemany("INSERT INTO ssh_cas (descr) VALUES (?)", [('a',), ('b',)])
-    _migration().upgrade(connection)
-    # An operator's later choice survives a second run
-    connection.execute("UPDATE ssh_cas SET allow_custom_key_id = 1 WHERE descr = 'b'")
-    _migration().upgrade(connection)
-    assert dict(connection.execute("SELECT descr, allow_custom_key_id FROM ssh_cas")) == {'a': 0, 'b': 1}
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgresql_turns_the_setting_off_for_existing_cas_and_runs_twice():
-    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
-    with _a_schema_of_our_own('migration_119') as url:
-        engine = create_engine(url)
-        try:
-            with engine.begin() as connection:
-                connection.execute(text("CREATE TABLE ssh_cas (id SERIAL PRIMARY KEY, descr VARCHAR(80))"))
-                connection.execute(text("CREATE TABLE ssh_certificates (id SERIAL PRIMARY KEY, "
-                                        "key_id VARCHAR(255) NOT NULL)"))
-                connection.execute(text("INSERT INTO ssh_cas (descr) VALUES ('a'), ('b')"))
-                _migration().upgrade(connection)
-                connection.execute(text("UPDATE ssh_cas SET allow_custom_key_id = TRUE WHERE descr = 'b'"))
-                _migration().upgrade(connection)
-                got = dict(connection.execute(text("SELECT descr, allow_custom_key_id FROM ssh_cas")).all())
-                assert got == {'a': False, 'b': True}
-                # principals@CA name has no fixed bound: eight 32-character hosts exceed 255
-                long_id = ','.join(f'host{n}.' + 'x' * 26 for n in range(8)) + '@Production Host CA'
-                assert len(long_id) > 255
-                connection.execute(text("INSERT INTO ssh_certificates (key_id) VALUES (:k)"), {'k': long_id})
-        finally:
-            engine.dispose()
-
-
 def test_a_backup_carries_the_setting(app, auth_client):
     from models import db
     from models.ssh import SSHCertificateAuthority

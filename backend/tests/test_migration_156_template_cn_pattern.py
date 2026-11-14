@@ -12,7 +12,7 @@ NEW_COLUMNS = {'subject_cn_pattern', 'subject_cn_keep_path'}
 
 
 def _migration():
-    return importlib.import_module('migrations.156_template_cn_pattern')
+    return importlib.import_module('migrations._from_2_254.156_template_cn_pattern')
 
 
 def test_the_table_is_the_model_s():

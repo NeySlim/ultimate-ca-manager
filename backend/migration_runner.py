@@ -7,41 +7,38 @@ Backend-agnostic. Supports SQLite and PostgreSQL.
 
 Bootstrap states
 ----------------
-- FRESH:      No `_migrations` table, no business tables.
+- FRESH:      No business tables (``users``, ``certificate_authorities``) and no
+              migration recorded.
               -> Schema is built by SQLAlchemy `db.create_all()`.
-              -> All current migrations are then marked as applied
-                 so future migrations from this point work normally.
+              -> Every current migration is then marked as applied.
 - TRACKED:    `_migrations` table exists.
-              -> Pending migrations are applied.
-- LEGACY:     Business tables exist (e.g. `users`) but no `_migrations`.
-              -> Tracking table is created and pending migrations applied
-                 (typical of pre-2.x SQLite installs).
+              -> Pending migrations are applied, once the pivot check passes.
+- LEGACY:     Business tables exist but no `_migrations`: refused.
 
-Backend behavior
-----------------
-- SQLite legacy install -> runs SQLite-only migrations as before.
-- PostgreSQL install    -> always treated as FRESH (we never had a PG
-                           install before, so legacy SQLite migrations
-                           are not relevant). After create_all() the
-                           caller invokes `mark_all_applied()`.
+Pivot (3.0)
+-----------
+3.0 starts from UCM 2.254. A database that is not fresh starts only when its
+registry holds ``300_upgrade_from_2_254`` (a 3.0 database) or every name 2.254
+records (``migrations/_from_2_254.PIVOT_NAMES``), and no name that neither 2.254
+nor this release knows. Any other database is refused before anything is written,
+with what to do.
 
-Future migrations
------------------
-Starting with migration 020 (v2.128), every new migration MUST be
-multi-backend:
+Migrations
+----------
+Numbered from 300. Every migration is multi-backend:
 
   * Set ``pg_compatible = True`` at module scope.
   * Expose ``upgrade(arg)`` that accepts EITHER ``sqlite3.Connection``
-    (SQLite path) OR ``sqlalchemy.Engine`` (PostgreSQL path).
+    (SQLite path) OR a SQLAlchemy connection (PostgreSQL path).
   * Use ``isinstance(arg, sqlite3.Connection)`` to dispatch.
 
-Migrations 000-019 are SQLite-only by design (they predate native PG
-support) and are silently skipped on PostgreSQL.
+Files and packages whose name starts with ``_`` are not migrations.
 
 Public API
 ----------
 - `run_all_migrations(dry_run=False, verbose=False)`
-- `mark_all_applied()`  -> call after create_all() on fresh installs
+- `build_fresh_schema(create_all)` -> fresh installs: registry, then tables
+- `mark_all_applied()`
 - `show_status()`       -> CLI helper
 """
 import os
@@ -116,10 +113,43 @@ def _get_state(engine):
     if has_meta:
         with engine.connect() as conn:
             rows = conn.execute(text("SELECT name FROM _migrations")).fetchall()
-        return ("tracked", {r[0] for r in rows})
+        if rows or has_data:
+            return ("tracked", {r[0] for r in rows})
     if has_data:
         return ("legacy", set())
     return ("fresh", set())
+
+
+# ---------------------------------------------------------------------------
+# Pivot: 3.0 upgrades a database last started by 2.254, nothing older
+# ---------------------------------------------------------------------------
+
+UPGRADE_MIGRATION = "300_upgrade_from_2_254"
+PIVOT_VERSION = "2.254"
+
+
+def pivot_refusal(state, applied):
+    """None when this database may be migrated, else the message that refuses it."""
+    from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
+    if state == "fresh":
+        return None
+    # A name neither 2.254 (2.254.N adds none) nor this release knows: a later release or a hand edit
+    unknown = sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+    if unknown:
+        return (f"This database names {len(unknown)} migration(s) this release does not know, first "
+                f"{', '.join(unknown[:3])}: a later release started it, or its registry was edited. "
+                f"Start it with the release that recorded them. Nothing was changed.")
+    if UPGRADE_MIGRATION in applied:
+        return None
+    missing = sorted(PIVOT_NAMES - set(applied))
+    if not missing:
+        return None
+    what = ("it has no migration registry" if state == "legacy"
+            else f"{len(missing)} migration(s) of {PIVOT_VERSION} are missing from its registry, "
+                 f"first {', '.join(missing[:3])}")
+    return (f"This database was last started by a release older than {PIVOT_VERSION} ({what}). "
+            f"Install {PIVOT_VERSION}, start it once, then upgrade. Nothing was changed: "
+            f"{PIVOT_VERSION} still starts on this database.")
 
 
 # ---------------------------------------------------------------------------
@@ -172,26 +202,37 @@ def _mark_applied(engine, names, is_pg: bool):
 def mark_all_applied():
     """Mark every current migration file as applied without running them.
 
-    Call this after `db.create_all()` on a fresh install so that future
-    migrations (added later) are the only ones that run.
+    A fresh install calls it through build_fresh_schema, before create_all, so that
+    future migrations (added later) are the only ones that run.
     """
     db_url = _get_db_url()
     is_pg = _is_postgres(db_url)
     engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
                            connect_args=postgres_connect_args(db_url))
     try:
-        _ensure_tracking_table(engine, is_pg)
-        _mark_applied(engine, _list_migration_names(), is_pg)
+        record_fresh_registry(engine, is_pg)
     finally:
         engine.dispose()
+
+
+def record_fresh_registry(engine, is_pg: bool):
+    """The registry of a fresh 3.0 database on *engine*: every current migration, applied."""
+    _ensure_tracking_table(engine, is_pg)
+    _mark_applied(engine, _list_migration_names(), is_pg)
+
+
+def build_fresh_schema(create_all):
+    """A fresh install records its registry first, then builds its tables: a start cut short in
+    between finds a 3.0 database whose tables create_all completes, never one older than 2.254."""
+    mark_all_applied()
+    create_all()
 
 
 def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
     """Apply pending migrations to the configured database.
 
     Returns True on success, False on failure. A no-op (FRESH state)
-    counts as success — caller is responsible for create_all() and
-    mark_all_applied().
+    counts as success — caller is responsible for build_fresh_schema().
     """
     db_url = _get_db_url()
     is_pg = _is_postgres(db_url)
@@ -210,33 +251,83 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
         if state == "fresh":
             say(
                 f"✓ Fresh {backend} database: schema will be built by "
-                f"SQLAlchemy create_all() (skipping legacy SQL migrations)"
+                f"SQLAlchemy create_all()"
             )
             return True
 
-        if state == "legacy":
-            _ensure_tracking_table(engine, is_pg)
+        # Checked before any write, the creation of `_migrations` included
+        refusal = pivot_refusal(state, applied)
+        if refusal:
+            say(f"✗ {refusal}")
+            return False
 
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
-
-        if not pending:
-            say(f"✓ {backend} database up to date (no pending migrations)")
-            return True
-
-        say(f"Found {len(pending)} pending migration(s) for {backend}:")
-        if is_pg:
-            return _run_pending_pg(engine, pending, dry_run)
+        serial_replay = UPGRADE_MIGRATION in applied and _serial_steps_pending(engine)
         # Pass the SQLite path derived from db_url so DATABASE_URL stays the
         # single source of truth (avoids DATABASE_URL/DATABASE_PATH mismatch).
         sqlite_path = db_url.replace("sqlite:///", "", 1) if db_url.startswith("sqlite:///") else None
-        return _run_pending_sqlite(pending, dry_run, db_path=sqlite_path)
+
+        if not pending and not serial_replay:
+            say(f"✓ {backend} database up to date (no pending migrations)")
+            return True
+
+        if pending:
+            say(f"Found {len(pending)} pending migration(s) for {backend}:")
+            done = (_run_pending_pg(engine, pending, dry_run) if is_pg
+                    else _run_pending_sqlite(pending, dry_run, db_path=sqlite_path))
+            if not done:
+                return False
+        if serial_replay and dry_run:
+            say(f"  → {SERIAL_REPLAY_NOTE} (dry run)")
+            return True
+        return _replay_serial_steps(engine, is_pg, sqlite_path) if serial_replay else True
     finally:
         engine.dispose()
 
 
 # ---------------------------------------------------------------------------
-# SQLite execution path (legacy migrations 000-019 are SQLite-only)
+# Serial steps: run again at each start while they leave the unique index pending
+# ---------------------------------------------------------------------------
+
+# Step 144 alone: it converts, creates the index and resets the key in one commit, so a
+# replay cut short keeps the key that triggers the next one (142 commits its deletion apart)
+SERIAL_STEP = "144_canonical_certificate_serials"
+SERIAL_REPLAY_NOTE = "serial_unique_index_pending is set: upgrade step 144 runs again at each start until it clears"
+
+
+def _serial_steps_pending(engine) -> bool:
+    from utils.serial_duplicates import PENDING_KEY
+    if "system_config" not in inspect(engine).get_table_names():
+        return False
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT 1 FROM system_config WHERE key = :k"),
+                            {"k": PENDING_KEY}).first() is not None
+
+
+def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
+    """Step 144 alone, idempotent; the 300 row and its date stay as they are."""
+    from migrations._from_2_254 import step
+    say("  → serial_unique_index_pending is set: upgrade step 144 runs again...", end=" ")
+    try:
+        if is_pg:
+            with engine.begin() as conn:
+                step(SERIAL_STEP).upgrade(conn)
+        else:
+            conn = sqlite3.connect(sqlite_path or os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db"))
+            try:
+                step(SERIAL_STEP).upgrade(conn)
+            finally:
+                conn.close()
+    except Exception as exc:  # noqa: BLE001
+        say(f"✗ {exc}")
+        return False
+    say("✓")
+    return True
+
+
+# ---------------------------------------------------------------------------
+# SQLite execution path
 # ---------------------------------------------------------------------------
 
 def _run_pending_sqlite(pending, dry_run, db_path: str = None) -> bool:
@@ -290,29 +381,16 @@ def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
                 mod.upgrade(conn)
             else:
                 mod.upgrade(conn)
-        elif hasattr(mod, "MIGRATION_SQL"):
-            conn.executescript(mod.MIGRATION_SQL)
         else:
             say("SKIP (no upgrade)")
             return False
-        conn.execute("INSERT INTO _migrations (name) VALUES (?)", (name,))
+        conn.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (name,))
         conn.commit()
         say("✓")
         return True
-    except sqlite3.IntegrityError:
-        conn.rollback()
-        say("(already applied)")
-        return True
     except Exception as e:  # noqa: BLE001
+        # A failed migration is never recorded: its steps are idempotent, the next start runs it again
         conn.rollback()
-        msg = str(e).lower()
-        if "already exists" in msg or "duplicate" in msg:
-            conn.execute(
-                "INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (name,)
-            )
-            conn.commit()
-            say("✓ (table existed)")
-            return True
         say(f"✗ {e}")
         return False
 
@@ -336,19 +414,15 @@ def _migration_index(name: str) -> int:
     return int("".join(digits)) if digits else -1
 
 
-# Migrations at this index or above MUST declare pg_compatible=True.
-# 000-019 are SQLite-only by design (predate PG support).
+# Migrations at this index or above MUST declare pg_compatible=True: every 3.0 migration (300+).
 PG_COMPATIBLE_REQUIRED_FROM = 20
 
 
 def _run_pending_pg(engine, pending, dry_run) -> bool:
-    """Run pending migrations against PostgreSQL.
+    """Run pending migrations against PostgreSQL, each in one transaction with its registry row.
 
-    A migration runs only if it declares `pg_compatible = True` and exposes
-    `upgrade(conn)`. Migrations numbered < 020 that don't declare
-    pg_compatible are silently marked applied (they are SQLite-only by
-    design). Migrations numbered >= 020 that don't declare pg_compatible
-    are a HARD ERROR — silent-skip was the root cause of issue #115.
+    Every 3.0 migration declares `pg_compatible = True`; one that does not is a hard error
+    (silent-skip was the root cause of issue #115).
     """
     for name in pending:
         path = MIGRATIONS_DIR / f"{name}.py"
@@ -411,6 +485,9 @@ def show_status():
     try:
         state, applied = _get_state(engine)
         say(f"State:   {state}")
+        refusal = pivot_refusal(state, applied)
+        if refusal:
+            say(f"Refused: {refusal}")
         all_names = _list_migration_names()
         pending = [n for n in all_names if n not in applied]
         say(f"Applied: {len(applied)}")
@@ -419,6 +496,8 @@ def show_status():
             say(f"  ✓ {n}")
         for n in pending:
             say(f"  ○ {n}")
+        if not refusal and UPGRADE_MIGRATION in applied and _serial_steps_pending(engine):
+            say(f"Replay:  {SERIAL_REPLAY_NOTE}")
     finally:
         engine.dispose()
 

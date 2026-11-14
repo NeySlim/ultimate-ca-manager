@@ -13,7 +13,7 @@ TABLE = SharedFile.__tablename__
 
 
 def _migration():
-    return importlib.import_module('migrations.152_shared_files')
+    return importlib.import_module('migrations._from_2_254.152_shared_files')
 
 
 def test_sqlite_creates_the_table_and_is_idempotent():

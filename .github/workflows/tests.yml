@@ -311,7 +311,6 @@ jobs:
             tests/test_database_migration_matrix.py \
             tests/test_database_migration_scale.py \
             tests/test_database_admin.py \
-            tests/test_migration_036.py \
             tests/test_migration_runner_pg.py \
             tests/test_scep_intune_ca_lock_pg.py
 
