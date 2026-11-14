@@ -2,7 +2,7 @@
 DNS Made Easy Provider
 https://api-docs.dnsmadeeasy.com/
 """
-import requests, hashlib, hmac, time
+import requests, hmac, time
 from typing import Tuple, Dict, Any, Optional
 import logging
 from datetime import datetime, timezone
@@ -22,10 +22,7 @@ class DnsMadeEasyDnsProvider(BaseDnsProvider):
     
     def _get_headers(self):
         now = datetime.now(timezone.utc).strftime('%a, %d %b %Y %H:%M:%S GMT')
-        hmac_hash = hmac.new(
-            self.credentials['secret_key'].encode(),
-            now.encode(), hashlib.sha1
-        ).hexdigest()
+        hmac_hash = hmac.digest(self.credentials['secret_key'].encode(), now.encode(), 'sha1').hex()
         return {
             'x-dnsme-apiKey': self.credentials['api_key'],
             'x-dnsme-requestDate': now,

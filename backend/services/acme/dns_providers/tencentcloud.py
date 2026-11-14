@@ -69,7 +69,7 @@ class TencentCloudDnsProvider(BaseDnsProvider):
     # ─── Signature ───────────────────────────────────
 
     def _sign(self, key: bytes, msg: str) -> bytes:
-        return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
+        return hmac.digest(key, msg.encode("utf-8"), "sha256")
 
     def _make_headers(self, action: str, payload: str) -> dict:
         secret_id = self.credentials["secret_id"]
@@ -93,7 +93,7 @@ class TencentCloudDnsProvider(BaseDnsProvider):
         secret_date = self._sign(("TC3" + secret_key).encode("utf-8"), date)
         secret_service = self._sign(secret_date, self.SERVICE)
         secret_signing = self._sign(secret_service, "tc3_request")
-        signature = hmac.new(secret_signing, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+        signature = hmac.digest(secret_signing, string_to_sign.encode("utf-8"), "sha256").hex()
 
         return {
             "Authorization": f"{algorithm} Credential={secret_id}/{credential_scope}, SignedHeaders={signed_headers}, Signature={signature}",

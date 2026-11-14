@@ -1119,7 +1119,7 @@ class AcmeClientService:
         
         # Sign with HMAC-SHA256
         signing_input = f"{protected_b64}.{payload_b64}".encode()
-        mac = hmac.new(hmac_key_bytes, signing_input, hashlib.sha256).digest()
+        mac = hmac.digest(hmac_key_bytes, signing_input, 'sha256')
         signature_b64 = base64.urlsafe_b64encode(mac).rstrip(b'=').decode()
         
         return {

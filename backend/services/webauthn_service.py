@@ -6,7 +6,6 @@ from typing import Optional, Tuple, List
 from datetime import datetime, timedelta
 import secrets
 import base64
-import hashlib
 import hmac
 import json
 
@@ -289,11 +288,11 @@ class WebAuthnService:
         """
         rp_id = get_rp_id(hostname)
         challenge_bytes = secrets.token_bytes(32)
-        decoy_id = hmac.new(
+        decoy_id = hmac.digest(
             secret or b'ucm-webauthn-decoy',
             b'webauthn-decoy:' + username.strip().lower().encode('utf-8'),
-            hashlib.sha256,
-        ).digest()
+            'sha256',
+        )
         options = generate_authentication_options(
             rp_id=rp_id,
             challenge=challenge_bytes,

@@ -6,7 +6,6 @@ https://www.inwx.de/en/help/apidoc
 import requests
 from typing import Tuple, Dict, Any, Optional
 import logging
-import hashlib
 import time
 import hmac
 import base64
@@ -115,7 +114,7 @@ class InwxDnsProvider(BaseDnsProvider):
         counter_bytes = counter.to_bytes(8, 'big')
         
         # HMAC-SHA1
-        hmac_result = hmac.new(key, counter_bytes, hashlib.sha1).digest()
+        hmac_result = hmac.digest(key, counter_bytes, 'sha1')
         
         # Dynamic truncation
         offset = hmac_result[-1] & 0x0F

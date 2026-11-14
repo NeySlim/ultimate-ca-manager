@@ -157,7 +157,8 @@ In FIPS mode UCM asks the loaded module whether it approves ML-DSA, Ed25519 and 
 - Still refused with the image: Ed25519 SSH keys of deployment targets and Ed25519 host keys (paramiko signs and verifies them with libsodium, outside the module), HSM and OpenBao keys other than RSA 2048+ and ECDSA P-256, P-384 and P-521, ML-DSA and EdDSA among them (the provider signs, not the module), and SLH-DSA, which the module approves but the Python cryptography library does not provide.
 - The readiness check of the image, run before the switch, judges these keys by the image's module, asked when the image was built.
 - With the image, TLS 1.2 without Extended Master Secret is refused in both directions, and TLS also offers the hybrid groups X25519MLKEM768, SecP256r1MLKEM768 and SecP384r1MLKEM1024; X25519 and X448 alone stay refused.
-- A webhook secret or TSIG key under 14 bytes is refused when saved in FIPS mode.
+- A webhook secret or TSIG key under 14 bytes (112 bits) is refused when saved in FIPS mode, and a webhook secret saved shorter before the switch no longer signs deliveries: they fail with the FIPS reason.
+- HMAC that UCM computes itself (webhook signatures, CSRF tokens, ACME External Account Binding, DNS provider API signatures) uses the one-shot call, which the image's module runs in its own HMAC service, key check included. Known limits: TSIG (dnspython), TOTP codes (pyotp) and Fernet tokens (the Python cryptography library) compute HMAC in OpenSSL around the module's digests, where the module checks no key length; for TSIG and webhook secrets only UCM's own 14-byte check applies.
 
 A standard package installed on a host in FIPS mode prints a reminder to set `UCM_FIPS_BUILD=1`. To return to the standard build, remove the line from `ucm.env` and reinstall.
 

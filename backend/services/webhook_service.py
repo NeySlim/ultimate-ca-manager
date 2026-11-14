@@ -9,8 +9,9 @@ from utils.encryption import decrypt_if_needed
 import requests
 import json
 import hmac
-import hashlib
 import logging
+
+import fips_mode
 from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
@@ -372,7 +373,13 @@ class WebhookService:
         })
         secret_plain = decrypt_if_needed(endpoint.secret) if endpoint.secret else None
         if secret_plain:
-            signature = hmac.new(secret_plain.encode(), body_json.encode(), hashlib.sha256).hexdigest()
+            # A secret saved before the switch may be short: FIPS refuses it on every module
+            try:
+                fips_mode.refuse_short_hmac_key(secret_plain.encode(), 'Webhook secret')
+            except fips_mode.FipsRestricted as e:
+                return False, None, str(e)
+            # The one-shot call: on the 3.5 module the only one its HMAC key check sees
+            signature = hmac.digest(secret_plain.encode(), body_json.encode(), 'sha256').hex()
             headers['X-UCM-Signature'] = f'sha256={signature}'
 
         from utils.ssrf_protection import safe_request_post

@@ -5,7 +5,6 @@ https://api.dns.constellix.com/v4/docs
 """
 import requests
 import hmac
-import hashlib
 import base64
 import time
 from typing import Tuple, Dict, Any, List, Optional
@@ -28,11 +27,7 @@ class ConstellixDnsProvider(BaseDnsProvider):
 
     def _get_headers(self) -> Dict[str, str]:
         timestamp = str(int(time.time() * 1000))
-        hmac_hash = hmac.new(
-            self.credentials['secret_key'].encode(),
-            timestamp.encode(),
-            hashlib.sha1
-        ).digest()
+        hmac_hash = hmac.digest(self.credentials['secret_key'].encode(), timestamp.encode(), 'sha1')
         token = base64.b64encode(hmac_hash).decode()
         return {
             'Authorization': f'Bearer {self.credentials["api_key"]}:{token}:{timestamp}',
