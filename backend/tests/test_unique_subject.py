@@ -365,6 +365,97 @@ def test_an_override_attests_the_same_entity_and_both_renew_without_it(app, auth
     assert _issue(auth_client, ca, 'override-renew.unique.test').status_code == 409
 
 
+def _keep_key(row, key):
+    """The server holds *key* for *row*: it renews in place."""
+    from security.encryption import encrypt_private_key
+    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                            serialization.NoEncryption())
+    row.prv = encrypt_private_key(base64.b64encode(pem).decode())
+
+
+def _sid_rows(app, ca, cn, sid, count=2):
+    """Certificates of *ca* bound to one requester by the SID extension alone (a 2.x row: no holder)."""
+    from services.ca_service import CAService
+    rows = []
+    with app.app_context():
+        for _ in range(count):
+            key = _key()
+            _pem, serial = CAService.sign_csr_from_crypto(db.session.get(CA, ca['id']), _csr(cn, key),
+                                                          validity_days=30, source='test', requester_sid=sid)
+            row = Certificate.query.filter_by(caref=ca['refid'], serial_number=str(int(serial, 16))).one()
+            row.subject_holder = None
+            _keep_key(row, key)
+            db.session.commit()
+            rows.append({'id': row.id, 'refid': row.refid, 'serial_number': row.serial_number})
+    return rows
+
+
+@pytest.mark.parametrize('how', ['button', 'api', 'auto'])
+def test_an_override_on_rows_of_one_key_renews_the_new_one_and_the_key_signs_again(
+        app, auth_client, create_ca, how):
+    """Two CSR signings of one key are one entity: the override takes the first one's lineage, the
+    new certificate renews without it, and so does each old one, by a request of its key (the
+    server holds no key of theirs to renew them in place)."""
+    cn = f'override-key-{how}.unique.test'
+    ca = unique_ca(app, create_ca, f'Unique override key {how} CA', on=False)
+    key = _key()
+    held = [_data(_sign(auth_client, app, ca, _csr(cn, key)), 200) for _ in range(2)]
+    with app.app_context():
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    forced = _data(_issue(auth_client, ca, cn, override_unique_subject=True), 201)
+    assert _row(app, forced['id']).subject_holder == f"cert:{held[0]['refid']}"
+    assert [_renews(app, auth_client, forced, how) for _ in range(2)] == [True, True]
+    _data(_sign(auth_client, app, ca, _csr(cn, key)), 200)
+    assert _issue(auth_client, ca, cn).status_code == 409
+
+
+@pytest.mark.parametrize('how', ['button', 'api', 'auto'])
+def test_an_override_on_rows_of_one_sid_renews_every_row(app, auth_client, create_ca, how):
+    """Two 2.x rows joined by the SID extension only are one entity: the override takes the first
+    one's lineage, and the old rows and the new one each renew in place without it."""
+    cn = f'override-sid-{how}.unique.test'
+    ca = unique_ca(app, create_ca, f'Unique override sid {how} CA', on=False)
+    held = _sid_rows(app, ca, cn, 'S-1-5-21-1004336348-1177238915-682003330-1001')
+    with app.app_context():
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    forced = _data(_issue(auth_client, ca, cn, override_unique_subject=True), 201)
+    assert _row(app, forced['id']).subject_holder == f"cert:{held[0]['refid']}"
+    assert [_renews(app, auth_client, h, how) for h in (forced, held[0], held[1], forced)] == [True] * 4
+    assert _issue(auth_client, ca, cn).status_code == 409
+
+
+def test_a_subject_two_groups_carry_stays_refused(app, auth_client, create_ca):
+    """Two entities, each of two rows of one key: a request of either key is refused, the
+    other entity's first row named; the count says one shared subject."""
+    ca = unique_ca(app, create_ca, 'Unique two groups CA', on=False)
+    keys = (_key(), _key())
+    rows = [_data(_sign(auth_client, app, ca, _csr('two-groups.unique.test', k)), 200) for k in keys for _ in (0, 1)]
+    with app.app_context():
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+        from services.cert.unique_subject import shared_subjects
+        assert shared_subjects(db.session.get(CA, ca['id'])) == [
+            {'subject': 'CN=two-groups.unique.test', 'serial_numbers': [r['serial_number'] for r in rows]}]
+    for key, other in ((keys[0], rows[2]), (keys[1], rows[0])):
+        r = _sign(auth_client, app, ca, _csr('two-groups.unique.test', key))
+        assert r.status_code == 409 and r.get_json()['details']['serial_number'] == other['serial_number']
+
+
+def test_the_lookup_count_does_not_grow_with_the_rows_carrying_the_subject(app, auth_client, create_ca):
+    """The grouping reads the subject's rows in one query: two per issuance, whatever their number."""
+    ca = unique_ca(app, create_ca, 'Unique grouped count CA', on=False)
+    key = _key()
+    for _ in range(6):
+        _data(_sign(auth_client, app, ca, _csr('grouped-count.unique.test', key)), 200)
+    with app.app_context():
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    assert _lookups(app, lambda: _data(_sign(auth_client, app, ca, _csr('grouped-count.unique.test', key)),
+                                       200)) == 2
+
+
 def test_an_override_on_a_subject_several_entities_carry_keeps_it_shared(app, auth_client, create_ca):
     """Nothing says which entity is attested: the new certificate is one more, each later
     issuance of the subject needs the override."""

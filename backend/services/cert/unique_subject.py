@@ -64,21 +64,30 @@ class _Requester:
     """Who asks: the issued certificate, its own and designated rows, the path's identity."""
 
     def __init__(self, issued, own, renews, holder, sid):
+        from services.trust_store.csr_operations_mixin import ad_security_extension_sid
         rows = [r for r in list(own) + list(renews) if r is not None]
-        self.spki = _spki(issued)
         self.identities = set().union(*(_identities(r) for r in rows)) if rows else set()
         if holder:
             self.identities.add(holder)
-        self.sid = sid
+        # The key and the SID the rows being renewed carry are this entity's too
+        held = [issued, *(_held(r) for r in own if r is not None)]
+        self.spkis = {_spki(c) for c in held if c is not None} - {None}
+        self.sids = ({sid} | {ad_security_extension_sid(c) for c in held if c is not None}) - {None}
 
     def same_as(self, row, held, full):
         from services.trust_store.csr_operations_mixin import ad_security_extension_sid
-        if self.sid is not None and ad_security_extension_sid(held) == self.sid:
+        if ad_security_extension_sid(held) in self.sids:
             return True
         if not full:  # a common name pattern alone: the SID extension is the only proof
             return False
-        return (bool(_identities(row) & self.identities)
-                or (self.spki is not None and _spki(held) == self.spki))
+        return bool(_identities(row) & self.identities) or _spki(held) in self.spkis
+
+
+def _held(row):
+    try:
+        return x509.load_pem_x509_certificate(base64.b64decode(row.crt)) if row.crt else None
+    except Exception:
+        return None
 
 
 def applies(ca, pattern=False):
@@ -126,23 +135,19 @@ def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requeste
             .filter(Certificate.caref.in_(refids), Certificate.subject_key == name_key(issued.subject),
                     Certificate.crt.isnot(None), ~Certificate.id.in_(own_ids or {-1}))
             .order_by(Certificate.id))
-    carriers, taken = [], None
+    carriers = []
     for row in rows:
-        try:
-            held = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
-        except Exception:
-            continue
-        if not same_name(held.subject, issued.subject):
-            continue
-        carriers.append((row, held))
-        if taken is None and not who.same_as(row, held, full):
-            taken = row
-            if not (override and full):
-                break
-    if taken is None:
+        held = _held(row)
+        if held is not None and same_name(held.subject, issued.subject):
+            carriers.append((row, held))
+    # A row is the requester's when one row of its entity is: one grouping, as the count's
+    groups = _entities(carriers, full)
+    others = [g for g in groups if not any(who.same_as(row, held, full) for row, held in g)]
+    if not others:
         return None
+    taken = others[0][0][0]
     if override and full:
-        return _attested(own, carriers, taken)
+        return _attested(own, groups, taken)
     refusal = SubjectTaken(issued.subject.rfc4514_string(), taken.serial_number)
     db.session.rollback()
     if full and audited:
@@ -158,30 +163,34 @@ class Override:
         self.serial, self.adopted, self.entities = serial, adopted, entities
 
 
-def _attested(own, carriers, taken):
+def _attested(own, groups, taken):
     """The operator attests the same entity: with one entity carrying the subject, the issued
     rows take its lineage, as a renewal would; with several, nothing says which one is meant."""
-    entities = _entity_count(carriers)
-    if entities != 1:
-        return Override(taken.serial_number, entities=entities)
-    first = carriers[0][0]
+    if len(groups) != 1:
+        return Override(taken.serial_number, entities=len(groups))
+    first = groups[0][0][0]
     for row in own:
         if row is not None:
             row.subject_holder = lineage(first)
     return Override(taken.serial_number, adopted=first.serial_number)
 
 
-def _entity_count(carriers):
-    """How many entities the (row, certificate) pairs make, merged on any shared proof:
-    key, recorded identity or lineage, SID."""
+def _entities(carriers, full=True):
+    """The (row, certificate) pairs grouped by entity, merged on any shared proof: key, recorded
+    identity or lineage, SID (the SID only for a common name pattern). In first-row order."""
     from services.trust_store.csr_operations_mixin import ad_security_extension_sid
-    groups = []  # one entry per entity: (keys, identities, SIDs)
+    groups = []  # one entry per entity: [members, keys, identities, SIDs]
     for row, held in carriers:
-        mine = ({_spki(held)} - {None}, _identities(row), {ad_security_extension_sid(held)} - {None})
-        joined = [g for g in groups if g[0] & mine[0] or g[1] & mine[1] or g[2] & mine[2]]
+        sid = {ad_security_extension_sid(held)} - {None}
+        mine = [[(row, held)], {_spki(held)} - {None} if full else set(),
+                _identities(row) if full else set(), sid]
+        joined = [g for g in groups if g[1] & mine[1] or g[2] & mine[2] or g[3] & mine[3]]
         groups = [g for g in groups if all(g is not j for j in joined)]
-        groups.append(tuple(set().union(*parts) for parts in zip(mine, *joined)))
-    return len(groups)
+        merged = [[m for g in [mine, *joined] for m in g[0]],
+                  *(set().union(*(g[i] for g in [mine, *joined])) for i in (1, 2, 3))]
+        groups.append(merged)
+    members = [sorted(g[0], key=lambda m: m[0].id) for g in groups]
+    return sorted(members, key=lambda g: g[0][0].id)
 
 
 def _audit_refusal(ca, taken, source, requester):
@@ -234,7 +243,7 @@ def shared_subjects(ca):
                 carriers.append((row, x509.load_pem_x509_certificate(base64.b64decode(row.crt))))
             except Exception:
                 continue
-        if _entity_count(carriers) > 1:
+        if len(_entities(carriers)) > 1:
             shared.append({'subject': carriers[0][1].subject.rfc4514_string(),
                            'serial_numbers': [row.serial_number for row, _ in carriers]})
     return shared
