@@ -37,6 +37,7 @@ from .matcher import KeyMatcher
 from utils.foreign_algorithms import spki_der
 from utils.cert_issuer import signing_ca_for
 from .validator import ImportValidator, ValidationResult
+from utils import key_algorithms
 from utils.datetime_utils import utc_now
 from utils.key_type import unsignable_csr_key, weak_ca_key_refusal
 
@@ -166,7 +167,9 @@ class SmartImporter:
     def _parse_fresh(self, content, password) -> List[ParsedObject]:
         # Before any parsing, as the other imports: the FIPS provider cannot load an EdDSA key
         refuse_eddsa_key(content, 'the imported file')
-        return self.parser.parse(content, password)
+        objects = self.parser.parse(content, password)
+        key_algorithms.refuse_unapproved_mldsa((o.key_algorithm for o in objects), 'the imported file')
+        return objects
 
     def analyze(self, content: str | bytes, password=None) -> AnalysisResult:
         """

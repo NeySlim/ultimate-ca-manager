@@ -43,8 +43,10 @@ KEY_TYPE_ALIASES = {'ecdsa': 'ecdsa-p256'}
 
 
 def default_key_type() -> str:
-    """Ed25519 is outside the FIPS module: ECDSA P-256 there, Ed25519 elsewhere."""
-    return 'ecdsa-p256' if fips_mode.enabled() else 'ed25519'
+    """Ed25519, or ECDSA P-256 in FIPS mode when the loaded module does not approve Ed25519."""
+    if fips_mode.enabled() and not fips_mode.module_approves('ED25519'):
+        return 'ecdsa-p256'
+    return 'ed25519'
 
 
 def normalize_key_type(value) -> str:
@@ -404,7 +406,7 @@ class SSHCAService:
     def refuse_unusable_ca(ca):
         """FipsRestricted for a CA whose stored key type FIPS mode cannot load."""
         if ca.key_type == 'ed25519':
-            fips_mode.refuse(f"Ed25519 key of SSH CA '{ca.descr}'")
+            fips_mode.refuse_unless_approved('ED25519', f"Ed25519 key of SSH CA '{ca.descr}'")
 
     @staticmethod
     def get_private_key_object(ca_id):

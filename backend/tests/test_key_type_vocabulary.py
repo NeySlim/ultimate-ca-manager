@@ -76,7 +76,8 @@ class TestTheScreensOfferWhatTheApiAccepts:
                 assert row['digest'] == default_digest_for_key_type(backend.trust_store_id), row['label']
             else:
                 assert row['digest'] is None, row['label']
-            assert row['fips'] == backend.fips_approved, row['label']
+            # null on the screens: the server's module decides (the effective policy's fips_key_types)
+            assert row['fips'] == (None if backend.fips_by_module else backend.fips_static), row['label']
             assert row['securityLevel'] == backend.security_level, row['label']
 
     def test_both_registries_list_the_same_keys_in_the_same_order(self, js_registry):

@@ -3,6 +3,8 @@ RFC2136 (Dynamic DNS Update) Provider
 Uses nsupdate protocol for BIND, Knot, PowerDNS, etc.
 Requires dnspython library (dns.update, dns.tsigkeyring)
 """
+import base64
+import binascii
 import ipaddress
 import logging
 import socket
@@ -27,6 +29,18 @@ class Rfc2136DnsProvider(BaseDnsProvider):
         # hashlib and hmac fall back to CPython's MD5, so only UCM can refuse it
         if str(credentials.get('tsig_algorithm') or '').strip().lower() == 'hmac-md5':
             fips_mode.refuse('TSIG hmac-md5')
+
+    @classmethod
+    def refuse_short_secret(cls, credentials):
+        """At save time, in FIPS mode: a TSIG secret under 14 bytes is not an HMAC key the module takes."""
+        text = credentials.get('tsig_key_secret')
+        if not isinstance(text, str) or not text.strip():
+            return
+        try:
+            secret = base64.b64decode(text.strip(), validate=True)
+        except (ValueError, binascii.Error):
+            return  # not base64: dnspython refuses it with its own error
+        fips_mode.refuse_short_hmac_key(secret, 'TSIG key secret')
 
     def _get_keyring(self):
         """Create TSIG keyring for authentication."""

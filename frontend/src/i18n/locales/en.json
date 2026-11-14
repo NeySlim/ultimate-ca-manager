@@ -3351,7 +3351,7 @@
           "remedy": "Enter the password again in the protocol settings: it is then stored as a PBKDF2 hash."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
           "remedy": "Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it before the switch; an authority key cannot be converted."
         },
         "ca_weak_key": {
@@ -3359,11 +3359,11 @@
           "remedy": "Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it."
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: the FIPS module UCM ships does not provide ML-DSA, so they cannot sign in FIPS mode",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module that does not approve ML-DSA",
           "remedy": "Create an RSA 2048+ or ECDSA P-256/P-384/P-521 authority and move issuance to it before the switch, or keep FIPS mode off while ML-DSA issuance is needed."
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode",
+          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
           "remedy": "Create an ECDSA or RSA SSH authority and distribute its public key to the hosts before the switch."
         },
         "ssh_certificates_eddsa_key": {
@@ -3417,6 +3417,10 @@
         "dns_tsig_hmac_md5": {
           "title": "RFC 2136 DNS providers signing with TSIG hmac-md5: DNS-01 updates are refused in FIPS mode",
           "remedy": "Create an hmac-sha256 TSIG key on the DNS server and enter it in the provider."
+        },
+        "hmac_short_secret": {
+          "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
+          "remedy": "Regenerate the webhook secrets and create TSIG keys of at least 14 bytes (hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers."
         },
         "msca_winrm_ntlm": {
           "title": "Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode",

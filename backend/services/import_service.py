@@ -11,6 +11,7 @@ from utils.cert_issuer import cas_by_ski, is_self_signed
 from utils.foreign_algorithms import describe_public_key, spki_der
 from fips_mode import FipsRestricted
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
+from utils import key_algorithms
 from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import refuse_pkcs12_import
 from services.smart_import.parser import PasswordNotTried, inspected_key, open_pkcs12
@@ -133,6 +134,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
     
     if not cert:
         raise ValueError('Could not parse certificate. Supported formats: PEM, DER, PKCS12 (.p12, .pfx), PKCS7 (.p7b)')
+    key_algorithms.refuse_unapproved_mldsa((cert, private_key), 'the imported file')
     
     return cert, private_key, format_type
 

@@ -3394,7 +3394,7 @@
           "remedy": "Введіть пароль повторно в налаштуваннях протоколу: тоді він зберігається як хеш PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Центри сертифікації з ключем Ed25519 або Ed448: вони не можуть підписувати в режимі FIPS",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
           "remedy": "Створіть центр сертифікації RSA або ECDSA (P-256/P-384/P-521) і перенесіть на нього видачу до перемикання; ключ центру сертифікації не можна перетворити."
         },
         "ca_weak_key": {
@@ -3402,11 +3402,11 @@
           "remedy": "Створіть центр сертифікації з RSA 2048+ або ECDSA P-256/P-384/P-521 і перенесіть на нього видачу."
         },
         "ca_unapproved_algorithm": {
-          "title": "Центри сертифікації з ключем ML-DSA: модуль FIPS, що постачається з UCM, не підтримує ML-DSA, тому вони не можуть підписувати в режимі FIPS",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module that does not approve ML-DSA",
           "remedy": "Створіть центр сертифікації RSA 2048+ або ECDSA P-256/P-384/P-521 і перенесіть на нього видачу до перемикання або залиште режим FIPS вимкненим, поки потрібна видача ML-DSA."
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH-центри сертифікації з ключем Ed25519: вони не можуть підписувати в режимі FIPS",
+          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
           "remedy": "Створіть SSH-центр сертифікації ECDSA або RSA і розповсюдьте його відкритий ключ на хости до перемикання."
         },
         "ssh_certificates_eddsa_key": {
@@ -3460,6 +3460,10 @@
         "dns_tsig_hmac_md5": {
           "title": "DNS-провайдери RFC 2136 з підписом TSIG hmac-md5: оновлення DNS-01 відхиляються в режимі FIPS",
           "remedy": "Створіть ключ TSIG hmac-sha256 на DNS-сервері та введіть його в провайдері."
+        },
+        "hmac_short_secret": {
+          "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
+          "remedy": "Regenerate the webhook secrets and create TSIG keys of at least 14 bytes (hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers."
         },
         "msca_winrm_ntlm": {
           "title": "Підключення до Microsoft CA, канал WinRM яких використовує NTLM: канал відхиляється в режимі FIPS",

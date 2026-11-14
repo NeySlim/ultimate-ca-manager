@@ -3350,7 +3350,7 @@
           "remedy": "プロトコル設定でパスワードを再入力してください。PBKDF2 ハッシュとして保存されます。"
         },
         "ca_eddsa_key": {
-          "title": "Ed25519 または Ed448 の鍵を持つ認証局：FIPS モードでは署名できません",
+          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
           "remedy": "切り替え前に RSA または ECDSA（P-256/P-384/P-521）の認証局を作成し、発行をそちらへ移行してください。認証局の鍵は変換できません。"
         },
         "ca_weak_key": {
@@ -3358,11 +3358,11 @@
           "remedy": "RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。"
         },
         "ca_unapproved_algorithm": {
-          "title": "ML-DSA 鍵を持つ認証局：UCM が同梱する FIPS モジュールは ML-DSA を提供しないため、FIPS モードでは署名できません",
+          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module that does not approve ML-DSA",
           "remedy": "切り替え前に RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。ML-DSA での発行が必要な間は FIPS モードをオフのままにしてください。"
         },
         "ssh_ca_eddsa_key": {
-          "title": "Ed25519 鍵を持つ SSH 認証局：FIPS モードでは署名できません",
+          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
           "remedy": "切り替え前に ECDSA または RSA の SSH 認証局を作成し、その公開鍵をホストに配布してください。"
         },
         "ssh_certificates_eddsa_key": {
@@ -3416,6 +3416,10 @@
         "dns_tsig_hmac_md5": {
           "title": "TSIG hmac-md5 で署名する RFC 2136 DNS プロバイダー：FIPS モードでは DNS-01 の更新が拒否されます",
           "remedy": "DNS サーバーで hmac-sha256 の TSIG 鍵を作成し、プロバイダーに入力してください。"
+        },
+        "hmac_short_secret": {
+          "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
+          "remedy": "Regenerate the webhook secrets and create TSIG keys of at least 14 bytes (hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers."
         },
         "msca_winrm_ntlm": {
           "title": "WinRM チャネルが NTLM を使う Microsoft CA 接続：FIPS モードではチャネルが拒否されます",

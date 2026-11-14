@@ -93,6 +93,8 @@ def create_dns_provider():
                 if not credentials.get(key):
                     return error_response(f'Missing required credential: {key}', 400)
             provider_class.validate_credentials(credentials)
+            if hasattr(provider_class, 'refuse_short_secret'):
+                provider_class.refuse_short_secret(credentials)
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
@@ -210,6 +212,8 @@ def update_provider(provider_id):
         if provider_class:
             try:
                 provider_class.validate_credentials(merged)
+                if hasattr(provider_class, 'refuse_short_secret'):
+                    provider_class.refuse_short_secret(credentials)  # a secret given now only
             except FipsRestricted:
                 raise
             except ValueError as e:

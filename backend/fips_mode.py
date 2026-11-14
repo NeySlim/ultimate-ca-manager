@@ -2,6 +2,7 @@
 libraries run on an active FIPS provider; enforce_at_startup() refuses to
 start when the two disagree."""
 import ctypes
+import functools
 import os
 
 PROBLEM_TYPE = 'urn:ucm:problem:fips-restricted'
@@ -34,6 +35,12 @@ def refuse(what: str) -> None:
         raise FipsRestricted(f'{what} not available in FIPS mode')
 
 
+def refuse_unless_approved(algorithm: str, what: str) -> None:
+    """refuse(what) unless the loaded FIPS module approves *algorithm* ('ED25519', 'ML-DSA-65')."""
+    if enabled() and not module_approves(algorithm):
+        raise FipsRestricted(f'{what} not available in FIPS mode')
+
+
 def refuse_softhsm() -> None:
     """SoftHSM is not a validated module; UCM_FIPS_ALLOW_SOFTHSM=1 lets a test setup use it."""
     allowed = os.environ.get('UCM_FIPS_ALLOW_SOFTHSM', '').strip().lower() in ('1', 'true', 'yes', 'on')
@@ -57,11 +64,17 @@ _INTEGER, _UTF8_PTR = 1, 6
 _UNMODIFIED = ctypes.c_size_t(-1).value
 _PROVIDER_CB = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
 
-# Upstream provider: its security policy (#4985, section 2.4) requires these at 1
+# Upstream provider: its security policies (#4985 and #5586, section 2.4) require these at 1
 UPSTREAM_PROVIDER = 'OpenSSL FIPS Provider'
 APPROVED_MODE_SETTINGS = ('security-checks', 'tls1-prf-ems-check', 'drbg-no-trunc-md')
-# Key agreement the policy lists as not allowed; the 3.1.2 provider still offers it
+# Key agreement the policies list as not allowed alone; the 3.1.2 provider still offers it
 REFUSED_TLS_GROUPS = ('X25519', 'X448')
+# Signatures some modules approve and others do not (3.5.9 does, 3.1.2 and the RHEL 9 and
+# Ubuntu 24.04 modules do not): allowed only when the loaded module answers for them
+MODULE_DEPENDENT_SIGNATURES = ('ED25519', 'ED448', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87')
+_APPROVED_QUERY = b'provider=fips,fips=yes'
+# HMAC keys under 112 bits are refused by the 3.5 module (hmac-key-check)
+MIN_HMAC_KEY_BYTES = 14
 
 
 def _fips_provider():
@@ -83,6 +96,47 @@ def _fips_provider():
 
     lib.OSSL_PROVIDER_do_all(None, _PROVIDER_CB(visit), None)
     return (lib, found[0]) if found else None
+
+
+@functools.lru_cache(maxsize=None)
+def _module_offers(algorithm: str) -> bool:
+    """Whether this process's libcrypto fetches *algorithm* as an approved signature and key
+    type of the 'fips' provider; the module does not change while the process runs."""
+    try:
+        lib = ctypes.CDLL('libcrypto.so.3')
+        fetched = []
+        for fetch, free in (('EVP_SIGNATURE_fetch', 'EVP_SIGNATURE_free'),
+                            ('EVP_KEYMGMT_fetch', 'EVP_KEYMGMT_free')):
+            fetch_fn, free_fn = getattr(lib, fetch), getattr(lib, free)
+            fetch_fn.restype = ctypes.c_void_p
+            fetch_fn.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p]
+            free_fn.argtypes = [ctypes.c_void_p]
+            handle = fetch_fn(None, algorithm.encode(), _APPROVED_QUERY)
+            if handle:
+                free_fn(handle)
+            fetched.append(bool(handle))
+        lib.ERR_clear_error()  # a failed fetch leaves its error on the thread's queue
+    except (OSError, AttributeError):
+        return False
+    return all(fetched)
+
+
+def module_approves(algorithm: str) -> bool:
+    """Whether the loaded FIPS module approves *algorithm* (OpenSSL name: 'ED25519',
+    'ML-DSA-65'); asked of the module, False without one. The single source of
+    every FIPS mode decision on the algorithms of MODULE_DEPENDENT_SIGNATURES."""
+    return _module_offers(str(algorithm).upper())
+
+
+def approved_module_signatures() -> tuple:
+    return tuple(a for a in MODULE_DEPENDENT_SIGNATURES if module_approves(a))
+
+
+def refuse_short_hmac_key(key: bytes, what: str) -> None:
+    """In FIPS mode, refuse an HMAC key the module would not take (under 14 bytes)."""
+    if enabled() and len(key) < MIN_HMAC_KEY_BYTES:
+        raise FipsRestricted(f'{what} of {len(key)} bytes not available in FIPS mode: the module '
+                             f'takes HMAC keys of {MIN_HMAC_KEY_BYTES} bytes (112 bits) or more')
 
 
 def _get_params(names, data_type, ctype):
@@ -211,6 +265,23 @@ def self_tests() -> None:
         except Exception:
             continue
         raise RuntimeError(f'{name} still works: the FIPS provider is not the one answering')
+    for algorithm in approved_module_signatures():
+        _signature_self_test(algorithm)
+
+
+def _signature_self_test(algorithm: str) -> None:
+    """Sign and verify with *algorithm* through cryptography, which the module then answers."""
+    from cryptography.hazmat.primitives.asymmetric import ed448, ed25519, mldsa
+    makers = {'ED25519': lambda: ed25519.Ed25519PrivateKey.from_private_bytes(bytes(32)),
+              'ED448': lambda: ed448.Ed448PrivateKey.from_private_bytes(bytes(57)),
+              'ML-DSA-44': lambda: mldsa.MLDSA44PrivateKey.from_seed_bytes(bytes(32)),
+              'ML-DSA-65': lambda: mldsa.MLDSA65PrivateKey.from_seed_bytes(bytes(32)),
+              'ML-DSA-87': lambda: mldsa.MLDSA87PrivateKey.from_seed_bytes(bytes(32))}
+    try:
+        key = makers[algorithm]()
+        key.public_key().verify(key.sign(b'ucm'), b'ucm')
+    except Exception as e:
+        raise RuntimeError(f'{algorithm} self-test failed although the module approves it: {e}') from e
 
 
 def tls_self_test() -> None:

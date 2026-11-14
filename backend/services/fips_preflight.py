@@ -2,7 +2,9 @@
 
 Every detector reads, none writes. Key types come from stored types and
 encodings (certificate SPKI, OpenSSH type names), never from loading a
-private key: an EdDSA key fails to load once the FIPS provider answers.
+private key: an EdDSA key fails to load on a FIPS provider without EdDSA.
+EdDSA and ML-DSA count as approved only when the loaded module approves them
+(fips_mode.module_approves); outside FIPS mode no module answers, so they are listed.
 """
 from __future__ import annotations
 
@@ -64,10 +66,12 @@ def certificate_key(cert) -> Tuple[str, bool]:
     keys are told by their OID, unloaded."""
     oid = cert.public_key_algorithm_oid.dotted_string
     if oid in _EDDSA_OIDS:
-        return _EDDSA_OIDS[oid], False
+        return _EDDSA_OIDS[oid], fips_mode.module_approves(_EDDSA_OIDS[oid])
     post_quantum = key_algorithms.post_quantum_info(oid)
     if post_quantum is not None:
-        return post_quantum.label, False
+        # SLH-DSA stays unapproved: pyca cannot load it, whatever the module approves
+        approved = post_quantum.family == 'ML-DSA' and fips_mode.module_approves(post_quantum.label)
+        return post_quantum.label, approved
     try:
         public_key = cert.public_key()
     except Exception:
@@ -167,12 +171,13 @@ def _ca_keys():
 
 
 @detector('ca.eddsa_key', BLOCKER,
-          'Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode',
+          'Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode '
+          'on a module that does not approve EdDSA',
           'Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it '
           'before the switch; an authority key cannot be converted.')
 def _ca_eddsa():
-    return [_named(ca.descr, ca.id, name) for ca, (name, _) in _ca_keys()
-            if name in _EDDSA_OIDS.values()]
+    return [_named(ca.descr, ca.id, name) for ca, (name, approved) in _ca_keys()
+            if name in _EDDSA_OIDS.values() and not approved]
 
 
 def _is_mldsa(name) -> bool:
@@ -190,22 +195,27 @@ def _ca_weak():
 
 
 @detector('ca.unapproved_algorithm', BLOCKER,
-          'Certificate authorities with an ML-DSA key: the FIPS module UCM ships does not provide '
-          'ML-DSA, so they cannot sign in FIPS mode',
+          'Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on a module '
+          'that does not approve ML-DSA',
           'Create an RSA 2048+ or ECDSA P-256/P-384/P-521 authority and move issuance to it '
           'before the switch, or keep FIPS mode off while ML-DSA issuance is needed.')
 def _ca_unapproved_algorithm():
-    return [_named(ca.descr, ca.id, name) for ca, (name, _) in _ca_keys() if _is_mldsa(name)]
+    return [_named(ca.descr, ca.id, name) for ca, (name, approved) in _ca_keys()
+            if _is_mldsa(name) and not approved]
 
 
 def _ssh_eddsa(key_type, public_key) -> Optional[str]:
+    """'Ed25519' or 'Ed448' for an SSH key the loaded module does not approve, else None."""
     if str(key_type or '').lower() in ('ed25519', 'ed448'):
-        return 'Ed25519' if str(key_type).lower() == 'ed25519' else 'Ed448'
-    return eddsa_key_name(public_key)
+        name = 'Ed25519' if str(key_type).lower() == 'ed25519' else 'Ed448'
+    else:
+        name = eddsa_key_name(public_key)
+    return None if name is None or fips_mode.module_approves(name) else name
 
 
 @detector('ssh_ca.eddsa_key', BLOCKER,
-          'SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode',
+          'SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode '
+          'on a module that does not approve EdDSA',
           'Create an ECDSA or RSA SSH authority and distribute its public key to the hosts '
           'before the switch.')
 def _ssh_ca_eddsa():
@@ -223,7 +233,15 @@ def _ssh_cert_eddsa():
     rows = (ssh_cert.query.with_entities(ssh_cert.id, ssh_cert.key_id, ssh_cert.key_type)
             .filter(ssh_cert.revoked.isnot(True), ssh_cert.valid_to > utc_now())
             .order_by(ssh_cert.id).all())
-    return [_named(r.key_id, r.id) for r in rows if str(r.key_type or '').lower().startswith('ed')]
+    return [_named(r.key_id, r.id) for r in rows if _ssh_cert_key_refused(r.key_type)]
+
+
+def _ssh_cert_key_refused(key_type) -> bool:
+    """Whether an SSH certificate's stored key type ('ed25519') is EdDSA the module does not approve."""
+    text = str(key_type or '').lower()
+    if not text.startswith('ed'):
+        return False
+    return not fips_mode.module_approves('ED448' if '448' in text else 'ED25519')
 
 
 @detector('deploy.ssh_eddsa_key', BLOCKER,
@@ -395,7 +413,14 @@ def _gcp():
     return [_named(p.name, p.id) for p in rows]
 
 
-_HSM_UNAPPROVED = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS', 'CHACHA')
+_HSM_UNAPPROVED = ('CHACHA',)
+# EdDSA spellings of HSM key types, unapproved while the loaded module does not approve Ed25519
+_HSM_EDDSA = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS')
+
+
+def _hsm_unapproved_words():
+    eddsa = () if fips_mode.module_approves('ED25519') and fips_mode.module_approves('ED448') else _HSM_EDDSA
+    return _HSM_UNAPPROVED + eddsa
 
 
 @detector('hsm.unapproved_keys', WARNING,
@@ -405,8 +430,9 @@ _HSM_UNAPPROVED = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS', 'CHACHA')
 def _hsm_keys():
     # Only algorithms known to be refused: UNKNOWN or provider-specific types stay out.
     rows = HsmKey.query.with_entities(HsmKey.id, HsmKey.label, HsmKey.algorithm).order_by(HsmKey.id)
+    words = _hsm_unapproved_words()
     return [_named(r.label, r.id, r.algorithm) for r in rows.all()
-            if any(word in str(r.algorithm or '').upper() for word in _HSM_UNAPPROVED)]
+            if any(word in str(r.algorithm or '').upper() for word in words)]
 
 
 @detector('dns.tsig_hmac_md5', BLOCKER,
@@ -422,6 +448,40 @@ def _tsig_md5():
         if isinstance(credentials, dict) and \
                 str(credentials.get('tsig_algorithm') or '').strip().lower() == 'hmac-md5':
             found.append(_named(provider.name, provider.id))
+    return found
+
+
+def _short_tsig_secret(text) -> bool:
+    try:
+        secret = base64.b64decode(str(text or '').strip(), validate=True)
+    except ValueError:
+        return False
+    return 0 < len(secret) < fips_mode.MIN_HMAC_KEY_BYTES
+
+
+@detector('hmac.short_secret', WARNING,
+          'Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve '
+          'HMAC keys this short, and FIPS mode refuses to save them',
+          'Regenerate the webhook secrets and create TSIG keys of at least 14 bytes '
+          '(hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers.')
+def _short_hmac_secrets():
+    from services.webhook_service import WebhookEndpoint
+    from utils.encryption import decrypt_if_needed
+    found = []
+    for endpoint in WebhookEndpoint.query.order_by(WebhookEndpoint.id).all():
+        try:
+            secret = decrypt_if_needed(endpoint.secret) if endpoint.secret else ''
+        except Exception:
+            continue
+        if secret and len(secret.encode()) < fips_mode.MIN_HMAC_KEY_BYTES:
+            found.append(_named(endpoint.name, endpoint.id, 'webhook secret'))
+    for provider in DnsProvider.query.filter_by(provider_type='rfc2136').order_by(DnsProvider.id).all():
+        try:
+            credentials = json.loads(provider.credentials or '{}')
+        except (TypeError, ValueError):
+            continue
+        if isinstance(credentials, dict) and _short_tsig_secret(credentials.get('tsig_key_secret')):
+            found.append(_named(provider.name, provider.id, 'TSIG key'))
     return found
 
 

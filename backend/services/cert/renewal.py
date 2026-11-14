@@ -184,7 +184,7 @@ def check_renewable(cert: Certificate) -> None:
         name = alg.display if alg else _stored_eddsa_name(cert)
         if name in ('Ed25519', 'Ed448'):
             try:
-                fips_mode.refuse(f'{name} key of certificate {cert.id}')
+                fips_mode.refuse_unless_approved(name.upper(), f'{name} key of certificate {cert.id}')
             except FipsRestricted as e:
                 raise RenewalError.from_fips(e) from e
 
