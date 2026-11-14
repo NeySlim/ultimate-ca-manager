@@ -289,6 +289,8 @@ GET /api/v2/account/2fa/recovery-codes
 POST /api/v2/account/2fa/recovery-codes/regenerate
 ```
 
+A code checked by `2fa/disable` or `2fa/recovery-codes/regenerate` against an enabled TOTP counts against the same `max_login_attempts` as the second step of a login for that account; past it, both answer 429 until `lockout_duration` has passed, and a code accepted resets the count. `2fa/confirm` answers 409 once TOTP is enabled.
+
 ### API Keys
 
 ```http

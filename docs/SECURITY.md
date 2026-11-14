@@ -263,6 +263,7 @@ Two guards, because the two jobs have different answers.
 WebAuthn authentication includes rate limiting:
 
 - Failed attempts tracked per user
+- A TOTP or recovery code checked in an open session (disabling 2FA, regenerating recovery codes) counts against the same per-account budget as the second step of a login
 - Account lockout after repeated failures
 - Separate rate limit from password login
 
