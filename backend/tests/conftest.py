@@ -10,6 +10,7 @@ Shared fixtures used by all test_*.py files:
   - create_cert: factory to create a certificate under a CA
   - create_user: factory to create a user
 """
+import io
 import atexit
 import contextlib
 import fcntl
@@ -649,16 +650,36 @@ class _ReloggingClient:
         self._client = client
         self._login = login
 
+    @staticmethod
+    def _uploads(kwargs):
+        """The bytes of each in-memory file of a multipart body, read before the first
+        attempt consumes it: (field, position or None, bytes, the other tuple items)."""
+        data = kwargs.get('data')
+        kept = []
+        for field, value in (data.items() if isinstance(data, dict) else ()):
+            for at, item in enumerate(value) if isinstance(value, list) else [(None, value)]:
+                if isinstance(item, tuple) and hasattr(item[0], 'getvalue'):
+                    kept.append((field, at, item[0].getvalue(), item[1:]))
+        return kept
+
     def _call(self, method, *args, **kwargs):
+        uploads = self._uploads(kwargs)
         response = getattr(self._client, method)(*args, **kwargs)
         if response.status_code != 401:
             return response
         self._login(self._client)
+        # The first attempt consumed the streams: the replay gets fresh ones
+        for field, at, content, rest in uploads:
+            fresh = (io.BytesIO(content), *rest)
+            if at is None:
+                kwargs['data'][field] = fresh
+            else:
+                kwargs['data'][field][at] = fresh
         try:
             return getattr(self._client, method)(*args, **kwargs)
         except ValueError:
-            # An upload whose stream the first attempt consumed cannot be
-            # replayed; the original answer is what the test asked for.
+            # A stream that is not in memory cannot be replayed; the original
+            # answer is what the test asked for.
             return response
 
     def get(self, *a, **k): return self._call('get', *a, **k)
