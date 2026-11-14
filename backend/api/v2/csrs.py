@@ -1015,7 +1015,8 @@ def sign_csr(csr_id):
         extra_ekus: EKU names or OIDs added to the type's own
         san_dns, san_ip, san_email, san_uri: names added to the request's own
         custom_extensions: [{oid, critical, value (hex)}] added verbatim (#437)
-        override_unique_subject: true issues although the CA's unique subject is taken (audited)
+        override_unique_subject: true attests that the certificate is for the same entity as the one
+            that already carries the subject under a CA enforcing a unique subject (audited)
     """
     
     cert = db.session.get(Certificate, csr_id)

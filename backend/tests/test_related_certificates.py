@@ -1116,3 +1116,29 @@ def test_csr_signing_issues_b_although_a_carries_its_subject(app, auth_client, c
     with app.app_context():
         assert db.session.get(Certificate, b_id).subject_holder == \
             f'cert:{db.session.get(Certificate, row_id).refid}'
+
+
+def test_an_override_on_a_shared_subject_keeps_b_with_its_a(app, auth_client, cert_a, create_cert):
+    """Two entities carry A's subject: the override names neither, B stays the entity of the A it
+    designates (RFC 9763) and the subject stays shared."""
+    row_id = cert_a[0]
+    with app.app_context():
+        a = db.session.get(Certificate, row_id)
+        ca_id, a_refid, cn = _signing_ca(row_id)[0].id, a.refid, a.common_name
+    other = create_cert(cn=cn, ca_id=ca_id)  # another entity, before the option
+    with app.app_context():
+        db.session.get(CA, ca_id).enforce_unique_subject = True
+        db.session.commit()
+    try:
+        csr_id = _generate_b(app, row_id)
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id, 'validity_days': 30})
+        assert r.status_code == 409 and r.get_json()['details']['serial_number'] == other['serial_number']
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={
+            'ca_id': ca_id, 'validity_days': 30, 'override_unique_subject': True})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert db.session.get(Certificate, r.get_json()['data']['id']).subject_holder == f'cert:{a_refid}'
+    finally:
+        with app.app_context():
+            db.session.get(CA, ca_id).enforce_unique_subject = False
+            db.session.commit()

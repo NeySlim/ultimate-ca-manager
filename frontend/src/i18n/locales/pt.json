@@ -868,8 +868,8 @@
     },
     "renewed": "Certificado renovado",
     "subjectTakenTitle": "Subject already in use",
-    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}}, issued by this CA to another entity. Issue anyway? The override is recorded in the audit log.",
-    "issueAnyway": "Issue anyway"
+    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}} of this CA. Confirm only if this certificate is for the same entity as the one that already carries this subject: it is then issued to that entity, and your confirmation is recorded in the audit log.",
+    "issueAnyway": "Issue to the same entity"
   },
   "cas": {
     "chainRevoked": "Revogada a montante",
@@ -1128,8 +1128,8 @@
     "stopEnforcingUniqueSubject": "Stop enforcing",
     "uniqueSubjectChanged": "Unique subject setting updated",
     "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
-    "uniqueSubjectShared_one": "{{count}} subject is already shared by several entities: every later issuance of it is refused, renewals of its certificates included",
-    "uniqueSubjectShared_other": "{{count}} subjects are already shared by several entities: every later issuance of them is refused, renewals of their certificates included"
+    "uniqueSubjectShared_one": "{{count}} subject is already carried by several entities: {{examples}}. Nothing tells which one a new certificate is for, so every later issuance of it asks for an override, renewals of its certificates included",
+    "uniqueSubjectShared_other": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for, so every later issuance of them asks for an override, renewals of their certificates included"
   },
   "csrs": {
     "uploadCSR": "Carregar CSR",

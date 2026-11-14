@@ -1,6 +1,6 @@
 /**
  * The CA option enforce_unique_subject (RFC 5280 §4.1.2.6), with its switch. Turning it on
- * says how many subjects several entities already share: they stay, their next issuance is refused.
+ * names the subjects several entities already share (count, first examples): they stay shared.
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -24,6 +24,11 @@ export function UniqueSubjectField({ ca, canWrite = false, onChanged }) {
   )
 }
 
+/** "CN=a (1, 2); CN=b (3, 4)": the first shared subjects the API returns, with their serials. */
+export function sharedExamples(examples) {
+  return (examples || []).map(e => `${e.subject} (${(e.serial_numbers || []).join(', ')})`).join('; ')
+}
+
 function UniqueSubjectSwitch({ ca, enforced, onChanged }) {
   const { t } = useTranslation()
   const { showSuccess, showWarning, showError } = useNotification()
@@ -35,7 +40,11 @@ function UniqueSubjectSwitch({ ca, enforced, onChanged }) {
       const res = await casService.update(ca.id, { enforceUniqueSubject: !enforced })
       const updated = res?.data || res
       showSuccess(t('cas.uniqueSubjectChanged'))
-      if (updated?.shared_subjects) showWarning(t('cas.uniqueSubjectShared', { count: updated.shared_subjects }))
+      if (updated?.shared_subjects) {
+        showWarning(t('cas.uniqueSubjectShared', {
+          count: updated.shared_subjects, examples: sharedExamples(updated.shared_subject_examples),
+        }))
+      }
       if (updated?.id) onChanged?.(updated)
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'ca' } }))
     } catch (err) {

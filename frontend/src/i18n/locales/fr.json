@@ -1085,8 +1085,8 @@
     "stopEnforcingUniqueSubject": "Ne plus imposer",
     "uniqueSubjectChanged": "Réglage du sujet unique mis à jour",
     "uniqueSubjectChangeFailed": "Le réglage du sujet unique n'a pas pu être mis à jour",
-    "uniqueSubjectShared_one": "{{count}} sujet est déjà partagé par plusieurs entités : toute émission suivante de ce sujet est refusée, renouvellements de ses certificats compris",
-    "uniqueSubjectShared_other": "{{count}} sujets sont déjà partagés par plusieurs entités : toute émission suivante de ces sujets est refusée, renouvellements de leurs certificats compris"
+    "uniqueSubjectShared_one": "{{count}} sujet est déjà porté par plusieurs entités : {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : toute émission suivante de ce sujet demande une dérogation, renouvellements de ses certificats compris",
+    "uniqueSubjectShared_other": "{{count}} sujets sont déjà portés par plusieurs entités, dont {{examples}}. Rien ne dit à laquelle un nouveau certificat est destiné : toute émission suivante de ces sujets demande une dérogation, renouvellements de leurs certificats compris"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -1271,8 +1271,8 @@
     },
     "renewed": "Certificat renouvelé",
     "subjectTakenTitle": "Sujet déjà utilisé",
-    "subjectTakenConfirm": "Le sujet {{subject}} est déjà porté par le certificat de numéro de série {{serial}}, émis par cette AC pour une autre entité. Émettre quand même ? La dérogation est inscrite au journal d'audit.",
-    "issueAnyway": "Émettre quand même"
+    "subjectTakenConfirm": "Le sujet {{subject}} est déjà porté par le certificat de numéro de série {{serial}} de cette AC. Ne confirmez que si ce certificat est pour la même entité que celle qui porte déjà ce sujet : il est alors émis pour cette entité, et votre confirmation est inscrite au journal d'audit.",
+    "issueAnyway": "Émettre pour la même entité"
   },
   "common": {
     "saved": "Paramètres enregistrés",

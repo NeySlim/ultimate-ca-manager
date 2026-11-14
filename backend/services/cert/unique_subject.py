@@ -90,7 +90,7 @@ def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requeste
                          pattern=False, override=False, source='manual', requester=None):
     """Raise :class:`SubjectTaken` (session rolled back, refusal audited) when another entity's
     certificate of *ca* carries *issued*'s subject; called under the CA row lock. With *override*
-    (manual issuance and CSR signing), return the serial of that certificate instead."""
+    (manual issuance and CSR signing), return an :class:`Override` instead."""
     if not applies(ca, pattern) or len(issued.subject) == 0:
         return None
     from models import Certificate, db
@@ -104,21 +104,62 @@ def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requeste
             .filter(Certificate.caref == ca.refid, Certificate.subject_key == name_key(issued.subject),
                     Certificate.crt.isnot(None), ~Certificate.id.in_(own_ids or {-1}))
             .order_by(Certificate.id))
+    carriers, taken = [], None
     for row in rows:
         try:
             held = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
         except Exception:
             continue
-        if not same_name(held.subject, issued.subject) or who.same_as(row, held, full):
+        if not same_name(held.subject, issued.subject):
             continue
-        if override and full:
-            return row.serial_number
-        taken = SubjectTaken(issued.subject.rfc4514_string(), row.serial_number)
-        db.session.rollback()
-        if full:
-            _audit_refusal(ca, taken, source, requester)
-        raise taken
-    return None
+        carriers.append((row, held))
+        if taken is None and not who.same_as(row, held, full):
+            taken = row
+            if not (override and full):
+                break
+    if taken is None:
+        return None
+    if override and full:
+        return _attested(own, carriers, taken)
+    refusal = SubjectTaken(issued.subject.rfc4514_string(), taken.serial_number)
+    db.session.rollback()
+    if full:
+        _audit_refusal(ca, refusal, source, requester)
+    raise refusal
+
+
+class Override:
+    """An override: *serial* carries the subject; *adopted* is the certificate whose holder the
+    issued rows took when one entity carries it, else None and *entities* say how many do."""
+
+    def __init__(self, serial, adopted=None, entities=1):
+        self.serial, self.adopted, self.entities = serial, adopted, entities
+
+
+def _attested(own, carriers, taken):
+    """The operator attests the same entity: with one entity carrying the subject, the issued
+    rows take its lineage, as a renewal would; with several, nothing says which one is meant."""
+    entities = _entity_count(carriers)
+    if entities != 1:
+        return Override(taken.serial_number, entities=entities)
+    first = carriers[0][0]
+    for row in own:
+        if row is not None:
+            row.subject_holder = lineage(first)
+    return Override(taken.serial_number, adopted=first.serial_number)
+
+
+def _entity_count(carriers):
+    """How many entities the (row, certificate) pairs make, merged on any shared proof:
+    key, recorded identity or lineage, SID."""
+    from services.trust_store.csr_operations_mixin import ad_security_extension_sid
+    groups = []  # one entry per entity: (keys, identities, SIDs)
+    for row, held in carriers:
+        mine = ({_spki(held)} - {None}, _identities(row), {ad_security_extension_sid(held)} - {None})
+        joined = [g for g in groups if g[0] & mine[0] or g[1] & mine[1] or g[2] & mine[2]]
+        groups = [g for g in groups if all(g is not j for j in joined)]
+        groups.append(tuple(set().union(*parts) for parts in zip(mine, *joined)))
+    return len(groups)
 
 
 def _audit_refusal(ca, taken, source, requester):
@@ -131,43 +172,48 @@ def _audit_refusal(ca, taken, source, requester):
     safe_commit(logger, 'Subject uniqueness refusal audit commit failed')
 
 
-def audit_override(ca, issued_row, serial, username):
-    """The audit entry of an issuance an operator asked for although the subject was taken."""
+def audit_override(ca, issued_row, override, username):
+    """The audit entry of an override: the operator attests that the certificate is for the
+    entity that already carries the subject, or the subject stays shared by several."""
     from services.audit.staging import stage_audit_entry
     from utils.db_transaction import safe_commit
+    issued = (f'certificate serial {issued_row.serial_number} under CA {ca.descr} (id={ca.id}) '
+              f'with the subject {issued_row.subject}')
+    if override.adopted is not None:
+        details = (f'{username} attested that {issued} is for the same entity as the one that already '
+                   f'carries this subject: it takes the holder of certificate serial {override.adopted}')
+    else:
+        details = (f'{username} issued {issued}, already carried by {override.entities} entities '
+                   f'(certificate serial {override.serial} among them): the subject stays shared')
     stage_audit_entry(
         action='certificate.subject_override', resource_type='certificate',
         resource_id=str(issued_row.id), resource_name=issued_row.subject, username=username,
-        details=(f'{username} issued certificate serial {issued_row.serial_number} under CA '
-                 f'{ca.descr} (id={ca.id}) with the subject {issued_row.subject}, already carried '
-                 f'by certificate serial {serial}'))
+        details=details)
     safe_commit(logger, 'Subject uniqueness override audit commit failed')
 
 
 def shared_subjects(ca):
-    """How many subjects certificates of *ca* already carry for more than one entity."""
+    """The subjects certificates of *ca* already carry for more than one entity, in id order:
+    ``[{'subject', 'serial_numbers'}]``."""
     from sqlalchemy import func
     from models import Certificate, db
     keys = [k for (k,) in db.session.query(Certificate.subject_key)
             .filter(Certificate.caref == ca.refid, Certificate.subject_key.isnot(None),
                     Certificate.crt.isnot(None))
-            .group_by(Certificate.subject_key).having(func.count(Certificate.id) > 1)]
-    from services.trust_store.csr_operations_mixin import ad_security_extension_sid
-    shared = 0
+            .group_by(Certificate.subject_key).having(func.count(Certificate.id) > 1)
+            .order_by(func.min(Certificate.id))]
+    shared = []
     for key in keys:
-        groups = []  # one entry per entity: (keys, identities, SIDs)
+        carriers = []
         for row in Certificate.query.filter(Certificate.caref == ca.refid, Certificate.subject_key == key,
                                             Certificate.crt.isnot(None)).order_by(Certificate.id):
             try:
-                held = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+                carriers.append((row, x509.load_pem_x509_certificate(base64.b64decode(row.crt))))
             except Exception:
                 continue
-            mine = ({_spki(held)} - {None}, _identities(row), {ad_security_extension_sid(held)} - {None})
-            # Entities merge on any shared proof: key, recorded identity or lineage, SID
-            joined = [g for g in groups if g[0] & mine[0] or g[1] & mine[1] or g[2] & mine[2]]
-            groups = [g for g in groups if all(g is not j for j in joined)]
-            groups.append(tuple(set().union(*parts) for parts in zip(mine, *joined)))
-        shared += len(groups) > 1
+        if _entity_count(carriers) > 1:
+            shared.append({'subject': carriers[0][1].subject.rfc4514_string(),
+                           'serial_numbers': [row.serial_number for row, _ in carriers]})
     return shared
 
 
@@ -194,7 +240,7 @@ def taken_response(taken):
     from utils.response import error_response
     return error_response(
         f'The subject {taken.subject} is already carried by certificate serial {taken.serial}, '
-        f'issued by this CA to another entity; send '
-        f'{OVERRIDE_FIELD}: true to issue it anyway (audited)', 409,
+        f'issued by this CA; send {OVERRIDE_FIELD}: true to attest that this certificate is for '
+        f'the same entity as the one that already carries this subject (audited)', 409,
         details={'subject': taken.subject, 'serial_number': taken.serial,
                  'override_field': OVERRIDE_FIELD})

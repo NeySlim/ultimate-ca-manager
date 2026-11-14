@@ -589,16 +589,22 @@ certificate of another entity already carries under it, whatever its status (RFC
 see the user guide for what makes the same entity). The CA object reads it back as
 `enforce_unique_subject`, and the change is audited. The answer that turns it on carries
 `shared_subjects`, the number of subjects certificates of the CA already carry for more than one
-entity: they stay, and every later issuance of such a subject is refused, the renewal (in place
-or automatic) of any of its certificates included; only the override below issues it.
+entity, and `shared_subject_examples`, the first 20 of them in issuance order:
+`[{"subject": "CN=…", "serial_numbers": ["…", "…"]}]`. Those certificates stay; every later
+issuance of such a subject, the renewal (in place or automatic) of any of its certificates
+included, is refused unless the override below is sent.
 
 With the option on, `POST /api/v2/certificates` and `POST /api/v2/csrs/{id}/sign` answer `409`
 when the subject is taken, with `details` `{"subject", "serial_number", "override_field":
-"override_unique_subject"}`. Sent again with `"override_unique_subject": true` (`write:certificates`),
-the request issues and writes a `certificate.subject_override` audit entry naming the operator,
-the subject and the serial of the certificate already carrying it. The subject is then shared:
-neither certificate can be renewed any more. A renewal refused for the same reason answers `409`
-and has no override.
+"override_unique_subject"}`. Sending the request again with `"override_unique_subject": true`
+(`write:certificates`) attests that this certificate is for the same entity as the one that
+already carries this subject. When a single entity carries it, the new certificate is recorded
+as that entity's, as a renewal would be, and the existing and the new certificates renew
+afterwards without the override; when several do, the subject stays shared (see the user
+guide). Either way the issuance writes a `certificate.subject_override` audit entry naming the
+operator, the subject, the new certificate and the certificate whose entity it joins, or the
+number of entities sharing the subject. A renewal refused for the same reason answers `409` and
+has no override.
 
 ### Confirm a Parent Whose Signature Cannot Be Verified
 ```http

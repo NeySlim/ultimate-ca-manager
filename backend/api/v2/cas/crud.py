@@ -1040,7 +1040,9 @@ def update_ca(ca_id):
         if unique_turned_on:
             # Checked at issuance only: subjects already shared stay, their holders are refused
             from services.cert.unique_subject import shared_subjects
-            ca_dict['shared_subjects'] = shared_subjects(ca)
+            shared = shared_subjects(ca)
+            ca_dict['shared_subjects'] = len(shared)
+            ca_dict['shared_subject_examples'] = shared[:20]
 
         return success_response(data=ca_dict, message='CA updated successfully')
     except Exception as e:

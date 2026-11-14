@@ -317,20 +317,51 @@ def test_renewal_in_place_is_the_same_entity_but_not_another_one(app, auth_clien
     assert _row(app, other['id']).serial_number == other['serial_number']
 
 
-def test_after_an_override_neither_certificate_renews_automatic_renewal_included(
-        app, auth_client, create_ca):
-    """An overridden subject is shared by two entities: each later issuance of it is refused."""
+def _renews(app, auth_client, held, how):
+    """Renew *held* in place by the Renew button's route, the bulk API or the scheduler."""
     from services.auto_renewal_service import AutoRenewalService
-    ca = unique_ca(app, create_ca, 'Unique override renewal CA')
+    if how == 'button':
+        r = auth_client.post(f"/api/v2/certificates/{held['id']}/renew", json={})
+        return r.status_code == 200
+    if how == 'api':
+        data = _data(auth_client.post('/api/v2/certificates/bulk/renew', json={'ids': [held['id']]}), 200)
+        return data['success'] == [held['id']]
+    with app.app_context():
+        renewed, _message = AutoRenewalService.renew_certificate(db.session.get(Certificate, held['id']))
+        return renewed is True
+
+
+@pytest.mark.parametrize('how', ['button', 'api', 'auto'])
+def test_an_override_attests_the_same_entity_and_both_renew_without_it(app, auth_client, create_ca, how):
+    """RFC 5280 §4.1.2.6: a CA MAY certify one DN again for the same entity, never for another."""
+    ca = unique_ca(app, create_ca, f'Unique override renewal {how} CA')
     first = _data(_issue(auth_client, ca, 'override-renew.unique.test'), 201)
     forced = _data(_issue(auth_client, ca, 'override-renew.unique.test', override_unique_subject=True), 201)
-    for held in (first, forced):
-        r = auth_client.post(f"/api/v2/certificates/{held['id']}/renew", json={})
-        assert r.status_code == 409, r.get_json()
-        with app.app_context():
-            renewed, message = AutoRenewalService.renew_certificate(db.session.get(Certificate, held['id']))
-            assert renewed is False and 'override-renew.unique.test' in message
-        assert _row(app, held['id']).serial_number == held['serial_number']
+    assert _row(app, forced['id']).subject_holder == f"cert:{first['refid']}"
+    assert [_renews(app, auth_client, held, how) for held in (first, forced, first)] == [True, True, True]
+    # Still one entity: another one is refused, and the override is needed again
+    assert _issue(auth_client, ca, 'override-renew.unique.test').status_code == 409
+
+
+def test_an_override_on_a_subject_several_entities_carry_keeps_it_shared(app, auth_client, create_ca):
+    """Nothing says which entity is attested: the new certificate is one more, each later
+    issuance of the subject needs the override."""
+    ca = unique_ca(app, create_ca, 'Unique override shared CA', on=False)
+    first = _data(_issue(auth_client, ca, 'override-shared.unique.test'), 201)
+    second = _data(_issue(auth_client, ca, 'override-shared.unique.test'), 201)
+    with app.app_context():
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    after = _last_audit_id(app)
+    forced = _data(_issue(auth_client, ca, 'override-shared.unique.test', override_unique_subject=True), 201)
+    assert _row(app, forced['id']).subject_holder is None
+    entry, = _audit(app, 'certificate.subject_override', after)
+    assert entry == (f"admin issued certificate serial {forced['serial_number']} under CA Unique override "
+                     f"shared CA (id={ca['id']}) with the subject CN=override-shared.unique.test, already "
+                     f"carried by 2 entities (certificate serial {first['serial_number']} among them): "
+                     "the subject stays shared")
+    for held in (forced, second):
+        assert auth_client.post(f"/api/v2/certificates/{held['id']}/renew", json={}).status_code == 409
 
 
 def test_the_override_issues_and_audits_operator_subject_and_certificate(app, auth_client, create_ca):
@@ -340,11 +371,12 @@ def test_the_override_issues_and_audits_operator_subject_and_certificate(app, au
     issued = _data(_issue(auth_client, ca, 'override.unique.test', override_unique_subject=True), 201)
     signed = _data(_sign(auth_client, app, ca, _csr('override.unique.test', _key()),
                          override_unique_subject=True), 200)
-    entries = _audit(app, 'certificate.subject_override', after)
-    assert [f"serial {c['serial_number']} under CA Unique override CA" in e and
-            f"already carried by certificate serial {first['serial_number']}" in e and
-            e.startswith('admin issued') and 'CN=override.unique.test' in e
-            for c, e in zip((issued, signed), entries)] == [True, True]
+    assert {_row(app, c['id']).subject_holder for c in (issued, signed)} == {f"cert:{first['refid']}"}
+    assert _audit(app, 'certificate.subject_override', after) == [
+        f"admin attested that certificate serial {c['serial_number']} under CA Unique override CA "
+        f"(id={ca['id']}) with the subject CN=override.unique.test is for the same entity as the one "
+        f"that already carries this subject: it takes the holder of certificate serial {first['serial_number']}"
+        for c in (issued, signed)]
     # Only true asks for it
     assert _issue(auth_client, ca, 'override.unique.test', override_unique_subject='yes').status_code == 409
 
@@ -541,15 +573,29 @@ def test_the_option_is_read_written_and_audited(app, auth_client, create_ca):
 def test_turning_it_on_counts_the_subjects_already_shared(app, auth_client, create_ca):
     """Allowed, as in EJBCA: the rule applies to the next issuance only."""
     ca = create_ca(cn='Unique shared CA')
+    serials = {}
     for cn in ('a.shared.test', 'a.shared.test', 'b.shared.test', 'b.shared.test', 'c.shared.test'):
-        _data(_issue(auth_client, ca, cn), 201)
+        serials.setdefault(cn, []).append(_data(_issue(auth_client, ca, cn), 201)['serial_number'])
     key = _key()
     for _ in range(2):  # one entity: its key
         _data(_sign(auth_client, app, ca, _csr('d.shared.test', key)), 200)
     data = _data(auth_client.patch(f"/api/v2/cas/{ca['id']}", json={'enforceUniqueSubject': True}), 200)
     assert data['shared_subjects'] == 2
+    assert data['shared_subject_examples'] == [
+        {'subject': f'CN={cn}', 'serial_numbers': serials[cn]} for cn in ('a.shared.test', 'b.shared.test')]
     data = _data(auth_client.patch(f"/api/v2/cas/{ca['id']}", json={'enforceUniqueSubject': True}), 200)
-    assert 'shared_subjects' not in data
+    assert 'shared_subjects' not in data and 'shared_subject_examples' not in data
+
+
+def test_the_shared_subject_examples_stop_at_twenty(app, auth_client, create_ca):
+    ca = create_ca(cn='Unique shared many CA')
+    for index in range(21):
+        for _ in range(2):
+            _data(_issue(auth_client, ca, f'{index}.many.shared.test'), 201)
+    data = _data(auth_client.patch(f"/api/v2/cas/{ca['id']}", json={'enforceUniqueSubject': True}), 200)
+    assert data['shared_subjects'] == 21
+    assert [e['subject'] for e in data['shared_subject_examples']] == [
+        f'CN={index}.many.shared.test' for index in range(20)]
 
 
 def test_backups_export_the_option_and_the_holder(app, auth_client, create_ca):

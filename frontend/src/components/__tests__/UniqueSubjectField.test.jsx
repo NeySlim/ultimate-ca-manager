@@ -1,6 +1,6 @@
 /**
  * The CA option enforce_unique_subject: shown with its help, switched both ways with write:cas,
- * the subjects already shared counted when it is turned on.
+ * the subjects already shared counted and named when it is turned on.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key, opts) => (opts?.count !== undefined ? `${key}:${opts.count}` : key),
+    t: (key, opts) => (opts?.count !== undefined ? `${key}:${opts.count}:${opts.examples}` : key),
     i18n: { language: 'en' },
   }),
   Trans: ({ children }) => children,
@@ -31,14 +31,16 @@ beforeEach(() => vi.clearAllMocks())
 
 describe('UniqueSubjectField', () => {
   it('turns it on and says how many subjects are already shared', async () => {
-    mocks.update.mockResolvedValue({ data: { ...on, shared_subjects: 3 } })
+    const examples = [{ subject: 'CN=a.test', serial_numbers: ['1', '2'] }, { subject: 'CN=b.test', serial_numbers: ['3', '4'] }]
+    mocks.update.mockResolvedValue({ data: { ...on, shared_subjects: 3, shared_subject_examples: examples } })
     render(<UniqueSubjectField ca={off} canWrite onChanged={mocks.onChanged} />)
     expect(screen.getByText('cas.uniqueSubjectNotEnforced')).toBeInTheDocument()
     expect(screen.getAllByText('cas.uniqueSubjectHelp').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByText('cas.enforceUniqueSubject'))
     await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(1, { enforceUniqueSubject: true }))
-    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('cas.uniqueSubjectShared:3'))
-    expect(mocks.onChanged).toHaveBeenCalledWith({ ...on, shared_subjects: 3 })
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      'cas.uniqueSubjectShared:3:CN=a.test (1, 2); CN=b.test (3, 4)'))
+    expect(mocks.onChanged).toHaveBeenCalledWith({ ...on, shared_subjects: 3, shared_subject_examples: examples })
   })
 
   it('turns it off without a warning', async () => {
