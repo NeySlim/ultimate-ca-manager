@@ -25,7 +25,7 @@ from config.settings import Config
 from utils.config_cas import config_compare_and_set, config_release
 from utils.datetime_utils import utc_now, utc_isoformat
 
-from . import storage
+from . import shared_store, storage
 from .backup_service import BackupService
 from .locking import BackupBusyError, backup_operation_lock
 from .errors import ScheduledBackupError
@@ -115,6 +115,13 @@ def get_schedule() -> dict:
 
 def _newest_validated_archive():
     """The most recent archive whose bytes still match what was recorded."""
+    if shared_store.enabled():
+        # Each stored archive was read back before its commit
+        stored = shared_store.list_archives()
+        if not stored:
+            return None, None
+        newest = stored[0]
+        return newest['filename'], shared_store.age_seconds(newest['created_at'])
     paths = _existing_archives()
     newest = storage.newest_validated(paths) if paths else None
     if newest is None:
@@ -180,7 +187,11 @@ def _get_backup_password() -> str:
 
 
 def list_backups() -> list[dict]:
-    """List backup files on disk, newest first."""
+    """List the archives, newest first: on disk, or in HA the database's with their node."""
+    if shared_store.enabled():
+        return [{'filename': a['filename'], 'size': a['size'], 'node': a['node'],
+                 'sha256': a['sha256'], 'created_at': utc_isoformat(a['created_at'])}
+                for a in shared_store.list_archives()]
     backups = []
     try:
         for path in glob.glob(os.path.join(str(Config.BACKUP_DIR), _BACKUP_GLOB)):
@@ -199,6 +210,21 @@ def list_backups() -> list[dict]:
     return backups
 
 
+def _apply_shared_retention(retention_days: int, wait: float = 0) -> int:
+    """HA: the rule below over the database's archives, under a lock of the whole cluster.
+
+    Busy with no wait is a pass skipped; with a wait it raises BackupBusyError.
+    """
+    try:
+        return shared_store.apply_retention(
+            retention_days, min_keep=_min_keep(), max_total_bytes=_max_total_bytes(), wait=wait)
+    except BackupBusyError as busy:
+        if wait:
+            raise
+        logger.info("Backup retention skipped: %s", busy)
+        return 0
+
+
 def _apply_retention(retention_days: int) -> int:
     """Delete backup files older than retention_days. Returns count removed.
 
@@ -210,6 +236,8 @@ def _apply_retention(retention_days: int) -> int:
     existed, or by another path — are kept in the two most recent, since
     nothing proves they are usable and nothing proves they are not.
     """
+    if shared_store.enabled():
+        return _apply_shared_retention(retention_days)
     if not retention_days or retention_days < 1:
         return 0
     # Wall-clock seconds, not utc_now().timestamp(): utc_now() is naive UTC,
@@ -369,6 +397,10 @@ def run_backup_retention(wait: float = 0) -> int:
     except (ValueError, TypeError):
         retention = 30
 
+    if shared_store.enabled():
+        # An archive in the database is invisible until committed whole: the store lock alone
+        # serialises deleters, and the node's disk lock would only add its own wait
+        return _apply_shared_retention(retention, wait)
     try:
         # Retention deletes; a backup being written at the same moment is not
         # yet recorded, and would look like an archive nothing vouches for.

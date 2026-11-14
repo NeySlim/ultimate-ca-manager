@@ -23,6 +23,8 @@ PostgreSQL (`UCM_TEST_PG_URL`); SQLite serializes writers on its own.
 | SSH CA serials unique | Counter row `FOR UPDATE` | `services/ssh_ca_service.py` |
 | A due discovery profile starts one scan | `next_scan_at` moved only while still due and the schedule enabled (rowcount 1) | `services/discovery_scheduler_task.py` |
 | A delegated OCSP responder is renewed once | Binding rebound only if it still names the old certificate | `services/ocsp_responder_renewal.py` |
+| An HA backup archive is listed only once whole | Row and chunks in one transaction, read back before the commit | `services/backup/shared_store.py` `store_archive` |
+| HA backup retention and deletions run one at a time across nodes | Transaction advisory lock keyed by schema | `services/backup/shared_store.py` `_take_lock` |
 
 Scheduled tasks without a claim of their own rely on the leader election: the backup
 `last_run`, the Microsoft CA CRL and inventory syncs. The automatic renewal task also

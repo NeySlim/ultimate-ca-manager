@@ -21,7 +21,7 @@ def _migration():
 
 def test_the_step_is_part_of_the_upgrade():
     from migrations._from_2_254 import STEPS
-    assert STEPS[-1] == '159_second_factor_failures'
+    assert '159_second_factor_failures' in STEPS
 
 
 def test_sqlite_creates_the_table_and_is_idempotent():

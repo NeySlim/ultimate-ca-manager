@@ -2833,6 +2833,10 @@
     "backupCount": "{{count}} backup(s)",
     "backupTotalSize": "Total size",
     "diskFree": "Disk free",
+    "backupNode": "Node",
+    "backupSha256": "SHA-256",
+    "backupCopySha256": "Copy the full SHA-256",
+    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "Search backups…",
     "backupSortNewest": "Newest first",
     "backupSortOldest": "Oldest first",
@@ -3427,7 +3431,7 @@
           "remedy": "Set the scheduled backup KDF to PBKDF2, and take a manual backup with kdf \"pbkdf2\" before the switch."
         },
         "backup_archives_argon2id": {
-          "title": "Backup archives on disk encrypted with Argon2id: they cannot be restored in FIPS mode",
+          "title": "Backup archives encrypted with Argon2id: they cannot be restored in FIPS mode",
           "remedy": "Keep them for a standard instance, and take a manual backup with kdf \"pbkdf2\" before the switch."
         },
         "database_postgres_without_tls": {

@@ -2832,6 +2832,10 @@
     "backupCount": "{{count}} backup(s)",
     "backupTotalSize": "Tamanho total",
     "diskFree": "Disco livre",
+    "backupNode": "Node",
+    "backupSha256": "SHA-256",
+    "backupCopySha256": "Copy the full SHA-256",
+    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "Pesquisar backups…",
     "backupSortNewest": "Mais recentes primeiro",
     "backupSortOldest": "Mais antigos primeiro",
@@ -3426,7 +3430,7 @@
           "remedy": "Defina a KDF do backup agendado como PBKDF2 e faça um backup manual com kdf \"pbkdf2\" antes da mudança."
         },
         "backup_archives_argon2id": {
-          "title": "Arquivos de backup em disco cifrados com Argon2id: não podem ser restaurados no modo FIPS",
+          "title": "Arquivos de backup cifrados com Argon2id: não podem ser restaurados no modo FIPS",
           "remedy": "Mantenha-os para uma instância padrão e faça um backup manual com kdf \"pbkdf2\" antes da mudança."
         },
         "database_postgres_without_tls": {

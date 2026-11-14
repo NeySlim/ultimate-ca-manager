@@ -44,8 +44,9 @@ IMPORTANT
   KEY_ENCRYPTION_KEY live in the "{{ include "ucm.secretName" . }}" Secret: back it up, losing
   KEY_ENCRYPTION_KEY makes every encrypted private key unrecoverable.
 {{- if not .Values.persistence.data.existingClaim }}
-- WARNING: the data volume is an emptyDir per pod. Local backups are lost when
-  a pod is rescheduled; take backups from the PostgreSQL side.
+- The data volume is an emptyDir per pod. Backup archives are kept in PostgreSQL,
+  not on it: download the ones you keep out of the cluster, and back PostgreSQL
+  up with its own tools.
 {{- end }}
 {{- if not .Values.redis.url }}
 - No redis.url: sessions are per node. Set a cookie affinity on the ingress.

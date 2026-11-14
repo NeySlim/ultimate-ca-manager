@@ -46,13 +46,14 @@ if __name__ == '__main__':
 
 
 class TestPerNodeTasks:
-    def test_local_backups_and_the_update_result_run_on_every_node(self, auth_client):
+    def test_the_update_result_alone_runs_on_every_node(self, auth_client):
         r = auth_client.get('/api/v2/system/scheduler')
         tasks = {t['name']: t for t in json.loads(r.data)['data']['tasks']}
         if 'backup_retention' not in tasks:
             pytest.skip('no task registered in this app')
         per_node = {name for name, t in tasks.items() if t['per_node']}
-        assert per_node == {'backup_retention', 'update_result'}
+        # Retention runs on the leader, over the archives every node shares
+        assert per_node == {'update_result'}
         assert tasks['update_result']['label'] == 'Update result'
 
     def test_the_update_check_leaves_the_result_to_its_node_task(self, app, monkeypatch, tmp_path):

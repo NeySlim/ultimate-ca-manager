@@ -20,8 +20,8 @@ replicaCount: 1
 ## fails unless database.type=postgresql and replicaCount >= 2. Each pod gets
 ## UCM_NODE_ID = pod name; UCM_SECRET_KEY and KEY_ENCRYPTION_KEY come from the
 ## one shared Secret (generated once, kept across upgrades). There is no etc
-## PVC. The data volume is an emptyDir per pod (local backups are lost with the
-## pod), or the persistence.data.existingClaim you name (ReadWriteMany).
+## PVC. The data volume is an emptyDir per pod (backup archives are kept in
+## PostgreSQL), or the persistence.data.existingClaim you name (ReadWriteMany).
 ## Without a Redis URL, sessions stay per node: set an ingress cookie affinity.
 ha:
   enabled: false

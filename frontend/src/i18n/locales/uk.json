@@ -2870,6 +2870,10 @@
     "backupCount": "{{count}} копій",
     "backupTotalSize": "Загальний розмір",
     "diskFree": "Вільно на диску",
+    "backupNode": "Node",
+    "backupSha256": "SHA-256",
+    "backupCopySha256": "Copy the full SHA-256",
+    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "Пошук копій…",
     "backupSortNewest": "Спочатку новіші",
     "backupSortOldest": "Спочатку старіші",
@@ -3470,7 +3474,7 @@
           "remedy": "Встановіть для KDF запланованого резервного копіювання PBKDF2 і зробіть ручну резервну копію з kdf \"pbkdf2\" до перемикання."
         },
         "backup_archives_argon2id": {
-          "title": "Архіви резервних копій на диску, зашифровані за допомогою Argon2id: їх не можна відновити в режимі FIPS",
+          "title": "Архіви резервних копій, зашифровані за допомогою Argon2id: їх не можна відновити в режимі FIPS",
           "remedy": "Збережіть їх для стандартного екземпляра і зробіть ручну резервну копію з kdf \"pbkdf2\" до перемикання."
         },
         "database_postgres_without_tls": {

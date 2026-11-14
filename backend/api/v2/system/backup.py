@@ -2,7 +2,7 @@
 System Backup Operations
 """
 
-from services.backup import storage
+from services.backup import shared_store, storage
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
 from services.backup.restore_report import safe_restore_audit_details, with_restore_warnings
@@ -102,6 +102,17 @@ def _scan_archives(directory) -> list:
             '_mtime': st.st_mtime,
         })
     return items
+
+
+def _stored_archives() -> list:
+    """HA: the archives of the database, the same set from every node."""
+    return [{
+        'filename': a['filename'],
+        'size_bytes': a['size'],
+        '_mtime': shared_store.timestamp(a['created_at']),
+        'node': a['node'],
+        'sha256': a['sha256'],
+    } for a in shared_store.list_archives()]
 
 
 def _disk_meta(directory) -> dict:
@@ -219,8 +230,9 @@ def list_backups():
         sort = _DEFAULT_SORT
 
     try:
+        shared = shared_store.enabled()
         directory = storage.backup_directory()
-        everything = _scan_archives(directory)
+        everything = _stored_archives() if shared else _scan_archives(directory)
         matching = ([item for item in everything
                      if search in item['filename'].lower()]
                     if search else list(everything))
@@ -235,6 +247,7 @@ def list_backups():
             'size_bytes': item['size_bytes'],
             'created_at': datetime.fromtimestamp(
                 item['_mtime'], timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'),
+            **({'node': item['node'], 'sha256': item['sha256']} if shared else {}),
         } for item in matching[start:start + per_page]]
 
         total_size = sum(item['size_bytes'] for item in matching)
@@ -249,12 +262,14 @@ def list_backups():
             'page': page,
             'per_page': per_page,
             'pages': max(1, -(-total // per_page)),
+            'storage': 'database' if shared else 'disk',
         }
     except Exception:
         logger.exception('Failed to list backups')
         return error_response('Failed to list backups', 500)
 
-    meta.update(_disk_meta(directory))
+    if not shared:
+        meta.update(_disk_meta(directory))
     return success_response(data={'items': items, 'meta': meta})
 
 
@@ -268,6 +283,10 @@ def download_backup(filename):
         return error_response('Invalid backup filename', 400)
     except PermissionError:
         return error_response('Access denied', 403)
+
+    if shared_store.enabled():
+        response = shared_store.download_response(safe_filename)
+        return response if response is not None else error_response('Backup file not found', 404)
 
     if backup_file.is_symlink() or not backup_file.is_file():
         return error_response('Backup file not found', 404)
@@ -292,9 +311,33 @@ def delete_backup(filename):
     except PermissionError:
         return error_response('Access denied', 403)
 
-    if backup_file.is_symlink() or not backup_file.is_file():
+    if shared_store.enabled():
+        try:
+            if not shared_store.delete_archives([safe_filename], wait=DELETE_LOCK_WAIT,
+                                                purpose='deleting a backup'):
+                return error_response('Backup file not found', 404)
+        except BackupBusyError as busy:
+            logger.info('Backup deletion refused: %s', busy)
+            return error_response(str(busy), 409)
+    elif backup_file.is_symlink() or not backup_file.is_file():
         return error_response('Backup file not found', 404)
+    else:
+        failure = _delete_local(backup_file, safe_filename)
+        if failure is not None:
+            return failure
 
+    _safe_audit_log(
+        action='backup_delete',
+        resource_type='system',
+        resource_name=safe_filename,
+        details=f'Deleted backup: {safe_filename}',
+        success=True,
+    )
+    return success_response(message='Backup deleted successfully')
+
+
+def _delete_local(backup_file, safe_filename):
+    """Remove one archive from this node's disk; an error response, or None once it is gone."""
     try:
         with backup_operation_lock(timeout=DELETE_LOCK_WAIT,
                                    purpose='deleting a backup'):
@@ -308,15 +351,7 @@ def delete_backup(filename):
     except OSError:
         logger.exception('Failed to delete backup %s', safe_filename)
         return error_response('Failed to delete backup', 500)
-
-    _safe_audit_log(
-        action='backup_delete',
-        resource_type='system',
-        resource_name=safe_filename,
-        details=f'Deleted backup: {safe_filename}',
-        success=True,
-    )
-    return success_response(message='Backup deleted successfully')
+    return None
 
 
 @bp.route('/api/v2/system/backups/bulk-delete', methods=['POST'])
@@ -335,29 +370,10 @@ def bulk_delete_backups():
     deleted_names = []
     seen = set()
     try:
-        with backup_operation_lock(timeout=BULK_DELETE_LOCK_WAIT,
-                                   purpose='deleting backups'):
-            for raw in filenames:
-                # A name that cannot be resolved is counted, never fatal.
-                try:
-                    path, name = storage.resolve_archive(raw)
-                except Exception:
-                    counts['invalid'] += 1
-                    continue
-                if path in seen:
-                    continue
-                seen.add(path)
-                if path.is_symlink() or not path.is_file():
-                    counts['missing'] += 1
-                    continue
-                try:
-                    path.unlink()
-                except OSError:
-                    logger.exception('Bulk delete: could not remove %s', name)
-                    counts['failed'] += 1
-                    continue
-                counts['deleted'] += 1
-                deleted_names.append(name)
+        if shared_store.enabled():
+            deleted_names = _bulk_delete_stored(filenames, counts)
+        else:
+            _bulk_delete_local(filenames, counts, deleted_names, seen)
     except BackupBusyError as busy:
         logger.info('Bulk backup deletion refused: %s', busy)
         return error_response(str(busy), 409)
@@ -373,6 +389,51 @@ def bulk_delete_backups():
     )
     return success_response(
         data=counts, message=f"Deleted {counts['deleted']} backup(s)")
+
+
+def _bulk_delete_stored(filenames, counts) -> list:
+    """HA: delete the named archives of the database in one transaction; returns the names deleted."""
+    names = []
+    for raw in filenames:
+        try:
+            _path, name = storage.resolve_archive(raw)
+        except Exception:
+            counts['invalid'] += 1
+            continue
+        if name not in names:
+            names.append(name)
+    deleted = shared_store.delete_archives(names, wait=BULK_DELETE_LOCK_WAIT,
+                                           purpose='deleting backups')
+    counts['deleted'] = len(deleted)
+    counts['missing'] = len(names) - len(deleted)
+    return [name for name in names if name in set(deleted)]
+
+
+def _bulk_delete_local(filenames, counts, deleted_names, seen) -> None:
+    """Delete local archives under one hold of the backup lock."""
+    with backup_operation_lock(timeout=BULK_DELETE_LOCK_WAIT,
+                               purpose='deleting backups'):
+        for raw in filenames:
+            # A name that cannot be resolved is counted, never fatal.
+            try:
+                path, name = storage.resolve_archive(raw)
+            except Exception:
+                counts['invalid'] += 1
+                continue
+            if path in seen:
+                continue
+            seen.add(path)
+            if path.is_symlink() or not path.is_file():
+                counts['missing'] += 1
+                continue
+            try:
+                path.unlink()
+            except OSError:
+                logger.exception('Bulk delete: could not remove %s', name)
+                counts['failed'] += 1
+                continue
+            counts['deleted'] += 1
+            deleted_names.append(name)
 
 
 @bp.route('/api/v2/system/backups/run-retention', methods=['POST'])
