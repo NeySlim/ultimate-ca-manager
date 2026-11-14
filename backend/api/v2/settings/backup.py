@@ -227,7 +227,9 @@ def restore_backup():
         # concurrent write a migration could be reading through. Both take the
         # same lock so one never sees the other half-done.
         # HA: every node refuses writes from here until the restore ends (services.cluster_maintenance)
-        with cluster_maintenance.restore_window(restore_actor()) as maintenance:
+        with cluster_maintenance.restore_window(
+                restore_actor(), preflight=lambda: BackupService().check_archive_opens(
+                    file.stream, password)) as maintenance:
             service = BackupService()
             try:
                 with database_migration_lock(purpose='the restore'), \

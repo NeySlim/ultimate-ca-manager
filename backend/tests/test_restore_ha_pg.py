@@ -1,6 +1,8 @@
 """A restore in HA on PostgreSQL, node A the session application and node B a second one
 (test_cluster_maintenance_pg.py): it waits for every node, commits or rolls back whole,
 and lifts the maintenance once every node restarted on the restored state."""
+import io
+import secrets
 import threading
 import time
 
@@ -161,3 +163,60 @@ def test_a_restore_longer_than_its_lease_renews_it(cluster, auth_client, monkeyp
     assert r.status_code == 200, r.data
     assert not _user_exists(a, 'after-backup')
     assert _row(a)['phase'] == cm.PHASE_RESTARTING
+
+
+def _flipped_tail(blob):
+    """The archive with its last byte changed: the header and first chunk still open."""
+    return blob[:-1] + bytes([blob[-1] ^ 0x01])
+
+
+@pytest.mark.parametrize('path', ['/api/v2/system/restore', '/api/v2/settings/backup/restore'])
+@pytest.mark.parametrize('case', ['wrong_password', 'not_a_backup'])
+def test_an_archive_refused_before_decryption_never_sets_the_maintenance(
+        cluster, auth_client, monkeypatch, path, case):
+    a, b = cluster.a, cluster.b
+    cluster.start('a')
+    cluster.start('b')
+    blob = _archive(a)
+    begun = []
+    real_begin = cm.Hold.begin.__func__
+    monkeypatch.setattr(cm.Hold, 'begin', classmethod(
+        lambda cls, *args, **kwargs: begun.append(1) or real_begin(cls, *args, **kwargs)))
+    bc = b.test_client()
+    outcomes, stop = [], threading.Event()
+
+    def write_on_b():
+        while not stop.is_set():
+            outcomes.append(bc.post('/write').status_code)
+            time.sleep(0.01)
+    writer = threading.Thread(target=write_on_b)
+    writer.start()
+    try:
+        assert wait_for(lambda: 201 in outcomes)
+        if case == 'wrong_password':
+            r = auth_client.post(path, data={'file': (io.BytesIO(blob), 'hd1.ucmbkp'),
+                                             'password': 'not-the-password'},
+                                 content_type='multipart/form-data')
+        else:
+            r = _restore(auth_client, secrets.token_bytes(4096), path)
+        time.sleep(0.2)
+    finally:
+        stop.set()
+        writer.join()
+    assert r.status_code == 400, r.data
+    assert begun == []
+    assert _row(a) is None
+    assert set(outcomes) == {201}, outcomes
+
+
+def test_an_archive_failing_past_its_first_chunk_is_refused_under_the_maintenance(
+        cluster, auth_client):
+    a = cluster.a
+    cluster.start('a')
+    cluster.start('b')
+    blob = _archive(a)
+    _add_user(a, 'after-backup')
+    r = _restore(auth_client, _flipped_tail(blob))
+    assert r.status_code == 400, r.data
+    assert _user_exists(a, 'after-backup')
+    assert wait_for(lambda: _row(a) is None)

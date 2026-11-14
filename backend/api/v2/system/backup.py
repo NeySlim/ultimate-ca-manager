@@ -516,7 +516,9 @@ def restore_backup():
             return error_response(pending, 409)
 
         # HA: every node refuses writes from here until the restore ends (services.cluster_maintenance)
-        with cluster_maintenance.restore_window(_actor()) as maintenance:
+        with cluster_maintenance.restore_window(
+                _actor(), preflight=lambda: BackupService().check_archive_opens(
+                    file.stream, password)) as maintenance:
             try:
                 # The backup lock too: an archive written meanwhile would read half of the restore
                 with database_migration_lock(purpose='the restore'), \

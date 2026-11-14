@@ -561,12 +561,15 @@ class Hold:
 
 
 @contextmanager
-def restore_window(actor):
-    """HA: the restore runs inside this; None outside HA, where nothing changes."""
+def restore_window(actor, preflight=None):
+    """HA: the restore runs inside this; None outside HA, where nothing changes.
+    `preflight` runs first: what it refuses (a wrong password) never reaches the cluster."""
     from utils.ha import ha_enabled
     if not ha_enabled():
         yield None
         return
+    if preflight is not None:
+        preflight()
     exempt_token = _exempt.set(True)
     try:
         hold = Hold.begin(REASON_RESTORE, actor, phase=PHASE_DRAINING, lease_seconds=LEASE_SECONDS)
