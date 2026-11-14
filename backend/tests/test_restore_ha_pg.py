@@ -171,13 +171,20 @@ def _flipped_tail(blob):
 
 
 @pytest.mark.parametrize('path', ['/api/v2/system/restore', '/api/v2/settings/backup/restore'])
-@pytest.mark.parametrize('case', ['wrong_password', 'not_a_backup'])
+@pytest.mark.parametrize('case', ['wrong_password', 'not_a_backup', 'newer_schema'])
 def test_an_archive_refused_before_decryption_never_sets_the_maintenance(
         cluster, auth_client, monkeypatch, path, case):
     a, b = cluster.a, cluster.b
     cluster.start('a')
     cluster.start('b')
-    blob = _archive(a)
+    if case == 'newer_schema':
+        # Written by a later release: refused on its first chunk, the metadata
+        from services.backup_service import BackupService
+        with monkeypatch.context() as later:
+            later.setattr(BackupService, 'SCHEMA_VERSION', BackupService.SCHEMA_VERSION + 1)
+            blob = _archive(a)
+    else:
+        blob = _archive(a)
     begun = []
     real_begin = cm.Hold.begin.__func__
     monkeypatch.setattr(cm.Hold, 'begin', classmethod(

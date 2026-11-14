@@ -66,3 +66,27 @@ def test_an_argon2id_archive_is_refused_in_fips_mode(app, archive, monkeypatch):
     monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
     with pytest.raises(FipsRestricted):
         _service().check_archive_opens(io.BytesIO(archive), PASSWORD)
+
+
+def test_an_archive_of_a_later_schema_is_refused_on_its_first_chunk(app, monkeypatch):
+    from services.backup.restore_core import BackupSchemaError
+    from services.backup_service import BackupService
+    with app.app_context():
+        with monkeypatch.context() as later:
+            later.setattr(BackupService, 'SCHEMA_VERSION', BackupService.SCHEMA_VERSION + 1)
+            blob = _service().create_backup(
+                PASSWORD, include={n: n == 'groups' for n in manifest.SECTIONS})
+        stream = _at_offset(blob)
+        with pytest.raises(BackupSchemaError, match='newer than'):
+            _service().check_archive_opens(stream, PASSWORD)
+        assert stream.tell() == len(b'spooled-')
+
+
+def test_outside_ha_the_restore_window_runs_no_check(app):
+    """One node has no group to spare: the restore itself refuses, the key is derived once."""
+    from services import cluster_maintenance
+    ran = []
+    with app.app_context():
+        with cluster_maintenance.restore_window('admin', preflight=lambda: ran.append(1)) as hold:
+            assert hold is None
+    assert ran == []

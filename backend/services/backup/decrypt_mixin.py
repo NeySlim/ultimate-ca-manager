@@ -139,8 +139,8 @@ class DecryptMixin:
         return master_key, container.ChunkReader(stream, master_key, header, metadata, nonce_base)
 
     def check_archive_opens(self, stream, password: str) -> None:
-        """Raise what a restore raises for a wrong password, a bad header or KDF, or FIPS,
-        writing nothing: a v4's header and first chunk, an older archive whole.
+        """Raise what a restore raises for a wrong password, a bad header or KDF, FIPS, or a
+        later schema, writing nothing: a v4's header and first chunk, an older archive whole.
         The stream is put back where it was."""
         start = stream.tell()
         try:
@@ -151,9 +151,12 @@ class DecryptMixin:
                 parts = reader.parts()
                 try:
                     with _first_chunk_is_the_password():
-                        next(parts, None)
+                        first = next(parts, None)
                 finally:
                     parts.close()
+                # The first chunk is the metadata: an archive of a later release stops here
+                if first is not None and first[0] == 'metadata':
+                    self._check_schema_version(first[2])
                 return
             size = stream.seek(0, io.SEEK_END) - start
             stream.seek(start)
