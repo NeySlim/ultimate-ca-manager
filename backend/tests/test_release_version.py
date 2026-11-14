@@ -441,7 +441,7 @@ def test_the_requested_package_is_the_published_one(instance, tag, kind, deb, el
 
 def _npm_of(version):
     """VERSION as package.json spells it: X.Y[.Z] with -dev (dev), -rcN (test) or nothing (main)."""
-    m = re.fullmatch(r'(\d+\.\d+)(\.\d+)?(-dev|-rc\d+)?', version)
+    m = re.fullmatch(r'((?:0|[1-9]\d*)\.(?:0|[1-9]\d*))(\.[1-9]\d*)?(-dev|-rc\d+)?', version)
     assert m, version
     return f'{m.group(1)}{m.group(2) or ".0"}{m.group(3) or ""}'
 
@@ -452,10 +452,11 @@ def _npm_of(version):
     ('2.254.1', '2.254.1'), ('2.254', '2.254.0'),
 ])
 def test_npm_spelling_of_each_branch_version(version, npm):
-    assert _npm_of(version) == npm
+    assert _npm_of(version) == npm == rv.npm_version(version)
 
 
-@pytest.mark.parametrize('version', ['2.254.1-beta', '2.254.1.2', 'v2.254', '2.254-rc', ''])
+@pytest.mark.parametrize('version', ['2.254.1-beta', '2.254.1.2', 'v2.254', '2.254-rc', '', '2.254.0',
+                                     '2.254.0-rc1', '02.254', '2.254.01', '2.254.1-dev-dev'])
 def test_npm_spelling_refuses_another_grammar(version):
     with pytest.raises(AssertionError):
         _npm_of(version)
