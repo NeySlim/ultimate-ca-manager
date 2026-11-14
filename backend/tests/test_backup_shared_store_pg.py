@@ -658,13 +658,28 @@ def test_storing_and_reading_an_archive_holds_a_chunk_not_the_archive(app, nodes
 
 
 def test_the_store_lock_is_per_schema(app):
-    from models import db
-    with app.app_context(), db.engine.connect() as conn:
-        shared_store._take_lock(conn, 0, 'test')
-        held = conn.execute(text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
-                                 "AND pid = pg_backend_pid()")).scalar()
-        conn.rollback()
-    assert held == 1
+    """Two installations sharing a database never wait on each other; two nodes of one do."""
+    import psycopg
+    from sqlalchemy import create_engine
+    from services.backup.locking import BackupBusyError
+    other = f'{pg_app_harness.SCHEMA}_lockb'
+    with psycopg.connect(pg_app_harness.APP_PG_URL, autocommit=True) as admin:
+        admin.execute(f'CREATE SCHEMA IF NOT EXISTS "{other}"')
+    engines = {schema: create_engine(pg_app_harness.app_url(schema))
+               for schema in (pg_app_harness.SCHEMA, other)}
+    try:
+        with engines[pg_app_harness.SCHEMA].connect() as holder, \
+                engines[other].connect() as neighbour, \
+                engines[pg_app_harness.SCHEMA].connect() as same:
+            shared_store._take_lock(holder, 0, 'node A')
+            shared_store._take_lock(neighbour, 0, 'other installation')
+            with pytest.raises(BackupBusyError):
+                shared_store._take_lock(same, 0, 'node B')
+    finally:
+        for engine in engines.values():
+            engine.dispose()
+        with psycopg.connect(pg_app_harness.APP_PG_URL, autocommit=True) as admin:
+            admin.execute(f'DROP SCHEMA IF EXISTS "{other}" CASCADE')
 
 
 def test_the_fips_preflight_reads_the_kdf_of_the_stored_archives(app, nodes):
