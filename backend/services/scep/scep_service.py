@@ -1819,7 +1819,8 @@ class SCEPService:
                             rsa_padding=rsa_padding_for(self.ca_key, sign_hash))
         rows = find_issued_rows(self.ca, renewal_of) if renewal_of is not None else []
         # Refused before the CT logs or Intune hear of it, again under the CA row lock
-        refuse_taken_subject(self.ca, cert, renews=rows, requester_sid=requester_sid, source='scep')
+        refuse_taken_subject(self.ca, cert, renews=rows, requester_sid=requester_sid, source='scep',
+                             locked=False)
         # Same CT policy as every other leaf path (a ValueError here is a
         # refusal the SCEP layer reports as a failure)
         from utils.ct_client import apply_ct_policy

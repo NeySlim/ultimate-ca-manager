@@ -611,7 +611,7 @@ def create_certificate():
         # it does to the CSR trunk and the lifecycle service
         from utils.ct_client import apply_ct_policy
         if not override:  # refused before the CT logs see a pre-certificate, again under the lock
-            refuse_taken_subject(ca, new_cert, source='manual', requester=(
+            refuse_taken_subject(ca, new_cert, source='manual', locked=False, requester=(
                 g.current_user.username if hasattr(g, 'current_user') else None))
         try:
             new_cert, _ = apply_ct_policy(new_cert, ca_cert, ca_key)

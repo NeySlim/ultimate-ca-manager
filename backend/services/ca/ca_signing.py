@@ -283,7 +283,7 @@ class CASigningMixin:
             before_publication=lambda leaf: refuse_taken_subject(
                 ca, leaf, renews=[related_a[0] if related_a else None, supersedes, *(renews or ())],
                 holder=subject_holder, requester_sid=requester_sid, pattern=unique_subject,
-                source=source),
+                source=source, locked=False),
         )
 
         # Extract serial number

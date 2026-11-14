@@ -123,6 +123,8 @@ RFC 5280 §4.1.2.6 requires a CA to give each distinct entity it certifies a dis
 
 Every certificate of the CA counts, whatever its status: valid, expired, revoked or superseded. A name once certified stays bound to its entity, so that a relying party that saw it on one certificate never finds it on another entity's later.
 
+The rule is the issuer's ("the one CA as defined by the issuer field"), not the record's: when UCM holds several records of one issuer, same subject and same key (a root and its cross-certificate, a CA imported twice), the option on one of them counts the certificates of all of them for what that record issues. Two of those records issuing the same subject at the same moment never both succeed.
+
 The issuance is the same entity's, and goes through, when one of these holds:
 
 | Proof | Paths |

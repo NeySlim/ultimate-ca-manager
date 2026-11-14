@@ -786,7 +786,7 @@ def _issue_approved_certificate(approval):
     from utils.ct_client import apply_ct_policy
     from services.cert.unique_subject import refuse_taken_subject
     if data.get('override_unique_subject') is not True:  # before the CT logs, again under the lock
-        refuse_taken_subject(ca, new_cert, source='approval',
+        refuse_taken_subject(ca, new_cert, source='approval', locked=False,
                              requester=approval.requester.username if approval.requester else 'system')
     new_cert, _ = apply_ct_policy(new_cert, ca_cert, ca_key)
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')

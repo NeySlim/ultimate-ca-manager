@@ -488,7 +488,7 @@ def test_an_mtls_certificate_is_its_user_s(app, create_ca):
 
 # --- Concurrency ---------------------------------------------------------------------------------
 
-def _race(app, ca_id, monkeypatch):
+def _race(app, ca_id, monkeypatch, second_ca_id=None):
     """Two entities ask for one subject at once, each on its own connection; the first holds the
     CA lock until the second is on its way."""
     from services.ca import ca_signing
@@ -507,7 +507,8 @@ def _race(app, ca_id, monkeypatch):
     def request(name):
         try:
             with app.app_context():
-                CAService.sign_csr_from_crypto(db.session.get(CA, ca_id), _csr('race.unique.test', _key()),
+                signer = ca_id if name == 'first' else (second_ca_id or ca_id)
+                CAService.sign_csr_from_crypto(db.session.get(CA, signer), _csr('race.unique.test', _key()),
                                                validity_days=30, source='test')
             outcome[name] = 'issued'
         except Exception as e:  # noqa: BLE001
@@ -574,6 +575,85 @@ def test_two_entities_at_once_get_one_certificate(app, create_ca, monkeypatch, t
         assert ('SubjectTaken' if _on_postgresql(app) else 'database is locked') in outcome['second'], outcome
         with app.app_context():
             assert Certificate.query.filter_by(caref=ca['refid']).count() == 1
+
+
+# --- The issuer, not the record (RFC 5280 §4.1.2.6) ---------------------------------------------
+
+@pytest.fixture
+def twins(app):
+    """Root B and its cross-certificate by root A, two records of one issuer, both holding B's key:
+    ``(root B id, cross record id)``, the root first (the lower id)."""
+    from tests.test_backfill_cross_dupes import _cert, _row
+    key_a, key_b = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    tag = secrets.token_hex(3)
+    with app.app_context():
+        root_a = _row(_cert(key_a, f'Unique Root A {tag}'), key_a)
+        root_b = _row(_cert(key_b, f'Unique Root B {tag}'), key_b)
+        cross = _row(_cert(key_b, f'Unique Root B {tag}', key_a, f'Unique Root A {tag}'), key_b,
+                     caref=db.session.get(CA, root_a).refid)
+        assert root_b < cross
+    yield root_b, cross
+    with app.app_context():
+        db.session.rollback()
+        rows = [db.session.get(CA, ca_id) for ca_id in (cross, root_b, root_a)]
+        Certificate.query.filter(Certificate.caref.in_([r.refid for r in rows])).delete(
+            synchronize_session=False)
+        for row in rows:
+            db.session.delete(row)
+        db.session.commit()
+
+
+def _trunk_issue(app, ca_id, cn):
+    from services.ca_service import CAService
+    with app.app_context():
+        CAService.sign_csr_from_crypto(db.session.get(CA, ca_id), _csr(cn, _key()), validity_days=30,
+                                       source='test')
+
+
+@pytest.mark.parametrize('enforcing', ['root', 'cross'])
+def test_a_root_and_its_cross_certificate_share_their_subjects(app, twins, enforcing):
+    """The option on one record counts the certificates of both; off on the other, it issues."""
+    from services.cert.unique_subject import SubjectTaken
+    root, cross = twins
+    on, off = (root, cross) if enforcing == 'root' else (cross, root)
+    with app.app_context():
+        db.session.get(CA, on).enforce_unique_subject = True
+        db.session.commit()
+    _trunk_issue(app, off, f'twin-{enforcing}.unique.test')
+    with pytest.raises(SubjectTaken):
+        _trunk_issue(app, on, f'twin-{enforcing}.unique.test')
+    _trunk_issue(app, off, f'twin-{enforcing}.unique.test')  # the record without the option
+    with app.app_context():
+        from services.cert.unique_subject import shared_subjects
+        assert [s['subject'] for s in shared_subjects(db.session.get(CA, on))] == [
+            f'CN=twin-{enforcing}.unique.test']
+
+
+def test_two_twin_records_at_once_get_one_certificate(app, twins, monkeypatch, tmp_path):
+    """The issuance by the cross record waits on the root's row, the lowest of the twins (PostgreSQL);
+    SQLite serialises every write anyway."""
+    from tests.test_revocation_record_rule import _on_postgresql, _wait_for_a_lock_waiter
+    root, cross = twins
+    with app.app_context():
+        for ca_id in twins:
+            db.session.get(CA, ca_id).enforce_unique_subject = True
+        db.session.commit()
+        refids = [db.session.get(CA, ca_id).refid for ca_id in twins]
+    with _database_on_two_connections(app, tmp_path / 'twins.db'):
+        first, second, release, outcome = _race(app, root, monkeypatch, second_ca_id=cross)
+        if _on_postgresql(app):
+            with app.app_context():
+                with db.engine.connect() as conn:
+                    assert _wait_for_a_lock_waiter(conn, 10)
+        else:
+            time.sleep(1)
+        release.set()
+        for thread in (first, second):
+            thread.join(60)
+        assert outcome['first'] == 'issued', outcome
+        assert ('SubjectTaken' if _on_postgresql(app) else 'database is locked') in outcome['second'], outcome
+        with app.app_context():
+            assert Certificate.query.filter(Certificate.caref.in_(refids)).count() == 1
 
 
 # --- CA API --------------------------------------------------------------------------------------

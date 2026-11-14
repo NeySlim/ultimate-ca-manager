@@ -86,11 +86,28 @@ def applies(ca, pattern=False):
     return bool(pattern or getattr(ca, 'enforce_unique_subject', False))
 
 
+def issuer_refids(ca):
+    """RFC 5280 §4.1.2.6 scopes the subject to "the one CA as defined by the issuer field": the
+    records of *ca*'s subject and key (a root and its cross-certificate, a re-imported CA)."""
+    from utils.cert_issuer import same_key_refids
+    return same_key_refids(ca)
+
+
+def _lock_twins(ca, refids):
+    """Serialise the issuances of twin records on the lowest-id one, *ca*'s own row being locked
+    already: two twins never wait on each other, both wait on that one."""
+    from models import CA, db
+    anchor = db.session.query(CA.id).filter(CA.refid.in_(refids)).order_by(CA.id).first()
+    if anchor is not None and anchor[0] != ca.id:
+        db.session.query(CA.id).filter(CA.id == anchor[0]).with_for_update().first()
+
+
 def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requester_sid=None,
-                         pattern=False, override=False, source='manual', requester=None):
+                         pattern=False, override=False, source='manual', requester=None, locked=True):
     """Raise :class:`SubjectTaken` (session rolled back, refusal audited) when another entity's
     certificate of *ca* carries *issued*'s subject; called under the CA row lock. With *override*
-    (manual issuance and CSR signing), return an :class:`Override` instead."""
+    (manual issuance and CSR signing), return an :class:`Override` instead. ``locked=False``: the
+    early check before anything is published, without the lock, repeated under it."""
     if not applies(ca, pattern) or len(issued.subject) == 0:
         return None
     from models import Certificate, db
@@ -98,10 +115,13 @@ def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requeste
     full = bool(getattr(ca, 'enforce_unique_subject', False))
     if any(r is not None and r.id is None for r in own):
         db.session.flush()  # the rows of this issuance are excluded by id
+    refids = issuer_refids(ca) if full else [ca.refid]  # a pattern alone keeps its own record
+    if locked and len(refids) > 1:
+        _lock_twins(ca, refids)
     who = _Requester(issued, own, renews, holder, requester_sid)
     own_ids = {r.id for r in own if r is not None and r.id is not None}
     rows = (db.session.query(Certificate)
-            .filter(Certificate.caref == ca.refid, Certificate.subject_key == name_key(issued.subject),
+            .filter(Certificate.caref.in_(refids), Certificate.subject_key == name_key(issued.subject),
                     Certificate.crt.isnot(None), ~Certificate.id.in_(own_ids or {-1}))
             .order_by(Certificate.id))
     carriers, taken = [], None
@@ -193,19 +213,20 @@ def audit_override(ca, issued_row, override, username):
 
 
 def shared_subjects(ca):
-    """The subjects certificates of *ca* already carry for more than one entity, in id order:
-    ``[{'subject', 'serial_numbers'}]``."""
+    """The subjects certificates of *ca* (its twin records included) already carry for more than
+    one entity, in id order: ``[{'subject', 'serial_numbers'}]``."""
     from sqlalchemy import func
     from models import Certificate, db
+    refids = issuer_refids(ca)
     keys = [k for (k,) in db.session.query(Certificate.subject_key)
-            .filter(Certificate.caref == ca.refid, Certificate.subject_key.isnot(None),
+            .filter(Certificate.caref.in_(refids), Certificate.subject_key.isnot(None),
                     Certificate.crt.isnot(None))
             .group_by(Certificate.subject_key).having(func.count(Certificate.id) > 1)
             .order_by(func.min(Certificate.id))]
     shared = []
     for key in keys:
         carriers = []
-        for row in Certificate.query.filter(Certificate.caref == ca.refid, Certificate.subject_key == key,
+        for row in Certificate.query.filter(Certificate.caref.in_(refids), Certificate.subject_key == key,
                                             Certificate.crt.isnot(None)).order_by(Certificate.id):
             try:
                 carriers.append((row, x509.load_pem_x509_certificate(base64.b64decode(row.crt))))
