@@ -93,7 +93,7 @@ class Box:
         exe.write_text(f'#!/bin/sh\n{body}\n')
         exe.chmod(0o755)
 
-    def wrap(self, fail=None, at=0, other_fs=(), corrupt_copies=False, other_mount=()):
+    def wrap(self, fail=None, at=0, other_fs=(), corrupt_copies=False, other_mount=(), fstype='testfs'):
         """Wrappers first in PATH: `fail` fails at its `at`-th call; `stat` reports the
         paths under each prefix of other_fs on a filesystem of their own, and `findmnt` on
         a mount of their own; other_mount is a mount of the same filesystem (a bind mount)."""
@@ -118,10 +118,10 @@ class Box:
         (self.bin / 'stat').write_text(
             f'#!/bin/sh\nfor last; do :; done\n[ "$1 $2" != "-c %d" ] || case $last in\n{cases}esac\n'
             f'exec {REAL["stat"]} "$@"\n')
-        mounts = ''.join(f'    "{p}"|"{p}"/*) echo "{p} testfs"; exit 0 ;;\n'
+        mounts = ''.join(f'    "{p}"|"{p}"/*) echo "{p} {fstype}"; exit 0 ;;\n'
                          for p in sorted((*other_fs, *other_mount), key=lambda p: -len(str(p))))
         (self.bin / 'findmnt').write_text(
-            f'#!/bin/sh\nfor last; do :; done\ncase $last in\n{mounts}esac\necho "/ testfs"\n')
+            f'#!/bin/sh\nfor last; do :; done\ncase $last in\n{mounts}esac\necho "/ {fstype}"\n')
         (self.bin / 'date').write_text(
             f'#!/bin/sh\ncase "$*" in *%Y%m%dT*) echo {STAMP} ;; *) exec {shutil.which("date")} "$@" ;; esac\n')
         for f in self.bin.iterdir():
@@ -495,6 +495,34 @@ def test_a_bind_mount_of_the_same_filesystem_is_crossed_by_a_copy_never_a_rename
     assert files(box.archive / 'data') == data
     assert files(box.archive / 'config') == config
     assert sorted(p.name for p in box.data.iterdir()) == KEPT
+
+
+def test_a_directory_on_overlayfs_is_copied_never_renamed(tmp_path):
+    """rename(2) refuses a directory of an overlayfs lower layer (EXDEV) and GNU mv copies:
+    on overlayfs only files are renamed."""
+    box = Box(tmp_path, python='stub')
+    data = files(box.data)
+    box.wrap(fstype='overlay')
+    (box.bin / 'mv').write_text(
+        f'#!/bin/sh\nif [ -d "$2" ] && [ ! -L "$2" ]; then {REAL["cp"]} -a -- "$2" "$3"; kill -9 0; fi\n'
+        f'exec {REAL["mv"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
+    assert files(box.archive / 'data') == data
+
+
+def test_a_bind_mount_inside_the_data_is_kept_and_its_contents_moved(tmp_path):
+    """A mount point cannot be renamed (EBUSY), on one device too."""
+    box = Box(tmp_path, python='stub')
+    data = files(box.data)
+    box.wrap(other_mount=(box.data / 'updates',))
+    (box.bin / 'mv').write_text(
+        f'#!/bin/sh\n[ "$2" != {box.data}/updates ] || {{ echo "mv: Device or resource busy" >&2; exit 1; }}\n'
+        f'exec {REAL["mv"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
+    assert files(box.archive / 'data') == data
+    assert list((box.data / 'updates').iterdir()) == []
 
 
 def _all_files(*tops):
