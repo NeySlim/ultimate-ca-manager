@@ -9,7 +9,7 @@ import pytest
 from config.settings import Config
 
 PROVIDERS = '/api/v2/hsm/providers'
-SOFT = '/usr/lib/softhsm/libsofthsm2.so'
+SOFT = '/nonexistent/softhsm/libsofthsm2.so'  # never a real token of this host
 VENDOR = '/opt/vendor/lib/libcs_pkcs11_R3.so'
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HELPER = ROOT / 'docker' / 'ha-database.sh'
@@ -74,6 +74,20 @@ class TestInHa:
         _assert_refused(r)
         with app.app_context():
             assert HsmKey.query.filter_by(provider_id=pid).count() == 0
+
+    def test_syncing_a_softhsm_provider_is_refused(self, app, auth_client, monkeypatch):
+        from models.hsm import HsmKey
+        monkeypatch.setattr(Config, 'HA_MODE', False)
+        pid = auth_client.post(PROVIDERS, json=_body(SOFT)).get_json()['data']['id']
+        monkeypatch.setattr(Config, 'HA_MODE', True)
+        _assert_refused(auth_client.post(f'{PROVIDERS}/{pid}/sync'))
+        with app.app_context():
+            assert HsmKey.query.filter_by(provider_id=pid).count() == 0
+
+    def test_syncing_a_network_provider_is_not_refused(self, auth_client, ha):
+        pid = auth_client.post(PROVIDERS, json=_body(VENDOR)).get_json()['data']['id']
+        r = auth_client.post(f'{PROVIDERS}/{pid}/sync')
+        assert (r.get_json() or {}).get('code') != 'ha_mode', r.data
 
     def test_a_ca_on_a_new_softhsm_key_is_refused(self, app, auth_client, monkeypatch):
         from models import CA

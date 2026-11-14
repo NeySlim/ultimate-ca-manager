@@ -405,6 +405,8 @@ def sync_provider_keys(provider_id):
         
         return success_response(data=result)
         
+    except HaRestricted:
+        raise
     except HsmError as e:
         logger.error(f"HSM sync error: {e}")
         return error_response('HSM synchronization error', 500)

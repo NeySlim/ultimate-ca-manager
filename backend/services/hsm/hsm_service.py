@@ -733,6 +733,9 @@ class HsmService:
         provider = db.session.get(HsmProvider, provider_id)
         if not provider:
             raise ValueError(f"Provider not found: {provider_id}")
+        # Rows synced from a SoftHSM token would only be valid on the node that answered
+        if compliance_signer.softhsm_provider(provider):
+            refuse_softhsm_in_ha()
         
         try:
             hsm = cls._get_provider_instance(provider)
