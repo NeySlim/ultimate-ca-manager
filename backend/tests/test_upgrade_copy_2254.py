@@ -95,6 +95,35 @@ def test_the_copy_holds_what_the_wal_holds_and_matches_the_source(base):
     conn.close()
 
 
+def _diverging_copy(monkeypatch, sql):
+    """The partial copy altered between the backup and its verification."""
+    real = pre_upgrade_copy._verify
+
+    def verify(path, counts, registry):
+        conn = sqlite3.connect(path)
+        conn.execute(sql)
+        conn.commit()
+        conn.close()
+        return real(path, counts, registry)
+    monkeypatch.setattr(pre_upgrade_copy, '_verify', verify)
+
+
+@pytest.mark.parametrize('sql, reason', [
+    ("INSERT INTO _migrations (name) VALUES ('137_not_from_this_database')",
+     'the copy does not hold the 2.254 migration registry'),
+    ("DELETE FROM audit_logs", 'the copy does not hold the same rows as the database'),
+], ids=['registry', 'rows'])
+def test_a_copy_that_differs_from_the_database_stops_the_upgrade(sql, reason, base, monkeypatch, capsys):
+    populate(base)
+    _diverging_copy(monkeypatch, sql)
+    before = _untouched(base)
+    assert base.upgrade() is False
+    assert _untouched(base) == before
+    assert _leftovers(base) == []
+    out = capsys.readouterr().out
+    assert 'Upgrade not started' in out and reason in out, out
+
+
 # --- 2. Before any write of the upgrade, after the pivot guard ---------------------------------
 
 def test_the_copy_is_verified_before_the_first_step_runs(base, monkeypatch):
