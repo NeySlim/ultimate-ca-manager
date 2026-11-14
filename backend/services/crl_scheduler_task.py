@@ -270,6 +270,10 @@ class CRLSchedulerTask:
                     if CRLSchedulerTask._delta_interval_if_due(ca_id) is not None \
                             and CRLSchedulerTask._under_lease(ca_id, CRLSchedulerTask._delta_if_due, retries):
                         delta_count += 1
+                except FipsRestricted as e:
+                    # As for the base CRL: an expected state, one line, no trace
+                    db.session.rollback()
+                    logger.warning(f"Delta CRL of CA {ca_id} not signed: {e}")
                 except Exception as e:
                     db.session.rollback()
                     logger.error(f"Error generating delta CRL for CA {ca_id}: {e}")

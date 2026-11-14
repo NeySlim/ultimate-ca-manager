@@ -1007,3 +1007,19 @@ class TestHsmSignApiInFipsMode:
             f'CRL of CA {weak_hsm_ca} not signed: RSA 1024 keys not available in FIPS mode'], caplog.text
         assert all(r.exc_info is None and r.levelno == logging.WARNING for r in ours)
 
+    def test_scheduled_delta_crl_logs_one_line(self, monkeypatch, caplog, weak_hsm_ca, fips_on):
+        import logging
+        from services.crl_scheduler_task import CRLSchedulerTask
+        ca = db.session.get(CA, weak_hsm_ca)
+        ca.cdp_enabled, ca.delta_crl_enabled = True, True
+        db.session.commit()
+        monkeypatch.setattr(CRLSchedulerTask, 'should_regenerate_crl', staticmethod(lambda ca_id: (False, None)))
+        monkeypatch.setattr(CRLSchedulerTask, '_delta_interval_if_due',
+                            staticmethod(lambda ca_id: 4 if ca_id == weak_hsm_ca else None))
+        with caplog.at_level(logging.WARNING):
+            CRLSchedulerTask.execute()
+        ours = [r for r in caplog.records if r.name.startswith(('services.crl', 'services.hsm'))]
+        assert [r.getMessage() for r in ours] == [
+            f'Delta CRL of CA {weak_hsm_ca} not signed: RSA 1024 keys not available in FIPS mode'], caplog.text
+        assert all(r.exc_info is None and r.levelno == logging.WARNING for r in ours)
+
