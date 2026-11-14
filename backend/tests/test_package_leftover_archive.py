@@ -93,10 +93,12 @@ class Box:
         exe.write_text(f'#!/bin/sh\n{body}\n')
         exe.chmod(0o755)
 
-    def wrap(self, fail=None, at=0, other_fs=(), corrupt_copies=False, other_mount=(), fstype='testfs'):
+    def wrap(self, fail=None, at=0, other_fs=(), corrupt_copies=False, other_mount=(), fstype='testfs',
+             corrupt_back=False):
         """Wrappers first in PATH: `fail` fails at its `at`-th call; `stat` reports the
         paths under each prefix of other_fs on a filesystem of their own, and `findmnt` on
-        a mount of their own; other_mount is a mount of the same filesystem (a bind mount)."""
+        a mount of their own; other_mount is a mount of the same filesystem (a bind mount).
+        corrupt_back harms only the copies out of the archive (the put-backs)."""
         (self.state / 'count').write_text('0')
         for name in ('mv', 'cp', 'rm', 'mkdir', 'chmod'):
             check = ''
@@ -105,12 +107,17 @@ class Box:
                          f'[ "$n" != {at} ] || {{ echo "{name}: injected failure" >&2; exit 1; }}\n')
             run = f'exec {REAL[name]} "$@"'
             if name == 'cp' and corrupt_copies:
-                # Reports success over a copy that differs: a key gains a byte, or loses
-                # the mode or the date of its source
-                harm = {'mode': 'chmod 0604 "$1"', 'date': 'touch -d @5 "$1"'}.get(
-                    corrupt_copies, 'printf x >> "$1"')
-                run = (f'{REAL[name]} "$@" || exit 1\nfor last; do :; done\n'
-                       f'find "$last" -name "*.key" -type f -exec sh -c \'{harm}\' sh {{}} \\;')
+                # Reports success over a copy that differs from its source: in content, mode,
+                # date, group or owner, of a key, of a file deep in a tree, or of the tree itself
+                harm, where = (corrupt_copies.split(':') + ['key'])[:2]
+                harm = {'mode': '[ -d "$1" ] && chmod 0705 "$1" || chmod 0604 "$1"',
+                        'date': 'touch -d @5 "$1"', 'group': f'chgrp {OTHER_GID} "$1"',
+                        'owner': 'chown 1 "$1"'}.get(harm, 'printf x >> "$1"')
+                where = {'key': '-name "*.key" -type f', 'nested': '-path "*/updates/nested/f"',
+                         'top': '-maxdepth 0 -type d -name updates'}[where]
+                only = f'case $3 in {self.parent}/*) ;; *) exit 0 ;; esac\n' if corrupt_back else ''
+                run = (f'{REAL[name]} "$@" || exit 1\nfor last; do :; done\n{only}'
+                       f'find "${{last%/}}" {where} -exec sh -c \'{harm}\' sh {{}} \\;')
             (self.bin / name).write_text(f'#!/bin/sh\n{check}{run}\n')
         cases = ''.join(f'    "{p}"|"{p}"/*) echo {700 + i}; exit 0 ;;\n'
                         for i, p in enumerate(sorted(other_fs, key=lambda p: -len(str(p)))))
@@ -143,20 +150,23 @@ class Box:
 
 
 def tree(top):
-    """Every entry under *top*: type, mode, and for files contents and mtime, for links targets."""
+    """Every entry under *top*: type, mode, owner and group, and for files contents and
+    mtime, for links targets, for other files their kind."""
     out = {}
     if not top.exists():
         return out
     for path in sorted(top.rglob('*')):
         st = path.lstat()
         rel = str(path.relative_to(top))
+        attrs = (stat.S_IMODE(st.st_mode), st.st_uid, st.st_gid)
         if stat.S_ISLNK(st.st_mode):
             out[rel] = ('link', os.readlink(path))
         elif stat.S_ISDIR(st.st_mode):
-            out[rel] = ('dir', stat.S_IMODE(st.st_mode))
+            out[rel] = ('dir', *attrs)
+        elif stat.S_ISREG(st.st_mode):
+            out[rel] = ('file', *attrs, st.st_mtime_ns, hashlib.sha256(path.read_bytes()).hexdigest())
         else:
-            out[rel] = ('file', stat.S_IMODE(st.st_mode), st.st_mtime_ns,
-                        hashlib.sha256(path.read_bytes()).hexdigest())
+            out[rel] = ('special', stat.S_IFMT(st.st_mode), *attrs)
     return out
 
 
@@ -169,6 +179,14 @@ def snapshot(box, *extra):
 
 
 KEPT = ['backups', 'ca', 'certs', 'crl', 'private', 'scep', 'sessions']
+# A group the files can be given that is not theirs: any as root, else a secondary one
+OTHER_GID = 1 if os.getuid() == 0 else next(iter(set(os.getgroups()) - {os.getgid()}), None)
+
+
+def whole(top, kept=()):
+    """tree(top) without the directories `kept`, which the archive recreates: every file,
+    link and directory moved or copied whole, with its attributes."""
+    return {rel: entry for rel, entry in tree(top).items() if rel not in kept}
 
 
 # -- what is archived, and how -------------------------------------------------------
@@ -603,8 +621,16 @@ def test_the_next_attempt_after_a_complete_roll_back_starts_over(tmp_path):
     assert files(box.archive / 'data') == data
 
 
-@pytest.mark.parametrize('differs', ['content', 'mode', 'date'])
+@pytest.mark.parametrize('differs', [
+    f'{harm}:{where}' for where in ('key', 'nested', 'top')
+    for harm in ('content', 'mode', 'date', 'group', 'owner')
+    if where != 'top' or harm not in ('content', 'date')])
 def test_a_copy_that_differs_from_its_source_is_never_kept_in_its_place(tmp_path, differs):
+    """Each attribute digest compares, on a file copied alone and in a copied tree."""
+    if differs.startswith('owner') and os.getuid() != 0:
+        pytest.skip('only root can give a file another owner')
+    if differs.startswith('group') and OTHER_GID is None:
+        pytest.skip('no secondary group to give a file')
     box = Box(tmp_path, python='stub')
     before = snapshot(box)
     box.wrap(other_fs=(box.data,), corrupt_copies=differs)
@@ -614,6 +640,32 @@ def test_a_copy_that_differs_from_its_source_is_never_kept_in_its_place(tmp_path
     assert not box.parent.exists() or not any(box.parent.iterdir())
 
 
+
+@pytest.mark.parametrize('differs', [
+    f'{harm}:{where}' for where in ('key', 'nested', 'top')
+    for harm in ('content', 'mode', 'date', 'group', 'owner')
+    if where != 'top' or harm not in ('content', 'date')])
+def test_a_put_back_that_differs_from_the_archive_is_never_taken_for_whole(tmp_path, differs):
+    """The last step fails once every source is gone; each put-back then reports success
+    over a copy that differs: the archive keeps it, and the retry puts it back whole."""
+    if differs.startswith('owner') and os.getuid() != 0:
+        pytest.skip('only root can give a file another owner')
+    if differs.startswith('group') and OTHER_GID is None:
+        pytest.skip('no secondary group to give a file')
+    box = Box(tmp_path / 'count', python='stub')
+    box.wrap(fail='rm', at=10 ** 6, other_fs=(box.data,))
+    assert box.run().returncode == 0
+    last_rm = int((box.state / 'count').read_text())
+    box = Box(tmp_path / 'box', python='stub')
+    data, config = tree(box.data), tree(box.config)
+    box.wrap(fail='rm', at=last_rm, other_fs=(box.data,), corrupt_copies=differs, corrupt_back=True)
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    box.wrap(other_fs=(box.data,))
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert whole(box.archive / 'data', KEPT) == {k: v for k, v in data.items() if k not in KEPT}
+    assert tree(box.archive / 'config') == config
 
 def test_the_kept_directories_are_those_the_packages_create():
     """RPM owns these directories and the DEB postinst creates them: the archive leaves them."""

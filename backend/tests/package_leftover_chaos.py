@@ -12,7 +12,7 @@ import shutil
 
 import pytest
 
-from tests.test_package_leftover_archive import KEPT, STAMP, Box, files, snapshot
+from tests.test_package_leftover_archive import KEPT, STAMP, Box, files, snapshot, tree, whole
 
 
 CHAOS = ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod')
@@ -30,7 +30,7 @@ def _chaos(box, layout):
     ('fail') or kills the whole run without any clean-up ('kill') at the calls it names.
     On a cp, 'torn', 'trunc', 'meta' and 'mode' kill it as a copy cut short would leave its
     target: other content, part of the content, or the whole content before its date or its
-    mode. 'alone' leaves the date wrong and fails that cp only, the run goes on; 'late' fails
+    mode, of the first file in it; 'top' before the mode of the copied directory itself. 'alone' leaves the date wrong and fails that cp only, the run goes on; 'late' fails
     a cp that copied everything."""
     box.wrap(other_fs=LAYOUTS[layout](box))
     s = box.state
@@ -44,7 +44,7 @@ def _chaos(box, layout):
             f'case $mode in\n'
             f'    fail) echo "{name}: injected failure" >&2; exit 1 ;;\n'
             f'    kill) kill -9 0 ;;\n'
-            f'    torn|trunc|meta|mode|alone|late)\n'
+            f'    torn|trunc|meta|mode|top|alone|late)\n'
             f'        if [ {name} = cp ]; then\n'
             f'            {shutil.which(name)} "$@"; for last; do :; done\n'
             f'            cut=$({find} "$last" -type f | {sort} | {head} -n 1)\n'
@@ -53,6 +53,7 @@ def _chaos(box, layout):
             f'                trunc) [ -z "$cut" ] || {shutil.which("truncate")} -s 1 "$cut" ;;\n'
             f'                meta|alone) [ -z "$cut" ] || {shutil.which("touch")} -d @5 "$cut" ;;\n'
             f'                mode) [ -z "$cut" ] || {shutil.which("chmod")} 0604 "$cut" ;;\n'
+            f'                top) [ ! -d "$last" ] || {shutil.which("chmod")} 0705 "$last" ;;\n'
             f'            esac\n'
             f'        fi\n'
             f'        case $mode in alone|late) exit 1 ;; esac\n'
@@ -91,7 +92,12 @@ def _chaos_box(tmp_path, layout, env='full'):
     path = box.config / 'ucm.env'
     path.write_text('UCM_FIPS_BUILD=1\n' if env == 'fips only' else path.read_text() + 'UCM_FIPS_BUILD=1\n')
     _chaos(box, layout)
-    return box, files(box.data), files(box.config)
+    return box, whole(box.data, _kept(layout)), whole(box.config)
+
+
+def _kept(layout):
+    """The directories that stay in place, recreated empty in the archive."""
+    return KEPT + (['updates'] if layout == 'a mount point inside the data' else [])
 
 
 class Run:
@@ -153,12 +159,12 @@ class Lab:
 
 
 def _nothing_lost(box, data, config, why):
-    """Every original file is whole in its place or in an archive, and what the output
-    names as still in the archive is there."""
+    """Every original file, link and moved directory is whole (attributes included) in its
+    place or in an archive."""
     archives = [a for a in box.parent.iterdir()] if box.parent.exists() else []
     for top, originals, sub in ((box.data, data, 'data'), (box.config, config, 'config')):
-        here = files(top)
-        there = [files(a / sub) for a in archives]
+        here = tree(top)
+        there = [tree(a / sub) for a in archives]
         for rel, entry in originals.items():
             assert here.get(rel) == entry or any(t.get(rel) == entry for t in there), (why, sub, rel)
 
@@ -185,17 +191,17 @@ def _while_failing(box, out, before, data, config, why):
 def _converged(box, out, data, config, layout, why):
     assert out.returncode == 0, (why, out.stdout, out.stderr)
     assert [a.name for a in box.parent.iterdir()] == [STAMP], (why, out.stdout)
-    assert files(box.archive / 'data') == data, why
-    assert files(box.archive / 'config') == config, why
+    assert whole(box.archive / 'data', _kept(layout)) == data, why
+    assert whole(box.archive / 'config') == config, why
     assert sorted(a.name for a in box.archive.iterdir()) == ['README.txt', 'config', 'data'], why
-    kept = KEPT + (['updates'] if layout == 'a mount point inside the data' else [])
+    kept = _kept(layout)
     assert sorted(p.name for p in box.data.iterdir()) == sorted(kept), why
     assert all(not any((box.data / d).iterdir()) for d in kept), why
     assert files(box.config) == {'ucm.env': files(box.config)['ucm.env']}, why
     assert (box.config / 'ucm.env').read_text() == 'UCM_FIPS_BUILD=1\n', why
 
 
-CUT_SHORT = ('torn', 'trunc', 'meta', 'mode', 'alone')
+CUT_SHORT = ('torn', 'trunc', 'meta', 'mode', 'top', 'alone')
 
 
 def _copies(run, put_back=False):
