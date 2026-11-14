@@ -1111,3 +1111,29 @@ def test_a_file_named_as_its_temporaries_is_never_taken_for_one(tmp_path, where)
     assert f'{stray} is named as this package names its temporary copies' in out.stdout
     assert snapshot(box, *extra) == before
 
+
+@pytest.mark.parametrize('edited', [False, True])
+def test_a_fips_line_stuck_in_the_journal_says_whether_the_new_configuration_went(tmp_path, edited):
+    """Killed on removing the journal; then the fips line cannot leave it. The new ucm.env
+    went first, unless it was edited since: the text says which."""
+    box = Box(tmp_path, python='stub')
+    env = box.config / 'ucm.env'
+    env.write_text(env.read_text() + 'UCM_FIPS_BUILD=1\n')
+    box.wrap()
+    (box.bin / 'rm').write_text(
+        f'#!/bin/sh\nfor last; do :; done\ncase $last in */.journal) kill -9 0 ;; esac\n'
+        f'exec {REAL["rm"]} "$@"\n')
+    assert box.run().returncode == -9
+    if edited:
+        env.write_text('UCM_FIPS_BUILD=1\nEDITED=1\n')
+    box.wrap()
+    (box.bin / 'mv').write_text('#!/bin/sh\nexit 1\n')
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    said = reported(out.stdout)[f'{box.archive}/.journal']
+    if edited:
+        assert said == 'could not be updated, so nothing it lists was put back'
+        assert env.read_text() == 'UCM_FIPS_BUILD=1\nEDITED=1\n'
+    else:
+        assert said == f'could not be updated once {env} was removed, so nothing it lists was put back'
+        assert not env.exists()

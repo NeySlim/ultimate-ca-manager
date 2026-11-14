@@ -283,12 +283,14 @@ roll_back() {
             fips)
                 # The new ucm.env goes while the archived one can take its place, once: the
                 # line goes too, or an old ucm.env put back since could pass for the new one
+                gone=""
                 if present "$dst" && fips_written "$src"; then
                     rm -f -- "$src" || { unsettled "$src" "the new configuration could not be removed for $dst to be put back"; break; }
+                    gone=" once $src was removed"
                 fi
                 # Stopped here, what is left is the journal with that line and the archive
                 drop_line "fips$TAB$src$TAB$dst" \
-                    || { unsettled "$JOURNAL" "could not be updated once $src was removed, so nothing it lists was put back"; break; } ;;
+                    || { unsettled "$JOURNAL" "could not be updated$gone, so nothing it lists was put back"; break; } ;;
             mkdir)
                 # Not named when it holds a path named already: removing it would lose that one
                 if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || holds_stuck "$dst" \
