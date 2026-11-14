@@ -197,12 +197,29 @@ def test_no_copy_means_no_upgrade_and_a_database_left_as_it_was(failure, base, m
 
 # --- 4. Never truncated, never multiplied -----------------------------------------------------
 
-def test_a_retry_replaces_the_previous_copy(base, monkeypatch):
-    """A start that failed after its copy, then 2.254 ran again: the next start copies anew."""
+def _schema(path):
+    conn = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+    try:
+        return pre_upgrade_copy._schema(conn)
+    finally:
+        conn.close()
+
+
+def _roll_back(db):
+    """The documented rollback: the copy put back in place of the database."""
+    db.engine.dispose()
+    for leftover in (f'{db.sqlite_path}-wal', f'{db.sqlite_path}-shm'):
+        Path(leftover).unlink(missing_ok=True)
+    Path(db.sqlite_path).write_bytes(_copy(db).read_bytes())
+
+
+def test_a_retry_after_a_rollback_replaces_the_previous_copy(base, monkeypatch):
+    """A start that failed after its copy, the copy put back, 2.254 ran again: the next start copies anew."""
     populate(base)
     restore = _broken_step(monkeypatch)
     assert base.upgrade() is False
     first = _sha(_copy(base))
+    _roll_back(base)
     base.run("INSERT INTO system_config (key, value) VALUES ('written_by_2254_meanwhile', '1')")
     restore()
     assert base.upgrade()
@@ -210,6 +227,20 @@ def test_a_retry_replaces_the_previous_copy(base, monkeypatch):
     conn = sqlite3.connect(_copy(base))
     assert conn.execute("SELECT 1 FROM system_config WHERE key = 'written_by_2254_meanwhile'").fetchall() == [(1,)]
     conn.close()
+    assert _leftovers(base) == [_copy(base).name]
+
+
+def test_a_restart_loop_after_a_partial_upgrade_keeps_the_pristine_copy(base, monkeypatch):
+    """Steps commit one by one: the next start finds a half-upgraded database, its copy stays 2.254."""
+    populate(base)
+    pristine = _schema(base.sqlite_path)
+    _broken_step(monkeypatch, '150_users_id_never_reused')
+    assert base.upgrade() is False
+    assert _schema(base.sqlite_path) != pristine
+    kept = _sha(_copy(base))
+    assert base.upgrade() is False
+    assert _schema(_copy(base)) == pristine
+    assert _sha(_copy(base)) == kept
     assert _leftovers(base) == [_copy(base).name]
 
 
@@ -226,6 +257,7 @@ def test_a_valid_copy_is_never_replaced_by_one_that_fails_verification(base, mon
     restore = _broken_step(monkeypatch)
     assert base.upgrade() is False
     restore()
+    _roll_back(base)
     kept = _sha(_copy(base))
     _corrupt(monkeypatch, base)
     assert base.upgrade() is False

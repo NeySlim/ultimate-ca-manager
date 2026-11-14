@@ -65,6 +65,11 @@ def _registry(conn) -> set:
     return {r[0] for r in conn.execute("SELECT name FROM _migrations")}
 
 
+def _schema(conn) -> set:
+    return {tuple(r) for r in conn.execute(
+        "SELECT type, name FROM sqlite_master WHERE type IN ('table', 'index')")}
+
+
 def _integrity(conn) -> str:
     return "; ".join(r[0] for r in conn.execute("PRAGMA integrity_check"))
 
@@ -83,6 +88,24 @@ def _verify(path: Path, counts: dict, registry: set) -> None:
             raise CopyFailed("the copy does not hold the same rows as the database")
     finally:
         conn.close()
+
+
+def _keeps_its_copy(target: Path, schema: set) -> bool:
+    """A valid 2.254 copy whose schema the database no longer has: the steps already applied
+    by a start cut short, so the database is no longer the 2.254 one and the copy stays."""
+    from migration_runner import UPGRADE_MIGRATION, pivot_refusal
+    if not target.is_file():
+        return False
+    try:
+        conn = sqlite3.connect(f"file:{target}?mode=ro", uri=True)
+        try:
+            names = _registry(conn)
+            return (_integrity(conn) == "ok" and UPGRADE_MIGRATION not in names
+                    and pivot_refusal("tracked", names) is None and _schema(conn) != schema)
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return False
 
 
 def _discard(path: Path) -> None:
@@ -115,7 +138,8 @@ def take(db_path) -> Path:
     """Copy *db_path* next to itself and verify the copy, or raise CopyFailed.
 
     Written under a fixed temporary name then renamed: a retry replaces the previous copy,
-    and an existing copy is only replaced by one that passed verification.
+    and an existing copy is only replaced by one that passed verification. A valid copy is
+    kept when the database's schema differs from it (a start cut short mid-upgrade).
     """
     source_path = Path(db_path).resolve()
     target = copy_path(source_path)
@@ -128,6 +152,9 @@ def take(db_path) -> Path:
             source.isolation_level = None
             # One read transaction: the counts and the backup see the same database
             source.execute("BEGIN")
+            if _keeps_its_copy(target, _schema(source)):
+                source.execute("COMMIT")
+                return target
             need = _size(source) + MARGIN_BYTES
             free = shutil.disk_usage(directory).free
             if free < need:
