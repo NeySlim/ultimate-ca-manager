@@ -188,6 +188,13 @@ livenessProbe:
   periodSeconds: 30
   timeoutSeconds: 10
   failureThreshold: 3
+## HA only: a container killed and restarted in its pod waits up to 190 s for its
+## previous heartbeat to expire before it serves; liveness and readiness start after.
+startupProbe:
+  enabled: true
+  periodSeconds: 10
+  timeoutSeconds: 10
+  failureThreshold: 30
 readinessProbe:
   enabled: true
   initialDelaySeconds: 20
