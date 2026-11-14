@@ -3,6 +3,7 @@ import pytest
 from flask import Flask
 
 from config.settings import Config
+from migration_marks import FULL_STOP_ASSET
 from utils.ha import reject_in_ha
 
 ROUTES = [
@@ -65,11 +66,13 @@ def test_scheduled_auto_update_never_installs_locally_in_ha(app, monkeypatch):
     monkeypatch.setattr(updates, 'fetch_expected_sha256', lambda url, name: 'e' * 64)
     monkeypatch.setattr(uc, 'start_campaign', lambda *a: started.append(a) or (True, 'ok', {}))
     monkeypatch.setattr(uc, 'campaign_tick', lambda: None)
+    # The package and the manifest a campaign waits for before it counts the attempt
+    assets = [{'name': n, 'browser_download_url': f'http://x/{n}'} for n in ('p.deb', FULL_STOP_ASSET)]
     with app.app_context():
         updates._auto_install({'latest_version': '99.0', 'download_url': 'http://x/p.deb',
                                'package_name': 'p.deb', 'checksum_url': 'http://x/p.sha256',
-                               'assets': [{'name': 'p.deb', 'browser_download_url': 'http://x/p.deb'}]})
-    assert started == [('99.0', [{'name': 'p.deb', 'browser_download_url': 'http://x/p.deb'}], 'scheduler')]
+                               'assets': assets})
+    assert started == [('99.0', assets, 'scheduler')]
 
 
 def test_service_restart_in_ha_is_a_rolling_restart_even_in_a_container(auth_client, monkeypatch):

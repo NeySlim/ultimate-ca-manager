@@ -21,24 +21,20 @@ def full_stop_reason(path):
     """The reason a migration file gives for requiring every node stopped, or None."""
     path = Path(path)
     tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
-    found = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            targets = node.targets
-        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
-            targets = [node.target]
-        else:
-            continue
-        if any(isinstance(t, ast.Name) and t.id == MARK for t in targets):
-            found.append(node)
-    if not found:
+    # Every way a module can bind the name: an assignment, a loop or with target, an import
+    bound = [n for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == MARK
+             and isinstance(n.ctx, ast.Store)]
+    bound += [a for n in ast.walk(tree) if isinstance(n, ast.Import | ast.ImportFrom)
+              for a in n.names if (a.asname or a.name) == MARK]
+    if not bound:
         return None
     # Read without running the file: one literal at module level, the value Python keeps too
-    node = found[0]
-    if len(found) == 1 and node in tree.body and isinstance(node, ast.Assign | ast.AnnAssign) \
-            and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) \
-            and node.value.value.strip():
-        return node.value.value.strip()
+    for node in tree.body if len(bound) == 1 else ():
+        target = node.targets if isinstance(node, ast.Assign) else \
+            [node.target] if isinstance(node, ast.AnnAssign) else []
+        if target == bound and isinstance(node.value, ast.Constant) \
+                and isinstance(node.value.value, str) and node.value.value.strip():
+            return node.value.value.strip()
     raise ValueError(f"{path.stem}: {MARK} must be set once, at module level, "
                      f"to a non-empty string literal giving the reason")
 

@@ -45,6 +45,9 @@ def test_the_mark_is_the_literal_reason_at_module_level(tmp_path):
     'def upgrade(conn):\n    requires_full_stop = "x"\n',
     'requires_full_stop = "a"\nrequires_full_stop = ""\n',
     'requires_full_stop = "a"\nrequires_full_stop = "b"\n',
+    'requires_full_stop, other = "why", 1\n',
+    'for requires_full_stop in ["why"]:\n    pass\n',
+    'import os as requires_full_stop\n',
 ])
 def test_a_mark_that_cannot_be_read_as_written_is_an_error(tmp_path, body):
     with pytest.raises(ValueError, match='requires_full_stop'):
