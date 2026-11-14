@@ -74,6 +74,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Docker: stopping the container now stops UCM cleanly. The server never received the stop signal and was killed when the grace period ran out.
 - CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum, and so is a CA key that cannot be read; the same CA without a key is still imported. In a batch only that CA is skipped and named.
 - OPNsense import and smart import chain a CA under the stored CA whose key signed it, whatever the order of the batch, instead of leaving it unlinked or taking a CA of the same name. A CA whose parent signature cannot be verified here (a parent key type the server does not handle, such as SLH-DSA or GOST) is imported without a parent, where smart import used to attach it by name.
 - CA import: a CA or certificate whose issuer is stored both as a root and as a cross or link certificate of the same key is now chained under the self-signed root, on SQLite and PostgreSQL alike, including a certificate installed on a pending CA and certificates linked by Smart Import, OPNsense import and the hourly chain repair. The chain status of a CA with no recorded parent and the chain added to an export follow the same rule.

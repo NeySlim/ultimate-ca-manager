@@ -587,7 +587,14 @@ jobs:
             exit 1
           fi
           
-          docker stop ucm-test && docker rm ucm-test
+          # A clean stop: the server received the signal and exited by itself
+          docker stop ucm-test
+          code=$(docker inspect -f '{{.State.ExitCode}}' ucm-test)
+          docker rm ucm-test
+          if [ "$code" != 0 ]; then
+            echo "❌ Container was killed on stop (exit $code)"
+            exit 1
+          fi
 
   # Pushes to dev only: the source build is too slow for every PR
   build-test-fips:

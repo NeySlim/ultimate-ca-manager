@@ -56,7 +56,8 @@ RestartSec=10s
 # Graceful shutdown
 KillMode=mixed
 KillSignal=SIGTERM
-TimeoutStopSec=30s
+# Workers drain for up to 30 s, then the scheduler process stops
+TimeoutStopSec=90s
 
 [Install]
 WantedBy=multi-user.target
