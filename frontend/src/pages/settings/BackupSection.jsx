@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next'
-import { Database, Download, Trash, UploadSimple, FloppyDisk, MagnifyingGlass, CaretLeft, CaretRight, Broom, HardDrives, WarningCircle } from '@phosphor-icons/react'
+import { Copy, Database, Download, Trash, UploadSimple, FloppyDisk, MagnifyingGlass, CaretLeft, CaretRight, Broom, HardDrives, WarningCircle } from '@phosphor-icons/react'
 import { Button, Input, Select, FileUpload, Badge, DetailHeader, DetailSection, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import AdminLockLabel from './AdminLockLabel'
+import { useClipboard } from '../../hooks/useClipboard'
 
 export default function BackupSection({
   settings, updateSetting, handleSave, saving, hasPermission,
@@ -13,6 +14,7 @@ export default function BackupSection({
   handleDownloadBackup, handleDeleteBackup, handleClearBackupPassword,
 }) {
   const { t } = useTranslation()
+  const { copy, isCopied } = useClipboard()
   const isAdmin = hasPermission('admin:system')
   // The KDF and the password need admin:settings; the schedule is refused by the API.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
@@ -223,8 +225,23 @@ export default function BackupSection({
                         <p className="text-xs text-text-secondary">{backup.size}</p>
                         <p className="text-xs text-text-secondary">{backup.created_at}</p>
                         {backup.node && (
-                          <p className="text-xs text-text-secondary truncate" title={backup.sha256 || undefined}>
+                          <p className="text-xs text-text-secondary truncate">
                             {t('settings.backupNode')}: {backup.node}
+                          </p>
+                        )}
+                        {backup.sha256 && (
+                          <p className="text-xs text-text-secondary flex items-center gap-1">
+                            {t('settings.backupSha256')}: <code className="font-mono">{backup.sha256.slice(0, 12)}</code>
+                            <button
+                              type="button"
+                              className="text-text-tertiary hover:text-text-primary"
+                              aria-label={t('settings.backupCopySha256')}
+                              title={t('settings.backupCopySha256')}
+                              onClick={() => copy(backup.sha256, `sha256:${backup.filename}`)}
+                            >
+                              <Copy size={12} />
+                            </button>
+                            {isCopied(`sha256:${backup.filename}`) && <span>{t('common.copied')}</span>}
                           </p>
                         )}
                       </div>

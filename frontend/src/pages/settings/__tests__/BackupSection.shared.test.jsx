@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
@@ -14,6 +14,11 @@ vi.mock('../../../components', () => ({
   DetailHeader: ({ title }) => <header>{title}</header>,
   DetailSection: ({ title, children }) => <section><h2>{title}</h2>{children}</section>,
   DetailContent: ({ children }) => <div>{children}</div>,
+}))
+
+const copy = vi.fn(async () => true)
+vi.mock('../../../hooks/useClipboard', () => ({
+  useClipboard: () => ({ copy, isCopied: () => false }),
 }))
 
 vi.mock('../../../components/ui/ToggleSwitch', () => ({
@@ -41,7 +46,15 @@ describe('BackupSection in high availability', () => {
     renderSection({ storage: 'database', total: 1 }, [{ ...archive, node: 'node-a', sha256: 'ab'.repeat(32) }])
     expect(screen.getByText('settings.backupSharedStoreNote')).toBeTruthy()
     expect(screen.getByText(/node-a/)).toBeTruthy()
-    expect(screen.getByTitle('ab'.repeat(32))).toBeTruthy()
+  })
+
+  it('shows the start of the SHA-256 and copies the whole of it', () => {
+    const sha256 = '0123456789ab' + 'cd'.repeat(26)
+    renderSection({ storage: 'database', total: 1 }, [{ ...archive, node: 'node-a', sha256 }])
+    expect(screen.getByText('0123456789ab')).toBeTruthy()
+    expect(screen.queryByText(sha256)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'settings.backupCopySha256' }))
+    expect(copy).toHaveBeenCalledWith(sha256, `sha256:${archive.filename}`)
   })
 
   it('says nothing of nodes for archives on disk', () => {

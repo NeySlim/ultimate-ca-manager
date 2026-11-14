@@ -2833,6 +2833,8 @@
     "backupTotalSize": "Dimensione totale",
     "diskFree": "Spazio libero",
     "backupNode": "Node",
+    "backupSha256": "SHA-256",
+    "backupCopySha256": "Copy the full SHA-256",
     "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
     "backupSearchPlaceholder": "Cerca backup…",
     "backupSortNewest": "Più recenti prima",
