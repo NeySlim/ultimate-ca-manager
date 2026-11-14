@@ -1,9 +1,10 @@
 """The full-stop mark of a migration, read from its source without importing it.
 
 A migration that removes or narrows something the release before it reads or writes sets, at
-module level, ``requires_full_stop = "<why>"`` (CONTRIBUTING.md, "Migrations"). The runner
-refuses to apply it in HA while a node of another version beats; a rolling update reads the
-marks the release publishes as FULL_STOP_ASSET and refuses before installing anything.
+module level, ``requires_full_stop = "<why>"`` (CONTRIBUTING.md, "Migrations and rolling
+updates"). The runner refuses to apply it in HA while a node of another version beats; a
+rolling update reads the marks the release publishes as FULL_STOP_ASSET and refuses before
+installing anything.
 
 ``python3 migration_marks.py <migrations dir>`` prints that asset. Standard library only.
 """
@@ -20,22 +21,26 @@ def full_stop_reason(path):
     """The reason a migration file gives for requiring every node stopped, or None."""
     path = Path(path)
     tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+    found = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
-            targets, value = node.targets, node.value
-        elif isinstance(node, ast.AnnAssign):
-            targets, value = [node.target], node.value
+            targets = node.targets
+        elif isinstance(node, (ast.AnnAssign, ast.AugAssign)):
+            targets = [node.target]
         else:
             continue
-        if not any(isinstance(t, ast.Name) and t.id == MARK for t in targets):
-            continue
-        # Read without running the file: only a literal at module level can be read so
-        if node in tree.body and isinstance(value, ast.Constant) and isinstance(value.value, str) \
-                and value.value.strip():
-            return value.value.strip()
-        raise ValueError(f"{path.stem}: {MARK} must be set once, at module level, "
-                         f"to a non-empty string literal giving the reason")
-    return None
+        if any(isinstance(t, ast.Name) and t.id == MARK for t in targets):
+            found.append(node)
+    if not found:
+        return None
+    # Read without running the file: one literal at module level, the value Python keeps too
+    node = found[0]
+    if len(found) == 1 and node in tree.body and isinstance(node, ast.Assign | ast.AnnAssign) \
+            and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) \
+            and node.value.value.strip():
+        return node.value.value.strip()
+    raise ValueError(f"{path.stem}: {MARK} must be set once, at module level, "
+                     f"to a non-empty string literal giving the reason")
 
 
 def full_stop_marks(directory):

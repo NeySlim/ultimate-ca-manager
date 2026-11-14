@@ -1,7 +1,7 @@
 """What a migration after the 2.254 upgrade does to a populated 3.0 database, and what of it the
-release before cannot live with (CONTRIBUTING.md, "Migrations"). Each migration runs through the
-runner on a copy of the schema it receives; the schema and the row counts are compared before
-and after, never its source text."""
+release before cannot live with (CONTRIBUTING.md, "Migrations and rolling updates"). Each
+migration runs through the runner on a copy of the schema it receives; the schema and the row
+counts are compared before and after, never its source text."""
 import re
 import shutil
 from datetime import date, datetime

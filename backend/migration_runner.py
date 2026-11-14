@@ -35,7 +35,7 @@ Numbered from 300. Every migration is multi-backend:
 Files and packages whose name starts with ``_`` are not migrations.
 
 A migration only adds to what the release before it reads or writes (CONTRIBUTING.md,
-"Migrations"). One that removes or narrows sets ``requires_full_stop = "<why>"``
+"Migrations and rolling updates"). One that removes or narrows sets ``requires_full_stop = "<why>"``
 (``migration_marks``): in HA the runner refuses to apply it while another node beats fresh on
 another version, and a rolling update refuses the release before installing anything.
 

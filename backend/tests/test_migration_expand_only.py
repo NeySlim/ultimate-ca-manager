@@ -16,7 +16,7 @@ def test_no_migration_after_the_upgrade_removes_or_narrows_without_the_mark(dial
     assert set(results) == set(post_pivot_names(migration_runner.MIGRATIONS_DIR))
     assert unmarked(results) == {}, (
         'these migrations remove or narrow what the release before reads or writes: make them '
-        'add only, or set requires_full_stop (CONTRIBUTING.md, "Migrations")')
+        'add only, or set requires_full_stop (CONTRIBUTING.md, "Migrations and rolling updates")')
 
 
 # Each factice runs on its own table or column, in this order, on the same database
