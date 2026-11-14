@@ -753,10 +753,13 @@ def _auto_install(result):
         return
     if in_ha:
         from services import update_campaign
+        from migration_marks import FULL_STOP_ASSET
         missing = update_campaign.families_without_package(result.get('assets'))
+        if not any(a.get('name') == FULL_STOP_ASSET for a in result.get('assets') or []):
+            missing.append(FULL_STOP_ASSET)
         if missing:
             # Before the marker: the next check tries again once the release has them
-            logger.info(f"Auto-update to {latest} waits: no package yet for {', '.join(missing)}")
+            logger.info(f"Auto-update to {latest} waits: not published yet: {', '.join(missing)}")
             return
     if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
         return  # one attempt per version — no overnight crash loops

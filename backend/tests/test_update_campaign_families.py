@@ -460,9 +460,12 @@ def test_scheduled_auto_install_in_ha_gives_each_family_its_package(app, ha, mon
 
 
 
-@pytest.mark.parametrize('assets', [[], [_asset(DEB), _asset(DEB + '.sha256')]])
-def test_scheduled_auto_install_in_ha_waits_for_the_package_of_each_family(app, ha, monkeypatch, assets):
-    # A release still uploading its assets is tried again at the next check, not marked as attempted
+@pytest.mark.parametrize('assets', [[], [_asset(DEB), _asset(DEB + '.sha256')],
+                                    [a for a in ASSETS if a['name'] != 'full-stop-migrations.json']],
+                         ids=['nothing', 'one family', 'no manifest'])
+def test_scheduled_auto_install_in_ha_waits_for_every_asset_it_reads(app, ha, monkeypatch, assets):
+    # A release still uploading its packages or its full-stop manifest is tried again at the next
+    # check, not marked as attempted
     from models import SystemConfig, db
     monkeypatch.delenv('UCM_DOCKER', raising=False)
     _rows(app, a='deb', b='rpm-el9')
