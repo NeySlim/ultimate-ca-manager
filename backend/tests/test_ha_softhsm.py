@@ -1,5 +1,6 @@
 """HA mode: no SoftHSM token is created, a SoftHSM provider already there is kept and flagged."""
 import json
+import os
 import pathlib
 import subprocess
 import uuid
@@ -227,6 +228,14 @@ class TestExistingSoftHsmKeyInHa:
             'cn': f'ha-{uuid.uuid4().hex[:6]}.test', 'ca_id': r.get_json()['data']['id'],
             'key_type': 'rsa', 'key_size': 2048, 'validity_days': 30})
         assert cert.status_code in (200, 201), cert.data
+
+
+@pytest.mark.skipif(not os.getenv('UCM_TEST_APP_PG_URL'), reason='UCM_TEST_APP_PG_URL not set')
+def test_these_refusals_ran_on_postgresql(app):
+    # HA mode exists only on PostgreSQL: the CI PostgreSQL step runs this whole file there
+    from models import db
+    with app.app_context():
+        assert db.engine.dialect.name == 'postgresql'
 
 
 class TestWithoutHa:
