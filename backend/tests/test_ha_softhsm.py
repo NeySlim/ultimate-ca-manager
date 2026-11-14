@@ -269,7 +269,47 @@ def test_default_token_without_ha_follows_hsm_auto_init(flag, auto, expected):
     assert _auto_init(env).returncode == expected
 
 
-def test_entrypoint_gates_token_init_on_the_helper():
-    text = (ROOT / 'docker' / 'entrypoint.sh').read_text()
-    block = text[text.index('HSM / SoftHSM AUTO-INIT'):]
-    assert 'ucm_softhsm_auto_init' in block and 'init-token' in block
+def _softhsm_block():
+    """The SoftHSM block of the image entrypoint, alone: the whole script never runs here."""
+    lines = (ROOT / 'docker' / 'entrypoint.sh').read_text().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith('if command -v softhsm2-util'))
+    end = next(i for i in range(start, len(lines)) if lines[i] == 'fi')
+    return '\n'.join(lines[start:end + 1])
+
+
+def _run_softhsm_block(tmp_path, env):
+    # Fake softhsm2-util and openssl first in PATH: no slot exists, every call is logged
+    fake = tmp_path / 'bin'
+    fake.mkdir()
+    calls = tmp_path / 'calls'
+    (fake / 'softhsm2-util').write_text(f'#!/bin/sh\necho "$@" >> {calls}\nexit 0\n')
+    (fake / 'openssl').write_text('#!/bin/sh\necho 0123456789abcdef\n')
+    for tool in fake.iterdir():
+        tool.chmod(0o755)
+    script = tmp_path / 'block.sh'
+    script.write_text(f'. {HELPER}\n{_softhsm_block()}\necho "PIN=${{HSM_DEFAULT_PIN-unset}}"\n')
+    run = subprocess.run(['bash', str(script)], env={'PATH': f'{fake}:/usr/bin:/bin', **env},
+                         capture_output=True, text=True, cwd=tmp_path)
+    assert run.returncode == 0, run.stderr
+    return run.stdout, calls.read_text() if calls.exists() else ''
+
+
+@pytest.mark.parametrize('auto', ['true', 'false', 'TRUE', None])
+def test_the_entrypoint_creates_no_token_in_ha(tmp_path, auto):
+    out, calls = _run_softhsm_block(tmp_path, {'UCM_HA': '1', **({'HSM_AUTO_INIT': auto} if auto else {})})
+    assert '--init-token' not in calls
+    assert 'not created in HA mode' in out
+    assert 'PIN=unset' in out
+
+
+@pytest.mark.parametrize('auto', ['true', None])
+def test_the_entrypoint_creates_the_token_without_ha(tmp_path, auto):
+    out, calls = _run_softhsm_block(tmp_path, {**({'HSM_AUTO_INIT': auto} if auto else {})})
+    assert '--init-token' in calls and 'UCM-Default' in calls
+    assert 'PIN=0123456789abcdef' in out
+
+
+def test_the_entrypoint_leaves_the_token_when_auto_init_is_off(tmp_path):
+    out, calls = _run_softhsm_block(tmp_path, {'HSM_AUTO_INIT': 'false'})
+    assert '--init-token' not in calls
+    assert 'HSM_AUTO_INIT is off' in out and 'PIN=unset' in out
