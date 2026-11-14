@@ -294,15 +294,33 @@ class TestApi:
         crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
         assert crypto == {'fips_requested': False, 'fips_active': False, 'provider_active': False,
                           'library': fips_mode.library_version(), 'provider': None,
-                          'module_settings': None, 'blockers': None}
+                          'module_settings': None, 'blockers': None, 'blockers_checked_at': None}
 
     def test_status_carries_the_blockers_found_at_startup(self, auth_client, monkeypatch):
         from services import fips_preflight
         found = [{'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1,
                   'examples': ['alice (#3)'], 'remedy': 'r'}]
-        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': found})
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': found,
+                                                         'checked_at': '2026-11-14T08:00:00Z'})
         crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
         assert crypto['blockers'] == found
+        assert crypto['blockers_checked_at'] == '2026-11-14T08:00:00Z'
+
+    def test_the_preflight_route_does_not_change_the_status(self, auth_client, monkeypatch):
+        from services import fips_preflight
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': [],
+                                                         'checked_at': '2026-11-14T08:00:00Z'})
+        before = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
+        found = [{'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1,
+                  'examples': [], 'remedy': 'r'}]
+        monkeypatch.setattr(fips_preflight, 'run_detectors', lambda *a, **k: {
+            'summary': {'blocker': 1, 'warning': 0, 'info': 0}, 'findings': found, 'errors': [],
+            'checked': ['users.password_scrypt']})
+        assert auth_client.get('/api/v2/system/fips-preflight').get_json()['data']['findings'] == found
+        after = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
+        assert (after['blockers'], after['blockers_checked_at']) == ([], '2026-11-14T08:00:00Z')
+        assert before['blockers'] == after['blockers']
 
     def test_status_hides_blocker_examples_without_admin_system(self, app, monkeypatch,
                                                                 create_user, auth_client, request):
@@ -310,7 +328,7 @@ class TestApi:
         from services import fips_preflight
         found = [{'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1,
                   'examples': ['alice (#3)'], 'remedy': 'r'}]
-        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': found})
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': found, 'checked_at': None})
         user = create_user(username='fips-status-operator', password='Operator-Pass-123!',
                            role='operator')
         request.addfinalizer(lambda: auth_client.delete(f"/api/v2/users/{user['id']}"))

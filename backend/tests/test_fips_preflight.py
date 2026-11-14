@@ -708,7 +708,7 @@ def _errors(caplog):
 class TestStartupBlockers:
     @pytest.fixture(autouse=True)
     def _forget(self, monkeypatch):
-        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': None})
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': None, 'checked_at': None})
 
     def test_each_blocker_is_an_error_line_with_its_remedy(self, session, monkeypatch, caplog):
         _seed_two_blockers(session)
@@ -775,11 +775,15 @@ class TestStartupBlockers:
         fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
         assert any('users.password_scrypt' in m and 'unreadable table' in m for m in _errors(caplog))
 
-    def test_the_preflight_route_refreshes_what_the_status_shows(self, session, monkeypatch):
+    def test_an_on_demand_check_leaves_the_startup_state(self, session, app, monkeypatch):
+        """The status shows the check of the start, the same in every worker forked after it;
+        the route answers a fresh report without changing it."""
         monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
         fips_preflight.log_startup_blockers(logging.getLogger('ucm.test'))
-        assert fips_preflight.startup_blockers() == []
+        state = fips_preflight.startup_state()
+        assert state['blockers'] == [] and state['checked_at'].endswith('Z')
         _seed_two_blockers(session)
-        fips_preflight.run()
-        assert {b['id'] for b in fips_preflight.startup_blockers()} == {
+        report = fips_preflight.run()
+        assert {f['id'] for f in report['findings'] if f['severity'] == 'blocker'} == {
             'users.password_scrypt', 'dns.tsig_hmac_md5'}
+        assert fips_preflight.startup_state() == state

@@ -2743,9 +2743,10 @@ GET /api/v2/system/service/status
 # to start when one is not 1 on the OpenSSL FIPS Provider; a distribution
 # module follows its own security policy. "blockers": the blocker findings
 # (id, severity, title, count, examples, remedy) of the FIPS readiness check
-# this node last ran in FIPS mode, at startup or through fips-preflight; null
-# outside FIPS mode or before any check. Without admin:system each finding
-# keeps only id, severity, title and count.
+# this node ran when it started in FIPS mode, and "blockers_checked_at" when
+# (ISO 8601 UTC); the same in every worker, never changed by fips-preflight,
+# which answers a fresh report. Both null outside FIPS mode. Without
+# admin:system each finding keeps only id, severity, title and count.
 "crypto": {
   "fips_requested": true,
   "fips_active": true,
@@ -2753,7 +2754,8 @@ GET /api/v2/system/service/status
   "library": "OpenSSL 3.5.7 9 Jun 2026",
   "provider": {"name": "OpenSSL FIPS Provider", "version": "3.5.9", "buildinfo": "3.5.9"},
   "module_settings": {"security-checks": 1, "tls1-prf-ems-check": 1, "drbg-no-trunc-md": 1},
-  "blockers": []
+  "blockers": [],
+  "blockers_checked_at": "2026-11-14T08:00:00Z"
 }
 
 # "cluster.nodes" in the response (HA mode): every registered node with node_id, leader,

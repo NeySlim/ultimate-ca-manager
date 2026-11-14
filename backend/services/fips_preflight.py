@@ -637,8 +637,9 @@ def _https():
 
 # --- run --------------------------------------------------------------------
 
-# Blockers of the last check this process ran in FIPS mode (startup, then the route); None before
-_startup = {'blockers': None}
+# Blockers found by the startup check in FIPS mode and when it ran; set once, before gunicorn
+# forks its workers (preload_app), so every worker shows the same; an on-demand run leaves it
+_startup = {'blockers': None, 'checked_at': None}
 
 
 def _blocker_findings(result) -> list:
@@ -648,8 +649,6 @@ def _blocker_findings(result) -> list:
 def run(detectors: Optional[Iterable[Detector]] = None) -> dict:
     """Every detector's findings, blockers first; a detector that fails is listed in errors."""
     result = run_detectors(DETECTORS if detectors is None else detectors, label='FIPS preflight')
-    if detectors is None and fips_mode.enabled():
-        _startup['blockers'] = _blocker_findings(result)
     return {'fips_active': fips_mode.enabled(),
             'ready': not result['summary'][BLOCKER] and not result['errors'],
             'summary': result['summary'], 'findings': result['findings'],
@@ -657,8 +656,13 @@ def run(detectors: Optional[Iterable[Detector]] = None) -> dict:
 
 
 def startup_blockers() -> Optional[list]:
-    """Blocker findings of the last check in FIPS mode, None when none ran."""
+    """Blocker findings of the startup check in FIPS mode, None when it did not run."""
     return _startup['blockers']
+
+
+def startup_state() -> dict:
+    """{'blockers', 'checked_at' (ISO 8601 UTC)} of the startup check; both None without one."""
+    return dict(_startup)
 
 
 def log_startup_blockers(log) -> None:
@@ -677,7 +681,8 @@ def log_startup_blockers(log) -> None:
                   type(e).__name__, e)
         return
     blockers = _blocker_findings(result)
-    _startup['blockers'] = blockers
+    _startup.update(blockers=blockers,
+                    checked_at=utc_now().isoformat(timespec='seconds') + 'Z')
     for f in blockers:
         log.error('FIPS mode blocker %s: %s (%d: %s). Remedy: %s', f['id'], f['title'], f['count'],
                   '; '.join(f['examples']), f['remedy'])

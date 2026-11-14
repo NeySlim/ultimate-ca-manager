@@ -178,7 +178,8 @@ def get_service_status():
             'memory_mb': memory_mb,
             'is_docker': is_docker_env,
             'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
-            'crypto': {**fips_mode.status(), 'blockers': _visible_blockers()},
+            'crypto': {**fips_mode.status(), 'blockers': _visible_blockers(),
+                       'blockers_checked_at': fips_preflight.startup_state()['checked_at']},
         }
         if ha_enabled():
             # Per-node detail stays behind authentication; /health names no other node
