@@ -51,6 +51,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The database switch refuses a target this release cannot start.** A target holding accounts from a release older than 2.254, or a 2.254 database without accounts, is refused (409) before `ucm.env` is written, where 2.254 switched to it, and so is a SQLite file older than 2.254 when switching back. Retrying a switch cut short on the same target resumes it, where 2.254 asked for a reset.
 - **WSTEP Kerberos requests without template are refused.** A request on the Kerberos binding that names no template and whose EKUs match none of the profile was issued as a server certificate; it is now refused and audited (`windows_enrollment.refused`), as AD CS does. UsernamePassword is unchanged, and so is the renewal of the requester's own valid certificate issued without template by Windows enrollment.
 - **WSTEP Kerberos renewals are audited for the requester's own certificate only.** `certificate.renewed` names a renewed certificate only when it is valid, of the same profile and the requester's; a request signed by another certificate is audited as `certificate.issued`.
 - SCEP: a PKCSReq signed by a valid certificate this endpoint issued is now a renewal, as clients that renew with PKCSReq expect: the challenge is still compared but may have expired, and the old certificate is replaced; a CSR subject other than the certificate's is refused (see UPGRADE.md).
@@ -72,7 +73,6 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Database switch: a target holding accounts, or the SQLite file a switch back to SQLite names, that the service would refuse to start is refused (409) with the startup message before `ucm.env` is written, instead of leaving the service down. A switch cut short can be retried on the same target.
 - CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum, and so is a CA key that cannot be read; the same CA without a key is still imported. In a batch only that CA is skipped and named.
 - OPNsense import and smart import chain a CA under the stored CA whose key signed it, whatever the order of the batch, instead of leaving it unlinked or taking a CA of the same name. A CA whose parent signature cannot be verified here (a parent key type the server does not handle, such as SLH-DSA or GOST) is imported without a parent, where smart import used to attach it by name.
 - CA import: a CA or certificate whose issuer is stored both as a root and as a cross or link certificate of the same key is now chained under the self-signed root, on SQLite and PostgreSQL alike, including a certificate installed on a pending CA and certificates linked by Smart Import, OPNsense import and the hourly chain repair. The chain status of a CA with no recorded parent and the chain added to an export follow the same rule.
