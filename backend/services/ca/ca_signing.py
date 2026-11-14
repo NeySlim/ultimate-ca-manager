@@ -166,6 +166,7 @@ class CASigningMixin:
         windows_profile_id: int = None,
         unique_subject: bool = False,
         subject_holder: str = None,
+        renews: list = None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -217,6 +218,8 @@ class CASigningMixin:
                 the CA carries the issued subject, even with the CA's option off; WSTEP
                 passes it for a subject built by a common name pattern.
             subject_holder: the requester's identity recorded on the row (WSTEP: its SID).
+            renews: rows of a designated renewal that ``supersedes`` does not archive (WSTEP's
+                template-less Kerberos renewal): the same entity, whose lineage the row inherits.
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -342,7 +345,7 @@ class CASigningMixin:
             source=source,
             template_id=template_id,
             windows_profile_id=windows_profile_id,
-            subject_holder=successor_holder(subject_holder, [supersedes]),
+            subject_holder=successor_holder(subject_holder, [supersedes, *(renews or ())]),
         )
         db.session.add(new_cert)
 
@@ -368,7 +371,7 @@ class CASigningMixin:
             next_ca_serial(ca)
             # Read once the CA row is locked (PostgreSQL) or the database write lock held
             # (SQLite, since the flush): a concurrent issuance under this CA commits before or after
-            refuse_taken_subject(ca, cert_obj, own=[new_cert], renews=[supersedes],
+            refuse_taken_subject(ca, cert_obj, own=[new_cert], renews=[supersedes, *(renews or ())],
                                  holder=subject_holder, requester_sid=requester_sid,
                                  pattern=unique_subject, source=source)
             db.session.commit()

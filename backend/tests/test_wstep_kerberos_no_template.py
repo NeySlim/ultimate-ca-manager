@@ -395,6 +395,18 @@ def test_a_taken_subject_matching_no_template_is_refused_as_held_by_another(app,
     assert err.audited.endswith(f'(serial {taken.serial_number})')
 
 
+@pytest.mark.parametrize('sid', [SID, None], ids=['sid', 'no-sid'])
+def test_a_kerberos_renewal_without_template_is_its_own_holder_once_the_option_is_on(
+        app, client, world, realm_a, unique_a, sid):
+    """The renewed template-less certificate proves the same entity, a new key and no SID notwithstanding."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old = _template_less_certificate(app, world, key, sid=sid)
+    unique_a()
+    r = _renew(client, world, MACHINE, old, key)
+    assert r.status_code == 200, r.data
+    assert _issued_cert_from_rstr(r.data).subject.rfc4514_string() == 'CN=hosta.c04a.test'
+
+
 def test_a_kerberos_renewal_without_template_of_a_subject_another_holds_is_a_fault(
         app, client, world, realm_a, unique_a):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

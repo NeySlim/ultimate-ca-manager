@@ -1319,6 +1319,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     if err:
         return None, err
 
+    from services.cert.issued_lookup import find_issued_rows
     cert_type, template_ku = _template_profile(matched_template, csr)
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
@@ -1340,6 +1341,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
             windows_profile_id=getattr(profile, 'id', None), unique_subject=patterned,
             subject_holder=sid_holder(requester_sid),
+            # The renewed template-less certificate proves the same entity (designated renewal)
+            renews=find_issued_rows(ca, exempted) if exempted is not None else None,
         )
     except SubjectTaken as e:
         return None, SubjectHeldByAnother(matched_template if patterned else None, e)
