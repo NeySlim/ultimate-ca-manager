@@ -81,6 +81,11 @@ capability=$(docker exec -e OPENSSL_CONF="$conf" -w /opt/ucm/backend "$name" pyt
     'import fips_mode; print(",".join(fips_mode.approved_module_signatures()))') \
     || fail "the capability query failed"
 echo "module approves: ${capability:-nothing of ED25519, ED448, ML-DSA}"
+# The record written at build, read by the readiness check outside FIPS mode, says the same
+built=$(docker exec -w /opt/ucm/backend "$name" python3 -c \
+    'import sys, fips_mode as f; c = f.build_capability(); sys.exit("no record") if c is None else print(",".join(a for a in f.MODULE_DEPENDENT_SIGNATURES if a in c))') \
+    || fail "the build capability record is missing or unreadable"
+[ "$built" = "$capability" ] || fail "the build record ($built) differs from the module ($capability)"
 if [ "$module_pq" = 1 ]; then
     genpkey ML-DSA-65 -provparam ml-dsa.output_formats=seed-only || fail "genpkey ML-DSA-65 failed"
     genpkey ED25519 || fail "genpkey ED25519 failed"

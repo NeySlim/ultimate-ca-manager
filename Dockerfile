@@ -166,6 +166,25 @@ WORKDIR /opt/ucm
 COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
 COPY --chown=ucm:ucm LICENSE NOTICE COMMERCIAL-LICENSE.md /opt/ucm/
 COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
+# FIPS variant: what the module approves, asked of it under the configuration the
+# entrypoint writes, so the readiness check judges keys by it before the switch
+RUN if [ "$UCM_FIPS_BUILD" = 1 ]; then \
+        set -eu; \
+        tmp="$(mktemp -d)"; \
+        moddir="$(openssl version -m | sed -E 's/^MODULESDIR: "(.*)"$/\1/')"; \
+        openssl fipsinstall -pedantic -module "$moddir/fips.so" -provider_name fips \
+            -out "$tmp/fipsmodule.cnf" >/dev/null; \
+        printf '%s\n' 'config_diagnostics = 1' 'openssl_conf = openssl_init' \
+            ".include $tmp/fipsmodule.cnf" '[openssl_init]' 'providers = provider_sect' \
+            '[provider_sect]' 'fips = fips_sect' 'base = base_sect' '[base_sect]' 'activate = 1' \
+            > "$tmp/openssl.cnf"; \
+        install -d -m 0755 /usr/share/ucm; \
+        OPENSSL_CONF="$tmp/openssl.cnf" python3 -I -c 'import sys; sys.path.insert(0, "/opt/ucm/backend"); \
+import fips_mode; fips_mode.write_build_capability(sys.argv[1])' /usr/share/ucm/fips-module.json; \
+        chmod 0644 /usr/share/ucm/fips-module.json; \
+        cat /usr/share/ucm/fips-module.json; \
+        rm -rf "$tmp"; \
+    fi
 # Only the built interface: the server serves frontend/dist, while frontend/
 # as a whole carries the sources and node_modules, several hundred megabytes
 # of build-time dependencies that have no place in a runtime image

@@ -3,8 +3,9 @@
 Every detector reads, none writes. Key types come from stored types and
 encodings (certificate SPKI, OpenSSH type names), never from loading a
 private key: an EdDSA key fails to load on a FIPS provider without EdDSA.
-EdDSA and ML-DSA count as approved only when the loaded module approves them
-(fips_mode.module_approves); outside FIPS mode no module answers, so they are listed.
+EdDSA and ML-DSA count as approved only when the module FIPS mode runs on approves
+them (fips_mode.switch_approves: before the switch, the -fips image's module as queried
+at build; elsewhere none, so they are listed).
 """
 from __future__ import annotations
 
@@ -56,7 +57,7 @@ def stored_label_approved(text) -> bool:
         return False
     alg = key_algorithms.get(text)
     if alg is not None:
-        return alg.fips_approved
+        return alg.fips_static or (alg.fips_by_module and fips_mode.switch_approves(alg.label))
     match = re.fullmatch(r'\s*RSA[\s:_-]*(\d+)\s*', str(text), re.IGNORECASE)
     return bool(match) and int(match.group(1)) >= 2048
 
@@ -66,11 +67,11 @@ def certificate_key(cert) -> Tuple[str, bool]:
     keys are told by their OID, unloaded."""
     oid = cert.public_key_algorithm_oid.dotted_string
     if oid in _EDDSA_OIDS:
-        return _EDDSA_OIDS[oid], fips_mode.module_approves(_EDDSA_OIDS[oid])
+        return _EDDSA_OIDS[oid], fips_mode.switch_approves(_EDDSA_OIDS[oid])
     post_quantum = key_algorithms.post_quantum_info(oid)
     if post_quantum is not None:
         # SLH-DSA stays unapproved: pyca cannot load it, whatever the module approves
-        approved = post_quantum.family == 'ML-DSA' and fips_mode.module_approves(post_quantum.label)
+        approved = post_quantum.family == 'ML-DSA' and fips_mode.switch_approves(post_quantum.label)
         return post_quantum.label, approved
     try:
         public_key = cert.public_key()
@@ -210,7 +211,7 @@ def _ssh_eddsa(key_type, public_key) -> Optional[str]:
         name = 'Ed25519' if str(key_type).lower() == 'ed25519' else 'Ed448'
     else:
         name = eddsa_key_name(public_key)
-    return None if name is None or fips_mode.module_approves(name) else name
+    return None if name is None or fips_mode.switch_approves(name) else name
 
 
 @detector('ssh_ca.eddsa_key', BLOCKER,
@@ -241,7 +242,7 @@ def _ssh_cert_key_refused(key_type) -> bool:
     text = str(key_type or '').lower()
     if not text.startswith('ed'):
         return False
-    return not fips_mode.module_approves('ED448' if '448' in text else 'ED25519')
+    return not fips_mode.switch_approves('ED448' if '448' in text else 'ED25519')
 
 
 @detector('deploy.ssh_eddsa_key', BLOCKER,
@@ -419,7 +420,7 @@ _HSM_EDDSA = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS')
 
 
 def _hsm_unapproved_words():
-    eddsa = () if fips_mode.module_approves('ED25519') and fips_mode.module_approves('ED448') else _HSM_EDDSA
+    eddsa = () if fips_mode.switch_approves('ED25519') and fips_mode.switch_approves('ED448') else _HSM_EDDSA
     return _HSM_UNAPPROVED + eddsa
 
 

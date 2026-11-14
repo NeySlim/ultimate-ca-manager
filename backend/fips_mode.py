@@ -132,6 +132,42 @@ def approved_module_signatures() -> tuple:
     return tuple(a for a in MODULE_DEPENDENT_SIGNATURES if module_approves(a))
 
 
+# The -fips image asks its module at build, under the configuration the switch writes,
+# and records the answer here: outside FIPS mode no module is loaded to ask
+BUILD_CAPABILITY_FILE = '/usr/share/ucm/fips-module.json'
+
+
+def write_build_capability(path: str) -> None:
+    """Record what the loaded FIPS module approves; RuntimeError when none is loaded."""
+    import json
+    info = provider_info()
+    if info is None:
+        raise RuntimeError('no FIPS provider is loaded: set OPENSSL_CONF to its configuration')
+    with open(path, 'w', encoding='utf-8') as handle:
+        json.dump({'provider': info, 'approved_signatures': list(approved_module_signatures())}, handle)
+
+
+def build_capability():
+    """Signatures the image's module approved at build (frozenset), None without a record."""
+    import json
+    try:
+        with open(BUILD_CAPABILITY_FILE, encoding='utf-8') as handle:
+            approved = json.load(handle)['approved_signatures']
+        return frozenset(str(a).upper() for a in approved)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def switch_approves(algorithm: str) -> bool:
+    """Whether FIPS mode allows *algorithm* once switched on: the loaded module in FIPS
+    mode, else the image's module as queried at build, else the loaded module (none: False)."""
+    if not enabled():
+        built = build_capability()
+        if built is not None:
+            return str(algorithm).upper() in built
+    return module_approves(algorithm)
+
+
 def refuse_short_hmac_key(key: bytes, what: str) -> None:
     """In FIPS mode, refuse an HMAC key the module would not take (under 14 bytes)."""
     if enabled() and len(key) < MIN_HMAC_KEY_BYTES:
