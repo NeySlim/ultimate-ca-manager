@@ -189,6 +189,14 @@ REASON=$(printf '%s\n' "$probe" | sed -n '2,4p' | tr '\n' ' ' | sed 's/ *$//')
 
 case $code in
     0|3) exit 0 ;;
+    6)
+        # A downgrade, not leftovers of an older release: nothing is archived
+        say "UCM: the database an earlier UCM left (${backend:-unknown}) was written by a release"
+        say "later than this one: $REASON"
+        say "Nothing was moved, and the service will refuse to start on it."
+        say "Reinstall the release that wrote this database, or move $CONFIG and $DATA aside"
+        say "and reinstall this package to start empty."
+        exit 0 ;;
     4) case $backend in
            "sqlite "/*) DB_FILE=${backend#sqlite } ;;
            *)

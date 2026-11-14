@@ -84,8 +84,9 @@ class Box:
             return
         else:
             line = first or f'sqlite {self.data}/ucm.db'
-            body = (f'echo "{line}"\necho "This database was last started by a release older '
-                    f'than 2.254."\nexit {code}')
+            reason = ('This database names 1 migration(s) this release does not know.' if code == 6
+                      else 'This database was last started by a release older than 2.254.')
+            body = f'echo "{line}"\necho "{reason}"\nexit {code}'
         exe.write_text(f'#!/bin/sh\n{body}\n')
         exe.chmod(0o755)
 
@@ -290,6 +291,23 @@ def test_a_database_it_cannot_archive_is_left_and_named(tmp_path, python, code, 
     assert says in out.stdout and '2.254' in out.stdout
     assert snapshot(box) == before
     assert not box.parent.exists()
+
+
+@pytest.mark.parametrize('python', ['real', 'stub'])
+def test_a_database_a_later_release_wrote_is_left_and_never_called_older(tmp_path, python):
+    """A registry naming migrations this release lacks is a downgrade: nothing moves, and the
+    output sends back to the release that wrote it, never to 2.254."""
+    box = Box(tmp_path, registry=None)
+    _database(box.data / 'ucm.db', _pivot_registry() + ['300_upgrade_from_2_254', '999_later'])
+    if python == 'stub':
+        box.python('stub', code=6)
+    before = snapshot(box)
+    out = box.run()
+    assert out.returncode == 0, out.stderr
+    assert snapshot(box) == before
+    assert not box.parent.exists()
+    assert 'release that wrote' in out.stdout
+    assert '2.254' not in out.stdout
 
 
 # -- idempotent ----------------------------------------------------------------------

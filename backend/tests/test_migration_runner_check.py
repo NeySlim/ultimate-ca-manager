@@ -1,6 +1,7 @@
 """`migration_runner.py check`: the package scripts ask the 3.0 runner whether it starts on a database.
 
-One exit code per answer (startable, fresh, refused by the pivot, unreadable), the backend on
+One exit code per answer (startable, fresh, refused by the pivot, unreadable, naming
+migrations this release does not know), the backend on
 the first line of stdout, and nothing written: the probe runs as root over another release's data.
 """
 import hashlib
@@ -19,7 +20,7 @@ BACKEND = pathlib.Path(__file__).resolve().parent.parent
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 _needs_pg = pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
 
-STARTABLE, FRESH, REFUSED, UNREADABLE = 0, 3, 4, 5
+STARTABLE, FRESH, REFUSED, UNREADABLE, UNKNOWN = 0, 3, 4, 5, 6
 
 
 def _check(url=None, path=None):
@@ -62,6 +63,7 @@ def _registry(kind):
         '3.0': names + ['300_upgrade_from_2_254'],
         'short': [n for n in names if n != '001_fix_dn_format'],
         'later': names + ['300_upgrade_from_2_254', '999_from_the_future'],
+        'short-and-later': [n for n in names if n != '001_fix_dn_format'] + ['999_from_the_future'],
     }[kind]
 
 
@@ -91,14 +93,22 @@ class TestSQLite:
         assert _check(path=db)[0] == STARTABLE
 
     @pytest.mark.parametrize('kind, reason', [
-        ('short', '001_fix_dn_format'), (None, 'it has no migration registry'),
-        ('later', '999_from_the_future')])
+        ('short', '001_fix_dn_format'), (None, 'it has no migration registry')])
     def test_what_the_pivot_refuses_is_refused_with_its_reason(self, tmp_path, kind, reason):
         db = tmp_path / 'ucm.db'
         _sqlite(db, _registry(kind) if kind else None)
         code, lines = _check(path=db)
         assert code == REFUSED
         assert reason in ' '.join(lines[1:])
+
+    @pytest.mark.parametrize('kind', ['later', 'short-and-later'])
+    def test_a_registry_naming_unknown_migrations_has_its_own_code(self, tmp_path, kind):
+        """A later release (or a hand edit) wrote it: never answered as older than 2.254."""
+        db = tmp_path / 'ucm.db'
+        _sqlite(db, _registry(kind))
+        code, lines = _check(path=db)
+        assert (code, lines[0]) == (UNKNOWN, f'sqlite {db}')
+        assert '999_from_the_future' in ' '.join(lines[1:])
 
     def test_a_file_that_is_not_a_database_is_unreadable(self, tmp_path):
         db = tmp_path / 'ucm.db'
@@ -190,6 +200,13 @@ class TestPostgreSQL:
         code, lines = _check(url=pg_url)
         assert (code, lines[0]) == (REFUSED, 'postgresql')
         assert reason in ' '.join(lines[1:])
+
+    @pytest.mark.parametrize('kind', ['later', 'short-and-later'])
+    def test_a_registry_naming_unknown_migrations_has_its_own_code(self, pg_url, kind):
+        _pg(pg_url, _registry(kind))
+        code, lines = _check(url=pg_url)
+        assert (code, lines[0]) == (UNKNOWN, 'postgresql')
+        assert '999_from_the_future' in ' '.join(lines[1:])
 
     def test_the_password_never_reaches_the_output(self, pg_url):
         _pg(pg_url, None)

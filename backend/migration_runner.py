@@ -129,13 +129,19 @@ UPGRADE_MIGRATION = "300_upgrade_from_2_254"
 PIVOT_VERSION = "2.254"
 
 
+def unknown_migrations(applied):
+    """Registry names neither 2.254 (2.254.N adds none) nor this release knows: a later release
+    or a hand edit wrote them."""
+    from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
+    return sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+
+
 def pivot_refusal(state, applied):
     """None when this database may be migrated, else the message that refuses it."""
-    from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
+    from migrations._from_2_254 import PIVOT_NAMES
     if state == "fresh":
         return None
-    # A name neither 2.254 (2.254.N adds none) nor this release knows: a later release or a hand edit
-    unknown = sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+    unknown = unknown_migrations(applied)
     if unknown:
         return (f"This database names {len(unknown)} migration(s) this release does not know, first "
                 f"{', '.join(unknown[:3])}: a later release started it, or its registry was edited. "
@@ -503,8 +509,9 @@ def show_status():
         engine.dispose()
 
 
-# Exit codes of `check`; any other code (a crash) means the answer is unknown
-CHECK_STARTABLE, CHECK_FRESH, CHECK_REFUSED, CHECK_UNREADABLE = 0, 3, 4, 5
+# Exit codes of `check`; any other code (a crash) means the answer is unknown. REFUSED is a
+# database older than 2.254, UNKNOWN one whose registry names migrations this release lacks.
+CHECK_STARTABLE, CHECK_FRESH, CHECK_REFUSED, CHECK_UNREADABLE, CHECK_UNKNOWN = 0, 3, 4, 5, 6
 
 
 @contextmanager
@@ -540,8 +547,10 @@ def _probe_engine(db_url: str):
 def check_database() -> int:
     """For the package scripts: whether this release starts on the configured database.
 
-    Prints the backend first ("sqlite <path>" or "postgresql"), then the reason of a
-    refusal or of an unreadable database, and returns one of the CHECK_* codes.
+    Prints the backend first ("sqlite <path>", "postgresql", or "other" for any other URL),
+    then the reason of a refusal or of an unreadable database, and returns one of the
+    CHECK_* codes: a missing or empty SQLite file is fresh, a registry naming unknown
+    migrations is UNKNOWN even when 2.254 migrations are missing too.
     """
     db_url = _get_db_url()
     sqlite_path = db_url[len("sqlite:///"):] if db_url.startswith("sqlite:///") else None
@@ -564,7 +573,7 @@ def check_database() -> int:
     refusal = pivot_refusal(state, applied)
     if refusal:
         say(refusal)
-        return CHECK_REFUSED
+        return CHECK_UNKNOWN if unknown_migrations(applied) else CHECK_REFUSED
     return CHECK_FRESH if state == "fresh" else CHECK_STARTABLE
 
 
