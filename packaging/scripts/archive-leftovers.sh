@@ -277,7 +277,7 @@ Contents
 $DB_LINE
 This directory holds private keys and the key that decrypts the database: keep it
 readable by root only. Nothing here is used or removed by UCM. What was copied from
-another filesystem was checked for its contents, mode, owner, group and dates; its
+another filesystem was checked: contents, mode, owner, group, and the dates of files;
 extended attributes and ACLs were copied where this filesystem keeps them, unchecked.
 
 To put that installation back in service
