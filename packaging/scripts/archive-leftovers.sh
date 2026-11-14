@@ -187,6 +187,13 @@ unsettled() {
     fi
 }
 
+# $1 holds a path already named in $stuck: it stays, and is not named itself
+holds_stuck() {
+    case $stuck in *"
+  $1/"*) left=1; return 0 ;; esac
+    return 1
+}
+
 # The paths not put back or cleared, then what the next attempt does with them
 say_stuck() {
     say "Some files could not be put back or cleared (archive: $DEST):"
@@ -283,7 +290,9 @@ roll_back() {
                 drop_line "fips$TAB$src$TAB$dst" \
                     || { unsettled "$JOURNAL" "could not be updated once $src was removed, so nothing it lists was put back"; break; } ;;
             mkdir)
-                if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || unsettled "$dst" "could not be removed"; fi ;;
+                # Not named when it holds a path named already: removing it would lose that one
+                if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || holds_stuck "$dst" \
+                    || unsettled "$dst" "could not be removed"; fi ;;
         esac
     done <<EOF
 $undo

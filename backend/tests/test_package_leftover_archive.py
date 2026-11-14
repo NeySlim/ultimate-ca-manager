@@ -656,6 +656,8 @@ def test_a_source_made_again_after_its_rename_is_never_removed_nor_its_archive(t
         assert reported(out.stdout)[f'{box.archive}/data/{name}'] == (
             f'not put back to {box.data}/{name}, which exists again: keep one of the two, '
             'remove the other, then retry')
+        # The archive directories holding it are not named: removing them loses the copy
+        assert named(out.stdout) == [f'{box.archive}/data/{name}'], out.stdout
         assert 'wait for your choice' in out.stdout or 'retrying alone will not' in out.stdout
         if made_again == 'a file':
             assert (box.data / name).read_bytes() == b'made again'
@@ -1012,6 +1014,7 @@ def test_a_copy_whose_source_went_or_changed_since_is_never_removed(tmp_path, ki
         assert out.returncode == 2, (out.stdout, out.stderr)
         text = (BOTH if then == 'changed' else ONLY).format(src=src)
         assert reported(out.stdout)[str(dst)] == text, out.stdout
+        assert named(out.stdout) == [str(dst)], out.stdout
         assert _shape(dst) == original
         if then == 'changed':
             assert _shape(src) == left
@@ -1054,6 +1057,7 @@ def test_a_source_made_again_after_it_was_removed_is_never_overwritten(tmp_path,
         out = box.run()
         assert out.returncode == 2, (out.stdout, out.stderr)
         assert reported(out.stdout)[str(dst)] == BOTH.format(src=src), out.stdout
+        assert named(out.stdout) == [str(dst)], out.stdout
         assert _shape(src) == again and _shape(dst) == original
 
     _gone(src)
