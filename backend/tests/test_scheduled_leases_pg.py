@@ -6,6 +6,7 @@ dies holding it frees it once the lease is over. Outside HA nothing is reserved.
 """
 import base64
 import os
+import threading
 import uuid
 from datetime import datetime, timedelta
 
@@ -134,10 +135,26 @@ def _record_sends(monkeypatch):
     return sent
 
 
-def _record_webhook_passes(monkeypatch):
+def _record_webhook_passes(monkeypatch, during=lambda: None):
     passes = []
-    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks', lambda **_: passes.append(1) or True)
+    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks',
+                        lambda **_: (passes.append(1), during()) and True)
     return passes
+
+
+def _until_the_other_is_refused(monkeypatch, key):
+    """What the holder of *key* waits on so that the two runs overlap: the other node's
+    take() refused. Without it a short run ends before the other starts, and both run."""
+    refused = threading.Event()
+    take = config_cas.ConfigLease.take
+
+    def watched(lease):
+        held = take(lease)
+        if not held and lease.key == key:
+            refused.set()
+        return held
+    monkeypatch.setattr(config_cas.ConfigLease, 'take', watched)
+    return lambda: refused.wait(10)
 
 
 def test_expiry_checks_held_by_a_live_node_send_nothing(
@@ -307,7 +324,8 @@ def test_a_certificate_expired_during_a_long_pause_is_announced_once(
 
 @pytest.mark.parametrize('_backend', [pytest.param('pg', marks=_on_pg)])
 def test_two_nodes_checking_expiry_at_once_emit_once_on_postgresql(app, ha, monkeypatch, _backend):
-    passes = _record_webhook_passes(monkeypatch)
+    passes = _record_webhook_passes(
+        monkeypatch, _until_the_other_is_refused(monkeypatch, notification_scheduler.EXPIRY_LEASE_KEY))
     with _pg(app):
         _twice_at_once(app, NotificationService.run_scheduled_checks, config_cas, '_held_value')
         with app.app_context():
@@ -335,10 +353,10 @@ def _drop_ca(app, ca_id):
         db.session.remove()
 
 
-def _record_regenerations(monkeypatch):
+def _record_regenerations(monkeypatch, during=lambda ca_id: None):
     regenerated = []
-    monkeypatch.setattr(CRLSchedulerTask, 'regenerate_crl',
-                        staticmethod(lambda ca_id, username='scheduler': regenerated.append(ca_id) or True))
+    monkeypatch.setattr(CRLSchedulerTask, 'regenerate_crl', staticmethod(
+        lambda ca_id, username='scheduler': (regenerated.append(ca_id), during(ca_id)) and True))
     return regenerated
 
 
@@ -423,9 +441,10 @@ def test_a_delta_crl_another_node_is_generating_is_left_to_it(app, ha, monkeypat
 
 @pytest.mark.parametrize('_backend', [pytest.param('pg', marks=_on_pg)])
 def test_two_nodes_publishing_a_crl_at_once_publish_once_on_postgresql(app, ha, monkeypatch, _backend):
-    regenerated = _record_regenerations(monkeypatch)
     with _pg(app):
         ca_id = _a_ca_due(app)
+        overlap = _until_the_other_is_refused(monkeypatch, f'crl_schedule_lease_{ca_id}')
+        regenerated = _record_regenerations(monkeypatch, lambda cid: cid == ca_id and overlap())
         _twice_at_once(app, CRLSchedulerTask.execute, config_cas, '_held_value')
     assert regenerated.count(ca_id) == 1
 
