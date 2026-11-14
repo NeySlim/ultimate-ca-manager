@@ -465,12 +465,39 @@ def _short_tsig_secret(text) -> bool:
     return 0 < len(secret) < fips_mode.MIN_HMAC_KEY_BYTES
 
 
+def _short(key: bytes) -> bool:
+    return 0 < len(key) < fips_mode.MIN_HMAC_KEY_BYTES
+
+
+@detector('session.short_secret_key', BLOCKER,
+          'The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be '
+          'issued or checked with it, so every sign-in fails',
+          'Set a SECRET_KEY of 32 characters or more in the service environment and restart; '
+          'existing sessions end.')
+def _short_session_key():
+    from security import session_key
+    key = session_key.signing_key(current_app)
+    if key is None:
+        return []  # not readable here: not listed
+    return [f'{len(key.encode())} bytes'] if len(key.encode()) < fips_mode.MIN_HMAC_KEY_BYTES else []
+
+
+# DNS providers that sign their API calls with an HMAC of a secret the operator entered
+_HMAC_DNS_PROVIDERS = ('constellix', 'dnsmadeeasy', 'inwx', 'tencentcloud')
+
+
 @detector('hmac.short_secret', WARNING,
-          'Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve '
-          'HMAC keys this short, and FIPS mode refuses to save them',
+          'HMAC secrets under 14 bytes (webhook secrets, RFC 2136 TSIG keys, Constellix, DNS Made '
+          'Easy, INWX and Tencent Cloud secrets, external EAB keys of ACME accounts): the FIPS module '
+          'does not approve them; FIPS mode refuses to save a webhook secret or TSIG key this short, '
+          'and every one of them but a TSIG key fails when used',
           'Regenerate the webhook secrets and create TSIG keys of at least 14 bytes '
-          '(hmac-sha256 keys of 32 bytes are the usual size), then update the receivers and DNS servers.')
+          '(hmac-sha256 keys of 32 bytes are the usual size), ask the DNS provider or the ACME CA '
+          'for a secret or EAB key of 14 bytes or more, then update the receivers, DNS servers, '
+          'providers and accounts.')
 def _short_hmac_secrets():
+    from models.acme_client_account import AcmeClientAccount
+    from services.acme.dns_providers import get_provider_class
     from services.webhook_service import WebhookEndpoint
     from utils.encryption import decrypt_if_needed
     found = []
@@ -488,6 +515,26 @@ def _short_hmac_secrets():
             continue
         if isinstance(credentials, dict) and _short_tsig_secret(credentials.get('tsig_key_secret')):
             found.append(_named(provider.name, provider.id, 'TSIG key'))
+    # A secret that does not decrypt is not read as JSON, so it is not listed
+    for provider in DnsProvider.query.filter(DnsProvider.provider_type.in_(_HMAC_DNS_PROVIDERS)) \
+            .order_by(DnsProvider.id).all():
+        provider_class = get_provider_class(provider.provider_type)
+        try:
+            credentials = json.loads(provider.credentials or '{}')
+        except (TypeError, ValueError):
+            continue
+        if isinstance(credentials, dict) and provider_class is not None and \
+                _short(provider_class.hmac_key(credentials)):
+            found.append(_named(provider.name, provider.id, provider_class.HMAC_SECRET_NAME))
+    for account in AcmeClientAccount.query.filter(AcmeClientAccount._eab_hmac_key.isnot(None)) \
+            .order_by(AcmeClientAccount.id).all():
+        try:
+            text = account.eab_hmac_key or ''
+            key = base64.urlsafe_b64decode(text + '=' * (-len(text) % 4))
+        except Exception:
+            continue
+        if _short(key):
+            found.append(_named(account.label, account.id, 'EAB HMAC key'))
     return found
 
 

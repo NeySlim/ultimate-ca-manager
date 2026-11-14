@@ -158,6 +158,19 @@ def load_keys(app, at_start=False) -> str:
     return source
 
 
+def signing_key(app):
+    """The key that signs once loaded: the stored active key, else the environment's; None
+    when this process cannot tell (a stored key it cannot open, no SECRET_KEY). Reads only."""
+    env = (app.extensions.get(_STATE) or {}).get('env', app.config.get('SECRET_KEY'))
+    try:
+        stored = _read_rows().get(ACTIVE_KEY)
+    except Exception:
+        return None
+    if stored:
+        return _open(stored, 'session key')
+    return env if env and env != 'INSTALL_TIME_PLACEHOLDER' else None
+
+
 def reload_pending(app) -> bool:
     return 'retry' in (app.extensions.get(_STATE) or {})
 

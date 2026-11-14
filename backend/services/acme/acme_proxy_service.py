@@ -2446,6 +2446,8 @@ class AcmeProxyService:
         # Decode HMAC key (base64url-encoded)
         hmac_key_padded = hmac_key_b64 + '=' * (4 - len(hmac_key_b64) % 4)
         hmac_key = base64.urlsafe_b64decode(hmac_key_padded)
+        import fips_mode
+        fips_mode.refuse_short_hmac_key(hmac_key, 'EAB HMAC key of the upstream account')
 
         # Protected header for EAB
         protected = {

@@ -12,6 +12,7 @@ import logging
 from typing import Tuple, Dict, Any, Optional
 
 import requests
+import fips_mode
 from .base import BaseDnsProvider
 
 logger = logging.getLogger(__name__)
@@ -68,12 +69,18 @@ class TencentCloudDnsProvider(BaseDnsProvider):
 
     # ─── Signature ───────────────────────────────────
 
+    HMAC_SECRET_NAME = 'Tencent Cloud secret key (with its TC3 prefix)'
+
+    @classmethod
+    def hmac_key(cls, credentials) -> bytes:
+        # The derived keys are 32 bytes: only the first, "TC3" + the secret, can be short
+        return ("TC3" + str(credentials.get('secret_key') or '')).encode("utf-8")
+
     def _sign(self, key: bytes, msg: str) -> bytes:
         return hmac.digest(key, msg.encode("utf-8"), "sha256")
 
     def _make_headers(self, action: str, payload: str) -> dict:
         secret_id = self.credentials["secret_id"]
-        secret_key = self.credentials["secret_key"]
         timestamp = int(time.time())
         date = datetime.datetime.fromtimestamp(timestamp, datetime.UTC).strftime("%Y-%m-%d")
 
@@ -90,7 +97,9 @@ class TencentCloudDnsProvider(BaseDnsProvider):
         hashed_request = hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()
         string_to_sign = "\n".join([algorithm, str(timestamp), credential_scope, hashed_request])
 
-        secret_date = self._sign(("TC3" + secret_key).encode("utf-8"), date)
+        first_key = self.hmac_key(self.credentials)
+        fips_mode.refuse_short_hmac_key(first_key, self.HMAC_SECRET_NAME)
+        secret_date = self._sign(first_key, date)
         secret_service = self._sign(secret_date, self.SERVICE)
         secret_signing = self._sign(secret_service, "tc3_request")
         signature = hmac.digest(secret_signing, string_to_sign.encode("utf-8"), "sha256").hex()

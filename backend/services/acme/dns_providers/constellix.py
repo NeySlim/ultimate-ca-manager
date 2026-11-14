@@ -10,6 +10,7 @@ import time
 from typing import Tuple, Dict, Any, List, Optional
 import logging
 
+import fips_mode
 from .base import BaseDnsProvider
 
 logger = logging.getLogger(__name__)
@@ -25,9 +26,17 @@ class ConstellixDnsProvider(BaseDnsProvider):
     MAX_PAGES = 50
     CREATE_VISIBLE_TRIES = 3
 
+    HMAC_SECRET_NAME = 'Constellix secret key'
+
+    @classmethod
+    def hmac_key(cls, credentials) -> bytes:
+        return str(credentials.get('secret_key') or '').encode()
+
     def _get_headers(self) -> Dict[str, str]:
         timestamp = str(int(time.time() * 1000))
-        hmac_hash = hmac.digest(self.credentials['secret_key'].encode(), timestamp.encode(), 'sha1')
+        secret = self.hmac_key(self.credentials)
+        fips_mode.refuse_short_hmac_key(secret, self.HMAC_SECRET_NAME)
+        hmac_hash = hmac.digest(secret, timestamp.encode(), 'sha1')
         token = base64.b64encode(hmac_hash).decode()
         return {
             'Authorization': f'Bearer {self.credentials["api_key"]}:{token}:{timestamp}',

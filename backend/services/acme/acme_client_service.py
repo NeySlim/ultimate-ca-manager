@@ -1126,6 +1126,7 @@ class AcmeClientService:
         # Add padding if needed
         padded = eab_hmac_key + '=' * (4 - len(eab_hmac_key) % 4)
         hmac_key_bytes = base64.urlsafe_b64decode(padded)
+        fips_mode.refuse_short_hmac_key(hmac_key_bytes, 'EAB HMAC key of this ACME account')
         
         # Sign with HMAC-SHA256
         signing_input = f"{protected_b64}.{payload_b64}".encode()

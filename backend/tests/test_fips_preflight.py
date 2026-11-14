@@ -455,6 +455,58 @@ def test_dns_tsig_hmac_md5(session):
     _assert_found('dns.tsig_hmac_md5', 1, 'md5-dns')
 
 
+def test_short_dns_provider_secrets_and_eab_keys(session):
+    """Secrets readable as stored: a provider or account whose secret does not decrypt is not
+    listed; the TSIG and webhook cases are covered with the save-time refusal."""
+    from models.acme_client_account import AcmeClientAccount
+    short_totp = base64.b32encode(b'\x01' * 10).decode()  # 80 bits
+    for name, kind, credentials in (
+            ('short-constellix', 'constellix', {'api_key': 'a', 'secret_key': 'short'}),
+            ('long-constellix', 'constellix', {'api_key': 'a', 'secret_key': 's' * 14}),
+            ('short-dme', 'dnsmadeeasy', {'api_key': 'a', 'secret_key': 'short'}),
+            ('short-tencent', 'tencentcloud', {'secret_id': 'i', 'secret_key': 's' * 10}),
+            ('long-tencent', 'tencentcloud', {'secret_id': 'i', 'secret_key': 's' * 11}),
+            ('short-inwx', 'inwx', {'username': 'u', 'password': 'p', 'shared_secret': short_totp}),
+            ('plain-inwx', 'inwx', {'username': 'u', 'password': 'p'})):
+        provider = DnsProvider(name=name, provider_type=kind)
+        provider.credentials = json.dumps(credentials)
+        session.add(provider)
+    for label, key in (('short-eab', b'e' * 10), ('long-eab', b'e' * 14)):
+        session.add(AcmeClientAccount(
+            directory_url=f'https://{label}.example/directory', label=label, email='a@example.test',
+            eab_kid='kid',
+            eab_hmac_key=base64.urlsafe_b64encode(key).rstrip(b'=').decode()))
+    session.flush()
+    finding = _assert_found('hmac.short_secret', 5, 'short-constellix', 'short-dme',
+                            'short-tencent', 'short-inwx', 'short-eab')
+    assert not any(e.startswith(('long-', 'plain-')) for e in finding['examples']), finding['examples']
+
+
+@pytest.mark.parametrize('env, stored, flagged', [
+    ('short-key', None, True), ('short-key', 's' * 32, False), ('k' * 32, None, False),
+    # Not readable here: a stored key this process cannot open, no SECRET_KEY at all
+    ('short-key', 'unopenable', False), (None, None, False)])
+def test_session_secret_key_under_14_bytes(session, app, monkeypatch, env, stored, flagged):
+    """The key that signs: the stored one, else the environment's."""
+    from security import encryption, session_key
+    monkeypatch.setitem(app.config, 'SECRET_KEY', env)
+    monkeypatch.setitem(app.extensions, 'ucm_session_key', {'env': env})
+    if stored:
+        monkeypatch.setattr(encryption.key_encryption, 'is_encrypted', lambda value: True)
+
+        def decrypt(value, kind):
+            if stored == 'unopenable':
+                raise ValueError('another key')
+            return stored
+        monkeypatch.setattr(encryption, 'decrypt_master_key_value', decrypt)
+        _config(session_key.ACTIVE_KEY, 'sealed')
+    finding = _finding(fips_preflight.run(), 'session.short_secret_key')
+    if flagged:
+        assert finding['severity'] == 'blocker' and finding['examples'] == ['9 bytes'], finding
+    else:
+        assert finding is None, finding
+
+
 def test_msca_winrm_ntlm(session):
     for name, transport, enabled in (('ntlm-ca', 'ntlm', True), ('krb-ca', 'kerberos', True),
                                      ('off-ca', 'ntlm', False)):

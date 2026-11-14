@@ -2799,10 +2799,10 @@ GET /api/v2/system/fips-preflight
 
 Check ids: `users.password_scrypt`, `protocols.secret_scrypt`, `ca.eddsa_key`, `ca.weak_key`,
 `ca.unapproved_algorithm`, `ssh_ca.eddsa_key`, `deploy.ssh_eddsa_key`, `tsa.signer_unapproved_key`, `dns.tsig_hmac_md5`,
-`msca.winrm_ntlm`, `database.postgres_without_tls`, `https.unapproved_key` (blockers);
+`session.short_secret_key`, `msca.winrm_ntlm`, `database.postgres_without_tls`, `https.unapproved_key` (blockers);
 `users.backup_codes_scrypt`, `ocsp.responder_unapproved_key`, `templates.unapproved_key_type`,
 `policies.unapproved_key_type`, `acme_client.unapproved_key_type`, `hsm.softhsm`, `hsm.gcp_grpc`,
-`hsm.unapproved_keys`, `backup.schedule_argon2id`, `backup.archives_argon2id` (warnings);
+`hsm.unapproved_keys`, `hmac.short_secret`, `backup.schedule_argon2id`, `backup.archives_argon2id` (warnings);
 `certificates.unapproved_key`, `ssh_certificates.eddsa_key` (information).
 
 

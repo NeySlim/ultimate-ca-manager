@@ -10,6 +10,7 @@ import time
 import hmac
 import base64
 
+import fips_mode
 from .base import BaseDnsProvider
 
 logger = logging.getLogger(__name__)
@@ -100,20 +101,27 @@ class InwxDnsProvider(BaseDnsProvider):
         
         return True, "Logged in"
     
+    HMAC_SECRET_NAME = 'INWX shared secret'
+
+    @classmethod
+    def hmac_key(cls, credentials) -> bytes:
+        """The TOTP key: the shared secret in base32, padded to a multiple of 8 characters."""
+        secret = str(credentials.get('shared_secret') or '')
+        try:
+            return base64.b32decode(secret.upper() + '=' * (-len(secret) % 8))
+        except Exception:
+            return secret.encode()
+
     def _generate_totp(self, secret: str) -> str:
         """Generate TOTP code from shared secret"""
-        # Base32 decode the secret, padded to a multiple of 8 characters (none when it is one)
-        import base64
-        try:
-            key = base64.b32decode(secret.upper() + '=' * (-len(secret) % 8))
-        except Exception:
-            key = secret.encode()
+        key = self.hmac_key({'shared_secret': secret})
         
         # Time-based counter
         counter = int(time.time() // 30)
         counter_bytes = counter.to_bytes(8, 'big')
         
         # HMAC-SHA1
+        fips_mode.refuse_short_hmac_key(key, self.HMAC_SECRET_NAME)
         hmac_result = hmac.digest(key, counter_bytes, 'sha1')
         
         # Dynamic truncation
