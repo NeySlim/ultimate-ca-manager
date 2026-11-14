@@ -168,7 +168,7 @@ def signing_key(app):
         return None
     if stored:
         return _open(stored, 'session key')
-    return env if env and env != 'INSTALL_TIME_PLACEHOLDER' else None
+    return env or None
 
 
 def reload_pending(app) -> bool:
