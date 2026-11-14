@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 @contextmanager
 def single_transaction():
     """Run a block where every commit is a flush, and commit once at the end."""
-    session = db.session
+    # This scope's Session, not the scoped proxy: another thread's commits stay commits
+    session = db.session()
     real_commit = session.commit
     real_rollback = session.rollback
 
