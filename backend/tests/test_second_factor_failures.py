@@ -249,14 +249,16 @@ def test_a_malformed_code_is_not_an_attempt(nodes):
     assert ('2fa', str(user['id'])) not in _rows(a)
 
 
-def test_the_configured_threshold_applies(nodes):
+@pytest.mark.parametrize('stored, applied', [('4', 4), ('0', 3), ('-2', 3)])
+def test_the_configured_threshold_applies(nodes, stored, applied):
+    """A stored value under the settings screen's minimum (3) reads as that minimum."""
     a, b, user = nodes
     with a.app_context():
-        db.session.add(SystemConfig(key='max_login_attempts', value='2'))
+        db.session.add(SystemConfig(key='max_login_attempts', value=stored))
         db.session.commit()
         db.session.remove()
-    assert _code(_webauthn(a, user['username'])) == 401
-    assert _code(_webauthn(b, user['username'])) == 401
+    for n in range(applied):
+        assert _code(_webauthn(a if n % 2 else b, user['username'])) == 401
     assert _webauthn(a, user['username']) == LOCKED
 
 
