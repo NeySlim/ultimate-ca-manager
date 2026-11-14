@@ -176,7 +176,6 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 
 - [ ] **High Availability / Clustering**: Active-passive or active-active HA deployment
 - [ ] **Post-Quantum Cryptography, next steps**: SLH-DSA issuance (FIPS 205) and ML-KEM (FIPS 203)
-- [ ] **CMP Protocol (RFC 4210)**: Certificate Management Protocol support
 - [ ] **Central management console**: a separate console that registers, monitors and administers several UCM instances (Docker or DEB/RPM), their database settings included, while each instance keeps its own keys and data
 - [x] **HTTP deploy targets, LDAP StartTLS and SAML Single Logout**: a deploy target can be an HTTP API with encrypted headers and a templated body, for firewalls and appliances without SSH; LDAP providers switch to TLS with StartTLS before binding; the SAML Single Logout endpoint ends the UCM session on an IdP-initiated LogoutRequest; EST `serverkeygen` delivers the key to EC clients by ECDH key agreement; SCEP can also answer on plain HTTP for clients that cannot use TLS *(v2.252)*
 - [x] **EdDSA CAs and custom X.509 extensions**: Ed25519 and Ed448 CA keys; custom X.509 extensions, each an OID, a critical flag and a value, on templates and the issue form *(v2.250)*
