@@ -196,7 +196,7 @@ def _step_copy(run: _Bootstrap) -> None:
 
 def _step_sequences(run: _Bootstrap) -> None:
     if run.is_pg:
-        _reset_pg_sequences(run.target)
+        _reset_pg_sequences(run.target, raise_only=True)
 
 
 def _step_high_water(run: _Bootstrap) -> None:
@@ -205,6 +205,14 @@ def _step_high_water(run: _Bootstrap) -> None:
 
 # Each step is idempotent: a switch cut short anywhere is resumed by the next one on the target
 _BOOTSTRAP_STEPS = (_step_registry, _step_schema, _step_copy, _step_sequences, _step_high_water)
+# Replayed on a target that already holds accounts: they only ever raise a counter
+_RESUME_STEPS = (_step_sequences, _step_high_water)
+
+
+def _source_high_water() -> Dict[str, int]:
+    from models import db as _db
+    with _db.engine.connect() as conn:
+        return read_id_high_water(conn, _db.engine.dialect.name == 'postgresql')
 
 
 def _bootstrap_plan(source_engine, target_engine) -> List[TablePlan]:
@@ -413,7 +421,8 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
 
     Safe to call against an empty target. If the target already has any users,
     bootstrap is skipped (we assume the operator manages that DB themselves),
-    once its registry shows that this release will start on it.
+    once its registry shows that this release will start on it; its counters
+    are still moved up to the source's, never down.
 
     Every table goes over in **one** transaction. It used to be one
     transaction per table, with each failure appended to a ``skipped`` list
@@ -444,6 +453,11 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         if refusal:
             raise PreflightError(refusal)
         if has_users:
+            # A copy committed by an attempt cut short before its counters: they are moved up now
+            run = _Bootstrap(target_engine, target_is_pg)
+            run.high_water = _source_high_water()
+            for step in _RESUME_STEPS:
+                step(run)
             return True, "Target already has users; bootstrap skipped.", stats
 
         # From here on the target carries a schema, which changes what the

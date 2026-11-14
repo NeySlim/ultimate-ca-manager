@@ -973,19 +973,55 @@ class TestASwitchNeverNamesATargetTheStartRefuses:
         assert _starts(url, monkeypatch) is True
 
 
+def _source_highest_ids(app):
+    """{copied table: its highest id on the source}, for the tables that hold rows."""
+    with app.app_context():
+        with db.engine.connect() as conn:
+            insp = inspect(conn)
+            highest = {}
+            for table in migration.BOOTSTRAP_AUTH_TABLES:
+                if 'id' in {c['name'] for c in insp.get_columns(table)}:
+                    top = conn.execute(text(f'SELECT MAX(id) FROM "{table}"')).scalar()
+                    if top is not None:
+                        highest[table] = top
+    assert set(highest) - {'users'}, 'no copied table but users holds a row'
+    return highest
+
+
+def _assert_new_ids_above(url, highest, gone):
+    """A new account takes an id above every one the source handed out, and on PostgreSQL
+    every copied table's next id is above the source's highest."""
+    assert _next_user_id(url) > max(gone, highest['users'])
+    if not url.startswith('postgresql'):
+        return
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            for table, top in highest.items():
+                nxt = conn.execute(text("SELECT nextval(pg_get_serial_sequence(:t, 'id'))"),
+                                   {'t': table}).scalar()
+                assert nxt > top, f'{table}: next id {nxt}, source reached {top}'
+    finally:
+        engine.dispose()
+
+
 class TestASwitchCutShortCanBeResumed:
     """The registry goes in before the accounts: a switch cut short anywhere leaves a
     target the next attempt takes over, never accounts the start refuses."""
 
     @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
-    def test_cut_after_the_copy(self, request, backend, app, monkeypatch):
+    def test_cut_after_the_copy(self, request, backend, app, auth_client, create_user,
+                                monkeypatch):
         url = request.getfixturevalue(f'{backend}_target')
+        gone = _deleted_last_user(app, auth_client, create_user)
+        highest = _source_highest_ids(app)
 
         def cut(*args, **kwargs):
             raise RuntimeError('the service stopped here')
 
         with app.app_context():
             with monkeypatch.context() as patch:
+                patch.setattr(migration, '_reset_pg_sequences', cut)
                 patch.setattr(migration, 'carry_id_high_water', cut)
                 ok, _, _ = migration.bootstrap_auth_to_target(url)
             assert ok is False
@@ -993,6 +1029,7 @@ class TestASwitchCutShortCanBeResumed:
             ok, message, _ = migration.bootstrap_auth_to_target(url)
         assert ok is True, message
         assert _starts(url, monkeypatch) is True
+        _assert_new_ids_above(url, highest, gone)
 
     @pytest.mark.parametrize('backend', ['sqlite', pytest.param('pg', marks=_needs_pg)])
     def test_cut_while_the_registry_is_recorded(self, request, backend, app, monkeypatch):
@@ -1027,6 +1064,22 @@ class TestASwitchCutShortCanBeResumed:
         assert ok is True, message
         assert stats['tables']['users'] > 0
         assert _starts(url, monkeypatch) is True
+
+
+    @_needs_pg
+    def test_a_target_in_use_keeps_counters_above_its_data(self, app, pg_target, monkeypatch):
+        """The replay on a target that already holds accounts never moves a counter down."""
+        _provision(pg_target, _the_3_0_registry())
+        engine = create_engine(pg_target)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("SELECT setval(pg_get_serial_sequence('users', 'id'), 1000)"))
+        finally:
+            engine.dispose()
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(pg_target)
+        assert ok is True and 'skipped' in message, message
+        assert _next_user_id(pg_target) > 1000
 
 
 class TestARevertNeverNamesAFileTheStartRefuses:
