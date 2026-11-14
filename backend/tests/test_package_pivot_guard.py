@@ -384,11 +384,41 @@ def test_the_deb_postinst_never_archives_on_an_upgrade_or_a_reconfigure(tmp_path
     assert 'systemctl start ucm' in calls
 
 
-def test_the_deb_postinst_does_not_start_ucm_when_archiving_failed(tmp_path):
-    out, calls, *_ = _run_postinst(tmp_path, 'configure', '', archive_rc=1)
+PENDING = '.leftover-archive-pending'
+
+
+def _stopped_at_the_archiver(out, calls, home, data, config, retry):
+    """A failed archiving ends the script: no call after it, nothing in the data or the
+    configuration, no banner, the retry named, and the next run told to archive again."""
+    assert out.returncode != 0
+    archive = calls.index(_archiver_calls(calls)[0])
+    assert calls[archive + 1:] == []
+    assert list(data.iterdir()) == [] and list(config.iterdir()) == []
+    assert 'INSTALLED' not in out.stdout
+    assert retry in out.stdout
+    assert (home / PENDING).exists()
+
+
+@pytest.mark.parametrize('archive_rc', [1, 2])
+def test_the_deb_postinst_stops_when_archiving_failed(tmp_path, archive_rc):
+    out, calls, home, data, config = _run_postinst(tmp_path, 'configure', '', archive_rc=archive_rc)
+    _stopped_at_the_archiver(out, calls, home, data, config, 'dpkg --configure -a')
+
+
+@pytest.mark.parametrize('previous', ['', '3.0'])
+def test_the_deb_postinst_archives_again_after_a_failed_attempt(tmp_path, previous):
+    """The pending mark is honoured whatever dpkg passes, and cleared once archiving worked."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    (home / PENDING).write_text('')
+    script = tmp_path / 'postinst.sandboxed'
+    script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+    out = subprocess.run(['/bin/bash', str(script), 'configure', previous], capture_output=True,
+                         text=True, timeout=20, env=env)
+    calls = _calls(log)
     assert out.returncode == 0, out.stderr
-    assert not [c for c in calls if c in ('systemctl start ucm', 'systemctl restart ucm')]
-    assert 'UCM was not started' in out.stdout
+    _check_order(calls, home, data, config)
+    assert f'rm -f {home}/{PENDING}' in calls
+    assert 'systemctl start ucm' in calls
 
 
 def test_the_rpm_post_archives_on_a_new_install_only(tmp_path):
@@ -401,11 +431,24 @@ def test_the_rpm_post_archives_on_a_new_install_only(tmp_path):
     assert _archiver_calls(calls) == []
 
 
-def test_the_rpm_post_does_not_start_ucm_when_archiving_failed(tmp_path):
-    out, calls, *_ = _run_post(tmp_path, '1', archive_rc=1)
+@pytest.mark.parametrize('archive_rc', [1, 2])
+def test_the_rpm_post_stops_when_archiving_failed(tmp_path, archive_rc):
+    out, calls, home, data, config = _run_post(tmp_path, '1', archive_rc=archive_rc)
+    _stopped_at_the_archiver(out, calls, home, data, config, 'dnf reinstall ucm')
+
+
+def test_the_rpm_post_archives_again_on_the_reinstall_after_a_failed_attempt(tmp_path):
+    """dnf reinstall runs %post with $1 = 2: the pending mark, not $1, asks for the archiving."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    (home / PENDING).write_text('')
+    body = _post_body(tmp_path, home, data, config)
+    out = subprocess.run([POSIX_SH, '-c', body, 'post', '2'], capture_output=True, text=True,
+                         timeout=20, env=env)
+    calls = _calls(log)
     assert out.returncode == 0, out.stderr
-    assert not [c for c in calls if c in ('systemctl start ucm', 'systemctl restart ucm')]
-    assert 'UCM was not started' in out.stdout
+    _check_order(calls, home, data, config)
+    assert f'rm -f {home}/{PENDING}' in calls
+    assert 'systemctl start ucm' in calls
 
 
 def test_both_packages_ship_the_archiver_and_the_deb_its_guard():

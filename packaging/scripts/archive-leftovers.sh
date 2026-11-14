@@ -6,7 +6,9 @@
 # step puts back what was moved, and the service is then not started.
 #
 # Usage: archive-leftovers.sh <ucm home> <data dir> <config dir> [<archive parent> [<log>]]
-# Exit 0: nothing to archive, or archived; 1: not archived, everything is back in place.
+# Exit 0: nothing to archive, archived, or left in place for the service to refuse;
+# 1: not archived, everything is back in place; 2: not archived, some files are still in
+# the archive (the next run puts them back first). On 1 and 2 the install must stop.
 set -u
 
 UCM_HOME=$1
@@ -171,6 +173,22 @@ EOF
 
 case "$(id -u)" in 0) as_root=1 ;; *) as_root="" ;; esac
 
+# -- 0. An earlier run that could not put everything back is finished first --------
+for j in "$PARENT"/*/.journal; do
+    [ -f "$j" ] || continue
+    DEST=${j%/.journal} JOURNAL=$j
+    if roll_back; then
+        say "UCM: an earlier attempt to archive what a removed UCM left did not complete:"
+        say "the files it could not put back are in place again."
+    else
+        say "UCM: an earlier attempt to archive what a removed UCM left did not complete, and"
+        say "some files could not be put back and are still in $DEST:$stuck"
+        say "The installation stops here: nothing else is written, and UCM was not started."
+        exit 2
+    fi
+done
+DEST="" JOURNAL=""
+
 # -- 1. Does this release start on what was left? ---------------------------------
 ENV_FILE=$CONFIG/ucm.env
 DB_URL=$(env_value "$ENV_FILE" DATABASE_URL)
@@ -227,22 +245,22 @@ say "UCM: an earlier UCM was removed and left a database this release cannot sta
 say "  $DB_FILE: $REASON"
 fail() {
     say "UCM: archiving what it left failed ($1)."
+    rc=1
     if [ -n "$JOURNAL" ] && [ -f "$JOURNAL" ]; then
         if roll_back; then
             say "Everything was put back in place."
         else
             say "Some files could not be put back and are still in $DEST:$stuck"
+            say "The next attempt puts them back before anything else."
+            rc=2
         fi
     else
         [ -z "$DEST" ] || rmdir -- "$DEST" 2>/dev/null
         [ -z "$MADE_PARENT" ] || rmdir -- "$PARENT" 2>/dev/null
         say "Nothing was moved."
     fi
-    say "UCM was not started. Fix the cause, then run as root:"
-    say "  sh $UCM_HOME/scripts/archive-leftovers.sh $UCM_HOME $DATA $CONFIG"
-    say "and set up the new installation: dpkg-reconfigure ucm (Debian, Ubuntu) or"
-    say "dnf reinstall ucm (RHEL, Fedora)."
-    exit 1
+    say "The installation stops here: nothing else is written, and UCM was not started."
+    exit "$rc"
 }
 if [ ! -d "$PARENT" ]; then
     mkdir -p -- "$PARENT" || fail "cannot create $PARENT"

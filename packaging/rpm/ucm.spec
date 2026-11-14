@@ -125,12 +125,18 @@ if ! bash "$UCM_SETUP" venv "$UCM_HOME" %{ucm_python} rpm "$UCM_CONFIG/ucm.env";
     bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" && exit 1
 fi
 
-# $1 is 1 when no UCM package was installed: archive what a removed one left
-# when this release refuses it
-ARCHIVE_FAILED=""
-if [ "$1" -eq 1 ]; then
-    sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG" \
-        || ARCHIVE_FAILED=1
+# $1 is 1 when no UCM package was installed, 2 on the reinstall that retries a failed
+# attempt: archive what a removed one left when this release refuses it. A failure
+# stops here: nothing below may run.
+ARCHIVE_PENDING=$UCM_HOME/.leftover-archive-pending
+if [ "$1" -eq 1 ] || [ -e "$ARCHIVE_PENDING" ]; then
+    if sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG"; then
+        rm -f "$ARCHIVE_PENDING"
+    else
+        : > "$ARCHIVE_PENDING"
+        echo "UCM was not set up. Fix the cause, then run: dnf reinstall ucm"
+        exit 1
+    fi
 fi
 
 # Listed one by one for the same reason as in %%install: this scriptlet
@@ -221,9 +227,7 @@ fi
 # Start/restart service
 systemctl daemon-reload
 systemctl enable %{name}
-if [ -n "$ARCHIVE_FAILED" ]; then
-    echo "UCM was not started: the files an earlier UCM left are still in place (see above)."
-elif systemctl is-active --quiet %{name}; then
+if systemctl is-active --quiet %{name}; then
     systemctl restart %{name} || true
 else
     systemctl start %{name} || true

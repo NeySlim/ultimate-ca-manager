@@ -428,11 +428,9 @@ def _all_files(*tops):
     return out
 
 
-def test_a_copy_is_kept_while_its_source_cannot_be_completed_again(tmp_path):
-    """Removing a copied source fails halfway, then putting it back fails too: the archive
-    keeps every copy whose source is not whole again, so no file is lost."""
-    box = Box(tmp_path, python='stub')
-    data = files(box.data)
+def _stuck(box):
+    """Removing a copied source fails halfway, then every later copy fails: what was copied
+    cannot be put back. Returns the marker the failed removal leaves."""
     box.wrap(other_fs=(box.data,))
     failed = box.state / 'rm-failed'
     (box.bin / 'rm').write_text(
@@ -440,15 +438,62 @@ def test_a_copy_is_kept_while_its_source_cannot_be_completed_again(tmp_path):
         f'    {REAL["rm"]} -f -- "$last/nested/f"; : > {failed}; exit 1 ;;\nesac\n'
         f'exec {REAL["rm"]} "$@"\n')
     (box.bin / 'cp').write_text(f'#!/bin/sh\n[ ! -e {failed} ] || exit 1\nexec {REAL["cp"]} "$@"\n')
+    return failed
+
+
+def test_a_copy_is_kept_while_its_source_cannot_be_completed_again(tmp_path):
+    """Removing a copied source fails halfway, then putting it back fails too: the archive
+    keeps every copy whose source is not whole again, so no file is lost."""
+    box = Box(tmp_path, python='stub')
+    data = files(box.data)
+    failed = _stuck(box)
 
     out = box.run()
 
-    assert out.returncode != 0, out.stdout
+    assert out.returncode == 2, out.stdout
     assert failed.exists()
     assert not (box.data / 'updates' / 'nested' / 'f').exists()
     assert 'could not be put back' in out.stdout and str(box.archive) in out.stdout
     assert 'Everything was put back' not in out.stdout
     assert _all_files(box.data, box.archive / 'data') == data
+
+
+def test_the_next_attempt_puts_back_what_was_stuck_then_archives_it_whole(tmp_path):
+    """A retry after a partial roll-back finishes it first: one archive, nothing mixed or lost."""
+    box = Box(tmp_path, python='stub')
+    data, config = files(box.data), files(box.config)
+    _stuck(box)
+    assert box.run().returncode == 2
+
+    # Still failing: no file is lost or archived a second time, and it says so again
+    out = box.run()
+    assert out.returncode == 2, out.stdout
+    assert 'could not be put back' in out.stdout
+    assert [p.name for p in box.parent.iterdir()] == [STAMP]
+    assert _all_files(box.data, box.archive / 'data') == data
+    assert files(box.config) == config
+
+    # Cause fixed: the roll-back completes, then one archive takes everything
+    box.wrap(other_fs=(box.data,))
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert 'put back' in out.stdout
+    assert [p.name for p in box.parent.iterdir()] == [STAMP]
+    assert files(box.archive / 'data') == data
+    assert files(box.archive / 'config') == config
+    assert not (box.archive / '.journal').exists()
+
+
+def test_the_next_attempt_after_a_complete_roll_back_starts_over(tmp_path):
+    box = Box(tmp_path, python='stub')
+    data = files(box.data)
+    box.wrap(fail='mv', at=3)
+    assert box.run().returncode == 1
+    box.wrap()
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert 'did not complete' not in out.stdout
+    assert files(box.archive / 'data') == data
 
 
 def test_a_copy_that_differs_from_its_source_is_never_kept_in_its_place(tmp_path):
