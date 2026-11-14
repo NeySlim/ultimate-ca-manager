@@ -24,6 +24,26 @@ CONTENT_JSON = 'application/json'
 BASE = '/api/v2/microsoft-cas'
 
 
+@pytest.fixture(scope='module')
+def drop_new_mscas(app):
+    """Deletes the connectors this module created, with their requests: their
+    encrypted passwords must not reach the next file's backups and migrations."""
+    from models import db
+    from models.msca import MicrosoftCA, MSCARequest
+    with app.app_context():
+        floor = db.session.query(db.func.max(MicrosoftCA.id)).scalar() or 0
+    yield
+    with app.app_context():
+        made = [row.id for row in MicrosoftCA.query.filter(MicrosoftCA.id > floor)]
+        MSCARequest.query.filter(MSCARequest.msca_id.in_(made)).delete(synchronize_session=False)
+        MicrosoftCA.query.filter(MicrosoftCA.id.in_(made)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+# Teardown runs right to left: connectors and requests go before the certificates.
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_mscas')
+
+
 def post_json(client, url, data=None):
     return client.post(url, data=json.dumps(data or {}), content_type=CONTENT_JSON)
 
