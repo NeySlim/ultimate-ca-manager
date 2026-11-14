@@ -744,6 +744,8 @@ class TestStartupBlockers:
         finally:
             event.remove(db.engine, 'before_cursor_execute', count)
         assert 0 < empty == len(statements)
+        # At most one statement per blocker check (14 for 15 checks when this was written)
+        assert empty <= len([d for d in fips_preflight.DETECTORS if d.severity == 'blocker'])
         # The certificate table is read only by key (the TSA signer), never scanned
         scans = [s for s in statements if 'FROM certificates' in s
                  and 'certificates.id = ' not in s and 'certificates.refid = ' not in s]

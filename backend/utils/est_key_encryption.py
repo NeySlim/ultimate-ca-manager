@@ -153,6 +153,8 @@ def recipient_refusal(cert):
             return 'Requested asymmetric key does not allow key transport'
         if public_key.key_size < 2048:
             return 'Client RSA key under 2048 bits: key transport refused'
+        if fips_mode.enabled() and not key_algorithms.fips_approved_for_key(public_key):
+            return f'Client RSA key of {public_key.key_size} bits not available in FIPS mode'
         return None
     if isinstance(public_key, ec.EllipticCurvePublicKey):
         if usage is not None and not usage.key_agreement:

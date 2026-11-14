@@ -180,3 +180,27 @@ def test_the_refusal_states_the_rsa_rule(fips):
     assert 'RSA of an even length from 2048 to 16384 bits' in text, text
     assert 'RSA-2048' not in text and 'RSA-4096' not in text, text
     assert 'EC-P256' in text, text
+
+
+def _certificate_for(public_key):
+    from datetime import datetime, timedelta, timezone
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'est client')])
+    now = datetime.now(timezone.utc)
+    return (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(public_key)
+            .serial_number(1).not_valid_before(now).not_valid_after(now + timedelta(days=1))
+            .sign(ec.generate_private_key(ec.SECP256R1()), hashes.SHA256()))
+
+
+@pytest.mark.parametrize('bits, in_fips, refused', [
+    (2049, True, True), (16386, True, True), (2050, True, False), (8192, True, False),
+    (2049, False, False), (1024, False, True)])
+def test_est_key_transport_follows_the_rsa_rule(monkeypatch, bits, in_fips, refused):
+    from utils.est_key_encryption import recipient_refusal
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: in_fips)
+    refusal = recipient_refusal(_certificate_for(_fake_private(bits).public_key()))
+    assert (refusal is not None) is refused, refusal
