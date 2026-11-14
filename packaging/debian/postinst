@@ -64,15 +64,23 @@ case "$1" in
         bash "$UCM_SETUP" venv "$UCM_HOME" python3 deb "$UCM_CONFIG/ucm.env"
 
         # A new install (nothing configured, or a removed UCM older than 2.254, which no
-        # upgrade reaches) or a failed earlier attempt archives what a removed UCM left
-        # when this release refuses it. A failure stops here: nothing below may run.
+        # upgrade reaches), an earlier attempt that failed or was killed (its mark, or an
+        # archive journal left) archives what a removed UCM left when this release refuses
+        # it. The mark is set first; a failure stops here: nothing below may run.
         ARCHIVE_PENDING="$UCM_HOME/.leftover-archive-pending"
         . "$UCM_HOME/scripts/pivot-guard.sh"
+        ARCHIVE_DUE=""
         if [ -z "$2" ] || ! ucm_pivot_version_ok "$2" || [ -e "$ARCHIVE_PENDING" ]; then
+            ARCHIVE_DUE=1
+        fi
+        for journal in "${UCM_HOME%/*}"/ucm-archive/*/.journal; do
+            [ ! -e "$journal" ] || ARCHIVE_DUE=1
+        done
+        if [ -n "$ARCHIVE_DUE" ]; then
+            : > "$ARCHIVE_PENDING"
             if sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG"; then
                 rm -f "$ARCHIVE_PENDING"
             else
-                : > "$ARCHIVE_PENDING"
                 echo "UCM was not set up. Fix the cause, then run: dpkg --configure -a"
                 exit 1
             fi

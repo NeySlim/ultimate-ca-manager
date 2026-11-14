@@ -125,15 +125,23 @@ if ! bash "$UCM_SETUP" venv "$UCM_HOME" %{ucm_python} rpm "$UCM_CONFIG/ucm.env";
     bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" && exit 1
 fi
 
-# $1 is 1 when no UCM package was installed, 2 on the reinstall that retries a failed
-# attempt: archive what a removed one left when this release refuses it. A failure
+# $1 is 1 when no UCM package was installed, 2 on the reinstall that retries an attempt
+# that failed or was killed (its mark, or an archive journal left): archive what a
+# removed one left when this release refuses it. The mark is set first; a failure
 # stops here: nothing below may run.
 ARCHIVE_PENDING=$UCM_HOME/.leftover-archive-pending
+ARCHIVE_DUE=""
 if [ "$1" -eq 1 ] || [ -e "$ARCHIVE_PENDING" ]; then
+    ARCHIVE_DUE=1
+fi
+for journal in "${UCM_HOME%%/*}"/ucm-archive/*/.journal; do
+    [ ! -e "$journal" ] || ARCHIVE_DUE=1
+done
+if [ -n "$ARCHIVE_DUE" ]; then
+    : > "$ARCHIVE_PENDING"
     if sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG"; then
         rm -f "$ARCHIVE_PENDING"
     else
-        : > "$ARCHIVE_PENDING"
         echo "UCM was not set up. Fix the cause, then run: dnf reinstall ucm"
         exit 1
     fi

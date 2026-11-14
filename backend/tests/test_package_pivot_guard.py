@@ -299,8 +299,10 @@ def _post_sandbox(tmp_path, archive_rc):
         'getent': 'case "$1 $2" in "group softhsm"|"group ods") exit 2 ;; esac; exit 0',
         'systemctl': record + '\n[ "$1" != is-active ]',
         'bash': record,
-        # The archiver's answer; whether the configuration existed when it ran
-        'sh': record + f'\n[ -e "{config}/ucm.env" ] && echo "sh saw ucm.env" >> "$LOG"\nexit {archive_rc}',
+        # The archiver's answer, or the scriptlet killed while it runs; whether the
+        # configuration existed when it ran
+        'sh': record + f'\n[ -e "{config}/ucm.env" ] && echo "sh saw ucm.env" >> "$LOG"\n'
+              + ('kill -9 $PPID; sleep 5' if archive_rc == 'kill' else f'exit {archive_rc}'),
         'python3': 'echo 00', 'hostname': 'echo host',
     })
     bin_dir = tmp_path / 'bin'
@@ -458,3 +460,47 @@ def test_both_packages_ship_the_archiver_and_the_deb_its_guard():
     for name in (ARCHIVER, 'pivot-guard.sh'):
         assert f'packaging/scripts/{name} debian/ucm/opt/ucm/scripts/' in rules.stdout
     assert f'packaging/scripts/{ARCHIVER} %{{buildroot}}%{{ucm_home}}/scripts/' in SPEC.read_text()
+
+
+@pytest.mark.parametrize('package, first', [('deb', ''), ('deb', '2.253'), ('rpm', '1')])
+def test_a_scriptlet_killed_while_archiving_leaves_the_mark_for_the_retry(tmp_path, package, first):
+    """The pending mark is set before the archiver runs: a scriptlet killed during it
+    leaves the mark, so a retry whose $1/$2 alone would skip it archives again (below)."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 'kill')
+    if package == 'deb':
+        script = tmp_path / 'postinst.sandboxed'
+        script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+        cmd = ['/bin/bash', str(script), 'configure', first]
+    else:
+        cmd = [POSIX_SH, '-c', _post_body(tmp_path, home, data, config), 'post', first]
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=20, env=env)
+    calls = _calls(log)
+    assert out.returncode != 0
+    assert _archiver_calls(calls) == calls[-1:]
+    assert (home / PENDING).exists()
+    assert list(data.iterdir()) == [] and list(config.iterdir()) == []
+
+@pytest.mark.parametrize('package, retry', [('deb', '3.0'), ('rpm', '2')])
+@pytest.mark.parametrize('left', ['mark', 'journal'])
+def test_a_retry_archives_while_a_mark_or_a_journal_is_left(tmp_path, package, retry, left):
+    """Either one is enough: a journal without the mark (a run killed before 3.0 set it,
+    or the mark removed by a purge) still sends the retry through the archiver."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    if left == 'mark':
+        (home / PENDING).write_text('')
+    else:
+        journal = home.parent / 'ucm-archive' / '20261114T120000Z' / '.journal'
+        journal.parent.mkdir(parents=True)
+        journal.write_text('')
+    if package == 'deb':
+        script = tmp_path / 'postinst.sandboxed'
+        script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+        cmd = ['/bin/bash', str(script), 'configure', retry]
+    else:
+        cmd = [POSIX_SH, '-c', _post_body(tmp_path, home, data, config), 'post', retry]
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=20, env=env)
+    calls = _calls(log)
+    assert out.returncode == 0, out.stderr
+    _check_order(calls, home, data, config)
+    assert f'rm -f {home}/{PENDING}' in calls
+
