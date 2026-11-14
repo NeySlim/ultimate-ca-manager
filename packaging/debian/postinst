@@ -61,6 +61,8 @@ case "$1" in
         # Built before anything is written to the data or the configuration: the archiving
         # below asks this release's runner about the database left there
         echo "Creating/updating Python virtual environment..."
+        BUILT_FIPS=""
+        ! bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" || BUILT_FIPS=1
         bash "$UCM_SETUP" venv "$UCM_HOME" python3 deb "$UCM_CONFIG/ucm.env"
 
         # A new install (nothing configured, or a removed UCM older than 2.254, which no
@@ -90,6 +92,12 @@ case "$1" in
                    exit 1 ;;
             esac
             rm -f "$ARCHIVE_PENDING"
+            # A retry built the venv while ucm.env was still in the archive; the archiver
+            # then carried its UCM_FIPS_BUILD=1 over: the standard venv is built again
+            if [ -z "$BUILT_FIPS" ] && bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env"; then
+                echo "UCM_FIPS_BUILD=1 came back after the Python environment was built: building it again against the system OpenSSL..."
+                bash "$UCM_SETUP" venv "$UCM_HOME" python3 deb "$UCM_CONFIG/ucm.env"
+            fi
         fi
 
         # Create directories

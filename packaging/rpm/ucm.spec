@@ -120,6 +120,8 @@ bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
 # Built before anything is written to the data or the configuration: the archiving
 # below asks this release's runner about the database left there
 echo "Creating Python virtual environment..."
+BUILT_FIPS=""
+! bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" || BUILT_FIPS=1
 # A failed UCM_FIPS_BUILD=1 build fails the scriptlet; the standard install keeps going as before
 if ! bash "$UCM_SETUP" venv "$UCM_HOME" %{ucm_python} rpm "$UCM_CONFIG/ucm.env"; then
     bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" && exit 1
@@ -151,6 +153,12 @@ if [ -n "$ARCHIVE_DUE" ]; then
            exit 1 ;;
     esac
     rm -f "$ARCHIVE_PENDING"
+    # A retry built the venv while ucm.env was still in the archive; the archiver then
+    # carried its UCM_FIPS_BUILD=1 over: the standard venv is built again
+    if [ -z "$BUILT_FIPS" ] && bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env"; then
+        echo "UCM_FIPS_BUILD=1 came back after the Python environment was built: building it again against the system OpenSSL..."
+        bash "$UCM_SETUP" venv "$UCM_HOME" %{ucm_python} rpm "$UCM_CONFIG/ucm.env" || exit 1
+    fi
 fi
 
 # Listed one by one for the same reason as in %%install: this scriptlet

@@ -298,11 +298,15 @@ def _post_sandbox(tmp_path, archive_rc):
     fakes.update({
         'getent': 'case "$1 $2" in "group softhsm"|"group ods") exit 2 ;; esac; exit 0',
         'systemctl': record + '\n[ "$1" != is-active ]',
-        'bash': record,
+        # fips-requested answers from the file, as native-setup.sh does
+        'bash': record + '\n[ "$2" != fips-requested ] || grep -qx "UCM_FIPS_BUILD=1" "$3"',
         # The archiver's answer, or the scriptlet killed while it runs; whether the
         # configuration existed when it ran
         'sh': record + f'\n[ -e "{config}/ucm.env" ] && echo "sh saw ucm.env" >> "$LOG"\n'
-              + ('kill -9 $PPID; sleep 5' if archive_rc == 'kill' else f'exit {archive_rc}'),
+              + {'kill': 'kill -9 $PPID; sleep 5',
+                 # Puts back an archived ucm.env, archives it, carries UCM_FIPS_BUILD=1 over
+                 'fips': f'printf "UCM_FIPS_BUILD=1\\n" > "{config}/ucm.env"'}.get(
+                     archive_rc, f'exit {archive_rc}'),
         'python3': 'echo 00', 'hostname': 'echo host',
     })
     bin_dir = tmp_path / 'bin'
@@ -519,4 +523,30 @@ def test_no_success_banner_after_a_database_left_for_the_service_to_refuse(tmp_p
     assert any(' banner ' in c for c in calls if c.startswith('bash ')) is banner
     assert f'rm -f {home}/{PENDING}' in calls
     assert 'not set up' not in out.stdout
+
+
+@pytest.mark.parametrize('package', ['deb', 'rpm'])
+@pytest.mark.parametrize('before', [False, True])
+def test_a_venv_built_before_fips_came_back_is_built_again(tmp_path, package, before):
+    """A retry whose ucm.env was still in the archive built a standard venv; the archiver
+    then wrote UCM_FIPS_BUILD=1 into the new ucm.env: the venv is built again, once."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 'fips')
+    if before:
+        (config / 'ucm.env').write_text('UCM_FIPS_BUILD=1\n')
+    if package == 'deb':
+        script = tmp_path / 'postinst.sandboxed'
+        script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+        cmd = ['/bin/bash', str(script), 'configure', '']
+    else:
+        cmd = [POSIX_SH, '-c', _post_body(tmp_path, home, data, config), 'post', '1']
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=20, env=env)
+    calls = _calls(log)
+    assert out.returncode == 0, out.stderr
+    venvs = [i for i, c in enumerate(calls) if c.startswith('bash ') and ' venv ' in f'{c} ']
+    archiver = calls.index(_archiver_calls(calls)[0])
+    if before:
+        assert len(venvs) == 1 and 'came back' not in out.stdout
+    else:
+        assert len(venvs) == 2 and venvs[0] < archiver < venvs[1]
+        assert 'building it again against the system OpenSSL' in out.stdout
 
