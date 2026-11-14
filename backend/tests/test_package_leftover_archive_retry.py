@@ -2,7 +2,8 @@
 without fault converges to one complete archive, no file lost or duplicated, no journal.
 
 Every file command the script runs is wrapped: one sequence numbers all their calls, and
-a plan fails or kills the run (SIGKILL to its process group, no clean-up) at given calls.
+a plan fails or kills the run (SIGKILL to its process group, no clean-up) at given calls,
+or kills it in the middle of a copy ('torn': the target exists with other content).
 """
 import os
 import random
@@ -20,7 +21,7 @@ LAYOUTS = {
     'a mount point inside the data': lambda box: (box.data / 'updates',),
 }
 # Pairs drawn per layout from every (fault i while archiving, fault j while putting back)
-SEED, PAIRS = 20261114, 120
+SEED, PAIRS, TORN_PAIRS = 20261114, 120, 60
 
 
 def _chaos(box, layout):
@@ -33,7 +34,12 @@ def _chaos(box, layout):
             f'#!/bin/sh\nn=$(( $(cat {s}/count) + 1 )); echo $n > {s}/count\n'
             f'case $(grep -x "$n [a-z]*" {s}/plan) in\n'
             f'    *" fail") echo "{name}: injected failure" >&2; exit 1 ;;\n'
-            f'    *" kill") kill -9 0 ;;\nesac\nexec {shutil.which(name)} "$@"\n')
+            f'    *" kill") kill -9 0 ;;\n'
+            # A copy cut short while it writes: its target is there, with other content
+            f'    *" torn") [ {name} = cp ] && {{ {shutil.which(name)} "$@"; for last; do :; done\n'
+            f'        torn=$({shutil.which("find")} "$last" -type f | {shutil.which("sort")} | {shutil.which("head")} -n 1)\n'
+            f'        [ -z "$torn" ] || printf torn > "$torn"; }}; kill -9 0 ;;\n'
+            f'esac\nexec {shutil.which(name)} "$@"\n')
         (box.bin / name).chmod(0o755)
 
 
@@ -146,4 +152,24 @@ def test_a_retry_converges_after_a_fault_while_putting_back(tmp_path, layout):
     draw = random.Random(f'{SEED}-{layout}')  # noqa: S311 - a fixed seed, a replayable draw
     pairs = draw.sample(product, PAIRS)
     for n, (first, second) in enumerate(pairs):
+        _scenario(tmp_path / f'p{n}', layout, first, second)
+
+
+@pytest.mark.parametrize('layout', list(LAYOUTS))
+def test_a_retry_converges_after_a_copy_cut_short_at_any_call(tmp_path, layout):
+    """Each call of the archiving run is killed in turn, a copy in the middle of its write."""
+    for at in range(1, _calls(tmp_path / 'count', layout) + 1):
+        _scenario(tmp_path / f'{at}', layout, (at, 'torn'), None)
+
+
+@pytest.mark.parametrize('layout', list(LAYOUTS))
+def test_a_retry_converges_after_a_put_back_cut_short_in_a_copy(tmp_path, layout):
+    """Pairs (fault i while archiving, the put-back killed at call j, a copy in the middle
+    of its write), drawn with a fixed seed, then a run without fault."""
+    product = []
+    for at in range(1, _calls(tmp_path / 'count', layout) + 1):
+        after_fail = _calls(tmp_path / f'f{at}', layout, [(at, 'fail')])
+        product += [((at, 'fail'), (j, 'torn')) for j in range(at + 1, after_fail + 1)]
+    draw = random.Random(f'{SEED}-torn-{layout}')  # noqa: S311 - a fixed seed, a replayable draw
+    for n, (first, second) in enumerate(draw.sample(product, min(TORN_PAIRS, len(product)))):
         _scenario(tmp_path / f'p{n}', layout, first, second)

@@ -138,8 +138,9 @@ roll_back() {
                 present "$dst" || continue
                 if [ -d "$dst" ] && [ ! -L "$dst" ]; then
                     mkdir -p -- "$src" && cp -a -- "$dst/." "$src/"
-                elif ! present "$src"; then
-                    cp -a -- "$dst" "$src"
+                elif ! present "$src" || [ "$(digest "$src" 2>/dev/null)" != "$(digest "$dst")" ]; then
+                    # A source that differs is a put-back cut short: the verified copy replaces it
+                    rm -f -- "$src" && cp -a -- "$dst" "$src"
                 fi
                 # Whole again: its copy line, undone next, removes the copy
                 if [ "$(digest "$src" 2>/dev/null)" != "$(digest "$dst")" ] \

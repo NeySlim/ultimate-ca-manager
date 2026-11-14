@@ -457,6 +457,29 @@ def test_the_rpm_post_archives_again_on_the_reinstall_after_a_failed_attempt(tmp
     assert 'systemctl start ucm' in calls
 
 
+def test_the_rpm_post_marks_a_new_install_before_the_venv_is_built(tmp_path):
+    """A UCM_FIPS_BUILD=1 build that fails stops %post before the archiver: the mark set
+    first makes the reinstall ($1 = 2) archive, where $1 alone would skip it."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    (config / 'ucm.env').write_text('UCM_FIPS_BUILD=1\n')
+    works = tmp_path / 'venv-works'
+    (tmp_path / 'bin' / 'bash').write_text(
+        f'#!{POSIX_SH}\necho "$(basename "$0") $*" >> "$LOG"\ncase $2 in\n'
+        f'    fips-requested) grep -qx "UCM_FIPS_BUILD=1" "$3" ;;\n    venv) [ -e "{works}" ] ;;\nesac\n')
+    body = _post_body(tmp_path, home, data, config)
+    out = subprocess.run([POSIX_SH, '-c', body, 'post', '1'], capture_output=True, text=True,
+                         timeout=20, env=env)
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert _archiver_calls(_calls(log)) == []
+    assert (home / PENDING).exists()
+    works.write_text('')
+    log.unlink()
+    out = subprocess.run([POSIX_SH, '-c', body, 'post', '2'], capture_output=True, text=True,
+                         timeout=20, env=env)
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert len(_archiver_calls(_calls(log))) == 1
+
+
 def test_both_packages_ship_the_archiver_and_the_deb_its_guard():
     rules = subprocess.run(['make', '-n', '-f', 'packaging/debian/rules', 'override_dh_auto_install'],
                            cwd=ROOT, capture_output=True, text=True, timeout=10)

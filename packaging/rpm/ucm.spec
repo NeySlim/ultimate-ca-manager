@@ -117,6 +117,11 @@ mkdir -p /var/log/%{name}
 # Resumed after a failed first attempt: the service never had a working venv
 bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
 
+# Set on a new install before the venv is built: a build that fails or is killed leaves
+# it, so the reinstall that retries ($1 = 2) still archives what a removed UCM left
+ARCHIVE_PENDING=$UCM_HOME/.leftover-archive-pending
+[ "$1" -ne 1 ] || : > "$ARCHIVE_PENDING"
+
 # Built before anything is written to the data or the configuration: the archiving
 # below asks this release's runner about the database left there
 echo "Creating Python virtual environment..."
@@ -131,7 +136,6 @@ fi
 # that failed or was killed (its mark, or an archive journal left): archive what a
 # removed one left when this release refuses it. The mark is set first; a failure
 # stops here: nothing below may run.
-ARCHIVE_PENDING=$UCM_HOME/.leftover-archive-pending
 ARCHIVE_DUE=""
 if [ "$1" -eq 1 ] || [ -e "$ARCHIVE_PENDING" ]; then
     ARCHIVE_DUE=1
@@ -266,6 +270,8 @@ fi
 
 %postun
 %systemd_postun_with_restart %{name}.service
+# Erased ($1 = 0): the mark of an archiving left pending goes with the package
+[ "$1" -ne 0 ] || rm -f %{ucm_home}/.leftover-archive-pending
 
 %files
 %license LICENSE NOTICE COMMERCIAL-LICENSE.md
