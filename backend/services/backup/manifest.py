@@ -564,6 +564,8 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'shared_files': ('the Kerberos keytab file every node writes, rebuilt from the profiles '
                      'when their section is restored and at startup, and the HTTPS pair, '
                      'carried as the https_server files instead'),
+    'backup_archives': 'the HA archive store: earlier archives, never carried inside a new one',
+    'backup_archive_chunks': 'the bytes of the HA archive store, never carried inside a new archive',
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }

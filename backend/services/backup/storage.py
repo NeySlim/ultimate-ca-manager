@@ -444,7 +444,8 @@ EXPORT_LOCK_WAIT = 30
 
 
 def export_archive(service, password: str, *, kdf=None, timeout=None) -> tuple:
-    """Export and publish one archive under the backup lock. Returns ``(size, path, filename)``.
+    """Export and publish one archive under the backup lock. Returns ``(size, path, filename)``,
+    path None in HA, where the archive is in the database.
 
     The archive is streamed to disk as it is produced, never held whole. The
     export runs inside the lock too: a restore holds it until it commits, so
@@ -478,6 +479,12 @@ def create_archive(data, backup_dir=None) -> tuple:
 
 
 def _create_archive(data, backup_dir=None) -> tuple:
+    from . import shared_store
+
+    # HA: every archive goes to the database, so any node lists and serves it
+    if backup_dir is None and shared_store.enabled():
+        filename, size, _sha256 = shared_store.store_archive(data, new_archive_filename)
+        return None, filename, size
     directory = Path(backup_dir) if backup_dir is not None else backup_directory()
     # A stream is consumed once: spooled first, so a name collision can retry
     spooled = None

@@ -14,6 +14,7 @@ STEPS = (
     '149_websocket_relay', '150_users_id_never_reused', '151_deploy_binding_attention',
     '152_shared_files', '153_encryption_keys', '155_windows_enrollment_profiles',
     '156_template_cn_pattern', '157_certificate_subject_key', '158_ca_parent_confirmation',
+    '159_backup_archives',
 )
 
 # Every name a 2.254 start leaves in `_migrations` (the migration files of tag v2.254-rc1,

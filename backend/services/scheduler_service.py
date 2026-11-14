@@ -209,7 +209,7 @@ class SchedulerService:
             description: Human-readable description
             enabled: Whether task starts enabled
             per_node: HA: runs on every node outside the leader election, for what lives on
-                each host (its local backups, its update result); single node: no difference
+                each host (its update result); single node: no difference
         """
         with self.tasks_lock:
             if name in self.tasks:

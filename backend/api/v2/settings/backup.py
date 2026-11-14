@@ -10,7 +10,7 @@ from utils.pagination import parse_request_pagination
 from utils.response import success_response, error_response, no_content_response
 from models import db, SystemConfig
 from services.audit_service import AuditService
-from services.backup import storage
+from services.backup import shared_store, storage
 from fips_mode import FipsRestricted
 from services.backup.decrypt_mixin import BackupDecryptionError
 from services.backup.locking import BackupBusyError, backup_operation_lock
@@ -351,6 +351,10 @@ def download_backup(filename):
     except PermissionError:
         return error_response('Access denied', 403)
 
+    if shared_store.enabled():
+        response = shared_store.download_response(safe_filename)
+        return response if response is not None else error_response('Backup file not found', 404)
+
     if backup_file.is_symlink() or not backup_file.is_file():
         return error_response('Backup file not found', 404)
 
@@ -383,9 +387,12 @@ def delete_backup(filename):
         # Same lock as every other operation on this directory: a deletion
         # while an archive is being written would race the catalogue that
         # vouches for it.
-        with backup_operation_lock(timeout=15, purpose='deleting a backup'):
-            if backup_file.is_file() and not backup_file.is_symlink():
-                backup_file.unlink()
+        if shared_store.enabled():
+            shared_store.delete_archives([safe_filename], wait=15, purpose='deleting a backup')
+        else:
+            with backup_operation_lock(timeout=15, purpose='deleting a backup'):
+                if backup_file.is_file() and not backup_file.is_symlink():
+                    backup_file.unlink()
     except BackupBusyError as busy:
         logger.info("Delete refused: %s", busy)
         return error_response(str(busy), 409)
@@ -468,7 +475,7 @@ def update_backup_schedule():
 @bp.route('/api/v2/settings/backup/history', methods=['GET'])
 @require_auth(['admin:system'])
 def get_backup_history():
-    """Get backup history (actual backup files on disk)"""
+    """Get backup history: the archives on disk, or in HA those of the database."""
     from services.backup.schedule import list_backups
     page, per_page = parse_request_pagination(default_per_page=20)
 

@@ -898,8 +898,8 @@ def create_app(config_name=None):
                 name="backup_retention",
                 func=run_backup_retention,
                 interval=86400,  # 24 hours
-                description="Prune backups past their retention period",
-                per_node=True  # each node prunes the archives on its own disk
+                description="Prune backups past their retention period"
+                # HA: the leader alone, over the archives of the database
             )
             app.logger.info("Registered backup retention task (daily)")
         except ImportError:

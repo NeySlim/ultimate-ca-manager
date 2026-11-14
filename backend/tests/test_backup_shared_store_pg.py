@@ -1,0 +1,496 @@
+"""HA on PostgreSQL: two nodes see, download and prune one set of backup archives.
+
+Node A and node B are the same application under two node ids and two archive
+directories, on one database: whatever B lists or serves came through the database.
+"""
+import base64
+import gc
+import hashlib
+import io
+import json
+import os
+import resource
+import secrets
+import shutil
+import threading
+import tracemalloc
+from contextlib import contextmanager
+from datetime import timedelta
+
+import pytest
+from sqlalchemy import func, select, text
+
+from config.settings import Config
+from services.backup import container, schedule, shared_store, storage
+from tests import pg_app_harness
+from utils.datetime_utils import utc_now
+
+pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
+                                reason='needs UCM_TEST_APP_PG_URL (HA runs on PostgreSQL)')
+
+PASSWORD = 'shared-store-pass-2026'
+PREFIX = f'hd2-{secrets.token_hex(3)}'
+# Archive size of the memory measurement; the report's figures used several hundred MB
+MEASURED_MB = int(os.environ.get('UCM_TEST_BACKUP_STORE_MB', '48'))
+
+
+def _tables():
+    from models import BackupArchive, BackupArchiveChunk
+    return BackupArchive.__table__, BackupArchiveChunk.__table__
+
+
+def _count(app, table, **where):
+    from models import db
+    with app.app_context():
+        query = select(func.count()).select_from(table)
+        for column, value in where.items():
+            query = query.where(table.c[column] == value)
+        with db.engine.connect() as conn:
+            return conn.execute(query).scalar()
+
+
+@pytest.fixture
+def nodes(app, monkeypatch, tmp_path):
+    """HA mode; `on(name)` makes the code run as that node, with its own archive directory.
+
+    Archives created by the test are dropped afterwards, chunks with them.
+    """
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    dirs = {}
+
+    @contextmanager
+    def on(name):
+        directory = dirs.setdefault(name, tmp_path / name)
+        directory.mkdir(exist_ok=True)
+        with monkeypatch.context() as m:
+            m.setattr(Config, 'NODE_ID', f'{PREFIX}-{name}')
+            m.setattr(Config, 'BACKUP_DIR', str(directory))
+            yield directory
+    on.dirs = dirs
+    with app.app_context():
+        before = {a['filename'] for a in shared_store.list_archives()}
+    yield on
+    with app.app_context():
+        made = [a['filename'] for a in shared_store.list_archives() if a['filename'] not in before]
+        if made:
+            shared_store.delete_archives(made, wait=30)
+
+
+def _payload(size):
+    """An archive-like stream: incompressible bytes, as an encrypted container is."""
+    seed = secrets.token_bytes(64)
+    out, n = bytearray(), 0
+    while len(out) < size:
+        out += hashlib.sha512(seed + n.to_bytes(8, 'big')).digest()
+        n += 1
+    return bytes(out[:size])
+
+
+def _on_disk(directory):
+    return [p.name for p in directory.iterdir() if storage.is_archive_name(p.name)]
+
+
+def _listing(client):
+    r = client.get('/api/v2/system/backups?per_page=100')
+    assert r.status_code == 200, r.data
+    return json.loads(r.data)['data']
+
+
+def _ours(items):
+    return [i for i in items if i.get('node', '').startswith(PREFIX)]
+
+
+# --- 1. The same list from every node --------------------------------------------------------
+
+def test_an_archive_made_on_a_is_listed_the_same_on_b_with_its_node(app, auth_client, nodes):
+    data = _payload(3 * shared_store.CHUNK_SIZE + 17)
+    with app.app_context(), nodes('a') as dir_a:
+        _path, name = storage.create_archive(data)
+        assert not _on_disk(dir_a), 'HA writes no archive to the node disk'
+        on_a = _listing(auth_client)
+    with nodes('b'):
+        on_b = _listing(auth_client)
+        history = json.loads(auth_client.get('/api/v2/settings/backup/history?per_page=100').data)
+    assert on_a == on_b
+    assert on_b['meta']['storage'] == 'database' and 'disk_free' not in on_b['meta']
+    (item,) = [i for i in _ours(on_b['items']) if i['filename'] == name]
+    assert item['node'] == f'{PREFIX}-a'
+    assert item['size_bytes'] == len(data)
+    assert item['sha256'] == hashlib.sha256(data).hexdigest()
+    assert item['created_at'].endswith('UTC')
+    (row,) = [h for h in history['data'] if h['filename'] == name]
+    assert (row['node'], row['size'], row['sha256']) == (item['node'], len(data), item['sha256'])
+    with app.app_context(), nodes('b'):
+        assert schedule.get_schedule()['last_archive'] == name
+
+
+# --- 2. Downloadable from every node, byte for byte --------------------------------------------
+
+def test_an_archive_made_on_a_downloads_from_b_after_a_is_gone(app, auth_client, nodes):
+    data = _payload(2 * shared_store.CHUNK_SIZE + 5)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+    shutil.rmtree(nodes.dirs['a'])
+    with nodes('b'):
+        for url in (f'/api/v2/system/backup/{name}/download',
+                    f'/api/v2/settings/backup/{name}/download'):
+            r = auth_client.get(url)
+            assert r.status_code == 200, r.data
+            assert r.data == data
+            assert r.headers['Content-Length'] == str(len(data))
+            assert r.headers['Repr-Digest'] == (
+                'sha-256=:' + base64.b64encode(hashlib.sha256(data).digest()).decode() + ':')
+            assert 'attachment' in r.headers['Content-Disposition']
+        assert auth_client.get('/api/v2/system/backup/ucm_backup_absent.ucmbkp/download').status_code == 404
+        assert auth_client.get('/api/v2/system/backup/..%2Fx.ucmbkp/download').status_code in (400, 404)
+
+
+def test_the_restore_reader_streams_and_seeks_a_stored_archive(app, nodes):
+    data = b'UCMB' + bytes([4]) + _payload(3 * shared_store.CHUNK_SIZE)
+    with app.app_context(), nodes('a'):
+        _path, name = storage.create_archive(data)
+        with shared_store.open_archive(name) as reader:
+            assert container.format_version_of(reader.read(container.HEADER_PREFIX_SIZE)) == 4
+            reader.seek(shared_store.CHUNK_SIZE - 3)
+            assert reader.read(10) == data[shared_store.CHUNK_SIZE - 3:shared_store.CHUNK_SIZE + 7]
+            assert reader.seek(0, io.SEEK_END) == len(data)
+            reader.seek(0)
+            assert hashlib.sha256(reader.read()).digest() == hashlib.sha256(data).digest()
+        assert shared_store.open_archive('ucm_backup_absent.ucmbkp') is None
+
+
+# --- 3. An archive appears once whole, an interrupted write leaves nothing -------------------
+
+def test_an_archive_is_not_listed_before_its_last_chunk(app, nodes):
+    _archives, chunks = _tables()
+    started, release, done = threading.Event(), threading.Event(), []
+    before = _count(app, chunks)
+
+    def slow():
+        for _ in range(3):
+            yield _payload(shared_store.CHUNK_SIZE)
+        started.set()
+        assert release.wait(30)
+        yield b'tail'
+
+    def write():
+        with app.app_context(), nodes('a'):
+            done.append(storage.create_archive(slow())[1])
+    writer = threading.Thread(target=write)
+    writer.start()
+    try:
+        assert started.wait(30)
+        with app.app_context():
+            assert not [a for a in shared_store.list_archives() if a['node'].startswith(PREFIX)]
+        assert _count(app, chunks) == before, 'chunks of an unfinished archive are visible'
+    finally:
+        release.set()
+        writer.join(60)
+    (name,) = done
+    with app.app_context():
+        assert shared_store.get_archive(name)['size'] == 3 * shared_store.CHUNK_SIZE + 4
+
+
+def test_an_interrupted_write_leaves_no_row_and_no_chunk(app, nodes):
+    archives, chunks = _tables()
+    before = (_count(app, archives), _count(app, chunks))
+
+    def broken():
+        yield _payload(shared_store.CHUNK_SIZE)
+        yield _payload(shared_store.CHUNK_SIZE)
+        raise RuntimeError('export died')
+
+    with app.app_context(), nodes('a'):
+        with pytest.raises(RuntimeError):
+            storage.create_archive(broken())
+    assert (_count(app, archives), _count(app, chunks)) == before
+
+
+# --- Retention, once, over the shared set ------------------------------------------------------
+
+def _aged(app, names, days):
+    archives = _tables()[0]
+    from models import db
+    with app.app_context(), db.engine.begin() as conn:
+        for offset, name in enumerate(names):
+            conn.execute(archives.update().where(archives.c.filename == name).values(
+                created_at=utc_now() - timedelta(days=days, minutes=len(names) - offset)))
+
+
+def _settings(app, **values):
+    from models import SystemConfig, db
+    with app.app_context():
+        saved = {}
+        for key, value in values.items():
+            row = SystemConfig.query.filter_by(key=key).first()
+            saved[key] = row.value if row else None
+            if row:
+                row.value = value
+            else:
+                db.session.add(SystemConfig(key=key, value=value))
+        db.session.commit()
+    return saved
+
+
+@pytest.fixture
+def retention_settings(app):
+    saved = []
+
+    def put(**values):
+        saved.append(_settings(app, **values))
+    yield put
+    for values in reversed(saved):
+        from models import SystemConfig, db
+        with app.app_context():
+            for key, value in values.items():
+                SystemConfig.query.filter_by(key=key).delete()
+                if value is not None:
+                    db.session.add(SystemConfig(key=key, value=value))
+            db.session.commit()
+
+
+def _make(app, nodes, count, node='a', size=1000):
+    names = []
+    with app.app_context(), nodes(node):
+        for _ in range(count):
+            names.append(storage.create_archive(_payload(size))[1])
+    return names
+
+
+def _stored_names(app):
+    with app.app_context():
+        return {a['filename'] for a in shared_store.list_archives()}
+
+
+def test_retention_applies_the_disk_rule_to_the_shared_set(app, nodes, retention_settings):
+    retention_settings(backup_retention_days='30', backup_min_keep='2', backup_max_total_mb='0')
+    old = _make(app, nodes, 4, 'a')
+    recent = _make(app, nodes, 1, 'b')
+    _aged(app, old, 40)
+    with app.app_context(), nodes('b'):
+        assert schedule.run_backup_retention() == 3
+    left = _stored_names(app)
+    # the newest one of B, and the newest old one to keep two whatever their age
+    assert set(recent) <= left and old[-1] in left and not set(old[:3]) & left
+    _, chunks = _tables()
+    with app.app_context():
+        assert _count(app, chunks) >= 2
+
+
+def test_the_size_ceiling_drops_the_oldest_and_keeps_the_restore_points(app, nodes, retention_settings):
+    retention_settings(backup_retention_days='30', backup_min_keep='1', backup_max_total_mb='1')
+    names = _make(app, nodes, 3, 'a', size=600 * 1024)
+    with app.app_context(), nodes('a'):
+        assert schedule.run_backup_retention() == 2
+    assert _stored_names(app) & set(names) == {names[-1]}
+
+
+def test_two_nodes_running_retention_together_delete_once(app, nodes, retention_settings, monkeypatch):
+    retention_settings(backup_retention_days='30', backup_min_keep='1', backup_max_total_mb='0')
+    old = _make(app, nodes, 3, 'a')
+    _aged(app, old, 40)
+    chosen, release, results = threading.Event(), threading.Event(), {}
+    real = shared_store._before_deleting
+
+    def pause(victims):
+        if threading.current_thread().name == 'node-a':
+            chosen.set()
+            assert release.wait(30)
+        real(victims)
+    monkeypatch.setattr(shared_store, '_before_deleting', pause)
+
+    def run_a():
+        # Node A's pass past its own disk lock, which a node B never shares
+        with app.app_context():
+            results['a'] = schedule._apply_shared_retention(30)
+    a = threading.Thread(target=run_a, name='node-a')
+    a.start()
+    try:
+        assert chosen.wait(30)
+        with app.app_context(), nodes('b'):
+            results['b'] = schedule.run_backup_retention()  # the daily pass: no wait
+    finally:
+        release.set()
+        a.join(60)
+    assert results == {'a': 2, 'b': 0}
+    assert _stored_names(app) & set(old) == {old[-1]}
+
+
+def test_retention_asked_while_another_node_prunes_waits_then_answers_409(
+        app, auth_client, nodes, monkeypatch):
+    from api.v2.system import backup as routes
+    from models import db
+    monkeypatch.setattr(routes, 'RETENTION_LOCK_WAIT', 0.5)
+    with app.app_context(), db.engine.connect() as other:
+        shared_store._take_lock(other, 0, 'node A')
+        try:
+            with nodes('b'):
+                r = auth_client.post('/api/v2/system/backups/run-retention')
+        finally:
+            other.rollback()
+    assert r.status_code == 409, r.data
+
+
+def test_an_archive_that_does_not_read_back_is_not_stored(app, nodes, monkeypatch):
+    from services.backup.errors import BackupValidationError
+    archives, chunks = _tables()
+    before = (_count(app, archives), _count(app, chunks))
+    real = shared_store._read_chunks
+
+    def flipped(conn, archive_id, count):
+        for n, piece in enumerate(real(conn, archive_id, count)):
+            yield bytes([piece[0] ^ 1]) + piece[1:] if n == 0 else piece
+    monkeypatch.setattr(shared_store, '_read_chunks', flipped)
+    with app.app_context(), nodes('a'):
+        with pytest.raises(BackupValidationError):
+            storage.create_archive(_payload(1000))
+    assert (_count(app, archives), _count(app, chunks)) == before
+
+
+def test_a_deletion_on_b_removes_the_archive_and_its_chunks(app, auth_client, nodes):
+    _archives, chunks = _tables()
+    names = _make(app, nodes, 3, 'a', size=shared_store.CHUNK_SIZE + 1)
+    with app.app_context():
+        from models import BackupArchive
+        ids = {n: BackupArchive.query.filter_by(filename=n).one().id for n in names}
+    with nodes('b'):
+        assert auth_client.delete(f'/api/v2/system/backup/{names[0]}').status_code == 200
+        assert auth_client.delete(f'/api/v2/system/backup/{names[0]}').status_code == 404
+        assert auth_client.delete(f'/api/v2/settings/backup/{names[1]}').status_code == 204
+        r = auth_client.post('/api/v2/system/backups/bulk-delete', json={
+            'filenames': [names[2], names[2], names[0], '../x.ucmbkp']})
+        assert json.loads(r.data)['data'] == {'deleted': 1, 'missing': 1, 'invalid': 1, 'failed': 0}
+    assert not _stored_names(app) & set(names)
+    for archive_id in ids.values():
+        assert _count(app, chunks, archive_id=archive_id) == 0
+
+
+# --- 5. Scheduled and manual archives follow the same rule ---------------------------------------
+
+def test_a_manual_backup_on_a_is_encrypted_in_the_database_and_restorable_from_its_stream(
+        app, auth_client, nodes):
+    from models import SystemConfig, db
+    marker = f'{PREFIX}-plaintext-marker'
+    with app.app_context():
+        db.session.add(SystemConfig(key=f'{PREFIX}.marker', value=marker))
+        db.session.commit()
+    try:
+        with nodes('a') as dir_a:
+            r = auth_client.post('/api/v2/system/backup', json={'password': PASSWORD})
+            assert r.status_code == 200, r.data
+            name = json.loads(r.data)['data']['filename']
+            assert not _on_disk(dir_a)
+        with app.app_context():
+            with shared_store.open_archive(name) as reader:
+                stored = reader.read()
+        assert stored[:4] == container.MAGIC
+        assert marker.encode() not in stored
+        # What a restore reads (HD-1): the stream decrypts with the password
+        from services.backup.backup_service import BackupService
+        from services.backup.section_store import SectionStore
+        with app.app_context(), shared_store.open_archive(name) as reader, SectionStore() as store:
+            assert BackupService()._read_v4(reader, PASSWORD, store)
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key=f'{PREFIX}.marker').delete()
+            db.session.commit()
+
+
+def test_the_scheduled_backup_goes_to_the_database(app, nodes, retention_settings):
+    from utils.encryption import encrypt_value
+    retention_settings(auto_backup_enabled='true', backup_frequency='daily',
+                       backup_password=encrypt_value(PASSWORD), **{'backup.last_run': None,
+                                                                   'backup.concluded_run': None})
+    with app.app_context(), nodes('a') as dir_a:
+        from models import SystemConfig, db
+        SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete(
+            synchronize_session=False)
+        db.session.commit()
+        result = schedule.run_scheduled_backup()
+        assert result['status'] == 'ok', result
+        assert not _on_disk(dir_a)
+    with app.app_context():
+        assert shared_store.get_archive(result['filename'])['node'] == f'{PREFIX}-a'
+
+
+# --- 6. Same permissions as on disk --------------------------------------------------------------
+
+def test_listing_and_download_keep_their_permission(app, nodes, create_user):
+    names = _make(app, nodes, 1, 'a')
+    create_user(username=f'{PREFIX}-op', role='operator')
+    client = app.test_client()
+    r = client.post('/api/v2/auth/login', json={'username': f'{PREFIX}-op', 'password': 'TestPass123!'})
+    assert r.status_code == 200, r.data
+    try:
+        with nodes('b'):
+            for url in ('/api/v2/system/backups', f'/api/v2/system/backup/{names[0]}/download',
+                        f'/api/v2/settings/backup/{names[0]}/download',
+                        '/api/v2/settings/backup/history'):
+                r = client.get(url)
+                assert r.status_code == 403, (url, r.status_code)
+                assert names[0].encode() not in r.data
+            assert app.test_client().get('/api/v2/system/backups').status_code == 401
+    finally:
+        from models import User, UserSession, db
+        with app.app_context():
+            ids = [u.id for u in User.query.filter_by(username=f'{PREFIX}-op')]
+            UserSession.query.filter(UserSession.user_id.in_(ids)).delete(synchronize_session=False)
+            User.query.filter(User.id.in_(ids)).delete(synchronize_session=False)
+            db.session.commit()
+
+
+# --- Memory stays bounded, writing and reading ----------------------------------------------------
+
+def test_storing_and_reading_an_archive_holds_a_chunk_not_the_archive(app, nodes):
+    size = MEASURED_MB * 1024 * 1024
+    seed = _payload(shared_store.CHUNK_SIZE)
+
+    def stream():
+        for n in range(size // shared_store.CHUNK_SIZE):
+            yield seed[n % 7:] + seed[:n % 7]
+    expected = hashlib.sha256()
+    for piece in stream():
+        expected.update(piece)
+
+    bound = 12 * shared_store.CHUNK_SIZE
+    with app.app_context(), nodes('a'):
+        gc.collect()
+        rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        tracemalloc.start()
+        try:
+            _path, name = storage.create_archive(stream())
+            written = tracemalloc.get_traced_memory()[1]
+            tracemalloc.reset_peak()
+            got = hashlib.sha256()
+            for piece in shared_store.iter_archive(name):
+                got.update(piece)
+            read = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        rss_growth = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - rss_before) * 1024
+    print(f'\n{MEASURED_MB} MiB archive: peak {written / 2**20:.1f} MiB writing, '
+          f'{read / 2**20:.1f} MiB reading, peak RSS +{rss_growth / 2**20:.1f} MiB')
+    assert got.hexdigest() == expected.hexdigest()
+    assert written < bound and read < bound, (written, read)
+    assert rss_growth < 8 * bound, rss_growth
+
+
+def test_the_store_lock_is_per_schema(app):
+    from models import db
+    with app.app_context(), db.engine.connect() as conn:
+        shared_store._take_lock(conn, 0, 'test')
+        held = conn.execute(text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                                 "AND pid = pg_backend_pid()")).scalar()
+        conn.rollback()
+    assert held == 1
+
+
+def test_the_fips_preflight_reads_the_kdf_of_the_stored_archives(app, nodes):
+    from services import fips_preflight
+    argon = container.MAGIC + bytes([4, 0, container.KDF_ARGON2ID]) + _payload(64)
+    pbkdf2 = container.MAGIC + bytes([4, 0, 1]) + _payload(64)
+    names = _make(app, nodes, 0)
+    with app.app_context(), nodes('a'):
+        names = [storage.create_archive(data)[1] for data in (argon, pbkdf2)]
+        found = fips_preflight._backup_archives()
+    assert names[0] in found and names[1] not in found

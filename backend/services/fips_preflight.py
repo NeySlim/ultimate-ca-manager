@@ -456,6 +456,10 @@ def _backup_schedule():
           'Keep them for a standard instance, and take a manual backup with kdf "pbkdf2" '
           'before the switch.')
 def _backup_archives():
+    from services.backup import shared_store
+    if shared_store.enabled():
+        return [name for name, head in shared_store.archive_heads(container.HEADER_PREFIX_SIZE)
+                if head[:4] == container.MAGIC and len(head) > 6 and head[6] == container.KDF_ARGON2ID]
     found = []
     for path in sorted(_existing_archives()):
         try:
