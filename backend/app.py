@@ -1035,6 +1035,7 @@ def create_app(config_name=None):
         with app.app_context():
             from services.hsm.hsm_service import HsmService
             HsmService.auto_register_softhsm()
+            HsmService.warn_local_softhsm()
     except Exception as e:
         app.logger.debug(f"SoftHSM auto-register skipped: {e}")
     
@@ -1274,6 +1275,9 @@ def create_app(config_name=None):
             response.headers.extend(
                 (k, v) for k, v in e.get_headers() if k.lower() != 'content-type')
             return response, code
+        from utils.ha import HaRestricted, ha_refusal
+        if isinstance(e, HaRestricted):
+            return ha_refusal(str(e))
         from fips_mode import FipsRestricted, PROBLEM_TYPE as FIPS_PROBLEM
         if isinstance(e, FipsRestricted):
             from compliance_profiles import ProfileRestricted, PROBLEM_TYPE as PROFILE_PROBLEM

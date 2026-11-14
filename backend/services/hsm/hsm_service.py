@@ -24,6 +24,7 @@ from services.hsm.base_provider import (
 )
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
+from utils.ha import SOFTHSM_LOCAL, ha_enabled, refuse_softhsm_in_ha
 from utils.process_lock import LockBusyError, process_lock
 from utils import hsm_check, pkcs11_config
 
@@ -200,6 +201,7 @@ class HsmService:
             raise ValueError(error)
         if compliance_signer.softhsm_config(provider_type, config, name):
             fips_mode.refuse_softhsm()
+            refuse_softhsm_in_ha()
 
         # Check name uniqueness
         if HsmProvider.query.filter_by(name=name).first():
@@ -261,6 +263,7 @@ class HsmService:
         if not compliance_signer.softhsm_provider(provider) and compliance_signer.softhsm_config(
                 provider.type, provider.get_config() if config is None else config, name or provider.name):
             fips_mode.refuse_softhsm()
+            refuse_softhsm_in_ha()
 
         if name:
             # Check name uniqueness
@@ -430,6 +433,8 @@ class HsmService:
         provider = db.session.get(HsmProvider, provider_id)
         if not provider:
             raise ValueError(f"Provider not found: {provider_id}")
+        if compliance_signer.softhsm_provider(provider):
+            refuse_softhsm_in_ha()
         
         # Validate algorithm
         if algorithm not in HsmKey.VALID_ALGORITHMS:
@@ -824,6 +829,17 @@ class HsmService:
         return True
 
     @staticmethod
+    def warn_local_softhsm():
+        """HA node start: say once that SoftHSM providers only work where their token is."""
+        if not ha_enabled():
+            return []
+        names = [p.name for p in HsmProvider.query.all() if compliance_signer.softhsm_provider(p)]
+        if names:
+            logger.warning("HA: SoftHSM provider(s) %s keep their token on this node only; "
+                           "CAs on those keys cannot sign elsewhere", ", ".join(names))
+        return names
+
+    @staticmethod
     def auto_register_softhsm():
         """
         Auto-register SoftHSM provider from Docker entrypoint env vars.
@@ -895,6 +911,9 @@ class HsmService:
             fips_mode.refuse_softhsm()
         except fips_mode.FipsRestricted as e:
             logger.warning("SoftHSM-Default not registered: %s", e)
+            return
+        if ha_enabled():
+            logger.warning("SoftHSM-Default not registered: %s", SOFTHSM_LOCAL)
             return
 
         try:

@@ -482,6 +482,8 @@ export INITIAL_ADMIN_PASSWORD_FILE="${UCM_INITIAL_ADMIN_PASSWORD_FILE}"
 if command -v softhsm2-util >/dev/null 2>&1; then
     if softhsm2-util --show-slots 2>/dev/null | grep -qE '^ *Label: +UCM-Default *$'; then
         echo -e "${GREEN}🔐 SoftHSM tokens found${NC}"
+    elif ucm_ha_active; then
+        echo -e "${YELLOW}🔐 $(ucm_ha_skip_softhsm_token)${NC}"
     elif [ "${HSM_AUTO_INIT:-true}" = "true" ]; then
         echo -e "${CYAN}🔐 Initializing SoftHSM default token...${NC}"
         HSM_PIN="${HSM_PIN:-$(openssl rand -hex 8)}"

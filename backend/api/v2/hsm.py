@@ -10,6 +10,7 @@ Supports:
 
 from flask import Blueprint, request, g
 from fips_mode import FipsRestricted
+from utils.ha import HaRestricted
 from auth.unified import require_auth
 from utils.secret_target import MASKS, changed_targets, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
@@ -125,7 +126,7 @@ def create_provider():
         
         return created_response(data=provider.to_dict())
         
-    except FipsRestricted:
+    except (FipsRestricted, HaRestricted):
         raise
     except ValueError as e:
         logger.warning(f"HSM provider validation error: {e}")
@@ -258,7 +259,7 @@ def update_provider(provider_id):
         
         return success_response(data=updated.to_dict(include_config=True))
         
-    except FipsRestricted:
+    except (FipsRestricted, HaRestricted):
         raise
     except ValueError as e:
         logger.warning(f"HSM provider update validation error: {e}")
@@ -527,7 +528,7 @@ def generate_key(provider_id):
         
         return created_response(data=key.to_dict())
         
-    except FipsRestricted:
+    except (FipsRestricted, HaRestricted):
         raise
     except ValueError as e:
         # Only the service's own checks raise ValueError (provider failures become HsmError)
