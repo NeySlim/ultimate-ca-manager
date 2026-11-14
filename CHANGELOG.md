@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Account: disabling 2FA or regenerating recovery codes now counts its TOTP or recovery code against the login's second-factor lockout, so a stolen session can no longer guess the code without limit; past `max_login_attempts` both answer 429 and the account's next login waits for the lock to expire.
 - Dependencies: dnspython 2.9.2, which bounds the services of a WKS record (CVE-2026-128089). UCM parses record text only for TXT values it computes, so no UCM path was exposed.
 
 ## [2.254] - 2026-11-13
