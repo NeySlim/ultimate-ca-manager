@@ -11,6 +11,7 @@ from tests.migration_contract_support import BACKENDS, check, post_pivot_names, 
 @pytest.mark.parametrize('dialect', BACKENDS)
 def test_no_migration_after_the_upgrade_removes_or_narrows_without_the_mark(dialect, tmp_path,
                                                                              monkeypatch):
+    """No migration follows 300 yet, so this passes either way today: only the factices prove the measure."""
     import migration_runner
     results = check(dialect, tmp_path, monkeypatch, migration_runner.MIGRATIONS_DIR, 'real')
     assert set(results) == set(post_pivot_names(migration_runner.MIGRATIONS_DIR))
