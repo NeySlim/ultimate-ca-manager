@@ -270,3 +270,46 @@ def test_key_alone_does_not_add_a_step_without_2fa(app, make_user):
     data = get_json(_password(c, username))['data']
     assert not data.get('requires_2fa')
     assert _logged_in(c)
+
+
+@pytest.fixture
+def lockout_writes(monkeypatch):
+    """Session state pending in the request each time the lockout row is committed."""
+    import api.v2.auth_methods as am
+    seen = []
+    for name in ('_reserve_2fa_attempt', '_clear_2fa_failures'):
+        def spy(*args, _real=getattr(am, name), _name=name):
+            s = db.session
+            seen.append((_name, [repr(o) for o in (*s.new, *s.dirty, *s.deleted)]))
+            return _real(*args)
+        monkeypatch.setattr(am, name, spy)
+    return seen
+
+
+def test_lockout_commits_carry_nothing_else_of_the_request(app, make_user, lockout_writes):
+    """Reserving or clearing commits db.session mid-request: nothing else may be pending."""
+    username, key, secret = make_user()
+    c = app.test_client()
+    _password(c, username)
+    assert _post(c, '/api/v2/auth/login/2fa', {'code': '00000000'}).status_code == 401
+    _challenge(c)
+    assert _verify(c, key.assert_(_b64url(b'z' * 32))).status_code == 401
+    assert _post(c, '/api/v2/auth/login/2fa', {'code': pyotp.TOTP(secret).now()}).status_code == 200
+
+    username, key, _ = make_user()
+    c = app.test_client()
+    _password(c, username)
+    assert _verify(c, key.assert_(_challenge(c))).status_code == 200
+
+    username, key, _ = make_user()
+    c = app.test_client()
+    challenge = get_json(_post(c, '/api/v2/auth/login/webauthn/start',
+                               {'username': username}))['data']['options']['challenge']
+    assert _post(c, '/api/v2/auth/login/webauthn/verify',
+                 {'username': username, 'response': key.assert_(challenge)}).status_code == 200
+    assert _post(c, '/api/v2/auth/login/webauthn/verify',
+                 {'username': f'nobody-{uuid.uuid4().hex[:8]}', 'response': {'id': 'x'}}).status_code == 401
+
+    assert [name for name, _ in lockout_writes].count('_clear_2fa_failures') == 3
+    assert len(lockout_writes) == 9
+    assert all(not pending for _, pending in lockout_writes), lockout_writes
