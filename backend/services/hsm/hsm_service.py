@@ -836,7 +836,14 @@ class HsmService:
         """HA node start: say once that SoftHSM providers only work where their token is."""
         if not ha_enabled():
             return []
-        names = [p.name for p in HsmProvider.query.all() if compliance_signer.softhsm_provider(p)]
+        names = []
+        for provider in HsmProvider.query.all():
+            try:
+                if compliance_signer.softhsm_provider(provider):
+                    names.append(provider.name)
+            except Exception as exc:
+                # One unreadable configuration must not hide the others
+                logger.warning("HA: HSM provider %s could not be read: %s", provider.name, type(exc).__name__)
         if names:
             logger.warning("HA: SoftHSM provider(s) %s keep their token on this node only; "
                            "CAs on those keys cannot sign elsewhere", ", ".join(names))

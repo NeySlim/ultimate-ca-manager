@@ -27,6 +27,21 @@ def _count(app):
         return HsmProvider.query.count()
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _drop_the_providers_created(app):
+    from models import db
+    from models.hsm import HsmProvider
+    with app.app_context():
+        before = {p.id for p in HsmProvider.query.all()}
+        db.session.remove()
+    yield
+    with app.app_context():
+        for provider in HsmProvider.query.filter(HsmProvider.id.notin_(before)).all():
+            db.session.delete(provider)
+        db.session.commit()
+        db.session.remove()
+
+
 @pytest.fixture
 def ha(monkeypatch):
     monkeypatch.setattr(Config, 'HA_MODE', True)
@@ -109,12 +124,16 @@ class TestInHa:
         from models.hsm import HsmProvider
         from services.hsm.hsm_service import HsmService
         with app.app_context():
+            # Not committed: a row another file left comes back with the rollback
             HsmProvider.query.filter_by(name='SoftHSM-Default').delete()
-            db.session.commit()
+            db.session.flush()
             monkeypatch.setenv('HSM_DEFAULT_PIN', '1234')
-            with patch('utils.hsm_check._find_softhsm', return_value=SOFT):
-                HsmService.auto_register_softhsm()
-            assert HsmProvider.query.filter_by(name='SoftHSM-Default').first() is None
+            try:
+                with patch('utils.hsm_check._find_softhsm', return_value=SOFT):
+                    HsmService.auto_register_softhsm()
+                assert HsmProvider.query.filter_by(name='SoftHSM-Default').first() is None
+            finally:
+                db.session.rollback()
 
     def test_an_existing_softhsm_provider_is_named_in_one_warning(self, app, ha, caplog):
         from models import db
@@ -132,6 +151,34 @@ class TestInHa:
                 assert caplog.text.count(name) == 1 and 'this node only' in caplog.text
             finally:
                 db.session.delete(row)
+                db.session.commit()
+
+    def test_a_provider_whose_config_cannot_be_read_does_not_silence_the_warning(
+            self, app, ha, caplog, monkeypatch):
+        from models import db
+        from models.hsm import HsmProvider
+        from services.hsm.hsm_service import HsmService
+        name, broken = (f'{kind}-{uuid.uuid4().hex[:6]}' for kind in ('old-softhsm', 'unreadable'))
+        read = HsmProvider.get_config
+
+        def get_config(self):
+            if self.name == broken:
+                raise ValueError('cannot decrypt')
+            return read(self)
+        monkeypatch.setattr(HsmProvider, 'get_config', get_config)
+        with app.app_context():
+            rows = [HsmProvider(type='pkcs11', name=n, config=json.dumps({'module_path': SOFT}))
+                    for n in (broken, name)]
+            db.session.add_all(rows)
+            db.session.commit()
+            try:
+                with caplog.at_level('WARNING'):
+                    names = HsmService.warn_local_softhsm()
+                assert name in names and broken not in names
+                assert 'this node only' in caplog.text
+            finally:
+                for row in rows:
+                    db.session.delete(row)
                 db.session.commit()
 
 
