@@ -550,3 +550,27 @@ def test_a_venv_built_before_fips_came_back_is_built_again(tmp_path, package, be
         assert len(venvs) == 2 and venvs[0] < archiver < venvs[1]
         assert 'building it again against the system OpenSSL' in out.stdout
 
+
+POSTRM = ROOT / 'packaging' / 'debian' / 'postrm'
+
+
+@pytest.mark.parametrize('action, removed', [('purge', True), ('remove', False)])
+def test_a_purge_removes_the_pending_mark(tmp_path, action, removed):
+    """The mark is no package file: dpkg leaves it, the purge takes it (a journal left in
+    the archive still sends the next install through the archiver)."""
+    env, log, home, *_ = _post_sandbox(tmp_path, 0)
+    (bin_rm := pathlib.Path(env['PATH']) / 'rm').write_text(
+        f'#!{POSIX_SH}\necho "rm $*" >> "$LOG"\nexec {shutil.which("rm")} "$@"\n')
+    bin_rm.chmod(0o755)
+    (home / PENDING).write_text('')
+    text = POSTRM.read_text()
+    assert text.count('UCM_HOME=/opt/ucm\n') == 1
+    script = tmp_path / 'postrm.sandboxed'
+    # Every other path it removes is outside the sandbox: only the mark's rm may run
+    script.write_text(text.replace('UCM_HOME=/opt/ucm\n', f'UCM_HOME={home}\n')
+                      .replace('rm -rf /', 'echo rm -rf /'))
+    out = subprocess.run(['/bin/bash', str(script), action], capture_output=True, text=True,
+                         timeout=20, env=env)
+    assert out.returncode == 0, out.stderr
+    assert (home / PENDING).exists() is not removed
+    assert all(c.startswith(f'rm -f {home}/') for c in _calls(log) if c.startswith('rm '))

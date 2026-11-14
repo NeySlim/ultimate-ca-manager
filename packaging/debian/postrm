@@ -4,6 +4,8 @@
 
 set -e
 
+UCM_HOME=/opt/ucm
+
 case "$1" in
     remove)
         # Stop service
@@ -20,6 +22,8 @@ case "$1" in
         rm -rf /var/lib/ucm
         rm -rf /etc/ucm
         rm -rf /var/log/ucm
+        # Not a package file: the mark of an unfinished archiving would outlive the purge
+        rm -f "$UCM_HOME/.leftover-archive-pending"
         
         # Remove user and group
         if getent passwd ucm >/dev/null 2>&1; then
