@@ -46,6 +46,10 @@ def _ca_policies(parent_refid, dn, key_type, hsm_key_id, hsm_key_algorithm,
     if hsm_key_id:
         hsm_key = db.session.get(HsmKey, hsm_key_id)
         label = hsm_key.algorithm if hsm_key else None
+        if hsm_key is not None:
+            # Bound only if it signs: the signing rule and its message, ahead of the policies
+            from services.hsm import HsmService
+            HsmService.refuse_signing_in_fips_mode(hsm_key)
     else:
         label = hsm_key_algorithm or key_type
     policies = PolicyEvaluationService.applicable_policies(
@@ -201,7 +205,7 @@ class CACreationMixin:
                 raise ValueError(
                     f"HSM key {hsm_key.label} is already bound to another CA"
                 )
-            HsmService.refuse_in_fips_mode(hsm_key.algorithm)
+            HsmService.refuse_signing_in_fips_mode(hsm_key)
         else:
             if not (hsm_provider_id and hsm_key_label and hsm_key_algorithm):
                 raise ValueError(

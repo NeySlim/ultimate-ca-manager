@@ -325,9 +325,9 @@ class TestSshAndHsm:
             for body in ({'hsmKeyId': key_id}, {'hsmProviderId': provider_id, 'hsmKeyLabel': f'new-{suffix}',
                                                 'hsmKeyAlgorithm': 'ML-DSA-65'}):
                 r = _post(auth_client, '/api/v2/cas', {**base, **body})
-                if approves:
+                if approves or 'hsmKeyId' in body:  # an existing key: the signing rule, at binding
                     _assert_fips_problem(r, 'ML-DSA-65')
-                else:  # the FIPS mode policy refuses it first, as before
+                else:  # the FIPS mode policy refuses a key to generate first, as before
                     assert r.status_code == 400 and 'Key type ML-DSA-65 is not allowed by policy "FIPS mode"' \
                         in r.get_json()['detail'], r.get_json()
         finally:
@@ -844,6 +844,45 @@ class TestPreflight:
                 db.session.delete(target)
                 db.session.commit()
 
+
+
+class TestHsmCaBindingInFipsMode:
+    """Binding an existing HSM key to a new CA applies the signing rule before anything is loaded."""
+
+    @pytest.mark.parametrize('algorithm,public,name', [
+        ('UNKNOWN', lambda: None, 'UNKNOWN'),
+        ('RSA-1024', lambda: _pem(_rsa_public(1024)), 'RSA 1024'),
+        ('UNKNOWN', lambda: _pem(_ec_public(ec.SECP256K1())), 'EC secp256k1'),
+    ])
+    def test_refused_at_creation_without_a_row(self, auth_client, hsm_signing_key, fips_on,
+                                               algorithm, public, name):
+        key = hsm_signing_key(algorithm, public())
+        before = CA.query.count()
+        r = _post(auth_client, '/api/v2/cas', {'type': 'root', 'commonName': f'bind {uuid.uuid4().hex[:6]}',
+                                               'organization': 'T', 'hsm_key_id': key.id})
+        _assert_fips_problem(r, name)
+        assert r.get_json()['detail'] == f'{name} keys not available in FIPS mode'
+        assert CA.query.count() == before
+        assert CA.query.filter_by(hsm_key_id=key.id).first() is None
+
+    def test_an_approved_key_is_bound(self, monkeypatch, auth_client, hsm_signing_key, fips_on):
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+        from services.hsm import HsmService
+        private = rsa.generate_private_key(65537, 2048)
+
+        class _Signer(_SigningStub):
+            def sign(self, key_identifier, data, algorithm=None, hash_algorithm=None, **kwargs):
+                return private.sign(data, padding.PKCS1v15(), getattr(hashes, hash_algorithm.upper())())
+
+        monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: _Signer()))
+        key = hsm_signing_key('RSA-2048', _pem(private.public_key()))
+        r = _post(auth_client, '/api/v2/cas', {'type': 'root', 'commonName': f'bind ok {uuid.uuid4().hex[:6]}',
+                                               'organization': 'T', 'hsm_key_id': key.id})
+        assert r.status_code == 201, r.get_json()
+        row = CA.query.filter_by(hsm_key_id=key.id).one()
+        db.session.delete(row)
+        db.session.commit()
 
 
 class TestHsmSignApiInFipsMode:
