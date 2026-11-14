@@ -721,6 +721,33 @@ class TestPreflight:
                 db.session.delete(provider)
                 db.session.commit()
 
+    @pytest.mark.parametrize('approves', [(), ALL])
+    def test_hsm_classical_cas_are_not_listed(self, monkeypatch, app, hsm_signing_key, fips_on, approves):
+        # The HSM exception covers only what the module alone approves: RSA and NIST curves pass
+        from cryptography.hazmat.primitives import hashes
+        from services import fips_preflight
+        _module(monkeypatch, approves)
+        rows = []
+        for algorithm, private in (('RSA-2048', rsa.generate_private_key(65537, 2048)),
+                                   ('EC-P256', ec.generate_private_key(ec.SECP256R1()))):
+            key = hsm_signing_key(algorithm, _pem(private.public_key()))
+            cert = _self_signed_ca(private, f'pf hsm {algorithm} {uuid.uuid4().hex[:6]}', hashes.SHA256())
+            row = CA(refid=str(uuid.uuid4()), descr=cert.subject.rfc4514_string(), serial=0,
+                     hsm_key_id=key.id,
+                     crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode())
+            db.session.add(row)
+            rows.append(row)
+        db.session.commit()
+        try:
+            ids = [f'(#{r.id})' for r in rows]
+            listed = (fips_preflight._ca_weak() + fips_preflight._ca_eddsa()
+                      + fips_preflight._ca_unapproved_algorithm())
+            assert not [f for f in listed if any(i in f for i in ids)], listed
+        finally:
+            for row in rows:
+                db.session.delete(row)
+            db.session.commit()
+
     def test_hsm_brainpool_keys_are_listed(self, hsm_signing_key, fips_on):
         from services import fips_preflight
         key = hsm_signing_key('EC-BP256', _pem(ec.generate_private_key(ec.BrainpoolP256R1()).public_key()))
@@ -804,9 +831,10 @@ class TestHsmSignApiInFipsMode:
         db.session.add(row)
         db.session.commit()
         yield row.id
-        from models import Certificate, CRLMetadata
+        from models import Certificate, CRLMetadata, OCSPResponse
         Certificate.query.filter_by(caref=row.refid).delete()
         CRLMetadata.query.filter_by(ca_id=row.id).delete()
+        OCSPResponse.query.filter_by(ca_id=row.id).delete()
         db.session.delete(row)
         db.session.commit()
 
