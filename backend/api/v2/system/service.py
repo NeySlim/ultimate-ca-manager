@@ -3,8 +3,8 @@ System Service Operations (HSM, Chain Repair, Service Status)
 """
 
 from . import bp
-from flask import request
-from auth.unified import require_auth
+from flask import g, request
+from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response
 from services.audit_service import AuditService
 from services.ski_aki_backfill import get_last_run_stats as get_backfill_stats
@@ -142,6 +142,14 @@ def run_chain_repair():
         return error_response("Chain repair failed", 500)
 
 
+def _visible_blockers():
+    """Startup blockers; their examples name users and objects, so only admin:system sees them."""
+    blockers = fips_preflight.startup_blockers()
+    if blockers is None or has_permission('admin:system', getattr(g, 'permissions', None) or []):
+        return blockers
+    return [{k: f[k] for k in ('id', 'severity', 'title', 'count')} for f in blockers]
+
+
 @bp.route('/api/v2/system/service/status', methods=['GET'])
 @require_auth(['read:settings'])
 def get_service_status():
@@ -170,7 +178,7 @@ def get_service_status():
             'memory_mb': memory_mb,
             'is_docker': is_docker_env,
             'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
-            'crypto': {**fips_mode.status(), 'blockers': fips_preflight.startup_blockers()},
+            'crypto': {**fips_mode.status(), 'blockers': _visible_blockers()},
         }
         if ha_enabled():
             # Per-node detail stays behind authentication; /health names no other node

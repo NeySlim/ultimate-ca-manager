@@ -2744,7 +2744,8 @@ GET /api/v2/system/service/status
 # module follows its own security policy. "blockers": the blocker findings
 # (id, severity, title, count, examples, remedy) of the FIPS readiness check
 # this node last ran in FIPS mode, at startup or through fips-preflight; null
-# outside FIPS mode or before any check.
+# outside FIPS mode or before any check. Without admin:system each finding
+# keeps only id, severity, title and count.
 "crypto": {
   "fips_requested": true,
   "fips_active": true,

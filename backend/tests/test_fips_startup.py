@@ -304,6 +304,26 @@ class TestApi:
         crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
         assert crypto['blockers'] == found
 
+    def test_status_hides_blocker_examples_without_admin_system(self, app, monkeypatch,
+                                                                create_user, auth_client, request):
+        """read:settings sees what blocks and how many; the names need admin:system."""
+        from services import fips_preflight
+        found = [{'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1,
+                  'examples': ['alice (#3)'], 'remedy': 'r'}]
+        monkeypatch.setattr(fips_preflight, '_startup', {'blockers': found})
+        user = create_user(username='fips-status-operator', password='Operator-Pass-123!',
+                           role='operator')
+        request.addfinalizer(lambda: auth_client.delete(f"/api/v2/users/{user['id']}"))
+        client = app.test_client()
+        assert client.post('/api/v2/auth/login', json={
+            'username': 'fips-status-operator', 'password': 'Operator-Pass-123!'}).status_code == 200
+        assert client.get('/api/v2/system/fips-preflight').status_code == 403
+        r = client.get('/api/v2/system/service/status')
+        assert r.status_code == 200
+        assert 'alice' not in r.get_data(as_text=True)
+        assert r.get_json()['data']['crypto']['blockers'] == [
+            {'id': 'users.password_scrypt', 'severity': 'blocker', 'title': 't', 'count': 1}]
+
     @pytest.mark.parametrize('active', [True, False])
     def test_health_says_whether_fips_is_on_without_versions(self, client, monkeypatch, active):
         monkeypatch.setattr(fips_mode, 'enabled', lambda: active)
