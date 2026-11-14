@@ -220,12 +220,12 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormKeyUsage(createFormType === 'root' && !mldsaKey ? ROOT_KEY_USAGE : INTERMEDIATE_KEY_USAGE)
     setCreateFormEkuServerAuth(false)
   }, [createFormType, mldsaKey])
-  const { fips, mldsa } = policyLimits
+  const { fips, fipsKeys, mldsa } = policyLimits
   const allowedLocalKeys = useMemo(
     () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))
-      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, mldsa })
+      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, fipsKeys, mldsa })
       && !(pqStandalone && isPostQuantum(caKeyLabel(algo, size)))),
-    [allowedKeyTypes, fips, mldsa, pqStandalone],
+    [allowedKeyTypes, fips, fipsKeys, mldsa, pqStandalone],
   )
   const allowedDigestChoices = useMemo(
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
@@ -272,16 +272,16 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
   // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
   const hsmAlgorithms = useMemo(
-    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, mldsa })
+    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, fipsKeys, mldsa })
       .filter(a => isAllowed(allowedKeyTypes, a.label) && !(pqStandalone && isPostQuantum(a.label))),
-    [allowedKeyTypes, hsmProviderType, fips, mldsa, pqStandalone])
+    [allowedKeyTypes, hsmProviderType, fips, fipsKeys, mldsa, pqStandalone])
   const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
   // Existing keys pass the same filters; one outside the registry (RSA-8192) is refused only in FIPS mode
   const usableHsmKeys = useMemo(() => hsmKeys.filter(k => {
     const row = findAlgorithm(k.algorithm)
-    return isAllowed(allowedKeyTypes, k.algorithm) && (row ? isUsable(row, { fips, mldsa }) : !fips)
+    return isAllowed(allowedKeyTypes, k.algorithm) && (row ? isUsable(row, { fips, fipsKeys, mldsa }) : !fips)
       && !(pqStandalone && isPostQuantum(k.algorithm))
-  }), [hsmKeys, allowedKeyTypes, fips, mldsa, pqStandalone])
+  }), [hsmKeys, allowedKeyTypes, fips, fipsKeys, mldsa, pqStandalone])
   // An HSM key synced from the token may be an RSA size the registry does not list ('RSA-8192')
   const keyIsRsa = keyRow?.family === 'RSA' || /^RSA-\d+$/.test(keyLabel ?? '')
   const pssAvailable = keyIsRsa && (keyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))

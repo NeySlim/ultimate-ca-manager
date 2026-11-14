@@ -73,6 +73,16 @@ describe('SSHCAsPage key algorithm in FIPS mode (#399)', () => {
     expect(create.mock.calls[0][0].key_type).toBe('ecdsa-p256')
   })
 
+  it('keeps Ed25519 in FIPS mode when the server module approves it', async () => {
+    getEffective.mockResolvedValue({ data: { fips: true, fips_key_types: ['RSA-2048', 'EC-P256', 'ED25519'] } })
+    const form = await createCa()
+    await waitFor(() => expect(getEffective).toHaveBeenCalled())
+    expect(form.textContent).toContain('Ed25519')
+    fireEvent.click(form.querySelector('button[type="submit"]'))
+    await waitFor(() => expect(create).toHaveBeenCalled())
+    expect(create.mock.calls[0][0].key_type).toBe('ed25519')
+  })
+
   it('keeps Ed25519 as the default outside FIPS mode', async () => {
     getEffective.mockResolvedValue({ data: { allowed_key_types: null } })
     const form = await createCa()

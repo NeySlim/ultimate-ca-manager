@@ -20,7 +20,7 @@ import { sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useClipboard, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
-import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshKeyOptions, useFipsMode } from '../lib/policyAlgorithms'
+import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 
 const KEY_ALGORITHM_OPTIONS = [
   { value: 'ed25519', label: 'Ed25519' },
@@ -696,13 +696,14 @@ function SSHCAModal({ ca, onSave, onClose }) {
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
 
-  // FIPS mode offers no Ed25519: a new CA then defaults to ECDSA P-256
-  const fips = useFipsMode()
+  // FIPS mode on a module without Ed25519: a new CA then defaults to ECDSA P-256
+  const { fips, fipsKeys } = useKeyPlatform()
+  const eddsaRefused = sshEddsaRefused(fips, fipsKeys)
   useEffect(() => {
-    if (!fips || ca) return
+    if (!eddsaRefused || ca) return
     setFormData(prev => (SSH_EDDSA_KEY_TYPES.includes(prev.key_algorithm)
       ? { ...prev, key_algorithm: SSH_FIPS_DEFAULT_KEY_TYPE } : prev))
-  }, [fips, ca])
+  }, [eddsaRefused, ca])
 
   const toggleExtension = (ext) => {
     setFormData(prev => {
@@ -776,7 +777,7 @@ function SSHCAModal({ ca, onSave, onClose }) {
           label={t('sshCas.keyAlgorithm')}
           value={formData.key_algorithm}
           onChange={value => handleChange('key_algorithm', value)}
-          options={ca ? KEY_ALGORITHM_OPTIONS : sshKeyOptions(KEY_ALGORITHM_OPTIONS, fips)}
+          options={ca ? KEY_ALGORITHM_OPTIONS : sshKeyOptions(KEY_ALGORITHM_OPTIONS, fips, fipsKeys)}
           disabled={!!ca}
         />
       </div>

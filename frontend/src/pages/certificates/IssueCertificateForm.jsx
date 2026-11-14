@@ -148,13 +148,13 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   }, [initialData])
 
   // Key types the policies of this CA/template allow (#397); the server enforces them regardless
-  const { allowedKeyTypes, fips, mldsa, pqStandalone, defaultKeyType } = useEffectiveAlgorithms({
+  const { allowedKeyTypes, fips, fipsKeys, mldsa, pqStandalone, defaultKeyType } = useEffectiveAlgorithms({
     caId: formData.ca_id, templateId: selectedTemplate,
   })
   const pairKeys = useMemo(
     () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))
-      && isUsable(findAlgorithm(issueKeyLabel(type, size)), { fips, mldsa })),
-    [allowedKeyTypes, fips, mldsa],
+      && isUsable(findAlgorithm(issueKeyLabel(type, size)), { fips, fipsKeys, mldsa })),
+    [allowedKeyTypes, fips, fipsKeys, mldsa],
   )
   // A post-quantum key the policies refuse alone (pq_standalone) is offered in a hybrid pair only
   const allowedKeys = useMemo(

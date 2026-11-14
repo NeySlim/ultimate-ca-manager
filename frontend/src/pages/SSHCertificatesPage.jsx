@@ -21,7 +21,7 @@ import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
-import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshKeyOptions, useFipsMode } from '../lib/policyAlgorithms'
+import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshEddsaRefused, sshKeyOptions, useKeyPlatform } from '../lib/policyAlgorithms'
 
 // ============= CONSTANTS =============
 
@@ -807,11 +807,12 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
   const [keyId, setKeyId] = useState('')
   const [publicKey, setPublicKey] = useState('')
   const [keyAlgorithm, setKeyAlgorithm] = useState('ed25519')
-  // FIPS mode offers no Ed25519: generated keys then default to ECDSA P-256
-  const fips = useFipsMode()
+  // FIPS mode on a module without Ed25519: generated keys then default to ECDSA P-256
+  const { fips, fipsKeys } = useKeyPlatform()
+  const eddsaRefused = sshEddsaRefused(fips, fipsKeys)
   useEffect(() => {
-    if (fips) setKeyAlgorithm(prev => (SSH_EDDSA_KEY_TYPES.includes(prev) ? SSH_FIPS_DEFAULT_KEY_TYPE : prev))
-  }, [fips])
+    if (eddsaRefused) setKeyAlgorithm(prev => (SSH_EDDSA_KEY_TYPES.includes(prev) ? SSH_FIPS_DEFAULT_KEY_TYPE : prev))
+  }, [eddsaRefused])
   const [principalsText, setPrincipalsText] = useState('')
   const [validityPreset, setValidityPreset] = useState('24h')
   const [customFrom, setCustomFrom] = useState('')
@@ -1025,7 +1026,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
           <Select
             value={keyAlgorithm}
             onChange={setKeyAlgorithm}
-            options={sshKeyOptions(KEY_ALGORITHMS, fips)}
+            options={sshKeyOptions(KEY_ALGORITHMS, fips, fipsKeys)}
           />
         </div>
       )}
