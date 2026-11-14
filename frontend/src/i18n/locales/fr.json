@@ -1076,7 +1076,17 @@
     "withdrawParentTitle": "Retirer le lien avec la parente",
     "withdrawParentWarning": "Cette CA restera sans parente tant que le lien n'aura pas été confirmé à nouveau.",
     "withdrawParentDone": "Lien avec la parente retiré",
-    "withdrawParentFailed": "Impossible de retirer le lien avec la parente"
+    "withdrawParentFailed": "Impossible de retirer le lien avec la parente",
+    "uniqueSubject": "Sujet unique",
+    "uniqueSubjectEnforced": "Imposé",
+    "uniqueSubjectNotEnforced": "Non imposé",
+    "uniqueSubjectHelp": "Imposé, cette AC refuse un certificat dont le sujet est déjà porté par un certificat d'une autre entité, même expiré ou révoqué (RFC 5280 §4.1.2.6).",
+    "enforceUniqueSubject": "Imposer",
+    "stopEnforcingUniqueSubject": "Ne plus imposer",
+    "uniqueSubjectChanged": "Réglage du sujet unique mis à jour",
+    "uniqueSubjectChangeFailed": "Le réglage du sujet unique n'a pas pu être mis à jour",
+    "uniqueSubjectShared_one": "{{count}} sujet est déjà partagé par plusieurs entités : sa prochaine émission pour une autre entité sera refusée",
+    "uniqueSubjectShared_other": "{{count}} sujets sont déjà partagés par plusieurs entités : leur prochaine émission pour une autre entité sera refusée"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -1259,7 +1269,10 @@
       "renewedWithRelated": "Certificat renouvelé, avec son certificat lié n°{{id}}",
       "bulkRelatedRenewed": "{{count}} certificats liés renouvelés avec la sélection"
     },
-    "renewed": "Certificat renouvelé"
+    "renewed": "Certificat renouvelé",
+    "subjectTakenTitle": "Sujet déjà utilisé",
+    "subjectTakenConfirm": "Le sujet {{subject}} est déjà porté par le certificat de numéro de série {{serial}}, émis par cette AC pour une autre entité. Émettre quand même ? La dérogation est inscrite au journal d'audit.",
+    "issueAnyway": "Émettre quand même"
   },
   "common": {
     "saved": "Paramètres enregistrés",

@@ -35,9 +35,10 @@ export const csrsService = {
     })
   },
 
-  // extra_sans: { san_dns, san_ip, san_email, san_uri } added to the request's names
-  async sign(id, ca_id, validity_days, cert_type = 'server', extra_ekus = [], extra_sans = {}) {
-    const payload = { ca_id, validity_days, cert_type, ...extra_sans }
+  // extra_sans: { san_dns, san_ip, san_email, san_uri } added to the request's names;
+  // options: { override_unique_subject } once the operator confirmed a taken subject
+  async sign(id, ca_id, validity_days, cert_type = 'server', extra_ekus = [], extra_sans = {}, options = {}) {
+    const payload = { ca_id, validity_days, cert_type, ...extra_sans, ...options }
     if (Array.isArray(extra_ekus) && extra_ekus.length) payload.extra_ekus = extra_ekus
     return apiClient.post(`/csrs/${id}/sign`, payload)
   },

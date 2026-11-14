@@ -870,7 +870,10 @@
       "renewedWithRelated": "Сертифікат поновлено разом із пов'язаним сертифікатом #{{id}}",
       "bulkRelatedRenewed": "Разом із вибраними поновлено пов'язаних сертифікатів: {{count}}"
     },
-    "renewed": "Сертифікат поновлено"
+    "renewed": "Сертифікат поновлено",
+    "subjectTakenTitle": "Subject already in use",
+    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}}, issued by this CA to another entity. Issue anyway? The override is recorded in the audit log.",
+    "issueAnyway": "Issue anyway"
   },
   "cas": {
     "chainRevoked": "Відкликано вище",
@@ -1134,7 +1137,19 @@
     "withdrawParentTitle": "Зняти зв'язок із батьківським ЦС",
     "withdrawParentWarning": "Цей ЦС залишиться без батьківського, доки зв'язок не буде підтверджено знову.",
     "withdrawParentDone": "Зв'язок із батьківським ЦС знято",
-    "withdrawParentFailed": "Не вдалося зняти зв'язок із батьківським ЦС"
+    "withdrawParentFailed": "Не вдалося зняти зв'язок із батьківським ЦС",
+    "uniqueSubject": "Unique subject",
+    "uniqueSubjectEnforced": "Enforced",
+    "uniqueSubjectNotEnforced": "Not enforced",
+    "uniqueSubjectHelp": "When enforced, this CA refuses a certificate whose subject a certificate of another entity already carries, even an expired or revoked one (RFC 5280 §4.1.2.6).",
+    "enforceUniqueSubject": "Enforce",
+    "stopEnforcingUniqueSubject": "Stop enforcing",
+    "uniqueSubjectChanged": "Unique subject setting updated",
+    "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
+    "uniqueSubjectShared_one": "{{count}} subject is already shared by several entities: its next issuance to another entity is refused",
+    "uniqueSubjectShared_few": "{{count}} subjects are already shared by several entities: their next issuance to another entity is refused",
+    "uniqueSubjectShared_many": "{{count}} subjects are already shared by several entities: their next issuance to another entity is refused",
+    "uniqueSubjectShared_other": "{{count}} subjects are already shared by several entities: their next issuance to another entity is refused"
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",

@@ -866,7 +866,10 @@
       "renewedWithRelated": "证书已续期，其关联证书 #{{id}} 一并续期",
       "bulkRelatedRenewed": "已随所选项一并续期 {{count}} 张关联证书"
     },
-    "renewed": "证书已续期"
+    "renewed": "证书已续期",
+    "subjectTakenTitle": "Subject already in use",
+    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}}, issued by this CA to another entity. Issue anyway? The override is recorded in the audit log.",
+    "issueAnyway": "Issue anyway"
   },
   "cas": {
     "chainRevoked": "上游已吊销",
@@ -1116,7 +1119,17 @@
     "withdrawParentTitle": "撤销父 CA 关联",
     "withdrawParentWarning": "在重新确认关联之前，此 CA 将没有父 CA。",
     "withdrawParentDone": "父 CA 关联已撤销",
-    "withdrawParentFailed": "无法撤销父 CA 关联"
+    "withdrawParentFailed": "无法撤销父 CA 关联",
+    "uniqueSubject": "Unique subject",
+    "uniqueSubjectEnforced": "Enforced",
+    "uniqueSubjectNotEnforced": "Not enforced",
+    "uniqueSubjectHelp": "When enforced, this CA refuses a certificate whose subject a certificate of another entity already carries, even an expired or revoked one (RFC 5280 §4.1.2.6).",
+    "enforceUniqueSubject": "Enforce",
+    "stopEnforcingUniqueSubject": "Stop enforcing",
+    "uniqueSubjectChanged": "Unique subject setting updated",
+    "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
+    "uniqueSubjectShared_one": "{{count}} subject is already shared by several entities: its next issuance to another entity is refused",
+    "uniqueSubjectShared_other": "{{count}} subjects are already shared by several entities: their next issuance to another entity is refused"
   },
   "csrs": {
     "uploadCSR": "上传CSR",

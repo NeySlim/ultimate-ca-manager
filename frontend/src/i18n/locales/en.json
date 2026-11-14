@@ -866,7 +866,10 @@
       "renewedWithRelated": "Certificate renewed, with its linked certificate #{{id}}",
       "bulkRelatedRenewed": "{{count}} linked certificates renewed with the selection"
     },
-    "renewed": "Certificate renewed"
+    "renewed": "Certificate renewed",
+    "subjectTakenTitle": "Subject already in use",
+    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}}, issued by this CA to another entity. Issue anyway? The override is recorded in the audit log.",
+    "issueAnyway": "Issue anyway"
   },
   "cas": {
     "chainRevoked": "Revoked upstream",
@@ -1116,7 +1119,17 @@
     "withdrawParentTitle": "Withdraw the parent link",
     "withdrawParentWarning": "This CA will be left without a parent until the link is confirmed again.",
     "withdrawParentDone": "Parent link withdrawn",
-    "withdrawParentFailed": "The parent link could not be withdrawn"
+    "withdrawParentFailed": "The parent link could not be withdrawn",
+    "uniqueSubject": "Unique subject",
+    "uniqueSubjectEnforced": "Enforced",
+    "uniqueSubjectNotEnforced": "Not enforced",
+    "uniqueSubjectHelp": "When enforced, this CA refuses a certificate whose subject a certificate of another entity already carries, even an expired or revoked one (RFC 5280 §4.1.2.6).",
+    "enforceUniqueSubject": "Enforce",
+    "stopEnforcingUniqueSubject": "Stop enforcing",
+    "uniqueSubjectChanged": "Unique subject setting updated",
+    "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
+    "uniqueSubjectShared_one": "{{count}} subject is already shared by several entities: its next issuance to another entity is refused",
+    "uniqueSubjectShared_other": "{{count}} subjects are already shared by several entities: their next issuance to another entity is refused"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
