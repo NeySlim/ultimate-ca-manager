@@ -19,6 +19,7 @@ SCRIPT = ROOT / 'packaging' / 'scripts' / 'archive-leftovers.sh'
 POSIX_SH = shutil.which('dash') or '/bin/sh'
 STAMP = '20261114T120000Z'
 SECRET = 'f00dfeedf00dfeedf00dfeedf00dfeed'
+PART = '.ucm-archive-part'
 REAL = {name: shutil.which(name) for name in ('mv', 'cp', 'rm', 'mkdir', 'chmod', 'stat')}
 
 
@@ -100,13 +101,16 @@ class Box:
         prefix of other_fs on a mount of its own, and of other_mount (a bind mount of the
         same filesystem) too. `rename`, the interpreter the script renames with, is refused
         (EXDEV) across those mounts, for a directory on overlayfs, and for the paths in
-        `refused`; `mv` fails the run (mv-items) on anything but the journal. corrupt_back
+        `refused`; `mv` fails the run (mv-items) on anything but the journal and the
+        renames of the script's own temporaries (without an interpreter). corrupt_back
         harms only the copies out of the archive (the put-backs)."""
         (self.state / 'count').write_text('0')
         (self.state / 'refused').write_text(''.join(f'{p}\n' for p in refused))
         mounts = sorted((*other_fs, *other_mount), key=lambda p: -len(str(p)))
         fs = ''.join(f'    "{p}"|"{p}"/*) echo {700 + i}; return 0 ;;\n' for i, p in enumerate(mounts))
-        overlay = ('[ ! -d "$src" ] || [ -L "$src" ] || refuse\n' if fstype == 'overlay' else '')
+        # A directory of the lower layer; one the script has just written is in the upper one
+        overlay = (f'[ ! -d "$src" ] || [ -L "$src" ] || case $src in *{PART}) ;; *) refuse ;; esac\n'
+                   if fstype == 'overlay' else '')
         self.inner.mkdir(exist_ok=True)
         (self.inner / 'rename').write_text(
             f'#!/bin/sh\n# Called as: rename -I -c <code> <from> <to>\nsrc=$4 dst=$5\n'
@@ -117,6 +121,7 @@ class Box:
             f'exec {sys.executable} "$@"\n')
         (self.inner / 'mv').write_text(
             f'#!/bin/sh\ncase "$1 $2" in "-- "*/.journal.new) exec {REAL["mv"]} "$@" ;; esac\n'
+            f'case "$1 $2 $3" in "-T -- "*{PART}) exec {REAL["mv"]} "$@" ;; esac\n'
             f'echo "$*" >> {self.state}/mv-items; exit 1\n')
         for f in self.inner.iterdir():
             f.chmod(0o755)
@@ -134,8 +139,9 @@ class Box:
                 harm = {'mode': '[ -d "$1" ] && chmod 0705 "$1" || chmod 0604 "$1"',
                         'date': 'touch -d @5 "$1"', 'group': f'chgrp {OTHER_GID} "$1"',
                         'owner': 'chown 1 "$1"'}.get(harm, 'printf x >> "$1"')
-                where = {'key': '-name "*.key" -type f', 'nested': '-path "*/updates/nested/f"',
-                         'top': '-maxdepth 0 -type d -name updates'}[where]
+                # The copy is made under its temporary name, then renamed
+                where = {'key': f'-name "*.key{PART}" -type f', 'nested': '-path "*/updates*/nested/f"',
+                         'top': '-maxdepth 0 -type d -name "updates*"'}[where]
                 only = f'case $3 in {self.parent}/*) ;; *) exit 0 ;; esac\n' if corrupt_back else ''
                 run = (f'{REAL[name]} "$@" || exit 1\nfor last; do :; done\n{only}'
                        f'find "${{last%/}}" {where} -exec sh -c \'{harm}\' sh {{}} \\;')
@@ -549,7 +555,7 @@ def _copied(box, *names):
     assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
     copied = (box.state / 'cp-args').read_text() if (box.state / 'cp-args').exists() else ''
     for name in names:
-        assert f'-a -- {box.data}/{name} {box.archive}/data/{name}' in copied.splitlines(), (name, copied)
+        assert f'-a -- {box.data}/{name} {box.archive}/data/{name}{PART}' in copied.splitlines(), (name, copied)
     return out
 
 
@@ -602,7 +608,7 @@ def test_without_a_working_interpreter_everything_is_copied_never_left(tmp_path,
     assert files(box.archive / 'data') == data
     assert files(box.archive / 'config') == config
     assert sorted(p.name for p in box.data.iterdir()) == KEPT
-    assert f'-a -- {box.data}/ucm.db {box.archive}/data/ucm.db' in (box.state / 'cp-args').read_text()
+    assert f'-a -- {box.data}/ucm.db {box.archive}/data/ucm.db{PART}' in (box.state / 'cp-args').read_text()
 
 
 def test_a_bind_mount_inside_the_data_is_kept_and_its_contents_moved(tmp_path):
@@ -670,7 +676,8 @@ def test_a_refused_rename_leaves_the_journal_before_its_copy(tmp_path):
     assert box.run().returncode == 0
     box = Box(tmp_path / 'box', python='stub')
     data, config = files(box.data), files(box.config)
-    box.wrap(fail='rename', at=1)
+    # Call 1 asks the interpreter whether it runs; call 2 is the first rename
+    box.wrap(fail='rename', at=2)
     first = box.state / 'first'
     # Every source removed, the journal cannot go: the put-back of the copy fails once
     (box.bin / 'rm').write_text(
@@ -705,7 +712,7 @@ def _stuck(box):
     box.wrap(other_fs=(box.data,))
     failed = box.state / 'rm-failed'
     (box.bin / 'rm').write_text(
-        f'#!/bin/sh\nfor last; do :; done\ncase $last in */updates)\n'
+        f'#!/bin/sh\nfor last; do :; done\ncase $last in {box.data}/updates|{box.data}/updates{PART})\n'
         f'    {REAL["rm"]} -f -- "$last/nested/f"; : > {failed}; exit 1 ;;\nesac\n'
         f'exec {REAL["rm"]} "$@"\n')
     (box.bin / 'cp').write_text(f'#!/bin/sh\n[ ! -e {failed} ] || exit 1\nexec {REAL["cp"]} "$@"\n')
@@ -895,22 +902,23 @@ def test_the_kept_directories_are_those_the_packages_create():
 
 
 def test_a_copy_half_removed_while_putting_back_is_removed_on_the_retry(tmp_path):
-    """A copy whose source is whole again leaves the journal's remove line first: when
-    removing that copy stops halfway, the retry finishes it instead of comparing the
-    source with what is left of the copy."""
+    """A copy whose source is whole again is renamed aside before it is removed: when that
+    removal stops halfway, the archive path is already empty and the retry finishes it,
+    never comparing the source with what is left of the copy."""
     box = Box(tmp_path, python='stub')
     data, config = files(box.data), files(box.config)
     box.wrap(other_fs=(box.data,))
-    once = box.state / 'once'
+    once, twice = box.state / 'once', box.state / 'twice'
     (box.bin / 'rm').write_text(
         f'#!/bin/sh\nfor last; do :; done\ncase $last in\n'
-        f'    {box.data}/updates) exit 1 ;;\n'
-        f'    {box.archive}/data/updates) [ -e {once} ] || {{ : > {once}; '
+        f'    {box.data}/updates|{box.data}/updates{PART}) [ -e {twice} ] || {{ : > {twice}; exit 1; }} ;;\n'
+        f'    {box.archive}/data/updates{PART}) [ -e {once} ] || {{ : > {once}; '
         f'{REAL["rm"]} -f -- "$last/nested/f"; exit 1; }} ;;\nesac\n'
         f'exec {REAL["rm"]} "$@"\n')
     out = box.run()
     assert out.returncode == 2, out.stdout
-    assert reported(out.stdout)[f'{box.archive}/data/updates'] == (
+    assert once.exists() and not os.path.lexists(box.archive / 'data' / 'updates')
+    assert reported(out.stdout)[f'{box.archive}/data/updates{PART}'] == (
         f'a copy of {box.data}/updates, which is back in place, could not be removed')
     assert files(box.data) == data
     box.wrap(other_fs=(box.data,))
@@ -934,3 +942,168 @@ def test_a_rename_back_that_is_refused_is_named_with_where_it_goes(tmp_path):
     assert out.returncode == 2, (out.stdout, out.stderr)
     assert reported(out.stdout)[f'{box.archive}/data/ucm.db'] == f'not put back to {box.data}/ucm.db', out.stdout
     assert _all_files(box.data, box.archive / 'data') == data
+
+
+# -- a real path holds a whole item or none of ours ----------------------------------
+
+ITEMS = {'file': 'ucm.db', 'directory': 'updates', 'link': 'current.key'}
+BOTH = 'not put back to {src}, which exists again: keep one of the two, remove the other, then retry'
+ONLY = 'the only copy of {src}, which is gone: put it back there or remove it, then retry'
+
+
+def _shape(path):
+    """What `path` holds, whatever its kind: compared before and after."""
+    if path.is_symlink():
+        return ('link', os.readlink(path))
+    if path.is_dir():
+        return tree(path)
+    return path.read_bytes()
+
+
+def _remake(path, kind):
+    """A new item of `kind` at `path`, unlike the archived one."""
+    if kind == 'file':
+        path.write_bytes(b'made again')
+    elif kind == 'directory':
+        path.mkdir()
+        (path / 'g').write_text('made again')
+    else:
+        os.symlink('elsewhere', path)
+
+
+def _gone(path):
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
+def _killed_once_copied(box, name):
+    """Across filesystems: killed as soon as data/<name> has its copy in the archive, before
+    any source goes."""
+    box.wrap(other_fs=(box.data,))
+    dst = box.archive / 'data' / name
+    check = f'[ ! -e "{dst}" ] && [ ! -L "{dst}" ] || kill -9 0\n'
+    (box.bin / 'cp').write_text(f'#!/bin/sh\n{REAL["cp"]} "$@" || exit 1\n{check}')
+    (box.bin / 'rename').write_text(f'#!/bin/sh\n{box.inner}/rename "$@" || exit 1\n{check}')
+    out = box.run()
+    assert out.returncode == -9, (out.stdout, out.stderr)
+    assert os.path.lexists(box.data / name) and os.path.lexists(dst)
+    box.wrap(other_fs=(box.data,))
+
+
+@pytest.mark.parametrize('kind', ITEMS)
+@pytest.mark.parametrize('then', ['removed', 'changed'])
+def test_a_copy_whose_source_went_or_changed_since_is_never_removed(tmp_path, kind, then):
+    """Killed once an item is copied, before its source goes; the source is then removed,
+    or replaced: the archive keeps the copy, names it, and exits 2 until the operator chooses."""
+    box = Box(tmp_path, python='stub')
+    name = ITEMS[kind]
+    src, dst = box.data / name, box.archive / 'data' / name
+    original = _shape(src)
+    _killed_once_copied(box, name)
+    _gone(src)
+    if then == 'changed':
+        _remake(src, kind)
+    left = _shape(src) if then == 'changed' else None
+
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 2, (out.stdout, out.stderr)
+        text = (BOTH if then == 'changed' else ONLY).format(src=src)
+        assert reported(out.stdout)[str(dst)] == text, out.stdout
+        assert _shape(dst) == original
+        if then == 'changed':
+            assert _shape(src) == left
+        else:
+            assert not os.path.lexists(src)
+
+    # The operator's choice: the copy back in place, or the source as it is now
+    if then == 'removed':
+        os.rename(dst, src)
+        archived = original
+    else:
+        _gone(dst)
+        archived = left
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert _shape(box.archive / 'data' / name) == archived
+    assert not os.path.lexists(src)
+
+
+@pytest.mark.parametrize('kind', ITEMS)
+def test_a_source_made_again_after_it_was_removed_is_never_overwritten(tmp_path, kind):
+    """Killed right after a copied source was removed, then that source made again: the
+    retry keeps both sides whole, names both, and exits 2."""
+    box = Box(tmp_path, python='stub')
+    name = ITEMS[kind]
+    src, dst = box.data / name, box.archive / 'data' / name
+    original = _shape(src)
+    box.wrap(other_fs=(box.data,))
+    (box.bin / 'rm').write_text(
+        f'#!/bin/sh\n{REAL["rm"]} "$@" || exit 1\nfor last; do :; done\n'
+        f'case $last in "{src}"|"{src}".*) kill -9 0 ;; esac\n')
+    out = box.run()
+    assert out.returncode == -9, (out.stdout, out.stderr)
+    assert not os.path.lexists(src) and _shape(dst) == original
+    box.wrap(other_fs=(box.data,))
+    _remake(src, kind)
+    again = _shape(src)
+
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 2, (out.stdout, out.stderr)
+        assert reported(out.stdout)[str(dst)] == BOTH.format(src=src), out.stdout
+        assert _shape(src) == again and _shape(dst) == original
+
+    _gone(src)
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert _shape(box.archive / 'data' / name) == original
+
+
+def test_a_source_removed_in_place_and_cut_short_is_completed_from_its_copy(tmp_path):
+    """Its rename aside refused too, a source is removed in place behind an inplace line:
+    killed halfway, the retry knows that half-removed source as its own, puts the copy back
+    in its place, then archives it whole."""
+    box = Box(tmp_path, python='stub')
+    data, config = files(box.data), files(box.config)
+    src = box.data / 'updates'
+    box.wrap(refused=(str(src),))
+    once = box.state / 'once'
+    (box.bin / 'rm').write_text(
+        f'#!/bin/sh\nfor last; do :; done\n'
+        f'if [ "$last" = {src} ] && [ ! -e {once} ]; then : > {once}; '
+        f'{REAL["rm"]} -f -- "$last/nested/f"; kill -9 0; fi\nexec {REAL["rm"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == -9 and once.exists(), (out.stdout, out.stderr)
+    assert src.is_dir() and not (src / 'nested' / 'f').exists()
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert 'in place again' in out.stdout
+    assert files(box.archive / 'data') == data and files(box.archive / 'config') == config
+    assert not any(p.name.endswith(PART) for p in box.tmp.rglob('*'))
+
+
+@pytest.mark.parametrize('where', ['data', 'kept directory', 'database elsewhere'])
+def test_a_file_named_as_its_temporaries_is_never_taken_for_one(tmp_path, where):
+    """No journal names it, so it is not the script's: nothing is archived, and it is named."""
+    box = Box(tmp_path, python='stub')
+    if where == 'database elsewhere':
+        elsewhere = tmp_path / 'srv'
+        elsewhere.mkdir()
+        shutil.move(box.data / 'ucm.db', elsewhere / 'pki.db')
+        env = box.config / 'ucm.env'
+        env.write_text(env.read_text().replace(f'{box.data}/ucm.db', f'{elsewhere}/pki.db'))
+        stray = elsewhere / f'pki.db{PART}'
+        box.python('stub', first=f'sqlite {elsewhere}/pki.db')
+    else:
+        stray = (box.data / 'ca' if where == 'kept directory' else box.data) / f'ucm.db{PART}'
+    stray.write_text('not ours')
+    extra = (stray.parent,) if where == 'database elsewhere' else ()
+    before = snapshot(box, *extra)
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert f'{stray} is named as this package names its temporary copies' in out.stdout
+    assert snapshot(box, *extra) == before
+

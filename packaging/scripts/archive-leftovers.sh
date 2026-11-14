@@ -25,6 +25,9 @@ PYTHON=${UCM_PYTHON:-}
 KEEP_DIRS="ca certs private crl scep backups sessions"
 TAB=$(printf '\t')
 FIPS_LINE=UCM_FIPS_BUILD=1
+# What a real path holds is whole, or not ours: our partial states live under this suffix,
+# beside that path, and take its place by a rename once verified
+PART=.ucm-archive-part
 DEST="" JOURNAL="" MADE_PARENT=""
 
 log_line() {
@@ -56,6 +59,15 @@ rename_item() {
 
 present() { [ -e "$1" ] || [ -L "$1" ]; }
 
+# $1, or the temporary it was renamed to when only that is left: the path to name
+here() { if present "$1" || ! present "$1$PART"; then printf '%s' "$1"; else printf '%s' "$1$PART"; fi; }
+
+# Our verified temporary $1 takes the place of $2 (absent), in one directory: rename(2), or
+# without an interpreter mv, which renames what this run has just written, never copies it
+rename_here() {
+    if [ -n "$RENAME" ]; then rename_item "$1" "$2"; else ! present "$2" && mv -T -- "$1" "$2"; fi
+}
+
 # $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
 normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
 
@@ -84,17 +96,36 @@ digest() {
 # $1 and $2 have one digest, and both could be taken
 same() { d1=$(digest "$1") && d2=$(digest "$2") && [ -n "$d1" ] && [ "$d1" = "$d2" ]; }
 
-# Moves $1 to $2 (absent): a rename, else a verified copy whose source is removed only
-# once every item is in the archive (remove_copied). A refused rename moved nothing: its
-# line leaves the journal before the copy line comes.
+# Moves $1 to $2 (absent): a rename, else a copy made beside $2, verified, then renamed to
+# $2; its source is removed only once every item is in the archive (remove_copied). A
+# refused rename moved nothing: its line leaves the journal before the copy line comes.
 move_item() {
     if present "$2"; then return 1; fi
     printf 'rename\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
     rename_item "$1" "$2" && return 0
     { present "$1" && ! present "$2" && drop_line "rename$TAB$1$TAB$2"; } || return 1
     printf 'copy\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
-    cp -a -- "$1" "$2" || return 1
-    same "$1" "$2" || return 1
+    cp -a -- "$1" "$2$PART" && same "$1" "$2$PART" && rename_here "$2$PART" "$2"
+}
+
+# Removes $1 so that its path holds it whole or not at all: renamed aside, then removed.
+# Where that rename is refused, removed in place behind an inplace line, which marks a
+# half-removed $1 as ours until it is gone.
+discard() {
+    if present "$1$PART"; then rm -rf -- "$1$PART" || return 1; fi
+    if rename_item "$1" "$1$PART"; then
+        rm -rf -- "$1$PART"
+    elif present "$1" && ! present "$1$PART"; then
+        printf 'inplace\t%s\n' "$1" >> "$JOURNAL" && rm -rf -- "$1" && drop_line "inplace$TAB$1"
+    else
+        return 1
+    fi
+}
+
+# Never ours (no journal names it), yet named as our temporaries are: nothing is archived
+not_ours() {
+    say "UCM: $1 is named as this package names its temporary copies ($PART):"
+    say "rename or remove it, then retry."
 }
 
 is_kept() {
@@ -110,6 +141,7 @@ archive_contents() {
     mkdir -- "$2" || return 1
     for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
         [ -e "$entry" ] || [ -L "$entry" ] || continue
+        case $entry in *"$PART") not_ours "$entry"; return 1 ;; esac
         if [ -d "$entry" ] && [ ! -L "$entry" ] && { is_kept "$1" "${entry##*/}" \
                 || is_mount "$entry"; }; then
             archive_contents "$entry" "$2/${entry##*/}" || return 1
@@ -123,13 +155,13 @@ archive_contents() {
 remove_copied() {
     grep "^copy$TAB" "$JOURNAL" | while IFS="$TAB" read -r _op src dst; do
         printf 'remove\t%s\t%s\n' "$src" "$dst" >> "$JOURNAL" || exit 1
-        rm -rf -- "$src" || exit 1
+        discard "$src" || exit 1
     done
 }
 
-# The journal without line $1, written aside then renamed over it
+# The journal without line $1 (and $2), written aside then renamed over it
 drop_line() {
-    { grep -vxF -- "$1" "$JOURNAL"; [ $? -le 1 ]; } > "$JOURNAL.new" 2>/dev/null \
+    { grep -vxF -e "$1" -e "${2:-$1}" "$JOURNAL"; [ $? -le 1 ]; } > "$JOURNAL.new" 2>/dev/null \
         && mv -- "$JOURNAL.new" "$JOURNAL"
 }
 
@@ -167,7 +199,7 @@ say_stuck() {
         say "them back. Fix what each line names, then retry; they stay where they are meanwhile."
     elif [ -n "$twice" ]; then
         say "The next attempt tries again to put them back before anything else, except where"
-        say "both paths exist: those wait for your choice."
+        say "a line asks you to choose: those wait for your choice."
     else
         say "The next attempt tries again to put them back before anything else."
     fi
@@ -175,7 +207,8 @@ say_stuck() {
 
 # Undoes the journal, last step first. Every line replays as a no-op once undone, so a
 # retry from any interrupted state converges. A copy goes only once its source is whole
-# again and its remove line is out of the journal: no retry meets a half-deleted copy.
+# again and its remove line is out of the journal. The temporaries beside the paths a
+# line names are ours, never whole: each line removes its own.
 roll_back() {
     stuck="" left="" seen="" again="" twice=""
     undo=$(sed -n '1!G;h;$p' "$JOURNAL") || { unsettled "$JOURNAL" "could not be read"; return 1; }
@@ -192,24 +225,53 @@ roll_back() {
             remove)
                 # Undone already when the copy is gone: its source was whole again first
                 present "$dst" || continue
-                if [ -d "$dst" ] && [ ! -L "$dst" ]; then
-                    mkdir -p -- "$src" && cp -a -- "$dst/." "$src/"
-                else
-                    # Always redone: a put-back cut short leaves a source that only looks whole
-                    rm -f -- "$src" && cp -a -- "$dst" "$src"
+                # Beside $src only our own leftovers: the source renamed aside, a partial put-back
+                if present "$src$PART"; then
+                    rm -rf -- "$src$PART" || { unsettled "$src$PART" "a partial copy of $dst could not be removed"; continue; }
                 fi
-                put=$?
-                # Whole again, and the copy said so: its copy line, undone next, removes the copy
-                if [ "$put" -ne 0 ] || ! same "$src" "$dst" \
-                        || ! drop_line "remove$TAB$src$TAB$dst"; then
-                    unsettled "$dst" "not put back to $src"
+                ours=""
+                if grep -qxF "inplace$TAB$src" "$JOURNAL"; then ours=1; fi
+                if present "$src" && same "$src" "$dst"; then
+                    drop_line "inplace$TAB$src" "remove$TAB$src$TAB$dst" || unsettled "$dst" "not put back to $src"
+                elif present "$src" && [ -z "$ours" ]; then
+                    # Removed whole, so this one was made again since
+                    twice=1
+                    unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"
+                else
+                    # Copied beside $src and verified; only then does a source half removed in
+                    # place (ours) go, and the copy takes its path. Its copy line, undone next,
+                    # removes the copy once this remove line is out.
+                    { cp -a -- "$dst" "$src$PART" && same "$dst" "$src$PART" \
+                        && { [ -z "$ours" ] || rm -rf -- "$src"; } \
+                        && rename_here "$src$PART" "$src" \
+                        && drop_line "inplace$TAB$src" "remove$TAB$src$TAB$dst"; } || {
+                        rm -rf -- "$src$PART" 2>/dev/null
+                        unsettled "$dst" "not put back to $src"
+                    }
                 fi ;;
             copy)
-                # While its remove line stays, the copy may be all that is left of a file
+                # A partial copy is ours and never whole; $dst is whole, and goes only while
+                # $src is the same (both there and different: the source changed since)
+                if present "$dst$PART"; then
+                    rm -rf -- "$dst$PART" || unsettled "$dst$PART" "a partial copy of $src could not be removed"
+                fi
                 if grep -qxF "remove$TAB$src$TAB$dst" "$JOURNAL"; then
+                    # While its remove line stays, the copy may be all that is left of a file
                     unsettled "$dst" "not put back to $src"
-                elif present "$dst"; then
-                    rm -rf -- "$dst" || unsettled "$dst" "a copy of $src, which is back in place, could not be removed"
+                elif grep -qxF "inplace$TAB$dst" "$JOURNAL"; then
+                    # Proved the same as $src, then cut short while removed in place
+                    { rm -rf -- "$dst" && drop_line "inplace$TAB$dst"; } \
+                        || unsettled "$dst" "a copy of $src, which is back in place, could not be removed"
+                elif ! present "$dst"; then
+                    :
+                elif ! present "$src"; then
+                    twice=1
+                    unsettled "$dst" "the only copy of $src, which is gone: put it back there or remove it, then retry"
+                elif same "$src" "$dst"; then
+                    discard "$dst" || unsettled "$(here "$dst")" "a copy of $src, which is back in place, could not be removed"
+                else
+                    twice=1
+                    unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"
                 fi ;;
             fips)
                 # The new ucm.env goes while the archived one can take its place, once: the
@@ -272,6 +334,8 @@ EOF
 }
 
 case "$(id -u)" in 0) as_root=1 ;; *) as_root="" ;; esac
+RENAME=""
+[ -z "$PYTHON" ] || ! "$PYTHON" -I -c '' 2>/dev/null || RENAME=1
 
 # -- 0. An earlier run that could not put everything back is finished first --------
 for d in "$PARENT"/*/; do
@@ -402,6 +466,7 @@ case $(normal "$DB_FILE") in
             && mkdir -- "$DEST/database" || fail "creating $DEST/database"
         for f in "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$DB_FILE-journal"; do
             [ -e "$f" ] || continue
+            ! present "$f$PART" || { not_ours "$f$PART"; fail "moving $f"; }
             move_item "$f" "$DEST/database/${f##*/}" || fail "moving $f"
         done
         DB_LINE="  database/   $DB_FILE, which DATABASE_PATH placed outside $DATA

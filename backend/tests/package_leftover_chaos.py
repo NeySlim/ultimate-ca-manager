@@ -12,7 +12,7 @@ import shutil
 
 import pytest
 
-from tests.test_package_leftover_archive import KEPT, STAMP, Box, files, named, snapshot, tree, whole
+from tests.test_package_leftover_archive import KEPT, PART, STAMP, Box, files, named, snapshot, tree, whole
 
 
 CHAOS = ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'rename')
@@ -116,10 +116,11 @@ class Run:
             self.calls.append((int(n), name, args))
 
     def item(self, path):
-        """(top, path relative to it) of a path in the data or the configuration."""
+        """(top, path relative to it) of a path in the data or the configuration, or of the
+        temporary the script names beside it."""
         for top, prefix in self.tops.items():
             if path.startswith(prefix):
-                return top, path[len(prefix):].rstrip('/').removesuffix('/.')
+                return top, path[len(prefix):].rstrip('/').removesuffix('/.').removesuffix(PART)
         return None, path
 
     def kind(self, n):
@@ -189,6 +190,8 @@ def _nothing_lost(box, data, config, why):
 
 
 def _while_failing(box, out, before, data, config, why):
+    """_nothing_lost compares real paths only: an original kept under a temporary alone
+    counts as lost."""
     if out.returncode == -9:
         _nothing_lost(box, data, config, why)
         return
@@ -207,8 +210,15 @@ def _while_failing(box, out, before, data, config, why):
         assert 'was not started' in out.stdout, (why, out.stdout)
 
 
+def _temporaries(box):
+    """The script's temporaries left anywhere it writes."""
+    return [str(p) for top in (box.data, box.config, box.parent) if top.exists()
+            for p in top.rglob('*') if p.name.endswith(PART)]
+
+
 def _converged(box, out, data, config, layout, why):
     assert out.returncode == 0, (why, out.stdout, out.stderr)
+    assert _temporaries(box) == [], why
     assert [a.name for a in box.parent.iterdir()] == [STAMP], (why, out.stdout)
     assert whole(box.archive / 'data', _kept(layout)) == data, why
     assert whole(box.archive / 'config') == config, why
@@ -234,9 +244,28 @@ def _copies(run, put_back=False):
 
 
 def _renames(run, put_back=False):
-    """The calls of `run` that were a rename; with put_back, those out of the archive."""
-    return [n for n, name, args in run.calls if name == 'rename'
-            and (not put_back or args[3].startswith(f'{run.parent}/'))]
+    """The calls of `run` that were a rename; with put_back, those out of the archive (a copy
+    renamed aside within it is not one)."""
+    return [n for n, name, args in run.calls if name == 'rename' and len(args) == 5
+            and (not put_back or (args[3].startswith(f'{run.parent}/')
+                                  and not args[4].startswith(f'{run.parent}/')))]
+
+
+def _steps(run):
+    """The calls of `run` through a temporary, by kind: a copy renamed into the archive, a
+    path renamed aside before it goes, a put-back renamed into place, a temporary removed."""
+    out = {}
+    for n, name, args in run.calls:
+        if name == 'rename' and len(args) == 5 and args[4].endswith(PART):
+            kind = 'aside'
+        elif name == 'rename' and len(args) == 5 and args[3].endswith(PART):
+            kind = 'into archive' if args[3].startswith(f'{run.parent}/') else 'put back'
+        elif name == 'rm' and args[-1].endswith(PART):
+            kind = 'temporary removed'
+        else:
+            continue
+        out.setdefault(kind, []).append(n)
+    return out
 
 
 class ChaosSuite:
@@ -270,9 +299,33 @@ class ChaosSuite:
         """Each call of the archiving run fails, or kills it, in turn; then a run without fault."""
         calls = self._calls(lab)
         assert calls > 20
+        # Every step through a temporary is among these calls, wherever items are copied
+        steps = set(_steps(lab.first_run()))
+        assert steps == (set() if self.layout == 'one filesystem' else
+                         {'into archive', 'aside', 'temporary removed'}), steps
         for at in range(1, calls + 1):
             for mode in ('fail', 'kill'):
                 self._scenario(lab, (at, mode), None)
+
+    def test_every_step_through_a_temporary_of_a_put_back_meets_every_fault(self, lab):
+        """Fails, kills, or kills right after, each kind of step through a temporary that a
+        roll-back takes (test_a_retry_converges_after_one_fault_at_any_call covers the
+        archiving run's)."""
+        if self.layout == 'one filesystem':
+            assert not _copies(lab.first_run())
+            return
+        backs = {}
+        for at in range(1, self._calls(lab) + 1):
+            for kind, calls in _steps(lab.first_run([(at, 'fail')])).items():
+                backs.setdefault(kind, []).extend((at, n) for n in calls if n > at)
+        assert {'put back', 'aside', 'temporary removed'} <= set(backs), set(backs)
+        covered = set()
+        for kind, pairs in backs.items():
+            for i, mode in enumerate(('fail', 'kill', 'done')):
+                at, n = pairs[(i * 7) % len(pairs)]
+                self._scenario(lab, (at, 'fail'), (n, mode))
+                covered.add((kind, mode))
+        assert covered == {(k, m) for k in backs for m in ('fail', 'kill', 'done')}
 
     def test_a_retry_converges_after_a_fault_while_putting_back(self, lab):
         """Pairs (fault i while archiving, fault j while putting back or in the next run), drawn
@@ -387,7 +440,20 @@ class RefusedRenameSuite:
         run = lab.first_run()
         refused = {f'{lab.first[()][0].data}/{name}' for name in _refused(self.layout)}
         for at, name, args in run.calls:
-            if name == 'rename' and args[3] in refused:
+            if name == 'rename' and len(args) == 5 and args[3] in refused:
                 for k in range(at, at + 6):
                     for mode in ('fail', 'kill', 'done'):
                         ChaosSuite._scenario(self, lab, (k, mode), None)
+
+    def test_a_retry_converges_after_a_fault_around_a_removal_in_place(self, lab):
+        """A refused source is renamed aside neither: removed in place behind its inplace
+        line. Failed, killed, or killed right after, from the refused rename aside to the
+        line leaving the journal."""
+        run = lab.first_run()
+        refused = {f'{lab.first[()][0].data}/{name}' for name in _refused(self.layout)}
+        removals = [n for n, name, args in run.calls if name == 'rm' and args[-1] in refused]
+        assert len(removals) == len(refused), removals
+        for at in removals:
+            for k in range(at - 1, at + 2):
+                for mode in ('fail', 'kill', 'done'):
+                    ChaosSuite._scenario(self, lab, (k, mode), None)

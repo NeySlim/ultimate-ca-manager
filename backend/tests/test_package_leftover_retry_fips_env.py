@@ -1,6 +1,6 @@
 """archive-leftovers.sh retried after any fault, the left ucm.env being exactly the line the
 new one is (UCM_FIPS_BUILD=1), on another filesystem (see package_leftover_chaos)."""
-from tests.test_package_leftover_archive import named
+from tests.test_package_leftover_archive import PART, named
 from tests.package_leftover_chaos import ChaosSuite, _converged, _nothing_lost, _while_failing
 
 
@@ -24,7 +24,7 @@ class TestTheLeftConfigurationIsTheFipsLine(ChaosSuite):
         again = lab.chain([(journal, 'kill')], ())[4][1]
         archived_env = f'{again.parent}/{box.archive.name}/config/ucm.env'
         copy_goes = next(n for n, name, args in again.calls
-                         if name == 'rm' and args[-1] == archived_env)
+                         if name == 'rm' and args[-1] in (archived_env, archived_env + PART))
         box, data, config, before, runs = lab.chain([(journal, 'kill')], [(copy_goes, 'kill')], ())
         assert runs[1].out.returncode == -9
         _nothing_lost(box, data, config, 'last run')
@@ -41,7 +41,8 @@ class TestTheLeftConfigurationIsTheFipsLine(ChaosSuite):
                             if n > journal and name == 'rm' and args[-1].endswith('/etc/ucm/ucm.env'))
         line_goes = next(n for n, name, args in run.calls if n > new_env_goes and name == 'mv')
         copy_goes = next(n for n, name, args in run.calls
-                         if name == 'rm' and args[-1].endswith('/config/ucm.env') and n > line_goes)
+                         if name == 'rm' and args[-1].removesuffix(PART).endswith('/config/ucm.env')
+                         and n > line_goes)
         box, data, config, before, runs = lab.chain(
             [(journal, 'fail'), (line_goes, 'fail'), (copy_goes, 'kill')], ())
         _converged(box, runs[-1].out, data, config, self.layout, 'last run')
