@@ -95,12 +95,11 @@ def _connector_names(rows):
     return connector_names(rows)
 
 
-def _identities(rows, held=()):
+def _identities(rows):
     """``(id, policy_id, oid_root)`` for the rows ``(id, policy CA, issuing CA)`` of a table
-    created without the identity columns, in id order: derived from the CA, as 2.254 did,
-    never one of the identities *held* by the rows that have one."""
+    created without the identity columns, in id order: derived from the CA, as 2.254 did."""
     from utils.policy_identity import identity_for
-    taken_ids, taken_roots, out = {h[0] for h in held}, {h[1] for h in held}, []
+    taken_ids, taken_roots, out = set(), set(), []
     for row_id, policy_ca, issuing_ca in sorted(rows):
         policy_id, root = identity_for(policy_ca or issuing_ca, taken_ids, taken_roots)
         taken_ids.add(policy_id)
@@ -109,44 +108,7 @@ def _identities(rows, held=()):
     return out
 
 
-_UNSET = (f"SELECT id, policy_ca_refid, issuing_ca_refid FROM {PROFILES} "
-          "WHERE policy_id IS NULL OR policy_oid_root IS NULL")
-_HELD = (f"SELECT policy_id, policy_oid_root FROM {PROFILES} "
-         "WHERE policy_id IS NOT NULL AND policy_oid_root IS NOT NULL")
-
-
-def _identity_sqlite(conn):
-    columns = {r[1] for r in conn.execute(f"PRAGMA table_info({PROFILES})")}
-    for column, size in (('policy_id', 36), ('policy_oid_root', 100)):
-        if column not in columns:
-            # Nullable: SQLite adds no NOT NULL column without a default
-            conn.execute(f"ALTER TABLE {PROFILES} ADD COLUMN {column} VARCHAR({size})")
-    held = conn.execute(_HELD).fetchall()
-    for row_id, policy_id, root in _identities(conn.execute(_UNSET).fetchall(), held):
-        conn.execute(f"UPDATE {PROFILES} SET policy_id = ?, policy_oid_root = ? WHERE id = ?",
-                     (policy_id, root, row_id))
-
-
-def _identity_pg(conn):
-    from sqlalchemy import text
-    for column, size in (('policy_id', 36), ('policy_oid_root', 100)):
-        conn.execute(text(f"ALTER TABLE {PROFILES} ADD COLUMN IF NOT EXISTS {column} VARCHAR({size})"))
-    held = conn.execute(text(_HELD)).fetchall()
-    for row_id, policy_id, root in _identities(conn.execute(text(_UNSET)).fetchall(), held):
-        conn.execute(text(f"UPDATE {PROFILES} SET policy_id = :p, policy_oid_root = :r WHERE id = :i"),
-                     {'p': policy_id, 'r': root, 'i': row_id})
-    for column in IDENTITY:
-        conn.execute(text(f"ALTER TABLE {PROFILES} ALTER COLUMN {column} SET NOT NULL"))
-
-
-def upgrade_identity(conn):
-    """The identity part alone, for an existing profiles table: run again at start by the
-    runner on a base that already records 300 (made before these columns)."""
-    if isinstance(conn, sqlite3.Connection):
-        _identity_sqlite(conn)
-        conn.commit()
-    else:
-        _identity_pg(conn)
+_UNSET = f"SELECT id, policy_ca_refid, issuing_ca_refid FROM {PROFILES} WHERE policy_id IS NULL"
 
 
 def upgrade_sqlite(conn, keytab=None):
@@ -154,7 +116,14 @@ def upgrade_sqlite(conn, keytab=None):
     for ddl in _SQLITE_DDL + _INDEXES:
         conn.execute(ddl)
     if PROFILES in tables:
-        _identity_sqlite(conn)
+        columns = {r[1] for r in conn.execute(f"PRAGMA table_info({PROFILES})")}
+        for column, size in (('policy_id', 36), ('policy_oid_root', 100)):
+            if column not in columns:
+                # Nullable: SQLite adds no NOT NULL column without a default
+                conn.execute(f"ALTER TABLE {PROFILES} ADD COLUMN {column} VARCHAR({size})")
+        for row_id, policy_id, root in _identities(conn.execute(_UNSET).fetchall()):
+            conn.execute(f"UPDATE {PROFILES} SET policy_id = ?, policy_oid_root = ? WHERE id = ?",
+                         (policy_id, root, row_id))
     if CONNECTORS in tables:
         columns = {r[1] for r in conn.execute(f"PRAGMA table_info({CONNECTORS})")}
         if 'name' not in columns:
@@ -201,7 +170,13 @@ def upgrade_pg(conn, keytab=None):
     for ddl in _PG_DDL + _INDEXES:
         conn.execute(text(ddl))
     if PROFILES in tables:
-        _identity_pg(conn)
+        for column, size in (('policy_id', 36), ('policy_oid_root', 100)):
+            conn.execute(text(f"ALTER TABLE {PROFILES} ADD COLUMN IF NOT EXISTS {column} VARCHAR({size})"))
+        for row_id, policy_id, root in _identities(conn.execute(text(_UNSET)).fetchall()):
+            conn.execute(text(f"UPDATE {PROFILES} SET policy_id = :p, policy_oid_root = :r WHERE id = :i"),
+                         {'p': policy_id, 'r': root, 'i': row_id})
+        for column in IDENTITY:
+            conn.execute(text(f"ALTER TABLE {PROFILES} ALTER COLUMN {column} SET NOT NULL"))
     if CONNECTORS in tables:
         conn.execute(text(f"ALTER TABLE {CONNECTORS} ADD COLUMN IF NOT EXISTS name VARCHAR(100)"))
         conn.execute(text(f"ALTER TABLE {CONNECTORS} ADD COLUMN IF NOT EXISTS domain_sid VARCHAR(255)"))

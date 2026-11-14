@@ -401,55 +401,6 @@ def test_step_155_turns_the_2x_settings_into_the_default_profile(upgraded):
     assert db.run("SELECT name FROM ad_connector_config") == []
 
 
-def test_a_start_gives_profiles_made_before_the_identity_columns_their_identity(fresh, capsys):
-    """A 3.0 development base records 300, so only a start-up replay of the identity part of
-    step 155 can add the columns; it touches nothing else and the next start runs nothing."""
-    from utils.policy_identity import derived_oid_root, derived_policy_id
-    for column in ('policy_id', 'policy_oid_root'):
-        fresh.run(f"ALTER TABLE windows_enrollment_profiles DROP COLUMN {column}")
-    fresh.run("INSERT INTO windows_enrollment_profiles (id, name, is_default, enabled, validity_days, "
-              "issuing_ca_refid, policy_ca_refid) VALUES (1, 'p1', TRUE, TRUE, 365, 'ca-a', NULL), "
-              "(2, 'p2', FALSE, TRUE, 365, 'ca-b', 'ca-a')")
-    fresh.run("INSERT INTO system_config (key, value) VALUES ('kerberos_spn', 'HTTP/ucm.corp.example')")
-    stamp = fresh.run("SELECT applied_at FROM _migrations WHERE name = '300_upgrade_from_2_254'")
-    runner = fresh._route()
-    capsys.readouterr()
-    assert runner.run_all_migrations(dry_run=True) is True
-    runner.show_status()
-    out = capsys.readouterr().out
-    assert 'up to date' not in out and out.count('lacks its policy identity') == 2, out
-    assert fresh.upgrade() is True, capsys.readouterr().out
-    rows = fresh.run("SELECT id, is_default, policy_id, policy_oid_root FROM windows_enrollment_profiles "
-                     "ORDER BY id")
-    assert rows[0] == (1, True, derived_policy_id('ca-a'), derived_oid_root('ca-a'))
-    assert rows[1][2] not in (None, rows[0][2]) and rows[1][3] not in (None, rows[0][3])
-    assert len(rows) == 2
-    assert fresh.run("SELECT key FROM system_config WHERE key = 'kerberos_spn'") == [('kerberos_spn',)]
-    assert fresh.run("SELECT applied_at FROM _migrations WHERE name = '300_upgrade_from_2_254'") == stamp
-    capsys.readouterr()
-    assert fresh.upgrade() is True
-    assert 'up to date' in capsys.readouterr().out
-    assert fresh.run("SELECT id, is_default, policy_id, policy_oid_root FROM windows_enrollment_profiles "
-                     "ORDER BY id") == rows
-
-
-def test_a_start_ends_an_identity_backfill_cut_short_without_sharing_an_identity(fresh, capsys):
-    """SQLite commits ADD COLUMN apart: a start cut after it leaves rows without an identity; the
-    next start fills them, never with the identity another row already holds."""
-    from utils.policy_identity import derived_oid_root, derived_policy_id
-    for column in ('policy_id', 'policy_oid_root'):
-        fresh.run(f"ALTER TABLE windows_enrollment_profiles DROP COLUMN {column}")
-        fresh.run(f"ALTER TABLE windows_enrollment_profiles ADD COLUMN {column} VARCHAR(100)")
-    held = (derived_policy_id('ca-a'), derived_oid_root('ca-a'))
-    fresh.run("INSERT INTO windows_enrollment_profiles (id, name, is_default, enabled, validity_days, "
-              "issuing_ca_refid, policy_id, policy_oid_root) VALUES (1, 'p1', TRUE, TRUE, 365, 'ca-a', :p, :r), "
-              "(2, 'p2', FALSE, TRUE, 365, 'ca-a', NULL, NULL)", {'p': held[0], 'r': held[1]})
-    assert fresh.upgrade() is True, capsys.readouterr().out
-    rows = fresh.run("SELECT policy_id, policy_oid_root FROM windows_enrollment_profiles ORDER BY id")
-    assert rows[0] == held
-    assert None not in rows[1] and rows[1][0] != held[0] and rows[1][1] != held[1]
-
-
 def test_step_157_fills_the_subject_key(upgraded):
     from utils.dn_match import name_key
     db, certs = upgraded

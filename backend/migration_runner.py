@@ -409,12 +409,11 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
             say(f"✗ {refusal}")
             return False
         serial_replay = UPGRADE_MIGRATION in applied and _serial_steps_pending(engine)
-        identity_replay = UPGRADE_MIGRATION in applied and _identity_step_pending(engine)
         # Pass the SQLite path derived from db_url so DATABASE_URL stays the
         # single source of truth (avoids DATABASE_URL/DATABASE_PATH mismatch).
         sqlite_path = db_url.replace("sqlite:///", "", 1) if db_url.startswith("sqlite:///") else None
 
-        if not pending and not serial_replay and not identity_replay:
+        if not pending and not serial_replay:
             say(f"✓ {backend} database up to date (no pending migrations)")
             return True
 
@@ -424,14 +423,9 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
                     else _run_pending_sqlite(pending, dry_run, db_path=sqlite_path))
             if not done:
                 return False
-        if dry_run:
-            for note, due in ((SERIAL_REPLAY_NOTE, serial_replay), (IDENTITY_REPLAY_NOTE, identity_replay)):
-                if due:
-                    say(f"  → {note} (dry run)")
+        if serial_replay and dry_run:
+            say(f"  → {SERIAL_REPLAY_NOTE} (dry run)")
             return True
-        if identity_replay and not _replay_step(engine, is_pg, sqlite_path, IDENTITY_STEP, IDENTITY_REPLAY_NOTE,
-                                                lambda mod: mod.upgrade_identity):
-            return False
         return _replay_serial_steps(engine, is_pg, sqlite_path) if serial_replay else True
     finally:
         engine.dispose()
@@ -458,41 +452,16 @@ def _serial_steps_pending(engine) -> bool:
 
 def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
     """Step 144 alone, idempotent; the 300 row and its date stay as they are."""
-    return _replay_step(engine, is_pg, sqlite_path, SERIAL_STEP,
-                        "serial_unique_index_pending is set: upgrade step 144 runs again",
-                        lambda mod: mod.upgrade)
-
-
-# A 3.0 base whose profiles table predates the policy identity columns records 300 already:
-# only this replay of the identity part of step 155 (never the whole step) can add them.
-IDENTITY_STEP = "155_windows_enrollment_profiles"
-IDENTITY_REPLAY_NOTE = "windows_enrollment_profiles lacks its policy identity: upgrade step 155 adds it"
-
-
-def _identity_step_pending(engine) -> bool:
-    insp = inspect(engine)
-    if "windows_enrollment_profiles" not in insp.get_table_names():
-        return False
-    columns = {c["name"] for c in insp.get_columns("windows_enrollment_profiles")}
-    if not {"policy_id", "policy_oid_root"} <= columns:
-        return True
-    with engine.connect() as conn:
-        return conn.execute(text("SELECT 1 FROM windows_enrollment_profiles "
-                                 "WHERE policy_id IS NULL OR policy_oid_root IS NULL")).first() is not None
-
-
-def _replay_step(engine, is_pg: bool, sqlite_path, name, note, entry) -> bool:
-    """One upgrade step run again, idempotent; the 300 row and its date stay as they are."""
     from migrations._from_2_254 import step
-    say(f"  → {note}...", end=" ")
+    say("  → serial_unique_index_pending is set: upgrade step 144 runs again...", end=" ")
     try:
         if is_pg:
             with engine.begin() as conn:
-                entry(step(name))(conn)
+                step(SERIAL_STEP).upgrade(conn)
         else:
             conn = sqlite3.connect(sqlite_path or os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db"))
             try:
-                entry(step(name))(conn)
+                step(SERIAL_STEP).upgrade(conn)
             finally:
                 conn.close()
     except Exception as exc:  # noqa: BLE001
@@ -681,8 +650,6 @@ def show_status():
             say(f"  ○ {n}")
         if not refusal and UPGRADE_MIGRATION in applied and _serial_steps_pending(engine):
             say(f"Replay:  {SERIAL_REPLAY_NOTE}")
-        if not refusal and UPGRADE_MIGRATION in applied and _identity_step_pending(engine):
-            say(f"Replay:  {IDENTITY_REPLAY_NOTE}")
     finally:
         engine.dispose()
 
