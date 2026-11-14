@@ -20,6 +20,7 @@ LOG=${5:-/var/log/ucm/leftover-archive.log}
 # The data directories the packages own or create: kept in place, their contents archived
 KEEP_DIRS="ca certs private crl scep backups sessions"
 TAB=$(printf '\t')
+FIPS_LINE=UCM_FIPS_BUILD=1
 DEST="" JOURNAL="" MADE_PARENT=""
 
 log_line() {
@@ -36,6 +37,8 @@ env_value() {
 }
 
 device() { stat -c %d -- "$1"; }
+
+present() { [ -e "$1" ] || [ -L "$1" ]; }
 
 # $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
 normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
@@ -91,55 +94,82 @@ archive_contents() {
 
 # Second phase of a cross-filesystem move: every copy is verified, the sources go
 remove_copied() {
-    grep "^copy$TAB" "$JOURNAL" > "$JOURNAL.copies" || { rm -f -- "$JOURNAL.copies"; return 0; }
-    while IFS="$TAB" read -r _op src dst; do
-        printf 'remove\t%s\t%s\n' "$src" "$dst" >> "$JOURNAL" || return 1
-        rm -rf -- "$src" || return 1
-    done < "$JOURNAL.copies"
-    rm -f -- "$JOURNAL.copies"
+    grep "^copy$TAB" "$JOURNAL" | while IFS="$TAB" read -r _op src dst; do
+        printf 'remove\t%s\t%s\n' "$src" "$dst" >> "$JOURNAL" || exit 1
+        rm -rf -- "$src" || exit 1
+    done
 }
 
-# Undoes the journal, last step first. Never deletes an original: a copy goes only once
-# its source is complete again, and whatever cannot be put back is named.
+# The journal without line $1, written aside then renamed over it
+drop_line() {
+    { grep -vxF -- "$1" "$JOURNAL"; [ $? -le 1 ]; } > "$JOURNAL.new" 2>/dev/null \
+        && mv -- "$JOURNAL.new" "$JOURNAL"
+}
+
+# $1 holds the new ucm.env, or the start of it a failed write left
+fips_written() {
+    [ -f "$1" ] && [ ! -L "$1" ] && [ "$(wc -c < "$1")" -le 17 ] \
+        && case $FIPS_LINE in "$(cat -- "$1")"*) true ;; *) false ;; esac
+}
+
+# $1 could not be undone; named in $stuck only while it is really there
+unsettled() {
+    left=1
+    if present "$1"; then
+        case " $stuck " in *" $1 "*) ;; *) stuck="$stuck $1" ;; esac
+    fi
+}
+
+# Undoes the journal, last step first. Every line replays as a no-op once undone, so a
+# retry from any interrupted state converges. A copy goes only once its source is whole
+# again and its remove line is out of the journal: no retry meets a half-deleted copy.
 roll_back() {
-    stuck=""
-    sed -n '1!G;h;$p' "$JOURNAL" > "$JOURNAL.undo" 2>/dev/null || cp -- "$JOURNAL" "$JOURNAL.undo"
+    stuck="" left=""
+    undo=$(sed -n '1!G;h;$p' "$JOURNAL") || { unsettled "$JOURNAL"; return 1; }
     while IFS="$TAB" read -r op src dst; do
         case $op in
             rename)
-                if { [ -e "$dst" ] || [ -L "$dst" ]; } && [ ! -e "$src" ] && [ ! -L "$src" ]; then
-                    mv -- "$dst" "$src" || stuck="$stuck $dst"
+                if present "$dst"; then
+                    { ! present "$src" && mv -- "$dst" "$src"; } || unsettled "$dst"
                 fi ;;
             remove)
-                # The source was being removed: complete it again from its verified copy
+                # Undone already when the copy is gone: its source was whole again first
+                present "$dst" || continue
                 if [ -d "$dst" ] && [ ! -L "$dst" ]; then
                     mkdir -p -- "$src" && cp -a -- "$dst/." "$src/"
-                else
-                    { [ -e "$src" ] || [ -L "$src" ] || cp -a -- "$dst" "$src"; }
+                elif ! present "$src"; then
+                    cp -a -- "$dst" "$src"
                 fi
-                if [ "$(digest "$src" 2>/dev/null)" = "$(digest "$dst")" ]; then
-                    rm -rf -- "$dst"
-                else
-                    stuck="$stuck $dst"
-                fi
-                ;;
+                # Whole again: its copy line, undone next, removes the copy
+                if [ "$(digest "$src" 2>/dev/null)" != "$(digest "$dst")" ] \
+                        || ! drop_line "remove$TAB$src$TAB$dst"; then
+                    unsettled "$dst"
+                fi ;;
             copy)
-                # A copy whose source removal started was dealt with on its remove line
-                if ! grep -qxF "remove$TAB$src$TAB$dst" "$JOURNAL.undo" \
-                        && { [ -e "$dst" ] || [ -L "$dst" ]; }; then
-                    rm -rf -- "$dst" || stuck="$stuck $dst"
+                # While its remove line stays, the copy may be all that is left of a file
+                if grep -qxF "remove$TAB$src$TAB$dst" "$JOURNAL"; then
+                    unsettled "$dst"
+                elif present "$dst"; then
+                    rm -rf -- "$dst" || unsettled "$dst"
+                fi ;;
+            fips)
+                # The new ucm.env goes while the archived one can take its place
+                if present "$dst" && fips_written "$src"; then
+                    rm -f -- "$src" || unsettled "$src"
                 fi ;;
             mkdir)
-                [ ! -d "$dst" ] || rmdir -- "$dst" 2>/dev/null || stuck="$stuck $dst" ;;
+                if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || unsettled "$dst"; fi ;;
         esac
-    done < "$JOURNAL.undo"
-    rm -f -- "$JOURNAL.undo" "$JOURNAL.copies" "$DEST/README.txt"
-    if [ -z "$stuck" ]; then
-        rm -f -- "$JOURNAL"
-        rmdir -- "$DEST" 2>/dev/null || stuck="$DEST"
-        [ -z "$MADE_PARENT" ] || rmdir -- "$PARENT" 2>/dev/null || true
-    fi
-    [ -z "$stuck" ]
+    done <<EOF
+$undo
+EOF
+    for f in "$DEST/README.txt" "$JOURNAL.new"; do
+        if present "$f"; then rm -f -- "$f" || unsettled "$f"; fi
+    done
+    [ -z "$left" ] || return 1
+    rm -f -- "$JOURNAL" || { unsettled "$JOURNAL"; return 1; }
+    rmdir -- "$DEST" 2>/dev/null || { unsettled "$DEST"; return 1; }
+    [ -z "$MADE_PARENT" ] || rmdir -- "$PARENT" 2>/dev/null || true
 }
 
 write_readme() {
@@ -178,6 +208,11 @@ EOF
 case "$(id -u)" in 0) as_root=1 ;; *) as_root="" ;; esac
 
 # -- 0. An earlier run that could not put everything back is finished first --------
+for d in "$PARENT"/*/; do
+    # Killed before its journal was written, or after it was removed: nothing to keep
+    [ -e "$d.journal" ] || [ -e "${d}README.txt" ] || { rm -f -- "$d.journal.new"; rmdir -- "$d"; } \
+        2>/dev/null || true
+done
 for j in "$PARENT"/*/.journal; do
     [ -f "$j" ] || continue
     DEST=${j%/.journal} JOURNAL=$j
@@ -186,7 +221,7 @@ for j in "$PARENT"/*/.journal; do
         say "the files it could not put back are in place again."
     else
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete, and"
-        say "some files could not be put back and are still in $DEST:$stuck"
+        say "some files could not be put back or cleared and are still in $DEST:$stuck"
         say "The installation stops here: nothing else is written, and UCM was not started."
         exit 2
     fi
@@ -259,7 +294,7 @@ fail() {
         if roll_back; then
             say "Everything was put back in place."
         else
-            say "Some files could not be put back and are still in $DEST:$stuck"
+            say "Some files could not be put back or cleared and are still in $DEST:$stuck"
             say "The next attempt puts them back before anything else."
             rc=2
         fi
@@ -309,19 +344,16 @@ case $(normal "$DB_FILE") in
         DB_RESTORE=", database/ back to ${DB_FILE%/*}" ;;
 esac
 remove_copied || fail "removing the sources of the copies"
+# Written inside the journal, so that a retry after any interruption takes it back first
+if [ -n "$FIPS_BUILD" ]; then
+    { printf 'fips\t%s\t%s\n' "$ENV_FILE" "$DEST/config/ucm.env" >> "$JOURNAL" \
+        && printf 'UCM_FIPS_BUILD=1\n' > "$ENV_FILE"; } || fail "writing UCM_FIPS_BUILD=1 into $ENV_FILE"
+fi
 write_readme || fail "writing $DEST/README.txt"
-rm -f -- "$JOURNAL"
+rm -f -- "$JOURNAL" || fail "removing $JOURNAL"
 
 say "Moved, unchanged, everything it left in $DATA and $CONFIG${DB_RESTORE:+ and $DB_FILE}"
 say "to $DEST (root only; README.txt there says how to restore it)."
-if [ -n "$FIPS_BUILD" ]; then
-    if printf 'UCM_FIPS_BUILD=1\n' > "$ENV_FILE"; then
-        say "UCM_FIPS_BUILD=1, set in the archived ucm.env, is kept in the new $ENV_FILE:"
-        say "this installation stays built against the system OpenSSL."
-    else
-        say "Warning: UCM_FIPS_BUILD=1 could not be written into the new $ENV_FILE: add it, then"
-        say "reinstall this package, to keep the build against the system OpenSSL."
-    fi
-fi
+[ -z "$FIPS_BUILD" ] || say "UCM_FIPS_BUILD=1, set in the archived ucm.env, is kept in the new $ENV_FILE."
 say "This installation starts empty, with a new configuration."
 exit 0

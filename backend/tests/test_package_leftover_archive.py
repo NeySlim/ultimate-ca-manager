@@ -87,6 +87,9 @@ class Box:
             reason = ('This database names 1 migration(s) this release does not know.' if code == 6
                       else 'This database was last started by a release older than 2.254.')
             body = f'echo "{line}"\necho "{reason}"\nexit {code}'
+            if code == 4 and first is None:
+                # Once archived, the database is gone: a new installation
+                body = f'[ -e "{self.data}/ucm.db" ] || {{ echo "sqlite {self.data}/ucm.db"; exit 3; }}\n' + body
         exe.write_text(f'#!/bin/sh\n{body}\n')
         exe.chmod(0o755)
 
@@ -119,10 +122,11 @@ class Box:
         if not any(self.bin.iterdir()):
             self.wrap()
         env = {'PATH': f'{self.bin}:/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
+        # A session of its own: a wrapper that kills the run kills its process group only
         return subprocess.run(
             [POSIX_SH, str(SCRIPT), str(self.home), str(self.data), str(self.config),
              '' if default_parent else str(self.parent), str(self.log)],
-            capture_output=True, text=True, timeout=60, env=env)
+            capture_output=True, text=True, timeout=60, env=env, start_new_session=True)
 
     @property
     def archive(self):
@@ -564,3 +568,29 @@ def test_the_kept_directories_are_those_the_packages_create():
     assert {frozenset(m.split()) for m in re.findall(r'for d in ([a-z ]+); do', spec)} == {frozenset(KEPT)}
     assert re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst) and all(
         set(m.split(',')) == set(KEPT) for m in re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst))
+
+
+def test_a_copy_half_removed_while_putting_back_is_removed_on_the_retry(tmp_path):
+    """A copy whose source is whole again leaves the journal's remove line first: when
+    removing that copy stops halfway, the retry finishes it instead of comparing the
+    source with what is left of the copy."""
+    box = Box(tmp_path, python='stub')
+    data, config = files(box.data), files(box.config)
+    box.wrap(other_fs=(box.data,))
+    once = box.state / 'once'
+    (box.bin / 'rm').write_text(
+        f'#!/bin/sh\nfor last; do :; done\ncase $last in\n'
+        f'    {box.data}/updates) exit 1 ;;\n'
+        f'    {box.archive}/data/updates) [ -e {once} ] || {{ : > {once}; '
+        f'{REAL["rm"]} -f -- "$last/nested/f"; exit 1; }} ;;\nesac\n'
+        f'exec {REAL["rm"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 2, out.stdout
+    assert f'{box.archive}/data/updates' in out.stdout
+    assert files(box.data) == data
+    box.wrap(other_fs=(box.data,))
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert [p.name for p in box.parent.iterdir()] == [STAMP]
+    assert files(box.archive / 'data') == data
+    assert files(box.archive / 'config') == config
