@@ -327,6 +327,19 @@ class ChaosSuite:
                 covered.add((kind, mode))
         assert covered == {(k, m) for k in backs for m in ('fail', 'kill', 'done')}
 
+    def test_a_mount_point_is_never_renamed_nor_removed(self, lab):
+        """A mount point kept in place is a directory of the archiving, never an item: no
+        rename, removal or temporary ever names it, at the archiving or at a put-back."""
+        lab.first_run()
+        box = lab.first[()][0]
+        mounts = {str(p) for p in LAYOUTS[self.layout](box)}
+        assert bool(mounts) == (self.layout != 'one filesystem')
+        runs = [lab.first_run()] + [lab.first_run([(at, 'fail')]) for at in range(1, self._calls(lab) + 1)]
+        touched = [(n, name, args) for r in runs for n, name, args in r.calls
+                   if name in ('rename', 'rm', 'mv', 'cp')
+                   and any(a.rstrip('/').removesuffix(PART) in mounts for a in args)]
+        assert touched == []
+
     def test_a_retry_converges_after_a_fault_while_putting_back(self, lab):
         """Pairs (fault i while archiving, fault j while putting back or in the next run), drawn
         from the full product with a fixed seed, then a run without fault."""
