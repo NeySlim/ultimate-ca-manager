@@ -341,18 +341,41 @@ print('BOOTED')
 '''
 
 
-class TestASwitchWithoutDataStartsOnTheTarget:
-    """The target of a switch without data is a 3.0 database: its registry names every
-    current migration, so the pivot accepts it and the next start goes to the end."""
+@pytest.fixture
+def a_3_0_source(app):
+    """The session database carries the registry of a started 3.0 database, as a real source does."""
+    import migration_runner
+    with app.app_context():
+        engine, pg = db.engine, db.engine.dialect.name == 'postgresql'
+        created = '_migrations' not in inspect(engine).get_table_names()
+        migration_runner._ensure_tracking_table(engine, pg)
+        with engine.connect() as conn:
+            present = {r[0] for r in conn.execute(text('SELECT name FROM _migrations'))}
+        added = [n for n in migration_runner._list_migration_names() if n not in present]
+        migration_runner._mark_applied(engine, added, pg)
+    yield
+    with app.app_context():
+        with db.engine.begin() as conn:
+            if created:
+                conn.execute(text('DROP TABLE _migrations'))
+                return
+            for name in added:
+                conn.execute(text('DELETE FROM _migrations WHERE name = :n'), {'n': name})
 
-    def _switch_then_start(self, app, target, tmp_path, monkeypatch):
+
+class TestASwitchedTargetStarts:
+    """The target of a switch, with or without its data, is a 3.0 database: its registry
+    names every current migration, so the pivot accepts it and the next start goes to the end."""
+
+    def _switch_then_start(self, app, target, tmp_path, monkeypatch,
+                           switch=migration.bootstrap_auth_to_target):
         import subprocess
         import sys
         import migration_runner
         from utils.db_url import postgres_connect_args, sqlalchemy_url
 
         with app.app_context():
-            ok, message, _ = migration.bootstrap_auth_to_target(target)
+            ok, message, _ = switch(target)
         assert ok is True, message
 
         engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
@@ -376,12 +399,19 @@ class TestASwitchWithoutDataStartsOnTheTarget:
                              capture_output=True, text=True, timeout=180)
         assert run.returncode == 0 and 'BOOTED' in run.stdout, run.stdout[-3000:] + run.stderr[-3000:]
 
-    def test_sqlite(self, app, sqlite_target, tmp_path, monkeypatch):
+    def test_without_data_to_sqlite(self, app, sqlite_target, tmp_path, monkeypatch):
         self._switch_then_start(app, sqlite_target, tmp_path, monkeypatch)
 
     @_needs_pg
-    def test_postgresql(self, app, pg_target, tmp_path, monkeypatch):
+    def test_without_data_to_postgresql(self, app, pg_target, tmp_path, monkeypatch):
         self._switch_then_start(app, pg_target, tmp_path, monkeypatch)
+
+    def test_with_data_to_sqlite(self, app, a_3_0_source, sqlite_target, tmp_path, monkeypatch):
+        self._switch_then_start(app, sqlite_target, tmp_path, monkeypatch, migration.migrate_data)
+
+    @_needs_pg
+    def test_with_data_to_postgresql(self, app, a_3_0_source, pg_target, tmp_path, monkeypatch):
+        self._switch_then_start(app, pg_target, tmp_path, monkeypatch, migration.migrate_data)
 
 
 class TestTheSourceKeepsBeingWrittenTo:

@@ -595,6 +595,15 @@ def test_a_3_0_database_starts_without_running_anything(fresh, capsys):
     assert 'up to date' in capsys.readouterr().out
 
 
+def test_a_database_reset_keeps_its_3_0_registry_and_starts(fresh, capsys):
+    """The reset route drops and recreates the model tables: `_migrations` is not one of them."""
+    before = fresh.registry()
+    fresh_metadata().drop_all(fresh.engine)
+    fresh_metadata().create_all(fresh.engine)
+    assert fresh.registry() == before == ['300_upgrade_from_2_254']
+    assert fresh.upgrade() is True, capsys.readouterr().out
+
+
 def test_a_2254_database_starts_once_then_is_up_to_date(base, capsys):
     assert base.upgrade() is True
     capsys.readouterr()
