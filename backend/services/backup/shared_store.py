@@ -17,7 +17,9 @@ from sqlalchemy import delete, func, insert, select, text, update
 from sqlalchemy.exc import IntegrityError
 
 from config.settings import Config
-from .locking import BackupBusyError
+from utils.process_lock import busy_message
+
+from .locking import _SUBJECT, BackupBusyError
 
 logger = logging.getLogger(__name__)
 
@@ -303,8 +305,7 @@ def _take_lock(conn, wait: float, purpose: str) -> None:
         if conn.execute(query).scalar():
             return
         if time.monotonic() >= deadline:
-            raise BackupBusyError(
-                f'Another backup operation is in progress ({purpose} could not start)')
+            raise BackupBusyError(busy_message(_SUBJECT, wait, purpose))
         time.sleep(_LOCK_POLL)
 
 

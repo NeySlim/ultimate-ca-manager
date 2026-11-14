@@ -687,3 +687,36 @@ def test_chunks_are_stored_out_of_line_uncompressed(app):
             "JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = current_schema() "
             "WHERE c.relname = 'backup_archive_chunks' AND a.attname = 'data'")).scalar()
     assert storage_kind == 'e'
+
+
+def test_a_busy_store_refuses_with_the_sentence_of_the_disk_lock(app, nodes):
+    from models import db
+    from services.backup.locking import BackupBusyError, backup_operation_lock
+    refusals, held, release = {}, threading.Event(), threading.Event()
+
+    def hold_disk_lock():
+        with backup_operation_lock(purpose='holder'):
+            held.set()
+            assert release.wait(30)
+    with nodes('a'):
+        holder = threading.Thread(target=hold_disk_lock)
+        holder.start()
+        try:
+            assert held.wait(30)
+            with pytest.raises(BackupBusyError) as disk:
+                with backup_operation_lock(timeout=0.2, purpose='deleting a backup'):
+                    pass
+            refusals['disk'] = str(disk.value)
+        finally:
+            release.set()
+            holder.join(30)
+    with app.app_context(), db.engine.connect() as other:
+        shared_store._take_lock(other, 0, 'node A')
+        try:
+            with pytest.raises(BackupBusyError) as store:
+                shared_store.delete_archives(['ucm_backup_x.ucmbkp'], wait=0.2,
+                                             purpose='deleting a backup')
+            refusals['store'] = str(store.value)
+        finally:
+            other.rollback()
+    assert refusals['store'] == refusals['disk']
