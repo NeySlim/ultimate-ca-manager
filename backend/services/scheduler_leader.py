@@ -326,7 +326,9 @@ def _holder(node_id):
     from models import ClusterNode, db
     db.session.expire_all()
     node = db.session.get(ClusterNode, node_id)
-    return None if node is None else (node.instance_token, node.heartbeat_at)
+    held = None if node is None else (node.instance_token, node.heartbeat_at)
+    db.session.commit()  # no transaction stays idle through the pause between polls
+    return held
 
 
 class NodeIdTaken(SystemExit):

@@ -124,6 +124,28 @@ def test_a_fresh_row_of_another_live_token_refuses_the_start(app, ha):
     assert beats and _row(app, node)[0] == 'live'
 
 
+def test_the_wait_for_a_held_row_keeps_no_transaction_open(app, ha):
+    """A server with idle_in_transaction_session_timeout would end the session mid-wait."""
+    from models import db
+    node = PREFIX + 'idle'
+    _put(app, node, 'old', age=0.5)
+    with app.app_context():
+        engine = db.engine
+    idle = []
+
+    def pause(_):
+        with engine.connect() as probe:
+            idle.append(probe.execute(text(
+                "SELECT count(*) FROM pg_stat_activity WHERE application_name = :name"
+                " AND state LIKE 'idle in transaction%' AND pid <> pg_backend_pid()"),
+                {'name': pg_app_harness.SCHEMA}).scalar())
+        time.sleep(0.05)
+    with app.app_context():
+        scheduler_leader.claim_node_at_start(node, 'new', stale_seconds=1, poll=0.05, sleep=pause,
+                                             release_at_exit=False)
+    assert idle and set(idle) == {0}
+
+
 def test_a_row_of_a_crashed_run_is_taken_once_its_heartbeat_expires(app, ha):
     node = PREFIX + 'crashed'
     _put(app, node, 'old', age=1.0, leader=True)
