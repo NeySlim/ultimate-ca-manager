@@ -72,6 +72,24 @@ def test_same_spki_different_pem_layout_is_not_a_rotation(app):
         assert result['changed_referenced_key_ids'] == []
 
 
+def test_corrected_label_on_the_same_spki_is_not_a_rotation(app):
+    same = new_pem()
+    with _provider_with_keys(app, 'relabel', ['a'], bound='a') as (pid, ids, _):
+        with app.app_context():
+            row = db.session.get(HsmKey, ids['a'])
+            row.algorithm, row.public_key_pem = 'EC-P384', same
+            db.session.commit()
+        listed = _info('a')
+        listed.public_key_pem = same
+        with patch.object(HsmService, 'forget_signing_hash') as forget:
+            result = _sync(app, pid, _ListingProvider([listed]))
+        forget.assert_not_called()
+        assert result['changed_referenced_key_ids'] == []
+        with app.app_context():
+            row = db.session.get(HsmKey, ids['a'])
+            assert (row.algorithm, row.public_key_pem) == ('EC-P256', same)
+
+
 @pytest.mark.parametrize('reading', [None, 'not a PEM'])
 def test_unreadable_same_algorithm_does_not_destroy_cached_public_key(app, reading):
     old = new_pem()

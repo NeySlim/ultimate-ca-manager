@@ -777,7 +777,9 @@ class HsmService:
             known.public_key_pem = key_info.public_key_pem
         elif algorithm_changed:
             known.public_key_pem = None
-        changed = algorithm_changed or bool(previous and current and previous != current)
+        # A corrected label over the same readable SPKI is not new key material.
+        same_material = bool(current) and current == previous
+        changed = not same_material and (algorithm_changed or bool(previous and current))
         if changed:
             cls.forget_signing_hash(known.id)
         return changed
