@@ -435,6 +435,8 @@ class SchedulerService:
         except OSError:
             listed = []
         for name in listed:
+            if name.startswith('.'):
+                continue
             try:
                 os.unlink(os.path.join(directory, name))
             except OSError:
@@ -491,7 +493,8 @@ class SchedulerService:
             except Exception:
                 self._in_app(_rollback)
         try:
-            return bool(os.listdir(_data_path(REQUESTS_DIR)))
+            # A request is named after its task: a hidden entry (a local archive) is none
+            return any(not name.startswith('.') for name in os.listdir(_data_path(REQUESTS_DIR)))
         except OSError:
             return False
 
