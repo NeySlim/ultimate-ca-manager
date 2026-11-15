@@ -41,6 +41,19 @@ def _suffix():
     return uuid.uuid4().hex[:8]
 
 
+@pytest.fixture
+def dropped(app):
+    """Rows to delete after the test: an unreadable secret left behind stops later backups."""
+    rows = []
+    yield rows
+    with app.app_context():
+        for model, row_id in rows:
+            row = db.session.get(model, row_id)
+            if row is not None:
+                db.session.delete(row)
+        db.session.commit()
+
+
 def _foreign_token(value='saved-under-another-key'):
     """A secret this node's database key does not open (another node, another key)."""
     from cryptography.fernet import Fernet
@@ -566,12 +579,14 @@ class TestHsmProvider:
                     'previous_user_pin': 'FOREIGN'},
          {'module_path': '/tmp/evil.so'}),
     ], ids=['openbao-token', 'pkcs11-pin', 'pkcs11-previous-pin'])
-    def test_an_unreadable_kept_credential_still_needs_retyping(self, app, auth_client,
+    def test_an_unreadable_kept_credential_still_needs_retyping(self, app, auth_client, dropped,
                                                                 kind, config, over):
         # This node cannot open it, yet the update keeps it: a node that can would send it on
+        from models.hsm import HsmProvider
         form = {k: v for k, v in config.items() if v != 'FOREIGN'}
         provider_id = self._make(app, kind, {k: (_foreign_token() if v == 'FOREIGN' else v)
                                              for k, v in config.items()})
+        dropped.append((HsmProvider, provider_id))
         before = self._stored(app, provider_id)
         _refused(_send(auth_client, 'put', f'/api/v2/hsm/providers/{provider_id}',
                        {'config': dict(form, **over)}))
@@ -716,7 +731,7 @@ class TestUnreadableSavedSecret:
             _drop_sso(app, provider_id)
 
     @pytest.mark.parametrize('which', ['basic', 'winrm'])
-    def test_msca_password(self, app, auth_client, which):
+    def test_msca_password(self, app, auth_client, dropped, which):
         from models.msca import MicrosoftCA
         with app.app_context():
             row = MicrosoftCA(name=f'Unreadable CA {_suffix()}', server='adcs.corp.example',
@@ -734,6 +749,7 @@ class TestUnreadableSavedSecret:
             db.session.add(row)
             db.session.commit()
             msca_id = row.id
+        dropped.append((MicrosoftCA, msca_id))
 
         def stored():
             with app.app_context():
@@ -744,7 +760,7 @@ class TestUnreadableSavedSecret:
         _refused(_send(auth_client, 'put', f'/api/v2/microsoft-cas/{msca_id}', body))
         assert stored() == before
 
-    def _msca_with_unreadable_winrm(self, app, winrm_host):
+    def _msca_with_unreadable_winrm(self, app, dropped, winrm_host):
         from models.msca import MicrosoftCA
         with app.app_context():
             row = MicrosoftCA(name=f'Unreadable CA {_suffix()}', server='adcs.corp.example',
@@ -754,16 +770,17 @@ class TestUnreadableSavedSecret:
             row._winrm_password = _foreign_token()
             db.session.add(row)
             db.session.commit()
+            dropped.append((MicrosoftCA, row.id))
             return f'/api/v2/microsoft-cas/{row.id}'
 
-    def test_msca_clearing_an_unreadable_winrm_password_on_the_ca_host(self, app, auth_client):
+    def test_msca_clearing_an_unreadable_winrm_password_on_the_ca_host(self, app, auth_client, dropped):
         # The basic password would take over the WinRM channel
-        _refused(_send(auth_client, 'put', self._msca_with_unreadable_winrm(app, None),
+        _refused(_send(auth_client, 'put', self._msca_with_unreadable_winrm(app, dropped, None),
                        {'winrm_password': ''}))
 
-    def test_msca_an_unreadable_winrm_password_is_not_the_basic_one(self, app, auth_client):
+    def test_msca_an_unreadable_winrm_password_is_not_the_basic_one(self, app, auth_client, dropped):
         # Cleared on a host of its own: the basic password never reaches it
-        r = _send(auth_client, 'put', self._msca_with_unreadable_winrm(app, 'winrm.corp.example'),
+        r = _send(auth_client, 'put', self._msca_with_unreadable_winrm(app, dropped, 'winrm.corp.example'),
                   {'winrm_password': '', 'winrm_port': 5985})
         assert r.status_code == 200, r.data
 
