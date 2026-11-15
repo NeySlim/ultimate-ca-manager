@@ -733,3 +733,12 @@ def test_a_purge_keeps_the_local_archives_of_an_earlier_installation(tmp_path):
     assert f'chown root:root {config}' in _calls(log) and f'chmod 700 {config}' in _calls(log)
     assert not any(c.startswith('rm -rf ') for c in _calls(log)), _calls(log)
     assert not any('.ucm-archive-' in c for c in _calls(log) if c.startswith('rm ')), _calls(log)
+
+
+def test_a_removal_says_where_the_data_stays_and_what_a_purge_keeps(tmp_path):
+    """The data of this release is under the home; no removal is advised beyond the purge,
+    which keeps what an earlier installation left in its local archives."""
+    out, _log, home, config = _postrm_with(tmp_path, 'remove', lambda home, config: None)
+    assert f'Data preserved in {home}/data, configuration in {config}' in out.stdout, out.stdout
+    assert 'apt purge ucm' in out.stdout and '.ucm-archive-* directories' in out.stdout, out.stdout
+    assert 'rm -rf' not in out.stdout, out.stdout

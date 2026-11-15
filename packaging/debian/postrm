@@ -33,8 +33,9 @@ case "$1" in
         systemctl disable ucm.service >/dev/null 2>&1 || true
         
         echo "UCM service stopped and disabled"
-        echo "Data preserved in /var/lib/ucm"
-        echo "To remove data: rm -rf /var/lib/ucm"
+        echo "Data preserved in $UCM_HOME/data, configuration in $UCM_CONFIG"
+        echo "apt purge ucm also removes the configuration, /var/lib/ucm and /var/log/ucm, and"
+        echo "keeps the .ucm-archive-* directories an earlier installation left; $UCM_HOME/data stays."
         ;;
         
     purge)
