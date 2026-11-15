@@ -179,12 +179,12 @@ def _switch_backend():
         ok_boot, boot_msg, boot_stats = svc.bootstrap_auth_to_target(database_url)
         if not ok_boot:
             # A step cut short is resumed on the same target, at once after a transient failure,
-            # once its cause is corrected otherwise. A copy that failed its verification is
-            # verified again and refused while it fails; a refused plan is refused again.
+            # once its cause is corrected otherwise. Accounts that failed their verification are
+            # emptied, copied again and verified again by the retry; a refused plan is refused again.
             reset, status = '', _refusal_status(boot_stats)
             if boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
                 if boot_stats.get('refusal') == 'verification':
-                    reset = ' The copy on the target failed its verification; reset the target before retrying.'
+                    reset = ' The copy on the target failed its verification; retrying copies the accounts again.'
                 elif boot_stats.get('transient'):
                     reset = ' A transient failure stopped it: retrying on the same target resumes the switch.'
                     status = 503

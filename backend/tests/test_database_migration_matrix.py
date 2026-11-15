@@ -759,7 +759,7 @@ class TestNothingSwitchesUnlessEverythingPassed:
         ('copy', True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
         ('error', False, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
         ('copy', False, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
-        ('verification', False, 500, 'failed its verification; reset the target before retrying.'),
+        ('verification', False, 500, 'failed its verification; retrying copies the accounts again.'),
     ])
     def test_a_bootstrap_cut_short_says_how_to_retry(
             self, auth_client, sqlite_target, env_file, refusal, transient, status, advice,
@@ -1325,9 +1325,9 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
         assert first.status_code == 500, first.data
         second = self._post(auth_client, target)
 
-        # Verified again against the source, and refused again
+        # Copied and verified again, and refused again only because the verification still fails
         assert second.status_code == 500, second.data
-        assert 'reset the target' in json.loads(second.data)['message']
+        assert json.loads(second.data)['message'].endswith('retrying copies the accounts again.')
         assert env_file.read_text() == before
         assert not restart_signal.exists()
         assert switch_pending() is None
