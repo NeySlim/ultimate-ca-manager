@@ -131,7 +131,12 @@ def test_the_csr_signing_path_records_the_first_common_name(app, auth_client, cr
     r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id})
     assert r.status_code == 200, r.data
     with app.app_context():
-        assert db.session.get(Certificate, csr_id).subject_cn == f'web-{tag}.example.com'
+        row = db.session.get(Certificate, csr_id)
+        try:
+            assert row.subject_cn == f'web-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
 
 
 def test_the_scep_path_records_the_first_common_name(app, create_ca, key):
