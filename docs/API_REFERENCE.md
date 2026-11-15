@@ -540,8 +540,9 @@ only (no HSM provider holds one), is refused in FIPS mode unless the loaded FIPS
 EdDSA (the `-fips` Docker image does) and signs without a separate digest,
 like ML-DSA below. Web browsers (Chrome, Firefox, Safari), Windows (CryptoAPI/CNG) and SCEP clients
 do not verify an Ed25519 or Ed448 signature on a certificate, so they reject anything such a CA issues,
-whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP and XCEP
-refuse an EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
+whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP refuses
+any CA whose key is not RSA (EC, EdDSA and ML-DSA included) or is held by an HSM, XCEP refuses an
+EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
 OpenSSL 3.5 or later and is refused in FIPS mode unless the loaded FIPS module approves it (the
 `-fips` Docker image does); `keyAlgo` generates it in software, and
 an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
@@ -3461,6 +3462,8 @@ GET /api/v2/system/fips-preflight
 {
   "data": {
     "fips_active": false,
+    "module_known": true,           # false: no FIPS module was asked (no loaded module, no
+                                    # build record of the -fips image), EdDSA and ML-DSA listed as refused
     "ready": false,                 # no blocker and every check ran
     "summary": {"blocker": 1, "warning": 0, "info": 0},
     "findings": [{

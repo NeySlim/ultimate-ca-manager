@@ -4555,7 +4555,7 @@
     "title": "Politiques de certificats",
     "subtitle": "Gérer les règles d'émission, les exigences de clés et les workflows d'approbation",
     "fipsRulesTitle": "Règles FIPS actives (lecture seule)",
-    "fipsRulesDesc": "Le mode FIPS applique en amont une politique système : clés RSA 2048 à 4096 et EC P-256 à P-521, signatures SHA-256 à SHA-512. Les politiques définies ici ne peuvent que la restreindre.",
+    "fipsRulesDesc": "Le mode FIPS applique en amont une politique système : clés RSA de longueur paire de 2048 à 16384 bits, EC P-256 à P-521, et Ed25519, Ed448 et ML-DSA quand le module FIPS chargé les approuve ; signatures SHA-256 à SHA-512. Les politiques définies ici ne peuvent que la restreindre.",
     "total": "Total",
     "active": "Actives",
     "inactive": "Inactives",

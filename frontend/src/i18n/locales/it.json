@@ -4911,7 +4911,7 @@
     "selectGroup": "Seleziona gruppo...",
     "subtitle": "Gestisci regole di emissione, requisiti delle chiavi e flussi di approvazione",
     "fipsRulesTitle": "Regole FIPS attive (sola lettura)",
-    "fipsRulesDesc": "La modalità FIPS applica una policy di sistema prima di queste: chiavi RSA da 2048 a 4096 ed EC da P-256 a P-521, firme da SHA-256 a SHA-512. Le policy qui definite possono solo restringerla.",
+    "fipsRulesDesc": "La modalità FIPS applica una policy di sistema prima di queste: chiavi RSA di lunghezza pari da 2048 a 16384 bit, EC da P-256 a P-521, ed Ed25519, Ed448 e ML-DSA quando il modulo FIPS caricato le approva; firme da SHA-256 a SHA-512. Le policy qui definite possono solo restringerla.",
     "targetCA": "CA di destinazione",
     "title": "Policy certificati",
     "toggleFailed": "Impossibile attivare/disattivare la policy",

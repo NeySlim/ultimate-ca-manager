@@ -4911,7 +4911,7 @@
     "selectGroup": "选择用户组...",
     "subtitle": "管理签发规则、密钥要求和审批工作流",
     "fipsRulesTitle": "FIPS 规则已启用（只读）",
-    "fipsRulesDesc": "FIPS 模式会优先应用系统策略：RSA 2048 至 4096 位和 EC P-256 至 P-521 密钥，SHA-256 至 SHA-512 签名。此处的策略只能进一步收窄该范围。",
+    "fipsRulesDesc": "FIPS 模式会优先应用系统策略：长度为偶数、2048 至 16384 位的 RSA 密钥，EC P-256 至 P-521，以及在已加载的 FIPS 模块批准时的 Ed25519、Ed448 和 ML-DSA 密钥；SHA-256 至 SHA-512 签名。此处的策略只能进一步收窄该范围。",
     "targetCA": "目标 CA",
     "title": "证书策略",
     "toggleFailed": "切换策略失败",

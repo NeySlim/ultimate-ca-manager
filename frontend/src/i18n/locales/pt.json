@@ -4911,7 +4911,7 @@
     "selectGroup": "Selecionar grupo...",
     "subtitle": "Gerencie regras de emissão, requisitos de chave e fluxos de aprovação",
     "fipsRulesTitle": "Regras FIPS ativas (somente leitura)",
-    "fipsRulesDesc": "O modo FIPS aplica uma política do sistema antes destas: chaves RSA 2048 a 4096 e EC P-256 a P-521, assinaturas SHA-256 a SHA-512. As políticas aqui só podem restringi-la mais.",
+    "fipsRulesDesc": "O modo FIPS aplica uma política do sistema antes destas: chaves RSA de comprimento par de 2048 a 16384 bits, EC P-256 a P-521, e Ed25519, Ed448 e ML-DSA quando o módulo FIPS carregado as aprova; assinaturas SHA-256 a SHA-512. As políticas aqui só podem restringi-la mais.",
     "targetCA": "CA Alvo",
     "title": "Políticas de Certificado",
     "toggleFailed": "Falha ao alternar política",
