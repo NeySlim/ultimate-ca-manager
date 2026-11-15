@@ -25,7 +25,7 @@ command -v npm >/dev/null || { echo "e2e: no npm on PATH" >&2; exit 2; }
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/ucm-e2e.XXXXXX") || exit 2
 PID=""
-# The functions below run from the EXIT trap (SC2317, SC2329: reached, though never called by name)
+# The functions below are reached only through the EXIT trap (SC2317, SC2329)
 # shellcheck disable=SC2317,SC2329
 stop_instance() {
   [ -n "$PID" ] || return 0

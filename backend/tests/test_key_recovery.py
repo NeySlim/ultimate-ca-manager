@@ -231,6 +231,18 @@ class TestWhatTheAuditTrailKeeps:
         assert r.status_code == 409
         assert _audited(app, rid) == ['key_recovery.requested']
 
+    def test_an_approval_and_a_download_are_audited(self, app, auth_client, archived_cert):
+        _set_dual_control(app, False)
+        rid = _open_request(auth_client, archived_cert)
+        auth_client.post(f'/api/v2/key-recovery/{rid}/approve',
+                         data=json.dumps({}), content_type='application/json')
+        r = auth_client.post(f'/api/v2/key-recovery/{rid}/recover',
+                             data=json.dumps({'password': 'recover-pw-123'}),
+                             content_type='application/json')
+        assert r.status_code == 200
+        assert _audited(app, rid) == ['key_recovery.approved', 'key_recovery.recovered',
+                                      'key_recovery.requested']
+
     def test_a_rejection_is_audited(self, app, auth_client, archived_cert):
         _set_dual_control(app, False)
         rid = _open_request(auth_client, archived_cert)

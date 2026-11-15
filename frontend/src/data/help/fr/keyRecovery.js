@@ -23,7 +23,7 @@ export default {
     ],
     tips: [
       'La récupération de clés concerne les clés qui n\'ont pas été exportées lors de l\'émission du certificat ; elle ne remplace pas la restriction de l\'export de clés au moment de l\'émission.',
-      'Chaque demande, approbation, rejet et téléchargement est enregistré dans la piste d\'audit, de même qu\'une auto-approbation refusée par le double contrôle et un téléchargement en échec ; un appel refusé pour une autre raison ne l\'est pas.',
+      'Chaque demande, approbation, rejet et téléchargement est enregistré dans la piste d\'audit, de même qu\'une auto-approbation refusée par le double contrôle et un téléchargement dont l\'archive n\'a pas pu être construite ; un appel refusé pour une autre raison ne l\'est pas.',
     ],
     warnings: [
       'Un certificat dont la clé privée n\'a jamais été archivée ne peut pas être récupéré : il n\'y a rien à délivrer.',
