@@ -161,7 +161,7 @@ Rate limits are counted per node, in memory, and are not shared. Two layers appl
 ### ACME challenges
 
 - **HTTP-01** (client orders): the answer is read from the database, so any node can serve the challenge file when the CA's request reaches it.
-- **TLS-ALPN-01**: the node that runs the validation opens a listener on the port set in the ACME client settings (443 by default), on all its addresses, for the duration of the challenge. That is the node that received the request for a manual validation, and the scheduler leader for an automatic renewal. The CA connects to the identifier's name on that port, so the connection must arrive at that node: a layer 7 balancer that terminates TLS cannot pass the proof, and a TCP balancer that spreads connections over the nodes reaches the listener only when it happens to pick that node. Route the port to a single node, or use HTTP-01 or DNS-01 behind a balancer.
+- **TLS-ALPN-01**: the node that runs the validation opens a listener on the port set in the ACME client settings (443 by default), on all its addresses, for the duration of the challenge. That is the node that received the request for a manual validation, and the scheduler leader for an automatic renewal. The CA connects to port 443 of the identifier's name, which must reach that node's listener (directly, or forwarded to the configured port): a layer 7 balancer that terminates TLS cannot pass the proof, and a TCP balancer that spreads connections over the nodes reaches the listener only when it happens to pick that node. Route the port to a single node, or use HTTP-01 or DNS-01 behind a balancer.
 
 ## What stays local to a node
 

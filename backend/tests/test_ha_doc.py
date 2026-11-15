@@ -52,3 +52,9 @@ def test_clock_bullet_names_the_leases_on_the_node_clock_pos():
     assert 'Heartbeats, leases and the staleness test' not in bullet
     assert 'ACME order lease' in bullet and 'scheduled backup' in bullet
 
+
+def test_tls_alpn_connects_to_port_443_pos():
+    # RFC 8737 section 3: the server connects to port 443; the setting is the local listening port.
+    bullet = next(l for l in _section('ACME challenges').splitlines() if l.startswith('- **TLS-ALPN-01'))
+    assert "identifier's name on that port" not in bullet
+    assert "port 443 of the identifier's name" in bullet
