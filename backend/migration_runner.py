@@ -781,8 +781,11 @@ def _probe_engine(db_url: str):
     if db_url.startswith("sqlite:///"):
         path = db_url[len("sqlite:///"):]
         if not _journal_holds_data(path):
+            import sqlite3
             from urllib.parse import quote
-            engine = create_engine(f"sqlite:///file:{quote(os.path.abspath(path))}?immutable=1&uri=true")
+            # The URI goes to sqlite3 as written: a URL parser would decode it again (#, ?, %)
+            uri = f"file:{quote(os.path.abspath(path))}?immutable=1"
+            engine = create_engine("sqlite://", creator=lambda: sqlite3.connect(uri, uri=True))
             try:
                 yield engine
             finally:

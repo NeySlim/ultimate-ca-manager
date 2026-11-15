@@ -128,6 +128,19 @@ class TestSQLite:
         assert _fingerprint(tmp_path) == before
 
 
+    @pytest.mark.parametrize('directory', ['plain', 'hash#x', 'q?x', 'pct%41x'])
+    @pytest.mark.parametrize('kind, code', [('short', REFUSED), ('2.254', STARTABLE)])
+    def test_a_directory_name_a_url_would_cut_or_decode_gets_the_same_verdict(
+            self, tmp_path, directory, kind, code):
+        """Read in place by its path, never through a URL parsed again: the same verdict as
+        an ordinary directory, and no file created anywhere."""
+        db = tmp_path / directory / 'ucm.db'
+        db.parent.mkdir()
+        _sqlite(db, _registry(kind))
+        before = sorted(str(p) for p in tmp_path.rglob('*'))
+        assert _check(path=db)[0] == code
+        assert sorted(str(p) for p in tmp_path.rglob('*')) == before
+
     def test_rows_still_in_the_write_ahead_log_are_read_without_writing_beside_it(self, tmp_path):
         """A -wal left by a stopped service holds committed rows: read, and no -shm appears."""
         live = tmp_path / 'live'
