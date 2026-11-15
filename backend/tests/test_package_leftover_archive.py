@@ -1689,3 +1689,24 @@ def test_a_local_archive_and_all_it_holds_are_root_s_before_and_after_the_way_ba
     assert all(stat.S_IMODE(d.stat().st_mode) == 0o700 for d in box.data.rglob('.ucm-archive-*'))
     assert _owner(outside) == (2, 2)
     assert _owner(box.data / 'ca') == (1, 1)
+
+
+# -- dnf5 cuts a scriptlet's lines at 80 columns ---------------------------------------
+
+@pytest.mark.parametrize('case', ['archived', 'failed', 'nothing to say'])
+def test_a_run_that_said_a_line_dnf5_cuts_names_the_log_once(tmp_path, case):
+    box = Box(tmp_path, python='stub', registry='short' if case != 'nothing to say' else 'full')
+    if case == 'nothing to say':
+        box.python('stub', code=0)
+    if case == 'failed':
+        box.wrap(other_fs=(box.data,), refused=(f'{box.data}/https_key.pem',))
+    out = box.run()
+    lines = out.stdout.splitlines()
+    note = f'UCM: the full text is in {box.log}'
+    if case == 'nothing to say':
+        assert out.returncode == 0 and note not in lines, out.stdout
+        return
+    assert out.returncode == (0 if case == 'archived' else 1), (out.stdout, out.stderr)
+    assert any(len(l) > 79 for l in lines)
+    assert lines.count(note) == 1 and lines[-1] == note, out.stdout
+    assert box.log.read_text().count(note) == 1

@@ -40,6 +40,15 @@ log_line() {
 }
 say() { printf '%s\n' "$*"; log_line "$*"; }
 
+# dnf5 cuts a scriptlet's lines at 80 columns: once a run said a longer one, a last line
+# names the log, which holds them whole (after its 21-column date)
+LOG_START=$( { wc -c < "$LOG"; } 2>/dev/null) || LOG_START=0
+full_text() {
+    tail -c +$((LOG_START + 1)) -- "$LOG" 2>/dev/null | awk 'length($0) > 100 { f = 1 } END { exit !f }' \
+        && say "UCM: the full text is in $LOG"
+}
+trap full_text EXIT
+
 # Last value of $2 in env file $1, unquoted; the file is read, never sourced
 env_value() {
     [ -f "$1" ] || return 0
