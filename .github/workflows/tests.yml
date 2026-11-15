@@ -143,11 +143,12 @@ jobs:
           pytest -v --tb=short -n 4 --dist loadfile $files
 
   # One database for the whole suite, as a user runs it: the integration judge.
-  # Release branches, the nightly run of dev, and on demand. Not on dev pushes.
+  # Release branches, the nightly run of dev, and on demand. A schedule runs only
+  # the default branch's copy, so the 3.0 line runs it on each sextant push instead.
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant'))
     timeout-minutes: 120
 
     steps:
@@ -185,10 +186,10 @@ jobs:
           cd backend
           pytest -v --tb=short --durations=30
 
-      # The same suite in random order on the nightly run: a report, not a gate.
-      # The job summary gives the seed that replays the order locally.
+      # The same suite in random order on the nightly run and on sextant pushes:
+      # a report, not a gate. The job summary gives the seed that replays the order.
       - name: Run tests in random order (report only)
-        if: ${{ !cancelled() && github.event_name == 'schedule' && steps.deterministic.outcome != 'skipped' }}
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref_name == 'sextant')) && steps.deterministic.outcome != 'skipped' }}
         continue-on-error: true
         timeout-minutes: 45
         env:
