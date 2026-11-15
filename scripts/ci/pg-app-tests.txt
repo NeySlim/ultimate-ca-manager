@@ -82,3 +82,6 @@ tests/test_ca_parent_on_replacement.py
 tests/test_import_triggers_deploy.py
 tests/test_unique_subject*.py
 tests/test_migration_runner_isolation.py
+tests/test_msca_pending_completion.py
+tests/test_msca_signed_elsewhere.py
+tests/test_msca_status_import_deploys.py
