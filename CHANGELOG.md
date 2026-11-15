@@ -43,7 +43,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Encryption: after a data key rotation or a disable, the old data keys stay readable for seven days and are dropped only once a daily sweep finds nothing left under them, so a value committed late under one cannot become unreadable; the next rotation waits only until every node has reloaded, then two minutes (ten at most).
 
 - Renewal: a deploy binding or the HTTPS binding that an EST, SCEP or WSTEP renewal leaves on the previous certificate (no key in UCM) is now flagged in the API (`needs_attention`), the bell, the overview queue and a `certificate.binding_left_behind` event; it can be reattached once UCM holds the key, and importing that key moves it.
-- **The overview follows the data.** Its cards reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when the tab returns, and a Refresh button reloads them all; the health card shows the TSA signer, and the expiry horizon marks the TSA signer and delegated OCSP responders.
+- **The overview follows the data.** Its cards reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when the tab returns, and a Refresh button reloads them all; the health card shows the TSA signer and, with the right to read settings, whether email, webhooks and auto-renewal are set up, the work queue lists trust store certificates that expire within 90 days or have expired, and the expiry horizon marks the TSA signer and delegated OCSP responders.
 
 ### High availability
 

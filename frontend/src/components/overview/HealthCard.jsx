@@ -7,8 +7,13 @@ import { formatDate } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
 import { CardFrame, num, useCardData } from './shared'
 
-const PROTOCOLS = ['acme', 'scep', 'est', 'tsa', 'scheduler']
-const ROW_LINKS = { tsa: '/tsa-config', scheduler: '/settings?tab=scheduler' }
+const PROTOCOLS = ['acme', 'scep', 'est', 'tsa', 'scheduler', 'smtp', 'webhooks', 'auto_renewal']
+// Settings witnesses: a state of a setting, no series and no last operation
+const WITNESSES = ['smtp', 'webhooks', 'auto_renewal']
+const ROW_LINKS = {
+  tsa: '/tsa-config', scheduler: '/settings?tab=scheduler', smtp: '/settings?tab=email',
+  webhooks: '/settings?tab=webhooks', auto_renewal: '/settings?tab=autoRenewal',
+}
 
 /** The row's link, only when the navigation guard of its page lets this user in. */
 function rowLink(name, can) {
@@ -35,6 +40,9 @@ function summary(name, p, t) {
   if (name === 'tsa') {
     const key = p.state === 'unusable' ? `overview.health.tsaReason.${p.reason}` : `overview.health.tsaState.${p.state}`
     return { text: t(key, { count: p.days_left, defaultValue: p.state }), alert: Boolean(p.alert) }
+  }
+  if (WITNESSES.includes(name)) {
+    return { text: t(`overview.health.witness.${name}.${p.state}`, { count: p.count, defaultValue: p.state }), alert: Boolean(p.alert) }
   }
   if (name === 'scheduler') {
     const failed = Number(p.by_status?.failed) || 0
@@ -73,7 +81,7 @@ export function HealthCard() {
                 {Array.isArray(p.periods) && <Bars periods={p.periods} />}
                 {name === 'scheduler' && <span>{t('overview.health.tasks')} {num(p.tasks)}</span>}
                 <span className={alert ? 'text-status-danger font-medium' : undefined}>{text}</span>
-                {name !== 'tsa' && <span>{p.last_operation_at ? formatDate(p.last_operation_at) : '–'}</span>}
+                {name !== 'tsa' && !WITNESSES.includes(name) && <span>{p.last_operation_at ? formatDate(p.last_operation_at) : '–'}</span>}
               </span>
             </li>
           )

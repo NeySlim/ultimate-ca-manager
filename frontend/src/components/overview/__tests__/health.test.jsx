@@ -91,6 +91,51 @@ describe('TSA signer on the health card', () => {
   })
 })
 
+const witness = (state, over) => ({ basis: 'setting', periods: null, state, count: null, alert: false,
+  last_operation_at: null, last_status: null, ...over })
+
+describe('mail, webhook and auto-renewal witnesses', () => {
+  it.each([
+    ['smtp', 'not_configured', {}, false, 'overview.health.witness.smtp.not_configured'],
+    ['smtp', 'disabled', { alert: true }, true, 'overview.health.witness.smtp.disabled'],
+    ['smtp', 'incomplete', { alert: true }, true, 'overview.health.witness.smtp.incomplete'],
+    ['smtp', 'ready', {}, false, 'overview.health.witness.smtp.ready'],
+    ['webhooks', 'not_configured', { count: 0 }, false, 'overview.health.witness.webhooks.not_configured'],
+    ['webhooks', 'none_active', { count: 2, alert: true }, true, 'overview.health.witness.webhooks.none_active:2'],
+    ['webhooks', 'active', { count: 3 }, false, 'overview.health.witness.webhooks.active:3'],
+    ['auto_renewal', 'enabled', {}, false, 'overview.health.witness.auto_renewal.enabled'],
+    ['auto_renewal', 'disabled', {}, false, 'overview.health.witness.auto_renewal.disabled'],
+  ])('%s %s reads %s', async (name, state, over, alert, text) => {
+    const card = await show({ [name]: witness(state, over) })
+    const line = row(card, name)
+    expect(line.textContent).toContain(text)
+    expect(line.getAttribute('data-alert')).toBe(alert ? 'true' : 'false')
+    expect(line.textContent).not.toContain('–')
+  })
+
+  it('a setting that is not configured is information in the user language, not an alert', async () => {
+    lang.fr = true
+    const card = await show({ smtp: witness('not_configured') })
+    const line = row(card, 'smtp')
+    expect(line.textContent).toContain('Non configuré')
+    expect(line.querySelector('.text-status-danger')).toBeNull()
+  })
+
+  it('shows only the witnesses the server sent (the right to read the setting)', async () => {
+    const card = await show({ scheduler: sched({}), webhooks: witness('active', { count: 1 }) })
+    expect(within(card).queryByTestId('health-smtp')).toBeNull()
+    expect(within(card).queryByTestId('health-auto_renewal')).toBeNull()
+    expect(within(card).getByTestId('health-webhooks')).toBeTruthy()
+  })
+
+  it('each row links to its settings tab', async () => {
+    const card = await show({ smtp: witness('ready'), webhooks: witness('active', { count: 1 }), auto_renewal: witness('enabled') })
+    expect(within(row(card, 'smtp')).getByRole('link').getAttribute('href')).toBe('/settings?tab=email')
+    expect(within(row(card, 'webhooks')).getByRole('link').getAttribute('href')).toBe('/settings?tab=webhooks')
+    expect(within(row(card, 'auto_renewal')).getByRole('link').getAttribute('href')).toBe('/settings?tab=autoRenewal')
+  })
+})
+
 describe('row links follow the navigation guards', () => {
   it('an operator without the rights sees the rows without their links', async () => {
     perms.admin = false

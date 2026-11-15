@@ -6290,7 +6290,8 @@
         "session_revoke": "セッションの取り消し",
         "session_revoke_all": "複数セッションの取り消し",
         "deploy_binding_left_behind": "旧証明書に残ったデプロイ",
-        "https_binding_left_behind": "旧証明書に残った HTTPS"
+        "https_binding_left_behind": "旧証明書に残った HTTPS",
+        "truststore_expiring": "トラストストアの証明書の期限切れ間近または期限切れ"
       }
     }
   },
@@ -6339,7 +6340,8 @@
       "renewal_declined": "更新の拒否",
       "ca_expiring": "CAの期限切れ間近",
       "deploy_binding_left_behind": "旧証明書に残ったデプロイ",
-      "https_binding_left_behind": "旧証明書に残った HTTPS"
+      "https_binding_left_behind": "旧証明書に残った HTTPS",
+      "truststore_expiring": "トラストストアの証明書の期限切れ間近または期限切れ"
     },
     "compliance": {
       "rsa_below_3072": "3072ビット未満のRSA",
@@ -6375,6 +6377,26 @@
         "revoked": "署名者の証明書が失効しています",
         "key_unavailable": "署名者の鍵を利用できません",
         "invalid": "署名者の証明書は使用できません"
+      },
+      "smtp": "メール",
+      "webhooks": "Webhooks",
+      "auto_renewal": "自動更新",
+      "witness": {
+        "smtp": {
+          "not_configured": "未設定",
+          "disabled": "設定済みですが無効です",
+          "incomplete": "有効ですが、ポートまたは送信元アドレスがありません",
+          "ready": "利用可能"
+        },
+        "webhooks": {
+          "not_configured": "エンドポイントなし",
+          "none_active": "エンドポイント {{count}} 件、有効なものはありません",
+          "active": "有効なエンドポイント {{count}} 件"
+        },
+        "auto_renewal": {
+          "enabled": "有効",
+          "disabled": "無効"
+        }
       }
     },
     "filter": {

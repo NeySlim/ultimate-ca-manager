@@ -6287,7 +6287,8 @@
         "session_revoke": "Sessão revogada",
         "session_revoke_all": "Sessões revogadas",
         "deploy_binding_left_behind": "Implantação deixada no certificado antigo",
-        "https_binding_left_behind": "HTTPS deixado no certificado antigo"
+        "https_binding_left_behind": "HTTPS deixado no certificado antigo",
+        "truststore_expiring": "Certificado da loja de confiança a expirar ou expirado"
       }
     }
   },
@@ -6336,7 +6337,8 @@
       "renewal_declined": "Renovação recusada",
       "ca_expiring": "CA prestes a expirar",
       "deploy_binding_left_behind": "Implantação deixada no certificado antigo",
-      "https_binding_left_behind": "HTTPS deixado no certificado antigo"
+      "https_binding_left_behind": "HTTPS deixado no certificado antigo",
+      "truststore_expiring": "Certificado da loja de confiança a expirar ou expirado"
     },
     "compliance": {
       "rsa_below_3072": "RSA abaixo de 3072 bits",
@@ -6372,6 +6374,26 @@
         "revoked": "Certificado do assinante revogado",
         "key_unavailable": "Chave do assinante indisponível",
         "invalid": "Certificado do assinante inutilizável"
+      },
+      "smtp": "Email",
+      "webhooks": "Webhooks",
+      "auto_renewal": "Renovação auto",
+      "witness": {
+        "smtp": {
+          "not_configured": "Não configurado",
+          "disabled": "Configurado, mas desativado",
+          "incomplete": "Ativado, porta ou endereço de remetente em falta",
+          "ready": "Pronto"
+        },
+        "webhooks": {
+          "not_configured": "Sem endpoints",
+          "none_active": "{{count}} endpoints, nenhum ativo",
+          "active": "{{count}} endpoints ativos"
+        },
+        "auto_renewal": {
+          "enabled": "Ativada",
+          "disabled": "Desativada"
+        }
       }
     },
     "filter": {
