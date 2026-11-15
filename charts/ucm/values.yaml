@@ -51,8 +51,8 @@ initialAdminPassword: ""
 ## and PERSISTS them across upgrades (via lookup) so sessions survive restarts.
 secrets:
   secretKey: ""   # UCM_SECRET_KEY (Flask)
-  keyEncryptionKey: ""   # KEY_ENCRYPTION_KEY (Fernet key), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled: there, helm template or GitOps (no cluster lookup) would generate a new key at each render, so set it.
-  dbEncryptionKey: ""   # UCM_DB_ENCRYPTION_KEY (Fernet key) for the integration secrets (DNS, LDAP, SMTP, webhooks, SSO...), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled, where every pod must share it; set it as keyEncryptionKey with helm template or GitOps. Moving an instance to HA: see docs/HA.md.
+  keyEncryptionKey: ""   # KEY_ENCRYPTION_KEY (Fernet key), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled: there, helm template or GitOps (no cluster lookup) refuse to render until it is set.
+  dbEncryptionKey: ""   # UCM_DB_ENCRYPTION_KEY (Fernet key) for the integration secrets (DNS, LDAP, SMTP, webhooks, SSO...), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled, where every pod must share it; helm template or GitOps refuse to render until it is set, as keyEncryptionKey. Moving an instance to HA: see docs/HA.md.
 
 ## Database backend.
 ##  - sqlite (default): file in the data PVC, one replica.

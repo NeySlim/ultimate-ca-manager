@@ -11,6 +11,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHART = ROOT / 'charts' / 'ucm'
 PG = ['--set', 'database.type=postgresql', '--set', 'database.databaseUrl=postgresql://u:p@db/ucm']
 HA = ['--set', 'ha.enabled=true', '--set', 'replicaCount=2'] + PG
+# helm template has no cluster: an HA render there takes both keys from the values
+GIVEN_KEYS = ['--set', 'secrets.keyEncryptionKey=K', '--set', 'secrets.dbEncryptionKey=D']
 SECRET_LOOKUP = 'lookup "v1" "Secret" .Release.Namespace'
 SA_LOOKUP = '(lookup "v1" "ServiceAccount" .Release.Namespace "default")'
 
@@ -71,9 +73,15 @@ def _chart_on_a_cluster(tmp_path, data=None):
     return chart, values
 
 
-def test_ha_secret_carries_a_fernet_database_key_passed_to_every_pod():
+def _installed(tmp_path, *args):
+    """A new HA release's Secret, as helm install on a cluster draws it."""
+    chart, values = _chart_on_a_cluster(tmp_path / 'install')
+    return _docs(*HA, *values, *args, chart=chart)
+
+
+def test_ha_secret_carries_a_fernet_database_key_passed_to_every_pod(tmp_path):
     from cryptography.fernet import Fernet
-    docs = _docs(*HA)
+    docs = _installed(tmp_path)
     key = docs['Secret']['stringData']['UCM_DB_ENCRYPTION_KEY']
     Fernet(key.encode())
     ref = _env(docs)['UCM_DB_ENCRYPTION_KEY']['valueFrom']['secretKeyRef']
@@ -81,7 +89,7 @@ def test_ha_secret_carries_a_fernet_database_key_passed_to_every_pod():
 
 
 def test_ha_database_key_is_kept_from_the_existing_secret_on_upgrade(tmp_path):
-    first = _docs(*HA)['Secret']['stringData']
+    first = _installed(tmp_path)['Secret']['stringData']
     chart, values = _chart_with_existing_secret(tmp_path, first)
     again = _docs(*HA, *values, '--is-upgrade', chart=chart)['Secret']['stringData']
     assert again['UCM_DB_ENCRYPTION_KEY'] == first['UCM_DB_ENCRYPTION_KEY']
@@ -120,26 +128,20 @@ def test_an_upgrade_rendered_without_a_cluster_names_the_server_dry_run():
     r = _render(*HA, '--is-upgrade', check=False)
     assert r.returncode != 0 and '--dry-run=server' in r.stderr
     assert 'existing single instance' not in r.stderr
-    given = _docs(*HA, '--is-upgrade', '--set', 'secrets.keyEncryptionKey=K',
-                  '--set', 'secrets.dbEncryptionKey=D')
+    given = _docs(*HA, '--is-upgrade', *GIVEN_KEYS)
     assert given['Secret']['stringData']['UCM_DB_ENCRYPTION_KEY'] == 'D'
 
 
 def test_an_ha_upgrade_on_a_cluster_keeps_its_generated_keys(tmp_path):
-    first = _docs(*HA)['Secret']['stringData']
+    first = _installed(tmp_path)['Secret']['stringData']
     chart, values = _chart_on_a_cluster(tmp_path, first)
     again = _docs(*HA, *values, '--is-upgrade', chart=chart)['Secret']['stringData']
     assert again['KEY_ENCRYPTION_KEY'] == first['KEY_ENCRYPTION_KEY']
 
 
-def test_a_new_ha_release_still_generates_its_keys():
-    stringdata = _docs(*HA)['Secret']['stringData']
-    assert stringdata['KEY_ENCRYPTION_KEY'] and stringdata['UCM_DB_ENCRYPTION_KEY']
-
-
 @pytest.mark.parametrize('extra', [[], HA])
 def test_secret_checksum_does_not_change_from_install_to_first_upgrade(tmp_path, extra):
-    installed = _docs(*extra)
+    installed = _installed(tmp_path) if extra else _docs()
     chart, values = _chart_with_existing_secret(tmp_path, installed['Secret']['stringData'])
     upgraded = _docs(*extra, *values, '--is-upgrade', chart=chart)
     assert _checksum(upgraded) == _checksum(installed)
@@ -152,14 +154,14 @@ def test_secret_checksum_follows_a_value_the_operator_sets():
 
 def test_ha_release_notes_say_to_back_up_the_database_key(tmp_path):
     from tests.test_helm_initial_admin_password import _notes
-    assert 'UCM_DB_ENCRYPTION_KEY' in _notes(tmp_path, *HA)
+    assert 'UCM_DB_ENCRYPTION_KEY' in _notes(tmp_path, *HA, *GIVEN_KEYS)
 
 
 @pytest.mark.parametrize('name', ['KEY_ENCRYPTION_KEY', 'UCM_DB_ENCRYPTION_KEY'])
-def test_a_generated_key_is_32_random_bytes(name):
+def test_a_generated_key_is_32_random_bytes(tmp_path, name):
     # Fernet splits the key into two 16-byte halves: each needs at least 112 bits
     # (NIST SP 800-57 Part 1 Rev. 5, section 5.6.3, Table 4); 16 letters or digits carry 95
-    raw = base64.urlsafe_b64decode(_docs(*HA)['Secret']['stringData'][name])
+    raw = base64.urlsafe_b64decode(_installed(tmp_path)['Secret']['stringData'][name])
     assert len(raw) == 32
     assert not all(chr(b).isalnum() and b < 128 for b in raw)
 
@@ -170,3 +172,21 @@ def test_a_key_drawn_by_an_earlier_chart_is_kept(tmp_path):
         'UCM_SECRET_KEY': 's', 'KEY_ENCRYPTION_KEY': old, 'UCM_DB_ENCRYPTION_KEY': old})
     again = _docs(*HA, *values, '--is-upgrade', chart=chart)['Secret']['stringData']
     assert again['KEY_ENCRYPTION_KEY'] == old and again['UCM_DB_ENCRYPTION_KEY'] == old
+
+
+def test_an_ha_render_without_a_cluster_refuses_to_draw_keys():
+    # helm template, GitOps: no lookup, so each render would write new keys into the
+    # Secret without restarting the pods, which then start on keys the data is not under
+    r = _render(*HA, check=False)
+    assert r.returncode != 0
+    assert 'secrets.keyEncryptionKey' in r.stderr and '--dry-run=server' in r.stderr
+    r = _render(*HA, '--set', 'secrets.keyEncryptionKey=K', check=False)
+    assert r.returncode != 0 and 'secrets.dbEncryptionKey' in r.stderr
+    docs = _docs(*HA, '--set', 'secrets.keyEncryptionKey=K', '--set', 'secrets.dbEncryptionKey=D')
+    assert docs['Secret']['stringData']['KEY_ENCRYPTION_KEY'] == 'K'
+
+
+def test_an_ha_install_on_a_cluster_draws_its_keys(tmp_path):
+    chart, values = _chart_on_a_cluster(tmp_path)
+    stringdata = _docs(*HA, *values, chart=chart)['Secret']['stringData']
+    assert stringdata['KEY_ENCRYPTION_KEY'] and stringdata['UCM_DB_ENCRYPTION_KEY']

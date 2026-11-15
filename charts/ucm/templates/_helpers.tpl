@@ -80,13 +80,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if lt (int .Values.replicaCount) 2 -}}
 {{- fail "ha.enabled requires replicaCount >= 2" -}}
 {{- end -}}
-{{- /* An existing release without these keys in its Secret is a single instance moving to HA;
-       without a cluster to look the Secret up in, only keys given in the values are known */ -}}
-{{- if and .Release.IsUpgrade (not (include "ucm.clusterReachable" .)) -}}
-{{- if not (and .Values.secrets.keyEncryptionKey .Values.secrets.dbEncryptionKey) -}}
-{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, helm upgrade --dry-run without =server, helm diff), so it cannot tell which keys the release holds: use --dry-run=server, or set secrets.keyEncryptionKey and secrets.dbEncryptionKey (docs/HA.md)" -}}
+{{- /* Without a cluster (helm template, GitOps, client-side --dry-run) the Secret cannot be read:
+       drawn keys would replace the stored ones at each sync, unseen by running pods */ -}}
+{{- if not (include "ucm.clusterReachable" .) -}}
+{{- if not .Values.secrets.keyEncryptionKey -}}
+{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.keyEncryptionKey and secrets.dbEncryptionKey, or render against the cluster (--dry-run=server); a key drawn here would replace the one the data is under (docs/HA.md)" -}}
+{{- end -}}
+{{- if not .Values.secrets.dbEncryptionKey -}}
+{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.dbEncryptionKey too, or render against the cluster (--dry-run=server) (docs/HA.md)" -}}
 {{- end -}}
 {{- else if .Release.IsUpgrade -}}
+{{- /* On a cluster, an existing release without these keys in its Secret is a single instance moving to HA */ -}}
 {{- if not (include "ucm.existingKek" .) -}}
 {{- fail "ha.enabled on an existing single instance requires secrets.keyEncryptionKey: set it to the content of the instance's /etc/ucm/master.key, or a new key would make its private keys unreadable (docs/HA.md, From a single node)" -}}
 {{- end -}}
