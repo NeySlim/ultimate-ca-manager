@@ -2080,19 +2080,18 @@ A database failure returns 500, never an empty `activity` list.
 GET /api/v2/dashboard/system-status
 ```
 
+Any authenticated caller. Each service is a `{status, message}` pair, `status` being `online`, `warning` or `offline`: `database`, `acme`, `scep`, `est`, `ocsp`, `crl`, `tsa` and `core` for every caller, `key_encryption` only for a caller holding `admin:system`, and `smtp`, `webhooks` and `auto_renewal` only for a caller holding `read:settings` (the gate of the same witnesses on `/dashboard/health`).
+
 **Response:**
 ```json
 {
   "data": {
-    "status": "healthy",
-    "database": "connected",
-    "disk_usage": {
-      "used": "2.1GB",
-      "total": "50GB",
-      "percent": 4.2
-    },
-    "uptime": "15 days, 3:42:15",
-    "version": "2.x"
+    "database": { "status": "online", "message": "Connected" },
+    "acme": { "status": "online", "message": "Enabled" },
+    "smtp": { "status": "online", "message": "Host: mail.example.com" },
+    "webhooks": { "status": "offline", "message": "No endpoints" },
+    "auto_renewal": { "status": "online", "message": "Scheduled" },
+    "core": { "status": "online", "message": "Operational" }
   }
 }
 ```

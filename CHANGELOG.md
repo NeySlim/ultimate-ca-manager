@@ -162,6 +162,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, also as the related partner of a lifted certificate, and the certificate details and list show the revocation the CA recorded.
 - Users: deleting a user, alone or in bulk, left the certificates they had enrolled for mTLS valid on the CRL and at the OCSP responder; they are now revoked (cessationOfOperation) and deleted as when an enrolment is removed; a certificate that cannot be revoked does not block the deletion but is named in the answer (`unrevoked_certificates`, or `unrevoked` per user in bulk), the warning and the audit log.
 - Users: on SQLite, a new account took the id of a deleted account when it held the highest id, with the rows that still named it; ids are no longer reused, a backend switch included.
+- Dashboard: `GET /api/v2/dashboard/system-status` returned the mail (with its host), webhook and auto-renewal status to any authenticated caller; these entries now need `read:settings`, like the same witnesses on `/dashboard/health`.
 - ACME client: revoking a certificate obtained from an ACME CA (single, bulk or approved request) only revoked it in UCM while the CA still answered "good"; the CA is now told (RFC 8555 §7.6) with reasons 1, 3, 4, 5 and 9 (privilegeWithdrawn included) and retried by the scheduler until it confirms, and the answer says when the revocation stayed local (`acme_local_only`), a hold included.
 
 ### Upgrade notes
@@ -173,6 +174,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Discovery: on PostgreSQL with a server time zone other than UTC, discovery dates stored before this release are in local time; run a scan of the discovery targets after upgrading to rewrite them.
 - Windows enrollment: the XCEP, WSTEP and Kerberos settings become the profile `default` with an explicit realm (connector base DN, else SPN, else a single-realm keytab), migrated with the same policy ID and template OIDs; without a realm to take, Kerberos alone is refused until one is set, see UPGRADE.md.
 - Windows enrollment: a Kerberos request naming no template whose EKUs match none of the profile is refused instead of issued as a server certificate; name the template or ask for its EKUs.
+- Dashboard: an API key without `read:settings` no longer receives `smtp`, `webhooks` and `auto_renewal` from `GET /api/v2/dashboard/system-status`; add the scope to keys that read them (see UPGRADE.md).
 - Certificates: `serial_number` of certificates issued from the form, renewed in place, issued on policy approval, issued by a Microsoft CA or used as TSA signer is now returned in decimal like the others; the UI still shows colon hex.
 
 ## [2.254.1] - 2026-11-14
