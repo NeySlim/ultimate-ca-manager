@@ -383,12 +383,25 @@ class MicrosoftCAInventoryMixin:
         }
 
     @staticmethod
+    def _stored_serial_forms(value):
+        """Spellings a stored serial of *value* may have: the decimal of step 144, and for the
+        rows it left as they were the hex ones _db_serial_variants reads (bare or zero-led to
+        whole bytes, one more zero byte, colon-separated, 0x-prefixed, either case)."""
+        bare = format(value, 'x')
+        even = bare.zfill(len(bare) + len(bare) % 2)
+        forms = {str(value)}
+        for digits in {bare, even, '00' + even}:
+            for case in (digits, digits.upper()):
+                forms.update((case, '0x' + case, '0X' + case))
+                if len(case) % 2 == 0:
+                    forms.add(':'.join(case[k:k + 2] for k in range(0, len(case), 2)))
+        return forms
+
+    @staticmethod
     def _close_known(msca, req, variants):
         """Mark a pending request issued and link it to the certificate UCM already
         holds with that serial; a concurrent completion (cert_id set) wins."""
-        # Stored serials are the decimal of the integer (step 144); the hex spellings
-        # cover rows that step left as they were, read both ways as _db_serial_variants does
-        forms = {f for v in variants for f in (str(v), format(v, 'x'), format(v, 'X'))}
+        forms = {f for v in variants for f in MicrosoftCAInventoryMixin._stored_serial_forms(v)}
         cert_id = (db.session.query(Certificate.id)
                    .filter(Certificate.serial_number.in_(sorted(forms)))
                    .order_by(Certificate.id).limit(1).scalar())

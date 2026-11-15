@@ -511,3 +511,24 @@ def test_closing_a_known_request_looks_up_its_serial_not_the_whole_store(app, ca
         cert_reads = [s for s in statements if 'FROM certificates' in s]
         assert cert_reads and all('serial_number IN' in s for s in cert_reads), cert_reads
         assert db.session.get(MSCARequest, req_id).cert_id == cert.id
+
+
+@pytest.mark.parametrize('stored', ['0abcde', '0ABCDE', '0a:bc:de', '0A:BC:DE', '0x0abcde', '00:0A:BC:DE'])
+def test_closing_a_known_request_finds_a_serial_left_in_hex(app, stored):
+    """Rows the canonical step left as they were (or written past the model) keep a hex
+    spelling: zero-led, colon-separated, prefixed; the closure still links the request."""
+    from models import Certificate, MicrosoftCA, MSCARequest, db
+    from services.msca.inventory import MicrosoftCAInventoryMixin
+    msca_id = _make_msca(app, f'PC hex {stored}')
+    req_id, _ = _pending(app, msca_id, 975, 'pc-hex.test.local', with_csr=False)
+    with app.app_context():
+        cert = Certificate(refid=f'pc-hex-{stored}', descr='manual', subject_cn='pc-hex.test.local')
+        db.session.add(cert)
+        db.session.commit()
+        db.session.execute(db.update(Certificate).where(Certificate.id == cert.id)
+                           .values(serial_number=stored))
+        db.session.commit()
+        MicrosoftCAInventoryMixin._close_known(
+            db.session.get(MicrosoftCA, msca_id), db.session.get(MSCARequest, req_id),
+            MicrosoftCAInventoryMixin._serial_int_variants('abcde'))
+        assert db.session.get(MSCARequest, req_id).cert_id == cert.id
