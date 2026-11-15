@@ -55,12 +55,17 @@ def _create_x509(key_id):
 def _race(app, key_id, first, second):
     """Run *first* then *second* on one key, *first* pausing after its checks; their outcomes."""
     from services.hsm import key_binding
-    checked, outcome = threading.Event(), {}
-    real_refusal = key_binding.refuse_bound_key
+    checked, outcome, locked = threading.Event(), {}, set()
+    real_refusal, real_lock = key_binding.refuse_bound_key, key_binding.lock_key
+
+    def lock(key_id):
+        locked.add(threading.current_thread().name)
+        return real_lock(key_id)
 
     def pause_first(key):
+        # Only the check made under lock_key pauses: an earlier unlocked check proves nothing
         real_refusal(key)
-        if threading.current_thread().name == 'first':
+        if threading.current_thread().name == 'first' and 'first' in locked:
             checked.set()
             time.sleep(PAUSE)
 
@@ -75,7 +80,8 @@ def _race(app, key_id, first, second):
                 outcome[name] = ('refused', str(e))
             db.session.remove()
 
-    with patch.object(key_binding, 'refuse_bound_key', side_effect=pause_first):
+    with patch.object(key_binding, 'refuse_bound_key', side_effect=pause_first), \
+            patch.object(key_binding, 'lock_key', side_effect=lock):
         threads = [threading.Thread(target=run, name='first', args=('first', first)),
                    threading.Thread(target=run, name='second', args=('second', second))]
         for t in threads:
@@ -135,3 +141,88 @@ def test_an_x509_and_an_ssh_ca_racing_on_one_key_on_sqlite(app, tmp_path, order)
             outcome = _race(app, key_id, first, second)
         assert outcome['first'][0] == 'created' and outcome['second'][0] == 'refused', outcome
         assert _held(app, key_id) == 1
+
+
+def _write_lock_free(engine, key_id):
+    """True when another connection takes, without waiting, the lock lock_key takes."""
+    if engine.dialect.name == 'sqlite':
+        import sqlite3
+        conn = sqlite3.connect(engine.url.database, timeout=0, isolation_level=None)
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            conn.execute('ROLLBACK')
+            return True
+        except sqlite3.OperationalError:
+            return False
+        finally:
+            conn.close()
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    with engine.connect() as conn:
+        try:
+            conn.execute(text('SELECT id FROM hsm_keys WHERE id = :id FOR UPDATE NOWAIT'), {'id': key_id})
+            return True
+        except OperationalError:
+            return False
+        finally:
+            conn.rollback()
+
+
+def _bind_ssh_elsewhere(engine, key_id, descr):
+    """Commit, on a connection of its own, an SSH CA on *key_id*."""
+    from sqlalchemy.orm import Session
+    with Session(engine) as other:
+        other.add(SSHCertificateAuthority(
+            refid=str(uuid.uuid4()), descr=descr, ca_type='host', public_key='x', private_key='',
+            key_source='hsm', hsm_key_id=key_id, key_type='ecdsa-p256', fingerprint=f'SHA256:{uuid.uuid4().hex}'))
+        other.commit()
+
+
+def _proof_cases(app, engine, real):
+    """The proof of possession runs before lock_key; the binding is checked again under it."""
+    from services.ssh_ca_service import SSHCAService
+    key_id, pub = _key(app, real)
+    sign = _sign_with(real)
+    seen = []
+
+    def slow_sign(kid, *args, **kwargs):
+        seen.append(_write_lock_free(engine, kid))
+        time.sleep(0.2)
+        return sign(kid, *args, **kwargs)
+    with patch('services.hsm.HsmService.sign', side_effect=slow_sign), \
+            patch('services.hsm.HsmService.get_public_key', return_value=pub), app.app_context():
+        SSHCAService.import_hsm_ca(descr=f'proof-{key_id}', ca_type='user', hsm_key_id=key_id)
+        db.session.remove()
+    assert seen and all(seen), seen
+
+    real = ec.generate_private_key(ec.SECP256R1())
+    key_id, pub = _key(app, real)
+    sign = _sign_with(real)
+    descr = f'raced-{key_id}'
+
+    def binding_sign(kid, *args, **kwargs):
+        _bind_ssh_elsewhere(engine, kid, descr)
+        return sign(kid, *args, **kwargs)
+    with patch('services.hsm.HsmService.sign', side_effect=binding_sign), \
+            patch('services.hsm.HsmService.get_public_key', return_value=pub), app.app_context():
+        with pytest.raises(HsmKeyBound, match=f"SSH host CA '{descr}'"):
+            SSHCAService.import_hsm_ca(descr=f'late-{key_id}', ca_type='user', hsm_key_id=key_id)
+        db.session.rollback()
+        db.session.remove()
+    assert _held(app, key_id) == 1
+
+
+def test_the_token_proof_runs_outside_the_binding_lock_on_sqlite(app, tmp_path):
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'proof.db'}") as engine:
+        _proof_cases(app, engine, ec.generate_private_key(ec.SECP256R1()))
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_the_token_proof_runs_outside_the_binding_lock_on_postgresql(app):
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+    with _a_schema_of_our_own(f'hsm_proof_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True) as engine:
+        _proof_cases(app, engine, ec.generate_private_key(ec.SECP256R1()))

@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.serialization import ssh as ssh_serializatio
 
 import fips_mode
 from models import db
+from models.hsm import HsmKey
 from models.ssh import SSHCertificateAuthority
 from utils import key_algorithms
 from utils.key_codec import refuse_eddsa_key
@@ -356,8 +357,8 @@ class SSHCAService:
         from services.hsm import HsmService, key_binding
         from services.hsm.hsm_private_key import load_hsm_private_key
 
-        # Binding checks come first; the key row stays locked until the commit below
-        key_row = key_binding.lock_key(hsm_key_id)
+        # Binding checks come before the token; they run again under lock_key after the proof
+        key_row = db.session.get(HsmKey, hsm_key_id)
         if not key_row:
             raise ValueError(f"HSM key {hsm_key_id} not found")
         key_binding.refuse_node_local_in_ha(key_row.provider)
@@ -393,12 +394,15 @@ class SSHCAService:
                 f"HSM SSH CA wrappers support only RSA and NIST-EC keys")
 
         fingerprint = SSHCAService._compute_fingerprint(public_key)
-        # Another key row naming the same token key is the same key (one CA per key, PROTOCOL.krl)
-        existing = SSHCertificateAuthority.query.filter_by(fingerprint=fingerprint).first()
-        if existing:
-            raise key_binding.HsmKeyBound(
-                f"HSM key '{key_row.label}' already backs the SSH {existing.ca_type} CA "
-                f"'{existing.descr}': an HSM key backs one authority only")
+
+        def refuse_same_public_key():
+            # Another key row naming the same token key is the same key (one CA per key, PROTOCOL.krl)
+            existing = SSHCertificateAuthority.query.filter_by(fingerprint=fingerprint).first()
+            if existing:
+                raise key_binding.HsmKeyBound(
+                    f"HSM key '{key_row.label}' already backs the SSH {existing.ca_type} CA "
+                    f"'{existing.descr}': an HSM key backs one authority only")
+        refuse_same_public_key()
 
         if default_ttl is None:
             default_ttl = DEFAULT_USER_TTL if ca_type == 'user' else DEFAULT_HOST_TTL
@@ -407,7 +411,14 @@ class SSHCAService:
         if max_ttl is not None:
             max_ttl = parse_duration_seconds(max_ttl, field='max_ttl')
 
+        # The token round trip holds no database lock; the binding is checked again under it
         _prove_hsm_ssh_signer(wrapper)
+        key_row = key_binding.lock_key(hsm_key_id)
+        if not key_row:
+            raise ValueError(f"HSM key {hsm_key_id} not found")
+        key_binding.refuse_bound_key(key_row)
+        refuse_same_public_key()
+
         pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')
 
         if default_extensions is None and ca_type == 'user':
