@@ -263,12 +263,12 @@ def probe(config):
     servers = lookup.config_servers(config)
     if not servers:
         return []
-    # The same rule the lookups and the save apply: an anonymous bind is
-    # not a connection this connector makes, so nothing is probed either.
     unreadable = lookup.unreadable_bind_password(config)
     if unreadable:
         logger.warning('AD Connector: %s', unreadable)
         return None
+    # The same rule the lookups and the save apply: an anonymous bind is
+    # not a connection this connector makes, so nothing is probed either.
     if not lookup.has_bind_credentials(config):
         logger.warning('AD Connector: %s', lookup.BIND_CREDENTIAL_MISSING)
         return None
