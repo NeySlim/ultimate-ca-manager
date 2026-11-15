@@ -34,6 +34,12 @@ def _keytab_here() -> Tuple[Optional[bytes], bool]:
         return None, False
 
 
+def _target_realm() -> Optional[str]:
+    from services.windows_profiles import default_profile
+    profile = default_profile()
+    return profile.realm if profile is not None else None
+
+
 def _name_connectors(backup_data) -> list:
     rows = backup_data.get('ad_connector') if 'ad_connector' in backup_data else None
     if not isinstance(rows, list):
@@ -93,8 +99,9 @@ def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Di
     else:
         # Written without its connectors, the archive does not say the profile has none: a merge keeps the link
         row.pop('connector_id', None)
-        if not spn_realm(archived.get('kerberos_spn')):
-            # Nor its realm when the SPN names none: the target's stays
+        if not spn_realm(archived.get('kerberos_spn')) and _target_realm():
+            # Nor its realm when the SPN names none: a realm the target holds stays, one it
+            # lacks is the realm resolved here (its keytab's)
             row.pop('realm', None)
     backup_data[PROFILES] = [row]
     for cert in backup_data.get('certificates') or []:

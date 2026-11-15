@@ -98,3 +98,41 @@ def test_a_30_profile_without_connector_is_merged_as_written(here):
     db.session.commit()
     _service().restore_backup(blob, PASSWORD, mode='merge')
     assert _default_connector() is None
+
+
+@pytest.fixture(params=ENGINES)
+def bare(app, tmp_path, request):
+    """An installation the test shapes itself (engine as for ``here``)."""
+    with _database(request.param, tmp_path) as url, \
+            _installation(app, url, Keys(tmp_path, 'bare'), is_postgresql=request.param != 'sqlite'), \
+            app.app_context():
+        yield
+        db.session.rollback()
+
+
+def _default_with_keytab(realm):
+    from tests.keytab_support import keytab
+    profile = WindowsEnrollmentProfile.query.filter_by(is_default=True).first()
+    if profile is None:
+        profile = WindowsEnrollmentProfile(name='default', is_default=True, enabled=True)
+        db.session.add(profile)
+    profile.realm, profile.connector_id = realm, None
+    profile.set_keytab(keytab('HTTP/ucm.kt.example@KT.EXAMPLE'))
+    db.session.commit()
+
+
+def test_a_2x_merge_fills_the_realm_a_target_profile_lacks_from_its_keytab(bare):
+    """The target's default profile has no realm to keep: the realm of its keytab, the single
+    one, is the merged profile's."""
+    _default_with_keytab(None)
+    blob = _forged(['configuration'], mutate=_as_2x)
+    _service().restore_backup(blob, PASSWORD, mode='merge')
+    assert _default_realm() == 'KT.EXAMPLE'
+
+
+def test_a_2x_replace_takes_the_realm_of_the_keytab_it_keeps(bare):
+    """pins the keytab's realm on a replace from a 2.x archive; proves no fix."""
+    _default_with_keytab('KT.EXAMPLE')
+    blob = _forged(['configuration'], mutate=_as_2x)
+    _service().restore_backup(blob, PASSWORD, mode='replace')
+    assert _default_realm() == 'KT.EXAMPLE'
