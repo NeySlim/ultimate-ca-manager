@@ -301,12 +301,13 @@ def test_the_identifier_a_kept_session_left_is_refused_for_good(nodes, operation
         _cleanup(first_node, user)
 
 
+@pytest.mark.parametrize('authenticated', ['before-the-renewal', 'after-the-renewal'])
 @pytest.mark.parametrize('operation', ['confirm-totp', 'change-password', 'close-other-sessions'])
 def test_a_request_served_during_the_renewal_neither_restores_nor_resends_the_old_id(
-        nodes, operation):
+        nodes, operation, authenticated):
     """A request opened on the old identifier and saved after the renewal writes no record
-    back and sends no cookie: the browser keeps the new identifier and stays signed in."""
-    from flask import session as flask_session
+    back and sends no cookie, not even a deletion: the browser keeps the new identifier."""
+    from flask import request, session as flask_session
     from auth.unified import AuthManager
     first_node, second_node = nodes
     start, call = RENEWALS[operation]
@@ -316,11 +317,14 @@ def test_a_request_served_during_the_renewal_neither_restores_nor_resends_the_ol
         before = this.get_cookie('session').value
         with second_node.test_request_context('/api/v2/account/profile',
                                               headers={'Cookie': f'session={before}'}):
-            from flask import request
-            assert AuthManager().authenticate_request(request) is not None
+            if authenticated == 'before-the-renewal':
+                assert AuthManager().authenticate_request(request) is not None
             r = call(first_node, this, user)
             assert r.status_code == 200, r.data
             assert this.get_cookie('session').value != before
+            if authenticated == 'after-the-renewal':
+                # the version check empties the session it loaded
+                assert AuthManager().authenticate_request(request) is None
             response = second_node.response_class()
             second_node.session_interface.save_session(second_node, flask_session, response)
             assert not any(h.startswith('session=') for h in response.headers.getlist('Set-Cookie'))
@@ -330,6 +334,12 @@ def test_a_request_served_during_the_renewal_neither_restores_nor_resends_the_ol
         assert refused.status_code == 401
         assert not any(h.startswith('session=') for h in refused.headers.getlist('Set-Cookie'))
         assert _signed_in(this)
+        # A real sign-out still finds its record and clears the cookie
+        out = _post(this, '/api/v2/auth/logout')
+        assert out.status_code == 200, out.data
+        assert any(h.startswith('session=;') and 'Max-Age=0' in h
+                   for h in out.headers.getlist('Set-Cookie'))
+        assert not _signed_in(this)
     finally:
         _cleanup(first_node, user)
 

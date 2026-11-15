@@ -42,12 +42,22 @@ class KeepsRemovedRecordsGone:
     def should_set_cookie(self, app, session):
         return not getattr(session, 'record_gone', False) and super().should_set_cookie(app, session)
 
+    def save_session(self, app, session, response):
+        # Emptied after its record was removed: the cookie now names the new identifier, keep it
+        if (not session and session.modified and self._opened_from_store(session)
+                and not self._record_exists(self._get_store_id(session.sid))):
+            return
+        super().save_session(app, session, response)
+
 
 class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessionInterface):
 
     @classmethod
     def adopt(cls, app):
         app.session_interface.__class__ = cls
+
+    def _record_exists(self, store_id):
+        return self.cache.has(store_id)
 
     def _upsert_session(self, session_lifetime, session, store_id):
         if self._opened_from_store(session) and not self.cache.has(store_id):
@@ -129,6 +139,12 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
             if record:
                 return self.serializer.decode(want_bytes(record.data))
             return None
+
+    @retry_query()
+    def _record_exists(self, store_id):
+        model = self.sql_session_model
+        with self._store() as s:
+            return s.query(model.id).filter_by(session_id=store_id).first() is not None
 
     @retry_query()
     def _delete_session(self, store_id):
