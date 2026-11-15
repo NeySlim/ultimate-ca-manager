@@ -341,6 +341,10 @@ def _admin_api_keys_stay_in_their_module():
         db.session.commit()
 
 
+# Session-app clients that sign in again when a file puts the epoch back
+_RELOGGING_CLIENTS = []
+
+
 def _epoch_row():
     """The stored session epoch: its value, None when absent (a fresh database)."""
     if not _SESSION_APP:
@@ -373,6 +377,9 @@ def _session_epoch_stays_in_its_module():
             row.value = before
         db.session.commit()
         db.session.remove()
+    # A client that signed back in during the file holds the epoch just undone
+    for client in _RELOGGING_CLIENTS:
+        client._login(client._client)
 
 
 @pytest.fixture(autouse=True, scope='module')
@@ -598,7 +605,9 @@ class _ReloggingClient:
 @pytest.fixture(scope='session')
 def auth_client(app):
     """Authenticated Flask test client (admin role)."""
-    return admin_client(app)
+    client = admin_client(app)
+    _RELOGGING_CLIENTS.append(client)
+    return client
 
 
 def admin_client(app):
