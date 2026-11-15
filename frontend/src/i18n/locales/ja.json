@@ -4833,6 +4833,7 @@
         "keysSynced": "鍵を同期しました: 新規 {{added}}、削除 {{removed}}、変更なし {{unchanged}}",
         "keysSyncedKept": "トークンに存在しませんが、認証局が使用しているため保持されたキー: {{count}}。",
         "keysSyncedUnreadable": "トークン上で読み取れなかったキー: {{count}}。キーは削除されていません。",
+        "keysSyncedMissingKept": "一覧になく保持されたキー: {{count}}。",
         "keysSyncedChanged": "認証局が使用しているキーのうち、トークン上で内容が変わったもの: {{count}}。"
       },
       "https": {

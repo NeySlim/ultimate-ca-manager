@@ -4830,6 +4830,7 @@
         "keysSynced": "Chiavi sincronizzate: {{added}} nuove, {{removed}} rimosse, {{unchanged}} invariate",
         "keysSyncedKept": "Assenti dal token ma mantenute perché un'autorità le usa: {{count}}.",
         "keysSyncedUnreadable": "Chiavi illeggibili sul token: {{count}}. Nessuna chiave è stata rimossa.",
+        "keysSyncedMissingKept": "Chiavi assenti dall'elenco e conservate: {{count}}.",
         "keysSyncedChanged": "Chiavi usate da un'autorità il cui materiale è cambiato sul token: {{count}}."
       },
       "https": {

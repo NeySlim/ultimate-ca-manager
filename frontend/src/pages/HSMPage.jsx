@@ -47,6 +47,8 @@ export function syncKeysMessage(t, d) {
   })]
   if (d.listing_errors > 0) {
     parts.push(t('messages.success.hsm.keysSyncedUnreadable', { count: d.listing_errors }))
+    // A partial listing keeps every missing key, not only those an authority holds
+    if (d.missing_kept > 0) parts.push(t('messages.success.hsm.keysSyncedMissingKept', { count: d.missing_kept }))
   } else if (d.missing_kept > 0) {
     parts.push(t('messages.success.hsm.keysSyncedKept', { count: d.missing_kept }))
   }

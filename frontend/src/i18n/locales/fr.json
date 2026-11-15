@@ -5038,6 +5038,7 @@
         "keysSynced": "Clés synchronisées : {{added}} nouvelles, {{removed}} supprimées, {{unchanged}} inchangées",
         "keysSyncedKept": "Absentes du jeton mais conservées parce qu'une autorité les utilise : {{count}}.",
         "keysSyncedUnreadable": "Clés illisibles sur le jeton : {{count}}. Aucune clé n'a été retirée.",
+        "keysSyncedMissingKept": "Clés absentes de la liste et conservées : {{count}}.",
         "keysSyncedChanged": "Clés utilisées par une autorité dont le matériel a changé sur le jeton : {{count}}."
       },
       "sso": {

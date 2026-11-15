@@ -5038,6 +5038,7 @@
         "keysSynced": "Keys synced: {{added}} new, {{removed}} removed, {{unchanged}} unchanged",
         "keysSyncedKept": "Missing from the token but kept because an authority uses them: {{count}}.",
         "keysSyncedUnreadable": "Keys that could not be read on the token: {{count}}. No key was removed.",
+        "keysSyncedMissingKept": "Keys missing from the listing and kept: {{count}}.",
         "keysSyncedChanged": "Keys used by an authority whose material changed on the token: {{count}}."
       },
       "sso": {

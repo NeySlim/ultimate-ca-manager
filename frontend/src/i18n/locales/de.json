@@ -4830,6 +4830,7 @@
         "keysSynced": "Schlüssel synchronisiert: {{added}} neu, {{removed}} entfernt, {{unchanged}} unverändert",
         "keysSyncedKept": "Auf dem Token nicht mehr vorhanden, aber behalten, weil eine Instanz sie nutzt: {{count}}.",
         "keysSyncedUnreadable": "Auf dem Token nicht lesbare Schlüssel: {{count}}. Es wurde kein Schlüssel entfernt.",
+        "keysSyncedMissingKept": "Nicht in der Liste enthaltene und beibehaltene Schlüssel: {{count}}.",
         "keysSyncedChanged": "Von einer Instanz genutzte Schlüssel, deren Material sich auf dem Token geändert hat: {{count}}."
       },
       "https": {

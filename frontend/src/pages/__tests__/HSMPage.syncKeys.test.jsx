@@ -109,11 +109,18 @@ describe('syncKeysMessage', () => {
     expect(m.text).toContain('messages.success.hsm.keysSyncedKept {"count":2}')
   })
 
-  it('says nothing was removed when the token listing failed', () => {
+  it('gives both counts when the token listing failed', () => {
     const m = syncKeysMessage(t, { added: 0, removed: 0, unchanged: 1, missing_kept: 3, listing_errors: 1 })
     expect(m.notable).toBe(true)
     expect(m.text).toContain('messages.success.hsm.keysSyncedUnreadable {"count":1}')
-    expect(m.text).not.toContain('keysSyncedKept')
+    // Without a full listing every missing key is kept, not only those an authority holds
+    expect(m.text).toContain('messages.success.hsm.keysSyncedMissingKept {"count":3}')
+    expect(m.text).not.toContain('keysSyncedKept ')
+  })
+
+  it('names no kept key when the listing failed but nothing is missing', () => {
+    const m = syncKeysMessage(t, { added: 0, removed: 0, unchanged: 1, missing_kept: 0, listing_errors: 2 })
+    expect(m.text).not.toContain('Kept')
   })
 
   it('reports the authority keys whose material changed', () => {

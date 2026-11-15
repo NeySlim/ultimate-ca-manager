@@ -4830,6 +4830,7 @@
         "keysSynced": "密钥已同步：新增 {{added}}，删除 {{removed}}，未变 {{unchanged}}",
         "keysSyncedKept": "令牌上已不存在但因认证机构在使用而保留的密钥：{{count}}。",
         "keysSyncedUnreadable": "令牌上无法读取的密钥：{{count}}。未删除任何密钥。",
+        "keysSyncedMissingKept": "列表中缺失但已保留的密钥：{{count}}。",
         "keysSyncedChanged": "认证机构所用且其内容在令牌上已变化的密钥：{{count}}。"
       },
       "https": {
