@@ -1,49 +1,182 @@
-"""A restored HTTPS pair is what the node serves: a stored regenerated pair would replace it at start."""
+"""A restored HTTPS pair is stored for the next start: served after a bound certificate,
+before a regenerated pair; outside HA applied once, then the disk is the truth again."""
+import json
 from collections import defaultdict
 
+import pytest
+
 from services import shared_files
+from services.backup.errors import BackupSchemaError
 from services.backup.restore_extended import RestoreExtendedMixin
 
-
-class _Staged:
-    def __init__(self):
-        self.paths = []
-
-    def stage(self, path, data, mode):
-        self.paths.append(path)
+CERT, KEY = 'RESTORED-CERT\n', 'RESTORED-KEY\n'
 
 
-def _store_generated(app):
+@pytest.fixture
+def clean(app):
     from models import db
-    with app.app_context():
-        shared_files.store_file(shared_files.HTTPS_GENERATED, b'{"crt": "c", "key": "k"}')
-        db.session.commit()
-
-
-def _generated_left(app):
-    from models import SharedFile, db
+    yield
     with app.app_context():
         db.session.rollback()
-        found = db.session.get(SharedFile, shared_files.HTTPS_GENERATED) is not None
-        shared_files.drop_file(shared_files.HTTPS_GENERATED)
+        for name in (shared_files.HTTPS_GENERATED, shared_files.HTTPS_RESTORED):
+            shared_files.drop_file(name)
         db.session.commit()
-        return found
 
 
-def test_restoring_an_https_pair_drops_the_stored_regenerated_pair(app):
+def _store(name, crt='c', key='k'):
     from models import db
-    _store_generated(app)
-    with app.app_context():
-        RestoreExtendedMixin()._restore_https_files(
-            {'https_server': {'cert_pem': 'C', 'key_pem': 'K'}}, defaultdict(int), _Staged())
-        db.session.commit()
-    assert _generated_left(app) is False
+    shared_files.store_file(name, json.dumps({'crt': crt, 'key': key}).encode())
+    db.session.commit()
 
 
-def test_an_archive_without_an_https_pair_keeps_it(app):
+def _stored(name):
+    from models import SharedFile, db
+    db.session.rollback()
+    return db.session.get(SharedFile, name) is not None
+
+
+def _restore_pair(data):
     from models import db
-    _store_generated(app)
+    RestoreExtendedMixin()._restore_https_files(data, defaultdict(int))
+    db.session.commit()
+
+
+def test_restoring_an_https_pair_stores_it_and_drops_the_regenerated_one(app, clean):
     with app.app_context():
-        RestoreExtendedMixin()._restore_https_files({}, defaultdict(int), _Staged())
-        db.session.commit()
-    assert _generated_left(app) is True
+        _store(shared_files.HTTPS_GENERATED)
+        _restore_pair({'https_server': {'cert_pem': CERT, 'key_pem': KEY}})
+        assert not _stored(shared_files.HTTPS_GENERATED)
+        assert json.loads(shared_files.read_file(shared_files.HTTPS_RESTORED)) == {
+            'crt': CERT, 'key': KEY}
+
+
+def test_an_archive_without_an_https_pair_keeps_what_is_stored(app, clean):
+    with app.app_context():
+        _store(shared_files.HTTPS_GENERATED)
+        _restore_pair({})
+        assert _stored(shared_files.HTTPS_GENERATED)
+        assert not _stored(shared_files.HTTPS_RESTORED)
+
+
+def test_half_a_pair_is_refused(app, clean):
+    with app.app_context():
+        with pytest.raises(BackupSchemaError, match='without'):
+            _restore_pair({'https_server': {'cert_pem': CERT}})
+
+
+class _Database:
+    """BootDatabase over the app's own connection."""
+
+    def __init__(self, session):
+        self.session = session
+
+    def rows(self, sql, params=()):
+        from sqlalchemy import text
+        names = {f'p{i}': value for i, value in enumerate(params)}
+        for i in range(len(params)):
+            sql = sql.replace('?', f':p{i}', 1)
+        return self.session.execute(text(sql), names).fetchall()
+
+    def one(self, sql, params=()):
+        found = self.rows(sql, params)
+        return found[0] if found else None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_the_restored_pair_comes_after_a_bound_certificate_and_before_a_regenerated_one(
+        app, clean):
+    from boot_config import RESTORED_LABEL, https_material
+    from models import db
+    with app.app_context():
+        _store(shared_files.HTTPS_GENERATED, 'gen-c', 'gen-k')
+        assert https_material(_Database(db.session))[:2] == ('gen-c', 'gen-k')
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+        assert https_material(_Database(db.session)) == (CERT, KEY, RESTORED_LABEL, True)
+
+
+def _attempt(tmp_path, monkeypatch, error=None, crt=CERT, key=KEY):
+    """What this start's master did with the pair, and the files it wrote."""
+    from boot_config import _record_restored_attempt
+    from config.settings import Config
+    monkeypatch.setattr(Config, 'DATA_DIR', tmp_path)
+    monkeypatch.setattr(Config, 'HTTPS_CERT_PATH', tmp_path / 'https_cert.pem')
+    monkeypatch.setattr(Config, 'HTTPS_KEY_PATH', tmp_path / 'https_key.pem')
+    if error is None:
+        (tmp_path / 'https_cert.pem').write_text(crt)
+        (tmp_path / 'https_key.pem').write_text(key)
+    _record_restored_attempt(str(tmp_path), crt, key, error)
+
+
+def test_outside_ha_the_pair_waits_for_the_master_then_is_consumed(app, clean, tmp_path,
+                                                                    monkeypatch):
+    from config.settings import Config
+    from services.https_binding import settle_restored_https
+    monkeypatch.setattr(Config, 'DATA_DIR', tmp_path)
+    with app.app_context():
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+        assert settle_restored_https() == 'pending'
+        assert _stored(shared_files.HTTPS_RESTORED)
+        _attempt(tmp_path, monkeypatch)
+        assert settle_restored_https() == 'applied'
+        assert not _stored(shared_files.HTTPS_RESTORED)
+
+
+def test_outside_ha_a_pair_the_master_could_not_write_is_reported_once(app, clean, tmp_path,
+                                                                       monkeypatch, caplog):
+    from services.https_binding import settle_restored_https
+    with app.app_context():
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+        _attempt(tmp_path, monkeypatch, error='PermissionError: read-only file system')
+        assert settle_restored_https() == 'not applied'
+        assert 'read-only file system' in caplog.text
+        assert not _stored(shared_files.HTTPS_RESTORED)
+        assert settle_restored_https() is None
+
+
+def test_in_ha_the_pair_stays_for_every_node(app, clean, tmp_path, monkeypatch):
+    from services.https_binding import settle_restored_https
+    from utils import ha
+    with app.app_context():
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+        _attempt(tmp_path, monkeypatch)
+        monkeypatch.setattr(ha, 'ha_enabled', lambda: True)
+        assert settle_restored_https() is None
+        assert _stored(shared_files.HTTPS_RESTORED)
+
+
+def test_binding_a_certificate_drops_the_restored_pair(app, clean):
+    from services.https_binding import set_bound_refid
+    with app.app_context():
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+        set_bound_refid('some-refid')
+        assert not _stored(shared_files.HTTPS_RESTORED)
+        set_bound_refid('')
+
+
+def test_the_master_writes_the_restored_pair_and_records_it(app, clean, tmp_path,
+                                                            monkeypatch):
+    import boot_config
+    from models import db
+    with app.app_context():
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+        database = _Database(db.session)
+        monkeypatch.setattr(boot_config, 'open_boot_database', lambda path: database)
+        cert, key = tmp_path / 'c.pem', tmp_path / 'k.pem'
+        done = boot_config.materialize_https(str(tmp_path), cert, key)
+        assert done == f'{boot_config.RESTORED_LABEL} written from the database'
+        assert cert.read_text() == CERT and key.read_text() == KEY
+        attempt = json.loads((tmp_path / boot_config.HTTPS_RESTORED_ATTEMPT).read_text())
+        assert attempt == {'digest': boot_config.restored_pair_digest(CERT, KEY), 'error': None}
+
+        monkeypatch.setattr(boot_config, 'write_https_pair', lambda *a, **k: (_ for _ in ()).throw(
+            PermissionError(13, 'Read-only file system')))
+        with pytest.raises(PermissionError):
+            boot_config.materialize_https(str(tmp_path), cert, key)
+        attempt = json.loads((tmp_path / boot_config.HTTPS_RESTORED_ATTEMPT).read_text())
+        assert 'Read-only file system' in attempt['error']
+

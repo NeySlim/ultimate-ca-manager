@@ -74,15 +74,21 @@ def _rate_limit_lan_exempt():
 
 
 def run_startup_housekeeping(app):
-    """Files missing on disk rewritten from the database, interrupted ACME orders reset."""
+    """Files reconciled with the database, a restored HTTPS pair settled, ACME orders reset."""
     try:
         with app.app_context():
-            from services.file_regen_service import regenerate_all_files
-            stats = regenerate_all_files()
-            if sum(stats.values()) > 0:
-                app.logger.info(f"✓ File regeneration completed: {stats}")
+            from services.file_regen_service import reconcile_files
+            stats = reconcile_files()
+            app.logger.info(f"File reconciliation at start: {stats}")
     except Exception as e:
-        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
+        app.logger.error(f"File reconciliation failed, retried by its task: {e}")
+
+    try:
+        with app.app_context():
+            from services.https_binding import settle_restored_https
+            settle_restored_https()
+    except Exception as e:
+        app.logger.warning(f"Restored HTTPS certificate not settled (non-fatal): {e}")
 
     # No auto-poll thread survives a restart: its orders go back to pending
     try:
@@ -383,9 +389,6 @@ def create_app(config_name=None):
     sweep_stale_stores(spool=app.config['UPLOAD_SPOOL_DIR'])
     from services.backup.storage import sweep_orphan_spools
     sweep_orphan_spools()
-    from services.backup.restore.files import sweep_kept_previous_contents
-    with app.app_context():    # whether a killed restore committed is read from the database
-        sweep_kept_previous_contents()
 
     # Initialize cache
     cache.init_app(app, config={
@@ -865,6 +868,16 @@ def create_app(config_name=None):
             app.logger.info("Registered update check task (hourly)")
         except ImportError:
             pass
+
+        # Every node: its certificate and key files follow the rows, after a restore anywhere
+        from services.file_regen_service import reconcile_if_behind
+        scheduler.register_task(
+            name="files_reconcile",
+            func=reconcile_if_behind,
+            interval=60,
+            description="Write and remove this node's certificate and key files after a restore",
+            per_node=True
+        )
         
         # Register discovery scheduler task (checks every 60s for due profiles)
         try:

@@ -4,6 +4,8 @@ from utils.datetime_utils import utc_now
 KERBEROS_KEYTAB = 'kerberos.keytab'
 # The self-signed HTTPS pair regenerated in HA, as JSON {"crt": pem, "key": pem}
 HTTPS_GENERATED = 'https.generated'
+# The pair of the last restored archive, same JSON; served before a regenerated pair
+HTTPS_RESTORED = 'https.restored'
 
 
 def store_file(name, data: bytes, actor=None):

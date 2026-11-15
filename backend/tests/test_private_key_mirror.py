@@ -246,7 +246,6 @@ def test_renew_import_csr_and_restore_do_not_recreate_encrypted_key_mirrors(
 ):
     import base64
 
-    from services.backup_service import BackupService
     from services.cert_service import CertificateService
     from utils.file_naming import cert_csr_path
     from utils.key_codec import load_pem_bytes
@@ -297,14 +296,12 @@ def test_renew_import_csr_and_restore_do_not_recreate_encrypted_key_mirrors(
 
             for item in (cert, imported, csr):
                 cert_key_path(item).write_bytes(b'stale plaintext')
-            # The certificate files are staged and published with the rest of
-            # the restore now; the key mirrors are still a direct write, and
-            # removing a stale one is what this checks.
-            from services.backup.restore.files import StagedFiles
-            with StagedFiles(base_dir=tmp_path / 'staging') as staged:
-                BackupService()._regenerate_files(staged)
-                staged.publish()
-                staged.discard()
+            # After a restore the reconciliation writes the files: never a key mirror
+            # while values are encrypted, and a stale one is removed
+            from services.file_regen_service import advance_generation, reconcile_files
+            advance_generation()
+            db.session.commit()
+            reconcile_files()
             assert all(not cert_key_path(item).exists() for item in (cert, imported, csr))
     finally:
         _cleanup_models(app, cert_ids, ca_data['id'])

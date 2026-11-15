@@ -98,7 +98,7 @@ def get_bound_refid():
 def set_bound_refid(refid, chain=None):
     """Bind *refid* (or nothing) with the certificate text written for it, and commit.
 
-    A new binding replaces a regenerated self-signed pair stored for the cluster.
+    A new binding replaces a regenerated or restored pair stored for the cluster.
     """
     from models import db
     from services import shared_files
@@ -106,6 +106,7 @@ def set_bound_refid(refid, chain=None):
     remember_chain(chain if refid else '')
     if refid:
         shared_files.drop_file(shared_files.HTTPS_GENERATED)
+        shared_files.drop_file(shared_files.HTTPS_RESTORED)
     # Any rebinding settles a renewal the binding could not follow
     from services.binding_attention import clear_https
     clear_https()
@@ -283,3 +284,54 @@ def register_https_binding_subscriber(app):
         except Exception as exc:
             logger.warning(f"Could not check the stored HTTPS certificate chain: {exc}")
     register_https_binding_subscriber._done = True
+
+
+def settle_restored_https():
+    """Outside HA a restored pair is applied once, at the start after the restore.
+
+    Dropped once this node's master has tried it: what is on disk is then the truth again,
+    and a pair it could not write (read-only file, a mount) is reported once, not retried.
+    Returns 'applied', 'not applied', 'pending' (the master has not tried it yet) or None.
+    """
+    import json
+    from boot_config import HTTPS_RESTORED_ATTEMPT, _same_file, restored_pair_digest
+    from config.settings import Config
+    from models import db
+    from services import shared_files
+    from utils.ha import ha_enabled
+    if ha_enabled():
+        return None  # every node writes it at each start, like a regenerated pair
+    try:
+        stored = shared_files.read_file(shared_files.HTTPS_RESTORED)
+    except ValueError as e:
+        logger.error("HTTPS: the restored certificate cannot be read here (%s)", e)
+        return None
+    if stored is None:
+        return None
+    pair = json.loads(stored)
+    if get_bound_refid():
+        outcome = 'not applied'
+        logger.info("HTTPS: the restored certificate gives way to the bound certificate")
+    else:
+        try:
+            with open(Path(Config.DATA_DIR) / HTTPS_RESTORED_ATTEMPT, encoding='utf-8') as handle:
+                attempt = json.load(handle)
+        except (OSError, ValueError):
+            attempt = None
+        if not isinstance(attempt, dict) or \
+                attempt.get('digest') != restored_pair_digest(pair['crt'], pair['key']):
+            return 'pending'
+        cert_path, key_path = Config.HTTPS_CERT_PATH, Config.HTTPS_KEY_PATH
+        if attempt.get('error') is None and _same_file(cert_path, pair['crt']) \
+                and _same_file(key_path, pair['key']):
+            outcome = 'applied'
+            logger.info("HTTPS: the restored certificate is in place in %s", cert_path)
+        else:
+            outcome = 'not applied'
+            logger.error(
+                "HTTPS: the restored certificate could not be written to %s (%s); the "
+                "certificate on disk is kept and the restored one is not tried again",
+                cert_path, attempt.get('error') or 'the file on disk differs')
+    shared_files.drop_file(shared_files.HTTPS_RESTORED)
+    db.session.commit()
+    return outcome

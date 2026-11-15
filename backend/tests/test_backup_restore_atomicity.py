@@ -99,42 +99,24 @@ class TestAnErrorAtAnyPhaseChangesNothing:
             db.session.rollback()
             assert _names() == before
 
-    def test_a_failure_while_publishing_the_files(self, app, archive_of_one_group,
-                                                 monkeypatch):
-        """The files are published inside the transaction, so a file that
-        cannot be placed takes the database back with it."""
+    def test_a_failure_while_listing_the_files_it_removes(self, app, archive_of_one_group,
+                                                           monkeypatch):
+        """The list of paths the rows no longer name is the last write of the
+        transaction: a failure there takes the rows and the generation back."""
+        from services import file_regen_service
+        from services.backup import restore_core
         blob, before = archive_of_one_group
-        import services.backup.restore.files as files
         with app.app_context():
-            monkeypatch.setattr(
-                files.StagedFiles, 'publish',
-                lambda self: (_ for _ in ()).throw(
-                    OSError('the files could not be published')))
+            generation = file_regen_service.current_generation()
+            monkeypatch.setattr(restore_core, 'keep_named_paths', lambda: (_ for _ in ()).throw(
+                OSError('the list could not be written')))
 
             with pytest.raises(OSError):
                 _service().restore_backup(blob, PASSWORD)
 
             db.session.rollback()
             assert _names() == before
-
-    def test_a_failure_at_the_commit_puts_the_files_back(self, app, tmp_path,
-                                                         monkeypatch):
-        """The last thing that can fail is the commit, and by then the files
-        are already in place."""
-        from services.backup.restore.files import StagedFiles
-
-        destination = tmp_path / 'https_cert.pem'
-        destination.write_bytes(b'the certificate in use')
-
-        staged = StagedFiles()
-        staged.stage(destination, b'the certificate from the archive')
-        staged.publish()
-        assert destination.read_bytes() == b'the certificate from the archive'
-
-        # What restore_backup does when the transaction block raises
-        staged.unpublish()
-        staged.discard()
-        assert destination.read_bytes() == b'the certificate in use'
+            assert file_regen_service.current_generation() == generation
 
 
 class TestTwoRestoresLeaveTheSameInstance:

@@ -1,6 +1,7 @@
 """A failed manual backup or restore leaves an audit line on both route families."""
 import io
 import json
+import os
 
 import pytest
 
@@ -282,15 +283,39 @@ def test_a_restore_refused_while_busy_carries_the_request_marker(auth_client, au
 
 
 @pytest.mark.parametrize('route', RESTORE)
-def test_a_restore_refused_by_an_unsettled_interrupted_one_is_a_409(auth_client, audit, monkeypatch, route):
-    from services.backup.restore import files
+def test_a_restore_refused_by_an_unwritable_directory_is_a_409(auth_client, audit, monkeypatch, route):
+    from services.backup.errors import RestoreFilesUnwritable
     from services.backup_service import BackupService
 
-    def unsettled(self, *a, **k):
-        raise files.InterruptedRestorePending(files.UNSETTLED_MESSAGE)
-    monkeypatch.setattr(BackupService, 'restore_backup_from_stream', unsettled)
+    def unwritable(self, *a, **k):
+        raise RestoreFilesUnwritable('The restore was refused: this server cannot write to '
+                                     '/the/private/dir. Nothing has been changed.')
+    monkeypatch.setattr(BackupService, 'restore_backup_from_stream', unwritable)
     response = _upload(auth_client, route)
     assert response.status_code == 409
-    assert 'nothing was restored' in response.get_json()['message']
+    assert response.get_json()['message'] == (
+        'The restore was refused: this server cannot write to /the/private/dir. '
+        'Nothing has been changed.')
     _assert_failure(audit, 'system_restore')
-    assert audit[0]['details'] == 'Restore refused: an interrupted restore could not be settled'
+    assert audit[0]['details'] == 'Restore refused: a file directory is not writable'
+
+
+@pytest.mark.parametrize('route', RESTORE)
+def test_a_restore_never_runs_without_the_backup_lock(auth_client, audit, monkeypatch, route):
+    """The lock file cannot be locked (a filesystem without flock): refused, not run open."""
+    import errno
+    import fcntl
+    from services.backup_service import BackupService
+    ran = []
+    monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
+                        lambda self, *a, **k: ran.append(True))
+    real_flock = fcntl.flock
+
+    def no_flock(fd, op):
+        if os.readlink(f'/proc/self/fd/{fd}').endswith('.ucm_backup_operation.lock'):
+            raise OSError(errno.ENOLCK, 'No locks available')
+        return real_flock(fd, op)
+    monkeypatch.setattr(fcntl, 'flock', no_flock)
+    response = _upload(auth_client, route)
+    assert response.status_code == 409 and ran == []
+    assert 'lock could not be taken' in response.get_json()['message']

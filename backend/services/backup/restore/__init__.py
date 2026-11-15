@@ -11,8 +11,10 @@ The phases are now separate, and in this order:
 2. validate every section and every row, touching nothing
 3. build the plan: which target row each archived row is, which target id
    each reference resolves to
-4. apply, in one transaction, with files staged but not published
-5. publish the files, then invalidate what the restore made stale
+4. apply, in one transaction, which advances the files generation and lists the
+   paths the rows no longer name; no file is written
+5. invalidate what the restore made stale; each node's reconciliation then makes
+   its files match the rows (services/file_regen_service)
 
 Phases 1 to 3 write nothing, so anything they refuse leaves the instance
 exactly as it was.
