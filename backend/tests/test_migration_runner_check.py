@@ -203,7 +203,7 @@ def test_the_probe_copies_the_database_only_when_reading_it_in_place_would_write
     assert (journal == 'holding rows') == ((db.parent / 'ucm.db-wal').exists()
                                            and (db.parent / 'ucm.db-wal').stat().st_size > 0)
     before = _fingerprint(db.parent)
-    sys.path.insert(0, str(BACKEND))
+    monkeypatch.syspath_prepend(str(BACKEND))
     import migration_runner
     copies = []
     real = shutil.copyfile
