@@ -238,7 +238,7 @@ npm run check:i18n
    - `acme_public_tls_cert_id` = ID of a `*.ucm.example.com` cert (optional)
 2. Save → reload (`Ctrl+Shift+R`) → values persisted
 3. Check the **helpers** (concrete hostname, DNS/TLS warning) in at least **fr** and **en**
-4. **ACME → Configuration**: directory `https://acme.ucm.example.com:8443/acme/directory`
+4. **ACME → Local ACME**: directory `https://acme.ucm.example.com:8443/acme/directory`
 5. **ACME → Let's Encrypt**: proxy base `https://acme.ucm.example.com:8443/acme/proxy/...`
 
 ### 2. REST API

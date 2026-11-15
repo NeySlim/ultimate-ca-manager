@@ -5140,12 +5140,12 @@ These endpoints are not part of the `/api/v2` management API. Clients such as AC
 
 | Protocol | Paths | Guide |
 |----------|-------|-------|
-| ACME (RFC 8555) | `/acme/directory`, `/acme/new-nonce`, `/acme/new-account`, `/acme/new-order`, `/acme/new-authz`, `/acme/order/{id}`, `/acme/order/{id}/finalize`, `/acme/authz/{id}`, `/acme/challenge/{id}`, `/acme/cert/{id}`, `/acme/cert/{id}/alt/{variant}`, `/acme/acct/{id}`, `/acme/acct/{id}/orders`, `/acme/key-change`, `/acme/revoke-cert`, `/acme/renewalInfo/{certid}`, `/acme/terms`, `/acme/health` | [User guide](USER_GUIDE.md#acme-server), [admin guide](ADMIN_GUIDE.md#acme-administration) |
+| ACME (RFC 8555) | `/acme/directory`, `/acme/new-nonce`, `/acme/new-account`, `/acme/new-order`, `/acme/new-authz`, `/acme/order/{id}`, `/acme/order/{id}/finalize`, `/acme/authz/{id}`, `/acme/challenge/{id}`, `/acme/cert/{id}`, `/acme/cert/{id}/alt/{variant}`, `/acme/acct/{id}`, `/acme/acct/{id}/orders`, `/acme/key-change`, `/acme/revoke-cert`, `/acme/renewalInfo/{certid}`, `/acme/terms`, `/acme/health` | [User guide](USER_GUIDE.md#acme), [admin guide](ADMIN_GUIDE.md#acme-administration) |
 | ACME proxy | `/acme/proxy/` and `/acme/proxy/{slug}/` followed by `directory`, `new-nonce`, `new-account`, `new-order`, `order/{id}`, `order/{id}/finalize`, `authz/{id}`, `challenge/{id}`, `cert/{id}`, `acct/{id}`, `acct/{id}/orders`, `key-change`, `revoke-cert`, `renewal-info/{certid}`; the proxy has no terms, health or new-authz route | [Admin guide](ADMIN_GUIDE.md#acme-administration), [proxy clients](integrations/acme-proxy-clients.md) |
 | ACME HTTP-01 | `/.well-known/acme-challenge/{token}` | [Admin guide](ADMIN_GUIDE.md#acme-client-http-01-challenges) |
-| SCEP | `/scep/pkiclient.exe`, `/scep/{profile_slug}/pkiclient.exe`, `/cgi-bin/pkiclient.exe` | [User guide](USER_GUIDE.md#scep-server), [admin guide](ADMIN_GUIDE.md#scep-administration), [Intune](integrations/intune-scep.md) |
-| EST (RFC 7030) | `/.well-known/est/` and `/.well-known/est/{label}/` followed by `cacerts`, `csrattrs`, `simpleenroll`, `simplereenroll`, `serverkeygen`, `fullcmc` | [User guide](USER_GUIDE.md#est-server), [admin guide](ADMIN_GUIDE.md#est-administration) |
-| OCSP (RFC 6960) | `/ocsp` (POST), `/ocsp/{encoded_request}` (GET) | [User guide](USER_GUIDE.md#ocsp-responder), [admin guide](ADMIN_GUIDE.md#ocsp-configuration) |
+| SCEP | `/scep/pkiclient.exe`, `/scep/{profile_slug}/pkiclient.exe`, `/cgi-bin/pkiclient.exe` | [User guide](USER_GUIDE.md#scep), [admin guide](ADMIN_GUIDE.md#scep-administration), [Intune](integrations/intune-scep.md) |
+| EST (RFC 7030) | `/.well-known/est/` and `/.well-known/est/{label}/` followed by `cacerts`, `csrattrs`, `simpleenroll`, `simplereenroll`, `serverkeygen`, `fullcmc` | [User guide](USER_GUIDE.md#est), [admin guide](ADMIN_GUIDE.md#est-administration) |
+| OCSP (RFC 6960) | `/ocsp` (POST), `/ocsp/{encoded_request}` (GET) | [User guide](USER_GUIDE.md#crl--ocsp), [admin guide](ADMIN_GUIDE.md#ocsp-configuration) |
 | CRL distribution | `/cdp/{ca_ref}.crl`, `/cdp/{ca_ref}-delta.crl` | [Admin guide](ADMIN_GUIDE.md#crl-distribution) |
 | CA issuers (AIA) | `/ca/{ca_ref}.cer`, `/ca/{ca_ref}.pem`, `/ca/{ca_ref}.p7c`, `/ca/{ca_ref}/cross/{xid}.cer` | [AIA CA Issuers](#aia-ca-issuers) |
 | Time stamping (RFC 3161) | `/tsa` (POST) | [Time Stamping (TSA)](#time-stamping-tsa) |
