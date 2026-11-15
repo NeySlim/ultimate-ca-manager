@@ -166,3 +166,56 @@ def test_a_request_that_is_not_pending_is_left_alone(app, ca):
     s = _sync(app, msca_id)
     assert (s['completed'], s['skipped']) == (0, 1)
     assert _req(app, req_id)[:2] == ('failed', None)
+
+
+class _Client:
+    def __init__(self, pem=None, error=None):
+        self.pem, self.error = pem, error
+
+    def get_existing_cert(self, request_id, encoding='b64'):
+        if self.error:
+            raise self.error
+        return self.pem
+
+
+def _check(app, auth_client, monkeypatch, msca_id, req_id, client):
+    from services.msca.connection import MicrosoftCAConnectionMixin
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_get_client', staticmethod(lambda m: client))
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_cleanup_client', staticmethod(lambda c: None))
+    return auth_client.get(f'/api/v2/microsoft-cas/{msca_id}/requests/{req_id}')
+
+
+def test_check_route_imports_the_issued_certificate(app, auth_client, monkeypatch):
+    from tests.test_msca_inventory import _make_cert
+    msca_id = _make_msca(app, 'PC check')
+    _, pem = _make_cert('pc-check.test.local')
+    req_id, csr_id = _pending(app, msca_id, 5, 'pc-check.test.local')
+    r = _check(app, auth_client, monkeypatch, msca_id, req_id, _Client(pem=pem))
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['cert_id'] == csr_id
+    assert _req(app, req_id)[:2] == ('issued', csr_id)
+    # A second check changes nothing
+    assert _check(app, auth_client, monkeypatch, msca_id, req_id, _Client(pem=pem)).status_code == 200
+    from models import Certificate
+    with app.app_context():
+        assert Certificate.query.filter_by(subject_cn='pc-check.test.local').count() == 1
+
+
+def test_check_route_import_failure_leaves_the_request_pending(app, auth_client, monkeypatch):
+    msca_id = _make_msca(app, 'PC check bad')
+    req_id, _ = _pending(app, msca_id, 6, 'pc-bad.test.local')
+    r = _check(app, auth_client, monkeypatch, msca_id, req_id, _Client(pem='not a certificate'))
+    assert r.status_code == 500
+    assert _req(app, req_id)[:2] == ('pending', None)
+    from tests.test_msca_inventory import _make_cert
+    _, pem = _make_cert('pc-bad.test.local')
+    r = _check(app, auth_client, monkeypatch, msca_id, req_id, _Client(pem=pem))
+    assert r.status_code == 200 and _req(app, req_id)[0] == 'issued'
+
+
+def test_check_route_needs_write_permission(app, viewer_client, monkeypatch):
+    # The import it performs is what the signing route guards with write:certificates
+    msca_id = _make_msca(app, 'PC check perm')
+    req_id, _ = _pending(app, msca_id, 8, 'pc-perm.test.local')
+    r = _check(app, viewer_client, monkeypatch, msca_id, req_id, _Client(error=RuntimeError('x')))
+    assert r.status_code == 403

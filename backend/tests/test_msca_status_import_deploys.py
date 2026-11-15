@@ -23,13 +23,15 @@ def _pending(app, cert_id):
 
 
 def _poll(app, auth_client, new, ids):
+    from services.msca.connection import MicrosoftCAConnectionMixin
     msca_id, req_id = ids
-    answer = {'status': 'issued', 'cert_pem': _pem(new)}
-    with patch('api.v2.msca.MicrosoftCAService.check_request', return_value=answer):
-        with app.app_context():
-            from models import db, MSCARequest
-            db.session.get(MSCARequest, req_id).cert_pem = _pem(new)
-            db.session.commit()
+
+    class _Client:
+        def get_existing_cert(self, request_id, encoding='b64'):
+            return _pem(new)
+
+    with patch.object(MicrosoftCAConnectionMixin, '_get_client', staticmethod(lambda m: _Client())), \
+            patch.object(MicrosoftCAConnectionMixin, '_cleanup_client', staticmethod(lambda c: None)):
         return auth_client.get(f'/api/v2/microsoft-cas/{msca_id}/requests/{req_id}')
 
 

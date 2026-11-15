@@ -956,34 +956,17 @@ def sign_csr(msca_id, csr_id):
 
 
 @bp.route('/<int:msca_id>/requests/<int:request_id>', methods=['GET'])
-@require_auth(['read:certificates'])
+@require_auth(['write:certificates'])
 def check_request_status(msca_id, request_id):
-    """Check status of a pending signing request"""
+    """Check a pending signing request; an issued certificate is imported (as signing does)."""
+    from services.msca.requests import MSCAImportError
     try:
         result = MicrosoftCAService.check_request(msca_id, request_id)
-
-        # If just issued, import the cert
-        if result.get('status') == 'issued' and result.get('cert_pem'):
-            req = db.session.get(MSCARequest, request_id)
-            if req and req.csr_id and not req.cert_id:
-                from models import Certificate
-                csr = db.session.get(Certificate, req.csr_id)
-                msca = db.session.get(MicrosoftCA, msca_id)
-                if csr and msca:
-                    try:
-                        _import_signed_cert(csr, req.cert_pem, msca, req.template, request_id)
-                        result = req.to_dict()
-                    except Exception as imp_err:
-                        logger.error(
-                            f"MS CA request {request_id} issued but UCM import failed: {imp_err}",
-                            exc_info=True,
-                        )
-                        return error_response(
-                            "Certificate was issued by MS CA but failed to import into UCM.",
-                            500,
-                        )
-
         return success_response(data=result)
+    except MSCAImportError as e:
+        logger.error(f"MS CA request {request_id} issued but UCM import failed: {e}")
+        return error_response(
+            "Certificate was issued by MS CA but failed to import into UCM.", 500)
     except ValueError as e:
         logger.error(f"Request not found or invalid: {e}")
         return error_response("Request not found", 404)

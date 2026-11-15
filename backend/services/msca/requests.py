@@ -8,6 +8,10 @@ from utils.datetime_utils import utc_now
 logger = logging.getLogger(__name__)
 
 
+class MSCAImportError(RuntimeError):
+    """The CA issued the certificate but UCM could not store it."""
+
+
 class MicrosoftCARequestsMixin:
 
     @staticmethod
@@ -35,6 +39,16 @@ class MicrosoftCARequestsMixin:
             if isinstance(cert_pem, bytes):
                 cert_pem = cert_pem.decode('utf-8', errors='replace')
 
+            if req.csr_id and not req.cert_id:
+                # Claim + import in one step, shared with the CA panel and the inventory
+                from .ca_control import MicrosoftCACAControlMixin
+                try:
+                    MicrosoftCACAControlMixin.complete_request(msca, req, cert_pem)
+                except Exception as imp_err:
+                    db.session.rollback()
+                    raise MSCAImportError(str(imp_err)) from imp_err
+                db.session.refresh(req)
+                return req.to_dict()
             req.status = 'issued'
             req.issued_at = utc_now()
             req.cert_pem = cert_pem
@@ -50,6 +64,8 @@ class MicrosoftCARequestsMixin:
             )
             return req.to_dict()
 
+        except MSCAImportError:
+            raise
         except Exception as e:
             # Locale-independent classification: a French/localized AD CS
             # returns generic error text for a still-pending request, which the
