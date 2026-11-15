@@ -482,7 +482,13 @@ def sweep_kept_previous_contents() -> List[Path]:
             named = set()
             for path, journal in found:
                 if journal is not None and journal['token'] not in committed:
-                    _put_back_journal(path, journal)
+                    try:
+                        _put_back_journal(path, journal)
+                    except OSError as exc:
+                        # Kept with its journal: its files disagree with the database until then
+                        logger.warning("Restore: could not put back the previous contents kept "
+                                       "in %s, retried at the next start: %s", path, exc)
+                        continue
                     restored.append(Path(path))
                 shutil.rmtree(path, ignore_errors=True)
                 if not os.path.lexists(path):

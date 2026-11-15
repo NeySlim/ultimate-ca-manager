@@ -235,6 +235,30 @@ def test_a_committed_directory_left_on_disk_keeps_its_row(dirs, monkeypatch):
     assert not key.exists() and not _row_exists(token)
 
 
+def test_a_directory_that_cannot_be_put_back_does_not_stop_the_others(dirs, monkeypatch, caplog):
+    kept, key, pem, new = _killed_after_publish(dirs, committed=False)
+    # The first directory scanned: before it was caught, the others were never reached
+    failing = next(path for path in kept if path.parent == dirs['certs'])
+    real = files._put_back_journal
+
+    def put_back(kept_dir, journal):
+        if kept_dir == str(failing):
+            raise OSError(errno.EIO, 'I/O error')
+        return real(kept_dir, journal)
+    with monkeypatch.context() as patched, caplog.at_level(logging.WARNING, logger=files.__name__):
+        patched.setattr(files, '_put_back_journal', put_back)
+        removed = files.sweep_kept_previous_contents()
+
+    assert sorted(removed) == sorted(path for path in kept if path != failing)
+    assert key.read_bytes() == b'OLD PLAINTEXT KEY' and pem.read_bytes() == b'OLD HTTPS CERT'
+    assert failing.exists() and new.exists()
+    assert any(str(failing) in record.getMessage() and record.levelno == logging.WARNING
+               for record in caplog.records)
+
+    assert files.sweep_kept_previous_contents() == [failing]
+    assert not new.exists()
+
+
 def test_a_publication_row_left_by_a_kill_after_discard_is_removed(dirs):
     record_publication('d' * 32)
     db.session.commit()
