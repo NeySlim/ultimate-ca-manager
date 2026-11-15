@@ -637,8 +637,9 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
 POSTRM = ROOT / 'packaging' / 'debian' / 'postrm'
 
 
-def _postrm_with(tmp_path, action, lay):
-    """_postrm, with `lay(home, config)` run on the sandbox before the script."""
+def _postrm_with(tmp_path, action, lay, lib=None, logs=None):
+    """_postrm, with `lay(home, config)` run on the sandbox before the script; /var/lib/ucm
+    and /var/log/ucm become `lib` and `logs` (by default absent paths of the sandbox)."""
     env, log, home, _data, config = _post_sandbox(tmp_path, 0)
     lay(home, config)
     (bin_rm := pathlib.Path(env['PATH']) / 'rm').write_text(
@@ -650,9 +651,13 @@ def _postrm_with(tmp_path, action, lay):
     for line, path in (('UCM_HOME=/opt/ucm\n', home), ('UCM_CONFIG=/etc/ucm\n', config)):
         assert text.count(line) == 1, line
         text = text.replace(line, f'{line.split("=")[0]}={path}\n')
+    for real, path in (('/var/lib/ucm', lib or tmp_path / 'var' / 'lib' / 'ucm'),
+                       ('/var/log/ucm', logs or tmp_path / 'var' / 'log' / 'ucm')):
+        text = text.replace(real, str(path))
+    # No path of this machine is left for the script to remove
+    assert not re.search(r'(?<![\w.-])/(var|etc|opt|srv|usr)/', text), text
     script = tmp_path / 'postrm.sandboxed'
-    # Every other path it removes is outside the sandbox: echoed, never run
-    script.write_text(text.replace('rm -rf /', 'echo rm -rf /'))
+    script.write_text(text)
     out = subprocess.run(['/bin/bash', str(script), action], capture_output=True, text=True,
                          timeout=20, env=env)
     assert out.returncode == 0, out.stderr
@@ -668,6 +673,32 @@ def test_a_purge_removes_the_pending_mark(tmp_path, action, removed):
     # Without a local archive the configuration goes whole, and only on a purge
     assert config.exists() is not removed
     assert all(c in (f'rm -f {home}/{PENDING}', f'rm -rf {config}') for c in _calls(log) if c.startswith('rm '))
+
+
+def test_a_purge_keeps_a_local_archive_the_archiver_left_under_var_lib_ucm(tmp_path):
+    """DATABASE_PATH of the older packages placed the database in /var/lib/ucm: on another
+    filesystem it is archived beside itself, and the purge, which removes that directory,
+    leaves that archive as its README says."""
+    from tests.test_package_leftover_archive import LOCAL, Box
+    box = Box(tmp_path / 'box')
+    lib = box.tmp / 'var' / 'lib' / 'ucm'
+    lib.mkdir(parents=True)
+    shutil.move(box.data / 'ucm.db', lib / 'ucm.db')
+    (lib / 'stale.pid').write_text('1')
+    env_file = box.config / 'ucm.env'
+    env_file.write_text(env_file.read_text().replace(f'{box.data}/ucm.db', f'{lib}/ucm.db'))
+    db = (lib / 'ucm.db').read_bytes()
+    box.wrap(other_fs=(lib,))
+    out = box.run()
+    assert out.returncode == 0, out.stdout + out.stderr
+    kept = lib / LOCAL
+    assert (kept / 'ucm.db').read_bytes() == db
+    assert 'leaves them where they are' in (box.archive / 'README.txt').read_text()
+
+    out, log, _home, _config = _postrm_with(tmp_path / 'pkg', 'purge', lambda home, config: None, lib=lib)
+    assert (kept / 'ucm.db').read_bytes() == db
+    assert not (lib / 'stale.pid').exists()
+    assert f'  {kept}' in out.stdout.splitlines()
 
 
 def _tree(root):
