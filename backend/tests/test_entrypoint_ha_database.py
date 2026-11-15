@@ -137,16 +137,18 @@ def _fingerprint(top):
             for p in sorted(top.rglob('*'))}
 
 
-def _volume_start(tmp_path, where, db_state):
+def _volume_start(tmp_path, where, db_state, database_path=None):
     """The entrypoint's steps from its refusal to the copy of the database, on a temporary
-    volume: the data at its path, and a path from before 2.70 that still holds files."""
+    volume: the data at its path, and a path from before 2.70 that still holds files;
+    database_path: UCM_DATABASE_PATH, relative to the volume (default: in the data)."""
     volume = tmp_path / 'volume'
     data, old = volume / 'opt/ucm/data', volume / 'opt/ucm/backend/data'
     data.mkdir(parents=True)
     (old / 'ca').mkdir(parents=True)
     (old / 'ca' / 'root.pem').write_text('ca')
     _registry((data if where == 'current' else old) / 'ucm.db', db_state == '2.254')
-    env = {'UCM_DATABASE_PATH': str(data / 'ucm.db'), 'UCM_BACKUP_ENABLED': 'true',
+    db = volume / database_path if database_path else data / 'ucm.db'
+    env = {'UCM_DATABASE_PATH': str(db), 'UCM_BACKUP_ENABLED': 'true',
            'UCM_BACKUP_RETENTION_DAYS': '30', 'UCM_BASE_PATH': str(ROOT), 'DATA_PATH': str(data),
            'UCM_OLD_DATA_PATHS': f'{old} {volume}/app/backend/data', 'UCM_INITIAL_ADMIN_USERNAME': 'admin',
            'PATH': f'{pathlib.Path(sys.executable).parent}:/usr/bin:/bin'}
@@ -172,3 +174,16 @@ def test_a_2_254_database_at_either_path_is_carried_over_and_copied(tmp_path, wh
     assert r.returncode == 0, (r.stdout, r.stderr)
     assert (data / 'ucm.db').is_file() and (data / 'ca' / 'root.pem').read_text() == 'ca'
     assert len(list((data / 'backups').glob('ucm-backup-*.db'))) == 1
+
+
+@pytest.mark.parametrize('database_path, refused', [
+    ('srv/pki.db', False), ('opt/ucm/data/./ucm.db', True), ('opt/ucm/data//ucm.db', True)])
+def test_a_refused_database_at_the_old_path_counts_only_where_the_application_opens_it(
+        tmp_path, database_path, refused):
+    """UCM_DATABASE_PATH elsewhere: the old ucm.db is never opened, so never refused for;
+    the same data path spelled otherwise still is."""
+    r, before, after, _data = _volume_start(tmp_path, 'from before 2.70', '2.253', database_path)
+    assert (r.returncode == 78) is refused, (r.stdout, r.stderr)
+    assert ('older than 2.254' in r.stdout) is refused, r.stdout
+    if refused:
+        assert after == before

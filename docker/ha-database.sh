@@ -75,10 +75,13 @@ ucm_old_data_paths() {
     printf '%s\n' ${UCM_OLD_DATA_PATHS:-/opt/ucm/backend/data /app/backend/data}
 }
 
-# The database ucm_carry_old_data_paths would copy into the data, if any
+# The database ucm_carry_old_data_paths would copy into the data, if any, and only when the
+# application opens it there: with UCM_DATABASE_PATH elsewhere, that copy is never read
 ucm_old_database() {
-    local old
-    [ ! -e "${DATA_PATH:-/opt/ucm/data}/ucm.db" ] || return 0
+    local old data=${DATA_PATH:-/opt/ucm/data}
+    [ "$(realpath -m -- "${UCM_DATABASE_PATH:-$data/ucm.db}")" = "$(realpath -m -- "$data/ucm.db")" ] \
+        || return 0
+    [ ! -e "$data/ucm.db" ] || return 0
     for old in $(ucm_old_data_paths); do
         [ ! -f "$old/ucm.db" ] || { printf '%s\n' "$old/ucm.db"; return 0; }
     done
