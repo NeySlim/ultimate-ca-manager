@@ -131,11 +131,14 @@ class TestTruststoreCRUD:
 
     def test_create_with_invalid_pem(self, auth_client):
         """Invalid PEM data should be rejected."""
+        before = assert_success(auth_client.get(f'{TS}?per_page=100&search=Bad Cert'))
         r = post_json(auth_client, TS, {
             'name': 'Bad Cert',
-            'pem_data': 'not-a-real-certificate'
+            'certificate_pem': 'not-a-real-certificate'
         })
-        assert r.status_code in (400, 500)
+        assert_error(r, 400)
+        assert get_json(r)['message'] != 'Certificate PEM is required'
+        assert assert_success(auth_client.get(f'{TS}?per_page=100&search=Bad Cert')) == before
 
     def test_get_nonexistent_returns_404(self, auth_client):
         """Getting a nonexistent cert should return 404."""
@@ -157,9 +160,14 @@ class TestTruststoreSync:
 
     def test_sync_returns_success(self, auth_client):
         """Sync from system CA bundle should succeed (or fail gracefully)."""
-        r = post_json(auth_client, f'{TS}/sync', {})
-        # May succeed or return error if no system certs available
-        assert r.status_code in (200, 400, 404, 500)
+        r = post_json(auth_client, f'{TS}/sync', {'limit': 5})
+        data = assert_success(r)
+        assert data['source'] == 'system' and data['total_found'] >= 5
+        assert data['error_count'] == 0
+        assert data['new_count'] + data['skipped_count'] == 5
+        # A second pass finds every one of them already there
+        again = assert_success(post_json(auth_client, f'{TS}/sync', {'limit': 5}))
+        assert (again['new_count'], again['skipped_count']) == (0, 5)
 
 
 # ============================================================

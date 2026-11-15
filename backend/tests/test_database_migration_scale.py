@@ -45,14 +45,13 @@ def _a_source_that_satisfies_its_own_schema(app):
     clean_dangling_rows(app)
     clean_unreadable_secrets(app)
 
-    # Having cleaned, say so: a source the migration would refuse makes every
-    # test here fail for a reason that has nothing to do with what they
-    # measure, and a skip naming the row beats four red tests naming nothing.
+    # Having cleaned, the source must be one the migration takes: a refusal is
+    # a defect of the cleaning or of the suite, said once with the row named.
     with app.app_context():
         try:
             _check_source_integrity()
         except PreflightError as refused:
-            pytest.skip(f'the shared database is not migratable: {refused}')
+            pytest.fail(f'the shared database is not migratable: {refused}')
     yield
 
 

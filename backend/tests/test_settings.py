@@ -15,7 +15,7 @@ import pytest
 import json
 import os
 import sys
-from tests.conftest import get_json, assert_success, assert_error
+from tests.conftest import get_json, assert_success, assert_error, assert_refused
 from tests.fresh_app import fresh_app_fixtures
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -264,23 +264,22 @@ class TestBackupSettings:
     def test_create_backup(self, auth_client):
         """Create backup — auto-generates password if not provided."""
         r = post_json(auth_client, '/api/v2/settings/backup/create', {})
-        # May succeed or fail depending on BackupService availability
-        assert r.status_code in (200, 500)
-        if r.status_code == 200:
-            data = assert_success(r)
-            assert 'filename' in data
-            assert 'size' in data
-            assert data.get('password_generated') is True
-            assert 'password' in data
+        data = assert_success(r)
+        assert data['size'] > 0
+        assert data.get('password_generated') is True
+        assert len(data['password']) >= 12
+        listed = assert_success(auth_client.get('/api/v2/system/backups'))
+        assert data['filename'] in str(listed)
 
     def test_create_backup_with_password(self, auth_client):
         r = post_json(auth_client, '/api/v2/settings/backup/create', {'password': 'securePass123!'})
-        assert r.status_code in (200, 500)
-        if r.status_code == 200:
-            data = assert_success(r)
-            assert 'filename' in data
-            # Should NOT include password in response when user-provided
-            assert data.get('password_generated') is not True
+        data = assert_success(r)
+        assert data['size'] > 0
+        # A password the caller chose is never echoed back
+        assert data.get('password_generated') is not True
+        assert 'password' not in data and b'securePass123!' not in r.data
+        listed = assert_success(auth_client.get('/api/v2/system/backups'))
+        assert data['filename'] in str(listed)
 
     def test_create_backup_short_password(self, auth_client):
         """Password shorter than 8 chars should be rejected."""
@@ -438,11 +437,17 @@ class TestEmailSettings:
         r = post_json(auth_client, '/api/v2/settings/email/test', {})
         assert_error(r, 400)
 
-    def test_test_email_with_address(self, auth_client):
-        """Sending test email — will fail without SMTP but should NOT 500."""
+    @pytest.mark.xfail(strict=True, reason='an unconfigured SMTP is answered 500, not 503 as forgot-password does')
+    def test_test_email_with_address(self, app, auth_client):
+        """Without a usable SMTP server the test mail is refused as unavailable."""
+        from models import db
+        from models.email_notification import SMTPConfig
+        with app.app_context():
+            for row in SMTPConfig.query.all():
+                row.enabled = False
+            db.session.commit()
         r = post_json(auth_client, '/api/v2/settings/email/test', {'email': 'test@test.local'})
-        # Should return 200 (sent) or 500 (SMTP error) — not an unhandled crash
-        assert r.status_code in (200, 500)
+        assert_refused(r, 503, 'SMTP is not configured or disabled')
 
     # Template
     def test_get_email_template(self, auth_client):

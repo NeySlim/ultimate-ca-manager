@@ -686,10 +686,25 @@ class TestKeylessCASigning:
 
 
 class TestCleanup:
-    def test_cleanup_runs(self, app):
+    def test_cleanup_removes_only_the_expired_answers(self, app, create_ca):
+        ca_id = create_ca(cn='OCSP cleanup CA')['id']
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         with app.app_context():
-            # Should not raise even with nothing to clean
+            rows = [OCSPResponse(ca_id=ca_id, cert_serial=f'cleanup-{name}', response_der=b'0',
+                                 status='good', this_update=now - timedelta(days=2),
+                                 next_update=now + delta)
+                    for name, delta in (('expired', timedelta(hours=-1)),
+                                        ('current', timedelta(hours=1)))]
+            db.session.add_all(rows)
+            db.session.commit()
+            expired, current = (row.id for row in rows)
+
             OCSPService().cleanup_expired_responses()
+            db.session.expire_all()
+            assert db.session.get(OCSPResponse, expired) is None
+            assert db.session.get(OCSPResponse, current) is not None
+            OCSPResponse.query.filter_by(id=current).delete()
+            db.session.commit()
 
 
 if __name__ == '__main__':

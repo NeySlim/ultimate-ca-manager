@@ -94,19 +94,59 @@ class TestSessionFieldParity:
         # email defaults to the signed-in user's address)
         assert verify_data['user']['email'] == login_data['user']['email']
 
-    def test_every_login_route_builds_its_body_from_the_shared_helper(self):
-        """No endpoint may go back to hand-rolling the session dict."""
-        import inspect
+    def test_every_login_route_answers_the_session_fields(self, app, monkeypatch):
+        """Password, 2FA and LDAP sign-ins carry the fields /verify carries, with
+        the forced change of the account that signed in."""
+        import uuid
 
-        from api.v2 import auth, auth_methods
-        from api.v2.sso import ldap_routes
+        import pyotp
 
-        for module in (auth, auth_methods, ldap_routes):
-            source = inspect.getsource(module)
-            assert 'auth_session_payload' in source, (
-                f'{module.__name__} no longer uses the shared session payload')
-            assert "'force_password_change':" not in source, (
-                f'{module.__name__} hand-writes force_password_change again')
+        import api.v2.sso.ldap_routes as ldap_routes
+        from models.sso import SSOProvider
+        from models.user import UserSession
+
+        tag = uuid.uuid4().hex[:8]
+        password = 'Parity-Login-Pass1!'
+        with app.app_context():
+            totp = User(username=f'parity2fa{tag}', email=f'parity2fa{tag}@example.test',
+                        role='viewer', active=True, totp_secret=pyotp.random_base32(),
+                        totp_confirmed=True, force_password_change=True)
+            totp.set_password(password)
+            provider = SSOProvider(
+                name=f'parity-ldap-{tag}', provider_type='ldap', enabled=True,
+                ldap_server='ldap.example.test', ldap_port=389, ldap_base_dn='dc=example,dc=test',
+                ldap_user_filter='(uid={username})', ldap_username_attr='uid',
+                ldap_email_attr='mail', ldap_fullname_attr='cn')
+            db.session.add_all([totp, provider])
+            db.session.commit()
+            secret, provider_id = totp.totp_secret, provider.id
+
+        ldap_name = f'parityldap{tag}'
+        monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda p, u, pw: ({
+            'dn': f'uid={ldap_name}', 'uid': ldap_name, 'username': ldap_name,
+            'email': f'{ldap_name}@example.test', 'fullname': ldap_name, 'groups': []}, None))
+        try:
+            client = app.test_client()
+            assert client.post('/api/v2/auth/login/password', json={
+                'username': totp.username, 'password': password}).status_code == 200
+            two_fa = client.post('/api/v2/auth/login/2fa',
+                                 json={'code': pyotp.TOTP(secret).now()})
+            ldap = app.test_client().post('/api/v2/sso/ldap/login', json={
+                'username': ldap_name, 'password': 'pw', 'provider_id': provider_id})
+            for name, response, forced in (('2fa', two_fa, True), ('ldap', ldap, False)):
+                assert response.status_code == 200, (name, response.data)
+                data = response.get_json()['data']
+                assert SESSION_FIELDS <= set(data), (name, SESSION_FIELDS - set(data))
+                assert data['force_password_change'] is forced, name
+        finally:
+            with app.app_context():
+                ids = [u.id for u in User.query.filter(
+                    User.username.in_([totp.username, ldap_name]))]
+                UserSession.query.filter(UserSession.user_id.in_(ids)).delete(
+                    synchronize_session=False)
+                User.query.filter(User.id.in_(ids)).delete(synchronize_session=False)
+                SSOProvider.query.filter_by(id=provider_id).delete()
+                db.session.commit()
 
 
 class TestPreservedContract:

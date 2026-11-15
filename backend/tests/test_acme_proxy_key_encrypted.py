@@ -9,22 +9,7 @@ legacy ``system_config`` proxy keys.
 from __future__ import annotations
 from tests.seeded_rows import delete_client_accounts
 
-import inspect
-
 import pytest
-
-def test_load_or_create_account_key_delegates_to_client_service():
-    """Proxy key load must go through AcmeClientService on the linked account."""
-    from services.acme.acme_client_service import AcmeClientService
-    from services.acme.acme_proxy_service import AcmeProxyService
-
-    src = inspect.getsource(AcmeProxyService._load_or_create_account_key)
-    assert "AcmeClientService" in src
-    assert "_get_account_key" in src
-
-    client_src = inspect.getsource(AcmeClientService._get_account_key)
-    assert "encrypt_text(" in client_src
-    assert "decrypt_text(" in client_src
 
 
 

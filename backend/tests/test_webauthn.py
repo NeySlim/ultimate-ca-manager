@@ -197,11 +197,10 @@ class TestWebAuthnRegistration:
     def test_register_options_returns_data(self, auth_client):
         """Registration options should return 200 with challenge data."""
         r = _post(auth_client, '/api/v2/webauthn/register/options')
-        # May succeed (200) or fail if RP config missing (400/500)
-        assert r.status_code in (200, 400, 500)
-        if r.status_code == 200:
-            data = get_json(r).get('data', {})
-            assert data is not None
+        assert r.status_code == 200, r.data
+        data = get_json(r)['data']
+        assert data['challenge'] and data['user']['name'] == 'admin'
+        assert data['rp']['id']
 
     def test_register_verify_empty_data(self, auth_client):
         """Verify with empty credential data → 400."""

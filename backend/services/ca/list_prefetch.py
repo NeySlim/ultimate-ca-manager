@@ -59,9 +59,13 @@ def count_by_issuer_cn(counts: Dict[str, int], cn: str) -> int:
     """Certificates whose issuer holds `CN=<cn>` as a whole RDN, as the ILIKE patterns did.
 
     The patterns were `CN=cn,%`, `%,CN=cn,%` and `%,CN=cn`; `%` and `_` in the
-    name kept their LIKE meaning, and the match ignores case.
+    name kept their LIKE meaning, and the match ignores case. `cn` is the unescaped
+    value, written back as RFC 4514 stores it (`Doe, John` as `Doe\\, John`).
     """
-    body = ''.join('.*' if ch == '%' else '.' if ch == '_' else re.escape(ch) for ch in f'CN={cn}')
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    stored = x509.NameAttribute(NameOID.COMMON_NAME, cn, _validate=False).rfc4514_string()
+    body = ''.join('.*' if ch == '%' else '.' if ch == '_' else re.escape(ch) for ch in stored)
     pattern = re.compile(rf'{body},.*|.*,{body},.*|.*,{body}', re.IGNORECASE | re.DOTALL)
     return sum(total for issuer, total in counts.items() if pattern.fullmatch(issuer))
 

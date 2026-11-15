@@ -7,11 +7,12 @@ Tests all 45 system routes for:
 - GET endpoints: full response validation
 - Dangerous POST endpoints: auth-only (no mutation)
 """
+import contextlib
 import pytest
 import json
 import os
 import sys
-from tests.conftest import get_json, assert_success, assert_error
+from tests.conftest import get_json, assert_success, assert_error, assert_refused
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -848,12 +849,64 @@ class TestSyslogUpdate:
 class TestSyslogTest:
     """POST /system/audit/syslog/test"""
 
-    def test_returns_response(self, auth_client):
-        """Test syslog connection — may fail if not configured, accept 200 or 400."""
+    @staticmethod
+    def _configure(auth_client, **values):
+        r = auth_client.put('/api/v2/system/audit/syslog', data=json.dumps(values),
+                            content_type='application/json')
+        assert r.status_code == 200, r.data
+
+    @classmethod
+    @contextlib.contextmanager
+    def _restoring(cls, auth_client):
+        """Put back the syslog configuration read before the test, not fixed values."""
+        before = get_json(auth_client.get('/api/v2/system/audit/syslog'))['data']
+        try:
+            yield
+        finally:
+            cls._configure(auth_client, **before)
+
+    def test_the_configuration_read_before_is_the_one_put_back(self, auth_client):
+        with self._restoring(auth_client):
+            self._configure(auth_client, enabled=False, host='192.0.2.7', port=1514,
+                            protocol='tcp', tls=True, tls_verify=False, framing='octet',
+                            categories=['settings'])
+            self._check_put_back(auth_client)
+
+    def _check_put_back(self, auth_client):
+        read = lambda: get_json(auth_client.get('/api/v2/system/audit/syslog'))['data']  # noqa: E731
+        kept = read()
+        with self._restoring(auth_client):
+            self._configure(auth_client, enabled=False, host='', port=514,
+                            protocol='udp', framing='line')
+            assert read() != kept
+        assert read() == kept
+
+    def test_the_test_message_reaches_the_collector(self, auth_client):
+        import socket
+        collector = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        collector.bind(('127.0.0.1', 0))
+        collector.settimeout(5)
+        port = collector.getsockname()[1]
+        try:
+            with self._restoring(auth_client):
+                self._configure(auth_client, enabled=True, host='127.0.0.1', port=port,
+                                protocol='udp', framing='line')
+                r = auth_client.post('/api/v2/system/audit/syslog/test',
+                                     data=json.dumps({}), content_type='application/json')
+                assert assert_success(r) is not None
+                assert get_json(r)['message'] == f'Test message sent via UDP to 127.0.0.1:{port}'
+                received = b''
+                while b'UCM syslog test message' not in received:
+                    received = collector.recv(65535)
+        finally:
+            collector.close()
+
+    def test_no_host_is_refused(self, auth_client):
+        self._configure(auth_client, enabled=False, host='', port=514,
+                        protocol='udp', framing='octet')
         r = auth_client.post('/api/v2/system/audit/syslog/test',
-                             data=json.dumps({}),
-                             content_type='application/json')
-        assert r.status_code in (200, 400, 500)
+                             data=json.dumps({}), content_type='application/json')
+        assert_refused(r, 400, 'No host configured')
 
 
 # ============================================================
@@ -917,12 +970,16 @@ class TestExpiryAlertUpdate:
 class TestExpiryAlertCheck:
     """POST /system/alerts/expiry/check"""
 
-    def test_returns_200_or_500(self, auth_client):
-        """May return 500 if email/SMTP not configured after settings changes."""
+    def test_reports_what_it_checked(self, auth_client):
         r = auth_client.post('/api/v2/system/alerts/expiry/check',
                              data=json.dumps({}),
                              content_type='application/json')
-        assert r.status_code in (200, 500)
+        data = assert_success(r)
+        counts = {name: data[name] for name in ('cert_expiring', 'crl_expiring')}
+        for name, values in counts.items():
+            assert {'checked', 'failed', 'notified'} <= set(values), name
+        sent = sum(values['notified'] for values in counts.values())
+        assert get_json(r)['message'] == f'Check complete: {sent} alerts sent'
 
     def test_response_has_message(self, auth_client):
         r = auth_client.post('/api/v2/system/alerts/expiry/check',
@@ -961,10 +1018,66 @@ class TestUpdatesVersion:
 class TestUpdatesCheck:
     """GET /system/updates/check"""
 
-    def test_returns_response(self, auth_client):
-        """May fail without internet — accept 200 or 500."""
-        r = auth_client.get('/api/v2/system/updates/check')
-        assert r.status_code in (200, 500)
+    @staticmethod
+    def _releases(monkeypatch, releases=None, error=None):
+        """GitHub answers with `releases`, or fails with `error`: no network in a test."""
+        import requests
+        import services.updates as updates
+
+        class _Answer:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return releases
+
+        def fake_get(url, **kwargs):
+            if error is not None:
+                raise error
+            return _Answer()
+
+        monkeypatch.setattr(updates.requests, 'get', fake_get)
+        # The forced check fills the 300 s cache: restore it on teardown
+        monkeypatch.setitem(updates._releases_cache, 'data', None)
+        monkeypatch.setitem(updates._releases_cache, 'ts', 0)
+
+    def test_the_fake_releases_do_not_outlive_the_test(self, auth_client):
+        import services.updates as updates
+        before = dict(updates._releases_cache)
+        with pytest.MonkeyPatch.context() as mp:
+            self._releases(mp, [{'tag_name': 'v999.1', 'draft': False, 'prerelease': False,
+                                 'assets': []}])
+            assert_success(auth_client.get('/api/v2/system/updates/check?force=true'))
+            assert updates._releases_cache['data']
+        assert updates._releases_cache == before
+
+    def test_a_newer_stable_release_is_offered(self, auth_client, monkeypatch):
+        self._releases(monkeypatch, [
+            {'tag_name': 'v999.1', 'draft': False, 'prerelease': False, 'assets': [],
+             'body': 'notes', 'published_at': '2030-01-01T00:00:00Z'},
+            {'tag_name': 'v999.2-rc1', 'draft': False, 'prerelease': True, 'assets': []},
+            {'tag_name': 'v1000.0', 'draft': True, 'prerelease': False, 'assets': []},
+        ])
+        data = assert_success(auth_client.get('/api/v2/system/updates/check?force=true'))
+        assert data['latest_version'] == '999.1'
+        assert data['update_available'] is True
+
+    def test_nothing_newer_offers_nothing(self, auth_client, monkeypatch):
+        self._releases(monkeypatch, [
+            {'tag_name': 'v0.1', 'draft': False, 'prerelease': False, 'assets': []},
+        ])
+        data = assert_success(auth_client.get('/api/v2/system/updates/check?force=true'))
+        assert data['update_available'] is False
+
+    def test_an_unreachable_github_is_a_handled_failure(self, auth_client, monkeypatch):
+        import requests
+        self._releases(monkeypatch, error=requests.exceptions.ConnectionError('injected'))
+        data = assert_success(auth_client.get('/api/v2/system/updates/check?force=true'))
+        # Said in the answer, not as a server error: the screen shows it
+        assert data['update_available'] is False
+        assert data['error'].startswith('Failed to check for updates')
 
 
 class TestUpdatesInstall:

@@ -15,6 +15,7 @@ import pytest
 import os
 import sys
 import json
+from tests.conftest import assert_refused, assert_success
 import tempfile
 import base64
 
@@ -235,7 +236,7 @@ class TestCreateCSR:
         r = auth_client.post('/api/v2/csrs',
                              data='not json',
                              content_type='text/plain')
-        assert r.status_code in (400, 415, 500)
+        assert_refused(r, 415, 'Unsupported Media Type')
 
     def test_create_csr_with_sans(self, auth_client):
         r = _create_csr(auth_client, cn='san-test.example.com',
@@ -430,7 +431,7 @@ class TestUploadCSR:
         r = auth_client.post('/api/v2/csrs/upload',
                              data=json.dumps({'pem': 'not-a-valid-pem'}),
                              content_type='application/json')
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Invalid CSR PEM', prefix=True)
 
 
 # ============================================================
@@ -455,7 +456,7 @@ class TestImportCSR:
         r = auth_client.post('/api/v2/csrs/import',
                              data={'pem_content': 'garbage-data'},
                              content_type='multipart/form-data')
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Invalid CSR PEM', prefix=True)
 
 
 # ============================================================
@@ -749,8 +750,11 @@ class TestCSRLifecycle:
         r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign',
                              data=json.dumps({'ca_id': ca_id}),
                              content_type='application/json')
-        # Uploaded CSRs may lack private key for signing; accept 200 or 500
-        assert r.status_code in (200, 400, 500)
+        # Signing needs the CA's key, not the requester's
+        signed = assert_success(r)
+        assert signed['caref'] == ca_for_signing['refid']
+        r = auth_client.get('/api/v2/csrs')
+        assert csr_id not in [c['id'] for c in _json(r)['data']]
 
 
 # ============================================================

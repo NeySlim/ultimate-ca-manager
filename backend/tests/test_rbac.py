@@ -364,9 +364,7 @@ class TestEffectivePermissions:
     def test_operator_has_limited_permissions(self, auth_client, create_user):
         """Operator should have more perms than viewer but fewer than admin."""
         user = create_user(username='rbac_operator_test', role='operator')
-        user_id = user.get('id', user.get('user_id'))
-        if not user_id:
-            pytest.skip("Could not determine operator user ID")
+        user_id = user['id']
 
         r = auth_client.get(f'/api/v2/rbac/effective-permissions/{user_id}')
         assert r.status_code == 200
@@ -378,15 +376,14 @@ class TestEffectivePermissions:
     def test_viewer_has_read_only(self, auth_client, create_user):
         """Viewer should only have read permissions."""
         user = create_user(username='rbac_viewer_test', role='viewer')
-        user_id = user.get('id', user.get('user_id'))
-        if not user_id:
-            pytest.skip("Could not determine viewer user ID")
+        user_id = user['id']
 
         r = auth_client.get(f'/api/v2/rbac/effective-permissions/{user_id}')
         assert r.status_code == 200
         perms = _json(r).get('data', _json(r))
         assert 'read:cas' in perms
         assert 'read:certificates' in perms
+        assert not [p for p in perms if not p.startswith('read:')], perms
 
 
 # ============================================================

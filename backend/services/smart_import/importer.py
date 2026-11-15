@@ -286,7 +286,7 @@ class SmartImporter:
                 result.errors.extend(f"Private key cannot be used: {e}" for e in unusable)
                 return result
             if import_csrs:  # refused as the upload refuses it, before anything is imported
-                refused = [f"CSR '{self._get_cn(o.subject)}' refused: {reason}" for o in objects
+                refused = [f"CSR '{self._get_cn(o)}' refused: {reason}" for o in objects
                            if o.type == ObjectType.CSR
                            and (reason := unsignable_csr_key(x509.load_pem_x509_csr(o.raw_pem.encode())))]
                 if refused:
@@ -380,18 +380,18 @@ class SmartImporter:
         for ca_obj in ca_objects:
             counterpart = self._cross_counterpart(ca_obj, bundle_roots)
             if counterpart is not None:
-                cn = self._get_cn(ca_obj.subject)
+                cn = self._get_cn(ca_obj)
                 refid = counterpart or subject_to_refid.get(ca_obj.subject)
                 attached = self._attach_cross(refid, ca_obj, username)
                 if attached is True:
                     result.warnings.append(
-                        f"Attached cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
+                        f"Attached cross-certificate: {cn} issued by {self._get_cn(ca_obj, issuer=True)} "
                         f"(the self-signed {cn} is kept)")
                     result.warning_details.append({
                         'code': 'cross_certificate_attached', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
                 else:
                     result.warnings.append(
-                        f"Skipped cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
+                        f"Skipped cross-certificate: {cn} issued by {self._get_cn(ca_obj, issuer=True)} "
                         f"(the self-signed {cn} is kept{'; ' + attached if attached else ''})")
                     result.warning_details.append({
                         'code': 'cross_certificate_skipped', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
@@ -413,7 +413,7 @@ class SmartImporter:
                         CA, ca_obj.serial_number, ca_obj.issuer, ca_obj.raw_pem
                     )
                 if existing:
-                    result.warnings.append(f"Skipped duplicate CA: {self._get_cn(ca_obj.subject)}")
+                    result.warnings.append(f"Skipped duplicate CA: {self._get_cn(ca_obj)}")
                     subject_to_refid[ca_obj.subject] = existing.refid
                     if existing.ski:
                         ski_to_refid[existing.ski] = existing.refid
@@ -437,7 +437,7 @@ class SmartImporter:
                     break
             
             if refused:
-                cn = self._get_cn(ca_obj.subject)
+                cn = self._get_cn(ca_obj)
                 result.warnings.append(f"Skipped CA '{cn}': {refused}")
                 result.warning_details.append({'code': 'ca_key_refused', 'subject': ca_obj.subject, 'reason': refused})
                 continue
@@ -446,7 +446,7 @@ class SmartImporter:
             refid = secrets.token_hex(8)
             ca = CA(
                 refid=refid,
-                descr=self._get_cn(ca_obj.subject),
+                descr=self._get_cn(ca_obj),
                 caref=caref,
                 crt=base64.b64encode(ca_obj.raw_pem.encode()).decode(),
                 prv=prv,
@@ -548,7 +548,7 @@ class SmartImporter:
                     Certificate, cert_obj.serial_number, cert_obj.issuer, cert_obj.raw_pem
                 )
                 if existing:
-                    result.warnings.append(f"Skipped duplicate certificate: {self._get_cn(cert_obj.subject)}")
+                    result.warnings.append(f"Skipped duplicate certificate: {self._get_cn(cert_obj)}")
                     continue
             
             # The issuing CA is the stored one whose key signed it, found by AKI then DN
@@ -561,7 +561,7 @@ class SmartImporter:
             
             # The unique (caref, serial_number) index holds whatever skip_duplicates says
             if Certificate.stored_under(caref, cert_obj.serial_number):
-                result.warnings.append(f"Skipped certificate {self._get_cn(cert_obj.subject)}: "
+                result.warnings.append(f"Skipped certificate {self._get_cn(cert_obj)}: "
                                        f"serial {cert_obj.serial_number} {Certificate.DUPLICATE_SERIAL}")
                 continue
 
@@ -589,12 +589,12 @@ class SmartImporter:
                 self._log_audit("certificate_imported", pending_csr.id,
                                 pending_csr.descr, username)
                 result.warnings.append(
-                    f"Certificate {self._get_cn(cert_obj.subject)} attached to its pending CSR"
+                    f"Certificate {self._get_cn(cert_obj)} attached to its pending CSR"
                 )
                 continue
             
             # Extract CN for subject_cn
-            cn = self._get_cn(cert_obj.subject)
+            cn = self._get_cn(cert_obj)
             if not cn or cn == "Unknown":
                 cn = cert_obj.san_dns[0] if cert_obj.san_dns else None
             
@@ -648,7 +648,7 @@ class SmartImporter:
         csr_objects = [o for o in objects if o.type == ObjectType.CSR]
         
         for csr_obj in csr_objects:
-            cn = self._get_cn(csr_obj.subject)
+            cn = self._get_cn(csr_obj)
             if not cn or cn == "Unknown":
                 cn = csr_obj.san_dns[0] if csr_obj.san_dns else "CSR"
             
@@ -708,15 +708,12 @@ class SmartImporter:
             caref=caref, key_pem=key_pem, username=username, commit=False,
         )
 
-    def _get_cn(self, subject: str) -> str:
-        """Extract CN from subject"""
-        if not subject:
-            return "Unknown"
-        for part in subject.split(','):
-            if part.strip().upper().startswith('CN='):
-                return part.strip()[3:]
-        return "Unknown"
-    
+    def _get_cn(self, obj: ParsedObject, issuer: bool = False) -> str:
+        """The most specific CN the parser read on the subject (or issuer), else "Unknown".
+        A CN present but empty stays ''."""
+        cn = obj.issuer_cn if issuer else obj.subject_cn
+        return "Unknown" if cn is None else cn
+
     def _log_audit(self, action: str, resource_id: int, resource_name: str,
                    username: str, details: str = None):
         """Note an audit entry; `_stage_audit` stages them just before the commit.

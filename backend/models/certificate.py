@@ -228,8 +228,9 @@ class Certificate(db.Model):
 
     @property
     def common_name(self) -> str:
-        """Extract Common Name from subject, or fallback to first SAN DNS"""
-        cn = self._extract_dn_field('CN')
+        """The first CN of the stored subject (escapes honoured), else the first SAN DNS"""
+        from utils.dn_parse import stored_dn_common_name
+        cn = stored_dn_common_name(self.subject)
         if cn:
             return cn
         # Fallback: use first SAN DNS if available
@@ -260,7 +261,8 @@ class Certificate(db.Model):
         """Extract issuer Common Name"""
         if not self.issuer:
             return ""
-        cn = self._extract_dn_field('CN', self.issuer)
+        from utils.dn_parse import stored_dn_common_name
+        cn = stored_dn_common_name(self.issuer)
         return cn if cn else self.issuer
     
     @property
@@ -303,20 +305,17 @@ class Certificate(db.Model):
             dn_string = self.subject
         if not dn_string:
             return ""
-        prefixes = [f'{field}=']
+        from utils.dn_parse import stored_dn_attribute
+        names = [field]
         alias = self._DN_FIELD_ALIASES.get(field)
         if alias:
-            prefixes.append(f'{alias}=')
+            names.append(alias)
         for short, long in self._DN_FIELD_ALIASES.items():
             if field == long:
-                prefixes.append(f'{short}=')
+                names.append(short)
                 break
-        for part in dn_string.split(','):
-            part = part.strip()
-            for prefix in prefixes:
-                if part.startswith(prefix):
-                    return part[len(prefix):]
-        return ""
+        # Escapes honoured; of several values, the first in the stored string
+        return stored_dn_attribute(dn_string, names) or ""
     
     @property
     def key_algorithm(self) -> str:

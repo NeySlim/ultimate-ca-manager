@@ -1,23 +1,19 @@
-"""The recorded subject_cn must be the subject's FIRST commonName.
+"""Which commonName is recorded as `subject_cn`, per signing path.
 
-Raised by NeySlim reviewing #251: the CN was derived by splitting
-`subject.rfc4514_string()` on ',' and taking the first `CN=` token. RFC 4514
-s2.1 emits RDNs in REVERSE order, so that token is the LAST commonName. For
-`CN=web.example.com, CN=admin.example.com` the recorder stored
-`admin.example.com` -- while ACME finalize validates
-`get_attributes_for_oid(COMMON_NAME)[0]`, i.e. `web.example.com`. The name
-CHECKED and the name RECORDED disagreed exactly when a subject carried more
-than one CN, which is the case an attacker controls.
+Two rules, each deliberate:
 
-#251 closed the ACME route by rejecting a multi-CN subject at finalize, so it
-is no longer reachable there -- but the same derivation fed every other
-signing path, so the defect outlived its most dangerous caller.
+* CN verified or chosen by the operator (ACME, CSR signing, SCEP, completion
+  of an external certificate): the FIRST CN of the sequence, the one ACME
+  finalize reads (`utils.dn_parse.subject_common_name`). Raised in #251: the
+  recorder used to split `rfc4514_string()` (reverse RDN order) and stored the
+  last CN while the check read the first.
+* Directory subjects (EST, WSTEP via `CAService.sign_csr_from_crypto`, and the
+  import): the MOST SPECIFIC CN, the LAST one (`most_specific_common_name`).
+  In `CN=Roy Hagland,CN=Users,DC=...` that is the person, not the container;
+  RFC 2818 s3.1 also names "the (most specific) Common Name".
 
-These tests drive the REAL helper (`utils.dn_parse.subject_common_name`) that
-both recorders now call, and pin the agreement against the same cryptography
-API ACME finalize uses. An earlier draft of this module defined its own copy
-of the derivation and asserted against that -- which would have passed no
-matter what the production code did.
+Both helpers read the x509 Name, never a split of `rfc4514_string()`, which
+mis-handles an escaped comma inside a value.
 """
 import datetime
 
@@ -27,7 +23,10 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from utils.dn_parse import subject_common_name
+from utils.dn_parse import most_specific_common_name, subject_common_name
+
+# The CAs create_ca makes, and any row a test leaves, are deleted after the module
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 @pytest.fixture(scope='module')
@@ -112,19 +111,395 @@ def test_subject_without_a_common_name_is_none_not_a_crash():
     assert subject_common_name(subject) is None
 
 
-def test_both_recorders_use_the_shared_helper():
-    """They had drifted into two copies of the same wrong derivation; a third
-    copy appearing is how this comes back."""
-    import inspect
+def _multi_cn_csr(key, tag):
+    return (x509.CertificateSigningRequestBuilder()
+            .subject_name(_subject(f'web-{tag}.example.com', f'admin-{tag}.example.com'))
+            .sign(key, hashes.SHA256()))
 
-    from services.cert.mixins import csr as csr_mixin
-    from services.scep import scep_service
 
-    for module in (csr_mixin, scep_service):
-        source = inspect.getsource(module)
-        assert 'subject_common_name(' in source, (
-            f'{module.__name__} should derive its CN through the shared helper'
-        )
-        assert "startswith('CN=')" not in source, (
-            f'{module.__name__} still splits an RFC 4514 string to find a CN'
-        )
+def test_the_csr_signing_path_records_the_first_common_name(app, auth_client, create_ca, key):
+    """Uploaded then signed through the API: the row names the first CN."""
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    pem = _multi_cn_csr(key, tag).public_bytes(serialization.Encoding.PEM).decode()
+    ca_id = create_ca(cn=f'RDN order CA {tag}')['id']
+    r = auth_client.post('/api/v2/csrs/upload', json={'pem': pem, 'name': f'rdn-{tag}'})
+    assert r.status_code in (200, 201), r.data
+    csr_id = r.get_json()['data']['id']
+    r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        row = db.session.get(Certificate, csr_id)
+        try:
+            assert row.subject_cn == f'web-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_the_scep_path_records_the_first_common_name(app, create_ca, key):
+    """Issued by the SCEP service: the row names the first CN too."""
+    import base64
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import CA, Certificate, SCEPRequest, db
+    from services.scep.scep_service import SCEPService
+
+    tag = uuid.uuid4().hex[:8]
+    csr = _multi_cn_csr(key, tag)
+    ca_id = create_ca(cn=f'RDN order SCEP CA {tag}')['id']
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        req = SCEPRequest(transaction_id=f'rdn-{tag}', ca_refid=ca.refid, status='pending',
+                          csr=base64.b64encode(csr.public_bytes(serialization.Encoding.DER)).decode(),
+                          subject=csr.subject.rfc4514_string())
+        db.session.add(req)
+        db.session.flush()
+        refid = SCEPService(ca_refid=ca.refid, auto_approve=True)._auto_approve_request(req, csr)
+        db.session.commit()
+        row = Certificate.query.filter_by(refid=refid).one()
+        try:
+            assert row.subject_cn == f'web-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.delete(req)
+            db.session.commit()
+
+
+def test_the_external_certificate_path_records_the_first_common_name(app, auth_client, key):
+    """A CSR signed outside UCM, imported back: the completed row names the first CN."""
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    csr = _multi_cn_csr(key, tag)
+    r = auth_client.post('/api/v2/csrs/upload', json={
+        'pem': csr.public_bytes(serialization.Encoding.PEM).decode(), 'name': f'rdn-ext-{tag}'})
+    assert r.status_code in (200, 201), r.data
+    csr_id = r.get_json()['data']['id']
+
+    issuer_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    issuer = _subject(f'External RDN CA {tag}')
+    now = datetime.datetime.now(datetime.timezone.utc)
+    leaf = (x509.CertificateBuilder()
+            .subject_name(csr.subject).issuer_name(issuer)
+            .public_key(csr.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(days=1))
+            .not_valid_after(now + datetime.timedelta(days=30))
+            .sign(issuer_key, hashes.SHA256()))
+    r = auth_client.post('/api/v2/certificates/import', data={
+        'pem_content': leaf.public_bytes(serialization.Encoding.PEM).decode()},
+        content_type='multipart/form-data')
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['id'] == csr_id
+    with app.app_context():
+        row = db.session.get(Certificate, csr_id)
+        try:
+            assert row.subject_cn == f'web-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_the_est_path_records_the_most_specific_common_name(app, create_ca, key):
+    """Directory subjects: EST (via CAService.sign_csr_from_crypto) records the LAST CN."""
+    import uuid
+
+    from models import CA, Certificate, db
+    from services.ca_service import CAService
+
+    tag = uuid.uuid4().hex[:8]
+    ca_id = create_ca(cn=f'RDN order EST CA {tag}')['id']
+    with app.app_context():
+        pem, _serial = CAService.sign_csr_from_crypto(
+            ca=db.session.get(CA, ca_id), csr=_multi_cn_csr(key, tag), validity_days=5,
+            source='est', cert_type='device_cert')
+        leaf = x509.load_pem_x509_certificate(pem.encode())
+        row = Certificate.query.filter_by(serial_number=str(leaf.serial_number)).one()
+        try:
+            assert row.subject_cn == f'admin-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+@pytest.mark.parametrize('cn_value', ['', None])
+def test_the_est_path_keeps_an_empty_cn_and_falls_back_only_without_one(app, create_ca, key, cn_value):
+    """A CN present but empty is recorded empty; only a subject without a CN records its DN."""
+    import uuid
+
+    from models import CA, Certificate, db
+    from services.ca_service import CAService
+
+    tag = uuid.uuid4().hex[:8]
+    attrs = [x509.NameAttribute(NameOID.ORGANIZATION_NAME, f'Empty CN {tag}')]
+    if cn_value is not None:
+        attrs.append(x509.NameAttribute(NameOID.COMMON_NAME, cn_value, _validate=False))
+    csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name(attrs)).sign(key, hashes.SHA256())
+    ca_id = create_ca(cn=f'RDN empty CN CA {tag}')['id']
+    with app.app_context():
+        pem, _serial = CAService.sign_csr_from_crypto(
+            ca=db.session.get(CA, ca_id), csr=csr, validity_days=5,
+            source='est', cert_type='device_cert')
+        leaf = x509.load_pem_x509_certificate(pem.encode())
+        row = Certificate.query.filter_by(serial_number=str(leaf.serial_number)).one()
+        try:
+            expected = '' if cn_value == '' else leaf.subject.rfc4514_string()
+            assert row.subject_cn == expected
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def _import_pem(auth_client, subject, key, tag, ca=False, san=None):
+    """Sign `subject` (self-signed when `ca`) and run it through /import/execute."""
+    import json
+
+    from cryptography.hazmat.primitives import serialization
+
+    issuer_key = key if ca else rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    builder = (x509.CertificateBuilder()
+               .subject_name(subject)
+               .issuer_name(subject if ca else _subject(f'Import RDN CA {tag}'))
+               .public_key(key.public_key())
+               .serial_number(x509.random_serial_number())
+               .not_valid_before(now - datetime.timedelta(days=1))
+               .not_valid_after(now + datetime.timedelta(days=30)))
+    if ca:
+        builder = builder.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+    if san:
+        builder = builder.add_extension(x509.SubjectAlternativeName([x509.DNSName(san)]), critical=False)
+    cert = builder.sign(issuer_key, hashes.SHA256())
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+        'content': cert.public_bytes(serialization.Encoding.PEM).decode(),
+        'options': {'import_certs': True, 'import_cas': True}}), content_type='application/json')
+    assert r.status_code in (200, 201), r.data
+    ids = r.get_json()['data']['imported_ids']['cas' if ca else 'certificates']
+    assert len(ids) == 1, r.data
+    return ids[0]
+
+
+def _import_leaf(auth_client, key, tag, *cns):
+    return _import_pem(auth_client, _subject(*cns), key, tag)
+
+
+def _legacy_country(cn):
+    """A subject real certificates carry and cryptography loads, but that
+    `Name.from_rfc4514_string` refuses: a three-letter country."""
+    return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn),
+                      x509.NameAttribute(NameOID.COUNTRY_NAME, 'USA', _validate=False)])
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_the_import_reads_the_cn_of_a_subject_rfc4514_cannot_parse_back(app, auth_client, key):
+    import uuid
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    with pytest.raises(ValueError):  # the premise
+        x509.Name.from_rfc4514_string(_legacy_country('x').rfc4514_string())
+    cert_id = _import_pem(auth_client, _legacy_country(f'legacy-{tag}.example'), key, tag)
+    with app.app_context():
+        row = db.session.get(Certificate, cert_id)
+        try:
+            assert row.subject_cn == f'legacy-{tag}.example'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_an_imported_ca_with_such_a_subject_is_named_after_its_cn(app, auth_client):
+    import uuid
+
+    from models import CA, db
+
+    tag = uuid.uuid4().hex[:8]
+    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    ca_id = _import_pem(auth_client, _legacy_country(f'Legacy CA {tag}'), ca_key, tag, ca=True)
+    with app.app_context():
+        row = db.session.get(CA, ca_id)
+        try:
+            assert row.descr == f'Legacy CA {tag}'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_an_imported_csr_is_named_after_its_parsed_cn(app, auth_client, key):
+    import json
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(_legacy_country(f'legacy-csr-{tag}.example'))
+           .sign(key, hashes.SHA256()))
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+        'content': csr.public_bytes(serialization.Encoding.PEM).decode(),
+        'options': {'import_csrs': True}}), content_type='application/json')
+    assert r.status_code in (200, 201), r.data
+    ids = r.get_json()['data']['imported_ids']['csrs']
+    assert len(ids) == 1, r.data
+    with app.app_context():
+        row = db.session.get(Certificate, ids[0])
+        try:
+            assert (row.subject_cn, row.descr) == (f'legacy-csr-{tag}.example',) * 2
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_an_imported_certificate_without_a_cn_falls_back_as_before(app, auth_client, key):
+    """No CN: the first DNS SAN, else no subject_cn (unchanged by this lot)."""
+    import uuid
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    org = x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, f'No CN {tag}')])
+    with_san = _import_pem(auth_client, org, key, tag, san=f'san-{tag}.example')
+    bare = _import_pem(auth_client, org, rsa.generate_private_key(public_exponent=65537, key_size=2048), tag)
+    with app.app_context():
+        rows = [db.session.get(Certificate, i) for i in (with_san, bare)]
+        try:
+            assert rows[0].subject_cn == f'san-{tag}.example'
+            assert rows[1].subject_cn is None
+            assert rows[1].descr == 'Certificate'
+        finally:
+            for row in rows:
+                db.session.delete(row)
+            db.session.commit()
+
+
+def test_an_imported_ca_without_a_cn_is_named_unknown_as_before(app, auth_client):
+    import uuid
+
+    from models import CA, db
+
+    tag = uuid.uuid4().hex[:8]
+    org = x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, f'No CN CA {tag}')])
+    ca_id = _import_pem(auth_client, org, rsa.generate_private_key(public_exponent=65537, key_size=2048),
+                        tag, ca=True)
+    with app.app_context():
+        row = db.session.get(CA, ca_id)
+        try:
+            assert row.descr == 'Unknown'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+@pytest.mark.parametrize('subject, expected', [
+    (_legacy_country('legacy.example'), 'legacy.example'),
+    (_subject('Doe, John'), 'Doe, John'),
+    (_subject('web.example.com', 'admin.example.com'), 'admin.example.com'),
+    (x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'A long organisation without any CN')]),
+     'O=A long organisation without ...'),
+])
+def test_the_validator_names_a_certificate_by_its_parsed_cn(subject, expected):
+    """Validator messages: the most specific CN, else the subject cut at 30 characters."""
+    from services.smart_import.parser import SmartParser
+    from services.smart_import.validator import ImportValidator
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    obj = SmartParser()._parse_x509_cert(_self_signed(subject, key))
+    validator = ImportValidator()
+    assert validator._get_cn(obj) == expected
+    assert validator._get_cn(obj, issuer=True) == expected
+
+
+def test_the_smart_import_path_records_the_most_specific_common_name(app, auth_client, key):
+    """Import records the LAST CN, like EST and WSTEP."""
+    import uuid
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    cert_id = _import_leaf(auth_client, key, tag, f'web-{tag}.example.com', f'admin-{tag}.example.com')
+    with app.app_context():
+        row = db.session.get(Certificate, cert_id)
+        try:
+            assert row.subject_cn == f'admin-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_the_smart_import_path_keeps_a_comma_inside_the_common_name(app, auth_client, key):
+    """A CN such as 'Doe, John' is recorded whole, not cut at the escaped comma."""
+    import uuid
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    cert_id = _import_leaf(auth_client, key, tag, f'Doe, John {tag}')
+    with app.app_context():
+        row = db.session.get(Certificate, cert_id)
+        try:
+            assert row.subject_cn == f'Doe, John {tag}'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_most_specific_common_name_is_the_last_one():
+    assert most_specific_common_name(_subject('a.example.com', 'b.example.com')) == 'b.example.com'
+    assert most_specific_common_name(_subject('Doe, John')) == 'Doe, John'
+    assert most_specific_common_name(x509.Name([])) is None
+
+
+def _empty_cn(org):
+    return x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, org),
+                      x509.NameAttribute(NameOID.COMMON_NAME, '', _validate=False)])
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_the_import_names_a_present_but_empty_cn_empty_as_before():
+    """A CN present but empty is '' (not 'Unknown' nor the DN), in both helpers."""
+    from services.smart_import.importer import SmartImporter
+    from services.smart_import.parser import SmartParser
+    from services.smart_import.validator import ImportValidator
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    obj = SmartParser()._parse_x509_cert(_self_signed(_empty_cn('Empty CN org'), key))
+    assert obj.subject_cn == ''
+    assert ImportValidator()._get_cn(obj) == ''
+    assert SmartImporter()._get_cn(obj) == ''
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_an_imported_ca_with_an_empty_cn_keeps_an_empty_name(app, auth_client):
+    import uuid
+
+    from models import CA, db
+
+    tag = uuid.uuid4().hex[:8]
+    ca_id = _import_pem(auth_client, _empty_cn(f'Empty CN CA {tag}'),
+                        rsa.generate_private_key(public_exponent=65537, key_size=2048), tag, ca=True)
+    with app.app_context():
+        row = db.session.get(CA, ca_id)
+        try:
+            assert row.descr == ''
+        finally:
+            db.session.delete(row)
+            db.session.commit()

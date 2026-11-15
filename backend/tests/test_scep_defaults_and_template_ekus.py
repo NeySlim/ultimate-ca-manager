@@ -65,10 +65,8 @@ class TestBareCsrDefaults:
 
     def test_san_is_critical_when_the_subject_is_empty(self, app, create_ca):
         ca = create_ca(cn='SCEP empty subject CA')
-        try:
-            cert = _issue(app, ca['id'], _csr('', sans=['nosubject.example.test']), txn='scep-empty')
-        except Exception as exc:  # the SCEP path may refuse an empty subject upstream
-            pytest.skip(f'empty subject refused before the builder: {exc}')
+        cert = _issue(app, ca['id'], _csr('', sans=['nosubject.example.test']), txn='scep-empty')
+        assert cert.subject == x509.Name([])
         san = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
         assert san.critical is True
 

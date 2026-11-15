@@ -402,9 +402,7 @@ class TestGetAPIKey:
             'permissions': ['read:certificates'],
         })
         created = assert_success(cr, 201)
-        key_id = created.get('id')
-        if key_id is None:
-            pytest.skip('Create did not return id')
+        key_id = created['id']
 
         r = auth_client.get(f'/api/v2/account/apikeys/{key_id}')
         data = assert_success(r)
@@ -429,9 +427,7 @@ class TestUpdateAPIKey:
             'permissions': ['read:cas'],
         })
         created = assert_success(cr, 201)
-        key_id = created.get('id')
-        if key_id is None:
-            pytest.skip('Create did not return id')
+        key_id = created['id']
 
         r = patch_json(auth_client, f'/api/v2/account/apikeys/{key_id}',
                        {'name': 'Updated Name'})
@@ -456,9 +452,7 @@ class TestDeleteAPIKey:
             'permissions': ['read:certificates'],
         })
         created = assert_success(cr, 201)
-        key_id = created.get('id')
-        if key_id is None:
-            pytest.skip('Create did not return id')
+        key_id = created['id']
 
         r = auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
         assert_success(r)
@@ -486,14 +480,12 @@ class TestRegenerateAPIKey:
             'permissions': ['read:cas'],
         })
         created = assert_success(cr, 201)
-        key_id = created.get('id')
-        if key_id is None:
-            pytest.skip('Create did not return id')
+        key_id = created['id']
 
         r = auth_client.post(f'/api/v2/account/apikeys/{key_id}/regenerate')
         data = assert_success(r, 201)
-        # Should return a new key
-        assert 'key' in data or 'id' in data
+        # A new secret, shown once, never the old one
+        assert data['key'] and data['key'] != created['key']
 
 
 # ============================================================================
@@ -745,9 +737,7 @@ class TestAPIKeyLifecycle:
             'permissions': ['read:certificates', 'write:certificates'],
         })
         created = assert_success(r, 201)
-        key_id = created.get('id')
-        if key_id is None:
-            pytest.skip('Create did not return id')
+        key_id = created['id']
 
         # List — should contain the new key
         r = auth_client.get('/api/v2/account/apikeys')

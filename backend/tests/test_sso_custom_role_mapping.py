@@ -253,12 +253,17 @@ class TestValidationOnSave:
 
     def test_a_system_role_is_not_a_custom_role(self, app, auth_client):
         with app.app_context():
-            system = CustomRole.query.filter_by(is_system=True).first()
-            if system is None:
-                pytest.skip('no system role seeded')
-            name = system.name
-        r = _post(auth_client, role_mapping={'g': {'custom_role': name}})
-        assert r.status_code == 400
+            system = CustomRole(name=f'sys-{_uid()}', permissions=['read:certificates'], is_system=True)
+            db.session.add(system)
+            db.session.commit()
+            name, role_id = system.name, system.id
+        try:
+            r = _post(auth_client, role_mapping={'g': {'custom_role': name}})
+            assert r.status_code == 400, r.data
+        finally:
+            with app.app_context():
+                CustomRole.query.filter_by(id=role_id).delete()
+                db.session.commit()
 
     def test_good_mappings_are_stored_as_sent(self, auth_client, role):
         name = role()
