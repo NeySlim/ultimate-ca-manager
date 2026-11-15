@@ -13,12 +13,14 @@ reader that *decides* already does, so adopting the registry changes what the
 API reports and nothing else. One entry is an exception, `mtls_enabled`,
 where the deciding reader was itself wrong.
 
-Why two flavours of boolean, rather than one:
+Why several flavours of boolean, rather than one:
 
 * `permissive` reads `yes` / `on` / `1` as true, which is what most runtime
   readers do and what an operator hand-editing the table expects;
 * `strict` accepts only the exact string `true`, which is what the readers
-  that configure a socket or grandfather a protocol endpoint do.
+  that configure a socket or grandfather a protocol endpoint do;
+* `strict_off` refuses only on the exact string `false`, for a safeguard that
+  must stay on when its row is garbled (the dedicated TSA signer).
 
 Picking one flavour for everything would silently flip real behaviour. A key
 whose deciding reader is strict keeps strict; the flavour is part of what the

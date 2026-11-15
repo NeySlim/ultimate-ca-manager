@@ -142,14 +142,11 @@ class TSAService:
 
     @staticmethod
     def validate_certificate(tsa_cert: x509.Certificate) -> None:
-        """Validate the TSA signer. A dedicated end-entity TSA certificate
-        (RFC 3161 §2.3: critical, exclusive timeStamping EKU) is the
-        recommended setup, but UCM historically signs with the configured
-        CA's own certificate. A root carries no EKU; a constrained sub-CA
-        carries an EKU without timeStamping (#309). Refusing either broke
-        existing deployments, so a CA certificate stays accepted (with a
-        warning), and only an end-entity certificate lacking the
-        timeStamping EKU is refused."""
+        """Validate the TSA signer. RFC 3161 §2.3 wants a dedicated end-entity
+        certificate (critical, exclusive timeStamping EKU). A CA certificate (a root
+        carries no EKU, a constrained sub-CA one without timeStamping, #309) is
+        accepted with a warning only while tsa_require_dedicated_cert is off; an
+        end-entity certificate lacking the timeStamping EKU is always refused."""
         try:
             bc = tsa_cert.extensions.get_extension_for_oid(
                 ExtensionOID.BASIC_CONSTRAINTS
