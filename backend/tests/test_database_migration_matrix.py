@@ -754,22 +754,24 @@ class TestNothingSwitchesUnlessEverythingPassed:
         assert env_file.read_text() == before
         assert not restart_signal.exists()
 
-    @pytest.mark.parametrize('refusal,transient,status,advice', [
-        ('error', True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
-        ('copy', True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
-        ('error', False, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
-        ('copy', False, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
-        ('verification', False, 500, 'failed its verification; retrying copies the accounts again.'),
+    @pytest.mark.parametrize('refusal,transient,written,status,advice', [
+        ('error', True, True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
+        ('copy', True, True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
+        ('error', True, False, 503, 'A transient failure stopped it: retrying on the same target starts it again.'),
+        ('preflight', True, False, 503, 'A transient failure stopped it: retrying on the same target starts it again.'),
+        ('error', False, True, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
+        ('copy', False, True, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
+        ('verification', False, True, 500, 'failed its verification; retrying copies the accounts again.'),
     ])
     def test_a_bootstrap_cut_short_says_how_to_retry(
-            self, auth_client, sqlite_target, env_file, refusal, transient, status, advice,
-            monkeypatch):
+            self, auth_client, sqlite_target, env_file, refusal, transient, written, status,
+            advice, monkeypatch):
         import api.v2.database as route_module
 
         monkeypatch.setattr(
             route_module.svc, 'bootstrap_auth_to_target',
             lambda url: (False, 'Bootstrap failed: stopped',
-                         {'refusal': refusal, 'target_written': True, 'transient': transient}))
+                         {'refusal': refusal, 'target_written': written, 'transient': transient}))
 
         response = self._post(auth_client, 'switch', {'database_url': sqlite_target})
 
@@ -1834,9 +1836,30 @@ class TestATransientFailureBeforeTheCopyIsRetriable:
 
         assert response.status_code == 503, response.data
         message = json.loads(response.data)['message']
-        assert message.endswith('retrying on the same target resumes the switch.'), message
+        # Cut before this attempt wrote anything
+        assert message.endswith('retrying on the same target starts it again.'), message
         assert env_file.read_text() == before
         assert (TRANSFER_MARKER in _tables(target)) is marker
+
+    def test_a_target_that_fails_its_connection_test_answers_400(
+            self, auth_client, env_file, monkeypatch):
+        """Pins that 503 starts once the target answered its connection test; proves no fix."""
+        import api.v2.database as route_module
+
+        def never(url):
+            raise AssertionError('the bootstrap must not run')
+
+        monkeypatch.setattr(route_module.svc, 'bootstrap_auth_to_target', never)
+        before = env_file.read_text()
+
+        response = auth_client.post(
+            '/api/v2/database/switch',
+            data=json.dumps({'database_url': 'postgresql://ucm:x@127.0.0.1:1/ucm'}),
+            content_type='application/json')
+
+        assert response.status_code == 400, response.data
+        assert json.loads(response.data)['message'].startswith('Target DB unreachable')
+        assert env_file.read_text() == before
 
     @pytest.mark.parametrize('statement,marker', [
         ('SELECT COUNT(*) FROM "users"', False),

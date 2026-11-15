@@ -183,7 +183,9 @@ def _switch_backend():
             # their verification are emptied, copied and verified again; a refused plan stays refused.
             advice, status = '', _refusal_status(boot_stats)
             if boot_stats.get('transient'):
-                advice = ' A transient failure stopped it: retrying on the same target resumes the switch.'
+                again = ('resumes the switch' if boot_stats.get('target_written')
+                         else 'starts it again')
+                advice = f' A transient failure stopped it: retrying on the same target {again}.'
                 status = 503
             elif boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
                 if boot_stats.get('refusal') == 'verification':
