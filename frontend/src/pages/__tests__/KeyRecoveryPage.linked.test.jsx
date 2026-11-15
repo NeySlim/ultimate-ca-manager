@@ -59,6 +59,16 @@ describe('KeyRecoveryPage linked request', () => {
     expect(cards()).toEqual(['cn-linked', 'cn-one', 'cn-two'])
   })
 
+  it('the listed copy of the linked request wins over the copy read on opening', async () => {
+    api.list.mockImplementation(async (status) => ({ data: { requests: rows.filter((r) => !status || r.status === status).map((r) => ({ ...r })), dual_control: true } }))
+    renderPage()
+    await waitFor(() => expect(linkedCard()).toBeTruthy())
+    rows[2].status = 'approved'
+    fireEvent.click(filter('keyRecovery.status.approved'))
+    await waitFor(() => expect(cards()).toEqual(['cn-linked', 'cn-two']))
+    expect(within(linkedCard()).getByText('keyRecovery.status.approved')).toBeTruthy()
+  })
+
   it('a linked request outside the list is shown first', async () => {
     renderPage()
     await waitFor(() => expect(linkedCard()).toBeTruthy())
