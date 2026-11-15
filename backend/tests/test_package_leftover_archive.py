@@ -1153,3 +1153,28 @@ def test_a_journal_line_no_step_writes_stops_the_put_back_touching_nothing(tmp_p
     assert snapshot(box, box.parent) == left and journal.read_text() == held
     journal.write_text(held.replace(line.format(data=box.data, archive=box.archive) + '\n', ''))
     archived(box, box.run(), data, config)
+
+
+def test_a_journal_write_cut_short_once_leaves_the_journal_whole_for_what_follows(tmp_path):
+    """One write is cut short (the disk full for a moment), then a put-back is refused: its
+    failure is still recorded, so the next attempt says retrying alone will not help."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    stuck = f'{box.data}/{LOCAL}/updates'
+    wrap = {'other_fs': (box.data,), 'refused': (stuck,)}
+    box.wrap(**wrap)
+    once = box.state / 'once'
+    (box.bin / 'tee').write_text(
+        f'#!/bin/sh\nline=$(cat)\nfor last; do :; done\n'
+        f'if [ "$line" = "mkdir\t{box.config}\t{box.archive}/config" ] && [ ! -e {once} ]; then\n'
+        f'    : > {once}; printf "%s" "mkdir\t{box.config}" >> "$last"; exit 1\nfi\n'
+        f'printf "%s\\n" "$line" | {REAL["tee"]} "$@"\n')
+    first = box.run()
+    assert first.returncode == 2, (first.stdout, first.stderr)
+    assert reported(first.stdout)[stuck] == f'not put back to {box.data}/updates'
+    assert (box.archive / '.journal').read_text().endswith('\n')
+    box.wrap(**wrap)
+    second = box.run()
+    assert second.returncode == 2 and 'same way at the previous attempt' in second.stdout, second.stdout
+    box.wrap(other_fs=(box.data,))
+    archived(box, box.run(), data, config)
