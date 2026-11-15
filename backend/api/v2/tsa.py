@@ -223,6 +223,11 @@ def update_tsa_config():
     # signer only in compatibility mode, including when this request switches to it
     strict_before = effective('tsa_require_dedicated_cert')
     strict = bool(data['require_dedicated_cert']) if 'require_dedicated_cert' in data else strict_before
+    # The signer this request leaves configured, as it is stored
+    dedicated = stored_signer
+    if 'signer_cert_refid' in data:
+        raw = data['signer_cert_refid']
+        dedicated = raw.strip() if isinstance(raw, str) else ''
 
     policy_oid = None
     if 'policy_oid' in data:
@@ -231,8 +236,7 @@ def update_tsa_config():
             return error_response('policy_oid must be a valid OID', 400)
 
     if 'signer_cert_refid' in data:
-        raw = data['signer_cert_refid']
-        refid = raw.strip() if isinstance(raw, str) else ''
+        refid = dedicated
         if refid:
             err, _cert = _validate_signer_refid(refid)
             if err:
@@ -248,12 +252,12 @@ def update_tsa_config():
     if 'enabled' in data:
         set_config('tsa_enabled', 'true' if data['enabled'] else 'false')
     if 'require_dedicated_cert' in data:
-        dedicated = data['signer_cert_refid'] if 'signer_cert_refid' in data else stored_signer
         if strict_before and not strict and not dedicated and 'ca_refid' not in data and 'ca_id' not in data:
             ca = CA.query.filter_by(refid=get_config('tsa_ca_refid', '')).first()
             problem = _ca_signer_refusal(ca) if ca is not None else None
             if problem:
-                return error_response(problem, 400)
+                return error_response(
+                    f'Turning off require_dedicated_cert makes the CA certificate sign the tokens: {problem}', 400)
         set_config(
             'tsa_require_dedicated_cert',
             'true' if data['require_dedicated_cert'] else 'false',
@@ -267,8 +271,6 @@ def update_tsa_config():
         else:
             ca = db.session.get(CA, data['ca_id']) if data['ca_id'] else None
             new_refid = ca.refid if ca else ''
-        dedicated = data['signer_cert_refid'] if 'signer_cert_refid' in data \
-            else get_config('tsa_signer_cert_refid', '')
         signer_dropped = not dedicated and stored_signer
         if new_refid and (new_refid != get_config('tsa_ca_refid', '') or signer_dropped
                           or (strict_before and not strict)):

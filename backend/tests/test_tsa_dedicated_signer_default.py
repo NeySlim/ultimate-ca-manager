@@ -190,7 +190,21 @@ def test_compatibility_mode_refuses_a_ca_that_cannot_sign(app, auth_client, tsa,
 def test_switching_to_compatibility_refuses_a_ca_that_cannot_sign(app, auth_client, tsa, ed_ca):
     tsa(tsa_ca_refid=ed_ca)
     r = _patch(auth_client, {'require_dedicated_cert': False})
-    assert r.status_code == 400 and 'EdDSA' in r.get_json()['message']
+    message = r.get_json()['message']
+    assert r.status_code == 400 and 'EdDSA' in message
+    assert message.startswith('Turning off require_dedicated_cert makes the CA certificate sign the tokens: ')
+    assert _stored(app, KEY) is None
+
+
+@pytest.mark.parametrize('blank', [' ', 123, True], ids=['space', 'number', 'true'])
+@pytest.mark.parametrize('with_ca', [False, True], ids=['switch_alone', 'ca_in_the_request'])
+def test_a_signer_field_stored_empty_is_no_dedicated_signer(app, auth_client, tsa, ed_ca, blank, with_ca):
+    tsa(tsa_ca_refid=ed_ca)
+    body = {'require_dedicated_cert': False, 'signer_cert_refid': blank}
+    if with_ca:
+        body['ca_refid'] = ed_ca
+    r = _patch(auth_client, body)
+    assert r.status_code == 400 and 'EdDSA' in r.get_json()['message'], r.get_json()
     assert _stored(app, KEY) is None
 
 

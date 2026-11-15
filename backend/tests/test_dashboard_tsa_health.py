@@ -83,13 +83,13 @@ def test_healthy_dedicated_signer(auth_client, tsa_config, create_cert):
     assert tsa['days_left'] > 300
 
 
-
 def test_a_dedicated_signer_clears_the_warning_with_the_setting_still_off(auth_client, tsa_config, create_cert):
     # The UPGRADE note: the warning lasts until a signer is issued, the setting is switched back after
     signer = create_cert(cn='tsa-health-compat', validity_days=365, extra_ekus=[TS_OID])
     tsa_config(tsa_enabled='true', tsa_signer_cert_refid=signer['refid'], tsa_require_dedicated_cert='false')
     tsa = _tsa(auth_client)
     assert (tsa['state'], tsa['alert'], tsa['severity']) == ('dedicated', False, None)
+
 
 def test_signer_near_expiry_is_an_alert(auth_client, tsa_config, create_cert):
     signer = create_cert(cn='tsa-health-near', validity_days=10, extra_ekus=[TS_OID])
