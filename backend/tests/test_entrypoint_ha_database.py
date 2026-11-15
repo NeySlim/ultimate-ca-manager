@@ -342,7 +342,8 @@ def test_the_copy_lands_in_the_measured_backups_directory(tmp_path):
     assert r.returncode == 0 and f"cp {env['UCM_DATABASE_PATH']} {tmp_path / 'backups'}/ucm-backup-" in r.stdout, r.stdout
 
 
-@pytest.mark.parametrize('url', ['postgresql://ucm@db/ucm', 'sqlite:////elsewhere/other.db'])
+@pytest.mark.parametrize('url', ['postgresql://ucm@db/ucm', 'postgres://ucm@db/ucm', 'postgresql+psycopg2://ucm@db/ucm',
+                                 'sqlite:////elsewhere/other.db'])
 def test_a_database_url_leaves_the_sqlite_file_unchecked_and_uncopied(tmp_path, url):
     # the application opens DATABASE_URL whenever it is set, never DATABASE_PATH
     env = _env(tmp_path, 'true')
@@ -396,3 +397,15 @@ def test_a_device_that_cannot_be_read_is_measured_on_the_total(tmp_path):
     r = _run(_df_names(9000, 5999, 1, '', 'a', 'b') + _START, env, tmp_path)
     assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
     assert 'needs 6 MB free, 5 MB available' in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize('suffix', ['', '?timeout=30'])
+def test_a_sqlite_url_on_the_same_file_still_checks_and_copies_it(tmp_path, suffix):
+    # the application opens that very file: the room check and the pre-start copy apply
+    env = _env(tmp_path, 'true')
+    env['DATABASE_URL'] = f"sqlite:///{env['UCM_DATABASE_PATH']}{suffix}"
+    _database(tmp_path, NAMES)
+    r = _run(_df(2999) + _START, env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout and 'Not enough' in r.stdout, r.stdout
+    r = _run(_df(3000) + _START, env, tmp_path)
+    assert r.returncode == 0 and 'cp ' in r.stdout and 'not used' not in r.stdout, r.stdout

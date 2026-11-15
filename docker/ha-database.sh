@@ -137,8 +137,25 @@ ucm_sqlite_disk_room() {
     return 0
 }
 
+# True when DATABASE_URL points the application away from the SQLite file at UCM_DATABASE_PATH:
+# any PostgreSQL URL (utils/db_url.is_postgres_url), another scheme, or another SQLite file.
+# An sqlite:/// URL on that same file leaves it in use.
+_ucm_database_url_elsewhere() {
+    local url=${DATABASE_URL:-} path
+    [ -z "$url" ] && return 1
+    case "$url" in
+        sqlite:///*)
+            path=${url#sqlite:///}
+            path=${path%%\?*}
+            [ "$path" -ef "$UCM_DATABASE_PATH" ] && return 1
+            [ "/$path" -ef "$UCM_DATABASE_PATH" ] && return 1
+            return 0 ;;
+        *) return 0 ;;
+    esac
+}
+
 # First-run notice and pre-start copy of the SQLite file; both skipped in HA mode. A SQLite file
-# left in place under DATABASE_URL is neither checked nor copied: the application never opens it.
+# the application does not open (DATABASE_URL elsewhere) is neither checked nor copied.
 ucm_sqlite_check_and_backup() {
     if ucm_ha_active; then
         echo -e "${GREEN:-}✅ HA mode: database is PostgreSQL, no SQLite backup${NC:-}"
@@ -147,7 +164,7 @@ ucm_sqlite_check_and_backup() {
     if [ ! -f "$UCM_DATABASE_PATH" ]; then
         echo -e "${YELLOW:-}   First run detected - database will be auto-created${NC:-}"
         ucm_initial_admin_notice
-    elif [ -n "${DATABASE_URL:-}" ]; then
+    elif _ucm_database_url_elsewhere; then
         echo -e "${GREEN:-}✅ Database from DATABASE_URL: the SQLite file is not used, no SQLite backup${NC:-}"
     else
         echo -e "${GREEN:-}✅ Database exists${NC:-}"
