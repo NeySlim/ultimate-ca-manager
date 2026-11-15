@@ -4,7 +4,7 @@
  * 
  * Migrated to ResponsiveLayout for consistent UX
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   Key, Plus, Trash, PencilSimple, CheckCircle, XCircle, TestTube,
@@ -40,6 +40,21 @@ const PROVIDER_ICONS = {
   'openbao': Lock,
 }
 
+// Everything the sync route reports: counts, then what was kept or changed and why
+export function syncKeysMessage(t, d) {
+  const parts = [t('messages.success.hsm.keysSynced', {
+    added: d.added || 0, removed: d.removed || 0, unchanged: d.unchanged || 0,
+  })]
+  if (d.listing_errors > 0) {
+    parts.push(t('messages.success.hsm.keysSyncedUnreadable', { count: d.listing_errors }))
+  } else if (d.missing_kept > 0) {
+    parts.push(t('messages.success.hsm.keysSyncedKept', { count: d.missing_kept }))
+  }
+  const changed = (d.changed_referenced_key_ids || []).length
+  if (changed > 0) parts.push(t('messages.success.hsm.keysSyncedChanged', { count: changed }))
+  return { text: parts.join(' '), notable: parts.length > 1 }
+}
+
 export default function HSMPage() {
   const { t } = useTranslation()
   const fips = useFipsMode()
@@ -56,7 +71,9 @@ export default function HSMPage() {
   const [filterType, setFilterType] = usePersistedState('ucm-filter-hsm-type', [])
   const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-hsm-status', [])
   const [hsmStatus, setHsmStatus] = useState(null)
-  const { showSuccess, showError, showConfirm } = useNotification()
+  const { showSuccess, showWarning, showError, showConfirm } = useNotification()
+  const [syncingId, setSyncingId] = useState(null)
+  const syncingRef = useRef(false)
   const { isMobile } = useMobile()
 
   useEffect(() => {
@@ -159,17 +176,22 @@ export default function HSMPage() {
     }
   }
 
+  // One sync at a time: two at once race on the keys' unique constraint
   const handleSyncKeys = async (provider) => {
+    if (syncingRef.current) return
+    syncingRef.current = true
+    setSyncingId(provider.id)
     try {
       const response = await hsmService.syncKeys(provider.id)
-      const d = response.data || {}
-      showSuccess(t('messages.success.hsm.keysSynced', {
-        added: d.added || 0, removed: d.removed || 0, unchanged: d.unchanged || 0
-      }))
+      const { text, notable } = syncKeysMessage(t, response.data || {})
+      ;(notable ? showWarning : showSuccess)(text)
       loadData()
       if (selectedProvider?.id === provider.id) loadKeys(provider.id)
     } catch (error) {
       showError(error.message || t('messages.errors.hsm.syncFailed'))
+    } finally {
+      syncingRef.current = false
+      setSyncingId(null)
     }
   }
 
@@ -370,9 +392,10 @@ export default function HSMPage() {
             {testing ? t('common.testing') : t('common.test')}
           </Button>
           {canWrite('hsm') && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => handleSyncKeys(provider)}>
-            <ArrowsClockwise size={14} />
-            {t('common.syncKeys')}
+          <Button type="button" size="sm" variant="secondary" onClick={() => handleSyncKeys(provider)}
+            disabled={syncingId !== null}>
+            <ArrowsClockwise size={14} className={syncingId === provider.id ? 'animate-spin' : undefined} />
+            {syncingId === provider.id ? t('hsm.syncingKeys') : t('common.syncKeys')}
           </Button>
           )}
           {canWrite('hsm') && (

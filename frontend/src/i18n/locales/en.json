@@ -3860,7 +3860,8 @@
       "firmwareVersion": "Firmware version",
       "notRead": "Test the connection to read what the module reports.",
       "softhsmFips": "SoftHSM is not a validated module: in FIPS mode, keys on it are not FIPS protected."
-    }
+    },
+    "syncingKeys": "Syncing..."
   },
   "sso": {
     "subtitle": "Configure LDAP, OAuth2, or SAML providers for centralized authentication",
@@ -5033,7 +5034,10 @@
       },
       "hsm": {
         "connectionOk": "Connection successful",
-        "keysSynced": "Keys synced: {{added}} new, {{removed}} removed, {{unchanged}} unchanged"
+        "keysSynced": "Keys synced: {{added}} new, {{removed}} removed, {{unchanged}} unchanged",
+        "keysSyncedKept": "Missing from the token but kept because an authority uses them: {{count}}.",
+        "keysSyncedUnreadable": "Keys that could not be read on the token: {{count}}. No key was removed.",
+        "keysSyncedChanged": "Keys used by an authority whose material changed on the token: {{count}}."
       },
       "sso": {
         "connectionOk": "Connection successful"

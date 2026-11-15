@@ -3858,7 +3858,8 @@
       "firmwareVersion": "固件版本",
       "notRead": "测试连接以读取模块报告的信息。",
       "softhsmFips": "SoftHSM 不是经过验证的模块：在 FIPS 模式下，其上的密钥不受 FIPS 保护。"
-    }
+    },
+    "syncingKeys": "正在同步..."
   },
   "sso": {
     "subtitle": "配置LDAP、OAuth2或SAML提供商进行集中认证",
@@ -4825,7 +4826,10 @@
       },
       "hsm": {
         "connectionOk": "连接成功",
-        "keysSynced": "密钥已同步：新增 {{added}}，删除 {{removed}}，未变 {{unchanged}}"
+        "keysSynced": "密钥已同步：新增 {{added}}，删除 {{removed}}，未变 {{unchanged}}",
+        "keysSyncedKept": "令牌上已不存在但因认证机构在使用而保留的密钥：{{count}}。",
+        "keysSyncedUnreadable": "令牌上无法读取的密钥：{{count}}。未删除任何密钥。",
+        "keysSyncedChanged": "认证机构所用且其内容在令牌上已变化的密钥：{{count}}。"
       },
       "https": {
         "applied": "HTTPS 证书已应用，服务器将重启。",

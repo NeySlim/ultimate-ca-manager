@@ -3858,7 +3858,8 @@
       "firmwareVersion": "Versión del firmware",
       "notRead": "Pruebe la conexión para leer lo que informa el módulo.",
       "softhsmFips": "SoftHSM no es un módulo validado: en modo FIPS, las claves almacenadas en él no están protegidas por FIPS."
-    }
+    },
+    "syncingKeys": "Sincronizando..."
   },
   "sso": {
     "subtitle": "Configure proveedores LDAP, OAuth2 o SAML para autenticación centralizada",
@@ -4825,7 +4826,10 @@
       },
       "hsm": {
         "connectionOk": "Conexión exitosa",
-        "keysSynced": "Claves sincronizadas: {{added}} nuevas, {{removed}} eliminadas, {{unchanged}} sin cambios"
+        "keysSynced": "Claves sincronizadas: {{added}} nuevas, {{removed}} eliminadas, {{unchanged}} sin cambios",
+        "keysSyncedKept": "Ausentes del token pero conservadas porque una autoridad las usa: {{count}}.",
+        "keysSyncedUnreadable": "Claves ilegibles en el token: {{count}}. No se eliminó ninguna clave.",
+        "keysSyncedChanged": "Claves usadas por una autoridad cuyo material cambió en el token: {{count}}."
       },
       "https": {
         "applied": "Certificado HTTPS aplicado. El servidor se reiniciará.",

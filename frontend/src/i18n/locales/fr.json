@@ -2400,7 +2400,8 @@
       "firmwareVersion": "Version du firmware",
       "notRead": "Testez la connexion pour lire ce que le module signale.",
       "softhsmFips": "SoftHSM n'est pas un module validé : en mode FIPS, les clés qu'il contient ne sont pas protégées par FIPS."
-    }
+    },
+    "syncingKeys": "Synchronisation..."
   },
   "import": {
     "smartImport": "Import intelligent",
@@ -5033,7 +5034,10 @@
       },
       "hsm": {
         "connectionOk": "Connexion réussie",
-        "keysSynced": "Clés synchronisées : {{added}} nouvelles, {{removed}} supprimées, {{unchanged}} inchangées"
+        "keysSynced": "Clés synchronisées : {{added}} nouvelles, {{removed}} supprimées, {{unchanged}} inchangées",
+        "keysSyncedKept": "Absentes du jeton mais conservées parce qu'une autorité les utilise : {{count}}.",
+        "keysSyncedUnreadable": "Clés illisibles sur le jeton : {{count}}. Aucune clé n'a été retirée.",
+        "keysSyncedChanged": "Clés utilisées par une autorité dont le matériel a changé sur le jeton : {{count}}."
       },
       "sso": {
         "connectionOk": "Connexion réussie"

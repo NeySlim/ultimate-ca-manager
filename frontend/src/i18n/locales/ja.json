@@ -3860,7 +3860,8 @@
       "firmwareVersion": "ファームウェアのバージョン",
       "notRead": "接続をテストして、モジュールが報告する情報を読み取ります。",
       "softhsmFips": "SoftHSM は検証済みモジュールではありません。FIPS モードでは、その上の鍵は FIPS で保護されません。"
-    }
+    },
+    "syncingKeys": "同期中..."
   },
   "sso": {
     "subtitle": "LDAP、OAuth2、SAMLプロバイダーを設定して一元認証",
@@ -4828,7 +4829,10 @@
       },
       "hsm": {
         "connectionOk": "接続に成功しました",
-        "keysSynced": "鍵を同期しました: 新規 {{added}}、削除 {{removed}}、変更なし {{unchanged}}"
+        "keysSynced": "鍵を同期しました: 新規 {{added}}、削除 {{removed}}、変更なし {{unchanged}}",
+        "keysSyncedKept": "トークンに存在しませんが、認証局が使用しているため保持されたキー: {{count}}。",
+        "keysSyncedUnreadable": "トークン上で読み取れなかったキー: {{count}}。キーは削除されていません。",
+        "keysSyncedChanged": "認証局が使用しているキーのうち、トークン上で内容が変わったもの: {{count}}。"
       },
       "https": {
         "applied": "HTTPS証明書が適用されました。サーバーが再起動します。",

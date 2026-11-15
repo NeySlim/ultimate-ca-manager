@@ -1,6 +1,6 @@
 /**
  * An SSH CA can be backed by an HSM key: the private key never comes back,
- * the algorithm comes off the card, and one key signs one CA per role.
+ * the algorithm comes off the card, and one key backs one authority.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
