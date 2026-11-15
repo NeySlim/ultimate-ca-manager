@@ -18,6 +18,7 @@ import './pageRenderingSetup.jsx'
 
 import SettingsPage from '../SettingsPage'
 import { systemService } from '../../services/system.service'
+import { holdSignOut } from '../../services/apiClient'
 
 const reload = vi.fn()
 beforeEach(() => {
@@ -28,6 +29,7 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   reload.mockClear()
+  holdSignOut.mockClear()
 })
 
 async function startRestore() {
@@ -62,6 +64,21 @@ describe('SettingsPage: restore report', () => {
     expect(await screen.findByText('settings.restoreReportTitle')).toBeTruthy()
     await act(async () => { vi.advanceTimersByTime(2000) })
     expect(reload).toHaveBeenCalled()
+  })
+
+  it('holds the sign-out from the restore on: it revokes the session of the page too', async () => {
+    let finish
+    systemService.restore = vi.fn(() => new Promise((resolve) => { finish = resolve }))
+    await startRestore()
+    expect(holdSignOut.mock.calls).toEqual([[]])
+    await act(async () => { finish({ data: { users: 1, cas: 1, certificates: 1, restart_requested: false, todo: [] } }) })
+    expect(holdSignOut.mock.calls).toEqual([[]])
+  })
+
+  it('releases the held sign-out when the restore is refused', async () => {
+    systemService.restore = vi.fn().mockRejectedValue(Object.assign(new Error('Invalid password'), { status: 400 }))
+    await startRestore()
+    expect(holdSignOut.mock.calls).toEqual([[], [false]])
   })
 
   it('shows the upload progress while the archive travels', async () => {

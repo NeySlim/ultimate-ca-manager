@@ -64,8 +64,17 @@ function buildErrorMessage(status, data, fallback = 'Request failed') {
 // a client certificate, and calls sent while it loads would carry no cookie.
 let loginRedirectPending = false
 
+// A restore revokes every session, the page's own too: while held, a 401 leaves the
+// report on screen and the sign-in follows its reload
+let signOutHeld = false
+
+export function holdSignOut(held = true) {
+  signOutHeld = held
+}
+
 export function resetLoginRedirect() {
   loginRedirectPending = false
+  signOutHeld = false
 }
 
 // The 401 of the server's authentication gate: refused before the route ran, so safe to send again
@@ -217,7 +226,8 @@ class APIClient {
         // Redirect to login on 401 (unless already on login page OR this is the login/verify request)
         const isLoginPage = window.location.pathname.includes('/login')
         const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/verify')
-        
+        if (response.status === 401 && signOutHeld) throw error
+
         // A 401 signs out only once the session is gone; the gate's refusal is sent again, once
         if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending
             && !replayed && await sessionStillOpen(this)) {

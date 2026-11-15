@@ -28,6 +28,7 @@ import CertificatePickerModal from '../components/CertificatePickerModal'
 import CertificateInput from '../components/CertificateInput'
 import LanguageSelector from '../components/ui/LanguageSelector'
 import { settingsService, systemService, casService, ssoService, mtlsService, mscaService } from '../services'
+import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission } from '../hooks'
@@ -1369,6 +1370,8 @@ export default function SettingsPage() {
     }
     
     setBackupLoading(true)
+    // Requests answered after the restore revoked the sessions get 401: the report stays first
+    holdSignOut()
     try {
       setRestoreProgress(0)
       const result = await systemService.restore(restoreFile, restorePassword, {
@@ -1379,6 +1382,7 @@ export default function SettingsPage() {
       setRestoreFile(null)
       setRestoreReport(result.data || {})
     } catch (error) {
+      holdSignOut(false)
       showError(error.message || t('messages.errors.backup.restoreFailed'))
     } finally {
       setBackupLoading(false)

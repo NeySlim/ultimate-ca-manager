@@ -527,5 +527,19 @@ describe('API Client', () => {
       expect(again).toMatchObject({ method: 'PATCH', body: JSON.stringify({ full_name: 'N' }) })
       expect(again.headers['X-CSRF-Token']).toBe('fresh-token')
     })
+
+    it('while a restore holds the sign-out, a 401 neither checks the session nor signs out', async () => {
+      global.fetch.mockResolvedValue(refused())
+      const { apiClient, holdSignOut } = await import('../apiClient')
+      holdSignOut()
+      await expect(apiClient.get('/certificates/stats')).rejects.toMatchObject({ status: 401 })
+      expect(urls()).toEqual(['/api/v2/certificates/stats'])
+      expect(assigned).toEqual([])
+
+      holdSignOut(false)
+      global.fetch.mockResolvedValueOnce(refused()).mockResolvedValueOnce(session(false))
+      await expect(apiClient.get('/certificates/stats')).rejects.toMatchObject({ status: 401 })
+      expect(assigned).toEqual(['/login?next=%2Faccount'])
+    })
   })
 })
