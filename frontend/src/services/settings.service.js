@@ -13,6 +13,10 @@ export const settingsService = {
     return apiClient.patch('/settings/general', settings)
   },
 
+  async getBackupSchedule() {
+    return apiClient.get('/settings/backup/schedule')
+  },
+
   async getPublicEndpoints() {
     return apiClient.get('/settings/public-endpoints')
   },

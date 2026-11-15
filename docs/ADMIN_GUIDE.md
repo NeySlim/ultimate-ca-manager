@@ -315,6 +315,8 @@ The `certificate.expired` webhooks of a pass cover what expired since the previo
 3. Enter encryption password
 4. Download `.ucmbkp` file
 
+Settings > Backup shows the space the archives counted by retention take (the `ucm_backup_*.ucmbkp` files of the backup directory, or in HA every archive of the database) and sets a size ceiling for all of them, in MiB (0, the default, for none). Retention removes the oldest archives until the total fits and audits each removal by name. It never removes the archives it protects: on a single node, the newest archive that matches its validation record, up to 2 archives with no validation record, and the `backup_min_keep` newest archives not found altered (2 by default); in HA, the `backup_min_keep` newest archives. The total can therefore stay above the ceiling, and the screen, the log and the retention response say so. A manual backup removes nothing: its response carries a `warning` when the total is then above the ceiling, and the next retention applies it. Other archive files of the directory (an archive copied there by hand, a `.json.enc` archive) are neither counted nor removed by retention, and the screen gives their number. The ceiling travels in a backup archive with the other settings and comes back with a restore.
+
 Backups, retention and restores take the same lock, so an archive never holds half of a restore: a manual backup started meanwhile waits up to 30 seconds, then answers 409; the scheduled one runs at the next minute.
 
 **Via command line (SQLite):**

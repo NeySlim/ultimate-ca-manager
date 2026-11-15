@@ -330,12 +330,13 @@ def _before_deleting(victims):
 
 
 def apply_retention(retention_days: int, *, min_keep: int, max_total_bytes: int,
-                    wait: float = 0) -> int:
+                    wait: float = 0, on_ceiling_removed=None) -> int:
     """The retention rule of the disk, applied once to the whole store. Returns the count removed.
 
     Kept whatever their age: the newest archive (each one is proven when it is committed, so
     the newest is the last provable restore point) and the `min_keep` newest. Then the
     oldest go until the store fits `max_total_bytes` (0: no ceiling), the kept ones never.
+    `on_ceiling_removed(filenames)` is told, once they are gone, which went for the ceiling.
     """
     if not retention_days or retention_days < 1:
         return 0
@@ -343,13 +344,15 @@ def apply_retention(retention_days: int, *, min_keep: int, max_total_bytes: int,
     with _engine().connect() as conn:
         _take_lock(conn, wait, 'backup retention')
         cutoff = _now(conn) - timedelta(days=retention_days)
-        rows = conn.execute(select(archives.c.id, archives.c.created_at, archives.c.size)
+        rows = conn.execute(select(archives.c.id, archives.c.filename, archives.c.created_at,
+                                   archives.c.size)
                             .order_by(archives.c.created_at.desc(), archives.c.id.desc())).all()
         keep = {row.id for row in rows[:max(1, min_keep)]}
         oldest_first = list(reversed(rows))
         victims = [row.id for row in oldest_first
                    if row.id not in keep and row.created_at < cutoff]
         remaining = [row for row in oldest_first if row.id not in set(victims)]
+        over_ceiling = []
         if max_total_bytes > 0:
             total = sum(int(row.size) for row in remaining)
             for row in remaining:
@@ -358,17 +361,20 @@ def apply_retention(retention_days: int, *, min_keep: int, max_total_bytes: int,
                 if row.id in keep:
                     continue
                 victims.append(row.id)
+                over_ceiling.append(row.filename)
                 total -= int(row.size)
             if total > max_total_bytes:
                 logger.warning(
                     "Backup retention: the stored archives still take %d MiB, above the %d MiB "
-                    "ceiling, because what remains is the last restore point",
-                    total // (1024 * 1024), max_total_bytes // (1024 * 1024))
+                    "ceiling: retention never removes the %d newest archives",
+                    total // (1024 * 1024), max_total_bytes // (1024 * 1024), len(keep))
         _before_deleting(victims)
         removed = len(_delete(conn, archives, chunks, archives.c.id.in_(victims))) if victims else 0
         conn.commit()
     if removed:
         logger.info("Backup retention removed %d archive(s) from the database", removed)
+    if over_ceiling and on_ceiling_removed:
+        on_ceiling_removed(over_ceiling)
     return removed
 
 

@@ -429,7 +429,7 @@ class TestRetentionNow:
         response = auth_client.post('/api/v2/system/backups/run-retention')
 
         assert response.status_code == 200, response.data
-        assert response.get_json()['data'] == {'removed': 3}
+        assert response.get_json()['data'] == {'removed': 3, 'warning': None}
         assert _message(response) == 'Retention applied: removed 3 backup(s)'
         assert [c['action'] for c in audit_spy] == ['backup_delete']
 
@@ -840,7 +840,7 @@ class TestAnAuditFailureDoesNotUndoTheAnswer:
         response = auth_client.post('/api/v2/system/backups/run-retention')
 
         assert response.status_code == 200, response.data
-        assert response.get_json()['data'] == {'removed': 1}
+        assert response.get_json()['data'] == {'removed': 1, 'warning': None}
         assert not path.exists()
 
 

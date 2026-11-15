@@ -7,7 +7,7 @@ import { useClipboard } from '../../hooks/useClipboard'
 
 export default function BackupSection({
   settings, updateSetting, handleSave, saving, hasPermission,
-  backups, backupMeta = {}, backupQuery = {}, updateBackupQuery,
+  backups, backupMeta = {}, backupSchedule = {}, backupQuery = {}, updateBackupQuery,
   selectedBackups = [], toggleSelectBackup, toggleSelectAllBackups,
   handleBulkDeleteBackups, handleRunRetention, backupBusy,
   setShowBackupModal, setShowRestoreModal, setRestoreFile,
@@ -23,6 +23,11 @@ export default function BackupSection({
   const diskHigh = typeof backupMeta.disk_used_pct === 'number' && backupMeta.disk_used_pct >= 85
   // HA: the archives live in the shared database, listed the same from every node
   const sharedStore = backupMeta.storage === 'database'
+  // The server's figures, read after each save: the saved ceiling, not the field being typed,
+  // and only the archives retention counts
+  const overCeiling = backupSchedule.over_ceiling === true
+  const storedMiB = typeof backupSchedule.stored_bytes === 'number'
+    ? `${(backupSchedule.stored_bytes / (1024 * 1024)).toFixed(1)} MiB` : null
 
   const sortOptions = [
     { value: 'created_desc', label: t('settings.backupSortNewest') },
@@ -132,6 +137,31 @@ export default function BackupSection({
             max="3650"
             helperText={t('settings.retentionHelper')}
           />
+          <Input
+            label={t('settings.backupMaxTotalMb')}
+            type="number"
+            value={settings.backup_max_total_mb ?? 0}
+            onChange={(e) => updateSetting('backup_max_total_mb', parseInt(e.target.value, 10) || 0)}
+            min="0"
+            max="1048576"
+            helperText={t('settings.backupMaxTotalMbHelper')}
+          />
+          {storedMiB && (
+            <p className="text-xs text-text-secondary" data-testid="backup-space-used">
+              {t('settings.backupSpaceUsed', { size: storedMiB, count: backupSchedule.stored_count ?? 0 })}
+            </p>
+          )}
+          {backupSchedule.uncounted_count > 0 && (
+            <p className="text-xs text-text-secondary" data-testid="backup-uncounted">
+              {t('settings.backupUncountedFiles', { count: backupSchedule.uncounted_count })}
+            </p>
+          )}
+          {overCeiling && (
+            <p className="flex items-start gap-2 text-xs text-status-warning" role="alert">
+              <WarningCircle size={14} className="flex-shrink-0 mt-0.5" />
+              <span>{t('settings.backupOverCeiling', { ceiling: backupSchedule.max_total_mb ?? 0 })}</span>
+            </p>
+          )}
           {(canWriteSettings || isAdmin) && (
             <div className="flex gap-2">
               {canWriteSettings && (

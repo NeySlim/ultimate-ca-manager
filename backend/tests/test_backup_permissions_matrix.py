@@ -174,6 +174,7 @@ BACKUP_SETTINGS = {
     'auto_backup_enabled': False,
     'backup_frequency': 'daily',
     'backup_retention_days': 30,
+    'backup_max_total_mb': 0,
     'backup_password': 'Correct-Horse-Battery-9',
     'backup_kdf': 'pbkdf2',
 }

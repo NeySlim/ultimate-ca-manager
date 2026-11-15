@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 MIN_RETENTION_DAYS = 1
 MAX_RETENTION_DAYS = 3650
 
+# The ceiling on what all archives may take, in MiB: 0 is "no ceiling", the
+# upper bound (1 TiB) only refuses a typo that no store could ever reach.
+MAX_TOTAL_MB_LIMIT = 1024 * 1024
+
 
 class BackupSettingError(ValueError):
     """A backup setting was refused.
@@ -73,6 +77,17 @@ def validate_retention_days(value, field: str = 'backup_retention_days') -> int:
             f"{field} must be between {MIN_RETENTION_DAYS} and "
             f"{MAX_RETENTION_DAYS} days")
     return days
+
+
+def validate_max_total_mb(value, field: str = 'backup_max_total_mb') -> int:
+    """Return the size ceiling in MiB (0 = none), or raise BackupSettingError."""
+    megabytes = _whole_number(value)
+    if megabytes is None:
+        raise BackupSettingError(f"{field} must be a whole number of MiB")
+    if megabytes < 0 or megabytes > MAX_TOTAL_MB_LIMIT:
+        raise BackupSettingError(
+            f"{field} must be between 0 (no ceiling) and {MAX_TOTAL_MB_LIMIT} MiB")
+    return megabytes
 
 
 def validate_backup_password(value) -> str:

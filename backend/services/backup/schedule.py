@@ -12,6 +12,7 @@ by copying that value to ``backup.concluded_run`` once its archive is written; t
 schedule reports ``in_progress`` while a reservation is not concluded within its lease.
 """
 import base64
+import fnmatch
 import glob
 import json
 import logging
@@ -70,7 +71,7 @@ def _get(key, default=None):
     return cfg.value if cfg and cfg.value is not None else default
 
 
-def get_schedule() -> dict:
+def get_schedule(with_archives: bool = True) -> dict:
     """Return the effective backup schedule, and what the last run did.
 
     `last_run` says when the task last decided something; it said nothing
@@ -82,6 +83,9 @@ def get_schedule() -> dict:
     hours since the last run, not a time of day, and the runs drift with
     restarts. Saying so is more useful than implying a calendar the scheduler
     does not keep.
+
+    The archive figures come from one listing, so they agree with each other;
+    the scheduler tick passes `with_archives=False` and lists nothing.
     """
     freq = _get('backup_frequency', 'daily')
     if freq not in _VALID_FREQUENCIES:
@@ -91,9 +95,8 @@ def get_schedule() -> dict:
     except (ValueError, TypeError):
         retention = 30
 
-    newest, age = _newest_validated_archive()
     last_run = _get(_LAST_RUN_KEY)
-    return {
+    sched = {
         'enabled': _get('auto_backup_enabled', 'false') == 'true',
         'frequency': freq,
         'cadence': 'rolling_interval',
@@ -106,27 +109,58 @@ def get_schedule() -> dict:
         'last_outcome': _get(_LAST_OUTCOME_KEY),
         'last_outcome_reason': _get(_LAST_REASON_KEY),
         'last_outcome_at': _get(_LAST_OUTCOME_AT_KEY),
-        'last_archive': os.path.basename(newest) if newest else None,
-        'last_archive_age_seconds': age,
         'password_set': bool(_get('backup_password')),
         'kdf': _get('backup_kdf') or 'auto',
     }
+    if with_archives:
+        snapshot = _archive_snapshot()
+        newest, age = snapshot['newest']
+        sched.update({
+            'stored_bytes': snapshot['bytes'],
+            'stored_count': snapshot['count'],
+            'uncounted_count': snapshot['uncounted'],
+            'over_ceiling': _over_ceiling(snapshot['bytes']),
+            'last_archive': os.path.basename(newest) if newest else None,
+            'last_archive_age_seconds': age,
+        })
+    return sched
 
 
-def _newest_validated_archive():
-    """The most recent archive whose bytes still match what was recorded."""
+def _archive_snapshot() -> dict:
+    """What the stored archives take, their newest restore point and the archive files
+    retention ignores, all from one listing (the database's in HA, else the disk's)."""
     if shared_store.enabled():
-        # Each stored archive was read back before its commit
+        # Each stored archive was read back before its commit: the newest is proven
         stored = shared_store.list_archives()
-        if not stored:
-            return None, None
-        newest = stored[0]
-        return newest['filename'], shared_store.age_seconds(newest['created_at'])
-    paths = _existing_archives()
-    newest = storage.newest_validated(paths) if paths else None
-    if newest is None:
-        return None, None
-    return newest, max(0, int(time.time() - _mtime_of(newest)))
+        newest = ((stored[0]['filename'], shared_store.age_seconds(stored[0]['created_at']))
+                  if stored else (None, None))
+        return {'bytes': sum(int(a['size']) for a in stored), 'count': len(stored),
+                'uncounted': 0, 'newest': newest}
+    counted, uncounted = _scan_directory()
+    validated = storage.newest_validated(counted) if counted else None
+    newest = ((validated, max(0, int(time.time() - _mtime_of(validated))))
+              if validated else (None, None))
+    return {'bytes': sum(_size_of(path) for path in counted), 'count': len(counted),
+            'uncounted': uncounted, 'newest': newest}
+
+
+def _scan_directory() -> tuple:
+    """(archives retention and the ceiling count, number of other archive files)."""
+    counted, uncounted = [], 0
+    try:
+        for path in glob.glob(os.path.join(str(Config.BACKUP_DIR), '*')):
+            name = os.path.basename(path)
+            if fnmatch.fnmatchcase(name, _BACKUP_GLOB):
+                try:
+                    os.stat(path)
+                except OSError:
+                    continue
+                counted.append(path)
+            elif storage.is_archive_name(name) and os.path.isfile(path):
+                uncounted += 1
+    except Exception as e:
+        logger.error(f"Failed to list backups: {e}")
+    return counted, uncounted
 
 
 def _record_outcome(outcome: str, reason: str = None) -> None:
@@ -210,6 +244,59 @@ def list_backups() -> list[dict]:
     return backups
 
 
+def stored_usage() -> tuple:
+    """(bytes, count) the stored archives take: the database's in HA, else the disk's."""
+    snapshot = _archive_snapshot()
+    return snapshot['bytes'], snapshot['count']
+
+
+def _over_ceiling(total: int) -> bool:
+    ceiling = _max_total_bytes()
+    return ceiling > 0 and total > ceiling
+
+
+def ceiling_warning():
+    """A sentence when the archives are above the size ceiling, else None."""
+    ceiling = _max_total_bytes()
+    if ceiling <= 0:
+        return None
+    total, _ = stored_usage()
+    if total <= ceiling:
+        return None
+    return (f"The archives take {total // (1024 * 1024)} MiB, above the "
+            f"{ceiling // (1024 * 1024)} MiB ceiling: {protected_archives_sentence()}")
+
+
+def protected_archives_sentence() -> str:
+    """What retention never removes, by age or for the ceiling, in the store in use."""
+    if shared_store.enabled():
+        # Every stored archive was proven at its commit: only the count protects
+        return f"retention never removes the {_min_keep()} newest archives."
+    return ("retention never removes the newest archive that matches its validation record, "
+            f"up to {_UNRECORDED_KEPT} archives with no validation record, nor the "
+            f"{_min_keep()} newest archives not found altered.")
+
+
+def safe_ceiling_warning():
+    """ceiling_warning(), or None (logged) when it cannot be computed: a report on an
+    operation already done never turns it into a failure."""
+    try:
+        return ceiling_warning()
+    except Exception:
+        logger.exception("The backup size ceiling could not be checked")
+        return None
+
+
+def _audit_ceiling_removals(names) -> None:
+    """One audit entry per archive removed to stay under the size ceiling."""
+    from services.audit_service import AuditService
+    for name in names:
+        AuditService.log_action(
+            action='backup_delete', resource_type='system', resource_name=name,
+            details=f'Removed by retention to stay under the size ceiling: {name}',
+            success=True)
+
+
 def _apply_shared_retention(retention_days: int, wait: float = 0) -> int:
     """HA: the rule below over the database's archives, under a lock of the whole cluster.
 
@@ -217,7 +304,8 @@ def _apply_shared_retention(retention_days: int, wait: float = 0) -> int:
     """
     try:
         return shared_store.apply_retention(
-            retention_days, min_keep=_min_keep(), max_total_bytes=_max_total_bytes(), wait=wait)
+            retention_days, min_keep=_min_keep(), max_total_bytes=_max_total_bytes(), wait=wait,
+            on_ceiling_removed=_audit_ceiling_removals)
     except BackupBusyError as busy:
         if wait:
             raise
@@ -312,6 +400,7 @@ def _enforce_size_ceiling(keep: set) -> int:
         return 0
 
     removed = 0
+    gone = []
     for path in _oldest_first(paths):
         if total <= ceiling:
             break
@@ -324,12 +413,14 @@ def _enforce_size_ceiling(keep: set) -> int:
             continue
         total -= size
         removed += 1
+        gone.append(os.path.basename(path))
+    _audit_ceiling_removals(gone)
 
     if total > ceiling:
         logger.warning(
             "Backup retention: the archives still take %d MiB, above the %d MiB "
-            "ceiling, because what remains is the last restore point",
-            total // (1024 * 1024), ceiling // (1024 * 1024))
+            "ceiling: %s", total // (1024 * 1024), ceiling // (1024 * 1024),
+            protected_archives_sentence())
     elif removed:
         logger.info("Backup retention removed %d archive(s) to stay under the "
                     "configured size ceiling", removed)
@@ -521,7 +612,7 @@ def run_scheduled_backup() -> dict:
     "completed successfully", with a green view, a growing run count and no
     archive anywhere.
     """
-    sched = get_schedule()
+    sched = get_schedule(with_archives=False)
     if not sched.get('enabled'):
         _record_outcome('skipped', 'disabled')
         return {'status': 'skipped', 'reason': 'disabled'}
