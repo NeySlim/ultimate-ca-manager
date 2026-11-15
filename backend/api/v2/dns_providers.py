@@ -178,7 +178,9 @@ def _saved_credentials(provider, credentials):
         given = {k for k, v in credentials.items() if _given(v)}
         required = set(provider_class.REQUIRED_CREDENTIALS) if provider_class else set()
         schema = provider_class.get_credential_schema() if provider_class else []
-        if required <= given and _secret_names(schema, given):
+        # A schema with no secret field (custom_command) is full with its required fields alone
+        has_secret = bool(_secret_names(schema, {f['name'] for f in schema}))
+        if required <= given and (_secret_names(schema, given) or not has_secret):
             return {}
         raise
     return json.loads(stored) if stored else None

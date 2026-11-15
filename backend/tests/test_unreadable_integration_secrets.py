@@ -647,3 +647,80 @@ def test_dns_provider_rename_keeps_credentials_this_node_cannot_open(
                           json={'name': f'renamed-{uuid.uuid4().hex[:6]}'})
     assert r.status_code == 200, r.get_data(as_text=True)
     assert _stored_credentials(app, pid) == token
+
+
+def _unreadable_provider(app, provider_type):
+    from models import db, DnsProvider
+    token = _foreign_token('{"saved": "under-another-key"}')
+    with app.app_context():
+        row = DnsProvider(name=f'dns-{uuid.uuid4().hex[:6]}', provider_type=provider_type)
+        row._credentials = token
+        db.session.add(row)
+        db.session.commit()
+        return row.id, token
+
+
+def _drop_provider(app, pid):
+    from models import db, DnsProvider
+    with app.app_context():
+        db.session.delete(db.session.get(DnsProvider, pid))
+        db.session.commit()
+
+
+def _full_entry(provider_class):
+    """Every required field, plus a secret when the schema declares one."""
+    from api.v2.dns_providers import _secret_names
+    schema = provider_class.get_credential_schema()
+    secret = _secret_names(schema, {f['name'] for f in schema})
+    wanted = set(provider_class.REQUIRED_CREDENTIALS)
+    if secret and not wanted & secret:
+        wanted.add(sorted(secret)[0])
+    entry = {}
+    for field in schema:
+        name = field['name']
+        if name not in wanted:
+            continue
+        if field.get('type') == 'select':
+            entry[name] = field['options'][0]['value']
+        elif field.get('type') == 'checkbox':
+            entry[name] = True
+        elif field.get('type') == 'number':
+            entry[name] = field.get('default') or 30
+        elif name in secret:
+            entry[name] = 'bmV3LXNlY3JldC1uZXctc2VjcmV0'
+        elif 'url' in name.lower():
+            entry[name] = 'https://dns.example'
+        else:
+            entry[name] = 'ns1.example'
+    return entry
+
+
+@pytest.mark.parametrize('provider_type', sorted(
+    __import__('services.acme.dns_providers', fromlist=['PROVIDER_REGISTRY']).PROVIDER_REGISTRY))
+def test_every_dns_provider_with_unreadable_credentials_is_repaired_by_a_full_entry(
+        app, auth_client, provider_type):
+    import json
+    from services.acme.dns_providers import get_provider_class
+    from utils.encryption import decrypt_value
+    entry = _full_entry(get_provider_class(provider_type))
+    if not entry:
+        pytest.skip('this provider has no credentials')
+    pid, token = _unreadable_provider(app, provider_type)
+    try:
+        r = auth_client.patch(f'/api/v2/dns-providers/{pid}', json={'credentials': entry})
+        assert r.status_code == 200, r.get_data(as_text=True)
+        assert json.loads(decrypt_value(_stored_credentials(app, pid))) == entry
+    finally:
+        _drop_provider(app, pid)
+
+
+def test_custom_command_credentials_this_node_cannot_open_need_every_required_field(
+        app, auth_client):
+    pid, token = _unreadable_provider(app, 'custom_command')
+    try:
+        r = auth_client.patch(f'/api/v2/dns-providers/{pid}',
+                              json={'credentials': {'delete_command': '/bin/true'}})
+        assert r.status_code == 400
+        assert _stored_credentials(app, pid) == token
+    finally:
+        _drop_provider(app, pid)
