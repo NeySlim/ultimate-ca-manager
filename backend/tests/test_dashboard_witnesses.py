@@ -109,3 +109,21 @@ def test_the_route_serves_admin_and_withholds_from_a_scoped_key(app, auth_client
         assert 'acme' in protocols
     finally:
         auth_client.delete(f"/api/v2/account/apikeys/{key['id']}")
+
+
+def test_legacy_system_status_withholds_the_witnesses_from_a_key_without_read_settings(app, auth_client, settings):
+    settings(smtp=READY, webhooks=(True,), renewal='true')
+    legacy = '/api/v2/dashboard/system-status'
+    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'legacy-no-settings', 'permissions': ['read:certificates']})
+    assert r.status_code == 201, r.data
+    key = get_json(r)['data']
+    try:
+        r = app.test_client().get(legacy, headers={'X-API-Key': key['key']})
+        assert r.status_code == 200, r.data
+        data = get_json(r)['data']
+        assert not {'smtp', 'webhooks', 'auto_renewal'} & set(data)
+        assert 'mail.example.com' not in r.get_data(as_text=True)
+    finally:
+        auth_client.delete(f"/api/v2/account/apikeys/{key['id']}")
+    full = get_json(auth_client.get(legacy))['data']
+    assert {'smtp', 'webhooks', 'auto_renewal'} <= set(full)
