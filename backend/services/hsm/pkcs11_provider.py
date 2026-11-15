@@ -408,6 +408,8 @@ class Pkcs11Provider(BaseHsmProvider):
                         public = load_pem_public_key(public_key_pem.encode())
                         algorithm = key_algorithms.label_for_public_key(public) or algorithm
                 except Exception as e:
+                    # Only a parsed SPKI is ever reported; the private key stays listed.
+                    public_key_pem = None
                     logger.warning("Public half of PKCS#11 key %s could not be read: %s", key_id, e)
 
             return HsmKeyInfo(

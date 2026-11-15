@@ -183,6 +183,16 @@ def test_unreadable_public_half_does_not_abort_listing(fake_pkcs11):
     assert keys['ec-secp256r1'].public_key_pem is None
 
 
+def test_pkcs11_listing_drops_a_public_half_that_is_not_a_key(fake_pkcs11):
+    provider, listing = fake_pkcs11
+    pub = _ec_public(b'\x13', 'secp256r1')
+    pub._attrs[Attribute.EC_POINT] = OctetString(b'\x04' + b'\x00' * 64).dump()  # not on the curve
+    keys = listing([_ec_private(b'\x13', 'secp256r1'), pub, _ec_private(b'\x14', 'secp384r1')])
+    assert len(keys) == 2
+    assert keys['ec-secp256r1'].public_key_pem is None
+    assert provider.list_errors == []
+
+
 @needs_softhsm
 @pytest.mark.parametrize('algorithm', ['RSA-2048', 'EC-P256', 'EC-P384', 'EC-P521'])
 def test_real_token_listing_exports_current_spki(softhsm_token, algorithm):
