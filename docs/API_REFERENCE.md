@@ -12,37 +12,52 @@
 
 1. [Authentication](#authentication)
 2. [Account Management](#account-management)
-3. [Certificate Authorities (CAs)](#certificate-authorities)
+3. [Certificate Authorities](#certificate-authorities)
 4. [Certificates](#certificates)
 5. [User Certificates (mTLS)](#user-certificates-mtls)
-6. [Certificate Signing Requests (CSRs)](#certificate-signing-requests)
-6. [Templates](#templates)
-7. [Trust Store](#trust-store)
-8. [ACME Server](#acme-server)
-9. [SCEP](#scep)
-10. [CRL & OCSP](#crl--ocsp)
-11. [Users](#users)
-12. [Roles & Permissions (RBAC)](#roles--permissions-rbac)
-13. [Dashboard](#dashboard)
-14. [Audit Logs](#audit-logs)
-15. [Settings](#settings)
-16. [System](#system)
-17. [Import/Export](#importexport)
-18. [Certificate Tools](#certificate-tools)
-19. [Global Search](#global-search)
-20. [User Groups](#user-groups)
-21. [Smart Import](#smart-import)
-22. [DNS Providers](#dns-providers)
-23. [ACME Client (Let's Encrypt)](#acme-client-lets-encrypt)
-24. [ACME Domains](#acme-domains)
-25. [SSO (LDAP/OAuth2/SAML)](#sso-ldapoauth2saml)
-26. [HSM](#hsm)
-27. [WebAuthn](#webauthn)
-28. [Webhooks](#webhooks)
-29. [Certificate Policies & Approvals](#certificate-policies--approvals)
-30. [Reports](#reports)
-31. [WebSocket](#websocket)
-32. [Health](#health)
+6. [Certificate Signing Requests](#certificate-signing-requests)
+7. [Templates](#templates)
+8. [Trust Store](#trust-store)
+9. [ACME Server](#acme-server)
+10. [SCEP](#scep)
+11. [EST](#est)
+12. [Time Stamping (TSA)](#time-stamping-tsa)
+13. [Windows Enrollment Profiles](#windows-enrollment-profiles)
+14. [Active Directory Connectors](#active-directory-connectors)
+15. [Microsoft CA](#microsoft-ca)
+16. [SSH Certificates](#ssh-certificates)
+17. [Deployment](#deployment)
+18. [Discovery](#discovery)
+19. [Key Recovery](#key-recovery)
+20. [CRL & OCSP](#crl--ocsp)
+21. [AIA CA Issuers](#aia-ca-issuers)
+22. [Users](#users)
+23. [Roles & Permissions (RBAC)](#roles--permissions-rbac)
+24. [Dashboard](#dashboard)
+25. [Audit Logs](#audit-logs)
+26. [Settings](#settings)
+27. [System](#system)
+28. [Import/Export](#importexport)
+29. [Certificate Tools](#certificate-tools)
+30. [Global Search](#global-search)
+31. [User Groups](#user-groups)
+32. [Smart Import](#smart-import)
+33. [DNS Providers](#dns-providers)
+34. [ACME Client (Let's Encrypt)](#acme-client-lets-encrypt)
+35. [ACME Domains](#acme-domains)
+36. [SSO (LDAP/OAuth2/SAML)](#sso-ldapoauth2saml)
+37. [HSM](#hsm)
+38. [WebAuthn](#webauthn)
+39. [Webhooks](#webhooks)
+40. [Certificate Policies & Approvals](#certificate-policies--approvals)
+41. [Reports](#reports)
+42. [WebSocket](#websocket)
+43. [Health](#health)
+44. [Protocol and Health Endpoints](#protocol-and-health-endpoints)
+45. [HTTP Status Codes](#http-status-codes)
+46. [Rate Limiting](#rate-limiting)
+47. [Permissions](#permissions)
+48. [Examples](#examples)
 
 ---
 
@@ -2931,6 +2946,63 @@ Content-Type: multipart/form-data
 DELETE /api/v2/settings/backup/{backup_id}
 ```
 
+### Certificate Transparency
+```http
+GET /api/v2/settings/ct
+PATCH /api/v2/settings/ct
+Content-Type: application/json
+
+{ "enabled": true, "log_urls": ["https://ct.example.com/log"], "auto_submit": false, "embed_sct": false, "required": false }
+```
+`GET` needs `read:settings`, `PATCH` needs `admin:settings`; all fields are optional. `log_urls` is a list of http or https URLs that must resolve and not to loopback or a cloud metadata address, or `null` for the built-in list (`400` otherwise). The `GET` response has the same five fields. Submission of a single certificate is `POST /api/v2/certificates/{cert_id}/submit-ct`.
+
+### Auto-Renewal
+```http
+GET /api/v2/settings/auto-renewal
+PATCH /api/v2/settings/auto-renewal
+POST /api/v2/settings/auto-renewal/run
+```
+`GET` (`read:settings`) and `PATCH` (`write:settings`) use `enabled`, `days_before_expiry` (an integer), `renewal_sources` (a list; default `manual`, `scep`, `acme`, `est`), `notify_on_renewal`, `notify_on_failure` (both default true) and `notify_emails` (a list of valid addresses); `400` for a wrongly typed value. `run` (`admin:settings`) triggers a renewal pass now and returns its counts `renewed`, `failed` and `skipped`.
+
+### Notifications
+```http
+GET /api/v2/settings/notifications
+PATCH /api/v2/settings/notifications
+GET /api/v2/settings/notifications/logs?type=cert_expiring&page=1&per_page=50
+```
+All need `read:settings` (`write:settings` for `PATCH`). `GET` returns `configs`, each with `id`, `notification_type`, `enabled`, `recipients`, `threshold_days`, `alert_days` (expiry notifications only), `cooldown_hours` and `description`. `PATCH` identifies a config by `id` (`404` when unknown) or by `notification_type` (created when it does not exist; `400` when neither is sent) and changes `enabled`, `recipients`, `threshold_days` (an integer) and `cooldown_hours` (an integer from 0 to 8760). `logs` returns `logs` (`notification_type`, `recipient`, `subject`, `sent_at`, `status`, `error_message`, `retry_count`) and `pagination`.
+
+### Email Templates and SMTP OAuth
+```http
+GET /api/v2/settings/email/template
+PATCH /api/v2/settings/email/template
+POST /api/v2/settings/email/template/preview
+POST /api/v2/settings/email/template/reset
+GET /api/v2/settings/email/oauth/providers
+POST /api/v2/settings/email/oauth/authorize-url
+GET /api/v2/settings/email/oauth/callback
+POST /api/v2/settings/email/oauth/revoke
+```
+- `template` reads need `read:settings`, changes `write:settings`. `GET` returns the HTML `template` and `text_template` in force (the defaults when none is customized), `is_custom`, `is_text_custom` and the two defaults. `PATCH` takes `template` and/or `text_template` (`400` for an empty body). `preview` renders `template` of `type` `html` (default) or `text` with sample data and returns it under `html` or `text`. `reset` restores both defaults.
+- `oauth/providers` (`read:settings`) returns the provider presets (`smtp_host`, `smtp_port`, TLS flags, `needs_tenant`, `default_tenant`).
+- `oauth/authorize-url` (`write:settings`) builds the consent URL from the saved SMTP settings (`404` when none are saved) and returns `authorize_url` and `redirect_uri`; optional `redirect_uri` in the body. The state is kept in the caller's session.
+- `oauth/callback` (`write:settings`) is the redirect target: it exchanges `code` for tokens, stores the refresh token and answers an HTML page saying whether authorization succeeded (state mismatch, missing parameters and provider errors are reported there).
+- `oauth/revoke` (`write:settings`) drops the stored refresh and access tokens (`404` when no SMTP settings exist).
+
+### Public Endpoints
+```http
+GET /api/v2/settings/public-endpoints
+PATCH /api/v2/settings/public-endpoints
+POST /api/v2/settings/public-endpoints/preflight
+```
+`GET` (`read:settings`) returns the effective public URLs, CORS origins and host-role status. `PATCH` (`write:settings`) updates the admin, protocol and ACME public endpoint settings with the same body and validation as `PATCH /api/v2/settings/general`. `preflight` (`write:settings`) runs DNS and TLS diagnostics for the configured admin and ACME hosts.
+
+### Settings Audit Logs
+```http
+GET /api/v2/settings/audit-logs?user_id=1&action=login&start_date=2026-01-01&end_date=2026-02-01&page=1&per_page=50
+```
+Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `page`, `per_page`). `start_date` and `end_date` are ISO 8601 and ignored when unparsable. The fuller audit routes are under [Audit Logs](#audit-logs).
+
 ---
 
 ## System
@@ -3512,6 +3584,41 @@ GET /api/v2/policies/effective?ca_id=3&template_id=1
 ```
 
 `default_key_type` is `null` when the policies leave no default candidate; `default_key_error` then holds the reason.
+
+### System Logs
+```http
+GET /api/v2/system/logs?source=app&level=INFO&lines=200&q=text&exclude=text&component=name&since=...&until=...
+GET /api/v2/system/logs/bundle
+```
+Permission `admin:system`. `logs` reads the tail of one source as filtered records: `source` is `app` (default), `access`, `error` or `journal`; `level` one of `DEBUG`, `INFO` (default), `WARNING`, `ERROR`, `CRITICAL`; `lines` an integer from 1 to 5000 (default 200); `q` and `exclude` are substrings (a `regex` parameter is refused); `component` filters by logger. Each invalid value answers `400`. `bundle` downloads a diagnostic ZIP.
+
+### Scheduler
+```http
+GET /api/v2/system/scheduler
+POST /api/v2/system/scheduler/{task_name}/run
+```
+`GET` (`read:settings`) lists the registered scheduler tasks with their live status and a `label`, sorted by label, with a count of tasks in warning and a `stale` flag. `run` (`admin:system`) runs a task now, or queues it; `404` for an unknown task.
+
+### Update Settings
+```http
+GET /api/v2/system/updates/settings
+PATCH /api/v2/system/updates/settings
+GET /api/v2/system/updates/whatsnew
+```
+`GET` and `PATCH` need `admin:system`. `PATCH` takes `channel` (`stable` or `rc`), `hour` (an integer from 0 to 23, the hour of automatic installation), `auto_install` (a boolean; refused with `400` on a container install) and `popup_enabled` (a boolean); the response is the stored settings. `whatsnew` (any authenticated user) returns `{"enabled": false}` while the post-update popup is off, otherwise `version`, `baseline_version`, `installed_at`, `release_notes` and `published_at`.
+
+### Encryption Key Operations
+```http
+GET /api/v2/system/security/master-key/download
+POST /api/v2/system/security/encrypt-all-keys
+POST /api/v2/system/security/rotate-encryption-key
+POST /api/v2/system/https/unbind
+```
+All need `admin:system`.
+- `master-key/download` returns the master key file (`ucm-master.key`, `no-store`) and audits the download. `400` when encryption is not enabled, `409` when the key is not stored as a file (it comes from `KEY_ENCRYPTION_KEY`, so it must be backed up by hand).
+- `encrypt-all-keys` takes `{"dry_run": true}` (the default: nothing is written) and returns `dry_run`, `encrypted`, `skipped` and `errors`.
+- `rotate-encryption-key` rotates the data-encryption key and rewrites every stored value under it; the master key does not change. `400` when encryption is not enabled. `200` when the rotation is done, `202` while some nodes have not loaded the new key yet (run it again to finish); `500` when interrupted (run it again to resume).
+- `https/unbind` stops following renewals of the bound HTTPS certificate; `400` when none is bound.
 
 ---
 
@@ -5017,6 +5124,38 @@ Returns 200 if the application process is alive, regardless of dependency status
   "service": "ucm"
 }
 ```
+
+### Metrics
+```http
+GET /api/v2/metrics
+GET /metrics
+```
+Prometheus text exposition. Off until a `metrics_token` is configured: without one the route answers `404`. With one, `Authorization: Bearer <token>` is required (`401` otherwise). No session is used.
+
+---
+
+## Protocol and Health Endpoints
+
+These endpoints are not part of the `/api/v2` management API. Clients such as ACME clients, SCEP and EST devices, OCSP and CRL consumers, time-stamp clients and Windows enrollment run them, and each protocol applies its own authentication. The admin access allowlist does not apply to them (see the [Admin guide](ADMIN_GUIDE.md#admin-access-allowlist)). The protocols are described in their own guides; only the paths are listed here. Rate limits: see [Rate Limiting](#rate-limiting).
+
+| Protocol | Paths | Guide |
+|----------|-------|-------|
+| ACME (RFC 8555) | `/acme/directory`, `/acme/new-nonce`, `/acme/new-account`, `/acme/new-order`, `/acme/order/{id}`, `/acme/order/{id}/finalize`, `/acme/authz/{id}`, `/acme/challenge/{id}`, `/acme/cert/{id}`, `/acme/acct/{id}`, `/acme/key-change`, `/acme/revoke-cert`, `/acme/renewalInfo/{certid}`, `/acme/terms`, `/acme/health` | [User guide](USER_GUIDE.md#acme-server), [admin guide](ADMIN_GUIDE.md#acme-administration) |
+| ACME proxy | the same set under `/acme/proxy/` and `/acme/proxy/{slug}/` | [Admin guide](ADMIN_GUIDE.md#acme-administration), [proxy clients](integrations/acme-proxy-clients.md) |
+| ACME HTTP-01 | `/.well-known/acme-challenge/{token}` | [Admin guide](ADMIN_GUIDE.md#acme-client-http-01-challenges) |
+| SCEP | `/scep/pkiclient.exe`, `/scep/{profile_slug}/pkiclient.exe`, `/cgi-bin/pkiclient.exe` | [User guide](USER_GUIDE.md#scep-server), [admin guide](ADMIN_GUIDE.md#scep-administration), [Intune](integrations/intune-scep.md) |
+| EST (RFC 7030) | `/.well-known/est/` and `/.well-known/est/{label}/` followed by `cacerts`, `csrattrs`, `simpleenroll`, `simplereenroll`, `serverkeygen`, `fullcmc` | [User guide](USER_GUIDE.md#est-server), [admin guide](ADMIN_GUIDE.md#est-administration) |
+| OCSP (RFC 6960) | `/ocsp` (POST), `/ocsp/{encoded_request}` (GET) | [User guide](USER_GUIDE.md#ocsp-responder), [admin guide](ADMIN_GUIDE.md#ocsp-configuration) |
+| CRL distribution | `/cdp/{ca_ref}.crl`, `/cdp/{ca_ref}-delta.crl` | [Admin guide](ADMIN_GUIDE.md#crl-distribution) |
+| CA issuers (AIA) | `/ca/{ca_ref}.cer`, `.pem`, `.p7c`, `/ca/{ca_ref}/cross/{xid}.cer` | [AIA CA Issuers](#aia-ca-issuers) |
+| Time stamping (RFC 3161) | `/tsa` (POST) | [Time Stamping (TSA)](#time-stamping-tsa) |
+| Windows enrollment (XCEP and WSTEP) | `/ADPolicyProvider_CEP_Kerberos/service.svc`, `/ADPolicyProvider_CEP_UsernamePassword/service.svc`, `/ADCertificateService_CES_Kerberos/service.svc`, `/ADCertificateService_CES_UsernamePassword/service.svc`, `/ADCertificateService_CES_Certificate/service.svc` | [Admin guide](ADMIN_GUIDE.md#windows-autoenrollment-xcepwstep-kerberosspnego), [Windows Enrollment Profiles](#windows-enrollment-profiles) |
+| SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key` | [SSH Certificates](#ssh-certificates) |
+
+Which of these routes exist depends on the configuration: a protocol that is turned off is not registered.
+
+### Probes
+`GET /health`, `/health/ready`, `/health/live` and their `/api/health` and `/api/v2/health` forms are described under [Health](#health). `GET /metrics` and `GET /api/v2/metrics` expose Prometheus metrics, see [Metrics](#metrics). The interactive API description is served at `/api/docs`.
 
 ---
 
