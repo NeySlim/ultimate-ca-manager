@@ -109,3 +109,25 @@ def test_the_purge_waits_and_keeps_a_session_written_meanwhile(file_app):
         assert c.get('/api/v2/account/profile').status_code == 200
     finally:
         _cleanup(file_app, user)
+
+
+def test_a_save_that_cannot_take_the_lock_writes_nothing(file_app, monkeypatch):
+    from flask import session as flask_session
+    from utils.session_store import HELD, session_files_lock
+    iface = file_app.session_interface
+    monkeypatch.setattr(iface, 'lock_wait', 0.05)
+    user = _make_user(file_app)
+    try:
+        c = _open_session(file_app, user)
+        cookie = c.get_cookie('session').value
+        sid = iface._unsign(file_app, cookie) if iface.use_signer else cookie
+        store_id = iface._get_store_id(sid)
+        with session_files_lock(iface.cache._path, exclusive=True) as state:
+            assert state == HELD
+            with file_app.test_request_context('/api/v2/account/profile',
+                                               headers={'Cookie': f'session={cookie}'}):
+                flask_session['probe'] = 'written'
+                iface.save_session(file_app, flask_session, file_app.response_class())
+        assert 'probe' not in iface.cache.get(store_id)
+    finally:
+        _cleanup(file_app, user)

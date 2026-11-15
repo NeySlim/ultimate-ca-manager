@@ -95,6 +95,8 @@ class KeepsRemovedRecordsGone:
 
 class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessionInterface):
 
+    lock_wait = 2.0
+
     @classmethod
     def adopt(cls, app):
         app.session_interface.__class__ = cls
@@ -109,7 +111,7 @@ class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessi
     def _upsert_session(self, session_lifetime, session, store_id):
         if not self._opened_from_store(session):
             return super()._upsert_session(session_lifetime, session, store_id)
-        with session_files_lock(self.cache._path, exclusive=False) as state:
+        with session_files_lock(self.cache._path, False, self.lock_wait) as state:
             if state == BUSY:
                 # A removal holds the store: writing without the lock could undo it
                 logger.warning("Session not saved: the session store stayed locked")
