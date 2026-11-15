@@ -23,6 +23,30 @@ def test_a_discovered_date_with_an_offset_is_stored_in_utc():
     assert _parse_iso(aware) == datetime(2026, 1, 1, 10, 0)
 
 
+@pytest.mark.postgres
+def test_on_a_server_off_utc_the_discovered_date_is_no_longer_shifted():
+    """The aware value 2.x stored was cast in the server's time zone; the naive UTC one is kept."""
+    import os
+    from services.discovery.helpers import _parse_iso
+    from utils.db_url import sqlalchemy_url
+    url = os.environ.get('UCM_TEST_PG_URL', '')
+    if not url:
+        pytest.skip('UCM_TEST_PG_URL not set')
+    engine = create_engine(sqlalchemy_url(url))
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("SET TIME ZONE 'Etc/GMT-2'"))  # UTC+2
+            conn.execute(sql_text('CREATE TEMP TABLE discovered_dates (d timestamp without time zone)'))
+            insert = sql_text('INSERT INTO discovered_dates (d) VALUES (:d) RETURNING d')
+            as_2x = conn.execute(insert, {'d': datetime.fromisoformat('2026-01-01T12:00:00+00:00')}).scalar()
+            as_30 = conn.execute(insert, {'d': _parse_iso('2026-01-01T12:00:00+00:00')}).scalar()
+            conn.rollback()
+    finally:
+        engine.dispose()
+    assert as_2x == datetime(2026, 1, 1, 14, 0)
+    assert as_30 == datetime(2026, 1, 1, 12, 0)
+
+
 # --- Dashboard activity: an error is an error -----------------------------------------------
 
 def test_an_unreadable_audit_log_answers_500_not_an_empty_feed(auth_client, monkeypatch):
