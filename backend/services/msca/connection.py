@@ -6,6 +6,7 @@ from typing import Optional
 from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
+from utils.encryption import decrypt_required
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,8 @@ class MicrosoftCAConnectionMixin:
 
             if msca.auth_method == 'certificate':
                 cert_path = _write_temp(msca.client_cert_pem)
-                key_path = _write_temp(msca.client_key_pem)
+                key_path = _write_temp(decrypt_required(
+                    msca._client_key_pem, f'Microsoft CA {msca.id} client key'))
 
                 client = certsrv.Certsrv(
                     server=server,
@@ -74,7 +76,7 @@ class MicrosoftCAConnectionMixin:
                 client = certsrv.Certsrv(
                     server=server,
                     username=msca.username or '',
-                    password=msca.password or '',
+                    password=decrypt_required(msca._password, f'Microsoft CA {msca.id} password') or '',
                     auth_method='basic',
                     cafile=cafile,
                 )

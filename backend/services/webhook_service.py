@@ -5,7 +5,7 @@ Sends HTTP notifications for certificate lifecycle events.
 import base64
 from datetime import datetime, timedelta
 from models import db, SystemConfig
-from utils.encryption import decrypt_if_needed
+from utils.encryption import SecretUnreadable, decrypt_required
 import requests
 import json
 import hmac
@@ -364,6 +364,14 @@ class WebhookService:
     @staticmethod
     def _perform_delivery(endpoint: WebhookEndpoint, event_type: str, body_json: str):
         """Build headers, sign, and POST. Returns (ok, status_code, error)."""
+        # A stored secret this node cannot open stops the delivery: never sent unsigned or unauthenticated
+        try:
+            secret_plain = decrypt_required(endpoint.secret, f'webhook {endpoint.id} secret')
+            if endpoint._auth_token and (endpoint.auth_type or 'none').strip().lower() != 'none':
+                decrypt_required(endpoint._auth_token, f'webhook {endpoint.id} auth token')
+        except SecretUnreadable as e:
+            logger.error(str(e))
+            return False, None, str(e)
         headers = {}
         headers.update(_safe_custom_headers(endpoint.get_headers()))
         headers.update(_build_auth_header(endpoint))
@@ -372,7 +380,6 @@ class WebhookService:
             'User-Agent': 'UCM-Webhook/2.0',
             'X-UCM-Event': event_type,
         })
-        secret_plain = decrypt_if_needed(endpoint.secret) if endpoint.secret else None
         if secret_plain:
             # A secret saved before the switch may be short: FIPS refuses it on every module
             try:
