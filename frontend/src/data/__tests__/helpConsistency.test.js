@@ -59,3 +59,19 @@ describe('SSO setup steps', () => {
     for (const type of ['saml', 'oauth2', 'ldap']) expect(text).toContain(`**${sso[type]}**`)
   })
 })
+
+describe('values and buttons quoted by the translated pages', () => {
+  const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
+  const page = (lang, key) => (lang === 'en' ? helpContent[key] : pages[`../help/${lang}/${key}.js`].default.helpContent)
+  it.each(['fr', 'ru', 'zh'])('%s keeps the renamed duplicates "name (N)" in English', (lang) => {
+    const found = strings(entries.filter((e) => e.lang === lang).map((e) => e.page))
+      .filter((s) => s.includes('name (2)') && !s.includes('name (3)') && /\(3\)/.test(s))
+    expect(found).toEqual([])
+  })
+  // The HSM page creates a provider with its "New Provider" button.
+  it.each(['en', 'fr', 'ru', 'zh'])('%s names the HSM New Provider button', (lang) => {
+    const { hsm } = locales[`../../i18n/locales/${lang}.json`].default
+    const actions = helpContent.hsm.sections.findIndex((s) => s.title === 'Actions')
+    expect(page(lang, 'hsm').sections[actions].items[0].label).toBe(hsm.newProvider)
+  })
+})

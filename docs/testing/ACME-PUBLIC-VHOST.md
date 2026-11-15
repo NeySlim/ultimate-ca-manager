@@ -16,7 +16,7 @@ See also: [ACME-PROXY-MULTI-CA.md](./ACME-PROXY-MULTI-CA.md), [ACME-DNS-PROPAGAT
 | **ACME settings** | `api/v2/acme/settings.py`, `api/v2/acme_client/settings.py` — `acme_public_base_url`, `acme_proxy_public_base_url` |
 | **Frontend** | `GeneralSection.jsx`, `ConfigTab.jsx`, `LetsEncryptTab.jsx` |
 | **i18n (10 languages)** | `frontend/src/i18n/locales/{en,fr,de,es,it,ja,pt,ru,uk,zh}.json`: labels + wildcard helpers |
-| **Contextual help** | `helpContent.js` / `helpGuides.js` (en) + `help/{fr,zh}/settings.js` |
+| **Contextual help** | `helpContent.js` / `helpGuides.js` (en) + `help/{fr,ru,zh}/settings.js` |
 | **Tests** | `backend/tests/test_acme_public_url.py`, `test_acme.py` extensions |
 
 ### `SystemConfig` keys

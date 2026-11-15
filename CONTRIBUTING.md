@@ -78,7 +78,8 @@ the only way to know the fix does anything, and it keeps the bug from coming bac
 - **Built-in help.** It exists in English (`helpContent.js`, `helpGuides.js`), French,
   Russian and Chinese (`frontend/src/data/help/<lang>/<page>.js`); the other
   interface languages show the English text. A change to a help page updates all four
-  versions, and the parity test fails when a translated page drifts from the English one.
+  versions; the parity test checks that each translated page has the English structure
+  (entries per section, item types, tips and warnings), not that its text says the same.
 - **Migrations** work on SQLite *and* PostgreSQL: a file
   `backend/migrations/NNN_name.py` numbered from 301 (300 is the upgrade from
   2.254), with `pg_compatible = True` and an `upgrade(conn)` that takes a

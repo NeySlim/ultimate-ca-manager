@@ -108,7 +108,7 @@ export default {
           { label: 'HTTPS', text: 'UCM Web 界面的 TLS 证书。已应用的证书会被记住，并在其续期后自动重新应用（v2.217）；界面会显示当前绑定的证书及一个解除绑定按钮，用于停止跟随续期（v2.218）。UCM 不持有其密钥的协议续期会让 HTTPS 继续使用前一张证书并给出提示，直到导入已续期证书的密钥' },
           { label: '更新', text: '检查新版本、查看变更日志、每日计划检查并可选启用无人值守安装（DEB/RPM）' },
           { label: 'Webhook', text: '证书事件（签发、吊销、过期）的 HTTP Webhook, 允许内部 LAN URL；阻止云元数据 IP。可选出站认证：Bearer、Basic、API 密钥或自定义标头' },
-          { label: 'Webhook 名称唯一 (v2.251)', text: '创建和重命名时，已被使用的 Webhook 名称会被拒绝 (409)。升级时，先前重复的名称按创建先后依次重命名为“name (2)”、“名称 (3)”' },
+          { label: 'Webhook 名称唯一 (v2.251)', text: '创建和重命名时，已被使用的 Webhook 名称会被拒绝 (409)。升级时，先前重复的名称按创建先后依次重命名为“name (2)”、“name (3)”' },
           { label: '部署', text: '部署目标提供可复用的 SSH/SFTP 连接，或 HTTP API 请求（v2.252）；证书部署和 CRL 部署各自定义路径和可选的重载命令（仅管理员，v2.215）' },
           { label: 'Active Directory', text: 'UCM 自身的 AD/LDAP 连接，用于与证书相关的查询（Kerberos 主体解析、AD 派生主题）' },
           { label: 'Windows 自动注册', text: 'MS-XCEP/MS-WSTEP 原生 Windows 注册：策略发现、证书签发和 Kerberos/SPNEGO 绑定' },

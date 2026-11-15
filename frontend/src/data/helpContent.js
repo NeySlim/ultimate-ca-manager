@@ -1495,7 +1495,7 @@ export const helpContent = {
         title: 'Actions',
         icon: Key,
         items: [
-          { label: 'Add Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
+          { label: 'New Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
           { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid; for a PKCS#11 module, also record what it reports (library, manufacturer, library and firmware versions), shown on the provider page' },
           { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
           { label: 'Status', text: 'Monitor provider connection health' },

@@ -17,7 +17,7 @@ export default {
       {
         title: 'Actions',
         items: [
-          { label: 'Ajouter un fournisseur', text: 'Configurer la connexion à un HSM (chemin de bibliothèque, identifiants, slot)' },
+          { label: 'Nouveau fournisseur', text: 'Configurer la connexion à un HSM (chemin de bibliothèque, identifiants, slot)' },
           { label: 'Tester la connexion', text: 'Vérifier que le HSM est joignable et que les identifiants sont valides ; pour un module PKCS#11, enregistre aussi ce qu\'il déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur' },
           { label: 'Générer une clé', text: 'Créer une nouvelle paire de clés directement sur le HSM' },
           { label: 'Statut', text: 'Surveiller la santé de la connexion du fournisseur' },
