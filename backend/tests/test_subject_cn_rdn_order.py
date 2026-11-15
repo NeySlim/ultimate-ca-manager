@@ -201,3 +201,53 @@ def test_the_external_certificate_path_records_the_first_common_name(app, auth_c
     assert r.get_json()['data']['id'] == csr_id
     with app.app_context():
         assert db.session.get(Certificate, csr_id).subject_cn == f'web-{tag}.example.com'
+
+
+@pytest.mark.xfail(strict=True, reason='EST/WSTEP recorder keeps the last CN (AD directory subjects); first vs last CN is a product decision')
+def test_the_est_path_records_the_first_common_name(app, create_ca, key):
+    """Signed through CAService.sign_csr_from_crypto as EST does."""
+    import uuid
+
+    from models import CA, Certificate, db
+    from services.ca_service import CAService
+
+    tag = uuid.uuid4().hex[:8]
+    ca_id = create_ca(cn=f'RDN order EST CA {tag}')['id']
+    with app.app_context():
+        pem, _serial = CAService.sign_csr_from_crypto(
+            ca=db.session.get(CA, ca_id), csr=_multi_cn_csr(key, tag), validity_days=5,
+            source='est', cert_type='device_cert')
+        leaf = x509.load_pem_x509_certificate(pem.encode())
+        row = Certificate.query.filter_by(serial_number=str(leaf.serial_number)).one()
+        assert row.subject_cn == f'web-{tag}.example.com'
+
+
+@pytest.mark.xfail(strict=True, reason='smart import _get_cn splits rfc4514_string and keeps the last CN; product decision pending')
+def test_the_smart_import_path_records_the_first_common_name(app, auth_client, key):
+    """An issued certificate brought in through /api/v2/import/execute."""
+    import json
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    issuer_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    leaf = (x509.CertificateBuilder()
+            .subject_name(_subject(f'web-{tag}.example.com', f'admin-{tag}.example.com'))
+            .issuer_name(_subject(f'Import RDN CA {tag}'))
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(days=1))
+            .not_valid_after(now + datetime.timedelta(days=30))
+            .sign(issuer_key, hashes.SHA256()))
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+        'content': leaf.public_bytes(serialization.Encoding.PEM).decode(),
+        'options': {'import_certs': True}}), content_type='application/json')
+    assert r.status_code in (200, 201), r.data
+    ids = r.get_json()['data']['imported_ids']['certificates']
+    assert len(ids) == 1, r.data
+    with app.app_context():
+        assert db.session.get(Certificate, ids[0]).subject_cn == f'web-{tag}.example.com'
