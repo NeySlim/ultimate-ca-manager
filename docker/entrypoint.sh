@@ -179,6 +179,8 @@ check_ha_secret || exit 1
 # Copy of the SQLite database taken by this script before each start
 : "${UCM_BACKUP_ENABLED:=true}"
 : "${UCM_BACKUP_RETENTION_DAYS:=30}"
+# Before the first write to the volumes: a refused database is never copied
+ucm_refuse_unstartable_database || exit $?
 
 # Initial Admin User (the unprefixed names, as set by older Helm charts, still count)
 : "${UCM_INITIAL_ADMIN_USERNAME:="${INITIAL_ADMIN_USERNAME:-admin}"}"

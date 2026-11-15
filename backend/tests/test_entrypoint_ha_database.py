@@ -81,3 +81,59 @@ def test_the_first_run_notice_says_both_sources_refuse_the_start(tmp_path):
     assert 'Username: operator' in r.stdout
     assert 'both set' in r.stdout and 'refused' in r.stdout
     assert 'the one you provided' not in r.stdout and 'Op-Chosen-1!' not in r.stdout
+
+
+# -- a database the runner refuses stops the start before anything is written ---------
+
+import sqlite3  # noqa: E402
+import sys  # noqa: E402
+
+
+def _registry(path, complete):
+    sys.path.insert(0, str(ROOT / 'backend'))
+    from migrations._from_2_254 import PIVOT_NAMES
+    names = sorted(PIVOT_NAMES)
+    conn = sqlite3.connect(path)
+    conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY)')
+    conn.execute('CREATE TABLE _migrations (id INTEGER PRIMARY KEY, name TEXT UNIQUE)')
+    conn.executemany('INSERT INTO _migrations (name) VALUES (?)',
+                     [(n,) for n in (names if complete else names[:-1])])
+    conn.commit()
+    conn.close()
+
+
+def _start(tmp_path, db_state):
+    """The entrypoint's database steps, in its order, with cp recording its calls."""
+    db = tmp_path / 'ucm.db'
+    if db_state != 'absent':
+        _registry(db, db_state == '2.254')
+    env = {'UCM_DATABASE_PATH': str(db), 'UCM_BACKUP_ENABLED': 'true', 'UCM_BACKUP_RETENTION_DAYS': '30',
+           'UCM_BASE_PATH': str(ROOT), 'UCM_INITIAL_ADMIN_USERNAME': 'admin',
+           'PATH': f'{pathlib.Path(sys.executable).parent}:/usr/bin:/bin'}
+    script = (f'. {HELPER}; cp() {{ echo "cp $*"; }}; find() {{ :; }}; '
+              'ucm_refuse_unstartable_database || exit $?; ucm_sqlite_check_and_backup')
+    return subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True,
+                          cwd=tmp_path, timeout=60)
+
+
+def test_a_database_older_than_2_254_stops_the_start_before_its_copy(tmp_path):
+    r = _start(tmp_path, '2.253')
+    assert r.returncode == 78, (r.stdout, r.stderr)
+    assert 'cp ' not in r.stdout
+    assert 'older than 2.254' in r.stdout and 'Nothing was written to the volume' in r.stdout
+
+
+@pytest.mark.parametrize('db_state, copied', [('2.254', True), ('absent', False)])
+def test_a_database_the_runner_starts_on_goes_on_as_before(tmp_path, db_state, copied):
+    r = _start(tmp_path, db_state)
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert ('cp ' in r.stdout) is copied
+
+
+def test_the_entrypoint_refuses_before_its_first_write_to_the_volumes():
+    """Text of the entrypoint: the refusal comes before the data migration, the directories,
+    the ownership, the configuration file and the copy of the database."""
+    text = (ROOT / 'docker' / 'entrypoint.sh').read_text()
+    guard = text.index('ucm_refuse_unstartable_database || exit $?')
+    for write in ('mkdir -p "$DATA_PATH"', 'chown -R', 'cp -a', 'ucm_sqlite_check_and_backup\n'):
+        assert guard < text.index(write), write

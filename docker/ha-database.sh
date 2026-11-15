@@ -45,6 +45,26 @@ ucm_initial_admin_notice() {
     fi
 }
 
+# 78 (EX_CONFIG): a SQLite database the runner refuses (older than 2.254, or written by a
+# later release) stops the start before anything is written to the volume; any other
+# answer leaves the decision to the application
+ucm_refuse_unstartable_database() {
+    local out rc=0
+    ucm_ha_active && return 0
+    [ -n "${DATABASE_URL:-}" ] && return 0
+    [ -f "$UCM_DATABASE_PATH" ] || return 0
+    out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 DATABASE_URL= \
+        DATABASE_PATH="$UCM_DATABASE_PATH" python3 migration_runner.py check 2>&1) || rc=$?
+    case $rc in
+        4|6) ;;
+        *) return 0 ;;
+    esac
+    echo -e "${RED:-}❌ This release cannot start on $UCM_DATABASE_PATH:${NC:-}"
+    printf '%s\n' "$out" | sed -n '2,4p' | sed 's/^/   /'
+    echo "   Nothing was written to the volume. See UPGRADE.md, Upgrading to v3.0."
+    return 78
+}
+
 # First-run notice and pre-start copy of the SQLite file; both skipped in HA mode.
 ucm_sqlite_check_and_backup() {
     if ucm_ha_active; then
