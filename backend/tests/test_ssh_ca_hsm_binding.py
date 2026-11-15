@@ -158,6 +158,34 @@ class TestOneKeyOneAuthority:
                 SSHCertificateAuthority.query.filter_by(descr=descr).delete(synchronize_session=False)
                 db.session.commit()
 
+    def test_an_ssh_ca_never_takes_another_row_of_an_x509_ca_key(self, auth_client, token_key):
+        real = ec.generate_private_key(ec.SECP256R1())
+        one, two = token_key(real=real), token_key(real=real)
+        descr, r = _x509_ca(auth_client, one['key'])
+        assert r.status_code == 201, r.data
+        r = _ssh_ca(auth_client, two['key'])
+        assert r.status_code == 409, r.data
+        assert _detail(r) == (f"HSM key '{two['label']}' is the token key of HSM key '{one['label']}', "
+                              f"which backs the X.509 CA '{descr}': an HSM key backs one authority only")
+
+    @pytest.mark.parametrize('first', ['ssh', 'x509'])
+    def test_an_x509_ca_never_takes_another_row_of_a_bound_key(self, app, auth_client, token_key, first):
+        real = ec.generate_private_key(ec.SECP256R1())
+        one, two = token_key(real=real), token_key(real=real)
+        if first == 'ssh':
+            r = _ssh_ca(auth_client, one['key'], 'host')
+            holder = f"SSH host CA '{r.get_json()['data']['descr']}'"
+        else:
+            held, r = _x509_ca(auth_client, one['key'])
+            holder = f"X.509 CA '{held}'"
+        assert r.status_code == 201, r.data
+        descr, r = _x509_ca(auth_client, two['key'])
+        assert r.status_code == 409, r.data
+        assert _detail(r) == (f"HSM key '{two['label']}' is the token key of HSM key '{one['label']}', "
+                              f"which backs the {holder}: an HSM key backs one authority only")
+        with app.app_context():
+            assert CA.query.filter_by(descr=descr).count() == 0
+
     def test_unused_keys_leave_out_a_key_an_ssh_ca_holds(self, auth_client, token_key):
         held, free = token_key(), token_key()
         assert _ssh_ca(auth_client, held['key']).status_code == 201

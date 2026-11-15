@@ -233,7 +233,10 @@ class CACreationMixin:
             )
 
         with _discarding_new_hsm_key(hsm_provider_id, hsm_key):
-            return load_hsm_private_key(hsm_key.id), None, hsm_key
+            wrapper = load_hsm_private_key(hsm_key.id)
+            if hsm_key_id:
+                key_binding.refuse_same_token_key(hsm_key, wrapper.public_key())
+            return wrapper, None, hsm_key
 
     @staticmethod
     def _encode_private_key(key_pem: Optional[bytes]) -> Optional[str]:

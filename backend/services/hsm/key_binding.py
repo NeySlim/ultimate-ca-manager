@@ -2,7 +2,11 @@
 
 A binding locks the ``hsm_keys`` row first (``lock_key``) and checks both tables under it:
 two creations racing on one key serialise on that row lock until the first one commits.
+Two rows naming one token key (two providers on one token) are matched by their public key
+(``refuse_same_token_key``), but each takes its own lock: two creations racing on the two rows
+at once are not serialised, and both may be created.
 """
+from cryptography.hazmat.primitives import serialization
 from sqlalchemy import update
 
 from models import CA, db
@@ -76,3 +80,25 @@ def summary(names, limit=5):
     """'A, B (+2 more)' for a refusal message."""
     more = '' if len(names) <= limit else f' (+{len(names) - limit} more)'
     return ', '.join(names[:limit]) + more
+
+
+def _spki(public_key):
+    return public_key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+
+
+def refuse_same_token_key(key, public_key):
+    """HsmKeyBound when another key row with *public_key* backs an authority: it is the same token key."""
+    spki = _spki(public_key)
+    bound = bound_key_ids() - {key.id}
+    if not bound:
+        return
+    rows = HsmKey.query.filter(HsmKey.id.in_(bound), HsmKey.public_key_pem.isnot(None)).order_by(HsmKey.id)
+    for other in rows:
+        try:
+            pem = other.public_key_pem
+            if _spki(serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)) != spki:
+                continue
+        except ValueError:
+            continue
+        raise HsmKeyBound(f"HSM key '{key.label}' is the token key of HSM key '{other.label}', "
+                          f"which backs the {holders(key_id=other.id)[0]}: an HSM key backs one authority only")

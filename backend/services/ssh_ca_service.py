@@ -407,6 +407,7 @@ class SSHCAService:
                     f"HSM key '{key_row.label}' holds the key of the software SSH {existing.ca_type} CA "
                     f"'{existing.descr}': a key backs one authority only")
         refuse_same_public_key()
+        key_binding.refuse_same_token_key(key_row, public_key)
 
         if default_ttl is None:
             default_ttl = DEFAULT_USER_TTL if ca_type == 'user' else DEFAULT_HOST_TTL
@@ -422,6 +423,7 @@ class SSHCAService:
             raise ValueError(f"HSM key {hsm_key_id} not found")
         key_binding.refuse_bound_key(key_row)
         refuse_same_public_key()
+        key_binding.refuse_same_token_key(key_row, public_key)
 
         pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')
 
