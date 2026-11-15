@@ -24,17 +24,49 @@ function leading(element, labels) {
   return hits.sort((a, b) => b.length - a.length)[0]
 }
 
+// Labels a page shows (tabs, sections, buttons): the en.json values of the keys its source names.
+// A module's page is its file plus the folder of the same name, and everything below that.
+const PAGES_DIR = path.resolve(__dirname, '../pages')
+const pagesJs = fs.readFileSync(path.resolve(__dirname, '../navigation/pages.js'), 'utf8')
+const PAGE_FILE = Object.fromEntries([...pagesJs.matchAll(/^\s+['"]?([\w-]+)['"]?: lazyWithRetry\(\(\) => import\('\.\.\/pages\/(\w+)'\)/gm)].map(m => [m[1], m[2]]))
+const PAGE_DIR = { users: 'users', acme: 'acme', scep: 'scep', cas: 'cas', certificates: 'certificates', discovery: 'discovery', settings: 'settings' }
+const sourcesOf = (dir) => fs.existsSync(dir)
+  ? fs.readdirSync(dir, { recursive: true }).filter(f => /\.jsx?$/.test(f) && !/(^|\/)__tests__\//.test(f)).map(f => path.join(dir, f))
+  : []
+function labelsOf(mod) {
+  const files = [path.join(PAGES_DIR, PAGE_FILE[mod.id] + '.jsx'), ...sourcesOf(path.join(PAGES_DIR, PAGE_DIR[mod.id] || '-'))]
+    .filter(f => fs.existsSync(f))
+  const flat = flatten(en)
+  const out = new Set()
+  for (const f of files) {
+    const code = fs.readFileSync(f, 'utf8')
+    for (const [, k] of code.matchAll(/['"`]([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)['"`]/g)) if (flat[k]) out.add(flat[k])
+    for (const [, p] of code.matchAll(/`([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*\.)\$\{/g)) {
+      for (const [k, v] of Object.entries(flat)) if (k.startsWith(p)) out.add(v)
+    }
+  }
+  // A label with a trailing "(CA)" is written without it in prose
+  for (const l of [...out]) out.add(l.replace(/\s*\([^)]*\)$/, ''))
+  // The Certificates page shortens its issue button to the first word of the label
+  if (mod.id === 'certificates') out.add(en.certificates.issueCertificate)
+  return [...out]
+}
+const labelCache = {}
+const pageLabels = (mod) => (labelCache[mod.id] ??= labelsOf(mod))
+
 // Roots the earlier console had and this one has not: a path under one of them is always stale
 const GONE = ['System', 'Admin', 'Dashboard']
-const ROOTS = ['Modules', ...GONE, ...Object.values(groupLabel), ...MODULES.flatMap(moduleLabels)]
+const ROOTS = ['Modules', ...GONE, ...Object.values(groupLabel), ...MODULES.flatMap(moduleLabels), ...settingsTabs]
+  .filter((r, i, all) => all.indexOf(r) === i)
   .sort((a, b) => b.length - a.length)
 const ROOT_RE = new RegExp(`(?:^|[^\\w])(${ROOTS.map(r => r.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|')})((?:\\s*(?:>|→)\\s*[A-Z][^>→()\`*,.;:|\\n]*)+)`, 'g')
 
 // Paths of another product's console, quoted by an integration guide
-const ELSEWHERE = ['Templates > SCEP certificate']
+const ELSEWHERE = ['Templates > SCEP certificate', 'Settings > General > VPN & Device Management']
 
 export function pathsIn(markdown) {
-  const prose = markdown.replace(/^```.*?^```/gms, '').replace(/\*\*|`/g, '')
+  // A path wrapped onto a lowercase continuation line is one path
+  const prose = markdown.replace(/^```.*?^```/gms, '').replace(/\*\*|`/g, '').replace(/(\S)[ \t]*\n[ \t]*(?=[a-z])/g, '$1 ')
   return [...prose.matchAll(ROOT_RE)].map(m => [m[1], ...m[2].split(/\s*(?:>|→)\s*/).filter(Boolean).map(s => s.trim())])
 }
 
@@ -42,23 +74,41 @@ export function problemsWith(steps) {
   const [root, ...rest] = steps
   const second = rest[0]
   if (GONE.includes(root)) return `${root} is not a place of this console`
+  let mod
+  let tail
   if (root === 'Modules') {
     const group = GROUPS.find(g => groupLabel[g.id] === second)
     if (!group) return `${second} is not a group of the Modules menu`
-    return rest[1] === undefined ? null : moduleProblem(group.id, rest[1])
+    if (rest[1] === undefined) return null
+    mod = moduleIn(group.id, rest[1])
+    if (!mod) return `${rest[1]} is not a module of the ${groupLabel[group.id]} group`
+    tail = rest.slice(2)
+  } else {
+    const group = GROUPS.find(g => groupLabel[g.id] === root)
+    if (group) {
+      mod = moduleIn(group.id, second)
+      if (!mod) return `${second} is not a module of the ${groupLabel[group.id]} group`
+      tail = rest.slice(1)
+    } else {
+      mod = MODULES.find(m => moduleLabels(m).includes(root))
+      if (!mod) return `${root} is a tab of Settings, not a place of its own`
+      tail = rest
+    }
   }
-  const group = GROUPS.find(g => groupLabel[g.id] === root)
-  if (group) return moduleProblem(group.id, second)
-  const mod = MODULES.find(m => moduleLabels(m).includes(root))
-  if (mod.id === 'settings') {
-    return leading(second, settingsTabs) && leading(second, settingsTabs) === bestLabel(second)
-      ? null : `${second} is not a tab of Settings`
+  if (mod.id === 'settings' && tail.length) {
+    const tab = tail[0]
+    if (!(leading(tab, settingsTabs) && leading(tab, settingsTabs) === bestLabel(tab))) return `${tab} is not a tab of Settings`
+  } else if (mod.id === 'account' && tail.length) {
+    if (!leading(tail[0], accountTabs)) return `${tail[0]} is not a tab of My Account`
+  } else if (tail.length) {
+    const own = MODULES.find(m => m.id.toLowerCase() === tail[0].toLowerCase() || leading(tail[0], moduleLabels(m)))
+    if (own && own !== mod) {
+      return `${tail[0]} is a module of its own (${groupLabel[own.group] || 'no group'}), not a part of ${root}`
+    }
   }
-  if (mod.id === 'account') {
-    return leading(second, accountTabs) ? null : `${second} is not a tab of My Account`
-  }
-  const own = MODULES.find(m => m.id.toLowerCase() === second.toLowerCase() || leading(second, moduleLabels(m)))
-  return own ? `${second} is a module of its own (${groupLabel[own.group] || 'no group'}), not a part of ${root}` : null
+  const labels = pageLabels(mod)
+  const unknown = tail.slice(mod.id === 'settings' || mod.id === 'account' ? 1 : 0).find(step => !leading(step, labels))
+  return unknown ? `${unknown} is not a tab, section or button of ${lookup(mod.labelKey)}` : null
 }
 
 // Whichever of the tab and module labels the element starts with longest
@@ -66,10 +116,8 @@ function bestLabel(element) {
   return leading(element, [...settingsTabs, ...MODULES.flatMap(moduleLabels)])
 }
 
-function moduleProblem(groupId, element) {
-  const inGroup = MODULES.filter(m => m.group === groupId)
-  const mod = inGroup.find(m => leading(element, moduleLabels(m)))
-  return mod ? null : `${element} is not a module of the ${groupLabel[groupId]} group`
+function moduleIn(groupId, element) {
+  return MODULES.filter(m => m.group === groupId).find(m => leading(element, moduleLabels(m)))
 }
 
 const guides = fs.readdirSync(docsDir, { recursive: true }).filter(f => f.endsWith('.md')).sort()
@@ -101,6 +149,14 @@ describe('documented navigation paths', () => {
     expect(bad('Settings > Audit Logs:')).toHaveLength(1)
     expect(bad('System > Updates shows the target')).toHaveLength(1)
     expect(bad('Dashboard → Create Certificate Authority')).toHaveLength(1)
+    expect(bad('Open Certificates > Frobnicate')).toHaveLength(1)
+    expect(bad('Open Certificate Tools > Bogus Tool')).toHaveLength(1)
+    expect(bad('Open Settings > About > Check Nonsense')).toHaveLength(1)
+    expect(bad('Open Modules > PKI > Certificates > Bogus')).toHaveLength(1)
+    expect(bad('Open Windows Autoenrollment > Bogus')).toHaveLength(1)
+    expect(bad('Open Settings > Windows Autoenrollment > Add profile')).toEqual([])
+    expect(bad('Open ACME > Let\'s Encrypt > Certificate Authorities')).toEqual([])
+    expect(bad('Open Modules > PKI > Certificates > Issue Certificate')).toEqual([])
   })
 })
 
