@@ -6,12 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { UploadSimple, FileText, X } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { Button } from './Button'
-
-export function formatSize(bytes) {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(0)}MB`
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
-}
+import { formatSize } from '../lib/fileSize'
 
 export function FileUpload({ 
   accept, 

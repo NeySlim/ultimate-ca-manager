@@ -4,7 +4,7 @@ import { Button, Input, Select, FileUpload, Badge, DetailHeader, DetailSection, 
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import AdminLockLabel from './AdminLockLabel'
 import { useClipboard } from '../../hooks/useClipboard'
-import { formatSize } from '../../components/FileUpload'
+import { formatSize } from '../../lib/fileSize'
 import { restoreMaxBytes, restoreLegacyCeilingExceeded } from './restoreLimits'
 
 export default function BackupSection({
