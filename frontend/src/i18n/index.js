@@ -24,6 +24,11 @@ export const languages = [
   { code: 'ja', name: '日本語', flag: '🇯🇵' },
 ]
 
+// The page's lang attribute names the language shown (screen readers, spelling, hyphenation)
+i18n.on('languageChanged', (lng) => {
+  if (typeof document !== 'undefined' && lng) document.documentElement.lang = lng
+})
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
