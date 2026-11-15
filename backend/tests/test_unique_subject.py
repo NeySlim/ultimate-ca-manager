@@ -584,8 +584,9 @@ def test_the_lookup_count_does_not_grow_with_the_rows_carrying_the_subject(app, 
     counts = []
     for cn in ('one.grouped.unique.test', 'six.grouped.unique.test'):
         statements = []
-        counts.append((_lookups(app, lambda: _data(_sign(auth_client, app, ca, _csr(cn, key)), 200),
-                                statements), len(statements)))
+        lookups = _lookups(app, lambda: _data(_sign(auth_client, app, ca, _csr(cn, key)), 200), statements)
+        # Only what reads certificates: a cache refreshed meanwhile adds a statement elsewhere
+        counts.append((lookups, len([s for s in statements if re.search(r'FROM certificates\b', s)])))
     assert counts[0][0] == 2 and counts[0] == counts[1], counts
 
 
