@@ -216,23 +216,33 @@ def _ed_pem(cn, key, issuer_cn=None, signer=None):
             .public_key(key.public_key()).serial_number(_serial())
             .not_valid_before(dt.datetime(2026, 1, 1)).not_valid_after(dt.datetime(2036, 1, 1))
             .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key((signer or key).public_key()),
+                           critical=False)
             .sign(signer or key, None))
     return cert.public_bytes(serialization.Encoding.PEM).decode()
 
 
-def test_the_chain_repair_keeps_a_link_when_the_provider_fails(app, auth_client, linked, monkeypatch):
+def test_the_chain_repair_keeps_a_link_when_the_provider_fails(app, auth_client, made, monkeypatch):
     """A verification that errors (a provider refusing the algorithm) proves nothing: no unlink, no audit."""
     from services.ski_aki_backfill import backfill_ski_aki
+    from tests.fixtures.cross_pki import make_cert, pem
     from utils import cert_issuer
+    tag, root_key = _tag(), _key()
+    root = _import(auth_client, pem(make_cert(f'Fail Root {tag}', root_key)))
+    made.append(root['id'])
+    child = _import(auth_client, pem(make_cert(f'Fail Child {tag}', _key(), f'Fail Root {tag}', root_key)))
+    made.append(child['id'])
+    assert child['caref'] == root['refid']
 
     def failing(cert, key):
         raise RuntimeError('provider refused the operation')
     monkeypatch.setattr(cert_issuer, 'verify_certificate_signature', failing)
-    before = _audits(app, UNLINKED, linked['child']['id'])
+    before = _audits(app, UNLINKED, child['id'])
     with app.app_context():
         backfill_ski_aki()
-    assert _caref(app, linked['child']['id']) == linked['root']['refid']
-    assert _audits(app, UNLINKED, linked['child']['id']) == before
+    assert _caref(app, child['id']) == root['refid']
+    assert _audits(app, UNLINKED, child['id']) == before
 
 
 @pytest.mark.parametrize('approved', [False, True])
@@ -326,3 +336,76 @@ def test_a_move_to_the_root_record_of_the_same_key_is_not_audited_as_a_dropped_p
     with app.app_context():
         assert db.session.get(CA, ids['i']).caref == db.session.get(CA, ids['b']).refid
     assert _audits(app, UNLINKED, ids['i']) == before
+
+
+# ------------------------------------------------- the chain repair and a re-keyed parent
+
+@pytest.fixture
+def rekeyed(app, auth_client, made):
+    """A root re-keyed in place (its new certificate imported over it) and a CA its former key signed."""
+    from tests.fixtures.cross_pki import make_cert, pem
+    tag, old_key, key = _tag(), _key(), _key()
+    root_cn, cn = f'Rekey Root {tag}', f'Rekey Child {tag}'
+    root = _import(auth_client, pem(make_cert(root_cn, old_key)))
+    made.append(root['id'])
+    child = _import(auth_client, pem(make_cert(cn, key, root_cn, old_key)))
+    made.append(child['id'])
+    assert child['caref'] == root['refid']
+    assert _import(auth_client, pem(make_cert(root_cn, _key())), cross_mode='replace')['id'] == root['id']
+    return root, child
+
+
+def _revoke_by_flag(app, ca_id):
+    """Revoked as a restore without the parent's revocation record leaves it: the flag alone."""
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        ca.revoked, ca.revoked_at, ca.revoke_reason = True, dt.datetime(2026, 2, 1), 'keyCompromise'
+        db.session.commit()
+
+
+def _on_crl_of(app, parent_id, child_id):
+    from services.crl import CRLService
+    with app.app_context():
+        serial = db.session.get(CA, child_id).serial_number
+        return any(str(getattr(r, 'serial_number', '')) == serial
+                   for r in CRLService.get_revoked_certificates(parent_id))
+
+
+def test_the_chain_repair_keeps_a_ca_signed_by_the_former_key_of_its_parent(app, auth_client, rekeyed):
+    """Its AKI names the former key: the bad signature under the new one proves nothing, and the
+    revocation names the re-keyed issuer."""
+    from services.ca_service import CAService
+    from services.ski_aki_backfill import backfill_ski_aki
+    root, child = rekeyed
+    with app.app_context():
+        backfill_ski_aki()
+    assert _caref(app, child['id']) == root['refid']
+    with app.app_context(), pytest.raises(ValueError, match='re-keyed or replaced'):
+        CAService.revocation_issuer(db.session.get(CA, child['id']))
+
+
+def test_the_chain_repair_keeps_a_revoked_ca_on_the_crl_of_its_re_keyed_parent(app, auth_client, rekeyed):
+    from services.ski_aki_backfill import backfill_ski_aki
+    root, child = rekeyed
+    _revoke_by_flag(app, child['id'])
+    assert _on_crl_of(app, root['id'], child['id'])
+    with app.app_context():
+        backfill_ski_aki()
+    assert _on_crl_of(app, root['id'], child['id'])
+    assert _caref(app, child['id']) == root['refid']
+
+
+def test_the_chain_repair_keeps_the_link_of_a_revoked_ca_under_another_name(app, auth_client, made, linked):
+    """A wrong link of a revoked CA is what lists it on a CRL: the repair leaves it."""
+    from services.ski_aki_backfill import backfill_ski_aki
+    w = linked
+    stray = _import(auth_client, _rsa_pem(f'Repl Stray {_tag()}', _key(), serial=_serial()))
+    made.append(stray['id'])
+    with app.app_context():
+        db.session.get(CA, w['child']['id']).caref = stray['refid']  # a link left by an earlier version
+        db.session.commit()
+    _revoke_by_flag(app, w['child']['id'])
+    with app.app_context():
+        backfill_ski_aki()
+    assert _on_crl_of(app, stray['id'], w['child']['id'])
+    assert _caref(app, w['child']['id']) == stray['refid']

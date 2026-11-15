@@ -2,7 +2,7 @@
 SKI/AKI Backfill & Chain Repair Task
 
 Phase 1: Populate missing SKI/AKI from stored PEM certificates
-Phase 1b: Drop CA parent links the signature disproves
+Phase 1b: Drop CA parent links the issuer name or the named key disproves
 Phase 2: Re-chain orphan CAs via AKI→SKI matching
 Phase 3: Re-chain orphan certificates via AKI→SKI matching
 Phase 4: Deduplicate CAs with identical SKI and certificate (merge into best record)
@@ -150,11 +150,10 @@ def _move_ca_dependents(db, dupe, keeper):
 
 
 def _drop_disproven_parents(db, CA, stats):
-    """Phase 1b: a parent linked without a confirmation whose key does not verify the CA's
-    certificate (left by an earlier version) is replaced by the one that does, or none; audited.
-    Only a proven bad signature counts: a link this build or its provider cannot check is kept."""
+    """Phase 1b: a parent linked without a confirmation that provably is not the issuer of the
+    CA's certificate is replaced by the one that is, or none; audited. A revoked CA keeps its link,
+    so the parent's CRL still lists it."""
     from services.ca import parent_confirmation
-    from utils.cert_issuer import signature_disproved
     by_refid = {c.refid: c for c in CA.query.all()}
     dropped = []
     for ca in by_refid.values():
@@ -163,7 +162,8 @@ def _drop_disproven_parents(db, CA, stats):
             continue
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
-            if not signature_disproved(cert, x509.load_pem_x509_certificate(base64.b64decode(parent.crt))):
+            if ca.is_revoked or not _provably_not_issuer(
+                    cert, x509.load_pem_x509_certificate(base64.b64decode(parent.crt))):
                 continue
         except Exception:
             continue
@@ -178,9 +178,25 @@ def _drop_disproven_parents(db, CA, stats):
         db.session.rollback()
         logger.error('SKI/AKI chain repair: disproven parent links not dropped', exc_info=True)
         raise
-    logger.info(f"SKI/AKI chain repair: dropped {len(dropped)} parent links their signature disproves")
+    logger.info(f"SKI/AKI chain repair: dropped {len(dropped)} parent links their issuer disproves")
     for ca in dropped:
         parent_confirmation.audit_dropped(ca, username='system')
+
+
+def _provably_not_issuer(cert, parent_cert):
+    """Another subject than the issuer name (RFC 5280 6.1.3 (a)(4)) never was the issuer. Under that
+    name, a bad signature proves it only from the key the AKI names (4.2.1.1): a record re-keyed
+    since the link holds another SKI, and the CA signed by its former key keeps the link."""
+    from utils.cert_issuer import authority_key_identifier_hex, signature_disproved
+    from utils.dn_match import same_name
+    if not same_name(parent_cert.subject, cert.issuer):
+        return True
+    try:
+        ski = parent_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
+    except x509.ExtensionNotFound:
+        return False
+    aki = authority_key_identifier_hex(cert)
+    return aki is not None and aki == ski.key_identifier.hex(':').upper() and signature_disproved(cert, parent_cert)
 
 
 def backfill_ski_aki():
