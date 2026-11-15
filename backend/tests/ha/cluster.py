@@ -1,9 +1,9 @@
 """Real UCM nodes (gunicorn, two or three) in HA mode on one PostgreSQL schema.
 
 Every node gets an environment built here and nothing else: its own DATA_DIR,
-UCM_CONFIG_DIR, logs and port under the bench directory, the shared database
-URL, SECRET_KEY and KEY_ENCRYPTION_KEY. The guard on its PYTHONPATH stops a node
-that touches an installation path.
+UCM_CONFIG_DIR, logs and port under the bench directory, its own database URL
+(application_name = schema_node), the shared SECRET_KEY and KEY_ENCRYPTION_KEY.
+The guard on its PYTHONPATH stops a node that touches an installation path.
 """
 import os
 import re
@@ -258,7 +258,7 @@ class Cluster:
             cur.execute(f'CREATE SCHEMA "{self.schema}"')
 
     def start(self):
-        """Both nodes at once on the empty schema, then a bounded wait for readiness."""
+        """Every node at once on the empty schema, then a bounded wait for readiness."""
         for node in self.nodes:
             node.start()
         for node in self.nodes:
