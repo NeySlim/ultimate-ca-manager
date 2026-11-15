@@ -105,12 +105,12 @@ move_item() {
     present "$2" && return 1
     try_rename "$1" "$2"; rc=$?
     [ "$rc" -eq 1 ] || return "$rc"
-    loc=${1%/*}/$LOCAL_NAME made=""
+    dir=${1%/*} loc=${1%/*}/$LOCAL_NAME made=""
     case $LOCALS in
         *"$NL$loc$NL"*) ;;
         *)  # Another's directory of that name is never written into, nor removed
             if present "$loc"; then rc=3; else
-                { jot "mkdir$TAB${1%/*}$TAB$loc" && mkdir -m 700 -- "$loc"; } || return 2
+                { jot "mkdir$TAB${dir:-/}$TAB$loc" && mkdir -m 700 -- "$loc"; } || return 2
                 LOCALS=$LOCALS$loc$NL made=1
             fi ;;
     esac
@@ -504,8 +504,9 @@ fi
 # A database DATABASE_PATH placed elsewhere, with what SQLite keeps beside it
 case $(normal "$DB_FILE") in
     "$(normal "$DATA")"/*|"$(normal "$CONFIG")"/*) ;;
-    *)
-        { jot "mkdir$TAB${DB_FILE%/*}$TAB$DEST/database" && mkdir -- "$DEST/database"; } \
+    *)  # A database in / is named there by "/", as a journal line has no empty field
+        DB_DIR=${DB_FILE%/*}
+        { jot "mkdir$TAB${DB_DIR:-/}$TAB$DEST/database" && mkdir -- "$DEST/database"; } \
             || fail "creating $DEST/database"
         for f in "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$DB_FILE-journal"; do
             [ -e "$f" ] || continue
@@ -513,7 +514,7 @@ case $(normal "$DB_FILE") in
         done
         DB_LINE="  database/   $DB_FILE, which DATABASE_PATH placed outside $DATA
 "
-        DB_RESTORE=", of database/ into ${DB_FILE%/*}" ;;
+        DB_RESTORE=", of database/ into ${DB_DIR:-/}" ;;
 esac
 # Written inside the journal, so that a retry after any interruption takes it back first;
 # the line names where the archived ucm.env went, centrally or beside the new one

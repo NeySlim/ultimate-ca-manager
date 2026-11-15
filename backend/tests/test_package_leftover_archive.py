@@ -448,6 +448,30 @@ def test_a_database_path_spelled_otherwise_under_the_data_goes_with_the_data(tmp
     assert 'placed outside' not in (box.archive / 'README.txt').read_text()
 
 
+@pytest.mark.skipif(os.path.lexists('/ucm.db'), reason='this machine has a /ucm.db')
+def test_a_database_at_the_root_is_a_whole_step_and_a_later_failure_puts_all_back(tmp_path):
+    """DATABASE_PATH=/ucm.db (absent here, so nothing outside the box is renamed): its
+    directory is /, which its journal line names like any other."""
+    def box_at(path):
+        box = Box(path, python='stub')
+        box.python('stub', first='sqlite /ucm.db')
+        env = box.config / 'ucm.env'
+        env.write_text(env.read_text().replace(f'DATABASE_PATH={box.data}/ucm.db', 'DATABASE_PATH=/ucm.db'))
+        return box
+    box = box_at(tmp_path / 'count')
+    box.wrap(fail='rm', at=10 ** 6)
+    assert box.run().returncode == 0
+    assert 'of database/ into /;' in ' '.join((box.archive / 'README.txt').read_text().split())
+    last_rm = int((box.state / 'count').read_text())
+    box = box_at(tmp_path / 'box')
+    box.wrap(fail='rm', at=last_rm)
+    before = snapshot(box)
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert 'Everything was put back in place' in out.stdout and 'not a whole step' not in out.stdout
+    assert snapshot(box) == before
+
+
 def test_the_readme_puts_each_file_where_the_packages_write_it(tmp_path):
     """The packages write the HTTPS key and certificate into the data directory."""
     box = Box(tmp_path)
