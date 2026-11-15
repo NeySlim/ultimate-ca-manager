@@ -54,7 +54,7 @@ export default {
           { label: "Même numéro de série, autre CA (v2.251)", text: "Un enrôlement est identifié par son émetteur et son numéro de série : un certificat client peut être enrôlé, importé ou assigné même si le certificat enrôlé d'une autre CA porte le même numéro de série" },
           { label: "En-têtes de reverse proxy (v2.252)", text: "Derrière un proxy qui transmet le certificat client sous forme d'en-têtes, envoyez le DN de l'émetteur (X-SSL-Client-I-DN) avec le numéro de série, lu en hexadécimal, ou le certificat lui-même (X-SSL-Client-Cert). Un numéro de série sans son émetteur n'ouvre aucun enrôlement qui en a enregistré un, et un certificat présenté ne peut pas être enrôlé sans lui" },
           { label: 'Émetteur révoqué', text: 'Un certificat client émis sous une CA révoquée, à n\'importe quel niveau de sa chaîne, n\'ouvre aucune session et ne peut être ni enrôlé ni importé (v2.252)' },
-          { label: "Clés générées (v2.251)", text: "Un certificat mTLS utilisateur généré par UCM reçoit une clé à la force de l'CA émettrice, RSA ou courbe NIST acceptée par les navigateurs, ramenée au type autorisé le plus proche par les politiques, au lieu de toujours du RSA-2048" },
+          { label: "Clés générées (v2.251)", text: "Un certificat mTLS utilisateur généré par UCM reçoit une clé à la force de la CA émettrice, RSA ou courbe NIST acceptée par les navigateurs, ramenée au type autorisé le plus proche par les politiques, au lieu de toujours du RSA-2048" },
         ]
       },
     ],

@@ -37,3 +37,12 @@ describe('code blocks of the translated guides', () => {
     expect(codeLines(page.helpGuides.content)).toEqual(codeLines(helpGuides[key].content))
   })
 })
+
+describe('French help wording', () => {
+  // "CA" is read "cé-a" and never elided: "la CA", "de la CA", not "l'CA" or "d'CA".
+  it('never elides an article before CA', () => {
+    const found = strings(entries.filter((e) => e.lang === 'fr').map((e) => e.page))
+      .flatMap((s) => s.match(/\b\w+\\?['’]CA\b.{0,20}/g) || [])
+    expect(found).toEqual([])
+  })
+})
