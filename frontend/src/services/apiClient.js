@@ -68,6 +68,30 @@ export function resetLoginRedirect() {
   loginRedirectPending = false
 }
 
+// The 401 of the server's authentication gate: refused before the route ran, so safe to send again
+export const AUTHENTICATION_REQUIRED_PROBLEM = 'urn:ucm:problem:authentication-required'
+
+// One check of the session for a burst of 401s: /auth/verify with the cookie held now, which a
+// renewed identifier (TOTP, password, other sessions closed) replaced. False when it cannot tell.
+let sessionCheck = null
+
+function sessionStillOpen(client) {
+  if (!sessionCheck) {
+    sessionCheck = (async () => {
+      try {
+        const response = await fetch(`${client.baseURL}/auth/verify`, { method: 'GET', credentials: 'include' })
+        const body = response.ok ? await response.json() : null
+        if (body?.data?.authenticated !== true) return false
+        client.setCsrfToken(body.data.csrf_token)
+        return true
+      } catch {
+        return false
+      }
+    })().finally(() => { sessionCheck = null })
+  }
+  return sessionCheck
+}
+
 // A page restored from the back-forward cache keeps its module state: it sends again
 if (typeof window !== 'undefined') {
   window.addEventListener('pageshow', (event) => {
@@ -123,7 +147,8 @@ class APIClient {
     sessionStorage.removeItem(CSRF_TOKEN_KEY)
   }
 
-  async request(endpoint, options = {}) {
+  // `replayed`: this call already follows a 401 and a session check, its own 401 signs out
+  async request(endpoint, options = {}, replayed = false) {
     if (import.meta.env.DEV && options.params) {
       console.warn(`⚠️ apiClient does not support 'params'. Use buildQueryString() to append query params to the URL. Called on: ${endpoint}`)
     }
@@ -193,6 +218,12 @@ class APIClient {
         const isLoginPage = window.location.pathname.includes('/login')
         const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/verify')
         
+        // A 401 signs out only once the session is gone; the gate's refusal is sent again, once
+        if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending
+            && !replayed && await sessionStillOpen(this)) {
+          if (data?.type === AUTHENTICATION_REQUIRED_PROBLEM) return this.request(endpoint, options, true)
+          throw error
+        }
         if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
           loginRedirectPending = true
