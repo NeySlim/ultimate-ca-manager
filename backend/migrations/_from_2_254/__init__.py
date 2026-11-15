@@ -5,6 +5,7 @@ an upgrade interrupted after any step and started again ends in the same state. 
 2.254 ran the same cleanup as its migration 136.
 """
 import importlib
+import time
 
 STEPS = (
     '138_flask_sessions', '139_dashboard_aggregates', '141_cluster_nodes',
@@ -94,3 +95,26 @@ RECORDED_BEFORE_2_52 = frozenset((
 def step(name):
     """The module of one step."""
     return importlib.import_module(f'{__name__}.{name}')
+
+
+PROGRESS_SECONDS = 30
+_clock = time.monotonic
+
+
+def say(line):
+    """A journal line now, as the runner writes them."""
+    print(line, flush=True)
+
+
+class Progress:
+    """Called with the rows done after each batch: one line at most every PROGRESS_SECONDS."""
+
+    def __init__(self, label, total):
+        self.label, self.total = label, total
+        self._last = _clock()
+
+    def __call__(self, done):
+        now = _clock()
+        if now - self._last >= PROGRESS_SECONDS:
+            self._last = now
+            say(f'    {self.label}: {done} of {self.total} rows')

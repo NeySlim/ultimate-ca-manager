@@ -47,9 +47,11 @@ def _values(rows):
     return out
 
 
-def _backfill(fetch, write):
+def _backfill(fetch, write, total):
     """Batches of _BATCH rows, keyed on id so a row nothing can fill is read once."""
-    cursor = 0
+    from migrations._from_2_254 import Progress
+    progress = Progress('step 157_certificate_subject_key', total)
+    cursor = done = 0
     while True:
         rows = fetch(cursor)
         if not rows:
@@ -58,6 +60,8 @@ def _backfill(fetch, write):
         values = _values(rows)
         if values:
             write(values)
+        done += len(rows)
+        progress(done)
 
 
 def _upgrade_sqlite(conn):
@@ -71,7 +75,8 @@ def _upgrade_sqlite(conn):
         conn.execute("ALTER TABLE certificates ADD COLUMN subject_holder VARCHAR(100)")
     _backfill(
         lambda c: conn.execute(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}").fetchall(),
-        lambda values: conn.executemany("UPDATE certificates SET subject_key = ? WHERE id = ?", values))
+        lambda values: conn.executemany("UPDATE certificates SET subject_key = ? WHERE id = ?", values),
+        conn.execute("SELECT COUNT(*) FROM certificates").fetchone()[0])
     conn.execute(f"CREATE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, subject_key)")
     if 'acme_orders' in tables:
         conn.execute(CREATE_ORDER_INDEX)
@@ -99,7 +104,8 @@ def _upgrade_pg(conn):
         bindparam('key'), bindparam('id'))
     _backfill(
         lambda c: conn.execute(text(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}")).fetchall(),
-        lambda values: conn.execute(update, [{'key': k, 'id': i} for k, i in values]))
+        lambda values: conn.execute(update, [{'key': k, 'id': i} for k, i in values]),
+        conn.execute(text("SELECT COUNT(*) FROM certificates")).scalar())
     conn.execute(text(f"CREATE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, subject_key)"))
     if 'acme_orders' in tables:
         conn.execute(text(CREATE_ORDER_INDEX))

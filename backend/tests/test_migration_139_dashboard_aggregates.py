@@ -119,3 +119,25 @@ def test_the_app_schema_carries_the_columns_and_indexes(app):
         assert {'key_bits', 'sig_hash'} <= columns
         for table, names in INDEXES.items():
             assert names <= {i['name'] for i in inspector.get_indexes(table)}, table
+
+
+class _Clock:
+    def __init__(self, step):
+        self.now, self.step = 0.0, step
+
+    def __call__(self):
+        self.now += self.step
+        return self.now
+
+
+@pytest.mark.parametrize('seconds,lines', [(31, ['2 of 6', '4 of 6', '5 of 6']), (1, [])])
+def test_sqlite_backfill_logs_its_progress_at_most_every_30_seconds(monkeypatch, capsys, seconds, lines):
+    import migrations._from_2_254 as package
+    monkeypatch.setattr(_migration(), '_BATCH', 2)
+    monkeypatch.setattr(package, '_clock', _Clock(seconds))
+    conn = sqlite3.connect(':memory:')
+    _sqlite_schema(conn)
+    conn.executemany('INSERT INTO certificates (id, crt) VALUES (?, ?)', _rows())
+    _migration().upgrade(conn)
+    out = [line for line in capsys.readouterr().out.splitlines() if '139_dashboard_aggregates' in line]
+    assert out == [f'    step 139_dashboard_aggregates: {n} rows' for n in lines]

@@ -49,6 +49,7 @@ Public API
 import os
 import sys
 import sqlite3
+import time
 import importlib.util
 from pathlib import Path
 
@@ -61,9 +62,8 @@ from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
 def say(*args, **kwargs):
     """say() that reaches the journal now, not when the process ends.
 
-    The progress line is written without a newline (``  -> name...`` then
-    ``OK``), so an unflushed stream leaves journald holding a partial line:
-    the upgrade ran, and its report only appeared at the next shutdown.
+    An unflushed stream leaves journald holding the lines of a long upgrade
+    until the process ends: the upgrade ran, its report came at shutdown.
     """
     kwargs.setdefault('flush', True)
     print(*args, **kwargs)
@@ -484,7 +484,8 @@ def _serial_steps_pending(engine) -> bool:
 def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
     """Step 144 alone, idempotent; the 300 row and its date stay as they are."""
     from migrations._from_2_254 import step
-    say("  → serial_unique_index_pending is set: upgrade step 144 runs again...", end=" ")
+    say(f"  → serial_unique_index_pending is set: upgrade step {SERIAL_STEP} runs again: started")
+    started = time.monotonic()
     try:
         if is_pg:
             with engine.begin() as conn:
@@ -496,9 +497,9 @@ def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
             finally:
                 conn.close()
     except Exception as exc:  # noqa: BLE001
-        say(f"✗ {exc}")
+        say(f"  ✗ {SERIAL_STEP}: failed after {time.monotonic() - started:.1f} s: {exc}")
         return False
-    say("✓")
+    say(f"  ✓ {SERIAL_STEP}: done in {time.monotonic() - started:.1f} s")
     return True
 
 
@@ -536,10 +537,11 @@ def _load_module(path: Path):
 
 def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
     name = path.stem
-    say(f"  → {name}...", end=" ", flush=True)
     if dry_run:
-        say("(dry run)")
+        say(f"  → {name}: (dry run)")
         return True
+    say(f"  → {name}: started")
+    started = time.monotonic()
     try:
         mod = _load_module(path)
         if hasattr(mod, "upgrade"):
@@ -558,16 +560,16 @@ def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
             else:
                 mod.upgrade(conn)
         else:
-            say("SKIP (no upgrade)")
+            say(f"  ✗ {name}: no upgrade(), skipped")
             return False
         conn.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (name,))
         conn.commit()
-        say("✓")
+        say(f"  ✓ {name}: done in {time.monotonic() - started:.1f} s")
         return True
     except Exception as e:  # noqa: BLE001
         # A failed migration is never recorded: its steps are idempotent, the next start runs it again
         conn.rollback()
-        say(f"✗ {e}")
+        say(f"  ✗ {name}: failed after {time.monotonic() - started:.1f} s: {e}")
         return False
 
 
@@ -602,10 +604,11 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
     """
     for name in pending:
         path = MIGRATIONS_DIR / f"{name}.py"
-        say(f"  → {name}...", end=" ", flush=True)
         if dry_run:
-            say("(dry run)")
+            say(f"  → {name}: (dry run)")
             continue
+        say(f"  → {name}: started")
+        started = time.monotonic()
         try:
             mod = _load_module(path)
             is_pg_compatible = getattr(mod, "pg_compatible", False)
@@ -613,7 +616,7 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
 
             if not is_pg_compatible and idx >= PG_COMPATIBLE_REQUIRED_FROM:
                 # Hard fail — refuse to silently skip a "new-era" migration.
-                say("✗")
+                say(f"  ✗ {name}: refused")
                 say(
                     f"    Migration {name} is numbered >= {PG_COMPATIBLE_REQUIRED_FROM:03d} "
                     f"but does not declare `pg_compatible = True`. "
@@ -625,9 +628,8 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
             with engine.begin() as conn:
                 if is_pg_compatible and hasattr(mod, "upgrade"):
                     mod.upgrade(conn)
-                    say("✓")
                 else:
-                    say("(SQLite-only, skipped)")
+                    say(f"    {name}: SQLite-only, skipped")
                 conn.execute(
                     text(
                         f"INSERT INTO _migrations (name, applied_at) VALUES (:n, {_PG_NOW_UTC}) "
@@ -635,8 +637,10 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
                     ),
                     {"n": name},
                 )
+            # After the commit: on PostgreSQL the step and its registry row land together
+            say(f"  ✓ {name}: done in {time.monotonic() - started:.1f} s")
         except Exception as e:  # noqa: BLE001
-            say(f"✗ {e}")
+            say(f"  ✗ {name}: failed after {time.monotonic() - started:.1f} s: {e}")
             return False
     say("✓ All migrations applied")
     return True

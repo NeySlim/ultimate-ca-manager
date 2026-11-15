@@ -293,3 +293,25 @@ def _postgres_holders(run, label, plan=False):
         conn.commit()
         conn.close()
         engine.dispose()
+
+
+class _Clock:
+    def __init__(self, step):
+        self.now, self.step = 0.0, step
+
+    def __call__(self):
+        self.now += self.step
+        return self.now
+
+
+@pytest.mark.parametrize('seconds,lines', [(31, ['2 of 5', '4 of 5']), (1, [])])
+def test_sqlite_backfill_logs_its_progress_at_most_every_30_seconds(monkeypatch, capsys, seconds, lines):
+    import migrations._from_2_254 as package
+    monkeypatch.setattr(_migration(), '_BATCH', 2)
+    monkeypatch.setattr(package, '_clock', _Clock(seconds))
+    conn = sqlite3.connect(':memory:')
+    conn.execute('CREATE TABLE certificates (id INTEGER PRIMARY KEY, caref VARCHAR(36), crt TEXT)')
+    conn.executemany('INSERT INTO certificates (id, crt) VALUES (?, ?)', _rows())
+    _migration().upgrade(conn)
+    out = [line for line in capsys.readouterr().out.splitlines() if '157_certificate_subject_key' in line]
+    assert out == [f'    step 157_certificate_subject_key: {n} rows' for n in lines]
