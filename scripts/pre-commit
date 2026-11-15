@@ -8,7 +8,7 @@
 #   2. No 'icon: undefined' in navigation components
 #   3. Backend: pyflakes gate (ruff), undefined-name and import audits,
 #      the tests named after the staged modules, then the last failures
-#   4. Frontend: vitest on the files touched since HEAD
+#   4. Frontend: vitest on the tests related to the staged files, on 4 workers
 # A version-bump commit (VERSION, CHANGELOG, package files, chart) runs 1 and 2 only.
 # The full suites run in scripts/pre-push before anything reaches dev.
 
@@ -108,6 +108,7 @@ if [ "$VERSION_ONLY" = 0 ] && [ -n "$BACKEND_PY" ]; then
     done
     # Empty means empty: a bare pytest here would run the whole suite.
     # Tests marked slow are left to the suites: a commit must not wait minutes for them.
+    # -m replaces the selection of addopts, so the bench marker it excludes is named again.
     TARGETS=$(printf '%s\n' $TARGETS | grep . | sort -u | tr '\n' ' ')
     if [ "$(echo $TARGETS | wc -w)" -gt 0 ]; then
         echo -n "  Backend targeted tests ($(echo $TARGETS | wc -w) files)... "
@@ -145,7 +146,7 @@ PY
     elif [ "$LF_COUNT" -gt 10 ]; then
         echo -e "${YELLOW}skipped${NC} ($LF_COUNT files on record, the pre-push suite will replay them)"
     else
-        LF_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest $LF_FILES --lf --lfnf=none -q -x --tb=short -rfE 2>&1) || true
+        LF_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest $LF_FILES --lf --lfnf=none -m "not slow and not ha" -q -x --tb=short -rfE 2>&1) || true
         LF_RESULT=$(echo "$LF_OUT" | tail -1)
         if echo "$LF_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
             echo -e "${RED}❌${NC} $LF_RESULT"
@@ -158,28 +159,48 @@ PY
 fi
 
 # ── 4. Frontend ──────────────────────────────────────────────
-if [ "$VERSION_ONLY" = 0 ] && [ -n "$FRONTEND" ]; then
-    echo -n "  Frontend tests (changed since HEAD)... "
-    # Locale and help text reach nearly every test through the import graph: their own
-    # check is the key sync, and the full suite runs before a merge, not at each commit.
-    FRONT_SRC=$(echo "$FRONTEND" | grep -E '^frontend/src/' | grep -vE '^frontend/src/(i18n/locales/|data/help)' | sed 's#^frontend/##' || true)
-    if [ -n "$FRONT_SRC" ]; then
-        # shellcheck disable=SC2086
-        FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest related $FRONT_SRC --run --no-coverage --maxWorkers=4 2>&1) || true
-    else
-        FRONT_OUT=$(cd "$ROOT/frontend" && npm run -s check:i18n 2>&1 && echo "No test files found") || true
-    fi
-    FRONT_RESULT=$(echo "$FRONT_OUT" | grep "Tests" | tail -1)
+# Runs vitest with the given arguments on 4 workers: a commit never takes every core.
+front_tests() {
+    local label=$1 out result; shift
+    echo -n "  Frontend tests ($label)... "
+    out=$(cd "$ROOT/frontend" && npx vitest "$@" --no-coverage --maxWorkers=4 2>&1) || true
+    result=$(echo "$out" | grep "Tests" | tail -1)
     # Strict: "N failed | M passed" must fail; "No test files found" is a pass.
-    if echo "$FRONT_OUT" | grep -q "No test files found"; then
+    if echo "$out" | grep -q "No test files found"; then
         echo -e "${GREEN}✅${NC} no related test files"
-    elif echo "$FRONT_RESULT" | grep -q "passed" && ! echo "$FRONT_RESULT" | grep -qE "fail|error"; then
-        echo -e "${GREEN}✅${NC} $FRONT_RESULT"
+    elif echo "$result" | grep -q "passed" && ! echo "$result" | grep -qE "fail|error"; then
+        echo -e "${GREEN}✅${NC} $result"
     else
-        echo -e "${RED}❌${NC} $FRONT_RESULT"
-        [ -n "$FRONT_RESULT" ] || echo "$FRONT_OUT" | tail -15 | sed 's/^/    /'
-        echo -e "${YELLOW}    Run 'cd frontend && npx vitest run' for details${NC}"
+        echo -e "${RED}❌${NC} $result"
+        [ -n "$result" ] || echo "$out" | tail -15 | sed 's/^/    /'
+        echo -e "${YELLOW}    Run 'cd frontend && npx vitest $* --maxWorkers=4' for details${NC}"
         FAILED=1
+    fi
+}
+
+if [ "$VERSION_ONLY" = 0 ] && [ -n "$FRONTEND" ]; then
+    # Locale files and everything under data/help (the loader's glob takes its tests too)
+    # reach nearly every test through the import graph: they get the tests written for
+    # them, and the full suite is left to the pre-push.
+    TEXT_RE='^frontend/src/(i18n/locales/[^/]+\.json|data/help/.*|data/helpContent\.js)$'
+    WHOLE_RE='^frontend/(package(-lock)?\.json|vite(st)?\.config\.[a-z]+)$'
+    FRONT_SRC=(); FRONT_TEXT=0; FRONT_WHOLE=0
+    while IFS= read -r -d '' f; do
+        if [[ $f =~ $WHOLE_RE ]]; then FRONT_WHOLE=1
+        elif [[ $f =~ $TEXT_RE ]]; then FRONT_TEXT=1
+        elif [[ $f == frontend/src/* ]]; then FRONT_SRC+=("${f#frontend/}")
+        fi
+    done < <(git diff --cached -z --name-only --diff-filter=ACMR -- frontend)
+    if [ "$FRONT_WHOLE" = 1 ]; then
+        # Dependencies or the test configuration changed: nothing narrower says what broke
+        front_tests "whole suite" run
+    else
+        if [ "${#FRONT_SRC[@]}" -gt 0 ]; then
+            front_tests "related to ${#FRONT_SRC[@]} staged files" related "${FRONT_SRC[@]}" --run
+        fi
+        if [ "$FRONT_TEXT" = 1 ]; then
+            front_tests "locale and help text" run src/data/help/__tests__ src/i18n/__tests__
+        fi
     fi
 fi
 
