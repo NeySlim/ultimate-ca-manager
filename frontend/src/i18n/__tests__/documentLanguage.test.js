@@ -11,4 +11,11 @@ describe('document language', () => {
     await i18n.changeLanguage('de')
     expect(document.documentElement.lang).toBe('de')
   })
+
+  it('names the language shown, not the one asked for', async () => {
+    await i18n.changeLanguage('ko')
+    expect(document.documentElement.lang).toBe('en')
+    await i18n.changeLanguage('fr-CA')
+    expect(document.documentElement.lang).toBe('fr')
+  })
 })
