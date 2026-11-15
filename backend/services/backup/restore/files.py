@@ -45,7 +45,8 @@ _PREVIOUS = re.compile(r'previous_[0-9]{6}')
 PUBLICATION_PREFIX = 'restore_publication_'
 
 
-def _atomic_replace(destination: Path, data: bytes, mode: int) -> None:
+def _atomic_replace(destination: Path, data: bytes, mode: int,
+                    owner: Optional[tuple] = None) -> None:
     """Put ``data`` at ``destination`` whole, or leave it as it was.
 
     The temporary file is written in the destination's own directory, so the
@@ -61,6 +62,11 @@ def _atomic_replace(destination: Path, data: bytes, mode: int) -> None:
         with os.fdopen(fd, 'wb') as handle:
             handle.write(data)
             handle.flush()
+            try:
+                _give_owner(handle.fileno(), owner)
+            except OSError as exc:
+                logger.error("Restore: %s is put back without its owner %s: %s",
+                             destination, owner, exc)
             os.fsync(handle.fileno())
         os.chmod(temp_path, mode)
         os.replace(temp_path, destination)
@@ -84,7 +90,7 @@ class _Staged:
     """
 
     __slots__ = ('destination', 'staged_path', 'mode', 'remove',
-                 'existed', 'previous_path', 'previous_mode', 'published')
+                 'existed', 'previous_path', 'previous_mode', 'previous_owner', 'published')
 
     def __init__(self, destination: Path, staged_path: Optional[Path], mode: int,
                  remove: bool = False):
@@ -96,6 +102,7 @@ class _Staged:
         self.existed = False
         self.previous_path: Optional[Path] = None
         self.previous_mode = mode
+        self.previous_owner: Optional[tuple] = None
         self.published = False
 
 
@@ -301,7 +308,9 @@ class StagedFiles:
             by_directory.setdefault(entry.destination.parent, []).append({
                 'name': entry.destination.name, 'previous': f"previous_{position:06d}",
                 'existed': info is not None,
-                'mode': (info.st_mode & 0o777) if info is not None else None})
+                'mode': (info.st_mode & 0o777) if info is not None else None,
+                'uid': info.st_uid if info is not None else None,
+                'gid': info.st_gid if info is not None else None})
         for directory, entries in by_directory.items():
             kept_dir = self._kept_dir(directory)
             fd = os.open(kept_dir / _JOURNAL, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -331,10 +340,12 @@ class StagedFiles:
         try:
             os.link(entry.destination, kept)
         except OSError:
-            _copy_private(entry.destination, kept)
+            # Raises when the owner cannot be kept: before any destination is replaced
+            _copy_private(entry.destination, kept, (info.st_uid, info.st_gid))
         entry.existed = True
         entry.previous_path = kept
         entry.previous_mode = info.st_mode & 0o777
+        entry.previous_owner = (info.st_uid, info.st_gid)
 
     def _publish(self, entry: _Staged) -> bool:
         """Replace or remove one destination; whether its directory changed."""
@@ -373,7 +384,8 @@ class StagedFiles:
                 continue
             try:
                 if entry.existed:
-                    _put_back(entry.previous_path, entry.destination, entry.previous_mode)
+                    _put_back(entry.previous_path, entry.destination, entry.previous_mode,
+                              owner=entry.previous_owner)
                 else:
                     entry.destination.unlink(missing_ok=True)
                 _fsync_directory(entry.destination.parent)
@@ -491,7 +503,10 @@ def _valid_entry(item) -> bool:
             and isinstance(previous, str) and bool(_PREVIOUS.fullmatch(previous))
             and isinstance(item.get('existed'), bool)
             and (mode is None or (isinstance(mode, int) and not isinstance(mode, bool)
-                                  and 0 <= mode <= 0o7777)))
+                                  and 0 <= mode <= 0o7777))
+            and all(item.get(key) is None or (isinstance(item[key], int)
+                                              and not isinstance(item[key], bool) and item[key] >= 0)
+                    for key in ('uid', 'gid')))
 
 
 def _read_journal(kept_dir: str, dir_fd: Optional[int] = None):
@@ -546,8 +561,10 @@ def _put_back_entries(dir_fd: int, parent: Path, journal: dict) -> None:
         if item['existed']:
             mode = item.get('mode')
             try:
+                owner = ((item['uid'], item['gid'])
+                         if item.get('uid') is not None and item.get('gid') is not None else None)
                 _put_back(previous, destination, mode if mode is not None else 0o600,
-                          dir_fd=dir_fd)
+                          dir_fd=dir_fd, owner=owner)
             except FileNotFoundError:
                 pass    # kept before its replace; absent, it was never touched
         else:
@@ -815,21 +832,33 @@ def _write_private(path: Path, data: bytes, mode: int) -> None:
             os.close(fd)
 
 
-def _copy_private(source: Path, kept: Path) -> None:
+def _copy_private(source: Path, kept: Path, owner: Optional[tuple] = None) -> None:
     """A private copy of `source`, streamed: the previous content of a destination.
 
-    Written under a name recovery never reads, synced, then renamed: a `previous_NNNNNN`
-    is always a complete copy (its directory is synced before any destination changes)."""
+    Written under a name recovery never reads, given the owner of `source` (or raising),
+    synced, then renamed: a `previous_NNNNNN` is always a complete copy (its directory is
+    synced before any destination changes)."""
     partial = kept.with_name('.copying_' + kept.name)
     fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'wb') as out, open(source, 'rb') as handle:
         shutil.copyfileobj(handle, out)
         out.flush()
+        _give_owner(out.fileno(), owner)
         os.fsync(out.fileno())
     os.replace(partial, kept)
 
 
-def _put_back(kept, destination: Path, mode: int, dir_fd: Optional[int] = None) -> None:
+def _give_owner(fd: int, owner: Optional[tuple]) -> None:
+    """`fd` takes `owner` (uid, gid) unless it already has it; raises when it cannot."""
+    if owner is None:
+        return
+    info = os.fstat(fd)
+    if (info.st_uid, info.st_gid) != tuple(owner):
+        os.fchown(fd, owner[0], owner[1])
+
+
+def _put_back(kept, destination: Path, mode: int, dir_fd: Optional[int] = None,
+              owner: Optional[tuple] = None) -> None:
     """Return the kept previous content to `destination`, atomically.
 
     Only a regular file, opened without following a link; its mode is set through that
@@ -845,8 +874,12 @@ def _put_back(kept, destination: Path, mode: int, dir_fd: Optional[int] = None) 
             if exc.errno != errno.EXDEV:
                 raise
             with os.fdopen(os.dup(fd), 'rb') as handle:
-                _atomic_replace(destination, handle.read(), mode)
+                _atomic_replace(destination, handle.read(), mode, owner)
             return
         os.fchmod(fd, mode)
+        try:
+            _give_owner(fd, owner)
+        except OSError as exc:
+            logger.error("Restore: %s is back, but not its owner %s: %s", destination, owner, exc)
     finally:
         os.close(fd)

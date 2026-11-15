@@ -667,3 +667,72 @@ def test_a_damaged_journal_keeps_every_lingering_row(dirs):
     (kept / 'journal.json').write_text('{"tok')
     files.sweep_kept_previous_contents()
     assert _row_exists('d' * 32)
+
+
+def _owned_elsewhere(path):
+    os.chown(path, 4321, 4322)
+    os.chmod(path, 0o640)
+
+
+def _no_link(*args, **kwargs):
+    raise OSError(errno.EPERM, 'protected hardlinks')
+
+
+@pytest.mark.skipif(os.geteuid() != 0, reason='giving a file to another owner needs root')
+def test_a_copied_previous_content_comes_back_with_its_owner(dirs, monkeypatch):
+    pem = dirs['https'] / 'key.pem'
+    pem.write_bytes(b'KEY READ BY THE TLS GROUP')
+    _owned_elsewhere(pem)
+    staged = StagedFiles(base_dir=dirs['backups'].parent / 'staging')
+    staged.stage(pem, b'NEW')
+    with monkeypatch.context() as patched:
+        patched.setattr(files.os, 'link', _no_link)
+        staged.publish()
+    staged.unpublish()
+    staged.discard()
+    info = os.stat(pem)
+    assert (info.st_uid, info.st_gid, _mode(pem)) == (4321, 4322, 0o640)
+
+
+@pytest.mark.skipif(os.geteuid() != 0, reason='giving a file to another owner needs root')
+def test_a_restore_killed_after_a_copy_puts_back_its_owner(dirs, monkeypatch):
+    pem = dirs['https'] / 'key.pem'
+    pem.write_bytes(b'KEY READ BY THE TLS GROUP')
+    _owned_elsewhere(pem)
+    staged = StagedFiles(base_dir=dirs['backups'].parent / 'staging')
+    staged.stage(pem, b'NEW')
+    with monkeypatch.context() as patched:
+        patched.setattr(files.os, 'link', _no_link)
+        staged.publish()
+    files.sweep_kept_previous_contents()    # never committed: no row
+    info = os.stat(pem)
+    assert pem.read_bytes() == b'KEY READ BY THE TLS GROUP'
+    assert (info.st_uid, info.st_gid, _mode(pem)) == (4321, 4322, 0o640)
+
+
+def test_an_owner_a_copy_cannot_keep_stops_before_the_original_is_replaced(dirs, monkeypatch):
+    pem = dirs['https'] / 'key.pem'
+    pem.write_bytes(b'ORIGINAL')
+    info = os.stat(pem)
+    staged = StagedFiles(base_dir=dirs['backups'].parent / 'staging')
+    staged.stage(pem, b'NEW')
+    real_stat = files.os.stat
+
+    def stat_elsewhere(path, *args, **kwargs):
+        result = real_stat(path, *args, **kwargs)
+        if Path(path) == pem:
+            fields = list(result)
+            fields[4], fields[5] = result.st_uid + 7, result.st_gid + 7
+            return os.stat_result(fields)
+        return result
+
+    def no_chown(*args, **kwargs):
+        raise OSError(errno.EPERM, 'not permitted')
+    with monkeypatch.context() as patched:
+        patched.setattr(files.os, 'link', _no_link)
+        patched.setattr(files.os, 'stat', stat_elsewhere)
+        patched.setattr(files.os, 'fchown', no_chown)
+        with pytest.raises(OSError):
+            staged.publish()
+    staged.discard()
+    assert pem.read_bytes() == b'ORIGINAL' and os.stat(pem).st_ino == info.st_ino
