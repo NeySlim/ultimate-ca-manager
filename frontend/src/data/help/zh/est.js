@@ -14,7 +14,7 @@ export default {
       {
         title: '认证方式',
         items: [
-          { label: 'mTLS（双向 TLS）', text: '客户端在 TLS 握手期间提供证书,, 最强的认证方式' },
+          { label: 'mTLS（双向 TLS）', text: '客户端在 TLS 握手期间提供证书，最强的认证方式' },
           { label: 'HTTP Basic Auth', text: '在 mTLS 不可用时的用户名/密码回退方式。通过 PATCH /api/v2/est/config 设置 allow_empty_username 后，客户端也可以发送空用户名加密码（RFC 7030 §3.2.3，v2.252）' },
           { label: '出示的证书', text: '对于通过 mTLS 访问的 /simpleenroll 和 /serverkeygen，由 EST CA 签发的证书必须是该 CA 仍持有的证书：已吊销、已被取代或已删除的证书会被拒绝（RFC 7030 §3.3.2）；由本服务器的其他 CA 签发的证书，在其自身或其上级 CA 被吊销或已过期后会被拒绝（v2.252）；来自本服务器未持有的颁发机构的证书则交由 TLS 层处理' },
           { label: 'tls-unique 绑定', text: '带有 challengePassword 的 CSR 必须携带其到 UCM 的 TLS 1.2 连接的 tls-unique 值（RFC 7030 §3.5）；该值不同或无法验证（TLS 1.3、前置代理）时以 400 拒绝。/csrattrs 不要求该值。通过 PATCH /api/v2/est/config 设置的 ignore_challenge_password 会为在此处放入密码的客户端跳过该检查（v2.252）' },
@@ -34,13 +34,13 @@ export default {
       },
     ],
     tips: [
-      'EST 是 SCEP 的现代替代方案:, 新部署请优先使用 EST',
-      '使用 mTLS 认证获得最高安全性:, Basic Auth 是备用方案',
+      'EST 是 SCEP 的现代替代方案：新部署请优先使用 EST',
+      '使用 mTLS 认证获得最高安全性：Basic Auth 是备用方案',
       '/simplereenroll 端点要求客户端通过 mTLS 提供当前证书',
       '从 EST 端点选项卡复制端点 URL 以配置您的 EST 客户端',
     ],
     warnings: [
-      'EST 需要 HTTPS:, 客户端必须信任 UCM 服务器证书或 CA',
+      'EST 需要 HTTPS：客户端必须信任 UCM 服务器证书或 CA',
       'mTLS 认证需要正确的 TLS 终止配置（反向代理必须转发客户端证书）',
     ],
   },
@@ -59,6 +59,7 @@ export default {
 2. **签名 CA**: 选择为 EST 注册的证书签名的证书颁发机构
 3. **认证**: 配置 HTTP Basic Auth 凭据（用户名和密码）
 4. **证书有效期**: EST 签发证书的默认有效期（天数）
+5. **CA 标签**: 在 \`/.well-known/est/<label>/\` 下提供其他 CA。操作名称（\`cacerts\`、\`simpleenroll\`、\`simplereenroll\`、\`fullcmc\`、\`serverkeygen\`、\`csrattrs\`）不能用作标签（RFC 7030 §3.2.2，v2.252）
 
 ### 保存配置
 
@@ -68,22 +69,27 @@ export default {
 
 EST 支持两种认证方式：
 
-### 双向 TLS（mTLS）:, 推荐
+### 双向 TLS（mTLS）：推荐
 
 客户端在 TLS 握手期间提供证书。UCM 验证证书并自动认证客户端。
 
 - **最强方式**: 加密的客户端身份
 - **必须用于** \`/simplereenroll\`: 客户端必须提供当前证书
-- **出示的证书**: 对于 \`/simpleenroll\` 和 \`/serverkeygen\`，由 EST CA 签发的证书必须是该 CA 仍持有的证书：已吊销、已被取代或已删除的证书会被拒绝（RFC 7030 §3.3.2）；其他受信任颁发机构签发的证书仍会被接受
+- **端口 8443**: 当 UCM 终止 TLS 时，握手只接受 mTLS 受信任 CA（设置 → 安全）及其下级 CA 的证书；要对该分支之外的 EST CA 的证书进行重新注册，请信任两者之上的某个 CA (v2.252)
+- **出示的证书**: 对于 \`/simpleenroll\` 和 \`/serverkeygen\`，由 EST CA 签发的证书必须是该 CA 仍持有的证书：已吊销、已被取代或已删除的证书会被拒绝（RFC 7030 §3.3.2）。本服务器的另一个 CA 所签发的证书，在其自身或其上级 CA 被吊销或证书过期后会被拒绝 (v2.252)；来自本服务器不持有的颁发机构的证书则交由 TLS 层处理
+- **tls-unique 绑定**: 带有 \`challengePassword\` 的 CSR 必须携带其与 UCM 之间 TLS 1.2 连接的 \`tls-unique\` 值（RFC 7030 §3.5）；该值不一致或无法验证（TLS 1.3、前置代理）时，会以 400 拒绝；\`/csrattrs\` 不要求它。通过 \`PATCH /api/v2/est/config\` 设置的 \`ignore_challenge_password\` 会对在此处放入密码的客户端跳过该检查 (v2.252)
 - **依赖于** 正确的 TLS 终止配置（反向代理必须将 \`SSL_CLIENT_CERT\` 传递给 UCM）
 
-### HTTP Basic Auth:, 备用
+### HTTP Basic Auth：备用
 
 通过 HTTPS 进行用户名和密码认证。在 EST 设置中配置。
 
 - **设置更简单**: 不需要客户端证书
 - **安全性较低**: 凭据在每次请求中传输（由 HTTPS 保护）
 - **使用场景**: mTLS 基础设施不可用时
+- **仅密码**: 通过 \`PATCH /api/v2/est/config\` 设置 \`allow_empty_username\` 后，客户端可以发送空用户名加密码（RFC 7030 §3.2.3，v2.252）
+
+密钥已因泄露而吊销的 CSR 会以 400 拒绝；每一次注册拒绝（包括速率限制）都会以纯文本消息说明原因（RFC 8951 §5，v2.252）。
 
 ## EST 端点
 
@@ -92,7 +98,7 @@ EST 支持两种认证方式：
 ### GET /cacerts
 获取 CA 证书链。**无需认证。**
 
-用于引导信任:, 客户端在注册前获取 CA 证书。
+用于引导信任：客户端在注册前获取 CA 证书。
 
 \`\`\`bash
 curl -k https://your-server:8443/.well-known/est/cacerts | \\
@@ -113,7 +119,7 @@ curl -k --user est-user:est-password \\
 \`\`\`
 
 ### POST /simplereenroll
-续期已有证书。**需要 mTLS**: 客户端必须提供正在续期的证书。
+续期已有证书。**需要 mTLS**: 客户端必须提供正在续期的证书，否则返回 403。不含 SubjectAltName 的 CSR 沿用该证书自身的名称，原本没有则不带名称，而不是从 CN 构造名称（RFC 7030 §4.2.2，v2.252）。
 
 \`\`\`bash
 curl -k --cert client.pem --key client.key \\
@@ -123,7 +129,7 @@ curl -k --cert client.pem --key client.key \\
 \`\`\`
 
 ### GET /csrattrs
-获取服务器推荐的 CSR 属性（OID）。
+获取服务器推荐的 CSR 属性：keyUsage、subjectAltName 和 extKeyUsage 以裸 OID 形式给出，这是 RFC 9908 §5.2 对未指定值的 OID 所给出的形式（v2.252）。需要旧形式（OID 位于 extensionRequest 属性内）的客户端，可通过 \`PATCH /api/v2/est/config\` 设置 \`csrattrs_legacy_encoding\` 来获得。
 
 ### POST /serverkeygen
 服务器生成密钥对并返回证书和私钥。适用于客户端无法在本地生成密钥的场景。

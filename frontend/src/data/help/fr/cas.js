@@ -22,8 +22,8 @@ export default {
           { label: 'Réparation de chaîne', text: 'Corriger automatiquement les relations parent-enfant rompues' },
           { label: 'Importer la clé privée', text: 'Rattacher la clé privée d\'une CA qui ne détient que son certificat, pour qu\'elle puisse signer' },
           { label: 'Clé et validité', text: 'RSA-3072 par défaut, locale ou HSM. Validité de 1, 2, 3, 5, 10, 15 ou 20 ans, ou Personnalisée (jours) jusqu\'à 50 ans. Une CA RSA-2048 qui dépasserait 2030 est signalée : l\'ANSSI accepte RSA-2048 jusqu\'à fin 2030, l\'ETSI TS 119 312 jusqu\'à fin 2026' },
-          { label: 'Post-quantique (ML-DSA)', text: "ML-DSA-44, ML-DSA-65 ou ML-DSA-87 (FIPS 204, niveaux NIST 2, 3 et 5), générées en logiciel ou sur un fournisseur HSM qui prend en charge ML-DSA, et masquées en mode FIPS. Une clé ML-DSA signe sans digest séparé : la CA, ses CRL et ses réponses OCSP n'ont donc aucun digest à choisir. Une CA ML-DSA peut signer des certificats RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA" },
-          { label: 'EdDSA (Ed25519, Ed448)', text: "Clés Ed25519 ou Ed448 pour une CA racine, intermédiaire ou externe, en logiciel uniquement (aucun fournisseur HSM ne signe en EdDSA) et masquées en mode FIPS. Comme ML-DSA, une clé EdDSA signe sans digest, et la hiérarchie peut mélanger RSA, EC ou ML-DSA. Les navigateurs, Windows (CryptoAPI/CNG) et les clients SCEP n'acceptent pas ce qu'une CA EdDSA signe, quelle que soit la clé du certificat final : réservez-la aux consommateurs OpenSSL, Go ou Java 15+. SCEP et XCEP refusent une telle CA" },
+          { label: 'Post-quantique (ML-DSA)', text: "ML-DSA-44, ML-DSA-65 ou ML-DSA-87 (FIPS 204, niveaux NIST 2, 3 et 5), générées en logiciel ou sur un fournisseur HSM qui prend en charge ML-DSA ; en mode FIPS, seule une clé logicielle, proposée quand le module FIPS approuve ML-DSA (l'image Docker -fips le fait). Une clé ML-DSA signe sans digest séparé : la CA, ses CRL et ses réponses OCSP n'ont donc aucun digest à choisir. Une CA ML-DSA peut signer des certificats RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA" },
+          { label: 'EdDSA (Ed25519, Ed448)', text: "Clés Ed25519 ou Ed448 pour une CA racine, intermédiaire ou externe, en logiciel uniquement (aucun fournisseur HSM ne signe en EdDSA) et masquées en mode FIPS sauf si le module FIPS approuve EdDSA (l'image Docker -fips le fait). Comme ML-DSA, une clé EdDSA signe sans digest, et la hiérarchie peut mélanger RSA, EC ou ML-DSA. Les navigateurs, Windows (CryptoAPI/CNG) et les clients SCEP n'acceptent pas ce qu'une CA EdDSA signe, quelle que soit la clé du certificat final : réservez-la aux consommateurs OpenSSL, Go ou Java 15+. SCEP et XCEP refusent une telle CA" },
           { label: "Import EdDSA (v2.251)", text: "Une clé de CA Ed25519 ou Ed448 peut être importée avec son certificat, ou ensuite avec Importer la clé privée" },
           { label: "Condensat par défaut (v2.251)", text: "Sous une AC P-384 ou P-521, ce qui est signé sans condensat choisi (EST, SCEP, WSTEP, Sign CSR, formulaire d'émission, orders ACME sans condensat, CRL) utilise SHA-384 ou SHA-512 ; les politiques bornent les certificats, pas les CRL. Les CRL déjà émises ne changent pas : la suivante applique la règle" },
           { label: "Pas de clé privée (v2.247)", text: "Une CA détenue sans sa clé privée est marquée Pas de clé privée, avec une action Importer la clé privée. Les sélecteurs de CA indiquent combien de CA ils écartent faute de pouvoir signer" },
@@ -103,7 +103,7 @@ export default {
     warnings: [
       "Une CA ML-DSA ne peut pas encore être exportée en PKCS#12 ni en JKS : exportez le certificat et la clé privée en PEM. Les clients sans prise en charge de ML-DSA (OpenSSL avant 3.5, la plupart des navigateurs aujourd'hui) ne peuvent pas vérifier ce qu'elle signe",
       'Une CA ne peut pas être supprimée tant qu\'elle a des CA intermédiaires ou des certificats émis : révoquez-les et supprimez-les d\'abord',
-      'Les clés privées sont stockées chiffrées ; perdre la base de données signifie perdre les clés',
+      'Les clés privées sont stockées chiffrées sous la clé maître ; perdre la base de données, ou la clé maître sans sauvegarde UCM, signifie perdre les clés',
       'Les mots de passe du mode hors ligne ne sont PAS récupérables : stockez-les dans votre coffre-fort avant de confirmer',
       'Un certificat croisé ne remplace jamais le certificat propre d\'une CA : une intermédiaire qui serait re-certifiée sous un autre émetteur est refusée (409) sauf si vous la rattachez comme certificat croisé ou remplacez le certificat actuel ; un roulement de racine sous le même nom d\'émetteur le remplace',
       'Une racine auto-signée écrasée ou supprimée n\'est pas récupérée par Convertir en certificat croisé : restaurez-la depuis une sauvegarde, ou fournissez son certificat à Restaurer comme principal',
@@ -146,10 +146,8 @@ Tableau plat avec colonnes triables.
 1. Cliquez sur **Créer CA** et choisissez le type racine dans la boîte de dialogue
 2. Remplissez les champs du sujet (CN, O, OU, C, ST, L)
 3. Sélectionnez l'algorithme de clé (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87, EdDSA Ed25519/Ed448) : RSA-3072 par défaut
-4. Choisissez l'algorithme de signature (Auto, SHA-256/384/512. Auto aligne P-384 sur SHA-384)
-5. Définissez la période de validité : 1, 2, 3, 5, 10, 15 ou 20 ans, ou **Personnalisée (jours)** jusqu'à 50 ans (typiquement 10-20 ans pour les CA racines)
-6. Optionnel : ouvrez **Profil certificat (RFC 5280)** pour ajuster Key Usage / EKU
-7. Cliquez sur **Créer**
+4. Définissez la période de validité : 1, 2, 3, 5, 10, 15 ou 20 ans, ou **Personnalisée (jours)** jusqu'à 50 ans (typiquement 10-20 ans pour les CA racines)
+5. Cliquez sur **Créer**
 
 ### Créer une CA intermédiaire
 1. Cliquez sur **Créer CA** et choisissez le type intermédiaire dans la boîte de dialogue
@@ -163,14 +161,14 @@ Tableau plat avec colonnes triables.
 Le formulaire signale une CA RSA-2048 qui dépasserait 2030 : l'ANSSI accepte RSA-2048 jusqu'à fin 2030, l'ETSI TS 119 312 jusqu'à fin 2026. Choisissez RSA-3072 ou plus. Sous **Contraintes avancées (RFC 5280)**, les sous-arbres permis et exclus (DNS, plage IP, e-mail) limitent les noms que la CA peut certifier.
 
 ### CA post-quantiques (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** et **ML-DSA-87** (FIPS 204) sont listées avec leur niveau de sécurité NIST (2, 3 et 5). La clé est générée en logiciel, ou sur un fournisseur HSM qui gère ML-DSA (voir CA adossées HSM), et l'algorithme est masqué en mode FIPS.
+**ML-DSA-44**, **ML-DSA-65** et **ML-DSA-87** (FIPS 204) sont listées avec leur niveau de sécurité NIST (2, 3 et 5). La clé est générée en logiciel, ou sur un fournisseur HSM qui gère ML-DSA (voir CA adossées HSM) ; en mode FIPS, seule une clé logicielle est proposée, quand le module FIPS approuve ML-DSA (l'image Docker \`-fips\` le fait, RHEL 9 et Ubuntu 24.04 non).
 
 - Une clé ML-DSA signe sans digest séparé : le champ digest disparaît, et un digest envoyé par l'API est ignoré avec un avertissement. Les CRL et les réponses OCSP de la CA suivent la même règle.
 - Les hiérarchies peuvent se mélanger : une racine ML-DSA peut signer une intermédiaire RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA, qui utilise alors le digest de sa parente.
 - Une CA ML-DSA s'exporte en PEM ou DER, pas en PKCS#12 ni en JKS. Les clients sans prise en charge de ML-DSA (OpenSSL avant 3.5, la plupart des navigateurs aujourd'hui) ne peuvent pas vérifier ce qu'elle signe.
 
 ### CA EdDSA (Ed25519, Ed448)
-Des clés **Ed25519** et **Ed448** peuvent être générées pour une CA racine, intermédiaire ou externe, ou importées avec ou après le certificat de la CA. La clé est une clé logicielle (aucun fournisseur HSM ne signe en EdDSA), et l'algorithme est masqué en mode FIPS.
+Des clés **Ed25519** et **Ed448** peuvent être générées pour une CA racine, intermédiaire ou externe, ou importées avec ou après le certificat de la CA. La clé est une clé logicielle (aucun fournisseur HSM ne signe en EdDSA), et en mode FIPS l'algorithme n'est proposé que si le module FIPS l'approuve (l'image Docker \`-fips\` le fait, RHEL 9 et Ubuntu 24.04 non).
 
 - Une clé EdDSA signe sans digest, comme ML-DSA : le champ digest disparaît, et les CRL et les réponses OCSP suivent la même règle.
 - Les hiérarchies peuvent se mélanger : une CA EdDSA peut signer des intermédiaires et des certificats RSA, EC ou ML-DSA, et inversement.

@@ -9,7 +9,7 @@ export default {
         items: [
           { label: '身份提供商', text: '配置 IDP 元数据 URL 或上传 XML' },
           { label: 'SP 元数据 URL', text: '向您的 IDP 提供此 URL 以自动配置 UCM 作为服务提供商' },
-          { label: 'SP 证书', text: '元数据中包含的 UCM HTTPS 证书,, 必须被 IDP 信任，否则元数据将被拒绝' },
+          { label: 'SP 证书', text: '元数据中包含的 UCM HTTPS 证书，必须被 IDP 信任，否则元数据将被拒绝' },
           { label: 'Entity ID', text: 'UCM 服务提供商实体标识符' },
           { label: 'ACS URL', text: '断言消费者服务回调 URL' },
           { label: '属性映射', text: '左列：IdP 发送的属性名称。右列：对应填充的 UCM 字段（username、email、fullname 或 groups）。示例：user.userprincipalname → username。' },
@@ -61,7 +61,7 @@ export default {
       'UCM HTTPS 证书必须被 IDP 信任，SAML 元数据才能被接受',
     ],
     warnings: [
-      '错误配置的 SSO 可能会锁定所有用户:, 请始终保留本地管理员',
+      '错误配置的 SSO 可能会锁定所有用户：请始终保留本地管理员',
     ],
   },
   helpGuides: {
@@ -84,7 +84,7 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 此 URL 返回符合 SAML 2.0 的 XML 文档，包含：
 - **Entity ID**: UCM 的服务提供商标识符
 - **ACS URL**: 断言消费者服务端点（HTTP-POST）
-- **SLO URL**: 单点登出服务端点
+- **SLO URL**: 以 HTTP-Redirect 接收 LogoutResponse 的 IdP 端点；导入元数据时保留 HTTP-Redirect 单点登出服务的 ResponseLocation，否则保留其 Location。见下文单点登出
 - **签名证书**: UCM 的 HTTPS 证书用于签名验证
 - **NameID 格式**: 提供商的 **NameID 格式**设置（未指定、持久、电子邮件地址或临时），同时随每个登录请求发送。持久格式提供稳定的标识符；临时 NameID 绝不用于识别账户
 
@@ -151,11 +151,11 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 1. 在 UCM 中进入**设置 → SSO**
 2. 点击**添加提供商** → LDAP
 3. 输入 **LDAP 服务器**主机名和**端口**（LDAP 用 389，LDAPS 用 636）
-4. 为加密连接启用**使用 SSL**
+4. 启用**使用 SSL/TLS**（LDAPS，端口 636），或在端口 389 上启用**使用 StartTLS**：连接会在任何绑定之前切换到 TLS，证书验证相同。两者都不启用时，绑定和用户密码会以明文在网络上传输
 5. 输入**绑定 DN** 和**绑定密码**（服务账户凭据）
 6. 输入**基础 DN**（用户查找的搜索基础）
 7. 配置**用户筛选器**（例如 \`(uid={username})\` 或 AD 用 \`(sAMAccountName={username})\`）
-8. 映射 LDAP 属性：**用户名**、**邮箱**、**全名**
+8. 映射 LDAP 属性：**用户名**、**邮箱**、**全名**，以及**唯一 ID 属性**（\`entryUUID\`、\`objectGUID\`）。按 DN 绑定的账户会在下一次登录时迁移到此 ID；从一个 ID 属性改为另一个会拒绝所有已绑定的用户，直到先**解除 SSO 关联**再**关联到 SSO**
 9. 点击**测试连接**验证，然后**保存**并**启用**
 
 ### Active Directory

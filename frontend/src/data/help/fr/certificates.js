@@ -48,7 +48,7 @@ export default {
         title: 'EKU supplémentaires personnalisés (RFC 5280 §4.2.1.12)',
         content: 'Le formulaire d\'émission et la modale de signature de CSR exposent un sélecteur multi-valeurs « EKU supplémentaires » qui ajoute des OID Extended Key Usage en plus des EKU par défaut du type de certificat :',
         items: [
-          { label: 'Catalogue', text: '26 EKU connus (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.)' },
+          { label: 'Catalogue', text: '26 EKU connus dans une liste déroulante (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.)' },
           { label: 'OID libre', text: 'Tout OID pointé bien formé respectant ^[0-2](?:\\.(?:0|[1-9]\\d*)){1,15}$' },
           { label: 'Limite', text: 'Jusqu\'à 16 OID au total par certificat' },
           { label: 'Fusion (jamais remplacement)', text: 'Les EKU par défaut du type (par ex. serverAuth) restent verrouillés, les extras s\'ajoutent par-dessus' },
@@ -101,7 +101,7 @@ export default {
       'Dans une vue liée (ouverte depuis la vue d\'ensemble), le bouton Effacer tous les filtres affiché quand rien ne correspond vide les statuts du lien et la recherche et garde les autres filtres du lien ; retirer une puce retire ce filtre, le bouton d\'effacement de la rangée de puces quitte la vue liée, et vos filtres enregistrés ne sont pas touchés',
     ],
     warnings: [
-      'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée',
+      'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée (unhold) ou rendue permanente avec un autre motif',
       'Un certificat valide non révoqué ne peut pas être supprimé seul : Supprimer explique pourquoi et propose « Révoquer, puis supprimer », pour que la révocation atteigne la CRL/OCSP ; les révocations survivent à la suppression',
       'UCM signe uniquement en SHA-256, SHA-384 ou SHA-512 : SHA-224 et les noms de hachage inconnus sont refusés au lieu d\'être remplacés par SHA-256',
     ],
@@ -127,7 +127,7 @@ Gestion centralisée de tous les certificats X.509. Émettez de nouveaux certifi
 1. Cliquez sur **Émettre un certificat**
 2. Sélectionnez la **CA de signature** (doit posséder une clé privée)
 3. Remplissez le sujet (CN obligatoire, autres champs optionnels)
-4. Ajoutez des noms alternatifs du sujet (SAN) : noms DNS, IP, e-mails
+4. Ajoutez des noms alternatifs du sujet (SAN) : noms DNS, IP, e-mails. Un nom DNS suit la RFC 5280 : étiquettes séparées par des points, un joker seulement comme première étiquette, ni espace ni point final ; un nom internationalisé est émis sous sa forme A-label. Un CN serveur ou combiné contenant un tiret bas (\`my_host.example.com\`) est refusé quand il serait le nom DNS du certificat, c'est-à-dire sans SAN fourni et avec un modèle qui autorise les noms DNS. Une adresse e-mail du sujet va aussi dans le SAN, quel que soit le type
 5. Choisissez le type et la taille de la clé
 6. Définissez la période de validité
 7. Appliquez optionnellement un **modèle** pour préremplir les paramètres
@@ -193,6 +193,7 @@ Formats d'exportation :
 - **PEM + Chaîne** : Certificat avec ses CA émettrices (**Inclure la chaîne CA**) ; la CA racine n'est ajoutée que si **Inclure l'AC racine** est coché
 - **DER** : Format binaire
 - **PKCS#12** : Certificat + clé + chaîne, protégé par mot de passe
+> ⚠ L'export de la **clé privée** (PKCS#12/PFX, JKS ou fichier de clé) exige la permission **read:private_keys**, réservée aux admins. Les rôles qui ne la détiennent pas, y compris le rôle Opérateur intégré, doivent récupérer les clés archivées par le flux **Récupération de clés**, soumis à approbation.
 
 ## Paires de certificats hybrides (RFC 9763)
 

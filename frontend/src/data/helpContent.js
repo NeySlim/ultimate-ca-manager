@@ -1810,13 +1810,13 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Archived key', text: 'The certificate\'s private key must be stored in the database, recovery cannot reconstruct a key that was never archived' },
-          { label: 'Dual control', text: 'On by default: request and approval are separate actions by different people. Requests, approvals and downloads are written to the audit trail; a refused approval or download is not' },
+          { label: 'Dual control', text: 'On by default: request and approval are separate actions by different people. Requests, approvals, rejections and downloads are written to the audit trail, as are a self-approval refused by dual control and a download whose archive could not be built; a call refused for any other reason is not' },
         ]
       },
     ],
     tips: [
       'Key Recovery is for keys that were not exported when the certificate was issued; it is not a replacement for restricting key export at issuance time.',
-      'Every request, approval and download is recorded in the audit trail; refusals are not.',
+      'Every request, approval, rejection and download is recorded in the audit trail, as are a self-approval refused by dual control and a download that failed; a call refused for any other reason is not.',
     ],
     warnings: [
       'A certificate whose private key was never archived cannot be recovered: there is nothing to release.',

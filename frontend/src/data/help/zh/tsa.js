@@ -15,11 +15,11 @@ export default {
         title: '配置',
         items: [
           { label: '签名 CA', text: '未设置专用签名证书时，由其自身证书签署时间戳令牌的 CA。有效期之外的 CA 不会签名：/tsa 应答 503。严格校验器（openssl ts -verify、jarsigner）会拒绝由 CA 证书签署的令牌，CA 签名时页面会给出警告' },
-          { label: '策略 OID', text: 'TSA 策略的对象标识符（例如 1.2.3.4.1）,, 包含在每个时间戳响应中' },
+          { label: '策略 OID', text: 'TSA 策略的对象标识符，包含在每个时间戳响应中。默认值 1.2.3.4.1 是 OpenSSL 的示例 OID，属于页面会提示的占位符：请使用您组织 OID 弧下的 OID' },
           { label: '启用/禁用', text: '在不丢失配置的情况下开关 TSA 端点' },
-          { label: '要求专用证书', text: '可选启用：拒绝使用 CA 证书本身签署时间戳,, 需要一个带有关键 timeStamping EKU 的专用终端实体签名证书（RFC 3161）' },
-                  { label: '签名证书 (v2.217)', text: '使用从已签发证书中选择的专用终端实体证书（timeStamping EKU，由 UCM 持有的 RSA、ECDSA 或 ML-DSA 私钥；不提供 Ed25519 和 Ed448 证书，FIPS 模式下也不提供 ML-DSA）签署令牌。续期会被自动跟随；过期或被吊销的签名者会使请求以 503 失败，绝不回退到 CA 证书' },
-                  { label: '生成签名证书 (v2.218)', text: '一键签发专用的 RFC 3161 签名证书：CA:FALSE、KeyUsage 仅含 digitalSignature，外加关键且独占的 timeStamping EKU,, 正是严格校验器（openssl ts -verify）所要求的形态。证书由已配置的 TSA CA 签发，并在没有可用签名者时被自动选用。该证书的来源为 "manual"：请将 "manual" 加入自动续期来源，或在到期前自行续期' },
+          { label: '要求专用证书', text: '可选启用：拒绝使用 CA 证书本身签署时间戳，需要一个带有关键 timeStamping EKU 的专用终端实体签名证书（RFC 3161）' },
+                  { label: '签名证书 (v2.217)', text: '使用从已签发证书中选择的专用终端实体证书（timeStamping EKU，由 UCM 持有的 RSA、ECDSA 或 ML-DSA 私钥；不提供 Ed25519 和 Ed448 证书；FIPS 模块不批准 ML-DSA 时，FIPS 模式下也不提供 ML-DSA）签署令牌。续期会被自动跟随；过期或被吊销的签名者会使请求以 503 失败，绝不回退到 CA 证书' },
+                  { label: '生成签名证书 (v2.218)', text: '一键签发专用的 RFC 3161 签名证书：CA:FALSE、KeyUsage 仅含 digitalSignature，外加关键且独占的 timeStamping EKU，正是严格校验器（openssl ts -verify）所要求的形态。证书由已配置的 TSA CA 签发，并在没有可用签名者时被自动选用。该证书的来源为 "manual"：请将 "manual" 加入自动续期来源，或在到期前自行续期' },
         ]
       },
       {
@@ -37,7 +37,7 @@ export default {
       '携带任何扩展的请求会以 unacceptedExtension 拒绝，格式错误的请求以 badDataFormat 拒绝（RFC 3161 §2.4.1）',
       '令牌的 genTime 精确到整秒，声明精度为 1 秒，请求中的消息摘要按原样复制',
       '创建时间戳请求时使用 SHA-256 或更强的哈希算法',
-      '无需认证:, TSA 端点像 CRL/OCSP 一样是公开可访问的',
+      '无需认证：TSA 端点像 CRL/OCSP 一样是公开可访问的',
     ],
     warnings: [
       '启用 TSA 之前必须配置有效的签名 CA',
@@ -65,22 +65,23 @@ export default {
 
 1. **启用 TSA**: 开关 TSA 服务器
 2. **签名 CA**: 选择哪个证书颁发机构签署时间戳令牌
-3. **策略 OID**: TSA 策略的对象标识符（例如 \`1.2.3.4.1\`），包含在每个时间戳响应中
+3. **策略 OID**: TSA 策略的对象标识符，包含在每个时间戳响应中
+4. **要求专用 TSA 证书**: 可选启用：拒绝使用 CA 证书本身签署时间戳。启用后，需要一个带有**关键 timeStamping EKU**（RFC 3161）的专用终端实体签名证书
 
 ### 选择签名 CA
 
 签名 CA 的私钥用于签署每个时间戳令牌。最佳实践：
 
 - 使用**专用子 CA** 进行时间戳签发，而不是根 CA
-- CA 证书应包含 **id-kp-timeStamping** 扩展密钥用途（OID 1.3.6.1.5.5.7.3.8）
-- 确保 CA 证书有**足够的有效期**:: 时间戳必须在数年内保持可验证
+- RFC 3161 §2.3 要求签名者唯一且关键的 EKU 为 **id-kp-timeStamping**（OID 1.3.6.1.5.5.7.3.8），而 CA 证书若带有它就会失去其他用途。由 CA 证书签署的令牌会被严格校验器拒绝：\`openssl ts -verify\` 报“unsuitable certificate purpose”，jarsigner 报“Certificate is not valid for timestamping”。CA 证书签名期间，设置选项卡会给出警告：请在那里为这些客户端**生成专用签名证书**
+- 确保 CA 证书有**足够的有效期**：时间戳必须在数年内保持可验证。超出有效期的 CA 不会签名：\`/tsa\` 应答 503
 - 启用**要求专用时间戳证书**，在签名时强制执行此要求，而不是依赖约定
 
 ### 策略 OID
 
 策略 OID 标识时间戳签发所依据的 TSA 策略。它嵌入在每个 \`TimeStampResp\` 中。
 
-- 默认值：\`1.2.3.4.1\`（占位符）
+- 默认值：\`1.2.3.4.1\`（占位符：OpenSSL 的示例 OID，未分配给任何人；使用期间设置选项卡会给出警告）
 - 生产环境中，请在您组织的 OID 弧下注册一个 OID，或使用 CP/CPS 中的 OID
 
 ## TSA 端点选项卡
@@ -89,15 +90,15 @@ TSA 端点选项卡显示：
 
 - **TSA 端点 URL**: 可直接复制的客户端配置 URL
 - **使用示例**: 用于创建请求、发送请求和验证响应的 OpenSSL 命令
-- **统计数据**: 已处理的时间戳请求总数（成功和失败）
+- **统计数据**: 已处理的时间戳请求总数（成功和失败）；每个被拒绝的请求都会以 \`tsa.timestamp_rejected\` 及其失败代码写入审计
 
 ## 使用示例
 
 ### 创建时间戳请求
 
 \`\`\`bash
-# 对文件进行哈希并创建时间戳请求
-openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq
+# 对文件进行哈希并创建时间戳请求（-cert：嵌入签名者证书）
+openssl ts -query -data file.txt -sha256 -cert -out request.tsq
 \`\`\`
 
 ### 向 TSA 发送请求
@@ -117,11 +118,11 @@ openssl ts -verify -data file.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
 
-\`openssl ts -verify\` 仅校验 RSA 和 ECDSA 令牌。ML-DSA 令牌请用 \`openssl cms -verify\`（OpenSSL 3.5 或更高版本）校验，然后将其消息摘要与文件的哈希比对。
+\`openssl ts -verify\` 需要专用签名证书（由 CA 证书签署的令牌会失败），并且仅校验 RSA 和 ECDSA 令牌。ML-DSA 令牌请用 \`openssl cms -verify\`（OpenSSL 3.5 或更高版本）校验，然后将其消息摘要与文件的哈希比对。
 
 ### 代码签名与时间戳
 
-签署代码时，添加 TSA URL 以确保签名在证书过期后仍然有效：
+签署代码时，添加 TSA URL 以确保签名在证书过期后仍然有效。请先配置专用签名证书：jarsigner 会拒绝由 CA 证书签署的令牌（“Certificate is not valid for timestamping”）。
 
 \`\`\`bash
 # 使用时间戳签名（osslsigncode）
@@ -154,16 +155,20 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 | 端点 | \`/tsa\` (POST) |
 | Content-Type | \`application/timestamp-query\` |
 | 响应类型 | \`application/timestamp-reply\` |
-| 哈希算法 | SHA-256、SHA-384、SHA-512、SHA-1（旧版） |
+| 哈希算法 | SHA-256、SHA-384、SHA-512（SHA-1 和 MD5 会以 badAlg 拒绝） |
+| 请求扩展 | 不接受任何扩展：任何扩展，无论是否关键，都会以 unacceptedExtension 拒绝 |
+| 格式错误的请求 | badDataFormat（包括末尾多余的字节） |
+| genTime / accuracy | 整秒，精度 1 秒 |
+| 消息摘要 | 按请求原样复制 |
 | 认证 | 无（公共端点） |
 | 传输 | HTTP 或 HTTPS |
 
 ## 安全注意事项
 
-- TSA 端点是**公共的**:: 无需认证（与 CRL/OCSP 相同）
-- 每个时间戳响应都由 CA 密钥**签名**:: 客户端验证签名以确保真实性
-- 创建请求时使用 **SHA-256 或更强**的哈希算法（SHA-1 可接受但不推荐）
-- TSA **不会**看到原始文档:: 只传输哈希值
+- TSA 端点是**公共的**：无需认证（与 CRL/OCSP 相同）
+- 每个时间戳响应都由专用签名者或 CA 密钥**签名**：客户端验证签名以确保真实性
+- 创建请求时使用 **SHA-256 或更强**的哈希算法（SHA-1 会被拒绝）
+- TSA **不会**看到原始文档：只传输哈希值
 - 如果 TSA 端点暴露在互联网上，考虑**速率限制**
 
 > 💡 时间戳对代码签名至关重要：它们确保您的签名软件在签名证书过期后仍然受信任。

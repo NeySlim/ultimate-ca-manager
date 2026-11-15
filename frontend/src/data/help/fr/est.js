@@ -59,6 +59,7 @@ L'inscription par transport sécurisé (EST) est définie dans le **RFC 7030** e
 2. **CA de signature** : Sélectionner quelle autorité de certification signe les certificats inscrits via EST
 3. **Authentification** : Configurer les identifiants HTTP Basic Auth (nom d'utilisateur et mot de passe)
 4. **Validité du certificat** : Période de validité par défaut pour les certificats émis via EST (en jours)
+5. **Libellés de CA** : servez d'autres CA sous \`/.well-known/est/<label>/\`. Un nom d'opération (\`cacerts\`, \`simpleenroll\`, \`simplereenroll\`, \`fullcmc\`, \`serverkeygen\`, \`csrattrs\`) ne peut pas être un libellé (RFC 7030 §3.2.2, v2.252)
 
 ### Enregistrer la configuration
 
@@ -74,7 +75,6 @@ Le client présente un certificat lors de la poignée de main TLS. UCM valide le
 
 - **Méthode la plus forte** : identité client cryptographique
 - **Requis pour** \`/simplereenroll\` : le client doit présenter son certificat actuel
-- **Certificat présenté** : pour \`/simpleenroll\` et \`/serverkeygen\`, un certificat signé par la CA EST doit être un certificat qu'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2) ; un certificat d'une autre autorité de confiance reste accepté
 - **Port 8443** : quand UCM termine le TLS, la poignée de main accepte les certificats de la CA de confiance mTLS (Paramètres → Sécurité) et des CA situées en dessous uniquement ; pour ré-inscrire des certificats d'une CA EST hors de cette branche, faites confiance à une CA au-dessus des deux (v2.252)
 - **Certificat présenté** : pour \`/simpleenroll\` et \`/serverkeygen\`, un certificat signé par la CA EST doit être un certificat qu'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2). Un certificat qu'une autre CA de ce serveur a émis est refusé dès que lui ou une CA au-dessus est révoqué, ou une fois expiré (v2.252) ; celui d'une autorité que ce serveur ne détient pas est laissé à la couche TLS
 - **Liaison tls-unique** : une CSR avec un \`challengePassword\` doit porter la valeur \`tls-unique\` de sa connexion TLS 1.2 vers UCM (RFC 7030 §3.5), et est refusée avec 400 quand la valeur diffère ou ne peut pas être vérifiée (TLS 1.3, proxy devant) ; \`/csrattrs\` n'en demande pas. \`ignore_challenge_password\`, défini via \`PATCH /api/v2/est/config\`, désactive la vérification pour un client qui y met un mot de passe (v2.252)

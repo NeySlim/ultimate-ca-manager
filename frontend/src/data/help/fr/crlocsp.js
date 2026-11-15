@@ -97,7 +97,7 @@ OCSP fournit une vérification de statut de certificat en temps réel. Au lieu d
 ### Statut OCSP
 La section OCSP affiche :
 - **Statut du répondeur** : Actif ou inactif par CA
-- **Total des requêtes** : Nombre de requêtes OCSP traitées
+- **Total des requêtes** : Nombre de requêtes OCSP traitées depuis le démarrage du service, et combien provenaient du cache
 - **Cache** : Cache de réponses avec nettoyage automatique quotidien des entrées expirées
 
 ### Cache OCSP
