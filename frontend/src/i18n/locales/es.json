@@ -5871,7 +5871,13 @@
       "allowAnyPrincipal": "Permitir cualquier principal",
       "allowAnyPrincipalHelp": "Si no hay ningún principal en la lista, firmar para cualquier nombre, incluido root. Sin esta opción, una CA con la lista vacía no firma nada.",
       "allowCustomKeyId": "Permitir que los solicitantes definan el ID de clave",
-      "allowCustomKeyIdHelp": "sshd registra el ID de clave como identidad del titular. Sin esta opción, la CA nombra cada certificado principals@nombre de la CA."
+      "allowCustomKeyIdHelp": "sshd registra el ID de clave como identidad del titular. Sin esta opción, la CA nombra cada certificado principals@nombre de la CA.",
+      "keyStorageLockedHelp": "La clave de la AC y el tipo de AC no pueden cambiarse después de crear la AC.",
+      "hsmKeyHelper": "Solo una clave de firma RSA o ECDSA P-256/P-384/P-521 del HSM puede firmar certificados SSH. Añada o sincronice claves en la gestión HSM.",
+      "hsmNoUsableKeys": "Este proveedor no tiene una clave de firma RSA o ECDSA que una AC SSH pueda usar.",
+      "hsmKeyUsedBy": "ya usada por la AC {{caType}}",
+      "hsmKeyInUse": "Una AC SSH {{caType}} ya usa esta clave: {{name}}",
+      "hsmDerivedKey": "Tipo de clave del HSM: {{keyType}}"
     },
     "searchPlaceholder": "Buscar CAs SSH...",
     "downloadSetupScript": "Descargar script de configuración",

@@ -47,7 +47,7 @@ from services.backup import manifest
 from services.backup.export_generic import (
     REFERENCE_SUFFIX, IdentityIndex, export_section, load_model)
 from services.backup.restore import RestorePlan, single_transaction
-from services.backup.restore.plan import RestoreValidationError
+from services.backup.restore.plan import RestoreValidationError, _identified_by_a_reference
 # One round trip needs a second installation: its database, and the two keys
 # it reads it with. That machinery belongs to the cross-installation file,
 # which is where it is exercised for every section.
@@ -211,11 +211,17 @@ def _seed():
         targets='["10.0.0.0/30"]', ports='[443, 8443]', timeout=9,
         max_workers=3, resolve_dns=True))
 
-    db.session.add(HsmKey(
+    token_key = HsmKey(
         provider_id=hsm_providers[1].id,
         key_identifier=IDENTITIES['hsm_keys']['key_identifier'],
         label=f'{MARK} key', algorithm='rsa', key_type='rsa', purpose='sign',
-        public_key_pem=f'{MARK}-public-key', extra_data='{}'))
+        public_key_pem=f'{MARK}-public-key', extra_data='{}')
+    db.session.add(token_key)
+    # A second key, for the SSH CA's link to drift to
+    db.session.add(HsmKey(
+        provider_id=hsm_providers[1].id, key_identifier=f'{MARK}-hsm-key-other',
+        label=f'{MARK} key other', algorithm='rsa', key_type='rsa',
+        purpose='sign', public_key_pem=f'{MARK}-public-key-other', extra_data='{}'))
 
     db.session.add(CertificatePolicy(
         name=IDENTITIES['certificate_policies']['name'],
@@ -290,6 +296,11 @@ def _seed():
         key_type='ed25519', fingerprint=f'SHA256:{MARK}cert', source='web'))
 
     ssh_authorities[1].owner_group_id = groups[1].id
+    # An authority whose private key never left the token: the only key link it
+    # carries is the hsm_keys one
+    ssh_authorities[1].key_source = 'hsm'
+    ssh_authorities[1].private_key = ''
+    ssh_authorities[1].hsm_key_id = token_key.id
     db.session.commit()
 
     return {'groups': groups, 'templates': templates, 'users': users,
@@ -382,6 +393,24 @@ def _archived(section_name):
         f"this file writes exactly one {section_name} row and the archive "
         f"carries {len(rows)}")
     return json.loads(json.dumps(rows, default=str))
+
+
+def _archived_with_targets(section_name):
+    """The archive for one section, plus the archived rows its references name.
+
+    A section identified by what it points at -- an HSM key is its provider and
+    its key identifier -- can only be resolved from the identity that row itself
+    carries: the provider number beside the link is the source's, and only the
+    archived HSM key says which provider that number was. An archive without it
+    carries a link nothing here can be matched to, which is why a real backup
+    writes the referenced sections as well as the referencing one.
+    """
+    payload = {section_name: _archived(section_name)}
+    for target in _section(section_name).references.values():
+        if target not in payload and target in IDENTITIES \
+                and _identified_by_a_reference(_section(target)):
+            payload[target] = _archived(target)
+    return payload
 
 
 def _serialised(value):
@@ -536,9 +565,10 @@ class TestARowAlreadyHereGoesBackToTheArchive:
     def test_every_column_the_manifest_carries_is_restored(
             self, app, seeded, section_name):
         with app.app_context():
-            archived = _archived(section_name)[0]
+            payload = _archived_with_targets(section_name)
+            archived = payload[section_name][0]
             _drift(section_name)
-            _restore({section_name: [archived]}, section_name)
+            _restore(payload, section_name)
 
             section = _section(section_name)
             row = _row(section_name)
@@ -567,10 +597,11 @@ class TestARowAlreadyHereGoesBackToTheArchive:
         wholesale would write.
         """
         with app.app_context():
-            archived = dict(_archived(section_name)[0], id=SOURCE_ID)
+            payload = _archived_with_targets(section_name)
+            archived = dict(payload[section_name][0], id=SOURCE_ID)
             before = _row(section_name).id
             assert before != SOURCE_ID, 'the test would prove nothing'
-            _restore({section_name: [archived]}, section_name)
+            _restore(payload, section_name)
 
             row = _row(section_name)
             assert row.id == before, (
@@ -689,7 +720,8 @@ class TestAReferenceLandsOnTheRowTheArchiveNames:
     def test_the_source_s_number_is_not_what_is_written(
             self, app, seeded, section_name, column):
         with app.app_context():
-            archived = _archived(section_name)[0]
+            payload = _archived_with_targets(section_name)
+            archived = payload[section_name][0]
             here = archived[column]
             assert here is not None, (
                 f'the seeded {section_name} row must carry {column}')
@@ -700,7 +732,7 @@ class TestAReferenceLandsOnTheRowTheArchiveNames:
             # The same row, as an installation that numbered it differently
             # would have written it.
             archived[column] = SOURCE_ID
-            _restore({section_name: [archived]}, section_name)
+            _restore(payload, section_name)
 
             row = _row(section_name)
             landed = getattr(row, _attribute_of(type(row), column))

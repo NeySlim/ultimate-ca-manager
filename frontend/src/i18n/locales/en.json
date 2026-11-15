@@ -5876,7 +5876,13 @@
       "allowAnyPrincipal": "Allow any principal",
       "allowAnyPrincipalHelp": "When no principal is listed, sign for any name, root included. Without it, a CA with an empty list signs nothing.",
       "allowCustomKeyId": "Let requesters set the key ID",
-      "allowCustomKeyIdHelp": "sshd logs the key ID as the holder's identity. Without this, the CA names every certificate principals@CA name."
+      "allowCustomKeyIdHelp": "sshd logs the key ID as the holder's identity. Without this, the CA names every certificate principals@CA name.",
+      "keyStorageLockedHelp": "The CA key and CA type cannot be changed after the CA is created.",
+      "hsmKeyHelper": "Only an RSA or ECDSA P-256/P-384/P-521 signing key held by the HSM can sign SSH certificates. Add or sync keys in HSM Management.",
+      "hsmNoUsableKeys": "This provider has no RSA or ECDSA signing key an SSH CA could use.",
+      "hsmKeyUsedBy": "already used by the {{caType}} CA",
+      "hsmKeyInUse": "An SSH {{caType}} CA already uses this key: {{name}}",
+      "hsmDerivedKey": "Key type from the HSM: {{keyType}}"
     },
     "searchPlaceholder": "Search SSH CAs...",
     "quickInstall": "Quick Install",

@@ -171,30 +171,52 @@ def create_ssh_ca():
             return error_response('Description is required', 400)
 
         ca_type = (data.get('ca_type') or 'user').strip().lower()
-        key_type = normalize_key_type(data.get('key_type'))
 
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
-        ca = SSHCAService.create_ca(
-            descr=descr,
-            ca_type=ca_type,
-            key_type=key_type,
-            username=username,
-            default_ttl=data.get('default_ttl'),
-            max_ttl=data.get('max_ttl', 0),
-            default_extensions=data.get('default_extensions'),
-            allowed_principals=_allowed_principals(data),
-            allow_any_principal=_opt_in(data, 'allow_any_principal'),
-            allow_custom_key_id=_opt_in(data, 'allow_custom_key_id'),
-            comment=data.get('comment'),
-        )
+        hsm_key_id = data.get('hsm_key_id')
+        if hsm_key_id is not None:
+            # An HSM-backed CA: the private key stays on the token
+            try:
+                hsm_key_id = int(hsm_key_id)
+            except (TypeError, ValueError):
+                return error_response('hsm_key_id must be an integer', 400)
+            ca = SSHCAService.import_hsm_ca(
+                descr=descr,
+                ca_type=ca_type,
+                hsm_key_id=hsm_key_id,
+                username=username,
+                default_ttl=data.get('default_ttl'),
+                max_ttl=data.get('max_ttl', 0),
+                default_extensions=data.get('default_extensions'),
+                allowed_principals=_allowed_principals(data),
+                allow_any_principal=_opt_in(data, 'allow_any_principal'),
+                allow_custom_key_id=_opt_in(data, 'allow_custom_key_id'),
+                comment=data.get('comment'),
+            )
+        else:
+            key_type = normalize_key_type(data.get('key_type'))
+            ca = SSHCAService.create_ca(
+                descr=descr,
+                ca_type=ca_type,
+                key_type=key_type,
+                username=username,
+                default_ttl=data.get('default_ttl'),
+                max_ttl=data.get('max_ttl', 0),
+                default_extensions=data.get('default_extensions'),
+                allowed_principals=_allowed_principals(data),
+                allow_any_principal=_opt_in(data, 'allow_any_principal'),
+                allow_custom_key_id=_opt_in(data, 'allow_custom_key_id'),
+                comment=data.get('comment'),
+            )
 
         AuditService.log_action(
             action='ssh_ca_created',
             resource_type='ssh_ca',
             resource_id=str(ca.id),
             resource_name=ca.descr,
-            details=f'SSH CA "{ca.descr}" created ({ca_type}, {key_type})',
+            details=f'SSH CA "{ca.descr}" created ({ca_type}, {ca.key_type}'
+                    f'{", HSM" if ca.key_source == "hsm" else ""})',
             success=True,
             username=username,
         )
