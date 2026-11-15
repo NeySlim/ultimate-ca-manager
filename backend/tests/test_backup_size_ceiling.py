@@ -112,7 +112,11 @@ def operator_client(app, create_user):
                                      'password': 'TestPass123!'}),
                     content_type='application/json')
     assert r.status_code == 200, r.data
-    return client
+    yield client
+    with app.app_context():
+        from models import User
+        User.query.filter_by(username='op_backup_ceiling').delete()
+        db.session.commit()
 
 
 def _archive(directory, name, size, age_days):
