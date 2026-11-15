@@ -6,11 +6,13 @@ The token is a stand-in that answers like one, signing through pyca. A real modu
 runs only when UCM_TEST_PKCS11_MLDSA_MODULE names one (SoftHSM 2.6 has no ML-DSA).
 """
 import os
+import shutil
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import mldsa
 
+from tests.optional_backends import needs
 from services.hsm.base_provider import HsmOperationError
 from services.hsm.pkcs11_provider import PKCS11_AVAILABLE
 from utils import key_algorithms
@@ -175,7 +177,7 @@ def _release(lib_path):
         lib.finalize()
 
 
-@pytest.mark.skipif(not os.path.exists(SOFTHSM_LIB), reason='SoftHSM not installed')
+@needs('softhsm', os.path.exists(SOFTHSM_LIB) and shutil.which('softhsm2-util'), reason='SoftHSM not installed')
 def test_a_token_without_ml_dsa_refuses_generation_cleanly(tmp_path, monkeypatch):
     import subprocess
     from services.hsm.pkcs11_provider import Pkcs11Provider

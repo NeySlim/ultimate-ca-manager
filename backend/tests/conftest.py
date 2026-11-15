@@ -171,6 +171,11 @@ def pytest_collection_modifyitems(config, items):
             reason = marker.kwargs.get('reason') or (marker.args[0] if marker.args else '')
             item.add_marker(pytest.mark.skip(reason=f'SQLite only: {reason}'))
 
+
+# needs_softhsm / needs_gssapi: skipped without the backend, failed under UCM_TEST_REQUIRE_<NAME>=1
+from tests.optional_backends import (  # noqa: E402,F401
+    pytest_configure, pytest_runtest_makereport, pytest_runtest_setup)
+
 # The host's master key, when the machine runs UCM, must not reach the tests:
 # rows encrypted with it outlive the test that wrote them and break any later
 # test that switches keys. The suite starts unencrypted, as on CI.

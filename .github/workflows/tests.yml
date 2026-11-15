@@ -401,7 +401,70 @@ jobs:
           files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 3 ../scripts/ci/pg-app-tests.txt)
           [ -n "$files" ]
           pytest --tb=short $files
-  
+
+  # The tests of a real SoftHSM token and of the system GSSAPI, both installed here.
+  # Selected by marker; a skip of a marked test fails the job (tests/optional_backends.py).
+  test-optional-backends:
+    name: Backend Tests (SoftHSM, GSSAPI)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev softhsm2
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          pip install --no-deps pyjks==20.0.0
+          # The Kerberos extra at the pyspnego version of the requirements, as the image does
+          pip install "pyspnego[kerberos]==$(pip show pyspnego | sed -n 's/^Version: //p')"
+
+      # Every token lives in the job's temporary directory, never in the system token store
+      - name: Throwaway SoftHSM configuration
+        run: |
+          mkdir -p "${{ runner.temp }}/softhsm/tokens"
+          printf '%s\n' 'directories.tokendir = ${{ runner.temp }}/softhsm/tokens' \
+            'objectstore.backend = file' 'log.level = ERROR' > "${{ runner.temp }}/softhsm2.conf"
+
+      - name: Run the SoftHSM tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          SOFTHSM2_CONF: ${{ runner.temp }}/softhsm2.conf
+          UCM_TEST_REQUIRE_SOFTHSM: '1'
+        run: |
+          cd backend
+          pytest --tb=short -rs -m needs_softhsm tests/
+
+      - name: Run the GSSAPI tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          UCM_TEST_REQUIRE_GSSAPI: '1'
+        run: |
+          cd backend
+          pytest --tb=short -rs -m needs_gssapi tests/
+
   # Two real UCM nodes in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
   # Manual only: run the workflow by hand with the `ha` input ticked.
   test-ha-bench:

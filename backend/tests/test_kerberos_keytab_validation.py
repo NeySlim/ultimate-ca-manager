@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from services.kerberos import negotiate_auth
+from tests.optional_backends import needs
 from tests.windows_profile_support import windows_profiles_restored, upload_keytab  # noqa: F401
 
 try:
@@ -26,8 +27,8 @@ try:
 except ImportError:
     HAS_GSSAPI = False
 
-requires_gssapi = pytest.mark.skipif(
-    not HAS_GSSAPI,
+requires_gssapi = needs(
+    'gssapi', HAS_GSSAPI,
     reason='gssapi not installed (optional pyspnego[kerberos] extra); '
            'positive-parse cases need the real GSSAPI keytab loader',
 )

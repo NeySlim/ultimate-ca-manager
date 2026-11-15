@@ -15,6 +15,7 @@ from services import cluster_commands as cc
 from services import shared_files, windows_profiles
 from services.kerberos import keytab_format, negotiate_auth
 from tests.keytab_support import keytab, negotiate_header
+from tests.optional_backends import needs
 from tests.windows_profile_support import upload_keytab
 
 try:
@@ -24,7 +25,7 @@ try:
 except ImportError:
     HAS_GSSAPI = False
 
-requires_gssapi = pytest.mark.skipif(not HAS_GSSAPI, reason='needs pyspnego[kerberos]')
+requires_gssapi = needs('gssapi', HAS_GSSAPI, reason='needs pyspnego[kerberos]')
 
 HOST = 'ucm.example.test'
 ONE = keytab(f'HTTP/{HOST}@ONE.TEST')

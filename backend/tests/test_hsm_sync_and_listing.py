@@ -15,6 +15,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from tests.optional_backends import needs
 from services.hsm.base_provider import HsmKeyInfo
 
 pkcs11 = pytest.importorskip('pkcs11')
@@ -27,8 +28,7 @@ SOFTHSM_MODULES = ('/usr/lib/softhsm/libsofthsm2.so',
                    '/usr/lib64/pkcs11/libsofthsm2.so',
                    '/usr/local/lib/softhsm/libsofthsm2.so')
 SOFTHSM_MODULE = next((m for m in SOFTHSM_MODULES if os.path.exists(m)), None)
-needs_softhsm = pytest.mark.skipif(
-    not (SOFTHSM_MODULE and shutil.which('softhsm2-util')), reason='SoftHSM not installed')
+needs_softhsm = needs('softhsm', SOFTHSM_MODULE and shutil.which('softhsm2-util'), reason='SoftHSM not installed')
 
 
 # ---------------------------------------------------------------------------
