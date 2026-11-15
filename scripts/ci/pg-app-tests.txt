@@ -77,4 +77,5 @@ tests/test_import_weak_ca_key.py
 tests/test_import_parent_link.py
 tests/test_relink_parent_self_signed_first.py
 tests/test_ca_parent_confirmation.py
+tests/test_import_triggers_deploy.py
 tests/test_unique_subject*.py
