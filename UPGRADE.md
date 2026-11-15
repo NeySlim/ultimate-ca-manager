@@ -170,6 +170,7 @@ Database migrations run automatically at startup.
 - **FIPS image: TLS 1.2 without Extended Master Secret is refused.** The 3.5.9 module enforces EMS (RFC 7627) for TLS 1.2, in both directions: a client that does not send it cannot connect, and an outgoing connection (ACME server, LDAP, SMTP, webhook, DNS API, PostgreSQL) to a TLS 1.2 server without it fails with a TLS internal error. TLS 1.3 is not affected; there is no setting to lift it in the approved mode, update the peer instead.
 - **FIPS mode: RSA sizes.** In FIPS mode a request whose RSA key has an even length other than 2048, 3072 and 4096 bits, up to 16384 (RSA-8192 among them), refused by 2.254, is now signed; an odd length or one over 16384 bits stays refused at issuance and is now also refused for an OCSP responder or a TSA signer key.
 - **FIPS mode: HMAC secrets of 14 bytes or more.** Saving a webhook secret or an RFC 2136 TSIG key shorter than 14 bytes (112 bits) is refused in FIPS mode, on every module. A TSIG key already saved keeps working; a webhook secret, Constellix, DNS Made Easy, INWX or Tencent Cloud secret or external EAB key already saved that short now fails when used in FIPS mode, with the FIPS reason, and a `SECRET_KEY` that short makes every sign-in fail. The FIPS readiness check lists them under `hmac.short_secret`, and the `SECRET_KEY` as the blocker `session.short_secret_key`: replace them before the switch.
+- **FIPS mode: HSM keys.** 2.x checked an HSM key against FIPS mode only when it was generated, so a CA bound to a key that FIPS mode refuses (RSA under 2048 bits, of an odd length or over 16384 bits, an elliptic curve other than P-256, P-384 and P-521, or Ed25519, Ed448 and ML-DSA, which not every FIPS module approves) kept signing. In FIPS mode 3.0 refuses to sign with such a key, whatever the module: its CA issues no certificate and no CRL, and its OCSP, unless it has a delegated responder, answers `unauthorized`. The FIPS readiness check lists these keys under `hsm.unapproved_keys`: replace them before the switch, or keep their CAs on an instance without FIPS mode.
 - In-app help is available in English, French and Chinese only; with the interface in German, Spanish, Italian, Japanese, Portuguese or Ukrainian the help panel shows the English text. The interface itself keeps its nine languages.
 - Private-key encryption becomes an envelope: the key in `master.key` or `KEY_ENCRYPTION_KEY` (the KEK) wraps a data key stored in the database. Nothing is re-encrypted at the upgrade and the KEK stays the only secret to back up. A KEK is now changed by hand with the previous one in `master.key.previous` or `KEY_ENCRYPTION_KEY_PREVIOUS` (see the Admin Guide); swapping the key without it puts UCM in safe mode while encryption is enabled, and in HA also once it was disabled. Disabling encryption with `KEY_ENCRYPTION_KEY` set no longer answers 409: the variable stays configured and unused.
 - No default administrator password: a new installation no longer creates `admin` / `changeme123`. Automation that logged in with `changeme123` after a fresh install must provide the password (`INITIAL_ADMIN_PASSWORD_FILE` or `INITIAL_ADMIN_PASSWORD`) or read the generated one from `DATA_DIR/initial-admin-password` and change it, as the first login requires for a generated password. An existing installation is not touched: its administrator and its password stay as they are, and no file is generated (for its sessions, see *Sessions* below).
@@ -203,9 +204,11 @@ Database migrations run automatically at startup.
 - Session key rotation: with private-key encryption enabled, `POST /api/v2/system/security/rotate-secrets` stores the new key in the database without a restart, and the previous key stays accepted for 24 hours (`previous_accepted_until` in the answer); another rotation is refused until then. `auto_apply: false`, which returned the manual steps in 2.x, now answers 400 in this mode. A rotation signs nobody out: to close sessions, reset the account's password (`POST /api/v2/users/{id}/reset-password`), or let the user close the others (`POST /api/v2/account/sessions/revoke-all`). With encryption disabled the rotation rewrites `ucm.env` and restarts the service, as in 2.x, and is refused in HA.
 - New permission `read:dashboard`: the overview routes `/api/v2/dashboard/compliance`, `/api/v2/dashboard/health`, `/api/v2/dashboard/issuance` and `/api/v2/dashboard/queue` require it. Every built-in role grants it, so accounts keep the overview; an API key whose scopes are listed one by one needs it added to call them. The other dashboard routes of 2.x keep their checks.
 - Certificate serial numbers: `serial_number` is stored and returned as a decimal string, where 2.x stored the hexadecimal one; the upgrade rewrites the stored serials of certificates and revocation records (duplicates aside, below), and the serial inside each signed certificate does not change. Update scripts that compare or parse it as hexadecimal, and keep it a string (it can exceed the integer range of JavaScript).
-- API clients of `POST /api/v2/database/switch`: a switch stopped by a transient failure (lost connection, deadlock, locked database) once the target answered its connection test, before or during the copy, answers 503 instead of 409 or 500, and a target whose copied accounts did not pass their verification is copied again on retry instead of being taken as it is.
+- API clients of `POST /api/v2/database/switch`: a switch stopped by a transient failure (lost connection, deadlock, locked database) once the target answered its connection test, before or during the copy, answers 503 instead of 409 or 500, and a target whose copied accounts did not pass their verification is copied again on retry instead of being taken as it is. A target that a failed attempt wrote no longer has to be reset: once the cause is corrected, retrying on it resumes the switch. A switch to a target, or back to SQLite, whose database 3.0 would refuse to start (see *Start from 2.254*) answers 409 before anything is written.
 - Account API clients: a password checked again in a session (`POST /api/v2/account/password`, `current_password` on one's own `PUT /api/v2/users/{id}` or `reset-password`, `PUT /api/v2/account/2fa/webauthn`) answers 429 after `max_login_attempts` wrong tries, even for the right one, until `lockout_duration` has passed. A change of second factor (TOTP, recovery codes, security keys) now closes the account's other sessions, as a password change already did: a script holding a second session of that account gets 401 and signs in again.
 - Login lockout: `max_login_attempts` below 3 is refused with 400 when saved (`PATCH /api/v2/settings/general`).
+- Dashboard activity: `GET /api/v2/dashboard/activity` answers 500 (`Activity log unavailable`) when the audit log cannot be read, where 2.x answered 200 with an empty list; treat it as an error, not as an empty feed.
+- Certificate hold of a related pair: `POST /api/v2/certificates/{id}/unhold` now lifts the hold of the other member of the pair too, as a revocation already takes both; send `{"unhold_related": false}` to lift one alone. The answer names the other one in `related_unheld`, and the webhook event `certificate.unheld` is now sent for each certificate lifted.
 - Audit and syslog consumers (SIEM): a restore refused before its archive was read is now audited as a failed `system_restore` whose text starts with `Restore request refused: ` followed by the reason; match on that prefix. Version 2.x wrote no audit line for these refusals.
 - SCEP: a PKCSReq signed by a certificate issued through the same endpoint is now a renewal. Its CSR must keep that certificate's subject and SANs, and the signer must not be revoked, expired or superseded: 2.x issued such a request as a new certificate when its challenge was valid, 3.0 refuses it with `badMessageCheck`. A device that changes its subject must sign its request with a self-signed key.
 - Windows enrollment, renewal by certificate: 2.x renewed over the Certificate binding any certificate of the WSTEP CA, including one signed in the interface and then renewed with `certreq -Renew`. 3.0 renews there only a certificate issued through Windows enrollment and refuses the others (`The certificate was not issued through Windows enrollment`, audited); reissue such a certificate through Windows enrollment (autoenrollment or `certreq` against the policy), whose renewals then work.
@@ -228,6 +231,16 @@ Database migrations run automatically at startup.
 - CA digest: an intermediate CA created without a digest (`auto`) is now signed with a hash at least as strong as the parent key's own (SHA-384 under a P-384 parent, where 2.x could choose SHA-256 for an RSA child). Existing certificates are not reissued.
 - SCEP replies: 2.x signed every CertRep with SHA-256. 3.0 signs it with the digest of the request when it is SHA-256, SHA-384 or SHA-512; test devices that accept only a SHA-256 reply.
 - Login lockout: a `max_login_attempts` below 3 saved by 2.x is applied as 3.
+- PostgreSQL connections: each pooled connection is checked before use and carries TCP keepalives, and a server that does not accept a connection within 10 seconds fails the attempt, where 2.x set no timeout; `connect_timeout` or a `keepalives` setting in `DATABASE_URL` takes precedence. Without Redis, each UCM process also opens for the sessions a second pool sized like the first (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`), and each web worker keeps one more connection open to receive events: check the server's `max_connections` against the number of processes.
+- HTTP protocol port: saving a new `http_protocol_port` (`PATCH /api/v2/settings/general`) now restarts the service of a package installation at once, a rolling restart in HA, and asks for a restart of a container (`needs_restart`, `restart_message`); 2.x saved it and bound it at the next restart. With `HTTP_PROTOCOL_PORT` set, the setting reads that port, and another value saved stays unused, which the answer says.
+- Webhooks and notifications: `certificate.issued` (`certificate.renewed` for a renewal) is now also sent for a certificate issued after an approval, through an AD CS connection or through the ACME proxy, and for a first certificate, or a renewal into a new row, obtained by the ACME client (2.x already sent `certificate.renewed` for an ACME client renewal in place); `certificate.imported` for a certificate imported by the import route, an mTLS import or an OPNsense import; `ca.created` (then `ca.updated`) for a CA brought in by the certificate import. 2.x did not send the other events on these paths: review the webhooks subscribed to them.
+- Expiry webhooks: `certificate.expired` now covers every certificate expired since the previous pass, up to 30 days back, so a stop of UCM no longer loses the expiries in between and a second pass does not announce them again. 2.x announced those of the last 24 hours at each pass; the first pass of 3.0 does the same.
+- Revoking a certificate obtained by the ACME client (in the interface or the API, one by one, in bulk or after an approval) now also revokes it at the ACME CA that issued it, and a revocation that CA does not confirm is sent again by the scheduler until it does; a hold stays in UCM. 2.x revoked it in UCM only. Keep the network access and the ACME account the certificate was ordered with.
+- Renewal over EST, SCEP or WSTEP: the deploy bindings and the HTTPS listener binding of the renewed certificate now move to the new one, where 2.x left them on the archived certificate. A binding that sends the private key, and the HTTPS binding, move only when UCM holds the new key; otherwise they stay on the previous certificate and are flagged (event `certificate.binding_left_behind`) until the key is imported or the binding is set again.
+- CRL signing key: a CA whose stored key is not the key of its certificate (a certificate or key replaced alone) no longer signs a CRL that nobody can verify: the scheduled CRL is skipped with an error in the log, and `POST /api/v2/crl/{id}/regenerate` and `/delta/regenerate` answer 409.
+- After a restore, UCM signs a new CRL (and delta CRL) for each CA that publishes one with its own key, so the distribution point no longer serves the CRL of the replaced instance until the next scheduled one; the restore summary names the CAs whose CRL could not be signed.
+- Common names with a comma: `common_name` of certificates and CAs, and `cn` and `issuer_name` of certificates, now return the whole name, unescaped (`Doe, John` for `CN=Doe\, John`, where 2.x returned `Doe\`); the signed subject does not change. Update scripts that match on the shortened name.
+- Discovery on a PostgreSQL server whose time zone is not UTC: the validity dates of discovered certificates are now stored in UTC like every other date; those a 2.x scan stored stay shifted by the server's offset until the next scan of their target rewrites them.
 
 #### Interface
 
@@ -274,27 +287,27 @@ Notes:
 
 ### Upgrading to v2.193
 
-**No breaking changes for typical deployments** — safe to upgrade directly.
+**No breaking changes for typical deployments**: safe to upgrade directly.
 
-**ACME proxy — loopback upstreams now rejected.** The ACME proxy's upstream calls (directory, nonce, signed POST) now go through the same SSRF-hardened HTTP path as the ACME client: cloud-metadata and **loopback** targets are rejected. If your proxy upstream directory URL points at `localhost` / `127.0.0.1` (e.g. a self-referencing test setup), the proxy directory endpoint will return an error after upgrade. Point it at a routable address instead (a LAN IP or hostname — RFC1918 and `.lan`/`.local` remain fully supported). Regular upstreams (Let's Encrypt, internal CAs on LAN addresses) are unaffected.
+**ACME proxy: loopback upstreams now rejected.** The ACME proxy's upstream calls (directory, nonce, signed POST) now go through the same SSRF-hardened HTTP path as the ACME client: cloud-metadata and **loopback** targets are rejected. If your proxy upstream directory URL points at `localhost` / `127.0.0.1` (e.g. a self-referencing test setup), the proxy directory endpoint will return an error after upgrade. Point it at a routable address instead (a LAN IP or hostname; RFC1918 and `.lan`/`.local` remain fully supported). Regular upstreams (Let's Encrypt, internal CAs on LAN addresses) are unaffected.
 
 **SoftHSM provider config normalized automatically.** Migration 057 rewrites legacy `library_path`/`pin` config keys to `module_path`/`user_pin` on all PKCS#11 providers; the `SoftHSM-Default` provider's *Test connection* works again after upgrade with no manual action.
 
 ### Upgrading to v2.56 from v2.5x
 
-**No breaking changes** — safe to upgrade directly.
+**No breaking changes**: safe to upgrade directly.
 
 **Fixed in v2.55–v2.56:**
 - Certificate subject/issuer fields now use standard RFC 4514 format (CN=, C=, O= instead of verbose names)
 - Existing certificates with wrong format are auto-corrected by migration on startup
-- ACME/CSR-signed certificates now include Extended Key Usage (`serverAuth`) — fixes Edge/Chrome rejecting certs
+- ACME/CSR-signed certificates now include Extended Key Usage (`serverAuth`), which fixes Edge/Chrome rejecting certs
 - CSRs with empty subject (common from ACME clients) now get CN populated from SAN
 
 **Note:** Existing ACME certificates need to be re-issued to benefit from the EKU fix.
 
 ### Upgrading to v2.52 from v2.48–v2.51
 
-**No breaking changes** — safe to upgrade directly.
+**No breaking changes**: safe to upgrade directly.
 
 **New in v2.49–v2.52:**
 - Certificate Discovery with network scanning (scan profiles, scheduling, results management)
@@ -310,7 +323,7 @@ Notes:
 
 ### Upgrading to v2.48 from v2.1.x
 
-**No breaking changes** — safe to upgrade directly.
+**No breaking changes**: safe to upgrade directly.
 
 > **Note:** UCM switched from Semantic Versioning (2.1.x) to Major.Build versioning (2.48) starting with this release. The version jump from 2.1.x to 2.48 is intentional and expected.
 
@@ -323,14 +336,14 @@ Notes:
 
 **Auto-update (DEB/RPM):**
 UCM can now check for and install updates automatically. The ucm-watcher systemd service monitors signal files:
-- `/opt/ucm/data/.restart_requested` — triggers a service restart
-- `/opt/ucm/data/.update_pending` — triggers package installation + restart
+- `/opt/ucm/data/.restart_requested`: triggers a service restart
+- `/opt/ucm/data/.update_pending`: triggers package installation + restart
 
-No manual action required — updates are triggered from the Settings > System page.
+No manual action required: updates are triggered from Settings > Updates.
 
 ### Upgrading to v2.1.0 from v2.0.x
 
-**No breaking changes** — safe to upgrade directly.
+**No breaking changes**: safe to upgrade directly.
 
 **New features:**
 - AKI/SKI-based certificate chain matching (automatic migration at startup)
@@ -345,7 +358,7 @@ No manual action required — updates are triggered from the Settings > System p
 - Orphan CAs and certificates are automatically re-chained if their parent CA exists
 - Duplicate CAs (same Subject Key Identifier) are merged
 
-No action required — all migration happens automatically.
+No action required: all migration happens automatically.
 
 ### Upgrading from v1.8.x to v2.0.x
 
