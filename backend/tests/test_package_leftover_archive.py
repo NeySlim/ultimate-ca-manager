@@ -1751,6 +1751,46 @@ def test_a_full_disk_under_a_directory_made_is_named_with_the_error_and_its_dire
             'No space left on device') in out.stdout, out.stdout
 
 
+def _has_locale(name):
+    """Asked in a child: setting a locale here would change how this process reads files."""
+    probe = f'import locale; locale.setlocale(locale.LC_ALL, {name!r})'
+    return subprocess.run([sys.executable, '-c', probe], capture_output=True).returncode == 0
+
+
+@pytest.mark.skipif(not _has_locale('fr_FR.UTF-8'), reason='needs the fr_FR.UTF-8 locale')
+def test_a_full_disk_is_named_under_a_locale_that_translates_the_error(tmp_path):
+    """The double says ENOSPC as the system does, in the language of its environment."""
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    target = box.archive / 'data' / 'ca'
+    (box.bin / 'mkdir').write_text(
+        f'#!/bin/sh\nfor last; do :; done\n[ "$last" != "{target}" ] || {{ {sys.executable} -c '
+        f'"import locale, os, sys; locale.setlocale(locale.LC_ALL, \'\'); '
+        f'sys.exit(\'mkdir: \' + sys.argv[1] + \': \' + os.strerror(28))" "$last"; exit 1; }}\n'
+        f'exec {REAL["mkdir"]} "$@"\n')
+    out = box.run(env={'LC_ALL': 'fr_FR.UTF-8'})
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert (f'No space left in {box.archive}/data: mkdir: {target}: No space left on device'
+            in out.stdout), out.stdout
+
+
+def test_a_full_disk_met_by_a_refused_rename_is_not_named_for_a_later_failure(tmp_path):
+    """https_key.pem refused (ENOSPC) into the archive and beside itself, then the empty local
+    archive cannot be removed: that failure is no full disk."""
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    (box.bin / 'rename').write_text(
+        f'#!/bin/sh\n[ "$4" != {box.data}/https_key.pem ] || '
+        f'{{ echo "OSError: [Errno 28] No space left on device" >&2; exit 1; }}\n'
+        f'exec {box.inner}/rename "$@"\n')
+    (box.bin / 'rmdir').write_text(
+        f'#!/bin/sh\nfor last; do :; done\n[ "$last" != {box.data}/{LOCAL} ] || '
+        f'{{ echo "rmdir: injected failure" >&2; exit 1; }}\nexec {REAL["rmdir"]} "$@"\n')
+    out = box.run()
+    assert out.returncode in (1, 2), (out.stdout, out.stderr)
+    assert 'archiving what it left failed' in out.stdout and 'No space left' not in out.stdout, out.stdout
+
+
 def test_another_failure_names_no_full_disk(tmp_path):
     box = Box(tmp_path, python='stub')
     box.wrap(fail='mkdir', at=3)

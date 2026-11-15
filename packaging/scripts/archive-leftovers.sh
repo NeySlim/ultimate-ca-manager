@@ -67,20 +67,21 @@ is_mount() {
 rename_item() {
     LAST_ERR=""
     [ -n "$PYTHON" ] || return 1
-    err=$("$PYTHON" -I -c \
+    err=$(LC_ALL=C "$PYTHON" -I -c \
         'import os, sys; a, b = sys.argv[1:]; os.path.lexists(b) and sys.exit(1); os.rename(a, b)' \
         "$1" "$2" 2>&1) && return 0
     failed_in "$(dir_of "$2")" "$(printf '%s\n' "$err" | tail -n 1)"
     return 1
 }
 
-# A failed write keeps the system's error and the directory written in, for fail() to name
+# A failed write keeps the system's error and the directory written in, for fail() to name:
+# the commands it reads run under LC_ALL=C, so that "No space left on device" is English
 failed_in() { LAST_DIR=$1 LAST_ERR=$2; }
 
 # mkdir of $1, mode $2 if given
 make_dir() {
     LAST_ERR=""
-    err=$(mkdir ${2:+-m "$2"} -- "$1" 2>&1) || { failed_in "$(dir_of "$1")" "$err"; return 1; }
+    err=$(LC_ALL=C mkdir ${2:+-m "$2"} -- "$1" 2>&1) || { failed_in "$(dir_of "$1")" "$err"; return 1; }
 }
 
 present() { [ -e "$1" ] || [ -L "$1" ]; }
@@ -93,12 +94,11 @@ normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
 # kill). A failed write is cut back to the size before it: truncating needs no free space,
 # so this holds on a full disk. Nothing is appended after a line a kill left torn.
 jot() {
-    size=0
+    size=0 LAST_ERR=""
     if [ -e "$JOURNAL" ]; then
         [ -z "$(tail -c 1 -- "$JOURNAL")" ] && size=$(wc -c < "$JOURNAL") || return 1
     fi
-    LAST_ERR=""
-    err=$(printf '%s\n' "$1" | tee -a -- "$JOURNAL" 2>&1 >/dev/null) && return 0
+    err=$(printf '%s\n' "$1" | LC_ALL=C tee -a -- "$JOURNAL" 2>&1 >/dev/null) && return 0
     failed_in "${JOURNAL%/*}" "$err"
     truncate -s "$size" -- "$JOURNAL" 2>/dev/null
     return 1
@@ -121,6 +121,8 @@ try_rename() {
     jot "rename$TAB$1$TAB$2" || return 2
     rename_item "$1" "$2" && return 0
     { present "$1" && ! present "$2" && drop_line "rename$TAB$1$TAB$2"; } || return 2
+    # A refusal met here is no cause of a later failure
+    LAST_ERR=""
     return 1
 }
 
