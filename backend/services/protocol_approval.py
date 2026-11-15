@@ -330,7 +330,13 @@ def issue_approved(approval, data: dict) -> dict:
     handler = _handler(approval.request_type)
     if handler is None:
         raise ValueError(f'No issuer for {approval.request_type} requests')
-    return handler.issue(approval, data)
+    from services.cert.unique_subject import SubjectTaken
+    try:
+        return handler.issue(approval, data)
+    except SubjectTaken as e:
+        # Checked again at approval (RFC 5280 §4.1.2.6): the request is closed, its client refused
+        raise ProtocolRequestGone(f'The request can no longer be issued: {e.audited}',
+                                  refusal=ISSUANCE_REFUSAL) from e
 
 
 def target_gone(approval) -> Optional[str]:

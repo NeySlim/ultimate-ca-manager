@@ -179,3 +179,11 @@ def test_helm_draws_no_password_when_extra_env_provides_it(name):
     docs = _render('--set', f'extraEnv[0].name={name}', '--set', 'extraEnv[0].value=x')
     secret = next(d for d in docs if d['kind'] == 'Secret' and 'UCM_SECRET_KEY' in d['stringData'])
     assert 'UCM_INITIAL_ADMIN_PASSWORD' not in secret['stringData']
+
+
+@pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
+def test_helm_notes_name_sqlite_only_on_sqlite(tmp_path):
+    pg = _notes(tmp_path / 'p', '--set', 'database.type=postgresql',
+                '--set', 'database.databaseUrl=postgresql://u:p@db/ucm')
+    assert 'SINGLE instance' in pg and 'SQLite' not in pg
+    assert 'SQLite' in _notes(tmp_path / 's')

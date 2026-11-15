@@ -866,7 +866,10 @@
       "renewedWithRelated": "証明書を更新しました（リンクされた証明書 #{{id}} も更新）",
       "bulkRelatedRenewed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を更新しました"
     },
-    "renewed": "証明書を更新しました"
+    "renewed": "証明書を更新しました",
+    "subjectTakenTitle": "Subject already in use",
+    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}} of this CA. Confirm only if this certificate is for the same entity as the one that already carries this subject: it is then issued to that entity, and your confirmation is recorded in the audit log.",
+    "issueAnyway": "Issue to the same entity"
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -1116,7 +1119,17 @@
     "withdrawParentTitle": "親CAのリンクを解除",
     "withdrawParentWarning": "リンクを再度承認するまで、この CA は親CAなしになります。",
     "withdrawParentDone": "親CAのリンクを解除しました",
-    "withdrawParentFailed": "親CAのリンクを解除できませんでした"
+    "withdrawParentFailed": "親CAのリンクを解除できませんでした",
+    "uniqueSubject": "Unique subject",
+    "uniqueSubjectEnforced": "Enforced",
+    "uniqueSubjectNotEnforced": "Not enforced",
+    "uniqueSubjectHelp": "When enforced, this CA refuses a certificate whose subject a certificate of another entity already carries, even an expired or revoked one (RFC 5280 §4.1.2.6).",
+    "enforceUniqueSubject": "Enforce",
+    "stopEnforcingUniqueSubject": "Stop enforcing",
+    "uniqueSubjectChanged": "Unique subject setting updated",
+    "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
+    "uniqueSubjectShared_one": "{{count}} subject is already carried by several entities: {{examples}}. Nothing tells which one a new certificate is for: renewals of its certificates are refused as they are, and only a manual issuance or a CSR signing of it goes through, with the override",
+    "uniqueSubjectShared_other": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for: renewals of their certificates are refused as they are, and only a manual issuance or a CSR signing of them goes through, with the override"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",

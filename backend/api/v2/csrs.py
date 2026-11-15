@@ -12,6 +12,7 @@ import uuid
 from flask import Blueprint, request, jsonify, g, Response
 from sqlalchemy import func, or_
 from auth.unified import has_permission, require_auth
+from services.cert.unique_subject import OVERRIDE_FIELD, SubjectTaken, override_requested, taken_response
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
 from utils.pagination import parse_request_pagination
@@ -252,7 +253,7 @@ def _malformed_request_refusal(cert, cert_type, template_id=None):
 
 
 def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus, validity_notice=None,
-                      extra_san=None, custom_extensions=None):
+                      extra_san=None, custom_extensions=None, override=False):
     """Queue the signing for approval when a policy requires it: ``(policy,
     approval)`` or ``(None, None)``. Raises on evaluation error."""
     from services.approval_gate import queue_if_approval_required
@@ -271,6 +272,8 @@ def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus
             'custom_extensions': custom_extensions or [],
             # The duration was already capped by policy: the approver is told
             'validity_notice': validity_notice or None,
+            # The requester's override of a taken unique subject, shown to the approver
+            OVERRIDE_FIELD: override,
         },
         comment=data.get('approval_comment'),
     )
@@ -1012,6 +1015,8 @@ def sign_csr(csr_id):
         extra_ekus: EKU names or OIDs added to the type's own
         san_dns, san_ip, san_email, san_uri: names added to the request's own
         custom_extensions: [{oid, critical, value (hex)}] added verbatim (#437)
+        override_unique_subject: true attests that the certificate is for the same entity as the one
+            that already carries the subject under a CA enforcing a unique subject (audited)
     """
     
     cert = db.session.get(Certificate, csr_id)
@@ -1025,6 +1030,7 @@ def sign_csr(csr_id):
         return error_response('CSR already signed', 400)
     
     data = request.get_json(silent=True) or {}
+    override = override_requested(data)
     ca_id = data.get('ca_id')
     validity_days = coerce_validity_days(data.get('validity_days', 365))
     if validity_days is None:
@@ -1127,7 +1133,8 @@ def sign_csr(csr_id):
     try:
         policy, approval = _approval_for_csr(
             g.current_user, ca, cert, data, validity_days, backend_cert_type, extra_ekus,
-            validity_notice=validity_notice, extra_san=extra_san, custom_extensions=custom_extensions)
+            validity_notice=validity_notice, extra_san=extra_san, custom_extensions=custom_extensions,
+            override=override)
     except Exception as e:
         logger.error(f"Policy evaluation failed for CSR {csr_id}; refusing to sign: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the request was not signed', 500)
@@ -1174,6 +1181,8 @@ def sign_csr(csr_id):
             policy_template_id=data.get('template_id'),
             notices=sign_notices,
             custom_extensions=custom_extensions,
+            override_unique_subject=override,
+            source='csr',
         )
         
         # Determine if result is a CA or Certificate
@@ -1201,6 +1210,8 @@ def sign_csr(csr_id):
         )
     except FipsRestricted:
         raise
+    except SubjectTaken as e:
+        return taken_response(e)
     except PolicyViolation as e:
         logger.warning(f"CSR {csr_id} not signed, refused: {e}")
         return error_response(f'Policy violation: {e}', 400)
@@ -1320,6 +1331,8 @@ def bulk_sign_csrs():
         except PolicyViolation as e:
             logger.warning(f"Bulk sign: CSR {csr_id} not signed, refused: {e}")
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
+        except SubjectTaken as e:
+            results['failed'].append({'id': csr_id, 'error': e.audited})
         except (FipsRestricted, TemplateConfigError, RequestRejected) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:

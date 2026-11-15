@@ -20,3 +20,39 @@ def test_single_node_procedure_migrates_sqlite_before_ha_pos():
     pg_upgrade = steps.find('database.type=postgresql')
     ha_upgrade = steps.find('ha.enabled=true`, then check')
     assert -1 < migrate < pg_upgrade < ha_upgrade
+
+
+def test_no_polling_fallback_claimed_neg():
+    # The UI client opens a WebSocket only, so no document may justify affinity by a polling fallback.
+    for rel in ('docs/HA.md', 'charts/ucm/templates/NOTES.txt', 'charts/ucm/values.yaml', 'docker-compose.ha.yml'):
+        assert 'polling' not in (ROOT / rel).read_text().lower(), rel
+
+
+def test_in_page_links_of_ha_doc_resolve_pos():
+    text = (ROOT / 'docs' / 'HA.md').read_text()
+    anchors = {re.sub(r'[^a-z0-9 -]', '', h.lower()).replace(' ', '-')
+               for h in re.findall(r'^#+ (.+)$', text, re.M)}
+    assert {a for a in re.findall(r'\]\(#([^)]+)\)', text) if a not in anchors} == set()
+
+
+def _slugs(path):
+    text = path.read_text()
+    return {re.sub(r'[^a-z0-9 -]', '', h.lower()).replace(' ', '-')
+            for h in re.findall(r'^#+ (.+)$', text, re.M)}
+
+
+def test_cross_document_anchors_of_ha_docs_resolve_pos():
+    # A heading rename must not leave a dead `file.md#anchor` link in the HA pages.
+    broken = []
+    for rel in ('docs/HA.md', 'docs/ADMIN_GUIDE.md', 'docs/installation/docker.md'):
+        src = ROOT / rel
+        for target, anchor in re.findall(r'\]\(([^)#:]+\.md)#([^)]+)\)', src.read_text()):
+            dest = (src.parent / target).resolve()
+            if anchor not in _slugs(dest):
+                broken.append((rel, target, anchor))
+    assert broken == []
+
+
+def test_ha_anchor_has_no_preview_label_neg():
+    assert 'ha-mode-scheduler-and-startup' in _slugs(ROOT / 'docs' / 'ADMIN_GUIDE.md')
+    assert 'preview' not in (ROOT / 'docs' / 'HA.md').read_text().lower()

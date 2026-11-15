@@ -866,7 +866,10 @@
       "renewedWithRelated": "Zertifikat erneuert, zusammen mit seinem verknüpften Zertifikat #{{id}}",
       "bulkRelatedRenewed": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl erneuert"
     },
-    "renewed": "Zertifikat erneuert"
+    "renewed": "Zertifikat erneuert",
+    "subjectTakenTitle": "Subject already in use",
+    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}} of this CA. Confirm only if this certificate is for the same entity as the one that already carries this subject: it is then issued to that entity, and your confirmation is recorded in the audit log.",
+    "issueAnyway": "Issue to the same entity"
   },
   "cas": {
     "chainRevoked": "Übergeordnet gesperrt",
@@ -1116,7 +1119,17 @@
     "withdrawParentTitle": "Verknüpfung mit übergeordneter CA aufheben",
     "withdrawParentWarning": "Diese CA bleibt ohne übergeordnete CA, bis die Verknüpfung erneut bestätigt wird.",
     "withdrawParentDone": "Verknüpfung aufgehoben",
-    "withdrawParentFailed": "Die Verknüpfung konnte nicht aufgehoben werden"
+    "withdrawParentFailed": "Die Verknüpfung konnte nicht aufgehoben werden",
+    "uniqueSubject": "Unique subject",
+    "uniqueSubjectEnforced": "Enforced",
+    "uniqueSubjectNotEnforced": "Not enforced",
+    "uniqueSubjectHelp": "When enforced, this CA refuses a certificate whose subject a certificate of another entity already carries, even an expired or revoked one (RFC 5280 §4.1.2.6).",
+    "enforceUniqueSubject": "Enforce",
+    "stopEnforcingUniqueSubject": "Stop enforcing",
+    "uniqueSubjectChanged": "Unique subject setting updated",
+    "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
+    "uniqueSubjectShared_one": "{{count}} subject is already carried by several entities: {{examples}}. Nothing tells which one a new certificate is for: renewals of its certificates are refused as they are, and only a manual issuance or a CSR signing of it goes through, with the override",
+    "uniqueSubjectShared_other": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for: renewals of their certificates are refused as they are, and only a manual issuance or a CSR signing of them goes through, with the override"
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",

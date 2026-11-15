@@ -584,6 +584,29 @@ certificate), behind a
 "show hidden CAs" link. It is presentation only: the CA still signs whatever it is asked to. The
 CA object reads it back as `issuance_hidden`, and the change is audited.
 
+`enforceUniqueSubject` (`true` or `false`) makes the CA refuse a certificate whose subject a
+certificate of another entity already carries under it, whatever its status (RFC 5280 §4.1.2.6,
+see the user guide for what makes the same entity). The CA object reads it back as
+`enforce_unique_subject`, and the change is audited. The answer that turns it on carries
+`shared_subjects`, the number of subjects certificates of the CA already carry for more than one
+entity (rows joined by a shared key, lineage, recorded identity or SID being one entity), and
+`shared_subject_examples`, the first 20 of them in issuance order:
+`[{"subject": "CN=…", "serial_numbers": ["…", "…"]}]`. Those certificates stay. A renewal of any
+of them (in place, automatic or by a protocol) is refused as it is; only a manual issuance or a
+CSR signing of such a subject goes through, with the override below.
+
+With the option on, `POST /api/v2/certificates` and `POST /api/v2/csrs/{id}/sign` answer `409`
+when the subject is taken, with `details` `{"subject", "serial_number", "override_field":
+"override_unique_subject"}`. Sending the request again with `"override_unique_subject": true`
+(`write:certificates`) attests that this certificate is for the same entity as the one that
+already carries this subject. When a single entity carries it, the new certificate is recorded
+as that entity's, as a renewal would be, and the existing and the new certificates renew
+afterwards without the override; when several do, the subject stays shared (see the user
+guide). Either way the issuance writes a `certificate.subject_override` audit entry naming the
+operator, the subject, the new certificate and the certificate whose entity it joins, or the
+number of entities sharing the subject. A renewal refused for the same reason answers `409` and
+has no override.
+
 ### Confirm a Parent Whose Signature Cannot Be Verified
 ```http
 POST /api/v2/cas/{ca_id}/parent-confirmation

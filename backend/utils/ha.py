@@ -1,4 +1,4 @@
-"""HA preview helpers: startup validation and the guard for host-local operations."""
+"""HA helpers: startup validation and the guard for host-local operations."""
 import logging
 import os
 from functools import wraps
@@ -29,9 +29,6 @@ def validate_ha_config(config=None):
             logger.warning("HA: the local master.key overrides KEY_ENCRYPTION_KEY on this node")
     elif not os.getenv('KEY_ENCRYPTION_KEY'):
         raise SystemExit("UCM_HA=1 requires KEY_ENCRYPTION_KEY set in the environment, identical on every node")
-    # Without Redis the sessions live in PostgreSQL, shared by every node
-    if getattr(cfg, 'SESSION_TYPE', None) == 'filesystem':
-        logger.warning("HA: filesystem sessions are not shared between nodes")
 
 
 def ha_refusal(reason):

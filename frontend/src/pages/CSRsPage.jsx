@@ -36,6 +36,7 @@ import {
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { issueWithSubjectOverride } from '../lib/uniqueSubject'
 
 const DEFAULT_CSR_KEY_TYPE = findAlgorithm(CSR_LABELS[0]).csr
 
@@ -363,8 +364,10 @@ export default function CSRsPage() {
         return
       }
       try {
-        const signed = await csrsService.sign(
-          selectedCSR.id, signCA, validityDays, signCertType, signExtraEkus, sanRowsToPayload(addedSans))
+        const signed = await issueWithSubjectOverride(options => csrsService.sign(
+          selectedCSR.id, signCA, validityDays, signCertType, signExtraEkus, sanRowsToPayload(addedSans),
+          options), showConfirm, t)
+        if (signed === null) return  // the operator kept the refusal of a taken subject
         setSignSans([])
         if (signed?.data?.approval_required) {
           // An issuance policy queued the signing for approval

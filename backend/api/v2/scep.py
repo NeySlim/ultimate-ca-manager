@@ -3,6 +3,7 @@ SCEP Management Routes v2.0
 /api/scep/* - SCEP configuration and requests
 """
 
+from services.cert.unique_subject import SubjectTaken
 from utils.signing_ca import scep_ca_problem
 from flask import Blueprint, request, g
 from auth.unified import require_auth
@@ -251,6 +252,9 @@ def approve_scep_request(request_id):
     except PolicyViolation as e:
         db.session.rollback()
         return error_response(f'Policy violation: {e}', 400)
+    except SubjectTaken as e:
+        # The approver reads the serial; the request stays pending until rejected
+        return error_response(f'{e.audited[:1].upper()}{e.audited[1:]}, issued by this CA to another entity', 409)
     except RenewalIdentityUnresolved as e:
         # The directory did not answer: the same approval may pass later
         db.session.rollback()

@@ -105,6 +105,9 @@ class Certificate(db.Model):
     # RFC 9763: on B, the A its id-pe-relatedCert names; on A, B once the pair is mutual
     related_certificate_id = db.Column(db.Integer, nullable=True, index=True)
     hybrid_role = db.Column(db.String(16), nullable=True)  # 'classical' or 'pq'
+    # Who the subject was certified to (services.cert.unique_subject): 'acme:<account>',
+    # 'sid:<SID>', 'user:<id>', or 'cert:<refid>' of the certificate this one renews
+    subject_holder = db.Column(db.String(100), nullable=True)
     
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")

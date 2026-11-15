@@ -649,8 +649,10 @@ class CSROperationsMixin:
         custom_extensions: Optional[list] = None,
         not_before: Optional[datetime] = None,
         not_after: Optional[datetime] = None,
+        before_publication=None,
     ) -> bytes:
-        """Sign a CSR with a CA. ``renewal_of``: existing certificate this
+        """Sign a CSR with a CA. ``before_publication``: called with the signed leaf before
+        anything leaves the server (the CT pre-certificate), to refuse it first. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation,
         and stand for the SAN of a CSR that carries none.
         ``allow_sensitive_ekus``: keep OCSPSigning/timeStamping from the CSR —
@@ -1294,6 +1296,8 @@ class CSROperationsMixin:
         # the web create-certificate path honored CT, so ct_required silently
         # did nothing for ACME. Never applied to intermediate CAs.
         if not issuing_ca:
+            if before_publication is not None:
+                before_publication(certificate)
             from utils.ct_client import apply_ct_policy
             certificate, _ = apply_ct_policy(certificate, ca_cert, ca_private_key)
 

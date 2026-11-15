@@ -12,6 +12,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 def next_ca_serial(ca) -> int:
     """Count one more issuance under *ca* in the current transaction; return the new count."""
     from models import CA, db
+    from services.cert.unique_subject import lock_issuer_records
     table = CA.__table__
     # The row lock (PostgreSQL) is held until the commit
     bump = (update(table).where(table.c.id == ca.id)
@@ -19,6 +20,9 @@ def next_ca_serial(ca) -> int:
     # SQLAlchemy 2.1 autoflushes before a Core statement too: the pending certificate
     # is flushed by its caller, where a refused row is handled
     with db.session.no_autoflush:
+        # A twin record's lowest one is locked before this row (unique subject); a caller
+        # counting under several CAs locks them all first, in id order (lock_issuers)
+        lock_issuer_records(ca)
         if not db.session.get_bind().dialect.update_returning:
             # SQLite before 3.35: no RETURNING; the UPDATE holds the write lock until the commit
             db.session.execute(bump)

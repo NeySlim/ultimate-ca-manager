@@ -18,6 +18,7 @@ from utils.ca_serial_counter import (
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
+from services.cert.unique_subject import SubjectTaken, refuse_taken_subject, successor_holder
 from .helpers import get_ca_cert_pem
 
 logger = logging.getLogger(__name__)
@@ -30,37 +31,6 @@ class CAOfflineError(Exception):
 
 class AlreadySuperseded(Exception):
     """The certificate being renewed was superseded by a concurrent renewal."""
-
-
-class SubjectTaken(Exception):
-    """RFC 5280 §4.1.2.6: the subject is already carried by a certificate of the CA issued to
-    another entity; *serial* is that certificate's."""
-
-    def __init__(self, subject, serial):
-        super().__init__(f'the subject {subject} is already carried by certificate serial {serial}')
-        self.subject, self.serial = subject, serial
-
-
-def _subject_holder(ca, cert, requester_sid, own_id):
-    """The serial of a certificate of *ca*, whatever its status, whose subject equals *cert*'s
-    (RFC 5280 §7.1) and whose SID extension does not name *requester_sid*; else None."""
-    from services.trust_store.csr_operations_mixin import ad_security_extension_sid
-    from utils.dn_match import name_key, same_name
-    rows = (db.session.query(Certificate.crt, Certificate.serial_number)
-            .filter(Certificate.caref == ca.refid, Certificate.subject_key == name_key(cert.subject),
-                    Certificate.id != own_id, Certificate.crt.isnot(None))
-            .order_by(Certificate.id))
-    for crt, serial in rows:
-        try:
-            held = x509.load_pem_x509_certificate(base64.b64decode(crt))
-        except Exception:
-            continue
-        if not same_name(held.subject, cert.subject):
-            continue
-        # Without the extension nothing proves the same entity: never a yes without proof
-        if requester_sid is None or ad_security_extension_sid(held) != requester_sid:
-            return serial
-    return None
 
 
 def _claim_superseded(row, presented=None, successor=None):
@@ -195,6 +165,9 @@ class CASigningMixin:
         on_stored=None,
         windows_profile_id: int = None,
         unique_subject: bool = False,
+        subject_holder: str = None,
+        renews: list = None,
+        audit_subject_refusal: bool = True,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -243,8 +216,12 @@ class CASigningMixin:
             windows_profile_id: the Windows enrollment profile a WSTEP issuance
                 or renewal served, recorded on the row; None for other protocols.
             unique_subject: raise SubjectTaken when another entity's certificate of
-                the CA carries the issued subject (``_subject_holder``); WSTEP passes
-                it for a subject built by a common name pattern.
+                the CA carries the issued subject, even with the CA's option off; WSTEP
+                passes it for a subject built by a common name pattern.
+            subject_holder: the requester's identity recorded on the row (WSTEP: its SID).
+            renews: rows of a designated renewal that ``supersedes`` does not archive (WSTEP's
+                template-less Kerberos renewal): the same entity, whose lineage the row inherits.
+            audit_subject_refusal: False when the caller audits a SubjectTaken itself (WSTEP).
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -254,7 +231,7 @@ class CASigningMixin:
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
         # RFC 9763: A is found before signing; linking refuses only an A renewed since
-        from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
+        from services.cert.related_pair import link_issued, named_by, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr.public_bytes(serialization.Encoding.DER))
 
         # Load CA cert and key (local or HSM-backed)
@@ -304,6 +281,11 @@ class CASigningMixin:
                           'digest_explicit': False},
             san_template=policy_template,
             custom_extensions=template_custom_extensions(policy_template),
+            # Without the lock, before the CT logs see a pre-certificate; checked again below
+            before_publication=lambda leaf: refuse_taken_subject(
+                ca, leaf, renews=[named_by(leaf, related_a), supersedes, *(renews or ())],
+                holder=subject_holder, requester_sid=requester_sid, pattern=unique_subject,
+                source=source, locked=False, audited=audit_subject_refusal),
         )
 
         # Extract serial number
@@ -370,6 +352,7 @@ class CASigningMixin:
             source=source,
             template_id=template_id,
             windows_profile_id=windows_profile_id,
+            subject_holder=successor_holder(subject_holder, [supersedes, *(renews or ())]),
         )
         db.session.add(new_cert)
 
@@ -385,7 +368,11 @@ class CASigningMixin:
             if supersedes is not None and not _claim_superseded(supersedes, renewal_of, new_cert):
                 db.session.rollback()
                 raise AlreadySuperseded('the renewed certificate is already superseded')
-            link_issued(new_cert, cert_obj, related_a)
+            # A verified relatedCertRequest proves A's key: B is A's entity (RFC 9763 pair)
+            a_row = link_issued(new_cert, cert_obj, related_a)
+            # The renewed row's lineage first: its archived predecessor stays this entity
+            designated = [supersedes, a_row, *(renews or ())]
+            new_cert.subject_holder = successor_holder(subject_holder, designated)
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
             if on_stored is not None:
@@ -395,11 +382,10 @@ class CASigningMixin:
             next_ca_serial(ca)
             # Read once the CA row is locked (PostgreSQL) or the database write lock held
             # (SQLite, since the flush): a concurrent issuance under this CA commits before or after
-            if unique_subject:
-                holder = _subject_holder(ca, cert_obj, requester_sid, new_cert.id)
-                if holder is not None:
-                    db.session.rollback()
-                    raise SubjectTaken(cert_obj.subject.rfc4514_string(), holder)
+            refuse_taken_subject(ca, cert_obj, own=[new_cert], renews=designated,
+                                 holder=subject_holder, requester_sid=requester_sid,
+                                 pattern=unique_subject, source=source,
+                                 audited=audit_subject_refusal)
             db.session.commit()
         except (AlreadySuperseded, SubjectTaken):
             raise

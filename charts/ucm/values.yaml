@@ -22,7 +22,8 @@ replicaCount: 1
 ## one shared Secret (generated once, kept across upgrades). There is no etc
 ## PVC. The data volume is an emptyDir per pod (backup archives are kept in
 ## PostgreSQL), or the persistence.data.existingClaim you name (ReadWriteMany).
-## Without a Redis URL, sessions stay per node: set an ingress cookie affinity.
+## Sessions are shared through PostgreSQL (or Redis), so no affinity is needed;
+## the ingress must pass the WebSocket upgrade (see docs/HA.md).
 ha:
   enabled: false
   podDisruptionBudget:
@@ -53,9 +54,9 @@ secrets:
   keyEncryptionKey: ""   # KEY_ENCRYPTION_KEY (Fernet key), passed to the pods whenever set or already in the Secret. Generated only with ha.enabled: there, helm template or GitOps (no cluster lookup) would generate a new key at each render, so set it.
 
 ## Database backend.
-##  - sqlite (default): file in the data PVC, single instance.
-##  - postgresql: set databaseUrl to an external PostgreSQL 13+ (HA-capable
-##    storage, but the app itself still runs as a single replica).
+##  - sqlite (default): file in the data PVC, one replica.
+##  - postgresql: set databaseUrl to an external PostgreSQL 13+; required for
+##    several replicas (ha.enabled=true).
 database:
   type: sqlite
   # e.g. postgresql://ucm:password@postgres:5432/ucm  (used when type=postgresql)
@@ -160,7 +161,7 @@ ingress:
   className: ""
   annotations: {}
     # nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    # Session affinity for HA without Redis (ingress-nginx):
+    # Optional cookie affinity (ingress-nginx); sessions are shared, none is required:
     # nginx.ingress.kubernetes.io/affinity: "cookie"
     # nginx.ingress.kubernetes.io/session-cookie-name: "ucm-node"
   host: ucm.local

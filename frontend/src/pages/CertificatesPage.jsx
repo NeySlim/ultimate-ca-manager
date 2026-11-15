@@ -37,6 +37,7 @@ import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { askRenewal } from '../lib/renewalPrompt'
 import { renameCertificate } from '../lib/certificateRename'
+import { issueWithSubjectOverride } from '../lib/uniqueSubject'
 
 // i18n keys for known certificate issuance sources (labelKey pattern: store the
 // KEY at module level, resolve with t() in the component). Options are built
@@ -845,7 +846,9 @@ export default function CertificatesPage() {
           onSubmit={async (data) => {
             try {
               muteToasts()
-              const response = await certificatesService.create(data)
+              const response = await issueWithSubjectOverride(
+                options => certificatesService.create({ ...data, ...options }), showConfirm, t)
+              if (response === null) return  // the operator kept the refusal of a taken subject
               // A hybrid pair answers { certificate: classical, related: ML-DSA }
               const pair = response?.data?.certificate ? response.data : null
               const issued = pair ? pair.certificate : response?.data

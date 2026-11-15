@@ -318,10 +318,14 @@ def _issue_and_respond(ca, parsed, username, *, profile, kerberos_principal=None
         return _answer_held(ca, parsed, held.approval)
     if error:
         logger.warning("WSTEP issuance rejected for %r: %s", username, error)
+        # One entry per refusal: every Kerberos one, an account's when the subject is taken
         if kerberos_principal:
             from services.windows_profiles import audit_kerberos_refusal, kerberos_route
             audit_kerberos_refusal('CES', kerberos_principal, kerberos_route(kerberos_principal)[1],
                                    profile, error)
+        elif isinstance(error, wstep_service.SubjectHeldByAnother):
+            from services.windows_profiles import audit_account_refusal
+            audit_account_refusal('CES', username, profile, error)
         return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
 
     try:
@@ -579,14 +583,15 @@ def renew_certificate_bound():
             return _answer_held(ca, parsed, held.approval)
     if error:
         logger.warning("WSTEP renewal rejected (%s): %s", served or 'not stored', error)
-        # Audited only for a certificate stored here, its key proven: an anonymous refusal would fill the log
-        if served:
-            _audit_issuance('certificate.renewed', None, username, success=False, details=(
-                f'WSTEP renewal refused from {client_ip()}: {error} '
-                f'(old serial {cert.serial_number}, {served})'))
+        # One entry per refusal; otherwise audited only for a certificate stored here, its key
+        # proven: an anonymous refusal would fill the log
         if isinstance(error, wstep_service.SubjectHeldByAnother):
             from services.windows_profiles import audit_renewal_refusal
             audit_renewal_refusal('CES', cert.serial_number, profile, error)
+        elif served:
+            _audit_issuance('certificate.renewed', None, username, success=False, details=(
+                f'WSTEP renewal refused from {client_ip()}: {error} '
+                f'(old serial {cert.serial_number}, {served})'))
         return _fault_response(error, status=status or _error_status(error), relates_to=parsed.message_id)
 
     try:

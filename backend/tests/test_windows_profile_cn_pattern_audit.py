@@ -118,8 +118,7 @@ def test_a_renewal_into_a_subject_another_account_holds_is_refused_and_audited(a
     floor = _top_audit(app)
     assert _fault(_renew_xml(client, renewed, key)) == (400, 's:Sender', TAKEN)
     rows = _audits(app, floor)
-    assert [(action, ok) for action, _u, _n, _d, ok in rows] == [
-        ('certificate.renewed', False), ('windows_enrollment.refused', False)]
-    assert f'serial {holder.serial_number}' not in rows[0][3]
-    assert rows[1][2] == 'c04-a'
-    assert f'{TAKEN} (serial {holder.serial_number}) (renewed serial {renewed.serial_number}' in rows[1][3]
+    # One entry per refusal, the one that names the holder's serial
+    assert [(action, ok) for action, _u, _n, _d, ok in rows] == [('windows_enrollment.refused', False)]
+    assert rows[0][2] == 'c04-a'
+    assert f'{TAKEN} (serial {holder.serial_number}) (renewed serial {renewed.serial_number}' in rows[0][3]
