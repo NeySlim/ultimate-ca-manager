@@ -89,7 +89,7 @@ def sessions_closed_by(user):
     if replaced is None:
         return 0
     from utils.session_census import count_sessions
-    return count_sessions(user.id, replaced)
+    return count_sessions(user, replaced)
 
 
 def closed_sessions_note(count):
