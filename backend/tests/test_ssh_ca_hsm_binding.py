@@ -168,6 +168,12 @@ class TestOneKeyOneAuthority:
         assert _detail(r) == (f"HSM key '{two['label']}' is the token key of HSM key '{one['label']}', "
                               f"which backs the X.509 CA '{descr}': an HSM key backs one authority only")
 
+    def test_a_bound_key_of_another_public_key_takes_nothing(self, auth_client, token_key):
+        held, free = token_key(), token_key()
+        _, r = _x509_ca(auth_client, held['key'])
+        assert r.status_code == 201, r.data
+        assert _ssh_ca(auth_client, free['key']).status_code == 201
+
     @pytest.mark.parametrize('first', ['ssh', 'x509'])
     def test_an_x509_ca_never_takes_another_row_of_a_bound_key(self, app, auth_client, token_key, first):
         real = ec.generate_private_key(ec.SECP256R1())
