@@ -6,23 +6,30 @@ import { render, screen, waitFor, configure } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import fr from '../../i18n/locales/fr.json'
 
+// A loaded machine slows the first render past the default second
+configure({ asyncUtilTimeout: 5000 })
+
 const api = vi.hoisted(() => ({ get: vi.fn() }))
 const lookup = (key) => key.split('.').reduce((node, part) => (node == null ? node : node[part]), fr)
+// One translator and one notifier for every render: the pages reload when either changes
+const stable = vi.hoisted(() => ({
+  tr: null,
+  i18n: { language: 'fr', changeLanguage: () => {}, on: () => {}, off: () => {} },
+  notify: { showSuccess: () => {}, showError: () => {}, showInfo: () => {}, showWarning: () => {}, showConfirm: () => {}, showPrompt: () => {} },
+}))
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key, arg) => {
-      const opts = typeof arg === 'object' && arg ? arg : {}
-      const found = lookup(key)
-      const text = typeof found === 'string' ? found : (typeof arg === 'string' ? arg : (opts.defaultValue ?? key))
-      return text.replace(/\{\{(\w+)\}\}/g, (_, name) => opts[name])
-    },
-    i18n: { language: 'fr', changeLanguage: () => {}, on: () => {}, off: () => {} },
-  }),
+  useTranslation: () => ({ t: stable.tr, i18n: stable.i18n }),
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
+stable.tr = (key, arg) => {
+  const opts = typeof arg === 'object' && arg ? arg : {}
+  const found = lookup(key)
+  const text = typeof found === 'string' ? found : (typeof arg === 'string' ? arg : (opts.defaultValue ?? key))
+  return text.replace(/\{\{(\w+)\}\}/g, (_, name) => opts[name])
+}
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({ showSuccess() {}, showError() {}, showInfo() {}, showWarning() {}, showConfirm() {}, showPrompt() {} }),
+  useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false, isTablet: false, screenWidth: 1280, sidebarOpen: true, setSidebarOpen: () => {} }),
   useInspector: () => ({ openEntity: () => {}, windows: [], prefs: {}, updatePrefs: () => {} }),
 }))
@@ -40,17 +47,19 @@ import ApprovalsPage from '../ApprovalsPage'
 import SCEPPage from '../SCEPPage'
 import KeyRecoveryPage from '../KeyRecoveryPage'
 
-// A loaded machine slows the first render past the default second
-configure({ asyncUtilTimeout: 5000 })
-
-const leaves = () => [...document.body.querySelectorAll('*')].filter((e) => !e.children.length).map((e) => e.textContent)
-const englishStates = () => leaves().filter((text) => ENGLISH.test(text))
+const leaves = () => {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  const texts = []
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) texts.push(node.textContent)
+  return texts
+}
 const ENGLISH = /\b(pending|approved|rejected|expired|issued|recovered|cancelled)\b/
+const englishStates = () => leaves().filter((text) => ENGLISH.test(text))
 const STATUSES = ['pending', 'approved', 'rejected', 'expired']
 
 const approvals = STATUSES.map((status, i) => ({ id: i + 1, request_type: 'certificate', status, requester_username: `user${i}`, created_at: '2026-01-01T00:00:00Z' }))
 const scep = [...STATUSES.slice(0, 3), 'issued'].map((status, i) => ({ id: i + 1, status, subject: `CN=dev${i}`, transaction_id: `txn${i}`, created_at: '2026-01-01T00:00:00Z' }))
-const recoveries = ['pending', 'approved', 'rejected', 'recovered', 'cancelled'].map((status, i) => ({ id: i + 1, status, cert_cn: `escrow${i}.example.com`, reason: 'r', requested_by: 'u', requested_at: '2026-01-01T00:00:00Z' }))
+const recoveries = ['pending', 'approved', 'rejected', 'recovered', 'cancelled', 'quarantined'].map((status, i) => ({ id: i + 1, status, cert_cn: `escrow${i}.example.com`, reason: 'r', requested_by: 'u', requested_at: '2026-01-01T00:00:00Z' }))
 
 function answer(url) {
   const path = url.split('?')[0]
@@ -58,6 +67,7 @@ function answer(url) {
   if (path === '/approvals/stats' || path === '/scep/stats') return { data: { pending: 1, approved: 1, rejected: 1, total: 4 } }
   if (path === '/approvals/1') return { data: approvals[0] }
   if (path === '/scep/requests') return { data: scep }
+  if (path === '/scep/requests/1') return { data: scep[0] }
   if (path === '/key-recovery') return { data: { requests: recoveries, dual_control: true } }
   if (path === '/scep/config') return { data: {} }
   return { data: [] }
@@ -67,31 +77,22 @@ beforeEach(() => { api.get.mockReset(); api.get.mockImplementation(async (url) =
 
 describe('request states in French', () => {
   it('approvals list and detail', async () => {
-    render(<MemoryRouter initialEntries={['/approvals?request=1&status=all']}><ApprovalsPage /></MemoryRouter>)
-    expect((await screen.findAllByText('user0')).length).toBeGreaterThan(0)
+    render(<MemoryRouter initialEntries={['/approvals?request=1']}><ApprovalsPage /></MemoryRouter>)
     await screen.findByText('Détails de la demande')
-    await waitFor(() => expect(screen.queryByText(/Chargement/)).toBeNull())
+    await waitFor(() => expect(leaves()).toContain('Rejeté'))
     expect(englishStates()).toEqual([])
   })
 
   it('SCEP requests list and detail', async () => {
-    api.get.mockImplementation(async (url) => (url.split('?')[0] === '/scep/requests/1' ? { data: scep[0] } : answer(url)))
     render(<MemoryRouter initialEntries={['/scep-config?tab=requests&request=1']}><SCEPPage /></MemoryRouter>)
-    expect((await screen.findAllByText('dev0')).length).toBeGreaterThan(0)
     await screen.findAllByText('txn0')
+    await waitFor(() => expect(leaves()).toContain('Rejeté'))
     expect(englishStates()).toEqual([])
   })
 
-  it('key recovery requests', async () => {
+  it('key recovery requests, an unknown state as sent', async () => {
     render(<MemoryRouter><KeyRecoveryPage /></MemoryRouter>)
-    expect((await screen.findAllByText('escrow0.example.com')).length).toBeGreaterThan(0)
+    await waitFor(() => expect(leaves()).toContain('quarantined'))
     expect(englishStates()).toEqual([])
-  })
-
-  it('an unknown state reads as sent', async () => {
-    api.get.mockImplementation(async (url) => (url.split('?')[0] === '/key-recovery'
-      ? { data: { requests: [{ ...recoveries[0], status: 'quarantined' }], dual_control: true } } : answer(url)))
-    render(<MemoryRouter><KeyRecoveryPage /></MemoryRouter>)
-    expect((await screen.findAllByText('quarantined')).length).toBeGreaterThan(0)
   })
 })

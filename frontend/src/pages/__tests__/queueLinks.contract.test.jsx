@@ -13,11 +13,12 @@ const notify = vi.hoisted(() => ({
   showConfirm: vi.fn(), showPrompt: vi.fn(),
 }))
 
+const i18n = vi.hoisted(() => {
+  const t = (key) => key
+  return { t, i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} } }
+})
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key) => key,
-    i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} },
-  }),
+  useTranslation: () => i18n,
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
