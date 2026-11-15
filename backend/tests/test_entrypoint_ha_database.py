@@ -410,7 +410,8 @@ def test_a_device_that_cannot_be_read_is_measured_on_the_total(tmp_path):
     _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
     r = _run(_df_names(9000, 5999, 1, '', 'a', 'b') + _START, env, tmp_path)
     assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
-    assert 'needs 6 MB free, 5 MB available' in r.stdout, r.stdout
+    # the 5 MB are the backups directory's room: that directory is the one named
+    assert 'Not enough disk space in /ucm-test-backups: the start needs 6 MB free, 5 MB available' in r.stdout, r.stdout
 
 
 @pytest.mark.parametrize('suffix', ['', '?timeout=30'])

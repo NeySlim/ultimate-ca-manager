@@ -106,7 +106,7 @@ _ucm_room_short() {
 # again on its own filesystem when an upgrade may run (journal and growth), summed when both
 # are one filesystem. Fails with what is needed and available; a df that cannot answer passes.
 ucm_sqlite_disk_room() {
-    local db_dir bytes size_kb size_mb db_need=0 copy_need=0 db_df="" copy_df="" short=false
+    local db_dir bytes size_kb size_mb db_need=0 copy_need=0 db_df="" copy_df="" short=false shared_dir
     db_dir=$(dirname "$UCM_DATABASE_PATH")
     bytes=$(stat -c %s "$UCM_DATABASE_PATH" 2>/dev/null || wc -c < "$UCM_DATABASE_PATH")
     size_kb=$(( (bytes + 1023) / 1024 ))
@@ -117,8 +117,9 @@ ucm_sqlite_disk_room() {
     [ "$copy_need" -gt 0 ] && copy_df=$(_ucm_df "$UCM_SQLITE_BACKUP_DIR")
     if [ -n "$db_df" ] && [ -n "$copy_df" ] && _ucm_same_fs "$db_dir" "$UCM_SQLITE_BACKUP_DIR"; then
         # one filesystem: the smaller of the two readings is the room
-        [ "${copy_df##* }" -lt "${db_df##* }" ] && db_df=$copy_df
-        if _ucm_room_short "$db_dir" $(( db_need + copy_need )) "$db_df"; then
+        shared_dir=$db_dir
+        [ "${copy_df##* }" -lt "${db_df##* }" ] && db_df=$copy_df && shared_dir=$UCM_SQLITE_BACKUP_DIR
+        if _ucm_room_short "$shared_dir" $(( db_need + copy_need )) "$db_df"; then
             echo "   The database is $size_mb MB; upgrading it needs its size for the upgrade's journal and growth,"
             echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
             return 1
