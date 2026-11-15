@@ -80,6 +80,15 @@ _LEGACY_WITNESS = {
 }
 
 
+def _legacy_detail(read):
+    """The figure a legacy message adds to its state, or None when it cannot be read."""
+    try:
+        return read()
+    except Exception:
+        _status_rollback()
+        return None
+
+
 def _legacy_witness(name, witness):
     """A witness of /health as the {status, message} pair of the historical route."""
     state, count = witness['state'], witness['count']
@@ -87,16 +96,17 @@ def _legacy_witness(name, witness):
         return {'status': 'warning', 'message': 'Status unavailable'}
     if name == 'smtp' and state == 'ready':
         from models.email_notification import SMTPConfig
-        return {'status': 'online', 'message': f'Host: {(SMTPConfig.query.first().smtp_host or "").strip()}'}
+        host = _legacy_detail(lambda: (SMTPConfig.query.first().smtp_host or '').strip())
+        return {'status': 'online', 'message': f'Host: {host}' if host else 'Configured'}
     if name == 'webhooks' and state == 'active':
         return {'status': 'online', 'message': f'{count} active endpoint(s)'}
     if name == 'webhooks' and state == 'none_active':
         return {'status': 'warning', 'message': f'{count} endpoint(s), none active'}
     if name == 'auto_renewal' and state == 'enabled':
         now_dt = utc_now()
-        pending = Certificate.query.filter(
+        pending = _legacy_detail(lambda: Certificate.query.filter(
             Certificate.revoked.isnot(True), Certificate.valid_to >= now_dt,
-            Certificate.valid_to <= now_dt + timedelta(days=30)).count()
+            Certificate.valid_to <= now_dt + timedelta(days=30)).count())
         return {'status': 'online', 'message': f'Scheduled ({pending} pending)' if pending else 'Scheduled'}
     status, message = _LEGACY_WITNESS[(name, state)]
     return {'status': status, 'message': message}

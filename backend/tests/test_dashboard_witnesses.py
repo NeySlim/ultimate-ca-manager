@@ -173,3 +173,35 @@ def test_both_routes_say_unavailable_when_a_witness_cannot_be_read(app, auth_cli
     assert get_json(auth_client.get(URL))['data']['protocols'][witness]['state'] == 'unavailable'
     legacy = get_json(auth_client.get(LEGACY))['data'][witness]
     assert legacy == {'status': 'warning', 'message': 'Status unavailable'}
+
+
+class _Unreadable:
+    """A model query that answers *good* times, then fails like a lost connection."""
+    def __init__(self, real, good):
+        self.real, self.good = real, good
+
+    def __getattr__(self, name):
+        if self.good <= 0:
+            raise RuntimeError('unreadable')
+        self.good -= 1
+        return getattr(self.real, name)
+
+
+def test_legacy_route_keeps_the_state_when_the_smtp_host_cannot_be_read(app, auth_client, settings, monkeypatch):
+    from models.email_notification import SMTPConfig
+    settings(smtp=READY)
+    with app.app_context(), monkeypatch.context() as patch:
+        patch.setattr(SMTPConfig, 'query', _Unreadable(SMTPConfig.query, 1))
+        r = auth_client.get(LEGACY)
+    assert r.status_code == 200
+    assert get_json(r)['data']['smtp'] == {'status': 'online', 'message': 'Configured'}
+
+
+def test_legacy_route_keeps_the_state_when_the_pending_renewals_cannot_be_read(app, auth_client, settings, monkeypatch):
+    from models import Certificate
+    settings(renewal='true')
+    with app.app_context(), monkeypatch.context() as patch:
+        patch.setattr(Certificate, 'query', _Unreadable(Certificate.query, 0))
+        r = auth_client.get(LEGACY)
+    assert r.status_code == 200
+    assert get_json(r)['data']['auto_renewal'] == {'status': 'online', 'message': 'Scheduled'}

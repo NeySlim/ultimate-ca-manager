@@ -383,7 +383,8 @@ def allowed(table, permissions):
 
 
 def work_queue(session, limit, now=None, kinds=None, permissions=None):
-    """Items to act on, critical first then by due date, and the total per kind.
+    """Items to act on, critical first then by due date (expired trust anchors after the
+    other critical items, latest expiry first), and the total per kind.
     *kinds* restricts the items (not the counts) to those kinds; a kind that needs a
     permission *permissions* lacks is neither listed nor counted."""
     now = now or utc_now()
