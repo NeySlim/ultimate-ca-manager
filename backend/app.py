@@ -1571,7 +1571,8 @@ def init_database(app):
         # Another worker already created the initial data
         db.session.rollback()
     initial_admin.sweep(app.config)
-    initial_admin.announce(app.config)
+    if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':  # the web master already said it
+        initial_admin.announce(app.config)
 
     # Create system certificate templates if none exist
     try:
