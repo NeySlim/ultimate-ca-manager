@@ -3374,6 +3374,7 @@
       "nothingFound": "Nichts gefunden, was dieses Profil ablehnen würde."
     },
     "fipsPreflight": {
+      "withoutModule": "Es wurde kein FIPS-Modul abgefragt: EdDSA- und ML-DSA-Schlüssel werden als abgelehnt aufgeführt. Führen Sie diese Prüfung mit Docker mit dem -fips-Image ohne UCM_FIPS aus, um sie nach dessen Modul zu beurteilen.",
       "title": "FIPS-Bereitschaft",
       "hint": "Listet auf, was der FIPS-Modus auf dieser Instanz ablehnen würde, jeweils mit einer Abhilfe. Es wird nichts geändert.",
       "run": "FIPS-Bereitschaft prüfen",
@@ -4910,7 +4911,7 @@
     "selectGroup": "Gruppe auswählen...",
     "subtitle": "Ausstellungsregeln, Schlüsselanforderungen und Genehmigungsworkflows verwalten",
     "fipsRulesTitle": "FIPS-Regeln aktiv (schreibgeschützt)",
-    "fipsRulesDesc": "Der FIPS-Modus wendet vorab eine Systemrichtlinie an: RSA-Schlüssel von 2048 bis 4096, EC-Schlüssel von P-256 bis P-521, Signaturen von SHA-256 bis SHA-512. Richtlinien an dieser Stelle können sie nur weiter einschränken.",
+    "fipsRulesDesc": "Der FIPS-Modus wendet vorab eine Systemrichtlinie an: RSA-Schlüssel gerader Länge von 2048 bis 16384 Bit, EC von P-256 bis P-521 sowie Ed25519, Ed448 und ML-DSA, wenn das geladene FIPS-Modul sie zulässt; Signaturen von SHA-256 bis SHA-512. Richtlinien an dieser Stelle können sie nur weiter einschränken.",
     "targetCA": "Ziel-CA",
     "title": "Zertifikatsrichtlinien",
     "toggleFailed": "Richtlinie konnte nicht umgeschaltet werden",

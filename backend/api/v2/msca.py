@@ -878,7 +878,8 @@ def sign_csr(msca_id, csr_id):
         if _unsignable:
             return error_response(_unsignable, 400)
         if not _csr_obj.is_signature_valid:
-            return error_response("CSR signature is invalid", 400)
+            from utils.csr_diagnostics import weak_csr_hash_error
+            return error_response(weak_csr_hash_error(_csr_obj) or "CSR signature is invalid", 400)
     except ValueError as e:
         return error_response(f"Invalid CSR: {e}", 400)
     except Exception as e:

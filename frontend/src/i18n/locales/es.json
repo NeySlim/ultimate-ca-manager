@@ -3374,6 +3374,7 @@
       "nothingFound": "No se encontró nada que este perfil rechazaría."
     },
     "fipsPreflight": {
+      "withoutModule": "No se consultó ningún módulo FIPS: las claves EdDSA y ML-DSA se listan como rechazadas. Con Docker, ejecute esta comprobación con la imagen -fips, sin UCM_FIPS, para juzgarlas según su módulo.",
       "title": "Preparación para FIPS",
       "hint": "Enumera lo que el modo FIPS rechazaría en esta instancia, con un remedio para cada caso. No se modifica nada.",
       "run": "Comprobar la preparación para FIPS",
@@ -4910,7 +4911,7 @@
     "selectGroup": "Seleccionar grupo...",
     "subtitle": "Gestionar reglas de emisión, requisitos de claves y flujos de aprobación",
     "fipsRulesTitle": "Reglas FIPS activas (solo lectura)",
-    "fipsRulesDesc": "El modo FIPS aplica una política del sistema antes que estas: claves RSA de 2048 a 4096 y EC de P-256 a P-521, firmas SHA-256 a SHA-512. Las políticas de aquí solo pueden restringirla más.",
+    "fipsRulesDesc": "El modo FIPS aplica una política del sistema antes que estas: claves RSA de longitud par de 2048 a 16384 bits, EC de P-256 a P-521, y Ed25519, Ed448 y ML-DSA cuando el módulo FIPS cargado las aprueba; firmas SHA-256 a SHA-512. Las políticas de aquí solo pueden restringirla más.",
     "targetCA": "CA destino",
     "title": "Políticas de certificados",
     "toggleFailed": "Error al cambiar el estado de la política",

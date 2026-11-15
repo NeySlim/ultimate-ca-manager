@@ -64,6 +64,26 @@ describe('FipsPreflightPanel', () => {
     ])
   })
 
+  it('says when no FIPS module judged EdDSA and ML-DSA', async () => {
+    getFipsPreflight.mockResolvedValue({ data: {
+      ready: true, module_known: false, summary: { blocker: 0, warning: 0, info: 0 }, findings: [], errors: [],
+    } })
+    render(<FipsPreflightPanel />)
+    fireEvent.click(screen.getByText('settings.fipsPreflight.run'))
+    await screen.findByTestId('fips-preflight-report')
+    expect(screen.getByText('settings.fipsPreflight.withoutModule')).toBeInTheDocument()
+  })
+
+  it('says nothing of the module when one judged', async () => {
+    getFipsPreflight.mockResolvedValue({ data: {
+      ready: true, module_known: true, summary: { blocker: 0, warning: 0, info: 0 }, findings: [], errors: [],
+    } })
+    render(<FipsPreflightPanel />)
+    fireEvent.click(screen.getByText('settings.fipsPreflight.run'))
+    await screen.findByTestId('fips-preflight-report')
+    expect(screen.queryByText('settings.fipsPreflight.withoutModule')).not.toBeInTheDocument()
+  })
+
   it('says when nothing blocks', async () => {
     getFipsPreflight.mockResolvedValue({ data: {
       ready: true, summary: { blocker: 0, warning: 0, info: 0 }, findings: [], errors: [],

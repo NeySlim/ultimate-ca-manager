@@ -55,6 +55,7 @@ validate_fqdn() {
 . "$(dirname "${BASH_SOURCE[0]}")/dns-update-port.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/ha-secret.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/ha-database.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/fips-module.sh"
 
 # =============================================================================
 # FIPS MODE (UCM_FIPS=1): module configuration written at every start
@@ -82,13 +83,8 @@ if [ "$FIPS_REQUESTED" = 1 ]; then
         echo "   With a read-only root filesystem, mount tmpfs: --tmpfs /run/ucm:uid=1000 --tmpfs /tmp"
         exit 1
     fi
-    # -pedantic: installation command of the module's security policy (approved mode)
-    if ! openssl fipsinstall -pedantic -module "$FIPS_MODULE" -provider_name fips \
-        -out "$FIPS_RUN_DIR/fipsmodule.cnf" > "$FIPS_RUN_DIR/fipsinstall.log" 2>&1; then
-        echo -e "${RED}❌ openssl fipsinstall failed: the FIPS module did not pass its self-tests${NC}"
-        cat "$FIPS_RUN_DIR/fipsinstall.log"
-        exit 1
-    fi
+    # -pedantic install (approved mode), then module-mac compared to the build's: no override
+    install_fips_module "$FIPS_MODULE" "$FIPS_RUN_DIR" /usr/share/ucm/fips-module.mac || exit 1
     # Settings the security policy requires at 1 in the approved mode (section 2.4)
     for FIPS_SETTING in security-checks conditional-errors tls1-prf-ems-check drbg-no-trunc-md; do
         if ! awk -F= -v key="$FIPS_SETTING" '{ gsub(/[ \t]/, "") }

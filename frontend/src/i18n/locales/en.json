@@ -3375,6 +3375,7 @@
       "nothingFound": "Nothing found that this profile would refuse."
     },
     "fipsPreflight": {
+      "withoutModule": "No FIPS module was asked: EdDSA and ML-DSA keys are listed as refused. With Docker, run this check with the -fips image, without UCM_FIPS, to judge them by its module.",
       "title": "FIPS readiness",
       "hint": "Lists what FIPS mode would refuse on this instance, with a remedy for each. Nothing is changed.",
       "run": "Check FIPS readiness",
@@ -4541,7 +4542,7 @@
     "title": "Certificate Policies",
     "subtitle": "Manage issuance rules, key requirements, and approval workflows",
     "fipsRulesTitle": "FIPS rules active (read only)",
-    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA 2048 to 4096 and EC P-256 to P-521 keys, SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
+    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA keys of an even length from 2048 to 16384 bits, EC P-256 to P-521, and Ed25519, Ed448 and ML-DSA when the loaded FIPS module approves them; SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "total": "Total",
     "active": "Active",
     "inactive": "Inactive",

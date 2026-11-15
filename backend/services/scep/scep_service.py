@@ -325,7 +325,7 @@ class SCEPService:
                 logger.warning(f"SCEP: CMS signature malformed: {e}")
                 return self._create_error_response(
                     self.FAIL_BAD_ALG,
-                    "Unsupported or malformed CMS signature",
+                    str(e) if isinstance(e, FipsRestricted) else "Unsupported or malformed CMS signature",
                     transaction_id=transaction_id,
                     recipient_nonce=sender_nonce,
                 ), 200
@@ -500,9 +500,12 @@ class SCEPService:
                     f"SCEP: CSR self-signature invalid "
                     f"(subject={csr.subject.rfc4514_string()})"
                 )
+                # A hash the server refuses is an unsupported algorithm: badAlg (RFC 8894 §3.2.1.4.5)
+                from utils.csr_diagnostics import weak_csr_hash_error
+                weak = weak_csr_hash_error(csr)
                 return self._create_error_response(
-                    self.FAIL_BAD_MESSAGE_CHECK,
-                    "CSR signature invalid (proof of possession failed)",
+                    self.FAIL_BAD_ALG if weak else self.FAIL_BAD_MESSAGE_CHECK,
+                    weak or "CSR signature invalid (proof of possession failed)",
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
