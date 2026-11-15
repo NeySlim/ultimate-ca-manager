@@ -1,4 +1,4 @@
-"""Tests that need an optional backend (SoftHSM, the system GSSAPI).
+"""Tests that need an optional backend (SoftHSM, the system GSSAPI, a Redis server).
 
 `needs('softhsm', available, reason)` marks a test: it is skipped without the backend, and when
 UCM_TEST_REQUIRE_SOFTHSM=1 any skip of it, for whatever reason, is reported as a failure instead.
@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-BACKENDS = ('softhsm', 'gssapi')
+BACKENDS = ('softhsm', 'gssapi', 'redis')
 
 
 def required_env(backend):

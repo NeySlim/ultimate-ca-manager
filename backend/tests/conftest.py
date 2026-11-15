@@ -172,9 +172,20 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.skip(reason=f'SQLite only: {reason}'))
 
 
-# needs_softhsm / needs_gssapi: skipped without the backend, failed under UCM_TEST_REQUIRE_<NAME>=1
+# needs_softhsm / needs_gssapi / needs_redis: skipped without the backend, failed under UCM_TEST_REQUIRE_<NAME>=1
 from tests.optional_backends import (  # noqa: E402,F401
     pytest_configure, pytest_runtest_makereport, pytest_runtest_setup)
+
+
+@pytest.fixture(scope='session')
+def redis_server(tmp_path_factory):
+    """This run's own Redis server, on a Unix socket of its temp dir (tests/redis_support.py)."""
+    from tests.redis_support import RedisServer
+    server = RedisServer(tmp_path_factory.mktemp('redis')).start()
+    try:
+        yield server
+    finally:
+        server.close()
 
 # The host's master key, when the machine runs UCM, must not reach the tests:
 # rows encrypted with it outlive the test that wrote them and break any later

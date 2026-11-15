@@ -3,8 +3,8 @@
 OWASP ASVS 5.0 §7.4.3: other sessions end after a change of any authentication
 factor. Each operation gets the password change's treatment: the session making it
 stays, every other one of the account gets 401, on the file store, on the SQL store
-(SQLite) and on the SQL store shared by two nodes on PostgreSQL (HA). The audit
-entry says how many sessions were closed.
+(SQLite), on the SQL store shared by two nodes on PostgreSQL (HA) and on Redis shared
+by two nodes. The audit entry says how many sessions were closed.
 """
 import json
 import os
@@ -15,6 +15,7 @@ import pytest
 
 from models import AuditLog, User, db
 from models.webauthn import WebAuthnCredential
+from tests.redis_support import needs_redis
 from tests.test_webauthn_second_factor import SoftKey
 
 PG_URL = os.getenv('UCM_TEST_APP_PG_URL') or os.getenv('UCM_TEST_PG_URL')
@@ -54,12 +55,24 @@ def _dispose(*applications):
     pytest.param('sql-postgresql', marks=[
         pytest.mark.postgres,
         pytest.mark.skipif(not PG_URL, reason='no PostgreSQL URL for the two-node session test')]),
+    pytest.param('redis', marks=[needs_redis]),
 ])
 def nodes(request, app, monkeypatch, tmp_path):
     """(node of the first session, node of the second): one store behind both."""
     from tests import pg_app_harness
     if request.param == 'files':
         yield app, app
+        return
+    if request.param == 'redis':
+        from tests.test_redis_sessions import dispose, redis_apps
+        server = request.getfixturevalue('redis_server')
+        server.client().flushdb()
+        created = redis_apps(monkeypatch, tmp_path, server.url())
+        try:
+            yield created[0], created[1]
+        finally:
+            dispose(*created)
+            server.client().flushdb()
         return
     if request.param == 'sql-sqlite':
         if pg_app_harness.ENABLED:
