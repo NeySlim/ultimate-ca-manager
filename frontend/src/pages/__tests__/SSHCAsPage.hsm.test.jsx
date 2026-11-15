@@ -24,12 +24,14 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
 
+const access = vi.hoisted(() => ({ hsm: true }))
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual('../../hooks')
   return {
     ...actual,
     usePermission: () => ({
-      canWrite: () => true, canDelete: () => true, hasPermission: () => true, canRead: () => true,
+      canWrite: () => true, canDelete: () => true, hasPermission: () => true,
+      canRead: (resource) => resource !== 'hsm' || access.hsm,
     }),
   }
 })
@@ -100,7 +102,7 @@ async function openHsmMode() {
   fireEvent.click(screen.getByText('cas.create.keyStorageHsm'))
   await waitFor(() => expect(getProviders).toHaveBeenCalled())
   await pickOption(comboboxFor(form, 'cas.create.hsmProvider'), 'PIV (pkcs11)')
-  await waitFor(() => expect(getSigningKeys).toHaveBeenCalledWith({ providerId: 3, unused: false }))
+  await waitFor(() => expect(getSigningKeys).toHaveBeenCalledWith({ providerId: 3, unused: true }))
   return form
 }
 
@@ -120,7 +122,7 @@ describe('SSHCAsPage SSH CA on HSM', () => {
 
   it('asks for every signing key: a key signing an X.509 CA is still free here', async () => {
     await openHsmMode()
-    expect(getSigningKeys).toHaveBeenCalledWith({ providerId: 3, unused: false })
+    expect(getSigningKeys).toHaveBeenCalledWith({ providerId: 3, unused: true })
   })
 
   it('offers only the key types OpenSSH certificates know', async () => {
@@ -146,24 +148,39 @@ describe('SSHCAsPage SSH CA on HSM', () => {
     expect(payload).not.toHaveProperty('key_type')
   })
 
-  it('names the role a key already serves, and blocks the CA until the role changes', async () => {
-    getAll.mockResolvedValue({ data: [{
-      id: 4, descr: 'Existing host CA', ca_type: 'host', key_type: 'ecdsa-p384',
-      key_source: 'hsm', hsm_key_id: 11, hsm_key_label: 'piv-sign', cert_count: 0,
-    }] })
+  it.each([
+    [409, "HSM key 'piv-sign' already backs the SSH user CA 'Existing': an HSM key backs one authority only"],
+    [403, 'Creating an SSH CA on an HSM key requires the read:hsm permission'],
+    [503, 'The HSM provider of this key cannot be reached'],
+    [403, 'FIPS mode refuses SoftHSM for a CA key'],
+    [403, 'A smart card reader is local to one node: refused in high availability'],
+  ])('shows the server refusal %s under the key: %s', async (status, message) => {
+    create.mockRejectedValue(Object.assign(new Error(message), { status }))
     const form = await openHsmMode()
-
-    // A user CA on this key is legal: OpenSSH keeps the roles apart
     await pickOption(comboboxFor(form, 'cas.create.hsmExistingKey'), /^piv-sign/)
-    const submit = form.querySelector('button[type="submit"]')
-    expect(submit.disabled).toBe(false)
+    fireEvent.click(form.querySelector('button[type="submit"]'))
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    // The modal stays open so the user can pick another key
+    expect(document.querySelector('form')).toBeTruthy()
+  })
 
-    await pickOption(comboboxFor(form, 'sshCas.caType'), 'sshCas.typeHost')
-    expect(await screen.findByText('sshCas.modal.hsmKeyInUse')).toBeInTheDocument()
-    expect(submit.disabled).toBe(true)
+  it('offers no HSM key storage without read:hsm, and says why', async () => {
+    access.hsm = false
+    try {
+      const form = await openCreateModal()
+      expect(screen.getByLabelText('cas.create.keyStorageHsm').disabled).toBe(true)
+      expect(screen.getByText('sshCas.modal.hsmNeedsRead')).toBeInTheDocument()
+      expect(form.querySelector('input[value="software"]').checked).toBe(true)
+      expect(getProviders).not.toHaveBeenCalled()
+    } finally {
+      access.hsm = true
+    }
+  })
 
-    await pickOption(comboboxFor(form, 'sshCas.caType'), 'sshCas.typeUser')
-    await waitFor(() => expect(submit.disabled).toBe(false))
+  it('keeps HSM key storage selectable with read:hsm', async () => {
+    await openCreateModal()
+    expect(screen.getByLabelText('cas.create.keyStorageHsm').disabled).toBe(false)
+    expect(screen.queryByText('sshCas.modal.hsmNeedsRead')).toBeNull()
   })
 
   it('shows a card-backed CA by its key, and keeps that key unchangeable', async () => {

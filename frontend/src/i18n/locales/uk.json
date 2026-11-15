@@ -5943,11 +5943,10 @@
       "allowCustomKeyId": "Дозволити запитувачам задавати ID ключа",
       "allowCustomKeyIdHelp": "sshd записує ID ключа в журнал як ідентичність власника. Без цього параметра CA називає кожен сертифікат principals@назва CA.",
       "keyStorageLockedHelp": "Ключ ЦС і тип ЦС не можна змінити після створення ЦС.",
-      "hsmKeyHelper": "SSH-сертифіки може підписувати лише ключ підпису RSA або ECDSA P-256/P-384/P-521 в HSM. Додайте або синхронізуйте ключі в керуванні HSM.",
-      "hsmNoUsableKeys": "У цього провайдера немає ключа підпису RSA або ECDSA, який могла б використати ЦС SSH.",
-      "hsmKeyUsedBy": "вже використовується ЦС {{caType}}",
-      "hsmKeyInUse": "ЦС SSH {{caType}} вже використовує цей ключ: {{name}}",
-      "hsmDerivedKey": "Тип ключа з HSM: {{keyType}}"
+      "hsmKeyHelper": "ЦС SSH на HSM використовує ключ підпису RSA або ECDSA P-256/P-384/P-521, який не зайнятий іншим центром. Додайте або синхронізуйте ключі в керуванні HSM.",
+      "hsmNoUsableKeys": "У цього провайдера немає вільного ключа підпису RSA або ECDSA. Ключ HSM обслуговує лише один центр, X.509 або SSH.",
+      "hsmDerivedKey": "Тип ключа з HSM: {{keyType}}",
+      "hsmNeedsRead": "Для створення ЦС SSH на ключі HSM потрібен дозвіл read:hsm."
     },
     "searchPlaceholder": "Шукати SSH CA...",
     "downloadSetupScript": "Завантажити скрипт налаштування",

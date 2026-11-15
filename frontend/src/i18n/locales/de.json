@@ -5873,11 +5873,10 @@
       "allowCustomKeyId": "Anfragenden die Wahl der Schlüssel-ID erlauben",
       "allowCustomKeyIdHelp": "sshd protokolliert die Schlüssel-ID als Identität des Inhabers. Ohne diese Option benennt die CA jedes Zertifikat principals@CA-Name.",
       "keyStorageLockedHelp": "Der CA-Schlüssel und der CA-Typ können nach der Erstellung der CA nicht geändert werden.",
-      "hsmKeyHelper": "Nur ein RSA- oder ECDSA-P-256/P-384/P-521-Signaturschlüssel im HSM kann SSH-Zertifikate signieren. Schlüssel in der HSM-Verwaltung hinzufügen oder synchronisieren.",
-      "hsmNoUsableKeys": "Dieser Anbieter hat keinen RSA- oder ECDSA-Signaturschlüssel, den eine SSH-CA nutzen könnte.",
-      "hsmKeyUsedBy": "bereits von der {{caType}}-CA verwendet",
-      "hsmKeyInUse": "Eine SSH-{{caType}}-CA verwendet diesen Schlüssel bereits: {{name}}",
-      "hsmDerivedKey": "Schlüsseltyp vom HSM: {{keyType}}"
+      "hsmKeyHelper": "Eine SSH-CA auf einem HSM nutzt einen RSA- oder ECDSA-P-256/P-384/P-521-Signaturschlüssel, den keine andere Instanz hält. Schlüssel in der HSM-Verwaltung hinzufügen oder synchronisieren.",
+      "hsmNoUsableKeys": "Dieser Anbieter hat keinen freien RSA- oder ECDSA-Signaturschlüssel. Ein HSM-Schlüssel dient nur einer Instanz, X.509 oder SSH.",
+      "hsmDerivedKey": "Schlüsseltyp vom HSM: {{keyType}}",
+      "hsmNeedsRead": "Das Anlegen einer SSH-CA auf einem HSM-Schlüssel erfordert die Berechtigung read:hsm."
     },
     "searchPlaceholder": "SSH-CAs durchsuchen...",
     "downloadSetupScript": "Einrichtungsskript herunterladen",

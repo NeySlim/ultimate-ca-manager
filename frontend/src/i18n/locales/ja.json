@@ -5876,11 +5876,10 @@
       "allowCustomKeyId": "リクエスタによる鍵IDの指定を許可",
       "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。",
       "keyStorageLockedHelp": "CAキーとCAタイプはCA作成後に変更できません。",
-      "hsmKeyHelper": "SSH証明書に使用できるのは、HSM内のRSAまたはECDSA P-256/P-384/P-521署名キーだけです。HSM管理でキーを追加または同期してください。",
-      "hsmNoUsableKeys": "このプロバイダーにはSSH CAが使用できるRSAまたはECDSA署名キーがありません。",
-      "hsmKeyUsedBy": "{{caType}} CAですでに使用済み",
-      "hsmKeyInUse": "SSH {{caType}} CAがこのキーをすでに使用しています: {{name}}",
-      "hsmDerivedKey": "HSMからのキータイプ: {{keyType}}"
+      "hsmKeyHelper": "HSM上のSSH CAは、他の認証局が使用していないRSAまたはECDSA P-256/P-384/P-521の署名キーを使います。HSM管理でキーを追加または同期してください。",
+      "hsmNoUsableKeys": "このプロバイダーには空いているRSAまたはECDSA署名キーがありません。HSMキーは、X.509またはSSHのいずれか1つの認証局にのみ使われます。",
+      "hsmDerivedKey": "HSMからのキータイプ: {{keyType}}",
+      "hsmNeedsRead": "HSMキー上にSSH CAを作成するには、read:hsm権限が必要です。"
     },
     "searchPlaceholder": "SSH CAを検索...",
     "downloadSetupScript": "セットアップスクリプトをダウンロード",

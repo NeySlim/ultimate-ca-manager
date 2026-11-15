@@ -41,8 +41,8 @@ const DEFAULT_EXTENSIONS = [
 ]
 
 // An HSM key decides the SSH key type it signs with: 'EC-P384' -> 'ecdsa-p384',
-// 'RSA-3072' -> 'rsa'. Everything else (Ed25519, Brainpool, post-quantum) has no
-// OpenSSH certificate format, so it is not offered as an SSH CA key at all.
+// 'RSA-3072' -> 'rsa'. UCM's HSM signing wrappers cover RSA and NIST ECDSA only
+// (Ed25519 SSH CAs exist as software keys), so nothing else is offered on an HSM.
 function hsmSshKeyType(algorithm) {
   const row = findAlgorithm(algorithm)
   if (row?.group === GROUP_RSA) return 'rsa'
@@ -658,7 +658,6 @@ export default function SSHCAsPage() {
       {showModal && (
         <SSHCAModal
           ca={editingCA}
-          existingCas={sshCas}
           onSave={editingCA ? handleUpdate : handleCreate}
           onClose={() => { setShowModal(false); setEditingCA(null) }}
         />
@@ -707,8 +706,10 @@ function principalList(ca) {
   return (listed || '').split(',').map(p => p.trim()).filter(Boolean)
 }
 
-function SSHCAModal({ ca, existingCas = [], onSave, onClose }) {
+function SSHCAModal({ ca, onSave, onClose }) {
   const { t } = useTranslation()
+  // Binding a key takes the right to see the HSM inventory (the server answers 403 otherwise)
+  const hsmAllowed = usePermission().canRead('hsm')
   const [loading, setLoading] = useState(false)
   // An existing CA keeps the key it was created with: only a new one chooses
   const [keySource, setKeySource] = useState(ca?.key_source === 'hsm' ? 'hsm' : 'software')
@@ -761,8 +762,8 @@ function SSHCAModal({ ca, existingCas = [], onSave, onClose }) {
     if (ca || keySource !== 'hsm' || !hsmProviderId) return
     let live = true
     setHsmKeysLoading(true)
-    // unused: false — a key already signing an X.509 CA can sign SSH certificates too
-    hsmService.getSigningKeys({ providerId: parseInt(hsmProviderId, 10), unused: false })
+    // An HSM key backs one authority, X.509 or SSH: only the free ones are offered
+    hsmService.getSigningKeys({ providerId: parseInt(hsmProviderId, 10), unused: true })
       .then(res => { if (live) setHsmKeys(extractData(res) || []) })
       .catch(() => { if (live) setHsmKeys([]) })
       .finally(() => { if (live) setHsmKeysLoading(false) })
@@ -775,22 +776,8 @@ function SSHCAModal({ ca, existingCas = [], onSave, onClose }) {
     && hsmSshKeyType(k.algorithm) !== null
   ), [hsmKeys, fips])
 
-  /* The server keeps one CA per (key, role): the CA list carries hsm_key_id, so
-   * a clash is visible before submitting. One key backing a user CA and a host
-   * CA is legal, so the other role's key stays selectable. */
-  const usedByRole = useMemo(() => {
-    const map = {}
-    for (const c of existingCas) {
-      if (c.hsm_key_id) map[`${c.hsm_key_id}:${c.ca_type}`] = c.descr || t('common.unnamed')
-    }
-    return map
-  }, [existingCas, t])
-  const roleLabel = t(formData.ca_type === 'user' ? 'sshCas.typeUser' : 'sshCas.typeHost')
-  const clash = keySource === 'hsm' && hsmKeyId
-    ? usedByRole[`${hsmKeyId}:${formData.ca_type}`] : null
   const selectedHsmKey = usableHsmKeys.find(k => String(k.id) === hsmKeyId)
   const keyError = fieldErrors.hsm_key
-    || (clash ? t('sshCas.modal.hsmKeyInUse', { caType: roleLabel, name: clash }) : null)
 
   const toggleExtension = (ext) => {
     setFormData(prev => {
@@ -851,7 +838,7 @@ function SSHCAModal({ ca, existingCas = [], onSave, onClose }) {
       submitLabel={ca ? t('common.save') : t('common.create')}
       loading={loading}
       disabled={loading || !formData.description.trim() || (!ca && keySource === 'hsm' && (
-        hsmProvidersLoading || hsmKeysLoading || !hsmProviderId || !hsmKeyId || !!clash
+        hsmProvidersLoading || hsmKeysLoading || !hsmProviderId || !hsmKeyId
       ))}
     >
       <Input
@@ -868,7 +855,7 @@ function SSHCAModal({ ca, existingCas = [], onSave, onClose }) {
           {['software', 'hsm'].map(mode => (
             <label key={mode} className={cn(
               'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all',
-              ca ? 'cursor-not-allowed' : 'cursor-pointer',
+              (ca || (mode === 'hsm' && !hsmAllowed)) ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
               keySource === mode
                 ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
                 : 'border-border hover:border-border-hover text-text-secondary'
@@ -878,7 +865,7 @@ function SSHCAModal({ ca, existingCas = [], onSave, onClose }) {
                 name="sshCaKeyStorage"
                 value={mode}
                 className="sr-only"
-                disabled={!!ca}
+                disabled={!!ca || (mode === 'hsm' && !hsmAllowed)}
                 checked={keySource === mode}
                 onChange={() => { setKeySource(mode); setFieldErrors({}) }}
               />
@@ -887,6 +874,7 @@ function SSHCAModal({ ca, existingCas = [], onSave, onClose }) {
           ))}
         </div>
         {ca && <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.keyStorageLockedHelp')}</p>}
+        {!ca && !hsmAllowed && <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.hsmNeedsRead')}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -937,9 +925,7 @@ function SSHCAModal({ ca, existingCas = [], onSave, onClose }) {
             onChange={value => { setHsmKeyId(value); setFieldErrors({}) }}
             options={usableHsmKeys.map(k => ({
               value: String(k.id),
-              label: usedByRole[`${k.id}:${formData.ca_type}`]
-                ? `${k.label} (${k.algorithm}) — ${t('sshCas.modal.hsmKeyUsedBy', { caType: roleLabel })}`
-                : `${k.label} (${k.algorithm})`
+              label: `${k.label} (${k.algorithm})`
             }))}
             placeholder={hsmKeysLoading ? t('common.loading') : undefined}
             disabled={!hsmProviderId || hsmKeysLoading}

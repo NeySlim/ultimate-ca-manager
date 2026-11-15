@@ -5873,11 +5873,10 @@
       "allowCustomKeyId": "Permitir que os solicitantes definam o ID da chave",
       "allowCustomKeyIdHelp": "O sshd registra o ID da chave como a identidade do titular. Sem esta opção, a CA nomeia cada certificado principals@nome da CA.",
       "keyStorageLockedHelp": "A chave da AC e o tipo de AC não podem ser alterados após a criação da AC.",
-      "hsmKeyHelper": "Somente uma chave de assinatura RSA ou ECDSA P-256/P-384/P-521 no HSM pode assinar certificados SSH. Adicione ou sincronize chaves no Gerenciamento HSM.",
-      "hsmNoUsableKeys": "Este provedor não tem uma chave de assinatura RSA ou ECDSA que uma AC SSH possa usar.",
-      "hsmKeyUsedBy": "já usada pela AC {{caType}}",
-      "hsmKeyInUse": "Uma AC SSH {{caType}} já usa esta chave: {{name}}",
-      "hsmDerivedKey": "Tipo de chave do HSM: {{keyType}}"
+      "hsmKeyHelper": "Uma AC SSH em HSM usa uma chave de assinatura RSA ou ECDSA P-256/P-384/P-521 que nenhuma outra autoridade detém. Adicione ou sincronize chaves no Gerenciamento HSM.",
+      "hsmNoUsableKeys": "Este provedor não tem nenhuma chave de assinatura RSA ou ECDSA livre. Uma chave HSM serve a uma única autoridade, X.509 ou SSH.",
+      "hsmDerivedKey": "Tipo de chave do HSM: {{keyType}}",
+      "hsmNeedsRead": "Criar uma AC SSH em uma chave HSM exige a permissão read:hsm."
     },
     "searchPlaceholder": "Pesquisar CAs SSH...",
     "downloadSetupScript": "Baixar script de configuração",
