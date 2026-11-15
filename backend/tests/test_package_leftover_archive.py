@@ -455,7 +455,9 @@ def test_a_database_path_spelled_otherwise_under_the_data_goes_with_the_data(tmp
     assert 'placed outside' not in (box.archive / 'README.txt').read_text()
 
 
-@pytest.mark.skipif(os.path.lexists('/ucm.db'), reason='this machine has a /ucm.db')
+# The script renames these four: none may be a real file of this machine
+@pytest.mark.skipif(any(os.path.lexists(f'/ucm.db{s}') for s in ('', '-wal', '-shm', '-journal')),
+                    reason='this machine has a /ucm.db or one of its journal files')
 def test_a_database_at_the_root_is_a_whole_step_and_a_later_failure_puts_all_back(tmp_path):
     """DATABASE_PATH=/ucm.db (absent here, so nothing outside the box is renamed): its
     directory is /, which its journal line names like any other."""
