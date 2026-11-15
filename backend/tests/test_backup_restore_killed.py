@@ -165,7 +165,8 @@ def test_a_restore_is_refused_while_an_older_journal_remains(app, diverged, monk
         before = _database_pem(refid)
         kept = _stale_journal(path.parent, 'never-published.crt')
         with monkeypatch.context() as patched:
-            patched.setattr(files.shutil, 'rmtree', lambda *args, **kwargs: None)
+            patched.setattr(files, '_put_back_journal', lambda *args: (_ for _ in ()).throw(
+                OSError('read-only filesystem')))
             with pytest.raises(files.InterruptedRestorePending):
                 BackupService().restore_backup_from_path(archive, PASSWORD, mode='replace')
         assert kept.exists()

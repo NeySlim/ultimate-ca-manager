@@ -569,6 +569,9 @@ def sweep_kept_previous_contents() -> List[Path]:
                 if journal is not None and journal['token'] not in committed:
                     try:
                         _put_back_journal(path, journal)
+                        # Put back once: a journal left after that would undo any later change
+                        os.unlink(os.path.join(path, _JOURNAL))
+                        _fsync_directory(Path(path))
                     except OSError as exc:
                         # Kept with its journal: its files disagree with the database until then
                         logger.warning("Restore: could not put back the previous contents kept "

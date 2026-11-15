@@ -440,3 +440,18 @@ def test_an_uncommitted_journal_left_on_disk_refuses_a_restore(dirs, monkeypatch
     with pytest.raises(files.InterruptedRestorePending):
         files.settle_interrupted_restores()
     assert all(path.exists() for path in kept)
+
+
+def test_a_journal_put_back_is_never_replayed_over_a_later_change(dirs, monkeypatch):
+    # Its directory left on disk, the journal replayed at each start undid what came after
+    kept, key, pem, new = _killed_after_publish(dirs, committed=False)
+    with monkeypatch.context() as patched:
+        patched.setattr(files.shutil, 'rmtree', lambda *args, **kwargs: None)
+        files.sweep_kept_previous_contents()
+    assert all(path.exists() and not (path / 'journal.json').exists() for path in kept)
+    assert pem.read_bytes() == b'OLD HTTPS CERT' and not new.exists()
+    new.write_bytes(b'ISSUED LATER')
+    pem.write_bytes(b'RENEWED HTTPS CERT')
+
+    assert sorted(files.sweep_kept_previous_contents()) == kept
+    assert new.read_bytes() == b'ISSUED LATER' and pem.read_bytes() == b'RENEWED HTTPS CERT'
