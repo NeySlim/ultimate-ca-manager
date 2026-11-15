@@ -183,7 +183,7 @@ Open **Modules** > **Protocols** > **EST**. RFC 7030 enrollment over HTTPS with 
 
 ### TSA
 
-Open **Modules** > **Protocols** > **TSA**. The RFC 3161 time stamp authority: enable it, choose the signing CA and set the policy OID (the default is a placeholder: use one from your organization's arc). A dedicated signing certificate, issued from the page, is preferred to signing with the CA certificate. The **TSA Endpoint** tab shows the URL and OpenSSL examples.
+Open **Modules** > **Protocols** > **TSA**. The RFC 3161 time stamp authority: enable it, choose the signing CA and set the policy OID (the default is a placeholder: use one from your organization's arc). A dedicated signing certificate is required by default: until one is set, `/tsa` answers 503. **Generate a signing certificate** issues one from the signing CA, with the timeStamping EKU alone and critical (RFC 3161), and selects it when no usable signer is set. Turning off **Require a dedicated TSA certificate** lets the CA certificate sign, which is not RFC 3161 compliant and which the overview shows as a warning. The **TSA Endpoint** tab shows the URL and OpenSSL examples.
 
 ### CRL & OCSP
 
