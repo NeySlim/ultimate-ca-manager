@@ -18,7 +18,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from ..storage import _fsync_directory
 
@@ -95,6 +95,8 @@ class StagedFiles:
         self._prefix = prefix
         self._staging_dir: Optional[Path] = None
         self._entries: List[_Staged] = []
+        # Destination to its position in _entries: one lookup per staged file
+        self._index: Dict[Path, int] = {}
 
     # -- staging ----------------------------------------------------------
 
@@ -140,16 +142,18 @@ class StagedFiles:
         destination = Path(destination)
         staging = self._staging()
 
-        for entry in self._entries:
-            if entry.destination == destination:
-                if entry.staged_path is None:
-                    entry.staged_path = staging / f"{self._entries.index(entry):04d}_{destination.name}"
-                entry.mode, entry.remove = mode, False
-                _write_private(entry.staged_path, data, mode)
-                return entry.staged_path
+        position = self._index.get(destination)
+        if position is not None:
+            entry = self._entries[position]
+            if entry.staged_path is None:
+                entry.staged_path = staging / f"{position:04d}_{destination.name}"
+            entry.mode, entry.remove = mode, False
+            _write_private(entry.staged_path, data, mode)
+            return entry.staged_path
 
         staged_path = staging / f"{len(self._entries):04d}_{destination.name}"
         _write_private(staged_path, data, mode)
+        self._index[destination] = len(self._entries)
         self._entries.append(_Staged(destination, staged_path, mode))
         return staged_path
 
@@ -159,10 +163,11 @@ class StagedFiles:
         Replaces whatever was staged for it: a file the restore no longer wants.
         """
         destination = Path(destination)
-        for entry in self._entries:
-            if entry.destination == destination:
-                entry.remove = True
-                return
+        position = self._index.get(destination)
+        if position is not None:
+            self._entries[position].remove = True
+            return
+        self._index[destination] = len(self._entries)
         self._entries.append(_Staged(destination, None, 0o600, remove=True))
 
     # -- publication ------------------------------------------------------
@@ -271,6 +276,7 @@ class StagedFiles:
         """
         staging, self._staging_dir = self._staging_dir, None
         self._entries = []
+        self._index = {}
         if staging is None:
             return
         try:

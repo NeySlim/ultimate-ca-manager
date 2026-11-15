@@ -219,3 +219,67 @@ class TestDiscardLeavesNothing:
 
         assert destination.read_bytes() == b'untouched'
         assert not staging_dir.exists()
+
+
+class _CountingPath(type(Path())):
+    """A path that counts equality tests, the cost of finding a destination."""
+
+    comparisons = 0
+
+    def __eq__(self, other):
+        type(self).comparisons += 1
+        return super().__eq__(other)
+
+    __hash__ = type(Path()).__hash__
+
+
+class TestStagingCostIsLinear:
+    """A restore stages one file per key mirror; finding an earlier entry for
+    a destination must not walk every entry staged before it."""
+
+    @staticmethod
+    def _comparisons(monkeypatch, tmp_path, count):
+        import services.backup.restore.files as files
+        monkeypatch.setattr(files, 'Path', _CountingPath)
+        _CountingPath.comparisons = 0
+        staged = StagedFiles(base_dir=tmp_path / f'staging{count}')
+        try:
+            for index in range(count):
+                staged.stage(tmp_path / f'k{index}.key', b'k')
+                staged.stage_removal(tmp_path / f'gone{index}.key')
+            return _CountingPath.comparisons
+        finally:
+            staged.discard()
+
+    def test_comparisons_do_not_grow_with_the_square(self, monkeypatch, tmp_path):
+        small = self._comparisons(monkeypatch, tmp_path, 100)
+        large = self._comparisons(monkeypatch, tmp_path, 400)
+        # Quadratic staging makes this ratio about 16; linear keeps it near 4.
+        assert large <= 5 * max(small, 1)
+        assert large <= 4 * 400
+
+    def test_restaging_replaces_and_keeps_the_order(self, tmp_path):
+        first, second = tmp_path / 'a.key', tmp_path / 'b.key'
+        with StagedFiles(base_dir=tmp_path / 'staging') as staged:
+            path_one = staged.stage(first, b'one')
+            staged.stage(second, b'two')
+            staged.stage_removal(first)
+            assert staged.stage(first, b'again') == path_one
+            assert staged.destinations == [first, second]
+            assert path_one.read_bytes() == b'again'
+            staged.publish()
+            staged.discard()
+        assert first.read_bytes() == b'again'
+        assert second.read_bytes() == b'two'
+
+    def test_a_removal_staged_first_gets_a_staging_path_when_restaged(self, tmp_path):
+        gone, other = tmp_path / 'gone.key', tmp_path / 'other.key'
+        gone.write_bytes(b'old')
+        with StagedFiles(base_dir=tmp_path / 'staging') as staged:
+            staged.stage_removal(gone)
+            staged.stage(other, b'o')
+            path = staged.stage(gone, b'new')
+            assert path.name.startswith('0000_')
+            staged.publish()
+            staged.discard()
+        assert gone.read_bytes() == b'new'
