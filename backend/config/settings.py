@@ -200,7 +200,7 @@ class Config:
     # v4 archives are streamed and not bound by the above; 0 accepts any size
     BACKUP_MAX_ARCHIVE_MB = backup_max_archive_mb()
     
-    # HA preview: multi-node mode refuses host-local operations (see utils/ha.py)
+    # HA: multi-node mode refuses host-local operations (see utils/ha.py)
     HA_MODE = env_bool("UCM_HA")
     NODE_ID = os.getenv("UCM_NODE_ID") or socket.gethostname()
 

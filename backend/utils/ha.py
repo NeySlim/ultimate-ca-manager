@@ -1,4 +1,4 @@
-"""HA preview helpers: startup validation and the guard for host-local operations."""
+"""HA helpers: startup validation and the guard for host-local operations."""
 import logging
 import os
 from functools import wraps
