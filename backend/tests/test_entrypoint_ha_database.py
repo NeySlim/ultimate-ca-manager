@@ -147,7 +147,8 @@ def _volume_start(tmp_path, where, db_state, database_path=None):
     (old / 'ca').mkdir(parents=True)
     (old / 'ca' / 'root.pem').write_text('ca')
     _registry((data if where == 'current' else old) / 'ucm.db', db_state == '2.254')
-    db = volume / database_path if database_path else data / 'ucm.db'
+    # Joined as text: pathlib would remove the ./ and // a spelling test needs
+    db = f'{volume}/{database_path}' if database_path else data / 'ucm.db'
     env = {'UCM_DATABASE_PATH': str(db), 'UCM_BACKUP_ENABLED': 'true',
            'UCM_BACKUP_RETENTION_DAYS': '30', 'UCM_BASE_PATH': str(ROOT), 'DATA_PATH': str(data),
            'UCM_OLD_DATA_PATHS': f'{old} {volume}/app/backend/data', 'UCM_INITIAL_ADMIN_USERNAME': 'admin',
