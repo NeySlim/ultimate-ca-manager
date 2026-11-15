@@ -534,6 +534,15 @@ class TestFipsAndHa:
         _, r = _x509_ca(auth_client, key['key'])
         assert r.status_code == 409 and r.get_json()['code'] == 'ha_mode', r.data
 
+    def test_the_reader_refusal_names_every_module_of_the_list(self, auth_client, token_key, monkeypatch):
+        from services import compliance_signer
+        monkeypatch.setitem(compliance_signer.LOCAL_READER_MODULES, 'acmecard', 'ACME Card reader')
+        key = token_key(module='/usr/lib/libacmecard-pkcs11.so')
+        monkeypatch.setattr(Config, 'HA_MODE', True)
+        r = _ssh_ca(auth_client, key['key'])
+        assert r.status_code == 409, r.data
+        assert all(display in _detail(r) for display in compliance_signer.LOCAL_READER_MODULES.values()), _detail(r)
+
     def test_ha_takes_a_network_token(self, auth_client, token_key, monkeypatch):
         key = token_key(module=VENDOR)
         monkeypatch.setattr(Config, 'HA_MODE', True)

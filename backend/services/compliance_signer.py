@@ -39,11 +39,11 @@ def softhsm_provider(provider):
     return softhsm_config(provider.type, provider.get_config(), provider.name)
 
 
-# PKCS#11 modules of a smart card reader attached to one host, matched in the module file name;
-# any other PKCS#11 module is assumed reachable from every node
+# PKCS#11 modules of a smart card reader attached to one host, matched in the module file name, and
+# the name the HA refusal gives each (utils.ha); any other PKCS#11 module is assumed reachable from every node
 LOCAL_READER_MODULES = {
     'opensc': 'OpenSC',
-    'ykcs11': 'YubiKey PIV (ykcs11)',
+    'ykcs11': 'YubiKey PIV',
 }
 
 

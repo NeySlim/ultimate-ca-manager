@@ -55,13 +55,16 @@ def refuse_softhsm_in_ha():
         raise HaRestricted(SOFTHSM_LOCAL)
 
 
-READER_LOCAL = ("Not available in HA mode: a smart card reader (OpenSC, YubiKey PIV) is attached to one node only, "
-                "use a network HSM or a KMS provider")
+def reader_local_message():
+    """The refusal of a smart card reader key in HA mode, naming the modules UCM takes for one."""
+    from services.compliance_signer import LOCAL_READER_MODULES
+    return (f"Not available in HA mode: a smart card reader ({', '.join(LOCAL_READER_MODULES.values())}) "
+            "is attached to one node only, use a network HSM or a KMS provider")
 
 
 def refuse_reader_in_ha():
     if ha_enabled():
-        raise HaRestricted(READER_LOCAL)
+        raise HaRestricted(reader_local_message())
 
 
 LOCAL_ONLY = "Not available in HA mode: this operation only changes the local host"
