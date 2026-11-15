@@ -120,7 +120,7 @@ describe('SSHCAsPage SSH CA on HSM', () => {
     create.mockResolvedValue({ data: { id: 7, descr: 'New SSH CA', ca_type: 'user', cert_count: 0 } })
   })
 
-  it('asks for every signing key: a key signing an X.509 CA is still free here', async () => {
+  it('asks for the unused keys only: one HSM key backs one authority, X.509 or SSH', async () => {
     await openHsmMode()
     expect(getSigningKeys).toHaveBeenCalledWith({ providerId: 3, unused: true })
   })
