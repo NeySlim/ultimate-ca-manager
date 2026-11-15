@@ -6,9 +6,11 @@ Factory pattern for provider instantiation and database operations.
 from typing import Dict, List, Optional, Any, Type
 from datetime import datetime
 from pathlib import Path
+import hashlib
 import json
 import logging
 
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from sqlalchemy import or_
@@ -36,12 +38,14 @@ GENERATE_LOCK_TIMEOUT = 60
 
 
 
-def _parses_as_spki(pem) -> bool:
+def _spki_fingerprint(pem) -> Optional[bytes]:
     try:
-        serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
-        return True
-    except Exception:
-        return False
+        public = serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
+        der = public.public_bytes(serialization.Encoding.DER,
+                                  serialization.PublicFormat.SubjectPublicKeyInfo)
+        return hashlib.sha256(der).digest()
+    except (ValueError, TypeError, UnsupportedAlgorithm):
+        return None
 
 
 def _spki_from_pkcs1_pem(pem):
@@ -625,13 +629,16 @@ class HsmService:
         """The digest the key's provider signs with when *requested* is asked
         for. Providers that hash with any digest return the request; those
         that bind the digest to the key (curve-matched ECDSA, a KMS key
-        version) return that one. Cached per key and request."""
-        cache_key = (key_id, requested)
-        if cache_key in cls._signing_hash_cache:
-            return cls._signing_hash_cache[cache_key]
+        version) return that one. Cached per key material and request."""
         key = db.session.get(HsmKey, key_id)
         if not key:
             raise ValueError(f"Key not found: {key_id}")
+        # Read the shared row even if this session still holds an older ORM instance.
+        pem = db.session.execute(db.select(HsmKey.public_key_pem).where(HsmKey.id == key_id)).scalar_one()
+        fingerprint = _spki_fingerprint(pem)
+        cache_key = (key_id, fingerprint, requested)
+        if fingerprint and cache_key in cls._signing_hash_cache:
+            return cls._signing_hash_cache[cache_key]
         try:
             hsm = cls._get_provider_instance(key.provider)
             name = hsm.hash_for_key(key.key_identifier, key_algorithm or key.algorithm, requested) or requested
@@ -640,7 +647,8 @@ class HsmService:
             # the request stands, and signing itself will say what is wrong
             logger.debug(f"Signing digest for HSM key {key_id} left as requested: {e}")
             return requested
-        cls._signing_hash_cache[cache_key] = name
+        if fingerprint:
+            cls._signing_hash_cache[cache_key] = name
         return name
 
     @staticmethod
@@ -756,21 +764,25 @@ class HsmService:
     # =========================================================================
     
     @classmethod
-    def _refresh_reading(cls, known: HsmKey, key_info: HsmKeyInfo) -> None:
-        """Take a valid label and a public key the row could not parse from a newer
-        listing; an UNKNOWN reading never overwrites what the row holds."""
-        if key_info.algorithm in HsmKey.VALID_ALGORITHMS and key_info.algorithm != known.algorithm:
+    def _refresh_reading(cls, known: HsmKey, key_info: HsmKeyInfo) -> bool:
+        """Refresh readable material; return whether a previously known key changed."""
+        previous = _spki_fingerprint(known.public_key_pem)
+        current = _spki_fingerprint(key_info.public_key_pem)
+        algorithm_changed = (key_info.algorithm in HsmKey.VALID_ALGORITHMS
+                             and key_info.algorithm != known.algorithm)
+        if algorithm_changed:
             known.algorithm = key_info.algorithm
-            # A different algorithm at the same slot id means the slot was re-keyed:
-            # the cached public key belongs to the key that no longer exists.
-            known.public_key_pem = key_info.public_key_pem if _parses_as_spki(key_info.public_key_pem) else None
-            cls.forget_signing_hash(known.id)
-        if key_info.public_key_pem and not _parses_as_spki(known.public_key_pem) \
-                and _parses_as_spki(key_info.public_key_pem):
+        if current:
             known.public_key_pem = key_info.public_key_pem
+        elif algorithm_changed:
+            known.public_key_pem = None
+        changed = algorithm_changed or bool(previous and current and previous != current)
+        if changed:
+            cls.forget_signing_hash(known.id)
+        return changed
 
     @classmethod
-    def sync_keys(cls, provider_id: int) -> Dict[str, int]:
+    def sync_keys(cls, provider_id: int) -> Dict[str, Any]:
         """
         Sync keys from HSM to database.
         Adds new keys found in HSM and removes missing ones, except keys another
@@ -782,7 +794,8 @@ class HsmService:
 
         Returns:
             Dict with 'added', 'removed', 'unchanged', 'missing_kept' and
-            'listing_errors' counts
+            'listing_errors' counts, plus 'changed_referenced_key_ids' for authorities
+            whose token material changed
         """
         provider = db.session.get(HsmProvider, provider_id)
         if not provider:
@@ -804,6 +817,7 @@ class HsmService:
             added = 0
             removed = 0
             unchanged = 0
+            changed_ids = set()
             
             # Add new keys from HSM
             for key_info in hsm_keys:
@@ -826,12 +840,14 @@ class HsmService:
                     level = (key_info.metadata or {}).get('protection_level')
                     if level:
                         known.set_metadata({**known.get_metadata(), 'protection_level': level})
-                    cls._refresh_reading(known, key_info)
+                    if cls._refresh_reading(known, key_info):
+                        changed_ids.add(known.id)
                     unchanged += 1
             
             # A partial listing proves nothing missing; a referenced key is never dropped
             # (deleting it would null the CA's hsm_key_id).
             referenced = cls._referenced_hsm_key_ids()
+            changed_referenced = sorted(changed_ids & referenced)
             missing_kept = 0
             for key_id, key in db_keys.items():
                 if key_id in hsm_key_ids:
@@ -850,7 +866,8 @@ class HsmService:
                     f"{missing_kept} missing key(s) kept")
             logger.info(f"Synced HSM keys for {provider.name}: +{added} -{removed} ={unchanged}")
             return {'added': added, 'removed': removed, 'unchanged': unchanged,
-                    'missing_kept': missing_kept, 'listing_errors': listing_errors}
+                    'missing_kept': missing_kept, 'listing_errors': listing_errors,
+                    'changed_referenced_key_ids': changed_referenced}
 
         except HsmError:
             db.session.rollback()

@@ -322,7 +322,7 @@ class TestSyncKeys:
                 row = db.session.get(HsmKey, ids['a'])
                 assert (row.algorithm, row.public_key_pem) == ('EC-P384', spki)
 
-    def test_a_key_keeps_its_label_and_spki_against_an_unknown_reading(self, app):
+    def test_a_key_keeps_its_label_but_accepts_readable_spki_from_unknown_reading(self, app):
         from models import db
         from models.hsm import HsmKey
         spki = ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(
@@ -338,7 +338,7 @@ class TestSyncKeys:
             _sync(app, pid, _ListingProvider([listed]))
             with app.app_context():
                 row = db.session.get(HsmKey, ids['a'])
-                assert (row.algorithm, row.public_key_pem) == ('EC-P256', spki)
+                assert (row.algorithm, row.public_key_pem) == ('EC-P256', other)
 
     def test_a_rekeyed_slot_takes_the_new_key_and_forgets_the_old_public_key(self, app):
         """A slot that holds a different key now: its cached SPKI belongs to the key that no longer exists."""
@@ -385,7 +385,7 @@ class TestSyncKeys:
         with _provider_with_keys(app, 'clean', ['a', 'gone']) as (pid, _ids, _ca):
             result = _sync(app, pid, _ListingProvider([_info('a'), _info('new')]))
             assert result == {'added': 1, 'removed': 1, 'unchanged': 1,
-                              'missing_kept': 0, 'listing_errors': 0}
+                              'missing_kept': 0, 'listing_errors': 0, 'changed_referenced_key_ids': []}
             assert _surviving(app, pid) == {'a', 'new'}
 
 

@@ -398,7 +398,9 @@ def sync_provider_keys(provider_id):
             resource_type='hsm_provider',
             resource_id=provider_id,
             resource_name=provider.name,
-            details=f"Synced keys: +{result['added']} -{result['removed']} ={result['unchanged']}",
+            details=(f"Synced keys: +{result['added']} -{result['removed']} ={result['unchanged']}; "
+                     f"Changed key material referenced by authorities: "
+                     f"{result['changed_referenced_key_ids']}"),
             success=True,
             user_id=_audit_user()[0],
             username=_audit_user()[1],

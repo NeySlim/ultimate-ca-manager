@@ -307,6 +307,6 @@ def test_deleting_a_key_forgets_its_cached_digest(app):
     from services.hsm import HsmService
     with _hsm_ec_key(app, 'EC-P384', raw=True, bound=True) as (key_id, _public_key, _digest):
         assert HsmService.signing_hash(key_id, 'EC-P384', 'sha256') == 'sha384'
-        assert (key_id, 'sha256') in HsmService._signing_hash_cache
+        assert any(k[0] == key_id for k in HsmService._signing_hash_cache)
         HsmService.delete_key(key_id)
-        assert (key_id, 'sha256') not in HsmService._signing_hash_cache
+        assert not any(k[0] == key_id for k in HsmService._signing_hash_cache)
