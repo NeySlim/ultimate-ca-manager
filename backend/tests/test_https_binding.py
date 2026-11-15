@@ -252,3 +252,23 @@ class TestLeftBehindBannerSuperseded:
                 SystemConfig.query.filter_by(key=HTTPS_LEFT_BEHIND_KEY).delete()
                 db.session.commit()
                 CertificateService.delete_certificate(succ['id'])
+
+
+class TestApplyingTheBoundCertificateAgain:
+    """Applying the certificate already in place writes the same files and binding: a 200."""
+
+    def test_the_second_apply_answers_like_the_first(
+        self, app, auth_client, clean_binding, monkeypatch, tmp_path, create_cert,
+    ):
+        import api.v2.system.https as route
+        monkeypatch.setenv('HTTPS_CERT_PATH', str(tmp_path / 'https_cert.pem'))
+        monkeypatch.setenv('HTTPS_KEY_PATH', str(tmp_path / 'https_key.pem'))
+        monkeypatch.setattr(route, 'restart_to_serve', lambda: (True, 'ok'))
+        cert = create_cert(cn='reapply-https.example.com')
+        first = auth_client.post('/api/v2/system/https/apply', json={'cert_id': cert['id']})
+        assert first.status_code == 200, first.data
+        again = auth_client.post('/api/v2/system/https/apply', json={'cert_id': cert['id']})
+        assert again.status_code == 200, again.data
+        assert again.get_json()['message'] == first.get_json()['message']
+        with app.app_context():
+            assert get_bound_refid() == cert['refid']

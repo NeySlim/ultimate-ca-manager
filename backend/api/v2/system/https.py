@@ -153,17 +153,21 @@ def unbind_https_cert():
     return success_response(message='HTTPS certificate binding cleared')
 
 
-def _unrecorded_message():
+def _unrecorded_message(refid=None):
     """The 500 of a pair written to disk whose binding was not stored (outside HA).
 
-    The next start rewrites the files only when the database names a pair (materialize_https).
+    The next start rewrites the files only when the database names a pair (materialize_https);
+    a binding that already names *refid*, the certificate just written, rewrites that one.
     """
     base = "Certificate written but not recorded: the service was not restarted"
     try:
         from services import shared_files
         from services.https_binding import get_bound_refid
         db.session.rollback()
-        named = bool(get_bound_refid()) or shared_files.read_file(shared_files.HTTPS_GENERATED) is not None
+        bound = get_bound_refid()
+        if refid and bound == refid:
+            return f"{base}, and its next start serves this certificate"
+        named = bool(bound) or shared_files.read_file(shared_files.HTTPS_GENERATED) is not None
     except Exception:
         db.session.rollback()
         return base
@@ -318,7 +322,7 @@ def apply_https_cert():
             current_app.logger.warning(f"Could not persist HTTPS binding: {e}")
             # Not restarted: the next start writes the certificate the database still names, if any
             message = ("Certificate applied on this node only: the binding could not be stored"
-                       if ha_enabled() else _unrecorded_message())
+                       if ha_enabled() else _unrecorded_message(refid))
             AuditService.log_action(
                 action='https_apply', resource_type='system', resource_id=str(cert_id),
                 resource_name=label,

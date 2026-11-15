@@ -144,3 +144,17 @@ def test_the_unrecorded_write_is_audited_as_a_failure(
         rows = AuditLog.query.filter(AuditLog.id > last, AuditLog.action == action).all()
         assert [row.success for row in rows] == [False], [(row.action, row.details) for row in rows]
         assert ('this node only' if ha else 'not recorded') in rows[0].details
+
+
+def test_applying_the_bound_certificate_again_names_it_as_the_one_served_next(
+        app, auth_client, own_cert, broken_binding, prior):
+    """The database already names this certificate: the next start serves it, not a previous one."""
+    from models import db
+    from services.https_binding import BOUND_REFID_KEY, _set_config
+    prior('none')
+    with app.app_context():
+        _set_config(BOUND_REFID_KEY, own_cert['refid'], 'test')
+        db.session.commit()
+    r = _post(auth_client, 'apply', own_cert)
+    assert r.status_code == 500, r.data
+    assert r.get_json()['message'].endswith('its next start serves this certificate'), r.data
