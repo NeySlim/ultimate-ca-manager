@@ -475,6 +475,10 @@ def _scheduler_health():
             'last_operation_at': last_run, 'last_status': last_status}
 
 
+# No signer configured is "not configured", not a fault: the protocol answers 503 by design
+_TSA_QUIET = ('ca_certificate', 'dedicated', 'no_signer')
+
+
 def _tsa_health():
     """The TSA signer's state, or None while the TSA is off. Coarse states only: no refid, no error text."""
     try:
@@ -494,7 +498,7 @@ def _tsa_health():
             if days_left is not None and days_left <= TSA_SIGNER_WARN_DAYS:
                 state = 'expiring'
         return {'basis': 'signer', 'periods': None, 'state': state, 'reason': reason,
-                'days_left': days_left, 'alert': state not in ('ca_certificate', 'dedicated'),
+                'days_left': days_left, 'alert': state not in _TSA_QUIET,
                 'last_operation_at': None, 'last_status': None}
     except Exception:
         # A resolver bug is exactly when the overview must not claim health

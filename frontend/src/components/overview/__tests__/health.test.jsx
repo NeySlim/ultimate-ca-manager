@@ -16,7 +16,8 @@ vi.mock('react-i18next', () => ({
       const opts = typeof arg === 'object' && arg ? arg : {}
       const fallback = typeof arg === 'string' ? arg : opts.defaultValue
       if (!lang.fr) return opts.count !== undefined ? `${key}:${opts.count}` : (fallback ?? key)
-      const found = opts.count === undefined ? frLookup(key) : frLookup(`${key}_${opts.count === 1 ? 'one' : 'other'}`)
+      // As i18next: a key without plural forms is read as is
+      const found = (opts.count === undefined ? undefined : frLookup(`${key}_${opts.count === 1 ? 'one' : 'other'}`)) ?? frLookup(key)
       const text = typeof found === 'string' ? found : (fallback ?? key)
       return text.replace(/\{\{(\w+)\}\}/g, (_, name) => opts[name])
     },
@@ -53,7 +54,7 @@ describe('TSA signer on the health card', () => {
     ['ca_certificate', {}, 'overview.health.tsaState.ca_certificate', false],
     ['dedicated', {}, 'overview.health.tsaState.dedicated', false],
     ['expiring', { days_left: 12 }, 'overview.health.tsaState.expiring:12', true],
-    ['no_signer', {}, 'overview.health.tsaState.no_signer', true],
+    ['no_signer', {}, 'overview.health.tsaState.no_signer', false],
     ['unavailable', {}, 'overview.health.tsaState.unavailable', true],
     ['unusable', { reason: 'expired' }, 'overview.health.tsaReason.expired', true],
     ['unusable', { reason: 'revoked' }, 'overview.health.tsaReason.revoked', true],
@@ -64,6 +65,16 @@ describe('TSA signer on the health card', () => {
     const line = row(card, 'tsa')
     expect(line.textContent).toContain(text)
     expect(line.getAttribute('data-alert')).toBe(alert ? 'true' : 'false')
+  })
+
+  it('no signer reads as not configured, neutral, with the link to configure it', async () => {
+    lang.fr = true
+    const card = await show({ tsa: tsa({ state: 'no_signer', alert: false, days_left: null }) })
+    const line = row(card, 'tsa')
+    expect(line.textContent).toContain('Non configuré')
+    expect(line.getAttribute('data-alert')).toBe('false')
+    expect(line.querySelector('.text-status-danger')).toBeNull()
+    expect(within(line).getByRole('link').getAttribute('href')).toBe('/tsa-config')
   })
 
   it('links to the TSA page', async () => {

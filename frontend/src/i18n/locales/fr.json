@@ -6350,7 +6350,7 @@
         "dedicated": "Signataire dédié",
         "expiring_one": "Le signataire expire dans {{count}} jour",
         "expiring_other": "Le signataire expire dans {{count}} jours",
-        "no_signer": "Aucun certificat de signature",
+        "no_signer": "Non configuré",
         "unavailable": "État indisponible"
       },
       "tsaReason": {

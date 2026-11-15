@@ -27,7 +27,7 @@ The bell lists what needs your attention (failed ACME orders, pending approvals,
 The Dashboard opens on the overview, six cards: what is waiting for you, the health of ACME, SCEP, EST, the TSA signer and the scheduler, the CA hierarchy, the expiry horizon, compliance and the latest operations.
 
 - Each entry of **To handle** opens the object it names: the approval, the SCEP or key recovery request, the ACME order, the CA or its CRL. If someone handled it meanwhile, a message says so.
-- The **TSA** line appears while the TSA is enabled and turns red when the signer is expired, revoked, without its key, missing or within 30 days of expiry. The expiry horizon marks the TSA signer and delegated OCSP responder certificates.
+- The **TSA** line appears while the TSA is enabled. Until a signer is set up it reads "Not configured", without alert; it turns red when the signer is expired, revoked, without its key or within 30 days of expiry. The expiry horizon marks the TSA signer and delegated OCSP responder certificates.
 - The **Scheduler** line turns red when a task failed or when its state is no longer published, even if the latest run was fine.
 - Cards reload by themselves when certificates or CAs change, when the live link comes back and when you return to the tab. **Refresh** reloads them all at once. While the live link is down, cards reload once a minute.
 

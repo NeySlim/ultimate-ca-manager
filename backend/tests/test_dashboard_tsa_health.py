@@ -51,10 +51,16 @@ def test_ca_certificate_path_is_healthy(app, auth_client, tsa_config, create_ca)
     assert (tsa['state'], tsa['alert']) == ('ca_certificate', False)
 
 
-def test_enabled_without_any_signer_is_an_alert(auth_client, tsa_config):
+def test_enabled_without_any_signer_is_not_an_alert(auth_client, tsa_config):
     tsa_config(tsa_enabled='true', tsa_signer_cert_refid='')
     tsa = _tsa(auth_client)
-    assert (tsa['state'], tsa['alert']) == ('no_signer', True)
+    assert (tsa['state'], tsa['alert']) == ('no_signer', False)
+
+
+def test_untouched_install_is_not_configured_without_alert(auth_client, tsa_config):
+    # No tsa_enabled row (on by default) and no tsa_ca_refid: nothing to sign with, nothing broken
+    tsa = _tsa(auth_client)
+    assert (tsa['state'], tsa['alert']) == ('no_signer', False)
 
 
 def test_healthy_dedicated_signer(auth_client, tsa_config, create_cert):

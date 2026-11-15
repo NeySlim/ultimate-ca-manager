@@ -6347,7 +6347,7 @@
         "dedicated": "Dedicated signer",
         "expiring_one": "Signer expires in {{count}} day",
         "expiring_other": "Signer expires in {{count}} days",
-        "no_signer": "No signing certificate",
+        "no_signer": "Not configured",
         "unavailable": "Status unavailable"
       },
       "tsaReason": {
