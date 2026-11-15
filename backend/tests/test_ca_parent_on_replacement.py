@@ -478,3 +478,27 @@ def test_a_parent_of_another_name_linked_by_an_earlier_version_is_dropped(app, a
     assert _caref(app, w['child']['id']) == w['root']['refid']
     assert _audits(app, UNLINKED, w['child']['id']) == before + 1
     assert 'its subject is not the issuer name' in _last_unlinked(app, w['child']['id'])
+
+
+@pytest.mark.parametrize('parent_kind', ['rsa', 'ec'])
+def test_the_chain_repair_drops_a_parent_whose_key_type_cannot_have_made_the_signature(
+        app, auth_client, made, parent_kind):
+    """An Ed25519 signature is not made by an RSA or EC key (RFC 5280 4.1.1.2): the types prove it."""
+    from cryptography.hazmat.primitives.asymmetric import ec, ed25519
+    from services.ski_aki_backfill import backfill_ski_aki
+    tag = _tag()
+    root_key = _key() if parent_kind == 'rsa' else ec.generate_private_key(ec.SECP256R1())
+    root_cn = f'Type Root {tag}'
+    root = _import(auth_client, _kid_pem(root_cn, root_key, root_cn, root_key, root_key))
+    made.append(root['id'])
+    child = _import(auth_client, _kid_pem(f'Type Child {tag}', _key(), root_cn,
+                                          ed25519.Ed25519PrivateKey.generate(), root_key))
+    made.append(child['id'])
+    with app.app_context():
+        db.session.get(CA, child['id']).caref = root['refid']  # linked by name by an earlier version
+        db.session.commit()
+    before = _audits(app, UNLINKED, child['id'])
+    with app.app_context():
+        backfill_ski_aki()
+    assert _caref(app, child['id']) is None
+    assert _audits(app, UNLINKED, child['id']) == before + 1

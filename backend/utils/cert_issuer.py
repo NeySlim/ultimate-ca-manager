@@ -101,6 +101,10 @@ def signature_disproved(cert: x509.Certificate, issuer: x509.Certificate) -> boo
     refusing the key (its type, curve or size, known before the call): it rejects any signature."""
     try:
         key = issuer.public_key()
+        signing_family, key_family = _signature_family(cert), _key_family(key)
+        if signing_family and key_family and signing_family != key_family:
+            # RFC 5280 4.1.1.2: the signature algorithm is the issuer key's; the types alone disprove it
+            return True
         if _fips_module_refuses(key):
             return False
         verify_certificate_signature(cert, key)
@@ -109,6 +113,32 @@ def signature_disproved(cert: x509.Certificate, issuer: x509.Certificate) -> boo
     except Exception:
         return False
     return False
+
+
+def _signature_family(cert):
+    """Key family that makes *cert*'s signature algorithm, None when it is not one of those below."""
+    from cryptography.x509.oid import SignatureAlgorithmOID as S
+    oid = cert.signature_algorithm_oid
+    for family, oids in (
+            ('RSA', (S.RSA_WITH_MD5, S.RSA_WITH_SHA1, S.RSA_WITH_SHA224, S.RSA_WITH_SHA256, S.RSA_WITH_SHA384,
+                     S.RSA_WITH_SHA512, S.RSA_WITH_SHA3_224, S.RSA_WITH_SHA3_256, S.RSA_WITH_SHA3_384,
+                     S.RSA_WITH_SHA3_512, S.RSASSA_PSS)),
+            ('EC', (S.ECDSA_WITH_SHA1, S.ECDSA_WITH_SHA224, S.ECDSA_WITH_SHA256, S.ECDSA_WITH_SHA384,
+                    S.ECDSA_WITH_SHA512, S.ECDSA_WITH_SHA3_224, S.ECDSA_WITH_SHA3_256, S.ECDSA_WITH_SHA3_384,
+                    S.ECDSA_WITH_SHA3_512)),
+            ('DSA', (S.DSA_WITH_SHA1, S.DSA_WITH_SHA224, S.DSA_WITH_SHA256, S.DSA_WITH_SHA384, S.DSA_WITH_SHA512)),
+            ('ED25519', (S.ED25519,)), ('ED448', (S.ED448,)), ('ML-DSA', (S.ML_DSA_44, S.ML_DSA_65, S.ML_DSA_87))):
+        if oid in oids:
+            return family
+    return None
+
+
+def _key_family(public_key):
+    for cls, family in ((rsa.RSAPublicKey, 'RSA'), (ec.EllipticCurvePublicKey, 'EC'), (dsa.DSAPublicKey, 'DSA'),
+                        (ed25519.Ed25519PublicKey, 'ED25519'), (ed448.Ed448PublicKey, 'ED448')):
+        if isinstance(public_key, cls):
+            return family
+    return 'ML-DSA' if key_algorithms.family_for_public_key(public_key) == 'ML-DSA' else None
 
 
 def _fips_module_refuses(public_key) -> bool:

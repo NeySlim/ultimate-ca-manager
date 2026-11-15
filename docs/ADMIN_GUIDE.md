@@ -510,7 +510,8 @@ stored CA that does or is left
 without one, audited as `ca_parent_unlinked`. The hourly chain repair drops a link left by an
 earlier version only when it is provably wrong: the parent's subject is not the issuer name, or the
 parent holds the key named by the certificate's authority key identifier and that key does not
-verify it. A parent re-keyed since the link (the certificate names its former key), a parent
+verify it or is of another type than the signature algorithm (an Ed25519 signature under an RSA or
+EC key). A parent re-keyed since the link (the certificate names its former key), a parent
 confirmed by hand and the parent of a revoked CA keep the link, so the revocation stays on the
 parent's CRL. When the
 parent's key or signature algorithm is one this server cannot check (SLH-DSA, GOST), the CA is left
