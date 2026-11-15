@@ -93,7 +93,9 @@ def _fake_tree(tmp_path):
     state.mkdir()
     # gunicorn stays up until killed and leaves its pid; the health check answers at once
     (bin_dir / 'fakepython').write_text(f'''#!/bin/sh
-if [ "$1" = "-m" ] && [ "$2" = "gunicorn" ]; then echo $$ > {state}/server.pid; exec sleep 300; fi
+if [ "$1" = "-m" ] && [ "$2" = "gunicorn" ]; then
+  echo $$ > {state}/server.pid; exec sleep 300
+fi
 if [ "$1" = "-" ]; then exit 0; fi
 exec {sys.executable} "$@"
 ''')
@@ -120,12 +122,16 @@ def _alive(pid):
     return stat[0] != 'Z'
 
 
-def test_the_script_returns_playwrights_code_and_always_stops_the_instance(tmp_path):
-    root, bin_dir, state = _fake_tree(tmp_path)
+def _run(root, bin_dir, tmp_path, *args):
     env = {'PATH': str(bin_dir), 'UCM_PYTHON': str(bin_dir / 'fakepython'),
            'TMPDIR': str(tmp_path), 'HOME': str(tmp_path)}
-    proc = subprocess.run([str(bin_dir / 'bash'), 'scripts/ci/e2e.sh', '--grep', 'login'], cwd=root, env=env,
+    return subprocess.run([str(bin_dir / 'bash'), 'scripts/ci/e2e.sh', *args], cwd=root, env=env,
                           capture_output=True, text=True, timeout=120)
+
+
+def test_the_script_returns_playwrights_code_and_always_stops_the_instance(tmp_path):
+    root, bin_dir, state = _fake_tree(tmp_path)
+    proc = _run(root, bin_dir, tmp_path, '--grep', 'login')
     assert proc.returncode == 7, proc.stdout + proc.stderr
     url, password, *args = (state / 'playwright').read_text().split()
     assert url.startswith('https://127.0.0.1:') and password
@@ -136,6 +142,17 @@ def test_the_script_returns_playwrights_code_and_always_stops_the_instance(tmp_p
         time.sleep(0.1)
     assert not _alive(pid), 'the instance outlived the script'
     # Its temporary directory is gone too
+    assert not list(tmp_path.glob('ucm-e2e.*'))
+
+
+def test_a_checkout_env_file_stops_the_script_before_any_instance(tmp_path):
+    """settings.py loads <checkout>/.env even under env -i: the suite would run on its database."""
+    root, bin_dir, state = _fake_tree(tmp_path)
+    (root / '.env').write_text('DATABASE_URL=postgresql://ucm:x@db.example:5432/ucm\n')
+    proc = _run(root, bin_dir, tmp_path)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert '.env' in proc.stderr
+    assert not (state / 'server.pid').exists() and not (state / 'playwright').exists()
     assert not list(tmp_path.glob('ucm-e2e.*'))
 
 

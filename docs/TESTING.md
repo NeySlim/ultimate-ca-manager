@@ -175,7 +175,7 @@ bash scripts/ci/e2e.sh e2e/certificates.spec.ts
 bash scripts/ci/e2e.sh -g "revoked" --headed
 ```
 
-The script needs `python` (or `UCM_PYTHON`) with `backend/requirements.txt` installed, `npm`, and the system libraries of Chromium (`npx playwright install-deps chromium`, as root). It downloads Chromium with `npx playwright install chromium`, into `PLAYWRIGHT_BROWSERS_PATH` when set. It writes only under a temporary directory and under `frontend/` (`dist/`, `playwright-report/`, `test-results/`). The administrator password is generated for each run and handed to the tests.
+The script needs `python` (or `UCM_PYTHON`) with `backend/requirements.txt` installed, `npm`, and the system libraries of Chromium (`npx playwright install-deps chromium`, as root). It downloads Chromium with `npx playwright install chromium`, into `PLAYWRIGHT_BROWSERS_PATH` when set. It writes only under a temporary directory and under `frontend/` (`dist/`, `playwright-report/`, `test-results/`). The administrator password is generated for each run and handed to the tests. It refuses to run while a `.env` file sits at the root of the checkout: the backend loads it, so its database, Redis and keys would become those of the test instance.
 
 ### What it covers
 

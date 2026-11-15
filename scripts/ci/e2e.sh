@@ -12,6 +12,13 @@ if [ ! -f backend/wsgi.py ] || [ ! -f frontend/package.json ]; then
   exit 2
 fi
 
+# settings.py loads <checkout>/.env under env -i too: its database, Redis or keys would be the
+# instance's, and the restore test replaces that database
+if [ -e .env ]; then
+  echo "e2e: $ROOT/.env would configure the test instance: move it aside to run the suite" >&2
+  exit 2
+fi
+
 PY=${UCM_PYTHON:-$(command -v python || command -v python3)}
 [ -n "$PY" ] || { echo "e2e: no python on PATH (set UCM_PYTHON)" >&2; exit 2; }
 command -v npm >/dev/null || { echo "e2e: no npm on PATH" >&2; exit 2; }
@@ -49,7 +56,8 @@ BASE_URL="https://127.0.0.1:$PORT"
 mkdir -p "$WORK/data" "$WORK/config" "$WORK/logs" "$WORK/home" "$WORK/tmp"
 SECRET=$("$PY" -c 'import secrets; print(secrets.token_hex(32))')
 
-# Only what is set here reaches the instance; the guard kills it if it touches an installation path
+# Only what is set here reaches the instance (.env is refused above); the guard kills it if it
+# touches an installation path
 echo "== starting UCM on $BASE_URL (data in $WORK/data)"
 (cd backend && exec env -i \
     PATH="$PATH" HOME="$WORK/home" TMPDIR="$WORK/tmp" LC_ALL=C.UTF-8 \
