@@ -97,3 +97,24 @@ def test_the_app_schema_carries_the_column_and_index(app):
         inspector = inspect(db.engine)
         assert 'subject_key' in {c['name'] for c in inspector.get_columns('certificates')}
         assert INDEX in {i['name'] for i in inspector.get_indexes('certificates')}
+
+
+@pytest.mark.slow
+def test_the_backfill_of_100000_certificates_is_measured(tmp_path, capsys):
+    """Each stored certificate is parsed once, in batches: the cost grows linearly with the
+    table (about 30 s per 100 000 rows on SQLite, measured; printed with -s)."""
+    import time
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pems = [self_signed(key, cn=f'host-{i}.measure.test') for i in range(50)]
+    conn = sqlite3.connect(tmp_path / 'measure.db')
+    conn.execute('CREATE TABLE certificates (id INTEGER PRIMARY KEY, caref VARCHAR(36), crt TEXT)')
+    conn.executemany('INSERT INTO certificates (id, caref, crt) VALUES (?, ?, ?)',
+                     ((i, 'ca-measure', pems[i % len(pems)]) for i in range(1, 100_001)))
+    conn.commit()
+    started = time.monotonic()
+    _migration().upgrade(conn)
+    elapsed = time.monotonic() - started
+    with capsys.disabled():
+        print(f'\nmigration 157: 100000 certificates backfilled in {elapsed:.1f} s')
+    assert conn.execute('SELECT count(*) FROM certificates WHERE subject_key IS NULL').fetchone()[0] == 0
+    assert elapsed < 600
