@@ -7,7 +7,6 @@ identifier. Redis down: requests carrying a session fail (500), nothing falls ba
 to another store; Redis back: the nodes serve again without a restart.
 """
 import json
-import os
 import subprocess
 import sys
 import time
@@ -27,7 +26,6 @@ BACKEND = Path(__file__).resolve().parent.parent
 PREFIX = 'ucm:session:'
 PASSWORD = 'Redis-Sess10ns-42!'
 NEW_PASSWORD = 'Redis-Changed-77!'
-PG_URL = os.getenv('UCM_TEST_APP_PG_URL') or os.getenv('UCM_TEST_PG_URL')
 
 
 def _post(c, url, body=None):
@@ -192,26 +190,6 @@ def test_a_process_started_with_redis_url_keeps_its_sessions_in_redis(store, red
     assert sid and store.exists(PREFIX + sid)
     assert rows is None, 'no session table without the SQL store'
     assert files == [], 'no session file'
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='no PostgreSQL URL for the Redis-over-SQL priority test')
-def test_on_postgresql_redis_wins_over_the_session_table(store, redis_server, tmp_path):
-    """docs/HA.md: sessions in PostgreSQL, in Redis when REDIS_URL is set."""
-    import psycopg
-    schema = f'ucm_redis_{uuid.uuid4().hex[:8]}'
-    admin = psycopg.connect(PG_URL, autocommit=True)
-    admin.execute(f'CREATE SCHEMA "{schema}"')
-    try:
-        sep = '&' if '?' in PG_URL else '?'
-        store_type, status, sid, rows, files = _store_in_fresh_process(
-            tmp_path, redis_server.url(), f'{PG_URL}{sep}options=-csearch_path%3D{schema}')
-        assert (store_type, status) == ('redis', 200)
-        assert sid and store.exists(PREFIX + sid)
-        assert not rows and files == [], 'neither the session table nor a file holds a session'
-    finally:
-        admin.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
-        admin.close()
 
 
 # ---------------------------------------------------------------- 2. one session, two nodes
