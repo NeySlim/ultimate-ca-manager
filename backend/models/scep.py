@@ -158,7 +158,10 @@ class ScepProfile(db.Model):
         app = self.intune_app
         if app is None:
             return '', '', ''
-        return app.tenant_id or '', app.client_id or '', app.decrypted_secret()
+        # A token this node's key does not open is named, not taken for a missing secret
+        from utils.encryption import decrypt_required
+        secret = decrypt_required(app.client_secret, f'Intune app {app.id} client secret') or ''
+        return app.tenant_id or '', app.client_id or '', secret
 
     def decrypted_intune_secret(self):
         return self.intune_credentials()[2]

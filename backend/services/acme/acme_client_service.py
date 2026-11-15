@@ -25,7 +25,7 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives.serialization import Encoding
 
 from models import db, SystemConfig, Certificate, DnsProvider, AcmeClientOrder
-from services.acme.dns_providers import create_provider, get_provider_class
+from services.acme.dns_providers import create_provider, get_provider_class, saved_credentials
 from services.acme.dns_selfcheck import acme_allow_loopback_upstream
 from services.acme.jwk_thumbprint import jwk_thumbprint
 from services.acme import outbound
@@ -1335,7 +1335,7 @@ class AcmeClientService:
                 return False, "DNS provider not found", {}
             
             try:
-                credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
+                credentials = saved_credentials(dns_provider_model)
                 provider = create_provider(dns_provider_model.provider_type, credentials)
             except Exception as e:
                 return False, f"Failed to initialize DNS provider: {e}", {}
@@ -2046,7 +2046,7 @@ class AcmeClientService:
             return True, "Manual cleanup required"
         
         try:
-            credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
+            credentials = saved_credentials(dns_provider_model)
             provider = create_provider(dns_provider_model.provider_type, credentials)
             
             challenges = order.challenges_dict

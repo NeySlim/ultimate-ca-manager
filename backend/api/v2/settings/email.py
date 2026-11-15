@@ -112,7 +112,8 @@ def _smtp_retarget_check(smtp, data):
     stale = []
     for key, current, used in (('smtp_password', server, auth_on and method == 'password'),
                                ('smtp_oauth_client_secret', oauth, auth_on and method == 'oauth2')):
-        if not keeps_saved_secret(data, key, getattr(smtp, key)):
+        # The stored token: a secret this node cannot open is kept all the same
+        if not keeps_saved_secret(data, key, getattr(smtp, '_' + key)):
             continue
         if used:
             err = retarget_error(current, request_view, True)

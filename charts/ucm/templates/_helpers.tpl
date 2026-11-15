@@ -80,8 +80,37 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if lt (int .Values.replicaCount) 2 -}}
 {{- fail "ha.enabled requires replicaCount >= 2" -}}
 {{- end -}}
+{{- /* Without a cluster (helm template, GitOps, client-side --dry-run) the Secret cannot be read:
+       drawn keys would replace the stored ones at each sync, unseen by running pods */ -}}
+{{- if not (include "ucm.clusterReachable" .) -}}
+{{- if not .Values.secrets.keyEncryptionKey -}}
+{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.keyEncryptionKey and secrets.dbEncryptionKey, or render against the cluster (--dry-run=server); a key drawn here would replace the one the data is under. helm install --create-namespace renders before the namespace exists, so it is refused too: create the namespace first, or set both keys (docs/HA.md)" -}}
+{{- end -}}
+{{- if not .Values.secrets.dbEncryptionKey -}}
+{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, GitOps, helm upgrade --dry-run without =server, helm diff): set secrets.dbEncryptionKey too, or render against the cluster (--dry-run=server); for helm install --create-namespace, create the namespace first (docs/HA.md)" -}}
+{{- end -}}
+{{- else if .Release.IsUpgrade -}}
+{{- /* On a cluster, an existing release without these keys in its Secret is a single instance moving to HA */ -}}
+{{- if not (include "ucm.existingKek" .) -}}
+{{- fail "ha.enabled on an existing single instance requires secrets.keyEncryptionKey: set it to the content of the instance's /etc/ucm/master.key, or a new key would make its private keys unreadable (docs/HA.md, From a single node)" -}}
+{{- end -}}
+{{- if not (include "ucm.existingDbKey" .) -}}
+{{- fail "ha.enabled on an existing single instance requires secrets.dbEncryptionKey: set it while the instance still runs alone and re-encrypt its integration secrets under it first (docs/HA.md, From a single node)" -}}
+{{- end -}}
+{{- end -}}
+{{- else if gt (int .Values.replicaCount) 1 -}}
+{{- fail "replicaCount > 1 requires ha.enabled=true (and PostgreSQL): a single instance cannot run in several pods" -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+"true" when lookups reach the cluster: every namespace has its "default" ServiceAccount,
+and a render without a cluster (helm template, client-side --dry-run) finds nothing, nor
+does helm install --create-namespace, which renders before creating the namespace.
+*/}}
+{{- define "ucm.clusterReachable" -}}
+{{- if or (lookup "v1" "ServiceAccount" .Release.Namespace "default") (lookup "v1" "Secret" .Release.Namespace (include "ucm.secretName" .)) -}}true{{- end -}}
+{{- end -}}
 
 {{/*
 Existing or explicit KEY_ENCRYPTION_KEY ("" when none): kept whatever ha.enabled is,
@@ -91,6 +120,13 @@ so leaving HA never drops the only copy of the key.
 {{- $existing := (lookup "v1" "Secret" .Release.Namespace (include "ucm.secretName" .)) | default dict -}}
 {{- $data := $existing.data | default dict -}}
 {{- .Values.secrets.keyEncryptionKey | default ((get $data "KEY_ENCRYPTION_KEY") | default "" | b64dec) -}}
+{{- end -}}
+
+{{/* Existing or explicit UCM_DB_ENCRYPTION_KEY ("" when none), kept like the KEK. */}}
+{{- define "ucm.existingDbKey" -}}
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace (include "ucm.secretName" .)) | default dict -}}
+{{- $data := $existing.data | default dict -}}
+{{- .Values.secrets.dbEncryptionKey | default ((get $data "UCM_DB_ENCRYPTION_KEY") | default "" | b64dec) -}}
 {{- end -}}
 
 {{/*
@@ -114,4 +150,14 @@ application then forces its change at first login, as for one it generates.
 */}}
 {{- define "ucm.adminPasswordGenerated" -}}
 {{- if not (or .Values.initialAdminPassword (include "ucm.adminPasswordFromExtraEnv" .)) }}true{{ end -}}
+{{- end -}}
+
+{{/*
+What the Secret is made from, as the operator sets it: the input of checksum/secret.
+A generated value is stored once and read back, so it never changes the Secret.
+*/}}
+{{- define "ucm.secretInputs" -}}
+{{- list .Values.secrets.secretKey .Values.initialAdminPassword (include "ucm.adminPasswordFromExtraEnv" .)
+    .Values.secrets.keyEncryptionKey .Values.secrets.dbEncryptionKey .Values.ha.enabled
+    .Values.database.type .Values.database.databaseUrl .Values.database.existingSecret | toJson -}}
 {{- end -}}

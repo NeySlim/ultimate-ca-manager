@@ -58,3 +58,29 @@ def test_nodes_trust_the_fixed_subnet_the_load_balancer_sits_on_pos():
     for env in ({}, {'UCM_HA_SUBNET': '10.99.0.0/24'}):
         assert [_resolve(s, env) for s in subnets] == [_resolve(trusted, env)]
     assert _resolve(trusted, {'UCM_TRUSTED_PROXIES': '10.1.2.3'}) == '10.1.2.3'
+
+
+def test_nodes_share_a_required_database_key_neg():
+    """Integration secrets: without one key for both nodes, each derives its own."""
+    assert '${UCM_DB_ENCRYPTION_KEY:?' in TEXT
+    assert not re.search(r'\$\{UCM_DB_ENCRYPTION_KEY:?-', TEXT)
+    a, b = (DOC['services'][n]['environment'] for n in ('ucm-1', 'ucm-2'))
+    assert a['UCM_DB_ENCRYPTION_KEY'] == b['UCM_DB_ENCRYPTION_KEY']
+
+
+def test_load_balancer_certificate_readability_is_stated_and_checked_pos():
+    header = TEXT.split('name: ucm-ha')[0]
+    assert 'HA_LB_CERT' in header and 'uid 99' in header and '--wait' in header
+    check = DOC['services']['lb']['healthcheck']['test']
+    assert 'haproxy' in ' '.join(check) and '-c' in check
+
+
+def test_password_file_comment_does_not_name_a_fixed_node_neg():
+    assert 'exec ucm-1 cat' not in TEXT
+    assert 'Initial administrator' in TEXT  # the log line that names the node holding it
+
+
+def test_load_balancer_retries_a_request_on_the_other_node_pos():
+    cfg = DOC['configs']['haproxy_cfg']['content']
+    assert re.search(r'^\s*option redispatch\b', cfg, re.M)
+    assert re.search(r'^\s*retries [1-9]', cfg, re.M)

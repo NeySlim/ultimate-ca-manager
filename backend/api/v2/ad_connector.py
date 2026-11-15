@@ -65,8 +65,9 @@ def _parse_servers(data):
 
 
 def _ad_retarget_error(saved, data):
-    """The saved bind password stays with the saved DCs, port and TLS trust."""
-    if saved is None or not keeps_saved_secret(data, 'bind_password', saved.bind_password,
+    """The saved bind password stays with the saved DCs, port and TLS trust. The stored
+    token is read, so a password this node cannot open still counts as kept."""
+    if saved is None or not keeps_saved_secret(data, 'bind_password', saved._bind_password,
                                                blank_clears=True):
         return None
     current = {'port': saved.port or 389, 'use_ssl': bool(saved.use_ssl),
@@ -153,7 +154,11 @@ def apply_fields(config, data):
         db.session.rollback()
         return error_response('bind_dn is required while the connector is enabled', 400)
     if config.enabled and not config.bind_password:
+        # A saved password this node cannot open is named: only typing it again saves
+        unreadable = lookup.unreadable_bind_password(config)
         db.session.rollback()
+        if unreadable:
+            return error_response(unreadable, 400)
         return error_response('bind_password is required while the connector is enabled', 400)
     return None
 
@@ -197,12 +202,15 @@ def run_unsaved_test(data, saved_connector):
     if not bind_password:
         # The saved secret only goes to the saved target, trusted the saved way
         saved = saved_connector
-        if (saved and saved.bind_password
+        if (saved and saved._bind_password
                 and set(lookup.split_servers(joined)) <= set(lookup.split_servers(saved.server))
                 and (saved.port or 389, bool(saved.use_ssl), bool(saved.verify_ssl),
                      saved.ca_bundle or None)
                 == (port, use_ssl, bool(verify_ssl), ca_bundle)):
-            bind_password = saved.bind_password
+            try:
+                bind_password = lookup._bind_password(saved)
+            except lookup.ADSecretUnreadable as e:
+                return error_response(str(e), 400)  # named, never taken for a missing one
     if not bind_password:
         # Same rule as the save: an anonymous bind is not a connection this
         # connector is allowed to make, so testing one would report a

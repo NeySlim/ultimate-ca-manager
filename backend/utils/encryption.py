@@ -84,6 +84,12 @@ def _get_encryption_key() -> bytes:
         # Use provided key (should be base64-encoded 32 bytes)
         return key.encode()
 
+    if _ha_mode():
+        # Each node would derive its own key: a secret saved on one is unreadable on the others
+        raise RuntimeError(
+            'UCM_HA=1 requires UCM_DB_ENCRYPTION_KEY, identical on every node: '
+            'the machine-derived key is never used in HA.')
+
     # No explicit key. The fallback below derives one from the machine id with
     # a salt that is a constant in this source file — so anyone holding a copy
     # of the database AND /etc/machine-id (world-readable, and routinely
@@ -110,8 +116,20 @@ def _get_encryption_key() -> bytes:
         'to enforce it).'
     )
 
-    # Generate deterministic key from machine-specific data
-    # This ensures the same key is used across restarts
+    return machine_derived_key()
+
+
+def _ha_mode() -> bool:
+    try:
+        from config.settings import Config
+    except Exception:  # a script without the application's configuration
+        return False
+    return bool(getattr(Config, 'HA_MODE', False))
+
+
+def machine_derived_key(create: bool = True):
+    """The fallback key this host derives from its machine id; None when it has
+    none and ``create`` is false (the re-encryption command never makes one)."""
     machine_id = None
     for path in MACHINE_ID_PATHS:
         try:
@@ -123,6 +141,8 @@ def _get_encryption_key() -> bytes:
             break  # an empty machine-id (common in containers) falls through to the next
 
     if not machine_id:
+        if not create:
+            return None
         machine_id = _create_machine_key()
 
     # Derive Fernet-compatible key (32 bytes, base64 encoded).
@@ -188,6 +208,24 @@ def decrypt_value(encrypted: str) -> str:
     except Exception:
         # Return None if decryption fails (corrupted or wrong key)
         return None
+
+
+class SecretUnreadable(Exception):
+    """A stored secret this node's database key does not open. The message names
+    the secret, never its value nor its ciphertext."""
+
+
+def decrypt_required(stored, what: str):
+    """``stored`` decrypted for an integration about to use it. A token this key
+    does not open raises instead of reading back as no secret at all."""
+    if not stored or not is_encrypted(stored):
+        return stored
+    value = decrypt_value(stored)
+    if value is None:
+        raise SecretUnreadable(
+            f'{what} cannot be decrypted with this node\'s database encryption key '
+            '(UCM_DB_ENCRYPTION_KEY): restore the key it was saved under, or enter it again')
+    return value
 
 
 def is_encrypted(value: str) -> bool:

@@ -19,6 +19,7 @@ Then `kubectl -n ucm port-forward svc/ucm 8443:8443` and open <https://localhost
 
 - Kubernetes 1.23+
 - Helm 3.8+ (uses `lookup` to persist generated secrets across upgrades)
+- For the account that runs `helm`: on every render, `get` on `secrets` in the release namespace, since the chart's `lookup` reads its Secret back to keep the generated keys; with `ha.enabled`, also `get` on `serviceaccounts` and `persistentvolumeclaims` in the release namespace. Without one of them the render stops with Kubernetes' `forbidden` error
 - A default StorageClass providing **ReadWriteOnce** volumes
 
 ## One instance, or several with `ha.enabled`
@@ -37,11 +38,15 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 |-----|---------|-------------|
 | `image.repository` | `neyslim/ultimate-ca-manager` | Image repo |
 | `image.tag` | `""` (→ chart `appVersion`) | Image tag |
-| `replicaCount` | `1` | Keep at 1 unless `ha.enabled` (then 2 or more) |
-| `ha.enabled` | `false` | Several nodes on one PostgreSQL (`UCM_HA=1`). Needs `database.type=postgresql` and `replicaCount` >= 2, or the render fails. Adds a PodDisruptionBudget, a preferred pod anti-affinity, a rolling update, `UCM_NODE_ID` (pod name) and a shared `KEY_ENCRYPTION_KEY`; no etc PVC. See `docs/HA.md` |
+| `image.pullPolicy` | `IfNotPresent` | Image pull policy |
+| `imagePullSecrets` | `[]` | Pull secrets for a private registry |
+| `nameOverride` / `fullnameOverride` | `""` / `""` | Replace the chart name / the full resource name prefix |
+| `replicaCount` | `1` | Keep at 1 unless `ha.enabled` (then 2 or more); above 1 without `ha.enabled` the render fails |
+| `ha.enabled` | `false` | Several nodes on one PostgreSQL (`UCM_HA=1`). Needs `database.type=postgresql` and `replicaCount` >= 2, or the render fails. Adds a PodDisruptionBudget, a preferred pod anti-affinity, a rolling update, `UCM_NODE_ID` (pod name) and a shared `KEY_ENCRYPTION_KEY` and `UCM_DB_ENCRYPTION_KEY`; no etc PVC. On an existing release (`helm upgrade`) the render fails until both keys are given or already in the Secret. See `docs/HA.md` |
 | `ha.podDisruptionBudget.minAvailable` | `1` | Pods kept available during voluntary disruptions |
 | `redis.url` | `""` | Redis shared by the nodes (`REDIS_URL`, HA only) |
-| `secrets.keyEncryptionKey` | `""` | `KEY_ENCRYPTION_KEY`, passed to the pods whenever set or already in the Secret; generated once when empty only with `ha.enabled` |
+| `secrets.keyEncryptionKey` | `""` | `KEY_ENCRYPTION_KEY`, passed to the pods whenever set or already in the Secret; generated once when empty only with `ha.enabled`, where a render without cluster access (`helm template`, GitOps) refuses to draw it |
+| `secrets.dbEncryptionKey` | `""` | `UCM_DB_ENCRYPTION_KEY` (Fernet key) for the integration secrets, passed to the pods whenever set or already in the Secret; generated once when empty only with `ha.enabled`, where a render without cluster access (`helm template`, GitOps) refuses to draw it |
 | `fqdn` | `ucm.local` | FQDN for the self-signed UI cert / default AIA-CRL-OCSP base URL |
 | `initialAdminPassword` | `""` (generated into the Secret, kept across upgrades) | First-boot admin password; the generated one must be changed at first login, a value set here is not forced to change. Read the generated one with `kubectl get secret <fullname>-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' \| base64 -d`. Unused when `extraEnv` sets `INITIAL_ADMIN_PASSWORD` (your own Secret) or `INITIAL_ADMIN_PASSWORD_FILE`: the chart then passes no password of its own and forces no change |
 | `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret |
@@ -50,20 +55,35 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `database.existingSecret` / `database.existingSecretKey` | `""` / `DATABASE_URL` | Use an existing Secret for the DB URL |
 | `persistence.data.size` | `5Gi` | DB / CA files / backups volume |
 | `persistence.etc.size` | `64Mi` | `/etc/ucm` (master.key) volume |
+| `persistence.enabled` | `true` | PVCs for the data and `/etc/ucm` volumes; `false` uses `emptyDir` (lost with the pod) |
+| `persistence.storageClass` | `""` | Storage class of both PVCs (empty = cluster default) |
+| `persistence.data.accessMode` / `persistence.etc.accessMode` | `ReadWriteOnce` | Access modes of the claims |
+| `persistence.data.existingClaim` / `persistence.etc.existingClaim` | `""` | Use an existing claim; in HA a data claim must be ReadWriteMany |
+| `fips.enabled` | `false` | Run the `<tag>-fips` image with `UCM_FIPS=1`; the pod refuses to start without the FIPS provider |
 | `service.type` | `ClusterIP` | Service type |
 | `service.httpsPort` / `service.httpPort` | `8443` / `8080` | UI/API (HTTPS) and protocol (HTTP) ports |
+| `service.annotations` | `{}` | Annotations of the Service |
 | `dnsUpdate.enabled` | `false` | Enable the DNS UPDATE (RFC 2136) listener and its own Service (internal networks only) |
 | `dnsUpdate.port` / `dnsUpdate.host` | `8053` / `""` | Container port (UDP and TCP, 1024-65535; sets `UCM_DNS_UPDATE_PORT`) and bind address (`UCM_DNS_UPDATE_HOST`, empty = default) |
 | `dnsUpdate.service.type` / `dnsUpdate.service.port` | `ClusterIP` / `53` | Type and client port of the separate DNS UPDATE Service (port 53 maps to `dnsUpdate.port`) |
 | `dnsUpdate.service.annotations` / `dnsUpdate.service.loadBalancerIP` | `{}` / `""` | Annotations and fixed address (type `LoadBalancer` only) |
 | `dnsUpdate.networkPolicy.enabled` / `dnsUpdate.networkPolicy.from` / `dnsUpdate.networkPolicy.extraPorts` | `false` / `[]` / `[]` | Additional NetworkPolicy: the listener ports accept only the `from` peers; `https`, `http` and `extraPorts` accept all sources; every other pod port is closed |
 | `ingress.enabled` | `false` | Expose the HTTPS UI via Ingress |
+| `ingress.className` / `ingress.annotations` | `""` / `{}` | Ingress class and annotations (e.g. the backend protocol HTTPS for nginx) |
+| `ingress.host` / `ingress.tls` | `ucm.local` / `[]` | Host and TLS section of the HTTPS Ingress |
 | `ingress.protocolHttp.enabled` | `false` | Second Ingress for cleartext CDP/OCSP/ACME-HTTP-01 (port 8080) |
+| `ingress.protocolHttp.host` | `pki.local` | Host of the cleartext protocol Ingress |
 | `proxy.behindProxy` | `false` | Set `UCM_BEHIND_PROXY=1` (honor `X-Forwarded-*` for one hop) |
 | `proxy.trustedProxies` | `[]` | `UCM_TRUSTED_PROXIES`: proxy IPs / CIDRs allowed to set forwarded / client-cert headers (CIDR entries need UCM 2.224 or later) |
 | `extraEnv` | `[]` | Extra `UCM_*` env vars |
 | `resources` | requests 100m/512Mi, limit 1Gi | Pod resources |
-| `startupProbe.enabled` / `periodSeconds` / `failureThreshold` | `true` / `10` / `36` | Probe on `/health/live` that holds the liveness and readiness probes until UCM answers (360 s by default): a first start that upgrades a large database answers nothing until the upgrade ends |
+| `livenessProbe` | enabled, 40 s delay, every 30 s, timeout 10 s, 3 failures | Liveness probe on `/health/live` |
+| `readinessProbe` | enabled, 20 s delay, every 15 s, timeout 10 s, 3 failures | Readiness probe on `/health/ready` |
+| `startupProbe` | enabled, every 10 s, timeout 10 s, 36 failures | Probe on `/health/live` that holds the liveness and readiness probes until UCM answers (360 s by default): a first start that upgrades a large database answers nothing until the upgrade ends |
+| `serviceAccount.create` / `serviceAccount.name` / `serviceAccount.annotations` | `true` / `""` / `{}` | Create a ServiceAccount (name defaults to the full name) |
+| `podSecurityContext` / `securityContext` | non-root UID/GID 1000, `fsGroup` 1000, seccomp `RuntimeDefault`; no privilege escalation, every capability dropped | Pod and container security contexts |
+| `nodeSelector` / `tolerations` / `affinity` | `{}` / `[]` / `{}` | Scheduling; `affinity` replaces the HA anti-affinity |
+| `podAnnotations` / `podLabels` | `{}` / `{}` | Extra pod annotations and labels |
 
 See [`values.yaml`](values.yaml) for the full list.
 

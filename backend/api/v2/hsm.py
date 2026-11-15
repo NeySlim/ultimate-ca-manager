@@ -173,7 +173,8 @@ def _hsm_retarget_error(provider, config):
     from models.hsm import _is_sensitive_key
     if not isinstance(config, dict):
         return None
-    existing = provider.get_config() if provider.config else {}
+    # A secret this node cannot open is still kept by set_config: it counts as kept
+    existing = provider.editable_config() if provider.config else {}
     keeping = any(_is_sensitive_key(k) and isinstance(v, str) and v in MASKS and existing.get(k)
                   for k, v in config.items())
     # The service carries the previous PIN over unless a new PIN comes with the request
@@ -190,7 +191,7 @@ def _hsm_targets(provider, existing, config):
 
 
 def _hsm_target_moved(provider, config):
-    existing = provider.get_config() if provider.config else {}
+    existing = provider.editable_config() if provider.config else {}
     return bool(changed_targets(*_hsm_targets(provider, existing, config)))
 
 

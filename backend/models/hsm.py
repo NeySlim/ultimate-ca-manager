@@ -6,7 +6,7 @@ Supports PKCS#11, Azure Key Vault, Google Cloud KMS, AWS CloudHSM
 from datetime import datetime
 import json
 from utils.datetime_utils import utc_now, utc_isoformat
-from utils.encryption import encrypt_if_needed, decrypt_if_needed, is_encrypted
+from utils.encryption import encrypt_if_needed, decrypt_if_needed, decrypt_required, is_encrypted
 
 try:
     from models import db
@@ -210,13 +210,39 @@ class HsmProvider(db.Model if db else object):
                 decrypted[k] = v
         return decrypted
 
+    def connection_config(self):
+        """The configuration a provider connects with. Unlike get_config, a secret
+        this node's key does not open raises SecretUnreadable naming the field."""
+        try:
+            raw = json.loads(self.config)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        if not isinstance(raw, dict):
+            return {}
+        return {k: decrypt_required(v, f'HSM provider {self.id} {k}')
+                if _is_sensitive_key(k) and isinstance(v, str) and v else v
+                for k, v in raw.items()}
+
+    def editable_config(self):
+        """The configuration to rewrite: a secret this node's key does not open stays
+        as its stored token, so a write-back never drops it (set_config keeps tokens)."""
+        try:
+            raw = json.loads(self.config)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        if not isinstance(raw, dict):
+            return {}
+        return {k: (decrypt_if_needed(v) or v)
+                if _is_sensitive_key(k) and isinstance(v, str) and v else v
+                for k, v in raw.items()}
+
     def set_config(self, config_dict):
         """Set configuration: encrypt sensitive fields, drop mask sentinels."""
         if not isinstance(config_dict, dict):
             self.config = json.dumps({})
             return
         out = {}
-        existing = self.get_config() if self.config else {}
+        existing = self.editable_config() if self.config else {}
         for k, v in config_dict.items():
             if _is_sensitive_key(k):
                 # Frontend echoed back a masked sentinel without re-typing the

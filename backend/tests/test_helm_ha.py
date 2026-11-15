@@ -11,7 +11,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHART = ROOT / 'charts' / 'ucm'
 GOLDEN = pathlib.Path(__file__).parent / 'fixtures' / 'helm_default_render.yaml'
 PG = ['--set', 'database.type=postgresql', '--set', 'database.databaseUrl=postgresql://u:p@db/ucm']
-HA = ['--set', 'ha.enabled=true', '--set', 'replicaCount=2'] + PG
+# helm template has no cluster: an HA render there takes both keys from the values
+HA = ['--set', 'ha.enabled=true', '--set', 'replicaCount=2', '--set', 'secrets.keyEncryptionKey=K',
+      '--set', 'secrets.dbEncryptionKey=D'] + PG
 
 pytestmark = pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
 
@@ -65,9 +67,10 @@ def test_ha_has_no_etc_volume_or_pvc_neg():
     assert 'PersistentVolumeClaim' not in docs
 
 
-def test_ha_kek_is_a_valid_fernet_key():
+def test_ha_kek_is_a_valid_fernet_key(tmp_path):
     from cryptography.fernet import Fernet
-    key = _docs(*HA)['Secret']['stringData']['KEY_ENCRYPTION_KEY']
+    from tests.test_helm_db_key import _installed
+    key = _installed(tmp_path)['Secret']['stringData']['KEY_ENCRYPTION_KEY']
     Fernet(key.encode())
 
 

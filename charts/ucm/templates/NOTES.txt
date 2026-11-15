@@ -40,9 +40,10 @@ UCM ({{ include "ucm.image" . }}) has been deployed as release "{{ .Release.Name
 
 IMPORTANT
 {{- if .Values.ha.enabled }}
-- HA mode: {{ .Values.replicaCount }} nodes on one PostgreSQL. UCM_SECRET_KEY and
-  KEY_ENCRYPTION_KEY live in the "{{ include "ucm.secretName" . }}" Secret: back it up, losing
-  KEY_ENCRYPTION_KEY makes every encrypted private key unrecoverable.
+- HA mode: {{ .Values.replicaCount }} nodes on one PostgreSQL. UCM_SECRET_KEY, KEY_ENCRYPTION_KEY
+  and UCM_DB_ENCRYPTION_KEY live in the "{{ include "ucm.secretName" . }}" Secret: back it up, losing
+  KEY_ENCRYPTION_KEY makes every encrypted private key unrecoverable, and losing
+  UCM_DB_ENCRYPTION_KEY every integration secret (DNS, LDAP, SMTP, webhooks, SSO).
 {{- if not .Values.persistence.data.existingClaim }}
 - The data volume is an emptyDir per pod. Backup archives are kept in PostgreSQL,
   not on it: download the ones you keep out of the cluster, and back PostgreSQL

@@ -1,3 +1,4 @@
+from utils.encryption import SecretUnreadable
 from . import bp
 from flask import request
 from auth.unified import require_auth
@@ -111,6 +112,9 @@ def _test_ldap_connection(provider):
         })
     except ImportError:
         return error_response("LDAP library not installed. Run: pip install ldap3", 500)
+    except SecretUnreadable as e:
+        # Names the secret, never its value
+        return error_response(str(e), 500)
     except Exception as e:
         logger.error(f"LDAP connection test failed: {e}")
         return error_response("LDAP connection failed. Check server address, port, and credentials.", 400)

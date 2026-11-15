@@ -6,6 +6,7 @@ from typing import Optional
 from models import db
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
+from utils.encryption import decrypt_required
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +14,15 @@ logger = logging.getLogger(__name__)
 class MicrosoftCAConnectionMixin:
 
     @staticmethod
-    def _get_client(msca):
+    def _get_client(msca, typed=False):
+        """typed: the secrets come from the form, in plaintext, never decrypted."""
         import certsrv
 
         server = msca.server
         temp_files = []
+
+        def _secret(stored, what):
+            return stored if typed else decrypt_required(stored, f'Microsoft CA {msca.id} {what}')
 
         def _write_temp(content):
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pem', mode='w')
@@ -33,7 +38,7 @@ class MicrosoftCAConnectionMixin:
 
             if msca.auth_method == 'certificate':
                 cert_path = _write_temp(msca.client_cert_pem)
-                key_path = _write_temp(msca.client_key_pem)
+                key_path = _write_temp(_secret(msca._client_key_pem, 'client key'))
 
                 client = certsrv.Certsrv(
                     server=server,
@@ -74,7 +79,7 @@ class MicrosoftCAConnectionMixin:
                 client = certsrv.Certsrv(
                     server=server,
                     username=msca.username or '',
-                    password=msca.password or '',
+                    password=_secret(msca._password, 'password') or '',
                     auth_method='basic',
                     cafile=cafile,
                 )
@@ -170,7 +175,12 @@ class MicrosoftCAConnectionMixin:
         from types import SimpleNamespace
         from .templates import MicrosoftCATemplatesMixin
 
+        # _get_client reads the stored columns (_password, _client_key_pem) and id; here they
+        # hold the plaintext typed in the form, used as typed even when it looks like a token.
         fake_msca = SimpleNamespace(
+            id='unsaved',
+            _password=data.get('password', ''),
+            _client_key_pem=data.get('client_key_pem', ''),
             server=data.get('server', ''),
             ca_name=data.get('ca_name', ''),
             auth_method=data.get('auth_method', 'basic'),
@@ -186,7 +196,7 @@ class MicrosoftCAConnectionMixin:
         )
         client = None
         try:
-            client = MicrosoftCAConnectionMixin._get_client(fake_msca)
+            client = MicrosoftCAConnectionMixin._get_client(fake_msca, typed=True)
             client.get_ca_cert()
 
             templates = []

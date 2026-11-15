@@ -332,6 +332,28 @@ def test_a_rejected_intune_request_is_notified(app, auth_client, scep_ca, intune
         assert _FakeIntune.calls == [('failure', 'txn-19', 'Rejected by an approver')]
 
 
+def test_an_unreadable_intune_secret_is_named_to_the_approver(app, auth_client, scep_ca, intune_held,
+                                                              monkeypatch):
+    from cryptography.fernet import Fernet
+    from models.scep import ScepProfile
+    from utils.encryption import decrypt_required
+    foreign = Fernet(Fernet.generate_key()).encrypt(b'saved-elsewhere').decode()
+    identity = _client_identity('scep intune unreadable')
+    with approval_policy(app, scep_ca, 'scep-held-intune-unreadable') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        _on_profile(app, scep_ca, intune_held)
+        # What intune_credentials raises for a token this node's key does not open
+        monkeypatch.setattr(ScepProfile, 'intune_credentials', lambda self: (
+            't', 'c', decrypt_required(foreign, 'Intune app 9 client secret')))
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is False
+        error = r.get_json()['data']['issue_error']
+        assert 'Intune app 9 client secret cannot be decrypted' in error
+        assert 'saved-elsewhere' not in error and foreign not in error
+        assert requests_of(app, pid, 'scep_request')[0][1] == 'pending'
+
+
 def _poll_transaction(app, ca_id, identity, transaction_id):
     """GetCertInitial for *transaction_id*, signed by *identity*."""
     def same_transaction(attrs):
