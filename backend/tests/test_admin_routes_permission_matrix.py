@@ -191,7 +191,8 @@ EXPECTED = {
     PUBLIC: {role: GRANTED for role in ROLES},
 }
 
-_GATE_CODE = require_auth(['probe:probe'])(lambda: None).__code__
+# Built without a scope: a scope named here would join ENFORCED_PERMISSIONS
+_GATE_CODE = require_auth()(lambda: None).__code__
 _PLACEHOLDER = re.compile(r'<(?:(\w+)(?:\([^)]*\))?:)?(\w+)>')
 SENTINEL = {'matrix_probe': 'view reached'}
 
