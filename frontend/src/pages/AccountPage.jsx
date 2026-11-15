@@ -246,8 +246,14 @@ export default function AccountPage() {
     try {
       const confirmed = await accountService.confirm2FA(confirmCode)
       factorChanged('messages.success.other.twoFactorEnabled', confirmed)
-      setShow2FAModal(false)
-      setQrData(null)
+      // The recovery codes are returned once: the dialog shows them until acknowledged
+      const codes = (confirmed?.data || confirmed)?.backup_codes
+      if (codes?.length) {
+        setQrData(prev => ({ ...prev, backup_codes: codes, confirmed: true }))
+      } else {
+        setShow2FAModal(false)
+        setQrData(null)
+      }
       setConfirmCode('')
       await loadAccount()
     } catch (error) {
@@ -1049,6 +1055,7 @@ export default function AccountPage() {
       >
         {qrData && (
           <div className="p-4 space-y-4">
+            {!qrData.confirmed && <>
             <div>
               <p className="text-sm text-text-secondary mb-3">
                 {t('account.scanQRCode')}
@@ -1071,6 +1078,7 @@ export default function AccountPage() {
                 className="text-center text-2xl tracking-widest font-mono"
               />
             </div>
+            </>}
             
             {qrData.backup_codes && (
               <div className="p-3 bg-status-warning-op10 border border-status-warning-op30 rounded-lg">
@@ -1078,6 +1086,7 @@ export default function AccountPage() {
                   <Warning size={16} />
                   {t('account.backupCodes')}
                 </p>
+                <p className="text-xs text-text-secondary mt-1">{t('account.backupCodesHint')}</p>
                 <div className="mt-2 grid grid-cols-2 gap-1 font-mono text-xs">
                   {qrData.backup_codes.map((code, i) => (
                     <span key={i} className="text-text-secondary">{code}</span>
@@ -1087,12 +1096,18 @@ export default function AccountPage() {
             )}
             
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
-              <Button type="button" variant="secondary" onClick={() => setShow2FAModal(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button type="button" onClick={handleConfirm2FA} disabled={confirmCode.length !== 6}>
-                {t('account.verifyAndEnable')}
-              </Button>
+              {qrData.confirmed ? (
+                <Button type="button" onClick={() => { setShow2FAModal(false); setQrData(null) }}>
+                  {t('account.backupCodesSaved')}
+                </Button>
+              ) : <>
+                <Button type="button" variant="secondary" onClick={() => setShow2FAModal(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="button" onClick={handleConfirm2FA} disabled={confirmCode.length !== 6}>
+                  {t('account.verifyAndEnable')}
+                </Button>
+              </>}
             </div>
           </div>
         )}
