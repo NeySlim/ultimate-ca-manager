@@ -18,7 +18,7 @@ export default {
         items: [
           { label: '最大有效期', text: '证书最大生命周期（天数）' },
           { label: '允许的密钥类型', text: '限制可使用的密钥算法和大小，包括 ML-DSA-44、ML-DSA-65 和 ML-DSA-87；当 FIPS 模块不批准 ML-DSA 时，FIPS 模式会移除 ML-DSA' },
-          { label: '允许的签名方案', text: 'PKCS#1 v1.5、RSA-PSS、ECDSA、EdDSA、ML-DSA 或 SLH-DSA，与签发 CA 的密钥进行匹配。允许的签名摘要不约束 ML-DSA CA，它无需单独的摘要即可签名' },
+          { label: '签名方案（仅限 API）', text: 'allowed_signature_schemes 规则，策略表单中没有该字段：PKCS#1 v1.5、RSA-PSS、ECDSA、EdDSA、ML-DSA 或 SLH-DSA，与签发 CA 的密钥进行匹配。允许的签名摘要不约束 ML-DSA CA，它无需单独的摘要即可签名' },
           { label: 'SAN 限制', text: '限制 DNS 名称的数量（其他 SAN 类型不计入）；每个策略一个 DNS 模式（*.company.com，或 company.com 以同时包含该域名本身），将策略限定到匹配的名称' },
           { label: '允许的签名摘要', text: 'SHA-256、SHA-384 或 SHA-512；未选择任何项则允许全部。无人指定摘要时，若默认值被允许则使用默认值，否则使用允许的最弱摘要。签发表单仅提供允许的密钥类型，创建 CA 仅提供允许的密钥类型和摘要' },
         ]
@@ -79,7 +79,7 @@ export default {
 - **EC-P521**: 最高安全性（很少需要）
 - **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: 后量子（FIPS 204），NIST 级别 2、3 和 5；当 FIPS 模块不批准它们时，在 FIPS 模式下移除
 
-**允许的签名方案**限制签发 CA 的签名方式（PKCS#1 v1.5、RSA-PSS、ECDSA、EdDSA、ML-DSA、SLH-DSA）。允许的签名摘要不约束 ML-DSA CA，它无需单独的摘要即可签名。
+\`allowed_signature_schemes\` 规则仅能通过 API 设置（策略表单不显示该字段），它限制签发 CA 的签名方式（PKCS#1 v1.5、RSA-PSS、ECDSA、EdDSA、ML-DSA、SLH-DSA）。允许的签名摘要不约束 ML-DSA CA，它无需单独的摘要即可签名。
 
 **允许的签名摘要**以同样的方式限制签名摘要（SHA-256、SHA-384、SHA-512）；未选择任何项则允许全部。无人指定摘要时，若默认值被允许则使用默认值，否则使用允许的最弱摘要。签发表单仅提供允许的密钥类型，创建 CA 仅提供允许的密钥类型和摘要。
 

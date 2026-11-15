@@ -75,3 +75,36 @@ describe('values and buttons quoted by the translated pages', () => {
     expect(page(lang, 'hsm').sections[actions].items[0].label).toBe(hsm.newProvider)
   })
 })
+
+describe('buttons named by the English help', () => {
+  // Labels not yet checked against their screen; every other "Click **X**" must be a label en.json holds.
+  const UNCHECKED = ['Issue', 'Duplicate', 'Generate Key']
+  const norm = (s) => s.replace(/\{\{\w+\}\}/g, 'N').replace(/^▶\s*/, '').trim().toLowerCase()
+  it('cites only labels the interface shows', async () => {
+    const en = (await import('../../i18n/locales/en.json')).default
+    const labels = new Set(strings(en).map(norm))
+    const cited = strings([helpContent, helpGuides])
+      .flatMap((s) => [...s.matchAll(/\b[Cc]lick(?: on)? \*\*([^*]+)\*\*/g)].map((m) => m[1]))
+    expect([...new Set(cited)].filter((c) => !UNCHECKED.includes(c) && !labels.has(norm(c)))).toEqual([])
+  })
+})
+
+describe('screen labels quoted by every help language', () => {
+  const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
+  const help = (lang, key) => (lang === 'en'
+    ? { guide: helpGuides[key].content, page: helpContent[key] }
+    : { guide: pages[`../help/${lang}/${key}.js`].default.helpGuides.content, page: pages[`../help/${lang}/${key}.js`].default.helpContent })
+  it.each(['en', 'fr', 'ru', 'zh'])('%s quotes the labels and API routes users actually have', (lang) => {
+    const t = locales[`../../i18n/locales/${lang}.json`].default
+    const bold = (s) => `**${s.replace(/\{\{\w+\}\}/g, 'N')}**`
+    const mtls = help(lang, 'user-certificates').guide
+    for (const s of [t.account.addCertificate, t.account.mtlsGenerate, t.account.generateCertificate, t.account.clientCertificates]) expect(mtls).toContain(bold(s))
+    const audit = help(lang, 'auditLogs').guide
+    for (const s of [t.audit.cleanupLogs, t.common.deleteOldLogs]) expect(audit).toContain(bold(s))
+    expect(help(lang, 'importExport').guide).toContain(bold(t.importExport.opnsense.importSelected))
+    expect(strings(help(lang, 'account').page).join('\n')).toContain(t.common.logout)
+    // Key regeneration and signature schemes have no control on screen: the help names the API.
+    expect(help(lang, 'account').guide).toContain('/api/v2/account/apikeys/<id>/regenerate')
+    expect(help(lang, 'policies').guide).toContain('`allowed_signature_schemes`')
+  })
+})

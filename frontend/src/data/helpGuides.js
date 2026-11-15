@@ -408,14 +408,14 @@ The **Lint** action (certificate detail) checks X.509 standards conformance. Inf
     content: `
 ## Overview
 
-The User Certificates page manages mTLS client certificates enrolled via the **Account → mTLS** tab. Unlike regular certificates, these are specifically tied to user accounts for mutual TLS authentication.
+The User Certificates page manages mTLS client certificates enrolled from **My Account → Security**, section **Client Certificates (mTLS)**. Unlike regular certificates, these are specifically tied to user accounts for mutual TLS authentication.
 
 Certificates here are fully managed by UCM: they are stored in the database with private keys, and can be exported, revoked, or deleted at any time.
 
 ## Enrolling a Certificate
 
-1. Go to **Account → mTLS** tab
-2. Click **Enroll Certificate**
+1. Go to **My Account → Security**, section **Client Certificates (mTLS)**
+2. Click **Add Certificate**, keep **Generate** and click **Generate Certificate**
 3. The system generates a key pair and issues a client certificate signed by your mTLS CA
 4. The certificate appears on this page and can be used for mTLS login
 
@@ -1944,9 +1944,9 @@ Exports apply only the date range, up to 10,000 entries: the other filters are n
 ## Cleanup
 
 Purge old logs based on retention period:
-1. Click **Cleanup**
+1. Click **Cleanup Old Logs**
 2. Set the retention period in days
-3. Confirm the cleanup
+3. Click **Delete Old Logs**
 
 > ⚠ Log cleanup is irreversible. Export important logs before purging.
 
@@ -2390,7 +2390,7 @@ X-API-Key: <your-api-key>
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself, and that key expires no later than the one asking. **Regenerate** keeps the key's permissions and lifetime; a revoked or expired key cannot be regenerated.
+Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself, and that key expires no later than the one asking. Regenerating a key, offered by the API only (\`POST /api/v2/account/apikeys/<id>/regenerate\`), keeps its permissions and lifetime; a revoked or expired key cannot be regenerated.
 
 API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 
@@ -2441,7 +2441,7 @@ Import certificates and CAs from an OPNsense firewall, on demand (UCM does not k
 
 ### Import
 1. Select the items you want to import
-2. Click **Import Selected**
+2. Click **Import N selected** (N counts the selected items)
 
 UCM imports certificates with their private keys (if available) and preserves the CA hierarchy.
 
@@ -2979,7 +2979,7 @@ Restrict which key algorithms and sizes can be used:
 - **EC-P521**: Maximum security (rarely needed)
 - **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-quantum (FIPS 204), NIST levels 2, 3 and 5; removed in FIPS mode when the FIPS module does not approve them
 
-**Allowed Signature Schemes** restricts how the signing CA signs (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest.
+The \`allowed_signature_schemes\` rule, set through the API only (the policy form does not show it), restricts how the signing CA signs (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest.
 
 **Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes.
 

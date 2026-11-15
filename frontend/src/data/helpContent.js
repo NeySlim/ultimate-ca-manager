@@ -373,7 +373,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Enroll new mTLS certificates from Account → mTLS tab',
+      'Enroll new mTLS certificates from My Account → Security',
       'Certificates are stored and managed by UCM like any other certificate',
       'Use the stats bar to quickly filter by status',
       'Click a row to view full certificate details in the inspector',
@@ -1073,7 +1073,7 @@ export const helpContent = {
         icon: Database,
         items: [
           { label: 'Export', text: 'Download logs in JSON or CSV format' },
-          { label: 'Cleanup', text: 'Purge old logs with configurable retention (days)' },
+          { label: 'Cleanup Old Logs', text: 'Purge old logs with configurable retention (days)' },
           { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering' },
         ]
       },
@@ -1320,7 +1320,7 @@ export const helpContent = {
           { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
           { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
           { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
-          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt offers Log out instead of Skip. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
+          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt cannot be skipped and offers only Logout. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
         ]
       },
       {
@@ -1328,7 +1328,7 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Create Key', text: 'Generate a new API key, optionally expiring after a number of days' },
-          { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
+          { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating, offered by the API only, keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
           { label: 'Revoke', text: 'Immediately invalidate an API key' },
           { label: 'Deactivated users', text: 'API keys belonging to a deactivated user are rejected even if the key itself is still valid' },
           { label: 'Interactive session only', text: 'API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: sign in interactively' },
@@ -1715,7 +1715,7 @@ export const helpContent = {
         items: [
           { label: 'Max Validity', text: 'Maximum certificate lifetime in days' },
           { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used, ML-DSA-44, ML-DSA-65 and ML-DSA-87 included; FIPS mode removes ML-DSA when the FIPS module does not approve it' },
-          { label: 'Allowed Signature Schemes', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
+          { label: 'Signature schemes (API only)', text: 'The allowed_signature_schemes rule, absent from the policy form: PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
           { label: 'SAN Restrictions', text: 'Limit the number of DNS names (other SAN types are not counted); one DNS pattern per policy (*.company.com, or company.com to include the domain itself) scopes the policy to the matching names' },
           { label: 'Allowed Signature Hashes', text: 'SHA-256, SHA-384 or SHA-512; none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes' },
         ]
