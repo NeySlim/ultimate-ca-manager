@@ -209,3 +209,54 @@ def test_the_trust_store_refuses_an_unreadable_certificate(app, auth_client, as_
     with app.app_context():
         assert TrustedCertificate.query.filter(TrustedCertificate.subject.contains(cn)).count() == 0
         assert TrustedCertificate.query.filter_by(name=cn).count() == 0
+
+
+def _signed_leaf_with_repeated_extension(cn, ca_cn, ca_key):
+    """A leaf that *ca_key* really signed, whose KeyUsage OID is rewritten to the SKI's before signing."""
+    from cryptography.hazmat.primitives.asymmetric import padding
+    key = rsa.generate_private_key(65537, 2048)
+    now = dt.datetime.now(dt.timezone.utc)
+    cert = (x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, cn)]))
+            .issuer_name(x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, ca_cn)]))
+            .public_key(key.public_key()).serial_number(uuid.uuid4().int >> 66)
+            .not_valid_before(now - dt.timedelta(days=1)).not_valid_after(now + dt.timedelta(days=365))
+            .add_extension(x509.KeyUsage(True, False, False, False, False, False, False, False, False), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .sign(ca_key, hashes.SHA256()))
+    tbs = cert.tbs_certificate_bytes
+    bad_tbs = tbs.replace(bytes.fromhex('0603551d0f'), bytes.fromhex('0603551d0e'))
+    signature = ca_key.sign(bad_tbs, padding.PKCS1v15(), hashes.SHA256())
+    der = cert.public_bytes(serialization.Encoding.DER).replace(tbs, bad_tbs).replace(cert.signature, signature)
+    bad = x509.load_der_x509_certificate(der)
+    with pytest.raises(x509.DuplicateExtension):
+        bad.extensions
+    return ssl.DER_cert_to_PEM_cert(der)
+
+
+@pytest.mark.parametrize('route', ['user-import', 'enroll-import'])
+def test_the_mtls_imports_refuse_an_unreadable_certificate(app, auth_client, route):
+    from models.auth_certificate import AuthCertificate
+    from tests.test_backfill_cross_dupes import _cert, _row
+    tag = uuid.uuid4().hex[:8]
+    ca_cn, cn = f'Dup mTLS CA {tag}', f'Dup mTLS {tag}'
+    ca_key = rsa.generate_private_key(65537, 2048)
+    with app.app_context():
+        ca_id = _row(_cert(ca_key, ca_cn), ca_key)
+    try:
+        pem = _signed_leaf_with_repeated_extension(cn, ca_cn, ca_key)
+        url, body = (('/api/v2/mtls/enroll-import', {'pem': pem}) if route == 'enroll-import'
+                     else ('/api/v2/users/1/mtls/certificates', {'mode': 'import', 'pem': pem}))
+        r = auth_client.post(url, json=body)
+        assert r.status_code == 400, r.data
+        assert 'extension' in get_json(r)['message'].lower()
+        assert _counts(app, cn) == (0, 0)
+        with app.app_context():
+            assert AuthCertificate.query.filter(AuthCertificate.cert_subject.contains(cn)).count() == 0
+    finally:
+        with app.app_context():
+            db.session.rollback()
+            AuthCertificate.query.filter(AuthCertificate.cert_subject.contains(cn)).delete(synchronize_session=False)
+            Certificate.query.filter(Certificate.subject.contains(cn)).delete(synchronize_session=False)
+            CA.query.filter_by(id=ca_id).delete()
+            db.session.commit()
