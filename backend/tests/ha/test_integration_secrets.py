@@ -72,10 +72,11 @@ def test_a_secret_saved_on_one_node_signs_what_another_sends_after_a_restart(clu
     assert 'cannot be decrypted' not in node_b.app_log_text()
 
 
-def test_a_node_names_the_secrets_its_key_does_not_open_and_still_serves(cluster, admin):
+def test_a_node_names_the_secrets_its_key_does_not_open_and_still_serves(cluster, admin, receiver):
+    url, received = receiver
     foreign = Fernet(Fernet.generate_key()).encrypt(b'from-the-former-single-node').decode()
     r = admin.post('/api/v2/webhooks', {'name': f'ha-foreign-{secrets.token_hex(3)}',
-                                        'url': 'https://hooks.example/x', 'events': ['certificate.issued']})
+                                        'url': url, 'events': ['certificate.issued']})
     assert r.status_code == 201, r.text[:500]
     webhook_id = r.json()['data']['id']
     cluster.sql('UPDATE webhook_endpoints SET secret = %s WHERE id = %s', (foreign, webhook_id))
@@ -88,4 +89,5 @@ def test_a_node_names_the_secrets_its_key_does_not_open_and_still_serves(cluster
     assert 'from-the-former-single-node' not in log and foreign not in log
     r = admin.on(node_b).post(f'/api/v2/webhooks/{webhook_id}/test')
     assert r.status_code == 400 and 'cannot be decrypted' in r.text
+    assert received == []  # never sent unsigned
     cluster.sql('DELETE FROM webhook_endpoints WHERE id = %s', (webhook_id,))
