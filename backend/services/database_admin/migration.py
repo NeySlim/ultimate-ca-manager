@@ -499,8 +499,9 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         target_is_pg = target_url.startswith("postgresql")
 
         has_users = _target_has_users(target_engine)
-        unverified = _unverified_copy(target_engine) if has_users else None
-        # Only the auth tables can be checked again here: a full copy never verified is refused
+        # Read with or without accounts: only the auth tables can be checked again here, so a
+        # full copy never verified is refused even once its accounts were removed
+        unverified = _unverified_copy(target_engine)
         if unverified == 'migration':
             raise PreflightError(
                 "The target holds a data migration whose verification did not pass; reset the "
@@ -510,7 +511,8 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         if refusal:
             raise PreflightError(refusal)
         if has_users and unverified:
-            # The marker proves this switch wrote those rows: emptied, then copied afresh below
+            # The marker proves only that a switch built this schema on a target without accounts:
+            # whatever the auth tables hold now, an instance's accounts included, is replaced
             stats["target_written"] = True
             _empty_auth_tables(target_engine)
         elif has_users:

@@ -1698,6 +1698,41 @@ class TestTheMarkerIsNeverTakenForAVerification:
             self, app, a_3_0_source, pg_target, monkeypatch):
         self._migration_cut_then_switched(app, pg_target, monkeypatch)
 
+    def _migration_refused_emptied_then_switched(self, app, target, monkeypatch):
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            with app.app_context():
+                ok, message, _ = migration.migrate_data(target)
+        assert ok is False and _marker_kinds(target) == {'migration'}, message
+        # Its accounts removed by hand: the marker alone still says the copy was never verified
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            migration._empty_auth_tables(engine)
+        finally:
+            engine.dispose()
+        assert _usernames(target) == []
+
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is False and stats['refusal'] == 'preflight', message
+        assert 'data migration' in message and stats['target_written'] is False
+        assert _marker_kinds(target) == {'migration'}
+        assert _usernames(target) == []
+
+    def test_a_refused_migration_without_accounts_is_not_switched_to_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._migration_refused_emptied_then_switched(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_refused_migration_without_accounts_is_not_switched_to_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._migration_refused_emptied_then_switched(app, pg_target, monkeypatch)
+
     def _migration_failed_before_its_rows_then_switched(self, app, target, monkeypatch):
         from services.database_admin import copy as copy_module
 
@@ -1711,7 +1746,7 @@ class TestTheMarkerIsNeverTakenForAVerification:
         assert ok is False and stats['refusal'] == 'copy'
         assert _marker_kinds(target) == {'migration'}
 
-        # Its empty registry is refused by the start, before the switch writes anything
+        # Its marker is refused before the switch writes anything
         with app.app_context():
             ok, message, stats = migration.bootstrap_auth_to_target(target)
         assert ok is False and stats['refusal'] == 'preflight', message

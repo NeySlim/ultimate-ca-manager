@@ -75,8 +75,9 @@ IGNORED_TABLES = frozenset({"alembic_version", "flask_sessions"})
 #       migration against a schema that already has them.
 INTERNAL_TABLES = frozenset({"_migrations"})
 
-# Present on a target from the start of a copy until its verification passed: accounts beside
-# it are refused by the switch. Empty and never copied; a migration may restart over it.
+# Present on a target from the start of a copy until its verification passed, one row per kind:
+# a switch copies its accounts again beside 'switch' and refuses them beside 'migration'.
+# Never copied, and skipped by the emptiness count: a migration may restart over it.
 TRANSFER_MARKER = "_transfer_unverified"
 
 
