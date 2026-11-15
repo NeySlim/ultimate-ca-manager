@@ -66,7 +66,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- **The Docker image checks the disk before a SQLite start.** It refuses to start, before its copy of the database, when the volume has less free space than twice the database (once with `UCM_BACKUP_ENABLED=false`), and says how much is needed and available.
+- **The Docker image checks the disk before a SQLite start.** Before its copy of the database it refuses to start, with the space needed and available, when the backups directory lacks the database's size for that copy (`UCM_BACKUP_ENABLED=false` skips it) or, on a start that upgrades the database, its filesystem lacks that size again; a start on a database already up to date only needs room for the copy.
 - **The start log times each migration.** Each migration and each step of the 3.0 upgrade logs its start, its end and its duration, and a step that reads certificates in batches logs its progress at most every 30 seconds.
 - Docker images: the `latest` and `latest-fips` tags now go to the highest stable version published, so a maintenance release of an older line no longer moves them.
 - **A Windows profile keeps its policy identity.** The MS-XCEP policy identifier and template OIDs belong to the profile, not to its CA: changing the policy or issuing CA no longer changes the identifier and OIDs registered clients cached (such a change made them fail with `0x8007000d`), two profiles on one CA no longer share an identifier, and the default profile upgraded from 2.254 keeps the values 2.254 served.
