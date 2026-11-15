@@ -54,6 +54,7 @@ tests/test_migration_157*.py
 tests/test_migration_158*.py
 tests/test_migration_159*.py
 tests/test_upgrade_from_2_254.py
+tests/test_fresh_install_interrupted.py
 tests/test_schema_rules_kept_from_2x.py
 tests/test_encryption_envelope*.py
 tests/test_session_key*.py

@@ -366,6 +366,37 @@ def build_fresh_schema(create_all):
     create_all()
 
 
+def start_schema(engine, metadata, create_all) -> bool:
+    """The schema step of a start, after the migrations: a database without its core tables is
+    built fresh (True); any other is a 3.0 one, where create_all and the index pass add only
+    what a cut fresh install left out."""
+    from sqlalchemy import inspect as _inspect
+    tables = set(_inspect(engine).get_table_names())
+    fresh = not {'users', 'certificate_authorities'} <= tables
+    if fresh:
+        build_fresh_schema(create_all)
+    else:
+        create_all()
+    create_missing_indexes(engine, metadata)
+    return fresh
+
+
+def create_missing_indexes(engine, metadata):
+    """create_all skips a table that exists, with its indexes: one a cut start left out (SQLite
+    commits each statement) is created here. Any 3.0 database already holds the model's indexes."""
+    from sqlalchemy import inspect as _inspect
+    insp = _inspect(engine)
+    tables = set(insp.get_table_names())
+    for table in metadata.sorted_tables:
+        if table.name not in tables:
+            continue
+        present = {i['name'] for i in insp.get_indexes(table.name)}
+        for index in table.indexes:
+            if index.name not in present:
+                say(f"✓ Creating index {index.name} missing from {table.name}")
+                index.create(engine)
+
+
 def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
     """Apply pending migrations to the configured database.
 
