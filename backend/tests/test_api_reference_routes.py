@@ -12,8 +12,6 @@ that way, so only operations are read.
 import os
 import re
 
-import pytest
-
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _REFERENCE = os.path.join(_REPO, 'docs', 'API_REFERENCE.md')
 
@@ -59,12 +57,15 @@ def _nonexistent(app):
     return sorted(documented_operations() - served_operations(app))
 
 
+def test_the_reference_is_read(app):
+    assert documented_operations() and served_operations(app)
+
+
 def test_every_documented_operation_exists(app):
     missing = _nonexistent(app)
     assert not missing, f'{len(missing)} documented but not served:\n' + '\n'.join(missing)
 
 
-@pytest.mark.xfail(reason='reference not yet corrected')
 def test_every_api_route_is_documented(app):
     missing = _undocumented(app)
     assert not missing, f'{len(missing)} served but not documented:\n' + '\n'.join(missing)
