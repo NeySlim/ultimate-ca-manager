@@ -195,8 +195,9 @@ export default function AccountPage() {
     }
   }
 
-  // A second factor changed: the server closed the account's other sessions
-  const factorChanged = (key) => showSuccess(`${t(key)} ${t('account.otherSessionsClosed')}`)
+  // A second factor changed: say so of the other sessions unless the server closed none
+  const factorChanged = (key, response) => showSuccess(response?.meta?.other_sessions_closed === 0
+    ? t(key) : `${t(key)} ${t('account.otherSessionsClosed')}`)
 
   // 2FA handlers
   const handleToggle2FA = async () => {
@@ -208,8 +209,8 @@ export default function AccountPage() {
           confirmText: t('common.disable2FA')
         })
         if (!code) return
-        await accountService.disable2FA(code)
-        factorChanged('messages.success.other.twoFactorDisabled')
+        const disabled = await accountService.disable2FA(code)
+        factorChanged('messages.success.other.twoFactorDisabled', disabled)
         await loadAccount()
       } else {
         const response = await accountService.enable2FA()
@@ -231,11 +232,9 @@ export default function AccountPage() {
           confirmText: t('account.turnOffKey2fa')
         })
         if (!password) return
-        await accountService.setWebAuthnSecondFactor(false, password)
-        factorChanged('account.key2faDisabled')
+        factorChanged('account.key2faDisabled', await accountService.setWebAuthnSecondFactor(false, password))
       } else {
-        await accountService.setWebAuthnSecondFactor(true)
-        factorChanged('account.key2faEnabled')
+        factorChanged('account.key2faEnabled', await accountService.setWebAuthnSecondFactor(true))
       }
       await loadAccount()
     } catch (error) {
@@ -245,8 +244,8 @@ export default function AccountPage() {
 
   const handleConfirm2FA = async () => {
     try {
-      await accountService.confirm2FA(confirmCode)
-      factorChanged('messages.success.other.twoFactorEnabled')
+      const confirmed = await accountService.confirm2FA(confirmCode)
+      factorChanged('messages.success.other.twoFactorEnabled', confirmed)
       setShow2FAModal(false)
       setQrData(null)
       setConfirmCode('')
@@ -265,9 +264,8 @@ export default function AccountPage() {
     
     setWebauthnRegistering(true)
     try {
-      await accountService.registerWebAuthnKey(webauthnName)
-      
-      factorChanged('account.keyRegistered')
+      const registered = await accountService.registerWebAuthnKey(webauthnName)
+      factorChanged('account.keyRegistered', registered)
       setShowWebAuthnModal(false)
       setWebauthnName('')
       await loadWebAuthnCredentials()
@@ -291,8 +289,8 @@ export default function AccountPage() {
     if (!confirmed) return
     
     try {
-      await accountService.deleteWebAuthnCredential(credentialId)
-      factorChanged('account.keyDeleted')
+      const deleted = await accountService.deleteWebAuthnCredential(credentialId)
+      factorChanged('account.keyDeleted', deleted)
       await loadWebAuthnCredentials()
     } catch (error) {
       showError(error.message || t('account.deleteKeyFailed'))

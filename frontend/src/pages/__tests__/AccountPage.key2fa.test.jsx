@@ -113,6 +113,14 @@ describe('AccountPage: security key as second factor', () => {
       'account.key2faEnabled account.otherSessionsClosed'))
   })
 
+  it.each([[0, 'account.key2faEnabled'], [2, 'account.key2faEnabled account.otherSessionsClosed']])(
+    'with %s other sessions closed', async (closed, message) => {
+      m.setWebAuthnSecondFactor.mockResolvedValue({ data: {}, meta: { other_sessions_closed: closed } })
+      await openSecurity({ webauthn_2fa: false, two_factor_methods: [] }, [KEY])
+      fireEvent.click(screen.getByText('account.turnOnKey2fa'))
+      await waitFor(() => expect(m.showSuccess).toHaveBeenCalledWith(message))
+    })
+
   it('lists the active second factors', async () => {
     await openSecurity({ two_factor_enabled: true, webauthn_2fa: true,
                          two_factor_methods: ['totp', 'webauthn'], two_factor_enforced: true }, [KEY])

@@ -6,6 +6,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
   enable2FA: vi.fn(),
+  confirm2FA: vi.fn(),
   registerWebAuthnKey: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
@@ -23,7 +24,7 @@ vi.mock('../../contexts', () => ({
 }))
 
 vi.mock('../../services', () => ({
-  accountService: { enable2FA: mocks.enable2FA, registerWebAuthnKey: mocks.registerWebAuthnKey },
+  accountService: { enable2FA: mocks.enable2FA, confirm2FA: mocks.confirm2FA, registerWebAuthnKey: mocks.registerWebAuthnKey },
 }))
 
 import { ForceEnroll2FA } from '../ForceEnroll2FA'
@@ -60,5 +61,28 @@ describe('ForceEnroll2FA: security key', () => {
     delete window.PublicKeyCredential
     render(<ForceEnroll2FA onComplete={vi.fn()} />)
     expect(screen.queryByText('account.registerKey')).not.toBeInTheDocument()
+  })
+
+  // Sessions the server reports closed: 0 says nothing of them, a count or no count does
+  const CLOSED = [[0, ''], [2, ' account.otherSessionsClosed'], [undefined, ' account.otherSessionsClosed']]
+
+  it.each(CLOSED)('a key registered with %s other sessions closed', async (closed, note) => {
+    mocks.registerWebAuthnKey.mockResolvedValue({ data: {}, meta: closed === undefined ? {} : { other_sessions_closed: closed } })
+    const onComplete = vi.fn()
+    render(<ForceEnroll2FA onComplete={onComplete} />)
+    fireEvent.click(screen.getByText('account.registerKey'))
+    await waitFor(() => expect(onComplete).toHaveBeenCalled())
+    expect(mocks.showSuccess).toHaveBeenCalledWith(`account.keyRegistered${note}`)
+  })
+
+  it.each(CLOSED)('TOTP confirmed with %s other sessions closed', async (closed, note) => {
+    mocks.confirm2FA.mockResolvedValue({ data: { backup_codes: ['A-B'] }, ...(closed === undefined ? {} : { meta: { other_sessions_closed: closed } }) })
+    const onComplete = vi.fn()
+    render(<ForceEnroll2FA onComplete={onComplete} />)
+    fireEvent.change(await screen.findByPlaceholderText('account.codePlaceholder'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByText('account.verifyAndEnable'))
+    fireEvent.click(await screen.findByText('account.backupCodesSaved'))
+    await waitFor(() => expect(onComplete).toHaveBeenCalled())
+    expect(mocks.showSuccess).toHaveBeenCalledWith(`account.twoFaEnabled${note}`)
   })
 })
