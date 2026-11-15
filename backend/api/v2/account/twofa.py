@@ -176,7 +176,8 @@ def disable_2fa():
         return error_response('Code or backup code required', 400)
 
     # A request refused whatever its code checks none: it must not use up an attempt
-    user, refused = lock_for_factor_change(g.current_user.id, dropping_totp=True)
+    user_id = g.current_user.id  # g.current_user expires with the rollback below
+    user, refused = lock_for_factor_change(user_id, dropping_totp=True)
     answer = _disable_refusal(user, refused, code)
     if answer:
         db.session.rollback()
@@ -186,13 +187,13 @@ def disable_2fa():
     counted = bool(user.totp_confirmed)
     db.session.rollback()
     # Counted before the row lock below, which the reservation's commit releases
-    locked = _reserve_code_check(g.current_user.id) if counted else None
+    locked = _reserve_code_check(user_id) if counted else None
     if locked:
         return locked
 
     # Required 2FA (#141, or a key turned on as second factor) keeps one factor;
     # checked under the user row lock so a concurrent key removal cannot race it.
-    user, refused = lock_for_factor_change(g.current_user.id, dropping_totp=True)
+    user, refused = lock_for_factor_change(user_id, dropping_totp=True)
     answer = _disable_refusal(user, refused, code)
     if answer:
         return answer
@@ -258,7 +259,8 @@ def set_webauthn_second_factor():
     if not isinstance(enabled, bool):
         return error_response('enabled must be true or false', 400)
 
-    user, refused = lock_for_factor_change(g.current_user.id, dropping_choice=not enabled)
+    user_id = g.current_user.id  # g.current_user expires with the counter's commit below
+    user, refused = lock_for_factor_change(user_id, dropping_choice=not enabled)
     if not user:
         return error_response('User not found', 404)
     if enabled and not has_security_key(user):
@@ -276,7 +278,10 @@ def set_webauthn_second_factor():
         answer = check_session_password(user, password, error_response('Invalid password', 403))
         if answer:
             return answer
-        user, refused = lock_for_factor_change(g.current_user.id, dropping_choice=True)
+        user, refused = lock_for_factor_change(user_id, dropping_choice=True)
+        if not user:
+            db.session.rollback()
+            return error_response('User not found', 404)
         if refused:
             return last_factor_refusal(_KEY_CHOICE_MESSAGE)
 

@@ -473,3 +473,87 @@ def test_a_request_that_changes_no_factor_closes_no_session(app, auth_client, op
         assert _audit_details(app, action, user) is None
     finally:
         _cleanup(app, user)
+
+
+def _delete_account(user_id):
+    """The rows go as a concurrent deletion would have them gone: the request's
+    objects stay loaded, its next row lock finds no account."""
+    from sqlalchemy import delete
+    from models.webauthn import WebAuthnChallenge
+    for model, column in ((WebAuthnChallenge, WebAuthnChallenge.user_id),
+                          (WebAuthnCredential, WebAuthnCredential.user_id), (User, User.id)):
+        db.session.execute(delete(model).where(column == user_id)
+                           .execution_options(synchronize_session=False))
+
+
+def test_key_second_factor_off_for_an_account_deleted_meanwhile_answers_404(app, monkeypatch):
+    """Deleted while its password was checked: the second lock finds no account."""
+    import api.v2.account.twofa as twofa
+    user = _make_user(app, key=SoftKey(), choice=True)
+    checked = twofa.check_session_password
+
+    def _check_then_delete(account, password, refusal):
+        answer = checked(account, password, refusal)
+        _delete_account(user['id'])
+        return answer
+    try:
+        this = _open_session(app, user)
+        monkeypatch.setattr(twofa, 'check_session_password', _check_then_delete)
+        r = _key_choice(False)(app, this, user)
+        assert r.status_code == 404, r.data
+        assert r.get_json()['message'] == 'User not found'
+    finally:
+        _cleanup(app, user)
+
+
+@pytest.mark.parametrize('operation', sorted(KEY_CHANGES))
+def test_a_key_change_for_an_account_deleted_meanwhile_answers_404(app, auth_client, monkeypatch,
+                                                                    operation):
+    """Deleted before its row lock is taken: no change, 404 as the neighbouring routes."""
+    import auth.twofa_enforcement as enforcement
+    start, call = KEY_CHANGES[operation]
+    user = _make_user(app, key=SoftKey(), **start)
+    lock = enforcement.lock_user
+
+    def _delete_then_lock(user_id):
+        if user_id == user['id']:
+            _delete_account(user_id)
+        return lock(user_id)
+    try:
+        this = _open_session(app, user)
+        if operation == 'add-key':
+            options = _post(this, '/api/v2/webauthn/register/options', {})
+            challenge = options.get_json()['data']['challenge']
+            monkeypatch.setattr(enforcement, 'lock_user', _delete_then_lock)
+            r = _post(this, '/api/v2/webauthn/register/verify',
+                      {'credential': SoftKey().attest(challenge), 'name': 'new'})
+        else:
+            monkeypatch.setattr(enforcement, 'lock_user', _delete_then_lock)
+            r = call(app, this, user, auth_client)
+        assert r.status_code == 404, r.data
+        assert r.get_json()['message'] == 'User not found'
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+
+
+def test_totp_disable_for_an_account_deleted_meanwhile_answers_404(app, monkeypatch):
+    """Deleted while its attempt was counted: the second lock finds no account."""
+    import api.v2.account.twofa as twofa
+    user = _make_user(app, totp=True)
+    reserve = twofa._reserve_code_check
+
+    def _reserve_then_delete(user_id):
+        answer = reserve(user_id)
+        _delete_account(user['id'])
+        return answer
+    try:
+        this = _open_session(app, user)
+        code = _code(app, user)
+        monkeypatch.setattr(twofa, '_reserve_code_check', _reserve_then_delete)
+        r = _post(this, '/api/v2/account/2fa/disable', {'code': code})
+        assert r.status_code == 404, r.data
+        assert r.get_json()['message'] == 'User not found'
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
