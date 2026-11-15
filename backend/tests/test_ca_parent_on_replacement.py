@@ -409,3 +409,38 @@ def test_the_chain_repair_keeps_the_link_of_a_revoked_ca_under_another_name(app,
         backfill_ski_aki()
     assert _on_crl_of(app, stray['id'], w['child']['id'])
     assert _caref(app, w['child']['id']) == stray['refid']
+
+
+# ------------------------------------------------- a parent of another name left by an earlier version
+
+def _last_unlinked(app, ca_id):
+    from models.audit_log import AuditLog
+    with app.app_context():
+        row = AuditLog.query.filter_by(action=UNLINKED, resource_type='ca', resource_id=str(ca_id)) \
+            .order_by(AuditLog.id.desc()).first()
+        return row.details if row else None
+
+
+@pytest.mark.parametrize('when', ['chain repair', 'certificate change'])
+def test_a_parent_of_another_name_linked_by_an_earlier_version_is_dropped(app, auth_client, made, linked, when):
+    """Its key verifies the certificate, but its subject is not the issuer name (RFC 5280 6.1.3 (a)(4))."""
+    from services.ski_aki_backfill import backfill_ski_aki
+    w, renamed_cn = linked, f'Repl Other Name {_tag()}'
+    renamed = _import(auth_client, _rsa_pem(renamed_cn, w['root_key'], serial=_serial()))
+    made.append(renamed['id'])
+    with app.app_context():
+        db.session.get(CA, w['child']['id']).caref = renamed['refid']
+        db.session.commit()
+    before = _audits(app, UNLINKED, w['child']['id'])
+    if when == 'chain repair':
+        with app.app_context():
+            backfill_ski_aki()
+    else:
+        # The AKI names the key the record of the other name is stored under
+        ski = x509.SubjectKeyIdentifier.from_public_key(w['root_key'].public_key()).digest
+        _with_ski(app, [renamed['id']], ski)
+        _replace(app, auth_client, w, _aki_pem(w['cn'], w['key'], w['root_cn'], w['root_key'], ski),
+                 '/api/v2/cas/import')
+    assert _caref(app, w['child']['id']) == w['root']['refid']
+    assert _audits(app, UNLINKED, w['child']['id']) == before + 1
+    assert 'its subject is not the issuer name' in _last_unlinked(app, w['child']['id'])
