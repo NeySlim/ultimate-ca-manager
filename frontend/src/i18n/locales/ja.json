@@ -449,25 +449,25 @@
     "preparing": "準備中…",
     "systemLogs": "システムログ",
     "states": {
-      "pending": "Pending",
-      "approved": "Approved",
-      "rejected": "Rejected",
-      "expired": "Expired",
-      "cancelled": "Cancelled",
-      "issued": "Issued",
-      "recovered": "Recovered",
-      "valid": "Valid",
-      "invalid": "Invalid",
-      "ready": "Ready",
-      "processing": "Processing",
-      "validating": "Validating",
+      "pending": "保留中",
+      "approved": "承認済み",
+      "rejected": "却下",
+      "expired": "期限切れ",
+      "cancelled": "キャンセル済み",
+      "issued": "発行済み",
+      "recovered": "回復済み",
+      "valid": "有効",
+      "invalid": "無効",
+      "ready": "準備完了",
+      "processing": "処理中",
+      "validating": "検証中",
       "ok": "OK",
-      "failed": "Failed",
-      "warning": "Warning",
-      "skipped": "Skipped",
-      "never": "Never run",
-      "active": "Active",
-      "revoked": "Revoked"
+      "failed": "失敗",
+      "warning": "警告",
+      "skipped": "スキップ",
+      "never": "未実行",
+      "active": "アクティブ",
+      "revoked": "失効済み"
     }
   },
   "commandPalette": {
@@ -888,9 +888,9 @@
       "bulkRelatedRenewed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を更新しました"
     },
     "renewed": "証明書を更新しました",
-    "subjectTakenTitle": "Subject already in use",
-    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}} of this CA. Confirm only if this certificate is for the same entity as the one that already carries this subject: it is then issued to that entity, and your confirmation is recorded in the audit log.",
-    "issueAnyway": "Issue to the same entity"
+    "subjectTakenTitle": "サブジェクトは使用済みです",
+    "subjectTakenConfirm": "サブジェクト {{subject}} は、この CA のシリアル {{serial}} の証明書にすでに使用されています。この証明書がそのサブジェクトを持つ既存の証明書と同じエンティティのものである場合にのみ確認してください。その場合、そのエンティティに発行され、確認内容は監査ログに記録されます。",
+    "issueAnyway": "同じエンティティに発行"
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -1141,16 +1141,16 @@
     "withdrawParentWarning": "リンクを再度承認するまで、この CA は親CAなしになります。",
     "withdrawParentDone": "親CAのリンクを解除しました",
     "withdrawParentFailed": "親CAのリンクを解除できませんでした",
-    "uniqueSubject": "Unique subject",
-    "uniqueSubjectEnforced": "Enforced",
-    "uniqueSubjectNotEnforced": "Not enforced",
-    "uniqueSubjectHelp": "When enforced, this CA refuses a certificate whose subject a certificate of another entity already carries, even an expired or revoked one (RFC 5280 §4.1.2.6).",
-    "enforceUniqueSubject": "Enforce",
-    "stopEnforcingUniqueSubject": "Stop enforcing",
-    "uniqueSubjectChanged": "Unique subject setting updated",
-    "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
-    "uniqueSubjectShared_one": "{{count}} subject is already carried by several entities: {{examples}}. Nothing tells which one a new certificate is for: renewals of its certificates are refused as they are, and only a manual issuance or a CSR signing of it goes through, with the override",
-    "uniqueSubjectShared_other": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for: renewals of their certificates are refused as they are, and only a manual issuance or a CSR signing of them goes through, with the override"
+    "uniqueSubject": "サブジェクトの一意性",
+    "uniqueSubjectEnforced": "強制中",
+    "uniqueSubjectNotEnforced": "強制していません",
+    "uniqueSubjectHelp": "強制すると、この CA は、別のエンティティの証明書がすでに使用しているサブジェクト（期限切れや失効済みの証明書も含む）を持つ証明書を拒否します（RFC 5280 §4.1.2.6）。",
+    "enforceUniqueSubject": "強制する",
+    "stopEnforcingUniqueSubject": "強制を解除",
+    "uniqueSubjectChanged": "サブジェクトの一意性の設定を更新しました",
+    "uniqueSubjectChangeFailed": "サブジェクトの一意性の設定を更新できませんでした",
+    "uniqueSubjectShared_one": "{{count}} 件のサブジェクトが複数のエンティティですでに使用されています: {{examples}}。新しい証明書がどのエンティティのものか判別できないため、これらの証明書の更新はそのままでは拒否されます。手動発行または CSR の署名のみ、上書きを指定すれば実行できます",
+    "uniqueSubjectShared_other": "{{count}} 件のサブジェクトが複数のエンティティですでに使用されています（例: {{examples}}）。新しい証明書がどのエンティティのものか判別できないため、これらの証明書の更新はそのままでは拒否されます。手動発行または CSR の署名のみ、上書きを指定すれば実行できます"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",
@@ -2862,21 +2862,21 @@
     "noBackups": "バックアップなし",
     "noBackupsHint": "データを保護するためにバックアップを作成してください",
     "retentionHelper": "古いバックアップは自動的に削除されます（毎日チェック）。すべてのバックアップに適用されます。",
-    "backupMaxTotalMb": "Size ceiling for all backups (MiB)",
-    "backupMaxTotalMbHelper": "The oldest backups are removed, each one audited, until the total fits. 0 means no ceiling. The backups retention protects are never removed (the minimum kept and, on a single node, the newest validated backup and up to 2 with no validation record), so the total can stay above it.",
-    "backupSpaceUsed": "Space used by the stored backups: {{size}} in {{count}} backup(s)",
-    "backupOverCeiling": "The stored backups take more than the {{ceiling}} MiB ceiling: the next retention removes the oldest ones until they fit, except those it never removes.",
-    "backupOverCeilingKept": "The backups are still above the size ceiling: retention never removes the newest backup that matches its validation record, up to 2 backups with no validation record, nor the {{minKeep}} newest backups not found altered.",
-    "backupOverCeilingKeptShared": "The backups are still above the size ceiling: retention never removes the {{minKeep}} newest backups.",
-    "backupUncountedFiles": "{{count}} other backup file(s) in the backup directory are neither counted against the ceiling nor removed by retention.",
+    "backupMaxTotalMb": "全バックアップのサイズ上限 (MiB)",
+    "backupMaxTotalMbHelper": "合計が収まるまで、古いバックアップから順に削除されます（削除ごとに監査されます）。0 は上限なしを意味します。保持ポリシーで保護されているバックアップ（最小保持数、および単一ノードでは検証済みの最新バックアップと、検証記録のないバックアップ最大 2 件）は削除されないため、合計が上限を超えたままになることがあります。",
+    "backupSpaceUsed": "保存済みバックアップの使用容量: {{count}} 件で {{size}}",
+    "backupOverCeiling": "保存済みバックアップが上限の {{ceiling}} MiB を超えています。次回の保持処理で、削除されないものを除き、収まるまで古いものから削除されます。",
+    "backupOverCeilingKept": "バックアップがまだサイズ上限を超えています。保持処理は、検証記録と一致する最新のバックアップ、検証記録のないバックアップ最大 2 件、および改変が見つかっていない最新の {{minKeep}} 件を削除しません。",
+    "backupOverCeilingKeptShared": "バックアップがまだサイズ上限を超えています。保持処理は、最新の {{minKeep}} 件のバックアップを削除しません。",
+    "backupUncountedFiles": "バックアップディレクトリ内のその他のバックアップファイル {{count}} 件は、上限の計算に含まれず、保持処理でも削除されません。",
     "backupCleanupNow": "今すぐクリーンアップ",
     "backupCount": "{{count}} 件のバックアップ",
     "backupTotalSize": "合計サイズ",
     "diskFree": "ディスク空き",
-    "backupNode": "Node",
+    "backupNode": "ノード",
     "backupSha256": "SHA-256",
-    "backupCopySha256": "Copy the full SHA-256",
-    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
+    "backupCopySha256": "SHA-256 全体をコピー",
+    "backupSharedStoreNote": "高可用性では、アーカイブは全ノードが読み取る PostgreSQL データベースに保存されるため、そのデータベースとともに失われます。保管するものはクラスターの外にダウンロードし、PostgreSQL は専用のツールでバックアップしてください。",
     "backupSearchPlaceholder": "バックアップを検索…",
     "backupSortNewest": "新しい順",
     "backupSortOldest": "古い順",
@@ -2907,15 +2907,15 @@
     "restoreFromBackupDesc": ".ucmbkp ファイルをアップロードしてすべてのデータを復元",
     "restoreWarning": "これにより現在のすべてのデータ（ユーザー、秘密鍵、保存されたシークレットを含む）がバックアップの内容に置き換えられ、元に戻せません。自分で作成したバックアップのみを復元してください：パスワードを攻撃者が管理しているバックアップは、永続的な管理者アカウントを埋め込む可能性があります。",
     "restoring": "復元中...",
-    "restoreUploading": "Uploading {{percent}}%...",
-    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
-    "restoreReportTitle": "Restore report",
-    "restoreReportTodo": "To do",
-    "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",
-    "restoreReportRestartRequested": "A restart of the service was requested. Sign in again once it is back.",
-    "restoreReportRestartManual": "The service was not restarted. Restart it to finish: {{detail}}",
-    "restoreReportAudit": "The restore is recorded in the audit log (action: system restore).",
-    "restoreReportAuditLink": "Open the audit log",
+    "restoreUploading": "アップロード中 {{percent}}%...",
+    "restoreTooLargeLegacy": "3.0 より前に作成されたアーカイブは {{size}} まで受け付けます (BACKUP_MAX_UPLOAD_MB)。このアーカイブはそれより大きくなっています。",
+    "restoreReportTitle": "復元レポート",
+    "restoreReportTodo": "対応が必要",
+    "restoreReportNothingRestored": "何も復元されませんでした。アーカイブにデータがなく、再起動は不要です。",
+    "restoreReportRestartRequested": "サービスの再起動を要求しました。再起動後に再度サインインしてください。",
+    "restoreReportRestartManual": "サービスは再起動されていません。完了するには再起動してください: {{detail}}",
+    "restoreReportAudit": "復元は監査ログに記録されています（アクション: system restore）。",
+    "restoreReportAuditLink": "監査ログを開く",
     "retentionPeriod": "保持期間（日）",
     "rowCount": "総行数",
     "saveSettings": "設定を保存",
@@ -3404,7 +3404,7 @@
           "remedy": "プロトコル設定でパスワードを再入力してください。PBKDF2 ハッシュとして保存されます。"
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
+          "title": "Ed25519 または Ed448 の鍵を持つ認証局: FIPS モードでは、HSM 上、または EdDSA を承認していないモジュール上で署名できません",
           "remedy": "切り替え前に RSA または ECDSA（P-256/P-384/P-521）の認証局を作成し、発行をそちらへ移行してください。認証局の鍵は変換できません。"
         },
         "ca_weak_key": {
@@ -3412,11 +3412,11 @@
           "remedy": "RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。"
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
+          "title": "ML-DSA の鍵を持つ認証局: FIPS モードでは、HSM 上、または ML-DSA を承認していないモジュール上で署名できません",
           "remedy": "切り替え前に RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。ML-DSA での発行が必要な間は FIPS モードをオフのままにしてください。"
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
+          "title": "Ed25519 の鍵を持つ SSH 認証局: FIPS モードでは、EdDSA を承認していないモジュール上で署名できません",
           "remedy": "切り替え前に ECDSA または RSA の SSH 認証局を作成し、その公開鍵をホストに配布してください。"
         },
         "ssh_certificates_eddsa_key": {
@@ -3465,15 +3465,15 @@
         },
         "hsm_unapproved_keys": {
           "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
-          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
+          "remedy": "RSA 2048 以上、ECDSA P-256/P-384/P-521、または AES の鍵に置き換えてください。FIPS モードでは、これらの種類以外の OpenBao および Vault Transit の鍵は一覧に表示されなくなります。"
         },
         "dns_tsig_hmac_md5": {
           "title": "TSIG hmac-md5 で署名する RFC 2136 DNS プロバイダー：FIPS モードでは DNS-01 の更新が拒否されます",
           "remedy": "DNS サーバーで hmac-sha256 の TSIG 鍵を作成し、プロバイダーに入力してください。"
         },
         "session_short_secret_key": {
-          "title": "The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be issued or checked with it, so every sign-in fails",
-          "remedy": "Set a SECRET_KEY of 32 characters or more in the service environment and restart."
+          "title": "セッションキー (SECRET_KEY) が 14 バイト未満です: FIPS モードでは、このキーで CSRF トークンを発行も検証もできず、すべてのサインインが失敗します",
+          "remedy": "サービスの環境で 32 文字以上の SECRET_KEY を設定し、再起動してください。"
         },
         "hmac_short_secret": {
           "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
@@ -3673,7 +3673,7 @@
     "enterPasswordToDisableKey2fa": "ログイン時にセキュリティキーを求めないようにするには、パスワードを入力してください",
     "key2faEnabled": "セキュリティキーが 2 要素目になりました",
     "key2faDisabled": "パスワードでのログイン時にセキュリティキーは求められなくなりました",
-    "otherSessionsClosed": "Your other sessions were signed out.",
+    "otherSessionsClosed": "他のセッションをサインアウトしました。",
     "activeSecondFactors": "有効な 2 要素目",
     "noSecondFactor": "なし",
     "twoFactorEnforced": "管理者により必須",
@@ -5563,7 +5563,7 @@
     "sharedTitle": "共有設定",
     "sharedDescription": "すべてのプロファイルで共通のスイッチとサービス名です。全プロファイルの keytab は 1 つのファイルとして提供されます。",
     "profileName": "プロファイル名",
-    "realm": "Kerberos realm",
+    "realm": "Kerberos レルム",
     "realmHelp": "KDC の表記どおりに大文字で入力します（例: CORP.EXAMPLE）。",
     "realmRequired": "realm は必須です。",
     "realmCapitals": "realm は KDC の表記どおり大文字で入力する必要があります（例: CORP.EXAMPLE）。KDC は realm を 1 文字ずつ比較するため、小文字の名前はチケットと一致しません。",
@@ -6357,24 +6357,24 @@
       "scheduler": "スケジューラ",
       "tasks": "タスク",
       "tsa": "TSA",
-      "stale": "State not published",
-      "tasksFailed_one": "{{count}} task failed",
-      "tasksFailed_other": "{{count}} tasks failed",
-      "tasksWarning_one": "{{count}} task with a warning",
-      "tasksWarning_other": "{{count}} tasks with a warning",
+      "stale": "状態が公開されていません",
+      "tasksFailed_one": "{{count}} 件のタスクが失敗",
+      "tasksFailed_other": "{{count}} 件のタスクが失敗",
+      "tasksWarning_one": "{{count}} 件のタスクに警告",
+      "tasksWarning_other": "{{count}} 件のタスクに警告",
       "tsaState": {
-        "ca_certificate": "Signing with the CA certificate",
-        "dedicated": "Dedicated signer",
-        "expiring_one": "Signer expires in {{count}} day",
-        "expiring_other": "Signer expires in {{count}} days",
-        "no_signer": "Not configured",
-        "unavailable": "Status unavailable"
+        "ca_certificate": "CA 証明書で署名中",
+        "dedicated": "専用の署名者",
+        "expiring_one": "署名者の有効期限まで {{count}} 日",
+        "expiring_other": "署名者の有効期限まで {{count}} 日",
+        "no_signer": "未設定",
+        "unavailable": "状態を取得できません"
       },
       "tsaReason": {
-        "expired": "Signer certificate expired",
-        "revoked": "Signer certificate revoked",
-        "key_unavailable": "Signer key unavailable",
-        "invalid": "Signer certificate not usable"
+        "expired": "署名者の証明書が期限切れです",
+        "revoked": "署名者の証明書が失効しています",
+        "key_unavailable": "署名者の鍵を利用できません",
+        "invalid": "署名者の証明書は使用できません"
       }
     },
     "filter": {
@@ -6416,16 +6416,16 @@
       "expiring": "期限切れ間近",
       "expired": "期限切れ",
       "soonest": "次に期限切れ",
-      "tsaSigner": "TSA signer",
-      "ocspResponder": "OCSP responder"
+      "tsaSigner": "TSA 署名者",
+      "ocspResponder": "OCSP レスポンダ"
     },
     "activity": {
       "all": "すべて表示"
     },
     "link": {
-      "handled": "Item #{{id}} no longer waits for action (status: {{status}}).",
-      "gone": "Item #{{id}} no longer exists."
+      "handled": "項目 #{{id}} は対応待ちではなくなりました（状態: {{status}}）。",
+      "gone": "項目 #{{id}} は存在しません。"
     },
-    "refresh": "Refresh"
+    "refresh": "更新"
   }
 }

@@ -449,25 +449,25 @@
     "preparing": "Preparando…",
     "systemLogs": "Registros del sistema",
     "states": {
-      "pending": "Pending",
-      "approved": "Approved",
-      "rejected": "Rejected",
-      "expired": "Expired",
-      "cancelled": "Cancelled",
-      "issued": "Issued",
-      "recovered": "Recovered",
-      "valid": "Valid",
-      "invalid": "Invalid",
-      "ready": "Ready",
-      "processing": "Processing",
-      "validating": "Validating",
+      "pending": "Pendiente",
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "expired": "Expirado",
+      "cancelled": "Cancelado",
+      "issued": "Emitido",
+      "recovered": "Recuperado",
+      "valid": "Válido",
+      "invalid": "Inválido",
+      "ready": "Listo",
+      "processing": "En proceso",
+      "validating": "Validando",
       "ok": "OK",
-      "failed": "Failed",
-      "warning": "Warning",
-      "skipped": "Skipped",
-      "never": "Never run",
-      "active": "Active",
-      "revoked": "Revoked"
+      "failed": "Fallido",
+      "warning": "Advertencia",
+      "skipped": "Omitido",
+      "never": "Nunca ejecutado",
+      "active": "Activo",
+      "revoked": "Revocado"
     }
   },
   "commandPalette": {
@@ -888,9 +888,9 @@
       "bulkRelatedRenewed": "{{count}} certificados vinculados renovados con la selección"
     },
     "renewed": "Certificado renovado",
-    "subjectTakenTitle": "Subject already in use",
-    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}} of this CA. Confirm only if this certificate is for the same entity as the one that already carries this subject: it is then issued to that entity, and your confirmation is recorded in the audit log.",
-    "issueAnyway": "Issue to the same entity"
+    "subjectTakenTitle": "Sujeto ya en uso",
+    "subjectTakenConfirm": "El sujeto {{subject}} ya lo lleva el certificado con número de serie {{serial}} de esta CA. Confirme solo si este certificado es para la misma entidad que el que ya lleva este sujeto: se emitirá entonces a esa entidad y su confirmación quedará registrada en el registro de auditoría.",
+    "issueAnyway": "Emitir a la misma entidad"
   },
   "cas": {
     "chainRevoked": "Revocada aguas arriba",
@@ -1141,16 +1141,16 @@
     "withdrawParentWarning": "Esta CA quedará sin CA padre hasta que se vuelva a confirmar el vínculo.",
     "withdrawParentDone": "Vínculo con la CA padre retirado",
     "withdrawParentFailed": "No se pudo retirar el vínculo con la CA padre",
-    "uniqueSubject": "Unique subject",
-    "uniqueSubjectEnforced": "Enforced",
-    "uniqueSubjectNotEnforced": "Not enforced",
-    "uniqueSubjectHelp": "When enforced, this CA refuses a certificate whose subject a certificate of another entity already carries, even an expired or revoked one (RFC 5280 §4.1.2.6).",
-    "enforceUniqueSubject": "Enforce",
-    "stopEnforcingUniqueSubject": "Stop enforcing",
-    "uniqueSubjectChanged": "Unique subject setting updated",
-    "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
-    "uniqueSubjectShared_one": "{{count}} subject is already carried by several entities: {{examples}}. Nothing tells which one a new certificate is for: renewals of its certificates are refused as they are, and only a manual issuance or a CSR signing of it goes through, with the override",
-    "uniqueSubjectShared_other": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for: renewals of their certificates are refused as they are, and only a manual issuance or a CSR signing of them goes through, with the override"
+    "uniqueSubject": "Sujeto único",
+    "uniqueSubjectEnforced": "Aplicado",
+    "uniqueSubjectNotEnforced": "No aplicado",
+    "uniqueSubjectHelp": "Cuando se aplica, esta CA rechaza un certificado cuyo sujeto ya lleva un certificado de otra entidad, incluso expirado o revocado (RFC 5280 §4.1.2.6).",
+    "enforceUniqueSubject": "Aplicar",
+    "stopEnforcingUniqueSubject": "Dejar de aplicar",
+    "uniqueSubjectChanged": "Ajuste de sujeto único actualizado",
+    "uniqueSubjectChangeFailed": "No se pudo actualizar el ajuste de sujeto único",
+    "uniqueSubjectShared_one": "{{count}} sujeto ya lo llevan varias entidades: {{examples}}. Nada indica para cuál es un nuevo certificado: las renovaciones de sus certificados se rechazan tal cual, y solo una emisión manual o una firma de CSR de este sujeto prospera, con la excepción",
+    "uniqueSubjectShared_other": "{{count}} sujetos ya los llevan varias entidades, entre ellos {{examples}}. Nada indica para cuál es un nuevo certificado: las renovaciones de sus certificados se rechazan tal cual, y solo una emisión manual o una firma de CSR de estos sujetos prospera, con la excepción"
   },
   "csrs": {
     "uploadCSR": "Subir CSR",
@@ -2862,21 +2862,21 @@
     "noBackups": "Sin respaldos disponibles",
     "noBackupsHint": "Cree una copia de seguridad para proteger sus datos",
     "retentionHelper": "Las copias más antiguas se eliminan automáticamente (comprobado a diario). Se aplica a todas las copias.",
-    "backupMaxTotalMb": "Size ceiling for all backups (MiB)",
-    "backupMaxTotalMbHelper": "The oldest backups are removed, each one audited, until the total fits. 0 means no ceiling. The backups retention protects are never removed (the minimum kept and, on a single node, the newest validated backup and up to 2 with no validation record), so the total can stay above it.",
-    "backupSpaceUsed": "Space used by the stored backups: {{size}} in {{count}} backup(s)",
-    "backupOverCeiling": "The stored backups take more than the {{ceiling}} MiB ceiling: the next retention removes the oldest ones until they fit, except those it never removes.",
-    "backupOverCeilingKept": "The backups are still above the size ceiling: retention never removes the newest backup that matches its validation record, up to 2 backups with no validation record, nor the {{minKeep}} newest backups not found altered.",
-    "backupOverCeilingKeptShared": "The backups are still above the size ceiling: retention never removes the {{minKeep}} newest backups.",
-    "backupUncountedFiles": "{{count}} other backup file(s) in the backup directory are neither counted against the ceiling nor removed by retention.",
+    "backupMaxTotalMb": "Límite de tamaño de todas las copias (MiB)",
+    "backupMaxTotalMbHelper": "Las copias más antiguas se eliminan, cada una auditada, hasta que el total quepa. 0 significa sin límite. Las copias que la retención protege nunca se eliminan (el mínimo conservado y, en un solo nodo, la última copia validada y hasta 2 sin registro de validación), por lo que el total puede seguir por encima.",
+    "backupSpaceUsed": "Espacio usado por las copias almacenadas: {{size}} en {{count}} copia(s)",
+    "backupOverCeiling": "Las copias almacenadas superan el límite de {{ceiling}} MiB: la próxima retención eliminará las más antiguas hasta que quepan, salvo las que nunca elimina.",
+    "backupOverCeilingKept": "Las copias siguen por encima del límite de tamaño: la retención nunca elimina la última copia que coincide con su registro de validación, hasta 2 copias sin registro de validación, ni las {{minKeep}} copias más recientes no alteradas.",
+    "backupOverCeilingKeptShared": "Las copias siguen por encima del límite de tamaño: la retención nunca elimina las {{minKeep}} copias más recientes.",
+    "backupUncountedFiles": "{{count}} otro(s) archivo(s) de copia en el directorio de copias no cuentan para el límite ni los elimina la retención.",
     "backupCleanupNow": "Limpiar ahora",
     "backupCount": "{{count}} copia(s)",
     "backupTotalSize": "Tamaño total",
     "diskFree": "Disco libre",
-    "backupNode": "Node",
+    "backupNode": "Nodo",
     "backupSha256": "SHA-256",
-    "backupCopySha256": "Copy the full SHA-256",
-    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
+    "backupCopySha256": "Copiar el SHA-256 completo",
+    "backupSharedStoreNote": "En alta disponibilidad los archivos se guardan en la base de datos PostgreSQL, que lee cada nodo: se pierden con esa base de datos. Descargue los que conserve a un lugar fuera del clúster y respalde PostgreSQL con sus propias herramientas.",
     "backupSearchPlaceholder": "Buscar copias…",
     "backupSortNewest": "Más recientes primero",
     "backupSortOldest": "Más antiguas primero",
@@ -2907,15 +2907,15 @@
     "restoreFromBackupDesc": "Cargue un archivo .ucmbkp para restaurar todos los datos",
     "restoreWarning": "Esto REEMPLAZA todos los datos actuales: incluidos usuarios, claves privadas y secretos almacenados, con el contenido de la copia de seguridad, y es irreversible. Restaure solo una copia que haya creado usted mismo: una copia cuya contraseña controla un atacante puede implantar una cuenta de administrador persistente.",
     "restoring": "Restaurando...",
-    "restoreUploading": "Uploading {{percent}}%...",
-    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
-    "restoreReportTitle": "Restore report",
-    "restoreReportTodo": "To do",
-    "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",
-    "restoreReportRestartRequested": "A restart of the service was requested. Sign in again once it is back.",
-    "restoreReportRestartManual": "The service was not restarted. Restart it to finish: {{detail}}",
-    "restoreReportAudit": "The restore is recorded in the audit log (action: system restore).",
-    "restoreReportAuditLink": "Open the audit log",
+    "restoreUploading": "Subiendo {{percent}}%...",
+    "restoreTooLargeLegacy": "Un archivo creado antes de la 3.0 se acepta hasta {{size}} (BACKUP_MAX_UPLOAD_MB): este es más grande.",
+    "restoreReportTitle": "Informe de restauración",
+    "restoreReportTodo": "Pendiente",
+    "restoreReportNothingRestored": "No se restauró nada: el archivo no contenía datos y no hace falta reiniciar.",
+    "restoreReportRestartRequested": "Se solicitó un reinicio del servicio. Vuelva a iniciar sesión cuando esté de nuevo disponible.",
+    "restoreReportRestartManual": "El servicio no se reinició. Reinícielo para terminar: {{detail}}",
+    "restoreReportAudit": "La restauración queda registrada en el registro de auditoría (acción: system restore).",
+    "restoreReportAuditLink": "Abrir el registro de auditoría",
     "retentionPeriod": "Período de retención (días)",
     "rowCount": "Filas totales",
     "saveSettings": "Guardar configuración",
@@ -3404,7 +3404,7 @@
           "remedy": "Vuelva a introducir la contraseña en la configuración del protocolo: se almacenará entonces como hash PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
+          "title": "Autoridades de certificación con clave Ed25519 o Ed448: no pueden firmar en modo FIPS en un HSM, ni en un módulo que no aprueba EdDSA",
           "remedy": "Cree una autoridad RSA o ECDSA (P-256/P-384/P-521) y traslade la emisión a ella antes del cambio; la clave de una autoridad no se puede convertir."
         },
         "ca_weak_key": {
@@ -3412,11 +3412,11 @@
           "remedy": "Cree una autoridad con RSA 2048+ o ECDSA P-256/P-384/P-521 y traslade la emisión a ella."
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
+          "title": "Autoridades de certificación con clave ML-DSA: no pueden firmar en modo FIPS en un HSM, ni en un módulo que no aprueba ML-DSA",
           "remedy": "Cree una autoridad RSA 2048+ o ECDSA P-256/P-384/P-521 y traslade la emisión a ella antes del cambio, o mantenga el modo FIPS desactivado mientras necesite emitir con ML-DSA."
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
+          "title": "Autoridades de certificación SSH con clave Ed25519: no pueden firmar en modo FIPS en un módulo que no aprueba EdDSA",
           "remedy": "Cree una autoridad SSH ECDSA o RSA y distribuya su clave pública a los hosts antes del cambio."
         },
         "ssh_certificates_eddsa_key": {
@@ -3465,15 +3465,15 @@
         },
         "hsm_unapproved_keys": {
           "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
-          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
+          "remedy": "Sustitúyalas por claves RSA 2048+, ECDSA P-256/P-384/P-521 o AES; en modo FIPS, las claves de estos tipos de OpenBao y Vault Transit ya no se listan."
         },
         "dns_tsig_hmac_md5": {
           "title": "Proveedores DNS RFC 2136 que firman con TSIG hmac-md5: las actualizaciones DNS-01 se rechazan en modo FIPS",
           "remedy": "Cree una clave TSIG hmac-sha256 en el servidor DNS e introdúzcala en el proveedor."
         },
         "session_short_secret_key": {
-          "title": "The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be issued or checked with it, so every sign-in fails",
-          "remedy": "Set a SECRET_KEY of 32 characters or more in the service environment and restart."
+          "title": "La clave de sesión (SECRET_KEY) tiene menos de 14 bytes: en modo FIPS no se puede emitir ni comprobar ningún token CSRF con ella, por lo que todos los inicios de sesión fallan",
+          "remedy": "Defina una SECRET_KEY de 32 caracteres o más en el entorno del servicio y reinicie."
         },
         "hmac_short_secret": {
           "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
@@ -3672,7 +3672,7 @@
     "enterPasswordToDisableKey2fa": "Introduzca su contraseña para dejar de pedir una llave de seguridad al iniciar sesión",
     "key2faEnabled": "Su llave de seguridad es ahora su segundo factor",
     "key2faDisabled": "Un inicio de sesión con contraseña ya no pide una llave de seguridad",
-    "otherSessionsClosed": "Your other sessions were signed out.",
+    "otherSessionsClosed": "Se cerraron sus otras sesiones.",
     "activeSecondFactors": "Segundos factores activos",
     "noSecondFactor": "ninguno",
     "twoFactorEnforced": "exigido por su administrador",
@@ -4232,7 +4232,7 @@
     "subjectAltNames": "Nombres alternativos del sujeto",
     "entityTitle": {
       "certificate": "Certificado #{{id}}",
-      "ca": "CA #{{id}}",
+      "ca": "CA n.º {{id}}",
       "truststore": "Almacén de confianza #{{id}}",
       "userCertificate": "Certificado de usuario #{{id}}"
     },
@@ -6354,24 +6354,24 @@
       "scheduler": "Planificador",
       "tasks": "Tareas",
       "tsa": "TSA",
-      "stale": "State not published",
-      "tasksFailed_one": "{{count}} task failed",
-      "tasksFailed_other": "{{count}} tasks failed",
-      "tasksWarning_one": "{{count}} task with a warning",
-      "tasksWarning_other": "{{count}} tasks with a warning",
+      "stale": "Estado no publicado",
+      "tasksFailed_one": "{{count}} tarea fallida",
+      "tasksFailed_other": "{{count}} tareas fallidas",
+      "tasksWarning_one": "{{count}} tarea con advertencia",
+      "tasksWarning_other": "{{count}} tareas con advertencia",
       "tsaState": {
-        "ca_certificate": "Signing with the CA certificate",
-        "dedicated": "Dedicated signer",
-        "expiring_one": "Signer expires in {{count}} day",
-        "expiring_other": "Signer expires in {{count}} days",
-        "no_signer": "Not configured",
-        "unavailable": "Status unavailable"
+        "ca_certificate": "Firma con el certificado de la CA",
+        "dedicated": "Firmante dedicado",
+        "expiring_one": "El firmante expira en {{count}} día",
+        "expiring_other": "El firmante expira en {{count}} días",
+        "no_signer": "No configurado",
+        "unavailable": "Estado no disponible"
       },
       "tsaReason": {
-        "expired": "Signer certificate expired",
-        "revoked": "Signer certificate revoked",
-        "key_unavailable": "Signer key unavailable",
-        "invalid": "Signer certificate not usable"
+        "expired": "Certificado del firmante expirado",
+        "revoked": "Certificado del firmante revocado",
+        "key_unavailable": "Clave del firmante no disponible",
+        "invalid": "Certificado del firmante no utilizable"
       }
     },
     "filter": {
@@ -6413,16 +6413,16 @@
       "expiring": "Por expirar",
       "expired": "Expirado",
       "soonest": "Próximo en expirar",
-      "tsaSigner": "TSA signer",
-      "ocspResponder": "OCSP responder"
+      "tsaSigner": "Firmante TSA",
+      "ocspResponder": "Respondedor OCSP"
     },
     "activity": {
       "all": "Ver todo"
     },
     "link": {
-      "handled": "Item #{{id}} no longer waits for action (status: {{status}}).",
-      "gone": "Item #{{id}} no longer exists."
+      "handled": "El elemento n.º {{id}} ya no espera acción (estado: {{status}}).",
+      "gone": "El elemento n.º {{id}} ya no existe."
     },
-    "refresh": "Refresh"
+    "refresh": "Actualizar"
   }
 }
