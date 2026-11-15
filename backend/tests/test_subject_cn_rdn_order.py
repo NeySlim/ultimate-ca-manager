@@ -25,6 +25,9 @@ from cryptography.x509.oid import NameOID
 
 from utils.dn_parse import most_specific_common_name, subject_common_name
 
+# The CAs create_ca makes, and any row a test leaves, are deleted after the module
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture(scope='module')
 def key():
