@@ -137,7 +137,7 @@ The image ships `opensc` (its PKCS#11 module is `opensc-pkcs11.so`) and `libpcsc
 
 The provider is then created on the HSM page: type `PKCS#11`, `module_path` the image's `opensc-pkcs11.so` (`docker exec ucm sh -c 'ls /usr/lib/*/opensc-pkcs11.so'`), the slot or token label, and the card PIN. The PIN is stored in the provider's configuration, encrypted in the database. **Sync keys** registers the card's keys as HSM keys; a key a CA holds is never removed by a later sync.
 
-In HA mode, a CA cannot be created on a key of an OpenSC provider: the reader is attached to one host.
+In HA mode, a CA cannot be created on a key of a local smart card reader provider, OpenSC (`opensc-pkcs11.so`) or YubiKey PIV (`libykcs11.so`): the reader is attached to one host.
 
 ## Cloud HSM
 
