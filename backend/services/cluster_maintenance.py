@@ -655,8 +655,14 @@ def complete_committed(row, now):
     # the restart, so a loser never refuses the sessions opened since
     cluster_commands.emit(cluster_commands.RESTART)
     _advance_session_epoch()
-    _revoke_database_sessions()
-    _revoke_flask_sessions()
+    try:
+        _revoke_database_sessions()
+        _revoke_flask_sessions()
+    except Exception as e:
+        # Committed above and never retried: the epoch already refuses what these rows list
+        db.session.rollback()
+        logger.error(f"Cluster maintenance: session rows left after the completed restore ({e}); "
+                     "the session epoch refuses them")
     logger.warning(f"Cluster maintenance: the restore committed by node {row['node_id']} was "
                    "completed here (sessions revoked, rolling restart requested)")
     return True
