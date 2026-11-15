@@ -88,6 +88,11 @@ def _x509_ca(client, key_id):
                                                     'hsm_key_id': key_id})
 
 
+def _deleted(client, url):
+    r = client.delete(url)
+    assert r.status_code in (200, 204), (url, r.data)
+
+
 def _detail(r):
     body = r.get_json()
     return body.get('detail') or body.get('message') or body.get('error') or ''
@@ -339,16 +344,20 @@ class TestPermission:
         (['write:ssh_cas'], 403),
         (['write:ssh_cas', 'read:hsm'], 201),
     ])
-    def test_a_custom_role(self, app, auth_client, create_user, token_key, permissions, status):
+    def test_a_custom_role(self, app, auth_client, create_user, token_key, request, permissions, status):
         from models import User
         name = f'sshhsm{uuid.uuid4().hex[:6]}'
         r = auth_client.post('/api/v2/rbac/roles', json={'name': f'{name} role', 'permissions': permissions})
         assert r.status_code == 200, r.data
+        role_id = r.get_json()['data']['id']
+        # The user goes before its role: the shared tables end as they began
+        request.addfinalizer(lambda: _deleted(auth_client, f'/api/v2/rbac/roles/{role_id}'))
         create_user(username=name, role='viewer')
         with app.app_context():
             user_id = User.query.filter_by(username=name).first().id
+        request.addfinalizer(lambda: _deleted(auth_client, f'/api/v2/users/{user_id}'))
         assert auth_client.put(f'/api/v2/users/{user_id}',
-                               json={'custom_role_id': r.get_json()['data']['id']}).status_code == 200
+                               json={'custom_role_id': role_id}).status_code == 200
         client = app.test_client()
         assert client.post('/api/v2/auth/login', json={'username': name, 'password': 'TestPass123!'}
                            ).status_code == 200
