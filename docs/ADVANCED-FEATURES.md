@@ -6,13 +6,13 @@ All features are included in UCM as core functionality. There is no separate "Pr
 
 | Feature | Status | Backend Module |
 |---------|--------|----------------|
-| Certificate Management | Stable | `api/v2/certificates.py` |
+| Certificate Management | Stable | `api/v2/certificates/` |
 | Multiple CAs | Stable | `api/v2/cas.py` |
 | ACME Protocol | Stable | `api/v2/acme.py` |
 | SCEP Protocol | Stable | `api/v2/scep.py` |
 | User Groups | Stable | `api/v2/groups.py` |
 | Custom RBAC Roles | Stable | `api/v2/rbac.py` |
-| SSO (LDAP/OAuth2/SAML) | Experimental | `api/v2/sso.py` |
+| SSO (LDAP/OAuth2/SAML) | Experimental | `api/v2/sso/` |
 | HSM Integration | Experimental | `api/v2/hsm.py` |
 | mTLS Authentication | Experimental | `api/v2/mtls.py` |
 | WebAuthn/FIDO2 | Stable | `api/v2/webauthn.py` |

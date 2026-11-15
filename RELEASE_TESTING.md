@@ -98,8 +98,8 @@ not boot, so a clean `journalctl` is **not** sufficient.
 
 | Feature              | What to do                                                     | Catches |
 |----------------------|----------------------------------------------------------------|---------|
-| PostgreSQL backend   | Settings → Database Backend → Test Connection                  | Missing `psycopg` (#78) |
-| HSM detect/test      | Settings → HSM → Detect / Test                                 | Provider mismatch |
+| PostgreSQL backend   | Settings → Database → Test connection                  | Missing `psycopg` (#78) |
+| HSM detect/test      | Modules > Administration > HSM Management → Detect / Test                                 | Provider mismatch |
 | SSO role mapping     | OIDC/SAML login that mutates a user's role                     | Audit signature drift (#79) |
 | ACME internal domain | Issue cert for `*.lan` / RFC1918                               | SSRF over-block (v2.124) |
 | Webhook to LAN       | Webhook → `http://192.168.x.x/...`                             | SSRF over-block |
