@@ -158,6 +158,7 @@ def regenerate_crl(ca_id):
         return error_response(str(e), 409)
     except SecretUnreadable as e:
         # The message names the secret, never its value: the operator knows what to restore
+        logger.error(f'Failed to regenerate CRL: {e}')
         return error_response(str(e), 500)
     except Exception as e:
         logger.error(f'Failed to regenerate CRL: {e}')

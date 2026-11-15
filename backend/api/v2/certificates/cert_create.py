@@ -751,6 +751,7 @@ def create_certificate():
     except SecretUnreadable as e:
         # The message names the secret, never its value: the operator knows what to restore
         db.session.rollback()
+        logger.error(f"Failed to create certificate: {e}")
         return error_response(str(e), 500)
     except Exception as e:
         db.session.rollback()

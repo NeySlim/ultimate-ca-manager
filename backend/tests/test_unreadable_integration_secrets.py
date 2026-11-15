@@ -3,6 +3,7 @@
 Each case stores a token made under another database key (another node, or the
 machine-derived key of the single instance a cluster came from).
 """
+import logging
 import smtplib
 import uuid
 from types import SimpleNamespace
@@ -336,22 +337,35 @@ def ca_on_unreadable_provider(app):
         db.session.commit()
 
 
+def _route_errors(caplog, logger_name):
+    return [r.getMessage() for r in caplog.records
+            if r.name == logger_name and r.levelno == logging.ERROR]
+
+
 def test_issuance_from_a_ca_on_an_unreadable_provider_names_the_secret(
-        auth_client, ca_on_unreadable_provider):
+        auth_client, ca_on_unreadable_provider, caplog):
     import json
     ids, _, _ = ca_on_unreadable_provider
+    caplog.set_level(logging.ERROR)
     r = auth_client.post('/api/v2/certificates', data=json.dumps(
         {'cn': 'unreadable.example.test', 'ca_id': ids['ca'], 'validity_days': 30}),
         content_type='application/json')
     assert r.status_code == 500
-    assert f"HSM provider {ids['provider']} token cannot be decrypted" in r.get_json()['message']
+    named = f"HSM provider {ids['provider']} token cannot be decrypted"
+    assert named in r.get_json()['message']
+    # Logged like every other failure of the route
+    assert any(named in m for m in _route_errors(caplog, 'api.v2.certificates.cert_create'))
 
 
-def test_crl_of_a_ca_on_an_unreadable_provider_names_the_secret(auth_client, ca_on_unreadable_provider):
+def test_crl_of_a_ca_on_an_unreadable_provider_names_the_secret(auth_client, ca_on_unreadable_provider,
+                                                              caplog):
     ids, _, _ = ca_on_unreadable_provider
+    caplog.set_level(logging.ERROR)
     r = auth_client.post(f"/api/v2/crl/{ids['ca']}/regenerate")
     assert r.status_code == 500
-    assert f"HSM provider {ids['provider']} token cannot be decrypted" in r.get_json()['message']
+    named = f"HSM provider {ids['provider']} token cannot be decrypted"
+    assert named in r.get_json()['message']
+    assert any(named in m for m in _route_errors(caplog, 'api.v2.crl'))
 
 
 def test_ocsp_of_a_ca_on_an_unreadable_provider_answers_internal_error(
