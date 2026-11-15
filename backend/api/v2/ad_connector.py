@@ -198,12 +198,15 @@ def run_unsaved_test(data, saved_connector):
     if not bind_password:
         # The saved secret only goes to the saved target, trusted the saved way
         saved = saved_connector
-        if (saved and saved.bind_password
+        if (saved and saved._bind_password
                 and set(lookup.split_servers(joined)) <= set(lookup.split_servers(saved.server))
                 and (saved.port or 389, bool(saved.use_ssl), bool(saved.verify_ssl),
                      saved.ca_bundle or None)
                 == (port, use_ssl, bool(verify_ssl), ca_bundle)):
-            bind_password = saved.bind_password
+            try:
+                bind_password = lookup._bind_password(saved)
+            except lookup.ADSecretUnreadable as e:
+                return error_response(str(e), 400)  # named, never taken for a missing one
     if not bind_password:
         # Same rule as the save: an anonymous bind is not a connection this
         # connector is allowed to make, so testing one would report a

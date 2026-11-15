@@ -469,3 +469,31 @@ def test_intune_with_an_unreadable_client_secret_names_it(app):
                                    client_secret=_foreign_token())
     with app.app_context(), pytest.raises(SecretUnreadable, match='Intune app 23 client secret'):
         intune_client.client_for_profile(profile)
+
+
+def _ad_config_with_unreadable_password():
+    from models.ad_connector import ADConnectorConfig
+    config = ADConnectorConfig(id=24, name='ad', server='dc.invalid', port=389, use_ssl=False,
+                               verify_ssl=True, base_dn='dc=example', bind_dn='cn=svc,dc=example')
+    config._bind_password = _foreign_token()
+    return config
+
+
+def test_ad_connector_test_names_an_unreadable_bind_password(app, ldap_binds):
+    from services.ad_connector import lookup
+    with app.app_context():
+        result = lookup.test_connection(_ad_config_with_unreadable_password())
+    assert result['success'] is False
+    assert 'AD connector 24 bind password cannot be decrypted' in result['message']
+    assert ldap_binds == []
+
+
+def test_ad_connector_inline_test_with_a_blank_password_names_the_saved_one(app, ldap_binds):
+    from api.v2.ad_connector import run_unsaved_test
+    with app.test_request_context():
+        response = run_unsaved_test({'server': 'dc.invalid', 'port': 389, 'bind_dn': 'cn=svc,dc=example',
+                                     'bind_password': ''}, _ad_config_with_unreadable_password())
+    response, status = response if isinstance(response, tuple) else (response, response.status_code)
+    assert status == 400
+    assert 'AD connector 24 bind password cannot be decrypted' in response.get_json()['message']
+    assert ldap_binds == []

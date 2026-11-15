@@ -920,6 +920,11 @@ def test_connection(config):
     if not servers:
         return {'success': False, 'partial': False,
                 'message': 'Server is required', 'servers': []}
+    try:
+        _bind_password(config)  # an unreadable one is named, not taken for a missing one
+    except ADSecretUnreadable as e:
+        logger.warning('AD Connector: %s', e)
+        return {'success': False, 'partial': False, 'message': str(e), 'servers': []}
     if not has_bind_credentials(config):
         logger.warning('AD Connector: %s', BIND_CREDENTIAL_MISSING)
         return {'success': False, 'partial': False,
