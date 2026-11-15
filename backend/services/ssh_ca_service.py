@@ -378,6 +378,11 @@ class SSHCAService:
                 raise ValueError(
                     f"OpenSSH certificates support only the NIST curves P-256/P-384/P-521, "
                     f"not {getattr(curve, 'name', curve)}")
+        elif key_algorithms.family_for_public_key(public_key) == 'ML-DSA':
+            # The loader wraps ML-DSA; the OpenSSH certificate format is what lacks it
+            raise ValueError(
+                f"OpenSSH certificates have no ML-DSA key type: "
+                f"HSM key '{key_row.label}' cannot back an SSH CA")
         else:
             raise ValueError(
                 f"HSM key '{key_row.label}' is neither RSA nor NIST-EC: "

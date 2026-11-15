@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa, utils
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, mldsa, padding, rsa, utils
 
 from models import db
 from models.hsm import HsmKey, HsmProvider
@@ -314,5 +314,15 @@ def test_real_token_ssh_certificate_verifies_independently(token, monkeypatch, s
 
 def test_ed25519_refusal_identifies_wrapper_limitation(token):
     row, _ = token(ed25519.Ed25519PrivateKey.generate(), 'ED25519')
-    with pytest.raises(ValueError, match='HSM.*wrapper'):
+    with pytest.raises(ValueError) as refused:
         create(row)
+    assert str(refused.value) == (
+        f"HSM wrappers do not support public key type Ed25519PublicKey for key {row.id} (SSH signer)")
+
+
+def test_mldsa_refusal_identifies_openssh_format_limitation(token):
+    row, _ = token(mldsa.MLDSA65PrivateKey.generate(), 'ML-DSA-65')
+    with pytest.raises(ValueError) as refused:
+        create(row)
+    assert str(refused.value) == (
+        "OpenSSH certificates have no ML-DSA key type: HSM key 'SSH signer' cannot back an SSH CA")
