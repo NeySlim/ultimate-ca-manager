@@ -70,7 +70,7 @@ Moving an existing single-node release to `ha.enabled=true` needs these steps, b
 docker compose -f docker-compose.ha.yml up -d --wait
 ```
 
-HAProxy does not run as root: the PEM file must be readable by uid 99 (`chmod 644`, or `chown 99` with `chmod 600`). A file it cannot read makes the balancer restart in a loop; its health check (`haproxy -c`, which loads the certificate) keeps it unhealthy, and `--wait` then fails instead of returning as if everything had started. Without `--wait`, `docker compose ps` shows it `Restarting` and its log says `cannot open the file '/certs/lb.pem'`.
+HAProxy does not run as root: the PEM file must be readable by uid 99 (`chmod 644`, or `chown 99` with `chmod 600`). A file it cannot read makes haproxy exit at start, so the balancer restarts in a loop and its health check never gets to run; because the service declares one, Docker reports the stopped container unhealthy and `docker compose up --wait` exits with an error within seconds (`container ... is unhealthy`). Without a health check, `--wait` returned success on that looping balancer. Without `--wait`, `docker compose ps` shows it `Restarting` and its log says `cannot open the file '/certs/lb.pem'`.
 
 Without a password for the first administrator, the node that creates it generates one in its own data volume: `docker compose -f docker-compose.ha.yml logs ucm-1 ucm-2 | grep 'Initial administrator'` names that node (the other one logs `file is on node ucm-N`), then `docker compose -f docker-compose.ha.yml exec ucm-N cat /opt/ucm/data/initial-admin-password` reads it.
 

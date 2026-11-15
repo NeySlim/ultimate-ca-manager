@@ -99,8 +99,8 @@ services:
     configs:
       - source: haproxy_cfg
         target: /usr/local/etc/haproxy/haproxy.cfg
-    # Loads the configuration and the certificate: an unreadable lb.pem keeps the service
-    # unhealthy (and `up --wait` failing) instead of restarting in silence
+    # An unreadable lb.pem stops haproxy before this check runs; declaring it is what makes
+    # Docker report the looping container unhealthy, so `up --wait` fails instead of succeeding
     healthcheck:
       test: ["CMD", "haproxy", "-c", "-q", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
       interval: 30s
