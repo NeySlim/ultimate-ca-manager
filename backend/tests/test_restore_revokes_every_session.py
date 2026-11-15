@@ -128,3 +128,19 @@ def test_a_session_begun_between_two_restores_is_refused_after_the_second(app, m
         assert _refused(app, between)
     finally:
         _cleanup(app, user)
+
+
+def test_a_session_posed_by_a_test_after_a_restore_is_accepted(app):
+    """The shared helper poses a session as a login does, under the current epoch."""
+    from auth.session_epoch import advance_epoch
+    from tests.session_support import pose_signed_in
+    user = _make_user(app)
+    try:
+        with app.app_context():
+            advance_epoch()
+        client = app.test_client()
+        with client.session_transaction() as sess, app.app_context():
+            pose_signed_in(sess, db.session.get(User, user['id']))
+        assert client.get('/api/v2/account/profile').status_code == 200
+    finally:
+        _cleanup(app, user)
