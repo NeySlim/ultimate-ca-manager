@@ -10,7 +10,7 @@ import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
 from auth.session_reverify import check_session_password
-from auth.session_start import keep_own_session
+from auth.session_start import closed_sessions_note, end_sessions_now, keep_own_session
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -528,14 +528,14 @@ def _refuse_last_factor(user, credential):
         409, {'reason': LAST_FACTOR_REASON})
 
 
-def _audit_key(action, user, credential, verb):
+def _audit_key(action, user, credential, verb, closed):
     AuditService.log_action(
         action=action,
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
         details=(f'Security key "{credential.name}" (id {credential.id}) of {user.username} '
-                 f'{verb} by {g.current_user.username}'),
+                 f'{verb} by {g.current_user.username} ({closed_sessions_note(closed)})'),
         success=True,
     )
 
@@ -576,8 +576,11 @@ def delete_user_security_key(user_id, credential_id):
     ok, message = WebAuthnService.remove_credential(credential)
     if not ok:
         return error_response(message, 500)
-    _audit_key('webauthn_admin_delete', user, credential, 'removed')
-    return success_response(message=f'Security key removed from {user.username}')
+    # The holder's factor changed: their sessions close, as after a password reset
+    closed = end_sessions_now(user.id)
+    _audit_key('webauthn_admin_delete', user, credential, 'removed', closed)
+    return success_response(message=f'Security key removed from {user.username}',
+                            meta={'other_sessions_closed': closed})
 
 
 @bp.route('/api/v2/users/<int:user_id>/webauthn/<int:credential_id>', methods=['PATCH'])
@@ -607,6 +610,7 @@ def toggle_user_security_key(user_id, credential_id):
     ok, message = WebAuthnService.set_credential_enabled(credential, enabled)
     if not ok:
         return error_response(message, 500)
+    closed = end_sessions_now(user.id)
     _audit_key('webauthn_admin_enable' if enabled else 'webauthn_admin_disable', user, credential,
-               'enabled' if enabled else 'disabled')
-    return success_response(data=credential.to_dict())
+               'enabled' if enabled else 'disabled', closed)
+    return success_response(data=credential.to_dict(), meta={'other_sessions_closed': closed})

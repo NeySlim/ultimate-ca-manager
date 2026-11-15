@@ -17,6 +17,7 @@ from services.webauthn_service import WebAuthnService
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from auth.session_start import closed_sessions_note, end_sessions_now
 
 logger = logging.getLogger(__name__)
 
@@ -60,17 +61,19 @@ def delete_credential(credential_id):
     
     if not success:
         return error_response(message, 404)
-    
+    # A factor change closes the account's other sessions, as a password change
+    closed = end_sessions_now(user.id)
+
     AuditService.log_action(
         action='webauthn_delete',
         resource_type='webauthn',
         resource_id=str(credential_id),
         resource_name=f'WebAuthn credential {credential_id}',
-        details=f'Deleted WebAuthn credential {credential_id}',
+        details=f'Deleted WebAuthn credential {credential_id} ({closed_sessions_note(closed)})',
         success=True
     )
-    
-    return success_response(message=message)
+
+    return success_response(message=message, meta={'other_sessions_closed': closed})
 
 
 @bp.route('/credentials/<int:credential_id>/toggle', methods=['POST'])
@@ -87,17 +90,19 @@ def toggle_credential(credential_id):
     
     if not success:
         return error_response(message, 404)
-    
+    closed = end_sessions_now(user.id)
+
     AuditService.log_action(
         action='webauthn_toggle',
         resource_type='webauthn',
         resource_id=str(credential_id),
         resource_name=f'WebAuthn credential {credential_id}',
-        details=f'{"Enabled" if enabled else "Disabled"} WebAuthn credential {credential_id}',
+        details=(f'{"Enabled" if enabled else "Disabled"} WebAuthn credential {credential_id} '
+                 f'({closed_sessions_note(closed)})'),
         success=True
     )
-    
-    return success_response(message=message)
+
+    return success_response(message=message, meta={'other_sessions_closed': closed})
 
 
 @bp.route('/register/options', methods=['POST'])
@@ -137,14 +142,16 @@ def verify_registration():
         owner.webauthn_2fa = True
         if not safe_commit(logger, "Failed to keep the enrolled key as second factor")[0]:
             return error_response('Failed to complete 2FA enrolment', 500)
-    
+    closed = end_sessions_now(user.id)
+
     AuditService.log_action(
         action='webauthn_register',
         resource_type='webauthn',
         resource_id=str(credential.id) if credential else None,
         resource_name=credential_name,
-        details=f'Registered WebAuthn credential: {credential_name}',
+        details=f'Registered WebAuthn credential: {credential_name} ({closed_sessions_note(closed)})',
         success=True
     )
-    
-    return success_response(data=credential.to_dict() if credential else None, message=message)
+
+    return success_response(data=credential.to_dict() if credential else None, message=message,
+                            meta={'other_sessions_closed': closed})

@@ -15,6 +15,7 @@ from utils.backup_codes import (
 )
 from auth.unified import require_auth
 from auth.session_reverify import check_session_password
+from auth.session_start import closed_sessions_note, sessions_closed_by
 from auth.twofa_enforcement import (
     enforcement_active_for, has_security_key, last_factor_refusal, lock_for_factor_change,
     lock_user,
@@ -119,9 +120,11 @@ def confirm_2fa():
     # plaintext list is only ever returned here.
     user.totp_confirmed = True
     user.backup_codes = backup_hash_codes(backup_codes)
+    user.end_sessions()  # a factor change closes the other sessions, as a password change
     ok, _err = safe_commit(logger, "Failed to enable 2FA")
     if not ok:
         return _err
+    closed = sessions_closed_by(user)
 
     # If this confirmation satisfied a forced-enrolment session (#141), lift the
     # gate so the now-enrolled user gets a full session.
@@ -134,13 +137,14 @@ def confirm_2fa():
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'2FA enabled for user: {user.username}',
+        details=f'2FA enabled for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
 
     return success_response(
         data={'backup_codes': backup_codes},
-        message='2FA enabled successfully. Save backup codes!'
+        message='2FA enabled successfully. Save backup codes!',
+        meta={'other_sessions_closed': closed},
     )
 
 
@@ -209,9 +213,11 @@ def disable_2fa():
     user.totp_confirmed = False
     user.totp_secret = None
     user.backup_codes = None
+    user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to disable 2FA")
     if not ok:
         return _err
+    closed = sessions_closed_by(user)
     if counted:
         _clear_code_checks(user.id)
 
@@ -220,11 +226,12 @@ def disable_2fa():
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'2FA disabled for user: {user.username}',
+        details=f'2FA disabled for user: {user.username} ({closed_sessions_note(closed)})',
         success=True
     )
 
-    return success_response(message='2FA disabled successfully')
+    return success_response(message='2FA disabled successfully',
+                            meta={'other_sessions_closed': closed})
 
 
 _KEY_CHOICE_MESSAGE = ('Your account requires a second factor: set up TOTP before turning off '
@@ -267,19 +274,22 @@ def set_webauthn_second_factor():
             return last_factor_refusal(_KEY_CHOICE_MESSAGE)
 
     user.webauthn_2fa = enabled
+    user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to update the security key second factor")
     if not ok:
         return _err
+    closed = sessions_closed_by(user)
 
     AuditService.log_action(
         action='mfa_webauthn_enable' if enabled else 'mfa_webauthn_disable',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Security key as second factor {"enabled" if enabled else "disabled"} for {user.username}',
+        details=(f'Security key as second factor {"enabled" if enabled else "disabled"} '
+                 f'for {user.username} ({closed_sessions_note(closed)})'),
         success=True
     )
-    return success_response(data={'webauthn_2fa': enabled})
+    return success_response(data={'webauthn_2fa': enabled}, meta={'other_sessions_closed': closed})
 
 
 @bp.route('/api/v2/account/2fa/recovery-codes', methods=['GET'])
@@ -326,12 +336,23 @@ def regenerate_recovery_codes():
     new_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
 
     user.backup_codes = backup_hash_codes(new_codes)
+    user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to regenerate backup codes")
     if not ok:
         return _err
+    closed = sessions_closed_by(user)
     _clear_code_checks(user.id)
 
+    AuditService.log_action(
+        action='mfa_recovery_regenerate',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'Recovery codes regenerated for user: {user.username} ({closed_sessions_note(closed)})',
+        success=True
+    )
     return success_response(
         data={'backup_codes': new_codes},
-        message='Recovery codes regenerated. Save them now!'
+        message='Recovery codes regenerated. Save them now!',
+        meta={'other_sessions_closed': closed},
     )

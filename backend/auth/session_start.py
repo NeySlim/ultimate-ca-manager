@@ -79,3 +79,33 @@ def _opened_after_creation(user) -> bool:
     created = to_naive_utc(user.created_at)
     # Every account created since the column exists has a time: NULL is never a recreated one
     return created is None or opened >= created
+
+
+def sessions_closed_by(user):
+    """After ``user.end_sessions()`` is committed: the caller's own session stays, and
+    the count of the account's other sessions that ended (None: store not listed)."""
+    keep_own_session(user)
+    replaced, _new = getattr(user, '_sessions_bump', (None, None))
+    if replaced is None:
+        return 0
+    from utils.session_census import count_sessions
+    return count_sessions(user.id, replaced)
+
+
+def closed_sessions_note(count):
+    """Audit wording of sessions_closed_by()."""
+    if count is None:
+        return 'other sessions closed'
+    return f"{count} other session{'' if count == 1 else 's'} closed"
+
+
+def end_sessions_now(user_id):
+    """For a change another service already committed: every session of the account
+    ends in a commit of its own, the caller's kept; returns sessions_closed_by()."""
+    from models import User, db
+    user = db.session.get(User, user_id)
+    if user is None:
+        return 0
+    user.end_sessions()
+    db.session.commit()
+    return sessions_closed_by(user)
