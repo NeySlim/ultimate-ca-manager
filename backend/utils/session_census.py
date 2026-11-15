@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 def count_sessions(user_id, version):
-    """Sessions of ``user_id`` (signed in or waiting on a second factor) still at ``version``."""
+    """Sessions of ``user_id`` (signed in or waiting on a second factor) still at ``version``,
+    and not already ended by the application's lifetime or inactivity limits."""
+    from auth.unified import AuthManager
+    from utils.datetime_utils import utc_now
     iface = current_app.session_interface
     serializer = getattr(iface, 'serializer', None)
     if serializer is None:
@@ -22,6 +25,7 @@ def count_sessions(user_id, version):
         if blobs is None:
             return None
         count = 0
+        now, limits = utc_now(), AuthManager.session_limits()
         for blob in blobs:
             try:
                 # The file store keeps the dict itself, the others its encoding
@@ -31,7 +35,8 @@ def count_sessions(user_id, version):
             if not isinstance(data, dict):
                 continue
             owner = data.get('user_id', data.get('pending_2fa_user_id'))
-            if owner == user_id and (data.get('session_version') or 0) == version:
+            if (owner == user_id and (data.get('session_version') or 0) == version
+                    and not AuthManager.session_ended(data, now, limits=limits, log=False)):
                 count += 1
         return count
     except Exception as exc:

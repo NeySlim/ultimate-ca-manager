@@ -197,43 +197,10 @@ class AuthManager:
             return None
 
         now = utc_now()
-        
-        # Check absolute session lifetime (default 24h)
-        login_time_str = session.get('login_time')
-        if login_time_str:
-            try:
-                login_time = datetime.fromisoformat(login_time_str)
-                max_lifetime = self._get_session_max_lifetime()
-                if (now - login_time).total_seconds() > max_lifetime:
-                    logger.info(
-                        f"Session expired (max lifetime): user={user.username}, "
-                        f"login_time={login_time_str}, max={max_lifetime}s"
-                    )
-                    session.clear()
-                    return None
-            except (ValueError, TypeError) as e:
-                logger.warning(
-                    f"Malformed session login_time={login_time_str!r} for user={user.username}: {e}"
-                )
-        
-        # Check inactivity timeout (default 8h)
-        last_activity_str = session.get('last_activity')
-        if last_activity_str:
-            try:
-                last_activity = datetime.fromisoformat(last_activity_str)
-                inactivity_timeout = self._get_session_timeout()
-                if (now - last_activity).total_seconds() > inactivity_timeout:
-                    logger.info(
-                        f"Session expired (inactivity): user={user.username}, "
-                        f"last_activity={last_activity_str}, timeout={inactivity_timeout}s"
-                    )
-                    session.clear()
-                    return None
-            except (ValueError, TypeError) as e:
-                logger.warning(
-                    f"Malformed session last_activity={last_activity_str!r} for user={user.username}: {e}"
-                )
-        
+        if self.session_ended(session, now, label=user.username):
+            session.clear()
+            return None
+
         # Update last activity timestamp
         session['last_activity'] = now.isoformat()
         
@@ -248,6 +215,31 @@ class AuthManager:
             'session_expires': session.get('expires_at')
         }
     
+    @classmethod
+    def session_ended(cls, data, now, label='', limits=None, log=True):
+        """Whether the session ``data`` is past its maximum lifetime or its inactivity
+        timeout at ``now``; ``limits`` = (max lifetime, inactivity timeout) in seconds."""
+        max_lifetime, inactivity_timeout = limits or cls.session_limits()
+        for key, limit, reason in (('login_time', max_lifetime, 'max lifetime'),
+                                   ('last_activity', inactivity_timeout, 'inactivity')):
+            value = data.get(key)
+            if not value:
+                continue
+            try:
+                if (now - datetime.fromisoformat(value)).total_seconds() > limit:
+                    if log:
+                        logger.info(f"Session expired ({reason}): user={label}, {key}={value}, "
+                                    f"max={limit}s")
+                    return True
+            except (ValueError, TypeError) as e:
+                if log:
+                    logger.warning(f"Malformed session {key}={value!r} for user={label}: {e}")
+        return False
+
+    @classmethod
+    def session_limits(cls):
+        return cls._get_session_max_lifetime(), cls._get_session_timeout()
+
     @staticmethod
     def _get_session_timeout():
         """Get inactivity timeout in seconds from DB config (default 8h = 28800s)"""

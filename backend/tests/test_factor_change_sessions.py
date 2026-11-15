@@ -402,3 +402,26 @@ def test_a_key_change_moves_the_key_and_the_session_version(app, auth_client, op
         assert new_keys != keys and new_version == version + 1
     finally:
         _cleanup(app, user)
+
+
+@pytest.mark.parametrize('expired', ['inactivity', 'max-lifetime'])
+def test_sessions_the_application_ended_are_not_counted(nodes, expired):
+    """A session past its inactivity timeout or its maximum lifetime is already over,
+    even while the store still keeps it: it is not one of the sessions closed."""
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now
+    first_node, second_node = nodes
+    user = _make_user(first_node, key=SoftKey())
+    try:
+        old = _open_session(second_node, user)
+        with old.session_transaction() as s:
+            key = 'last_activity' if expired == 'inactivity' else 'login_time'
+            s[key] = (utc_now() - timedelta(hours=9 if expired == 'inactivity' else 25)).isoformat()
+        live = _open_session(second_node, user)
+        this = _open_session(first_node, user)
+        r = _toggle_key(False)(first_node, this, user)
+        assert r.status_code == 200, r.data
+        assert r.get_json()['meta']['other_sessions_closed'] == 1
+        assert not _signed_in(live) and not _signed_in(old) and _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
