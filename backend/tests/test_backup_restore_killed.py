@@ -185,3 +185,33 @@ def test_a_restore_that_ends_leaves_no_publication_row(app, diverged):
         assert path.read_bytes() == archived_pem
         assert not SystemConfig.query.filter(SystemConfig.key.startswith(PUBLICATION_PREFIX)).all()
         assert not list(path.parent.glob('.ucm_restore_kept_*'))
+
+
+def test_a_commit_that_fails_puts_the_files_back(app, diverged, monkeypatch):
+    # The restore's own commit raises, its files already published: they come back
+    from models import SystemConfig, db
+    from services.backup.restore.files import PUBLICATION_PREFIX
+    from services.backup_service import BackupService
+    archive, refid, path, archived_pem = diverged
+    failed = []
+
+    def commit(self):
+        pending = self.query(SystemConfig).filter(
+            SystemConfig.key.startswith(PUBLICATION_PREFIX)).count()
+        if pending and not failed:
+            failed.append(path.read_bytes())
+            raise RuntimeError('the commit failed')
+        return real_commit(self)
+
+    with app.app_context():
+        before = _database_pem(refid)
+        session_class = type(db.session())
+        real_commit = session_class.commit
+        with monkeypatch.context() as patched:
+            patched.setattr(session_class, 'commit', commit)
+            with pytest.raises(RuntimeError, match='the commit failed'):
+                BackupService().restore_backup_from_path(archive, PASSWORD, mode='replace')
+        assert failed == [archived_pem], 'the files were published when the commit ran'
+        assert path.read_bytes() == before == _database_pem(refid)
+        assert not list(path.parent.glob('.ucm_restore_kept_*'))
+        assert not SystemConfig.query.filter(SystemConfig.key.startswith(PUBLICATION_PREFIX)).all()
