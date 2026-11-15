@@ -1241,3 +1241,21 @@ def test_a_name_with_a_tab_or_a_line_break_is_refused_before_anything_moves(tmp_
     assert 'Nothing was moved' in out.stdout and 'was not started' in out.stdout
     assert snapshot(box) == before
     assert not box.parent.exists() or not any(box.parent.iterdir())
+
+
+@pytest.mark.parametrize('beside', [True, False])
+def test_the_way_back_puts_back_only_the_local_archives_of_this_archiving(tmp_path, beside):
+    """An earlier archiving's local archive holds another installation: step 3 sends back
+    only the directories listed under "Kept beside where they were"."""
+    box = Box(tmp_path, python='stub')
+    earlier = box.data / '.ucm-archive-20250101T000000Z'
+    earlier.mkdir(mode=0o700)
+    (earlier / 'old.key').write_text('an earlier archive')
+    box.wrap(other_fs=(box.data,) if beside else ())
+    assert box.run().returncode == 0
+    readme = ' '.join((box.archive / 'README.txt').read_text().split())
+    assert 'by an earlier archiving' in readme
+    assert ('Kept beside where they were' in readme) == beside
+    step3 = readme.split(' 3. ', 1)[1].split(' 4. ', 1)[0]
+    assert 'each directory listed above' not in step3, step3
+    assert ('each directory listed under "Kept beside where they were"' in step3) == beside, step3

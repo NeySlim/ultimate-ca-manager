@@ -304,6 +304,11 @@ configuration (apt purge) leaves them where they are.
     else
         BESIDE=""
     fi
+    # Only this archiving's local archives go back: an earlier one holds another installation
+    LOCAL_RESTORE=""
+    [ "$LOCALS" = "$NL" ] || LOCAL_RESTORE=",
+     and the contents of each directory listed under \"Kept beside where they
+     were\" into the directory that holds it (then remove it, empty)"
     if [ -n "$EARLIER" ]; then
         BESIDE="$BESIDE
 Left where they were, by an earlier archiving (their own README.txt is in the archive
@@ -338,9 +343,7 @@ To put that installation back in service
      sudo dnf downgrade ./ucm-2.254-1.<dist>.noarch.rpm), then stop it again.
   3. Move aside what the new installation wrote in $DATA and $CONFIG (all but
      the directories named .ucm-archive-*), then put these back: the contents of data/
-     into $DATA, of config/ into $CONFIG$DB_RESTORE, and the
-     contents of each directory listed above into the directory that holds it (then
-     remove it, empty); then
+     into $DATA, of config/ into $CONFIG$DB_RESTORE$LOCAL_RESTORE; then
      sudo chown -R ucm:ucm $DATA $CONFIG
   4. Start it (sudo systemctl start ucm) and check that UCM 2.254 opens: this
      records the 2.254 migrations in the database.
