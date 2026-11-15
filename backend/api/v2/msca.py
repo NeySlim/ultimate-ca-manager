@@ -12,6 +12,8 @@ from utils.response import success_response, error_response, created_response, n
 from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
+from services.msca.requests import (MSCASignedElsewhere, SIGNED_MEANWHILE_MESSAGE, SUPERSEDED,
+                                    SUPERSEDED_MESSAGE, msca_may_write_clause, supersede)
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
@@ -663,11 +665,13 @@ def inventory_sync(msca_id):
     try:
         summary = MicrosoftCAService.inventory_sync(msca_id, username=_actor(), full=full)
         _audit('msca.inventory_sync', msca,
-               f"imported={summary['imported']} skipped={summary['skipped']} "
+               f"imported={summary['imported']} completed={summary['completed']} "
+               f"denied={summary['denied']} skipped={summary['skipped']} "
                f"failed={summary['failed']} full={full}")
         return success_response(
             data=summary,
-            message=f"Inventory sync complete: {summary['imported']} certificate(s) imported"
+            message=(f"Inventory sync complete: {summary['imported']} certificate(s) imported, "
+                    f"{summary['completed']} pending request(s) completed")
         )
     except MSCAAdminChannelError as e:
         _audit('msca.inventory_sync', msca, f"error={e}", success=False)
@@ -910,6 +914,14 @@ def sign_csr(msca_id, csr_id):
             # (don't pretend the whole call succeeded).
             try:
                 _import_signed_cert(csr, result.get('cert_pem'), msca, template, result['request_id'])
+            except MSCASignedElsewhere:
+                # Signed by a local CA or an import meanwhile: closed as complete_request does
+                db.session.rollback()
+                supersede([result['request_id']], states=('issued',))
+                _audit('msca.sign', msca,
+                       f"template={template} csr_id={csr_id} eobo={bool(enrollee_name or enrollee_upn)} "
+                       f"status=superseded", success=False)
+                return error_response(SIGNED_MEANWHILE_MESSAGE, 409)
             except Exception as imp_err:
                 logger.error(
                     f"MS CA issued cert but UCM import failed (msca={msca.name}, "
@@ -955,34 +967,19 @@ def sign_csr(msca_id, csr_id):
 
 
 @bp.route('/<int:msca_id>/requests/<int:request_id>', methods=['GET'])
-@require_auth(['read:certificates'])
+@require_auth(['write:certificates'])
 def check_request_status(msca_id, request_id):
-    """Check status of a pending signing request"""
+    """Check a pending signing request; an issued certificate is imported (as signing does)."""
+    from services.msca.requests import MSCAImportError
     try:
         result = MicrosoftCAService.check_request(msca_id, request_id)
-
-        # If just issued, import the cert
-        if result.get('status') == 'issued' and result.get('cert_pem'):
-            req = db.session.get(MSCARequest, request_id)
-            if req and req.csr_id and not req.cert_id:
-                from models import Certificate
-                csr = db.session.get(Certificate, req.csr_id)
-                msca = db.session.get(MicrosoftCA, msca_id)
-                if csr and msca:
-                    try:
-                        _import_signed_cert(csr, req.cert_pem, msca, req.template, request_id)
-                        result = req.to_dict()
-                    except Exception as imp_err:
-                        logger.error(
-                            f"MS CA request {request_id} issued but UCM import failed: {imp_err}",
-                            exc_info=True,
-                        )
-                        return error_response(
-                            "Certificate was issued by MS CA but failed to import into UCM.",
-                            500,
-                        )
-
+        if result.get('status') == SUPERSEDED:
+            return success_response(data=result, message=SUPERSEDED_MESSAGE)
         return success_response(data=result)
+    except MSCAImportError as e:
+        logger.error(f"MS CA request {request_id} issued but UCM import failed: {e}")
+        return error_response(
+            "Certificate was issued by MS CA but failed to import into UCM.", 500)
     except ValueError as e:
         logger.error(f"Request not found or invalid: {e}")
         return error_response("Request not found", 404)
@@ -1084,6 +1081,10 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id, announce
         # aki/ski come from the crt listener, in the form CA lookups match
         old_serial = stored_certificate_serial(csr) if csr is not None else None
         if csr is not None:
+            # Atomic with the write: a certificate another source stored on this row stays
+            if Certificate.query.filter(Certificate.id == csr.id, msca_may_write_clause()).update(
+                    {Certificate.crt: cert_pem_b64}, synchronize_session=False) != 1:
+                raise MSCASignedElsewhere(f"CSR id={csr.id} already holds a certificate from another source")
             csr.crt = cert_pem_b64
             csr.descr = csr.descr or f"MSCA: {cn} ({template})"
             csr.cert_type = csr.cert_type or 'server'
@@ -1154,6 +1155,8 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id, announce
             emit_cert_stored(cert.to_dict(), old_serial, cert_obj.serial_number,
                              ca_refid=cert.caref, actor=actor)
 
+    except MSCASignedElsewhere:
+        raise
     except Exception as e:
         logger.error(f"Failed to import MS CA signed certificate: {e}", exc_info=True)
         raise

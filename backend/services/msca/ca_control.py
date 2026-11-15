@@ -104,27 +104,47 @@ class MicrosoftCACAControlMixin:
     def _claim_own_request(msca, rid, pem):
         """Import the certificate of a request UCM submitted into that request's row,
         with its event. Returns (handled, cert_id): handled is False only for a request
-        UCM did not submit; a claim lost to a poll is handled, cert_id possibly None."""
-        from models import Certificate
+        UCM did not submit; a claim lost to a poll is handled, cert_id possibly None.
+        A row whose CSR was deleted is still UCM's: completing it avoids a second row."""
         from models.msca import MSCARequest
         req = (MSCARequest.query
-               .filter(MSCARequest.msca_id == msca.id, MSCARequest.request_id == rid,
-                       MSCARequest.csr_id.isnot(None))
+               .filter(MSCARequest.msca_id == msca.id, MSCARequest.request_id == rid)
                .order_by(MSCARequest.id.desc()).first())
         if req is None:
             return False, None
+        outcome, cert_id = MicrosoftCACAControlMixin.complete_request(msca, req, pem)
+        # A request closed as superseded no longer owns the certificate: import it as foreign
+        return outcome != 'superseded', cert_id
+
+    @staticmethod
+    def complete_request(msca, req, pem, username=None):
+        """Import the issued certificate into a request's row, claimed atomically so
+        concurrent callers import once. Returns (outcome, cert_id): 'imported' by this
+        call, 'lost' to another caller, or 'superseded' when the CSR was signed elsewhere
+        (closure audited under *username*, else the request's user)."""
+        from models import Certificate
+        from models.msca import MSCARequest
+        from .requests import MSCASignedElsewhere, SUPERSEDED, supersede
         claimed = (MSCARequest.query
                    .filter(MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
-                           MSCARequest.status != 'issued')
+                           MSCARequest.status.notin_(('issued', SUPERSEDED)))
                    .update({MSCARequest.status: 'issued', MSCARequest.cert_pem: pem},
                            synchronize_session=False))
         if claimed != 1:
             db.session.rollback()
-            return True, db.session.get(MSCARequest, req.id).cert_id
+            current = db.session.get(MSCARequest, req.id)
+            if current.status == SUPERSEDED:
+                return 'superseded', None
+            return 'lost', current.cert_id
         from api.v2.msca import _import_signed_cert
-        row = db.session.get(Certificate, req.csr_id)
-        _import_signed_cert(row, pem, msca, req.template, req.id)
-        return True, db.session.get(MSCARequest, req.id).cert_id
+        row = db.session.get(Certificate, req.csr_id) if req.csr_id else None
+        try:
+            _import_signed_cert(row, pem, msca, req.template, req.id)
+        except MSCASignedElsewhere:
+            db.session.rollback()
+            supersede([req.id], username=username)
+            return 'superseded', None
+        return 'imported', db.session.get(MSCARequest, req.id).cert_id
 
     @staticmethod
     def deny_request(msca_id, request_id):

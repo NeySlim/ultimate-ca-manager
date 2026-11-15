@@ -563,7 +563,7 @@ If Microsoft CA connections are configured, a **Microsoft CA** tab appears in th
 4. Select the **certificate template** (auto-loaded from the CA)
 5. Click **Sign**
 
-If the template requires manager approval, the request stays Pending in UCM and the interface offers no status check: approve it from the CA Control Panel of the connection, which imports the certificate.
+If the template requires manager approval, the request stays Pending in UCM. Open it in **Pending** and click **Check status** to fetch the certificate once the CA has issued it (also needs the permission to sign CSRs), or approve it from the CA Control Panel of the connection.
 
 ### Enroll on Behalf Of (EOBO)
 
@@ -3364,7 +3364,7 @@ UCM integrates with Microsoft Active Directory Certificate Services (AD CS) to s
 The certificate is returned immediately and imported into UCM.
 
 ### Manager Approval Templates
-UCM saves the request as **Pending** and tracks the MS CA request ID. The interface offers no status check for it: approve it from the **CA Control Panel**, which imports the certificate. **Inventory sync** does not complete a pending request, as it skips the request IDs UCM already tracks: for a request approved on the Windows CA console, call \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` (the request's id in UCM, listed by \`GET /api/v2/microsoft-cas/requests/pending\`), which fetches the certificate.
+UCM saves the request as **Pending** and tracks the MS CA request ID. Open the CSR in **CSRs → Pending** and click **Check status**: if the CA issued the certificate (approved on the Windows CA console, for instance), UCM imports it into the request; if the CA denied it, the request becomes Denied; otherwise it stays Pending. Approving from the **CA Control Panel** imports the certificate too. **Inventory sync** completes pending requests the same way, and reports them as completed, apart from the certificates it imports. A request whose CSR is signed elsewhere (a local CA, an import) is closed; if its details are still open, **Check status** shows *This CSR was signed elsewhere: its Microsoft CA request is closed*. A certificate the CA still issues for it enters as a separate certificate when the request is approved from the **CA Control Panel**, or through a full inventory sync (\`full: true\` on \`POST /api/v2/microsoft-cas/{id}/inventory-sync\`): **Import from CA now** and the scheduled sync are incremental and can miss it.
 
 ## Enroll on Behalf Of (EOBO)
 
@@ -3452,7 +3452,7 @@ The control panel (opened from the connection, requires the admin channel) manag
 | Connection test fails | Verify hostname, port 443, and that certsrv is accessible |
 | No templates found | Check that the UCM account has enrollment permissions on the CA |
 | EOBO denied | Verify enrollment agent certificate and template permissions |
-| Request stuck pending | Approve it from the CA Control Panel; if it was approved on the Windows CA console, fetch it with \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` |
+| Request stuck pending | Click Check status on the CSR, or run an Inventory sync; or approve it from the CA Control Panel |
 | Admin channel test fails | Verify WinRM is enabled on the CA, the port/transport, and that pywinrm is installed |
 | Revocation not on the CA | Enable the WinRM admin channel, without it, revocation is local to UCM |
 | Pending not detected (non-English CA) | Fixed in v2.192. UCM now recognizes localized AD CS pending pages |

@@ -58,6 +58,20 @@ from security.encryption import decrypt_private_key, encrypt_private_key
 from utils.key_codec import load_pem_bytes
 
 
+def _supersede_msca_requests(csr_id, username, commit):
+    """Close the Microsoft CA requests a certificate from another source made moot.
+    With ``commit`` the action is already stored: a failure is logged, never raised."""
+    from services.msca.requests import supersede_for_csr
+    if not commit:
+        return supersede_for_csr(csr_id, username=username, commit=False)
+    try:
+        return supersede_for_csr(csr_id, username=username, commit=True)
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to close the Microsoft CA requests of CSR %s", csr_id)
+        return 0
+
+
 class RelatedSignerError(ValueError):
     """The certificate A named by ``related_to`` cannot sign a relatedCertRequest."""
 
@@ -544,6 +558,7 @@ class CSRMixin:
         resolve_moot_requests('csr', 'csr_id', cert_id, outcome='approved', username=username,
                               certificate_id=None if new_ca else certificate.id,
                               reason='Signed directly')
+        _supersede_msca_requests(cert_id, username, commit=True)
         # Audit log with centralized service
         from services.audit_service import AuditService
         if new_ca:
@@ -685,6 +700,7 @@ class CSRMixin:
         from services.approval_gate import resolve_moot_requests
         resolve_moot_requests('csr', 'csr_id', certificate.id, outcome='approved', username=username,
                               certificate_id=certificate.id, reason='Certificate imported', commit=commit)
+        _supersede_msca_requests(certificate.id, username, commit=commit)
 
         with open(cert_cert_path(certificate), 'wb') as f:
             f.write(cert_pem)
