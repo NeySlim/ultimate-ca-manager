@@ -3,6 +3,7 @@ real on temporary packages, image filesystems and release directories."""
 import hashlib
 import json
 import shutil
+import subprocess
 
 import pytest
 
@@ -48,6 +49,31 @@ def test_the_frontend_record_names_what_the_bundle_holds(tmp_path):
     assert frag['unattributed_modules'] == ['vite/preload-helper.js']
     assert frag['first_party_modules'] == 1
     assert frag['dist']['assets/vendor.js'] == hashlib.sha256(b'/* react */').hexdigest()
+
+
+def test_the_bundle_record_written_by_the_build_keeps_a_nested_package_apart(tmp_path):
+    # Contract between frontend/scripts/bundle-modules.js and sbom.py: the nested copy is the shipped one
+    node = shutil.which('node')
+    if node is None:
+        pytest.skip('node is not installed')
+    js = s.ROOT / 'frontend' / 'scripts' / 'bundle-modules.js'
+    nested = '/elsewhere/shared/node_modules/mdast-util-find-and-replace/node_modules/escape-string-regexp/index.js'
+    bundle = {'a': {'type': 'chunk', 'fileName': 'assets/index.js', 'modules': {nested: {'renderedLength': 9}}}}
+    out = subprocess.run(
+        [node, '--input-type=module', '-e',
+         f'import {{ collectModules }} from {json.dumps("file://" + str(js))};'
+         f'console.log(JSON.stringify(collectModules({json.dumps(bundle)}, "/work/frontend")))'],
+        capture_output=True, text=True, timeout=60, check=True)
+    lock = {'name': 'ucm', 'lockfileVersion': 3, 'packages': {
+        'node_modules/escape-string-regexp': {'version': '4.0.0', 'license': 'MIT', 'dev': True},
+        'node_modules/mdast-util-find-and-replace': {'version': '3.0.2', 'license': 'MIT'},
+        'node_modules/mdast-util-find-and-replace/node_modules/escape-string-regexp': {
+            'version': '5.0.0', 'license': 'MIT'}}}
+    frag = _doc(s.frontend(tmp_path, modules=json.loads(out.stdout)['modules'], lock=lock))
+    by_key = {p['key']: p for p in frag['packages']}
+    shipped = by_key['node_modules/mdast-util-find-and-replace/node_modules/escape-string-regexp']
+    assert shipped['role'] == 'content' and shipped['version'] == '5.0.0'
+    assert 'node_modules/escape-string-regexp' not in by_key
 
 
 def test_a_bundled_module_outside_the_lock_is_refused(tmp_path):

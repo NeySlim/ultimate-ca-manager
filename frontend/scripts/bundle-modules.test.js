@@ -49,6 +49,12 @@ describe('bundle modules record', () => {
     expect(JSON.stringify(rec)).not.toContain('/work/')
   })
 
+  it('keeps the parent path of a nested package, shared checkout included', () => {
+    const nested = 'node_modules/mdast-util-find-and-replace/node_modules/escape-string-regexp/index.js'
+    expect(relativeId(`${ROOT}/${nested}`, ROOT)).toEqual({ id: nested, virtual: false })
+    expect(relativeId(`\0/elsewhere/shared/${nested}?commonjs-module`, ROOT)).toEqual({ id: nested, virtual: true })
+  })
+
   it('skips assets, which carry no modules', () => {
     const rec = collectModules({ f: { type: 'asset', fileName: 'fonts/Inter-Regular.woff2' } }, ROOT)
     expect(rec.modules).toEqual([])

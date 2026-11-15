@@ -10,7 +10,8 @@ export function relativeId(id, root) {
   let clean = String(id).split('?')[0]
   const virtual = clean.startsWith('\0')
   if (virtual) clean = clean.slice(1)
-  const nm = clean.lastIndexOf('/node_modules/')
+  // First node_modules segment: a nested package keeps its parent (node_modules/a/node_modules/b)
+  const nm = clean.indexOf('/node_modules/')
   if (nm >= 0) return { id: clean.slice(nm + 1), virtual }
   if (!path.isAbsolute(clean)) return { id: clean, virtual }
   const rel = path.relative(root, clean).split(path.sep).join('/')
