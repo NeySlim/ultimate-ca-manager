@@ -39,8 +39,11 @@ def msca_may_write_clause():
 
 
 def _named(req):
-    """The CA's RequestId, or UCM's own id for a direct issue the CA gave no RequestId to."""
-    return f"RequestId={req.request_id}" if req.request_id is not None else f"request={req.id} (direct issue)"
+    """The CA's RequestId, else UCM's own id, marked a direct issue only for an issued request
+    (a pending one may lack a RequestId too)."""
+    if req.request_id is not None:
+        return f"RequestId={req.request_id}"
+    return f"request={req.id} (direct issue)" if req.status == 'issued' else f"request={req.id}"
 
 
 def supersede(req_ids, *, username=None, commit=True, states=('submitted', 'pending')):
@@ -54,6 +57,7 @@ def supersede(req_ids, *, username=None, commit=True, states=('submitted', 'pend
     username = username or 'system'
     closed = 0
     for req in MSCARequest.query.filter(MSCARequest.id.in_(list(req_ids))).all():
+        name = _named(req)  # judged on the status before the closure
         changed = (MSCARequest.query
                    .filter(MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
                            MSCARequest.status.in_(states))
@@ -67,8 +71,8 @@ def supersede(req_ids, *, username=None, commit=True, states=('submitted', 'pend
         stage_audit_entry(action='msca.request_superseded', resource_type='microsoft_ca',
                           resource_id=str(req.msca_id), resource_name=msca.name if msca else None,
                           username=username,
-                          details=f"{_named(req)} csr_id={req.csr_id}: CSR signed elsewhere")
-        logger.info(f"MS CA request {_named(req)} closed: its CSR (id={req.csr_id}) "
+                          details=f"{name} csr_id={req.csr_id}: CSR signed elsewhere")
+        logger.info(f"MS CA request {name} closed: its CSR (id={req.csr_id}) "
                     f"was signed elsewhere")
     if commit:
         db.session.commit()
