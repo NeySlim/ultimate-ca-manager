@@ -7,25 +7,13 @@ existing CA and has no dedicated signer gets the key written ``false``; nothing 
 import logging
 import sqlite3
 
+from services.tsa_upgrade import KEY, READ, ca_signer_refid_kept
+
 logger = logging.getLogger(__name__)
 pg_compatible = True
 
 SETTINGS = 'system_config'
 CAS = 'certificate_authorities'
-KEY = 'tsa_require_dedicated_cert'
-READ = ('tsa_enabled', 'tsa_ca_refid', 'tsa_signer_cert_refid', KEY)
-
-
-def _ca_refid_kept(settings):
-    """The CA refid whose certificate signs the 2.x tokens, or None when the rule does not apply."""
-    if KEY in settings:
-        return None
-    enabled = settings.get('tsa_enabled')
-    if enabled is not None and str(enabled).strip().lower() != 'true':
-        return None
-    if (settings.get('tsa_signer_cert_refid') or '').strip():
-        return None
-    return (settings.get('tsa_ca_refid') or '').strip() or None
 
 
 def upgrade(conn):
@@ -35,7 +23,7 @@ def upgrade(conn):
             return
         settings = dict(conn.execute(
             f"SELECT key, value FROM {SETTINGS} WHERE key IN ({','.join('?' * len(READ))})", READ))
-        refid = _ca_refid_kept(settings)
+        refid = ca_signer_refid_kept(settings)
         if refid and conn.execute(f"SELECT 1 FROM {CAS} WHERE refid = ?", (refid,)).fetchone():
             conn.execute(f"INSERT INTO {SETTINGS} (key, value) VALUES (?, 'false')", (KEY,))
             logger.info("[162] the TSA keeps signing with its CA certificate (SQLite)")
@@ -47,7 +35,7 @@ def upgrade(conn):
     settings = dict(conn.execute(
         text(f"SELECT key, value FROM {SETTINGS} WHERE key IN :keys").bindparams(
             bindparam('keys', expanding=True)), {'keys': list(READ)}).fetchall())
-    refid = _ca_refid_kept(settings)
+    refid = ca_signer_refid_kept(settings)
     if refid and conn.execute(text(f"SELECT 1 FROM {CAS} WHERE refid = :r"), {'r': refid}).first():
         conn.execute(text(f"INSERT INTO {SETTINGS} (key, value) VALUES (:k, 'false')"), {'k': KEY})
         logger.info("[162] the TSA keeps signing with its CA certificate (PostgreSQL)")

@@ -55,6 +55,7 @@ tests/test_migration_157*.py
 tests/test_migration_158*.py
 tests/test_migration_159*.py
 tests/test_migration_162*.py
+tests/test_restore_tsa_ca_signer.py
 tests/test_upgrade_from_2_254.py
 tests/test_fresh_install_interrupted.py
 tests/test_schema_rules_kept_from_2x.py
