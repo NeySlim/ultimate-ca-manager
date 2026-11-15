@@ -1274,6 +1274,10 @@ def init_database(app):
             'groups': [
                 ('description', 'TEXT', None),
             ],
+            'ssh_cas': [
+                ('key_source', "VARCHAR(20)", "'software'"),
+                ('hsm_key_id', 'INTEGER', None),
+            ],
             'audit_logs': [
                 ('resource_name', 'VARCHAR(255)', None),
                 ('entry_hash', 'VARCHAR(64)', None),

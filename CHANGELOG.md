@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- SSH CA on a hardware token: an SSH certificate authority can now be backed by a key that stays on an HSM/PKCS#11 token. `POST /api/v2/ssh/cas` takes an optional `hsm_key_id` (an HSM key as the HSM page lists it) instead of `key_type`: the server reads the SSH key type off the token (RSA, ECDSA P-256/P-384/P-521; anything else, Ed25519 included, is refused), stores only the public half, and signs every certificate through the token, the same path the X.509 HSM CAs use. An SSH CA reports `key_source` (`software` | `hsm`) and `hsm_key_label`; the SSH CA list, its details and the create/edit modal show the key and keep both unchangeable after creation. One token key may back one user CA and one host CA — OpenSSH keeps the roles apart — and a second CA of the same role on the same key is refused. Deleting such an HSM key is refused (409) while an SSH CA uses it, and a backup carries that link. The Docker image now ships `opensc` and `libpcsclite1`, so a USB PIV card signed through `pcscd` can be the signing key.
+
 ### Changed
 
 - Updates: the update check, the update notification and the unattended install now stay within the installed major version, so a later major version is never installed automatically and this line's maintenance releases stay visible (releases are now read 100 per page).

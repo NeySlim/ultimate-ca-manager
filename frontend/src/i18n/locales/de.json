@@ -5587,7 +5587,13 @@
       "allowAnyPrincipal": "Beliebigen Principal erlauben",
       "allowAnyPrincipalHelp": "Wenn kein Principal aufgeführt ist, für jeden Namen signieren, einschließlich root. Ohne diese Option signiert eine CA mit leerer Liste nichts.",
       "allowCustomKeyId": "Anfragenden die Wahl der Schlüssel-ID erlauben",
-      "allowCustomKeyIdHelp": "sshd protokolliert die Schlüssel-ID als Identität des Inhabers. Ohne diese Option benennt die CA jedes Zertifikat principals@CA-Name."
+      "allowCustomKeyIdHelp": "sshd protokolliert die Schlüssel-ID als Identität des Inhabers. Ohne diese Option benennt die CA jedes Zertifikat principals@CA-Name.",
+      "keyStorageLockedHelp": "Der CA-Schlüssel und der CA-Typ können nach der Erstellung der CA nicht geändert werden.",
+      "hsmKeyHelper": "Nur ein RSA- oder ECDSA-P-256/P-384/P-521-Signaturschlüssel im HSM kann SSH-Zertifikate signieren. Schlüssel in der HSM-Verwaltung hinzufügen oder synchronisieren.",
+      "hsmNoUsableKeys": "Dieser Anbieter hat keinen RSA- oder ECDSA-Signaturschlüssel, den eine SSH-CA nutzen könnte.",
+      "hsmKeyUsedBy": "bereits von der {{caType}}-CA verwendet",
+      "hsmKeyInUse": "Eine SSH-{{caType}}-CA verwendet diesen Schlüssel bereits: {{name}}",
+      "hsmDerivedKey": "Schlüsseltyp vom HSM: {{keyType}}"
     },
     "searchPlaceholder": "SSH-CAs durchsuchen...",
     "downloadSetupScript": "Einrichtungsskript herunterladen",

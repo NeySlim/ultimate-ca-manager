@@ -597,6 +597,11 @@ def _seed_source():
             key_type='ed25519', fingerprint=f'SHA256:xinst{suffix}')
         for suffix in 'ab']
     ssh_authorities[1].owner_group_id = groups[1].id
+    # An authority whose private key never left the token: only its hsm_keys
+    # link travels, and the restore must point it at the row of the new install
+    ssh_authorities[0].key_source = 'hsm'
+    ssh_authorities[0].private_key = ''
+    ssh_authorities[0].hsm_key_id = hsm_keys[0].id
     db.session.flush()
 
     add('ssh_certificates', refid='xinst-sshcert', ssh_ca_id=ssh_authorities[1].id,

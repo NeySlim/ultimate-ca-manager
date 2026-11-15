@@ -5590,7 +5590,13 @@
       "allowAnyPrincipal": "任意のプリンシパルを許可",
       "allowAnyPrincipalHelp": "プリンシパルが一つも指定されていない場合、root を含む任意の名前に署名します。このオプションがなければ、リストが空の CA は何も署名しません。",
       "allowCustomKeyId": "リクエスタによる鍵IDの指定を許可",
-      "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。"
+      "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。",
+      "keyStorageLockedHelp": "CAキーとCAタイプはCA作成後に変更できません。",
+      "hsmKeyHelper": "SSH証明書に使用できるのは、HSM内のRSAまたはECDSA P-256/P-384/P-521署名キーだけです。HSM管理でキーを追加または同期してください。",
+      "hsmNoUsableKeys": "このプロバイダーにはSSH CAが使用できるRSAまたはECDSA署名キーがありません。",
+      "hsmKeyUsedBy": "{{caType}} CAですでに使用済み",
+      "hsmKeyInUse": "SSH {{caType}} CAがこのキーをすでに使用しています: {{name}}",
+      "hsmDerivedKey": "HSMからのキータイプ: {{keyType}}"
     },
     "searchPlaceholder": "SSH CAを検索...",
     "downloadSetupScript": "セットアップスクリプトをダウンロード",

@@ -35,7 +35,12 @@ class SSHCertificateAuthority(db.Model if db else object):
 
     # Key material — public key in OpenSSH format, private key base64-encoded (optionally encrypted)
     public_key = db.Column(db.Text, nullable=False)
+    # An HSM-backed CA stores no private key: the column stays an empty string
     private_key = db.Column(db.Text, nullable=False)
+    # 'software' (private_key above) or 'hsm' (the key lives on the token; hsm_key_id points at it)
+    key_source = db.Column(db.String(20), nullable=False, default='software', server_default='software')
+    hsm_key_id = db.Column(db.Integer, db.ForeignKey('hsm_keys.id'), nullable=True)
+    hsm_key = db.relationship('HsmKey', backref='ssh_certificate_authorities')
 
     # Key metadata
     key_type = db.Column(db.String(20), nullable=False)  # ed25519, rsa, ecdsa-p256, ecdsa-p384, ecdsa-p521
@@ -146,6 +151,9 @@ class SSHCertificateAuthority(db.Model if db else object):
             'ca_type': self.ca_type,
             'public_key': self.public_key,
             'key_type': self.key_type,
+            'key_source': self.key_source or 'software',
+            'hsm_key_id': self.hsm_key_id,
+            'hsm_key_label': self.hsm_key.label if self.hsm_key else None,
             'fingerprint': self.fingerprint,
             'serial_counter': self.serial_counter,
             'default_ttl': self.default_ttl,

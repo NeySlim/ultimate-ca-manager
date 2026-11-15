@@ -309,6 +309,112 @@ class SSHCAService:
         return ca
 
     @staticmethod
+    def import_hsm_ca(descr, ca_type, hsm_key_id, username=None,
+                      default_ttl=None, max_ttl=0, default_extensions=None,
+                      allowed_principals=None, comment=None, owner_group_id=None,
+                      allow_any_principal=False, allow_custom_key_id=False):
+        """Create an SSH CA whose private key stays on the HSM/PKCS#11 token.
+
+        The CA record stores only the public half; signing is delegated to the
+        token through the HSM wrappers (services/hsm/hsm_private_key.py).
+
+        Args:
+            hsm_key_id: the HsmKey row naming the token key — an existing synced
+                or registered key, RSA or NIST-EC (OpenSSH format has no Ed25519
+                or Brainpool CA keys)
+            the other arguments: as in import_ca()
+
+        Returns:
+            SSHCertificateAuthority instance
+        """
+        if ca_type not in SSHCertificateAuthority.VALID_CA_TYPES:
+            raise ValueError(f"Invalid CA type: {ca_type}. Must be 'user' or 'host'.")
+
+        from models.hsm import HsmKey
+        from services.hsm.hsm_private_key import load_hsm_private_key
+
+        key_row = db.session.get(HsmKey, hsm_key_id)
+        if not key_row:
+            raise ValueError(f"HSM key {hsm_key_id} not found")
+
+        # Raises when the key is not a signing key or its type is unsupported.
+        wrapper = load_hsm_private_key(hsm_key_id)
+        public_key = wrapper.public_key()
+
+        if isinstance(public_key, rsa.RSAPublicKey):
+            key_type = 'rsa'
+        elif isinstance(public_key, ec.EllipticCurvePublicKey):
+            curve = public_key.curve
+            if isinstance(curve, ec.SECP256R1):
+                key_type = 'ecdsa-p256'
+            elif isinstance(curve, ec.SECP384R1):
+                key_type = 'ecdsa-p384'
+            elif isinstance(curve, ec.SECP521R1):
+                key_type = 'ecdsa-p521'
+            else:
+                raise ValueError(
+                    f"OpenSSH certificates support only the NIST curves P-256/P-384/P-521, "
+                    f"not {getattr(curve, 'name', curve)}")
+        else:
+            raise ValueError(
+                f"HSM key '{key_row.label}' is neither RSA nor NIST-EC: "
+                f"an SSH CA key must be one of them")
+
+        fingerprint = SSHCAService._compute_fingerprint(public_key)
+        # The same token key may back one user CA and one host CA (OpenSSH keeps
+        # the roles separate); a second CA of the same role would be a duplicate.
+        existing = SSHCertificateAuthority.query.filter_by(
+            fingerprint=fingerprint, ca_type=ca_type).first()
+        if existing:
+            raise ValueError(
+                f"An SSH {ca_type} CA with this HSM key already exists: {existing.descr}")
+
+        if default_ttl is None:
+            default_ttl = DEFAULT_USER_TTL if ca_type == 'user' else DEFAULT_HOST_TTL
+        else:
+            default_ttl = parse_duration_seconds(default_ttl, field='default_ttl')
+        if max_ttl is not None:
+            max_ttl = parse_duration_seconds(max_ttl, field='max_ttl')
+
+        pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')
+
+        if default_extensions is None and ca_type == 'user':
+            default_extensions = list(SSHCertificateAuthority.STANDARD_EXTENSIONS)
+
+        ca = SSHCertificateAuthority(
+            refid=str(uuid.uuid4()),
+            descr=descr,
+            ca_type=ca_type,
+            public_key=pub_openssh,
+            private_key='',
+            key_source='hsm',
+            hsm_key_id=hsm_key_id,
+            key_type=key_type,
+            fingerprint=fingerprint,
+            serial_counter=0,
+            default_ttl=default_ttl,
+            max_ttl=max_ttl,
+            comment=comment,
+            created_by=username,
+            owner_group_id=owner_group_id,
+        )
+        ca.set_default_extensions(default_extensions)
+        ca.set_allowed_principals(allowed_principals)
+        ca.allow_any_principal = bool(allow_any_principal)
+        ca.allow_custom_key_id = bool(allow_custom_key_id)
+
+        try:
+            db.session.add(ca)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to create HSM-backed SSH CA: {e}")
+            raise
+
+        logger.info(f"Created SSH CA '{descr}' ({ca_type}, {key_type}, hsm key {key_row.label}, {fingerprint})")
+        return ca
+
+    @staticmethod
     def update_ca(ca_id, **kwargs):
         """Update SSH CA metadata (description, TTL, extensions, etc.).
 
@@ -411,10 +517,18 @@ class SSHCAService:
         """Load and return the CA's private key object for signing.
 
         Internal use only — never expose the private key to API consumers.
+        An HSM-backed CA yields a wrapper that delegates signing to the token:
+        the private key never exists in UCM.
         """
         ca = db.session.get(SSHCertificateAuthority, ca_id)
         if not ca:
             raise ValueError(f"SSH CA not found: {ca_id}")
+
+        if ca.key_source == 'hsm':
+            from services.hsm.hsm_private_key import load_hsm_private_key
+            if not ca.hsm_key_id:
+                raise ValueError(f"SSH CA '{ca.descr}' is flagged HSM but names no HSM key")
+            return load_hsm_private_key(ca.hsm_key_id)
 
         SSHCAService.refuse_unusable_ca(ca)
         return SSHCAService._load_private_key(ca.private_key, f"SSH CA '{ca.descr}'")
