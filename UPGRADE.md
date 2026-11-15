@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### `-fips` Docker image: the FIPS module is checked against the build
+
+With `UCM_FIPS=1`, the `-fips` image now refuses to start when its `fips.so` differs from the one installed when the image was built, or when the record of that build (`/usr/share/ucm/fips-module.mac`) is missing or malformed. An image derived from the `-fips` image that replaces or modifies `fips.so` no longer starts in FIPS mode: build it from the UCM sources instead, or use the published `-fips` image unchanged. The standard image is not affected.
+
 ### Upgrading to v2.243
 
 Several fixes change what an existing installation does once upgraded. The CHANGELOG lists them under **Upgrade notes**; before upgrading:
