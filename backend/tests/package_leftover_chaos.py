@@ -292,14 +292,15 @@ class ChaosSuite:
     def test_a_retry_converges_after_any_fault_once_an_archived_item_was_removed(self, lab):
         """Killed right after data/https_key.pem was renamed, then the archived one removed by
         hand: each call of the next attempt fails, or kills it, in turn; then a run without fault."""
-        kill = next(n for n, name, args in lab.first_run().calls
-                    if step(name, args) == 'rename' and args[3].endswith('/data/https_key.pem'))
+        # The last rename of it is the one that moved it: the one before, if any, was refused
+        kill = [n for n, name, args in lab.first_run().calls
+                if step(name, args) == 'rename' and args[3].endswith('/data/https_key.pem')][-1]
 
         def start():
             box, data, config, before, _run = lab._first([(kill, 'done')])
             src = f'{box.data}/https_key.pem'
-            line = next(l for l in (box.archive / '.journal').read_text().splitlines()
-                        if l.startswith(f'rename\t{src}\t'))
+            line = [l for l in (box.archive / '.journal').read_text().splitlines()
+                    if l.startswith(f'rename\t{src}\t')][-1]
             os.unlink(line.split('\t')[2])
             data = {k: v for k, v in data.items() if k != 'https_key.pem'}
             before = {p: dict(t) for p, t in before.items()}
