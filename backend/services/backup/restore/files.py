@@ -13,6 +13,7 @@ the last one is published: a failure halfway through puts back what the
 earlier replaces overwrote, rather than leaving the instance with half of a
 restore's files.
 """
+import errno
 import logging
 import os
 import shutil
@@ -60,13 +61,14 @@ def _atomic_replace(destination: Path, data: bytes, mode: int) -> None:
 class _Staged:
     """One destination, its staged content, and what it held before.
 
-    The previous content is read at publication time rather than at staging
+    The previous content is kept at publication time rather than at staging
     time: between the two, the transaction has run, and only what is on disk
-    when the replace happens is what a compensation has to put back.
+    when the replace happens is what a compensation has to put back. It is
+    kept as a file of the staging directory, never in memory.
     """
 
     __slots__ = ('destination', 'staged_path', 'mode', 'remove',
-                 'existed', 'previous_data', 'previous_mode', 'published')
+                 'existed', 'previous_path', 'previous_mode', 'published')
 
     def __init__(self, destination: Path, staged_path: Optional[Path], mode: int,
                  remove: bool = False):
@@ -76,7 +78,7 @@ class _Staged:
         # Published as a removal: the destination goes, and comes back on compensation
         self.remove = remove
         self.existed = False
-        self.previous_data = b''
+        self.previous_path: Optional[Path] = None
         self.previous_mode = mode
         self.published = False
 
@@ -176,17 +178,22 @@ class StagedFiles:
         """Publish every staged file, or leave the destinations as they were.
 
         Called with the database work done but not yet committed: each
-        destination is read before it is replaced, so a failure on any file
+        destination is kept before it is replaced, so a failure on any file
         undoes the replaces that already happened, and the caller rolls the
         database back. What the staging holds is kept until `discard()`, so a
         commit that fails afterwards can still call `unpublish()`.
         """
         published: List[Path] = []
+        directories: Dict[Path, None] = {}
         try:
-            for entry in self._entries:
-                self._capture_previous(entry)
-                self._publish(entry)
+            for position, entry in enumerate(self._entries):
+                self._capture_previous(entry, position)
+                if self._publish(entry):
+                    directories[entry.destination.parent] = None
                 published.append(entry.destination)
+            # Each directory once, after its renames: none is durable before this returns
+            for directory in directories:
+                _fsync_directory(directory)
         except Exception:
             failed = (self._entries[len(published)].destination
                       if len(published) < len(self._entries) else None)
@@ -198,39 +205,46 @@ class StagedFiles:
 
         return published
 
-    def _capture_previous(self, entry: _Staged) -> None:
-        """Read what the destination holds, before anything overwrites it.
+    def _capture_previous(self, entry: _Staged, position: int) -> None:
+        """Keep what the destination holds, before anything overwrites it.
 
-        A destination that cannot be read is a destination that could not be
-        put back, so the read failure stops the publication here instead of
-        producing a file nothing can undo.
+        A hard link when the staging shares the destination's filesystem, a
+        copy otherwise. A destination that cannot be kept is a destination
+        that could not be put back, so the failure stops the publication here
+        instead of producing a file nothing can undo.
         """
         try:
-            entry.previous_data = entry.destination.read_bytes()
+            info = os.stat(entry.destination)
         except FileNotFoundError:
             entry.existed = False
-            entry.previous_data = b''
+            entry.previous_path = None
             entry.previous_mode = entry.mode
             return
+        kept = self._staging() / f"previous_{position:06d}"
+        try:
+            os.link(entry.destination, kept)
+        except OSError:
+            _copy_private(entry.destination, kept)
         entry.existed = True
-        entry.previous_mode = os.stat(entry.destination).st_mode & 0o777
+        entry.previous_path = kept
+        entry.previous_mode = info.st_mode & 0o777
 
-    def _publish(self, entry: _Staged) -> None:
-        directory = entry.destination.parent
+    def _publish(self, entry: _Staged) -> bool:
+        """Replace or remove one destination; whether its directory changed."""
         if entry.remove:
             if entry.existed:
                 entry.destination.unlink()
                 entry.published = True
-                _fsync_directory(directory)
-            return
-        directory.mkdir(parents=True, exist_ok=True)
+                return True
+            return False
+        entry.destination.parent.mkdir(parents=True, exist_ok=True)
         data = entry.staged_path.read_bytes()
 
         _atomic_replace(entry.destination, data, entry.mode)
         # Recorded before the directory fsync: the rename has already taken
         # effect, so a failing fsync must still compensate this file.
         entry.published = True
-        _fsync_directory(directory)
+        return True
 
     def unpublish(self) -> None:
         """Undo a successful publication.
@@ -253,9 +267,7 @@ class StagedFiles:
                 continue
             try:
                 if entry.existed:
-                    _atomic_replace(
-                        entry.destination, entry.previous_data,
-                        entry.previous_mode)
+                    _put_back(entry.previous_path, entry.destination, entry.previous_mode)
                 else:
                     entry.destination.unlink(missing_ok=True)
                 _fsync_directory(entry.destination.parent)
@@ -299,7 +311,8 @@ def _write_private(path: Path, data: bytes, mode: int) -> None:
     """Write staged content at the mode its destination will carry.
 
     Staged key material must never be readable more widely than the file it
-    will become, not even for the life of a restore.
+    will become, not even for the life of a restore. Not synced: the
+    publication copies it and syncs the copy, the staging never outlives the process.
     """
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
     try:
@@ -307,8 +320,25 @@ def _write_private(path: Path, data: bytes, mode: int) -> None:
         with os.fdopen(fd, 'wb') as handle:
             fd = -1
             handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
     finally:
         if fd >= 0:
             os.close(fd)
+
+
+def _copy_private(source: Path, kept: Path) -> None:
+    """A private copy of `source`, streamed: the previous content of a destination."""
+    fd = os.open(kept, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, 'wb') as out, open(source, 'rb') as handle:
+        shutil.copyfileobj(handle, out)
+
+
+def _put_back(kept: Path, destination: Path, mode: int) -> None:
+    """Return the kept previous content to `destination`, atomically."""
+    try:
+        os.replace(kept, destination)    # the kept link, on the destination's filesystem
+        os.chmod(destination, mode)
+        return
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            raise
+    _atomic_replace(destination, kept.read_bytes(), mode)

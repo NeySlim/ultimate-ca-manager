@@ -294,3 +294,66 @@ class TestStagingCostIsLinear:
         staged.publish()
         staged.discard()
         assert destination.read_bytes() == b'second'
+
+
+class TestPublicationCost:
+    """A restore publishes one file per certificate, key and request: what a
+    publication costs per file bounds the restore of a large installation."""
+
+    @staticmethod
+    def _fsyncs(monkeypatch, tmp_path, count):
+        calls = []
+        real = os.fsync
+        monkeypatch.setattr(os, 'fsync', lambda fd: calls.append(fd) or real(fd))
+        staged = StagedFiles(base_dir=tmp_path / f'staging{count}')
+        try:
+            for index in range(count):
+                directory = tmp_path / f'out{count}' / ('certs' if index % 2 else 'private')
+                staged.stage(directory / f'f{index}.pem', b'x')
+            staged.publish()
+            return len(calls)
+        finally:
+            staged.discard()
+
+    def test_one_fsync_per_file_and_one_per_directory(self, monkeypatch, tmp_path):
+        # The content is synced once, where it is published; each directory once, at the end
+        assert self._fsyncs(monkeypatch, tmp_path, 40) <= 40 + 2
+        assert self._fsyncs(monkeypatch, tmp_path, 160) <= 160 + 2
+
+    def test_previous_contents_are_kept_on_disk_not_in_memory(self, tmp_path):
+        import tracemalloc
+        size, count = 256 * 1024, 16
+        destinations = []
+        for index in range(count):
+            path = tmp_path / 'certs' / f'c{index}.pem'
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(bytes([index]) * size)
+            destinations.append(path)
+        staged = StagedFiles(base_dir=tmp_path / 'staging')
+        for path in destinations:
+            staged.stage(path, b'restored')
+        tracemalloc.start()
+        try:
+            staged.publish()
+            held = tracemalloc.get_traced_memory()[0]
+        finally:
+            tracemalloc.stop()
+        assert held < size * count / 8, f"{held} bytes held after publishing"
+
+        staged.unpublish()
+        for index, path in enumerate(destinations):
+            assert path.read_bytes() == bytes([index]) * size
+        staged.discard()
+
+    def test_a_removed_file_comes_back_whole(self, tmp_path):
+        gone = tmp_path / 'private' / 'k.key'
+        gone.parent.mkdir()
+        gone.write_bytes(b'the key in use')
+        os.chmod(gone, 0o600)
+        staged = StagedFiles(base_dir=tmp_path / 'staging')
+        staged.stage_removal(gone)
+        staged.publish()
+        assert not gone.exists()
+        staged.unpublish()
+        assert gone.read_bytes() == b'the key in use' and _mode(gone) == 0o600
+        staged.discard()
