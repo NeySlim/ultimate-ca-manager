@@ -23,11 +23,18 @@ def holds_current_epoch(data) -> bool:
 def advance_epoch() -> int:
     """Commits the next epoch and returns it; raises when it could not be stored."""
     try:
-        row = SystemConfig.query.filter_by(key=EPOCH_KEY).with_for_update().first()
-        if row is None:
-            row = SystemConfig(key=EPOCH_KEY, value='0',
-                               description='Sessions begun before the last restore are refused')
-            db.session.add(row)
+        # Nodes creating the row together: one INSERT lands, the others do nothing,
+        # and the row lock then orders every increment
+        if db.session.connection().dialect.name == 'postgresql':
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            from sqlalchemy.dialects.sqlite import insert
+        db.session.execute(insert(SystemConfig.__table__).values(
+            key=EPOCH_KEY, value='0', encrypted=False,
+            description='Sessions begun before the last restore are refused',
+        ).on_conflict_do_nothing(index_elements=['key']))
+        row = (SystemConfig.query.filter_by(key=EPOCH_KEY)
+               .with_for_update().populate_existing().one())
         row.value = str(int(row.value or 0) + 1)
         db.session.commit()
         return int(row.value)
