@@ -16,3 +16,9 @@ def test_protocol_routes_are_registered_and_the_doc_says_so(app):
     assert '/tsa' in rules
     assert any(r.startswith('/.well-known/est') for r in rules)
     assert 'is not registered' not in _doc()
+
+
+def test_rate_limit_switch_turns_off_both_limiters_in_the_doc():
+    doc = _doc()
+    assert 'Fixed in code' not in doc
+    assert 'turns off both limiters' in doc
