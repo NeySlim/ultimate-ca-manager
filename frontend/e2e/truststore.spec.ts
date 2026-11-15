@@ -1,43 +1,27 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, createCA, issueCert } from './support/fixtures'
 
-test.describe('Truststore', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/truststore')
-    await page.waitForLoadState('networkidle')
-  })
+test('a managed CA added on screen enters the trust store', async ({ page, api }) => {
+  const ca = await createCA(api)
+  await page.goto('/truststore')
+  await page.getByRole('main').getByRole('button', { name: 'Add', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add from Managed CAs' })
+  await dialog.getByRole('checkbox', { name: new RegExp(ca.common_name) }).check()
+  await dialog.getByRole('button', { name: 'Add 1 selected' }).click()
+  await expect(dialog).toBeHidden()
 
-  test('page loads with heading', async ({ page }) => {
-    await expect(page.locator('h1')).toBeVisible()
-  })
+  await expect(page.getByRole('main').getByText(ca.common_name).first()).toBeVisible()
+  const data = await api.get('/truststore?per_page=500')
+  const list = (Array.isArray(data) ? data : data.items || data.certificates) as any[]
+  expect(JSON.stringify(list)).toContain(ca.common_name)
+})
 
-  test('has table', async ({ page }) => {
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
-  })
-
-  test('has help button', async ({ page }) => {
-    await expect(page.locator('button').filter({ hasText: /help/i })).toBeVisible()
-  })
-
-  test('has action buttons', async ({ page }) => {
-    // Truststore has: Help, purpose filter, Sync, Import, Add
-    const buttons = page.locator('button')
-    expect(await buttons.count()).toBeGreaterThanOrEqual(3)
-  })
-
-  test('action button opens dialog', async ({ page }) => {
-    const buttons = page.locator('button')
-    const count = await buttons.count()
-    for (let i = count - 1; i >= Math.max(0, count - 4); i--) {
-      await buttons.nth(i).click()
-      const dialog = page.locator('[role="dialog"]').first()
-      try {
-        await dialog.waitFor({ state: 'visible', timeout: 2000 })
-        await expect(dialog).toBeVisible()
-        return
-      } catch {
-        await page.keyboard.press('Escape')
-        await page.waitForTimeout(300)
-      }
-    }
-  })
+test('the certificate decoder reads a pasted certificate', async ({ page, api }) => {
+  const cert = await issueCert(api, (await createCA(api)).id)
+  await page.goto('/tools')
+  await page.getByRole('button', { name: 'Certificate Decoder' }).click()
+  await page.getByLabel('Certificate (PEM or DER)').fill(cert.pem)
+  await page.getByRole('button', { name: 'Decode Certificate' }).click()
+  const main = page.getByRole('main')
+  await expect(main.getByText(cert.common_name).first()).toBeVisible()
+  await expect(main.getByText(cert.issuer_name).first()).toBeVisible()
 })

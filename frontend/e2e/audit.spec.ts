@@ -1,41 +1,14 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, createCA } from './support/fixtures'
 
-test.describe('Audit Logs', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/audit')
-    await page.waitForLoadState('networkidle')
-  })
+test('an action of the test appears in the audit log', async ({ page, api }) => {
+  const ca = await createCA(api)
+  await page.goto('/audit')
+  await page.getByRole('main').getByRole('textbox').first().fill(ca.common_name)
+  const row = page.getByRole('main').getByRole('row', { name: new RegExp(ca.common_name) }).first()
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('admin')
 
-  test('page loads with heading', async ({ page }) => {
-    await expect(page.locator('h1')).toBeVisible()
-  })
-
-  test('has table', async ({ page }) => {
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
-  })
-
-  test('has filter buttons', async ({ page }) => {
-    // Audit has filters: action, status, user, date
-    const buttons = page.locator('button')
-    expect(await buttons.count()).toBeGreaterThanOrEqual(4)
-  })
-
-  test('has pagination', async ({ page }) => {
-    const pagination = page.locator('[class*="pagination"], nav[aria-label], button:has-text("/page")')
-    if (await pagination.count() > 0) {
-      await expect(pagination.first()).toBeVisible()
-    }
-  })
-
-  test('table has rows', async ({ page }) => {
-    const rows = page.locator('table tbody tr')
-    await rows.first().waitFor({ state: 'visible', timeout: 10000 })
-    expect(await rows.count()).toBeGreaterThan(0)
-  })
-
-  test('has action buttons', async ({ page }) => {
-    // Clean logs, Verify integrity buttons
-    const buttons = page.locator('button')
-    expect(await buttons.count()).toBeGreaterThanOrEqual(2)
-  })
+  const logs = await api.get(`/audit/logs?search=${encodeURIComponent(ca.common_name)}`)
+  const list = (Array.isArray(logs) ? logs : logs.items || logs.logs) as any[]
+  expect(list.some(l => l.resource_name === ca.common_name && l.username === 'admin')).toBe(true)
 })
