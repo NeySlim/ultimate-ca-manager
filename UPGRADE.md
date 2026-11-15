@@ -170,6 +170,9 @@ Database migrations run automatically at startup.
 - **FIPS image: TLS 1.2 without Extended Master Secret is refused.** The 3.5.9 module enforces EMS (RFC 7627) for TLS 1.2, in both directions: a client that does not send it cannot connect, and an outgoing connection (ACME server, LDAP, SMTP, webhook, DNS API, PostgreSQL) to a TLS 1.2 server without it fails with a TLS internal error. TLS 1.3 is not affected; there is no setting to lift it in the approved mode, update the peer instead.
 - **FIPS mode: RSA sizes.** In FIPS mode a request whose RSA key has an even length other than 2048, 3072 and 4096 bits, up to 16384 (RSA-8192 among them), refused by 2.254, is now signed; an odd length or one over 16384 bits stays refused at issuance and is now also refused for an OCSP responder or a TSA signer key.
 - **FIPS mode: HMAC secrets of 14 bytes or more.** Saving a webhook secret or an RFC 2136 TSIG key shorter than 14 bytes (112 bits) is refused in FIPS mode, on every module. A TSIG key already saved keeps working; a webhook secret, Constellix, DNS Made Easy, INWX or Tencent Cloud secret or external EAB key already saved that short now fails when used in FIPS mode, with the FIPS reason, and a `SECRET_KEY` that short makes every sign-in fail. The FIPS readiness check lists them under `hmac.short_secret`, and the `SECRET_KEY` as the blocker `session.short_secret_key`: replace them before the switch.
+- **The DEB and RPM packages check the installed version first.** Installing 3.0 over an installed UCM package older than 2.254 (1.x included) stops in the pre-installation script, before any file is written: `UCM 2.253 is installed, and this package upgrades UCM 2.254 or later only: its database must have been started by 2.254 first. Install 2.254, start it once, then install this package. Nothing was changed: UCM 2.253 is still installed.` The installed version stays installed, and the 3.0 package stops nothing. Release candidates of 2.254 (`2.254~rc1`) and the 2.254.x security updates are accepted. The 3.0 packages no longer carry the 1.x to 2.0 upgrade: a 1.x installation goes through 2.254 too.
+- **An older UCM removed with its data left in place is archived, not upgraded.** After an RPM removal, or a DEB removed or purged, no UCM package is installed and the 3.0 package installs as new. Before it writes its configuration, it asks the 3.0 migration runner whether it starts on the SQLite database left there. When it does not, the package moves everything that installation left, unchanged, into `/opt/ucm-archive/<UTC date and time>/` (readable by root only, outside every path UCM serves, writes or backs up): the contents of `/opt/ucm/data` and `/etc/ucm`, and the database file with its `-wal` when `DATABASE_PATH` placed it elsewhere. It then sets up a new, empty UCM and starts it; `UCM_FIPS_BUILD=1`, when the archived `ucm.env` set it, is written into the new one, and the output says so; when a retry had built the Python environment while that `ucm.env` was still in the archive, the environment is built again against the system OpenSSL. The installation output and `/var/log/ucm/leftover-archive.log` say what was found and where it went. Every item is renamed, never copied or removed: one that cannot be renamed out of its filesystem (another filesystem, a bind mount, overlayfs) goes into a `.ucm-archive-<UTC date and time>/` directory beside it, readable by root only, and a directory that cannot be renamed at all stays where it is while its contents move the same way. The output lists each such directory, and the archive's `README.txt` lists each one with what it holds; UCM never uses or removes them, and `apt purge ucm` leaves them in place: it removes the rest of `/etc/ucm`, `/var/lib/ucm` and `/var/log/ucm` and names what it kept. `README.txt` in the archive gives the way back: install 2.254 in place of 3.0, stop it, put the archived data and configuration back, start it once, then install 3.0 again. Data that 3.0 starts on (left by 2.254 or later) is kept and used as before. A database whose registry names migrations 3.0 does not know (written by a later release) is not archived either: that is a downgrade, the service refuses to start, and the output says to reinstall the release that wrote it. A database it cannot read, or a PostgreSQL database it refuses, is left where it is, the output says so (the SQLite file, or `postgresql` without its address), and the service then refuses to start as described above. In these cases where nothing is archived, the installation does not end on its `UCM INSTALLED` banner. If a move fails, the installation stops there: what was moved is put back (the output says whether all of it could be), nothing else is written, and the service is not started. Once the cause is fixed, `dpkg --configure -a` or `dnf reinstall ucm` retries, first putting back whatever could not be.
+- **Docker has no package step.** The 3.0 image starts and refuses a database older than 2.254 as described above; it never archives a volume, since starting a newer image on it is an upgrade. A container that still mounts its volume at a path used by images before 2.70 (`/opt/ucm/backend/data` or `/app/backend/data`) has those files copied into `/opt/ucm/data` at startup, as before; a database carried over that way is checked the same way.
 - In-app help is available in English, French and Chinese only; with the interface in German, Spanish, Italian, Japanese, Portuguese or Ukrainian the help panel shows the English text. The interface itself keeps its nine languages.
 - Private-key encryption becomes an envelope: the key in `master.key` or `KEY_ENCRYPTION_KEY` (the KEK) wraps a data key stored in the database. Nothing is re-encrypted at the upgrade and the KEK stays the only secret to back up. A KEK is now changed by hand with the previous one in `master.key.previous` or `KEY_ENCRYPTION_KEY_PREVIOUS` (see the Admin Guide); swapping the key without it puts UCM in safe mode while encryption is enabled, and in HA also once it was disabled. Disabling encryption with `KEY_ENCRYPTION_KEY` set no longer answers 409: the variable stays configured and unused.
 - No default administrator password: a new installation no longer creates `admin` / `changeme123`. Automation that logged in with `changeme123` after a fresh install must provide the password (`INITIAL_ADMIN_PASSWORD_FILE` or `INITIAL_ADMIN_PASSWORD`) or read the generated one from `DATA_DIR/initial-admin-password` and change it, as the first login requires for a generated password. An existing installation is not touched: its administrator, its password and its sessions stay as they are, and no file is generated.
@@ -304,19 +307,9 @@ No manual action required — updates are triggered from the Settings > System p
 
 No action required — all migration happens automatically.
 
-### Upgrading from v1.8.x to v2.0.x
+### Upgrading from v1.8.x
 
-**Major version upgrade** -- data is automatically migrated.
-
-- Database path moved from `/var/lib/ucm/` to `/opt/ucm/data/`
-- Frontend replaced: HTMX -> React 18
-- Authentication: JWT -> session cookies
-- A backup is created automatically during upgrade
-
-Steps:
-1. Standard upgrade procedure (install new package)
-2. No configuration changes required
-3. Check logs: `journalctl -u ucm -n 50`
+Bring the installation to 2.254 first: 3.0 starts only on a database 2.254 has started, and its packages no longer handle a 1.x installation. Then follow [Upgrading to v3.0](#upgrading-to-v30).
 
 ---
 
@@ -331,7 +324,8 @@ sudo journalctl -u ucm -n 100 --no-pager
 # Common fixes:
 
 # 1. Permission issues
-sudo chown -R ucm:ucm /opt/ucm/data
+# A local archive (.ucm-archive-*) holds an earlier installation's keys: it stays root's
+sudo find /opt/ucm/data/ -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
 sudo chown -R ucm:ucm /var/log/ucm
 
 # 2. Missing dependencies

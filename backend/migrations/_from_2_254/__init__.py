@@ -71,7 +71,7 @@ PIVOT_NAMES = frozenset((
 ))
 
 # What else a 2.254 registry may hold: 001 to 042 of the 2.0 series, which the 2.52 baseline
-# (000) folded and kept recorded, and the name migrate_v1_to_v2 writes
+# (000) folded and kept recorded, and the name the 2.x upgrade from 1.8 wrote
 RECORDED_BEFORE_2_52 = frozenset((
     '001_add_api_keys', '002_upgrade_users_table', '003_create_v2_tables',
     '004_create_webauthn_table', '005_create_webauthn_challenges', '006_add_locked_until',

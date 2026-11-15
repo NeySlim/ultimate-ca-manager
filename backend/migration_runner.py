@@ -50,6 +50,7 @@ import os
 import sys
 import sqlite3
 import importlib.util
+from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import create_engine, text, inspect
@@ -134,13 +135,19 @@ UPGRADE_MIGRATION = "300_upgrade_from_2_254"
 PIVOT_VERSION = "2.254"
 
 
+def unknown_migrations(applied):
+    """Registry names neither 2.254 (2.254.N adds none) nor this release knows: a later release
+    or a hand edit wrote them."""
+    from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
+    return sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+
+
 def pivot_refusal(state, applied):
     """None when this database may be migrated, else the message that refuses it."""
-    from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
+    from migrations._from_2_254 import PIVOT_NAMES
     if state == "fresh":
         return None
-    # A name neither 2.254 (2.254.N adds none) nor this release knows: a later release or a hand edit
-    unknown = sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+    unknown = unknown_migrations(applied)
     if unknown:
         return (f"This database names {len(unknown)} migration(s) this release does not know, first "
                 f"{', '.join(unknown[:3])}: a later release started it, or its registry was edited. "
@@ -654,13 +661,81 @@ def show_status():
         engine.dispose()
 
 
+# Exit codes of `check`; any other code (a crash) means the answer is unknown. REFUSED is a
+# database older than 2.254, UNKNOWN one whose registry names migrations this release lacks.
+CHECK_STARTABLE, CHECK_FRESH, CHECK_REFUSED, CHECK_UNREADABLE, CHECK_UNKNOWN = 0, 3, 4, 5, 6
+
+
+@contextmanager
+def _probe_engine(db_url: str):
+    """An engine on *db_url* that writes nothing there: SQLite is read from a private copy
+    (with its -wal and -journal, which a read-only open would still pair with a new -shm)."""
+    if db_url.startswith("sqlite:///"):
+        import shutil
+        import tempfile
+        path = db_url[len("sqlite:///"):]
+        with tempfile.TemporaryDirectory(prefix="ucm-check-") as tmp:
+            copy = os.path.join(tmp, "probe.db")
+            shutil.copyfile(path, copy)
+            for suffix in ("-wal", "-journal"):
+                if os.path.isfile(path + suffix):
+                    shutil.copyfile(path + suffix, copy + suffix)
+            engine = create_engine(f"sqlite:///{copy}")
+            try:
+                yield engine
+            finally:
+                engine.dispose()
+        return
+    args = dict(postgres_connect_args(db_url))
+    if _is_postgres(db_url) and "connect_timeout" not in db_url:
+        args["connect_timeout"] = 10
+    engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True, connect_args=args)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+def check_database() -> int:
+    """For the package scripts: whether this release starts on the configured database.
+
+    Prints the backend first ("sqlite <path>", "postgresql", or "other" for any other URL),
+    then the reason of a refusal or of an unreadable database, and returns one of the
+    CHECK_* codes: a missing or empty SQLite file is fresh, a registry naming unknown
+    migrations is UNKNOWN even when 2.254 migrations are missing too.
+    """
+    db_url = _get_db_url()
+    sqlite_path = db_url[len("sqlite:///"):] if db_url.startswith("sqlite:///") else None
+    say(f"sqlite {sqlite_path}" if sqlite_path else
+        "postgresql" if _is_postgres(db_url) else "other")
+    if sqlite_path is not None and not os.path.lexists(sqlite_path):
+        return CHECK_FRESH
+    try:
+        with _probe_engine(db_url) as engine:
+            # _get_state takes a table listing that fails for an empty file: read it here first
+            with engine.connect() as conn:
+                if sqlite_path is not None:
+                    conn.execute(text("SELECT name FROM sqlite_master LIMIT 1")).fetchall()
+            state, applied = _get_state(engine)
+    except Exception as exc:  # noqa: BLE001
+        cause = getattr(exc, "orig", None) or exc
+        # Never the URL: only the driver's first line, which names no password
+        say(f"unreadable: {type(cause).__name__}: {str(cause).splitlines()[0] if str(cause) else ''}")
+        return CHECK_UNREADABLE
+    refusal = pivot_refusal(state, applied)
+    if refusal:
+        say(refusal)
+        return CHECK_UNKNOWN if unknown_migrations(applied) else CHECK_REFUSED
+    return CHECK_FRESH if state == "fresh" else CHECK_STARTABLE
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="UCM Database Migration Runner")
     parser.add_argument(
         "command",
-        choices=["run", "status", "dry-run", "mark-applied"],
+        choices=["run", "status", "dry-run", "mark-applied", "check"],
         nargs="?",
         default="status",
     )
@@ -669,6 +744,8 @@ if __name__ == "__main__":
 
     if args.command == "status":
         show_status()
+    elif args.command == "check":
+        sys.exit(check_database())
     elif args.command == "dry-run":
         run_all_migrations(dry_run=True, verbose=args.verbose)
     elif args.command == "run":
