@@ -18,7 +18,7 @@ export default {
           { label: 'Sélection du modèle', text: 'Choisir parmi les modèles de certificats disponibles sur la MS CA' },
           { label: 'Auto-approuvé', text: 'Les modèles avec autoenroll retournent le certificat immédiatement' },
           { label: 'Approbation du gestionnaire', text: 'Certains modèles exigent l\'approbation du gestionnaire, UCM suit la requête en attente' },
-          { label: 'Requêtes en attente', text: 'Une requête que la CA retient pour son gestionnaire reste En attente dans UCM : utilisez Vérifier le statut dans les détails de la CSR, ou approuvez-la depuis le panneau de contrôle CA. La synchronisation de l\'inventaire termine aussi une requête en attente que la CA montre émise, et marque refusée celle qu\'elle montre refusée' },
+          { label: 'Requêtes en attente', text: 'Une requête que la CA retient pour son gestionnaire reste En attente dans UCM : utilisez Vérifier le statut dans les détails de la CSR, ou approuvez-la depuis le panneau de contrôle CA. La synchronisation de l\'inventaire termine aussi une requête en attente que la CA montre émise, et marque refusée celle qu\'elle montre refusée. Une requête dont la CSR est signée ailleurs (CA locale, import) est close comme Signée ailleurs, et un certificat que la CA émet malgré tout entre par la synchronisation de l\'inventaire comme un certificat distinct' },
         ]
       },
       {
@@ -124,7 +124,7 @@ UCM s'intègre avec Microsoft Active Directory Certificate Services (AD CS) pour
 Le certificat est retourné immédiatement et importé dans UCM.
 
 ### Modèles avec approbation du gestionnaire
-UCM enregistre la requête comme **En attente** et suit l'ID de requête MS CA. Ouvrez la CSR dans **CSR → En attente** et cliquez sur **Vérifier le statut** : si la CA a émis le certificat (approuvé sur la console de la CA Windows, par exemple), UCM l'importe dans la requête ; si la CA l'a refusée, la requête passe à Refusée ; sinon elle reste En attente. L'approbation depuis le **panneau de contrôle CA** importe aussi le certificat. La **synchronisation de l'inventaire** termine de la même façon les requêtes en attente et les compte à part des certificats importés.
+UCM enregistre la requête comme **En attente** et suit l'ID de requête MS CA. Ouvrez la CSR dans **CSR → En attente** et cliquez sur **Vérifier le statut** : si la CA a émis le certificat (approuvé sur la console de la CA Windows, par exemple), UCM l'importe dans la requête ; si la CA l'a refusée, la requête passe à Refusée ; sinon elle reste En attente. L'approbation depuis le **panneau de contrôle CA** importe aussi le certificat. La **synchronisation de l'inventaire** termine de la même façon les requêtes en attente et les compte à part des certificats importés. Une requête dont la CSR est signée ailleurs (CA locale, import) est close comme **Signée ailleurs**, et un certificat que la CA émet malgré tout entre par la **synchronisation de l'inventaire** comme un certificat distinct.
 
 ## Inscription pour le compte d'autrui (EOBO)
 
