@@ -176,3 +176,13 @@ def test_a_branch_run_builds_the_images_without_pushing_them(ctx, pushed):
         assert not [o for o in opts if o.startswith('push=') and o != f'push={str(pushed).lower()}'], outputs
         # The job itself still runs on a branch: the build is the check
         assert 'if' not in _jobs()[job] or evaluate(_jobs()[job]['if'], {'github': BRANCH_RUN}), job
+
+
+@pytest.mark.parametrize('ctx, kept', [(BRANCH_RUN, False), (TAG_RUN, True)])
+def test_the_digest_is_handed_over_on_a_tag_only(ctx, kept):
+    """Nothing pushed means no digest to hand to the manifest job, which a branch run skips."""
+    for job in ('build-docker', 'build-docker-fips'):
+        steps = {s.get('name'): s for s in _jobs()[job]['steps']}
+        for name in ('Export digest', 'Upload digest'):
+            assert bool(evaluate(steps[name]['if'], {'github': ctx})) is kept, (job, name)
+

@@ -363,12 +363,14 @@ jobs:
             VERSION=${{ needs.build-deb.outputs.version }}
 
       - name: Export digest
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           mkdir -p "${{ runner.temp }}/digests"
           digest="${{ steps.push.outputs.digest }}"
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: std-digest-${{ matrix.arch }}
@@ -585,12 +587,14 @@ jobs:
             UCM_FIPS_BUILD=1
 
       - name: Export digest
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           mkdir -p "${{ runner.temp }}/digests"
           digest="${{ steps.push.outputs.digest }}"
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fips-digest-${{ matrix.arch }}
