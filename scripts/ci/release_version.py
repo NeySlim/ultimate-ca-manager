@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Release version grammar, conversions and release notes, shared by the workflows and scripts.
+
+Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
+A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
+Usage: release_version.py <validate|deb|rpm|tar|file|npm|assets|notes|history> <version> [CHANGELOG]
+"""
+import re
+import sys
+
+VERSION_RE = re.compile(
+    r'(?P<major>0|[1-9][0-9]*)\.(?P<minor>0|[1-9][0-9]*)'
+    r'(?:\.(?P<patch>[1-9][0-9]*))?(?:-(?P<rc>rc[0-9]+))?'
+)
+
+
+def parse(version):
+    m = VERSION_RE.fullmatch(version or '')
+    if not m:
+        raise ValueError(f'Invalid version: {version}')
+    return m
+
+
+def is_stable(version):
+    return parse(version).group('rc') is None
+
+
+def numeric(version):
+    m = parse(version)
+    return (int(m.group('major')), int(m.group('minor')), int(m.group('patch') or 0))
+
+
+def deb_version(version):
+    return parse(version).string.replace('-', '~')
+
+
+def rpm_version(version):
+    return deb_version(version)
+
+
+def tar_version(version):
+    return parse(version).string.replace('-', '_')
+
+
+def file_version(version):
+    """Release asset names carry dots where the package version has '~' or '-'."""
+    return parse(version).string.replace('-', '.')
+
+
+def npm_version(version):
+    """Valid semver: X.Y gets a .0 patch, X.Y.Z is kept, a -dev suffix is kept."""
+    if (version or '').endswith('-dev'):
+        base = version[:-4]
+        if not is_stable(base):
+            raise ValueError(f'Invalid version: {version}')
+        return npm_version(base) + '-dev'
+    m = parse(version)
+    base = f"{m.group('major')}.{m.group('minor')}.{m.group('patch') or 0}"
+    return base + (f"-{m.group('rc')}" if m.group('rc') else '')
+
+
+def asset_names(version):
+    fv = file_version(version)
+    return {
+        'deb': f'ucm_{fv}_all.deb',
+        'rpm': f'ucm-{fv}-1.fc43.noarch.rpm',
+        'rpm_el9': f'ucm-el9-{fv}-1.el9.noarch.rpm',
+        'rpm_el10': f'ucm-el10-{fv}-1.el10.noarch.rpm',
+    }
+
+
+def _section(heading, text, stop):
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if heading.match(line):
+            body = []
+            for nxt in lines[i + 1:]:
+                if nxt.startswith(stop):
+                    break
+                body.append(nxt)
+            return '\n'.join([''] + [b for b in body if b.strip()]) + '\n'
+    return ''
+
+
+def changelog_section(version, text):
+    """Body of `## [version]` up to the next `## [` heading, blank lines dropped, led by one blank line."""
+    parse(version)
+    return (_section(re.compile(r'^## \[' + re.escape(version) + r'\]'), text, '## [')
+            or _section(re.compile(r'^## ' + re.escape(version) + r'(\s|$)'), text, '## '))
+
+
+def release_notes(version, text):
+    """A RC ships what `[Unreleased]` holds; a stable ships its own section, renamed by the release commit."""
+    heading = 'Unreleased' if not is_stable(version) else version
+    body = (_section(re.compile(r'^## \[Unreleased\]'), text, '## [') if heading == 'Unreleased'
+            else changelog_section(version, text))
+    if not body.strip():
+        raise ValueError(f'CHANGELOG.md has no [{heading}] section with entries for {version}')
+    return body
+
+
+def changelog_history(version, text, count=2):
+    """Up to *count* published sections below *version* on its own major line, heading and body."""
+    major, top = numeric(version)[0], numeric(version)
+    blocks = re.split(r'(?m)^(?=## \[)', text)
+    out = []
+    for block in blocks:
+        m = re.match(r'## \[([^\]]+)\]', block)
+        if not m or not VERSION_RE.fullmatch(m.group(1)) or not is_stable(m.group(1)):
+            continue
+        n = numeric(m.group(1))
+        if n[0] == major and n < top:
+            out.append(block.rstrip('\n') + '\n')
+        if len(out) >= count:
+            break
+    return '\n'.join(out)
+
+
+def main(argv):
+    if len(argv) < 3:
+        print(__doc__, file=sys.stderr)
+        return 2
+    cmd, version = argv[1], argv[2]
+    try:
+        if cmd == 'validate':
+            parse(version)
+        elif cmd == 'deb':
+            print(deb_version(version))
+        elif cmd == 'rpm':
+            print(rpm_version(version))
+        elif cmd == 'tar':
+            print(tar_version(version))
+        elif cmd == 'file':
+            print(file_version(version))
+        elif cmd == 'npm':
+            print(npm_version(version))
+        elif cmd == 'assets':
+            print('\n'.join(asset_names(version).values()))
+        elif cmd in ('notes', 'history'):
+            path = argv[3] if len(argv) > 3 else 'CHANGELOG.md'
+            with open(path, encoding='utf-8') as fh:
+                text = fh.read()
+            sys.stdout.write(release_notes(version, text) if cmd == 'notes' else changelog_history(version, text))
+        else:
+            print(f'Unknown command: {cmd}', file=sys.stderr)
+            return 2
+    except (ValueError, OSError) as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

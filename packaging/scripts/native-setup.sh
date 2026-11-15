@@ -468,7 +468,7 @@ cmd_fips_finish() {
         say "The host is not in FIPS mode: UCM runs in standard mode on the system OpenSSL."
         case "$(fips_distro)" in
             el9) say "To enable it: sudo fips-mode-setup --enable, reboot, then reinstall the package." ;;
-            ubuntu2404) say "To enable it (Ubuntu Pro): sudo pro enable fips-updates, reboot, then reinstall the package." ;;
+            ubuntu2404) say "To enable it (Ubuntu Pro): sudo pro enable fips (the certified binaries), reboot, then reinstall the package." ;;
         esac
         ! is_true "$(env_value "$envfile" UCM_FIPS)" || say "WARNING: UCM_FIPS=1 is set in $envfile: the service refuses to start until the host is in FIPS mode."
     fi

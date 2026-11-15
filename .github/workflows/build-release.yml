@@ -32,6 +32,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate the tag grammar
+        run: python3 scripts/ci/release_version.py validate "${GITHUB_REF#refs/tags/v}"
+
       - name: Ensure tag points to the correct release branch
         run: |
           set -euo pipefail
@@ -39,18 +42,21 @@ jobs:
           VERSION="${GITHUB_REF#refs/tags/v}"
           TAG_SHA="$(git rev-parse HEAD)"
 
-          if [[ "$VERSION" == *-rc* || "$VERSION" == *-beta* || "$VERSION" == *-alpha* || "$VERSION" == *-dev* ]]; then
-            EXPECTED_REF="origin/test"
-          else
-            EXPECTED_REF="origin/main"
-          fi
+          # The head of a branch is read by its exact name on the remote: a tag, or a ref
+          # that only ends like the branch, never stands for it
+          remote_head() { git ls-remote origin "refs/heads/$1" | awk -v r="refs/heads/$1" '$2 == r { print $1 }'; }
 
-          git fetch origin main:refs/remotes/origin/main test:refs/remotes/origin/test
-          EXPECTED_SHA="$(git rev-parse "$EXPECTED_REF")"
+          if [[ "$VERSION" == *-rc* || "$VERSION" == *-beta* || "$VERSION" == *-alpha* || "$VERSION" == *-dev* ]]; then
+            EXPECTED_BRANCH="test"
+          else
+            EXPECTED_BRANCH="main"
+          fi
+          EXPECTED_SHA="$(remote_head "$EXPECTED_BRANCH")"
+          [ -n "$EXPECTED_SHA" ] || { echo "Branch $EXPECTED_BRANCH not found on origin."; exit 1; }
 
           echo "Version: $VERSION"
           echo "Tag SHA: $TAG_SHA"
-          echo "Expected $EXPECTED_REF SHA: $EXPECTED_SHA"
+          echo "Expected origin/$EXPECTED_BRANCH SHA: $EXPECTED_SHA"
 
           if [ "$TAG_SHA" != "$EXPECTED_SHA" ]; then
             echo "Stable tags must point to origin/main; RC tags must point to origin/test."
@@ -87,9 +93,9 @@ jobs:
           else
             VERSION=${GITHUB_REF#refs/tags/v}
           fi
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VERSION"; exit 1; }
-          # Convert to DEB version (2.244-rc1 -> 2.244~rc1)
-          DEB_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
+          python3 scripts/ci/release_version.py validate "$VERSION"
+          # Convert to DEB version (3.0-rc1 -> 3.0~rc1)
+          DEB_VERSION=$(python3 scripts/ci/release_version.py deb "$VERSION")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "deb_version=$DEB_VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION (DEB: $DEB_VERSION)"
@@ -104,8 +110,8 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Normalize semver for npm: 2.161-rc1 -> 2.161.0-rc1
-          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
+          # Normalize semver for npm: 3.0-rc1 -> 3.0.0-rc1
+          STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION
           export STAMP_VERSION
@@ -197,7 +203,7 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
-          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
+          STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION STAMP_VERSION
           node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
@@ -212,8 +218,8 @@ jobs:
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           # For RPM Version field (supports ~), and for tarball name (use _)
-          RPM_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
-          TAR_VERSION=$(echo "$VERSION" | sed 's/-/_/g')
+          RPM_VERSION=$(python3 scripts/ci/release_version.py rpm "$VERSION")
+          TAR_VERSION=$(python3 scripts/ci/release_version.py tar "$VERSION")
           
           mkdir -p /tmp/rpm-output /tmp/rpm-build/ucm-${TAR_VERSION}
           
@@ -299,7 +305,7 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
-          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
+          STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION STAMP_VERSION
           node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
@@ -482,7 +488,7 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
-          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
+          STAMP_VERSION=$(python3 scripts/ci/release_version.py npm "$VERSION")
           printf '%s' "$VERSION" > VERSION
           export VERSION STAMP_VERSION
           node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
@@ -699,35 +705,12 @@ jobs:
           IMAGE="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
           REPO="${{ github.repository }}"
           
-          # Extract changelog section for this version
+          # RC: the [Unreleased] section; stable: its own section. A missing section stops the release.
           CHANGES_FILE=$(mktemp)
           PREVIOUS_FILE=$(mktemp)
-          if [ -f CHANGELOG.md ]; then
-            # Extract content between ## [VERSION] and the next ## [
-            SECTION=$(sed -n "/^## \[${VERSION}\]/,/^## \[/p" CHANGELOG.md | head -n -1)
-            if [ -z "$SECTION" ]; then
-              SECTION=$(sed -n "/^## ${VERSION}/,/^## /p" CHANGELOG.md | head -n -1)
-            fi
-            # Remove the heading line itself, keep the content
-            echo "$SECTION" | tail -n +2 | sed '/^$/d; 1i\\' > "$CHANGES_FILE" || true
-
-            # Extract the 2 previous versioned sections (skip Unreleased and current)
-            # Output is the raw markdown blocks (heading + body) so users see version + date.
-            awk -v current="${VERSION}" '
-              /^## \[Unreleased\]/ { capture=0; next }
-              /^## \[/ {
-                line = $0
-                sub(/^## \[/, "", line)
-                sub(/\].*$/, "", line)
-                ver = line
-                if (ver == current) { capture=0; next }
-                if (count >= 2) { capture=0; exit }
-                count++
-                capture=1
-              }
-              capture { print }
-            ' CHANGELOG.md > "$PREVIOUS_FILE" || true
-          fi
+          python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md > "$CHANGES_FILE"
+          # Recent history: earlier releases of the same major line only
+          python3 scripts/ci/release_version.py history "$VERSION" CHANGELOG.md > "$PREVIOUS_FILE"
           
           # Build release notes
           {
@@ -803,7 +786,7 @@ jobs:
             --name ucm neyslim/ultimate-ca-manager:VERSION-fips
           ```
           
-          Ubuntu 24.04 with Ubuntu Pro (`sudo pro enable fips-updates`, then reboot):
+          Ubuntu 24.04 with Ubuntu Pro (`sudo pro enable fips`, then reboot). The binary certified under #5115 is the one of Ubuntu Pro's `fips` stream; `fips-updates` carries later, patched versions that are not the certified binary:
           ```bash
           sudo apt-get install -y gcc pkg-config python3-dev python3-venv libpq-dev libxml2-dev libxslt1-dev \
               zlib1g-dev libssl-dev libxmlsec1-dev libxmlsec1t64-openssl rustc-1.91 cargo-1.91
@@ -844,7 +827,7 @@ jobs:
           
           # Replace placeholders (specific first, then generic)
           # File names use dots (2.1.0.rc2), not tildes (2.1.0~rc2)
-          FILE_VERSION=$(echo "$VERSION" | sed 's/-/./g')
+          FILE_VERSION=$(python3 scripts/ci/release_version.py file "$VERSION")
           sed -i "s|DEB_VERSION|${FILE_VERSION}|g" notes.md
           sed -i "s|RPM_VERSION|${FILE_VERSION}|g" notes.md
           sed -i "s|IMAGE|$IMAGE|g" notes.md

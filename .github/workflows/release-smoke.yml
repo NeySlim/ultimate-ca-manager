@@ -50,7 +50,7 @@ jobs:
             VER="${HEAD_BRANCH#v}"
             IMAGE="neyslim/ultimate-ca-manager"
           fi
-          [[ "$VER" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VER"; exit 1; }
+          python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
@@ -129,7 +129,7 @@ jobs:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then VER="$INPUT_VERSION"; else VER="${HEAD_BRANCH#v}"; fi
-          [[ "$VER" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VER"; exit 1; }
+          python3 scripts/ci/release_version.py validate "$VER"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
 
       - name: Download the published asset and verify its checksum
@@ -191,7 +191,7 @@ jobs:
             VER="${HEAD_BRANCH#v}"
             IMAGE="neyslim/ultimate-ca-manager"
           fi
-          [[ "$VER" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VER"; exit 1; }
+          python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
@@ -269,7 +269,7 @@ jobs:
             VER="${HEAD_BRANCH#v}"
             IMAGE="neyslim/ultimate-ca-manager"
           fi
-          [[ "$VER" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VER"; exit 1; }
+          python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
