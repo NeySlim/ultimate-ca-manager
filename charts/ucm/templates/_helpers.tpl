@@ -83,10 +83,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- /* An existing release without these keys in its Secret is a single instance moving to HA */ -}}
 {{- if .Release.IsUpgrade -}}
 {{- if not (include "ucm.existingKek" .) -}}
-{{- fail "ha.enabled on an existing single instance requires secrets.keyEncryptionKey: set it to the content of the instance's /etc/ucm/master.key, or a new key would make its private keys unreadable (docs/HA.md, From one node to a cluster)" -}}
+{{- fail "ha.enabled on an existing single instance requires secrets.keyEncryptionKey: set it to the content of the instance's /etc/ucm/master.key, or a new key would make its private keys unreadable (docs/HA.md, From a single node)" -}}
 {{- end -}}
 {{- if not (include "ucm.existingDbKey" .) -}}
-{{- fail "ha.enabled on an existing single instance requires secrets.dbEncryptionKey: set it while the instance still runs alone and re-encrypt its integration secrets under it first (docs/HA.md, From one node to a cluster)" -}}
+{{- fail "ha.enabled on an existing single instance requires secrets.dbEncryptionKey: set it while the instance still runs alone and re-encrypt its integration secrets under it first (docs/HA.md, From a single node)" -}}
 {{- end -}}
 {{- end -}}
 {{- else if gt (int .Values.replicaCount) 1 -}}

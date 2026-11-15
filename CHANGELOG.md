@@ -47,6 +47,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### High availability
 
+- **One database key for the cluster.** A node with `UCM_HA=1` requires `UCM_DB_ENCRYPTION_KEY` and never uses the key derived from its machine, so integration secrets saved on one node work on every other; the chart and the Compose recipe provide it, and `python -m scripts.rewrap_db_key` re-encrypts a single instance's secrets under it.
 - **HA mode.** `UCM_HA=1` runs UCM on several nodes sharing one PostgreSQL database: a node requires `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. The Helm chart probes readiness on `/health/ready`, where safe mode answers 503 only with `UCM_HA=1`, and liveness on `/health/live`.
 - **One scheduler, elected.** One node runs the scheduled tasks, elected by a PostgreSQL advisory lock and replaced within seconds when its connection drops, or about a minute after its host vanishes. Nodes heartbeat in `cluster_nodes`, "run now" works from any node, and startup migrations run on one node at a time.
 - **Real-time events reach every node.** Without Redis, an event raised on any node reaches the browsers connected to every node, once each. On any PostgreSQL install without Redis, a `LISTEN`/`NOTIFY` wake-up delivers events within a second.
@@ -153,6 +154,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Integrations: a stored secret the database key cannot decrypt (saved under another key) now stops its integration with an error naming it: a webhook was sent unsigned or without its auth token, a mail without SMTP login, an SSO token request or a Microsoft CA connection without its secret.
 - Account: a password checked again in an open session (password change, `PUT /api/v2/users/{id}` and `POST /api/v2/users/{id}/reset-password` on one's own account, turning off the security key as second factor) now counts its failures per account, apart from the login's; past `max_login_attempts` it answers 429 with `Retry-After`, the right password included, until `lockout_duration` has passed.
 - Account: confirming or disabling TOTP, regenerating recovery codes, adding, removing, enabling or disabling a security key (an administrator's change included) and turning the security key as second factor on or off now close the account's other sessions, as a password change does; the audit entry gives how many. Under enforced 2FA without TOTP, turning off the security key as second factor is refused (403, `last_second_factor`), as removing the last key is.
 - Login: failed second-factor (TOTP, recovery code, security key) and passkey attempts are counted in the database, so the lockout applies on every node, survives a restart, and parallel attempts never get more tries than `max_login_attempts`. An attempt counts when it is made rather than when it fails, and a count left idle for `lockout_duration` is forgotten.
