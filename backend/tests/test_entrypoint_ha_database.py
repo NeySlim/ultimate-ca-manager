@@ -116,37 +116,94 @@ def test_a_df_that_cannot_answer_never_blocks_the_start(tmp_path):
     assert r.returncode == 0 and 'cp ' in r.stdout
 
 
-def _started(tmp_path, version):
-    """Marker the application leaves next to the database after a start that migrated."""
-    (tmp_path / '.ucm-started-version').write_text(version + '\n')
+MIGRATIONS = ROOT / 'backend' / 'migrations'
+NAMES = sorted(f.stem for f in MIGRATIONS.glob('*.py') if not f.name.startswith('_'))
+
+
+def _database(tmp_path, applied, pending_serial=False, kb=3000):
+    """Real SQLite file of `kb` KB (zero padding past its pages) recording `applied`."""
+    import sqlite3
+    db = tmp_path / 'ucm.db'
+    db.unlink(missing_ok=True)
+    with sqlite3.connect(db) as c:
+        c.execute('PRAGMA page_size = 1024')
+        c.execute('CREATE TABLE _migrations (name TEXT PRIMARY KEY)')
+        c.executemany('INSERT INTO _migrations VALUES (?)', [(n,) for n in applied])
+        c.execute('CREATE TABLE system_config (key TEXT, value TEXT)')
+        if pending_serial:
+            c.execute("INSERT INTO system_config VALUES ('serial_unique_index_pending', '1')")
+    c.close()
+    import os
+    os.truncate(db, kb * 1024)
+
+
+def _env(tmp_path, backup):
+    env = _sqlite_env(tmp_path, None)
+    env.update(UCM_BACKUP_ENABLED=backup, UCM_MIGRATIONS_DIR=str(MIGRATIONS), UCM_VERSION='3.0')
+    return env
+
+
+_START = 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup'
 
 
 @pytest.mark.parametrize('backup,avail_kb', [('false', 2900), ('false', 0), ('true', 3000)])
 def test_an_ordinary_start_claims_only_the_copy(tmp_path, backup, avail_kb):
-    env = _sqlite_env(tmp_path, None)
-    env.update(UCM_BACKUP_ENABLED=backup, UCM_VERSION='3.0')
-    (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
-    _started(tmp_path, '3.0')
-    r = _run(_df(avail_kb) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+    env = _env(tmp_path, backup)
+    _database(tmp_path, NAMES)
+    r = _run(_df(avail_kb) + _START, env, tmp_path)
     assert r.returncode == 0, r.stdout + r.stderr
     assert ('cp ' in r.stdout) is (backup == 'true')
 
 
 def test_an_ordinary_start_still_needs_room_for_the_copy(tmp_path):
-    env = _sqlite_env(tmp_path, None)
-    env['UCM_VERSION'] = '3.0'
-    (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
-    _started(tmp_path, '3.0')
-    r = _run(_df(2999) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, NAMES)
+    r = _run(_df(2999) + _START, env, tmp_path)
     assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
     assert 'needs 2 MB free' in r.stdout, r.stdout
 
 
-@pytest.mark.parametrize('last,current', [('2.254.1', '3.0'), ('3.0', ''), ('3.0', 'unknown')])
-def test_a_new_or_unknown_version_claims_the_upgrade_room(tmp_path, last, current):
-    env = _sqlite_env(tmp_path, None)
-    env.update(UCM_BACKUP_ENABLED='false', UCM_VERSION=current)
-    (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
-    _started(tmp_path, last)
-    r = _run(_df(2999) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+def test_a_restored_database_claims_the_upgrade_room(tmp_path):
+    # a 2.254 copy put back after a 3.0 start: its registry decides, not what started last
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, NAMES)
+    (tmp_path / '.ucm-started-version').write_text('3.0\n')
+    _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
+    r = _run(_df(2 * 3000 - 1) + _START, env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
+    assert 'needs 5 MB free' in r.stdout, r.stdout
+
+
+def test_a_pending_serial_replay_claims_the_upgrade_room(tmp_path):
+    env = _env(tmp_path, 'false')
+    _database(tmp_path, NAMES, pending_serial=True)
+    r = _run(_df(2999) + _START, env, tmp_path)
     assert r.returncode != 0 and 'needs 2 MB free' in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize('case', ['not a database', 'no registry', 'no migrations dir'])
+def test_a_database_that_cannot_be_read_claims_the_upgrade_room(tmp_path, case):
+    env = _env(tmp_path, 'false')
+    _database(tmp_path, NAMES)
+    if case == 'not a database':
+        (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
+    elif case == 'no registry':
+        import sqlite3
+        with sqlite3.connect(tmp_path / 'ucm.db') as c:
+            c.execute('DROP TABLE _migrations')
+        c.close()
+    else:
+        env['UCM_MIGRATIONS_DIR'] = str(tmp_path / 'absent')
+    r = _run(_df(2999) + _START, env, tmp_path)
+    assert r.returncode != 0 and 'needs 2 MB free' in r.stdout, r.stdout
+
+
+def test_the_check_leaves_the_database_unchanged(tmp_path):
+    env = _env(tmp_path, 'false')
+    _database(tmp_path, NAMES)
+    before = (tmp_path / 'ucm.db').read_bytes()
+    entries = sorted(p.name for p in tmp_path.iterdir())
+    r = _run(_df(0) + _START, env, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert (tmp_path / 'ucm.db').read_bytes() == before
+    assert sorted(p.name for p in tmp_path.iterdir()) == entries

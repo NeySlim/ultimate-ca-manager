@@ -45,13 +45,20 @@ ucm_initial_admin_notice() {
     fi
 }
 
-# Marker the application writes next to the database once a start has migrated it: same
-# version as the image means no upgrade can run; absent or different means one may (the
-# application never records an empty or unknown version).
+# The database itself says whether this start upgrades it: a migration of the image missing from
+# its registry, or the serial step left to run again. Read-only; any doubt counts as an upgrade.
 ucm_sqlite_upgrade_possible() {
-    local last
-    last=$(cat "$(dirname "$UCM_DATABASE_PATH")/.ucm-started-version" 2>/dev/null) || return 0
-    [ "$last" != "${UCM_VERSION:-}" ]
+    python3 -I - "$UCM_DATABASE_PATH" "${UCM_MIGRATIONS_DIR:-/opt/ucm/backend/migrations}" <<'PY' 2>/dev/null && return 1
+import pathlib, sqlite3, sys
+names = {p.stem for p in pathlib.Path(sys.argv[2]).glob("*.py") if not p.name.startswith("_")}
+db = sqlite3.connect(pathlib.Path(sys.argv[1]).resolve().as_uri() + "?mode=ro", uri=True)
+applied = {row[0] for row in db.execute("SELECT name FROM _migrations")}
+tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+pending = "system_config" in tables and db.execute(
+    "SELECT 1 FROM system_config WHERE key = 'serial_unique_index_pending'").fetchone()
+sys.exit(0 if names and names <= applied and not pending else 1)
+PY
+    return 0
 }
 
 # Room for the start next to the database: its copy when enabled, plus its size again when an
@@ -70,7 +77,7 @@ ucm_sqlite_disk_room() {
     [ "$avail_kb" -ge "$need_kb" ] && return 0
     echo -e "${RED:-}❌ Not enough disk space in $dir: the start needs $(( need_kb / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
     if [ "$upgrade" = "true" ]; then
-        echo "   The database is $(( size_kb / 1024 )) MB; a start on a new version needs its size for the upgrade's journal and growth,"
+        echo "   The database is $(( size_kb / 1024 )) MB; upgrading it needs its size for the upgrade's journal and growth,"
         echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
     else
         echo "   The database is $(( size_kb / 1024 )) MB; the pre-start copy needs its size (UCM_BACKUP_ENABLED=false skips it)."

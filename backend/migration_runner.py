@@ -295,34 +295,6 @@ def run_at_startup(lock, clock=None, sleep=None) -> bool:
         return run_all_migrations(dry_run=False, verbose=False)
 
 
-STARTED_VERSION_MARKER = ".ucm-started-version"
-
-
-def record_started_version(version: str) -> None:
-    """SQLite, after the start's migrations: the version next to the database tells the image
-    entrypoint that the next start on that version upgrades nothing (no journal room to claim).
-    Left out while step 144 is to run again; never fails the start."""
-    db_url = _get_db_url()
-    if _is_postgres(db_url) or not db_url.startswith("sqlite:///") or version in ("", "unknown"):
-        return
-    db_path = Path(db_url.replace("sqlite:///", "", 1))
-    marker = db_path.parent / STARTED_VERSION_MARKER
-    try:
-        engine = _engine(db_url)
-        try:
-            pending = _serial_steps_pending(engine)
-        finally:
-            engine.dispose()
-        if pending:
-            marker.unlink(missing_ok=True)
-            return
-        tmp = marker.with_name(f"{marker.name}.{os.getpid()}.tmp")
-        tmp.write_text(version + "\n")
-        os.replace(tmp, marker)
-    except Exception as exc:
-        say(f"⚠ Could not record the started version in {marker}: {exc}")
-
-
 def mark_node_stopped(node_id=None) -> None:
     """HA, gunicorn master on exit, once its workers and scheduler process are gone: the node's
     row keeps its last heartbeat with pid NULL, which _full_stop_hold reads as stopped."""
