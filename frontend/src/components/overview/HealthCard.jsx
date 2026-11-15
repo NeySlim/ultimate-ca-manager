@@ -1,12 +1,21 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { overviewService } from '../../services'
+import { usePermission } from '../../hooks/usePermission'
+import { isVisible, moduleForPath } from '../../navigation/registry'
 import { formatDate } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
 import { CardFrame, num, useCardData } from './shared'
 
 const PROTOCOLS = ['acme', 'scep', 'est', 'tsa', 'scheduler']
 const ROW_LINKS = { tsa: '/tsa-config', scheduler: '/settings?tab=scheduler' }
+
+/** The row's link, only when the navigation guard of its page lets this user in. */
+function rowLink(name, can) {
+  const link = ROW_LINKS[name]
+  const mod = link && moduleForPath(link.split('?')[0])
+  return mod && isVisible(mod, can) ? link : null
+}
 
 function Bars({ periods }) {
   const peak = Math.max(1, ...periods.map((p) => (Number(p.ok) || 0) + (Number(p.failed) || 0)))
@@ -39,6 +48,8 @@ function summary(name, p, t) {
 
 export function HealthCard() {
   const { t } = useTranslation()
+  const { isAdmin, hasPermission } = usePermission()
+  const can = { isAdmin, hasPermission }
   const state = useCardData(() => overviewService.getHealth(), ['certificate'])
   const protocols = state.data?.protocols || {}
   const present = PROTOCOLS.filter((p) => protocols[p])
@@ -51,7 +62,7 @@ export function HealthCard() {
           const p = protocols[name]
           const { text, alert } = summary(name, p, t)
           const label = t(`overview.health.${name}`)
-          const link = ROW_LINKS[name]
+          const link = rowLink(name, can)
           return (
             <li key={name} data-testid={`health-${name}`} data-alert={alert ? 'true' : 'false'}
               className="flex items-center justify-between gap-3">

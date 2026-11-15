@@ -29,7 +29,10 @@ vi.mock('../../../hooks/useWebSocket', () => ({
   ConnectionState: { CONNECTED: 'connected', DISCONNECTED: 'disconnected', CONNECTING: 'connecting', ERROR: 'error' },
 }))
 
-vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: () => true }) }))
+const perms = vi.hoisted(() => ({ admin: true, granted: [] }))
+vi.mock('../../../hooks/usePermission', () => ({
+  usePermission: () => ({ isAdmin: () => perms.admin, hasPermission: (p) => perms.admin || perms.granted.includes(p) }),
+}))
 
 import { HealthCard } from '..'
 
@@ -47,7 +50,7 @@ const show = async (protocols) => {
 }
 const row = (card, name) => within(card).getByTestId(`health-${name}`)
 
-beforeEach(() => { vi.clearAllMocks(); lang.fr = false })
+beforeEach(() => { vi.clearAllMocks(); lang.fr = false; perms.admin = true; perms.granted = [] })
 
 describe('TSA signer on the health card', () => {
   it.each([
@@ -85,6 +88,31 @@ describe('TSA signer on the health card', () => {
   it('is not listed while the server leaves it out', async () => {
     const card = await show({ scheduler: sched({}) })
     expect(within(card).queryByTestId('health-tsa')).toBeNull()
+  })
+})
+
+describe('row links follow the navigation guards', () => {
+  it('an operator without the rights sees the rows without their links', async () => {
+    perms.admin = false
+    perms.granted = ['read:certificates']
+    const card = await show({ tsa: tsa({}), scheduler: sched({}) })
+    for (const name of ['tsa', 'scheduler']) {
+      expect(row(card, name).textContent).toContain(`overview.health.${name}`)
+      expect(within(row(card, name)).queryByRole('link'), name).toBeNull()
+    }
+  })
+
+  it('read:settings opens the TSA page but not the admin-only scheduler settings', async () => {
+    perms.admin = false
+    perms.granted = ['read:settings']
+    const card = await show({ tsa: tsa({}), scheduler: sched({}) })
+    expect(within(row(card, 'tsa')).getByRole('link').getAttribute('href')).toBe('/tsa-config')
+    expect(within(row(card, 'scheduler')).queryByRole('link')).toBeNull()
+  })
+
+  it('an administrator gets both links', async () => {
+    const card = await show({ tsa: tsa({}), scheduler: sched({}) })
+    expect(within(row(card, 'scheduler')).getByRole('link').getAttribute('href')).toBe('/settings?tab=scheduler')
   })
 })
 
