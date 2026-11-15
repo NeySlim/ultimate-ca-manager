@@ -150,22 +150,20 @@ def _move_ca_dependents(db, dupe, keeper):
 
 
 def _drop_disproven_parents(db, CA, stats):
-    """Phase 1b: a parent linked without a confirmation that provably is not the issuer of the
-    CA's certificate is replaced by the one that is, or none; audited. A revoked CA keeps its link,
-    so the parent's CRL still lists it."""
+    """Phase 1b: a parent linked without a confirmation that ``may_drop_parent`` allows to remove
+    is replaced by the one that is the issuer, or none; audited."""
     from services.ca import parent_confirmation
     by_refid = {c.refid: c for c in CA.query.all()}
     dropped = []
     for ca in by_refid.values():
         parent = by_refid.get(ca.caref) if ca.caref else None
-        if parent is None or ca.parent_confirmed_at is not None or not ca.crt or not parent.crt:
+        if parent is None or ca.parent_confirmed_at is not None or not ca.crt:
             continue
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
-            if ca.is_revoked or not _provably_not_issuer(
-                    cert, x509.load_pem_x509_certificate(base64.b64decode(parent.crt))):
-                continue
         except Exception:
+            continue
+        if not parent_confirmation.may_drop_parent(ca, cert, parent):
             continue
         parent_confirmation.settle_parent(ca, cert)
         dropped.append(ca)
@@ -181,22 +179,6 @@ def _drop_disproven_parents(db, CA, stats):
     logger.info(f"SKI/AKI chain repair: dropped {len(dropped)} parent links their issuer disproves")
     for ca in dropped:
         parent_confirmation.audit_dropped(ca, username='system')
-
-
-def _provably_not_issuer(cert, parent_cert):
-    """Another subject than the issuer name (RFC 5280 6.1.3 (a)(4)) never was the issuer. Under that
-    name, a bad signature proves it only from the key the AKI names (4.2.1.1): a record re-keyed
-    since the link holds another SKI, and the CA signed by its former key keeps the link."""
-    from utils.cert_issuer import authority_key_identifier_hex, signature_disproved
-    from utils.dn_match import same_name
-    if not same_name(parent_cert.subject, cert.issuer):
-        return True
-    try:
-        ski = parent_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
-    except x509.ExtensionNotFound:
-        return False
-    aki = authority_key_identifier_hex(cert)
-    return aki is not None and aki == ski.key_identifier.hex(':').upper() and signature_disproved(cert, parent_cert)
 
 
 def backfill_ski_aki():

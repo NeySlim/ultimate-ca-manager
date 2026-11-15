@@ -142,16 +142,50 @@ def keeps_confirmed_parent(ca, cert):
     return found is not None and found.parent.refid == ca.caref
 
 
+def _revoked_as(ca, cert):
+    """Whether *cert* is the revoked certificate of *ca*: revocation is per serial (RFC 5280 5.3)."""
+    from services.import_service import stored_certificate_serial
+    return stored_certificate_serial(ca) == cert.serial_number and ca.is_revoked
+
+
+def may_drop_parent(ca, cert, parent):
+    """Whether *parent* may be removed from *ca* holding *cert*: the one rule of the chain repair
+    and of every certificate change. Never for a revoked CA (its parent's CRL lists it); yes for a
+    subject that is not the issuer name (RFC 5280 6.1.3 (a)(4)) or for the key the AKI names
+    (4.2.1.1) when it disproves the signature; no for a parent re-keyed since (the AKI names
+    another key) and whatever proves nothing."""
+    from utils.cert_issuer import signature_disproved
+    parent_cert = _certificate(parent)
+    if parent_cert is None or _revoked_as(ca, cert):
+        return False
+    if is_self_signed(cert) or not same_name(parent_cert.subject, cert.issuer):
+        return True
+    try:
+        ski = parent_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
+    except x509.ExtensionNotFound:
+        return False
+    aki = authority_key_identifier_hex(cert)
+    return aki is not None and aki == ski.key_identifier.hex(':').upper() and signature_disproved(cert, parent_cert)
+
+
 def settle_parent(ca, cert):
     """Before *ca* takes *cert*: ``caref`` becomes its parent confirmed by hand while that is still
-    the proposal, else the CA whose key verifies *cert* (the former parent only if it still does),
-    else None. Returns whether the confirmed parent held; the caller audits a dropped link after
-    its commit with ``audit_dropped``."""
+    the proposal, else the CA whose subject is the issuer name of *cert* and whose key verifies it,
+    else the former parent unless ``may_drop_parent`` allows its removal, else None. A revoked CA
+    keeps its parent. Returns whether the confirmed parent held; the caller audits a dropped link
+    after its commit with ``audit_dropped``."""
     if keeps_confirmed_parent(ca, cert):
         return True
+    from models import CA
     from services.import_service import relink_parent_caref
     former, confirmed = ca.caref, ca.parent_confirmed_at is not None
-    ca.caref = relink_parent_caref(cert, None if confirmed else former, exclude_ca_id=ca.id)
+    parent = CA.query.filter_by(refid=former).first() if former else None
+    held = parent is not None and parent.id != ca.id and not may_drop_parent(ca, cert, parent)
+    if held and _revoked_as(ca, cert):
+        # Moved under another record, the CA would leave the CRL of the parent that revoked it
+        return confirmed
+    held = held and not confirmed  # a link confirmed by hand holds only while it is the proposal
+    ca.caref = relink_parent_caref(cert, None, exclude_ca_id=ca.id) or (former if held else None)
     ca.parent_confirmed_by = None
     ca.parent_confirmed_at = None
     if former and (confirmed or ca.caref != former and not _same_issuer_record(former, ca.caref)):

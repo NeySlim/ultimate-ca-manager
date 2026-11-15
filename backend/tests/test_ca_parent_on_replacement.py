@@ -32,6 +32,11 @@ def _key():
     return rsa.generate_private_key(65537, 2048)
 
 
+def _key_pem(key):
+    return key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                             serialization.NoEncryption()).decode()
+
+
 def _stored_pem(app, ca_id):
     with app.app_context():
         return base64.b64decode(db.session.get(CA, ca_id).crt).strip()
@@ -382,7 +387,8 @@ def rekeyed(app, auth_client, made):
     root_cn, cn = f'Rekey Root {tag}', f'Rekey Child {tag}'
     root = _import(auth_client, pem(make_cert(root_cn, old_key)))
     made.append(root['id'])
-    child = _import(auth_client, pem(make_cert(cn, key, root_cn, old_key)))
+    # The CA holds its key: the install path checks the certificate against it
+    child = _import(auth_client, pem(make_cert(cn, key, root_cn, old_key)) + _key_pem(key))
     made.append(child['id'])
     assert child['caref'] == root['refid']
     assert _import(auth_client, pem(make_cert(root_cn, _key())), cross_mode='replace')['id'] == root['id']
@@ -443,6 +449,127 @@ def test_the_chain_repair_keeps_the_link_of_a_revoked_ca_under_another_name(app,
         backfill_ski_aki()
     assert _on_crl_of(app, stray['id'], w['child']['id'])
     assert _caref(app, w['child']['id']) == stray['refid']
+
+
+# ------------------------------------------------- one rule for the repair and a certificate change
+
+SETTLE_ROUTES = ['/api/v2/cas/import', '/api/v2/certificates/import', 'install']
+
+
+def _reimport(app, auth_client, ca_id, pem, route):
+    if route == 'install':
+        _with_csr(app, ca_id)
+        route = '/api/v2/cas/import'
+    assert _import(auth_client, pem, route=route, cross_mode='replace')['id'] == ca_id
+
+
+@pytest.mark.parametrize('route', SETTLE_ROUTES)
+@pytest.mark.parametrize('revoked', [True, False])
+def test_the_same_certificate_imported_again_keeps_the_link_to_a_re_keyed_parent(
+        app, auth_client, rekeyed, route, revoked):
+    """The AKI names the former key: nothing disproves the parent, and a revoked CA stays on its CRL."""
+    root, child = rekeyed
+    if revoked:
+        _revoke_by_flag(app, child['id'])
+    before = _audits(app, UNLINKED, child['id'])
+    _reimport(app, auth_client, child['id'], _stored_pem(app, child['id']).decode(), route)
+    assert _caref(app, child['id']) == root['refid']
+    assert _audits(app, UNLINKED, child['id']) == before
+    assert _on_crl_of(app, root['id'], child['id']) is revoked
+
+
+@pytest.mark.parametrize('route', ROUTES)
+def test_a_new_serial_is_not_the_revoked_ca_and_follows_the_rule_of_every_certificate(
+        app, auth_client, made, linked, route):
+    """Revocation is per certificate (RFC 5280 5.3): a new one moves under the CA whose key verifies it."""
+    w = linked
+    stray = _import(auth_client, _rsa_pem(f'Repl Stray {_tag()}', _key(), serial=_serial()))
+    made.append(stray['id'])
+    with app.app_context():
+        db.session.get(CA, w['child']['id']).caref = stray['refid']  # a link left by an earlier version
+        db.session.commit()
+    _revoke_by_flag(app, w['child']['id'])
+    _replace(app, auth_client, w, _rsa_pem(w['cn'], w['key'], w['root_cn'], w['root_key'], serial=_serial()), route)
+    assert _caref(app, w['child']['id']) == w['root']['refid']
+
+
+def _case_re_keyed(app, auth_client, made):
+    from tests.fixtures.cross_pki import make_cert, pem
+    tag, old_key = _tag(), _key()
+    root = _import(auth_client, pem(make_cert(f'Tbl Rekey {tag}', old_key)))
+    made.append(root['id'])
+    child = _import(auth_client, pem(make_cert(f'Tbl Rekey Child {tag}', _key(), f'Tbl Rekey {tag}', old_key)))
+    made.append(child['id'])
+    _import(auth_client, pem(make_cert(f'Tbl Rekey {tag}', _key())), cross_mode='replace')
+    return child['id'], root['refid']
+
+
+def _case_other_name(app, auth_client, made):
+    tag, root_key = _tag(), _key()
+    root = _import(auth_client, _rsa_pem(f'Tbl Root {tag}', root_key, serial=_serial()))
+    stray = _import(auth_client, _rsa_pem(f'Tbl Stray {tag}', _key(), serial=_serial()))
+    child = _import(auth_client, _rsa_pem(f'Tbl Child {tag}', _key(), f'Tbl Root {tag}', root_key, serial=_serial()))
+    made.extend([root['id'], stray['id'], child['id']])
+    return child['id'], stray['refid']
+
+
+def _case_named_key_disproves(app, auth_client, made, *, aki=True):
+    tag, root_key = _tag(), _key()
+    root_cn = f'Tbl Named {tag}'
+    root = _import(auth_client, _kid_pem(root_cn, root_key, root_cn, root_key, root_key))
+    made.append(root['id'])
+    if aki:
+        pem = _kid_pem(f'Tbl Named Child {tag}', _key(), root_cn, _key(), root_key)
+    else:
+        pem = _rsa_pem(f'Tbl Named Child {tag}', _key(), root_cn, _key(), serial=_serial())
+    child = _import(auth_client, pem)
+    made.append(child['id'])
+    return child['id'], root['refid']
+
+
+def _case_unverifiable(app, auth_client, made):
+    tag, ski = _tag(), uuid.uuid4().bytes
+    gost = _import(auth_client, _gost_pem(f'Tbl Gost {tag}', serial=_serial(), ski=ski))
+    made.append(gost['id'])
+    child = _import(auth_client, _gost_pem(f'Tbl Gost Child {tag}', f'Tbl Gost {tag}', serial=_serial(), aki=ski))
+    made.append(child['id'])
+    return child['id'], gost['refid']
+
+
+CASES = {
+    're-keyed parent': (_case_re_keyed, True),
+    'parent of another name': (_case_other_name, False),
+    'bad signature under the named key': (_case_named_key_disproves, False),
+    'bad signature without a key identifier': (lambda *a: _case_named_key_disproves(*a, aki=False), True),
+    'signature not verifiable here': (_case_unverifiable, True),
+}
+
+
+def _link_kept(app, auth_client, made, case, revoked, path):
+    from services.ski_aki_backfill import backfill_ski_aki
+    child_id, parent_refid = CASES[case][0](app, auth_client, made)
+    with app.app_context():
+        db.session.get(CA, child_id).caref = parent_refid  # a link left by an earlier version
+        db.session.commit()
+    if revoked:
+        _revoke_by_flag(app, child_id)
+    if path == 'chain repair':
+        with app.app_context():
+            backfill_ski_aki()
+    else:
+        _reimport(app, auth_client, child_id, _stored_pem(app, child_id).decode(), '/api/v2/cas/import')
+    return _caref(app, child_id) == parent_refid
+
+
+@pytest.mark.parametrize('revoked', [False, True])
+@pytest.mark.parametrize('case', sorted(CASES))
+def test_the_chain_repair_and_a_certificate_change_keep_or_drop_the_same_links(
+        app, auth_client, made, case, revoked):
+    """Both paths ask one question, may this parent be removed: a revoked CA never loses it."""
+    expected = revoked or CASES[case][1]
+    kept = {path: _link_kept(app, auth_client, made, case, revoked, path)
+            for path in ('chain repair', 'certificate change')}
+    assert kept == {'chain repair': expected, 'certificate change': expected}
 
 
 # ------------------------------------------------- a parent of another name left by an earlier version
