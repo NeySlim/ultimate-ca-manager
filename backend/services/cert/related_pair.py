@@ -375,6 +375,13 @@ def _still_holding(a_row, cert_a):
     return fresh
 
 
+def named_by(cert_b, requested):
+    """A's row when *cert_b* names it, as :func:`link_issued` requires (read without its lock)."""
+    if requested is None or related_cert.read_related_certificate(cert_b) is None:
+        return None
+    return requested[0] if related_cert.references(cert_b, requested[1]) else None
+
+
 def link_issued(b_row, cert_b, requested):
     """Record on *b_row* the A (*requested*, from ``requested_by_csr``) its
     certificate names, and on A the way back: the newest B takes A from the

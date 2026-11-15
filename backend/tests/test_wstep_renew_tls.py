@@ -886,3 +886,44 @@ def test_renewal_keeps_the_key_usage_of_its_template(app, templated_ca, ekus):
     assert err is None, err
     assert (cert.extensions.get_extension_for_class(x509.KeyUsage).value
             == old_cert.extensions.get_extension_for_class(x509.KeyUsage).value)
+
+
+def test_renewal_of_a_subject_another_holds_is_a_fault_once_the_option_is_on(client, app, wstep_renew_config):
+    """No pattern names the subject: the refusal names it, as a fault the requester can read."""
+    from tests.test_windows_profile_routing import _audits, _fault, _top_audit
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-taken.example.test')
+    _issue(app, wstep_renew_config['id'], 'tls-renew-taken.example.test')  # another key, no holder
+    with app.app_context():
+        db.session.get(CA, wstep_renew_config['id']).enforce_unique_subject = True
+        db.session.commit()
+    floor = _top_audit(app)
+    try:
+        new_key = _key()
+        body = _rst(_cmc_renewal(_renewal_csr(old_cert, new_key), [(new_key, None), (old_key, old_cert)]))
+        assert _fault(_post(client, body, tls_cert=old_cert)) == (
+            400, 's:Sender',
+            'The subject CN=tls-renew-taken.example.test is already carried by a certificate of another account')
+        # One entry, as for a pattern's refusal: no certificate.subject_taken
+        assert [a[0] for a in _audits(app, floor)] == ['windows_enrollment.refused']
+    finally:
+        with app.app_context():
+            db.session.get(CA, wstep_renew_config['id']).enforce_unique_subject = False
+            db.session.commit()
+
+
+def test_a_templated_renewal_of_a_subject_another_holds_names_no_template(app, templated_ca):
+    """A template matched, no pattern building the subject: the CA's option refuses it, and the
+    refusal names no template (the template did not build that subject)."""
+    ca_id = templated_ca('WSTEP renew taken template CA', USER_AND_CODESIGN)
+    old_cert, old_key = _wstep_issued(app, ca_id, 'template-taken.example.test')
+    _wstep_issued(app, ca_id, 'template-taken.example.test')  # another key, the option still off
+    with app.app_context():
+        db.session.get(CA, ca_id).enforce_unique_subject = True
+        db.session.commit()
+    before = _issued_count(app)
+    cert, err = _renew(app, ca_id, 'tls', old_cert, old_key,
+                       _eku_csr(old_cert, old_key, ExtendedKeyUsageOID.CLIENT_AUTH))
+    assert cert is None and isinstance(err, wstep_service.SubjectHeldByAnother), err
+    assert err == ('The subject CN=template-taken.example.test is already carried by a certificate '
+                   'of another account')
+    assert _issued_count(app) == before

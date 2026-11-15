@@ -141,7 +141,8 @@ class TestSignCsr:
             pem = _csr('custom-acme.example.test').public_bytes(serialization.Encoding.PEM).decode()
             with app.app_context():
                 ca_refid = db.session.get(CA, ca['id']).refid
-                order = types.SimpleNamespace(order_id='custom-ext-order', profile='custom')
+                order = types.SimpleNamespace(order_id='custom-ext-order', profile='custom',
+                                              account_id='custom-ext-account')
                 ok, cert_id, err = AcmeService(base_url='http://localhost')._sign_certificate_with_ca(
                     order, pem, ca_refid)
                 assert ok, err
@@ -228,7 +229,8 @@ class TestMisconfiguredTemplate:
             pem = _csr('custom-acme-bad.example.test').public_bytes(serialization.Encoding.PEM).decode()
             with app.app_context():
                 service = AcmeService(base_url='http://localhost')
-                order = types.SimpleNamespace(order_id='custom-ext-bad-order', profile='broken')
+                order = types.SimpleNamespace(order_id='custom-ext-bad-order', profile='broken',
+                                              account_id='custom-ext-account')
                 ok, cert_id, err = service._sign_certificate_with_ca(
                     order, pem, db.session.get(CA, ca['id']).refid)
                 assert not ok and cert_id is None

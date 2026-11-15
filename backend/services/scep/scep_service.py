@@ -31,6 +31,7 @@ from utils.leaf_key_usage import constrain_builder_key_usage
 from utils.key_codec import load_pem_bytes, refuse_eddsa_key
 from utils.csr_extensions import csr_extensions
 from utils.ca_serial_counter import next_ca_serial
+from services.cert.unique_subject import SubjectTaken, refuse_taken_subject, successor_holder
 from utils.datetime_utils import utc_now
 from utils.file_naming import cert_cert_path
 
@@ -706,7 +707,7 @@ class SCEPService:
                     from utils.request_names import RequestRejected
                     return self._create_error_response(
                         self.FAIL_BAD_REQUEST,
-                        str(e) if isinstance(e, RequestRejected) else "Server error issuing certificate",
+                        str(e) if isinstance(e, (RequestRejected, SubjectTaken)) else "Server error issuing certificate",
                         transaction_id=transaction_id, recipient_nonce=sender_nonce,
                     ), 200
 
@@ -756,8 +757,15 @@ class SCEPService:
 
                 try:
                     # Counted after the Intune notice: the count locks the CA row until the commit
-                    next_ca_serial(self.ca)
+                    self._count_issuance()
                     db.session.commit()
+                except SubjectTaken as e:
+                    # RFC 8894 §3.2.1.4: badRequest, "transaction not permitted"
+                    self._notify_intune_failure(transaction_id, csr_data, str(e))
+                    return self._create_error_response(
+                        self.FAIL_BAD_REQUEST, str(e),
+                        transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                    ), 200
                 except Exception as e:
                     db.session.rollback()
                     logger.error(f"SCEP: DB commit failed during auto-approve: {e}")
@@ -981,7 +989,12 @@ class SCEPService:
             except Exception as e:
                 logger.warning(f"SCEP approve_request: stored renewal certificate unreadable, "
                                f"approving as an initial enrolment: {e}")
-        cert_refid = self._auto_approve_request(scep_req, csr, validity_days, renewal_of=renewal_of)
+        try:
+            cert_refid = self._auto_approve_request(scep_req, csr, validity_days, renewal_of=renewal_of)
+        except SubjectTaken as e:
+            # Intune validated this request: it hears of the refusal; the request stays pending
+            self._notify_intune_failure(transaction_id, base64.b64decode(scep_req.csr), str(e))
+            raise
 
         scep_req.status = "approved"
         scep_req.cert_refid = cert_refid
@@ -1002,8 +1015,11 @@ class SCEPService:
                 raise ValueError('Intune could not be notified; the certificate was not issued') from e
         try:
             # Counted after the Intune notice: the count locks the CA row until the commit
-            next_ca_serial(self.ca)
+            self._count_issuance()
             db.session.commit()
+        except SubjectTaken as e:
+            self._notify_intune_failure(transaction_id, base64.b64decode(scep_req.csr), str(e))
+            raise
         except Exception as e:
             db.session.rollback()
             logger.error(f"SCEP approve_request: DB commit failed: {e}")
@@ -1437,6 +1453,14 @@ class SCEPService:
             raise PolicyViolation('; '.join(violations))
         return capped
 
+    def _count_issuance(self):
+        """Count the issuance _auto_approve_request staged, under the CA row lock, then refuse it
+        when its subject is taken (RFC 5280 §4.1.2.6, the CA's unique subject option)."""
+        next_ca_serial(self.ca)
+        issued, row, renews, sid = self._staged_issuance
+        refuse_taken_subject(self.ca, issued, own=[row], renews=renews, requester_sid=sid,
+                             source='scep')
+
     def _auto_approve_request(
         self,
         scep_req: SCEPRequest,
@@ -1793,6 +1817,10 @@ class SCEPService:
 
         cert = builder.sign(self.ca_key, sign_hash, default_backend(),
                             rsa_padding=rsa_padding_for(self.ca_key, sign_hash))
+        rows = find_issued_rows(self.ca, renewal_of) if renewal_of is not None else []
+        # Refused before the CT logs or Intune hear of it, again under the CA row lock
+        refuse_taken_subject(self.ca, cert, renews=rows, requester_sid=requester_sid, source='scep',
+                             locked=False)
         # Same CT policy as every other leaf path (a ValueError here is a
         # refusal the SCEP layer reports as a failure)
         from utils.ct_client import apply_ct_policy
@@ -1847,10 +1875,11 @@ class SCEPService:
             # Archived in the same transaction, and claimed once: the scheduler
             # does not renew it again, nor does a concurrent renewal
             from services.ca.ca_signing import _claim_superseded
-            rows = find_issued_rows(self.ca, renewal_of)
             live = next((r for r in rows if not r.archived), None)
             if rows and (live is None or not _claim_superseded(live, renewal_of, cert_obj)):
                 raise ValueError('Signing certificate has been superseded by a newer one')
+        cert_obj.subject_holder = successor_holder(None, rows)
+        self._staged_issuance = (cert, cert_obj, rows, requester_sid)
 
         Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
         with open(cert_cert_path(cert_obj), "wb") as f:

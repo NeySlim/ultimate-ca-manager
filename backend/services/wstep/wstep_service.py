@@ -23,6 +23,7 @@ from cryptography.x509.oid import NameOID
 from models import Certificate
 from services.ad_connector import renewal_identity
 from services.ca.ca_signing import AlreadySuperseded, SubjectTaken
+from services.cert.unique_subject import applies as applies_unique_subject, sid_holder
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
 from services.protocol_approval import RENEWED_REVOKED, AlreadyIssued
@@ -984,12 +985,15 @@ class _PatternRefusal(str):
 
 
 class SubjectHeldByAnother(str):
-    """A patterned subject a certificate of another account of the CA carries: the requester's
-    fault, naming no account; ``audited`` adds the serial of that certificate, for the audit only."""
+    """A subject a certificate of another account of the CA carries: the requester's fault, naming
+    no account; *template* is the one whose pattern built it, None when no pattern applied.
+    ``audited`` adds the serial of that certificate, for the audit only."""
 
     def __new__(cls, template, taken):
-        refusal = super().__new__(cls, f"Template '{template.name}' builds the subject {taken.subject}, "
-                                       'which a certificate of another account already carries')
+        refusal = super().__new__(cls, (
+            f"Template '{template.name}' builds the subject {taken.subject}, "
+            'which a certificate of another account already carries' if template is not None else
+            f'The subject {taken.subject} is already carried by a certificate of another account'))
         refusal.audited = f'{refusal} (serial {taken.serial})'
         return refusal
 
@@ -1315,6 +1319,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     if err:
         return None, err
 
+    from services.cert.issued_lookup import find_issued_rows
     cert_type, template_ku = _template_profile(matched_template, csr)
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
@@ -1335,9 +1340,13 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
             windows_profile_id=getattr(profile, 'id', None), unique_subject=patterned,
+            subject_holder=sid_holder(requester_sid), audit_subject_refusal=False,
+            # The renewed template-less certificate proves the same entity (designated renewal)
+            renews=(find_issued_rows(ca, exempted)
+                    if exempted is not None and applies_unique_subject(ca, patterned) else None),
         )
     except SubjectTaken as e:
-        return None, SubjectHeldByAnother(matched_template, e)
+        return None, SubjectHeldByAnother(matched_template if patterned else None, e)
     except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
     except RequestRejected as e:
@@ -1686,11 +1695,13 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
             windows_profile_id=profile.id, unique_subject=override_subject is not None,
+            subject_holder=sid_holder(requester_sid), audit_subject_refusal=False,
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'
     except SubjectTaken as e:
-        return None, SubjectHeldByAnother(matched_template, e)
+        return None, SubjectHeldByAnother(
+            matched_template if override_subject is not None else None, e)
     except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
     except RequestRejected as e:

@@ -243,6 +243,7 @@ def _issue_approved_csr(approval, data):
         policy_template_id=data.get('template_id'),
         notices=sign_notices,
         custom_extensions=data.get('custom_extensions'),
+        override_unique_subject=data.get('override_unique_subject') is True,
     )
     if isinstance(signed, CA):
         # An intermediate CA request: the result lives in the CA table, the
@@ -783,6 +784,10 @@ def _issue_approved_certificate(approval):
     # Same CT policy as the direct issue form (raises ValueError when
     # ct_required cannot be met: the approval stays pending with the reason)
     from utils.ct_client import apply_ct_policy
+    from services.cert.unique_subject import refuse_taken_subject
+    if data.get('override_unique_subject') is not True:  # before the CT logs, again under the lock
+        refuse_taken_subject(ca, new_cert, source='approval', locked=False,
+                             requester=approval.requester.username if approval.requester else 'system')
     new_cert, _ = apply_ct_policy(new_cert, ca_cert, ca_key)
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     key_pem = private_key_to_pem(new_key).decode('utf-8')
@@ -854,6 +859,10 @@ def _issue_approved_certificate(approval):
     if claimed != 1:
         db.session.rollback()
         raise RuntimeError('A certificate was already issued for this approval')
+    from services.cert.unique_subject import audit_override
+    overridden = refuse_taken_subject(
+        ca, new_cert, own=[db_cert], override=data.get('override_unique_subject') is True,
+        source='approval', requester=db_cert.created_by)
     approval.certificate_id = db_cert.id
     ok, _err = safe_commit(logger, "Failed to link approval to certificate")
     if not ok:
@@ -862,6 +871,8 @@ def _issue_approved_certificate(approval):
         # the JSON response as `certificate`
         raise RuntimeError('Failed to link approval to certificate')
 
+    if overridden is not None:
+        audit_override(ca, db_cert, overridden, db_cert.created_by)
     # The event the issue form fires, once the row is committed
     from services.webhook_service import emit_cert_issued
     emit_cert_issued(db_cert.to_dict(), ca_refid=ca.refid, actor=db_cert.created_by)
@@ -1396,7 +1407,8 @@ def approve_approval_request(request_id, comment=None):
             from services.policy_service import PolicyViolation
             from services.cert.renewal import RenewalError
             from services.cert.related_pair import RelatedCertificateRefused
-            if isinstance(e, RelatedCertificateRefused) or (
+            from services.cert.unique_subject import SubjectTaken
+            if isinstance(e, (RelatedCertificateRefused, SubjectTaken)) or (
                     isinstance(e, RenewalError) and e.status < 500):
                 # A refusal the approver is told about, not a failure
                 logger.warning(f"Certificate for approval #{approval.id} refused: {e}")
@@ -1405,7 +1417,9 @@ def approve_approval_request(request_id, comment=None):
                              exc_info=True)
             from services.protocol_approval import GENERIC_ISSUE_ERROR, is_key_material_error
             from utils.custom_extensions import TemplateConfigError
-            if isinstance(e, PolicyViolation):
+            if isinstance(e, SubjectTaken):
+                issue_error = e.audited[:1].upper() + e.audited[1:]  # the approver may know the serial
+            elif isinstance(e, PolicyViolation):
                 issue_error = str(e) if str(e).startswith('Policy violation:') else f'Policy violation: {e}'
             elif isinstance(e, RenewalError):
                 issue_error = e.message

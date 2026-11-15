@@ -37,6 +37,7 @@ import { ChainUsageSection } from '../cas/ChainUsageSection'
 import { SignatureSchemeField } from '../cas/SignatureSchemeField'
 import { ComplianceProfileField } from '../cas/ComplianceProfileField'
 import { IssuanceVisibilityField } from '../cas/IssuanceVisibilityField'
+import { UniqueSubjectField } from '../cas/UniqueSubjectField'
 import { ParentConfirmationSection } from '../cas/ParentConfirmationSection'
 import { cn } from '../../lib/utils'
 import { useClipboard } from '../../hooks/useClipboard'
@@ -302,6 +303,7 @@ export function CAPanel({
           <SignatureSchemeField ca={ca} canWrite={canWriteCas} onChanged={onCaChanged} />
           <ComplianceProfileField ca={ca} canWrite={canWriteCas} canAttach={canAttachProfile} onChanged={onCaChanged} />
           <IssuanceVisibilityField ca={ca} canWrite={canWriteCas} onChanged={onCaChanged} />
+          <UniqueSubjectField ca={ca} canWrite={canWriteCas} onChanged={onCaChanged} />
           {ca.uses_hsm && (
             <>
               <CompactField label={t('cas.create.hsmProvider')} value={ca.hsm_provider_name || '-'} />

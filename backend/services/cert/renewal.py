@@ -41,6 +41,7 @@ from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.serial_format import canonical_serial
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
 from utils.db_transaction import commit_or_rollback
+from services.cert.unique_subject import SubjectTaken, lock_issuers, refuse_taken_subject
 from utils.ca_serial_counter import next_ca_serial
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
@@ -223,6 +224,8 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
     of a related pair is renewed with it, A first, in the same commit."""
     try:
         members = _renewal_members(cert)
+        # Read before a row takes its new certificate: the replaced ones prove the entity
+        previous = [(m, _stored(m)) for m in members]
         pair = len(members) == 2
         staged_all, renewed_a = [], None
         for index, member in enumerate(members):
@@ -233,7 +236,10 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                 staged_member = _stage_renewal(
                     member, ca if is_cert else None, rekey=rekey, trigger=trigger,
                     known_serial=known_serial if is_cert else SERIAL_UNSET,
-                    validity_days=validity_days, related_to=related_to)
+                    validity_days=validity_days, related_to=related_to,
+                    precheck=lambda signer, issued: _refuse_taken(
+                        signer, issued, members, trigger, username, locked=False,
+                        previous=previous))
             except RenewalError as e:
                 if is_cert:
                     raise
@@ -246,15 +252,21 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
             leave_pair(staged_all[0]['cert'])
-        # A renewal is an issuance, counted in its commit; the CA rows are locked last,
-        # after every certificate row written, and by id so two pairs never cross
+        # A renewal is an issuance, counted in its commit; the CA rows (twins' lowest records
+        # included) are locked last, after every certificate row written, all in id order
         try:
             db.session.flush()
         except SQLAlchemyError as e:
             logger.error(f'Failed to renew certificate {cert.id}: {e}', exc_info=True)
             raise RenewalError('Failed to renew certificate', 500) from e
+        lock_issuers([s['ca'] for s in staged_all])
         for s in sorted(staged_all, key=lambda s: s['ca'].id):
             next_ca_serial(s['ca'])
+        # The renewed row is the same entity (RFC 5280 §4.1.2.6), and so is its pair partner
+        rows = [s['cert'] for s in staged_all]
+        for s in staged_all:
+            _refuse_taken(s['ca'], x509.load_pem_x509_certificate(s['cert_pem']), rows, trigger, username,
+                          previous=previous)
     except Exception:
         db.session.rollback()
         raise
@@ -285,6 +297,23 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                       trigger=trigger)
         crl_done.add(s['ca'].id)
     return outcome
+
+
+def _refuse_taken(ca, issued, rows, trigger, username, locked=True, previous=()):
+    """RFC 5280 §4.1.2.6: the renewed rows are the same entity; another one's subject is a 409."""
+    try:
+        refuse_taken_subject(ca, issued, own=rows, source=f'renewal ({trigger})', requester=username,
+                             locked=locked, previous=previous)
+    except SubjectTaken as e:
+        raise RenewalError(f'{e.audited[:1].upper()}{e.audited[1:]}, issued by this CA to '
+                           'another entity: the CA requires a unique subject', 409) from e
+
+
+def _stored(row):
+    try:
+        return x509.load_pem_x509_certificate(b64decode(row.crt)) if row.crt else None
+    except (ValueError, InvalidRequestError):  # unreadable or deleted: check_renewable answers
+        return None
 
 
 def _renewal_members(cert):
@@ -336,7 +365,8 @@ def _current_related(row):
     return cert_a
 
 
-def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None) -> dict:
+def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,
+                   precheck=None) -> dict:
     """Every check, the signature and the writes, left uncommitted; *related_to*
     is the certificate A the renewed one names (RFC 9763)."""
     cert = _reread(cert, known_serial, trigger)
@@ -371,6 +401,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
                        _template_custom_extensions(getattr(cert, 'template_id', None)))
     renewed = builder.sign(private_key=ca_key, algorithm=sign_hash,
                            rsa_padding=rsa_padding_for(ca_key, sign_hash))
+    if precheck is not None:  # without the lock, before the CT logs see a pre-certificate
+        precheck(ca, renewed)
     renewed, scts = _apply_ct(renewed, ca_cert, ca_key)
 
     old_serial, old_valid_to = cert.serial_number, cert.valid_to

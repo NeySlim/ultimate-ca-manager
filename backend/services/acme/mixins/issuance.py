@@ -572,7 +572,8 @@ class IssuanceMixin:
         if exc is None:
             return True
         from services.policy_service import PolicyViolation
-        if isinstance(exc, PolicyViolation):
+        from services.cert.unique_subject import SubjectTaken
+        if isinstance(exc, (PolicyViolation, SubjectTaken)):  # SubjectTaken: RFC 8555 §7.4 badCSR
             return True
         from utils.ca_signing_window import IssuerWindowError
         try:
@@ -714,6 +715,7 @@ class IssuanceMixin:
                 template_id=params.get('template_id'),
                 not_before=not_before,
                 not_after=not_after,
+                subject_holder=f'acme:{order.account_id}', source='acme',
             )
             
             return True, signed_cert.id, None

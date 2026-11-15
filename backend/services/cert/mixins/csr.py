@@ -10,6 +10,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, Certificate
+from services.cert.unique_subject import (SubjectTaken, audit_override, refuse_taken_subject,
+                                          successor_holder)
 from utils.ca_serial_counter import (
     log_commit_failure, next_ca_serial, retry_on_serial_collision,
     rollback_unless_serial_collision)
@@ -209,6 +211,9 @@ class CSRMixin:
         custom_extensions: list = None,
         not_before=None,
         not_after=None,
+        subject_holder: str = None,
+        override_unique_subject: bool = False,
+        source: str = 'csr',
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -234,6 +239,10 @@ class CSRMixin:
                 over the template's for the same OID; the template's apply to leaves only
             not_before, not_after: dates the requester asked for (naive UTC), issued
                 exactly or refused (ACME notBefore/notAfter)
+            subject_holder: who the subject is certified to (ACME: 'acme:<account>')
+            override_unique_subject: an operator issues although the CA's unique subject
+                is taken (audited); never set by a protocol
+            source: the issuance path its refusal audit names
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -297,7 +306,7 @@ class CSRMixin:
             raise ValueError(f"Failed to verify CSR signature: {e}")
 
         # RFC 9763: A is found before signing; linking refuses only an A renewed since
-        from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
+        from services.cert.related_pair import link_issued, named_by, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr_obj.public_bytes(serialization.Encoding.DER))
 
         # Sign CSR
@@ -364,6 +373,10 @@ class CSRMixin:
             notices=notices,
             not_before=not_before,
             not_after=not_after,
+            # Without the lock, before the CT logs see a pre-certificate; checked again under it
+            before_publication=None if override_unique_subject else (lambda leaf: refuse_taken_subject(
+                ca, leaf, own=[certificate], renews=[named_by(leaf, related_a)],
+                holder=subject_holder, source=source, requester=username, locked=False)),
         )
 
         # Parse signed certificate
@@ -420,6 +433,8 @@ class CSRMixin:
         certificate.serial_number = str(cert.serial_number)
         certificate.valid_from = cert.not_valid_before
         certificate.valid_to = cert.not_valid_after
+        if subject_holder:
+            certificate.subject_holder = subject_holder
 
         # Keep the template link and record the divergences from its
         # defaults (#258), as the issue form and approval paths do. The key
@@ -439,10 +454,13 @@ class CSRMixin:
 
         # RFC 9763: the A the request named and the certificate now names, refused if renewed since
         try:
-            link_issued(certificate, cert, related_a)
+            a_row = link_issued(certificate, cert, related_a)
         except Exception:
             db.session.rollback()
             raise
+        # A verified relatedCertRequest proves A's key: B is A's entity (RFC 9763 pair)
+        if a_row is not None:
+            certificate.subject_holder = successor_holder(subject_holder, [a_row])
 
         # Store SANs
         if san_dns_list:
@@ -502,11 +520,21 @@ class CSRMixin:
             # Every row written (A's link included) is locked before the CA row, last
             db.session.flush()
             next_ca_serial(ca)
+            overridden = None
+            if new_ca is None:  # a CA certificate is out of the subject rule's scope
+                overridden = refuse_taken_subject(
+                    ca, cert, own=[certificate], renews=[a_row], holder=subject_holder,
+                    override=override_unique_subject, source=source,
+                    requester=username)
             db.session.commit()
+        except SubjectTaken:
+            raise
         except Exception as _commit_err:
             rollback_unless_serial_collision(_commit_err)
             log_commit_failure(logger, "Storing the signed CSR failed", _commit_err)
             raise
+        if overridden is not None:
+            audit_override(ca, certificate, overridden, username)
 
         # A request queued for approval and then signed directly is closed
         # as approved by the signer (no other approver could do more)

@@ -101,6 +101,9 @@ class CA(db.Model):
 
     # Kept out of the manual issuance pickers, offered on request only (#430)
     issuance_hidden = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    # RFC 5280 §4.1.2.6: no subject issued to two entities (services.cert.unique_subject)
+    enforce_unique_subject = db.Column(db.Boolean, nullable=False, default=False,
+                                       server_default=db.false())
     
     # OCSP (Online Certificate Status Protocol)
     ocsp_enabled = db.Column(db.Boolean, default=False)
@@ -690,6 +693,7 @@ class CA(db.Model):
             "signature_scheme": self.signature_scheme or 'pkcs1v15',
             "compliance_profile": self.compliance_profile,
             "issuance_hidden": bool(self.issuance_hidden),
+            "enforce_unique_subject": bool(self.enforce_unique_subject),
             # CRL/CDP configuration
             "cdp_enabled": self.cdp_enabled,
             "cdp_url": self.get_primary_cdp_url(),
