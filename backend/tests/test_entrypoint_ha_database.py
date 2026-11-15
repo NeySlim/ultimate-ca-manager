@@ -17,7 +17,9 @@ def _run(body, env, cwd):
 def _sqlite_env(tmp_path, ha):
     db = tmp_path / 'ucm.db'
     db.write_text('x')
-    env = {'UCM_DATABASE_PATH': str(db), 'UCM_BACKUP_ENABLED': 'true', 'UCM_BACKUP_RETENTION_DAYS': '30'}
+    # never the image's default migrations directory, which on a host is an installation's
+    env = {'UCM_DATABASE_PATH': str(db), 'UCM_BACKUP_ENABLED': 'true', 'UCM_BACKUP_RETENTION_DAYS': '30',
+           'UCM_MIGRATIONS_DIR': str(tmp_path / 'no-migrations')}
     if ha is not None:
         env['UCM_HA'] = ha
     return env
@@ -67,7 +69,8 @@ def test_dockerfile_ships_the_helper_pos():
     ({'UCM_INITIAL_ADMIN_PASSWORD_FILE': '/run/secrets/a'}, 'the one you provided (INITIAL_ADMIN_PASSWORD_FILE)'),
 ])
 def test_the_first_run_notice_never_shows_a_password(tmp_path, provided, expect):
-    env = {'UCM_DATABASE_PATH': str(tmp_path / 'absent.db'), 'UCM_INITIAL_ADMIN_USERNAME': 'admin', **provided}
+    env = {'UCM_DATABASE_PATH': str(tmp_path / 'absent.db'), 'UCM_INITIAL_ADMIN_USERNAME': 'admin',
+           'UCM_MIGRATIONS_DIR': str(tmp_path / 'no-migrations'), **provided}
     r = _run('ucm_sqlite_check_and_backup', env, tmp_path)
     assert r.returncode == 0 and expect in r.stdout, r.stdout
     assert 'changeme123' not in r.stdout and 'Op-Chosen-1!' not in r.stdout
@@ -207,3 +210,80 @@ def test_the_check_leaves_the_database_unchanged(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
     assert (tmp_path / 'ucm.db').read_bytes() == before
     assert sorted(p.name for p in tmp_path.iterdir()) == entries
+
+
+def _files(directory):
+    return {p.name: (p.stat().st_size, p.stat().st_mtime_ns) for p in directory.iterdir()}
+
+
+_HOT_JOURNAL = r'''
+import os, sqlite3, sys
+c = sqlite3.connect(sys.argv[1], isolation_level=None)
+c.execute('PRAGMA cache_size = 1')
+c.execute('BEGIN')
+c.execute("UPDATE _migrations SET name = name || '-'")
+c.execute("INSERT INTO system_config SELECT hex(randomblob(400)), '' FROM _migrations, _migrations AS b LIMIT 5000")
+os._exit(0)  # killed mid-transaction: the journal stays hot
+'''
+
+
+@pytest.mark.parametrize('case', ['wal', 'wal after a crash', 'hot journal'])
+def test_the_check_creates_and_changes_nothing(tmp_path, case):
+    import sqlite3
+    import sys
+    env = _env(tmp_path, 'false')
+    _database(tmp_path, NAMES)
+    db = tmp_path / 'ucm.db'
+    if case.startswith('wal'):
+        c = sqlite3.connect(db)
+        c.execute('PRAGMA journal_mode = WAL')
+        if case == 'wal after a crash':
+            subprocess.run([sys.executable, '-I', '-c', 'import os, sqlite3, sys\n'
+                            'c = sqlite3.connect(sys.argv[1]); c.execute("PRAGMA wal_autocheckpoint = 0")\n'
+                            'c.execute("INSERT INTO _migrations VALUES (\'x\')"); c.commit(); os._exit(0)', str(db)],
+                           check=True)
+        c.close()
+        if case == 'wal after a crash':
+            # the closing connection checkpointed: write again from a process that dies holding the log
+            subprocess.run([sys.executable, '-I', '-c', 'import os, sqlite3, sys\n'
+                            'c = sqlite3.connect(sys.argv[1]); c.execute("PRAGMA wal_autocheckpoint = 0")\n'
+                            'c.execute("INSERT INTO _migrations VALUES (\'y\')"); c.commit(); os._exit(0)', str(db)],
+                           check=True)
+            assert (tmp_path / 'ucm.db-wal').exists()
+    else:
+        subprocess.run([sys.executable, '-I', '-c', _HOT_JOURNAL, str(db)], check=True)
+        assert (tmp_path / 'ucm.db-journal').stat().st_size > 0
+    before = _files(tmp_path)
+    r = _run(_df(0) + _START, env, tmp_path)
+    assert _files(tmp_path) == before
+    # neither case can be read without writing: both count as an upgrade
+    assert r.returncode != 0 and 'upgrading it needs' in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize('python3', [
+    'hash -p /nonexistent/python3 python3',
+    'python3() { echo "Traceback: boom" >&2; return 1; }',
+])
+def test_a_missing_or_failing_python_counts_as_an_upgrade_and_never_stops_the_start(tmp_path, python3):
+    # as the entrypoint runs it: set -e and its ERR trap
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, NAMES)
+    head = f"set -e; trap 'echo TRAPPED; exit 1' ERR; . {HELPER}; {python3}; "
+    for avail_kb, starts in ((2 * 3000, True), (3000, False)):
+        r = subprocess.run(['bash', '-c', head + _df(avail_kb) + _START + '; echo REACHED'],
+                           env={'PATH': '/usr/bin:/bin', **env}, capture_output=True, text=True, cwd=tmp_path)
+        # the refusal itself stops the entrypoint through its trap, as intended
+        assert ('TRAPPED' in r.stdout) is not starts, r.stdout
+        assert ('REACHED' in r.stdout) is starts and ('cp ' in r.stdout) is starts, r.stdout
+        assert starts or 'upgrading it needs' in r.stdout, r.stdout
+
+
+def test_a_2_254_database_and_an_older_2x_database_count_as_an_upgrade(tmp_path):
+    import sys
+    sys.path.insert(0, str(ROOT / 'backend'))
+    from migrations._from_2_254 import PIVOT_NAMES
+    env = _env(tmp_path, 'false')
+    for applied in (sorted(PIVOT_NAMES), sorted(n for n in PIVOT_NAMES if n < '120')):
+        _database(tmp_path, applied)
+        r = _run(_df(2999) + _START, env, tmp_path)
+        assert r.returncode != 0 and 'upgrading it needs' in r.stdout, r.stdout

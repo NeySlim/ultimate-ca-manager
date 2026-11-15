@@ -47,11 +47,17 @@ ucm_initial_admin_notice() {
 
 # The database itself says whether this start upgrades it: a migration of the image missing from
 # its registry, or the serial step left to run again. Read-only; any doubt counts as an upgrade.
+# A WAL database is not opened: a read-only open would create its -wal and -shm files.
 ucm_sqlite_upgrade_possible() {
     python3 -I - "$UCM_DATABASE_PATH" "${UCM_MIGRATIONS_DIR:-/opt/ucm/backend/migrations}" <<'PY' 2>/dev/null && return 1
 import pathlib, sqlite3, sys
+path = pathlib.Path(sys.argv[1]).resolve()
+with open(path, "rb") as f:
+    head = f.read(20)
+if head[:16] != b"SQLite format 3\0" or head[18:20] != b"\1\1":
+    sys.exit(1)
 names = {p.stem for p in pathlib.Path(sys.argv[2]).glob("*.py") if not p.name.startswith("_")}
-db = sqlite3.connect(pathlib.Path(sys.argv[1]).resolve().as_uri() + "?mode=ro", uri=True)
+db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
 applied = {row[0] for row in db.execute("SELECT name FROM _migrations")}
 tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
 pending = "system_config" in tables and db.execute(
