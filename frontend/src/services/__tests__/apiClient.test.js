@@ -541,5 +541,14 @@ describe('API Client', () => {
       await expect(apiClient.get('/certificates/stats')).rejects.toMatchObject({ status: 401 })
       expect(assigned).toEqual(['/login?next=%2Faccount'])
     })
+
+    it('a page restored from the back-forward cache no longer holds the sign-out', async () => {
+      const { apiClient, holdSignOut } = await import('../apiClient')
+      holdSignOut()
+      window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }))
+      global.fetch.mockResolvedValueOnce(refused()).mockResolvedValueOnce(session(false))
+      await expect(apiClient.get('/certificates/stats')).rejects.toMatchObject({ status: 401 })
+      expect(assigned).toEqual(['/login?next=%2Faccount'])
+    })
   })
 })
