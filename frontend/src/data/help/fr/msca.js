@@ -18,7 +18,7 @@ export default {
           { label: 'Sélection du modèle', text: 'Choisir parmi les modèles de certificats disponibles sur la MS CA' },
           { label: 'Auto-approuvé', text: 'Les modèles avec autoenroll retournent le certificat immédiatement' },
           { label: 'Approbation du gestionnaire', text: 'Certains modèles exigent l\'approbation du gestionnaire, UCM suit la requête en attente' },
-          { label: 'Requêtes en attente', text: 'Une requête que la CA retient pour son gestionnaire reste En attente dans UCM, et l\'interface ne propose pas de vérification du statut : approuvez-la depuis le panneau de contrôle CA, qui importe le certificat. La synchronisation de l\'inventaire ne termine pas une requête en attente' },
+          { label: 'Requêtes en attente', text: 'Une requête que la CA retient pour son gestionnaire reste En attente dans UCM : utilisez Vérifier le statut dans les détails de la CSR, ou approuvez-la depuis le panneau de contrôle CA. La synchronisation de l\'inventaire termine aussi une requête en attente que la CA montre émise, et marque refusée celle qu\'elle montre refusée' },
         ]
       },
       {
@@ -124,7 +124,7 @@ UCM s'intègre avec Microsoft Active Directory Certificate Services (AD CS) pour
 Le certificat est retourné immédiatement et importé dans UCM.
 
 ### Modèles avec approbation du gestionnaire
-UCM enregistre la requête comme **En attente** et suit l'ID de requête MS CA. L'interface ne propose pas de vérification du statut : approuvez-la depuis le **panneau de contrôle CA**, qui importe le certificat. La **synchronisation de l'inventaire** ne termine pas une requête en attente, car elle saute les identifiants de requête que UCM suit déjà : pour une requête approuvée sur la console de la CA Windows, appelez \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` (l'identifiant de la requête dans UCM, listé par \`GET /api/v2/microsoft-cas/requests/pending\`), qui récupère le certificat.
+UCM enregistre la requête comme **En attente** et suit l'ID de requête MS CA. Ouvrez la CSR dans **CSR → En attente** et cliquez sur **Vérifier le statut** : si la CA a émis le certificat (approuvé sur la console de la CA Windows, par exemple), UCM l'importe dans la requête ; si la CA l'a refusée, la requête passe à Refusée ; sinon elle reste En attente. L'approbation depuis le **panneau de contrôle CA** importe aussi le certificat. La **synchronisation de l'inventaire** termine de la même façon les requêtes en attente et les compte à part des certificats importés.
 
 ## Inscription pour le compte d'autrui (EOBO)
 
@@ -212,7 +212,7 @@ Le panneau de contrôle (ouvert depuis la connexion, nécessite le canal admin) 
 | Le test de connexion échoue | Vérifiez le nom d'hôte, le port 443 et que certsrv est accessible |
 | Aucun modèle trouvé | Vérifiez que le compte UCM a les permissions d'inscription sur la CA |
 | EOBO refusé | Vérifiez le certificat d'agent d'inscription et les permissions du modèle |
-| Requête bloquée en attente | Approuvez-la depuis le panneau de contrôle CA ; si elle a été approuvée sur la console de la CA Windows, récupérez-la par \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` |
+| Requête bloquée en attente | Cliquez sur Vérifier le statut sur la CSR, lancez une synchronisation de l'inventaire, ou approuvez-la depuis le panneau de contrôle CA |
 | Le test du canal admin échoue | Vérifiez que WinRM est activé sur la CA, le port/transport, et que pywinrm est installé |
 | Révocation absente sur la CA | Activez le canal admin WinRM : sans lui, la révocation est locale à UCM |
 | Attente non détectée (CA non anglophone) | Corrigé en v2.192. UCM reconnaît désormais les pages d'attente AD CS localisées |

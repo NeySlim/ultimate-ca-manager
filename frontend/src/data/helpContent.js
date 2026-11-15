@@ -1939,7 +1939,7 @@ export const helpContent = {
           { label: 'Template Selection', text: 'Choose from available certificate templates on the MS CA' },
           { label: 'Auto-Approved', text: 'Templates with autoenroll return the certificate immediately' },
           { label: 'Manager Approval', text: 'Some templates require manager approval, UCM tracks the pending request' },
-          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM, and the interface offers no status check: approve it from the CA Control Panel, which imports the certificate. Inventory sync does not complete a pending request' },
+          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM: use Check status in the CSR details, or approve it from the CA Control Panel. Inventory sync also completes a pending request the CA shows issued, and marks one it shows denied' },
         ]
       },
       {
