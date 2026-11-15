@@ -2216,7 +2216,7 @@ GET /api/v2/settings/backup/history
 # Download backup
 GET /api/v2/settings/backup/{backup_id}/download
 
-# Restore backup
+# Restore backup (signs out every session begun before it, the caller's included)
 POST /api/v2/settings/backup/restore
 Content-Type: multipart/form-data
 
@@ -2286,7 +2286,7 @@ POST /api/v2/system/backup/create
 # Download backup
 GET /api/v2/system/backup/{filename}/download
 
-# Restore backup
+# Restore backup (signs out every session begun before it, the caller's included)
 POST /api/v2/system/backup/restore
 ```
 
