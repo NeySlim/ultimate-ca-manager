@@ -22,6 +22,7 @@ from utils.process_lock import (  # noqa: F401  (_local: the test suite resets i
     LockBusyError,
     _local,
     lock_depth,
+    lock_held,
     process_lock,
 )
 
@@ -56,6 +57,11 @@ def operation_lock_path() -> Path:
     mutual exclusion this module exists to provide.
     """
     return Path(Config.BACKUP_DIR) / LOCK_NAME
+
+
+def operation_lock_held() -> bool:
+    """Whether this thread holds the backup lock for real, not fail-open."""
+    return lock_held(operation_lock_path())
 
 
 def operation_lock_depth() -> int:

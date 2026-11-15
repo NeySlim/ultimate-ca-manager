@@ -65,14 +65,24 @@ def _depths() -> dict:
     """
     state = getattr(_local, 'state', None)
     if state is None or state['pid'] != os.getpid():
-        state = {'pid': os.getpid(), 'depth': {}}
+        state = {'pid': os.getpid(), 'depth': {}, 'held': set()}
         _local.state = state
     return state['depth']
+
+
+def _held() -> set:
+    _depths()
+    return _local.state.setdefault('held', set())
 
 
 def lock_depth(path) -> int:
     """How many nested blocks of this thread currently hold ``path``."""
     return _depths().get(str(path), 0)
+
+
+def lock_held(path) -> bool:
+    """Whether this thread holds ``path`` by flock, not merely runs fail-open."""
+    return str(path) in _held()
 
 
 def _open_lock_file(path: Path) -> int:
@@ -183,10 +193,13 @@ def process_lock(path, *, timeout: float = 0, purpose: str = 'the operation',
     # Counted even when nothing was locked: the nesting has to unwind the
     # same way either way, and a nested block must not try to lock again.
     depths[key] = 1
+    if held:
+        _held().add(key)
     try:
         yield
     finally:
         depths[key] = 0
+        _held().discard(key)
         if fd is not None:
             if held:
                 try:
