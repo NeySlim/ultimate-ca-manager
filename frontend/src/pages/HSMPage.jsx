@@ -326,13 +326,6 @@ export default function HSMPage() {
     }
   ]
 
-  const rowActions = (row) => [
-    { label: t('common.test'), icon: TestTube, onClick: () => handleTest(row) },
-    ...(canWrite('hsm') ? [{ label: t('common.syncKeys'), icon: ArrowsClockwise, onClick: () => handleSyncKeys(row) }] : []),
-    ...(canWrite('hsm') ? [{ label: t('common.edit'), icon: PencilSimple, onClick: () => handleEdit(row) }] : []),
-    ...(canDelete('hsm') ? [{ label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }] : [])
-  ]
-
   const stats = useMemo(() => {
     const enabledCount = providers.filter(p => p.enabled).length
     const disabledCount = providers.filter(p => !p.enabled).length

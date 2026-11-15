@@ -893,7 +893,9 @@ class HsmService:
         database write lock (no-op UPDATE) on SQLite, as key_binding.lock_key does for a key."""
         if db.session.get_bind().dialect.name == 'sqlite':
             table = HsmProvider.__table__
-            db.session.execute(update(table).where(table.c.id == provider_id).values(id=table.c.id))
+            # updated_at is named so its onupdate does not date a sync as an edit
+            db.session.execute(update(table).where(table.c.id == provider_id)
+                               .values(id=table.c.id, updated_at=table.c.updated_at))
         return HsmProvider.query.filter_by(id=provider_id).with_for_update().one_or_none()
 
     @staticmethod

@@ -110,3 +110,38 @@ def test_two_syncs_of_one_provider_at_once_on_sqlite(app, tmp_path):
     with _bound_to(app, f"sqlite:///{tmp_path / 'sync-race.db'}"):
         pid, keys = _provider(app)
         _assert_serialized(*_race(app, pid, keys))
+
+
+def _updated_at_after_a_sync(app):
+    from datetime import datetime
+    from services.hsm import HsmService
+    pid, keys = _provider(app)
+    stamp = datetime(2020, 1, 1)
+    with app.app_context():
+        HsmProvider.query.filter_by(id=pid).update({'updated_at': stamp})
+        db.session.commit()
+        with patch.object(HsmService, '_get_provider_instance', return_value=_Token(keys)):
+            HsmService.sync_keys(pid)
+        found = db.session.get(HsmProvider, pid).updated_at
+        db.session.remove()
+    return found, stamp
+
+
+def test_a_sync_leaves_the_provider_date_alone_on_sqlite(app, tmp_path):
+    from tests.test_backup_cross_installation import _bound_to
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'sync-date.db'}"):
+        found, stamp = _updated_at_after_a_sync(app)
+    assert found == stamp
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_a_sync_leaves_the_provider_date_alone_on_postgresql(app):
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'hsm_sync_date_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        found, stamp = _updated_at_after_a_sync(app)
+    assert found == stamp

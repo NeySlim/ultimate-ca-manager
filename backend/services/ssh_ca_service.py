@@ -345,7 +345,7 @@ class SSHCAService:
         Args:
             hsm_key_id: the HsmKey row naming the token key — an existing synced
                 or registered key, RSA or NIST-EC. HSM wrappers do not implement
-                Ed25519; OpenSSH does not support Brainpool CA keys.
+                Ed25519; OpenSSH has no key type for Brainpool or ML-DSA.
             the other arguments: as in import_ca()
 
         Returns:
