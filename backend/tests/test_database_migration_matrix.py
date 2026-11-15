@@ -727,23 +727,26 @@ class TestNothingSwitchesUnlessEverythingPassed:
         assert env_file.read_text() == before
         assert not restart_signal.exists()
 
-    @pytest.mark.parametrize('refusal,advice', [
-        ('error', 'Retrying on the same target resumes the switch.'),
-        ('copy', 'Retrying on the same target resumes the switch.'),
-        ('verification', 'failed its verification; reset the target before retrying.'),
+    @pytest.mark.parametrize('refusal,transient,status,advice', [
+        ('error', True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
+        ('copy', True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
+        ('error', False, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
+        ('copy', False, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
+        ('verification', False, 500, 'failed its verification; reset the target before retrying.'),
     ])
     def test_a_bootstrap_cut_short_says_how_to_retry(
-            self, auth_client, sqlite_target, env_file, refusal, advice, monkeypatch):
+            self, auth_client, sqlite_target, env_file, refusal, transient, status, advice,
+            monkeypatch):
         import api.v2.database as route_module
 
         monkeypatch.setattr(
             route_module.svc, 'bootstrap_auth_to_target',
             lambda url: (False, 'Bootstrap failed: stopped',
-                         {'refusal': refusal, 'target_written': True}))
+                         {'refusal': refusal, 'target_written': True, 'transient': transient}))
 
         response = self._post(auth_client, 'switch', {'database_url': sqlite_target})
 
-        assert response.status_code == 500, response.data
+        assert response.status_code == status, response.data
         message = json.loads(response.data)['message']
         assert message.endswith(advice), message
         assert 'carries a schema' not in message
@@ -1417,3 +1420,51 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
             self, app, auth_client, create_user, pg_target, monkeypatch):
         self._verified_then_cut_before_the_counters(
             app, auth_client, create_user, pg_target, monkeypatch)
+
+
+def _driver_error(cls, message, *, invalidated=False, sqlstate=None):
+    """A SQLAlchemy driver error as the copy would see it."""
+    import sqlalchemy.exc as sa_exc
+
+    class Orig(Exception):
+        pass
+    orig = Orig(message)
+    if sqlstate:
+        orig.sqlstate = sqlstate
+    return getattr(sa_exc, cls)('INSERT', {}, orig, connection_invalidated=invalidated)
+
+
+class TestARefusalSaysWhetherARetryCanHelp:
+    """A lost connection is retried as it is; a row the target refuses is refused again."""
+
+    @pytest.mark.parametrize('error,transient', [
+        (lambda: _driver_error('OperationalError', 'server closed the connection', invalidated=True), True),
+        (lambda: _driver_error('OperationalError', 'deadlock detected', sqlstate='40P01'), True),
+        (lambda: _driver_error('OperationalError', 'database is locked'), True),
+        (lambda: ConnectionResetError('reset by peer'), True),
+        (lambda: _driver_error('IntegrityError', 'duplicate key', sqlstate='23505'), False),
+        (lambda: _driver_error('OperationalError', 'no such table: users'), False),
+        (lambda: RuntimeError('a bug'), False),
+    ], ids=['disconnect', 'deadlock', 'sqlite-locked', 'reset', 'integrity', 'no-table', 'bug'])
+    def test_the_bootstrap_reports_it(self, app, sqlite_target, monkeypatch, error, transient):
+        from services.database_admin import copy as copy_module
+
+        def fail(*args, **kwargs):
+            raise error()
+
+        monkeypatch.setattr(copy_module, '_copy_one', fail)
+        with app.app_context():
+            ok, _, stats = migration.bootstrap_auth_to_target(sqlite_target)
+
+        assert ok is False
+        assert stats['refusal'] == 'copy'
+        assert stats['transient'] is transient
+
+    def test_a_verification_is_never_transient(self, app, sqlite_target, monkeypatch):
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        monkeypatch.setattr(migration, 'verify_migration', refuse)
+        with app.app_context():
+            ok, _, stats = migration.bootstrap_auth_to_target(sqlite_target)
+        assert ok is False and stats['transient'] is False

@@ -562,10 +562,12 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     except (PreflightError, CopyError, VerificationError) as exc:
         logger.error("Bootstrap refused: %s", exc)
         stats["refusal"] = _refusal_kind(exc)
+        stats["transient"] = isinstance(exc, CopyError) and _is_transient(exc)
         return False, f"Bootstrap failed: {exc}", stats
     except Exception as e:
         logger.exception("bootstrap_auth_to_target failed")
         stats["refusal"] = "error"
+        stats["transient"] = _is_transient(e)
         return False, f"Bootstrap failed: {_short_err(str(e))}", stats
     finally:
         if target_engine is not None:
@@ -724,6 +726,35 @@ def _refusal_kind(exc: Exception) -> str:
         if isinstance(exc, kind):
             return name
     return 'error'
+
+
+# SQLSTATE classes a retry can clear: connection, transaction rollback (serialization, deadlock),
+# insufficient resources, operator intervention (shutdown, cancel)
+_TRANSIENT_SQLSTATES = ('08', '40', '53', '57')
+_TRANSIENT_SQLITE = ('database is locked', 'database table is locked', 'disk i/o error')
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """Whether the failure, or one it was raised from, is one the same retry can clear."""
+    from sqlalchemy import exc as sa_exc
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if isinstance(exc, (ConnectionError, TimeoutError, sa_exc.DisconnectionError,
+                            sa_exc.TimeoutError)):
+            return True
+        if isinstance(exc, sa_exc.DBAPIError):
+            if exc.connection_invalidated:
+                return True
+            orig = exc.orig
+            state = str(getattr(orig, 'sqlstate', None) or getattr(orig, 'pgcode', None) or '')
+            if state.startswith(_TRANSIENT_SQLSTATES):
+                return True
+            if isinstance(exc, sa_exc.OperationalError) and any(
+                    marker in str(orig).lower() for marker in _TRANSIENT_SQLITE):
+                return True
+        exc = exc.__cause__ or exc.__context__
+    return False
 
 
 def _rollback_hint(target_url: str, stats: dict) -> str:
