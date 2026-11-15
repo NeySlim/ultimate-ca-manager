@@ -24,6 +24,7 @@ tests/test_discovery_timestamps.py
 tests/test_health_ha.py
 tests/test_ha_softhsm.py
 tests/test_sessions_store.py
+tests/test_redis_sessions_pg.py
 tests/test_factor_change_sessions.py
 tests/test_dashboard*.py
 tests/test_protocol_approval_*.py
@@ -54,6 +55,7 @@ tests/test_migration_157*.py
 tests/test_migration_158*.py
 tests/test_migration_159*.py
 tests/test_upgrade_from_2_254.py
+tests/test_fresh_install_interrupted.py
 tests/test_schema_rules_kept_from_2x.py
 tests/test_encryption_envelope*.py
 tests/test_session_key*.py

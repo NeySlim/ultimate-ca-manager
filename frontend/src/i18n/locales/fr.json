@@ -6290,7 +6290,8 @@
         "session_revoke": "Session révoquée",
         "session_revoke_all": "Sessions révoquées",
         "deploy_binding_left_behind": "Déploiement resté sur l'ancien certificat",
-        "https_binding_left_behind": "HTTPS resté sur l'ancien certificat"
+        "https_binding_left_behind": "HTTPS resté sur l'ancien certificat",
+        "truststore_expiring": "Certificat du magasin de confiance expirant ou expiré"
       }
     }
   },
@@ -6339,7 +6340,8 @@
       "renewal_declined": "Renouvellement refusé",
       "ca_expiring": "CA bientôt expirée",
       "deploy_binding_left_behind": "Déploiement resté sur l'ancien certificat",
-      "https_binding_left_behind": "HTTPS resté sur l'ancien certificat"
+      "https_binding_left_behind": "HTTPS resté sur l'ancien certificat",
+      "truststore_expiring": "Certificat du magasin de confiance expirant ou expiré"
     },
     "compliance": {
       "rsa_below_3072": "RSA sous 3072 bits",
@@ -6375,6 +6377,29 @@
         "revoked": "Certificat du signataire révoqué",
         "key_unavailable": "Clé du signataire indisponible",
         "invalid": "Certificat du signataire inutilisable"
+      },
+      "smtp": "Email",
+      "webhooks": "Webhooks",
+      "auto_renewal": "Renouvellement auto",
+      "witness": {
+        "smtp": {
+          "not_configured": "Non configuré",
+          "disabled": "Configuré mais désactivé",
+          "incomplete": "Activé, port ou adresse d'expédition manquant",
+          "ready": "Prêt"
+        },
+        "webhooks": {
+          "not_configured": "Aucun point de terminaison",
+          "none_active_one": "{{count}} point de terminaison, aucun actif",
+          "none_active_other": "{{count}} points de terminaison, aucun actif",
+          "active_one": "{{count}} point de terminaison actif",
+          "active_other": "{{count}} points de terminaison actifs"
+        },
+        "auto_renewal": {
+          "enabled": "Activé",
+          "disabled": "Désactivé"
+        },
+        "unavailable": "État indisponible"
       }
     },
     "filter": {

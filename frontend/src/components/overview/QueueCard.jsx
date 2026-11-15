@@ -10,7 +10,7 @@ const VISIBLE = 6
 
 export function QueueCard({ defaultOpen = false, onToggle }) {
   const { t } = useTranslation()
-  const state = useCardData(() => overviewService.getQueue(), ['certificate', 'ca'])
+  const state = useCardData(() => overviewService.getQueue(), ['certificate', 'ca', 'truststore'])
   const [open, setOpen] = useState(defaultOpen)
   // The saved preference may arrive after mounting: it wins over the initial state
   useEffect(() => { setOpen(defaultOpen) }, [defaultOpen])

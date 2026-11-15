@@ -77,7 +77,7 @@ describe('NotificationBell', () => {
     const panel = screen.getByRole('region', { name: 'shell.bell.title' })
     const rows = within(panel).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
     expect(rows).toEqual(['acme_order_failed:7', 'approval_pending:3', 'audit:41', 'audit:43'])
-    expect(m.getQueue).toHaveBeenCalledWith(expect.arrayContaining(['acme_order_failed', 'approval_pending']))
+    expect(m.getQueue).toHaveBeenCalledWith(expect.arrayContaining(['acme_order_failed', 'approval_pending', 'truststore_expiring']))
   })
 
   it('asks for the bindings a renewal left behind and links each to its binding', async () => {
@@ -95,6 +95,22 @@ describe('NotificationBell', () => {
     const panel = screen.getByRole('region', { name: 'shell.bell.title' })
     const links = within(panel).getAllByRole('link').map(a => a.getAttribute('href'))
     expect(links).toEqual(expect.arrayContaining(['/certificates/12?binding=5', '/settings?tab=https']))
+  })
+
+  it('counts an expired trust anchor, names it and links to it; one expiring later stays out', async () => {
+    m.getQueue.mockResolvedValue({ data: { counts: {}, items: [
+      { kind: 'truststore_expiring', tier: 'critical', id: 4, label: 'Old Root', due_at: '2024-01-01T00:00:00Z', href_hint: '/truststore/4' },
+      { kind: 'truststore_expiring', tier: 'warning', id: 5, label: 'Next Root', due_at: '2027-01-01T00:00:00Z', href_hint: '/truststore/5' },
+    ] } })
+    m.getLogs.mockResolvedValue({ data: [] })
+    const user = setup()
+    await waitFor(() => expect(bell()).toHaveAccessibleName(/shell\.bell\.unread\|1/))
+    expect(m.getQueue.mock.calls[0][0]).toContain('truststore_expiring')
+    await user.click(bell())
+    const panel = screen.getByRole('region', { name: 'shell.bell.title' })
+    expect(within(panel).getByText('Old Root')).toBeTruthy()
+    expect(within(panel).queryByText('Next Root')).toBeNull()
+    expect(within(panel).getByRole('link', { name: /Old Root/ }).getAttribute('href')).toBe('/truststore/4')
   })
 
   it('shows a count equal to the unread items of the panel', async () => {

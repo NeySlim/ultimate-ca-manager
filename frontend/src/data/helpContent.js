@@ -25,8 +25,8 @@ export const helpContent = {
         title: 'Cards',
         icon: ListChecks,
         items: [
-          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
+          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record (with the right to read the trust store, the trust store certificates that expire within 90 days or have expired); a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state; the TSA signer while the TSA is enabled; and, with the right to read settings, whether email, webhooks and auto-renewal are set up' },
           { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
           { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
           { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
@@ -1816,7 +1816,7 @@ export const helpContent = {
     ],
     tips: [
       'Key Recovery is for keys that were not exported when the certificate was issued; it is not a replacement for restricting key export at issuance time.',
-      'Every request, approval, rejection and download is recorded in the audit trail, as are a self-approval refused by dual control and a download that failed; a call refused for any other reason is not.',
+      'Every request, approval, rejection and download is recorded in the audit trail, as are a self-approval refused by dual control and a download whose archive could not be built; a call refused for any other reason is not.',
     ],
     warnings: [
       'A certificate whose private key was never archived cannot be recovered: there is nothing to release.',
@@ -1939,7 +1939,7 @@ export const helpContent = {
           { label: 'Template Selection', text: 'Choose from available certificate templates on the MS CA' },
           { label: 'Auto-Approved', text: 'Templates with autoenroll return the certificate immediately' },
           { label: 'Manager Approval', text: 'Some templates require manager approval, UCM tracks the pending request' },
-          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM, and the page offers no status check: once it is issued on the CA, import the certificate, or let Inventory sync over the WinRM admin channel import the certificates UCM does not know yet' },
+          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM, and the interface offers no status check: approve it from the CA Control Panel, which imports the certificate. Inventory sync does not complete a pending request' },
         ]
       },
       {

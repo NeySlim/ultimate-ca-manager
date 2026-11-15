@@ -9,7 +9,8 @@ from sqlalchemy import event, insert
 from models import Certificate, db
 from utils.datetime_utils import utc_now
 
-BUDGET = 12
+# Constant whatever the table sizes; the health overview's three setting witnesses cost one statement each
+BUDGET = 14
 ROUTES = ('/api/v2/dashboard/queue', '/api/v2/dashboard/health?days=30',
           '/api/v2/dashboard/compliance', '/api/v2/dashboard/issuance?days=90')
 MARK = 'dashboard-volume'

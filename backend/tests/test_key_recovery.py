@@ -15,6 +15,15 @@ def _set_dual_control(app, enabled):
         db.session.commit()
 
 
+@pytest.fixture(autouse=True)
+def _dual_control_back_to_its_default(app):
+    """No test leaves the setting behind: the next file reads the default (on)."""
+    yield
+    with app.app_context():
+        SystemConfig.query.filter_by(key='key_recovery_dual_control').delete()
+        db.session.commit()
+
+
 @pytest.fixture
 def archived_cert(app, create_cert):
     info = create_cert(cn='escrow-test.example.com', validity_days=365)
@@ -230,6 +239,18 @@ class TestWhatTheAuditTrailKeeps:
                              content_type='application/json')
         assert r.status_code == 409
         assert _audited(app, rid) == ['key_recovery.requested']
+
+    def test_an_approval_and_a_download_are_audited(self, app, auth_client, archived_cert):
+        _set_dual_control(app, False)
+        rid = _open_request(auth_client, archived_cert)
+        auth_client.post(f'/api/v2/key-recovery/{rid}/approve',
+                         data=json.dumps({}), content_type='application/json')
+        r = auth_client.post(f'/api/v2/key-recovery/{rid}/recover',
+                             data=json.dumps({'password': 'recover-pw-123'}),
+                             content_type='application/json')
+        assert r.status_code == 200
+        assert _audited(app, rid) == ['key_recovery.approved', 'key_recovery.recovered',
+                                      'key_recovery.requested']
 
     def test_a_rejection_is_audited(self, app, auth_client, archived_cert):
         _set_dual_control(app, False)

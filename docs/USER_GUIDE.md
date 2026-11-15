@@ -24,9 +24,11 @@ The bell lists what needs your attention (failed ACME orders, pending approvals,
 
 ### Dashboard
 
-The Dashboard opens on the overview, six cards: what is waiting for you, the health of ACME, SCEP, EST, the TSA signer and the scheduler, the CA hierarchy, the expiry horizon, compliance and the latest operations.
+The Dashboard opens on the overview, six cards: what is waiting for you, the health of ACME, SCEP, EST, the TSA signer, the scheduler and the email, webhook and auto-renewal settings, the CA hierarchy, the expiry horizon, compliance and the latest operations.
 
 - Each entry of **To handle** opens the object it names: the approval, the SCEP or key recovery request, the ACME order, the CA or its CRL. If someone handled it meanwhile, a message says so.
+- With the right to read the trust store, **To handle** also lists the trust store certificates that expire within 90 days (warning) and those already expired, however long ago (critical); each opens its detail in the Trust Store page.
+- The **Email**, **Webhooks** and **Auto-Renewal** lines of the health card appear only with the right to read settings. A setting that is not configured is shown as information; email that is configured but disabled or missing its port or From address, and webhooks with none active, show as alerts. These lines read the settings when the page opens, when you return to the tab or on **Refresh**.
 - The **TSA** line appears while the TSA is enabled. Until a signer is set up it reads "Not configured", without alert; it turns red when the signer is expired, revoked, without its key or within 30 days of expiry. The expiry horizon marks the TSA signer and delegated OCSP responder certificates.
 - The **Scheduler** line turns red when a task failed or when its state is no longer published, even if the latest run was fine.
 - Cards reload by themselves when certificates or CAs change, when the live link comes back and when you return to the tab. **Refresh** reloads them all at once. While the live link is down, cards reload once a minute.

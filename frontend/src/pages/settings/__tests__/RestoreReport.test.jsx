@@ -52,6 +52,13 @@ describe('RestoreReport', () => {
     expect(reload).toHaveBeenCalled()
   })
 
+  it('keeps the manual restart instruction on screen when the restart was not obtained', () => {
+    show({ users: 2, cas: 1, certificates: 5, todo: [], restart_requested: false, restart_detail: 'systemd refused' })
+    act(() => { vi.advanceTimersByTime(10000) })
+    expect(reload).not.toHaveBeenCalled()
+    expect(screen.getByText(/settings.restoreReportRestartManual.*systemd refused/)).toBeTruthy()
+  })
+
   it('says nothing was restored, without a restart line, when the archive carried no section', () => {
     show({ sections_carried: [], sections_not_restored: ['future_thing'], todo: ['Section not restored by this version: future_thing'] })
     expect(screen.getByText('settings.restoreReportNothingRestored')).toBeTruthy()

@@ -6287,7 +6287,8 @@
         "session_revoke": "Sesión revocada",
         "session_revoke_all": "Sesiones revocadas",
         "deploy_binding_left_behind": "Despliegue en el certificado anterior",
-        "https_binding_left_behind": "HTTPS en el certificado anterior"
+        "https_binding_left_behind": "HTTPS en el certificado anterior",
+        "truststore_expiring": "Certificado del almacén de confianza por caducar o caducado"
       }
     }
   },
@@ -6336,7 +6337,8 @@
       "renewal_declined": "Renovación rechazada",
       "ca_expiring": "CA por expirar",
       "deploy_binding_left_behind": "Despliegue en el certificado anterior",
-      "https_binding_left_behind": "HTTPS en el certificado anterior"
+      "https_binding_left_behind": "HTTPS en el certificado anterior",
+      "truststore_expiring": "Certificado del almacén de confianza por caducar o caducado"
     },
     "compliance": {
       "rsa_below_3072": "RSA por debajo de 3072 bits",
@@ -6372,6 +6374,29 @@
         "revoked": "Certificado del firmante revocado",
         "key_unavailable": "Clave del firmante no disponible",
         "invalid": "Certificado del firmante no utilizable"
+      },
+      "smtp": "Correo",
+      "webhooks": "Webhooks",
+      "auto_renewal": "Auto-renovación",
+      "witness": {
+        "smtp": {
+          "not_configured": "No configurado",
+          "disabled": "Configurado pero desactivado",
+          "incomplete": "Activado, falta el puerto o la dirección de remitente",
+          "ready": "Listo"
+        },
+        "webhooks": {
+          "not_configured": "Sin endpoints",
+          "none_active_one": "{{count}} endpoint, ninguno activo",
+          "none_active_other": "{{count}} endpoints, ninguno activo",
+          "active_one": "{{count}} endpoint activo",
+          "active_other": "{{count}} endpoints activos"
+        },
+        "auto_renewal": {
+          "enabled": "Activada",
+          "disabled": "Desactivada"
+        },
+        "unavailable": "Estado no disponible"
       }
     },
     "filter": {

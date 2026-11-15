@@ -1,5 +1,5 @@
 """The optional-backend markers: a skip without the backend, a failure when the CI requires it;
-and the CI job that installs SoftHSM and GSSAPI runs every marked test with skips forbidden."""
+and the CI job that installs SoftHSM, GSSAPI and Redis runs every marked test with skips forbidden."""
 import os
 import re
 import shlex
@@ -80,6 +80,8 @@ SOFTHSM_FILES = ('test_hsm_brainpool.py', 'test_hsm_pss.py', 'test_hsm_sync_and_
                  'test_pkcs11_fork.py', 'test_issue_366_hsm_ecdsa_der.py', 'test_hsm_pkcs11_mldsa.py',
                  'test_hsm_fips_softhsm.py')
 GSSAPI_FILES = ('test_kerberos_keytab_validation.py', 'test_keytab_composed.py')
+REDIS_FILES = ('test_redis_sessions.py', 'test_redis_events.py', 'test_factor_change_sessions.py',
+               'test_websocket_handshake.py')
 
 
 def _job():
@@ -101,12 +103,17 @@ def test_the_job_runs_each_marker_with_skips_forbidden(backend):
     assert str(steps[0]['env'].get(required_env(backend))) == '1', backend
 
 
-def test_the_job_installs_both_backends_and_keeps_tokens_in_its_temp_dir():
+def test_the_job_installs_the_backends_and_keeps_tokens_in_its_temp_dir():
     job = _job()
     runs = '\n'.join(str(s.get('run', '')) for s in job['steps'])
     assert re.search(r'apt-install\.sh\b[^\n]*\bsofthsm2\b', runs)
     assert re.search(r'apt-install\.sh\b[^\n]*\blibkrb5-dev\b', runs)
     assert 'pyspnego[kerberos]' in runs
+    # Redis: the package for its binary, the service it starts stopped before the tests
+    assert re.search(r'apt-install\.sh\b[^\n]*\bredis-server\b', runs)
+    steps = [str(s.get('run', '')) for s in job['steps']]
+    stop = next(i for i, run in enumerate(steps) if re.search(r'systemctl stop redis-server\b', run))
+    assert stop < next(i for i, run in enumerate(steps) if '-m needs_redis' in run)
     for step in _run_steps(job):
         if '-m needs_softhsm' in step['run']:
             conf = str(step['env'].get('SOFTHSM2_CONF', ''))
@@ -127,6 +134,7 @@ def _collected(marker, files):
 def test_each_named_file_has_tests_under_its_marker():
     assert _collected('needs_softhsm', SOFTHSM_FILES) == set(SOFTHSM_FILES)
     assert _collected('needs_gssapi', GSSAPI_FILES) == set(GSSAPI_FILES)
+    assert _collected('needs_redis', REDIS_FILES) == set(REDIS_FILES)
 
 
 @pytest.mark.parametrize('event, ref, runs', [

@@ -66,11 +66,23 @@ function moduleProblem(groupId, element) {
   return mod ? null : `${element} is not a module of the ${groupLabel[groupId]} group`
 }
 
-const guides = fs.readdirSync(docsDir, { recursive: true }).filter(f => f.endsWith('.md')).sort()
+const repoDir = path.resolve(docsDir, '..')
+const markdownUnder = (dir) => fs.readdirSync(path.join(repoDir, dir), { recursive: true })
+  .filter(f => f.endsWith('.md')).map(f => path.join(dir, f))
+// Rewritten by another change: its stale path (Settings > ACME client) is left to it, not read here
+const REWRITTEN_ELSEWHERE = ['README.md']
+const guides = [...markdownUnder('docs'), ...markdownUnder('examples'),
+  'UPGRADE.md', 'README.md', 'RELEASE_TESTING.md']
+  .filter(f => !REWRITTEN_ELSEWHERE.includes(f)).sort()
 
 describe('documented navigation paths', () => {
+  it('reads the guides at the root and the examples too', () => {
+    expect(guides).toEqual(expect.arrayContaining(['UPGRADE.md', path.join('docs', 'ADMIN_GUIDE.md')]))
+    expect(guides.some(f => f.startsWith('examples'))).toBe(true)
+  })
+
   it.each(guides)('%s names places the console has', (file) => {
-    const found = pathsIn(fs.readFileSync(path.join(docsDir, file), 'utf8'))
+    const found = pathsIn(fs.readFileSync(path.join(repoDir, file), 'utf8'))
     const bad = found.map(steps => [steps.join(' > '), problemsWith(steps)])
       .filter(([text, p]) => p && !ELSEWHERE.includes(text))
     expect(bad).toEqual([])

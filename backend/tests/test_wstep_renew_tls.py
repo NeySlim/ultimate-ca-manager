@@ -949,3 +949,56 @@ def test_a_templated_renewal_of_a_subject_another_holds_names_no_template(app, t
     assert err == ('The subject CN=template-taken.example.test is already carried by a certificate '
                    'of another account')
     assert _issued_count(app) == before
+
+
+# An imported twin of the renewed certificate
+
+@contextlib.contextmanager
+def _imported_twin_listed_first(app, ca_id, cert):
+    """The same certificate imported under a twin record of the CA (no profile, source='import'),
+    the Windows row stored again after it so that the twin is read first."""
+    from services.cert.issued_lookup import find_issued_rows
+
+    def copy(model, row, **changes):
+        values = {c.key: getattr(row, c.key) for c in model.__table__.columns if c.key != 'id'}
+        values.update(changes)
+        db.session.add(model(**values))
+        db.session.flush()
+
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        twin_refid = '0000' + uuid.uuid4().hex[:28]
+        copy(CA, ca, refid=twin_refid, descr=f'{ca.descr} twin', url_slug=None, hsm_key_id=None)
+        original = Certificate.query.filter_by(caref=ca.refid, serial_number=str(cert.serial_number)).one()
+        copy(Certificate, original, refid=uuid.uuid4().hex, caref=twin_refid, source='import',
+             windows_profile_id=None)
+        values = {c.key: getattr(original, c.key) for c in Certificate.__table__.columns if c.key != 'id'}
+        db.session.delete(original)
+        db.session.flush()
+        db.session.add(Certificate(**values))
+        db.session.commit()
+        assert [r.source for r in find_issued_rows(ca, cert)] == ['import', 'wstep']
+    try:
+        yield
+    finally:
+        with app.app_context():
+            Certificate.query.filter_by(caref=twin_refid).delete()
+            CA.query.filter_by(refid=twin_refid).delete()
+            db.session.commit()
+
+
+@pytest.mark.parametrize('path', ['tls', 'ws-security'])
+def test_a_certificate_bound_renewal_is_served_when_an_imported_twin_is_read_first(
+        client, app, wstep_renew_config, path):
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], f'tls-renew-twin-{path}.example.test')
+    with _imported_twin_listed_first(app, wstep_renew_config['id'], old_cert):
+        csr = _renewal_csr(old_cert, old_key)
+        if path == 'tls':
+            r = _post(client, _rst(_cmc_renewal(csr, [(old_key, old_cert)])), tls_cert=old_cert)
+        else:
+            r = _post(client, _build_signed_rst(old_cert, old_key, csr))
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            rows = {row.source: row for row in Certificate.query.filter_by(
+                serial_number=str(old_cert.serial_number))}
+            assert rows['wstep'].archived, 'the Windows row is the one superseded'

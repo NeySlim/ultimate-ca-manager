@@ -3,8 +3,8 @@
 OWASP ASVS 5.0 §7.4.3: other sessions end after a change of any authentication
 factor. Each operation gets the password change's treatment: the session making it
 stays, every other one of the account gets 401, on the file store, on the SQL store
-(SQLite) and on the SQL store shared by two nodes on PostgreSQL (HA). The audit
-entry says how many sessions were closed.
+(SQLite), on the SQL store shared by two nodes on PostgreSQL (HA) and on Redis shared
+by two nodes. The audit entry says how many sessions were closed.
 """
 import json
 import os
@@ -15,6 +15,7 @@ import pytest
 
 from models import AuditLog, User, db
 from models.webauthn import WebAuthnCredential
+from tests.redis_support import needs_redis
 from tests.test_webauthn_second_factor import SoftKey
 
 PG_URL = os.getenv('UCM_TEST_APP_PG_URL') or os.getenv('UCM_TEST_PG_URL')
@@ -48,58 +49,13 @@ def _dispose(*applications):
             db.engine.dispose()
 
 
-@pytest.fixture
-def redis_server(tmp_path):
-    """A throwaway redis-server on a free loopback port, gone with the test."""
-    import shutil
-    import socket
-    import subprocess
-    import time
-    binary = shutil.which('redis-server')
-    if not binary:
-        pytest.skip('redis-server not installed')
-    with socket.socket() as probe:
-        probe.bind(('127.0.0.1', 0))
-        port = probe.getsockname()[1]
-    proc = subprocess.Popen([binary, '--port', str(port), '--bind', '127.0.0.1', '--save', '',
-                             '--appendonly', 'no', '--dir', str(tmp_path)],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    import redis
-    client = redis.Redis(host='127.0.0.1', port=port)
-    try:
-        for _ in range(100):
-            try:
-                client.ping()
-                break
-            except redis.ConnectionError:
-                time.sleep(0.05)
-        else:
-            pytest.fail('redis-server did not start')
-        yield f'redis://127.0.0.1:{port}/0', client
-    finally:
-        client.close()
-        proc.terminate()
-        proc.wait(timeout=10)
-
-
-def _redis_store_app(monkeypatch, url, redis_url):
-    from config.settings import TestingConfig
-    from utils.db_url import sqlalchemy_url
-    monkeypatch.setenv('REDIS_URL', redis_url)
-    monkeypatch.setattr(TestingConfig, 'SQLALCHEMY_DATABASE_URI', sqlalchemy_url(url))
-    monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'redis')
-    monkeypatch.setattr(TestingConfig, 'SESSION_KEY_PREFIX', 'ucm:session:', raising=False)
-    from app import create_app
-    return create_app('testing')
-
-
 @pytest.fixture(params=[
     'files',
-    'redis',
     'sql-sqlite',
     pytest.param('sql-postgresql', marks=[
         pytest.mark.postgres,
         pytest.mark.skipif(not PG_URL, reason='no PostgreSQL URL for the two-node session test')]),
+    pytest.param('redis', marks=[needs_redis]),
 ])
 def nodes(request, app, monkeypatch, tmp_path):
     """(node of the first session, node of the second): one store behind both."""
@@ -108,16 +64,15 @@ def nodes(request, app, monkeypatch, tmp_path):
         yield app, app
         return
     if request.param == 'redis':
-        if pg_app_harness.ENABLED:
-            pytest.skip('Redis store over a file database, not meaningful in PostgreSQL mode')
-        server_url, _client = request.getfixturevalue('redis_server')
-        node = _redis_store_app(monkeypatch, f'sqlite:///{tmp_path / "redis-sessions.db"}',
-                                server_url)
+        from tests.test_redis_sessions import dispose, redis_apps
+        server = request.getfixturevalue('redis_server')
+        server.client().flushdb()
+        created = redis_apps(monkeypatch, tmp_path, server.url())
         try:
-            assert node.config['SESSION_TYPE'] == 'redis'
-            yield node, node
+            yield created[0], created[1]
         finally:
-            _dispose(node)
+            dispose(*created)
+            server.client().flushdb()
         return
     if request.param == 'sql-sqlite':
         if pg_app_harness.ENABLED:
