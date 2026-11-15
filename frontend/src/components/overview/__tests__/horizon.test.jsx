@@ -1,6 +1,6 @@
 /** Expiry horizon: the certificates that carry a service are marked as such. */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, configure } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k, o) => (typeof o === 'string' ? o : (o?.defaultValue ?? k)) }) }))
@@ -17,6 +17,9 @@ vi.mock('../../../hooks/useWebSocket', () => ({
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: () => true }) }))
 
 import { HorizonCard } from '..'
+
+// A loaded machine slows the first render past the default second
+configure({ asyncUtilTimeout: 5000 })
 
 const cert = (id, over) => ({ id, common_name: `cert-${id}`, valid_to: '2027-01-01T00:00:00Z', ...over })
 

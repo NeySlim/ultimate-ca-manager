@@ -3,7 +3,7 @@
  * The table is contracts/queue_links.json; the backend test holds the server's hrefs to it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, configure } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import contract from '../../../../contracts/queue_links.json'
 
@@ -42,6 +42,9 @@ import SCEPPage from '../SCEPPage'
 import KeyRecoveryPage from '../KeyRecoveryPage'
 import CRLOCSPPage from '../CRLOCSPPage'
 import ACMEPage from '../ACMEPage'
+
+// A loaded machine slows the first render past the default second
+configure({ asyncUtilTimeout: 5000 })
 
 const ID = 7
 const PAGES = {

@@ -183,7 +183,7 @@ export default function SCEPPage() {
       issued: { variant: 'primary', dot: true, pulse: false }
     }
     const { variant, dot, pulse } = config[status] || { variant: 'secondary', dot: false, pulse: false }
-    return <Badge variant={variant} size="sm" dot={dot} pulse={pulse}>{status}</Badge>
+    return <Badge variant={variant} size="sm" dot={dot} pulse={pulse}>{stateLabel(t, status)}</Badge>
   }
 
   // Parse DN to extract CN and other fields
@@ -404,7 +404,7 @@ export default function SCEPPage() {
         <CompactGrid>
           <CompactField autoIcon="transactionId" label={t('scep.transactionId')} value={selectedRequest.transaction_id} mono copyable />
           <CompactField autoIcon="subject" label={t('common.subject')} value={selectedRequest.subject} />
-          <CompactField autoIcon="status" label={t('common.status')} value={selectedRequest.status} />
+          <CompactField autoIcon="status" label={t('common.status')} value={stateLabel(t, selectedRequest.status)} />
           <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedRequest.created_at)} />
         </CompactGrid>
       </CompactSection>

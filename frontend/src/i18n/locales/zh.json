@@ -465,7 +465,9 @@
       "failed": "Failed",
       "warning": "Warning",
       "skipped": "Skipped",
-      "never": "Never run"
+      "never": "Never run",
+      "active": "Active",
+      "revoked": "Revoked"
     }
   },
   "commandPalette": {

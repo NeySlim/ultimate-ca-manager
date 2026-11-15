@@ -207,7 +207,7 @@ export default function ApprovalsPage() {
         return (
           <Badge variant={STATUS_VARIANTS[val] || 'default'}>
             <Icon size={12} weight="fill" className="mr-1" />
-            {val}
+            {stateLabel(t, val)}
           </Badge>
         )
       },
@@ -300,7 +300,7 @@ export default function ApprovalsPage() {
       {/* Status */}
       <div className="flex items-center gap-2">
         <Badge variant={STATUS_VARIANTS[selectedRequest.status]} size="lg">
-          {selectedRequest.status}
+          {stateLabel(t, selectedRequest.status)}
         </Badge>
         <RequestTypeBadge type={selectedRequest.request_type} t={t} />
       </div>

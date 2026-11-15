@@ -1740,7 +1740,9 @@
       "failed": "Échec",
       "warning": "Avertissement",
       "skipped": "Ignoré",
-      "never": "Jamais exécuté"
+      "never": "Jamais exécuté",
+      "active": "Actif",
+      "revoked": "Révoqué"
     }
   },
   "compare": {

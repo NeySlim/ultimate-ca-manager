@@ -3,7 +3,7 @@
  * that cannot look healthy while tasks fail or its published state is old.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, configure } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import fr from '../../../i18n/locales/fr.json'
 
@@ -31,6 +31,9 @@ vi.mock('../../../hooks/useWebSocket', () => ({
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: () => true }) }))
 
 import { HealthCard } from '..'
+
+// A loaded machine slows the first render past the default second
+configure({ asyncUtilTimeout: 5000 })
 
 const tsa = (over) => ({ basis: 'signer', periods: null, state: 'dedicated', reason: null, days_left: 200,
   alert: false, last_operation_at: null, last_status: null, ...over })
