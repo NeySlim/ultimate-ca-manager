@@ -447,7 +447,21 @@
     "continue": "继续",
     "keyRecovery": "密钥恢复",
     "preparing": "准备中…",
-    "systemLogs": "系统日志"
+    "systemLogs": "系统日志",
+    "states": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "issued": "Issued",
+      "recovered": "Recovered",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "ready": "Ready",
+      "processing": "Processing",
+      "validating": "Validating"
+    }
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -6358,6 +6372,10 @@
     },
     "activity": {
       "all": "查看全部"
+    },
+    "link": {
+      "handled": "Item #{{id}} no longer waits for action (status: {{status}}).",
+      "gone": "Item #{{id}} no longer exists."
     }
   }
 }

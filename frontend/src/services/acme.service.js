@@ -43,6 +43,10 @@ export const acmeService = {
     return apiClient.get(`/acme/accounts/${accountId}/orders`)
   },
 
+  async getLocalOrder(id) {
+    return apiClient.get(`/acme/orders/${id}`)
+  },
+
   async getChallenges(accountId) {
     return apiClient.get(`/acme/accounts/${accountId}/challenges`)
   },

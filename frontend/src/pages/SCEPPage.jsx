@@ -21,6 +21,8 @@ import ScepProfilesTab from './scep/ScepProfilesTab'
 import ScepIntuneAppsTab from './scep/ScepIntuneAppsTab'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
+import { useLinkedId } from '../hooks/useLinkedId'
+import { stateLabel } from '../lib/stateLabel'
 import { formatDate, cn } from '../lib/utils'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { scepPickerCas, unlistedScepPickerCas } from '../lib/caSelection'
@@ -55,6 +57,28 @@ export default function SCEPPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // /scep-config?tab=requests&request=N opens that request, even past the latest 50 listed
+  const linkedId = useLinkedId('request')
+  useEffect(() => {
+    if (!linkedId) return
+    let cancelled = false
+    scepService.getRequest(linkedId)
+      .then((res) => {
+        if (cancelled || !res?.data) return
+        setActiveTab('requests')
+        setSelectedRequest(res.data)
+        if (res.data.status !== 'pending') {
+          showInfo(t('overview.link.handled', { id: res.data.id, status: stateLabel(t, res.data.status) }))
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return
+        if (error?.status === 404) showInfo(t('overview.link.gone', { id: linkedId }))
+        else showError(error.message || t('messages.errors.loadFailed.scep'))
+      })
+    return () => { cancelled = true }
+  }, [linkedId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     setLoading(true)

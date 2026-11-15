@@ -14,6 +14,9 @@ import {
 import { acmeService, casService, certificatesService, templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
+import { useLinkedId } from '../hooks/useLinkedId'
+import { useSearchParams } from 'react-router-dom'
+import { stateLabel } from '../lib/stateLabel'
 import { formatDate, downloadBlob, publicBaseUrl } from '../lib/utils'
 import AccountDetailPanel from './acme/AccountDetailPanel'
 import LetsEncryptTab from './acme/LetsEncryptTab'
@@ -39,6 +42,9 @@ import { fetchPages } from '../lib/fetchAllPages'
 
 // The order list pages by 100 rows; the tab shows and filters all of them
 const CLIENT_ORDERS_MAX = 5000
+
+const ACME_TABS = ['letsencrypt', 'letsencryptorders', 'dns', 'domains', 'config', 'localdomains',
+  'localorders', 'accounts', 'eab', 'history']
 
 export default function ACMEPage() {
   const { t } = useTranslation()
@@ -73,7 +79,12 @@ export default function ACMEPage() {
   // UI states
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('letsencrypt')
+  // /acme?tab=<tab>&order=N: the tab, and the order it holds
+  const [searchParams] = useSearchParams()
+  const linkedTab = searchParams.get('tab')
+  const linkedOrder = useLinkedId('order')
+  const [activeTab, setActiveTab] = useState(ACME_TABS.includes(linkedTab) ? linkedTab : 'letsencrypt')
+  const [linkedLocalOrder, setLinkedLocalOrder] = useState(null)
   const [activeDetailTab, setActiveDetailTab] = useState('account')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
@@ -117,6 +128,28 @@ export default function ACMEPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (!linkedOrder || !['letsencryptorders', 'localorders'].includes(linkedTab)) return
+    let cancelled = false
+    const client = linkedTab === 'letsencryptorders'
+    const fetchOrder = client ? acmeService.getClientOrder(linkedOrder) : acmeService.getLocalOrder(linkedOrder)
+    fetchOrder.then((res) => {
+      const order = res?.data
+      if (cancelled || !order) return
+      const stillFailing = client ? order.renewal_failures > 0 : String(order.status).toLowerCase() === 'invalid'
+      if (client) setSelectedClientOrder(order)
+      else setLinkedLocalOrder(order)
+      if (!stillFailing) {
+        showInfo(t('overview.link.handled', { id: order.id, status: stateLabel(t, order.status) }))
+      }
+    }).catch((error) => {
+      if (cancelled) return
+      if (error?.status === 404) showInfo(t('overview.link.gone', { id: linkedOrder }))
+      else showError(error.message || t('messages.errors.loadFailed.acme'))
+    })
+    return () => { cancelled = true }
+  }, [linkedOrder, linkedTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Templates a certificate profile may bind (CA templates excluded, as for
   // SCEP profiles); loaded once, independently of the ACME data refreshes.
@@ -1297,7 +1330,7 @@ export default function ACMEPage() {
           />
         )}
         {activeTab === 'localorders' && (
-        <LocalOrdersTab />
+        <LocalOrdersTab linkedOrder={linkedLocalOrder} onCloseLinked={() => setLinkedLocalOrder(null)} />
       )}
 
       {activeTab === 'localdomains' && (

@@ -447,7 +447,21 @@
     "continue": "Continua",
     "keyRecovery": "Recupero chiavi",
     "preparing": "Preparazione…",
-    "systemLogs": "Log di sistema"
+    "systemLogs": "Log di sistema",
+    "states": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "issued": "Issued",
+      "recovered": "Recovered",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "ready": "Ready",
+      "processing": "Processing",
+      "validating": "Validating"
+    }
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",
@@ -6358,6 +6372,10 @@
     },
     "activity": {
       "all": "Vedi tutto"
+    },
+    "link": {
+      "handled": "Item #{{id}} no longer waits for action (status: {{status}}).",
+      "gone": "Item #{{id}} no longer exists."
     }
   }
 }

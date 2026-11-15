@@ -1722,7 +1722,21 @@
     "continue": "Continuer",
     "keyRecovery": "Récupération de clés",
     "preparing": "Préparation…",
-    "systemLogs": "Journaux système"
+    "systemLogs": "Journaux système",
+    "states": {
+      "pending": "En attente",
+      "approved": "Approuvé",
+      "rejected": "Rejeté",
+      "expired": "Expiré",
+      "cancelled": "Annulé",
+      "issued": "Émis",
+      "recovered": "Récupéré",
+      "valid": "Valide",
+      "invalid": "Invalide",
+      "ready": "Prêt",
+      "processing": "En cours",
+      "validating": "Validation"
+    }
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -6361,6 +6375,10 @@
     },
     "activity": {
       "all": "Tout voir"
+    },
+    "link": {
+      "handled": "L'élément n°{{id}} n'attend plus d'action (état : {{status}}).",
+      "gone": "L'élément n°{{id}} n'existe plus."
     }
   }
 }

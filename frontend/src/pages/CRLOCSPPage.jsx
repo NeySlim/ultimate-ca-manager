@@ -23,6 +23,7 @@ import { CRLDeploySection } from '../components/CRLDeploySection'
 import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
+import { useLinkedId } from '../hooks/useLinkedId'
 import { formatDate, cn , downloadBlob} from '../lib/utils'
 import { findAlgorithm } from '../lib/keyAlgorithms'
 export default function CRLOCSPPage() {
@@ -119,6 +120,17 @@ export default function CRLOCSPPage() {
       setOcspResponder(res.data?.responder || null)
     }).catch(() => setOcspResponder(null))
   }
+
+  // /crl-ocsp?ca=N selects that CA once the list is in
+  const linkedCa = useLinkedId('ca')
+  const openedCa = useRef(null)
+  useEffect(() => {
+    if (!linkedCa || loading || openedCa.current === linkedCa) return
+    openedCa.current = linkedCa
+    const ca = cas.find((c) => String(c.id) === linkedCa)
+    if (ca) handleSelectCA(ca)
+    else showInfo(t('overview.link.gone', { id: linkedCa }))
+  }, [linkedCa, loading, cas]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAssignResponder = async (certId) => {
     try {

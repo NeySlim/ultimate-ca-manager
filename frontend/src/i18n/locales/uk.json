@@ -449,7 +449,21 @@
     "continue": "Продовжити",
     "keyRecovery": "Відновлення ключів",
     "preparing": "Підготовка…",
-    "systemLogs": "Системні журнали"
+    "systemLogs": "Системні журнали",
+    "states": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "issued": "Issued",
+      "recovered": "Recovered",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "ready": "Ready",
+      "processing": "Processing",
+      "validating": "Validating"
+    }
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
@@ -6438,6 +6452,10 @@
     },
     "activity": {
       "all": "Показати всі"
+    },
+    "link": {
+      "handled": "Item #{{id}} no longer waits for action (status: {{status}}).",
+      "gone": "Item #{{id}} no longer exists."
     }
   }
 }

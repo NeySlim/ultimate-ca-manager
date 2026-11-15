@@ -22,6 +22,10 @@ export const scepService = {
     return apiClient.get(`/scep/requests${buildQueryString(filters)}`)
   },
 
+  async getRequest(id) {
+    return apiClient.get(`/scep/requests/${id}`)
+  },
+
   async approveRequest(id) {
     return apiClient.post(`/scep/${id}/approve`)
   },
