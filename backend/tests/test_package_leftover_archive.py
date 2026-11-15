@@ -1255,6 +1255,45 @@ def test_an_item_removed_by_hand_is_named_and_never_said_to_be_back(tmp_path):
             f'  {box.data}/https_key.pem\n') in out.stdout, out.stdout
 
 
+@pytest.mark.parametrize('layout', list(LAYOUT_OF))
+def test_an_item_removed_by_hand_is_named_once_and_never_blocks_a_later_attempt(tmp_path, layout):
+    """Removed by hand from the archive while another put-back waits for a choice: named
+    once, then forgotten, so removing its directory (empty) cannot later read as a missing
+    filesystem; once the choice is made, the next attempt archives everything."""
+    box = Box(tmp_path, python='stub')
+    wrap = _wrap_of(box, layout)
+    data, config = originals(box)
+    _killed_after_renaming(box, 'https_key.pem', **wrap)
+    held = (box.archive / 'data' / 'backups' if layout == 'one filesystem' else box.data / 'backups' / LOCAL)
+    (held / 'ucm-2026.ucmbkp').unlink()
+    os.symlink('elsewhere', box.data / 'current.key')
+    first = box.run()
+    assert first.returncode == 2, (first.stdout, first.stderr)
+    assert f'{box.data}/backups/ucm-2026.ucmbkp is missing: an earlier attempt moved it' in first.stdout
+    assert not held.exists()
+    (box.data / 'current.key').unlink()
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 0, (out.stdout, out.stderr)
+        assert 'is missing' not in out.stdout and 'mount what holds it' not in out.stdout, out.stdout
+        assert not (box.archive / '.journal').exists()
+        exactly_once(box, data, config, skip=('backups/ucm-2026.ucmbkp',))
+
+
+def test_an_item_removed_by_hand_with_the_directory_it_came_from_is_named_missing(tmp_path):
+    """That directory gone too, nothing is there to mount: the item is named missing and the
+    retry archives the rest."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    _killed_after_renaming(box, 'ca/root.key')
+    (box.archive / 'data' / 'ca' / 'root.key').unlink()
+    (box.data / 'ca').rmdir()
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert f'{box.data}/ca/root.key is missing' in out.stdout and 'mount' not in out.stdout, out.stdout
+    exactly_once(box, data, config, skip=('ca', 'ca/root.key'))
+
+
 # -- names the journal cannot hold ---------------------------------------------------
 
 @pytest.mark.parametrize('name, shown', [('a\tb', 'a<tab>b'), ('a\nb', 'a<newline>b')])

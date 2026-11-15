@@ -285,6 +285,34 @@ class ChaosSuite:
         for at, back in sorted(backs)[::4]:
             self._scenario(lab, (at, 'fail'), (back, 'done'))
 
+    def test_a_retry_converges_after_any_fault_once_an_archived_item_was_removed(self, lab):
+        """Killed right after data/https_key.pem was renamed, then the archived one removed by
+        hand: each call of the next attempt fails, or kills it, in turn; then a run without fault."""
+        kill = next(n for n, name, args in lab.first_run().calls
+                    if step(name, args) == 'rename' and args[3].endswith('/data/https_key.pem'))
+
+        def start():
+            box, data, config, before, _run = lab._first([(kill, 'done')])
+            src = f'{box.data}/https_key.pem'
+            line = next(l for l in (box.archive / '.journal').read_text().splitlines()
+                        if l.startswith(f'rename\t{src}\t'))
+            os.unlink(line.split('\t')[2])
+            data = {k: v for k, v in data.items() if k != 'https_key.pem'}
+            before = {p: dict(t) for p, t in before.items()}
+            del before[str(box.data)]['https_key.pem']
+            return box, data, config, before
+
+        box = start()[0]
+        calls = Run(box, *_chaos_run(box)).count
+        assert calls > 20
+        for at in range(1, calls + 1):
+            for mode in FAULTS:
+                why = (self.layout, 'removed', at, mode)
+                box, data, config, before = start()
+                run = Run(box, *_chaos_run(box, [(at, mode)]))
+                while_failing(box, run.out, before, data, config, why)
+                converged(box, Run(box, *_chaos_run(box)).out, data, config, why)
+
     def test_only_the_journal_is_ever_moved_and_nothing_copied(self, lab):
         """cp never runs; mv only renames the journal into place (the guard of Box fails any
         other call that names an item, whatever the run)."""

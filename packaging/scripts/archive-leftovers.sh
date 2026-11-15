@@ -237,17 +237,19 @@ EOF
                 elif present "$dst"; then
                     rename_item "$dst" "$src" || unsettled "$dst" "not put back to $src"
                 elif ! present "$src"; then
-                    # Removed by hand only while both directories are there: a directory
-                    # missing too is a filesystem not mounted, which may hold it
-                    gap=""
-                    for d in "${dst%/*}" "${src%/*}"; do [ -d "$d" ] || { gap=$d; break; }; done
-                    if [ -n "$gap" ]; then
+                    # A rename stays on one filesystem: the directory of $dst absent, that one
+                    # is not mounted (the mkdir line of that directory, earlier, runs later)
+                    if [ ! -d "${dst%/*}" ]; then
                         left=1 stuck="$stuck
-  $dst: not put back to $src: neither is there, as $gap is absent: mount what holds it, then retry"
+  $dst: not put back to $src: neither is there, as ${dst%/*} is absent: mount what holds it, then retry"
                     else
+                        # Removed by hand: named once, then its line goes, as its directory
+                        # removed empty below would read as not mounted at the next attempt
                         say "UCM: $src is missing: an earlier attempt moved it to $dst, which no longer holds it either."
                         missing="$missing
   $src"
+                        drop_line "rename$TAB$src$TAB$dst" \
+                            || { unsettled "$JOURNAL" "could not be updated, so what it lists before $src was not put back"; break; }
                     fi
                 fi ;;
             fips)
