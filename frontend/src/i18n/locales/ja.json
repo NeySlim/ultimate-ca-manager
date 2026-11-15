@@ -1084,7 +1084,8 @@
       "noSchemeAllowedByProfile": "この鍵では、コンプライアンスプロファイルで許可されている RSA 署名方式がありません。",
       "profileRequiresHsm": "このプロファイルでは、CA 鍵を HSM に保管する必要があります。",
       "profileHorizon": "コンプライアンスプロファイルは {{key}} を {{date}} まで認めており、この CA はそれより長く存続します。",
-      "noDigestAllowedByPolicy": "この CA に適用されるポリシーで許可されている署名ハッシュはありません。"
+      "noDigestAllowedByPolicy": "この CA に適用されるポリシーで許可されている署名ハッシュはありません。",
+      "hsmNeedsRead": "HSMキー上にCAを作成するには、read:hsm権限が必要です。"
     },
     "detail": {
       "hsmBacked": "HSM バック",

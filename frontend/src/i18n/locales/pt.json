@@ -1084,7 +1084,8 @@
       "noSchemeAllowedByProfile": "Nenhum esquema de assinatura RSA é permitido pelo perfil de conformidade para esta chave.",
       "profileRequiresHsm": "Este perfil exige que a chave da CA seja guardada num HSM.",
       "profileHorizon": "O perfil de conformidade aceita {{key}} até {{date}}, e esta CA ultrapassaria essa data.",
-      "noDigestAllowedByPolicy": "Nenhum hash de assinatura é permitido pelas políticas aplicáveis a esta CA."
+      "noDigestAllowedByPolicy": "Nenhum hash de assinatura é permitido pelas políticas aplicáveis a esta CA.",
+      "hsmNeedsRead": "Criar uma AC em uma chave HSM exige a permissão read:hsm."
     },
     "detail": {
       "hsmBacked": "Apoiada por HSM",
