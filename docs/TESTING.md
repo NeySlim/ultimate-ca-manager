@@ -155,7 +155,7 @@ describe('Button', () => {
 
 ## Release Smoke
 
-The release smoke (`release-smoke.yml`, with `scripts/ci/package-smoke.sh` for the packages) is called by "Build & Release" once a tag is published, so its definition and scripts are those of the tag, and every checkout names the tag `v<version>`. A failed smoke fails that release run. It can also be started by hand (workflow dispatch with the version), which checks out the same tag. A "Build & Release" run started manually on a branch builds the packages and the images to check them, but pushes no image, publishes no release and calls no smoke.
+The release smoke (`release-smoke.yml`, with `scripts/ci/package-smoke.sh` for the packages) is called by "Build & Release" once a tag is published, so its definition and scripts are those of the tag, and every checkout names the tag `v<version>`. A failed smoke fails that release run. It can also be started by hand (workflow dispatch with the version), which checks out the same tag and runs that tag's scripts (`scripts/ci/release_version.py`, `scripts/ci/wait-health.sh`): a manual smoke only checks tags that carry them, and an earlier version is checked from its own release line. A "Build & Release" run started manually on a branch builds the packages and the images to check them, but pushes no image, publishes no release and calls no smoke.
 
 The `latest` and `latest-fips` image tags, and the "Latest" mark of the GitHub release, go to a stable version that no published stable tag exceeds: never to a release candidate, never to a maintenance release of an older line, never to a branch run (`scripts/ci/release_version.py latest`).
 
