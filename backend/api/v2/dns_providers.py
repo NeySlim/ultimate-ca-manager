@@ -16,7 +16,8 @@ from services.acme.dns_providers import (
     get_available_providers, 
     is_valid_provider_type,
     create_provider,
-    get_provider_class
+    get_provider_class,
+    saved_credentials,
 )
 
 import logging
@@ -334,7 +335,7 @@ def test_provider(provider_id):
         return error_response('Provider not found', 404)
     
     try:
-        credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+        credentials = saved_credentials(provider_model)
         provider = create_provider(provider_model.provider_type, credentials)
         
         success, message = provider.test_connection()
@@ -346,6 +347,8 @@ def test_provider(provider_id):
             },
             message='Connection test completed'
         )
+    except SecretUnreadable as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"DNS provider test failed: {e}")
         return error_response('Connection test failed', 500)

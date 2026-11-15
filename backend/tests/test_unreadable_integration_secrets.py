@@ -739,3 +739,74 @@ def test_a_partial_dns_entry_over_unreadable_credentials_names_what_is_missing(
         'credentials': {'server': 'ns1.example', 'tsig_key_name': 'k.'}})
     assert r.get_json()['message'].endswith('missing: tsig_key_secret')
     assert _stored_credentials(app, pid) == token
+
+
+@pytest.fixture
+def unreadable_cloudflare(app):
+    pid, _token = _unreadable_provider(app, 'cloudflare')
+    yield pid
+    _drop_provider(app, pid)
+
+
+def _named(message, pid):
+    return f'DNS provider {pid} credentials cannot be decrypted' in str(message)
+
+
+def _dns_order(pid):
+    return SimpleNamespace(challenge_type='dns-01', dns_provider_id=pid, id=None,
+                           challenges_dict={'example.com': {'dns_txt_name': '_acme-challenge.example.com',
+                                                            'dns_txt_value': 'v'}})
+
+
+def test_dns_challenge_setup_and_cleanup_name_unreadable_credentials(app, unreadable_cloudflare):
+    from services.acme.acme_client_service import AcmeClientService
+    svc = AcmeClientService.__new__(AcmeClientService)
+    with app.app_context():
+        ok, message, _ = svc.setup_dns_challenge(_dns_order(unreadable_cloudflare))
+        assert not ok and _named(message, unreadable_cloudflare), message
+        ok, message = AcmeClientService.cleanup_dns_challenge(_dns_order(unreadable_cloudflare))
+        assert not ok and _named(message, unreadable_cloudflare), message
+
+
+def test_dns_renewal_names_unreadable_credentials(app, unreadable_cloudflare):
+    from services.acme_renewal_service import _renew_with_new_order
+    with app.app_context(), pytest.raises(SecretUnreadable) as caught:
+        _renew_with_new_order(None, _dns_order(unreadable_cloudflare), None, None, None)
+    assert _named(caught.value, unreadable_cloudflare)
+
+
+def test_acme_proxy_dns_paths_name_unreadable_credentials(app, monkeypatch, caplog,
+                                                          unreadable_cloudflare):
+    import json
+    from models import db, AcmeClientOrder, DnsProvider
+    from services.acme.acme_proxy_service import AcmeProxyService
+    svc = AcmeProxyService.__new__(AcmeProxyService)
+    with app.app_context():
+        order = AcmeClientOrder(domains=json.dumps(['example.com']), environment='staging',
+                                challenge_type='dns-01', status='pending', is_proxy_order=True)
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
+        row = db.session.get(DnsProvider, unreadable_cloudflare)
+        monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
+                            lambda *_a, **_k: {'provider': row})
+        try:
+            with pytest.raises(SecretUnreadable) as caught:
+                svc._run_dns01_automation('https://ca.example/chall', 'tok.th', 'example.com', order_id)
+            assert _named(caught.value, unreadable_cloudflare)
+        finally:
+            db.session.rollback()
+            db.session.delete(db.session.get(AcmeClientOrder, order_id))
+            db.session.commit()
+    with caplog.at_level(logging.WARNING):
+        svc._bg_cleanup_dns_records(app, [{'provider_id': unreadable_cloudflare, 'domain': 'example.com',
+                                           'record_name': '_acme-challenge', 'value': 'v'}])
+    assert _named(caplog.text, unreadable_cloudflare), caplog.text
+
+
+def test_dns_provider_tests_name_unreadable_credentials(auth_client, unreadable_cloudflare):
+    r = auth_client.post(f'/api/v2/dns-providers/{unreadable_cloudflare}/test')
+    assert r.status_code == 400 and _named(r.get_json()['message'], unreadable_cloudflare)
+    r = auth_client.post('/api/v2/acme/domains/test',
+                         json={'domain': 'example.com', 'dns_provider_id': unreadable_cloudflare})
+    assert r.status_code == 400 and _named(r.get_json()['message'], unreadable_cloudflare)

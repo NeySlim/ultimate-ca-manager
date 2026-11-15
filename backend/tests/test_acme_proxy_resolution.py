@@ -669,7 +669,7 @@ class TestDns01Thread:
     def _patch_dns(self, monkeypatch):
         from unittest.mock import MagicMock
 
-        provider_model = SimpleNamespace(id=1, provider_type='manual', credentials='{}')
+        provider_model = SimpleNamespace(id=1, provider_type='manual', _credentials='{}')
         monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
                             lambda *_a, **_k: {'provider': provider_model})
         provider = MagicMock()
