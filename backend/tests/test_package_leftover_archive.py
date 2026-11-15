@@ -1212,6 +1212,30 @@ def test_a_journal_write_cut_short_once_leaves_the_journal_whole_for_what_follow
     archived(box, box.run(), data, config)
 
 
+def test_a_journal_line_torn_by_a_kill_leaves_room_for_the_lines_that_follow(tmp_path):
+    """Killed while writing a line: the next attempt cuts it off first, so a put-back refused
+    there is recorded, and the attempt after says retrying alone will not help."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    stuck = f'{box.data}/{LOCAL}/updates'
+    box.wrap(other_fs=(box.data,))
+    (box.bin / 'tee').write_text(
+        f'#!/bin/sh\nline=$(cat)\nfor last; do :; done\n'
+        f'[ "$line" != "mkdir\t{box.config}\t{box.archive}/config" ] || {{ printf "%s" "mkdir\t{box.config}" >> "$last"; kill -9 0; }}\n'
+        f'printf "%s\\n" "$line" | {REAL["tee"]} "$@"\n')
+    assert box.run().returncode == -9
+    wrap = {'other_fs': (box.data,), 'refused': (stuck,)}
+    outs = []
+    for _ in range(2):
+        box.wrap(**wrap)
+        outs.append(box.run())
+        assert outs[-1].returncode == 2 and reported(outs[-1].stdout)[stuck] == f'not put back to {box.data}/updates'
+    assert 'next attempt tries again' in outs[0].stdout, outs[0].stdout
+    assert 'same way at the previous attempt' in outs[1].stdout, outs[1].stdout
+    box.wrap(other_fs=(box.data,))
+    archived(box, box.run(), data, config)
+
+
 # -- an item at neither path ---------------------------------------------------------
 
 def test_an_item_whose_filesystem_is_gone_waits_for_it_and_is_never_called_missing(tmp_path):

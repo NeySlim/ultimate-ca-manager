@@ -79,11 +79,6 @@ jot() {
     return 1
 }
 
-# The journal's whole lines: a last line without its newline was never a step taken
-whole_lines() {
-    if [ -z "$(tail -c 1 -- "$JOURNAL")" ]; then cat -- "$JOURNAL"; else sed '$d' -- "$JOURNAL"; fi
-}
-
 # $1 is a line this script writes, with all its fields
 whole_step() {
     case $1 in *"$TAB"*"$TAB"*"$TAB"*) return 1 ;; esac
@@ -157,9 +152,9 @@ archive_contents() {
     done
 }
 
-# The journal without line $1 (and $2), written aside then renamed over it
+# The journal without line $1, written aside then renamed over it
 drop_line() {
-    { whole_lines | grep -vxF -e "$1" -e "${2:-$1}"; [ $? -le 1 ]; } > "$JOURNAL.new" 2>/dev/null \
+    { grep -vxF -e "$1" -- "$JOURNAL"; [ $? -le 1 ]; } > "$JOURNAL.new" 2>/dev/null \
         && mv -- "$JOURNAL.new" "$JOURNAL"
 }
 
@@ -216,7 +211,10 @@ say_stuck() {
 # no-op once undone, so a retry from any interrupted state converges.
 roll_back() {
     stuck="" left="" seen="" again="" twice="" broken="" missing=""
-    lines=$(whole_lines) || { unsettled "$JOURNAL" "could not be read"; return 1; }
+    # A last line a kill left torn was never a step: cut off (that needs no free space), the
+    # journal holds whole lines only from here on, and the next ones can be written
+    { [ -z "$(tail -c 1 -- "$JOURNAL")" ] || truncate -s "$(sed '$d' -- "$JOURNAL" | wc -c)" -- "$JOURNAL"; } \
+        && lines=$(cat -- "$JOURNAL") || { unsettled "$JOURNAL" "could not be read or cut to its whole lines"; return 1; }
     # Any line that is not a whole step stops the put-back before it touches anything
     while IFS= read -r line; do
         [ -z "$line" ] || whole_step "$line" && continue
