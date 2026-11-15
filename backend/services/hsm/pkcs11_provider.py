@@ -138,6 +138,7 @@ class Pkcs11Provider(BaseHsmProvider):
         slot_index: Slot index (optional, default: auto-detect)
     """
 
+    ECDSA_SIGNATURE_FORMAT = 'raw'
     SIGNS_PSS = True
     SIGNS_BRAINPOOL = True
     SIGNS_ML_DSA = bool(ML_DSA_PARAMETER_SETS)

@@ -47,20 +47,20 @@ class TestEcdsaToDer:
     def test_der_passes_through_unchanged(self):
         key = ec.generate_private_key(ec.SECP384R1())
         der = key.sign(b'tbs', ec.ECDSA(hashes.SHA384()))
-        assert ecdsa_to_der(der, 48) == der
+        assert ecdsa_to_der(der, 48, 'der') == der
 
     def test_der_of_exactly_two_coordinates_is_kept(self):
-        # r and s short enough that the DER is 96 bytes: the codec round trip
-        # recognises it, the length alone would not.
+        # The provider's contract, not the length or content, identifies this as DER.
         r = int.from_bytes(b'\x01' + b'\x00' * 44, 'big')
         s = int.from_bytes(b'\x01' + b'\x00' * 44, 'big')
         der = encode_dss_signature(r, s)
         assert len(der) == 96
-        assert ecdsa_to_der(der, 48) == der
+        assert ecdsa_to_der(der, 48, 'der') == der
 
-    def test_unknown_key_or_other_length_is_left_alone(self):
+    def test_unknown_key_is_left_alone_but_wrong_raw_length_is_refused(self):
         assert ecdsa_to_der(b'\x00' * 96, None) == b'\x00' * 96
-        assert ecdsa_to_der(b'\x00' * 95, 48) == b'\x00' * 95
+        with pytest.raises(ValueError, match='length'):
+            ecdsa_to_der(b'\x00' * 95, 48)
 
     def test_coordinate_bytes_from_algorithm_or_public_key(self):
         assert coordinate_bytes('EC-P521') == 66
@@ -81,6 +81,7 @@ class _FakeProvider:
 
     def __init__(self, key, digest, raw: bool, bound: bool = False):
         self.key, self.digest, self.raw, self.bound = key, digest, raw, bound
+        self.ECDSA_SIGNATURE_FORMAT = 'raw' if raw else 'der'
 
     def hash_for_key(self, key_identifier, key_algorithm, requested='sha256'):
         return self.digest.name if self.bound else requested

@@ -748,7 +748,8 @@ class HsmService:
             # PKCS#11 and Azure return ECDSA as raw r || s; X.509 needs DER (#366).
             if not pure:
                 signature = ecdsa_to_der(
-                    signature, coordinate_bytes(key.algorithm, key.public_key_pem))
+                    signature, coordinate_bytes(key.algorithm, key.public_key_pem),
+                    signature_format=getattr(hsm, 'ECDSA_SIGNATURE_FORMAT', 'der'))
 
             logger.debug(f"Signed data with HSM key: {key.label}")
             return signature
