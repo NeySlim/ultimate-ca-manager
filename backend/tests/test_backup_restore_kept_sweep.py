@@ -340,6 +340,8 @@ def test_a_staging_is_swept_only_under_a_held_lock_and_never_through_a_link(
         patched.setattr(process_lock, '_open_lock_file',
                         lambda path: (_ for _ in ()).throw(OSError(errno.ENOLCK, 'no locks')))
         files.sweep_kept_previous_contents()
+        with backup_operation_lock(timeout=0):    # taken fail-open: held by nobody
+            files.sweep_kept_previous_contents()
     assert staging.exists()
 
     files.sweep_kept_previous_contents()
@@ -352,3 +354,22 @@ def test_a_staging_of_another_user_is_kept(dirs, system_tmp, monkeypatch):
     monkeypatch.setattr(files.os, 'geteuid', lambda: os.stat(staging).st_uid + 1)
     files.sweep_kept_previous_contents()
     assert staging.exists()
+
+
+def test_a_staging_swept_before_its_lock_is_taken_is_made_again(system_tmp, monkeypatch):
+    # Another instance's sweep may remove it between its creation and the flock
+    real_flock, calls = files.fcntl.flock, []
+
+    def flock(fd, operation):
+        if not calls:
+            os.rmdir(os.readlink(f'/proc/self/fd/{fd}'))
+        calls.append(fd)
+        return real_flock(fd, operation)
+    monkeypatch.setattr(files.fcntl, 'flock', flock)
+    staged = StagedFiles()
+    try:
+        staged.stage(system_tmp / 'k.key', b'live')
+        assert len(calls) == 2 and staged.staging_dir.is_dir()
+    finally:
+        monkeypatch.undo()
+        staged.discard()
