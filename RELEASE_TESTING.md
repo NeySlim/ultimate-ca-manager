@@ -37,7 +37,7 @@ run in a browser on every target.
 
 ## Package install smoke
 
-`scripts/ci/package-smoke.sh` installs one DEB or RPM in a bare distribution container (no sudo, no systemd) and checks the venv imports, the application start and `/api/v2/health`. The `smoke-packages` job of `release-smoke.yml` runs it on the published assets (checksum verified first) for Debian 13, Ubuntu 24.04 and 26.04, AlmaLinux 9 and 10, and Fedora 43, after each release or by `workflow_dispatch` on a version. Debian 12 is out: the packages need python3 >= 3.12. `test-channel.yml` runs it on the sanity DEB (Debian 13, Ubuntu 24.04).
+`scripts/ci/package-smoke.sh` installs one DEB or RPM in a bare distribution container (no sudo, no systemd) and checks the venv imports, the application start and `/api/v2/health`. The `smoke-packages` job of `release-smoke.yml` runs it (checksum verified first) for Debian 13, Ubuntu 24.04 and 26.04, AlmaLinux 9 and 10, and Fedora 43: on the packages of the release run before the release is created, or on the published assets by `workflow_dispatch` on a version. Debian 12 is out: the packages need python3 >= 3.12. `test-channel.yml` runs it on the sanity DEB (Debian 13, Ubuntu 24.04).
 
 ## Per-target recipe
 
