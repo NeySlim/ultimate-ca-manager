@@ -327,3 +327,44 @@ def test_pending_request_with_a_known_serial_is_closed_not_left_pinning(app, pan
     panel_ca.scripts.clear()
     _sync(app, msca_id, full=False)
     assert _listing_starts(panel_ca) == [5000]
+
+
+def _give_row_a_cert(app, csr_id, cn, source):
+    from models import Certificate, db
+    from tests.test_msca_inventory import _make_cert
+    serial, pem = _make_cert(cn)
+    with app.app_context():
+        row = db.session.get(Certificate, csr_id)
+        row.crt = base64.b64encode(pem.encode()).decode()
+        row.serial_number = serial
+        row.source = source
+        db.session.commit()
+    return serial
+
+
+def test_sync_leaves_a_request_whose_csr_a_local_ca_signed_meanwhile(app, ca):
+    from models import Certificate, db
+    msca_id = _make_msca(app, 'PC local')
+    req_id, csr_id = _pending(app, msca_id, 904, 'pc-local.test.local')
+    local_serial = _give_row_a_cert(app, csr_id, 'pc-local.test.local', 'csr')
+    ca.add(904, 'pc-local.test.local')
+    s = _sync(app, msca_id)
+    assert (s['completed'], s['imported'], s['skipped']) == (0, 0, 1)
+    assert _req(app, req_id)[:2] == ('pending', None)
+    with app.app_context():
+        stored = str(db.session.get(Certificate, csr_id).serial_number)
+        assert stored in (local_serial, str(int(local_serial, 16)))
+
+
+def test_sync_still_completes_a_renewal_of_a_microsoft_ca_certificate(app, ca):
+    from models import Certificate, db
+    msca_id = _make_msca(app, 'PC renew')
+    req_id, csr_id = _pending(app, msca_id, 905, 'pc-renew.test.local')
+    old_serial = _give_row_a_cert(app, csr_id, 'pc-renew.test.local', 'msca')
+    new_serial = ca.add(905, 'pc-renew.test.local')
+    assert _sync(app, msca_id)['completed'] == 1
+    assert _req(app, req_id)[:2] == ('issued', csr_id)
+    with app.app_context():
+        stored = db.session.get(Certificate, csr_id).serial_number
+        assert str(stored) in (new_serial, str(int(new_serial, 16)))
+        assert str(stored) not in (old_serial, str(int(old_serial, 16)))

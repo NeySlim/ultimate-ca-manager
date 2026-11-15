@@ -88,6 +88,17 @@ class MicrosoftCAInventoryMixin:
                     completed_ids.add(req_id)
                     skipped += 1
                     continue
+                # A CSR signed elsewhere meanwhile holds a live certificate: never
+                # overwrite it unattended (an MS CA renewal has source 'msca')
+                csr_row = (db.session.get(Certificate, pending[req_id].csr_id)
+                           if pending[req_id].csr_id else None)
+                if csr_row is not None and csr_row.crt and csr_row.source != 'msca':
+                    logger.warning(
+                        f"MS CA '{msca.name}' inventory: RequestId={req_id} left pending, "
+                        f"its CSR (id={csr_row.id}) already holds a certificate from another source"
+                    )
+                    skipped += 1
+                    continue
                 try:
                     pem = MicrosoftCAInventoryMixin._fetch_cert_pem(msca, req_id)
                     if not pem:
