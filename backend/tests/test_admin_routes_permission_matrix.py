@@ -334,6 +334,13 @@ class TestEveryAdministrationRouteHasADecidedScope:
             'these routes are not in the administration grid; add them with '
             f'the scope decided for them: {missing}')
 
+    def test_every_decorator_requires_the_scope_decided_for_it(self, app):
+        found = {label: scope for label, (_e, scope) in _covered_routes(app).items()}
+        wrong = {label: (found[label], ROUTES[label])
+                 for label in sorted(set(found) & set(ROUTES))
+                 if found[label] != ROUTES[label]}
+        assert not wrong, f'decorator scope differs from the grid (found, decided): {wrong}'
+
     def test_the_grid_holds_no_route_that_is_gone_or_lost_its_scope(self, app):
         stale = sorted(set(ROUTES) - set(_covered_routes(app)))
         assert not stale, f'the grid describes routes that are not there: {stale}'
