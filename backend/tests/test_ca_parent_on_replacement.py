@@ -796,3 +796,41 @@ def test_the_same_certificate_imported_again_keeps_a_parent_whose_extensions_can
     assert _caref(app, child['id']) == root['refid']
     assert auth_client.get(f"/api/v2/cas/{child['id']}").status_code == 200
 
+
+
+# ------------------------------------------------- what the chain repair counts
+
+def test_the_chain_repair_counts_only_the_links_it_drops(app, auth_client, made, linked):
+    """A move to a record of the same subject and key drops nothing (no audit): it is not counted."""
+    import ssl
+    from services.ski_aki_backfill import backfill_ski_aki
+    w, tag = linked, _tag()
+    # Another record of the root's key, its subject column the root's but its certificate of another name
+    alias_pem = _rsa_pem(f'Move Alias {tag}', w['root_key'], serial=_serial())
+    alias_cert = x509.load_pem_x509_certificate(alias_pem.encode())
+    stray = _import(auth_client, _rsa_pem(f'Move Stray {tag}', _key(), serial=_serial()))
+    made.append(stray['id'])
+    mover = _import(auth_client, _rsa_pem(f'Move Child {tag}', _key(), w['root_cn'], w['root_key'], serial=_serial()))
+    made.append(mover['id'])
+    with app.app_context():
+        root = db.session.get(CA, w['root']['id'])
+        alias = CA(refid=str(uuid.uuid4()), descr=f'Move Alias {tag}', serial=0,
+                   crt=base64.b64encode(ssl.DER_cert_to_PEM_cert(
+                       alias_cert.public_bytes(serialization.Encoding.DER)).encode()).decode(),
+                   subject=root.subject, issuer=root.subject, serial_number=str(alias_cert.serial_number))
+        db.session.add(alias)
+        db.session.commit()
+        made.append(alias.id)
+        alias_refid = alias.refid
+    with app.app_context():
+        backfill_ski_aki()  # whatever another test left is settled first
+        db.session.get(CA, mover['id']).caref = alias_refid
+        db.session.get(CA, w['child']['id']).caref = stray['refid']
+        db.session.commit()
+    before = _audits(app, UNLINKED, mover['id'])
+    with app.app_context():
+        stats = backfill_ski_aki()
+    assert _caref(app, mover['id']) == w['root']['refid']
+    assert _audits(app, UNLINKED, mover['id']) == before
+    assert _caref(app, w['child']['id']) == w['root']['refid']
+    assert stats['unlinked_cas'] == 1

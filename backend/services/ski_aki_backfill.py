@@ -175,7 +175,7 @@ def _drop_disproven_parents(db, CA, stats):
             logger.warning(f"SKI/AKI chain repair: parent of CA '{ca.descr}' left as is", exc_info=True)
             continue
         dropped.append(ca)
-    stats['unlinked_cas'] = len(dropped)
+    stats['unlinked_cas'] = sum(1 for ca in dropped if parent_confirmation.drops_parent(ca))
     if not dropped:
         return
     try:
@@ -184,7 +184,7 @@ def _drop_disproven_parents(db, CA, stats):
         db.session.rollback()
         logger.error('SKI/AKI chain repair: disproven parent links not dropped', exc_info=True)
         raise
-    logger.info(f"SKI/AKI chain repair: dropped {len(dropped)} parent links their issuer disproves")
+    logger.info(f"SKI/AKI chain repair: dropped {stats['unlinked_cas']} parent links their issuer disproves")
     for ca in dropped:
         parent_confirmation.audit_dropped(ca, username='system')
 

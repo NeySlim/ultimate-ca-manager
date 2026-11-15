@@ -199,6 +199,11 @@ def _same_issuer_record(former, now):
     return parent is not None and former in same_key_refids(parent)
 
 
+def drops_parent(ca):
+    """Whether ``settle_parent`` dropped the former parent of *ca* (not a move to a record of its subject and key)."""
+    return '_dropped_parent' in ca.__dict__
+
+
 def audit_dropped(ca, username=None):
     """After the caller's commit: the audit entry of a parent ``settle_parent`` dropped
     (``ca_parent_unconfirmed`` for one confirmed by hand, ``ca_parent_unlinked`` otherwise)."""
