@@ -725,9 +725,7 @@ def test_an_in_place_renewal_and_the_merge_of_its_ca_record_do_not_deadlock(app,
     certificates; a renewal under the duplicate locks its certificate row, then the CA rows. The
     merge locks those certificate rows before any CA row, so it waits instead of each holding
     what the other needs: the renewal is stored and the merge done."""
-    from services.cert import renewal
     from services.cert_service import CertificateService
-    from services.ski_aki_backfill import backfill_ski_aki
     from tests.test_backup_cross_installation import _bound_to
     from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
 
@@ -751,52 +749,7 @@ def test_an_in_place_renewal_and_the_merge_of_its_ca_record_do_not_deadlock(app,
             assert db.session.get(Certificate, cert_id).aki
             db.session.remove()
 
-        holds, release = threading.Event(), threading.Event()
-        errors, pids, stats = [], {}, []
-        reread = renewal._reread
-
-        def pause_holding_the_row(*args):
-            fresh = reread(*args)
-            if threading.current_thread().name == 'in-place':
-                holds.set()
-                release.wait(30)
-            return fresh
-        monkeypatch.setattr(renewal, '_reread', pause_holding_the_row)
-
-        def in_place():
-            with app.app_context():
-                engine, pids['in-place'] = _own_session(url)
-                try:
-                    renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id),
-                                                       db.session.get(CA, dupe_id))
-                except Exception as exc:  # noqa: BLE001
-                    errors.append(('in-place', repr(exc)))
-                finally:
-                    holds.set()
-                    db.session.remove()
-                    engine.dispose()
-
-        def repair():
-            with app.app_context():
-                engine, pids['repair'] = _own_session(url)
-                try:
-                    stats.append(backfill_ski_aki())
-                except Exception as exc:  # noqa: BLE001
-                    errors.append(('repair', repr(exc)))
-                finally:
-                    db.session.remove()
-                    engine.dispose()
-
-        t_a = threading.Thread(target=in_place, name='in-place')
-        t_a.start()
-        assert holds.wait(30)
-        t_b = threading.Thread(target=repair, name='repair')
-        t_b.start()
-        # The repair blocks on the certificate row the renewal holds, then the renewal goes on
-        met = _waits_on_a_lock(url, _pid_of(pids, 'repair'))
-        release.set()
-        t_a.join(60)
-        t_b.join(60)
+        met, errors, stats = _renewal_meets_the_repair(app, url, monkeypatch, cert_id, dupe_id)
 
         with app.app_context():
             row = db.session.get(Certificate, cert_id)
@@ -808,3 +761,121 @@ def test_an_in_place_renewal_and_the_merge_of_its_ca_record_do_not_deadlock(app,
     assert errors == []
     assert stats and stats[0]['deduplicated'] == 1
     assert records == 1 and moved_to == keeper_refid and renewed
+
+
+def _renewal_meets_the_repair(app, url, monkeypatch, cert_id, ca_id):
+    """An in-place renewal of *cert_id* under *ca_id* paused holding its certificate row, then the
+    SKI/AKI repair run until it waits on a lock, then the renewal let go: (met, errors, stats)."""
+    from services.cert import renewal
+    from services.ski_aki_backfill import backfill_ski_aki
+    holds, release = threading.Event(), threading.Event()
+    errors, pids, stats = [], {}, []
+    reread = renewal._reread
+
+    def pause_holding_the_row(*args):
+        fresh = reread(*args)
+        if threading.current_thread().name == 'in-place':
+            holds.set()
+            release.wait(30)
+        return fresh
+    monkeypatch.setattr(renewal, '_reread', pause_holding_the_row)
+
+    def in_place():
+        with app.app_context():
+            engine, pids['in-place'] = _own_session(url)
+            try:
+                renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id),
+                                                   db.session.get(CA, ca_id))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(('in-place', repr(exc)))
+            finally:
+                holds.set()
+                db.session.remove()
+                engine.dispose()
+
+    def repair():
+        with app.app_context():
+            engine, pids['repair'] = _own_session(url)
+            try:
+                stats.append(backfill_ski_aki())
+            except Exception as exc:  # noqa: BLE001
+                errors.append(('repair', repr(exc)))
+            finally:
+                db.session.remove()
+                engine.dispose()
+
+    t_a = threading.Thread(target=in_place, name='in-place')
+    t_a.start()
+    assert holds.wait(30)
+    t_b = threading.Thread(target=repair, name='repair')
+    t_b.start()
+    # The repair blocks on the certificate row the renewal holds, then the renewal goes on
+    met = _waits_on_a_lock(url, _pid_of(pids, 'repair'))
+    release.set()
+    t_a.join(60)
+    t_b.join(60)
+    return met, errors, stats
+
+
+def _intermediate(root_key, root_cert):
+    from datetime import datetime, timedelta, timezone
+    key = ec.generate_private_key(ec.SECP256R1())
+    now = datetime.now(timezone.utc)
+    cert = (x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'Sub {uuid.uuid4().hex[:8]}')]))
+            .issuer_name(root_cert.subject).public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=1825))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(root_key.public_key()),
+                           critical=False)
+            .sign(root_key, hashes.SHA256()))
+    return key, cert
+
+
+def test_a_renewal_and_the_merge_of_a_rechained_orphan_record_do_not_deadlock(app, monkeypatch):
+    """Two records of one intermediate, the lower-id one orphan: the repair re-chains it (phase 2,
+    a write on the anchor both records lock), then merges the other into it (phase 4, which locks
+    the other's certificates). A renewal under the other holds its certificate and waits for the
+    anchor: the repair commits the re-chaining before it asks for certificates, so both finish."""
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    schema = f'renewal_rechain_{uuid.uuid4().hex[:6]}'
+    with _a_schema_of_our_own(schema) as url, _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            root_key, root_cert = _authority()
+            root = _ca_row(root_key, root_cert)
+            key, cert = _intermediate(root_key, root_cert)
+            orphan = _ca_row(key, cert)
+            linked = _ca_row(key, cert)
+            for row, digest in ((root, root_cert), (orphan, cert), (linked, cert)):
+                row.ski = digest.extensions.get_extension_for_class(
+                    x509.SubjectKeyIdentifier).value.digest.hex(':').upper()
+                row.cdp_enabled = False
+                row.enforce_unique_subject = True
+            orphan.caref, linked.caref = None, root.refid
+            db.session.commit()
+            orphan_id, linked_id, linked_refid = orphan.id, linked.id, linked.refid
+            assert orphan_id < linked_id  # the orphan is the anchor of the twins
+            issued = CertificateService.create_certificate(
+                descr='under the linked record', caref=linked_refid,
+                dn={'CN': 'rechain.example.test'}, key_type='prime256v1', validity_days=30)
+            cert_id, first_serial = issued.id, issued.serial_number
+            db.session.remove()
+
+        met, errors, stats = _renewal_meets_the_repair(app, url, monkeypatch, cert_id, linked_id)
+
+        with app.app_context():
+            row = db.session.get(Certificate, cert_id)
+            moved_to, renewed = row.caref, row.serial_number
+            kept = db.session.get(CA, orphan_id)
+            kept_refid, kept_parent = kept.refid, kept.caref
+            gone = db.session.get(CA, linked_id) is None
+            db.session.remove()
+    assert met, errors
+    assert errors == []
+    assert stats and stats[0]['rechained_cas'] == 1 and stats[0]['deduplicated'] == 1
+    assert gone and moved_to == kept_refid and kept_parent and renewed != first_serial
