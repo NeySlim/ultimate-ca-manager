@@ -194,10 +194,13 @@ def _generate_in_child(app, url, ca_id, barrier, results):
     db._app_engines[app][None] = engine
     allocate = generation.allocate_crl_number
 
+    met = []
+
     def meet_then_allocate(*args, **kwargs):
         # Both ask for a number at the same moment
         try:
             barrier.wait()
+            met.append(1)
         except threading.BrokenBarrierError:
             pass
         return allocate(*args, **kwargs)
@@ -206,10 +209,11 @@ def _generate_in_child(app, url, ca_id, barrier, results):
     try:
         with app.app_context():
             db.session.remove()
-            results.put(CRLService.generate_crl(ca_id).crl_number)
+            number = CRLService.generate_crl(ca_id).crl_number
+            results.put((bool(met), number))
             db.session.remove()
     except Exception as exc:  # noqa: BLE001
-        results.put(repr(exc))
+        results.put((bool(met), repr(exc)))
     finally:
         results.close()
         results.join_thread()
@@ -218,16 +222,18 @@ def _generate_in_child(app, url, ca_id, barrier, results):
 
 def _race(app, url, ca_id):
     context = multiprocessing.get_context('fork')
-    barrier, results = context.Barrier(2, timeout=3), context.Queue()
+    barrier, results = context.Barrier(2, timeout=30), context.Queue()
     children = [context.Process(target=_generate_in_child,
                                 args=(app, url, ca_id, barrier, results))
                 for _ in range(2)]
     for child in children:
         child.start()
-    numbers = [results.get(timeout=30) for _ in children]
+    answers = [results.get(timeout=90) for _ in children]
     for child in children:
         child.join(10)
-    return numbers
+    # Two generations that never met ran one after the other: nothing was raced
+    assert all(met for met, _ in answers), f'the two generations never met: {answers}'
+    return [number for _, number in answers]
 
 
 def _two_processes(app, url, is_postgresql):

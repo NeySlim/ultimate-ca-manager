@@ -54,14 +54,17 @@ def ha(app, monkeypatch):
 
 
 def _together(app, monkeypatch, run):
-    """Both threads read the campaign before either writes it."""
+    """Both threads read the campaign before either writes it; two runs that never met
+    ran one after the other, and the test fails."""
     real = uc.read_campaign
-    both = threading.Barrier(2, timeout=10)
+    both = threading.Barrier(2, timeout=30)
+    met = []
 
     def read_then_meet():
         value = real()
         try:
             both.wait()
+            met.append(1)
         except threading.BrokenBarrierError:
             pass
         return value
@@ -83,6 +86,7 @@ def _together(app, monkeypatch, run):
         t.join(60)
     monkeypatch.setattr(uc, 'read_campaign', real)
     assert errors == []
+    assert met, 'the two runs never met in read_campaign: they did not overlap'
     return results
 
 
