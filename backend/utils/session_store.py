@@ -94,6 +94,8 @@ class KeepsRemovedRecordsGone:
 
 
 class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessionInterface):
+    """Check and write are atomic only where the directory takes a flock: NFS refuses
+    an exclusive one, and cachelib's capacity pruning, not a revocation, stays outside."""
 
     lock_wait = 2.0
 
