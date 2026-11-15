@@ -100,6 +100,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Packages: no bytecode of the previous version after an upgrade.** The DEB and RPM post-installation remove the `__pycache__` the service wrote under `/opt/ucm`, and the RPM keeps the dates of its sources: on Fedora 43 and EL10 every version carried the same file dates, so a source of unchanged size could run the previous version's bytecode.
 - FIPS on Ubuntu 24.04: the package and the release notes now tell to enable Ubuntu Pro's `fips` stream, which ships the binaries certified under CMVP #5115, instead of `fips-updates`, whose patched versions are not the certified binary.
 - Release notes: a release candidate lists the changes under `[Unreleased]` and a stable release its own section, with history from the same major line only; a release whose section is missing now stops instead of publishing notes from older versions. Release tooling accepts three-segment maintenance versions (`2.254.2`) and writes the npm form of the version in both npm files.
 - Automatic update install: a release whose package was published before its `.sha256` file got a failed `settings_update` audit entry and was never installed automatically; it now waits, audited once per version, and the next check after the file appears installs it.
