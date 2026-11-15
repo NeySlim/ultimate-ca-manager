@@ -47,7 +47,7 @@ def ha_cfg(monkeypatch):
 
 def test_ha_start_refused_without_the_shared_db_key(ha_cfg, monkeypatch):
     monkeypatch.delenv('UCM_DB_ENCRYPTION_KEY')
-    with pytest.raises(SystemExit, match='UCM_DB_ENCRYPTION_KEY'):
+    with pytest.raises(SystemExit, match='requires UCM_DB_ENCRYPTION_KEY .* identical on every node'):
         ha.validate_ha_config(Config)
 
 
