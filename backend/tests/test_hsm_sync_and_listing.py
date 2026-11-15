@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from services.hsm.base_provider import HsmKeyInfo
 
@@ -330,6 +330,47 @@ class TestSyncKeys:
             with app.app_context():
                 row = db.session.get(HsmKey, ids['a'])
                 assert (row.algorithm, row.public_key_pem) == ('EC-P256', spki)
+
+    def test_a_rekeyed_slot_takes_the_new_key_and_forgets_the_old_public_key(self, app):
+        """A slot that holds a different key now: its cached SPKI belongs to the key that no longer exists."""
+        from models import db
+        from models.hsm import HsmKey
+        old = rsa.generate_private_key(public_exponent=65537, key_size=2048).public_key()
+        old_pem = old.public_bytes(serialization.Encoding.PEM,
+                                   serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        fresh = ec.generate_private_key(ec.SECP384R1()).public_key()
+        fresh_pem = fresh.public_bytes(serialization.Encoding.PEM,
+                                       serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        with _provider_with_keys(app, 'rekey', ['a']) as (pid, ids, _ca):
+            with app.app_context():
+                row = db.session.get(HsmKey, ids['a'])
+                row.algorithm, row.public_key_pem = 'RSA-2048', old_pem
+                db.session.commit()
+            listed = _info('a')
+            listed.algorithm, listed.public_key_pem = 'EC-P384', fresh_pem
+            _sync(app, pid, _ListingProvider([listed]))
+            with app.app_context():
+                row = db.session.get(HsmKey, ids['a'])
+                assert (row.algorithm, row.public_key_pem) == ('EC-P384', fresh_pem)
+
+    def test_a_rekeyed_slot_drops_the_cached_key_when_the_new_one_cannot_be_read(self, app):
+        """Even when the provider cannot export the new public half, the old key's SPKI must not survive."""
+        from models import db
+        from models.hsm import HsmKey
+        old = ec.generate_private_key(ec.SECP256R1()).public_key()
+        old_pem = old.public_bytes(serialization.Encoding.PEM,
+                                   serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        with _provider_with_keys(app, 'rekey-fail', ['a']) as (pid, ids, _ca):
+            with app.app_context():
+                row = db.session.get(HsmKey, ids['a'])
+                row.public_key_pem = old_pem
+                db.session.commit()
+            listed = _info('a')
+            listed.algorithm, listed.public_key_pem = 'EC-P384', None
+            _sync(app, pid, _ListingProvider([listed]))
+            with app.app_context():
+                row = db.session.get(HsmKey, ids['a'])
+                assert row.algorithm == 'EC-P384' and not row.public_key_pem
 
     def test_an_unreferenced_missing_key_is_still_removed(self, app):
         with _provider_with_keys(app, 'clean', ['a', 'gone']) as (pid, _ids, _ca):
