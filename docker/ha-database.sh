@@ -46,12 +46,12 @@ ucm_initial_admin_notice() {
 }
 
 # Marker the application writes next to the database once a start has migrated it: same
-# version as the image means no upgrade can run; absent, different or unknown means one may.
+# version as the image means no upgrade can run; absent or different means one may (the
+# application never records an empty or unknown version).
 ucm_sqlite_upgrade_possible() {
     local last
     last=$(cat "$(dirname "$UCM_DATABASE_PATH")/.ucm-started-version" 2>/dev/null) || return 0
-    case "${UCM_VERSION:-}" in ''|unknown) return 0 ;; esac
-    [ "$last" != "$UCM_VERSION" ]
+    [ "$last" != "${UCM_VERSION:-}" ]
 }
 
 # Room for the start next to the database: its copy when enabled, plus its size again when an
