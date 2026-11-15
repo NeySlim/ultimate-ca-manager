@@ -867,7 +867,7 @@ class TestSyslogTest:
 
     def test_the_configuration_read_before_is_the_one_put_back(self, auth_client):
         with self._restoring(auth_client):
-            self._configure(auth_client, enabled=True, host='192.0.2.7', port=1514,
+            self._configure(auth_client, enabled=False, host='192.0.2.7', port=1514,
                             protocol='tcp', tls=True, tls_verify=False, framing='octet',
                             categories=['settings'])
             self._check_put_back(auth_client)
