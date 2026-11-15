@@ -167,3 +167,37 @@ def test_the_scep_path_records_the_first_common_name(app, create_ca, key):
             db.session.delete(row)
             db.session.delete(req)
             db.session.commit()
+
+
+def test_the_external_certificate_path_records_the_first_common_name(app, auth_client, key):
+    """A CSR signed outside UCM, imported back: the completed row names the first CN."""
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    csr = _multi_cn_csr(key, tag)
+    r = auth_client.post('/api/v2/csrs/upload', json={
+        'pem': csr.public_bytes(serialization.Encoding.PEM).decode(), 'name': f'rdn-ext-{tag}'})
+    assert r.status_code in (200, 201), r.data
+    csr_id = r.get_json()['data']['id']
+
+    issuer_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    issuer = _subject(f'External RDN CA {tag}')
+    now = datetime.datetime.now(datetime.timezone.utc)
+    leaf = (x509.CertificateBuilder()
+            .subject_name(csr.subject).issuer_name(issuer)
+            .public_key(csr.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(days=1))
+            .not_valid_after(now + datetime.timedelta(days=30))
+            .sign(issuer_key, hashes.SHA256()))
+    r = auth_client.post('/api/v2/certificates/import', data={
+        'pem_content': leaf.public_bytes(serialization.Encoding.PEM).decode()},
+        content_type='multipart/form-data')
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['id'] == csr_id
+    with app.app_context():
+        assert db.session.get(Certificate, csr_id).subject_cn == f'web-{tag}.example.com'
