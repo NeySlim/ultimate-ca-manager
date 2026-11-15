@@ -110,4 +110,21 @@ describe('CreateCAModal on an HSM key, server refusals', () => {
     expect(screen.getByText('cas.create.hsmNeedsRead')).toBeTruthy()
     expect(screen.getByLabelText('cas.create.keyStorageLocal').checked).toBe(true)
   })
+
+  it('offers the HSM again once the providers list is granted at a later opening', async () => {
+    mocks.getProviders.mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { status: 403 }))
+    mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, allowed_digests: null } })
+    mocks.getProfiles.mockResolvedValue({ data: [] })
+    mocks.getSettings.mockResolvedValue({ data: { compliance_profile_default: '' } })
+    const props = { onClose: vi.fn(), cas: [], onSuccess: vi.fn() }
+    const { rerender } = render(<CreateCAModal open {...props} />)
+    await waitFor(() => expect(screen.getByLabelText('cas.create.keyStorageHsm').disabled).toBe(true))
+
+    mocks.getProviders.mockResolvedValue({ data: PROVIDERS })
+    rerender(<CreateCAModal open={false} {...props} />)
+    rerender(<CreateCAModal open {...props} />)
+    await waitFor(() => expect(mocks.getProviders).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByLabelText('cas.create.keyStorageHsm').disabled).toBe(false))
+    expect(screen.queryByText('cas.create.hsmNeedsRead')).toBeNull()
+  })
 })

@@ -149,6 +149,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         if (cancelled) return
         const list = extractData(res) || []
         setHsmProviders(list.filter(p => p.enabled))
+        setHsmDenied(false)
       })
       .catch((error) => {
         if (cancelled) return
