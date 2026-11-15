@@ -111,7 +111,7 @@ def test_the_application_engine_takes_the_prepare_threshold(value, expected):
     out = subprocess.run(
         [sys.executable, '-c', 'from config.settings import Config; '
          'args = Config.SQLALCHEMY_ENGINE_OPTIONS.get("connect_args"); '
-         'print("absent" if args is None else args["prepare_threshold"])'],
+         'print(args.get("prepare_threshold", "absent"))'],
         cwd=BACKEND, env=env, capture_output=True, text=True, check=True)
     assert out.stdout.strip().splitlines()[-1] == expected
 

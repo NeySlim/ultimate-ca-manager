@@ -42,6 +42,27 @@ def postgres_connect_args(url, environ=None) -> dict:
     return {'prepare_threshold': int(raw)}
 
 
+# Client side: a dead server or a partition is noticed within about a minute, an
+# unreachable one refused in ten seconds (the application pool and the leader's lock)
+POSTGRES_KEEPALIVE_ARGS = {'keepalives': 1, 'keepalives_idle': 30, 'keepalives_interval': 10,
+                           'keepalives_count': 3, 'connect_timeout': 10}
+
+
+def postgres_engine_options(url, environ=None) -> dict:
+    """Engine options of the application pool on PostgreSQL: each checkout pinged, so a
+    connection the server dropped is replaced unseen, and the keepalives above unless the
+    URL sets them; postgres_connect_args on top. Empty for another database."""
+    if not is_postgres_url(url):
+        return {}
+    try:
+        in_url = set(make_url(str(url)).query)
+    except Exception:
+        in_url = set()
+    args = {k: v for k, v in POSTGRES_KEEPALIVE_ARGS.items() if k not in in_url}
+    args.update(postgres_connect_args(url, environ))
+    return {'pool_pre_ping': True, 'connect_args': args}
+
+
 def is_postgres_url(url: str) -> bool:
     """True for every PostgreSQL spelling: postgres://, postgresql://, postgresql+driver://."""
     return (url or '').startswith(('postgresql://', 'postgres://', 'postgresql+'))

@@ -12,7 +12,7 @@ from datetime import timedelta
 from dotenv import load_dotenv
 
 from config.paths import env_file as _config_env_file
-from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
+from utils.db_url import is_postgres_url, postgres_engine_options, sqlalchemy_url
 
 # Load environment variables FIRST (before using them)
 # Try multiple locations for .env files
@@ -233,9 +233,9 @@ class Config:
     # SQLAlchemy would otherwise quote bound values in its errors, private keys included.
     # PostgreSQL's DETAIL stays for a duplicate or missing key; a refused row or input is dropped (utils/db_errors)
     SQLALCHEMY_ENGINE_OPTIONS["hide_parameters"] = True
-    # UCM_PG_PREPARE_THRESHOLD, for a transaction-mode pooler without prepared statements
-    if _db_url and postgres_connect_args(_db_url):
-        SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = postgres_connect_args(_db_url)
+    # Pre-ping, keepalives and connect timeout, plus UCM_PG_PREPARE_THRESHOLD (utils/db_url)
+    if _db_url:
+        SQLALCHEMY_ENGINE_OPTIONS.update(postgres_engine_options(_db_url))
     
     
     @classmethod
