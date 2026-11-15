@@ -278,3 +278,152 @@ def test_a_superseded_request_stays_closed_once_its_csr_is_gone(app, adcs):
         other = MSCARequest.query.filter(MSCARequest.request_id == 7010, MSCARequest.id != req_id).one()
         assert other.cert_id == result['imported_cert_id']
     assert _req(app, req_id) == ('superseded', None)
+
+
+# Races between two real sessions: the other side runs in its own app context
+# (its own session and connection) and commits while this side is mid-flight.
+
+def _external_cert_for(app, csr_id, cn):
+    """A certificate another CA issued for the CSR's key, as an operator would import it."""
+    import datetime
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+    from models import Certificate, db
+    with app.app_context():
+        csr = x509.load_pem_x509_csr(base64.b64decode(db.session.get(Certificate, csr_id).csr))
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(csr.subject)
+            .issuer_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'Other CA {cn}')]))
+            .public_key(csr.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now).not_valid_after(now + datetime.timedelta(days=30))
+            .sign(key, hashes.SHA256()))
+    return cert, cert.public_bytes(serialization.Encoding.PEM)
+
+
+def _complete_msca(app, msca_id, req_id, pem):
+    from models import MicrosoftCA, MSCARequest, db
+    from services.msca.ca_control import MicrosoftCACAControlMixin
+    with app.app_context():
+        return MicrosoftCACAControlMixin.complete_request(
+            db.session.get(MicrosoftCA, msca_id), db.session.get(MSCARequest, req_id), pem)
+
+
+def _once(fn):
+    done = []
+
+    def run():
+        if not done:
+            done.append(fn())
+    return run, done
+
+
+def test_an_import_into_the_csr_loses_to_a_microsoft_ca_completion(app, adcs, monkeypatch):
+    import services.cert.mixins.csr as csr_mod
+    from models import Certificate, db
+    from services.cert_service import CertificateService
+    msca_id = _make_msca(app, 'MSE race import')
+    csr_id, req_id = _csr_with_request(app, msca_id, 7020, 'mse-race-import.test.local')
+    adcs.add(7020, 'mse-race-import.test.local')
+    ms_pem = adcs.rows[-1]['pem']
+    cert, pem = _external_cert_for(app, csr_id, 'race-import')
+    other, done = _once(lambda: _complete_msca(app, msca_id, req_id, ms_pem))
+    real_cn = csr_mod.subject_common_name
+    monkeypatch.setattr(csr_mod, 'subject_common_name', lambda s: (other(), real_cn(s))[1])
+    with app.app_context():
+        row = db.session.get(Certificate, csr_id)
+        with pytest.raises(ValueError):
+            CertificateService.complete_external_csr(row, cert, pem, username='admin')
+    assert done == [('imported', csr_id)]
+    serial, crt, source = _row(app, csr_id)
+    assert source == 'msca' and b'BEGIN' in base64.b64decode(crt)
+    assert base64.b64decode(crt).strip() != pem.strip()
+    assert _req(app, req_id) == ('issued', csr_id)
+
+
+def test_a_microsoft_ca_completion_loses_to_an_import_into_the_csr(app, adcs, monkeypatch):
+    import services.approval_gate as gate
+    from models import Certificate, db
+    from services.cert_service import CertificateService
+    msca_id = _make_msca(app, 'MSE race msca')
+    csr_id, req_id = _csr_with_request(app, msca_id, 7021, 'mse-race-msca.test.local')
+    adcs.add(7021, 'mse-race-msca.test.local')
+    ms_pem = adcs.rows[-1]['pem']
+    cert, pem = _external_cert_for(app, csr_id, 'race-msca')
+    # Between the import's commit and the closure of its requests
+    other, done = _once(lambda: _complete_msca(app, msca_id, req_id, ms_pem))
+    real_resolve = gate.resolve_moot_requests
+    monkeypatch.setattr(gate, 'resolve_moot_requests', lambda *a, **k: (other(), real_resolve(*a, **k))[1])
+    with app.app_context():
+        CertificateService.complete_external_csr(db.session.get(Certificate, csr_id), cert, pem,
+                                                 username='admin')
+    assert done == [('superseded', None)]
+    serial, crt, source = _row(app, csr_id)
+    assert source == 'import' and int(serial) == cert.serial_number
+    assert _req(app, req_id) == ('superseded', None)
+
+
+def test_local_signing_loses_to_a_microsoft_ca_completion(app, auth_client, create_ca, adcs, monkeypatch):
+    import services.hsm.ca_key_loader as loader
+    ca = create_ca(cn='MSE race sign CA')
+    msca_id = _make_msca(app, 'MSE race sign')
+    csr_id, req_id = _csr_with_request(app, msca_id, 7022, 'mse-race-sign.test.local')
+    adcs.add(7022, 'mse-race-sign.test.local')
+    ms_pem = adcs.rows[-1]['pem']
+    other, done = _once(lambda: _complete_msca(app, msca_id, req_id, ms_pem))
+    real_key = loader.get_ca_signing_key
+    monkeypatch.setattr(loader, 'get_ca_signing_key', lambda c: (other(), real_key(c))[1])
+    r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', data=json.dumps({'ca_id': ca['id'], 'validity_days': 30}),
+                         content_type='application/json')
+    assert r.status_code >= 400, r.data
+    assert done == [('imported', csr_id)]
+    assert _row(app, csr_id)[2] == 'msca'
+    assert _req(app, req_id) == ('issued', csr_id)
+
+
+def test_direct_microsoft_ca_signing_loses_to_a_local_signing(app, auth_client, create_ca, adcs, monkeypatch):
+    """The CA issues at once, but a local CA signed the CSR meanwhile: the request is
+    closed superseded with a 409, and a full sync brings the CA's certificate in."""
+    from models import CA, Certificate, MSCARequest, db
+    from services.cert_service import CertificateService
+    from services.msca.connection import MicrosoftCAConnectionMixin
+    from tests.test_msca_inventory import _make_cert
+    ca = create_ca(cn='MSE race direct CA')
+    msca_id = _make_msca(app, 'MSE race direct')
+    with app.app_context():
+        row = CertificateService.generate_csr(descr='mse-race-direct', dn={'CN': 'mse-race-direct.test.local'},
+                                              key_type='2048')
+        db.session.commit()
+        csr_id, caref = row.id, db.session.get(CA, ca['id']).refid
+    ms_serial, ms_pem = _make_cert('mse-race-direct.test.local')
+
+    def sign_locally():
+        with app.app_context():
+            CertificateService.sign_csr(csr_id, caref, validity_days=30, username='admin')
+
+    class _Issuing:
+        def get_cert(self, csr_pem, template, encoding='b64', attributes=None):
+            sign_locally()
+            return ms_pem
+
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_get_client', staticmethod(lambda m: _Issuing()))
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_cleanup_client', staticmethod(lambda c: None))
+    r = auth_client.post(f'/api/v2/microsoft-cas/{msca_id}/sign/{csr_id}',
+                         data=json.dumps({'template': 'WebServer'}), content_type='application/json')
+    assert r.status_code == 409, r.data
+    assert 'signed elsewhere' in r.get_json()['message'] and 'full inventory sync' in r.get_json()['message']
+    local = _row(app, csr_id)
+    assert local[1] and local[2] != 'msca'
+    with app.app_context():
+        req = MSCARequest.query.filter_by(msca_id=msca_id, csr_id=csr_id).one()
+        assert (req.status, req.cert_id) == ('superseded', None)
+    adcs.rows.append({'request_id': 7023, 'serial': ms_serial, 'template': 'WebServer',
+                      'cn': 'mse-race-direct.test.local', 'pem': ms_pem})
+    assert _sync(app, msca_id)['imported'] == 1
+    assert _row(app, csr_id) == local
+    with app.app_context():
+        ms_row = Certificate.query.filter(Certificate.source == 'msca',
+                                          Certificate.subject_cn == 'mse-race-direct.test.local').one()
+        assert int(str(ms_row.serial_number)) == int(ms_serial, 16)

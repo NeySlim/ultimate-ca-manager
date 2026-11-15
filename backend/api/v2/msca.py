@@ -12,7 +12,8 @@ from utils.response import success_response, error_response, created_response, n
 from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
-from services.msca.requests import MSCASignedElsewhere, SUPERSEDED, SUPERSEDED_MESSAGE, msca_may_write_clause
+from services.msca.requests import (MSCASignedElsewhere, SIGNED_MEANWHILE_MESSAGE, SUPERSEDED,
+                                    SUPERSEDED_MESSAGE, msca_may_write_clause, supersede)
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
@@ -912,6 +913,14 @@ def sign_csr(msca_id, csr_id):
             # (don't pretend the whole call succeeded).
             try:
                 _import_signed_cert(csr, result.get('cert_pem'), msca, template, result['request_id'])
+            except MSCASignedElsewhere:
+                # Signed by a local CA or an import meanwhile: closed as complete_request does
+                db.session.rollback()
+                supersede([result['request_id']], states=('issued',))
+                _audit('msca.sign', msca,
+                       f"template={template} csr_id={csr_id} eobo={bool(enrollee_name or enrollee_upn)} "
+                       f"status=superseded", success=False)
+                return error_response(SIGNED_MEANWHILE_MESSAGE, 409)
             except Exception as imp_err:
                 logger.error(
                     f"MS CA issued cert but UCM import failed (msca={msca.name}, "

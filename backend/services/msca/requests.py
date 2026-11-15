@@ -19,6 +19,8 @@ class MSCASignedElsewhere(RuntimeError):
 # Terminal state of a request whose CSR received a certificate from another source
 SUPERSEDED = 'superseded'
 SUPERSEDED_MESSAGE = 'The CSR was signed elsewhere; the Microsoft CA request is closed'
+SIGNED_MEANWHILE_MESSAGE = ('The CSR was signed elsewhere meanwhile; the Microsoft CA request is closed '
+                            'and the certificate it issued enters UCM through a full inventory sync')
 
 
 def holds_foreign_certificate(row):
@@ -35,10 +37,10 @@ def msca_may_write_clause():
                   Certificate.source == 'msca', Certificate.imported_from.like('msca:%'))
 
 
-def supersede(req_ids, *, username=None, commit=True):
-    """Close the given open requests as superseded, audited under *username* (else the
-    request's user, else 'system'); returns how many changed. Rides the caller's
-    transaction when ``commit`` is False."""
+def supersede(req_ids, *, username=None, commit=True, states=('submitted', 'pending')):
+    """Close the given requests still in *states* and without a certificate as superseded,
+    audited under *username* (else the request's user, else 'system'); returns how many
+    changed. Rides the caller's transaction when ``commit`` is False."""
     from flask import g, has_request_context
     from services.audit.staging import stage_audit_entry
     if username is None and has_request_context():
@@ -48,7 +50,7 @@ def supersede(req_ids, *, username=None, commit=True):
     for req in MSCARequest.query.filter(MSCARequest.id.in_(list(req_ids))).all():
         changed = (MSCARequest.query
                    .filter(MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
-                           MSCARequest.status.in_(('submitted', 'pending')))
+                           MSCARequest.status.in_(states))
                    .update({MSCARequest.status: SUPERSEDED,
                             MSCARequest.error_message: 'CSR signed elsewhere'},
                            synchronize_session=False))
