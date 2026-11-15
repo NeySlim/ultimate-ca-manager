@@ -62,6 +62,14 @@ def _merge_ca_group(db, cas_with_ski, stats):
     if not keeper:
         keeper = cas_with_ski[0]
 
+    # Certificate rows before CA rows, as an issuance or a renewal locks them: the
+    # certificates the merge moves are locked before the keeper's row is written
+    from models import Certificate
+    moved = [c.refid for c in cas_with_ski if c.id != keeper.id]
+    with db.session.no_autoflush:
+        db.session.query(Certificate.id).filter(Certificate.caref.in_(moved)).order_by(
+            Certificate.id).with_for_update().all()
+
     latest = max(cas_with_ski, key=lambda c: c.id)
     if latest.descr != keeper.descr:
         logger.info(f"SKI/AKI backfill: renaming keeper '{keeper.descr}' -> '{latest.descr}'")

@@ -718,3 +718,93 @@ def test_two_protocol_renewals_of_a_bound_row_move_its_bindings_once(app):
             db.session.remove()
     assert len(stored) == 1 and len(errors) == 1 and 'AlreadySuperseded' in errors[0], errors
     assert (bound_to, https) == result
+
+
+def test_an_in_place_renewal_and_the_merge_of_its_ca_record_do_not_deadlock(app, monkeypatch):
+    """The SKI/AKI repair merges a duplicate CA record into its keeper and moves the duplicate's
+    certificates; a renewal under the duplicate locks its certificate row, then the CA rows. The
+    merge locks those certificate rows before any CA row, so it waits instead of each holding
+    what the other needs: the renewal is stored and the merge done."""
+    from services.cert import renewal
+    from services.cert_service import CertificateService
+    from services.ski_aki_backfill import backfill_ski_aki
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    schema = f'renewal_merge_{uuid.uuid4().hex[:6]}'
+    with _a_schema_of_our_own(schema) as url, _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            key, cert = _authority()
+            keeper = _ca_row(key, cert)
+            dupe = _ca_row(key, cert)
+            dupe.descr = 'merged record, renamed keeper'
+            ski = cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value.digest
+            for row in (keeper, dupe):
+                row.enforce_unique_subject = True
+                row.ski = ski.hex(':').upper()  # filled already: the repair goes to the merge
+                row.cdp_enabled = False  # no CRL signed after the renewal under the record merged
+            db.session.commit()
+            keeper_id, dupe_id, dupe_refid = keeper.id, dupe.id, dupe.refid
+            cert_id = CertificateService.create_certificate(
+                descr='under the duplicate', caref=dupe_refid, dn={'CN': 'merge.example.test'},
+                key_type='prime256v1', validity_days=30).id
+            assert db.session.get(Certificate, cert_id).aki
+            db.session.remove()
+
+        holds, release = threading.Event(), threading.Event()
+        errors, pids, stats = [], {}, []
+        reread = renewal._reread
+
+        def pause_holding_the_row(*args):
+            fresh = reread(*args)
+            if threading.current_thread().name == 'in-place':
+                holds.set()
+                release.wait(30)
+            return fresh
+        monkeypatch.setattr(renewal, '_reread', pause_holding_the_row)
+
+        def in_place():
+            with app.app_context():
+                engine, pids['in-place'] = _own_session(url)
+                try:
+                    renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id),
+                                                       db.session.get(CA, dupe_id))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(('in-place', repr(exc)))
+                finally:
+                    holds.set()
+                    db.session.remove()
+                    engine.dispose()
+
+        def repair():
+            with app.app_context():
+                engine, pids['repair'] = _own_session(url)
+                try:
+                    stats.append(backfill_ski_aki())
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(('repair', repr(exc)))
+                finally:
+                    db.session.remove()
+                    engine.dispose()
+
+        t_a = threading.Thread(target=in_place, name='in-place')
+        t_a.start()
+        assert holds.wait(30)
+        t_b = threading.Thread(target=repair, name='repair')
+        t_b.start()
+        # The repair blocks on the certificate row the renewal holds, then the renewal goes on
+        met = _waits_on_a_lock(url, _pid_of(pids, 'repair'))
+        release.set()
+        t_a.join(60)
+        t_b.join(60)
+
+        with app.app_context():
+            row = db.session.get(Certificate, cert_id)
+            moved_to, renewed = row.caref, row.serial_number
+            records = CA.query.filter(CA.id.in_((keeper_id, dupe_id))).count()
+            keeper_refid = db.session.get(CA, keeper_id).refid
+            db.session.remove()
+    assert met, errors
+    assert errors == []
+    assert stats and stats[0]['deduplicated'] == 1
+    assert records == 1 and moved_to == keeper_refid and renewed
