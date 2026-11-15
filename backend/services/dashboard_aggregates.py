@@ -12,7 +12,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import (DateTime, String, and_, case, cast, false, func, literal, literal_column,
                         or_, select, true, type_coerce, union_all)
 
-from models import CA, Certificate, DeployBinding, DeployTarget, SystemConfig
+from models import CA, Certificate, DeployBinding, DeployTarget, SystemConfig, db
 from models.acme_models import AcmeClientOrder, AcmeOrder
 from models.audit_log import AuditLog
 from models.certificate_template import CertificateTemplate
@@ -503,6 +503,11 @@ def _tsa_health():
     except Exception:
         # A resolver bug is exactly when the overview must not claim health
         logger.debug('TSA health check failed', exc_info=True)
+        # On PostgreSQL a failed statement aborts the transaction for the rest of the request
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
         return {'basis': 'signer', 'periods': None, 'state': 'unavailable', 'reason': None,
                 'days_left': None, 'alert': True, 'last_operation_at': None, 'last_status': None}
 

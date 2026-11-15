@@ -126,3 +126,18 @@ def test_expiring_certs_flag_a_delegated_ocsp_responder(app, auth_client, create
         with app.app_context():
             SystemConfig.query.filter_by(key=key).delete(synchronize_session=False)
             db.session.commit()
+
+
+def test_a_failed_statement_in_the_check_leaves_the_session_usable(app, tsa_config, monkeypatch):
+    # On PostgreSQL a failed statement aborts the transaction until a rollback
+    from sqlalchemy import text
+    import services.tsa_service as tsa_service
+    from services import dashboard_aggregates
+    tsa_config(tsa_enabled='true')
+
+    def broken():
+        db.session.execute(text('SELECT * FROM tsa_health_no_such_table'))
+    monkeypatch.setattr(tsa_service, 'describe_configured_signer', broken)
+    with app.test_request_context(URL):
+        assert dashboard_aggregates._tsa_health()['state'] == 'unavailable'
+        assert SystemConfig.query.filter_by(key='tsa_enabled').first().value == 'true'
