@@ -328,7 +328,10 @@ def create_app(config_name=None):
                     Index(f'ix_{model.__tablename__}_expiry', model.expiry).create(db.engine, checkfirst=True)
             except Exception as exc:
                 app.logger.warning("Could not create the session expiry index: %s", exc)
-    
+        elif app.config.get('SESSION_TYPE') == 'filesystem':
+            from utils.session_store import GuardedFileSystemSessionInterface
+            GuardedFileSystemSessionInterface.adopt(app)
+
     # Ensure session directory exists with correct permissions (filesystem mode).
     # Session files contain CSRF tokens and authenticated user IDs — anyone with
     # read access to /opt/ucm/data/sessions can hijack live sessions. Pin the

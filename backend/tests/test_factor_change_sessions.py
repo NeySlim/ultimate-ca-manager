@@ -301,6 +301,39 @@ def test_the_identifier_a_kept_session_left_is_refused_for_good(nodes, operation
         _cleanup(first_node, user)
 
 
+@pytest.mark.parametrize('operation', ['confirm-totp', 'change-password', 'close-other-sessions'])
+def test_a_request_served_during_the_renewal_neither_restores_nor_resends_the_old_id(
+        nodes, operation):
+    """A request opened on the old identifier and saved after the renewal writes no record
+    back and sends no cookie: the browser keeps the new identifier and stays signed in."""
+    from flask import session as flask_session
+    from auth.unified import AuthManager
+    first_node, second_node = nodes
+    start, call = RENEWALS[operation]
+    user = _make_user(first_node, **start)
+    try:
+        this = _open_session(first_node, user)
+        before = this.get_cookie('session').value
+        with second_node.test_request_context('/api/v2/account/profile',
+                                              headers={'Cookie': f'session={before}'}):
+            from flask import request
+            assert AuthManager().authenticate_request(request) is not None
+            r = call(first_node, this, user)
+            assert r.status_code == 200, r.data
+            assert this.get_cookie('session').value != before
+            response = second_node.response_class()
+            second_node.session_interface.save_session(second_node, flask_session, response)
+            assert not any(h.startswith('session=') for h in response.headers.getlist('Set-Cookie'))
+        stale = first_node.test_client()
+        stale.set_cookie('session', before)
+        refused = stale.get('/api/v2/account/profile')
+        assert refused.status_code == 401
+        assert not any(h.startswith('session=') for h in refused.headers.getlist('Set-Cookie'))
+        assert _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
+
+
 @pytest.mark.parametrize('method', ['delete', 'patch'])
 def test_an_administrator_changing_a_key_closes_the_holders_sessions(app, auth_client, method):
     """The holder loses or regains a factor: their sessions close, the administrator's stays."""

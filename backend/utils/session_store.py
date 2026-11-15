@@ -10,14 +10,53 @@ import threading
 from datetime import datetime
 
 from flask_session._utils import retry_query
+from flask_session.filesystem import FileSystemSessionInterface
 from flask_session.sqlalchemy import SqlAlchemySessionInterface
 from flask import current_app
-from itsdangerous import want_bytes
+from itsdangerous import BadSignature, want_bytes
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-class IsolatedSqlSessionInterface(SqlAlchemySessionInterface):
+class KeepsRemovedRecordsGone:
+    """A session opened from a stored record is saved only while that record exists:
+    a renewal or revocation served meanwhile is never undone, and no cookie names the
+    removed identifier."""
+
+    def open_session(self, app, request):
+        opened = super().open_session(app, request)
+        sid = request.cookies.get(app.config['SESSION_COOKIE_NAME'])
+        if sid and self.use_signer:
+            try:
+                sid = self._unsign(app, sid)
+            except BadSignature:
+                sid = None
+        opened.stored_sid = sid if sid and opened.sid == sid else None
+        return opened
+
+    @staticmethod
+    def _opened_from_store(session):
+        stored = getattr(session, 'stored_sid', None)
+        return stored is not None and stored == getattr(session, 'sid', None)
+
+    def should_set_cookie(self, app, session):
+        return not getattr(session, 'record_gone', False) and super().should_set_cookie(app, session)
+
+
+class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessionInterface):
+
+    @classmethod
+    def adopt(cls, app):
+        app.session_interface.__class__ = cls
+
+    def _upsert_session(self, session_lifetime, session, store_id):
+        if self._opened_from_store(session) and not self.cache.has(store_id):
+            session.record_gone = True
+            return
+        super()._upsert_session(session_lifetime, session, store_id)
+
+
+class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInterface):
 
     _engine_lock = threading.Lock()
 
@@ -108,6 +147,14 @@ class IsolatedSqlSessionInterface(SqlAlchemySessionInterface):
         expiry = datetime.utcnow() + session_lifetime
         data = self.serializer.encode(session)
         with self._store() as s:
+            if self._opened_from_store(session):
+                # UPDATE only: a record removed since the request opened it stays removed
+                updated = (s.query(model).filter_by(session_id=store_id)
+                           .update({'data': data, 'expiry': expiry}, synchronize_session=False))
+                s.commit()
+                if not updated:
+                    session.record_gone = True
+                return
             record = s.query(model).filter_by(session_id=store_id).first()
             if record:
                 record.data = data
