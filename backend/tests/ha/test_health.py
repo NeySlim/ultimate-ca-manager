@@ -10,12 +10,12 @@ def test_each_node_reports_itself_and_the_same_cluster(cluster):
     def converged():
         reports = [node.health() for node in cluster.nodes]
         clusters = [r.get('cluster') for r in reports]
-        if all(c and c['nodes'] == 2 and c['stale'] == 0 and c['leader_node_id'] for c in clusters) \
-                and clusters[0] == clusters[1]:
+        if all(c and c['nodes'] == len(cluster.nodes) and c['stale'] == 0 and c['leader_node_id']
+               for c in clusters) and all(c == clusters[0] for c in clusters):
             return reports
         return None
 
-    reports = wait_until(converged, 30, 'both nodes report one cluster')
+    reports = wait_until(converged, 30, 'every node reports one cluster')
 
     assert [r['node_id'] for r in reports] == [n.name for n in cluster.nodes]
     assert all(r['ha'] is True and r['status'] == 'ok' for r in reports)

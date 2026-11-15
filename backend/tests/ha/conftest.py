@@ -1,11 +1,12 @@
 """HA bench: opt-in with UCM_TEST_HA=1 and UCM_TEST_PG_URL, run with `pytest -m ha`.
 
-Each test module gets a fresh cluster (schema and two nodes), stopped and dropped
-after it; a failing test carries both nodes' logs in its report.
+Each test module gets a fresh cluster (schema and two nodes, or the sizes its
+`node_counts` mark names), stopped and dropped after it; a failing test carries
+every node's log in its report.
 """
 import pytest
 
-from tests.ha.cluster import ENABLED, Client, Cluster
+from tests.ha.cluster import ENABLED, NODE_NAMES, Client, Cluster
 
 
 def pytest_collection_modifyitems(config, items):
@@ -18,8 +19,9 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture(scope='module')
-def cluster(tmp_path_factory):
-    bench = Cluster(tmp_path_factory.mktemp('ha'))
+def cluster(request, tmp_path_factory):
+    size = getattr(request, 'param', 2)
+    bench = Cluster(tmp_path_factory.mktemp('ha'), names=NODE_NAMES[:size])
     bench.create_schema()
     try:
         bench.start()
