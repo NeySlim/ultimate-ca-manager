@@ -81,3 +81,36 @@ def test_the_first_run_notice_says_both_sources_refuse_the_start(tmp_path):
     assert 'Username: operator' in r.stdout
     assert 'both set' in r.stdout and 'refused' in r.stdout
     assert 'the one you provided' not in r.stdout and 'Op-Chosen-1!' not in r.stdout
+
+
+def _df(avail_kb):
+    """df -Pk stubbed: one data line whose fourth column is the space available."""
+    return f'df() {{ echo "Filesystem 1024-blocks Used Available Capacity Mounted"; echo "/dev/x 100 0 {avail_kb} 0% /"; }}; '
+
+
+@pytest.mark.parametrize('backup,needed_kb', [('true', 2 * 3000), ('false', 3000)])
+def test_the_start_is_refused_before_the_copy_when_the_disk_is_short(tmp_path, backup, needed_kb):
+    env = _sqlite_env(tmp_path, None)
+    env['UCM_BACKUP_ENABLED'] = backup
+    (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
+    r = _run(_df(needed_kb - 1) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
+    out = r.stdout + r.stderr
+    assert f'needs {needed_kb // 1024} MB free' in out and f'{(needed_kb - 1) // 1024} MB available' in out, out
+
+
+@pytest.mark.parametrize('backup', ['true', 'false'])
+def test_the_start_goes_on_when_the_disk_has_room(tmp_path, backup):
+    env = _sqlite_env(tmp_path, None)
+    env['UCM_BACKUP_ENABLED'] = backup
+    (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
+    need = 6000 if backup == 'true' else 3000
+    r = _run(_df(need) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert ('cp ' in r.stdout) is (backup == 'true')
+
+
+def test_a_df_that_cannot_answer_never_blocks_the_start(tmp_path):
+    env = _sqlite_env(tmp_path, None)
+    r = _run('df() { return 1; }; cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+    assert r.returncode == 0 and 'cp ' in r.stdout

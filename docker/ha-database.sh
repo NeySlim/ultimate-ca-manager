@@ -45,6 +45,25 @@ ucm_initial_admin_notice() {
     fi
 }
 
+# Room for the start next to the database: its copy when enabled, plus its size again for an
+# upgrade's journal and growth (measured: 1.7 times the database at the 3.0 upgrade with the copy).
+# Fails with what is needed and available; a df that cannot answer lets the start go on.
+ucm_sqlite_disk_room() {
+    local dir bytes size_kb need_kb avail_kb
+    dir=$(dirname "$UCM_DATABASE_PATH")
+    bytes=$(stat -c %s "$UCM_DATABASE_PATH" 2>/dev/null || wc -c < "$UCM_DATABASE_PATH")
+    size_kb=$(( (bytes + 1023) / 1024 ))
+    need_kb=$size_kb
+    [ "$UCM_BACKUP_ENABLED" = "true" ] && need_kb=$(( size_kb * 2 ))
+    avail_kb=$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print $4 }') || avail_kb=""
+    case "$avail_kb" in ''|*[!0-9]*) return 0 ;; esac
+    [ "$avail_kb" -ge "$need_kb" ] && return 0
+    echo -e "${RED:-}❌ Not enough disk space in $dir: the start needs $(( need_kb / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
+    echo "   The database is $(( size_kb / 1024 )) MB; the start needs its size for an upgrade's journal and growth,"
+    echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
+    return 1
+}
+
 # First-run notice and pre-start copy of the SQLite file; both skipped in HA mode.
 ucm_sqlite_check_and_backup() {
     if ucm_ha_active; then
@@ -56,6 +75,7 @@ ucm_sqlite_check_and_backup() {
         ucm_initial_admin_notice
     else
         echo -e "${GREEN:-}✅ Database exists${NC:-}"
+        ucm_sqlite_disk_room || return 1
 
         # Database backup if enabled
         if [ "$UCM_BACKUP_ENABLED" = "true" ]; then
