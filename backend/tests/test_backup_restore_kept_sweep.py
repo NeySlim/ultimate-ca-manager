@@ -13,6 +13,7 @@ import logging
 import os
 import stat
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -517,3 +518,65 @@ def test_a_copy_cut_short_is_never_put_back_over_an_intact_original(dirs, monkey
     files.sweep_kept_previous_contents()
     assert key.read_bytes() == b'INTACT ORIGINAL KEY' * 100
     assert not kept.exists()
+
+
+def _failing_parent_sync(monkeypatch, parents):
+    real, synced = files._fsync_directory, []
+
+    def fsync_directory(path):
+        if Path(path) in parents:
+            raise OSError(errno.EIO, 'I/O error')
+        synced.append(Path(path))
+        return real(path)
+    monkeypatch.setattr(files, '_fsync_directory', fsync_directory)
+    return synced
+
+
+def test_a_removal_not_known_durable_keeps_the_row(dirs, monkeypatch):
+    # The removal lost at a power cut, the journal would come back without its row
+    kept, key, pem, new = _killed_after_publish(dirs, committed=True)
+    token = json.loads((kept[0] / 'journal.json').read_text())['token']
+    with monkeypatch.context() as patched:
+        _failing_parent_sync(patched, {dirs['https']})
+        files.sweep_kept_previous_contents()
+    assert not any(path.exists() for path in kept) and _row_exists(token)
+
+    files.sweep_kept_previous_contents()
+    assert not _row_exists(token)
+
+
+def test_each_removal_is_synced_before_the_row_goes(dirs, monkeypatch):
+    kept, key, pem, new = _killed_after_publish(dirs, committed=True)
+    token = json.loads((kept[0] / 'journal.json').read_text())['token']
+    events, real_forget = [], files.forget_publication
+    real_sync = files._fsync_directory
+    monkeypatch.setattr(files, '_fsync_directory',
+                        lambda path: events.append(Path(path)) or real_sync(path))
+    monkeypatch.setattr(files, 'forget_publication',
+                        lambda value: events.append(value) or real_forget(value))
+    files.sweep_kept_previous_contents()
+    assert {path.parent for path in kept} <= set(events[:events.index(token)])
+
+
+def test_a_discard_not_known_durable_reports_its_directory(dirs, monkeypatch):
+    pem = dirs['https'] / 'cert.pem'
+    pem.write_bytes(b'OLD')
+    staged = StagedFiles(base_dir=dirs['backups'].parent / 'staging')
+    staged.stage(pem, b'NEW')
+    staged.publish()
+    kept = next(dirs['https'].glob('.ucm_restore_kept_*'))
+    with monkeypatch.context() as patched:
+        _failing_parent_sync(patched, {dirs['https']})
+        assert staged.discard() == [kept]
+    assert not kept.exists()
+
+
+def test_a_lingering_row_stays_while_an_absence_is_not_durable(dirs, monkeypatch):
+    record_publication('d' * 32)
+    db.session.commit()
+    with monkeypatch.context() as patched:
+        _failing_parent_sync(patched, {dirs['private']})
+        files.sweep_kept_previous_contents()
+    assert _row_exists('d' * 32)
+    files.sweep_kept_previous_contents()
+    assert not _row_exists('d' * 32)

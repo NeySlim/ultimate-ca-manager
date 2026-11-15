@@ -416,7 +416,7 @@ class StagedFiles:
                 shutil.rmtree(directory)
             except OSError:
                 logger.exception("Could not remove staged restore files %s", directory)
-            if directory is not staging and os.path.lexists(directory):
+            if directory is not staging and not _removed_durably(directory):
                 left.append(directory)
         if staging_lock is not None:
             os.close(staging_lock)
@@ -593,10 +593,10 @@ def sweep_kept_previous_contents() -> List[Path]:
                 shutil.rmtree(path, ignore_errors=True)
                 if not os.path.lexists(path):
                     removed.append(Path(path))
-                elif journal is not None:
+                if not _removed_durably(path) and journal is not None:
                     named.add(journal['token'])
-                    logger.warning("Restore: could not remove %s, settled again at the next "
-                                   "start", path)
+                    logger.warning("Restore: could not remove %s for good, settled again at the "
+                                   "next start", path)
             for token in committed - named:
                 forget_publication(token)
             _forget_lingering_publications(keep=named)
@@ -687,6 +687,18 @@ def _owner_is_gone(staging: str) -> bool:
         return False
 
 
+def _removed_durably(path) -> bool:
+    """`path` is gone and its parent synced: a power cut cannot bring its journal back."""
+    if os.path.lexists(path):
+        return False
+    try:
+        _fsync_directory(Path(path).parent)
+    except OSError as exc:
+        logger.warning("Restore: the removal of %s is not known durable: %s", path, exc)
+        return False
+    return True
+
+
 def _forget_lingering_publications(keep=()) -> None:
     """Rows of restores killed after `discard()`, but never one a journal in `keep` still names;
     single node only, where every kept directory is this one's (in HA another node's may be)."""
@@ -695,6 +707,14 @@ def _forget_lingering_publications(keep=()) -> None:
     if ha_enabled() or not has_app_context():
         return
     from models import SystemConfig, db
+    # An absence observed is not yet durable: each directory a journal could be in is synced first
+    try:
+        for parent in _kept_parents():
+            if parent.is_dir():
+                _fsync_directory(parent)
+    except OSError as exc:
+        logger.warning("Restore publication records kept, a removal is not known durable: %s", exc)
+        return
     try:
         # The first start sweeps before the schema exists: no table, no row to forget
         if not db.inspect(db.engine).has_table(SystemConfig.__tablename__):
