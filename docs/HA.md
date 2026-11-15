@@ -165,7 +165,7 @@ Rate limits are counted per node, in memory, and are not shared. Two layers appl
 
 - **Update result.** The outcome of an update is read on the node that installed it, leader or not.
 - **Per-node task status.** The scheduler view shows the update result runs of the node that answers, and Run now runs them on that node.
-- **SoftHSM tokens.** A token lives on the node's own disk, so UCM refuses to create one in HA mode (see [Refused in HA mode today](#refused-in-ha-mode-today)). A SoftHSM provider already in the database stays visible, a warning at start names it, and its keys sign only on the node that holds the token. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
+- **SoftHSM tokens.** A token lives on the node's own disk, so UCM refuses to create one in HA mode (see [Refused in HA mode](#refused-in-ha-mode)). A SoftHSM provider already in the database stays visible, a warning at start names it, and its keys sign only on the node that holds the token. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
 - **Kerberos negotiation state.** A SPNEGO handshake that takes more than one request is kept in the memory of the node that received its first leg (see [Windows enrollment](#windows-enrollment-kerberos)).
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
 - **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
@@ -196,7 +196,7 @@ The Windows enrollment profiles, their connectors and the switches are in the da
 - **SPNEGO state.** Some Windows clients need more than one request to complete the Negotiate handshake (a request-MIC leg). The context in progress is kept in the memory of the node that answered the first leg, under the client's source address (the address behind the trusted proxy when there is one), and expires after 30 seconds. The balancer must therefore send the requests of one client address to one node: use source-address affinity for the two Kerberos endpoints (`/ADPolicyProvider_CEP_Kerberos/` and `/ADCertificateService_CES_Kerberos/`); the web interface needs no affinity. Two clients behind one address that negotiate at the same moment can make each other retry, never authenticate wrongly.
 - **The keytab file.** A profile's keytab is stored in the database, under the master key. UCM composes the keytabs of all profiles into one file, stores it in the database and asks every node to write it (`reload_keytab`, within seconds, and at each start); the composition is made under a lock, so two uploads at once give one result on every node. A node that cannot read the stored keytab (a different `KEY_ENCRYPTION_KEY`) cannot write the file and logs the reason. A keytab found on one node only, as 2.x kept it, is not shared in HA: upload it again.
 
-## Refused in HA mode today
+## Refused in HA mode
 
 These operations answer `409` with code `ha_mode`, because they only change the host that receives the request:
 
