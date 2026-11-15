@@ -311,3 +311,18 @@ def test_the_issuer_name_is_searched_when_no_key_identifier_candidate_is_retaine
         db.session.commit()
     _replace(app, auth_client, w, _aki_pem(w['cn'], w['key'], w['root_cn'], w['root_key'], ski), route)
     assert _caref(app, w['child']['id']) == w['root']['refid']
+
+
+def test_a_move_to_the_root_record_of_the_same_key_is_not_audited_as_a_dropped_parent(app, auth_client, made):
+    """Linked to the record of a cross-certificate of its issuer, a renewal moves the CA to the
+    self-signed record of that key: the former parent still verifies it, so nothing is dropped."""
+    from tests.fixtures.cross_pki import make_cert, pem
+    from tests.test_cross_repair import _world
+    pki, ids = _world(app)
+    made.extend(ids.values())
+    before = _audits(app, UNLINKED, ids['i'])
+    renewed = make_cert(f'Cross Int B {pki.tag}', pki.key_int, pki.name_b, pki.key_b, days=300, path_length=0)
+    assert _import(auth_client, pem(renewed), cross_mode='replace')['id'] == ids['i']
+    with app.app_context():
+        assert db.session.get(CA, ids['i']).caref == db.session.get(CA, ids['b']).refid
+    assert _audits(app, UNLINKED, ids['i']) == before

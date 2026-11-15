@@ -154,9 +154,17 @@ def settle_parent(ca, cert):
     ca.caref = relink_parent_caref(cert, None if confirmed else former, exclude_ca_id=ca.id)
     ca.parent_confirmed_by = None
     ca.parent_confirmed_at = None
-    if former and (confirmed or ca.caref != former):
+    if former and (confirmed or ca.caref != former and not _same_issuer_record(former, ca.caref)):
         ca._dropped_parent = (former, confirmed)
     return False
+
+
+def _same_issuer_record(former, now):
+    """Whether *former* holds the subject and key of the record *now*: a move between them drops nothing."""
+    from models import CA
+    from utils.cert_issuer import same_key_refids
+    parent = CA.query.filter_by(refid=now).first() if now else None
+    return parent is not None and former in same_key_refids(parent)
 
 
 def audit_dropped(ca, username=None):
@@ -179,5 +187,17 @@ def audit_dropped(ca, username=None):
     now = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
     AuditService.log_ca(
         'ca_parent_unlinked', ca,
-        f'Parent "{name}" dropped: its key does not verify the certificate of this CA'
+        f'Parent "{name}" dropped: {_why_not_issuer(parent, _certificate(ca))}'
         + (f'; linked under "{now.descr}"' if now else ''), username=username)
+
+
+def _why_not_issuer(parent, cert):
+    """Why *parent* is not the issuer of *cert* (RFC 5280 6.1.3 (a)(1) signature, (a)(4) name)."""
+    parent_cert = _certificate(parent)
+    if parent_cert is None or cert is None:
+        return 'it is not the issuer of the certificate of this CA'
+    if not same_name(parent_cert.subject, cert.issuer):
+        return 'its subject is not the issuer name of the certificate of this CA'
+    if signature_verdict(cert, parent_cert)[0] == UNVERIFIABLE:
+        return 'its signature of the certificate of this CA cannot be verified here'
+    return 'its key does not verify the certificate of this CA'
