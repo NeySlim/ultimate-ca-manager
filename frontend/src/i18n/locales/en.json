@@ -278,6 +278,7 @@
     "source": "Source",
     "addDnsProvider": "Add Provider",
     "test": "Test",
+    "syncKeys": "Sync keys",
     "dnsProviderTestFailed": "Connection test failed",
     "providerName": "Provider Name",
     "providerType": "Provider Type",
@@ -4717,7 +4718,8 @@
         "testFailed": "Failed to send test email"
       },
       "hsm": {
-        "testFailed": "Connection test failed"
+        "testFailed": "Connection test failed",
+        "syncFailed": "Key synchronization failed"
       },
       "sso": {
         "toggleFailed": "Failed to toggle provider",
@@ -4824,7 +4826,8 @@
         "generated": "CRL regenerated successfully"
       },
       "hsm": {
-        "connectionOk": "Connection successful"
+        "connectionOk": "Connection successful",
+        "keysSynced": "Keys synced: {{added}} new, {{removed}} removed, {{unchanged}} unchanged"
       },
       "sso": {
         "connectionOk": "Connection successful"

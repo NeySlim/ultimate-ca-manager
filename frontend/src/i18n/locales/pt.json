@@ -276,6 +276,7 @@
     "source": "Origem",
     "addDnsProvider": "Adicionar provedor",
     "test": "Testar",
+    "syncKeys": "Sincronizar chaves",
     "dnsProviderTestFailed": "Teste de conexão falhou",
     "providerName": "Nome do provedor",
     "providerType": "Tipo de provedor",
@@ -4489,7 +4490,8 @@
         "template": "Falha ao exportar template"
       },
       "hsm": {
-        "testFailed": "Falha no teste de conexão"
+        "testFailed": "Falha no teste de conexão",
+        "syncFailed": "Falha ao sincronizar chaves"
       },
       "https": {
         "applyFailed": "Falha ao aplicar certificado",
@@ -4616,7 +4618,8 @@
         "template": "Template exportado com sucesso"
       },
       "hsm": {
-        "connectionOk": "Conexão bem-sucedida"
+        "connectionOk": "Conexão bem-sucedida",
+        "keysSynced": "Chaves sincronizadas: {{added}} novas, {{removed}} removidas, {{unchanged}} inalteradas"
       },
       "https": {
         "applied": "Certificado HTTPS aplicado. O servidor será reiniciado.",

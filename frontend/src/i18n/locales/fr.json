@@ -1520,6 +1520,7 @@
     "source": "Source",
     "addDnsProvider": "Ajouter un fournisseur",
     "test": "Tester",
+    "syncKeys": "Synchroniser les clés",
     "dnsProviderTestFailed": "Échec du test de connexion",
     "providerName": "Nom du fournisseur",
     "providerType": "Type de fournisseur",
@@ -4717,7 +4718,8 @@
         "testFailed": "Échec de l'envoi de l'e-mail test"
       },
       "hsm": {
-        "testFailed": "Échec du test de connexion"
+        "testFailed": "Échec du test de connexion",
+        "syncFailed": "Échec de la synchronisation des clés"
       },
       "sso": {
         "toggleFailed": "Échec de l'activation/désactivation du fournisseur",
@@ -4824,7 +4826,8 @@
         "generated": "CRL régénérée avec succès"
       },
       "hsm": {
-        "connectionOk": "Connexion réussie"
+        "connectionOk": "Connexion réussie",
+        "keysSynced": "Clés synchronisées : {{added}} nouvelles, {{removed}} supprimées, {{unchanged}} inchangées"
       },
       "sso": {
         "connectionOk": "Connexion réussie"

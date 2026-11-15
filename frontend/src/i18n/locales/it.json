@@ -276,6 +276,7 @@
     "source": "Fonte",
     "addDnsProvider": "Aggiungi provider",
     "test": "Testa",
+    "syncKeys": "Sincronizza chiavi",
     "dnsProviderTestFailed": "Test connessione fallito",
     "providerName": "Nome provider",
     "providerType": "Tipo provider",
@@ -4489,7 +4490,8 @@
         "template": "Impossibile esportare il modello"
       },
       "hsm": {
-        "testFailed": "Test di connessione fallito"
+        "testFailed": "Test di connessione fallito",
+        "syncFailed": "Sincronizzazione delle chiavi non riuscita"
       },
       "https": {
         "applyFailed": "Impossibile applicare il certificato",
@@ -4616,7 +4618,8 @@
         "template": "Modello esportato con successo"
       },
       "hsm": {
-        "connectionOk": "Connessione riuscita"
+        "connectionOk": "Connessione riuscita",
+        "keysSynced": "Chiavi sincronizzate: {{added}} nuove, {{removed}} rimosse, {{unchanged}} invariate"
       },
       "https": {
         "applied": "Certificato HTTPS applicato. Il server verrà riavviato.",

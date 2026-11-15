@@ -276,6 +276,7 @@
     "source": "ソース",
     "addDnsProvider": "プロバイダーを追加",
     "test": "テスト",
+    "syncKeys": "鍵を同期",
     "dnsProviderTestFailed": "接続テストに失敗しました",
     "providerName": "プロバイダー名",
     "providerType": "プロバイダータイプ",
@@ -4492,7 +4493,8 @@
         "template": "テンプレートのエクスポートに失敗しました"
       },
       "hsm": {
-        "testFailed": "接続テストに失敗しました"
+        "testFailed": "接続テストに失敗しました",
+        "syncFailed": "鍵の同期に失敗しました"
       },
       "https": {
         "applyFailed": "証明書の適用に失敗しました",
@@ -4619,7 +4621,8 @@
         "template": "テンプレートがエクスポートされました"
       },
       "hsm": {
-        "connectionOk": "接続に成功しました"
+        "connectionOk": "接続に成功しました",
+        "keysSynced": "鍵を同期しました: 新規 {{added}}、削除 {{removed}}、変更なし {{unchanged}}"
       },
       "https": {
         "applied": "HTTPS証明書が適用されました。サーバーが再起動します。",
