@@ -17,7 +17,9 @@ install_fips_module() {
         cat "$run_dir/fipsinstall.log"
         return 1
     fi
-    if ! expected=$(tr -d '[:space:]' < "$reference" 2>/dev/null) || [ -z "$expected" ]; then
+    # same format the Dockerfile checks when it writes the reference; no shell error shown
+    if ! { expected=$(tr -d '[:space:]' < "$reference"); } 2>/dev/null \
+        || ! [[ $expected =~ ^([0-9A-F]{2}:){31}[0-9A-F]{2}$ ]]; then
         echo -e "${RED:-}❌ The FIPS module integrity reference of the image ($reference) is missing or unreadable${NC:-}"
         echo "   Pull the published -fips image again; the module cannot be checked against its build."
         return 1

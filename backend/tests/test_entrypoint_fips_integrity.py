@@ -75,13 +75,17 @@ def test_modified_module_is_refused_neg(bench):
 def test_missing_reference_is_refused_neg(bench):
     rc, out = _run(bench, bench / 'absent.mac')
     assert rc == 1 and 'continued' not in out
-    assert 'reference' in out
+    assert 'missing or unreadable' in out
+    # the refusal is the only text: no shell redirection error above it
+    assert 'No such file' not in out and 'line ' not in out
 
 
-@pytest.mark.parametrize('content', ['', '\n', 'not a mac\n'])
-def test_empty_or_unreadable_reference_is_refused_neg(bench, content):
+@pytest.mark.parametrize('content', ['', '\n', 'not a mac\n', BUILD_MAC.lower(), BUILD_MAC[3:],
+                                     BUILD_MAC + ':00', BUILD_MAC.replace(':', '')])
+def test_empty_or_malformed_reference_is_refused_neg(bench, content):
     rc, out = _run(bench, _reference(bench, content))
     assert rc == 1 and 'continued' not in out
+    assert 'missing or unreadable' in out and 'modified' not in out
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason='root reads a mode 000 file')
@@ -94,7 +98,7 @@ def test_reference_without_read_permission_is_refused_neg(bench):
 
 def test_config_without_module_mac_is_refused_neg(bench):
     # an empty module-mac in the runtime config never equals an empty reference
-    rc, out = _run(bench, _reference(bench, ''), mac='')
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), mac='')
     assert rc == 1 and 'continued' not in out
 
 
