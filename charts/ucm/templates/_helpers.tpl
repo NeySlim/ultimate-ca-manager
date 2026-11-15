@@ -80,6 +80,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if lt (int .Values.replicaCount) 2 -}}
 {{- fail "ha.enabled requires replicaCount >= 2" -}}
 {{- end -}}
+{{- /* An existing release without these keys in its Secret is a single instance moving to HA */ -}}
+{{- if .Release.IsUpgrade -}}
+{{- if not (include "ucm.existingKek" .) -}}
+{{- fail "ha.enabled on an existing single instance requires secrets.keyEncryptionKey: set it to the content of the instance's /etc/ucm/master.key, or a new key would make its private keys unreadable (docs/HA.md, From one node to a cluster)" -}}
+{{- end -}}
+{{- if not (include "ucm.existingDbKey" .) -}}
+{{- fail "ha.enabled on an existing single instance requires secrets.dbEncryptionKey: set it while the instance still runs alone and re-encrypt its integration secrets under it first (docs/HA.md, From one node to a cluster)" -}}
+{{- end -}}
+{{- end -}}
+{{- else if gt (int .Values.replicaCount) 1 -}}
+{{- fail "replicaCount > 1 requires ha.enabled=true (and PostgreSQL): a single instance cannot run in several pods" -}}
 {{- end -}}
 {{- end }}
 
@@ -91,6 +102,13 @@ so leaving HA never drops the only copy of the key.
 {{- $existing := (lookup "v1" "Secret" .Release.Namespace (include "ucm.secretName" .)) | default dict -}}
 {{- $data := $existing.data | default dict -}}
 {{- .Values.secrets.keyEncryptionKey | default ((get $data "KEY_ENCRYPTION_KEY") | default "" | b64dec) -}}
+{{- end -}}
+
+{{/* Existing or explicit UCM_DB_ENCRYPTION_KEY ("" when none), kept like the KEK. */}}
+{{- define "ucm.existingDbKey" -}}
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace (include "ucm.secretName" .)) | default dict -}}
+{{- $data := $existing.data | default dict -}}
+{{- .Values.secrets.dbEncryptionKey | default ((get $data "UCM_DB_ENCRYPTION_KEY") | default "" | b64dec) -}}
 {{- end -}}
 
 {{/*
@@ -114,4 +132,14 @@ application then forces its change at first login, as for one it generates.
 */}}
 {{- define "ucm.adminPasswordGenerated" -}}
 {{- if not (or .Values.initialAdminPassword (include "ucm.adminPasswordFromExtraEnv" .)) }}true{{ end -}}
+{{- end -}}
+
+{{/*
+What the Secret is made from, as the operator sets it: the input of checksum/secret.
+A generated value is stored once and read back, so it never changes the Secret.
+*/}}
+{{- define "ucm.secretInputs" -}}
+{{- list .Values.secrets.secretKey .Values.initialAdminPassword (include "ucm.adminPasswordFromExtraEnv" .)
+    .Values.secrets.keyEncryptionKey .Values.secrets.dbEncryptionKey .Values.ha.enabled
+    .Values.database.type .Values.database.databaseUrl .Values.database.existingSecret | toJson -}}
 {{- end -}}

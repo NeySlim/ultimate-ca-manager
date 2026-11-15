@@ -26,7 +26,9 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        # Over what the operator sets: generated values never change once stored, and a
+        # sum over a fresh draw would restart the pods at the first upgrade
+        checksum/secret: {{ include "ucm.secretInputs" . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -97,6 +99,13 @@ spec:
                 secretKeyRef:
                   name: {{ include "ucm.secretName" . }}
                   key: KEY_ENCRYPTION_KEY
+            {{- end }}
+            {{- if or .Values.ha.enabled (include "ucm.existingDbKey" .) }}
+            - name: UCM_DB_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ucm.secretName" . }}
+                  key: UCM_DB_ENCRYPTION_KEY
             {{- end }}
             {{- if not (include "ucm.adminPasswordFromExtraEnv" .) }}
             - name: UCM_INITIAL_ADMIN_PASSWORD
