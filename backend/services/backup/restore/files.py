@@ -12,6 +12,10 @@ one atomic replace per file, and what each destination held is kept until
 the last one is published: a failure halfway through puts back what the
 earlier replaces overwrote, rather than leaving the instance with half of a
 restore's files.
+
+Invariant: a token's publication row is erased only once every kept directory
+holding a journal of that token is gone; while a journal exists, the row tells
+the truth about whether its restore committed.
 """
 import errno
 import json
@@ -334,8 +338,9 @@ class StagedFiles:
 
     # -- disposal ---------------------------------------------------------
 
-    def discard(self) -> None:
-        """Drop the staged content without publishing any of it.
+    def discard(self) -> List[Path]:
+        """Drop the staged content without publishing any of it; return the kept
+        directories still on disk, whose journals still need the publication row.
 
         Called when the transaction failed, and after a successful
         publication: staged content is key material in the clear and has no
@@ -345,6 +350,7 @@ class StagedFiles:
         kept_dirs, self._kept_dirs = self._kept_dirs, {}
         self._entries = []
         self._index = {}
+        left: List[Path] = []
         for directory in dict.fromkeys([*kept_dirs.values(), staging]):
             if directory is None:
                 continue
@@ -352,6 +358,9 @@ class StagedFiles:
                 shutil.rmtree(directory)
             except OSError:
                 logger.exception("Could not remove staged restore files %s", directory)
+            if directory is not staging and os.path.lexists(directory):
+                left.append(directory)
+        return left
 
     # -- context manager --------------------------------------------------
 
@@ -381,7 +390,7 @@ def record_publication(token: str) -> None:
 
 
 def forget_publication(token: str) -> None:
-    """After `discard()`: the restore's kept directories are gone, so is its row."""
+    """Once the restore's kept directories are all gone: its row goes too."""
     from models import SystemConfig, db
     try:
         SystemConfig.query.filter_by(key=PUBLICATION_PREFIX + token).delete()
@@ -469,6 +478,8 @@ def sweep_kept_previous_contents() -> List[Path]:
                 logger.warning("Interrupted restores not settled, the database could not "
                                "be read: %s", exc)
                 return []
+            # Tokens a directory still on disk names: their rows stay for the next start
+            named = set()
             for path, journal in found:
                 if journal is not None and journal['token'] not in committed:
                     _put_back_journal(path, journal)
@@ -476,9 +487,13 @@ def sweep_kept_previous_contents() -> List[Path]:
                 shutil.rmtree(path, ignore_errors=True)
                 if not os.path.lexists(path):
                     removed.append(Path(path))
-            for token in committed:
+                elif journal is not None:
+                    named.add(journal['token'])
+                    logger.warning("Restore: could not remove %s, settled again at the next "
+                                   "start", path)
+            for token in committed - named:
                 forget_publication(token)
-            _forget_lingering_publications()
+            _forget_lingering_publications(keep=named)
     except BackupBusyError as exc:
         logger.debug("Interrupted restores not swept: %s", exc)
     except OSError as exc:
@@ -492,17 +507,20 @@ def sweep_kept_previous_contents() -> List[Path]:
     return removed
 
 
-def _forget_lingering_publications() -> None:
-    """Rows of restores killed after `discard()`; single node only, where every kept
-    directory is this one's (in HA another node's restore may still need its row)."""
+def _forget_lingering_publications(keep=()) -> None:
+    """Rows of restores killed after `discard()`, but never one a journal in `keep` still names;
+    single node only, where every kept directory is this one's (in HA another node's may be)."""
     from flask import has_app_context
     from utils.ha import ha_enabled
     if ha_enabled() or not has_app_context():
         return
     from models import SystemConfig, db
     try:
-        SystemConfig.query.filter(SystemConfig.key.startswith(PUBLICATION_PREFIX)).delete(
-            synchronize_session=False)
+        query = SystemConfig.query.filter(SystemConfig.key.startswith(PUBLICATION_PREFIX))
+        if keep:
+            query = query.filter(SystemConfig.key.notin_(
+                [PUBLICATION_PREFIX + token for token in keep]))
+        query.delete(synchronize_session=False)
         db.session.commit()
     except Exception as exc:
         db.session.rollback()

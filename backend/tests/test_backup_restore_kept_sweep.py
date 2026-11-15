@@ -221,6 +221,20 @@ def test_a_symlink_named_like_a_kept_directory_is_not_followed(dirs, tmp_path):
     assert (target / 'keep').exists()
 
 
+def test_a_committed_directory_left_on_disk_keeps_its_row(dirs, monkeypatch):
+    # Its row erased, the next start would read the journal as uncommitted and put the old files back
+    kept, key, pem, new = _killed_after_publish(dirs, committed=True)
+    token = json.loads((kept[0] / 'journal.json').read_text())['token']
+    with monkeypatch.context() as patched:
+        patched.setattr(files.shutil, 'rmtree', lambda *args, **kwargs: None)
+        assert files.sweep_kept_previous_contents() == []
+    assert all(path.exists() for path in kept) and _row_exists(token)
+
+    assert sorted(files.sweep_kept_previous_contents()) == kept
+    assert pem.read_bytes() == b'NEW HTTPS CERT' and new.read_bytes() == b'NEW CERT'
+    assert not key.exists() and not _row_exists(token)
+
+
 def test_a_publication_row_left_by_a_kill_after_discard_is_removed(dirs):
     record_publication('d' * 32)
     db.session.commit()

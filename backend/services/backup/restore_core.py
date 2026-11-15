@@ -520,8 +520,10 @@ class RestoreCoreMixin:
             staged.discard()
             raise
         finally:
-            staged.discard()
-        forget_publication(staged.token)
+            left = staged.discard()
+        # A kept directory still on disk is settled at the next start, by this row
+        if not left:
+            forget_publication(staged.token)
 
         if keytab_published:
             self._write_keytab_here()

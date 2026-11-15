@@ -106,6 +106,32 @@ def test_killed_after_the_commit_the_files_stay(app, diverged, monkeypatch):
         assert not SystemConfig.query.filter(SystemConfig.key.startswith(PUBLICATION_PREFIX)).all()
 
 
+def test_a_kept_directory_discard_cannot_remove_keeps_the_row(app, diverged, monkeypatch):
+    # Forgotten anyway, the next start would read the journal as uncommitted and undo the restore
+    import errno
+    import shutil
+    from services.backup.restore import files
+    from services.backup_service import BackupService
+    archive, refid, path, archived_pem = diverged
+    real_rmtree = shutil.rmtree
+
+    def rmtree(directory, *args, **kwargs):
+        if str(directory).rsplit('/', 1)[-1].startswith('.ucm_restore_kept_'):
+            raise OSError(errno.EIO, 'I/O error')
+        return real_rmtree(directory, *args, **kwargs)
+
+    with app.app_context():
+        with monkeypatch.context() as patched:
+            patched.setattr(files.shutil, 'rmtree', rmtree)
+            BackupService().restore_backup_from_path(archive, PASSWORD, mode='replace')
+        assert list(path.parent.glob('.ucm_restore_kept_*'))
+        assert path.read_bytes() == archived_pem
+
+        assert files.sweep_kept_previous_contents()
+        assert path.read_bytes() == archived_pem == _database_pem(refid)
+        assert not list(path.parent.glob('.ucm_restore_kept_*'))
+
+
 def test_a_restore_that_ends_leaves_no_publication_row(app, diverged):
     from models import SystemConfig
     from services.backup.restore.files import PUBLICATION_PREFIX
