@@ -87,6 +87,20 @@ class TestCommandLine:
         code = cli.main(list(args))
         return code, capsys.readouterr().out
 
+    def test_a_database_not_in_utf8_is_named_before_any_check_reads_it(self, monkeypatch, capsys):
+        """Simulated: the server answers SQL_ASCII, on which SQLAlchemy's first connection fails."""
+        import migration_runner
+
+        class Unreachable:
+            SQLALCHEMY_DATABASE_URI = 'postgresql://ucm:x@127.0.0.1:1/ucm'
+            SQLALCHEMY_TRACK_MODIFICATIONS = False
+            HTTPS_CERT_PATH = None
+
+        monkeypatch.setattr(migration_runner, '_server_encoding', lambda engine: 'SQL_ASCII')
+        code, out = self._run(monkeypatch, capsys, Unreachable)
+        assert code == 2
+        assert '[ERROR] database: This PostgreSQL database uses the encoding SQL_ASCII' in out, out
+
     def test_blockers_exit_1_in_text_and_json(self, instance_db, monkeypatch, capsys):
         engine, config = instance_db
         with engine.begin() as connection:

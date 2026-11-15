@@ -239,12 +239,8 @@ def create_app(config_name=None):
     db_path = config.DATABASE_PATH
     if db_path:
         os.environ.setdefault('DATABASE_PATH', str(db_path))
-    from utils.ha import ha_enabled as _ha_on
-    if _ha_on():
-        # A restore that has not committed holds the cluster: no migration or write before it ends
-        from services.cluster_maintenance import wait_while_restoring
-        wait_while_restoring(_get_db_url())
-    # HA: one node at a time migrates; the next one finds nothing left to apply
+    # HA: once no restore holds the cluster, one node at a time migrates; the next one finds
+    # nothing left to apply
     migrate_or_refuse(boot_lock)
     
     # A backend switch that asked for this restart has now been applied: the

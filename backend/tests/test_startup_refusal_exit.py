@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 import pytest
@@ -48,6 +48,65 @@ def test_a_database_out_of_reach_is_not_a_refusal(monkeypatch):
     with pytest.raises(Exception) as caught:
         startup_refusal.migrate_or_refuse(_no_lock)
     assert not isinstance(caught.value, startup_refusal.DatabaseRefused)
+
+
+UNREACHABLE = 'postgresql://ucm:x@127.0.0.1:1/ucm'
+SQLALCHEMY_ON_SQL_ASCII = 'cannot use a string pattern on a bytes-like object'
+
+
+def _ha(monkeypatch, on, encoding):
+    """Simulated: the server answers *encoding*; each step that opens a SQLAlchemy connection
+    (the restore wait, the HA startup lock) records itself, and fails as it does on SQL_ASCII."""
+    import utils.ha
+    from services import cluster_maintenance
+    monkeypatch.setenv('DATABASE_URL', UNREACHABLE)
+    monkeypatch.setattr(migration_runner, '_server_encoding', lambda engine: encoding)
+    monkeypatch.setattr(utils.ha, 'ha_enabled', lambda: on)
+    reached = []
+
+    def restore_wait(url, poll=None):
+        reached.append('restore wait')
+        raise TypeError(SQLALCHEMY_ON_SQL_ASCII)
+
+    @contextmanager
+    def lock(url):
+        reached.append('startup lock')
+        if on:
+            raise TypeError(SQLALCHEMY_ON_SQL_ASCII)
+        yield
+
+    monkeypatch.setattr(cluster_maintenance, 'wait_while_restoring', restore_wait)
+    return reached, lock
+
+
+@pytest.mark.parametrize('ha', [True, False], ids=['HA', 'single node'])
+def test_an_encoding_refusal_exits_78_before_any_sqlalchemy_connection(monkeypatch, ha):
+    reached, lock = _ha(monkeypatch, ha, 'SQL_ASCII')
+    with pytest.raises(startup_refusal.DatabaseRefused, match='uses the encoding SQL_ASCII; UCM needs UTF8'):
+        startup_refusal.migrate_or_refuse(lock)
+    assert reached == []
+
+
+def test_in_ha_a_utf8_database_waits_for_a_restore_then_takes_the_startup_lock(monkeypatch):
+    reached, lock = _ha(monkeypatch, True, 'UTF8')
+    with pytest.raises(TypeError):
+        startup_refusal.migrate_or_refuse(lock)
+    assert reached == ['restore wait']
+    reached.clear()
+    from services import cluster_maintenance
+    monkeypatch.setattr(cluster_maintenance, 'wait_while_restoring', lambda url, poll=None: reached.append('restore wait'))
+    with pytest.raises(TypeError):
+        startup_refusal.migrate_or_refuse(lock)
+    assert reached == ['restore wait', 'startup lock']
+
+
+def test_the_status_command_names_the_encoding_of_a_refused_database(monkeypatch, capsys):
+    """Simulated, as above: the diagnostic reads no registry after it."""
+    monkeypatch.setenv('DATABASE_URL', UNREACHABLE)
+    monkeypatch.setattr(migration_runner, '_server_encoding', lambda engine: 'SQL_ASCII')
+    monkeypatch.setattr(migration_runner, '_get_state', lambda engine: pytest.fail('registry read'))
+    migration_runner.show_status()
+    assert 'Refused: This PostgreSQL database uses the encoding SQL_ASCII' in capsys.readouterr().out
 
 
 STUB_APP = textwrap.dedent('''

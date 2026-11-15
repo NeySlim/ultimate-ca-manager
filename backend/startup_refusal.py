@@ -11,7 +11,17 @@ class DatabaseRefused(RuntimeError):
 
 
 def migrate_or_refuse(lock) -> None:
-    from migration_runner import run_at_startup
+    """The encoding first, on a bare driver connection: every SQLAlchemy connection after it
+    (the HA restore wait, the startup lock, the migrations) fails on a SQL_ASCII database."""
+    from migration_runner import _get_db_url, run_at_startup, startup_encoding_refusal
+    refusal = startup_encoding_refusal()
+    if refusal:
+        raise DatabaseRefused(refusal)
+    from utils.ha import ha_enabled
+    if ha_enabled():
+        # A restore that has not committed holds the cluster: no migration or write before it ends
+        from services.cluster_maintenance import wait_while_restoring
+        wait_while_restoring(_get_db_url())
     if not run_at_startup(lock):
         raise DatabaseRefused(
             "Schema migration failed or the database was refused at startup. "

@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 import fips_mode
-from migration_runner import pending_migrations
+from migration_runner import encoding_refusal, pending_migrations
 from models import db
 from services import fips_preflight, preflight_core
 
@@ -74,6 +74,11 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     app = read_only_app()
     with app.app_context():
+        # On a bare connection: the first SQLAlchemy one fails on such a database, unnamed
+        refusal = encoding_refusal(db.engine)
+        if refusal:
+            print(f'[ERROR] database: {refusal}')
+            return 2
         try:
             # Before the upgrade the next start applies, the model and the tables differ: the
             # checks that read the database wait for it, the others run

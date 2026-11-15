@@ -399,6 +399,25 @@ def encoding_refusal(engine):
             f"DATABASE_URL at it. Nothing was changed.")
 
 
+def startup_encoding_refusal():
+    """encoding_refusal of the configured database, before any SQLAlchemy connection; None
+    when the server cannot be asked (the steps after it fail on that as they would)."""
+    db_url = _get_db_url()
+    if not _is_postgres(db_url):
+        return None
+    try:
+        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
+                               connect_args=postgres_connect_args(db_url))
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        return encoding_refusal(engine)
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        engine.dispose()
+
+
 def _pending(applied):
     return [n for n in _list_migration_names() if n not in applied]
 
@@ -705,6 +724,10 @@ def show_status():
         say(f"✗ Cannot connect: {e}")
         return
     try:
+        refusal = encoding_refusal(engine)
+        if refusal:
+            say(f"Refused: {refusal}")
+            return
         state, applied = _get_state(engine)
         say(f"State:   {state}")
         refusal = pivot_refusal(state, applied)
