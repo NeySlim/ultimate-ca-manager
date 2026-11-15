@@ -15,9 +15,9 @@ def count_sessions(user, version):
     """Sessions of ``user`` (signed in or waiting on a second factor) still at ``version``,
     not already ended by the application's lifetime or inactivity limits, and not left by
     an earlier account of the same id (SQLite hands the last deleted id out again)."""
-    from auth.session_start import ACCOUNT_KEY, account_proof
+    from auth.session_start import holds_account
     from auth.unified import AuthManager
-    user_id, proof = user.id, account_proof(user)
+    user_id = user.id
     from utils.datetime_utils import utc_now
     iface = current_app.session_interface
     serializer = getattr(iface, 'serializer', None)
@@ -39,7 +39,7 @@ def count_sessions(user, version):
                 continue
             owner = data.get('user_id', data.get('pending_2fa_user_id'))
             if (owner == user_id and (data.get('session_version') or 0) == version
-                    and data.get(ACCOUNT_KEY, proof) == proof
+                    and holds_account(data, user)
                     and not AuthManager.session_ended(data, now, limits=limits, log=False)):
                 count += 1
         return count

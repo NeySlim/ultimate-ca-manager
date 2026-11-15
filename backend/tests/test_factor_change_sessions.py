@@ -450,6 +450,37 @@ def test_a_session_left_by_an_earlier_account_of_the_same_id_is_not_counted(node
         _cleanup(first_node, user)
 
 
+def _forget_proof(c):
+    """The session as a release older than the account proof stored it."""
+    from auth.session_start import ACCOUNT_KEY
+    with c.session_transaction() as s:
+        assert s.pop(ACCOUNT_KEY, None) is not None
+
+
+@pytest.mark.parametrize('left_by', ['an earlier account', 'this account'])
+def test_a_session_without_the_account_proof_is_counted_for_its_account_only(nodes, left_by):
+    """A session stored before the proof existed is this account's when it was opened for
+    its name after its creation, as the validity check reads it: counted then, and not when
+    an earlier account of the same id left it."""
+    first_node, second_node = nodes
+    earlier = _make_user(first_node)
+    if left_by == 'an earlier account':
+        _forget_proof(_open_session(second_node, earlier))
+    _cleanup(first_node, earlier)
+    user = _make_user(first_node, key=SoftKey(), key_enabled=False, id=earlier['id'])
+    try:
+        other = _open_session(second_node, user)
+        if left_by == 'this account':
+            _forget_proof(other)
+        this = _open_session(first_node, user)
+        r = _toggle_key(True)(first_node, this, user)
+        assert r.status_code == 200, r.data
+        assert r.get_json()['meta']['other_sessions_closed'] == 1
+        assert not _signed_in(other) and _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
+
+
 def _disable_pending_totp(application, c, user):
     """TOTP set up but never confirmed is no factor yet: dropping it changes none."""
     r = _post(c, '/api/v2/account/2fa/enable')
