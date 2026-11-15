@@ -442,10 +442,11 @@ def _bulk_delete_local(filenames, counts, deleted_names, seen) -> None:
 @require_auth(['admin:system'])
 def run_retention_now():
     """Apply the retention policy now."""
-    from services.backup.schedule import run_backup_retention
+    from services.backup.schedule import ceiling_warning, run_backup_retention
 
     try:
         removed = run_backup_retention(wait=RETENTION_LOCK_WAIT)
+        warning = ceiling_warning()
     except BackupBusyError as busy:
         logger.info('Retention refused: %s', busy)
         return error_response(str(busy), 409)
@@ -460,7 +461,7 @@ def run_retention_now():
         success=True,
     )
     return success_response(
-        data={'removed': removed},
+        data={'removed': removed, 'warning': warning},
         message=f'Retention applied: removed {removed} backup(s)')
 
 

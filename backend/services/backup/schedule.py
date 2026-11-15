@@ -91,6 +91,7 @@ def get_schedule() -> dict:
     except (ValueError, TypeError):
         retention = 30
 
+    stored_total, stored_count = stored_usage()
     newest, age = _newest_validated_archive()
     last_run = _get(_LAST_RUN_KEY)
     return {
@@ -100,6 +101,9 @@ def get_schedule() -> dict:
         'retention_days': retention,
         'min_keep': _min_keep(),
         'max_total_mb': _max_total_bytes() // (1024 * 1024),
+        'stored_bytes': stored_total,
+        'stored_count': stored_count,
+        'over_ceiling': ceiling_warning() is not None,
         'last_run': last_run,
         # last_run is then this run's reservation, the outcome still the previous run's
         'in_progress': _in_flight(last_run, _get(_CONCLUDED_KEY), utc_now()),
@@ -210,6 +214,35 @@ def list_backups() -> list[dict]:
     return backups
 
 
+def stored_usage() -> tuple:
+    """(bytes, count) the stored archives take: the database's in HA, else the disk's."""
+    archives = list_backups()
+    return sum(int(a['size']) for a in archives), len(archives)
+
+
+def ceiling_warning():
+    """A sentence when the archives are above the size ceiling, else None."""
+    ceiling = _max_total_bytes()
+    if ceiling <= 0:
+        return None
+    total, _ = stored_usage()
+    if total <= ceiling:
+        return None
+    return (f"The archives take {total // (1024 * 1024)} MiB, above the "
+            f"{ceiling // (1024 * 1024)} MiB ceiling: what remains is the last restore point "
+            "and the minimum kept, which retention never removes.")
+
+
+def _audit_ceiling_removals(names) -> None:
+    """One audit entry per archive removed to stay under the size ceiling."""
+    from services.audit_service import AuditService
+    for name in names:
+        AuditService.log_action(
+            action='backup_delete', resource_type='system', resource_name=name,
+            details=f'Removed by retention to stay under the size ceiling: {name}',
+            success=True)
+
+
 def _apply_shared_retention(retention_days: int, wait: float = 0) -> int:
     """HA: the rule below over the database's archives, under a lock of the whole cluster.
 
@@ -217,7 +250,8 @@ def _apply_shared_retention(retention_days: int, wait: float = 0) -> int:
     """
     try:
         return shared_store.apply_retention(
-            retention_days, min_keep=_min_keep(), max_total_bytes=_max_total_bytes(), wait=wait)
+            retention_days, min_keep=_min_keep(), max_total_bytes=_max_total_bytes(), wait=wait,
+            on_ceiling_removed=_audit_ceiling_removals)
     except BackupBusyError as busy:
         if wait:
             raise
@@ -312,6 +346,7 @@ def _enforce_size_ceiling(keep: set) -> int:
         return 0
 
     removed = 0
+    gone = []
     for path in _oldest_first(paths):
         if total <= ceiling:
             break
@@ -324,6 +359,8 @@ def _enforce_size_ceiling(keep: set) -> int:
             continue
         total -= size
         removed += 1
+        gone.append(os.path.basename(path))
+    _audit_ceiling_removals(gone)
 
     if total > ceiling:
         logger.warning(

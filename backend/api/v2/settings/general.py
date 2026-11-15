@@ -20,6 +20,7 @@ from services.backup.settings_contract import (
     validate_backup_kdf,
     validate_backup_password,
     validate_frequency,
+    validate_max_total_mb,
     validate_retention_days,
 )
 from utils.hsts import hsts_env_locked
@@ -71,6 +72,7 @@ _ADMIN_ONLY_SETTINGS = frozenset([
     'auto_backup_enabled',
     'backup_frequency',
     'backup_retention_days',
+    'backup_max_total_mb',
     'backup_password',
     'backup_kdf',
     'clear_backup_password',
@@ -101,6 +103,7 @@ def get_general_settings():
         'auto_backup_enabled': get_config('auto_backup_enabled', 'false') == 'true',
         'backup_frequency': get_config('backup_frequency', 'daily'),
         'backup_retention_days': int(get_config('backup_retention_days', '30')),
+        'backup_max_total_mb': _int_config('backup_max_total_mb', 0),
         'backup_kdf': get_config('backup_kdf', '') or 'auto',
         'audit_retention_days': RetentionPolicy.get_retention_days(),
         'backup_password': '',  # Never return password
@@ -188,7 +191,8 @@ def update_general_settings():
     # List of allowed settings
     allowed_keys = [
         'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
-        'backup_retention_days', 'backup_password', 'backup_kdf', 'session_timeout',
+        'backup_retention_days', 'backup_max_total_mb', 'backup_password', 'backup_kdf',
+        'session_timeout',
         'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
         'protocol_base_url', 'http_protocol_port', 'base_url', 'date_format', 'show_time',
         'acme_public_vhost', 'acme_public_port', 'acme_public_tls_cert_id',
@@ -371,6 +375,13 @@ def update_general_settings():
         try:
             data['backup_retention_days'] = validate_retention_days(
                 data['backup_retention_days'])
+        except BackupSettingError as e:
+            return error_response(str(e), 400)
+
+    if 'backup_max_total_mb' in data:
+        try:
+            data['backup_max_total_mb'] = validate_max_total_mb(
+                data['backup_max_total_mb'])
         except BackupSettingError as e:
             return error_response(str(e), 400)
 

@@ -41,6 +41,7 @@ RESERVED_VALUES = {
     'auto_backup_enabled': True,
     'backup_frequency': 'weekly',
     'backup_retention_days': 1,
+    'backup_max_total_mb': 5,
     'backup_password': 'Reserved-Backup-Pass-123!',
     'backup_kdf': 'pbkdf2',
     'clear_backup_password': True,
@@ -119,7 +120,7 @@ def api_key(auth_client):
 def test_the_reserved_set_is_the_contract():
     from api.v2.settings.general import _ADMIN_ONLY_SETTINGS
     assert set(_ADMIN_ONLY_SETTINGS) == set(RESERVED_VALUES)
-    assert len(RESERVED_VALUES) == 34
+    assert len(RESERVED_VALUES) == 35
 
 
 @pytest.mark.parametrize('key', sorted(RESERVED_VALUES))

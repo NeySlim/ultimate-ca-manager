@@ -29,6 +29,7 @@ from services.backup.settings_contract import (
     validate_backup_kdf,
     validate_backup_password,
     validate_frequency,
+    validate_max_total_mb,
     validate_retention_days,
 )
 from services.backup.backup_service import check_backup_kdf
@@ -437,7 +438,8 @@ def update_backup_schedule():
 
     Writes the same General-settings keys the UI uses, so both surfaces stay
     consistent: enabled→auto_backup_enabled, frequency→backup_frequency,
-    retention_days→backup_retention_days, kdf→backup_kdf.
+    retention_days→backup_retention_days, max_total_mb→backup_max_total_mb,
+    kdf→backup_kdf.
     """
     from . import set_config
     from services.backup.schedule import get_schedule
@@ -454,6 +456,9 @@ def update_backup_schedule():
         if 'retention_days' in data:
             data['retention_days'] = validate_retention_days(
                 data['retention_days'], 'retention_days')
+        if 'max_total_mb' in data:
+            data['max_total_mb'] = validate_max_total_mb(
+                data['max_total_mb'], 'max_total_mb')
         if 'kdf' in data:
             data['kdf'] = validate_backup_kdf(data['kdf'], 'kdf')
     except BackupSettingError as e:
@@ -465,6 +470,8 @@ def update_backup_schedule():
         set_config('backup_frequency', data['frequency'])
     if 'retention_days' in data:
         set_config('backup_retention_days', str(data['retention_days']))
+    if 'max_total_mb' in data:
+        set_config('backup_max_total_mb', str(data['max_total_mb']))
     if 'kdf' in data:
         set_config('backup_kdf', data['kdf'])
 
@@ -477,7 +484,9 @@ def update_backup_schedule():
 
     AuditService.log_action(
         action='backup_schedule_updated', resource_type='system',
-        details="Backup schedule updated", success=True,
+        details="Backup schedule updated" + (
+            f" (max_total_mb={data['max_total_mb']})" if 'max_total_mb' in data else ''),
+        success=True,
     )
     return success_response(data=get_schedule(),
                             message='Backup schedule updated successfully')
