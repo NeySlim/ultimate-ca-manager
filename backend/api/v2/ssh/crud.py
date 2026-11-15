@@ -4,7 +4,7 @@ SSH CA CRUD routes — list, get, import, create, update, delete.
 
 from flask import request, g
 
-from auth.unified import has_permission, require_auth
+from auth.unified import hsm_binding_refusal, require_auth
 from fips_mode import FipsRestricted
 from services.hsm.base_provider import (HsmConfigError, HsmConnectionError, HsmError,
                                         HsmKeyNotFoundError)
@@ -202,9 +202,9 @@ def create_ssh_ca():
 
         hsm_key_id = data.get('hsm_key_id')
         if hsm_key_id is not None:
-            # Binding a key takes the right to see the HSM inventory too
-            if not has_permission('read:hsm', getattr(g, 'permissions', None) or []):
-                return error_response('Creating an SSH CA on an HSM key requires the read:hsm permission', 403)
+            refusal = hsm_binding_refusal('an SSH CA')
+            if refusal:
+                return refusal
             hsm_key_id = _hsm_key_id(hsm_key_id)
             ca = SSHCAService.import_hsm_ca(
                 descr=descr,

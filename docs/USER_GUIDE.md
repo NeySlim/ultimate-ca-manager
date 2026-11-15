@@ -270,6 +270,8 @@ Open **Modules** > **Administration** > **Access Control** (administrators). Cus
 
 Open **Modules** > **Administration** > **HSM Management**. Providers hold CA private keys in hardware or a key service: PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS and OpenBao/Vault Transit. **New Provider** configures one, **Test** checks it and a key can be generated directly on the module. In a Docker deployment see [HSM in Docker](HSM_DOCKER.md).
 
+Creating a CA on an HSM key, an existing one or one generated for it, needs the `read:hsm` permission besides `write:cas` (`write:ssh_cas` for an SSH CA).
+
 ### Audit Logs
 
 Open **Modules** > **Administration** > **Audit Logs**. Every operation is recorded: who did what, when and from where. Filter by action, user, status and date, search the text, export as JSON or CSV, purge old entries with a retention, and **Verify Integrity** checks the log chain for tampering.

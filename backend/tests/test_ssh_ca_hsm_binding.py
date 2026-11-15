@@ -366,6 +366,82 @@ class TestPermission:
         assert r.status_code == status, r.data
 
 
+def _x509_bodies(key_id, provider_id):
+    """Every way POST /api/v2/cas puts an X.509 CA on an HSM key: internal, external, new key."""
+    base = {'validityYears': 1}
+    return {
+        'internal': {**base, 'hsm_key_id': key_id},
+        'external': {**base, 'type': 'external', 'hsm_key_id': key_id},
+        'camel_case': {**base, 'hsmKeyId': key_id},
+        'new_key': {**base, 'hsm_provider_id': provider_id, 'hsm_key_label': f'new-{uuid.uuid4().hex[:6]}',
+                    'hsm_key_algorithm': 'EC-P256'},
+        'new_key_external': {**base, 'type': 'external', 'hsm_provider_id': provider_id,
+                             'hsm_key_label': f'new-{uuid.uuid4().hex[:6]}', 'hsm_key_algorithm': 'EC-P256'},
+    }
+
+
+def _post_x509(client, body, headers=None):
+    descr = f'x509-{uuid.uuid4().hex[:6]}'
+    return descr, client.post('/api/v2/cas', json={'commonName': descr, 'descr': descr, **body},
+                              headers=headers or {})
+
+
+class TestX509Permission:
+    """An X.509 CA on an HSM key asks for read:hsm too, as an SSH CA does."""
+
+    api_key = TestPermission.api_key
+
+    @pytest.mark.parametrize('entry', sorted(_x509_bodies(0, 0)))
+    def test_an_api_key_without_read_hsm_binds_no_key(self, app, auth_client, token_key, api_key, entry):
+        key = token_key()
+        headers = api_key(['read:cas', 'write:cas'])
+        with patch('services.hsm.HsmService.generate_key') as generated:
+            descr, r = _post_x509(app.test_client(), _x509_bodies(key['key'], key['provider'])[entry], headers)
+        assert r.status_code == 403, r.data
+        assert _detail(r) == 'Creating an X.509 CA on an HSM key requires the read:hsm permission'
+        generated.assert_not_called()
+        with app.app_context():
+            assert CA.query.filter_by(descr=descr).count() == 0
+
+    def test_without_an_hsm_key_nothing_more_is_asked(self, app, auth_client, api_key):
+        descr, r = _post_x509(app.test_client(), {'validityYears': 1}, api_key(['read:cas', 'write:cas']))
+        assert r.status_code == 201, r.data
+        from tests.seeded_rows import delete_cas
+        with app.app_context():
+            delete_cas(CA.query.filter_by(descr=descr))
+            db.session.commit()
+
+    @pytest.mark.parametrize('entry', ['internal', 'external'])
+    def test_an_api_key_with_both_binds_it(self, app, auth_client, token_key, api_key, entry):
+        key = token_key()
+        _, r = _post_x509(app.test_client(), _x509_bodies(key['key'], key['provider'])[entry],
+                          api_key(['write:cas', 'read:hsm']))
+        assert r.status_code == 201, r.data
+
+    @pytest.mark.parametrize('permissions,status', [
+        (['write:cas'], 403),
+        (['write:cas', 'read:hsm'], 201),
+    ])
+    def test_a_custom_role(self, app, auth_client, create_user, token_key, request, permissions, status):
+        from models import User
+        name = f'x509hsm{uuid.uuid4().hex[:6]}'
+        r = auth_client.post('/api/v2/rbac/roles', json={'name': f'{name} role', 'permissions': permissions})
+        assert r.status_code == 200, r.data
+        role_id = r.get_json()['data']['id']
+        request.addfinalizer(lambda: _deleted(auth_client, f'/api/v2/rbac/roles/{role_id}'))
+        create_user(username=name, role='viewer')
+        with app.app_context():
+            user_id = User.query.filter_by(username=name).first().id
+        request.addfinalizer(lambda: _deleted(auth_client, f'/api/v2/users/{user_id}'))
+        assert auth_client.put(f'/api/v2/users/{user_id}',
+                               json={'custom_role_id': role_id}).status_code == 200
+        client = app.test_client()
+        assert client.post('/api/v2/auth/login', json={'username': name, 'password': 'TestPass123!'}
+                           ).status_code == 200
+        _, r = _post_x509(client, {'validityYears': 1, 'hsm_key_id': token_key()['key']})
+        assert r.status_code == status, r.data
+
+
 class TestFipsAndHa:
 
     def test_fips_refuses_a_key_it_does_not_approve_before_the_token(self, app, auth_client, token_key,
