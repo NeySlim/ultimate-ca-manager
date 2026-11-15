@@ -3374,6 +3374,7 @@
       "nothingFound": "Non è stato trovato nulla che questo profilo rifiuterebbe."
     },
     "fipsPreflight": {
+      "withoutModule": "Nessun modulo FIPS è stato interrogato: le chiavi EdDSA e ML-DSA sono elencate come rifiutate. Con Docker, esegui questo controllo con l'immagine -fips, senza UCM_FIPS, per valutarle in base al suo modulo.",
       "title": "Idoneità a FIPS",
       "hint": "Elenca ciò che la modalità FIPS rifiuterebbe su questa istanza, con un rimedio per ciascun punto. Non viene modificato nulla.",
       "run": "Verifica idoneità a FIPS",

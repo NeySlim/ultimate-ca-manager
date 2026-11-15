@@ -3374,6 +3374,7 @@
       "nothingFound": "未发现此配置文件会拒绝的项目。"
     },
     "fipsPreflight": {
+      "withoutModule": "未询问任何 FIPS 模块：EdDSA 和 ML-DSA 密钥被列为拒绝。使用 Docker 时，请用 -fips 镜像（不设置 UCM_FIPS）运行此检查，按其模块判定。",
       "title": "FIPS 就绪检查",
       "hint": "列出 FIPS 模式在此实例上会拒绝的项目，并为每项给出补救办法。不会更改任何内容。",
       "run": "检查 FIPS 就绪情况",

@@ -3521,6 +3521,7 @@
       "nothingFound": "Rien que ce profil refuserait."
     },
     "fipsPreflight": {
+      "withoutModule": "Aucun module FIPS n'a été interrogé : les clés EdDSA et ML-DSA sont listées comme refusées. Avec Docker, lancez ce contrôle avec l'image -fips, sans UCM_FIPS, pour les juger selon son module.",
       "title": "Préparation à FIPS",
       "hint": "Liste ce que le mode FIPS refuserait sur cette instance, avec un remède pour chaque point. Rien n'est modifié.",
       "run": "Vérifier la préparation à FIPS",
