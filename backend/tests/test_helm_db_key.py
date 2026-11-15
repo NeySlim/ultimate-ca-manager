@@ -153,3 +153,20 @@ def test_secret_checksum_follows_a_value_the_operator_sets():
 def test_ha_release_notes_say_to_back_up_the_database_key(tmp_path):
     from tests.test_helm_initial_admin_password import _notes
     assert 'UCM_DB_ENCRYPTION_KEY' in _notes(tmp_path, *HA)
+
+
+@pytest.mark.parametrize('name', ['KEY_ENCRYPTION_KEY', 'UCM_DB_ENCRYPTION_KEY'])
+def test_a_generated_key_is_32_random_bytes(name):
+    # Fernet splits the key into two 16-byte halves: each needs at least 112 bits
+    # (NIST SP 800-57 Part 1 Rev. 5, section 5.6.3, Table 4); 16 letters or digits carry 95
+    raw = base64.urlsafe_b64decode(_docs(*HA)['Secret']['stringData'][name])
+    assert len(raw) == 32
+    assert not all(chr(b).isalnum() and b < 128 for b in raw)
+
+
+def test_a_key_drawn_by_an_earlier_chart_is_kept(tmp_path):
+    old = base64.urlsafe_b64encode(b'A1' * 16).decode()
+    chart, values = _chart_on_a_cluster(tmp_path, {
+        'UCM_SECRET_KEY': 's', 'KEY_ENCRYPTION_KEY': old, 'UCM_DB_ENCRYPTION_KEY': old})
+    again = _docs(*HA, *values, '--is-upgrade', chart=chart)['Secret']['stringData']
+    assert again['KEY_ENCRYPTION_KEY'] == old and again['UCM_DB_ENCRYPTION_KEY'] == old
