@@ -215,7 +215,7 @@ The move from 2.x to 3.0 is a full stop: stop every node, then start them on 3.0
 
 - **Helm:** `helm upgrade` rolls the pods with no unavailable pod; the PodDisruptionBudget protects them from node drains.
 - **Compose:** `docker compose -f docker-compose.ha.yml pull`, then `up -d ucm-1`, wait until it is healthy, then `up -d ucm-2`.
-- **DEB/RPM:** upgrade and restart one host, wait for `/health/ready`, then the next. Or install the update from the web interface (System > Updates), or let the scheduled automatic install do it: in HA mode either starts a rolling update.
+- **DEB/RPM:** upgrade and restart one host, wait for `/health/ready`, then the next. Or install the update from the web interface (Settings > Updates), or let the scheduled automatic install do it: in HA mode either starts a rolling update.
 
 ### Rolling update from the web interface (DEB/RPM)
 

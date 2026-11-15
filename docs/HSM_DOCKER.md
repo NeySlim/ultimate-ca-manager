@@ -133,7 +133,7 @@ Then configure the provider in the UCM web UI with the vendor library path.
 
 ## Cloud HSM
 
-Configure cloud HSM providers via the UCM web UI (Settings → HSM):
+Configure cloud HSM providers via the UCM web UI (**Modules** > **Administration** > **HSM Management**):
 
 - **AWS CloudHSM**: uses PKCS#11 with the CloudHSM client library
 - **Azure Key Vault**: requires `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`

@@ -408,7 +408,7 @@ FLASK_ENV=production
 ## Security Monitoring
 
 ### Audit Dashboard
-Access security metrics at Settings > Audit Logs:
+Access security metrics at **Modules** > **Administration** > **Audit Logs**:
 - Failed login attempts
 - Rate limited requests
 - Permission denied events
