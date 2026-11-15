@@ -556,7 +556,8 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     except (PreflightError, CopyError, VerificationError) as exc:
         logger.error("Bootstrap refused: %s", exc)
         stats["refusal"] = _refusal_kind(exc)
-        stats["transient"] = isinstance(exc, CopyError) and _is_transient(exc)
+        # Wherever it struck: a PreflightError raised while reading the target keeps its cause
+        stats["transient"] = not isinstance(exc, VerificationError) and _is_transient(exc)
         return False, f"Bootstrap failed: {exc}", stats
     except Exception as e:
         logger.exception("bootstrap_auth_to_target failed")

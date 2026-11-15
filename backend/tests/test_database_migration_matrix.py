@@ -1758,3 +1758,73 @@ class TestATransferStateThatCannotBeReadIsRefused:
     @_needs_pg
     def test_an_unreadable_marker_is_refused_postgresql(self, app, auth_client, pg_target, env_file):
         self._unreadable_marker(app, auth_client, pg_target, env_file)
+
+
+
+class TestATransientFailureBeforeTheCopyIsRetriable:
+    """A transient failure answers 503 wherever it strikes, the target written or not."""
+
+    def _cut_on(self, app, auth_client, target, env_file, monkeypatch, statement, *, marker):
+        from services.database_admin.preflight import TRANSFER_MARKER
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+        _standalone_target(app, target)
+        if marker:
+            engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+            try:
+                migration._mark_unverified(engine, 'switch')
+            finally:
+                engine.dispose()
+        real = migration.create_engine
+
+        def lost_on(*args, **kwargs):
+            engine = real(*args, **kwargs)
+
+            @event.listens_for(engine, 'before_cursor_execute')
+            def cut(conn, cursor, sql, params, context, many):
+                if statement in sql:
+                    raise _driver_error('OperationalError', 'server closed the connection',
+                                        invalidated=True)
+            return engine
+
+        monkeypatch.setattr(migration, 'create_engine', lost_on)
+        before = env_file.read_text()
+
+        response = auth_client.post('/api/v2/database/switch',
+                                    data=json.dumps({'database_url': target}),
+                                    content_type='application/json')
+
+        assert response.status_code == 503, response.data
+        message = json.loads(response.data)['message']
+        assert message.endswith('retrying on the same target resumes the switch.'), message
+        assert env_file.read_text() == before
+        assert (TRANSFER_MARKER in _tables(target)) is marker
+
+    @pytest.mark.parametrize('statement,marker', [
+        ('SELECT COUNT(*) FROM "users"', False),
+        ('FROM _transfer_unverified', True),
+        ('SELECT name FROM _migrations', False),
+    ], ids=['users', 'marker', 'registry'])
+    def test_a_lost_connection_answers_503_sqlite(
+            self, app, auth_client, sqlite_target, env_file, monkeypatch, statement, marker):
+        self._cut_on(app, auth_client, sqlite_target, env_file, monkeypatch, statement,
+                     marker=marker)
+
+    @_needs_pg
+    @pytest.mark.parametrize('statement,marker', [
+        ('SELECT COUNT(*) FROM "users"', False),
+        ('FROM _transfer_unverified', True),
+        ('SELECT name FROM _migrations', False),
+    ], ids=['users', 'marker', 'registry'])
+    def test_a_lost_connection_answers_503_postgresql(
+            self, app, auth_client, pg_target, env_file, monkeypatch, statement, marker):
+        self._cut_on(app, auth_client, pg_target, env_file, monkeypatch, statement,
+                     marker=marker)
+
+
+def _tables(url):
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        return set(inspect(engine).get_table_names())
+    finally:
+        engine.dispose()

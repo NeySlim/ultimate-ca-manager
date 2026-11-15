@@ -178,21 +178,21 @@ def _switch_backend():
         # this, the new DB has no users and the operator is locked out.
         ok_boot, boot_msg, boot_stats = svc.bootstrap_auth_to_target(database_url)
         if not ok_boot:
-            # A step cut short is resumed on the same target, at once after a transient failure,
-            # once its cause is corrected otherwise. Accounts that failed their verification are
-            # emptied, copied again and verified again by the retry; a refused plan is refused again.
-            reset, status = '', _refusal_status(boot_stats)
-            if boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
+            # A transient failure is retried as it is, before or after the target was written. A
+            # step cut short otherwise resumes once its cause is corrected; accounts that failed
+            # their verification are emptied, copied and verified again; a refused plan stays refused.
+            advice, status = '', _refusal_status(boot_stats)
+            if boot_stats.get('transient'):
+                advice = ' A transient failure stopped it: retrying on the same target resumes the switch.'
+                status = 503
+            elif boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
                 if boot_stats.get('refusal') == 'verification':
-                    reset = ' The copy on the target failed its verification; retrying copies the accounts again.'
-                elif boot_stats.get('transient'):
-                    reset = ' A transient failure stopped it: retrying on the same target resumes the switch.'
-                    status = 503
+                    advice = ' The copy on the target failed its verification; retrying copies the accounts again.'
                 else:
-                    reset = ' Correct the cause above, then retry: the switch resumes on the same target.'
+                    advice = ' Correct the cause above, then retry: the switch resumes on the same target.'
             return error_response(
                 'Pre-flight bootstrap failed, so the backend was not '
-                f'switched. {svc._redact_uri(boot_msg)}{reset}',
+                f'switched. {svc._redact_uri(boot_msg)}{advice}',
                 status,
             )
     else:
