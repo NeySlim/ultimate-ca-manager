@@ -1552,7 +1552,7 @@ def test_the_way_back_puts_back_only_the_local_archives_of_this_archiving(tmp_pa
     readme = ' '.join((box.archive / 'README.txt').read_text().split())
     assert 'by an earlier archiving' in readme
     assert ('Kept beside where they were' in readme) == beside
-    step3 = readme.split(' 3. ', 1)[1].split(' 4. ', 1)[0]
+    step3 = readme.split(' 4. ', 1)[1].split(' 5. ', 1)[0]
     assert 'each directory listed above' not in step3, step3
     assert ('each directory listed under "Kept beside where they were"' in step3) == beside, step3
 
@@ -1619,7 +1619,7 @@ def test_the_way_back_keeps_the_ucm_env_of_2_254_when_the_archive_holds_none(tmp
     assert box.run().returncode == 0
     readme = (box.archive / 'README.txt').read_text()
     flat = ' '.join(readme.split())
-    step3 = _step(readme, 3)
+    step3 = _step(readme, 4)
     assert ('and ' + f'{box.config}/ucm.env' in step3) is purged, step3
     assert (f'of config/ into {box.config}' in step3) is not purged, step3
     assert ('No ucm.env was left' in flat) is purged
@@ -1793,3 +1793,18 @@ def test_the_way_back_names_the_2_254_package_published_for_this_system(tmp_path
     published = ('./ucm_2.254_all.deb', './ucm-2.254-1.fc43.noarch.rpm', './ucm-el9-2.254-1.el9.noarch.rpm')
     assert sum(p in flat for p in published) == (3 if os_release is None else
                                                  0 if 'published for this system' in named[0] else 1)
+
+
+def test_the_way_back_lists_its_steps_in_the_order_they_happen(tmp_path):
+    """The 2.254 package starts the service as it installs: installed, then stopped, then
+    the files put back, then started."""
+    box = Box(tmp_path, python='stub')
+    assert box.run().returncode == 0
+    readme = (box.archive / 'README.txt').read_text()
+    steps = [_step(readme, n) for n in range(1, 7)]
+    assert 'systemctl stop ucm' in steps[0]
+    assert 'Install UCM 2.254' in steps[1] and 'stop' not in steps[1].replace('starts', '')
+    assert steps[2] == 'Stop it: sudo systemctl stop ucm'
+    assert 'put these back' in steps[3]
+    assert 'systemctl start ucm' in steps[4]
+    assert 'Install this release again' in steps[5]

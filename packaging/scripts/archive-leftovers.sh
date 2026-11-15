@@ -382,7 +382,7 @@ $(printf '%s' "$EARLIER" | sed 's/^/  /')
         ENV_KEEP=", and $CONFIG/ucm.env"
         NO_ENV="
 No ucm.env was left in $CONFIG (removing the package with its configuration, as
-apt purge does, removes it): step 3 keeps the one UCM 2.254 writes as it installs.
+apt purge does, removes it): step 4 keeps the one UCM 2.254 writes as it installs.
 What the removed one held is lost: its SECRET_KEY, the session key (open sessions
 end), and any setting written there by hand. Private keys encrypted with a
 master.key or a KEY_ENCRYPTION_KEY that was not kept cannot be decrypted.
@@ -411,18 +411,20 @@ make a directory removed there again, empty (mkdir -p), before a retry puts back
 
 To put that installation back in service
   1. Stop UCM: sudo systemctl stop ucm
-  2. Install UCM 2.254 in place of this release, then stop it again:
+  2. Install UCM 2.254 in place of this release (the Debian and Ubuntu package
+     starts it as it installs):
      $(install_254)
-  3. Move aside what the new installation wrote in $DATA and $CONFIG (all but
+  3. Stop it: sudo systemctl stop ucm
+  4. Move aside what the new installation wrote in $DATA and $CONFIG (all but
      the directories named .ucm-archive-*$ENV_KEEP), then put these back: the contents of data/
      into $DATA$CONFIG_RESTORE$DB_RESTORE$LOCAL_RESTORE; then
      sudo find $DATA/ $CONFIG/ -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
      The 2.254 package gave every .ucm-archive-* directory to the service account as it
      installed: give those left back to root, readable by root only:
      sudo find $DATA/ $CONFIG/ -name '.ucm-archive-*' -prune -exec chown -hR root:root {} + -exec chmod 700 {} +
-  4. Start it (sudo systemctl start ucm) and check that UCM 2.254 opens: this
+  5. Start it (sudo systemctl start ucm) and check that UCM 2.254 opens: this
      records the 2.254 migrations in the database.
-  5. Install this release again: it upgrades that database.
+  6. Install this release again: it upgrades that database.
 EOF
 }
 
