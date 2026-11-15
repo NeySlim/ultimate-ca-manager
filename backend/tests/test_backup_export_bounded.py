@@ -126,3 +126,16 @@ def test_each_related_certificate_is_carried_by_identity(app, template, small_pa
     assert len(linked) == len(rows) - 1
     for row in linked:
         assert row['related_certificate_id_ref'] == {'refid': by_id[row['related_certificate_id']]}
+
+
+def test_the_identity_index_holds_one_page_of_certificates(app, template, small_pages):
+    from services.backup.export_generic import IdentityIndex, iter_section
+    sizes = []
+    for count in (SMALL, LARGE):
+        _fill(app, template, count)
+        with app.app_context():
+            index = IdentityIndex()
+            assert sum(1 for _ in iter_section('certificates', index)) >= count
+            sizes.append(len(index._by_section['certificates']))
+    # The previous page's identities are forgotten: the index never grows with the table
+    assert all(size <= PAGE for size in sizes), sizes
