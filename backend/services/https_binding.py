@@ -117,6 +117,9 @@ def set_bound_refid(refid, chain=None):
         raise
 
 
+_SCAN_BATCH = 500
+
+
 def backfill_legacy_https_binding():
     """Bind a managed certificate that was applied before bindings existed.
 
@@ -141,24 +144,24 @@ def backfill_legacy_https_binding():
     try:
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes
-        from models import Certificate
+        from models import Certificate, db
 
         installed = x509.load_pem_x509_certificate(cert_path.read_bytes())
         installed_fingerprint = installed.fingerprint(hashes.SHA256())
+        # Runs at every start without a binding: two columns, _SCAN_BATCH rows held at a time
         candidates = (
-            Certificate.query
+            db.session.query(Certificate.refid, Certificate.crt)
             .filter(Certificate.crt.isnot(None), Certificate.prv.isnot(None))
             .filter(Certificate.revoked.isnot(True), Certificate.archived.isnot(True))
-            .all()
+            .order_by(Certificate.id)
+            .yield_per(_SCAN_BATCH)
         )
         matches = []
-        for candidate in candidates:
+        for refid, crt in candidates:
             try:
-                managed = x509.load_pem_x509_certificate(
-                    _decode(candidate.crt).encode('utf-8')
-                )
+                managed = x509.load_pem_x509_certificate(_decode(crt).encode('utf-8'))
                 if managed.fingerprint(hashes.SHA256()) == installed_fingerprint:
-                    matches.append(candidate.refid)
+                    matches.append(refid)
             except Exception:
                 continue
 
