@@ -275,6 +275,7 @@
     "source": "Quelle",
     "addDnsProvider": "Anbieter hinzufügen",
     "test": "Testen",
+    "syncKeys": "Schlüssel synchronisieren",
     "dnsProviderTestFailed": "Verbindungstest fehlgeschlagen",
     "providerName": "Anbietername",
     "providerType": "Anbietertyp",
@@ -1083,7 +1084,8 @@
       "noSchemeAllowedByProfile": "Das Compliance-Profil erlaubt für diesen Schlüssel kein RSA-Signaturverfahren.",
       "profileRequiresHsm": "Dieses Profil verlangt, dass der CA-Schlüssel in einem HSM gespeichert wird.",
       "profileHorizon": "Das Compliance-Profil akzeptiert {{key}} bis {{date}}, und diese CA würde diesen Zeitpunkt überdauern.",
-      "noDigestAllowedByPolicy": "Die für diese CA geltenden Richtlinien erlauben keinen Signatur-Hash."
+      "noDigestAllowedByPolicy": "Die für diese CA geltenden Richtlinien erlauben keinen Signatur-Hash.",
+      "hsmNeedsRead": "Das Anlegen einer CA auf einem HSM-Schlüssel erfordert die Berechtigung read:hsm."
     },
     "detail": {
       "hsmBacked": "HSM-gesichert",
@@ -3857,7 +3859,8 @@
       "firmwareVersion": "Firmware-Version",
       "notRead": "Testen Sie die Verbindung, um die Angaben des Moduls auszulesen.",
       "softhsmFips": "SoftHSM ist kein validiertes Modul: Im FIPS-Modus sind Schlüssel darauf nicht FIPS-geschützt."
-    }
+    },
+    "syncingKeys": "Synchronisierung..."
   },
   "sso": {
     "subtitle": "Konfigurieren Sie LDAP, OAuth2 oder SAML-Anbieter für zentrale Authentifizierung",
@@ -4693,7 +4696,8 @@
         "template": "Vorlage konnte nicht exportiert werden"
       },
       "hsm": {
-        "testFailed": "Verbindungstest fehlgeschlagen"
+        "testFailed": "Verbindungstest fehlgeschlagen",
+        "syncFailed": "Synchronisierung der Schlüssel fehlgeschlagen"
       },
       "https": {
         "applyFailed": "Zertifikat konnte nicht angewendet werden",
@@ -4822,7 +4826,12 @@
         "template": "Vorlage erfolgreich exportiert"
       },
       "hsm": {
-        "connectionOk": "Verbindung erfolgreich"
+        "connectionOk": "Verbindung erfolgreich",
+        "keysSynced": "Schlüssel synchronisiert: {{added}} neu, {{removed}} entfernt, {{unchanged}} unverändert",
+        "keysSyncedKept": "Auf dem Token nicht mehr vorhanden, aber behalten, weil eine Instanz sie nutzt: {{count}}.",
+        "keysSyncedUnreadable": "Auf dem Token nicht lesbare Schlüssel: {{count}}. Es wurde kein Schlüssel entfernt.",
+        "keysSyncedMissingKept": "Nicht in der Liste enthaltene und beibehaltene Schlüssel: {{count}}.",
+        "keysSyncedChanged": "Von einer Instanz genutzte Schlüssel, deren Material sich auf dem Token geändert hat: {{count}}."
       },
       "https": {
         "applied": "HTTPS-Zertifikat angewendet. Server wird neu gestartet.",
@@ -5868,7 +5877,12 @@
       "allowAnyPrincipal": "Beliebigen Principal erlauben",
       "allowAnyPrincipalHelp": "Wenn kein Principal aufgeführt ist, für jeden Namen signieren, einschließlich root. Ohne diese Option signiert eine CA mit leerer Liste nichts.",
       "allowCustomKeyId": "Anfragenden die Wahl der Schlüssel-ID erlauben",
-      "allowCustomKeyIdHelp": "sshd protokolliert die Schlüssel-ID als Identität des Inhabers. Ohne diese Option benennt die CA jedes Zertifikat principals@CA-Name."
+      "allowCustomKeyIdHelp": "sshd protokolliert die Schlüssel-ID als Identität des Inhabers. Ohne diese Option benennt die CA jedes Zertifikat principals@CA-Name.",
+      "keyStorageLockedHelp": "Der CA-Schlüssel und der CA-Typ können nach der Erstellung der CA nicht geändert werden.",
+      "hsmKeyHelper": "Eine SSH-CA auf einem HSM nutzt einen RSA- oder ECDSA-P-256/P-384/P-521-Signaturschlüssel, den keine andere Instanz hält. Schlüssel in der HSM-Verwaltung hinzufügen oder synchronisieren.",
+      "hsmNoUsableKeys": "Dieser Anbieter hat keinen freien RSA- oder ECDSA-Signaturschlüssel. Ein HSM-Schlüssel dient nur einer Instanz, X.509 oder SSH.",
+      "hsmDerivedKey": "Schlüsseltyp vom HSM: {{keyType}}",
+      "hsmNeedsRead": "Das Anlegen einer SSH-CA auf einem HSM-Schlüssel erfordert die Berechtigung read:hsm."
     },
     "searchPlaceholder": "SSH-CAs durchsuchen...",
     "downloadSetupScript": "Einrichtungsskript herunterladen",

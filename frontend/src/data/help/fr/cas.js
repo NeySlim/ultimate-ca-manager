@@ -69,6 +69,8 @@ export default {
           { label: 'Utiliser une clé existante', text: 'Lier la CA à une clé de signature inutilisée déjà présente sur le HSM' },
           { label: 'Pas d\'export de clé privée', text: 'Les clés adossées HSM ne quittent jamais le HSM, les exports PKCS#12, JKS et clé seule sont désactivés' },
           { label: 'Prérequis', text: 'Configurer et connecter un fournisseur HSM dans la gestion HSM au préalable' },
+          { label: 'Une autorité par clé', text: 'La liste des clés existantes ne propose que des clés inutilisées : une clé HSM sert une seule autorité, X.509 ou SSH. Une clé qu\'une AC tient déjà est refusée (409) avec le nom de cette AC' },
+          { label: 'Droit requis', text: 'Créer une AC sur une clé HSM exige read:hsm en plus de write:cas ; sans lui, le choix HSM est désactivé' },
         ]
       },
       {
@@ -285,7 +287,8 @@ UCM peut stocker la clé de signature d'une CA sur un module matériel de sécur
 ### Limitations
 - Les clés privées adossées HSM **ne peuvent pas être exportées**. Les options d'export PKCS#12, JKS et clé seule sont masquées pour les CA HSM. Seul le certificat (PEM/DER/P7B) peut être exporté.
 - Il n'y a **pas de migration en place** entre Local et HSM. Pour « déplacer » une CA locale existante sur un HSM, créez une nouvelle CA sur le HSM et réémettez les certificats.
-- Les clés existantes proposées dans *Utiliser une clé existante* sont filtrées sur les clés asymétriques de signature non encore liées à une autre CA.
+- Les clés existantes proposées dans *Utiliser une clé existante* sont filtrées sur les clés asymétriques de signature non encore liées à une autorité, X.509 ou SSH : une clé HSM sert une seule autorité.
+- Créer une AC sur une clé HSM exige la permission \`read:hsm\` en plus de \`write:cas\` ; sans elle, le choix **HSM** est désactivé.
 
 ## Mode hors ligne
 

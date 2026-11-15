@@ -73,6 +73,8 @@ class AzureKeyVaultProvider(BaseHsmProvider):
         use_managed_identity: Use the ambient identity (default: when no credential is given)
     """
     
+    ECDSA_SIGNATURE_FORMAT = 'raw'
+
     def __init__(self, config: Dict[str, Any]):
         if not AZURE_AVAILABLE:
             raise HsmConfigError(

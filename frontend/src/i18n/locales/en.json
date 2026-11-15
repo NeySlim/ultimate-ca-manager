@@ -277,6 +277,7 @@
     "source": "Source",
     "addDnsProvider": "Add Provider",
     "test": "Test",
+    "syncKeys": "Sync keys",
     "dnsProviderTestFailed": "Connection test failed",
     "providerName": "Provider Name",
     "providerType": "Provider Type",
@@ -1083,7 +1084,8 @@
       "noSchemeAllowedByProfile": "No RSA signature scheme is allowed by the compliance profile for this key.",
       "profileRequiresHsm": "This profile requires the CA key to be stored on an HSM.",
       "profileHorizon": "The compliance profile accepts {{key}} until {{date}}, and this CA would outlive it.",
-      "noDigestAllowedByPolicy": "No signature hash is allowed by the policies that apply to this CA."
+      "noDigestAllowedByPolicy": "No signature hash is allowed by the policies that apply to this CA.",
+      "hsmNeedsRead": "Creating a CA on an HSM key requires the read:hsm permission."
     },
     "detail": {
       "hsmBacked": "HSM-backed",
@@ -3859,7 +3861,8 @@
       "firmwareVersion": "Firmware version",
       "notRead": "Test the connection to read what the module reports.",
       "softhsmFips": "SoftHSM is not a validated module: in FIPS mode, keys on it are not FIPS protected."
-    }
+    },
+    "syncingKeys": "Syncing..."
   },
   "sso": {
     "subtitle": "Configure LDAP, OAuth2, or SAML providers for centralized authentication",
@@ -4921,7 +4924,8 @@
         "testFailed": "Failed to send test email"
       },
       "hsm": {
-        "testFailed": "Connection test failed"
+        "testFailed": "Connection test failed",
+        "syncFailed": "Key synchronization failed"
       },
       "sso": {
         "toggleFailed": "Failed to toggle provider",
@@ -5030,7 +5034,12 @@
         "generated": "CRL regenerated successfully"
       },
       "hsm": {
-        "connectionOk": "Connection successful"
+        "connectionOk": "Connection successful",
+        "keysSynced": "Keys synced: {{added}} new, {{removed}} removed, {{unchanged}} unchanged",
+        "keysSyncedKept": "Missing from the token but kept because an authority uses them: {{count}}.",
+        "keysSyncedUnreadable": "Keys that could not be read on the token: {{count}}. No key was removed.",
+        "keysSyncedMissingKept": "Keys missing from the listing and kept: {{count}}.",
+        "keysSyncedChanged": "Keys used by an authority whose material changed on the token: {{count}}."
       },
       "sso": {
         "connectionOk": "Connection successful"
@@ -5873,7 +5882,12 @@
       "allowAnyPrincipal": "Allow any principal",
       "allowAnyPrincipalHelp": "When no principal is listed, sign for any name, root included. Without it, a CA with an empty list signs nothing.",
       "allowCustomKeyId": "Let requesters set the key ID",
-      "allowCustomKeyIdHelp": "sshd logs the key ID as the holder's identity. Without this, the CA names every certificate principals@CA name."
+      "allowCustomKeyIdHelp": "sshd logs the key ID as the holder's identity. Without this, the CA names every certificate principals@CA name.",
+      "keyStorageLockedHelp": "The CA key and CA type cannot be changed after the CA is created.",
+      "hsmKeyHelper": "An SSH CA on an HSM uses an RSA or ECDSA P-256/P-384/P-521 signing key that no other authority holds. Add or sync keys in HSM Management.",
+      "hsmNoUsableKeys": "This provider has no free RSA or ECDSA signing key. An HSM key backs one authority, X.509 or SSH.",
+      "hsmDerivedKey": "Key type from the HSM: {{keyType}}",
+      "hsmNeedsRead": "Creating an SSH CA on an HSM key requires the read:hsm permission."
     },
     "searchPlaceholder": "Search SSH CAs...",
     "quickInstall": "Quick Install",

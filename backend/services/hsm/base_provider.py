@@ -29,6 +29,9 @@ class BaseHsmProvider(ABC):
     Implementations: PKCS11Provider, AzureKeyVaultProvider, GcpKmsProvider
     """
 
+    # ECDSA output of sign(): DER for transit/KMS, fixed-width r||s for PKCS#11/JWA.
+    ECDSA_SIGNATURE_FORMAT = 'der'
+
     # True when sign() honours padding='pss' (RSASSA-PSS, salt = digest length)
     SIGNS_PSS = False
 

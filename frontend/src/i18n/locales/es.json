@@ -275,6 +275,7 @@
     "source": "Fuente",
     "addDnsProvider": "Añadir proveedor",
     "test": "Probar",
+    "syncKeys": "Sincronizar claves",
     "dnsProviderTestFailed": "Prueba de conexión fallida",
     "providerName": "Nombre del proveedor",
     "providerType": "Tipo de proveedor",
@@ -1083,7 +1084,8 @@
       "noSchemeAllowedByProfile": "Ningún esquema de firma RSA está permitido por el perfil de cumplimiento para esta clave.",
       "profileRequiresHsm": "Este perfil exige que la clave de la CA se almacene en un HSM.",
       "profileHorizon": "El perfil de cumplimiento acepta {{key}} hasta {{date}}, y esta CA lo superaría.",
-      "noDigestAllowedByPolicy": "Ningún hash de firma está permitido por las políticas que se aplican a esta CA."
+      "noDigestAllowedByPolicy": "Ningún hash de firma está permitido por las políticas que se aplican a esta CA.",
+      "hsmNeedsRead": "Crear una AC en una clave HSM requiere el permiso read:hsm."
     },
     "detail": {
       "hsmBacked": "Respaldada por HSM",
@@ -3857,7 +3859,8 @@
       "firmwareVersion": "Versión del firmware",
       "notRead": "Pruebe la conexión para leer lo que informa el módulo.",
       "softhsmFips": "SoftHSM no es un módulo validado: en modo FIPS, las claves almacenadas en él no están protegidas por FIPS."
-    }
+    },
+    "syncingKeys": "Sincronizando..."
   },
   "sso": {
     "subtitle": "Configure proveedores LDAP, OAuth2 o SAML para autenticación centralizada",
@@ -4693,7 +4696,8 @@
         "template": "Error al exportar la plantilla"
       },
       "hsm": {
-        "testFailed": "Error en la prueba de conexión"
+        "testFailed": "Error en la prueba de conexión",
+        "syncFailed": "Error al sincronizar claves"
       },
       "https": {
         "applyFailed": "Error al aplicar el certificado",
@@ -4822,7 +4826,12 @@
         "template": "Plantilla exportada exitosamente"
       },
       "hsm": {
-        "connectionOk": "Conexión exitosa"
+        "connectionOk": "Conexión exitosa",
+        "keysSynced": "Claves sincronizadas: {{added}} nuevas, {{removed}} eliminadas, {{unchanged}} sin cambios",
+        "keysSyncedKept": "Ausentes del token pero conservadas porque una autoridad las usa: {{count}}.",
+        "keysSyncedUnreadable": "Claves ilegibles en el token: {{count}}. No se eliminó ninguna clave.",
+        "keysSyncedMissingKept": "Claves ausentes de la lista y conservadas: {{count}}.",
+        "keysSyncedChanged": "Claves usadas por una autoridad cuyo material cambió en el token: {{count}}."
       },
       "https": {
         "applied": "Certificado HTTPS aplicado. El servidor se reiniciará.",
@@ -5868,7 +5877,12 @@
       "allowAnyPrincipal": "Permitir cualquier principal",
       "allowAnyPrincipalHelp": "Si no hay ningún principal en la lista, firmar para cualquier nombre, incluido root. Sin esta opción, una CA con la lista vacía no firma nada.",
       "allowCustomKeyId": "Permitir que los solicitantes definan el ID de clave",
-      "allowCustomKeyIdHelp": "sshd registra el ID de clave como identidad del titular. Sin esta opción, la CA nombra cada certificado principals@nombre de la CA."
+      "allowCustomKeyIdHelp": "sshd registra el ID de clave como identidad del titular. Sin esta opción, la CA nombra cada certificado principals@nombre de la CA.",
+      "keyStorageLockedHelp": "La clave de la AC y el tipo de AC no pueden cambiarse después de crear la AC.",
+      "hsmKeyHelper": "Una AC SSH en un HSM usa una clave de firma RSA o ECDSA P-256/P-384/P-521 que ninguna otra autoridad posee. Añada o sincronice claves en la gestión HSM.",
+      "hsmNoUsableKeys": "Este proveedor no tiene ninguna clave de firma RSA o ECDSA libre. Una clave HSM sirve a una sola autoridad, X.509 o SSH.",
+      "hsmDerivedKey": "Tipo de clave del HSM: {{keyType}}",
+      "hsmNeedsRead": "Crear una AC SSH en una clave HSM requiere el permiso read:hsm."
     },
     "searchPlaceholder": "Buscar CAs SSH...",
     "downloadSetupScript": "Descargar script de configuración",

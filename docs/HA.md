@@ -221,7 +221,7 @@ These operations answer `409` with code `ha_mode`, because they only change the 
 
 - backend switch and data migration between databases (`database.py`): change `DATABASE_URL` by hand, then restart;
 - session key rotation without encryption (it would write `ucm.env`); with the KEK every HA node holds, it is stored in the database and works from any node, see [Session key rotation](ADMIN_GUIDE.md#session-key-rotation);
-- creating a SoftHSM provider, pointing a provider at SoftHSM, generating a key on a SoftHSM provider, syncing the keys of a SoftHSM provider, and creating a CA (root, intermediate or external CSR) on a new or an existing SoftHSM key (the token is on one node's disk). A CA already bound to a SoftHSM key keeps signing on the node that holds the token. The image does not initialize its default token when `UCM_HA` is set, whatever `HSM_AUTO_INIT` says. Network PKCS#11, OpenBao and cloud KMS providers are not affected.
+- creating a SoftHSM provider, pointing a provider at SoftHSM, generating a key on a SoftHSM provider, syncing the keys of a SoftHSM provider, and creating a CA (root, intermediate, external CSR or SSH) on a new or an existing SoftHSM key (the token is on one node's disk). Creating a CA on a key of a provider whose module is a local smart card reader module, OpenSC (`opensc-pkcs11.so`) or YubiKey PIV (`libykcs11.so`), is refused the same way: the reader is attached to one host. Any other PKCS#11 module is assumed reachable from every node. A CA already bound to a SoftHSM key keeps signing on the node that holds the token. The image does not initialize its default token when `UCM_HA` is set, whatever `HSM_AUTO_INIT` says. Network PKCS#11, OpenBao and cloud KMS providers are not affected.
 
 ## Upgrading
 

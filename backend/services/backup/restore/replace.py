@@ -365,8 +365,23 @@ def remove_before_writes(replacement: Replacement) -> Replacement:
         _release_dependents(replacement, table, _primary(table), replacement.doomed[name], name)
     for name in replacement.order:
         _delete(replacement, name, replacement.doomed[name] - replacement.deferred.get(name, set()))
+    _release_waiting_hsm_keys(replacement)
     db.session.expire_all()
     return replacement
+
+
+# An authority that waits for the writes goes with them: its HSM key is free for an archived one now
+_HSM_KEY_HOLDERS = ('certificate_authorities', 'ssh_cas')
+
+
+def _release_waiting_hsm_keys(replacement: Replacement) -> None:
+    for name in _HSM_KEY_HOLDERS:
+        waiting = replacement.deferred.get(name)
+        if not waiting:
+            continue
+        table = _table_of(name)
+        for chunk in _chunks(waiting):
+            db.session.execute(table.update().where(_primary(table).in_(chunk)).values(hsm_key_id=None))
 
 
 def remove_after_writes(replacement: Replacement) -> Replacement:

@@ -275,6 +275,7 @@
     "source": "ソース",
     "addDnsProvider": "プロバイダーを追加",
     "test": "テスト",
+    "syncKeys": "鍵を同期",
     "dnsProviderTestFailed": "接続テストに失敗しました",
     "providerName": "プロバイダー名",
     "providerType": "プロバイダータイプ",
@@ -1083,7 +1084,8 @@
       "noSchemeAllowedByProfile": "この鍵では、コンプライアンスプロファイルで許可されている RSA 署名方式がありません。",
       "profileRequiresHsm": "このプロファイルでは、CA 鍵を HSM に保管する必要があります。",
       "profileHorizon": "コンプライアンスプロファイルは {{key}} を {{date}} まで認めており、この CA はそれより長く存続します。",
-      "noDigestAllowedByPolicy": "この CA に適用されるポリシーで許可されている署名ハッシュはありません。"
+      "noDigestAllowedByPolicy": "この CA に適用されるポリシーで許可されている署名ハッシュはありません。",
+      "hsmNeedsRead": "HSMキー上にCAを作成するには、read:hsm権限が必要です。"
     },
     "detail": {
       "hsmBacked": "HSM バック",
@@ -3859,7 +3861,8 @@
       "firmwareVersion": "ファームウェアのバージョン",
       "notRead": "接続をテストして、モジュールが報告する情報を読み取ります。",
       "softhsmFips": "SoftHSM は検証済みモジュールではありません。FIPS モードでは、その上の鍵は FIPS で保護されません。"
-    }
+    },
+    "syncingKeys": "同期中..."
   },
   "sso": {
     "subtitle": "LDAP、OAuth2、SAMLプロバイダーを設定して一元認証",
@@ -4696,7 +4699,8 @@
         "template": "テンプレートのエクスポートに失敗しました"
       },
       "hsm": {
-        "testFailed": "接続テストに失敗しました"
+        "testFailed": "接続テストに失敗しました",
+        "syncFailed": "鍵の同期に失敗しました"
       },
       "https": {
         "applyFailed": "証明書の適用に失敗しました",
@@ -4825,7 +4829,12 @@
         "template": "テンプレートがエクスポートされました"
       },
       "hsm": {
-        "connectionOk": "接続に成功しました"
+        "connectionOk": "接続に成功しました",
+        "keysSynced": "鍵を同期しました: 新規 {{added}}、削除 {{removed}}、変更なし {{unchanged}}",
+        "keysSyncedKept": "トークンに存在しませんが、認証局が使用しているため保持されたキー: {{count}}。",
+        "keysSyncedUnreadable": "トークン上で読み取れなかったキー: {{count}}。キーは削除されていません。",
+        "keysSyncedMissingKept": "一覧になく保持されたキー: {{count}}。",
+        "keysSyncedChanged": "認証局が使用しているキーのうち、トークン上で内容が変わったもの: {{count}}。"
       },
       "https": {
         "applied": "HTTPS証明書が適用されました。サーバーが再起動します。",
@@ -5871,7 +5880,12 @@
       "allowAnyPrincipal": "任意のプリンシパルを許可",
       "allowAnyPrincipalHelp": "プリンシパルが一つも指定されていない場合、root を含む任意の名前に署名します。このオプションがなければ、リストが空の CA は何も署名しません。",
       "allowCustomKeyId": "リクエスタによる鍵IDの指定を許可",
-      "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。"
+      "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。",
+      "keyStorageLockedHelp": "CAキーとCAタイプはCA作成後に変更できません。",
+      "hsmKeyHelper": "HSM上のSSH CAは、他の認証局が使用していないRSAまたはECDSA P-256/P-384/P-521の署名キーを使います。HSM管理でキーを追加または同期してください。",
+      "hsmNoUsableKeys": "このプロバイダーには空いているRSAまたはECDSA署名キーがありません。HSMキーは、X.509またはSSHのいずれか1つの認証局にのみ使われます。",
+      "hsmDerivedKey": "HSMからのキータイプ: {{keyType}}",
+      "hsmNeedsRead": "HSMキー上にSSH CAを作成するには、read:hsm権限が必要です。"
     },
     "searchPlaceholder": "SSH CAを検索...",
     "downloadSetupScript": "セットアップスクリプトをダウンロード",

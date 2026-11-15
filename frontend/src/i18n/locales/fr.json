@@ -1020,7 +1020,8 @@
       "noSchemeAllowedByProfile": "Aucun schéma de signature RSA n'est autorisé par le profil de conformité pour cette clé.",
       "profileRequiresHsm": "Ce profil exige que la clé de la CA soit stockée sur un HSM.",
       "profileHorizon": "Le profil de conformité accepte {{key}} jusqu'au {{date}}, et cette CA lui survivrait.",
-      "noDigestAllowedByPolicy": "Aucun hachage de signature n'est autorisé par les politiques qui s'appliquent à cette CA."
+      "noDigestAllowedByPolicy": "Aucun hachage de signature n'est autorisé par les politiques qui s'appliquent à cette CA.",
+      "hsmNeedsRead": "Créer une AC sur une clé HSM exige la permission read:hsm."
     },
     "detail": {
       "hsmBacked": "Adossé HSM",
@@ -1553,6 +1554,7 @@
     "source": "Source",
     "addDnsProvider": "Ajouter un fournisseur",
     "test": "Tester",
+    "syncKeys": "Synchroniser les clés",
     "dnsProviderTestFailed": "Échec du test de connexion",
     "providerName": "Nom du fournisseur",
     "providerType": "Type de fournisseur",
@@ -2399,7 +2401,8 @@
       "firmwareVersion": "Version du firmware",
       "notRead": "Testez la connexion pour lire ce que le module signale.",
       "softhsmFips": "SoftHSM n'est pas un module validé : en mode FIPS, les clés qu'il contient ne sont pas protégées par FIPS."
-    }
+    },
+    "syncingKeys": "Synchronisation..."
   },
   "import": {
     "smartImport": "Import intelligent",
@@ -4921,7 +4924,8 @@
         "testFailed": "Échec de l'envoi de l'e-mail test"
       },
       "hsm": {
-        "testFailed": "Échec du test de connexion"
+        "testFailed": "Échec du test de connexion",
+        "syncFailed": "Échec de la synchronisation des clés"
       },
       "sso": {
         "toggleFailed": "Échec de l'activation/désactivation du fournisseur",
@@ -5030,7 +5034,12 @@
         "generated": "CRL régénérée avec succès"
       },
       "hsm": {
-        "connectionOk": "Connexion réussie"
+        "connectionOk": "Connexion réussie",
+        "keysSynced": "Clés synchronisées : {{added}} nouvelles, {{removed}} supprimées, {{unchanged}} inchangées",
+        "keysSyncedKept": "Absentes du jeton mais conservées parce qu'une autorité les utilise : {{count}}.",
+        "keysSyncedUnreadable": "Clés illisibles sur le jeton : {{count}}. Aucune clé n'a été retirée.",
+        "keysSyncedMissingKept": "Clés absentes de la liste et conservées : {{count}}.",
+        "keysSyncedChanged": "Clés utilisées par une autorité dont le matériel a changé sur le jeton : {{count}}."
       },
       "sso": {
         "connectionOk": "Connexion réussie"
@@ -5871,7 +5880,12 @@
       "allowAnyPrincipal": "Autoriser tout principal",
       "allowAnyPrincipalHelp": "Si aucun principal n'est listé, signer pour n'importe quel nom, root compris. Sans cette option, une CA à liste vide ne signe rien.",
       "allowCustomKeyId": "Laisser les demandeurs définir l'identifiant de clé",
-      "allowCustomKeyIdHelp": "sshd journalise l'identifiant de clé comme identité du titulaire. Sans cette option, la CA nomme chaque certificat principals@nom de la CA."
+      "allowCustomKeyIdHelp": "sshd journalise l'identifiant de clé comme identité du titulaire. Sans cette option, la CA nomme chaque certificat principals@nom de la CA.",
+      "keyStorageLockedHelp": "La clé de l'AC et le type d'AC ne peuvent pas être modifiés après la création de l'AC.",
+      "hsmKeyHelper": "Une AC SSH sur HSM utilise une clé de signature RSA ou ECDSA P-256/P-384/P-521 qu'aucune autre autorité ne détient. Ajoutez ou synchronisez les clés dans la gestion HSM.",
+      "hsmNoUsableKeys": "Ce fournisseur n'a aucune clé de signature RSA ou ECDSA libre. Une clé HSM sert une seule autorité, X.509 ou SSH.",
+      "hsmDerivedKey": "Type de clé issu du HSM : {{keyType}}",
+      "hsmNeedsRead": "Créer une AC SSH sur une clé HSM exige la permission read:hsm."
     },
     "searchPlaceholder": "Rechercher les CA SSH...",
     "downloadSetupScript": "Télécharger le script de configuration",
