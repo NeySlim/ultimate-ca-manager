@@ -15,6 +15,7 @@ from services.hsm import HsmService
 from services.hsm.base_provider import HsmConnectionError
 from services.ssh_ca_service import SSHCAService
 from services.ssh_cert import SSHCertificateService
+from tests.test_hsm_sync_and_listing import needs_softhsm, softhsm_token  # noqa: F401
 
 
 def spki(key):
@@ -193,15 +194,17 @@ def test_creation_proves_possession_with_ssh_digest(token, algorithm, generate):
     assert fake.calls[0][1] == expected
 
 
+@pytest.mark.parametrize('algorithm,generate', KEYS)
 @pytest.mark.parametrize('failure', ['offline', 'different-key', 'wrong-digest', 'lying-digest'])
-def test_creation_cannot_trust_cached_pem_without_a_working_signer(token, failure, monkeypatch):
-    row, fake = token(rsa.generate_private_key(65537, 2048), 'RSA-2048')
+def test_creation_cannot_trust_cached_pem_without_a_working_signer(
+        token, failure, monkeypatch, algorithm, generate):
+    row, fake = token(generate(), algorithm)
     if failure == 'offline':
         fake.offline = True
     elif failure == 'different-key':
-        fake.key = rsa.generate_private_key(65537, 2048)
+        fake.key = generate()
     else:
-        fake.fixed_hash = 'sha256'
+        fake.fixed_hash = 'sha384' if algorithm == 'EC-P256' else 'sha256'
         if failure == 'lying-digest':
             monkeypatch.setattr(fake, 'hash_for_key', lambda i, a, r: r)
     with pytest.raises((ValueError, HsmConnectionError)):
@@ -287,6 +290,26 @@ def test_gcp_sign_ignores_requested_hash_and_is_rejected_at_issuance(token, monk
     with pytest.raises(ValueError, match='signature.*verif'):
         issue(ca)
     assert SSHCertificate.query.filter_by(ssh_ca_id=ca.id).count() == 0
+
+
+@needs_softhsm
+@pytest.mark.parametrize('algorithm,generate', KEYS)
+def test_real_token_ssh_certificate_verifies_independently(token, monkeypatch, softhsm_token, algorithm, generate):
+    from services.hsm.pkcs11_provider import Pkcs11Provider
+    with Pkcs11Provider(softhsm_token) as provider:
+        info = provider.generate_key(f'ssh-wire-{algorithm}', algorithm)
+    try:
+        row, _ = token(generate(), algorithm)
+        row.key_identifier, row.public_key_pem = info.key_identifier, info.public_key_pem
+        db.session.commit()
+        monkeypatch.setattr(HsmService, '_get_provider_instance', lambda *a: Pkcs11Provider(softhsm_token))
+        ca = create(row)
+        certificate = issue(ca)
+        verify_wire(certificate.certificate, ca.public_key,
+                    serialization.load_pem_public_key(info.public_key_pem.encode()))
+    finally:
+        with Pkcs11Provider(softhsm_token) as provider:
+            provider.delete_key(info.key_identifier)
 
 
 def test_ed25519_refusal_identifies_wrapper_limitation(token):
