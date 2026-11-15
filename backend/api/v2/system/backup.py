@@ -553,6 +553,7 @@ def restore_backup():
                     if maintenance:
                         maintenance.lift_unchanged()
                     logger.warning('Restore: the archive carried no data section')
+                    attach_restore_todo(results)
                     return success_response(
                         data=results,
                         message=('The archive carried no data: nothing was restored, '

@@ -73,3 +73,24 @@ class TestListingAnnouncesTheRestoreLimits:
             'archive_bytes': storage.restore_archive_limit(),
         }
         assert meta['restore_limits']['archive_bytes'] == 2048 * 1024 * 1024
+
+
+class TestArchiveWithoutSection:
+    @pytest.mark.parametrize('route', ('/api/v2/system/restore', '/api/v2/settings/backup/restore'))
+    def test_early_answer_still_lists_what_was_not_restored(self, app, auth_client, monkeypatch, route):
+        from api.v2.system.backup import BackupService
+
+        monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
+                            lambda self, *a, **k: {'sections_carried': [],
+                                                   'sections_not_restored': ['future_thing']})
+        monkeypatch.setattr(BackupService, 'check_archive_opens', lambda self, *a, **k: None)
+
+        response = auth_client.post(
+            route, data={'file': (io.BytesIO(b'x'), 'x.ucmbkp'),
+                         'password': 'a-password-that-is-long-enough'},
+            content_type='multipart/form-data')
+
+        assert response.status_code == 200, response.data
+        data = response.get_json()['data']
+        assert len(data['todo']) == 1 and 'future_thing' in data['todo'][0]
+        assert 'restart_requested' not in data
