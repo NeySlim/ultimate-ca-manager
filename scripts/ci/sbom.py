@@ -34,6 +34,8 @@ SCHEMA_DIR = HERE / 'sbom-data' / 'cyclonedx'
 FONTS = HERE / 'sbom-data' / 'fonts.json'
 ROLES = ('content', 'build-input', 'install-requirement', 'excluded')
 LEGAL = ('LICENSE', 'NOTICE', 'COMMERCIAL-LICENSE.md')
+# Where each package format installs them: packaging/debian/rules, %license of the RPM spec
+LEGAL_DIRS = {'deb': 'usr/share/doc/ucm', 'rpm': 'usr/share/licenses/ucm'}
 FONT_SUFFIXES = ('.woff2', '.woff', '.ttf', '.otf')
 VARIANTS = {'std': 'standard', 'fips': 'fips'}
 ARCHES = ('amd64', 'arm64')
@@ -381,6 +383,9 @@ def cmd_package(args):
     if req_path not in files:
         fail(f'{pkg.name}: no {req_path}')
     check_dist(files, frag, f'{app}/frontend/dist')
+    missing = [p for p in (f'{LEGAL_DIRS[args.format]}/{name}' for name in LEGAL) if p not in files]
+    if missing:
+        fail(f'{pkg.name}: no {missing[0]}, a legal text every {args.format} package ships')
     asset = published(pkg.name)
     subject = {'type': 'application', 'bom-ref': 'subject', 'name': 'ucm', 'version': args.version,
                'hashes': [{'alg': 'SHA-256', 'content': sha256_file(pkg)}],

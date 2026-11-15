@@ -1,6 +1,6 @@
 # Software bill of materials (SBOM)
 
-Every release ships one CycloneDX 1.6 JSON document per deliverable: one per package file (the DEB and the three RPMs) and one per image platform (standard and FIPS, amd64 and arm64). The release workflow refuses to tag an image or create the release if one of them is missing, empty, invalid against the CycloneDX 1.6 schema, made for another version, or describing another file or image.
+Every release ships one CycloneDX 1.6 JSON document per deliverable: one per package file (the DEB and the three RPMs) and one per image platform (standard and FIPS, amd64 and arm64). The release workflow refuses to tag an image or create the release if one of them is missing, empty, invalid against the CycloneDX 1.6 schema, made for another version, or describing another file or image. The SBOM of a package is not made, and the release stops, when the package lacks one of its legal texts (`LICENSE`, `NOTICE`, `COMMERCIAL-LICENSE.md`, under `/usr/share/doc/ucm` in the DEB and `/usr/share/licenses/ucm` in the RPMs).
 
 ## Where to find them
 
