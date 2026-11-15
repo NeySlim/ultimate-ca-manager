@@ -31,7 +31,8 @@ echo "$VERSION" > "$ROOT_DIR/VERSION"
 VERSION="$NPM_VERSION" FRONTEND="$ROOT_DIR/frontend" node -e "const fs=require('fs'); for (const n of ['package.json','package-lock.json']) { const f=process.env.FRONTEND+'/'+n; const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=process.env.VERSION; if (p.packages && p.packages['']) p.packages[''].version=process.env.VERSION; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
 
 # 3. Helm chart appVersion: the image tag the chart deploys by default. The release
-#    workflow publishes an image for every tag (stable and RC), none for a -dev version.
+#    workflow publishes an image for every tag (stable and RC), none for a -dev version,
+#    which leaves appVersion as it is.
 #    The chart `version` follows chart changes only.
 if [[ "$VERSION" != *-dev ]]; then
     sed -i "s/^appVersion: \".*\"/appVersion: \"$VERSION\"/" "$ROOT_DIR/charts/ucm/Chart.yaml"

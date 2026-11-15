@@ -13,8 +13,9 @@ Each target is a host of its own (`<host>`, `<port>` below). An RC container
 runs under a separate name and port (e.g. `ucm-rc-test`): never restart a
 production container with an RC image.
 
-"Fresh database" means an empty PostgreSQL database: the boot log must show
-every migration of `backend/migrations` applied and none failed.
+"Fresh database" means an empty PostgreSQL database: its schema is built in one
+pass, not migration by migration. The boot log must show `Database: POSTGRESQL`,
+`Fresh PostgreSQL database` and `migration baseline marked`, and no line starting with `✗`.
 
 ## Smoke and UI checks
 
@@ -74,7 +75,7 @@ ssh <host> "cp /etc/ucm/ucm.env /etc/ucm/ucm.env.pre-pg && \
     echo 'DATABASE_URL=postgresql://ucm:ucmtest@<pg-host>:<pg-port>/ucm' >> /etc/ucm/ucm.env && \
     systemctl restart ucm"
 
-# Boot log MUST show: ✓ Database: POSTGRESQL and the migrations applied
+# Boot log MUST show: ✓ Database: POSTGRESQL and, on a fresh database, the migration baseline marked
 ssh <host> "journalctl -u ucm -n 100 --no-pager | grep -E 'Database|migration'"
 
 # Re-run the smoke and the UI checks

@@ -55,12 +55,10 @@ if ! git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "$TAG"; then
 fi
 
 # Same section as the workflow: [Unreleased] for a RC, its own section for a stable.
-NOTES="$(python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md | sed -e 's/[[:space:]]*$//')"
-if [[ -z "${NOTES//[[:space:]]/}" ]]; then
-    echo "No CHANGELOG section with entries for ${VERSION}." >&2
+NOTES="$(python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md | sed -e 's/[[:space:]]*$//')" || {
     echo "A RC needs an '## [Unreleased]' block; a stable needs '## [${VERSION}] - YYYY-MM-DD'." >&2
     exit 1
-fi
+}
 
 NOTES_FILE="$(mktemp -t ucm-relnotes.XXXXXX.md)"
 trap 'rm -f "$NOTES_FILE"' EXIT

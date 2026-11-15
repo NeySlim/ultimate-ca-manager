@@ -22,9 +22,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / 'scripts' / 'ci' / 'release_version.py'
 WORKFLOWS = ROOT / '.github' / 'workflows'
 BASH = shutil.which('bash')
-# A commit hook exports GIT_DIR and friends: scratch repositories must not inherit them.
-for _k in [k for k in os.environ if k.startswith('GIT_')]:
-    os.environ.pop(_k)
+
+
+@pytest.fixture(autouse=True)
+def _no_inherited_git_environment(monkeypatch):
+    """A commit hook exports GIT_DIR and friends: scratch repositories must not inherit them."""
+    for key in [k for k in os.environ if k.startswith('GIT_')]:
+        monkeypatch.delenv(key)
 
 # Major.Build for this line, X.Y.Z for the maintenance releases of the previous one
 ACCEPTED = ['3.0', '3.1', '3.0-rc1', '2.254.2', '2.254.2-rc1']
@@ -370,7 +374,7 @@ def test_npm_form_of_each_branch_version(version, npm):
     assert _cli('npm', version).stdout.strip() == npm
 
 
-@pytest.mark.parametrize('version', ['3.0.0-dev', '3.0-dev-dev', '3.0-1', 'v3.0-dev', ''])
+@pytest.mark.parametrize('version', ['3.0.0-dev', '3.0-dev-dev', '3.0-rc1-dev', '3.0-1', 'v3.0-dev', ''])
 def test_npm_form_refuses_another_grammar(version):
     assert _cli('npm', version).returncode == 1
 
@@ -407,7 +411,7 @@ def _chart(root):
 @pytest.mark.parametrize('v,npm,chart_app', [
     ('3.0', '3.0.0', '3.0'), ('3.1', '3.1.0', '3.1'), ('3.0-rc1', '3.0.0-rc1', '3.0-rc1'),
     ('2.254.2', '2.254.2', '2.254.2'), ('2.254.2-rc1', '2.254.2-rc1', '2.254.2-rc1'),
-    # No image is published for a -dev version: the chart keeps the last published one
+    # No image is published for a -dev version: appVersion is left as it is
     ('3.1-dev', '3.1.0-dev', None), ('2.254.3-dev', '2.254.3-dev', None),
 ])
 def test_bump_version_updates_every_file(tmp_path, v, npm, chart_app):
