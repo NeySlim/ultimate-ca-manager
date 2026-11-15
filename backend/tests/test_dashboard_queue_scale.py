@@ -494,3 +494,81 @@ def test_the_queue_cost_grows_linearly_with_the_certificates(app, rows):
     first, second = once - base, twice - once
     # Linear: the second batch costs what the first did; a per-row walk of a table makes it about three times as much
     assert second < 1.5 * first, (base, once, twice)
+
+
+# ------------------------------------------------------------------- the declined ids, bounded
+
+# Far enough ahead that only this test's certificates are due: rows other tests left cannot be candidates
+_FAR = timedelta(days=365 * 60)
+
+
+def _far_cert(rows, ca, name, days, valid_from_days=300):
+    now = utc_now() + _FAR
+    return rows.add(Certificate(refid=str(uuid.uuid4()), descr=name, subject_cn=name, caref=ca.refid, crt=_PEM,
+                                prv='k', source='manual', valid_from=now - timedelta(days=valid_from_days),
+                                valid_to=now + timedelta(days=days)))
+
+
+def _far_reject(rows, cert_id, days_ago):
+    return rows.add(ApprovalRequest(request_type='renewal', status='rejected',
+                                    request_data=json.dumps({'certificate_id': cert_id, 'trigger': 'auto'}),
+                                    created_at=utc_now() + _FAR - timedelta(days=days_ago)))
+
+
+def test_the_declined_ids_hold_only_certificates_a_kind_can_list(app, rows):
+    with app.app_context():
+        ca = _ca(rows, 'bound-ca')
+        due = _far_cert(rows, ca, 'bound-due', 10)
+        _far_reject(rows, due.id, 1)
+        db.session.commit()
+        now = utc_now() + _FAR
+        sizes = []
+        for start, count in ((0, 20), (20, 60)):
+            for i in range(start, start + count):
+                _far_reject(rows, _far_cert(rows, ca, f'bound-later-{i}', 200).id, 1)
+            db.session.commit()
+            ids = da.renewal_inputs(now)['declined_ids']
+            assert due.id in ids
+            sizes.append(len(ids))
+        # A certificate beyond every window cannot be listed: its rejection adds nothing to the inlined list
+        assert sizes[0] == sizes[1], sizes
+
+
+def _request_reads(call):
+    """Rows each statement selecting FROM approval_requests hands back to Python while call() runs."""
+    from sqlalchemy.orm import Session
+    counts = []
+
+    def listener(state):
+        froms = getattr(state.statement, 'get_final_froms', lambda: [])()
+        if ApprovalRequest.__table__ not in froms:
+            return None
+        frozen = state.invoke_statement().freeze()
+        counts.append(len(frozen.data))
+        return frozen()
+
+    event.listen(Session, 'do_orm_execute', listener)
+    try:
+        call()
+    finally:
+        event.remove(Session, 'do_orm_execute', listener)
+    return counts
+
+
+def test_the_declined_requests_are_read_in_pages_from_the_oldest_due_issuance(app, rows, monkeypatch):
+    monkeypatch.setattr(da, 'DECLINED_PAGE', 10)
+    with app.app_context():
+        ca = _ca(rows, 'pages-ca')
+        due = _far_cert(rows, ca, 'pages-due', 10)
+        for _ in range(35):
+            _far_reject(rows, due.id, 1)
+        db.session.commit()
+        now = utc_now() + _FAR
+        before = _request_reads(lambda: da.renewal_inputs(now))
+        for _ in range(50):
+            _far_reject(rows, due.id, 400)  # before the certificate was issued: it cannot decline it
+        db.session.commit()
+        after = _request_reads(lambda: da.renewal_inputs(now))
+        assert sum(before) >= 35
+        assert max(before + after) <= 10, (before, after)
+        assert sum(after) == sum(before), (before, after)

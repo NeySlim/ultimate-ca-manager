@@ -109,23 +109,44 @@ def _renewal_config():
     return AutoRenewalService.get_renewal_config()
 
 
+DECLINED_PAGE = 500
 # Superset of what LIKE '%"certificate_id": <id>,%' matches: '_' is any character, ASCII case folds on SQLite
 _NAMED_ID = re.compile(r'"certificate.id": ([0-9]+),', re.IGNORECASE | re.DOTALL)
 
 
-def _declined_ids():
-    """Every id a rejected renewal request may name, read once: only those run the correlated LIKE."""
-    found = set()
-    for (data,) in db.session.execute(select(ApprovalRequest.request_data).where(
-            ApprovalRequest.request_type == 'renewal', ApprovalRequest.status == 'rejected',
-            ApprovalRequest.request_data.isnot(None))):
-        found.update(int(m) for m in _NAMED_ID.findall(data))
-    return sorted(found)
+def _declined_ids(now, days):
+    """The certificates a renewal kind can list (live, due within *days*) that a rejected renewal
+    request may name: only those run the correlated LIKE. Requests are read by pages of
+    DECLINED_PAGE, from the oldest such certificate's issuance (an older one declines none)."""
+    live = _live_until(now, days)
+    total, dated, oldest = db.session.execute(select(
+        func.count(), func.count(Certificate.valid_from), func.min(Certificate.valid_from)).where(*live)).one()
+    query = select(ApprovalRequest.id, ApprovalRequest.request_data).where(
+        ApprovalRequest.request_type == 'renewal', ApprovalRequest.status == 'rejected',
+        ApprovalRequest.request_data.isnot(None))
+    # One page statement even when none is due: the statement count does not depend on the data
+    if not total:
+        query = query.where(false())
+    elif dated == total:
+        query = query.where(ApprovalRequest.created_at >= oldest)
+    found, after = set(), None
+    while True:
+        page = db.session.execute((query if after is None else query.where(ApprovalRequest.id > after))
+                                  .order_by(ApprovalRequest.id).limit(DECLINED_PAGE)).all()
+        if not page:
+            return sorted(found)
+        after = page[-1][0]
+        named = sorted({int(m) for _, data in page for m in _NAMED_ID.findall(data)} - found)
+        if named:
+            found.update(db.session.execute(select(Certificate.id).where(
+                Certificate.id.in_(bindparam(None, named, expanding=True, literal_execute=True)), *live)).scalars())
 
 
-def renewal_inputs():
+def renewal_inputs(now=None):
     """What the four renewal kinds read outside their statement: the auto-renewal settings, the declined ids."""
-    return {**_renewal_config(), 'declined_ids': _declined_ids()}
+    config = _renewal_config()
+    days = max(EXPIRY_WINDOW_DAYS, CLIENT_RENEWAL_OVERDUE_DAYS, config['days_before_expiry'])
+    return {**config, 'declined_ids': _declined_ids(now or utc_now(), days)}
 
 
 # ------------------------------------------------------------------ queue
@@ -141,7 +162,7 @@ def _within_half_validity(next_update, now, dialect):
 def _queue_union(now, dialect, kinds=QUEUE_KINDS):
     """One SELECT per kind, all shaped (kind, rank, id, label, due_at); rank 0 is critical."""
     soon = now + CRITICAL_WITHIN
-    config = renewal_inputs()  # read once: four kinds depend on it
+    config = renewal_inputs(now)  # read once: four kinds depend on it
     # type_coerce, not CAST: SQLite would turn CAST(... AS DATETIME) into a number
     text_label = lambda col: type_coerce(col, String)  # noqa: E731
     due = lambda col: type_coerce(col, DateTime)  # noqa: E731
@@ -761,7 +782,7 @@ def certificate_list_conditions(args, dialect, now=None):
         bad = [k for k in kinds if k not in RENEWAL_KINDS]
         if bad:
             raise ValueError(f"Unknown renewal kind: {', '.join(bad)}")
-        config = renewal_inputs()
+        config = renewal_inputs(now)
         conditions.append(or_(*[and_(*renewal_conditions(k, now, config, dialect)) for k in kinds]))
     return conditions
 
