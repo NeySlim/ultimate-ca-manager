@@ -216,6 +216,13 @@ holds_stuck() {
     return 1
 }
 
+# A directory a mkdir line names as kept in place (never removed by this script) strictly
+# under directory $1, absent now: the tree of $1 is not mounted, its mount point left empty
+lost_under() {
+    printf '%s\n' "$lines" | P=${1%/}/ awk -F "$TAB" '$1 == "mkdir" && index($2, ENVIRON["P"]) == 1 { print $2 }' \
+        | while IFS= read -r d; do [ -d "$d" ] || { printf '%s\n' "$d"; break; }; done
+}
+
 # The paths not put back or cleared, then what the next attempt does with them
 say_stuck() {
     say "Some files could not be put back or cleared (archive: $DEST):"
@@ -263,6 +270,8 @@ EOF
                 absent=""
                 [ -d "$(dir_of "$dst")" ] || absent=$(dir_of "$dst")
                 [ -d "$(dir_of "$src")" ] || absent=$(dir_of "$src")
+                # So is a source directory left as an empty mount point
+                [ -n "$absent" ] || present "$src" || absent=$(lost_under "$(dir_of "$src")")
                 # A rename is atomic: both there, the source was made again since
                 if present "$dst" && present "$src"; then
                     twice=1

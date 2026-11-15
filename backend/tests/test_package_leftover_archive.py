@@ -1638,11 +1638,12 @@ def _killed_before_renaming(box, name, **wrap):
     box.wrap(**wrap)
 
 
+@pytest.mark.parametrize('unmounted', ['gone', 'an empty mount point'])
 @pytest.mark.parametrize('layout', ['one filesystem', 'another filesystem'])
-def test_an_item_whose_rename_never_ran_waits_for_its_absent_filesystem(tmp_path, layout):
-    """Killed between the journal line of a rename and the rename, then the data absent (not
-    mounted): never called missing, no line removed, exit 2 at each attempt; the data back,
-    the next attempt archives everything."""
+def test_an_item_whose_rename_never_ran_waits_for_its_absent_filesystem(tmp_path, layout, unmounted):
+    """Killed between the journal line of a rename and the rename, then the data not mounted
+    (gone, or its mount point left empty): never called missing, nothing written there, no
+    line removed, exit 2 at each attempt; the data back, the next attempt archives everything."""
     box = Box(tmp_path, python='stub')
     wrap = {'other_fs': (box.data,)} if layout == 'another filesystem' else {}
     data, config = originals(box)
@@ -1652,15 +1653,19 @@ def test_an_item_whose_rename_never_ran_waits_for_its_absent_filesystem(tmp_path
     assert f'rename\t{box.data}/https_key.pem\t{box.archive}/data/https_key.pem' in lines
     mounted = tmp_path / 'mounted'
     box.data.rename(mounted)
-    outs = []
+    empty = unmounted == 'an empty mount point'
+    if empty:
+        box.data.mkdir()
     for _ in range(2):
         out = box.run()
-        outs.append(out.stdout)
         assert out.returncode == 2, (out.stdout, out.stderr)
         assert 'is missing' not in out.stdout and 'back in place now' not in out.stdout, out.stdout
-        assert f'as {box.data} is absent: mount what holds it' in out.stdout, out.stdout
+        assert 'is absent: mount what holds it' in out.stdout, out.stdout
+        assert empty or f'as {box.data} is absent' in out.stdout, out.stdout
         assert lines <= set(journal.read_text().splitlines())
-        assert not box.data.exists()
+        assert (list(box.data.iterdir()) == []) if empty else not box.data.exists()
+    if empty:
+        box.data.rmdir()
     mounted.rename(box.data)
     out = box.run()
     assert 'is missing' not in out.stdout, out.stdout

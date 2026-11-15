@@ -320,22 +320,28 @@ class ChaosSuite:
                 while_failing(box, run.out, before, data, config, why)
                 converged(box, Run(box, *_chaos_run(box)).out, data, config, why)
 
-    def test_a_retry_waits_for_absent_data_then_converges_after_any_fault(self, lab):
+    def _absent_data_then_any_fault(self, lab, empty):
         """Killed once the journal names the first rename of data/https_key.pem, before it ran;
-        then the data absent: each attempt exits 2, calls nothing missing, removes no line. The
-        data back, each call of the next attempt fails, or kills it, in turn; then a run without fault."""
+        then the data not mounted (gone, or its mount point left empty): each attempt exits 2,
+        calls nothing missing, removes no line, writes nothing there. The data back, each call
+        of the next attempt fails, or kills it, in turn; then a run without fault."""
         kill = [n for n, name, args in lab.first_run().calls
                 if step(name, args) == 'rename' and args[3].endswith('/data/https_key.pem')][0]
 
         def absent(box):
             aside = box.tmp / 'unmounted'
             os.rename(box.data, aside)
+            if empty:
+                box.data.mkdir()
             journal = box.archive / '.journal'
             lines = set(journal.read_text().splitlines())
             out = Run(box, *_chaos_run(box)).out
             assert out.returncode == 2 and 'is missing' not in out.stdout, (self.layout, out.stdout)
             assert 'mount what holds it' in out.stdout, (self.layout, out.stdout)
             assert lines <= set(journal.read_text().splitlines()), self.layout
+            if empty:
+                assert list(box.data.iterdir()) == [], self.layout
+                box.data.rmdir()
             os.rename(aside, box.data)
 
         box = lab._first([(kill, 'kill')])[0]
@@ -345,12 +351,18 @@ class ChaosSuite:
         assert calls > 20
         for at in range(1, calls + 1):
             for mode in FAULTS:
-                why = (self.layout, 'absent', at, mode)
+                why = (self.layout, 'empty' if empty else 'absent', at, mode)
                 box, data, config, before, _run = lab._first([(kill, 'kill')])
                 absent(box)
                 run = Run(box, *_chaos_run(box, [(at, mode)]))
                 while_failing(box, run.out, before, data, config, why)
                 converged(box, Run(box, *_chaos_run(box)).out, data, config, why)
+
+    def test_a_retry_waits_for_absent_data_then_converges_after_any_fault(self, lab):
+        self._absent_data_then_any_fault(lab, empty=False)
+
+    def test_a_retry_waits_for_an_empty_mount_point_then_converges_after_any_fault(self, lab):
+        self._absent_data_then_any_fault(lab, empty=True)
 
     def test_only_the_journal_is_ever_moved_and_nothing_copied(self, lab):
         """cp never runs; mv only renames the journal into place (the guard of Box fails any
