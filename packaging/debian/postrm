@@ -5,6 +5,25 @@
 set -e
 
 UCM_HOME=/opt/ucm
+UCM_CONFIG=/etc/ucm
+
+# Removes the configuration, except the archives of an earlier installation kept beside
+# its files (.ucm-archive-*): they hold its keys, and only their owner removes them
+purge_config() {
+    [ -d "$1" ] || return 0
+    if [ -z "$(find "$1" -name '.ucm-archive-*' -print -quit 2>/dev/null)" ]; then
+        rm -rf "$1"
+        return 0
+    fi
+    find "$1" -name '.ucm-archive-*' -prune -o ! -type d -exec rm -f {} +
+    # Deepest first; a directory that holds an archive stays, with nothing else in it
+    find "$1" -name '.ucm-archive-*' -prune -o -type d -print | sort -r | while IFS= read -r d; do
+        rmdir -- "$d" 2>/dev/null || true
+    done
+    chown root:root "$1" && chmod 700 "$1"
+    echo "Kept: what an earlier UCM installation left, archived under $1:"
+    find "$1" -name '.ucm-archive-*' -prune -print | sed 's/^/  /'
+}
 
 case "$1" in
     remove)
@@ -20,7 +39,7 @@ case "$1" in
     purge)
         # Remove data directories
         rm -rf /var/lib/ucm
-        rm -rf /etc/ucm
+        purge_config "$UCM_CONFIG"
         rm -rf /var/log/ucm
         # Not a package file: the mark of an unfinished archiving would outlive the purge
         rm -f "$UCM_HOME/.leftover-archive-pending"

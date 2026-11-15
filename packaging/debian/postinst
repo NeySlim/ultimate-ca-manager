@@ -180,10 +180,10 @@ ENVEOF
             grep -q "^DATA_DIR=" "$UCM_CONFIG/ucm.env" || echo "DATA_DIR=$UCM_DATA" >> "$UCM_CONFIG/ucm.env"
         fi
         
-        # Set permissions
-        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_HOME"
-        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_DATA"
-        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG"
+        # Set permissions; a local archive of a removed UCM's files (.ucm-archive-*) stays root's
+        find "$UCM_HOME" -name '.ucm-archive-*' -prune -o -exec chown -h "$UCM_USER":"$UCM_GROUP" {} +
+        find "$UCM_DATA" -name '.ucm-archive-*' -prune -o -exec chown -h "$UCM_USER":"$UCM_GROUP" {} +
+        find "$UCM_CONFIG" -name '.ucm-archive-*' -prune -o -exec chown -h "$UCM_USER":"$UCM_GROUP" {} +
         chown -R "$UCM_USER":"$UCM_GROUP" /var/log/ucm
         chmod 750 "$UCM_DATA"
 

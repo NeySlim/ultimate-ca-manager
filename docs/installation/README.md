@@ -112,7 +112,7 @@ sudo systemctl status ucm
 
 The 3.0 packages install over UCM 2.254 or later only. Over an older version, the pre-installation script refuses before writing anything and leaves that version installed and running: install 2.254, start it once, then install 3.0. See the [Upgrade Guide](../../UPGRADE.md#upgrading-to-v30).
 
-Where an older UCM was removed but left its data (an RPM removal, a DEB removed or purged), the 3.0 package installs as new. If 3.0 cannot start on the SQLite database left there, the package moves that installation's files, unchanged, into `/opt/ucm-archive/<UTC date and time>/` (root only, with a `README.txt` that gives the way back through 2.254), then starts a new, empty UCM. Data that 3.0 starts on is kept. The Docker image never archives: it refuses an older volume at startup.
+Where an older UCM was removed but left its data (an RPM removal, a DEB removed or purged), the 3.0 package installs as new. If 3.0 cannot start on the SQLite database left there, the package moves that installation's files, unchanged, into `/opt/ucm-archive/<UTC date and time>/` (root only, with a `README.txt` that gives the way back through 2.254; a file that cannot be renamed out of its filesystem goes into a root-only `.ucm-archive-<UTC date and time>/` directory beside it, which that README lists), then starts a new, empty UCM. Data that 3.0 starts on is kept. The Docker image never archives: it refuses an older volume at startup.
 
 ---
 

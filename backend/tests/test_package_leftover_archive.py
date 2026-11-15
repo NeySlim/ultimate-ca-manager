@@ -1,7 +1,9 @@
 """archive-leftovers.sh: a 3.0 package installed over what a removed UCM left archives it, or nothing.
 
 Everything runs in a temporary root: the data, configuration, archive and log paths are
-arguments, and the commands that move files can be wrapped to fail at any call.
+arguments, and the commands that move files can be wrapped to fail at any call. Every
+item is renamed once, never copied or removed: a guard fails the run at the first cp, mv
+or rm that names a path of the earlier installation or of its archives.
 """
 import hashlib
 import os
@@ -19,8 +21,12 @@ SCRIPT = ROOT / 'packaging' / 'scripts' / 'archive-leftovers.sh'
 POSIX_SH = shutil.which('dash') or '/bin/sh'
 STAMP = '20261114T120000Z'
 SECRET = 'f00dfeedf00dfeedf00dfeedf00dfeed'
-PART = '.ucm-archive-part'
-REAL = {name: shutil.which(name) for name in ('mv', 'cp', 'rm', 'mkdir', 'chmod', 'stat')}
+# Where an item rename(2) cannot take out of its filesystem goes, beside it
+LOCAL = f'.ucm-archive-{STAMP}'
+FIPS = 'UCM_FIPS_BUILD=1\n'
+REAL = {name: shutil.which(name) for name in ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'tee')}
+KEPT = ['backups', 'ca', 'certs', 'crl', 'private', 'scep', 'sessions']
+COMMANDS = ('mkdir', 'rmdir', 'mv', 'rm', 'chmod', 'rename', 'tee')
 
 
 def _pivot_registry(missing=None):
@@ -56,7 +62,7 @@ class Box:
         (self.home / 'VERSION').write_text('3.0\n')
         os.symlink(ROOT / 'backend', self.home / 'backend')
         self.python(python)
-        for d in ('ca', 'certs', 'private', 'crl', 'scep', 'backups', 'sessions'):
+        for d in KEPT:
             (self.data / d).mkdir(parents=True)
         if registry:
             _database(self.data / 'ucm.db', _pivot_registry('136_lifted_hold_leftovers')
@@ -69,6 +75,8 @@ class Box:
         (self.data / '.update_result.json').write_text('{}')
         (self.data / 'updates' / 'nested').mkdir(parents=True)
         (self.data / 'updates' / 'nested' / 'f').write_text('x')
+        (self.data / 'updates' / 'manifest.json').write_text('{}')
+        os.symlink('nested', self.data / 'updates' / 'latest')
         os.symlink('ca/root.key', self.data / 'current.key')
         (self.data / 'private' / 'leaf.key').chmod(0o600)
         os.utime(self.data / 'ca' / 'root.key', (1_000_000_000, 1_000_000_000))
@@ -95,22 +103,28 @@ class Box:
         exe.write_text(f'#!/bin/sh\n{body}\n')
         exe.chmod(0o755)
 
-    def wrap(self, fail=None, at=0, other_fs=(), corrupt_copies=False, other_mount=(), fstype='testfs',
-             corrupt_back=False, refused=()):
+    def _guard(self, name, allowed=(), arms=''):
+        """`name` fails, and records the call in state/forbidden, when an argument is a path
+        of the earlier installation or of its archives that `allowed` (case patterns) and
+        `arms` (case arms of their own) leave out."""
+        mine = '|'.join(f'"{self.tmp}/{d}"/*' for d in ('opt', 'etc', 'srv'))
+        ok = f'        {"|".join(allowed)}) continue ;;\n' if allowed else ''
+        return (f'#!/bin/sh\nno() {{ printf "%s\\n" "{name} $*" >> {self.state}/forbidden; exit 1; }}\n'
+                f'for a; do\n    case $a in\n{ok}{arms}        {mine}) no "$@" ;;\n'
+                f'    esac\ndone\nexec {REAL[name]} "$@"\n')
+
+    def wrap(self, fail=None, at=0, other_fs=(), other_mount=(), fstype='testfs', refused=()):
         """Wrappers first in PATH: `fail` fails at its `at`-th call; `findmnt` reports each
         prefix of other_fs on a mount of its own, and of other_mount (a bind mount of the
         same filesystem) too. `rename`, the interpreter the script renames with, is refused
         (EXDEV) across those mounts, for a directory on overlayfs, and for the paths in
-        `refused`; `mv` fails the run (mv-items) on anything but the journal and the
-        renames of the script's own temporaries (without an interpreter). corrupt_back
-        harms only the copies out of the archive (the put-backs)."""
+        `refused` wherever they go; cp, mv and rm are guarded (Box._guard)."""
         (self.state / 'count').write_text('0')
         (self.state / 'refused').write_text(''.join(f'{p}\n' for p in refused))
         mounts = sorted((*other_fs, *other_mount), key=lambda p: -len(str(p)))
         fs = ''.join(f'    "{p}"|"{p}"/*) echo {700 + i}; return 0 ;;\n' for i, p in enumerate(mounts))
-        # A directory of the lower layer; one the script has just written is in the upper one
-        overlay = (f'[ ! -d "$src" ] || [ -L "$src" ] || case $src in *{PART}) ;; *) refuse ;; esac\n'
-                   if fstype == 'overlay' else '')
+        # A directory of the lower layer, as every directory the earlier installation left is
+        overlay = '[ ! -d "$src" ] || [ -L "$src" ] || refuse\n' if fstype == 'overlay' else ''
         self.inner.mkdir(exist_ok=True)
         (self.inner / 'rename').write_text(
             f'#!/bin/sh\n# Called as: rename -I -c <code> <from> <to>\nsrc=$4 dst=$5\n'
@@ -119,33 +133,21 @@ class Box:
             f'[ "$(fs "${{src%/*}}")" = "$(fs "${{dst%/*}}")" ] || refuse\n{overlay}'
             f'! grep -qxF -- "$src" {self.state}/refused || refuse\n'
             f'exec {sys.executable} "$@"\n')
-        (self.inner / 'mv').write_text(
-            f'#!/bin/sh\ncase "$1 $2" in "-- "*/.journal.new) exec {REAL["mv"]} "$@" ;; esac\n'
-            f'case "$1 $2 $3" in "-T -- "*{PART}) exec {REAL["mv"]} "$@" ;; esac\n'
-            f'echo "$*" >> {self.state}/mv-items; exit 1\n')
+        journal = (f'"{self.parent}"/*/.journal', f'"{self.parent}"/*/.journal.new')
+        # The ucm.env the script wrote (UCM_FIPS_BUILD=1, or the start of it), absent or whole
+        fips = (f'        "{self.config}/ucm.env") case {FIPS.strip()} in "$(cat -- "$a" 2>/dev/null)"*) continue ;; esac\n'
+                f'            no "$@" ;;\n')
+        (self.inner / 'mv').write_text(self._guard('mv', journal))
+        (self.inner / 'cp').write_text(self._guard('cp'))
+        (self.inner / 'rm').write_text(self._guard('rm', (*journal, f'"{self.parent}"/*/README.txt'), fips))
         for f in self.inner.iterdir():
             f.chmod(0o755)
-        inner = {'mv': self.inner / 'mv', 'rename': self.inner / 'rename'}
-        for name in ('mv', 'cp', 'rm', 'mkdir', 'chmod', 'rename'):
+        for name in ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'rename', 'tee'):
             check = ''
             if name == fail:
                 check = (f'n=$(( $(cat {self.state}/count) + 1 )); echo $n > {self.state}/count\n'
                          f'[ "$n" != {at} ] || {{ echo "{name}: injected failure" >&2; exit 1; }}\n')
-            run = f'exec {inner.get(name, REAL.get(name))} "$@"'
-            if name == 'cp' and corrupt_copies:
-                # Reports success over a copy that differs from its source: in content, mode,
-                # date, group or owner, of a key, of a file deep in a tree, or of the tree itself
-                harm, where = (corrupt_copies.split(':') + ['key'])[:2]
-                harm = {'mode': '[ -d "$1" ] && chmod 0705 "$1" || chmod 0604 "$1"',
-                        'date': 'touch -d @5 "$1"', 'group': f'chgrp {OTHER_GID} "$1"',
-                        'owner': 'chown 1 "$1"'}.get(harm, 'printf x >> "$1"')
-                # The copy is made under its temporary name, then renamed
-                where = {'key': f'-name "*.key{PART}" -type f', 'nested': '-path "*/updates*/nested/f"',
-                         'top': '-maxdepth 0 -type d -name "updates*"'}[where]
-                only = f'case $3 in {self.parent}/*) ;; *) exit 0 ;; esac\n' if corrupt_back else ''
-                run = (f'{REAL[name]} "$@" || exit 1\nfor last; do :; done\n{only}'
-                       f'find "${{last%/}}" {where} -exec sh -c \'{harm}\' sh {{}} \\;')
-            (self.bin / name).write_text(f'#!/bin/sh\n{check}{run}\n')
+            (self.bin / name).write_text(f'#!/bin/sh\n{check}exec {self.real(name)} "$@"\n')
         # Asked for the target only: the mount holding a path
         table = ''.join(f'    "{p}"|"{p}"/*) echo "{p}"; exit 0 ;;\n' for p in mounts)
         (self.bin / 'findmnt').write_text(
@@ -155,17 +157,25 @@ class Box:
         for f in self.bin.iterdir():
             f.chmod(0o755)
 
+    def real(self, name):
+        """What a wrapper of `name` runs in the end: the guard for cp, mv, rm and rename."""
+        return self.inner / name if name in ('mv', 'cp', 'rm', 'rename') else REAL[name]
+
     def run(self, default_parent=False, timeout=60, interpreter=None):
-        """interpreter: what UCM_PYTHON names (default: the `rename` wrapper)."""
+        """interpreter: what UCM_PYTHON names (default: the `rename` wrapper). Fails the test
+        when a guarded command was handed a path of the installation or of its archives."""
         if not any(self.bin.iterdir()):
             self.wrap()
         env = {'PATH': f'{self.bin}:/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C',
                'UCM_PYTHON': str(self.bin / 'rename') if interpreter is None else interpreter}
         # A session of its own: a wrapper that kills the run kills its process group only
-        return subprocess.run(
+        out = subprocess.run(
             [POSIX_SH, str(SCRIPT), str(self.home), str(self.data), str(self.config),
              '' if default_parent else str(self.parent), str(self.log)],
             capture_output=True, text=True, timeout=timeout, env=env, start_new_session=True)
+        forbidden = self.state / 'forbidden'
+        assert not forbidden.exists(), forbidden.read_text()
+        return out
 
     @property
     def archive(self):
@@ -196,7 +206,7 @@ def tree(top):
 def reported(stdout):
     """{path: what failed} of a run that exits 2: one line each under the header, no
     reference to a cause printed elsewhere."""
-    assert 'shown above' not in stdout and '\u2014' not in stdout
+    assert 'shown above' not in stdout and '—' not in stdout
     lines = stdout.splitlines()
     heads = [i for i, line in enumerate(lines) if line.startswith('Some files could not be put back or cleared')]
     out = {}
@@ -222,34 +232,93 @@ def snapshot(box, *extra):
     return {str(p): tree(p) for p in (box.data, box.config, *extra)}
 
 
-KEPT = ['backups', 'ca', 'certs', 'crl', 'private', 'scep', 'sessions']
 # A group the files can be given that is not theirs: any as root, else a secondary one
 OTHER_GID = 1 if os.getuid() == 0 else next(iter(set(os.getgroups()) - {os.getgid()}), None)
 
 
-def whole(top, kept=()):
-    """tree(top) without the directories `kept`, which the archive recreates: every file,
-    link and directory moved or copied whole, with its attributes."""
-    return {rel: entry for rel, entry in tree(top).items() if rel not in kept}
+def plain(rel):
+    """`rel` without the local archive directories it may sit in: the path it had."""
+    return '/'.join(p for p in rel.split('/') if not p.startswith('.ucm-archive-'))
+
+
+def places(box, sub):
+    """{path it had: [(where it is, entry)]} of every entry under the data (sub 'data') or
+    the configuration, local archives included, and under `sub` in every central archive."""
+    top = box.data if sub == 'data' else box.config
+    archives = sorted(box.parent.iterdir()) if box.parent.exists() else []
+    out = {}
+    for base in (top, *(a / sub for a in archives)):
+        for rel, entry in tree(base).items():
+            if plain(rel):
+                out.setdefault(plain(rel), []).append((base / rel, entry))
+    return out
+
+
+def _fips_written(path):
+    return path.is_file() and not path.is_symlink() and FIPS.startswith(path.read_text())
+
+
+def exactly_once(box, data, config, why='', skip=()):
+    """Every original file, link and special file is whole at exactly one path: its own,
+    a central archive or a local one (never none, never two); every original directory
+    whole at one at least. The ucm.env the script wrote does not count; nor does `skip`."""
+    for sub, originals in (('data', data), ('config', config)):
+        found = places(box, sub)
+        for rel, entry in originals.items():
+            if rel in skip or not plain(rel):
+                continue
+            at = found.get(plain(rel), [])
+            if entry[0] == 'dir':
+                assert any(e == entry for _p, e in at), (why, sub, rel, at)
+                continue
+            if sub == 'config' and plain(rel) == 'ucm.env' and len(at) > 1:
+                at = [(p, e) for p, e in at if not (p == box.config / 'ucm.env' and _fips_written(p))]
+            assert [e for _p, e in at] == [entry], (why, sub, rel, at)
+
+
+def archived(box, out, data, config, why=''):
+    """A finished archive: exit 0, one archive with its README and no journal, every
+    original exactly once and none at its own path, local archives root only."""
+    assert out.returncode == 0, (why, out.stdout, out.stderr)
+    assert [a.name for a in box.parent.iterdir()] == [STAMP], (why, out.stdout)
+    assert (box.archive / 'README.txt').is_file() and not (box.archive / '.journal').exists(), why
+    exactly_once(box, data, config, why)
+    for sub, top in (('data', box.data), ('config', box.config)):
+        for rel, entry in tree(top).items():
+            if rel == plain(rel) and entry[0] != 'dir':
+                assert sub == 'config' and rel == 'ucm.env' and _fips_written(top / rel), (why, rel)
+    for local in locals_of(box):
+        assert local.name == LOCAL and stat.S_IMODE(local.stat().st_mode) == 0o700, (why, local)
+
+
+def locals_of(box):
+    """The local archive directories under the data and the configuration."""
+    return sorted(p for top in (box.data, box.config) if top.exists()
+                  for p in top.rglob('.ucm-archive-*') if p.is_dir())
+
+
+def originals(box):
+    return tree(box.data), tree(box.config)
 
 
 # -- what is archived, and how -------------------------------------------------------
 
 def test_a_refused_database_and_everything_beside_it_are_moved_intact(tmp_path):
     box = Box(tmp_path)
-    data, config = files(box.data), files(box.config)
+    data, config = originals(box)
     kept_modes = {d: stat.S_IMODE((box.data / d).stat().st_mode) for d in KEPT}
 
     out = box.run()
 
-    assert out.returncode == 0, out.stdout + out.stderr
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'config') == config
-    # The directories stay, with their modes; nothing else is left
+    archived(box, out, data, config)
+    assert files(box.archive / 'data') == {k: v for k, v in data.items() if v[0] != 'dir'}
+    assert files(box.archive / 'config') == {k: v for k, v in config.items() if v[0] != 'dir'}
+    # The directories stay, with their modes; nothing else is left, no local archive
     assert sorted(p.name for p in box.data.iterdir()) == KEPT
     assert all(not any((box.data / d).iterdir()) for d in KEPT)
     assert {d: stat.S_IMODE((box.data / d).stat().st_mode) for d in KEPT} == kept_modes
     assert box.config.is_dir() and list(box.config.iterdir()) == []
+    assert locals_of(box) == []
 
 
 def test_the_archive_is_root_only_and_says_how_to_restore(tmp_path):
@@ -264,10 +333,10 @@ def test_the_archive_is_root_only_and_says_how_to_restore(tmp_path):
     assert '—' not in readme and '–' not in readme
     assert STAMP in readme and str(box.data) in readme and str(box.config) in readme
     assert '136_lifted_hold_leftovers' in readme
-    # Copied whenever a rename is refused, not only across filesystems
     flat = ' '.join(readme.split())
-    assert 'could not be renamed (another filesystem, a bind mount, overlayfs) was copied' in flat
-    assert 'symbolic links by their target only' in flat
+    assert 'renamed, never copied' in flat and 'copied, then checked' not in flat
+    # Nothing went beside its directory: no section for it
+    assert 'could not be renamed out of its filesystem' not in flat
     for step in ('Install UCM 2.254', 'systemctl stop ucm', 'systemctl start ucm',
                  'Install this release again'):
         assert step in readme
@@ -303,8 +372,7 @@ def test_it_reports_what_it_found_where_it_went_and_that_ucm_starts_empty(tmp_pa
         assert SECRET not in text
 
 
-def test_a_database_placed_elsewhere_goes_with_its_journal_files(tmp_path):
-    box = Box(tmp_path)
+def _elsewhere(box, tmp_path):
     elsewhere = tmp_path / 'srv'
     elsewhere.mkdir()
     shutil.move(box.data / 'ucm.db', elsewhere / 'pki.db')
@@ -312,14 +380,26 @@ def test_a_database_placed_elsewhere_goes_with_its_journal_files(tmp_path):
     (elsewhere / 'unrelated').write_text('stays')
     env = box.config / 'ucm.env'
     env.write_text(env.read_text().replace(f'{box.data}/ucm.db', f'"{elsewhere}/pki.db"'))
+    return elsewhere
+
+
+@pytest.mark.parametrize('where', ['one filesystem', 'another filesystem'])
+def test_a_database_placed_elsewhere_goes_with_its_journal_files(tmp_path, where):
+    box = Box(tmp_path)
+    elsewhere = _elsewhere(box, tmp_path)
+    box.wrap(other_fs=(elsewhere,) if where == 'another filesystem' else ())
     before = files(elsewhere)
 
     out = box.run()
 
     assert out.returncode == 0, out.stdout + out.stderr
-    assert files(box.archive / 'database') == {k: v for k, v in before.items() if k != 'unrelated'}
-    assert sorted(p.name for p in elsewhere.iterdir()) == ['unrelated']
-    assert f'{elsewhere}/pki.db' in (box.archive / 'README.txt').read_text()
+    went = box.archive / 'database' if where == 'one filesystem' else elsewhere / LOCAL
+    assert files(went) == {k: v for k, v in before.items() if k != 'unrelated'}
+    assert sorted(p.name for p in elsewhere.iterdir()) == sorted(
+        ['unrelated'] + ([LOCAL] if where != 'one filesystem' else []))
+    readme = (box.archive / 'README.txt').read_text()
+    assert f'{elsewhere}/pki.db' in readme
+    assert (f'{elsewhere}/{LOCAL}' in readme) == (where != 'one filesystem')
 
 
 @pytest.mark.parametrize('spelling', ['{data}/./ucm.db', '{data}//ucm.db', '{home}/../ucm/data/ucm.db'])
@@ -350,22 +430,25 @@ def test_the_readme_puts_each_file_where_the_packages_write_it(tmp_path):
 
 @pytest.mark.parametrize('line, kept', [('UCM_FIPS_BUILD=1', True), ('export UCM_FIPS_BUILD="yes"', True),
                                         ('UCM_FIPS_BUILD=True', True), ('UCM_FIPS_BUILD=0', False)])
-def test_a_fips_build_request_is_carried_into_the_new_configuration(tmp_path, line, kept):
+@pytest.mark.parametrize('where', ['one filesystem', 'another filesystem'])
+def test_a_fips_build_request_is_carried_into_the_new_configuration(tmp_path, line, kept, where):
     """The venv was built from the archived ucm.env: the new one keeps that install choice."""
     box = Box(tmp_path)
     env = box.config / 'ucm.env'
     env.write_text(env.read_text() + line + '\n')
-    config = files(box.config)
+    box.wrap(other_fs=(box.config,) if where == 'another filesystem' else ())
+    data, config = originals(box)
     out = box.run()
-    assert out.returncode == 0, out.stdout + out.stderr
-    assert files(box.archive / 'config') == config
+    archived(box, out, data, config)
+    went = box.archive / 'config' if where == 'one filesystem' else box.config / LOCAL
+    assert files(went) == {k: v for k, v in config.items() if v[0] != 'dir'}
     if kept:
-        assert env.read_text() == 'UCM_FIPS_BUILD=1\n'
+        assert env.read_text() == FIPS
         assert stat.S_IMODE(env.stat().st_mode) == 0o600
         assert 'UCM_FIPS_BUILD=1' in out.stdout
         assert SECRET not in out.stdout
     else:
-        assert list(box.config.iterdir()) == []
+        assert not env.exists()
         assert 'UCM_FIPS_BUILD' not in out.stdout
 
 
@@ -378,6 +461,131 @@ def test_a_purged_install_without_configuration_is_archived_too(tmp_path):
     assert out.returncode == 0, out.stdout + out.stderr
     assert files(box.archive / 'data') == data
     assert not (box.archive / 'config').exists()
+
+
+# -- where each item goes, by layout -------------------------------------------------
+
+def _layout(box, layout):
+    """Wraps the box for `layout`; returns what stays in place among the data's directories
+    besides the kept ones."""
+    kept = {d: box.data / d for d in KEPT}
+    box.wrap(**{
+        'one filesystem': {},
+        'data on another filesystem': {'other_fs': (box.data,)},
+        'data on a bind mount': {'other_mount': (box.data,)},
+        'config on another filesystem': {'other_fs': (box.config,)},
+        'each kept directory a mount point': {'other_fs': tuple(kept.values())},
+        'a mount point inside the data': {'other_mount': (box.data / 'updates',)},
+        'overlayfs': {'fstype': 'overlay'},
+    }[layout])
+
+
+# Where each item of the box ends, by layout: central (c), beside itself (l), or, for a
+# directory nothing renames, in place with its entries placed the same way (a dict)
+WHERE = {
+    'one filesystem': {},
+    'data on another filesystem': {'data': 'l', 'kept': 'l'},
+    'data on a bind mount': {'data': 'l', 'kept': 'l'},
+    'config on another filesystem': {'config': 'l'},
+    'each kept directory a mount point': {'kept': 'l'},
+    'a mount point inside the data': {'updates': 'l'},
+    'overlayfs': {'updates': 'c', 'nested': 'c'},
+}
+
+
+@pytest.mark.parametrize('layout', list(WHERE))
+def test_each_item_is_renamed_into_the_archive_or_beside_itself(tmp_path, layout):
+    """Out of its filesystem rename(2) refuses an item: it goes beside it, into a local
+    archive in its own directory; a directory neither can take stays, its entries placed
+    the same way. Every original is then at exactly one path."""
+    box = Box(tmp_path, python='stub')
+    _layout(box, layout)
+    data, config = originals(box)
+    out = box.run()
+    archived(box, out, data, config, layout)
+    where = WHERE[layout]
+    local = lambda rel: box.data / pathlib.Path(rel).parent / LOCAL / pathlib.Path(rel).name
+    central = lambda rel: box.archive / 'data' / rel
+    expect = {
+        'ucm.db': where.get('data', 'c'), 'https_key.pem': where.get('data', 'c'),
+        'current.key': where.get('data', 'c'), 'ca/root.key': where.get('kept', 'c'),
+        'sessions/abc': where.get('kept', 'c'), 'updates/manifest.json': where.get('updates'),
+        'updates/nested/f': where.get('nested'), 'updates': None if 'updates' in where else where.get('data', 'c'),
+    }
+    for rel, w in expect.items():
+        if w is None:
+            continue
+        at = local(rel) if w == 'l' else central(rel)
+        assert os.path.lexists(at), (layout, rel, at, tree(box.tmp / 'opt'))
+    config_at = box.config / LOCAL if where.get('config') == 'l' else box.archive / 'config'
+    assert (config_at / 'master.key').is_file(), layout
+    if layout == 'overlayfs':
+        # The directories stay, empty; their files went into the archive
+        assert (box.data / 'updates' / 'nested').is_dir() and not os.path.lexists(box.data / 'updates' / 'nested' / 'f')
+        assert locals_of(box) == []
+    expected_locals = {
+        'one filesystem': [], 'overlayfs': [],
+        'data on another filesystem': [box.data / LOCAL, box.data / 'backups' / LOCAL, box.data / 'ca' / LOCAL,
+                                       box.data / 'private' / LOCAL, box.data / 'sessions' / LOCAL],
+        'config on another filesystem': [box.config / LOCAL],
+        'each kept directory a mount point': [box.data / d / LOCAL for d in ('backups', 'ca', 'private', 'sessions')],
+        'a mount point inside the data': [box.data / 'updates' / LOCAL],
+    }.get(layout, None)
+    if layout == 'data on a bind mount':
+        expected_locals = [box.data / LOCAL] + [box.data / d / LOCAL for d in ('backups', 'ca', 'private', 'sessions')]
+    assert locals_of(box) == sorted(expected_locals), locals_of(box)
+    # The README names each of them with what it holds, and why
+    readme = ' '.join((box.archive / 'README.txt').read_text().split())
+    for d in expected_locals:
+        assert f'{d}/: ' + ' '.join(sorted(p.name for p in d.iterdir())) in readme, (d, readme)
+    assert ('could not be renamed out of its filesystem' in readme) == bool(expected_locals)
+    if expected_locals:
+        assert 'Nothing in them is used or removed by UCM' in readme
+        assert str(box.data / LOCAL if 'data' in where else expected_locals[0]) in out.stdout
+
+
+def test_a_file_nothing_can_rename_puts_everything_back(tmp_path):
+    """Refused into the archive and beside itself: the archiving fails, everything is put
+    back, and the file is named."""
+    box = Box(tmp_path, python='stub')
+    before = snapshot(box)
+    box.wrap(other_fs=(box.data,), refused=(f'{box.data}/https_key.pem',))
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert f'{box.data}/https_key.pem could not be renamed' in out.stdout
+    assert 'Everything was put back in place' in out.stdout and 'was not started' in out.stdout
+    assert snapshot(box) == before
+    assert not box.parent.exists() or not any(box.parent.iterdir())
+
+
+def test_a_fifo_is_renamed_never_read(tmp_path):
+    """Reading a FIFO left in the data would block the installation."""
+    box = Box(tmp_path, python='stub')
+    os.mkfifo(box.data / 'ucm.sock', 0o600)
+    data, config = originals(box)
+    box.wrap(other_fs=(box.data,))
+    out = box.run(timeout=20)
+    archived(box, out, data, config)
+    assert tree(box.data / LOCAL)['ucm.sock'][0] == 'special'
+
+
+@pytest.mark.parametrize('where', ['data', 'kept directory', 'config'])
+def test_a_local_archive_an_earlier_pass_left_stays_where_it_is(tmp_path, where):
+    """Not an item: it is neither moved nor walked, and the README names it."""
+    box = Box(tmp_path, python='stub')
+    top = {'data': box.data, 'kept directory': box.data / 'ca', 'config': box.config}[where]
+    earlier = top / '.ucm-archive-20250101T000000Z'
+    earlier.mkdir(mode=0o700)
+    (earlier / 'old.key').write_text('an earlier archive')
+    held = tree(earlier)
+    data, config = originals(box)
+    box.wrap(other_fs=(box.data,))
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert tree(earlier) == held
+    exactly_once(box, data, config)
+    readme = ' '.join((box.archive / 'README.txt').read_text().split())
+    assert f'{earlier}' in readme and 'an earlier archiving' in readme
 
 
 # -- nothing happens anywhere else ---------------------------------------------------
@@ -455,16 +663,48 @@ def test_a_database_a_later_release_wrote_is_left_and_never_called_older(tmp_pat
     assert '2.254' not in out.stdout
 
 
+# -- without an interpreter, nothing moves -------------------------------------------
+
+@pytest.mark.parametrize('interpreter', ['', 'missing', 'failing'])
+def test_without_a_working_interpreter_nothing_moves(tmp_path, interpreter):
+    """No interpreter to call rename(2) with, or one that fails: the run stops before
+    anything is created or moved."""
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    before = snapshot(box)
+    path = {'': '', 'missing': str(tmp_path / 'no-python'), 'failing': '/bin/false'}[interpreter]
+    out = box.run(interpreter=path)
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert 'no interpreter to rename files with' in out.stdout and 'nothing was moved' in out.stdout
+    assert 'was not started' in out.stdout
+    assert snapshot(box) == before
+    assert not box.parent.exists()
+    assert 'could not be renamed' not in out.stdout
+
+
+def test_without_an_interpreter_an_unfinished_attempt_is_left_as_it_is(tmp_path):
+    """Killed right after a rename; then no interpreter: nothing is touched, exit 2."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    _killed_after_renaming(box, 'ucm.db')
+    left = snapshot(box, box.parent)
+    out = box.run(interpreter='')
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert 'no interpreter to rename files with' in out.stdout
+    assert snapshot(box, box.parent) == left
+    archived(box, box.run(), data, config)
+
+
 # -- idempotent ----------------------------------------------------------------------
 
 def test_a_second_run_finds_nothing_to_archive(tmp_path):
     box = Box(tmp_path)
     assert box.run().returncode == 0
-    archived = tree(box.parent)
+    archived_tree = tree(box.parent)
     _database(box.data / 'ucm.db', _pivot_registry() + ['300_upgrade_from_2_254'])
     out = box.run()
     assert (out.returncode, out.stdout) == (0, '')
-    assert tree(box.parent) == archived
+    assert tree(box.parent) == archived_tree
 
 
 def test_an_existing_archive_is_never_overwritten(tmp_path):
@@ -489,18 +729,18 @@ def _fail_everywhere(tmp_path, layout):
     failure puts back everything and starts nothing; a call whose failure is tolerated
     (the log) still archives everything. Returns how many runs failed."""
     failed = 0
-    for command in ('mkdir', 'mv', 'cp', 'rm', 'chmod', 'rename'):
+    for command in COMMANDS:
         for at in range(1, 200):
             box = Box(tmp_path / f'{command}-{at}', python='stub')
-            box.wrap(fail=command, at=at, other_fs=layout(box))
-            before, data, config = snapshot(box), files(box.data), files(box.config)
+            box.wrap(fail=command, at=at, **_layout_args(box, layout))
+            before = snapshot(box)
+            data, config = originals(box)
             out = box.run()
             if int((box.state / 'count').read_text()) < at:
-                assert out.returncode == 0, (command, at, out.stdout, out.stderr)
+                archived(box, out, data, config, (command, at))
                 break
             if out.returncode == 0:
-                assert files(box.archive / 'data') == data, (command, at)
-                assert files(box.archive / 'config') == config, (command, at)
+                archived(box, out, data, config, (command, at))
                 continue
             failed += 1
             assert out.returncode == 1, (command, at, out.stdout, out.stderr)
@@ -512,445 +752,35 @@ def _fail_everywhere(tmp_path, layout):
     return failed
 
 
-@pytest.mark.parametrize('layout', ['one filesystem', 'data and config are mount points',
-                                    'a mount point inside the data'])
-def test_a_failure_at_any_step_puts_everything_back(tmp_path, layout):
-    other_fs = {
-        'one filesystem': lambda box: (),
-        'data and config are mount points': lambda box: (box.data, box.config),
-        'a mount point inside the data': lambda box: (box.data / 'updates',),
+def _layout_args(box, layout):
+    return {
+        'one filesystem': {},
+        'data and config on other filesystems': {'other_fs': (box.data, box.config)},
+        'each kept directory a mount point': {'other_fs': tuple(box.data / d for d in KEPT)},
+        'overlayfs': {'fstype': 'overlay'},
     }[layout]
-    assert _fail_everywhere(tmp_path, other_fs) > 5
 
 
-def test_mount_points_are_kept_and_their_contents_copied(tmp_path):
-    box = Box(tmp_path, python='stub')
-    box.wrap(other_fs=(box.data, box.config, box.data / 'updates'))
-    data, config = files(box.data), files(box.config)
-    out = box.run()
-    assert out.returncode == 0, out.stdout + out.stderr
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'config') == config
-    assert sorted(p.name for p in box.data.iterdir()) == sorted(KEPT + ['updates'])
-    assert list((box.data / 'updates').iterdir()) == []
+@pytest.mark.parametrize('layout', ['one filesystem', 'data and config on other filesystems',
+                                    'each kept directory a mount point', 'overlayfs'])
+def test_a_failure_at_any_step_puts_everything_back(tmp_path, layout):
+    assert _fail_everywhere(tmp_path, layout) > 5
 
 
-def test_a_copy_whose_source_removal_failed_is_restored_before_it_goes(tmp_path):
-    """Across filesystems the sources go last; one that fails midway is completed again."""
-    box = Box(tmp_path, python='stub')
-    before = snapshot(box)
-    box.wrap(fail='rm', at=2, other_fs=(box.data,))
-    out = box.run()
-    assert out.returncode == 1, out.stdout
-    assert snapshot(box) == before
-    assert 'Everything was put back' in out.stdout
-
-
-def _copied(box, *names):
-    """Runs the archiving; asserts it succeeded and that each of `names` (relative to the
-    data) was copied, none renamed."""
-    (box.state / 'cp-args').unlink(missing_ok=True)
-    (box.bin / 'cp').write_text(f'#!/bin/sh\necho "$*" >> {box.state}/cp-args\nexec {REAL["cp"]} "$@"\n')
-    out = box.run()
-    assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
-    copied = (box.state / 'cp-args').read_text() if (box.state / 'cp-args').exists() else ''
-    for name in names:
-        assert f'-a -- {box.data}/{name} {box.archive}/data/{name}{PART}' in copied.splitlines(), (name, copied)
-    return out
-
-
-def test_a_bind_mount_of_the_same_filesystem_is_crossed_by_a_verified_copy(tmp_path):
-    """rename(2) cannot cross a bind mount even on one device: refused, the move is a copy."""
-    box = Box(tmp_path, python='stub')
-    data, config = files(box.data), files(box.config)
-    box.wrap(other_mount=(box.data,))
-    _copied(box, 'ucm.db', 'updates', 'current.key')
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'config') == config
-    assert sorted(p.name for p in box.data.iterdir()) == KEPT
-
-
-def test_a_directory_on_overlayfs_is_copied_and_a_file_renamed(tmp_path):
-    """rename(2) refuses a directory of an overlayfs lower layer (EXDEV)."""
-    box = Box(tmp_path, python='stub')
-    data = files(box.data)
-    box.wrap(fstype='overlay')
-    _copied(box, 'updates')
-    copied = (box.state / 'cp-args').read_text()
-    assert 'ucm.db' not in copied and 'https_key.pem' not in copied
-    assert files(box.archive / 'data') == data
-
-
-@pytest.mark.parametrize('kind', ['file', 'directory', 'link'])
-def test_an_item_whose_rename_is_refused_is_archived_by_a_verified_copy(tmp_path, kind):
-    """Whatever the kernel refuses to rename (EXDEV) is copied, compared, then removed."""
-    box = Box(tmp_path, python='stub')
-    data, config = files(box.data), files(box.config)
-    name = {'file': 'https_key.pem', 'directory': 'updates', 'link': 'current.key'}[kind]
-    box.wrap(refused=(f'{box.data}/{name}',))
-    _copied(box, name)
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'config') == config
-    assert sorted(p.name for p in box.data.iterdir()) == KEPT
-
-
-@pytest.mark.parametrize('interpreter', ['', 'missing', 'failing'])
-def test_without_a_working_interpreter_everything_is_copied_never_left(tmp_path, interpreter):
-    """No interpreter to call rename(2) with, or one that fails: every move is a copy."""
-    box = Box(tmp_path, python='stub')
-    data, config = files(box.data), files(box.config)
-    box.wrap()
-    path = {'': '', 'missing': str(tmp_path / 'no-python'), 'failing': '/bin/false'}[interpreter]
-    (box.state / 'cp-args').unlink(missing_ok=True)
-    (box.bin / 'cp').write_text(f'#!/bin/sh\necho "$*" >> {box.state}/cp-args\nexec {REAL["cp"]} "$@"\n')
-    out = box.run(interpreter=path)
-    assert out.returncode == 0, (out.stdout, out.stderr)
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'config') == config
-    assert sorted(p.name for p in box.data.iterdir()) == KEPT
-    assert f'-a -- {box.data}/ucm.db {box.archive}/data/ucm.db{PART}' in (box.state / 'cp-args').read_text()
-
-
-def test_a_bind_mount_inside_the_data_is_kept_and_its_contents_moved(tmp_path):
-    """A mount point cannot be renamed (EBUSY), on one device too."""
-    box = Box(tmp_path, python='stub')
-    data = files(box.data)
-    box.wrap(other_mount=(box.data / 'updates',))
-    out = box.run()
-    assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
-    assert files(box.archive / 'data') == data
-    assert list((box.data / 'updates').iterdir()) == []
-
-
-def _killed_after_renaming(box, name):
+def _killed_after_renaming(box, name, **wrap):
     """The run is killed right after rename(2) moved data/<name> into the archive."""
-    box.wrap()
+    box.wrap(**wrap)
     (box.bin / 'rename').write_text(
         f'#!/bin/sh\n{box.inner}/rename "$@" || exit 1\n'
         f'[ "$4" != {box.data}/{name} ] || kill -9 0\n')
     out = box.run()
     assert out.returncode == -9, (out.stdout, out.stderr)
-    assert not os.path.lexists(box.data / name) and os.path.lexists(box.archive / 'data' / name)
-    box.wrap()
+    assert not os.path.lexists(box.data / name)
+    box.wrap(**wrap)
 
-
-@pytest.mark.parametrize('name, made_again', [('ucm.db', 'a file'), ('updates', 'a file'),
-                                               ('updates', 'a directory')])
-def test_a_source_made_again_after_its_rename_is_never_removed_nor_its_archive(tmp_path, name, made_again):
-    """Killed right after a rename, then the source made again (a service started by hand
-    creates ucm.db): the retry keeps both sides whole, names both, and exits 2."""
-    box = Box(tmp_path, python='stub')
-    archived = tree(box.data / name) if (box.data / name).is_dir() else None
-    original = (box.data / name).read_bytes() if archived is None else None
-    _killed_after_renaming(box, name)
-    if made_again == 'a file':
-        (box.data / name).write_bytes(b'made again')
-    else:
-        (box.data / name).mkdir()
-        (box.data / name / 'g').write_text('made again')
-    again = tree(box.data / name) if made_again == 'a directory' else None
-
-    for _ in range(2):
-        out = box.run()
-        assert out.returncode == 2, (out.stdout, out.stderr)
-        assert reported(out.stdout)[f'{box.archive}/data/{name}'] == (
-            f'not put back to {box.data}/{name}, which exists again: keep one of the two, '
-            'remove the other, then retry')
-        # The archive directories holding it are not named: removing them loses the copy
-        assert named(out.stdout) == [f'{box.archive}/data/{name}'], out.stdout
-        assert 'wait for your choice' in out.stdout or 'retrying alone will not' in out.stdout
-        if made_again == 'a file':
-            assert (box.data / name).read_bytes() == b'made again'
-        else:
-            assert tree(box.data / name) == again
-        if archived is None:
-            assert (box.archive / 'data' / name).read_bytes() == original
-        else:
-            assert tree(box.archive / 'data' / name) == archived
-
-
-def test_a_refused_rename_leaves_the_journal_before_its_copy(tmp_path):
-    """A rename refused once (not across filesystems) makes the item a copy, whose source is
-    then removed; its put-back failing, the retry puts it back from the copy and converges:
-    no rename line left to move the copy back behind the journal's back."""
-    box = Box(tmp_path / 'count', python='stub')
-    box.wrap(fail='rename', at=10 ** 6)
-    assert box.run().returncode == 0
-    box = Box(tmp_path / 'box', python='stub')
-    data, config = files(box.data), files(box.config)
-    # Call 1 asks the interpreter whether it runs; call 2 is the first rename
-    box.wrap(fail='rename', at=2)
-    first = box.state / 'first'
-    # Every source removed, the journal cannot go: the put-back of the copy fails once
-    (box.bin / 'rm').write_text(
-        f'#!/bin/sh\nfor last; do :; done\ncase $last in */.journal) exit 1 ;; esac\n'
-        f'exec {REAL["rm"]} "$@"\n')
-    (box.bin / 'cp').write_text(
-        f'#!/bin/sh\ncase $3 in {box.parent}/*) [ -e {first} ] || {{ : > {first}; exit 1; }} ;; esac\n'
-        f'exec {REAL["cp"]} "$@"\n')
-    out = box.run()
-    assert out.returncode == 2, (out.stdout, out.stderr)
-    assert first.exists() and 'ucm-2026.ucmbkp' in out.stdout
-    box.wrap()
-    out = box.run()
-    assert out.returncode == 0, (out.stdout, out.stderr)
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'config') == config
-
-
-def _all_files(*tops):
-    """The files under several trees, by path relative to each, whichever tree holds them."""
-    out = {}
-    for top in tops:
-        for rel, entry in files(top).items():
-            assert rel not in out, rel
-            out[rel] = entry
-    return out
-
-
-def _stuck(box):
-    """Removing a copied source fails halfway, then every later copy fails: what was copied
-    cannot be put back. Returns the marker the failed removal leaves."""
-    box.wrap(other_fs=(box.data,))
-    failed = box.state / 'rm-failed'
-    (box.bin / 'rm').write_text(
-        f'#!/bin/sh\nfor last; do :; done\ncase $last in {box.data}/updates|{box.data}/updates{PART})\n'
-        f'    {REAL["rm"]} -f -- "$last/nested/f"; : > {failed}; exit 1 ;;\nesac\n'
-        f'exec {REAL["rm"]} "$@"\n')
-    (box.bin / 'cp').write_text(f'#!/bin/sh\n[ ! -e {failed} ] || exit 1\nexec {REAL["cp"]} "$@"\n')
-    return failed
-
-
-def test_a_copy_is_kept_while_its_source_cannot_be_completed_again(tmp_path):
-    """Removing a copied source fails halfway, then putting it back fails too: the archive
-    keeps every copy whose source is not whole again, so no file is lost."""
-    box = Box(tmp_path, python='stub')
-    data = files(box.data)
-    failed = _stuck(box)
-
-    out = box.run()
-
-    assert out.returncode == 2, out.stdout
-    assert failed.exists()
-    assert not (box.data / 'updates' / 'nested' / 'f').exists()
-    assert 'could not be put back' in out.stdout and str(box.archive) in out.stdout
-    assert 'Everything was put back' not in out.stdout
-    assert _all_files(box.data, box.archive / 'data') == data
-
-
-def test_the_next_attempt_puts_back_what_was_stuck_then_archives_it_whole(tmp_path):
-    """A retry after a partial roll-back finishes it first: one archive, nothing mixed or lost."""
-    box = Box(tmp_path, python='stub')
-    data, config = files(box.data), files(box.config)
-    _stuck(box)
-    assert box.run().returncode == 2
-
-    # Still failing: no file is lost or archived a second time, and it says so again
-    out = box.run()
-    assert out.returncode == 2, out.stdout
-    assert 'could not be put back' in out.stdout
-    assert [p.name for p in box.parent.iterdir()] == [STAMP]
-    assert _all_files(box.data, box.archive / 'data') == data
-    assert files(box.config) == config
-
-    # Cause fixed: the roll-back completes, then one archive takes everything
-    box.wrap(other_fs=(box.data,))
-    out = box.run()
-    assert out.returncode == 0, out.stdout + out.stderr
-    assert 'put back' in out.stdout
-    assert [p.name for p in box.parent.iterdir()] == [STAMP]
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'config') == config
-    assert not (box.archive / '.journal').exists()
-
-
-def test_the_next_attempt_after_a_complete_roll_back_starts_over(tmp_path):
-    box = Box(tmp_path, python='stub')
-    data = files(box.data)
-    box.wrap(fail='rm', at=3, other_fs=(box.data,))
-    assert box.run().returncode == 1
-    box.wrap()
-    out = box.run()
-    assert out.returncode == 0, out.stdout + out.stderr
-    assert 'did not complete' not in out.stdout
-    assert files(box.archive / 'data') == data
-
-
-@pytest.mark.parametrize('differs', [
-    f'{harm}:{where}' for where in ('key', 'nested', 'top')
-    for harm in ('content', 'mode', 'date', 'group', 'owner')
-    if where != 'top' or harm not in ('content', 'date')])
-def test_a_copy_that_differs_from_its_source_is_never_kept_in_its_place(tmp_path, differs):
-    """Each attribute digest compares, on a file copied alone and in a copied tree."""
-    if differs.startswith('owner') and os.getuid() != 0:
-        pytest.skip('only root can give a file another owner')
-    if differs.startswith('group') and OTHER_GID is None:
-        pytest.skip('no secondary group to give a file')
-    box = Box(tmp_path, python='stub')
-    before = snapshot(box)
-    box.wrap(other_fs=(box.data,), corrupt_copies=differs)
-    out = box.run()
-    assert out.returncode == 1, out.stdout
-    assert snapshot(box) == before
-    assert not box.parent.exists() or not any(box.parent.iterdir())
-
-
-
-@pytest.mark.parametrize('differs', [
-    f'{harm}:{where}' for where in ('key', 'nested', 'top')
-    for harm in ('content', 'mode', 'date', 'group', 'owner')
-    if where != 'top' or harm not in ('content', 'date')])
-def test_a_put_back_that_differs_from_the_archive_is_never_taken_for_whole(tmp_path, differs):
-    """The last step fails once every source is gone; each put-back then reports success
-    over a copy that differs: the archive keeps it, and the retry puts it back whole."""
-    if differs.startswith('owner') and os.getuid() != 0:
-        pytest.skip('only root can give a file another owner')
-    if differs.startswith('group') and OTHER_GID is None:
-        pytest.skip('no secondary group to give a file')
-    box = Box(tmp_path / 'count', python='stub')
-    box.wrap(fail='rm', at=10 ** 6, other_fs=(box.data,))
-    assert box.run().returncode == 0
-    last_rm = int((box.state / 'count').read_text())
-    box = Box(tmp_path / 'box', python='stub')
-    data, config = tree(box.data), tree(box.config)
-    box.wrap(fail='rm', at=last_rm, other_fs=(box.data,), corrupt_copies=differs, corrupt_back=True)
-    out = box.run()
-    assert out.returncode == 2, (out.stdout, out.stderr)
-    # cp said nothing: the line alone says which put-back failed
-    assert any(what.startswith('not put back to ') for what in reported(out.stdout).values()), out.stdout
-    box.wrap(other_fs=(box.data,))
-    out = box.run()
-    assert out.returncode == 0, (out.stdout, out.stderr)
-    assert whole(box.archive / 'data', KEPT) == {k: v for k, v in data.items() if k not in KEPT}
-    assert tree(box.archive / 'config') == config
-
-@pytest.mark.parametrize('tool', ['find', 'find dates', 'cksum', 'stat'])
-def test_a_digest_that_cannot_be_taken_never_passes_for_a_match(tmp_path, tool):
-    """find missing (a minimal image), failing on its last question only, cksum or stat
-    failing: no copy is taken for whole."""
-    box = Box(tmp_path, python='stub')
-    before = snapshot(box)
-    box.wrap(other_fs=(box.data,))
-    fails = ''
-    if tool == 'find dates':
-        tool, fails = 'find', f'case "$*" in *"date "*) ;; *) exec {shutil.which("find")} "$@" ;; esac\n'
-    (box.bin / tool).write_text(f'#!/bin/sh\n{fails}echo "{tool}: not found" >&2; exit 127\n')
-    (box.bin / tool).chmod(0o755)
-    out = box.run()
-    assert out.returncode == 1, (out.stdout, out.stderr)
-    assert snapshot(box) == before
-    assert 'Everything was put back' in out.stdout
-
-
-def test_a_fifo_is_compared_by_its_kind_never_read(tmp_path):
-    """Reading a FIFO left in the data would block the installation."""
-    box = Box(tmp_path, python='stub')
-    os.mkfifo(box.data / 'ucm.sock', 0o600)
-    data = files(box.data)
-    box.wrap(other_fs=(box.data,))
-    out = box.run(timeout=20)
-    assert out.returncode == 0, (out.stdout, out.stderr)
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'data')['ucm.sock'][0] == 'special'
-
-
-def test_a_put_back_refused_twice_the_same_way_says_a_retry_will_not_help(tmp_path):
-    """The source filesystem refuses what a put-back sets (an owner, as root on a share):
-    the first failure says the next attempt tries again, the second one that it will not
-    succeed before the cause is fixed. Then, fixed, the retry converges."""
-    box = Box(tmp_path / 'count', python='stub')
-    box.wrap(fail='rm', at=10 ** 6, other_fs=(box.data,))
-    assert box.run().returncode == 0
-    last_rm = int((box.state / 'count').read_text())
-    box = Box(tmp_path / 'box', python='stub')
-    data, config = files(box.data), files(box.config)
-    box.wrap(fail='rm', at=last_rm, other_fs=(box.data,))
-    (box.bin / 'cp').write_text(
-        f'#!/bin/sh\ncase $3 in {box.parent}/*) echo "cp: failed to preserve ownership" >&2; exit 1 ;; esac\n'
-        f'exec {REAL["cp"]} "$@"\n')
-    first = box.run()
-    assert first.returncode == 2, first.stdout
-    assert 'next attempt tries again' in first.stdout and 'will not' not in first.stdout
-    lines = reported(first.stdout)
-    assert lines[f'{box.archive}/data/updates'] == f'not put back to {box.data}/updates'
-    second = box.run()
-    assert second.returncode == 2, second.stdout
-    assert 'same way at the previous attempt' in second.stdout and 'retrying alone will not' in second.stdout
-    assert reported(second.stdout) == lines
-    assert 'tries again' not in second.stdout
-    assert _all_files(box.data, box.archive / 'data') == data
-    box.wrap(other_fs=(box.data,))
-    out = box.run()
-    assert out.returncode == 0, out.stdout + out.stderr
-    assert files(box.archive / 'data') == data and files(box.archive / 'config') == config
-
-
-def test_the_rpm_requires_what_the_archiving_runs():
-    """find, cksum and stat compare the copies (a minimal RHEL image lacks find); findmnt
-    tells a bind mount. On Debian these are essential packages, never named."""
-    spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
-    requires = {line.split(':', 1)[1].split()[0] for line in spec.splitlines()
-                if line.startswith('Requires:')}
-    assert {'findutils', 'coreutils', '/usr/bin/findmnt'} <= requires
-
-def test_the_kept_directories_are_those_the_packages_create():
-    """RPM owns these directories and the DEB postinst creates them: the archive leaves them."""
-    import re
-    spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
-    postinst = (ROOT / 'packaging' / 'debian' / 'postinst').read_text()
-    assert {frozenset(m.split()) for m in re.findall(r'for d in ([a-z ]+); do', spec)} == {frozenset(KEPT)}
-    assert re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst) and all(
-        set(m.split(',')) == set(KEPT) for m in re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst))
-
-
-def test_a_copy_half_removed_while_putting_back_is_removed_on_the_retry(tmp_path):
-    """A copy whose source is whole again is renamed aside before it is removed: when that
-    removal stops halfway, the archive path is already empty and the retry finishes it,
-    never comparing the source with what is left of the copy."""
-    box = Box(tmp_path, python='stub')
-    data, config = files(box.data), files(box.config)
-    box.wrap(other_fs=(box.data,))
-    once, twice = box.state / 'once', box.state / 'twice'
-    (box.bin / 'rm').write_text(
-        f'#!/bin/sh\nfor last; do :; done\ncase $last in\n'
-        f'    {box.data}/updates|{box.data}/updates{PART}) [ -e {twice} ] || {{ : > {twice}; exit 1; }} ;;\n'
-        f'    {box.archive}/data/updates{PART}) [ -e {once} ] || {{ : > {once}; '
-        f'{REAL["rm"]} -f -- "$last/nested/f"; exit 1; }} ;;\nesac\n'
-        f'exec {REAL["rm"]} "$@"\n')
-    out = box.run()
-    assert out.returncode == 2, out.stdout
-    assert once.exists() and not os.path.lexists(box.archive / 'data' / 'updates')
-    assert reported(out.stdout)[f'{box.archive}/data/updates{PART}'] == (
-        f'a copy of {box.data}/updates, which is back in place, could not be removed')
-    assert files(box.data) == data
-    box.wrap(other_fs=(box.data,))
-    out = box.run()
-    assert out.returncode == 0, out.stdout + out.stderr
-    assert [p.name for p in box.parent.iterdir()] == [STAMP]
-    assert files(box.archive / 'data') == data
-    assert files(box.archive / 'config') == config
-
-
-def test_a_rename_back_that_is_refused_is_named_with_where_it_goes(tmp_path):
-    """The last step fails once every item is renamed; renaming ucm.db back is refused."""
-    box = Box(tmp_path / 'count', python='stub')
-    box.wrap(fail='rm', at=10 ** 6)
-    assert box.run().returncode == 0
-    last_rm = int((box.state / 'count').read_text())
-    box = Box(tmp_path / 'box', python='stub')
-    data = files(box.data)
-    box.wrap(fail='rm', at=last_rm, refused=(f'{box.archive}/data/ucm.db',))
-    out = box.run()
-    assert out.returncode == 2, (out.stdout, out.stderr)
-    assert reported(out.stdout)[f'{box.archive}/data/ucm.db'] == f'not put back to {box.data}/ucm.db', out.stdout
-    assert _all_files(box.data, box.archive / 'data') == data
-
-
-# -- a real path holds a whole item or none of ours ----------------------------------
 
 ITEMS = {'file': 'ucm.db', 'directory': 'updates', 'link': 'current.key'}
 BOTH = 'not put back to {src}, which exists again: keep one of the two, remove the other, then retry'
-ONLY = 'the only copy of {src}, which is gone: put it back there or remove it, then retry'
 
 
 def _shape(path):
@@ -980,79 +810,28 @@ def _gone(path):
         path.unlink()
 
 
-def _killed_once_copied(box, name):
-    """Across filesystems: killed as soon as data/<name> has its copy in the archive, before
-    any source goes."""
-    box.wrap(other_fs=(box.data,))
-    dst = box.archive / 'data' / name
-    check = f'[ ! -e "{dst}" ] && [ ! -L "{dst}" ] || kill -9 0\n'
-    (box.bin / 'cp').write_text(f'#!/bin/sh\n{REAL["cp"]} "$@" || exit 1\n{check}')
-    (box.bin / 'rename').write_text(f'#!/bin/sh\n{box.inner}/rename "$@" || exit 1\n{check}')
-    out = box.run()
-    assert out.returncode == -9, (out.stdout, out.stderr)
-    assert os.path.lexists(box.data / name) and os.path.lexists(dst)
-    box.wrap(other_fs=(box.data,))
+LAYOUT_OF = {'one filesystem': {}, 'data on another filesystem': {'other_fs': ('data',)}}
 
 
+def _wrap_of(box, layout):
+    return {k: tuple(getattr(box, p) for p in v) for k, v in LAYOUT_OF[layout].items()}
+
+
+@pytest.mark.parametrize('layout', list(LAYOUT_OF))
 @pytest.mark.parametrize('kind', ITEMS)
-@pytest.mark.parametrize('then, keep', [('removed', 'copy'), ('changed', 'source'), ('changed', 'copy')])
-def test_a_copy_whose_source_went_or_changed_since_is_never_removed(tmp_path, kind, then, keep):
-    """Killed once an item is copied, before its source goes; the source is then removed,
-    or replaced: the archive keeps the copy, names it, and exits 2 until the operator
-    chooses; each choice the text offers ends in a whole archive."""
+@pytest.mark.parametrize('keep', ['source', 'archived'])
+def test_a_source_made_again_between_two_attempts_keeps_both_until_one_is_chosen(tmp_path, layout, kind, keep):
+    """Killed right after a rename, then the source made again (a service started by hand
+    creates ucm.db): the retry keeps both sides whole, names the archived one, and exits 2;
+    each of the two ways out the text gives ends in a finished archive."""
     box = Box(tmp_path, python='stub')
+    wrap = _wrap_of(box, layout)
     name = ITEMS[kind]
-    src, dst = box.data / name, box.archive / 'data' / name
+    src = box.data / name
+    dst = box.archive / 'data' / name if layout == 'one filesystem' else box.data / LOCAL / name
+    data, config = originals(box)
     original = _shape(src)
-    _killed_once_copied(box, name)
-    _gone(src)
-    if then == 'changed':
-        _remake(src, kind)
-    left = _shape(src) if then == 'changed' else None
-
-    for _ in range(2):
-        out = box.run()
-        assert out.returncode == 2, (out.stdout, out.stderr)
-        text = (DIFFERS if then == 'changed' else ONLY).format(src=src)
-        assert reported(out.stdout)[str(dst)] == text, out.stdout
-        assert named(out.stdout) == [str(dst)], out.stdout
-        assert _shape(dst) == original
-        if then == 'changed':
-            assert _shape(src) == left
-        else:
-            assert not os.path.lexists(src)
-
-    # The operator's choice: the copy back in place of the source, or the source as it is
-    if keep == 'copy':
-        if then == 'changed':
-            _gone(src)
-        os.rename(dst, src)
-        archived = original
-    else:
-        _gone(dst)
-        archived = left
-    out = box.run()
-    assert out.returncode == 0, (out.stdout, out.stderr)
-    assert _shape(box.archive / 'data' / name) == archived
-    assert not os.path.lexists(src)
-
-
-@pytest.mark.parametrize('kind', ITEMS)
-def test_a_source_made_again_after_it_was_removed_is_never_overwritten(tmp_path, kind):
-    """Killed right after a copied source was removed, then that source made again: the
-    retry keeps both sides whole, names both, and exits 2."""
-    box = Box(tmp_path, python='stub')
-    name = ITEMS[kind]
-    src, dst = box.data / name, box.archive / 'data' / name
-    original = _shape(src)
-    box.wrap(other_fs=(box.data,))
-    (box.bin / 'rm').write_text(
-        f'#!/bin/sh\n{REAL["rm"]} "$@" || exit 1\nfor last; do :; done\n'
-        f'case $last in "{src}"|"{src}".*) kill -9 0 ;; esac\n')
-    out = box.run()
-    assert out.returncode == -9, (out.stdout, out.stderr)
-    assert not os.path.lexists(src) and _shape(dst) == original
-    box.wrap(other_fs=(box.data,))
+    _killed_after_renaming(box, name, **wrap)
     _remake(src, kind)
     again = _shape(src)
 
@@ -1060,59 +839,115 @@ def test_a_source_made_again_after_it_was_removed_is_never_overwritten(tmp_path,
         out = box.run()
         assert out.returncode == 2, (out.stdout, out.stderr)
         assert reported(out.stdout)[str(dst)] == BOTH.format(src=src), out.stdout
+        # The directories holding it are not named: removing them loses that item
         assert named(out.stdout) == [str(dst)], out.stdout
+        assert 'wait for your choice' in out.stdout or 'retrying alone will not' in out.stdout
         assert _shape(src) == again and _shape(dst) == original
+        exactly_once(box, data, config, skip=(name,) + tuple(k for k in data if k.startswith(f'{name}/')))
 
-    _gone(src)
-    out = box.run()
-    assert out.returncode == 0, (out.stdout, out.stderr)
-    assert _shape(box.archive / 'data' / name) == original
-
-
-def test_a_source_removed_in_place_and_cut_short_is_completed_from_its_copy(tmp_path):
-    """Its rename aside refused too, a source is removed in place behind an inplace line:
-    killed halfway, the retry knows that half-removed source as its own, puts the copy back
-    in its place, then archives it whole."""
-    box = Box(tmp_path, python='stub')
-    data, config = files(box.data), files(box.config)
-    src = box.data / 'updates'
-    box.wrap(refused=(str(src),))
-    once = box.state / 'once'
-    (box.bin / 'rm').write_text(
-        f'#!/bin/sh\nfor last; do :; done\n'
-        f'if [ "$last" = {src} ] && [ ! -e {once} ]; then : > {once}; '
-        f'{REAL["rm"]} -f -- "$last/nested/f"; kill -9 0; fi\nexec {REAL["rm"]} "$@"\n')
-    out = box.run()
-    assert out.returncode == -9 and once.exists(), (out.stdout, out.stderr)
-    assert src.is_dir() and not (src / 'nested' / 'f').exists()
-    out = box.run()
-    assert out.returncode == 0, (out.stdout, out.stderr)
-    assert 'in place again' in out.stdout
-    assert files(box.archive / 'data') == data and files(box.archive / 'config') == config
-    assert not any(p.name.endswith(PART) for p in box.tmp.rglob('*'))
-
-
-@pytest.mark.parametrize('where', ['data', 'kept directory', 'database elsewhere'])
-def test_a_file_named_as_its_temporaries_is_never_taken_for_one(tmp_path, where):
-    """No journal names it, so it is not the script's: nothing is archived, and it is named."""
-    box = Box(tmp_path, python='stub')
-    if where == 'database elsewhere':
-        elsewhere = tmp_path / 'srv'
-        elsewhere.mkdir()
-        shutil.move(box.data / 'ucm.db', elsewhere / 'pki.db')
-        env = box.config / 'ucm.env'
-        env.write_text(env.read_text().replace(f'{box.data}/ucm.db', f'{elsewhere}/pki.db'))
-        stray = elsewhere / f'pki.db{PART}'
-        box.python('stub', first=f'sqlite {elsewhere}/pki.db')
+    if keep == 'source':
+        _gone(dst)
     else:
-        stray = (box.data / 'ca' if where == 'kept directory' else box.data) / f'ucm.db{PART}'
-    stray.write_text('not ours')
-    extra = (stray.parent,) if where == 'database elsewhere' else ()
-    before = snapshot(box, *extra)
+        _gone(src)
     out = box.run()
-    assert out.returncode == 1, (out.stdout, out.stderr)
-    assert f'{stray} is named as this package names its temporary copies' in out.stdout
-    assert snapshot(box, *extra) == before
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert _shape(box.archive / 'data' / name if layout == 'one filesystem' else box.data / LOCAL / name) == (
+        again if keep == 'source' else original)
+    assert not os.path.lexists(src)
+
+
+@pytest.mark.parametrize('kind', ITEMS)
+def test_a_source_made_again_during_an_attempt_keeps_both(tmp_path, kind):
+    """The source is made again while a later step fails: the roll-back finds both sides,
+    touches neither, and names the archived one."""
+    box = Box(tmp_path, python='stub')
+    name = ITEMS[kind]
+    src, dst = box.data / name, box.archive / 'data' / name
+    original = _shape(src)
+    box.wrap()
+    once = box.state / 'once'
+    remake = {'file': f'printf "made again" > "{src}"',
+              'directory': f'{REAL["mkdir"]} "{src}" && printf "made again" > "{src}/g"',
+              'link': f'ln -s elsewhere "{src}"'}[kind]
+    # The journal line of the configuration: every data item has been renamed by then
+    (box.bin / 'tee').write_text(
+        f'#!/bin/sh\nline=$(cat)\ncase $line in *"{box.archive}/config"*)\n'
+        f'    [ -e {once} ] || {{ : > {once}; {remake}; exit 1; }} ;;\nesac\n'
+        f'printf "%s\\n" "$line" | {REAL["tee"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert reported(out.stdout)[str(dst)] == BOTH.format(src=src), out.stdout
+    assert _shape(dst) == original and os.path.lexists(src)
+
+
+@pytest.mark.parametrize('layout', list(LAYOUT_OF))
+def test_an_item_archived_then_removed_by_hand_is_named_and_nothing_else_goes(tmp_path, layout):
+    """Killed right after a rename, then the archived item removed by hand: the retry puts
+    the others back, archives them, and says which one is at neither path."""
+    box = Box(tmp_path, python='stub')
+    wrap = _wrap_of(box, layout)
+    data, config = originals(box)
+    _killed_after_renaming(box, 'https_key.pem', **wrap)
+    dst = box.archive / 'data' / 'https_key.pem' if layout == 'one filesystem' else box.data / LOCAL / 'https_key.pem'
+    dst.unlink()
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert f'{box.data}/https_key.pem is missing: an earlier attempt moved it to {dst}' in out.stdout
+    exactly_once(box, data, config, skip=('https_key.pem',))
+    assert not os.path.lexists(box.data / 'https_key.pem')
+
+
+def test_a_rename_back_that_is_refused_is_named_with_where_it_goes(tmp_path):
+    """The last step fails once every item is renamed; renaming ucm.db back is refused."""
+    box = Box(tmp_path / 'count', python='stub')
+    box.wrap(fail='rm', at=10 ** 6)
+    assert box.run().returncode == 0
+    last_rm = int((box.state / 'count').read_text())
+    box = Box(tmp_path / 'box', python='stub')
+    data, config = originals(box)
+    box.wrap(fail='rm', at=last_rm, refused=(f'{box.archive}/data/ucm.db',))
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert reported(out.stdout)[f'{box.archive}/data/ucm.db'] == f'not put back to {box.data}/ucm.db', out.stdout
+    exactly_once(box, data, config)
+
+
+def test_a_put_back_refused_twice_the_same_way_says_a_retry_will_not_help(tmp_path):
+    """The first refusal says the next attempt tries again, the second one that retrying
+    alone will not do; then, the cause gone, the retry converges."""
+    box = Box(tmp_path / 'count', python='stub')
+    box.wrap(fail='rm', at=10 ** 6, other_fs=(box.data,))
+    assert box.run().returncode == 0
+    last_rm = int((box.state / 'count').read_text())
+    box = Box(tmp_path / 'box', python='stub')
+    data, config = originals(box)
+    stuck = f'{box.data}/{LOCAL}/updates'
+    box.wrap(fail='rm', at=last_rm, other_fs=(box.data,), refused=(stuck,))
+    first = box.run()
+    assert first.returncode == 2, first.stdout
+    assert 'next attempt tries again' in first.stdout and 'will not' not in first.stdout
+    lines = reported(first.stdout)
+    assert lines[stuck] == f'not put back to {box.data}/updates'
+    box.wrap(other_fs=(box.data,), refused=(stuck,))
+    second = box.run()
+    assert second.returncode == 2, second.stdout
+    assert 'same way at the previous attempt' in second.stdout and 'retrying alone will not' in second.stdout
+    assert reported(second.stdout) == lines
+    assert 'tries again' not in second.stdout
+    exactly_once(box, data, config)
+    box.wrap(other_fs=(box.data,))
+    archived(box, box.run(), data, config)
+
+
+def test_the_next_attempt_after_a_complete_roll_back_starts_over(tmp_path):
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    box.wrap(fail='tee', at=5, other_fs=(box.data,))
+    assert box.run().returncode == 1
+    box.wrap(other_fs=(box.data,))
+    out = box.run()
+    archived(box, out, data, config)
+    assert 'did not complete' not in out.stdout
 
 
 @pytest.mark.parametrize('edited', [False, True])
@@ -1125,7 +960,7 @@ def test_a_fips_line_stuck_in_the_journal_says_whether_the_new_configuration_wen
     box.wrap()
     (box.bin / 'rm').write_text(
         f'#!/bin/sh\nfor last; do :; done\ncase $last in */.journal) kill -9 0 ;; esac\n'
-        f'exec {REAL["rm"]} "$@"\n')
+        f'exec {box.real("rm")} "$@"\n')
     assert box.run().returncode == -9
     if edited:
         env.write_text('UCM_FIPS_BUILD=1\nEDITED=1\n')
@@ -1142,196 +977,76 @@ def test_a_fips_line_stuck_in_the_journal_says_whether_the_new_configuration_wen
         assert not env.exists()
 
 
-# -- a temporary goes only while its item stands at a real path ------------------------
+# -- the guard itself ----------------------------------------------------------------
 
-LEFT = 'what may be all that is left of {src}: check it, move it back to {src} to keep it or remove it, then retry'
-DIFFERS = ('not put back to {src}, which differs from its copy: to keep {src}, remove this copy; '
-           'to keep this copy, put it back in place of {src}; then retry')
-
-
-def _lost_nothing(box, data, out, why=''):
-    from tests.package_leftover_chaos import _nothing_lost
-    _nothing_lost(box, data, {}, why, out)
-
-
-def _rm_kills(box, path, after=False):
-    """rm kills the run on `path`: before removing it, or once it is gone."""
-    real = f'{REAL["rm"]} "$@"'
-    kill = f'for last; do :; done\n[ "$last" != "{path}" ] || kill -9 0\n'
-    (box.bin / 'rm').write_text(f'#!/bin/sh\n{real} || exit 1\n{kill}' if after else f'#!/bin/sh\n{kill}exec {real}\n')
-
-
-def _then(box, part, src, then):
-    """The operator's choice over a temporary named as all that may be left of src."""
-    if then == 'moved back':
-        os.rename(part, src)
-    else:
-        _gone(part)
-
-
-def _left_alone(box, part, src, data, held, why):
-    """Two runs: each exits 2, names the temporary alone as all that may be left of src,
-    and keeps it as it was."""
-    for _ in range(2):
-        out = box.run()
-        assert out.returncode == 2, (why, out.stdout, out.stderr)
-        assert reported(out.stdout)[str(part)] == LEFT.format(src=src), out.stdout
-        assert named(out.stdout) == [str(part)], out.stdout
-        assert 'wait for your choice' in out.stdout or 'retrying alone will not' in out.stdout
-        assert _shape(part) == held and not os.path.lexists(src)
-        if data is not None:
-            _lost_nothing(box, data, out, why)
-
-
-def _converges_after(box, part, src, name, original, then):
-    _then(box, part, src, then)
-    out = box.run()
-    assert out.returncode == 0, (out.stdout, out.stderr)
-    assert not os.path.lexists(src)
-    if then == 'moved back':
-        assert _shape(box.archive / 'data' / name) == original
-    else:
-        assert not os.path.lexists(box.archive / 'data' / name)
-    assert not any(p.name.endswith(PART) for p in box.tmp.rglob('*'))
-
-
-@pytest.mark.parametrize('kind', ITEMS)
-@pytest.mark.parametrize('then', ['moved back', 'removed'])
-def test_a_copy_set_aside_whose_source_went_since_is_kept_and_named(tmp_path, kind, then):
-    """A copy proved the same as its source is renamed aside to go, and the run killed on
-    its removal; the source is then removed: that temporary is all that may be left."""
+@pytest.mark.parametrize('command, args', [
+    ('cp', '-a -- {data}/ucm.db {archive}/data/ucm.db'),
+    ('mv', '-- {data}/ucm.db {archive}/data/ucm.db'),
+    ('rm', '-rf -- {data}/updates'),
+    ('rm', '-f -- {config}/ucm.env'),
+])
+def test_the_guard_fails_at_the_first_copy_move_or_removal_of_an_item(tmp_path, command, args):
+    """What every test runs through: a cp, mv or rm naming an item fails the test."""
     box = Box(tmp_path, python='stub')
-    name = ITEMS[kind]
-    src, dst = box.data / name, box.archive / 'data' / name
-    part = pathlib.Path(f'{dst}{PART}')
-    data, original = whole(box.data, KEPT), _shape(src)
-    _killed_once_copied(box, name)
-    _rm_kills(box, part)
-    assert box.run().returncode == -9
-    assert _shape(part) == original and not os.path.lexists(dst)
-    box.wrap(other_fs=(box.data,))
-    _gone(src)
-    _left_alone(box, part, src, data, original, kind)
-    _converges_after(box, part, src, name, original, then)
+    box.wrap()
+    call = f'{command} ' + args.format(data=box.data, config=box.config, archive=box.archive)
+    out = subprocess.run([str(box.bin / command), *call.split()[1:]], capture_output=True)
+    assert out.returncode == 1
+    assert (box.state / 'forbidden').read_text() == call + '\n'
+    with pytest.raises(AssertionError, match=command):
+        box.run()
 
 
-@pytest.mark.parametrize('kind', ITEMS)
-@pytest.mark.parametrize('then', ['moved back', 'removed'])
-def test_a_source_set_aside_whose_copy_went_since_is_kept_and_named(tmp_path, kind, then):
-    """A copied source is renamed aside to go, and the run killed on its removal; its copy
-    is then removed from the archive: that temporary is all that may be left."""
+def test_the_guard_lets_the_journal_the_readme_and_the_written_ucm_env_go(tmp_path):
     box = Box(tmp_path, python='stub')
-    name = ITEMS[kind]
-    src, dst = box.data / name, box.archive / 'data' / name
-    part = pathlib.Path(f'{src}{PART}')
-    data, original = whole(box.data, KEPT), _shape(src)
-    box.wrap(other_fs=(box.data,))
-    _rm_kills(box, part)
-    assert box.run().returncode == -9
-    assert _shape(part) == original and _shape(dst) == original and not os.path.lexists(src)
-    box.wrap(other_fs=(box.data,))
-    _gone(dst)
-    _left_alone(box, part, src, data, original, kind)
-    _converges_after(box, part, src, name, original, then)
+    box.wrap()
+    box.archive.mkdir(parents=True)
+    for name in ('.journal', '.journal.new', 'README.txt'):
+        (box.archive / name).write_text('x')
+    (box.config / 'ucm.env').write_text(FIPS)
+    for call in (['mv', '--', f'{box.archive}/.journal.new', f'{box.archive}/.journal'],
+                 ['rm', '-f', '--', f'{box.archive}/.journal', f'{box.archive}/README.txt'],
+                 ['rm', '-f', '--', f'{box.config}/ucm.env']):
+        assert subprocess.run([str(box.bin / call[0]), *call[1:]]).returncode == 0, call
+    assert not (box.state / 'forbidden').exists()
 
 
-@pytest.mark.parametrize('kind', ITEMS)
-def test_a_partial_copy_whose_source_went_since_is_kept_and_named(tmp_path, kind):
-    """Killed while copying an item into the archive, then its source removed: the partial
-    copy is kept and named, never removed as a leftover, until the operator chooses."""
-    box = Box(tmp_path, python='stub')
-    name = ITEMS[kind]
-    src = box.data / name
-    part = pathlib.Path(f'{box.archive}/data/{name}{PART}')
-    box.wrap(other_fs=(box.data,))
-    cut = (f'{shutil.which("truncate")} -s 1 "$last"' if kind == 'file' else
-           f'{REAL["rm"]} -f "$last/nested/f"' if kind == 'directory' else ':')
-    (box.bin / 'cp').write_text(
-        f'#!/bin/sh\n{REAL["cp"]} "$@" || exit 1\nfor last; do :; done\n'
-        f'[ "$last" != "{part}" ] || {{ {cut}; kill -9 0; }}\n')
-    assert box.run().returncode == -9
-    box.wrap(other_fs=(box.data,))
-    _gone(src)
-    held = _shape(part)
-    _left_alone(box, part, src, None, held, kind)
-    _converges_after(box, part, src, name, None, 'removed')
+# -- the packages --------------------------------------------------------------------
+
+def _requires(spec, kind='Requires'):
+    return {line.split(':', 1)[1].strip() for line in spec.splitlines() if line.startswith(f'{kind}:')}
 
 
-def test_a_source_whose_two_paths_went_during_its_removal_is_kept_aside(tmp_path):
-    """While the sources of the copies go, one of them is found only under its temporary:
-    it is kept and named, the others put back."""
-    box = Box(tmp_path, python='stub')
-    src, dst = box.data / 'ucm.db', box.archive / 'data' / 'ucm.db'
-    part = pathlib.Path(f'{src}{PART}')
-    data, original = whole(box.data, KEPT), _shape(src)
-    box.wrap(other_fs=(box.data,))
-    # Once the last item is copied, ucm.db is set aside and its copy gone
-    (box.bin / 'cp').write_text(
-        f'#!/bin/sh\n{REAL["cp"]} "$@" || exit 1\nfor last; do :; done\n'
-        f'[ "$last" != "{box.archive}/data/updates{PART}" ] || '
-        f'{{ {REAL["mv"]} -- "{src}" "{part}" && {REAL["rm"]} -f -- "{dst}"; }}\n')
-    out = box.run()
-    assert out.returncode == 2, (out.stdout, out.stderr)
-    assert reported(out.stdout)[str(part)] == LEFT.format(src=src), out.stdout
-    assert _shape(part) == original
-    _lost_nothing(box, data, out)
+def test_the_rpm_requires_what_the_archiving_and_post_run():
+    """findmnt tells a mount point kept in place; %post walks the data with find to keep the
+    local archives root's. On Debian these are essential packages, never named."""
+    spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
+    assert {'findutils', 'coreutils', '/usr/bin/findmnt'} <= {r.split()[0] for r in _requires(spec)}
 
 
-def test_a_put_back_whose_copy_went_while_copying_is_kept_aside(tmp_path):
-    """A put-back fails once its copy is gone from the archive: what it copied beside the
-    source is kept and named, never removed as a partial copy."""
-    box = Box(tmp_path, python='stub')
-    src, dst = box.data / 'ucm.db', box.archive / 'data' / 'ucm.db'
-    part = pathlib.Path(f'{src}{PART}')
-    data, original = whole(box.data, KEPT), _shape(src)
-    box.wrap(other_fs=(box.data,))
-    once = box.state / 'once'
-    # The last source cannot go, once: everything is put back
-    (box.bin / 'rm').write_text(
-        f'#!/bin/sh\nfor last; do :; done\n'
-        f'if [ "$last" = "{box.data}/updates{PART}" ] && [ ! -e {once} ]; then : > {once}; exit 1; fi\n'
-        f'exec {REAL["rm"]} "$@"\n')
-    (box.bin / 'cp').write_text(
-        f'#!/bin/sh\n{REAL["cp"]} "$@" || exit 1\n'
-        f'[ "$3" != "{dst}" ] || {{ {REAL["rm"]} -f -- "{dst}"; exit 1; }}\n')
-    out = box.run()
-    assert out.returncode == 2, (out.stdout, out.stderr)
-    assert reported(out.stdout)[str(part)] == LEFT.format(src=src), out.stdout
-    assert _shape(part) == original
-    _lost_nothing(box, data, out)
+def test_the_rpm_has_the_interpreter_while_post_runs():
+    """%post renames with %{ucm_python}: Requires(post) makes it installed by then, on EL9
+    (python3.12) as elsewhere (python3)."""
+    spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
+    for branch in spec.split('%endif', 1)[0].split('%else'):
+        python = next(line.split()[2] for line in branch.splitlines() if line.startswith('%global ucm_python'))
+        assert any(r.split()[0] == python for r in _requires(branch, 'Requires(post)')), python
 
 
-def test_a_source_set_aside_that_cannot_be_removed_is_named_as_such(tmp_path):
-    box = Box(tmp_path, python='stub')
-    src = box.data / 'ucm.db'
-    part = f'{src}{PART}'
-    box.wrap(other_fs=(box.data,))
-    _rm_kills(box, part)
-    assert box.run().returncode == -9
-    box.wrap(other_fs=(box.data,))
-    (box.bin / 'rm').write_text(
-        f'#!/bin/sh\nfor last; do :; done\n[ "$last" != "{part}" ] || exit 1\nexec {REAL["rm"]} "$@"\n')
-    out = box.run()
-    assert out.returncode == 2, (out.stdout, out.stderr)
-    assert reported(out.stdout)[part] == f'what is left of {src}, renamed aside, could not be removed'
+def test_the_deb_has_the_interpreter_while_postinst_runs():
+    """dpkg configures a package's Depends before running its postinst configure: python3
+    is a Depends of the package, not a Recommends."""
+    import re
+    control = (ROOT / 'packaging' / 'debian' / 'control').read_text()
+    depends = re.search(r'^Depends:(.*?)^\S', control, re.M | re.S).group(1)
+    assert 'python3 (>= 3.12)' in depends
 
 
-def test_a_put_back_over_a_source_removed_in_place_says_it_replaces_it(tmp_path):
-    """While its inplace line stays, the next attempt puts the copy back over whatever
-    stands at the source: the stop says so before the operator retries."""
-    box = Box(tmp_path, python='stub')
-    src = box.data / 'updates'
-    box.wrap(refused=(str(src),))
-    once = box.state / 'once'
-    (box.bin / 'rm').write_text(
-        f'#!/bin/sh\nfor last; do :; done\n'
-        f'if [ "$last" = {src} ] && [ ! -e {once} ]; then : > {once}; '
-        f'{REAL["rm"]} -f -- "$last/nested/f"; kill -9 0; fi\nexec {REAL["rm"]} "$@"\n')
-    assert box.run().returncode == -9
-    box.wrap(refused=(str(src),))
-    (box.bin / 'cp').write_text(
-        f'#!/bin/sh\ncase $3 in {box.parent}/*) exit 1 ;; esac\nexec {REAL["cp"]} "$@"\n')
-    out = box.run()
-    assert out.returncode == 2, (out.stdout, out.stderr)
-    assert reported(out.stdout)[f'{box.archive}/data/updates'] == (
-        f'not put back to {src}: the next attempt puts its copy back at {src}, replacing what is there')
+def test_the_kept_directories_are_those_the_packages_create():
+    """RPM owns these directories and the DEB postinst creates them: the archive leaves them."""
+    import re
+    spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
+    postinst = (ROOT / 'packaging' / 'debian' / 'postinst').read_text()
+    assert {frozenset(m.split()) for m in re.findall(r'for d in ([a-z ]+); do', spec)} == {frozenset(KEPT)}
+    assert re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst) and all(
+        set(m.split(',')) == set(KEPT) for m in re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst))

@@ -12,17 +12,21 @@ BuildArch:      noarch
 AutoReqProv:    no
 # EL9's python3 is 3.9: the el9 build runs on the parallel-installable python3.12.
 # EL10's python3 is 3.12: it takes the system python3 like Fedora
+# Requires(post): %post renames the files a removed UCM left with it (archive-leftovers.sh)
 %if 0%{?rhel} && 0%{?rhel} < 10
 Requires:       python3.12
+Requires(post): python3.12
 %global ucm_python python3.12
 %else
 Requires:       python3 >= 3.12
+Requires(post): python3 >= 3.12
 %global ucm_python python3
 %endif
 Requires:       systemd
 Requires:       openssl >= 1.1.1
 Requires:       logrotate
-# The archiving of a removed UCM's files compares its copies and tells a bind mount
+# The archiving of a removed UCM's files tells a mount point; %post keeps its local
+# archives out of the chown with find
 Requires:       coreutils
 Requires:       findutils
 Requires:       /usr/bin/findmnt
@@ -220,9 +224,9 @@ fi
 ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 [ "$ENV_STATE" != new ] || NEW_CONFIG=1
 
-# Set permissions
-chown -R %{name}:%{name} $UCM_HOME
-chown -R %{name}:%{name} $UCM_CONFIG
+# Set permissions; a local archive of a removed UCM's files (.ucm-archive-*) stays root's
+find $UCM_HOME -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
+find $UCM_CONFIG -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
 chown -R %{name}:%{name} /var/log/%{name}
 chmod 750 $UCM_DATA
 

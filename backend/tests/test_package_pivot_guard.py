@@ -315,7 +315,7 @@ def _post_sandbox(tmp_path, archive_rc):
     for name, body in fakes.items():
         (bin_dir / name).write_text(f'#!{POSIX_SH}\n{body}\n')
         (bin_dir / name).chmod(0o755)
-    for tool in ('cat', 'grep', 'basename', 'dirname'):
+    for tool in ('cat', 'grep', 'basename', 'dirname', 'find'):
         os.symlink(shutil.which(tool), bin_dir / tool)
     log = tmp_path / 'calls.log'
     return {'PATH': str(bin_dir), 'LOG': str(log)}, log, home, data, config
@@ -606,26 +606,99 @@ def test_a_venv_built_before_fips_came_back_is_built_again(tmp_path, package, be
         assert 'building it again against the system OpenSSL' in out.stdout
 
 
+@pytest.mark.parametrize('package', ['deb', 'rpm'])
+def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_path, package):
+    """The archiver leaves what it could not rename out of its filesystem in .ucm-archive-*
+    directories of the data and the configuration, root's: the chown that gives the rest to
+    the service account passes them by, and still reaches everything else."""
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    for top in (data, data / 'ca', config):
+        (top / '.ucm-archive-20261114T120000Z' / 'old').mkdir(parents=True)
+        (top / '.ucm-archive-20261114T120000Z' / 'old' / 'leaf.key').write_text('key')
+    (data / 'ca' / 'kept.pem').write_text('pem')
+    (config / 'kept.env').write_text('x')
+    if package == 'deb':
+        script = tmp_path / 'postinst.sandboxed'
+        script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+        cmd = ['/bin/bash', str(script), 'configure', '2.254']
+    else:
+        cmd = [POSIX_SH, '-c', _post_body(tmp_path, home, data, config), 'post', '2']
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=20, env=env)
+    assert out.returncode == 0, out.stderr
+    chowned = [c for c in _calls(log) if c.startswith('chown ')]
+    named = ' '.join(chowned)
+    assert '.ucm-archive-' not in named, chowned
+    for path in (data / 'ca' / 'kept.pem', config / 'kept.env', data, config):
+        assert f' {path} ' in f'{named} ', (path, chowned)
+    assert not any(c.startswith('chown -R ') and (str(data) in c or str(config) in c or c.endswith(str(home)))
+                   for c in chowned), chowned
+
+
 POSTRM = ROOT / 'packaging' / 'debian' / 'postrm'
+
+
+def _postrm_with(tmp_path, action, lay):
+    """_postrm, with `lay(home, config)` run on the sandbox before the script."""
+    env, log, home, _data, config = _post_sandbox(tmp_path, 0)
+    lay(home, config)
+    (bin_rm := pathlib.Path(env['PATH']) / 'rm').write_text(
+        f'#!{POSIX_SH}\necho "rm $*" >> "$LOG"\nexec {shutil.which("rm")} "$@"\n')
+    bin_rm.chmod(0o755)
+    for tool in ('sort', 'sed', 'rmdir'):
+        os.symlink(shutil.which(tool), pathlib.Path(env['PATH']) / tool)
+    text = POSTRM.read_text()
+    for line, path in (('UCM_HOME=/opt/ucm\n', home), ('UCM_CONFIG=/etc/ucm\n', config)):
+        assert text.count(line) == 1, line
+        text = text.replace(line, f'{line.split("=")[0]}={path}\n')
+    script = tmp_path / 'postrm.sandboxed'
+    # Every other path it removes is outside the sandbox: echoed, never run
+    script.write_text(text.replace('rm -rf /', 'echo rm -rf /'))
+    out = subprocess.run(['/bin/bash', str(script), action], capture_output=True, text=True,
+                         timeout=20, env=env)
+    assert out.returncode == 0, out.stderr
+    return out, log, home, config
 
 
 @pytest.mark.parametrize('action, removed', [('purge', True), ('remove', False)])
 def test_a_purge_removes_the_pending_mark(tmp_path, action, removed):
     """The mark is no package file: dpkg leaves it, the purge takes it (a journal left in
     the archive still sends the next install through the archiver)."""
-    env, log, home, *_ = _post_sandbox(tmp_path, 0)
-    (bin_rm := pathlib.Path(env['PATH']) / 'rm').write_text(
-        f'#!{POSIX_SH}\necho "rm $*" >> "$LOG"\nexec {shutil.which("rm")} "$@"\n')
-    bin_rm.chmod(0o755)
-    (home / PENDING).write_text('')
-    text = POSTRM.read_text()
-    assert text.count('UCM_HOME=/opt/ucm\n') == 1
-    script = tmp_path / 'postrm.sandboxed'
-    # Every other path it removes is outside the sandbox: only the mark's rm may run
-    script.write_text(text.replace('UCM_HOME=/opt/ucm\n', f'UCM_HOME={home}\n')
-                      .replace('rm -rf /', 'echo rm -rf /'))
-    out = subprocess.run(['/bin/bash', str(script), action], capture_output=True, text=True,
-                         timeout=20, env=env)
-    assert out.returncode == 0, out.stderr
+    out, log, home, config = _postrm_with(tmp_path, action, lambda home, config: (home / PENDING).write_text(''))
     assert (home / PENDING).exists() is not removed
-    assert all(c.startswith(f'rm -f {home}/') for c in _calls(log) if c.startswith('rm '))
+    # Without a local archive the configuration goes whole, and only on a purge
+    assert config.exists() is not removed
+    assert all(c in (f'rm -f {home}/{PENDING}', f'rm -rf {config}') for c in _calls(log) if c.startswith('rm '))
+
+
+def _tree(root):
+    return sorted((str(p.relative_to(root)), p.read_bytes() if p.is_file() else None, oct(p.lstat().st_mode))
+                  for p in root.rglob('*'))
+
+
+def test_a_purge_keeps_the_local_archives_of_an_earlier_installation(tmp_path):
+    """They hold that installation's keys: the purge removes the configuration around
+    them, names them, and leaves each one as it was, an empty directory inside included."""
+    def lay(home, config):
+        (config / 'ucm.env').write_text('new')
+        (config / 'conf.d').mkdir()
+        (config / 'conf.d' / 'extra').write_text('new')
+        (config / 'ssl').mkdir()
+        (config / 'ssl' / 'cert.pem').write_text('new')
+        for where in (config, config / 'ssl'):
+            kept = where / '.ucm-archive-20260101T000000Z'
+            (kept / 'empty').mkdir(parents=True)
+            (kept / 'master.key').write_text('old key')
+            kept.chmod(0o700)
+    out, log, home, config = _postrm_with(tmp_path, 'purge', lay)
+    kept = [config / '.ucm-archive-20260101T000000Z', config / 'ssl' / '.ucm-archive-20260101T000000Z']
+    for k in kept:
+        assert [n for n, *_ in _tree(k)] == ['empty', 'master.key'], k
+        assert (k / 'master.key').read_text() == 'old key' and (k / 'empty').is_dir()
+        assert oct(k.stat().st_mode & 0o777) == '0o700'
+        assert f'  {k}' in out.stdout.splitlines()
+    # Nothing else is left, and no directory but those that hold an archive
+    assert sorted(str(p.relative_to(config)) for p in config.rglob('*') if not any(
+        part.startswith('.ucm-archive-') for part in p.relative_to(config).parts)) == ['ssl']
+    assert f'chown root:root {config}' in _calls(log) and f'chmod 700 {config}' in _calls(log)
+    assert not any(c.startswith('rm -rf ') for c in _calls(log)), _calls(log)
+    assert not any('.ucm-archive-' in c for c in _calls(log) if c.startswith('rm ')), _calls(log)

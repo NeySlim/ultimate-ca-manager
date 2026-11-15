@@ -2,15 +2,17 @@
 # Run by the DEB postinst and the RPM %post on a new install, before the configuration
 # is written: when an earlier UCM was removed and left a SQLite database this release
 # refuses (migration_runner.py check), everything it left is moved, intact, to a root-only
-# archive, so the install goes on as on a new machine. Nothing is ever deleted: a failed
-# step puts back what was moved, and the service is then not started.
+# archive, so the install goes on as on a new machine. Nothing is ever copied or deleted:
+# each item is renamed once, so it is whole at exactly one path at any time, and a failed
+# step renames back what was moved; the service is then not started.
 #
 # Usage: UCM_PYTHON=<python> archive-leftovers.sh <ucm home> <data dir> <config dir>
 #            [<archive parent> [<log>]]
 # Exit 0: nothing to archive, or archived; 3: a database it must not archive is left in
 # place, and the service will refuse to start on it; 1: not archived, everything is back
-# in place; 2: not archived, some files are still in the archive (the next run tries to
-# put them back first). On 1 and 2 the install must stop; on 3 it must not announce a success.
+# in place (or nothing was moved: no interpreter to rename with); 2: not archived, some
+# files are still in the archive (the next run tries to put them back first). On 1 and 2
+# the install must stop; on 3 it must not announce a success.
 set -u
 
 UCM_HOME=$1
@@ -19,16 +21,18 @@ CONFIG=$3
 # Beside the home (/opt/ucm-archive): outside every path the service may write or back up
 PARENT=${4:-${UCM_HOME%/*}/ucm-archive}
 LOG=${5:-/var/log/ucm/leftover-archive.log}
-# Renames with rename(2) alone; without it, every move is a verified copy
+# Renames with rename(2) alone: without it, nothing moves
 PYTHON=${UCM_PYTHON:-}
 # The data directories the packages own or create: kept in place, their contents archived
 KEEP_DIRS="ca certs private crl scep backups sessions"
 TAB=$(printf '\t')
+NL='
+'
 FIPS_LINE=UCM_FIPS_BUILD=1
-# What a real path holds is whole, or not ours: our partial states live under this suffix,
-# beside that path, and take its place by a rename once verified
-PART=.ucm-archive-part
-DEST="" JOURNAL="" MADE_PARENT=""
+# An item rename(2) cannot take out of its filesystem goes into <its directory>/$LOCAL_PREFIX<archive>
+LOCAL_PREFIX=.ucm-archive-
+# LOCALS: the local archives this run made, one per line between newlines
+DEST="" JOURNAL="" MADE_PARENT="" LOCALS=$NL EARLIER=""
 
 log_line() {
     { mkdir -p "${LOG%/*}" && printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$LOG"; } \
@@ -44,7 +48,7 @@ env_value() {
 }
 
 # $1 is a mount point, from the mount table (a bind mount of the same filesystem too):
-# kept in place, as rm -rf would empty it then fail (EBUSY)
+# kept in place, as it cannot be renamed (EBUSY)
 is_mount() {
     mnt=$(findmnt -n -o TARGET -T "$1" 2>/dev/null) && [ "$mnt" = "$(normal "$1")" ]
 }
@@ -59,83 +63,49 @@ rename_item() {
 
 present() { [ -e "$1" ] || [ -L "$1" ]; }
 
-# $1, or the temporary it was renamed to when only that is left: the path to name
-here() { if present "$1" || ! present "$1$PART"; then printf '%s' "$1"; else printf '%s' "$1$PART"; fi; }
-
-# Our verified temporary $1 takes the place of $2 (absent), in one directory: rename(2), or
-# without an interpreter mv, which renames what this run has just written, never copies it
-rename_here() {
-    if [ -n "$RENAME" ]; then rename_item "$1" "$2"; else ! present "$2" && mv -T -- "$1" "$2"; fi
-}
-
 # $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
 normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
 
-# A comparable digest of a file, a symbolic link, a special file or a whole tree: names,
-# types, contents, and what a copy carries over last (mode, owner, group, date of the
-# files). Equal means whole; fails, printing nothing usable, when a command it runs fails.
-digest() {
-    if [ -L "$1" ]; then
-        target=$(readlink -- "$1") || return 1
-        printf 'link %s\n' "$target"
-    elif [ -d "$1" ]; then
-        list=$(cd -- "$1" && find . \( -type f -exec cksum {} + \) -o \( -type l -exec sh -c \
-            'for l; do t=$(readlink -- "$l") || exit 1; printf "link %s %s\n" "$l" "$t"; done' sh {} + \) \
-            -o -print && find . ! -type l -printf 'attr %y %m %U %G %p\n' \
-            && find . -type f -printf 'date %Ts %p\n') || return 1
-        printf '%s\n' "$list" | LC_ALL=C sort
-    elif [ -f "$1" ]; then
-        sum=$(cksum < "$1") && attr=$(stat -c 'attr %a %u %g %Y' -- "$1") || return 1
-        printf '%s\n%s\n' "$sum" "$attr"
-    else
-        # A FIFO or a device is never read (a FIFO would block): its kind and attributes
-        stat -c 'special %F %t %T %a %u %g' -- "$1"
-    fi
-}
+# Appends line $1 to the journal (tee: a command, which a test can fail or kill)
+jot() { printf '%s\n' "$1" | tee -a -- "$JOURNAL" >/dev/null; }
 
-# $1 and $2 have one digest, and both could be taken
-same() { d1=$(digest "$1") && d2=$(digest "$2") && [ -n "$d1" ] && [ "$d1" = "$d2" ]; }
-
-# Moves $1 to $2 (absent): a rename, else a copy made beside $2, verified, then renamed to
-# $2; its source is removed only once every item is in the archive (remove_copied). A
-# refused rename moved nothing: its line leaves the journal before the copy line comes.
-move_item() {
-    if present "$2"; then return 1; fi
-    printf 'rename\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
+# A rename line, then rename(2) of $1 to $2. 0: moved; 1: refused while $1 is there and $2
+# absent, its line out of the journal again; 2: any other failure.
+try_rename() {
+    jot "rename$TAB$1$TAB$2" || return 2
     rename_item "$1" "$2" && return 0
-    { present "$1" && ! present "$2" && drop_line "rename$TAB$1$TAB$2"; } || return 1
-    printf 'copy\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
-    cp -a -- "$1" "$2$PART" && same "$1" "$2$PART" && rename_here "$2$PART" "$2"
+    { present "$1" && ! present "$2" && drop_line "rename$TAB$1$TAB$2"; } || return 2
+    return 1
 }
 
-# Removes $1, copied at $2, so that its path holds it whole or not at all: renamed aside,
-# then removed.
-# Where that rename is refused, removed in place behind an inplace line, which marks a
-# half-removed $1 as ours until it is gone.
-discard() {
-    if present "$1$PART"; then
-        # Removed only while the item stands at $1 or $2, its other path
-        { present "$1" || present "$2"; } && rm -rf -- "$1$PART" || return 1
+# Moves item $1 to $2 in the archive; refused, into the local archive of its directory;
+# refused too, a directory stays, its entries moved the same way, and a file fails.
+move_item() {
+    present "$2" && return 1
+    try_rename "$1" "$2"; rc=$?
+    [ "$rc" -eq 1 ] || return "$rc"
+    loc=${1%/*}/$LOCAL_NAME made=""
+    case $LOCALS in
+        *"$NL$loc$NL"*) ;;
+        *)  # Another's directory of that name is never written into, nor removed
+            if present "$loc"; then rc=3; else
+                { jot "mkdir$TAB${1%/*}$TAB$loc" && mkdir -m 700 -- "$loc"; } || return 2
+                LOCALS=$LOCALS$loc$NL made=1
+            fi ;;
+    esac
+    if [ "$rc" -ne 3 ]; then
+        try_rename "$1" "$loc/${1##*/}"; rc=$?
+        [ "$rc" -eq 1 ] || return "$rc"
     fi
-    if rename_item "$1" "$1$PART"; then
-        rm -rf -- "$1$PART"
-    elif present "$1" && ! present "$1$PART"; then
-        printf 'inplace\t%s\n' "$1" >> "$JOURNAL" && rm -rf -- "$1" && drop_line "inplace$TAB$1"
-    else
+    if [ -n "$made" ]; then
+        rmdir -- "$loc" || return 2
+        LOCALS=${LOCALS%"$loc$NL"}
+    fi
+    if [ ! -d "$1" ] || [ -L "$1" ]; then
+        say "UCM: $1 could not be renamed, into the archive or beside it."
         return 1
     fi
-}
-
-# Our temporary $1 of $2, with no item at its real paths: perhaps all that is left of it
-kept_aside() {
-    twice=1
-    unsettled "$1" "what may be all that is left of $2: check it, move it back to $2 to keep it or remove it, then retry"
-}
-
-# Never ours (no journal names it), yet named as our temporaries are: nothing is archived
-not_ours() {
-    say "UCM: $1 is named as this package names its temporary copies ($PART):"
-    say "rename or remove it, then retry."
+    archive_contents "$1" "$2"
 }
 
 is_kept() {
@@ -145,27 +115,19 @@ is_kept() {
 }
 
 # Archives the contents of directory $1, which stays, into $2 (created here). A kept
-# directory or a mount point is never moved itself: its contents are, the same way.
+# directory or a mount point is never moved itself: its contents are, the same way. A
+# local archive an earlier run left is not an item: it stays, and the README names it.
 archive_contents() {
-    printf 'mkdir\t%s\t%s\n' "$1" "$2" >> "$JOURNAL" || return 1
-    mkdir -- "$2" || return 1
+    { jot "mkdir$TAB$1$TAB$2" && mkdir -- "$2"; } || return 1
     for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
-        [ -e "$entry" ] || [ -L "$entry" ] || continue
-        case $entry in *"$PART") not_ours "$entry"; return 1 ;; esac
+        present "$entry" || continue
+        case ${entry##*/} in "$LOCAL_PREFIX"*) EARLIER=$EARLIER$entry$NL; continue ;; esac
         if [ -d "$entry" ] && [ ! -L "$entry" ] && { is_kept "$1" "${entry##*/}" \
                 || is_mount "$entry"; }; then
             archive_contents "$entry" "$2/${entry##*/}" || return 1
         else
             move_item "$entry" "$2/${entry##*/}" || return 1
         fi
-    done
-}
-
-# Second phase of a cross-filesystem move: every copy is verified, the sources go
-remove_copied() {
-    grep "^copy$TAB" "$JOURNAL" | while IFS="$TAB" read -r _op src dst; do
-        printf 'remove\t%s\t%s\n' "$src" "$dst" >> "$JOURNAL" || exit 1
-        discard "$src" "$dst" || exit 1
     done
 }
 
@@ -193,7 +155,7 @@ unsettled() {
     if grep -qxF "failed$TAB$1" "$JOURNAL" 2>/dev/null; then
         again=1
     else
-        printf 'failed\t%s\n' "$1" >> "$JOURNAL" 2>/dev/null || true
+        jot "failed$TAB$1" 2>/dev/null || true
     fi
 }
 
@@ -222,10 +184,8 @@ say_stuck() {
     fi
 }
 
-# Undoes the journal, last step first. Every line replays as a no-op once undone, so a
-# retry from any interrupted state converges. A copy goes only once its source is whole
-# again and its remove line is out of the journal. The temporaries beside the paths a
-# line names are ours; each line removes its own, only while the item stands at a real path.
+# Undoes the journal, last step first, by renames back alone. Every line replays as a
+# no-op once undone, so a retry from any interrupted state converges.
 roll_back() {
     stuck="" left="" seen="" again="" twice=""
     undo=$(sed -n '1!G;h;$p' "$JOURNAL") || { unsettled "$JOURNAL" "could not be read"; return 1; }
@@ -238,68 +198,8 @@ roll_back() {
                     unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"
                 elif present "$dst"; then
                     rename_item "$dst" "$src" || unsettled "$dst" "not put back to $src"
-                fi ;;
-            remove)
-                # Beside $src only our own leftovers: the source renamed aside, a partial put-back
-                if present "$src$PART"; then
-                    if ! present "$src" && ! present "$dst"; then kept_aside "$src$PART" "$src"; continue; fi
-                    rm -rf -- "$src$PART" || { unsettled "$src$PART" "what is left of $src, renamed aside, could not be removed"; continue; }
-                fi
-                if ! present "$dst"; then
-                    # Its copy gone by hand: nothing to put back, unless half removed in place
-                    grep -qxF "inplace$TAB$src" "$JOURNAL" || drop_line "remove$TAB$src$TAB$dst" \
-                        || unsettled "$JOURNAL" "could not be updated"
-                    continue
-                fi
-                ours=""
-                if grep -qxF "inplace$TAB$src" "$JOURNAL"; then ours=1; fi
-                if present "$src" && same "$src" "$dst"; then
-                    drop_line "inplace$TAB$src" "remove$TAB$src$TAB$dst" || unsettled "$dst" "not put back to $src"
-                elif present "$src" && [ -z "$ours" ]; then
-                    # Removed whole, so this one was made again since
-                    twice=1
-                    unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"
-                else
-                    # Copied beside $src and verified; only then does a source half removed in
-                    # place (ours) go, and the copy takes its path. Its copy line, undone next,
-                    # removes the copy once this remove line is out.
-                    { cp -a -- "$dst" "$src$PART" && same "$dst" "$src$PART" \
-                        && { [ -z "$ours" ] || rm -rf -- "$src"; } \
-                        && rename_here "$src$PART" "$src" \
-                        && drop_line "inplace$TAB$src" "remove$TAB$src$TAB$dst"; } || {
-                        if present "$src" || present "$dst"; then
-                            rm -rf -- "$src$PART" 2>/dev/null
-                            # While the inplace line stays, whatever stands at $src then is replaced
-                            unsettled "$dst" "not put back to $src${ours:+: the next attempt puts its copy back at $src, replacing what is there}"
-                        else
-                            kept_aside "$src$PART" "$src"
-                        fi
-                    }
-                fi ;;
-            copy)
-                # $dst$PART is ours; removed only while the item stands at a real path. $dst is
-                # whole, and goes only while $src is the same (else the source changed since)
-                if present "$dst$PART"; then
-                    if ! present "$src" && ! present "$dst"; then kept_aside "$dst$PART" "$src"; continue; fi
-                    rm -rf -- "$dst$PART" || unsettled "$dst$PART" "a partial copy of $src could not be removed"
-                fi
-                if grep -qxF "remove$TAB$src$TAB$dst" "$JOURNAL"; then
-                    # While its remove line stays, the copy may be all that is left of a file
-                    unsettled "$dst" "not put back to $src"
-                elif grep -qxF "inplace$TAB$dst" "$JOURNAL"; then
-                    # Proved the same as $src, then cut short while removed in place
-                    { rm -rf -- "$dst" && drop_line "inplace$TAB$dst"; } \
-                        || unsettled "$dst" "a copy of $src, which is back in place, could not be removed"
-                elif ! present "$dst"; then
-                    :
                 elif ! present "$src"; then
-                    twice=1
-                    unsettled "$dst" "the only copy of $src, which is gone: put it back there or remove it, then retry"
-                elif same "$src" "$dst"; then
-                    discard "$dst" "$src" || unsettled "$(here "$dst")" "a copy of $src, which is back in place, could not be removed"
-                else
-                    twice=1
-                    unsettled "$dst" "not put back to $src, which differs from its copy: to keep $src, remove this copy; to keep this copy, put it back in place of $src; then retry"
+                    say "UCM: $src is missing: an earlier attempt moved it to $dst, which no longer holds it either."
                 fi ;;
             fips)
                 # The new ucm.env goes while the archived one can take its place, once: the
@@ -329,7 +229,32 @@ EOF
     [ -z "$MADE_PARENT" ] || rmdir -- "$PARENT" 2>/dev/null || true
 }
 
+# Each local archive with what it holds, one line each
+local_lines() {
+    printf '%s' "$1" | while IFS= read -r d; do
+        [ -z "$d" ] || printf '  %s/: %s\n' "$d" "$(ls -A -- "$d" 2>/dev/null | tr '\n' ' ' | sed 's/ $//')"
+    done
+}
+
 write_readme() {
+    if [ "$LOCALS" != "$NL" ]; then
+        BESIDE="
+Kept beside where they were, in directories readable by root only, as each one
+could not be renamed out of its filesystem (another filesystem, a bind mount, overlayfs):
+$(local_lines "$LOCALS")
+Nothing in them is used or removed by UCM: removing the package with its
+configuration (apt purge) leaves them where they are.
+"
+    else
+        BESIDE=""
+    fi
+    if [ -n "$EARLIER" ]; then
+        BESIDE="$BESIDE
+Left where they were, by an earlier archiving (their own README.txt is in the archive
+that run wrote under $PARENT):
+$(printf '%s' "$EARLIER" | sed 's/^/  /')
+"
+    fi
     cat > "$DEST/README.txt" <<EOF
 UCM: what an earlier installation left on this machine
 
@@ -337,32 +262,48 @@ Archived on $STAMP (UTC) by the UCM $(cat "$UCM_HOME/VERSION" 2>/dev/null || ech
 installed while no UCM package was installed and an earlier one had left its files.
 This release cannot start on the database that installation left:
   $REASON
-So the package moved that installation's files here, unchanged, and set up a new,
-empty UCM in their place.
+So the package moved that installation's files, unchanged, and set up a new, empty UCM
+in their place.
 
 Contents
   data/       what was in $DATA (database, CA files, private keys, HTTPS key and
               certificate, backups, sessions)
   config/     what was in $CONFIG (ucm.env, master.key)
-$DB_LINE
+$DB_LINE$BESIDE
 This directory holds private keys and the key that decrypts the database: keep it
-readable by root only. Nothing here is used or removed by UCM. What could not be renamed
-(another filesystem, a bind mount, overlayfs) was copied, then checked: contents, mode,
-owner, group and the dates of files, symbolic links by their target only; extended
-attributes and ACLs were copied where this filesystem keeps them, unchecked.
+readable by root only. Nothing here is used or removed by UCM. Every file was renamed,
+never copied: each one is here or in a directory listed above, unchanged. A directory
+that could not be renamed stays where it was, and its entries were moved the same way.
 
 To put that installation back in service
   1. Stop UCM: sudo systemctl stop ucm
   2. Install UCM 2.254 in place of this release (Debian, Ubuntu:
      sudo apt install --allow-downgrades ./ucm_2.254_all.deb; RHEL, Fedora:
      sudo dnf downgrade ./ucm-2.254-1.<dist>.noarch.rpm), then stop it again.
-  3. Move the new files aside, then put these back: the contents of data/ into
-     $DATA, of config/ into $CONFIG$DB_RESTORE, then
+  3. Move aside what the new installation wrote in $DATA and $CONFIG (all but
+     the directories named .ucm-archive-*), then put these back: the contents of data/
+     into $DATA, of config/ into $CONFIG$DB_RESTORE, and the
+     contents of each directory listed above into the directory that holds it (then
+     remove it, empty); then
      sudo chown -R ucm:ucm $DATA $CONFIG
   4. Start it (sudo systemctl start ucm) and check that UCM 2.254 opens: this
      records the 2.254 migrations in the database.
   5. Install this release again: it upgrades that database.
 EOF
+}
+
+# Without an interpreter, nothing is renamed: before archiving, the run stops (1); with
+# an attempt left to finish, that attempt's archive is named as it stands (2)
+no_interpreter() {
+    say "UCM: no interpreter to rename files with (UCM_PYTHON=${PYTHON:-unset}): nothing was moved."
+    if [ -n "$DEST" ]; then
+        say "An earlier attempt to archive what a removed UCM left did not complete."
+        stuck="
+  $DEST: still holds what could not be put back, which needs that interpreter" again="" twice=""
+        say_stuck
+    fi
+    say "The installation stops here: nothing else is written, and UCM was not started."
+    exit "$1"
 }
 
 case "$(id -u)" in 0) as_root=1 ;; *) as_root="" ;; esac
@@ -378,6 +319,7 @@ done
 for j in "$PARENT"/*/.journal; do
     [ -f "$j" ] || continue
     DEST=${j%/.journal} JOURNAL=$j
+    [ -n "$RENAME" ] || no_interpreter 2
     if roll_back; then
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete:"
         say "the files it could not put back are in place again."
@@ -449,6 +391,7 @@ umask 077
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 say "UCM: an earlier UCM was removed and left a database this release cannot start on:"
 say "  $DB_FILE: $REASON"
+[ -n "$RENAME" ] || no_interpreter 1
 fail() {
     say "UCM: archiving what it left failed ($1)."
     rc=1
@@ -481,7 +424,7 @@ until mkdir -- "$DEST" 2>/dev/null; do
     DEST=$PARENT/$STAMP-$n
 done
 JOURNAL=$DEST/.journal
-: > "$JOURNAL" || fail "cannot write in $DEST"
+LOCAL_NAME=$LOCAL_PREFIX${DEST##*/}
 
 DB_LINE="" DB_RESTORE=""
 if [ -d "$DATA" ]; then
@@ -494,28 +437,33 @@ fi
 case $(normal "$DB_FILE") in
     "$(normal "$DATA")"/*|"$(normal "$CONFIG")"/*) ;;
     *)
-        printf 'mkdir\t%s\t%s\n' "${DB_FILE%/*}" "$DEST/database" >> "$JOURNAL" \
-            && mkdir -- "$DEST/database" || fail "creating $DEST/database"
+        { jot "mkdir$TAB${DB_FILE%/*}$TAB$DEST/database" && mkdir -- "$DEST/database"; } \
+            || fail "creating $DEST/database"
         for f in "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$DB_FILE-journal"; do
             [ -e "$f" ] || continue
-            ! present "$f$PART" || { not_ours "$f$PART"; fail "moving $f"; }
             move_item "$f" "$DEST/database/${f##*/}" || fail "moving $f"
         done
         DB_LINE="  database/   $DB_FILE, which DATABASE_PATH placed outside $DATA
 "
-        DB_RESTORE=", database/ back to ${DB_FILE%/*}" ;;
+        DB_RESTORE=", of database/ into ${DB_FILE%/*}" ;;
 esac
-remove_copied || fail "removing the sources of the copies"
-# Written inside the journal, so that a retry after any interruption takes it back first
+# Written inside the journal, so that a retry after any interruption takes it back first;
+# the line names where the archived ucm.env went, centrally or beside the new one
 if [ -n "$FIPS_BUILD" ]; then
-    { printf 'fips\t%s\t%s\n' "$ENV_FILE" "$DEST/config/ucm.env" >> "$JOURNAL" \
-        && printf 'UCM_FIPS_BUILD=1\n' > "$ENV_FILE"; } || fail "writing UCM_FIPS_BUILD=1 into $ENV_FILE"
+    OLD_ENV=$DEST/config/ucm.env
+    present "$OLD_ENV" || OLD_ENV=$CONFIG/$LOCAL_NAME/ucm.env
+    { jot "fips$TAB$ENV_FILE$TAB$OLD_ENV" && printf 'UCM_FIPS_BUILD=1\n' > "$ENV_FILE"; } \
+        || fail "writing UCM_FIPS_BUILD=1 into $ENV_FILE"
 fi
 write_readme || fail "writing $DEST/README.txt"
 rm -f -- "$JOURNAL" || fail "removing $JOURNAL"
 
 say "Moved, unchanged, everything it left in $DATA and $CONFIG${DB_RESTORE:+ and $DB_FILE}"
 say "to $DEST (root only; README.txt there says how to restore it)."
+if [ "$LOCALS" != "$NL" ]; then
+    say "What could not be renamed out of its filesystem is beside it, readable by root only, in:"
+    printf '%s' "$LOCALS" | while IFS= read -r d; do [ -z "$d" ] || say "  $d"; done
+fi
 [ -z "$FIPS_BUILD" ] || say "UCM_FIPS_BUILD=1, set in the archived ucm.env, is kept in the new $ENV_FILE."
 say "This installation starts empty, with a new configuration."
 exit 0
