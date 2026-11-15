@@ -155,6 +155,13 @@ def test_a_later_major_rc_not_flagged_prerelease_is_never_offered(monkeypatch, i
     assert updates.check_for_updates(channel='rc')['major_upgrade'] is None
 
 
+def test_a_later_major_flagged_prerelease_is_never_offered(monkeypatch, instance):
+    instance('2.254.1', ['2.254.2'])
+    monkeypatch.setitem(updates._releases_cache, 'data',
+                        updates._releases_cache['data'] + [_release('3.0', prerelease=True)])
+    assert updates.check_for_updates(channel='rc')['major_upgrade'] is None
+
+
 def test_without_a_later_major_the_notice_stays(instance):
     instance('2.254.1', ['2.254.2', '2.254.1'])
     result = updates.check_for_updates(channel='stable')
