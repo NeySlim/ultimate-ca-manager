@@ -283,3 +283,14 @@ class TestStagingCostIsLinear:
             staged.publish()
             staged.discard()
         assert gone.read_bytes() == b'new'
+
+    def test_staging_after_discard_starts_afresh(self, tmp_path):
+        destination = tmp_path / 'ca.key'
+        staged = StagedFiles(base_dir=tmp_path / 'staging')
+        staged.stage(destination, b'first')
+        staged.discard()
+        staged.stage(destination, b'second')
+        assert staged.destinations == [destination]
+        staged.publish()
+        staged.discard()
+        assert destination.read_bytes() == b'second'
