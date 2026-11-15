@@ -619,6 +619,10 @@ def create_app(config_name=None):
             except Exception as e:
                 db.session.rollback()
                 app.logger.error(f"HA: node identifier not claimed at start: {type(e).__name__}: {e}")
+            # Secrets saved under another key (a former single instance): named, the service starts
+            if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':
+                from services.db_key_rewrap import report_unreadable_at_start
+                report_unreadable_at_start()
 
     # FIPS mode: each blocker of the readiness check as an ERROR line, on every node; the
     # operations it names are refused at use, the service itself always starts
