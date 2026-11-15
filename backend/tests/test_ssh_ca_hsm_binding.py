@@ -133,9 +133,30 @@ class TestOneKeyOneAuthority:
     def test_two_key_rows_on_one_token_key_are_one_key(self, auth_client, token_key):
         real = ec.generate_private_key(ec.SECP256R1())
         one, two = token_key(real=real), token_key(real=real)
-        assert _ssh_ca(auth_client, one['key'], 'user').status_code == 201
+        first = _ssh_ca(auth_client, one['key'], 'user')
+        assert first.status_code == 201, first.data
         r = _ssh_ca(auth_client, two['key'], 'host')
         assert r.status_code == 409, r.data
+        assert _detail(r) == (f"HSM key '{two['label']}' already backs the SSH user CA "
+                              f"'{first.get_json()['data']['descr']}': an HSM key backs one authority only")
+
+    def test_a_software_ca_on_the_same_public_key_is_named_as_software(self, app, auth_client, token_key):
+        real = ec.generate_private_key(ec.SECP256R1())
+        descr = f'soft-{uuid.uuid4().hex[:6]}'
+        pem = real.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.OpenSSH,
+                                 serialization.NoEncryption()).decode()
+        r = auth_client.post(f'{SSH_CAS}/import', json={'descr': descr, 'ca_type': 'user', 'private_key': pem})
+        assert r.status_code == 201, r.data
+        try:
+            key = token_key(real=real)
+            r = _ssh_ca(auth_client, key['key'], 'host')
+            assert r.status_code == 409, r.data
+            assert _detail(r) == (f"HSM key '{key['label']}' holds the key of the software SSH user CA "
+                                  f"'{descr}': a key backs one authority only")
+        finally:
+            with app.app_context():
+                SSHCertificateAuthority.query.filter_by(descr=descr).delete(synchronize_session=False)
+                db.session.commit()
 
     def test_unused_keys_leave_out_a_key_an_ssh_ca_holds(self, auth_client, token_key):
         held, free = token_key(), token_key()

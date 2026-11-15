@@ -398,10 +398,14 @@ class SSHCAService:
         def refuse_same_public_key():
             # Another key row naming the same token key is the same key (one CA per key, PROTOCOL.krl)
             existing = SSHCertificateAuthority.query.filter_by(fingerprint=fingerprint).first()
-            if existing:
+            if existing and existing.key_source == 'hsm':
                 raise key_binding.HsmKeyBound(
                     f"HSM key '{key_row.label}' already backs the SSH {existing.ca_type} CA "
                     f"'{existing.descr}': an HSM key backs one authority only")
+            if existing:
+                raise key_binding.HsmKeyBound(
+                    f"HSM key '{key_row.label}' holds the key of the software SSH {existing.ca_type} CA "
+                    f"'{existing.descr}': a key backs one authority only")
         refuse_same_public_key()
 
         if default_ttl is None:
