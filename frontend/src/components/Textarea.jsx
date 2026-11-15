@@ -1,6 +1,7 @@
 /**
  * Textarea Component
  */
+import { useId } from 'react'
 import { cn } from '../lib/utils'
 
 export function Textarea({ 
@@ -13,11 +14,14 @@ export function Textarea({
   value = '',
   ...props 
 }) {
+  // The label names the field (assistive technologies, getByLabelText)
+  const autoId = useId()
+  const fieldId = props.id ?? autoId
   return (
     <div className={cn("space-y-1.5", className)}>
       {label && (
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-medium text-text-primary">
+          <label htmlFor={fieldId} className="block text-sm font-medium text-text-primary">
             {label}
             {props.required && <span className="status-danger-text ml-1">*</span>}
           </label>
@@ -42,6 +46,7 @@ export function Textarea({
         value={value}
         maxLength={maxLength}
         {...props}
+        id={fieldId}
       />
 
       {error && (
