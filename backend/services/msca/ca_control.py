@@ -104,11 +104,11 @@ class MicrosoftCACAControlMixin:
     def _claim_own_request(msca, rid, pem):
         """Import the certificate of a request UCM submitted into that request's row,
         with its event. Returns (handled, cert_id): handled is False only for a request
-        UCM did not submit; a claim lost to a poll is handled, cert_id possibly None."""
+        UCM did not submit; a claim lost to a poll is handled, cert_id possibly None.
+        A row whose CSR was deleted is still UCM's: completing it avoids a second row."""
         from models.msca import MSCARequest
         req = (MSCARequest.query
-               .filter(MSCARequest.msca_id == msca.id, MSCARequest.request_id == rid,
-                       MSCARequest.csr_id.isnot(None))
+               .filter(MSCARequest.msca_id == msca.id, MSCARequest.request_id == rid)
                .order_by(MSCARequest.id.desc()).first())
         if req is None:
             return False, None

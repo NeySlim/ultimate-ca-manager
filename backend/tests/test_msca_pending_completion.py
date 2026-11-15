@@ -253,3 +253,77 @@ def test_check_route_completes_a_request_whose_csr_was_deleted(app, auth_client,
     assert (s['imported'], s['completed']) == (0, 0)
     with app.app_context():
         assert Certificate.query.filter_by(subject_cn='pc-check-gone.test.local').count() == 1
+
+
+class PanelADCS(DenyingADCS):
+    """DenyingADCS that accepts certutil -resubmit and records each script."""
+
+    def __init__(self):
+        super().__init__()
+        self.scripts = []
+
+    def run_ps(self, msca, script):
+        self.scripts.append(script)
+        if '-resubmit' in script:
+            return 'CertUtil: -resubmit command completed successfully.\n'
+        return super().run_ps(msca, script)
+
+
+@pytest.fixture
+def panel_ca(monkeypatch):
+    from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+    fake = PanelADCS()
+    monkeypatch.setattr(MicrosoftCAAdminChannelMixin, '_run_ps', staticmethod(fake.run_ps))
+    return fake
+
+
+def _set_high_water(app, msca_id, value):
+    from models import MicrosoftCA, db
+    with app.app_context():
+        db.session.get(MicrosoftCA, msca_id).last_synced_request_id = value
+        db.session.commit()
+
+
+def _listing_starts(fake):
+    return [int(m.group(1)) for s in fake.scripts
+            for m in [re.search(r'Disposition=20,RequestId>=(\d+)', s)] if m]
+
+
+def test_panel_approval_completes_a_request_whose_csr_was_deleted(app, panel_ca):
+    from models import MSCARequest
+    from services.msca_service import MicrosoftCAService
+    msca_id = _make_msca(app, 'PC panel gone')
+    panel_ca.add(902, 'pc-panel-gone.test.local')
+    req_id, _ = _pending(app, msca_id, 902, 'pc-panel-gone.test.local', with_csr=False)
+    with app.app_context():
+        result = MicrosoftCAService.approve_request(msca_id, 902)
+        assert result['imported_cert_id']
+        rows = MSCARequest.query.filter_by(msca_id=msca_id).all()
+        assert [(r.id, r.status, r.cert_id) for r in rows] == [
+            (req_id, 'issued', result['imported_cert_id'])]
+    _set_high_water(app, msca_id, 5000)
+    panel_ca.scripts.clear()
+    _sync(app, msca_id, full=False)
+    assert _listing_starts(panel_ca) == [5000]
+
+
+def test_pending_request_with_a_known_serial_is_closed_not_left_pinning(app, panel_ca):
+    from models import Certificate, db
+    msca_id = _make_msca(app, 'PC known pin')
+    serial = panel_ca.add(903, 'pc-known-pin.test.local')
+    pem = panel_ca.rows[-1]['pem']
+    req_id, _ = _pending(app, msca_id, 903, 'pc-known-pin.test.local', with_csr=False)
+    with app.app_context():
+        cert = Certificate(refid='pc-known-pin', descr='manual',
+                           crt=base64.b64encode(pem.encode()).decode(),
+                           subject_cn='pc-known-pin.test.local', serial_number=serial.upper())
+        db.session.add(cert)
+        db.session.commit()
+        cert_id = cert.id
+    s = _sync(app, msca_id)
+    assert (s['completed'], s['imported'], s['skipped']) == (0, 0, 1)
+    assert _req(app, req_id)[:2] == ('issued', cert_id)
+    _set_high_water(app, msca_id, 5000)
+    panel_ca.scripts.clear()
+    _sync(app, msca_id, full=False)
+    assert _listing_starts(panel_ca) == [5000]

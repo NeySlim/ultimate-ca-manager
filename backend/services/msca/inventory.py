@@ -80,8 +80,12 @@ class MicrosoftCAInventoryMixin:
 
             # A request UCM submitted that the CA now shows issued: finish it
             if req_id in pending:
-                # Certificate already in UCM by serial: do not import a second copy.
-                if MicrosoftCAInventoryMixin._serial_int_variants(serial) & known_serials:
+                # Certificate already in UCM by serial: do not import a second copy,
+                # but close the request so it stops pinning the scan start.
+                variants = MicrosoftCAInventoryMixin._serial_int_variants(serial)
+                if variants & known_serials:
+                    MicrosoftCAInventoryMixin._close_known(msca, pending[req_id], variants)
+                    completed_ids.add(req_id)
                     skipped += 1
                     continue
                 try:
@@ -357,6 +361,24 @@ class MicrosoftCAInventoryMixin:
                                      MSCARequest.request_id.isnot(None))
             .order_by(MSCARequest.id).all()
         }
+
+    @staticmethod
+    def _close_known(msca, req, variants):
+        """Mark a pending request issued and link it to the certificate UCM already
+        holds with that serial; a concurrent completion (cert_id set) wins."""
+        cert_id = next((cid for cid, raw in
+                        db.session.query(Certificate.id, Certificate.serial_number)
+                        .filter(Certificate.serial_number.isnot(None)).all()
+                        if MicrosoftCAInventoryMixin._db_serial_variants(raw) & variants), None)
+        MSCARequest.query.filter(
+            MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
+            MSCARequest.status == 'pending',
+        ).update({MSCARequest.status: 'issued', MSCARequest.cert_id: cert_id,
+                  MSCARequest.issued_at: utc_now()}, synchronize_session=False)
+        logger.info(
+            f"MS CA '{msca.name}' inventory: RequestId={req.request_id} closed, its "
+            f"certificate is already in UCM (id={cert_id})"
+        )
 
     @staticmethod
     def _deny_refused(msca, waiting):
