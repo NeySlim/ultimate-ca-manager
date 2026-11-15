@@ -106,8 +106,8 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 spec:
   # Default render (ha.enabled=false): one pod, SQLite unless database.type is
-  # postgresql. The per-pod scheduler is not HA-safe and the RWO volumes cannot
-  # be mounted by two pods at once.
+  # postgresql. Several pods need ha.enabled (shared PostgreSQL, elected
+  # scheduler); the RWO volumes cannot be mounted by two pods at once.
   replicas: 1
   strategy:
     type: Recreate

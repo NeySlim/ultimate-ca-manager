@@ -1,13 +1,13 @@
 # High availability
 
-UCM can run on two or more nodes that share one PostgreSQL database. This page covers what a node needs, three ways to deploy it, what stays local to a node and what is refused in HA mode. The scheduler, leader election and rolling restart are described in [HA mode (preview)](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
+UCM can run on two or more nodes that share one PostgreSQL database. This page covers what a node needs, three ways to deploy it, what stays local to a node and what is refused in HA mode. The scheduler, leader election and rolling restart are described in [HA mode](ADMIN_GUIDE.md#ha-mode-scheduler-and-startup).
 
 ## Prerequisites
 
 - **PostgreSQL 13 or later**, reachable by every node (`DATABASE_URL`). SQLite is refused at startup.
 - **The same `SECRET_KEY` on every node** (`UCM_SECRET_KEY` in the Docker image). It signs the CSRF tokens until the session key is rotated from the web interface, which stores the new key in the database for every node; it then stays the fallback (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md#session-key-rotation)).
 - **The same `KEY_ENCRYPTION_KEY` on every node**, a Fernet key. It decrypts every private key in the database: losing it makes them unrecoverable. Do not keep a different `master.key` file on a node: a local file overrides the variable.
-- **A distinct `UCM_NODE_ID` per node** (default: the host name). Two VMs cloned from one image keep the same host name: set it explicitly. A node whose identifier a live node already uses refuses to start, see [Node identifier](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
+- **A distinct `UCM_NODE_ID` per node** (default: the host name). Two VMs cloned from one image keep the same host name: set it explicitly. A node whose identifier a live node already uses refuses to start, see [Node identifier](ADMIN_GUIDE.md#ha-mode-scheduler-and-startup).
 - **`UCM_HA=1`** on every node.
 - **A load balancer** in front of the nodes. Probe `/health/ready`. UI sessions are stored in PostgreSQL (in Redis when `REDIS_URL` is set, see [REDIS.md](REDIS.md)) and shared by every node, so no request needs a given node, except the multi-request Kerberos handshake, and the balancer must pass the WebSocket upgrade, see [Session affinity](#session-affinity).
 - **One gunicorn worker per node**, which is the default (`workers = 1`). Do not raise it.
@@ -165,14 +165,14 @@ Rate limits are counted per node, in memory, and are not shared. Two layers appl
 
 - **Update result.** The outcome of an update is read on the node that installed it, leader or not.
 - **Per-node task status.** The scheduler view shows the update result runs of the node that answers, and Run now runs them on that node.
-- **SoftHSM tokens.** A token lives on the node's own disk, so UCM refuses to create one in HA mode (see [Refused in HA mode today](#refused-in-ha-mode-today)). A SoftHSM provider already in the database stays visible, a warning at start names it, and its keys sign only on the node that holds the token. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
+- **SoftHSM tokens.** A token lives on the node's own disk, so UCM refuses to create one in HA mode (see [Refused in HA mode](#refused-in-ha-mode)). A SoftHSM provider already in the database stays visible, a warning at start names it, and its keys sign only on the node that holds the token. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
 - **Kerberos negotiation state.** A SPNEGO handshake that takes more than one request is kept in the memory of the node that received its first leg (see [Windows enrollment](#windows-enrollment-kerberos)).
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
 - **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
 
 ## Scheduled passes across nodes
 
-The `certificate.expired` webhooks resume from the last pass on any node, at most 30 days back, as on a single node. A pass of the expiry alerts or of a CA's scheduled CRL skipped because another node holds its lease runs once more 30 seconds after that lease ends, instead of waiting a day or an hour. See [ADMIN_GUIDE.md](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
+The `certificate.expired` webhooks resume from the last pass on any node, at most 30 days back, as on a single node. A pass of the expiry alerts or of a CA's scheduled CRL skipped because another node holds its lease runs once more 30 seconds after that lease ends, instead of waiting a day or an hour. See [ADMIN_GUIDE.md](ADMIN_GUIDE.md#ha-mode-scheduler-and-startup).
 
 ## When PostgreSQL is unavailable
 
@@ -196,7 +196,7 @@ The Windows enrollment profiles, their connectors and the switches are in the da
 - **SPNEGO state.** Some Windows clients need more than one request to complete the Negotiate handshake (a request-MIC leg). The context in progress is kept in the memory of the node that answered the first leg, under the client's source address (the address behind the trusted proxy when there is one), and expires after 30 seconds. The balancer must therefore send the requests of one client address to one node: use source-address affinity for the two Kerberos endpoints (`/ADPolicyProvider_CEP_Kerberos/` and `/ADCertificateService_CES_Kerberos/`); the web interface needs no affinity. Two clients behind one address that negotiate at the same moment can make each other retry, never authenticate wrongly.
 - **The keytab file.** A profile's keytab is stored in the database, under the master key. UCM composes the keytabs of all profiles into one file, stores it in the database and asks every node to write it (`reload_keytab`, within seconds, and at each start); the composition is made under a lock, so two uploads at once give one result on every node. A node that cannot read the stored keytab (a different `KEY_ENCRYPTION_KEY`) cannot write the file and logs the reason. A keytab found on one node only, as 2.x kept it, is not shared in HA: upload it again.
 
-## Refused in HA mode today
+## Refused in HA mode
 
 These operations answer `409` with code `ha_mode`, because they only change the host that receives the request:
 

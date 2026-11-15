@@ -36,7 +36,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `DATABASE_URL` | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `DATA_DIR/ucm.db`. |
 | `UCM_ADMIN_ALLOWED_NETWORKS` | `UCM_ADMIN_ALLOWED_NETWORKS` | (unset) | Comma-separated IP addresses or CIDR networks allowed to reach the web interface and the management API. When set, it wins over the setting in Settings > Security, which becomes read-only. See [Admin access allowlist](#admin-access-allowlist) |
 | `UCM_ADMIN_ALLOWLIST_DISABLE` | `UCM_ADMIN_ALLOWLIST_DISABLE` | (unset) | `1` turns the admin access allowlist off (recovery after a lock-out); a warning is logged at startup |
-| `UCM_HA` | `UCM_HA` | (unset) | `1` enables HA mode in preview: settings and restarts propagate to every node, operations that only change the local host are refused; full high availability arrives in later releases. Requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node (the native packages generate a random key per node); the node exits at startup when one is missing (the Docker image also refuses to generate `UCM_SECRET_KEY`) |
+| `UCM_HA` | `UCM_HA` | (unset) | `1` enables HA mode: settings and restarts propagate to every node and operations that only change the local host are refused (see [HA.md](HA.md)). Requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node (the native packages generate a random key per node); the node exits at startup when one is missing (the Docker image also refuses to generate `UCM_SECRET_KEY`) |
 | `INITIAL_ADMIN_PASSWORD_FILE` | `UCM_INITIAL_ADMIN_PASSWORD_FILE` (or `INITIAL_ADMIN_PASSWORD_FILE`) | (unset) | File holding the first administrator's password (a secret), read at the first start only. See [Initial administrator password](#initial-administrator-password) |
 | `INITIAL_ADMIN_PASSWORD` | `UCM_INITIAL_ADMIN_PASSWORD` (or `INITIAL_ADMIN_PASSWORD`) | (unset: generated) | The first administrator's password, read at the first start only. No default |
 | `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE` | `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE` | (unset) | `1`: the provided password was drawn by a deployment tool, nobody chose it; it must be changed at first login. The Helm chart sets it for the value it generates |
@@ -460,7 +460,7 @@ psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 
 > ℹ The psycopg 3 driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
 
-### HA mode (preview): scheduler and startup
+### HA mode: scheduler and startup
 
 With `UCM_HA=1`, every node runs against the same PostgreSQL database and names itself with `UCM_NODE_ID` (default: the host name, which must differ between nodes).
 
