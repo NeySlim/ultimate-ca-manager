@@ -12,6 +12,7 @@ from fips_mode import FipsRestricted
 from services.smart_import import SmartImporter
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
+from utils.certificate_readability import UnreadableCertificate
 import logging
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,8 @@ def analyze_import():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f'Smart import analysis failed: {e}')
         return error_response('Import analysis failed', 500)
@@ -151,6 +154,8 @@ def execute_import():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f'Smart import execution failed: {e}')
         return error_response('Import execution failed', 500)

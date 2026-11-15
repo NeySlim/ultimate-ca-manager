@@ -22,6 +22,7 @@ from flask import has_request_context, request
 from sqlalchemy.exc import IntegrityError
 from fips_mode import FipsRestricted
 from utils.key_codec import refuse_eddsa_key
+from utils.certificate_readability import UnreadableCertificate
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
@@ -337,7 +338,7 @@ class SmartImporter:
             except Exception as e:
                 logger.error(f"Webhook emit (import) failed: {e}")
 
-        except FipsRestricted:
+        except (FipsRestricted, UnreadableCertificate):
             db.session.rollback()
             raise
         except IntegrityError:

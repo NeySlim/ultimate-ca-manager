@@ -95,6 +95,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A certificate whose extensions cannot be read is refused at import.** A certificate that repeats an extension or carries a malformed one was stored as a CA, or answered 500; every import path (file, paste, smart import, OPNsense, CA certificate install, converter) now refuses it with a 400 or a per-item error that names the extension.
 - **Form labels name their field.** Text fields, text areas and selects are now tied to their label, so assistive technologies announce the field and a click on the label focuses it.
 - **The page language follows the interface language.** The `lang` attribute of the page changes with the language chosen, so screen readers and browsers read it in that language.
 - **Recovery codes are shown when TOTP is enabled.** The enrolment dialog closed on confirmation and the codes the server returned were never shown; the dialog now lists them until they are marked as saved.
