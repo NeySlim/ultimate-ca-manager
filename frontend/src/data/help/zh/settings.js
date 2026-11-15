@@ -71,7 +71,7 @@ export default {
         content: '设置 › 更新：每日后台检查新版本，并可选启用无人值守安装。',
         items: [
           { label: "通道", text: "“稳定版”仅跟随正式发布；“候选发布版”额外仅接受 rcN 版本,, 绝不包含 alpha/beta" },
-          { label: '通知', text: '发现新版本时触发 system.update_available Webhook/邮件事件，每个版本仅一次' },
+          { label: '通知', text: '发现新版本时触发 system.update_available Webhook 事件，每个版本仅一次' },
           { label: "主版本", text: "更新始终保持在已安装的主版本内。更高的主版本以正式版发布后，会作为推荐升级单独列出，仅在明确确认的请求下安装；自动更新绝不会安装它，且每个主版本只触发一次带 major_upgrade 标记的 system.update_available" },
           { label: "安全维护", text: "此版本系列处于安全维护阶段：将继续提供安全修复，但不再增加新功能。更新页面始终显示此通知" },
           { label: '自动安装', text: '默认关闭。启用后，UCM 会在选定的时间下载、验证并安装更新，然后重启,, 仅限 DEB/RPM 安装' },

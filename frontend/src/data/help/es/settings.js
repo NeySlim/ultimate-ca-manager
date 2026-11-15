@@ -71,7 +71,7 @@ export default {
         content: 'Ajustes › Actualizaciones: una comprobación diaria en segundo plano de nuevas versiones y una instalación desatendida opcional.',
         items: [
           { label: "Canal", text: "Stable sigue solo las versiones finales; Release candidates acepta además únicamente versiones rcN, nunca alfa/beta" },
-          { label: 'Notificación', text: 'Una versión recién disponible dispara el evento webhook/correo system.update_available, una vez por versión' },
+          { label: 'Notificación', text: 'Una versión recién disponible dispara el evento webhook system.update_available, una vez por versión' },
           { label: "Versiones principales", text: "Las actualizaciones se mantienen dentro de la versión principal instalada. Una versión principal posterior publicada como versión final se ofrece aparte como actualización recomendada, instalada solo a petición explícita y confirmada; las actualizaciones automáticas nunca la instalan, y system.update_available se emite una vez por versión principal, con major_upgrade activado" },
           { label: "Mantenimiento de seguridad", text: "Esta línea de versiones está en mantenimiento de seguridad: seguirán llegando correcciones de seguridad, pero no nuevas funciones. La página Actualizaciones muestra este aviso en todo momento" },
           { label: 'Instalación automática', text: 'Desactivada por defecto. Cuando está activada, UCM descarga, verifica e instala la actualización a la hora elegida y luego se reinicia, solo instalaciones DEB/RPM' },

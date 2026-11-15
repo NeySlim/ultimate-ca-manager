@@ -71,7 +71,7 @@ export default {
         content: "Paramètres › Mises à jour : vérification quotidienne en arrière-plan des nouvelles versions, et installation sans surveillance optionnelle.",
         items: [
           { label: "Canal", text: "« Versions stables » ne suit que les releases finales ; « Versions candidates » n'accepte en plus que les versions rcN, jamais les alpha/bêta" },
-          { label: "Notification", text: "Une version nouvellement disponible déclenche l'événement webhook/e-mail system.update_available, une fois par version" },
+          { label: "Notification", text: "Une version nouvellement disponible déclenche l'événement webhook system.update_available, une fois par version" },
           { label: "Versions majeures", text: "Les mises à jour restent dans la version majeure installée. Une version majeure ultérieure publiée en version finale est proposée à part comme passage recommandé, installé seulement sur une demande explicite et confirmée ; les mises à jour automatiques ne l'installent jamais, et system.update_available est émis une fois par version majeure, avec major_upgrade positionné" },
           { label: "Maintenance de sécurité", text: "Cette ligne de versions est en maintenance de sécurité : les correctifs de sécurité continuent, les nouvelles fonctionnalités non. La page Mises à jour affiche cet avis en permanence" },
           { label: "Installation auto", text: "Désactivée par défaut. Une fois activée, UCM télécharge, vérifie et installe la mise à jour à l'heure choisie, puis redémarre, installations DEB/RPM uniquement" },

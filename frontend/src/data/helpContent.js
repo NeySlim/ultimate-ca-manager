@@ -1100,7 +1100,7 @@ export const helpContent = {
         content: 'Settings › Updates: a daily background check for new versions, and an optional unattended install.',
         items: [
           { label: 'Channel', text: 'Stable follows final releases only; Release candidates additionally accepts rcN versions only, alpha/beta never qualify' },
-          { label: 'Notification', text: 'A newly available version fires the system.update_available webhook/email event, once per version' },
+          { label: 'Notification', text: 'A newly available version fires the system.update_available webhook event, once per version' },
           { label: "Major versions", text: "Updates stay within the installed major version. A later major version published as a final release is offered apart as a recommended upgrade, installed only on an explicit, confirmed request; automatic updates never install it, and system.update_available fires once per major version, with major_upgrade set" },
           { label: "Security maintenance", text: "This version line is in security maintenance: security fixes will keep coming, new features will not. The Updates page shows this notice at all times" },
           { label: 'Auto-install', text: 'Off by default. When enabled, UCM downloads, verifies and installs the update at the chosen hour, then restarts, DEB/RPM installs only' },
