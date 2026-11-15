@@ -225,7 +225,7 @@ python -m pytest tests/test_acme_public_url.py \
 ```bash
 cd frontend
 npm run check:i18n
-# Expected: 4036 keys, 10/10 locales in sync (acmePublic* keys)
+# Expected: 10 locale files checked, all in sync (acmePublic* keys)
 ```
 
 ## Manual test plan
@@ -312,7 +312,7 @@ Expected: account registration OK; failure only if DNS hook missing or TXT not p
 - [ ] A `*.ucm.example.com` cert covers **admin** and **ACME** (not the apex)
 - [ ] Certbot reaches the directory without timeout or hostname mismatch
 - [ ] `pytest tests/test_acme_public_url.py` — 21 passed
-- [ ] `npm run check:i18n` — 10 locales synchronized
+- [ ] `npm run check:i18n`: 10 locales synchronized
 - [ ] Help panel + helpers mention the wildcard topology in all UI languages
 - [ ] Doc and examples: `example.com` only (no lab FQDN)
 
