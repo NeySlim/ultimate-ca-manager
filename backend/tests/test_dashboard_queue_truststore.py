@@ -6,7 +6,7 @@ from datetime import timedelta
 
 import pytest
 
-from models import db
+from models import CA, db
 from models.truststore import TrustedCertificate
 from services import dashboard_aggregates as agg
 from tests.conftest import get_json
@@ -20,9 +20,10 @@ URL = '/api/v2/dashboard/queue'
 def anchors(app):
     ids = {}
     now = utc_now()
-    spec = {'soon': now + timedelta(days=30), 'edge_in': now + timedelta(days=89),
-            'edge_out': now + timedelta(days=91), 'far': now + timedelta(days=400),
-            'expired': now - timedelta(days=900), 'unknown': None}
+    day90 = timedelta(days=90)
+    spec = {'soon': now + timedelta(days=30), 'edge_in': now + day90 - timedelta(minutes=1),
+            'edge_out': now + day90 + timedelta(minutes=1), 'far': now + timedelta(days=400),
+            'expired': now - timedelta(days=900), 'recent': now - timedelta(days=10), 'unknown': None}
     with app.app_context():
         for name, not_after in spec.items():
             row = TrustedCertificate(
@@ -46,11 +47,35 @@ def _queue(app, permissions=None):
 
 def test_in_window_out_of_window_expired(app, anchors):
     _, rows = _queue(app)
-    assert set(rows) == {anchors['soon'], anchors['edge_in'], anchors['expired']}
+    assert set(rows) == {anchors[k] for k in ('soon', 'edge_in', 'expired', 'recent')}
     assert rows[anchors['soon']]['tier'] == 'warning'
     assert rows[anchors['expired']]['tier'] == 'critical'
     assert rows[anchors['soon']]['href_hint'] == f"/truststore/{anchors['soon']}"
     assert rows[anchors['soon']]['label'] == 'ts-soon'
+
+
+def test_expired_anchors_come_after_every_other_critical_entry(app, anchors):
+    import uuid as _uuid
+    with app.app_context():
+        ca = CA(refid=str(_uuid.uuid4()), descr='ts-order-ca', crt='placeholder', cdp_enabled=True,
+                valid_to=utc_now() + timedelta(days=3650))
+        db.session.add(ca)
+        db.session.commit()
+        ca_id = ca.id
+    try:
+        data, _ = _queue(app)
+    finally:
+        with app.app_context():
+            CA.query.filter_by(id=ca_id).delete(synchronize_session=False)
+            db.session.commit()
+    order = [(i['kind'], i['id']) for i in data['items']]
+    missing = order.index(('crl_missing', ca_id))
+    recent = order.index((KIND, anchors['recent']))
+    old = order.index((KIND, anchors['expired']))
+    soon = order.index((KIND, anchors['soon']))
+    # Most recently expired first; a still-valid anchor keeps its warning rank, after the critical ones
+    assert missing < recent < old < soon
+    assert {i['tier'] for i in data['items'][missing:old + 1]} == {'critical'}
 
 
 def test_counted_in_the_aggregates(app, anchors):

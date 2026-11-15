@@ -396,8 +396,12 @@ def work_queue(session, limit, now=None, kinds=None, permissions=None):
     listing = select(queue)
     if kinds is not None:
         listing = listing.where(queue.c.kind.in_(list(kinds)))
-    rows = session.execute(
-        listing.order_by(queue.c.rank, queue.c.due_at, queue.c.kind, queue.c.id).limit(limit))
+    # An expired trust anchor stays critical but sorts after every other critical entry, newest first
+    lapsed = and_(queue.c.kind == 'truststore_expiring', queue.c.rank == 0)
+    after = case((lapsed, 1), else_=0)
+    rows = session.execute(listing.order_by(
+        queue.c.rank, after, case((lapsed, None), else_=queue.c.due_at),
+        case((lapsed, queue.c.due_at)).desc(), queue.c.kind, queue.c.id).limit(limit))
     rows = rows.all()
     # A binding's link names the certificate holding it: one lookup for the page shown
     binding_ids = [r.id for r in rows if r.kind == 'deploy_binding_left_behind']
