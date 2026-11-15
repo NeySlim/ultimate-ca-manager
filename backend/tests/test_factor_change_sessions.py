@@ -360,7 +360,9 @@ KEY_CHANGES = {
 @pytest.mark.parametrize('operation', sorted(KEY_CHANGES))
 def test_a_key_change_and_the_session_closure_commit_together(app, auth_client, operation,
                                                               target):
-    """Whichever of the two writes fails, neither stays: no key changed with sessions open."""
+    """Whichever of the two writes fails, neither stays: no key changed with sessions open.
+    The 'key' cases pass on the older code too: they only keep a failed key write from
+    leaving the session version bumped."""
     from sqlalchemy import event
     from sqlalchemy.orm import Session
     start, call = KEY_CHANGES[operation]
@@ -391,6 +393,7 @@ def test_a_key_change_and_the_session_closure_commit_together(app, auth_client, 
 
 @pytest.mark.parametrize('operation', sorted(KEY_CHANGES))
 def test_a_key_change_moves_the_key_and_the_session_version(app, auth_client, operation):
+    """Non-regression of the success path (passes on the older code too): key and version move."""
     start, call = KEY_CHANGES[operation]
     user = _make_user(app, key=SoftKey(), **start)
     try:
