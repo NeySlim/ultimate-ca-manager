@@ -177,7 +177,13 @@ def _release(lib_path):
         lib.finalize()
 
 
-@needs('softhsm', os.path.exists(SOFTHSM_LIB) and shutil.which('softhsm2-util'), reason='SoftHSM not installed')
+# Marked only on a build with ML-DSA: elsewhere the module skip is legitimate, not a lost SoftHSM test
+_softhsm_without_mldsa = (needs('softhsm', os.path.exists(SOFTHSM_LIB) and shutil.which('softhsm2-util'),
+                                reason='SoftHSM not installed')
+                          if key_algorithms.mldsa_supported() else pytest.mark.skip(reason='this build has no ML-DSA'))
+
+
+@_softhsm_without_mldsa
 def test_a_token_without_ml_dsa_refuses_generation_cleanly(tmp_path, monkeypatch):
     import subprocess
     from services.hsm.pkcs11_provider import Pkcs11Provider

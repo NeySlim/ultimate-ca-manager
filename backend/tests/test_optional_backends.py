@@ -159,3 +159,60 @@ def test_each_step_collects_the_whole_test_tree(backend):
     step = next(s for s in _run_steps(_job()) if f'-m needs_{backend}' in s['run'])
     assert 'cd backend' in step['run'].splitlines()[0]
     assert _pytest_paths(step['run']) == ['tests/'], step['run']
+
+
+# ---------------------------------------------------------------- a missing import never hides a module
+
+BLOCK_PKCS11 = '''
+import sys
+
+
+class _Block:
+    def find_spec(self, name, path=None, target=None):
+        if name == 'pkcs11' or name.startswith('pkcs11.'):
+            raise ImportError(f'{name} blocked by the test')
+
+
+sys.meta_path.insert(0, _Block())
+'''
+
+NO_MLDSA = '''
+from utils import key_algorithms
+
+key_algorithms.mldsa_supported = lambda: False
+'''
+
+
+def _run_files(tmp_path, plugin, files, env, marker=None):
+    (tmp_path / 'shim_plugin.py').write_text(plugin)
+    clean = {k: v for k, v in os.environ.items() if not k.startswith('UCM_TEST_REQUIRE_')}
+    args = [sys.executable, '-m', 'pytest', '-q', '-rA', '-p', 'no:cacheprovider', '-p', 'no:randomly',
+            '-p', 'shim_plugin', *(['-m', marker] if marker else []), *[f'tests/{f}' for f in files]]
+    proc = subprocess.run(args, cwd=BACKEND_DIR, capture_output=True, text=True, timeout=600,
+                          env={**clean, **env, 'PYTHONPATH': os.pathsep.join([str(tmp_path), str(BACKEND_DIR)])})
+    return proc, proc.stdout.strip().splitlines()[-1]
+
+
+PKCS11_FILES = ('test_hsm_sync_and_listing.py', 'test_hsm_fips_softhsm.py')
+
+
+def test_without_python_pkcs11_the_softhsm_tests_fail_under_the_variable(tmp_path):
+    proc, tail = _run_files(tmp_path, BLOCK_PKCS11, PKCS11_FILES, {required_env('softhsm'): '1'},
+                            marker='needs_softhsm')
+    assert proc.returncode == 1, proc.stdout[-3000:]
+    failed = {line.split('::')[0].split('/')[-1] for line in proc.stdout.splitlines()
+              if line.startswith(('FAILED', 'ERROR'))}
+    assert failed == set(PKCS11_FILES), proc.stdout[-3000:]
+    assert 'passed' not in tail and 'skipped' not in tail, tail
+
+
+def test_without_python_pkcs11_the_module_skips_quietly_otherwise(tmp_path):
+    proc, tail = _run_files(tmp_path, BLOCK_PKCS11, PKCS11_FILES, {})
+    assert proc.returncode == 0, proc.stdout[-3000:]
+    assert 'skipped' in tail and 'failed' not in tail and 'error' not in tail, tail
+
+
+def test_a_build_without_ml_dsa_is_no_lost_softhsm_test(tmp_path):
+    proc, tail = _run_files(tmp_path, NO_MLDSA, ('test_hsm_pkcs11_mldsa.py',), {required_env('softhsm'): '1'})
+    assert proc.returncode == 0, proc.stdout[-3000:]
+    assert 'skipped' in tail and 'failed' not in tail, tail

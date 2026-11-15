@@ -18,17 +18,26 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from tests.optional_backends import needs
 from services.hsm.base_provider import HsmKeyInfo
 
-pkcs11 = pytest.importorskip('pkcs11')
-from pkcs11 import Attribute, KeyType, ObjectClass  # noqa: E402
-from pkcs11.exceptions import AttributeTypeInvalid  # noqa: E402
-from pkcs11.util.ec import encode_named_curve_parameters  # noqa: E402
+# Imported here, not by importorskip: a module skipped at collection would vanish from the
+# SoftHSM job instead of failing it; without python-pkcs11 each test skips (fails under the job)
+try:
+    import pkcs11
+    from pkcs11 import Attribute, KeyType, ObjectClass
+    from pkcs11.exceptions import AttributeTypeInvalid
+    from pkcs11.util.ec import encode_named_curve_parameters
+    HAS_PKCS11 = True
+except ImportError:
+    HAS_PKCS11 = False
+
+pytestmark = pytest.mark.skipif(not HAS_PKCS11, reason='python-pkcs11 not installed')
 
 SOFTHSM_MODULES = ('/usr/lib/softhsm/libsofthsm2.so',
                    '/usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so',
                    '/usr/lib64/pkcs11/libsofthsm2.so',
                    '/usr/local/lib/softhsm/libsofthsm2.so')
 SOFTHSM_MODULE = next((m for m in SOFTHSM_MODULES if os.path.exists(m)), None)
-needs_softhsm = needs('softhsm', SOFTHSM_MODULE and shutil.which('softhsm2-util'), reason='SoftHSM not installed')
+needs_softhsm = needs('softhsm', HAS_PKCS11 and SOFTHSM_MODULE and shutil.which('softhsm2-util'),
+                      reason='SoftHSM or python-pkcs11 not installed')
 
 
 # ---------------------------------------------------------------------------
