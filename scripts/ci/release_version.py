@@ -79,7 +79,11 @@ def _section(heading, text, stop):
                 if nxt.startswith(stop):
                     break
                 body.append(nxt)
-            return '\n'.join([''] + [b for b in body if b.strip()]) + '\n'
+            kept = [b for b in body if b.strip()]
+            # Sub-headings alone are not entries.
+            if not any(not b.startswith('#') for b in kept):
+                return ''
+            return '\n'.join([''] + kept) + '\n'
     return ''
 
 

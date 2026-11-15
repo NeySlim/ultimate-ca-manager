@@ -227,6 +227,16 @@ def test_a_rc_with_an_empty_own_section_falls_back_to_unreleased(tmp_path):
     assert 'Next thing.' in r.stdout
 
 
+def test_a_section_of_subheadings_only_has_no_entries(tmp_path):
+    empty = '### Added\n\n### Fixed\n'
+    rc = f'## [Unreleased]\n{empty}\n## [3.0-rc1] - 2026-12-01\n{empty}\n## [3.0] - 2026-12-20\n{empty}'
+    assert _notes(tmp_path, '3.0', rc).returncode == 1
+    assert _notes(tmp_path, '3.0-rc1', rc).returncode == 1
+    own = rc.replace('## [Unreleased]\n' + empty, '## [Unreleased]\n### Added\n- Next.\n')
+    r = _notes(tmp_path, '3.0-rc1', own)
+    assert r.returncode == 0 and 'Next.' in r.stdout
+
+
 def test_the_fallback_heading_does_not_bite_on_a_longer_version():
     rv = _load()
     text = '## 2.254.1\n- three\n\n## 2.254\n- two\n'
