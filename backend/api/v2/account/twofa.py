@@ -340,9 +340,14 @@ def regenerate_recovery_codes():
     user = db.session.get(User, g.current_user.id)
     if not user or not user.totp_confirmed:
         return error_response('2FA not enabled', 400)
-    locked = _reserve_code_check(user.id)
+    user_id = user.id  # the reservation commits: the account is read again after it
+    locked = _reserve_code_check(user_id)
     if locked:
         return locked
+    user = lock_user(user_id)
+    if user is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
 
     # Verify code, once only
     if not consume_totp(user, code):

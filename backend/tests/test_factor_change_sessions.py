@@ -677,3 +677,26 @@ def test_a_key_enrolled_for_an_account_deleted_meanwhile_never_answers_500(app, 
         monkeypatch.undo()
         _cleanup(app, user)
 
+
+def test_recovery_codes_for_an_account_deleted_meanwhile_answer_404(app, monkeypatch):
+    """Deleted while its attempt was counted: the lock after it finds no account."""
+    import api.v2.account.twofa as twofa
+    user = _make_user(app, totp=True)
+    reserve = twofa._reserve_code_check
+
+    def _reserve_then_delete(user_id):
+        answer = reserve(user_id)
+        _delete_account(user['id'])
+        db.session.commit()
+        return answer
+    try:
+        this = _open_session(app, user)
+        code = _code(app, user)
+        monkeypatch.setattr(twofa, '_reserve_code_check', _reserve_then_delete)
+        r = _post(this, '/api/v2/account/2fa/recovery-codes/regenerate', {'code': code})
+        assert r.status_code == 404, r.data
+        assert r.get_json()['message'] == 'User not found'
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+
