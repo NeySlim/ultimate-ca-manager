@@ -301,7 +301,7 @@ class TestProxyServiceBinding:
                 provider_model = MagicMock()
                 provider_model.id = 1
                 provider_model.provider_type = 'gandi'
-                provider_model.credentials = '{}'
+                provider_model._credentials = '{}'
                 find_prov.return_value = {'provider': provider_model}
                 provider = MagicMock()
                 provider.get_zone_for_domain.return_value = 'example.com'
@@ -355,7 +355,7 @@ class TestProxyServiceBinding:
                 provider_model = MagicMock()
                 provider_model.id = 1
                 provider_model.provider_type = 'gandi'
-                provider_model.credentials = '{}'
+                provider_model._credentials = '{}'
                 find_prov.return_value = {'provider': provider_model}
                 provider = MagicMock()
                 provider.get_zone_for_domain.return_value = 'example.com'

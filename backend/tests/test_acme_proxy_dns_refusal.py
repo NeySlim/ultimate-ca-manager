@@ -107,7 +107,7 @@ def _svc(monkeypatch, answers=None):
 
 
 def _provider(monkeypatch, create_result):
-    model = SimpleNamespace(id=5, provider_type='manual', credentials='{}')
+    model = SimpleNamespace(id=5, provider_type='manual', _credentials='{}')
     monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
                         lambda *_a, **_k: {'provider': model})
     provider = MagicMock()

@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils.encryption import SecretUnreadable, decrypt_required
 from utils.secret_target import retarget_error
 from models import db, DnsProvider
 from services.audit_service import AuditService
@@ -15,7 +16,8 @@ from services.acme.dns_providers import (
     get_available_providers, 
     is_valid_provider_type,
     create_provider,
-    get_provider_class
+    get_provider_class,
+    saved_credentials,
 )
 
 import logging
@@ -160,6 +162,34 @@ def _given(value):
     return value is not None and value != ''
 
 
+def _secret_names(schema, names):
+    """Values are never shown back, so anything that looks secret is treated as one."""
+    return {n for n in names
+            if any(f['name'] == n and f.get('type') == 'password' for f in schema)
+            or any(h in n.lower() for h in _SECRET_HINTS)}
+
+
+def _saved_credentials(provider, credentials):
+    """The saved credentials to merge *credentials* into. Saved ones this node cannot open
+    are replaced only by a full entry (every required field and a secret), never merged."""
+    try:
+        stored = decrypt_required(provider._credentials, f'DNS provider {provider.id} credentials')
+    except SecretUnreadable as e:
+        provider_class = get_provider_class(provider.provider_type)
+        given = {k for k, v in credentials.items() if _given(v)}
+        required = set(provider_class.REQUIRED_CREDENTIALS) if provider_class else set()
+        schema = provider_class.get_credential_schema() if provider_class else []
+        # A schema with no secret field (custom_command) is full with its required fields alone
+        secrets = sorted(_secret_names(schema, {f['name'] for f in schema}))
+        if required <= given and (_secret_names(schema, given) or not secrets):
+            return {}
+        missing = sorted(required - given) or [f"a secret ({', '.join(secrets)})"]
+        need = 'every required field and a secret' if secrets else 'every required field'
+        raise SecretUnreadable(f"{e} in full, {need} in one request; "
+                               f"missing: {', '.join(missing)}") from None
+    return json.loads(stored) if stored else None
+
+
 def _credentials_retarget_error(provider, credentials):
     """Saved credential secrets stay with the server and account they were saved for."""
     if not isinstance(credentials, dict) or not credentials or not provider.credentials:
@@ -171,10 +201,7 @@ def _credentials_retarget_error(provider, credentials):
     provider_class = get_provider_class(provider.provider_type)
     schema = provider_class.get_credential_schema() if provider_class else []
     names = {f['name'] for f in schema} | set(existing) | set(credentials)
-    # Values are never shown back, so anything that looks secret is treated as one
-    secret = {n for n in names
-              if any(f['name'] == n and f.get('type') == 'password' for f in schema)
-              or any(h in n.lower() for h in _SECRET_HINTS)}
+    secret = _secret_names(schema, names)
     # The form shows an unsaved checkbox without a default as unticked
     defaults = {f['name']: f.get('default', False if f.get('type') == 'checkbox' else None)
                 for f in schema}
@@ -203,8 +230,12 @@ def update_provider(provider_id):
     merged = None
     if credentials and isinstance(credentials, dict):
         merged = credentials
-        if provider.credentials:
-            merged = json.loads(provider.credentials)
+        try:
+            saved = _saved_credentials(provider, credentials)
+        except SecretUnreadable as e:
+            return error_response(str(e), 400)  # kept as stored: it must be entered again
+        if saved is not None:
+            merged = saved
             for key, value in credentials.items():
                 if _given(value):
                     merged[key] = value
@@ -304,7 +335,7 @@ def test_provider(provider_id):
         return error_response('Provider not found', 404)
     
     try:
-        credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+        credentials = saved_credentials(provider_model)
         provider = create_provider(provider_model.provider_type, credentials)
         
         success, message = provider.test_connection()
@@ -316,6 +347,8 @@ def test_provider(provider_id):
             },
             message='Connection test completed'
         )
+    except SecretUnreadable as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"DNS provider test failed: {e}")
         return error_response('Connection test failed', 500)

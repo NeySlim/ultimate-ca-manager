@@ -2,7 +2,8 @@
 
 Every node gets an environment built here and nothing else: its own DATA_DIR,
 UCM_CONFIG_DIR, logs and port under the bench directory, its own database URL
-(application_name = schema_node), the shared SECRET_KEY and KEY_ENCRYPTION_KEY.
+(application_name = schema_node), the shared SECRET_KEY, KEY_ENCRYPTION_KEY and
+UCM_DB_ENCRYPTION_KEY.
 The guard on its PYTHONPATH stops a node that touches an installation path.
 """
 import os
@@ -228,6 +229,7 @@ class Cluster:
         shared = {
             'SECRET_KEY': secrets.token_hex(32),
             'KEY_ENCRYPTION_KEY': Fernet.generate_key().decode(),
+            'UCM_DB_ENCRYPTION_KEY': Fernet.generate_key().decode(),
             'UCM_HA': '1',
             'INITIAL_ADMIN_PASSWORD': self.password,
             'FQDN': 'ucm-ha.test',
@@ -398,12 +400,18 @@ class Client:
 TASK_LINE = re.compile(r"Task '([A-Za-z0-9_]+)' (?:completed|skipped|failed)")
 
 
-def single_leader(nodes):
-    """The one node of `nodes` that every report names as leader, None while they disagree."""
+def single_leader(nodes, settling=False):
+    """The one node of `nodes` that every report names as leader, None while they disagree.
+
+    `settling`: just after the lock changed hands. Each report reads its node's heartbeat
+    flag, which follows the lock within a pass; reports read one after the other can then
+    straddle the move, so two leaders mean "not yet" instead of failing."""
     reports = {node.name: node.health() for node in nodes}
     leaders = [name for name, r in reports.items() if r['leader'] is True]
     named = {r['cluster']['leader_node_id'] for r in reports.values()}
     if len(leaders) > 1:
+        if settling:
+            return None
         raise AssertionError(f'more than one leader: {reports}')
     if len(leaders) == 1 and named == set(leaders) \
             and all(r['leader'] is False for name, r in reports.items() if name != leaders[0]):

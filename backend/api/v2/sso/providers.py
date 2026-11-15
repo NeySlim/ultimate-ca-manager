@@ -262,8 +262,9 @@ def _sso_retarget_error(provider, data):
     # to_dict sends ca_bundle back as a boolean, which the update ignores
     requested = {k: v for k, v in data.items()
                  if not (k.endswith('_ca_bundle') and not isinstance(v, str))}
+    # The stored token: a secret this node cannot open is kept all the same
     return retarget_error(current, requested,
-                          keeps_saved_secret(data, secret_key, getattr(provider, secret_key)))
+                          keeps_saved_secret(data, secret_key, getattr(provider, '_' + secret_key)))
 
 
 @bp.route('/api/v2/sso/providers/<int:provider_id>', methods=['PUT'])

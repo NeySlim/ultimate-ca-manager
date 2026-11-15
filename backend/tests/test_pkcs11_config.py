@@ -187,6 +187,21 @@ class TestAutoRegisterSofthsm:
             assert row.get_config()['user_pin'] == 'third-pin'
             assert row.get_config()['previous_user_pin'] == 'first-pin'
 
+    def test_a_takeover_keeps_a_pin_this_node_cannot_open(self, app):
+        """A PIN saved under another database key stays stored, as the previous PIN."""
+        import json
+        from cryptography.fernet import Fernet
+        token = Fernet(Fernet.generate_key()).encrypt(b'stale-pin').decode()
+        with app.app_context():
+            from models import db
+
+            row = self._seed_row({'token_label': 'UCM-Default', 'user_pin': token})
+            self._run({'HSM_DEFAULT_PIN': 'fresh-pin', 'HSM_TOKEN_CREATED': '1'})
+
+            db.session.refresh(row)
+            assert json.loads(row.config)['previous_user_pin'] == token
+            assert row.get_config()['user_pin'] == 'fresh-pin'
+
     def test_editing_the_provider_keeps_the_previous_pin(self, app):
         """The form sends only its own fields; the kept PIN is not one of them."""
         with app.app_context():

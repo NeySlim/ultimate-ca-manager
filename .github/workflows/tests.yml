@@ -575,7 +575,7 @@ jobs:
         run: |
           helm lint charts/ucm
           helm template t charts/ucm > /dev/null
-          HA="--set ha.enabled=true --set replicaCount=2 --set database.type=postgresql --set database.databaseUrl=postgresql://u:p@db/ucm"
+          HA="--set ha.enabled=true --set replicaCount=2 --set database.type=postgresql --set database.databaseUrl=postgresql://u:p@db/ucm --set secrets.keyEncryptionKey=K --set secrets.dbEncryptionKey=D"
           helm lint charts/ucm $HA
           helm template t charts/ucm $HA > /dev/null
 
@@ -593,7 +593,7 @@ jobs:
       - name: Run the chart tests
         run: |
           cd backend
-          pytest --tb=short -rs tests/test_helm_ha.py tests/test_helm_security_context.py tests/test_helm_initial_admin_password.py tests/test_no_jwt_secret_generated.py tests/test_health_ha.py tests/test_compose_ha.py tests/test_entrypoint_ha_database.py
+          pytest --tb=short -rs tests/test_helm_ha.py tests/test_helm_db_key.py tests/test_helm_security_context.py tests/test_helm_initial_admin_password.py tests/test_no_jwt_secret_generated.py tests/test_health_ha.py tests/test_compose_ha.py tests/test_entrypoint_ha_database.py
 
   test-frontend:
     name: Frontend Tests

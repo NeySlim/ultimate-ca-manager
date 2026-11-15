@@ -295,6 +295,7 @@ SECTIONS: Dict[str, Section] = {
         identity=('label',),
         exclude={**_SURROGATE},
         secrets=('account_key', 'eab_hmac_key'),
+        # eab_hmac_key is a property that writes under the KEK itself: no layer to name
         stored={'account_key': 'master'},
     ),
     'acme_client_orders': Section(

@@ -10,6 +10,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.secret_target import SECRET_TARGET_MESSAGE, keeps_saved_secret, retarget_error
+from utils.encryption import SecretUnreadable, decrypt_required
 from models import db, SCEPRequest, SystemConfig, CA
 from services.audit_service import AuditService
 from services.policy_service import PolicyViolation
@@ -996,9 +997,10 @@ def delete_intune_app(app_id):
 
 
 def _saved_intune_secret(app, tenant, client):
-    """The stored secret, only for the tenant and client it was stored with."""
+    """The stored secret, only for the tenant and client it was stored with. One this
+    node's key does not open raises SecretUnreadable naming it, never reads as blank."""
     if app and tenant == (app.tenant_id or '').strip() and client == (app.client_id or '').strip():
-        return app.decrypted_secret()
+        return decrypt_required(app.client_secret, f'Intune app {app.id} client secret') or ''
     return ''
 
 
@@ -1014,7 +1016,10 @@ def test_intune_app():
         return error_response('Intune app registration not found', 404)
     tenant = (data.get('tenant_id') or (app.tenant_id if app else '')).strip()
     client = (data.get('client_id') or (app.client_id if app else '')).strip()
-    secret = (data.get('client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
+    try:
+        secret = (data.get('client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
+    except SecretUnreadable as e:
+        return error_response(str(e), 400)
     if not tenant or not client or not secret:
         return error_response('Tenant ID, client ID and client secret are all required', 400)
     result = _test_intune_credentials(tenant, client, secret)
@@ -1039,7 +1044,10 @@ def test_intune_connection():
         app = db.session.get(IntuneApp, data['intune_app_id'])
     tenant = (data.get('intune_tenant_id') or (app.tenant_id if app else '')).strip()
     client = (data.get('intune_client_id') or (app.client_id if app else '')).strip()
-    secret = (data.get('intune_client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
+    try:
+        secret = (data.get('intune_client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
+    except SecretUnreadable as e:
+        return error_response(str(e), 400)
     if not tenant or not client or not secret:
         return error_response('Tenant ID, client ID and client secret are all required', 400)
     result = _test_intune_credentials(tenant, client, secret)

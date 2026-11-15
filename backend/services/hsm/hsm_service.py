@@ -23,10 +23,11 @@ from services import compliance_signer
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo, brainpool_refusal, mldsa_refusal,
-    HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
+    HsmError, HsmConnectionError, HsmOperationError, HsmConfigError, HsmSecretUnreadable
 )
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
+from utils.encryption import SecretUnreadable
 from utils.ha import SOFTHSM_LOCAL, ha_enabled, refuse_softhsm_in_ha
 from utils.process_lock import LockBusyError, process_lock
 from utils import hsm_check, pkcs11_config
@@ -158,7 +159,10 @@ class HsmService:
             )
         
         provider_class = cls._provider_registry[provider.type]
-        config = provider.get_config()
+        try:
+            config = provider.connection_config()
+        except SecretUnreadable as e:
+            raise HsmSecretUnreadable(str(e)) from e
         return provider_class(config)
     
     # =========================================================================
@@ -287,7 +291,7 @@ class HsmService:
         
         if config is not None:
             # The form never carries the PIN kept when a new SoftHSM token took over.
-            previous_pin = provider.get_config().get('previous_user_pin')
+            previous_pin = provider.editable_config().get('previous_user_pin')
             if previous_pin and 'previous_user_pin' not in config:
                 config = {**config, 'previous_user_pin': previous_pin}
             # set_config encrypts sensitive fields and drops mask sentinels
@@ -900,7 +904,7 @@ class HsmService:
         """Rewrite legacy PKCS#11 config keys (library_path/pin) in-place."""
         if provider.type != 'pkcs11':
             return False
-        raw = provider.get_config()
+        raw = provider.editable_config()
         if not pkcs11_config.pkcs11_config_needs_normalization(raw):
             return False
         provider.set_config(pkcs11_config.normalize_pkcs11_config(raw))
@@ -944,7 +948,7 @@ class HsmService:
         pin = os.environ.get('HSM_DEFAULT_PIN')
         existing = HsmProvider.query.filter_by(name='SoftHSM-Default').first()
         if existing:
-            config = existing.get_config()
+            config = existing.editable_config()
             aimed_at_default = config.get('token_label', 'UCM-Default') == 'UCM-Default'
             takeover = bool(pin and os.environ.get('HSM_TOKEN_CREATED') == '1' and aimed_at_default)
             restore = bool(

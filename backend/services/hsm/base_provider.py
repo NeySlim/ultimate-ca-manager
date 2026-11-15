@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
+from utils.encryption import SecretUnreadable
+
 
 @dataclass
 class HsmKeyInfo:
@@ -260,3 +262,7 @@ class HsmKeyNotFoundError(HsmError):
 class HsmConfigError(HsmError):
     """HSM configuration invalid"""
     pass
+
+
+class HsmSecretUnreadable(HsmConfigError, SecretUnreadable):
+    """A provider secret this node's database key does not open; the message names it."""

@@ -4,6 +4,8 @@
 #
 # --build-arg UCM_FIPS_BUILD=1 builds the -fips variant: OpenSSL FIPS provider
 # plus crypto libraries compiled against the system libcrypto. Default 0 = standard.
+# Needs BuildKit (docker buildx), both variants: the RUN --mount steps are not
+# understood by the legacy builder, which also builds the stages a variant skips.
 ARG UCM_FIPS_BUILD=0
 # OpenSSL FIPS Provider 3.5.9, CMVP certificate #5586; 3.1.2 (#4985, SHA-256
 # a0ce69b8b97ea6a35b96875235aa453b966ba3cba8af2de23657d8b6767d6539) still builds with these args

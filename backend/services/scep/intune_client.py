@@ -52,8 +52,14 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 
 from config.settings import Config
+from utils.encryption import SecretUnreadable
 
 logger = logging.getLogger(__name__)
+
+
+class IntuneSecretUnreadable(ValueError, SecretUnreadable):
+    """The app registration's stored secret this node's key does not open; the message
+    names it. A ValueError, so an approver reads it as any other configuration refusal."""
 
 AUTHORITY = "https://login.microsoftonline.com/"
 GRAPH_RESOURCE_URL = "https://graph.microsoft.com/"
@@ -411,7 +417,10 @@ def client_for_profile(profile):
     """
     if profile is None or not profile.intune_enabled:
         return None
-    tenant_id, client_id, client_secret = profile.intune_credentials()
+    try:
+        tenant_id, client_id, client_secret = profile.intune_credentials()
+    except SecretUnreadable as e:
+        raise IntuneSecretUnreadable(str(e)) from e
     if not tenant_id or not client_id or not client_secret:
         raise ValueError("tenant_id, client_id and client_secret are all required")
     key = (tenant_id, client_id)
