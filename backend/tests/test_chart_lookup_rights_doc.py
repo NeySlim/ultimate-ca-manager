@@ -6,12 +6,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 TEMPLATES = ROOT / 'charts' / 'ucm' / 'templates'
 PLURALS = {'ServiceAccount': 'serviceaccounts', 'Secret': 'secrets',
            'PersistentVolumeClaim': 'persistentvolumeclaims'}
+# Any API group: "v1", "apps/v1", "networking.k8s.io/v1"
+LOOKUP = re.compile(r'lookup\s+"[\w.-]+(?:/[\w.-]+)?"\s+"(\w+)"')
 
 
 def _looked_up():
     kinds = set()
     for path in TEMPLATES.glob('*'):
-        kinds |= set(re.findall(r'lookup\s+"v1"\s+"(\w+)"', path.read_text()))
+        kinds |= set(LOOKUP.findall(path.read_text()))
     return kinds
 
 
@@ -20,6 +22,12 @@ def _rights(text):
     found = re.findall(r'`get` on (.+?) in the release namespace', text)
     assert found, 'no sentence on the lookup rights'
     return [set(re.findall(r'`([a-z]+)`', f)) for f in found]
+
+
+def test_the_lookup_pattern_sees_every_api_group():
+    assert LOOKUP.findall('lookup "v1" "Secret" ns n') == ['Secret']
+    assert LOOKUP.findall('(lookup "apps/v1" "Deployment" ns n)') == ['Deployment']
+    assert LOOKUP.findall('lookup "networking.k8s.io/v1" "Ingress" ns n') == ['Ingress']
 
 
 def test_every_looked_up_kind_is_known():
