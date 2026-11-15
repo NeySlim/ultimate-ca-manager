@@ -180,3 +180,19 @@ def test_the_master_writes_the_restored_pair_and_records_it(app, clean, tmp_path
         attempt = json.loads((tmp_path / boot_config.HTTPS_RESTORED_ATTEMPT).read_text())
         assert 'Read-only file system' in attempt['error']
 
+
+
+def test_regenerating_the_certificate_drops_the_restored_pair(app, auth_client, clean, tmp_path,
+                                                               monkeypatch):
+    import api.v2.system.https as route
+    from config.settings import Config
+    monkeypatch.setenv('HTTPS_CERT_PATH', str(tmp_path / 'https_cert.pem'))
+    monkeypatch.setenv('HTTPS_KEY_PATH', str(tmp_path / 'https_key.pem'))
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    monkeypatch.setattr(route, 'restart_to_serve', lambda: (True, ''))
+    with app.app_context():
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+    r = auth_client.post('/api/v2/system/https/regenerate', json={'common_name': 'regen.test'})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert not _stored(shared_files.HTTPS_RESTORED)
