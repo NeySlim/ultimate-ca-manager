@@ -106,6 +106,7 @@ logs/
 /migrate_*.py
 data/
 !frontend/src/data/
+!backend/tests/data/
 CLAUDE.md
 backend/static/
 SECURITY_AUDIT.md

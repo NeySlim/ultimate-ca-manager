@@ -54,9 +54,13 @@ if ! git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "$TAG"; then
     exit 1
 fi
 
-# Same section as the workflow: [Unreleased] for a RC, its own section for a stable.
+# Same rule as the workflow (release_version.py): its own section, else [Unreleased] for a RC.
 NOTES="$(python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md | sed -e 's/[[:space:]]*$//')" || {
-    echo "A RC needs an '## [Unreleased]' block; a stable needs '## [${VERSION}] - YYYY-MM-DD'." >&2
+    if [[ "$VERSION" == *-rc* ]]; then
+        echo "CHANGELOG.md needs '## [${VERSION}]' or '## [Unreleased]' with entries." >&2
+    else
+        echo "CHANGELOG.md needs '## [${VERSION}]' with entries." >&2
+    fi
     exit 1
 }
 
