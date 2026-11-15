@@ -6376,6 +6376,7 @@
     "link": {
       "handled": "Item #{{id}} no longer waits for action (status: {{status}}).",
       "gone": "Item #{{id}} no longer exists."
-    }
+    },
+    "refresh": "Refresh"
   }
 }

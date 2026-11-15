@@ -10,7 +10,7 @@ const LATEST = 5
 export function ActivityCard() {
   const { t } = useTranslation()
   const { hasPermission } = usePermission()
-  const state = useCardData(() => dashboardService.getActivityLog(LATEST))
+  const state = useCardData(() => dashboardService.getActivityLog(LATEST), ['certificate', 'ca', 'user', 'group'])
   const rows = Array.isArray(state.data?.activity) ? state.data.activity : []
 
   return (

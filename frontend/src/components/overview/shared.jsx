@@ -5,29 +5,80 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
+import { ConnectionState, useWebSocket } from '../../hooks/useWebSocket'
+import { REFRESH_EVENT } from '../../lib/overviewRefresh'
 
 /** A figure from the API response; anything but a finite number reads as a dash. */
 export function num(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : '–'
 }
 
-/** {status: 'loading'|'ready'|'error'|'forbidden', data, reload}. */
-export function useCardData(fetcher) {
+// Events inside this window cost one reload; the only polling is while the live link is down
+const COALESCE_MS = 2000
+const OFFLINE_POLL_MS = 60000
+
+/**
+ * {status: 'loading'|'ready'|'error'|'forbidden', data, reload}. After the first load the card
+ * reloads in the background (the figures stay on screen) when one of `watch` (resources of the
+ * `ucm:data-changed` bus) changes, when the live link comes back, and when the tab returns.
+ */
+export function useCardData(fetcher, watch = []) {
   const [state, setState] = useState({ status: 'loading', data: null })
   const seq = useRef(0)
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false) => {
     const mine = ++seq.current
-    setState((s) => ({ status: 'loading', data: s.data }))
+    if (!quiet) setState((s) => ({ status: 'loading', data: s.data }))
     try {
       const res = await fetcher()
       if (mine === seq.current) setState({ status: 'ready', data: res?.data ?? null, meta: res?.meta ?? null })
     } catch (error) {
-      if (mine === seq.current) setState({ status: error?.status === 403 ? 'forbidden' : 'error', data: null })
+      // A background reload that fails leaves what the card shows
+      if (mine === seq.current && !quiet) setState({ status: error?.status === 403 ? 'forbidden' : 'error', data: null })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => { load(); return () => { seq.current += 1 } }, [load])
-  return { ...state, reload: load }
+
+  const timer = useRef(null)
+  const schedule = useCallback(() => {
+    if (timer.current) return
+    timer.current = setTimeout(() => { timer.current = null; load(true) }, COALESCE_MS)
+  }, [load])
+  const watched = watch.join(',')
+  useEffect(() => {
+    const onData = (e) => { if (watched.split(',').includes(e.detail?.type)) schedule() }
+    const onShow = () => { if (document.visibilityState === 'visible') schedule() }
+    const onRefresh = () => { clearTimeout(timer.current); timer.current = null; load(true) }
+    window.addEventListener('ucm:data-changed', onData)
+    window.addEventListener(REFRESH_EVENT, onRefresh)
+    document.addEventListener('visibilitychange', onShow)
+    return () => {
+      window.removeEventListener('ucm:data-changed', onData)
+      window.removeEventListener(REFRESH_EVENT, onRefresh)
+      document.removeEventListener('visibilitychange', onShow)
+      clearTimeout(timer.current)
+      timer.current = null
+    }
+  }, [watched, schedule, load])
+
+  const { connectionState } = useWebSocket()
+  const lostLink = useRef(false)
+  const down = connectionState === ConnectionState.DISCONNECTED || connectionState === ConnectionState.ERROR
+  useEffect(() => {
+    if (connectionState === ConnectionState.CONNECTED) {
+      if (lostLink.current) schedule()
+      lostLink.current = false
+    } else if (connectionState !== ConnectionState.CONNECTING) {
+      lostLink.current = true
+    }
+  }, [connectionState, schedule])
+  useEffect(() => {
+    if (!down) return undefined
+    const id = setInterval(schedule, OFFLINE_POLL_MS)
+    return () => clearInterval(id)
+  }, [down, schedule])
+
+  return { ...state, reload: () => load() }
 }
 
 /**

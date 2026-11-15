@@ -17,6 +17,7 @@ vi.mock('../../stores/userPreferencesStore', () => ({
 }))
 
 import OverviewPage from '../OverviewPage'
+import { REFRESH_EVENT } from '../../lib/overviewRefresh'
 
 beforeEach(() => { store.prefs = {}; store.persist.mockClear() })
 
@@ -45,5 +46,14 @@ describe('OverviewPage', () => {
     store.prefs = { dashboard: { order: ['horizon'], hidden: ['queue', 'health', 'compliance', 'hierarchy', 'activity'] } }
     render(<OverviewPage />)
     expect(screen.getAllByTestId(/^card-/).map((e) => e.dataset.testid)).toEqual(['card-horizon'])
+  })
+
+  it('the refresh button asks every card to reload', () => {
+    const heard = vi.fn()
+    window.addEventListener(REFRESH_EVENT, heard)
+    render(<OverviewPage />)
+    fireEvent.click(screen.getByText('overview.refresh'))
+    window.removeEventListener(REFRESH_EVENT, heard)
+    expect(heard).toHaveBeenCalledTimes(1)
   })
 })

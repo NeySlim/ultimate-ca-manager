@@ -13,7 +13,7 @@ export function HorizonCard() {
       { stats: () => certificatesService.getStats(), next: () => dashboardService.getNextExpirations(SOONEST) },
       (g) => Boolean(g.stats) || g.next?.data?.length > 0)
     return { data: { stats: got.stats?.data, next: got.next?.data, missing } }
-  })
+  }, ['certificate'])
   const stats = state.data?.stats || {}
   const next = Array.isArray(state.data?.next) ? state.data.next : []
 

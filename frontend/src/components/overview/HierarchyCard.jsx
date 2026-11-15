@@ -71,7 +71,7 @@ export function HierarchyCard() {
       { cas: () => casService.getAll(), issuance: () => overviewService.getIssuance(DAYS) },
       (g) => Boolean(g.cas) || g.issuance?.data?.by_ca?.length > 0)
     return { data: { cas: got.cas?.data, issuance: got.issuance?.data, missing }, meta: got.cas?.meta }
-  })
+  }, ['ca', 'certificate'])
   const casLoaded = Array.isArray(state.data?.cas)
   const cas = casLoaded ? state.data.cas : []
   const byCa = state.data?.issuance?.by_ca

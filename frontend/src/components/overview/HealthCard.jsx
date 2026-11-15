@@ -20,7 +20,7 @@ function Bars({ periods }) {
 
 export function HealthCard() {
   const { t } = useTranslation()
-  const state = useCardData(() => overviewService.getHealth())
+  const state = useCardData(() => overviewService.getHealth(), ['certificate'])
   const protocols = state.data?.protocols || {}
   const present = PROTOCOLS.filter((p) => protocols[p])
 
