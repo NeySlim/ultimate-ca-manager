@@ -531,3 +531,27 @@ def test_a_reload_that_cannot_read_the_clock_keeps_the_current_keys(
     assert app.config['SECRET_KEY'] == 'C' * 43
     assert app.config['SECRET_KEY_FALLBACKS'] == [key]
     assert not stored.reload_pending(app)
+
+
+def test_a_manual_apply_is_refused_while_the_key_is_stored(
+        app, auth_client, stored, encryption_enabled):
+    """UPGRADE.md: with encryption on, `auto_apply: false` (the 2.x manual steps) answers 400."""
+    env = app.config['SECRET_KEY']
+    r = auth_client.post(ROTATE, json={'auto_apply': False})
+    assert r.status_code == 400, r.data
+    assert 'nothing to apply by hand' in r.get_json()['message']
+    assert _rows(app) == {}
+    assert app.config['SECRET_KEY'] == env
+
+
+def test_a_rotation_in_the_database_signs_nobody_out(app, auth_client, stored, encryption_enabled):
+    """UPGRADE.md: a rotation is not a way to close sessions; a session opened before it stays."""
+    from tests.conftest import clear_admin_password_flag
+    clear_admin_password_flag(app)
+    before = app.test_client()
+    assert before.post('/api/v2/auth/login', json={'username': 'admin',
+                                                   'password': 'changeme123'}).status_code == 200
+    r = auth_client.post(ROTATE, json={})
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['previous_accepted_until']
+    assert before.get('/api/v2/account/profile').status_code == 200
