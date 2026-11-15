@@ -477,8 +477,26 @@ def _open_kept_dir(path: str) -> Optional[int]:
     return fd
 
 
-def _read_journal(kept_dir: str, dir_fd: Optional[int] = None) -> Optional[dict]:
-    """The journal a kept directory holds, or None when publication never began there."""
+# A journal present but unreadable or malformed: its directory is set aside, never removed
+DAMAGED = object()
+
+
+def _valid_entry(item) -> bool:
+    """A plain name in this very directory, a kept file this module named, typed fields."""
+    if not isinstance(item, dict):
+        return False
+    name, previous, mode = item.get('name'), item.get('previous'), item.get('mode')
+    return (isinstance(name, str) and bool(name) and name not in ('.', '..') and '/' not in name
+            and '\0' not in name and not name.startswith(_KEPT_PREFIX)
+            and isinstance(previous, str) and bool(_PREVIOUS.fullmatch(previous))
+            and isinstance(item.get('existed'), bool)
+            and (mode is None or (isinstance(mode, int) and not isinstance(mode, bool)
+                                  and 0 <= mode <= 0o7777)))
+
+
+def _read_journal(kept_dir: str, dir_fd: Optional[int] = None):
+    """The journal a kept directory holds, None when publication never began there (no
+    journal), or DAMAGED when one is there but cannot be trusted whole."""
     try:
         if dir_fd is None:
             fd = os.open(os.path.join(kept_dir, _JOURNAL), os.O_RDONLY | os.O_NOFOLLOW)
@@ -486,14 +504,18 @@ def _read_journal(kept_dir: str, dir_fd: Optional[int] = None) -> Optional[dict]
             fd = os.open(_JOURNAL, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
     except FileNotFoundError:
         return None
+    except OSError:
+        return DAMAGED
     try:
         with os.fdopen(fd, 'r') as handle:
             journal = json.load(handle)
-    except ValueError:
-        return None    # cut short while written: nothing was replaced after it
+    except (OSError, ValueError):
+        return DAMAGED
+    # Every entry checked before the first effect: a journal is replayed whole or not at all
     if not (isinstance(journal, dict) and isinstance(journal.get('token'), str)
-            and isinstance(journal.get('entries'), list)):
-        return None
+            and isinstance(journal.get('entries'), list)
+            and all(_valid_entry(item) for item in journal['entries'])):
+        return DAMAGED
     return journal
 
 
@@ -518,18 +540,13 @@ def _put_back_journal(kept_dir: str, journal: dict) -> None:
 
 
 def _put_back_entries(dir_fd: int, parent: Path, journal: dict) -> None:
-    for item in journal['entries']:
-        name, previous = item.get('name'), item.get('previous')
-        # Only a plain name in this very directory, and a kept file this module named
-        if (not isinstance(name, str) or not name or name in ('.', '..') or '/' in name
-                or name.startswith(_KEPT_PREFIX) or not isinstance(previous, str)
-                or not _PREVIOUS.fullmatch(previous)):
-            continue
+    for item in journal['entries']:    # each one validated by _read_journal
+        name, previous = item['name'], item['previous']
         destination = parent / name
-        if item.get('existed'):
+        if item['existed']:
             mode = item.get('mode')
             try:
-                _put_back(previous, destination, mode if isinstance(mode, int) else 0o600,
+                _put_back(previous, destination, mode if mode is not None else 0o600,
                           dir_fd=dir_fd)
             except FileNotFoundError:
                 pass    # kept before its replace; absent, it was never touched
@@ -572,12 +589,14 @@ def settle_interrupted_restores() -> None:
         return    # the usual case: nothing to settle, nothing touched
     sweep_kept_previous_contents()
     found = [(path, journal) for path, journal in _find_kept_directories() if journal is not None]
+    readable = [(path, journal) for path, journal in found if journal is not DAMAGED]
     try:
-        committed = _committed_tokens({journal['token'] for _, journal in found})
+        committed = _committed_tokens({journal['token'] for _, journal in readable})
     except Exception:
         committed = set()
     # A committed journal only drops its kept copies: it is never replayed over this restore
-    left = [path for path, journal in found if journal['token'] not in committed]
+    left = [path for path, journal in found
+            if journal is DAMAGED or journal['token'] not in committed]
     if left:
         logger.error("Restore refused: interrupted restores could not be settled, remove or "
                      "repair %s and restart", ', '.join(left))
@@ -605,7 +624,16 @@ def sweep_kept_previous_contents() -> List[Path]:
                 _sweep_stale_stagings()
             except OSError as exc:
                 logger.warning("Stagings of interrupted restores not swept: %s", exc)
-            found = _find_kept_directories()
+            found, damaged = [], False
+            for path, journal in _find_kept_directories():
+                if journal is DAMAGED:
+                    damaged = True
+                    # Set aside whole: its kept files may be the only copy of what it replaced
+                    logger.warning("Restore: the journal in %s cannot be read; nothing there is "
+                                   "put back or removed, and restores are refused until an "
+                                   "administrator repairs or removes it", path)
+                else:
+                    found.append((path, journal))
             tokens = {journal['token'] for _, journal in found if journal is not None}
             try:
                 committed = _committed_tokens(tokens)
@@ -637,7 +665,8 @@ def sweep_kept_previous_contents() -> List[Path]:
                                    "next start", path)
             for token in committed - named:
                 forget_publication(token)
-            _forget_lingering_publications(keep=named)
+            if not damaged:    # its token unknown, any lingering row may be the one it needs
+                _forget_lingering_publications(keep=named)
     except BackupBusyError as exc:
         logger.debug("Interrupted restores not swept: %s", exc)
     except OSError as exc:

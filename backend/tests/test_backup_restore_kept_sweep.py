@@ -165,8 +165,8 @@ def test_a_journal_names_nothing_outside_its_directory(dirs, tmp_path):
                {'name': 'x.key', 'previous': '../../outside.key', 'existed': True, 'mode': 0o600}]
     (kept / 'journal.json').write_text(json.dumps({'token': 'f' * 32, 'entries': entries}))
 
-    assert files.sweep_kept_previous_contents() == [kept]
-    assert outside.read_bytes() == b'not ours'
+    assert files.sweep_kept_previous_contents() == []
+    assert outside.read_bytes() == b'not ours' and kept.exists()
 
 
 def test_a_restore_in_progress_elsewhere_keeps_its_directories(dirs):
@@ -631,3 +631,39 @@ def test_a_kept_directory_not_private_to_the_service_is_left_alone(dirs, monkeyp
     assert destination.read_bytes() == b'live key'
     assert (kept / 'previous_000000').read_bytes() == b'forged'
     assert any(str(kept) in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.parametrize('journal', [
+    '{"token": "', '', '{"token": "' + 'b' * 32 + '", "entries": [42]}',
+    json.dumps({'token': 'b' * 32, 'entries': [
+        {'name': 'key.pem', 'previous': 'previous_000000', 'existed': True, 'mode': 0o600},
+        {'name': '../x', 'previous': 'previous_000001', 'existed': False}]}),
+    json.dumps({'token': 'b' * 32, 'entries': [
+        {'name': 'key.pem', 'previous': 'previous_000000', 'existed': 'yes'}]})])
+def test_a_damaged_journal_is_set_aside_and_refuses_a_restore(dirs, caplog, journal):
+    # Read as absent, it let the sweep delete the only copy of what the restore replaced
+    destination = dirs['https'] / 'key.pem'
+    destination.write_bytes(b'uncommitted replacement')
+    kept = dirs['https'] / '.ucm_restore_kept_damaged'
+    kept.mkdir(mode=0o700)
+    (kept / 'previous_000000').write_bytes(b'ORIGINAL KEY')
+    (kept / 'journal.json').write_text(journal)
+    with caplog.at_level(logging.WARNING, logger=files.__name__):
+        assert files.sweep_kept_previous_contents() == []
+    assert (kept / 'previous_000000').read_bytes() == b'ORIGINAL KEY'
+    assert destination.read_bytes() == b'uncommitted replacement'
+    assert any(str(kept) in record.getMessage() for record in caplog.records)
+    with pytest.raises(files.InterruptedRestorePending):
+        files.settle_interrupted_restores()
+    assert kept.exists()
+
+
+def test_a_damaged_journal_keeps_every_lingering_row(dirs):
+    # Its token unknown, any row may be the one it would need once repaired
+    record_publication('d' * 32)
+    db.session.commit()
+    kept = dirs['certs'] / '.ucm_restore_kept_damaged'
+    kept.mkdir(mode=0o700)
+    (kept / 'journal.json').write_text('{"tok')
+    files.sweep_kept_previous_contents()
+    assert _row_exists('d' * 32)
