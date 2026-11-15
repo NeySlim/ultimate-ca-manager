@@ -136,7 +136,7 @@ def parse_version(version_str):
 
 
 def major_of(version_str):
-    """Major version number of a version string ('2.254.2' -> 2, 'v3.0-rc1' -> 3)."""
+    """Major version number of a version string ('2.254.2' -> 2, 'v10.1-rc1' -> 10)."""
     return parse_version(version_str)[0]
 
 

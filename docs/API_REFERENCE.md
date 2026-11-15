@@ -2490,11 +2490,17 @@ POST /api/v2/system/alerts/expiry/check
 
 ### Updates
 ```http
-# Check for updates
+# Check for updates (within the installed major version; a later
+# major version's final release is reported apart in major_upgrade,
+# null when there is none; security_maintenance is a boolean)
 GET /api/v2/system/updates/check
 
-# Install update
+# Install update (within the installed major version)
 POST /api/v2/system/updates/install
+
+# Upgrade to the later major version reported by the check
+POST /api/v2/system/updates/install
+{"major_upgrade": true, "version": "<major_upgrade.version>"}
 
 # Get current version
 GET /api/v2/system/updates/version
