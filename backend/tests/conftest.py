@@ -986,6 +986,13 @@ def assert_error(response, status):
         f'Expected {status}, got {response.status_code}: {response.data[:500]}'
 
 
+def assert_refused(response, status, message, prefix=False):
+    """The exact status and the exact message (or its start) of an error answer."""
+    assert_error(response, status)
+    said = (json.loads(response.data) or {}).get('message') or ''
+    assert (said.startswith(message) if prefix else said == message), said
+
+
 def clean_dangling_rows(app):
     """Delete rows of the shared test database that break its own schema.
 

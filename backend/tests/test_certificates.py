@@ -22,7 +22,8 @@ Uses shared conftest fixtures: app, client, auth_client, create_ca, create_cert.
 """
 import pytest
 import json
-from tests.conftest import get_json, assert_success, assert_error
+import uuid
+from tests.conftest import get_json, assert_success, assert_error, assert_refused
 
 CONTENT_JSON = 'application/json'
 BASE = '/api/v2/certificates'
@@ -243,39 +244,54 @@ class TestListCertificates:
         assert r.status_code == 200
         assert 'meta' in body or 'data' in body
 
-    def test_list_filter_by_status_valid(self, auth_client, create_cert):
-        create_cert(cn='valid-filter.example.com')
-        r = auth_client.get(f'{BASE}?status=valid')
+    @staticmethod
+    def _cns(client, query):
+        """The common names the list returns for `query`, in order."""
+        r = client.get(f'{BASE}?per_page=100&{query}')
         data = assert_success(r)
-        assert isinstance(data, list)
+        return [c.get('common_name') or c.get('cn') or c.get('subject_cn') for c in data]
 
-    def test_list_filter_by_status_revoked(self, auth_client):
-        r = auth_client.get(f'{BASE}?status=revoked')
-        data = assert_success(r)
-        assert isinstance(data, list)
+    def test_list_filter_by_status_valid(self, auth_client, create_cert):
+        tag = f'stv-{uuid.uuid4().hex[:8]}'
+        create_cert(cn=f'{tag}-valid.example.com')
+        revoked = create_cert(cn=f'{tag}-revoked.example.com')
+        r = post_json(auth_client, f'{BASE}/{revoked["id"]}/revoke', {'reason': 'unspecified'})
+        assert r.status_code == 200, r.data
+        assert self._cns(auth_client, f'status=valid&search={tag}') == [f'{tag}-valid.example.com']
+
+    def test_list_filter_by_status_revoked(self, auth_client, create_cert):
+        tag = f'str-{uuid.uuid4().hex[:8]}'
+        create_cert(cn=f'{tag}-valid.example.com')
+        revoked = create_cert(cn=f'{tag}-revoked.example.com')
+        r = post_json(auth_client, f'{BASE}/{revoked["id"]}/revoke', {'reason': 'unspecified'})
+        assert r.status_code == 200, r.data
+        assert self._cns(auth_client, f'status=revoked&search={tag}') == [f'{tag}-revoked.example.com']
 
     def test_list_filter_by_ca_id(self, auth_client, create_ca, create_cert):
-        """ca_id filter hits a known bug (model uses caref not ca_id)."""
-        ca = create_ca(cn='Filter CA')
-        ca_id = ca.get('id', ca.get('ca_id'))
-        create_cert(cn='ca-filter.example.com', ca_id=ca_id)
-        try:
-            r = auth_client.get(f'{BASE}?ca_id={ca_id}')
-            # If it doesn't raise, accept 200 or 500
-            assert r.status_code in (200, 500)
-        except Exception:
-            # Known bug: filter_by(ca_id=...) raises InvalidRequestError
-            pytest.skip('ca_id filter broken — model uses caref not ca_id')
+        tag = f'cai-{uuid.uuid4().hex[:8]}'
+        picked = create_ca(cn=f'{tag} Filter CA')['id']
+        other = create_ca(cn=f'{tag} Other CA')['id']
+        create_cert(cn=f'{tag}-picked.example.com', ca_id=picked)
+        create_cert(cn=f'{tag}-other.example.com', ca_id=other)
+        assert self._cns(auth_client, f'ca_id={picked}&search={tag}-') == [f'{tag}-picked.example.com']
+        # An id that names no CA lists nothing, rather than everything
+        assert self._cns(auth_client, f'ca_id=999999&search={tag}-') == []
 
     def test_list_search(self, auth_client, create_cert):
-        create_cert(cn='searchable-unique-xyz.example.com')
-        r = auth_client.get(f'{BASE}?search=searchable-unique-xyz')
-        data = assert_success(r)
-        assert isinstance(data, list)
+        tag = f'srch-{uuid.uuid4().hex[:8]}'
+        create_cert(cn=f'{tag}-hit.example.com')
+        create_cert(cn=f'{tag[::-1]}-miss.example.com')
+        assert self._cns(auth_client, f'search={tag}') == [f'{tag}-hit.example.com']
 
-    def test_list_sort_by_valid_to(self, auth_client):
-        r = auth_client.get(f'{BASE}?sort_by=valid_to&sort_order=desc')
-        assert r.status_code == 200
+    def test_list_sort_by_valid_to(self, auth_client, create_cert):
+        tag = f'sort-{uuid.uuid4().hex[:8]}'
+        # Created longest first, so the id tie-break would give the opposite order
+        create_cert(cn=f'{tag}-b-long.example.com', validity_days=300)
+        create_cert(cn=f'{tag}-a-short.example.com', validity_days=30)
+        assert self._cns(auth_client, f'search={tag}&sort_by=valid_to&sort_order=desc') == [
+            f'{tag}-b-long.example.com', f'{tag}-a-short.example.com']
+        assert self._cns(auth_client, f'search={tag}&sort_by=valid_to&sort_order=asc') == [
+            f'{tag}-a-short.example.com', f'{tag}-b-long.example.com']
 
 
 # ============================================================================
@@ -411,7 +427,7 @@ class TestExportAll:
     def test_export_unsupported_format(self, auth_client, create_cert):
         create_cert(cn='export-bad-fmt.example.com')
         r = auth_client.get(f'{BASE}/export?format=der')
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Bulk export only supports PEM and P7B formats', prefix=True)
 
 
 # ============================================================================
@@ -684,11 +700,20 @@ class TestUploadPrivateKey:
         })
         assert r.status_code == 400
 
-    def test_key_invalid_format(self, auth_client, create_cert):
-        cert = create_cert(cn='key-badfmt.example.com')
-        cert_id = cert.get('id')
+    def test_key_invalid_format(self, app, auth_client, create_cert):
+        from models import Certificate, db
+        cert_id = create_cert(cn='key-badfmt.example.com')['id']
+        with app.app_context():
+            # A certificate without its key: the only one this route takes
+            db.session.get(Certificate, cert_id).prv = None
+            db.session.commit()
         r = post_json(auth_client, f'{BASE}/{cert_id}/key', {'key': 'not-a-key'})
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Invalid key format - must be PEM or base64-encoded PEM')
+        r = post_json(auth_client, f'{BASE}/{cert_id}/key',
+                      {'key': '-----BEGIN PRIVATE KEY-----\nbm90IGEga2V5\n-----END PRIVATE KEY-----'})
+        assert_error(r, 400)
+        with app.app_context():
+            assert not db.session.get(Certificate, cert_id).has_private_key
 
 
 # ============================================================================
@@ -711,7 +736,7 @@ class TestRenewCertificate:
 
     def test_renew_nonexistent(self, auth_client):
         r = post_json(auth_client, f'{BASE}/999999/renew', {})
-        assert r.status_code in (404, 500)
+        assert_refused(r, 404, 'Certificate not found')
 
 
 
@@ -745,10 +770,12 @@ class TestImportCertificate:
         assert r.status_code == 400
 
     def test_import_invalid_pem(self, auth_client):
+        before = _all_ids(auth_client, BASE)
         r = auth_client.post(f'{BASE}/import',
                              data={'pem_content': 'not-valid-pem-data'},
                              content_type='multipart/form-data')
-        assert r.status_code in (400, 500)
+        assert_refused(r, 400, 'Invalid input')
+        assert _all_ids(auth_client, BASE) == before
 
     def test_import_valid_pem(self, auth_client, create_cert):
         # Export a cert as PEM, then re-import it
