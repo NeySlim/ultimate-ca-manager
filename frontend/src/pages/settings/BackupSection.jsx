@@ -4,7 +4,8 @@ import { Button, Input, Select, FileUpload, Badge, DetailHeader, DetailSection, 
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import AdminLockLabel from './AdminLockLabel'
 import { useClipboard } from '../../hooks/useClipboard'
-import { restoreMaxBytes } from './restoreLimits'
+import { formatSize } from '../../components/FileUpload'
+import { restoreMaxBytes, restoreLegacyCeilingExceeded } from './restoreLimits'
 
 export default function BackupSection({
   settings, updateSetting, handleSave, saving, hasPermission,
@@ -290,6 +291,10 @@ export default function BackupSection({
           <FileUpload
             accept=".ucmbkp,.tar.gz"
             maxSize={restoreMaxBytes(backupMeta.restore_limits)}
+            validate={async (file) => {
+              const ceiling = await restoreLegacyCeilingExceeded(file, backupMeta.restore_limits)
+              return ceiling ? t('settings.restoreTooLargeLegacy', { size: formatSize(ceiling) }) : null
+            }}
             onFileSelect={(file) => { setRestoreFile(file); setShowRestoreModal(true) }}
             helperText={t('settings.selectBackupFile')}
           />

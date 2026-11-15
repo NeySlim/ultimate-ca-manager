@@ -2881,6 +2881,7 @@
     "restoreWarning": "This REPLACES all current data, including users, private keys and stored secrets, with the backup contents, and is irreversible. Only restore a backup you created yourself: a backup whose password an attacker controls can implant a persistent admin account.",
     "restoring": "Restoring...",
     "restoreUploading": "Uploading {{percent}}%...",
+    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
     "restoreReportTitle": "Restore report",
     "restoreReportTodo": "To do",
     "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",

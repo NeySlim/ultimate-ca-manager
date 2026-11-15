@@ -3139,6 +3139,7 @@
     "enterBackupPassword": "Entrez le mot de passe utilisé pour créer la sauvegarde",
     "restoring": "Restauration en cours...",
     "restoreUploading": "Envoi {{percent}} %...",
+    "restoreTooLargeLegacy": "Une archive d'avant la 3.0 est acceptée jusqu'à {{size}} (BACKUP_MAX_UPLOAD_MB) : celle-ci est plus grosse.",
     "restoreReportTitle": "Bilan de la restauration",
     "restoreReportTodo": "À faire",
     "restoreReportNothingRestored": "Rien n'a été restauré : l'archive ne contenait aucune donnée et aucun redémarrage n'est nécessaire.",

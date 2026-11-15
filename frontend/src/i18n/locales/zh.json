@@ -2880,6 +2880,7 @@
     "restoreWarning": "这将用备份内容替换所有当前数据（包括用户、私钥和存储的密钥），且不可撤销。仅还原您自己创建的备份：密码被攻击者掌握的备份可能植入持久的管理员账户。",
     "restoring": "恢复中...",
     "restoreUploading": "Uploading {{percent}}%...",
+    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
     "restoreReportTitle": "Restore report",
     "restoreReportTodo": "To do",
     "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",

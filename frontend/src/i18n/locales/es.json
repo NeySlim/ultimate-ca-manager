@@ -2880,6 +2880,7 @@
     "restoreWarning": "Esto REEMPLAZA todos los datos actuales: incluidos usuarios, claves privadas y secretos almacenados, con el contenido de la copia de seguridad, y es irreversible. Restaure solo una copia que haya creado usted mismo: una copia cuya contraseña controla un atacante puede implantar una cuenta de administrador persistente.",
     "restoring": "Restaurando...",
     "restoreUploading": "Uploading {{percent}}%...",
+    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
     "restoreReportTitle": "Restore report",
     "restoreReportTodo": "To do",
     "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",

@@ -2880,6 +2880,7 @@
     "restoreWarning": "これにより現在のすべてのデータ（ユーザー、秘密鍵、保存されたシークレットを含む）がバックアップの内容に置き換えられ、元に戻せません。自分で作成したバックアップのみを復元してください：パスワードを攻撃者が管理しているバックアップは、永続的な管理者アカウントを埋め込む可能性があります。",
     "restoring": "復元中...",
     "restoreUploading": "Uploading {{percent}}%...",
+    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
     "restoreReportTitle": "Restore report",
     "restoreReportTodo": "To do",
     "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",

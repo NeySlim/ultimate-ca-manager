@@ -2920,6 +2920,7 @@
     "restoreWarning": "Це ЗАМІНЮЄ всі поточні дані: зокрема користувачів, приватні ключі та збережені секрети, вмістом резервної копії, і це незворотно. Відновлюйте лише резервну копію, яку створили самі: копія, пароль якої контролює зловмисник, може імплантувати постійний обліковий запис адміністратора.",
     "restoring": "Відновлення...",
     "restoreUploading": "Uploading {{percent}}%...",
+    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
     "restoreReportTitle": "Restore report",
     "restoreReportTodo": "To do",
     "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",

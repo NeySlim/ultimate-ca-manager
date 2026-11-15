@@ -7,7 +7,7 @@ import { UploadSimple, FileText, X } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { Button } from './Button'
 
-function formatSize(bytes) {
+export function formatSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(0)}MB`
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
@@ -22,6 +22,7 @@ export function FileUpload({
   label,
   compact = false, // Compact mode: smaller drop zone
   maxSize = 10 * 1024 * 1024, // 10MB default; 0 for no ceiling
+  validate, // Optional async (file) => error text or null, run after the size check
   className 
 }) {
   const { t } = useTranslation()
@@ -46,12 +47,12 @@ export function FileUpload({
     return null
   }
 
-  const handleFiles = (fileList) => {
+  const handleFiles = async (fileList) => {
     setError(null)
     const newFiles = Array.from(fileList)
     
     for (const file of newFiles) {
-      const error = validateFile(file)
+      const error = validateFile(file) || (validate ? await validate(file) : null)
       if (error) {
         setError(error)
         return

@@ -2880,6 +2880,7 @@
     "restoreWarning": "Isto SUBSTITUI todos os dados atuais: incluindo utilizadores, chaves privadas e segredos armazenados, pelo conteúdo do backup, e é irreversível. Restaure apenas um backup que você mesmo criou: um backup cuja palavra-passe é controlada por um atacante pode implantar uma conta de administrador persistente.",
     "restoring": "Restaurando...",
     "restoreUploading": "Uploading {{percent}}%...",
+    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
     "restoreReportTitle": "Restore report",
     "restoreReportTodo": "To do",
     "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",
