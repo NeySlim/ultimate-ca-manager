@@ -147,9 +147,11 @@ class WebAuthnService:
         return json.loads(options_to_json(options))
     
     @staticmethod
-    def verify_registration(user_id: int, credential_data: dict, hostname: str, credential_name: str = None) -> Tuple[bool, str, Optional[WebAuthnCredential]]:
+    def verify_registration(user_id: int, credential_data: dict, hostname: str, credential_name: str = None,
+                            second_factor_of=None) -> Tuple[bool, str, Optional[WebAuthnCredential]]:
         """
-        Verify registration response and create credential
+        Verify registration response and create credential; ``second_factor_of`` (the
+        owner's User row) gets webauthn_2fa set in the credential's own commit.
         """
         rp_id = get_rp_id(hostname)
         
@@ -203,6 +205,8 @@ class WebAuthnService:
             )
             
             db.session.add(credential)
+            if second_factor_of is not None:
+                second_factor_of.webauthn_2fa = True
             db.session.commit()
             
             logger.info(f"WebAuthn credential registered: user_id={user_id}, cred_id={verification.credential_id.hex()[:16]}...")

@@ -146,10 +146,9 @@ def verify_registration():
     # A key registered under forced enrolment (#141) stays the user's second factor if
     # enforcement is lifted later: the flag rides the key's own commit, the gate goes after it.
     enrolling = session.get(ENROLL_SESSION_KEY) is not None
-    if enrolling:
-        owner.webauthn_2fa = True
     success, message, credential = WebAuthnService.verify_registration(
-        user.id, credential_data, hostname, credential_name
+        user.id, credential_data, hostname, credential_name,
+        second_factor_of=owner if enrolling else None
     )
     if not success:
         db.session.rollback()
