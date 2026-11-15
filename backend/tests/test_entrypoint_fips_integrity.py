@@ -29,6 +29,7 @@ conditional-errors = 1
 security-checks = 1
 module-mac = $FAKE_MAC
 EOF
+[ -n "${FAKE_FAIL_AFTER_WRITE:-}" ] && { echo "INSTALL FAILED"; exit 1; }
 echo "INSTALL PASSED"
 '''
 
@@ -76,7 +77,7 @@ def test_modified_module_is_refused_neg(bench):
 def test_missing_reference_is_refused_neg(bench):
     rc, out = _run(bench, bench / 'absent.mac')
     assert rc == 1 and 'continued' not in out
-    assert 'missing or unreadable' in out
+    assert 'missing, unreadable or malformed' in out
     # the refusal is the only text: no shell redirection error above it
     assert 'No such file' not in out and 'line ' not in out
 
@@ -86,7 +87,7 @@ def test_missing_reference_is_refused_neg(bench):
 def test_empty_or_malformed_reference_is_refused_neg(bench, content):
     rc, out = _run(bench, _reference(bench, content))
     assert rc == 1 and 'continued' not in out
-    assert 'missing or unreadable' in out and 'modified' not in out
+    assert 'missing, unreadable or malformed' in out and 'modified' not in out
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason='root reads a mode 000 file')
@@ -106,6 +107,59 @@ def test_config_without_module_mac_is_refused_neg(bench):
 def test_failed_self_tests_are_refused_neg(bench):
     rc, out = _run(bench, _reference(bench, BUILD_MAC), FAKE_FAIL='1')
     assert rc == 1 and 'self-tests' in out and 'INSTALL FAILED' in out
+
+
+def test_failed_self_tests_with_a_previous_good_config_are_refused_neg(bench):
+    # a config left by an earlier successful start must not stand in for a failed install
+    cnf = bench / 'run' / 'fipsmodule.cnf'
+    cnf.write_text(f'[fips_sect]\nmodule-mac = {BUILD_MAC}\n')
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), FAKE_FAIL='1')
+    assert rc == 1 and 'continued' not in out
+    assert 'self-tests' in out and 'modified' not in out
+
+
+def test_failed_self_tests_after_writing_a_good_config_are_refused_neg(bench):
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), FAKE_FAIL_AFTER_WRITE='1')
+    assert rc == 1 and 'continued' not in out and 'self-tests' in out
+    assert not (bench / 'run' / 'fipsmodule.cnf').exists()
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log']
+
+
+def test_refused_module_leaves_no_new_config_neg(bench):
+    rc, _ = _run(bench, _reference(bench, BUILD_MAC), mac=OTHER_MAC)
+    assert rc == 1
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log']
+
+
+def test_refused_module_keeps_the_previous_config_neg(bench):
+    cnf = bench / 'run' / 'fipsmodule.cnf'
+    cnf.write_text('previous\n')
+    rc, _ = _run(bench, _reference(bench, BUILD_MAC), mac=OTHER_MAC)
+    assert rc == 1 and cnf.read_text() == 'previous\n'
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log', 'fipsmodule.cnf']
+
+
+def test_accepted_module_leaves_only_the_config_pos(bench):
+    rc, _ = _run(bench, _reference(bench, BUILD_MAC))
+    assert rc == 0
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log', 'fipsmodule.cnf']
+    assert f'module-mac = {BUILD_MAC}' in (bench / 'run' / 'fipsmodule.cnf').read_text()
+
+
+@pytest.mark.parametrize('modules', [None, '{bench}', '{bench}/', '{bench}/./'])
+def test_openssl_modules_on_the_checked_directory_is_accepted_pos(bench, modules):
+    extra = {} if modules is None else {'OPENSSL_MODULES': modules.format(bench=bench)}
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), **extra)
+    assert rc == 0 and 'continued' in out
+
+
+@pytest.mark.parametrize('modules', ['/nonexistent', '{bench}/other', ''])
+def test_openssl_modules_elsewhere_is_refused_neg(bench, modules):
+    (bench / 'other').mkdir()
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), OPENSSL_MODULES=modules.format(bench=bench))
+    assert rc == 1 and 'continued' not in out and 'OPENSSL_MODULES' in out
+    # refused before fipsinstall: nothing written in the run directory
+    assert list((bench / 'run').iterdir()) == []
 
 
 def test_build_records_the_mac_the_runtime_compares_pos(bench):
