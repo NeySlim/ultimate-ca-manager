@@ -37,6 +37,11 @@ LEGAL = ('LICENSE', 'NOTICE', 'COMMERCIAL-LICENSE.md')
 FONT_SUFFIXES = ('.woff2', '.woff', '.ttf', '.otf')
 VARIANTS = {'std': 'standard', 'fips': 'fips'}
 ARCHES = ('amd64', 'arm64')
+
+
+def is_legal_text(path):
+    """A legal text by its file name, also when the package tool compressed it (dh_compress)."""
+    return path.rsplit('/', 1)[-1].removesuffix('.gz') in LEGAL
 INDEX = 'sbom-index.json'
 HEX64 = re.compile(r'[0-9a-f]{64}')
 
@@ -390,7 +395,7 @@ def cmd_package(args):
                           ['AGPL-3.0-only'], 'NOTICE')]
     comps += frontend_components(frag, f'{app}/frontend/dist')
     for path, digest in files.items():
-        if path.rsplit('/', 1)[-1] in LEGAL:
+        if is_legal_text(path):
             comps.append(file_component(path, digest, 'content', f'legal:{path}', 'legal-text'))
     nodeps, subs = native_setup_rules(_read(root / app / 'scripts' / 'native-setup.sh'))
     comps += requirement_components(parse_requirements((root / req_path).read_text()), req_path, subs)
@@ -558,7 +563,7 @@ def cmd_image(args):
         fail(f'the standard image holds {fips[0][0]}')
     comps += frontend_components(frag, f'{app}/frontend/dist')
     for path, h in sorted(files.items()):
-        if path.rsplit('/', 1)[-1] in LEGAL and not path.startswith(f'{app}/frontend/'):
+        if is_legal_text(path) and not path.startswith(f'{app}/frontend/'):
             comps.append(file_component(path, h, 'content', f'legal:{path}', 'legal-text'))
     meta = [prop('ucm:subject-kind', 'image'), prop('ucm:release-version', args.version),
             prop('ucm:not-covered', 'code statically linked into native extensions, unless listed'),
