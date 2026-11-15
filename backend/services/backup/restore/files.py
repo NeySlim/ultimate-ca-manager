@@ -545,6 +545,9 @@ def _forget_lingering_publications(keep=()) -> None:
         return
     from models import SystemConfig, db
     try:
+        # The first start sweeps before the schema exists: no table, no row to forget
+        if not db.inspect(db.engine).has_table(SystemConfig.__tablename__):
+            return
         query = SystemConfig.query.filter(SystemConfig.key.startswith(PUBLICATION_PREFIX))
         if keep:
             query = query.filter(SystemConfig.key.notin_(

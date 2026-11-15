@@ -279,3 +279,13 @@ def test_app_startup_sweeps_the_key_directories():
     (kept / 'previous_000000').write_bytes(b'OLD PLAINTEXT KEY')
     with fresh_app():
         assert not kept.exists()
+
+
+def test_the_first_start_on_an_empty_database_reads_no_missing_table(caplog):
+    # The sweep runs before the schema exists: SQLite in memory, a schema of its own on PostgreSQL
+    from tests.fresh_app import fresh_app
+    with caplog.at_level(logging.DEBUG, logger=files.__name__):
+        with fresh_app():
+            pass
+    assert not [record.getMessage() for record in caplog.records
+                if record.name == files.__name__ and record.levelno >= logging.INFO]
