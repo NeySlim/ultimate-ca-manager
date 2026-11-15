@@ -93,6 +93,12 @@ def step(name, args):
     return None
 
 
+def received(run, n, mode):
+    """{(step, mode)} of call `n` if `run` made it (its wrapper logs it before the fault):
+    a fault planned at a call the run never reached is never counted."""
+    return {(step(name, args), mode) for k, name, args in run.calls if k == n and step(name, args)}
+
+
 class Run:
     """One run of the script: its output, how many file commands it called, and each
     call as (number, command, arguments)."""
@@ -239,9 +245,7 @@ class ChaosSuite:
             for i, mode in enumerate(('fail', 'kill', 'done') + (TORN if kind == 'journal' else ())):
                 fit = [p for p in pairs if mode not in TORN or p[2] == 'tee']
                 at, n, _name = fit[(i * 7) % len(fit)]
-                faulty = self._scenario(lab, (at, 'fail'), (n, mode))[0]
-                hit = [(step(name, args), mode) for k, name, args in faulty.calls if k == n]
-                covered.update(hit)
+                covered |= received(self._scenario(lab, (at, 'fail'), (n, mode))[0], n, mode)
         assert {(k, m) for k in ('rename', 'rmdir', 'journal') for m in ('fail', 'kill', 'done')} <= covered, covered
         assert {('journal', m) for m in TORN} <= covered, covered
 

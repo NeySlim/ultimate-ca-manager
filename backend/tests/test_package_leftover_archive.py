@@ -1460,3 +1460,15 @@ def test_the_harness_finds_an_item_only_in_the_local_archive_of_this_archiving(t
     (box.data / LOCAL / 'https_key.pem').rename(target)
     with pytest.raises(AssertionError):
         exactly_once(box, data, config)
+
+
+def test_the_sweep_counts_a_fault_only_at_a_call_the_run_made(tmp_path):
+    """The coverage of the put-back sweep is counted on the calls really made."""
+    from tests.package_leftover_chaos import Run, received
+    box = Box(tmp_path, python='stub')
+    (box.state / 'names').write_text(f'3\trename\t-I\t-c\tcode\t{box.data}/a\t{box.archive}/data/a\n'
+                                     f'5\trmdir\t--\t{box.archive}/data\n')
+    run = Run(box, None, 5)
+    assert received(run, 3, 'kill') == {('rename', 'kill')}
+    assert received(run, 5, 'fail') == {('rmdir', 'fail')}
+    assert received(run, 4, 'fail') == set() and received(run, 9, 'done') == set()
