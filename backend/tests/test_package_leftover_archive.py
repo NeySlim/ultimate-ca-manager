@@ -1341,6 +1341,27 @@ def test_an_item_removed_by_hand_is_named_once_and_never_blocks_a_later_attempt(
         exactly_once(box, data, config, skip=('backups/ucm-2026.ucmbkp',))
 
 
+def test_an_archive_directory_removed_by_hand_waits_until_it_is_made_again_empty(tmp_path):
+    """As the README says: a directory of an unfinished archive removed by hand reads as
+    not mounted; made again, empty, the next attempt names what it held and archives the rest."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    _killed_after_renaming(box, 'https_key.pem')
+    held = box.archive / 'data' / 'backups'
+    shutil.rmtree(held)
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 2 and f'{held} is absent: mount what holds it' in out.stdout, out.stdout
+    held.mkdir(parents=True)
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert f'{box.data}/backups/ucm-2026.ucmbkp is missing' in out.stdout, out.stdout
+    exactly_once(box, data, config, skip=('backups/ucm-2026.ucmbkp',))
+    readme = ' '.join((box.archive / 'README.txt').read_text().split())
+    assert (f'While an attempt left a .journal in a directory under {box.parent}, remove nothing from it; '
+            'make a directory removed there again, empty (mkdir -p), before a retry') in readme, readme
+
+
 def test_an_item_removed_by_hand_with_the_directory_it_came_from_is_named_missing(tmp_path):
     """That directory gone too, nothing is there to mount: the item is named missing and the
     retry archives the rest."""

@@ -172,8 +172,7 @@ unsettled() {
     left=1
     case " $seen " in *" $1 "*) return 0 ;; esac
     seen="$seen $1"
-    if present "$1"; then stuck="$stuck
-  $1: $2"; fi
+    if present "$1"; then stuck="$stuck$NL  $1: $2"; fi
     if grep -qxF "failed$TAB$1" "$JOURNAL" 2>/dev/null; then
         again=1
     else
@@ -183,8 +182,7 @@ unsettled() {
 
 # $1 holds a path already named in $stuck: it stays, and is not named itself
 holds_stuck() {
-    case $stuck in *"
-  $1/"*) left=1; return 0 ;; esac
+    case $stuck in *"$NL  $1/"*) left=1; return 0 ;; esac
     return 1
 }
 
@@ -209,7 +207,8 @@ say_stuck() {
 }
 
 # Undoes the journal, last step first, by renames back alone. Every line replays as a
-# no-op once undone, so a retry from any interrupted state converges.
+# no-op once undone, so a retry from any interrupted state converges; an archive directory
+# removed by hand reads as a filesystem not mounted until it is made again, empty.
 roll_back() {
     stuck="" left="" seen="" again="" twice="" broken="" missing=""
     # A last line a kill left torn was never a step: cut off (that needs no free space), the
@@ -245,8 +244,7 @@ EOF
                         # Removed by hand: named once, then its line goes, as its directory
                         # removed empty below would read as not mounted at the next attempt
                         say "UCM: $src is missing: an earlier attempt moved it to $dst, which no longer holds it either."
-                        missing="$missing
-  $src"
+                        missing="$missing$NL  $src"
                         drop_line "rename$TAB$src$TAB$dst" \
                             || { unsettled "$JOURNAL" "could not be updated, so what it lists before $src was not put back"; break; }
                     fi
@@ -336,6 +334,8 @@ This directory holds private keys and the key that decrypts the database: keep i
 readable by root only. Nothing here is used or removed by UCM. Every file was renamed,
 never copied: each one is here or in a directory listed above, unchanged. A directory
 that could not be renamed stays where it was, and its entries were moved the same way.
+While an attempt left a .journal in a directory under $PARENT, remove nothing from it;
+make a directory removed there again, empty (mkdir -p), before a retry puts back the rest.
 
 To put that installation back in service
   1. Stop UCM: sudo systemctl stop ucm
