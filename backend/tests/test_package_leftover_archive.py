@@ -1345,21 +1345,46 @@ def test_an_item_removed_by_hand_with_the_directory_it_came_from_is_named_missin
 # -- names the journal cannot hold ---------------------------------------------------
 
 @pytest.mark.parametrize('name, shown', [('a\tb', 'a<tab>b'), ('a\nb', 'a<newline>b')])
-@pytest.mark.parametrize('where', ['data', 'nested', 'config'])
+@pytest.mark.parametrize('where', ['data', 'kept', 'config'])
 def test_a_name_with_a_tab_or_a_line_break_is_refused_before_anything_moves(tmp_path, name, shown, where):
-    """A journal line cannot hold it: the run stops before the first rename, exit 1, and
-    names the entry readably."""
+    """An entry the journal would name cannot be named so: the run stops before the first
+    rename, exit 1, and shows the entry with no other path to read in it."""
     box = Box(tmp_path, python='stub')
-    top = {'data': box.data, 'nested': box.data / 'updates' / 'nested', 'config': box.config}[where]
+    top = {'data': box.data, 'kept': box.data / 'sessions', 'config': box.config}[where]
     (top / name).write_text('x')
     box.wrap()
     before = snapshot(box)
     out = box.run()
     assert out.returncode == 1, (out.stdout, out.stderr)
-    assert f'{top}/{shown}' in out.stdout, out.stdout
+    assert f'{top}/{shown} has a tab or a line break' in out.stdout, out.stdout
     assert 'Nothing was moved' in out.stdout and 'was not started' in out.stdout
     assert snapshot(box) == before
     assert not box.parent.exists() or not any(box.parent.iterdir())
+
+
+@pytest.mark.parametrize('where', ['updates/nested', 'backups/old', 'conf.d'])
+def test_a_name_with_a_line_break_inside_a_directory_moved_whole_is_archived(tmp_path, where):
+    """The journal names that directory, never what it holds."""
+    box = Box(tmp_path, python='stub')
+    top = box.config / where if where == 'conf.d' else box.data / where
+    top.mkdir(exist_ok=True)
+    (top / 'a\nb').write_text('x')
+    (top / 'c\t').write_text('y')
+    data, config = originals(box)
+    archived(box, box.run(), data, config)
+
+
+def test_a_name_with_a_line_break_in_a_directory_kept_in_place_puts_all_back(tmp_path):
+    """A mount point found while walking the data: what it holds would be named, so the run
+    stops there, puts back what moved, and shows the entry."""
+    box = Box(tmp_path, python='stub')
+    (box.data / 'updates' / 'a\nb').write_text('x')
+    box.wrap(other_fs=(box.data / 'updates',))
+    before = snapshot(box)
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert f'{box.data}/updates/a<newline>b has a tab' in out.stdout and 'Everything was put back' in out.stdout
+    assert snapshot(box) == before
 
 
 @pytest.mark.parametrize('beside', [True, False])

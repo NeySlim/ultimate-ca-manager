@@ -139,6 +139,7 @@ is_kept() {
 # directory or a mount point is never moved itself: its contents are, the same way. A
 # local archive an earlier run left is not an item: it stays, and the README names it.
 archive_contents() {
+    odd_names "$1"
     { jot "mkdir$TAB$1$TAB$2" && mkdir -- "$2"; } || return 1
     for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
         present "$entry" || continue
@@ -471,28 +472,26 @@ fail() {
     say "The installation stops here: nothing else is written, and UCM was not started."
     exit "$rc"
 }
-# A journal line cannot hold a tab or a line break: such a name stops the run before
-# anything moves (an earlier local archive is not archived, so not walked)
-odd=$({ printf '%s\n' "$DB_FILE" | grep -q "$TAB" && printf '%s' "$DB_FILE"; } \
-    || find "$DATA" "$CONFIG" -name "$LOCAL_PREFIX*" -prune -o \( -name "*$TAB*" -o -name "*$NL*" \) \
-        -print -quit 2>/dev/null)
-[ -z "$odd" ] || fail "$(printf '%s\n' "$odd" | sed -e ':a' -e '$!N' -e '$!ba' \
-    -e 's/\n/<newline>/g' -e "s/$TAB/<tab>/g") has a tab or a line break in its name, which the journal cannot hold: rename it"
-if [ ! -d "$PARENT" ]; then
-    mkdir -p -- "$PARENT" || fail "cannot create $PARENT"
-    MADE_PARENT=1
-fi
+# A journal line holds no tab or line break: one in the path of the database or of an entry
+# of the directories $@ (those the run walks) stops it, shown visibly
+odd_names() {
+    odd=$(find "$@" -maxdepth 1 \( -path "*$TAB*" -o -path "*$NL*" \) -print -quit 2>/dev/null)
+    case $DB_FILE in *"$TAB"*) odd=${odd:-$DB_FILE} ;; esac
+    [ -z "$odd" ] || fail "$(printf '%s\n' "$odd" | sed -e ':a' -e '$!N' -e '$!ba' -e 's/\n/<newline>/g' \
+        -e "s/$TAB/<tab>/g") has a tab or a line break in its name, which the journal cannot hold: rename it"
+}
+# Before anything moves: the entries of the data, the configuration and the kept directories
+set --; for d in $KEEP_DIRS; do set -- "$@" "$DATA/$d"; done; odd_names "$DATA" "$CONFIG" "$@"
+[ -d "$PARENT" ] || { mkdir -p -- "$PARENT" || fail "cannot create $PARENT"; MADE_PARENT=1; }
 chmod 700 "$PARENT" || fail "cannot restrict $PARENT"
 [ -z "$as_root" ] || chown 0:0 "$PARENT" || fail "cannot give $PARENT to root"
-DEST=$PARENT/$STAMP
-n=1
+DEST=$PARENT/$STAMP n=1
 until mkdir -- "$DEST" 2>/dev/null; do
     { [ -e "$DEST" ] && [ "$n" -lt 100 ]; } || { DEST=""; fail "cannot create a directory in $PARENT"; }
     n=$((n + 1))
     DEST=$PARENT/$STAMP-$n
 done
-JOURNAL=$DEST/.journal
-LOCAL_NAME=$LOCAL_PREFIX${DEST##*/}
+JOURNAL=$DEST/.journal LOCAL_NAME=$LOCAL_PREFIX${DEST##*/}
 
 DB_LINE="" DB_RESTORE=""
 if [ -d "$DATA" ]; then
