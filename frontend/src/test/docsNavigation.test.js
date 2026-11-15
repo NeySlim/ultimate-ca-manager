@@ -267,6 +267,25 @@ describe('user guide claims about the bell and SCEP tabs', () => {
     }
   })
 
+  it('says where a bell entry leads', () => {
+    const bell = guide.split('\n').find(l => l.startsWith('The bell lists'))
+    expect(bell).not.toContain('opens the page of the item')
+    expect(bell).toMatch(/audit entries open the audit log/i)
+    expect(bell).toMatch(/queue entry without a path has no link/i)
+  })
+
+  it('says the Modules menu lists modules, and what refuses a renewal', () => {
+    expect(guide).not.toContain('lists every page you may open')
+    expect(guide).toContain('lists every module you may open')
+    const renewing = guide.split('\n').find(l => l.startsWith('**Renewing.**'))
+    expect(renewing).toMatch(/private key the server does not hold/)
+  })
+
+  it('gives the Viewer role everything the permission table gives it', () => {
+    const row = guide.split('\n').find(l => l.startsWith('| **Viewer** |'))
+    for (const word of ['CSRs', 'trust store', 'SSH']) expect(row, word).toContain(word)
+  })
+
   it('places the SCEP challenge password on the Challenges tab, not Configuration', () => {
     const para = guide.split('\n').find(l => l.includes('The **Configuration** tab enables the server'))
     expect(para).toBeDefined()

@@ -19,10 +19,10 @@ A menu path in this guide such as **Modules** > **PKI** > **Certificates** means
 - the UCM logo, which goes back to the Dashboard
 - **Dashboard**, **Certificates** and **Certificate Authorities**, always present; a count badge next to Certificates shows how many certificates are expiring or expired, and selecting it dismisses it until the count changes
 - up to three modules you pinned
-- the **Modules** menu, which lists every page you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Pages you have no right to are not shown. The pin button next to a page keeps it in the bar
+- the **Modules** menu, which lists every module you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Pages you have no right to are not shown. The pin button next to a page keeps it in the bar
 - search (`Ctrl K`), the help button, the live-link indicator, the theme menu, the notification bell and your account menu
 
-The bell lists what needs your attention: critical items and pending approvals from the To handle queue (ACME order failed, ACME renewal failed, Approval pending, CRL due, CRL missing, Manual renewal due, Automatic renewal blocked, CA expiring, Deployment left on the old certificate, HTTPS left on the old certificate), plus Backup failed, Restore failed, Session revoked and Sessions revoked from the audit log. Each entry opens the page of the item; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
+The bell lists what needs your attention: critical items and pending approvals from the To handle queue (ACME order failed, ACME renewal failed, Approval pending, CRL due, CRL missing, Manual renewal due, Automatic renewal blocked, CA expiring, Deployment left on the old certificate, HTTPS left on the old certificate), plus Backup failed, Restore failed, Session revoked and Sessions revoked from the audit log. Queue entries open the page of the item, audit entries open the audit log, and a queue entry without a path has no link; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
 
 A status bar shows whether the service is running and the UCM version; on an instance in HA mode it also names the node and whether it is the leader.
 
@@ -60,7 +60,7 @@ Open **Modules** > **PKI** > **Certificates**, or **Certificates** in the top ba
 
 **Exporting.** Select a certificate and use **Export** in its details: PEM, DER, PKCS#12 or JKS. Set a password for PKCS#12.
 
-**Renewing.** **Renew** replaces the certificate in place: same identifier, new serial and validity. A revoked certificate cannot be renewed.
+**Renewing.** **Renew** replaces the certificate in place: same identifier, new serial and validity. A revoked certificate cannot be renewed, nor one whose private key the server does not hold (enrolled by a device, or imported without its key): renew it through its enrollment protocol, sign a new request or issue a new certificate.
 
 **Revoking.** Select the certificate, click **Revoke** and choose a reason. The certificate appears in the CRL and answers OCSP as revoked. A certificate revoked with the reason Certificate Hold can be released with **Remove Hold**.
 
@@ -258,7 +258,7 @@ The **Groups** tab defines groups of users: a group grants permissions to every 
 | **Admin** | Full access |
 | **Operator** | Manages certificates, CAs, CSRs, ACME and SSH; templates and groups read-only; no access to users or access control |
 | **Auditor** | Read-only access to operational data, for compliance and audit |
-| **Viewer** | Basic read-only access to certificates, CAs and templates |
+| **Viewer** | Read-only access to certificates, user certificates, CAs, CSRs, templates, the trust store, SSH CAs and SSH certificates |
 
 ### Access Control
 
