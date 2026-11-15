@@ -730,6 +730,7 @@ export default function SettingsPage() {
       const res = await mscaService.inventorySync(conn.id)
       showSuccess(t('msca.inventorySyncResult', {
         imported: res.data?.imported ?? 0,
+        completed: res.data?.completed ?? 0,
         skipped: res.data?.skipped ?? 0
       }))
       loadMscaConnections()

@@ -46,7 +46,7 @@ describe('FloatingHelpPanel help languages', () => {
     expect(screen.queryByText('NOTICE')).toBeNull()
   })
 
-  it.each(['de', 'ja', 'uk'])('shows English with no import for %s, with the notice', async (lang) => {
+  it.each(['de', 'es', 'it', 'ja', 'pt', 'uk', 'ru'])('shows English with no import for %s, with the notice', async (lang) => {
     h.lang = lang
     open()
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(en)

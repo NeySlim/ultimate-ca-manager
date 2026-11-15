@@ -139,4 +139,4 @@ def test_no_writer_of_crt_skips_the_attribute_event():
         text = path.read_text(errors='ignore')
         for match in _QUERY_UPDATE_OF_CRT.finditer(text):
             # the claim UPDATE is followed by the ORM assignment that fires the listener
-            assert re.search(r'\bcertificate\.crt\s*=', text[match.end():match.end() + 600]), path
+            assert re.search(r'\b(?:certificate|csr)\.crt\s*=', text[match.end():match.end() + 600]), path

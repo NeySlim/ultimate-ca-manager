@@ -280,9 +280,8 @@ def get_expiring_certificates():
 
     # Flag the configured dedicated TSA signer so the widget can mark it as
     # infrastructure — its expiry means /tsa starts returning 503.
-    tsa_signer_refid = db.session.execute(
-        text("SELECT value FROM system_config WHERE key = 'tsa_signer_cert_refid'")
-    ).scalar() or None
+    from services.tsa_service import configured_signer_refid
+    tsa_signer_refid = configured_signer_refid() or None
 
     # Delegated OCSP responders are infrastructure too: their expiry ends OCSP answers for the CA
     ocsp_ids = set()
@@ -602,8 +601,9 @@ def get_system_status():
             signer = describe_configured_signer()
             if not signer.get('configured'):
                 if tsa_ca_certificate_path_ready():
-                    status['tsa'] = {'status': 'online',
-                                     'message': 'Signing with CA certificate'}
+                    # Only with tsa_require_dedicated_cert turned off: RFC 3161 §2.3 refuses these tokens
+                    status['tsa'] = {'status': 'warning',
+                                     'message': 'Signing with CA certificate, not RFC 3161 compliant'}
                 else:
                     status['tsa'] = {'status': 'offline',
                                      'message': 'No signing certificate configured'}

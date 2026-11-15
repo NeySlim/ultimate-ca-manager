@@ -8,7 +8,7 @@ import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const localesDir = join(dir, '..', 'locales')
-const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
+const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 const LOG_KEYS = ['subtitle', 'level', 'lines', 'searchPlaceholder', 'empty',
   'unavailable', 'showing', 'scanCap', 'linesOpt', 'filters', 'exclude', 'readingFrom', 'source', 'sourceApp', 'sourceAccess',
   'sourceError', 'sourceJournal', 'component', 'allComponents', 'follow', 'time', 'message', 'levelShort', 'from', 'to', 'serverTime', 'errors', 'warnings', 'components', 'copyAll', 'copySelected']
@@ -19,7 +19,7 @@ function loadLocale(code) {
   return JSON.parse(readFileSync(join(localesDir, `${code}.json`), 'utf8'))
 }
 
-describe('system logs i18n keys (9 locales)', () => {
+describe('system logs i18n keys (10 locales)', () => {
   for (const code of LOCALE_CODES) {
     it(`${code}: the nav label is defined`, () => {
       const value = loadLocale(code).common?.systemLogs

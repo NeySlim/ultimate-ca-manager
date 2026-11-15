@@ -30,8 +30,9 @@ SET_PENDING = (f"INSERT INTO {CONFIG} (key, value, encrypted, description, updat
                "VALUES ('" + PENDING_KEY + "', {value}, {false}, "
                "'Upgrade steps 142/144 pending: certificates of one CA share a serial number', "
                "CURRENT_TIMESTAMP)")
-_CERTS = (f"SELECT id, caref, serial_number, crt FROM {TABLE} "
-          "WHERE serial_number IS NOT NULL AND serial_number <> '' ORDER BY id")
+# The rows read, and counted for the progress total
+_WITH_SERIAL = f"{TABLE} WHERE serial_number IS NOT NULL AND serial_number <> ''"
+_CERTS = f"SELECT id, caref, serial_number, crt FROM {_WITH_SERIAL} ORDER BY id"
 _REVOKED = f"SELECT id, serial_number, certificate_id FROM {REVOKED} ORDER BY id"
 
 
@@ -82,12 +83,22 @@ def plan(cert_rows, revoked_rows):
     return cert_updates, revoked_updates, pending
 
 
+def _read(rows, total):
+    """The rows as they come, their count in the journal at most every 30 s."""
+    from migrations._from_2_254 import Progress
+    progress = Progress('step 144_canonical_certificate_serials', total)
+    for done, row in enumerate(rows, 1):
+        yield row
+        progress(done)
+
+
 def _apply(execute, executemany, stream, tables, value_param, false_literal, index_query):
     if TABLE not in tables:
         return
     revoked_rows = execute(_REVOKED, None).fetchall() if REVOKED in tables else []
     # Streamed: only the ids and serials stay in memory, never every certificate's PEM
-    cert_updates, revoked_updates, pending = plan(stream(_CERTS), revoked_rows)
+    total = execute(f"SELECT COUNT(*) FROM {_WITH_SERIAL}", None).fetchone()[0]
+    cert_updates, revoked_updates, pending = plan(_read(stream(_CERTS), total), revoked_rows)
     # Two passes: a target spelling may still be another converted row's current one
     executemany(f"UPDATE {TABLE} SET serial_number = {{p}}s WHERE id = {{p}}i",
                 [{'s': f'm144-{row_id}', 'i': row_id} for row_id, _ in cert_updates])

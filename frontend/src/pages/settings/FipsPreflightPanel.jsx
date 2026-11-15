@@ -38,6 +38,10 @@ export default function FipsPreflightPanel() {
 
         {error && <p className="text-sm status-danger-text">{error}</p>}
 
+        {report?.module_known === false && (
+          <p className="text-xs text-text-secondary">{t('settings.fipsPreflight.withoutModule')}</p>
+        )}
+
         {report && <PreflightReport report={report} testId="fips-preflight-report" checkBase="settings.fipsPreflight.checks" />}
       </div>
     </DetailSection>
