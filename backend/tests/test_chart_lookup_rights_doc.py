@@ -32,3 +32,8 @@ def test_the_docs_ask_get_on_every_looked_up_resource():
         for rights in _rights(doc.read_text()):
             assert rights == wanted, doc.name
 
+
+def test_a_new_namespace_waits_for_its_default_service_account():
+    text = (ROOT / 'docs' / 'HA.md').read_text()
+    assert 'kubectl create namespace <name>' in text
+    assert 'kubectl get sa default -n <name>' in text
