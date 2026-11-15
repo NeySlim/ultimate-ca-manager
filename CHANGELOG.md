@@ -95,7 +95,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- **ACME and SCEP name the weak hash of a refused CSR.** A CSR signed with SHA-1 or MD5 is refused with "CSR signed with an unsupported hash algorithm", as EST and WSTEP say, instead of a failed proof of possession; ACME keeps `badCSR` and SCEP now answers `badAlg`, and in FIPS mode SCEP names a refused SHA-1 CMS signature.
+- **ACME, SCEP and CSR imports name the weak hash of a refused CSR.** A CSR signed with SHA-1 or MD5 is refused with "CSR signed with an unsupported hash algorithm", as EST and WSTEP say, instead of a failed proof of possession, also on CSR upload and import, smart import and Microsoft CA signing (same HTTP codes); ACME keeps `badCSR` and SCEP now answers `badAlg`, and in FIPS mode SCEP names a refused SHA-1 CMS signature.
 - **The FIPS readiness check says when it judged without a module.** Its report carries `module_known`, false when no FIPS module was asked (the standard image), where EdDSA and ML-DSA keys are listed as refused; the guide says to run it with the `-fips` image.
 - **`RATE_LIMIT_ENABLED=1`, `yes` or `on` no longer drops the route limits (sign-in, password reset and the default of 200 per minute and 2000 per hour).** Only `true` turned on the route limits while the tiered limiter also took `1`, `yes` and `on`; both now read the variable the same way (any case), and an empty value keeps the default, on.
 - **WebSocket events through Redis on a Unix socket.** With a `unix://` `REDIS_URL`, the event relay passed TCP keepalive options that a Unix socket connection refuses, so every WebSocket connection failed and no browser received real-time events; they now go through Redis as with a TCP address.
