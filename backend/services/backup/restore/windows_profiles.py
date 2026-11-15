@@ -10,7 +10,7 @@ import logging
 from typing import Any, Dict, Optional, Tuple
 
 from services.windows_profiles.legacy import (MIGRATED_KEYS, connector_names, has_windows_configuration,
-                                              keytab_realms, profile_from_2x, switches_from_2x)
+                                              keytab_realms, profile_from_2x, spn_realm, switches_from_2x)
 from utils.policy_identity import identity_for
 
 from ..export_generic import REFERENCE_SUFFIX
@@ -93,6 +93,9 @@ def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Di
     else:
         # Written without its connectors, the archive does not say the profile has none: a merge keeps the link
         row.pop('connector_id', None)
+        if not spn_realm(archived.get('kerberos_spn')):
+            # Nor its realm when the SPN names none: the target's stays
+            row.pop('realm', None)
     backup_data[PROFILES] = [row]
     for cert in backup_data.get('certificates') or []:
         if isinstance(cert, dict) and cert.get('source') == 'wstep' and not cert.get('windows_profile_id'):

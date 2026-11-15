@@ -1,6 +1,10 @@
 """A merge whose default Windows profile names no connector keeps the link the target holds
 when the archive does not say there is none (a 2.x archive written without its connectors);
 an archive that carries its connectors, or a 3.0 profile without one, is restored as written."""
+import os
+from contextlib import contextmanager
+import uuid
+
 import pytest
 
 from models import ADConnectorConfig, WindowsEnrollmentProfile, db
@@ -13,10 +17,26 @@ SETTINGS_2X = {
 }
 
 
-@pytest.fixture
-def here(app, tmp_path):
+_PG_URL = os.environ.get('UCM_TEST_PG_URL')
+ENGINES = ['sqlite', pytest.param('postgresql', marks=[
+    pytest.mark.postgres, pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')])]
+
+
+@contextmanager
+def _database(engine, tmp_path):
+    if engine == 'sqlite':
+        yield f"sqlite:///{tmp_path / 'merge.db'}"
+        return
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+    with _a_schema_of_our_own(f'profile_merge_{uuid.uuid4().hex[:6]}') as url:
+        yield url
+
+
+@pytest.fixture(params=ENGINES)
+def here(app, tmp_path, request):
     """An installation whose default profile is linked to its connector."""
-    with _installation(app, f"sqlite:///{tmp_path / 'merge.db'}", Keys(tmp_path, 'merge')), \
+    with _database(request.param, tmp_path) as url, \
+            _installation(app, url, Keys(tmp_path, 'merge'), is_postgresql=request.param != 'sqlite'), \
             app.app_context():
         connector = ADConnectorConfig(name='target-dc', base_dn='DC=corp,DC=example', enabled=True)
         db.session.add(connector)
@@ -48,10 +68,17 @@ def _default_connector():
     return WindowsEnrollmentProfile.query.filter_by(is_default=True).one().connector_id
 
 
+def _default_realm():
+    db.session.expire_all()
+    return WindowsEnrollmentProfile.query.filter_by(is_default=True).one().realm
+
+
 def test_a_2x_archive_without_its_connectors_keeps_the_targets_link(here):
     blob = _forged(['configuration'], mutate=_as_2x)
     _service().restore_backup(blob, PASSWORD, mode='merge')
     assert _default_connector() == here
+    # The SPN names no realm and no connector came with the archive: the target's realm stays
+    assert _default_realm() == 'CORP.EXAMPLE'
 
 
 def test_a_2x_archive_saying_it_has_no_connector_is_restored_as_written(here):
