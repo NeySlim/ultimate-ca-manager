@@ -421,3 +421,22 @@ def test_an_unlocked_staging_without_proof_of_death_is_kept(system_tmp, damage):
     (staging / files._OWNER).write_text('{' if damage == 'unreadable' else json.dumps(owner))
     files._sweep_stale_stagings()
     assert staging.exists()
+
+
+def test_a_committed_directory_left_on_disk_does_not_refuse_a_restore(dirs, monkeypatch):
+    # Its journal is never replayed over newer files: a committed token only drops its kept copies
+    kept, _key, pem, _new = _killed_after_publish(dirs, committed=True)
+    monkeypatch.setattr(files.shutil, 'rmtree', lambda *args, **kwargs: None)
+    files.settle_interrupted_restores()
+    assert all(path.exists() for path in kept) and pem.read_bytes() == b'NEW HTTPS CERT'
+
+
+def test_an_uncommitted_journal_left_on_disk_refuses_a_restore(dirs, monkeypatch):
+    kept, _key, pem, _new = _killed_after_publish(dirs, committed=False)
+
+    def put_back(kept_dir, journal):
+        raise OSError(errno.EIO, 'I/O error')
+    monkeypatch.setattr(files, '_put_back_journal', put_back)
+    with pytest.raises(files.InterruptedRestorePending):
+        files.settle_interrupted_restores()
+    assert all(path.exists() for path in kept)

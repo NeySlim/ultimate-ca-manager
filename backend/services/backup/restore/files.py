@@ -513,7 +513,13 @@ def settle_interrupted_restores() -> None:
     if not _find_kept_directories():
         return    # the usual case: nothing to settle, nothing touched
     sweep_kept_previous_contents()
-    left = [path for path, journal in _find_kept_directories() if journal is not None]
+    found = [(path, journal) for path, journal in _find_kept_directories() if journal is not None]
+    try:
+        committed = _committed_tokens({journal['token'] for _, journal in found})
+    except Exception:
+        committed = set()
+    # A committed journal only drops its kept copies: it is never replayed over this restore
+    left = [path for path, journal in found if journal['token'] not in committed]
     if left:
         logger.error("Restore refused: interrupted restores could not be settled, remove or "
                      "repair %s and restart", ', '.join(left))
