@@ -78,4 +78,4 @@ openssl x509 -in cert.pem -noout -serial
 - `frontend/src/lib/utils.js` — `formatSerialNumberHex()`
 - `frontend/src/components/CertificateDetails.jsx` — **Serial (hex)** field
 - `frontend/src/lib/__tests__/utils.test.js` — tests T1–T4
-- `frontend/src/i18n/locales/*.json` — `common.serialHex` key (9 languages)
+- `frontend/src/i18n/locales/*.json`: `common.serialHex` key (10 languages)

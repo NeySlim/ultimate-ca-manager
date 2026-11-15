@@ -52,7 +52,7 @@ npm test -- --run src/i18n/__tests__/issuerSignatureI18n.test.js
 4. Add SAN type **IP** with `www.example.com` → client error (translated)
 5. Key type **ECDSA** + **NIST P-521** → certificate issued
 6. Open certificate details → **Key type** = `EC secp521r1`, **Issuer signature algorithm** = `SHA256-RSA` when CA is RSA (tooltip explains independence)
-7. Hover issuer signature label → hint visible in all 9 languages
+7. Hover issuer signature label → hint visible in all 10 languages
 
 ## Lab API smoke (optional)
 
