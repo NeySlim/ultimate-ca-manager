@@ -278,7 +278,7 @@ With a generated password, UCM asks for a new one right after login. Until it is
 
 ### Docker
 - **Data:** `/opt/ucm/data` (inside container, mount as volume)
-- **Volume:** `ucm-data` (Docker volume)
+- **Volumes:** `ucm-data` for the data and `ucm-config` for `/etc/ucm`, where `master.key` lives (both Docker volumes)
 - **Config:** Environment variables
 
 ### DEB/RPM Packages

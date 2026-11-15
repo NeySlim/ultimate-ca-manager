@@ -58,11 +58,13 @@ services:
       - "8080:8080"   # HTTP — CRL/CDP and OCSP public endpoints
     volumes:
       - ucm-data:/opt/ucm/data
+      - ucm-config:/etc/ucm   # holds master.key
     environment:
       - UCM_FQDN=ucm.example.com
 
 volumes:
   ucm-data:
+  ucm-config:
 ```
 
 **Start:**
@@ -89,6 +91,9 @@ services:
     volumes:
       # Persistent data
       - ucm-data:/opt/ucm/data
+
+      # Persistent configuration: master.key, which encrypts the private keys
+      - ucm-config:/etc/ucm
 
       # Optional: Custom HTTPS certificates
       # - ./certs/https_cert.pem:/opt/ucm/data/https_cert.pem:ro
@@ -122,6 +127,7 @@ services:
 
 volumes:
   ucm-data:
+  ucm-config:
 ```
 
 ---
@@ -144,7 +150,7 @@ volumes:
 | `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `/opt/ucm/data/ucm.log` is rotated (10 MB) |
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
-| `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`; the `/etc/ucm` volume follows it if you change it |
+| `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`. Changing it does not change the Docker mounts: mount a persistent directory at the configured path as well as the data directory |
 | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
 | `UCM_HA` | (unset) | `1` enables HA mode: settings and restarts propagate to every node (a restart exits each container in turn with code 0: use the restart policy `always` or `unless-stopped`, as `on-failure` and `no` leave the container stopped), operations that only change the local host are refused (see [HA.md](../HA.md)). Requires `DATABASE_URL` (PostgreSQL), `UCM_SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node |
 | `UCM_NODE_ID` | container hostname | Node name reported as `node_id` by `/health` |
@@ -159,6 +165,8 @@ See full list in [docker-compose.yml](../../docker-compose.yml). SMTP, ACME, the
 
 ### Using Named Volumes (Recommended)
 
+Mount both the data and configuration directories on persistent volumes.
+
 ```bash
 docker volume create ucm-data
 docker volume create ucm-config
@@ -168,9 +176,9 @@ docker run -v ucm-data:/opt/ucm/data -v ucm-config:/etc/ucm ...
 ### Using Bind Mounts
 
 ```bash
-mkdir -p /opt/ucm/data
-chown -R 1000:1000 /opt/ucm/data
-docker run -v /opt/ucm/data:/opt/ucm/data ...
+mkdir -p /opt/ucm/data /opt/ucm/config
+chown -R 1000:1000 /opt/ucm/data /opt/ucm/config
+docker run -v /opt/ucm/data:/opt/ucm/data -v /opt/ucm/config:/etc/ucm ...
 ```
 
 The container runs as UID 1000 and cannot change the owner of a bind-mounted directory, so a directory left to root (or created by Docker on the first run) is refused at startup. Give it to UID 1000 as above rather than opening it to everyone with `chmod 777`; the same applies to a host directory mounted on `/etc/ucm`.
