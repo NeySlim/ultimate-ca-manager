@@ -119,3 +119,24 @@ def test_a_refused_key_choice_does_not_use_up_a_password_attempt(app, make_user,
     with app.app_context():
         uid = User.query.filter_by(username=username).first().id
         assert db.session.get(SecondFactorFailure, ('session_pw', str(uid))) is None
+
+
+def test_the_key_choice_is_checked_again_under_the_lock(app, make_user, enforce_2fa, monkeypatch):
+    """TOTP disabled while the password was being checked: the re-check refuses."""
+    import api.v2.account.twofa as twofa
+    username, key, _ = make_user()
+    _set_choice(app, username)
+    c = _key_session(app, username, key)
+    real = twofa.check_session_password
+
+    def totp_goes_meanwhile(user, password, wrong):
+        answer = real(user, password, wrong)
+        db.session.execute(db.update(User).where(User.id == user.id)
+                           .values(totp_confirmed=False, totp_secret=None))
+        db.session.commit()
+        return answer
+
+    monkeypatch.setattr(twofa, 'check_session_password', totp_goes_meanwhile)
+    r = c.put('/api/v2/account/2fa/webauthn', json={'enabled': False, 'password': PASSWORD})
+    assert r.status_code == 403 and get_json(r)['details'] == {'reason': 'last_second_factor'}
+    assert _state(app, username) == (False, True, 1)
