@@ -294,3 +294,20 @@ def test_the_former_parent_is_dropped_when_the_issuer_name_changes(app, auth_cli
     _replace(app, auth_client, w, _rsa_pem(w['cn'], w['key'], f'Repl Nowhere {_tag()}', w['root_key'],
                                            serial=_serial()), route)
     assert _caref(app, w['child']['id']) is None
+
+
+@pytest.mark.parametrize('route', ['/api/v2/cas/import', 'install'])
+def test_the_issuer_name_is_searched_when_no_key_identifier_candidate_is_retained(
+        app, auth_client, made, linked, route):
+    """The AKI names only a record of another name: the record of the issuer name and key still links."""
+    w, renamed_cn = linked, f'Repl Alias {_tag()}'
+    renamed = _import(auth_client, _rsa_pem(renamed_cn, w['root_key'], serial=_serial()))
+    made.append(renamed['id'])
+    ski = x509.SubjectKeyIdentifier.from_public_key(w['root_key'].public_key()).digest
+    _with_ski(app, [renamed['id']], ski)
+    with app.app_context():
+        db.session.get(CA, w['root']['id']).ski = None  # the homonym of the issuer name, stored without a SKI
+        db.session.get(CA, w['child']['id']).caref = None
+        db.session.commit()
+    _replace(app, auth_client, w, _aki_pem(w['cn'], w['key'], w['root_cn'], w['root_key'], ski), route)
+    assert _caref(app, w['child']['id']) == w['root']['refid']

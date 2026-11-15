@@ -359,10 +359,10 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
         # A key shared by two names does not make both the issuer: the name chains too
         return same_name(parent_cert.subject, cert.issuer) and signature_verdict(cert, parent_cert)[0] == VERIFIED
     aki = authority_key_identifier_hex(cert)
-    candidates = cas_by_ski(aki) if aki else []
-    if not candidates:
-        candidates = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).order_by(CA.id).all()
-    for parent in self_signed_first(candidates):
+    by_key = cas_by_ski(aki) if aki else []
+    by_name = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).order_by(CA.id).all()
+    # The AKI only orders the search: a record of the issuer name stored under another SKI still counts
+    for parent in by_key + [ca for ca in self_signed_first(by_name) if ca not in by_key]:
         if exclude_ca_id is not None and parent.id == exclude_ca_id or not parent.crt:
             continue
         try:
