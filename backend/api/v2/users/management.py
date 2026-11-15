@@ -9,6 +9,7 @@ import io
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
+from auth.session_reverify import check_session_password
 from auth.session_start import keep_own_session
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
@@ -62,8 +63,12 @@ def reset_user_password(user_id):
     # (otherwise a stolen session = silent password rotation = full takeover)
     if g.current_user.id == user_id:
         current = data.get('current_password') or data.get('old_password')
-        if not current or not user.check_password(current):
+        if not current:
             return error_response('Current password is required', 400)
+        refused = check_session_password(
+            user, current, error_response('Current password is required', 400))
+        if refused:
+            return refused
 
     # SECURITY: Validate password strength
     is_valid, error_msg = validate_password_strength(data['new_password'])
@@ -512,7 +517,7 @@ def _refuse_last_factor(user, credential):
     Confirmed, the account is left as after a 2FA reset: under enforcement it
     enrols a factor again at its next login.
     """
-    from auth.twofa_enforcement import lock_for_factor_change
+    from auth.twofa_enforcement import LAST_FACTOR_REASON, lock_for_factor_change
     _user, refused = lock_for_factor_change(user.id, dropping_key=credential.id)
     if not refused or not credential.enabled or request.args.get('confirm') == _CONFIRM_LAST_FACTOR:
         return None
@@ -520,7 +525,7 @@ def _refuse_last_factor(user, credential):
     return error_response(
         'This is the last second factor of an account that requires one; confirm with '
         f'?confirm={_CONFIRM_LAST_FACTOR} and the user enrols again at next login',
-        409, {'reason': 'last_second_factor'})
+        409, {'reason': LAST_FACTOR_REASON})
 
 
 def _audit_key(action, user, credential, verb):

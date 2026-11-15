@@ -14,8 +14,10 @@ from utils.backup_codes import (
     verify_code_only as backup_verify,
 )
 from auth.unified import require_auth
+from auth.session_reverify import check_session_password
 from auth.twofa_enforcement import (
-    enforcement_active_for, has_security_key, lock_for_factor_change, lock_user,
+    enforcement_active_for, has_security_key, last_factor_refusal, lock_for_factor_change,
+    lock_user,
 )
 import pyotp
 from auth.totp import consume_totp
@@ -31,10 +33,10 @@ def _reserve_code_check(user_id):
 
     One counter per account (the pending login's): the secret guessed is the same,
     so a stolen session gets no tries beyond what the login allows."""
-    from api.v2.auth_methods import TWO_FA, _reserve_2fa_attempt
+    from api.v2.auth_methods import TWO_FA, _reserve_2fa_attempt, too_many_attempts
     if _reserve_2fa_attempt(TWO_FA, str(user_id)):
         return None
-    return error_response('Too many failed attempts. Try again later.', 429)
+    return too_many_attempts(TWO_FA, str(user_id))
 
 
 def _clear_code_checks(user_id):
@@ -147,8 +149,8 @@ def _disable_refusal(user, refused, code):
     if not user:
         return error_response('User not found', 404)
     if refused:
-        return error_response(
-            'Your account requires a second factor: register a security key before disabling TOTP', 403)
+        return last_factor_refusal(
+            'Your account requires a second factor: register a security key before disabling TOTP')
     if code and not user.totp_secret:
         return error_response('2FA not enabled', 400)
     return None
@@ -225,6 +227,10 @@ def disable_2fa():
     return success_response(message='2FA disabled successfully')
 
 
+_KEY_CHOICE_MESSAGE = ('Your account requires a second factor: set up TOTP before turning off '
+                       'the security key as second factor')
+
+
 @bp.route('/api/v2/account/2fa/webauthn', methods=['PUT'])
 @require_auth(session_only=True)
 def set_webauthn_second_factor():
@@ -238,15 +244,27 @@ def set_webauthn_second_factor():
     if not isinstance(enabled, bool):
         return error_response('enabled must be true or false', 400)
 
-    user = lock_user(g.current_user.id)
+    user, refused = lock_for_factor_change(g.current_user.id, dropping_choice=not enabled)
     if not user:
         return error_response('User not found', 404)
     if enabled and not has_security_key(user):
         return error_response('Register a security key first', 400)
+    # A request refused whatever its password checks none: it must not use up an attempt
+    if not enabled and refused:
+        db.session.rollback()
+        return last_factor_refusal(_KEY_CHOICE_MESSAGE)
     if not enabled and (user.auth_source or 'local') == 'local':
         password = data.get('password')
-        if not isinstance(password, str) or not user.check_password(password):
+        if not isinstance(password, str) or not password:
             return error_response('Invalid password', 403)
+        db.session.rollback()
+        # Counted before the row lock below, which the counter's commit releases
+        answer = check_session_password(user, password, error_response('Invalid password', 403))
+        if answer:
+            return answer
+        user, refused = lock_for_factor_change(g.current_user.id, dropping_choice=True)
+        if refused:
+            return last_factor_refusal(_KEY_CHOICE_MESSAGE)
 
     user.webauthn_2fa = enabled
     ok, _err = safe_commit(logger, "Failed to update the security key second factor")

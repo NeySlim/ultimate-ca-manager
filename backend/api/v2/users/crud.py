@@ -7,6 +7,7 @@ from flask import request, g
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
+from auth.session_reverify import check_session_password
 from auth.session_start import keep_own_session
 from utils.response import success_response, error_response, created_response
 from auth.permissions import BUILTIN_ROLES
@@ -398,6 +399,21 @@ def update_user(user_id):
 
     data = request.get_json()
 
+    # SECURITY: Self-password change requires current-password proof (defends against
+    # stolen-cookie / XSS account takeover); checked before any field changes, as its
+    # attempt counter commits.
+    if 'password' in data and data['password'] and g.current_user.id == user_id:
+        is_valid, error_msg = validate_password_strength(data['password'])
+        if not is_valid:
+            return error_response(error_msg, 400)
+        current = data.get('current_password') or data.get('old_password')
+        if not current:
+            return error_response('Current password is required', 400)
+        refused = check_session_password(
+            user, current, error_response('Current password is required', 400))
+        if refused:
+            return refused
+
     # Update fields
     if 'email' in data:
         # Email is unique only among local accounts. Only block when this change
@@ -472,12 +488,6 @@ def update_user(user_id):
         is_valid, error_msg = validate_password_strength(data['password'])
         if not is_valid:
             return error_response(error_msg, 400)
-        # SECURITY: Self-password change requires current-password proof
-        # (defends against stolen-cookie / XSS account takeover)
-        if g.current_user.id == user_id:
-            current = data.get('current_password') or data.get('old_password')
-            if not current or not user.check_password(current):
-                return error_response('Current password is required', 400)
         user.set_password(data['password'])
         password_changed = True
 

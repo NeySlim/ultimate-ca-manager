@@ -8,7 +8,9 @@ import logging
 
 from flask import Blueprint, request, g, session
 from auth.unified import require_auth
-from auth.twofa_enforcement import ENROLL_SESSION_KEY, lock_for_factor_change, lock_user
+from auth.twofa_enforcement import (
+    ENROLL_SESSION_KEY, last_factor_refusal, lock_for_factor_change, lock_user,
+)
 from models import db
 from models.webauthn import WebAuthnCredential
 from services.webauthn_service import WebAuthnService
@@ -53,7 +55,7 @@ def delete_credential(credential_id):
     """Delete a WebAuthn credential"""
     user = g.current_user
     if _strips_last_factor(user, credential_id):
-        return error_response(_LAST_FACTOR_MESSAGE, 403)
+        return last_factor_refusal(_LAST_FACTOR_MESSAGE)
     success, message = WebAuthnService.delete_credential(credential_id, user.id)
     
     if not success:
@@ -79,7 +81,7 @@ def toggle_credential(credential_id):
     data = request.get_json() or {}
     enabled = data.get('enabled', True)
     if not enabled and _strips_last_factor(user, credential_id):
-        return error_response(_LAST_FACTOR_MESSAGE, 403)
+        return last_factor_refusal(_LAST_FACTOR_MESSAGE)
     
     success, message = WebAuthnService.toggle_credential(credential_id, user.id, enabled)
     
