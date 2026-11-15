@@ -28,11 +28,12 @@ permissions:
   security-events: write
 
 # A new push to a branch replaces the run of its previous commit, except on
-# test and main where every run is a release record: one group per commit
-# there, so nothing is cancelled or queued away
+# test and main, where every run is a release record, and on the 3.0 integration
+# branch, whose sequential job must not die with a superseded run: one group per
+# commit there, so no run is cancelled or queued behind another
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main') && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' }}
+  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant') && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' && github.ref_name != 'sextant' }}
 
 jobs:
   lint:
@@ -144,12 +145,18 @@ jobs:
 
   # One database for the whole suite, as a user runs it: the integration judge.
   # Release branches, the nightly run of dev, and on demand. A schedule runs only
-  # the default branch's copy, so the 3.0 line runs it on each sextant push instead.
+  # the default branch's copy, so the 3.0 line runs it on each push of the 3.0
+  # integration branch instead.
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant'))
     timeout-minutes: 120
+    # On the 3.0 integration branch one run at a time: the running one finishes, the
+    # newest push waits and replaces any older waiting one; elsewhere one group per commit
+    concurrency:
+      group: tests-sequential-${{ github.event_name }}-${{ github.ref_name == 'sextant' && github.ref || github.sha }}
+      cancel-in-progress: false
 
     steps:
       - name: Checkout code
@@ -186,8 +193,8 @@ jobs:
           cd backend
           pytest -v --tb=short --durations=30
 
-      # The same suite in random order on the nightly run and on sextant pushes:
-      # a report, not a gate. The job summary gives the seed that replays the order.
+      # The same suite in random order on the nightly run and on pushes of the 3.0
+      # integration branch: a report, not a gate. The job summary gives the seed that replays the order.
       - name: Run tests in random order (report only)
         if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref_name == 'sextant')) && steps.deterministic.outcome != 'skipped' }}
         continue-on-error: true

@@ -56,9 +56,50 @@ def test_the_random_order_report_follows_the_same_runs(event, ref, runs):
     assert step.get('continue-on-error') is True  # a report, not a gate
 
 
-def test_a_newer_push_of_the_line_branch_cancels_the_running_one():
+def _push(ref, sha):
+    ctx = _ctx('push', ref)
+    ctx['github'].update(workflow='Tests', sha=sha)
+    return ctx
+
+
+def _run_concurrency(ref, sha):
     conc = load('tests.yml')['concurrency']
-    ctx = _ctx('push', f'refs/heads/{LINE_BRANCH}')
-    ctx['github'].update(workflow='Tests', sha='abc123')
-    assert evaluate(conc['cancel-in-progress'], ctx) is True
-    assert render(conc['group'], ctx) == f'tests-Tests-push-refs/heads/{LINE_BRANCH}'
+    ctx = _push(ref, sha)
+    return render(conc['group'], ctx), bool(evaluate(conc['cancel-in-progress'], ctx))
+
+
+def _job_concurrency(ref, sha):
+    conc = _job()['concurrency']
+    ctx = _push(ref, sha)
+    cancel = conc['cancel-in-progress']
+    return render(conc['group'], ctx), bool(evaluate(cancel, ctx) if isinstance(cancel, str) else cancel)
+
+
+@pytest.mark.parametrize('ref', [f'refs/heads/{LINE_BRANCH}', 'refs/heads/test', 'refs/heads/main'])
+def test_a_newer_push_never_cancels_nor_queues_the_run(ref):
+    """One group per commit: the fast jobs of a new push start at once, the old run is not cancelled."""
+    (g1, cancel1), (g2, _) = _run_concurrency(ref, 'a1'), _run_concurrency(ref, 'b2')
+    assert g1 != g2 and cancel1 is False
+
+
+def test_a_feature_branch_push_still_replaces_its_previous_run():
+    (g1, cancel), (g2, _) = _run_concurrency('refs/heads/feature/x', 'a1'), _run_concurrency('refs/heads/feature/x', 'b2')
+    assert g1 == g2 and cancel is True
+
+
+def test_one_sequential_run_at_a_time_on_the_line_branch_and_it_finishes():
+    ref = f'refs/heads/{LINE_BRANCH}'
+    (g1, cancel), (g2, _) = _job_concurrency(ref, 'a1'), _job_concurrency(ref, 'b2')
+    # Same group: the newest waits and replaces an older waiting one; the running one is never cancelled
+    assert g1 == g2 and cancel is False
+
+
+@pytest.mark.parametrize('ref', ['refs/heads/test', 'refs/heads/main'])
+def test_every_release_commit_keeps_its_sequential_run(ref):
+    (g1, _), (g2, _) = _job_concurrency(ref, 'a1'), _job_concurrency(ref, 'b2')
+    assert g1 != g2
+
+
+def test_only_the_sequential_job_has_its_own_group():
+    jobs = load('tests.yml')['jobs']
+    assert [name for name, job in jobs.items() if 'concurrency' in job] == ['test-backend-sequential']
