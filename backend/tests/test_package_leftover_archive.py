@@ -236,9 +236,14 @@ def snapshot(box, *extra):
 OTHER_GID = 1 if os.getuid() == 0 else next(iter(set(os.getgroups()) - {os.getgid()}), None)
 
 
-def plain(rel):
-    """`rel` without the local archive directories it may sit in: the path it had."""
-    return '/'.join(p for p in rel.split('/') if not p.startswith('.ucm-archive-'))
+def plain(rel, local=True):
+    """The path `rel` had: without the one local archive of this archiving it may sit in
+    (beside it, or beside a parent moved whole). Under another .ucm-archive-*, under two,
+    or in a central archive (local False), it stays as it is, so matches no original."""
+    parts = rel.split('/')
+    if not local or parts.count(LOCAL) != 1:
+        return rel
+    return '/'.join(p for p in parts if p != LOCAL)
 
 
 def places(box, sub):
@@ -249,8 +254,8 @@ def places(box, sub):
     out = {}
     for base in (top, *(a / sub for a in archives)):
         for rel, entry in tree(base).items():
-            if plain(rel):
-                out.setdefault(plain(rel), []).append((base / rel, entry))
+            if plain(rel, base == top):
+                out.setdefault(plain(rel, base == top), []).append((base / rel, entry))
     return out
 
 
@@ -285,7 +290,8 @@ def archived(box, out, data, config, why=''):
     exactly_once(box, data, config, why)
     for sub, top in (('data', box.data), ('config', box.config)):
         for rel, entry in tree(top).items():
-            if rel == plain(rel) and entry[0] != 'dir':
+            # An earlier archiving's local archive stays where it is, as it was
+            if rel == plain(rel) and entry[0] != 'dir' and '/.ucm-archive-' not in f'/{rel}':
                 assert sub == 'config' and rel == 'ucm.env' and _fips_written(top / rel), (why, rel)
     for local in locals_of(box):
         assert local.name == LOCAL and stat.S_IMODE(local.stat().st_mode) == 0o700, (why, local)
@@ -1276,3 +1282,19 @@ def test_a_refused_rename_leaves_no_line_that_would_ask_for_a_choice(tmp_path):
     assert reported(out.stdout) == {held: 'could not be removed'}, out.stdout
     assert 'choose' not in out.stdout and 'exists again' not in out.stdout, out.stdout
     exactly_once(box, data, config)
+
+
+@pytest.mark.parametrize('elsewhere', ['.ucm-archive-20250101T000000Z/https_key.pem',
+                                       f'{LOCAL}/{LOCAL}/https_key.pem', 'ca/https_key.pem'])
+def test_the_harness_finds_an_item_only_in_the_local_archive_of_this_archiving(tmp_path, elsewhere):
+    """exactly_once counts an item beside itself only in this archiving's local archive."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    box.wrap(other_fs=(box.data,))
+    assert box.run().returncode == 0
+    exactly_once(box, data, config)
+    target = box.data / elsewhere
+    target.parent.mkdir(exist_ok=True)
+    (box.data / LOCAL / 'https_key.pem').rename(target)
+    with pytest.raises(AssertionError):
+        exactly_once(box, data, config)
