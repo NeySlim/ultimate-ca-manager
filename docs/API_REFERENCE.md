@@ -4413,7 +4413,7 @@ Returns 200 if the application process is alive, regardless of dependency status
 | 201 | Created |
 | 204 | No Content (successful deletion) |
 | 400 | Bad Request (invalid parameters) |
-| 401 | Unauthorized (not authenticated) |
+| 401 | Unauthorized (not authenticated). A request refused by the authentication check, before the route ran, carries the problem type `urn:ucm:problem:authentication-required` |
 | 403 | Forbidden (insufficient permissions) |
 | 404 | Not Found |
 | 409 | Conflict (resource already exists) |
