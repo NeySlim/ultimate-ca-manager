@@ -122,3 +122,31 @@ def test_the_app_schema_carries_the_columns_and_indexes(app):
         assert {'key_bits', 'sig_hash'} <= columns
         for table, names in INDEXES.items():
             assert names <= {i['name'] for i in inspector.get_indexes(table)}, table
+
+
+class _Clock:
+    def __init__(self, step):
+        self.now, self.step = 0.0, step
+
+    def __call__(self):
+        self.now += self.step
+        return self.now
+
+
+# The total counts the rows the loop reads (no crt: none), a resumed run only those left
+@pytest.mark.parametrize('seconds,resume,lines', [(31, False, ['2 of 5', '4 of 5', '5 of 5']), (1, False, []),
+                                                  (31, True, ['2 of 3', '3 of 3'])])
+def test_sqlite_backfill_logs_its_progress_at_most_every_30_seconds(monkeypatch, capsys, seconds, resume, lines):
+    import migrations._from_2_254 as package
+    monkeypatch.setattr(_migration(), '_BATCH', 2)
+    conn = sqlite3.connect(':memory:')
+    _sqlite_schema(conn)
+    conn.executemany('INSERT INTO certificates (id, crt) VALUES (?, ?)', _rows())
+    if resume:
+        _migration().upgrade(conn)
+        conn.execute('UPDATE certificates SET key_bits = NULL, sig_hash = NULL WHERE id = 1')
+        capsys.readouterr()
+    monkeypatch.setattr(package, '_clock', _Clock(seconds))
+    _migration().upgrade(conn)
+    out = [line for line in capsys.readouterr().out.splitlines() if '139_dashboard_aggregates' in line]
+    assert out == [f'    step 139_dashboard_aggregates: {n} rows' for n in lines]

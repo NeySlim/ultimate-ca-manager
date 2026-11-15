@@ -69,6 +69,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The Docker image checks the disk before a SQLite start.** Before its copy of the database it refuses to start, with the space needed and available, when the backups directory lacks the database's size for that copy (`UCM_BACKUP_ENABLED=false` skips it) or, on a start that upgrades the database, its filesystem lacks that size again; a start on a database already up to date only needs room for the copy.
+- **The Helm chart holds its liveness probe until UCM answers.** A startup probe on `/health/live` (`startupProbe`, 360 s by default) now comes by default, with or without HA, so a long first start that upgrades the database is no longer restarted after about 100 seconds.
+- **The start log times each migration.** Each migration and each step of the 3.0 upgrade logs its start, its end and its duration, and a step that reads certificates in batches logs its progress at most every 30 seconds.
 - **TSA requires a dedicated signer by default.** Without a dedicated signing certificate, `/tsa` no longer signs with the CA certificate (RFC 3161 §2.3) unless `require_dedicated_cert` is turned off, which an upgrade from 2.x does for a TSA that signed with its CA, flagged as a warning on the overview. In that default mode the signing CA only issues the dedicated signer, so a CA whose key cannot sign tokens (EdDSA, or ML-DSA in FIPS mode when the module does not approve it) can be chosen.
 - Docker images: the `latest` and `latest-fips` tags now go to the highest stable version published, so a maintenance release of an older line no longer moves them.
 - **A Windows profile keeps its policy identity.** The MS-XCEP policy identifier and template OIDs belong to the profile, not to its CA: changing the policy or issuing CA no longer changes the identifier and OIDs registered clients cached (such a change made them fail with `0x8007000d`), two profiles on one CA no longer share an identifier, and the default profile upgraded from 2.254 keeps the values 2.254 served.
@@ -99,6 +102,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A start no longer loads every certificate into memory.** While the HTTPS certificate is not a managed one, each start looked for it among the managed certificates by loading all of them with their keys; it now reads them in batches of 500, and the start of a 255,000 certificate database peaks at 250 MB instead of 1.8 GB (2.7 GB on PostgreSQL).
+- **A killed start no longer holds PostgreSQL locks.** The migration session now asks the server to check its client every 10 seconds (PostgreSQL 14 and later) and uses the keepalives of the application's connections, so a start killed during a long migration releases its locks within seconds instead of when the server finishes the statement.
 - **Audit statistics on a large journal.** On SQLite, `GET /api/v2/audit/stats` read every entry of the journal to rank the users, whatever the period; it now reads the period only (about 1.3 s down to under 0.1 s with a million entries), and users with the same count are listed by name.
 - **Faster audit chain verification.** `GET /api/v2/audit/verify` reads the journal as plain rows instead of building an object per entry, which cuts its time by about a quarter on SQLite and by half on PostgreSQL with a million entries; the verdict is unchanged.
 - ACME proxy: the help and the proxy hints now point to the "Certificate Authorities (CA)" section by the exact title the screen shows, instead of "External CA Accounts".

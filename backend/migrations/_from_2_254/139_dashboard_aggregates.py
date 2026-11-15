@@ -19,8 +19,10 @@ INDEXES = (
     ('certificates', 'ix_certificates_caref_subject_cn', ('caref', 'subject_cn')),
     ('acme_client_orders', 'ix_acme_client_orders_certificate_id', ('certificate_id',)),
 )
-_PENDING = ("SELECT id, crt FROM certificates WHERE crt IS NOT NULL AND crt <> '' "
-            "AND key_bits IS NULL AND sig_hash IS NULL AND id > {cursor} ORDER BY id")
+# The rows left to fill: the batches read them, the progress total counts them
+_LEFT = "certificates WHERE crt IS NOT NULL AND crt <> '' AND key_bits IS NULL AND sig_hash IS NULL"
+_PENDING = "SELECT id, crt FROM " + _LEFT + " AND id > {cursor} ORDER BY id"
+_COUNT = "SELECT COUNT(*) FROM " + _LEFT
 _UPDATE = "UPDATE certificates SET key_bits = {p}, sig_hash = {p} WHERE id = {p}"
 _BATCH = 500
 
@@ -44,9 +46,11 @@ def _values(rows):
     return out
 
 
-def _backfill(fetch, write):
+def _backfill(fetch, write, total):
     """Batches of _BATCH rows, keyed on id so a row nothing can fill is read once."""
-    cursor = 0
+    from migrations._from_2_254 import Progress
+    progress = Progress('step 139_dashboard_aggregates', total)
+    cursor = done = 0
     while True:
         rows = fetch(cursor)
         if not rows:
@@ -55,6 +59,8 @@ def _backfill(fetch, write):
         values = [v for v in _values(rows) if v[0] is not None or v[1] is not None]
         if values:
             write(values)
+        done += len(rows)
+        progress(done)
 
 
 def _upgrade_sqlite(conn):
@@ -66,7 +72,8 @@ def _upgrade_sqlite(conn):
                 conn.execute(f"ALTER TABLE certificates ADD COLUMN {name} {sql_type}")
         _backfill(
             lambda c: conn.execute(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}").fetchall(),
-            lambda values: conn.executemany(_UPDATE.format(p='?'), values))
+            lambda values: conn.executemany(_UPDATE.format(p='?'), values),
+            conn.execute(_COUNT).fetchone()[0])
     for table, index, cols in INDEXES:
         if table in tables:
             conn.execute(f"CREATE INDEX IF NOT EXISTS {index} ON {table} ({', '.join(cols)})")
@@ -86,7 +93,8 @@ def _upgrade_pg(conn):
             bindparam('bits'), bindparam('hash'), bindparam('id'))
         _backfill(
             lambda c: conn.execute(text(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}")).fetchall(),
-            lambda values: conn.execute(update, [{'bits': b, 'hash': h, 'id': i} for b, h, i in values]))
+            lambda values: conn.execute(update, [{'bits': b, 'hash': h, 'id': i} for b, h, i in values]),
+            conn.execute(text(_COUNT)).scalar())
     for table, index, cols in INDEXES:
         if table in tables:
             conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index} ON {table} ({', '.join(cols)})"))

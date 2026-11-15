@@ -163,6 +163,15 @@ spec:
                   key: UCM_INITIAL_ADMIN_PASSWORD
             - name: INITIAL_ADMIN_PASSWORD_FORCE_CHANGE
               value: "1"
+          # A first start that upgrades the database, or in HA the wait for a previous heartbeat
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 36
           livenessProbe:
             httpGet:
               path: /health/live

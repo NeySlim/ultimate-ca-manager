@@ -63,6 +63,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `proxy.trustedProxies` | `[]` | `UCM_TRUSTED_PROXIES`: proxy IPs / CIDRs allowed to set forwarded / client-cert headers (CIDR entries need UCM 2.224 or later) |
 | `extraEnv` | `[]` | Extra `UCM_*` env vars |
 | `resources` | requests 100m/512Mi, limit 1Gi | Pod resources |
+| `startupProbe.enabled` / `periodSeconds` / `failureThreshold` | `true` / `10` / `36` | Probe on `/health/live` that holds the liveness and readiness probes until UCM answers (360 s by default): a first start that upgrades a large database answers nothing until the upgrade ends |
 
 See [`values.yaml`](values.yaml) for the full list.
 
