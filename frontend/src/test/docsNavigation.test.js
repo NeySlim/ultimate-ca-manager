@@ -341,13 +341,17 @@ describe('user guide button names', () => {
   })
 
   it.each([
-    ['Certificates', [en.certificates.issueCertificate.split(' ')[0]]],
+    ['Certificates', [en.certificates.issueCertificate.split(' ')[0], en.common.revoke, en.certificates.removeHold]],
     ['Certificate Authorities', [en.common.create, en.common.import]],
     ['Taking a CA Offline', [en.cas.takeOffline, en.cas.offlinePasswordProtected, en.cas.offlineFileExported]],
     ['Restoring an Offline CA', [en.cas.restore]],
-    ['Certificate Signing Requests', [en.csrs.generateCSR, en.common.import, en.csrs.uploadCSR]],
+    ['Certificate Signing Requests', [en.csrs.generateCSR, en.common.import, en.csrs.uploadCSR, en.csrs.sign, en.common.signCSR, en.csrs.signAgain]],
     ['Templates', [en.templates.new, en.common.copy]],
-    ['Trust Store', [en.trustStore.sync]],
+    ['Trust Store', [en.trustStore.sync, en.common.export, en.trustStore.exportBundle]],
+    ['Users', [en.users.createUser]],
+    ['Audit Logs', [en.audit.verifyIntegrity]],
+    ['Settings', [en.scheduler.runNow]],
+    ['Enabling 2FA (TOTP)', [en.common.enable2FA]],
     ['HSM Management', [en.hsm.newProvider, en.common.test]],
     ['Adding WebAuthn Key', [en.account.addKey]],
   ])('%s names the buttons of its page', (title, labels) => {

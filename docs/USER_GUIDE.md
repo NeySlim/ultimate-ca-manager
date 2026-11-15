@@ -143,7 +143,7 @@ Click **New** to make one, or select a template and click **Copy** to start from
 
 ### Trust Store
 
-Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync** imports the operating system's trusted CAs, and **Export** downloads a certificate.
+Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync** imports the operating system's trusted CAs, and **Export** downloads a certificate and **Export Bundle**, in the toolbar, downloads all of them as one PEM file.
 
 ### User Certificates
 
