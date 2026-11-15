@@ -303,6 +303,34 @@ def test_an_imported_ca_with_such_a_subject_is_named_after_its_cn(app, auth_clie
             db.session.commit()
 
 
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_an_imported_csr_is_named_after_its_parsed_cn(app, auth_client, key):
+    import json
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(_legacy_country(f'legacy-csr-{tag}.example'))
+           .sign(key, hashes.SHA256()))
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+        'content': csr.public_bytes(serialization.Encoding.PEM).decode(),
+        'options': {'import_csrs': True}}), content_type='application/json')
+    assert r.status_code in (200, 201), r.data
+    ids = r.get_json()['data']['imported_ids']['csrs']
+    assert len(ids) == 1, r.data
+    with app.app_context():
+        row = db.session.get(Certificate, ids[0])
+        try:
+            assert (row.subject_cn, row.descr) == (f'legacy-csr-{tag}.example',) * 2
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
 def test_an_imported_certificate_without_a_cn_falls_back_as_before(app, auth_client, key):
     """No CN: the first DNS SAN, else no subject_cn (unchanged by this lot)."""
     import uuid
