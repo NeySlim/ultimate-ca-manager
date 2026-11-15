@@ -28,7 +28,7 @@ Technical documentation for Ultimate Certificate Manager.
 
 - **[HSM_DOCKER.md](./HSM_DOCKER.md)**: HSM integration in Docker
 - **[LOG_ROTATION.md](./LOG_ROTATION.md)**: Log rotation configuration
-- **[REDIS.md](./REDIS.md)**: Redis, reserved for a future high-availability mode
+- **[REDIS.md](./REDIS.md)**: Redis, optional: shared sessions and events in high availability
 - **[TESTING.md](./TESTING.md)**: Testing & linting guide (unit + E2E + ESLint + Ruff)
 
 ### ACME testing notes

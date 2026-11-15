@@ -310,7 +310,7 @@ After installation:
 
 - [Docker Deployment Guide](docker.md)
 - [Upgrade Guide](../../UPGRADE.md)
-- [Redis (future high-availability mode)](../REDIS.md)
+- [Redis (optional, shared sessions and events in high availability)](../REDIS.md)
 
 ---
 
