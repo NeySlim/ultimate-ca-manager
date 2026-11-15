@@ -9,7 +9,7 @@ PR: [#169](https://github.com/NeySlim/ultimate-ca-manager/pull/169)
 - **Typed SAN enforcement**: FQDN in IP field → HTTP 400 (no silent DNS reclassification)
 - **EC curves**: `ecdsa` + `256` / `NIST P-384` / UI labels → `prime256v1` / `secp384r1` / `secp521r1`
 - **CN auto-SAN**: email CN (`fred@fred.fr`) is **not** auto-added as DNS on server certs; use **Email** or **Combined** cert type for email SAN
-- **i18n**: validation messages under `certificates.san*` (9 locales); CSR key labels under `csrs.key*`
+- **i18n**: validation messages under `certificates.san*` (10 locales); CSR key labels under `csrs.key*`
 - **UI clarity**: certificate details label **Issuer signature algorithm** (`common.issuerSignatureAlgorithm`) — distinct from **Key type** (EE public key). An EC P-521 cert issued by an RSA CA correctly shows `SHA256-RSA` as issuer signature.
 
 ## Automated tests

@@ -7,7 +7,7 @@ const localesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'locales'
 const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 
 // Either the English term kept whole, or a translation: never half of each
-describe('templates.commonName (9 locales)', () => {
+describe('templates.commonName (10 locales)', () => {
   for (const code of LOCALE_CODES) {
     it(`${code}: is not half translated`, () => {
       const value = JSON.parse(readFileSync(join(localesDir, `${code}.json`), 'utf8')).templates.commonName
