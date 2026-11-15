@@ -186,6 +186,13 @@ def test_an_ha_render_without_a_cluster_refuses_to_draw_keys():
     assert docs['Secret']['stringData']['KEY_ENCRYPTION_KEY'] == 'K'
 
 
+def test_the_refusal_names_an_install_into_a_namespace_not_created_yet():
+    # helm install --create-namespace renders before the namespace exists: nothing is found
+    for extra in ([], ['--set', 'secrets.keyEncryptionKey=K']):
+        r = _render(*HA, *extra, check=False)
+        assert r.returncode != 0 and '--create-namespace' in r.stderr, extra
+
+
 def test_an_ha_install_on_a_cluster_draws_its_keys(tmp_path):
     chart, values = _chart_on_a_cluster(tmp_path)
     stringdata = _docs(*HA, *values, chart=chart)['Secret']['stringData']
