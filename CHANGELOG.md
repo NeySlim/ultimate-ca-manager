@@ -12,6 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Security
 
 - FIPS: the `-fips` Docker image recomputed the integrity value of the FIPS module at each start, so a `fips.so` modified after the build still passed its self-tests; the start in FIPS mode now compares it to the value recorded when the image was built and refuses a modified module, a missing or malformed record, or an `OPENSSL_MODULES` that is not the directory of that module.
+- Restore: with sessions on disk, the session of the operator who restored and any session whose request was in flight were written back once the restore had removed them, and with Redis no session was revoked at all, so they stayed signed in after the accounts were replaced. Each restore now advances an epoch every session carries, so no session begun before it is accepted afterwards, whatever the store.
 
 ## [2.254.2] - 2026-11-15
 

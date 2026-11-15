@@ -625,6 +625,12 @@ def is_public_protocol_path(path: str) -> bool:
     return is_protocol_path(path) or is_acme_path(path)
 
 
+def is_file_request(path: str) -> bool:
+    """A static file (favicon, bundle, font): browsers may fetch these without the
+    session cookie, so no session is opened or checked there."""
+    return not path.startswith('/api/') and '.' in path.rsplit('/', 1)[-1]
+
+
 def is_admin_ui_path(path: str) -> bool:
     """SPA, authenticated API, static assets — not protocol/ACME-only paths."""
     if path in _HEALTH_PATHS or path.startswith(_STATIC_PREFIXES):

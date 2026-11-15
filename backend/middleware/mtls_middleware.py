@@ -12,6 +12,8 @@ from services.mtls_auth_service import MTLSAuthService
 import logging
 from utils.datetime_utils import utc_now
 from utils.admin_allowlist import is_exempt_path
+from utils.public_endpoints import is_file_request
+from auth.session_epoch import holds_current_epoch
 from auth.session_start import ACCOUNT_KEY, account_proof, begin_session
 
 logger = logging.getLogger(__name__)
@@ -60,12 +62,6 @@ def _extract_certificate():
     return None
 
 
-def _is_file_request(path):
-    """A static file (favicon, bundle, font): browsers may fetch these without the
-    session cookie, so a login there would open a session nobody keeps."""
-    return not path.startswith('/api/') and '.' in path.rsplit('/', 1)[-1]
-
-
 def _names_no_stored_session():
     """A session cookie came with the request, but the store holds nothing under it."""
     return bool(_presented_cookie()) and not session
@@ -85,7 +81,7 @@ def _join_successor(old, user, auth_cert):
     data = iface._retrieve_session_data(iface._get_store_id(entry[0]))
     if (not data or data.get('user_id') != user.id or data.get('cert_id') != auth_cert.id
             or data.get('session_version', 0) != (user.session_version or 0)
-            or data.get(ACCOUNT_KEY) != account_proof(user)):
+            or data.get(ACCOUNT_KEY) != account_proof(user) or not holds_current_epoch(data)):
         return False
     session.clear()
     session.update(data)
@@ -127,7 +123,7 @@ def process_client_certificate():
     """
     # Protocol and probe paths read client certificates themselves; touching the
     # session there would keep a cookie's inactivity clock running from anywhere.
-    if is_exempt_path(request.path) or _is_file_request(request.path):
+    if is_exempt_path(request.path) or is_file_request(request.path):
         return
     # A valid session of any method is kept (password/LDAP/WebAuthn never overwritten);
     # an expired one, certificate included, takes the expired-cookie path below

@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### A restore signs out every session, the restoring one included
+
+After a successful restore, every session opened before it is refused, whatever the session store, including the session of the operator who ran the restore: sign in again once the restore has completed. A script that restores through the API with a session cookie needs a new sign-in before its next call; an API key is not a session and is kept or replaced as the archive says. A failed restore, or an archive that carried no data, signs nobody out.
+
 ### `-fips` Docker image: the FIPS module is checked against the build
 
 With `UCM_FIPS=1`, the `-fips` image now refuses to start when its `fips.so` differs from the one installed when the image was built, or when the record of that build (`/usr/share/ucm/fips-module.mac`) is missing or malformed. An image derived from the `-fips` image that replaces or modifies `fips.so` no longer starts in FIPS mode: build it from the UCM sources instead, or use the published `-fips` image unchanged. FIPS mode also refuses to start when `OPENSSL_MODULES` is set to anything but the absolute path of the directory of the checked module. The standard image is not affected.

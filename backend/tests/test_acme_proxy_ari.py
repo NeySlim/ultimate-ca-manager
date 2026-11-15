@@ -127,16 +127,27 @@ def _import_cert_for_ari(app, aki_hex: str, serial_int: int, real=False):
         return cert.id
 
 
+@pytest.fixture
+def ari_rows(app):
+    """Rows `_import_cert_for_ari` inserts, deleted after the test: their FAKEPEM
+    would break every later export of all certificates in the worker."""
+    ids = []
+    yield lambda *a, **k: ids.append(_import_cert_for_ari(app, *a, **k))
+    with app.app_context():
+        Certificate.query.filter(Certificate.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+
 class TestRenewalInfoRoute:
     def _certid(self, aki_hex: str, serial_int: int) -> str:
         aki_bytes = bytes.fromhex(aki_hex.replace(':', ''))
         serial_bytes = serial_int.to_bytes((serial_int.bit_length() + 7) // 8, 'big')
         return f"{_b64url(aki_bytes)}.{_b64url(serial_bytes)}"
 
-    def test_default_route_serves_window(self, app, client, proxy_account, monkeypatch):
+    def test_default_route_serves_window(self, app, client, proxy_account, monkeypatch, ari_rows):
         aki_hex = 'A8:4A:94:24:3A:1E:82:11'
         serial_int = 0x1234567890ABCDEF
-        _import_cert_for_ari(app, aki_hex, serial_int)
+        ari_rows(aki_hex, serial_int)
         certid = self._certid(aki_hex, serial_int)
 
         # No directory fetch needed for the route — but stub anyway for safety.
@@ -151,10 +162,10 @@ class TestRenewalInfoRoute:
         assert r.headers.get('Retry-After')
         assert 'public' in r.headers.get('Cache-Control', '')
 
-    def test_slug_route_serves_window(self, app, client, proxy_account, monkeypatch):
+    def test_slug_route_serves_window(self, app, client, proxy_account, monkeypatch, ari_rows):
         aki_hex = 'B1:C2:D3:E4'
         serial_int = 0x42
-        _import_cert_for_ari(app, aki_hex, serial_int)
+        ari_rows(aki_hex, serial_int)
         certid = self._certid(aki_hex, serial_int)
 
         stub_acme_proxy_upstream(monkeypatch)
