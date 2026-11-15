@@ -1251,3 +1251,169 @@ class TestARevertNeverNamesAFileTheStartRefuses:
 
         assert self._post_revert(auth_client).status_code == 200
         assert not path.exists()
+
+
+class _Killed(BaseException):
+    """A process killed mid-switch: nothing in the bootstrap may catch it."""
+
+
+def _standalone_target(app, url):
+    """A target nobody transferred to: a fresh 3.0 registry, its schema, one account."""
+    import migration_runner
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        migration_runner.record_fresh_registry(engine, url.startswith('postgresql'))
+        with app.app_context():
+            migration._force_register_all_models()
+            db.metadata.create_all(engine)
+        with engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO users (username, email, password_hash, role, auth_source) "
+                "VALUES ('standalone', 'stand@alone', 'x', 'admin', 'local')"))
+    finally:
+        engine.dispose()
+
+
+class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
+    """The copy commits before it is verified: a target left holding accounts by a refused or
+    interrupted attempt is refused by the next one, never taken as an installation of its own."""
+
+    def _post(self, auth_client, target):
+        return auth_client.post('/api/v2/database/switch',
+                                data=json.dumps({'database_url': target}),
+                                content_type='application/json')
+
+    def _refused_twice(self, auth_client, target, env_file, restart_signal, monkeypatch):
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        monkeypatch.setattr(migration, 'verify_migration', refuse)
+        before = env_file.read_text()
+
+        first = self._post(auth_client, target)
+        assert first.status_code == 500, first.data
+        second = self._post(auth_client, target)
+
+        # Verified again against the source, and refused again
+        assert second.status_code == 500, second.data
+        assert 'reset the target' in json.loads(second.data)['message']
+        assert env_file.read_text() == before
+        assert not restart_signal.exists()
+        assert switch_pending() is None
+
+    def test_a_second_switch_after_a_refused_verification_to_sqlite(
+            self, auth_client, sqlite_target, env_file, restart_signal, monkeypatch):
+        self._refused_twice(auth_client, sqlite_target, env_file, restart_signal, monkeypatch)
+
+    @_needs_pg
+    def test_a_second_switch_after_a_refused_verification_to_postgresql(
+            self, auth_client, pg_target, env_file, restart_signal, monkeypatch):
+        self._refused_twice(auth_client, pg_target, env_file, restart_signal, monkeypatch)
+
+    def _killed_before_verification(self, app, target, monkeypatch):
+        def killed(*args, **kwargs):
+            raise _Killed()
+
+        monkeypatch.setattr(migration, 'verify_migration', killed)
+        with app.app_context():
+            with pytest.raises(_Killed):
+                migration.bootstrap_auth_to_target(target)
+            source_users = db.session.execute(text('SELECT COUNT(*) FROM users')).scalar()
+
+        seen = []
+
+        def refuse(engine, expected, **kwargs):
+            seen.append(dict(expected))
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        monkeypatch.setattr(migration, 'verify_migration', refuse)
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is False, message
+        assert stats['refusal'] == 'verification' and stats['target_written'] is True
+        assert seen and seen[0]['users'] == source_users
+        assert set(seen[0]) == set(migration.BOOTSTRAP_AUTH_TABLES)
+
+        monkeypatch.undo()
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is True, message
+        assert stats['validation']['ok'] is True
+
+    def test_a_cut_between_the_copy_and_its_verification_to_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._killed_before_verification(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_cut_between_the_copy_and_its_verification_to_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._killed_before_verification(app, pg_target, monkeypatch)
+
+    def _migrated_then_switched(self, app, target, monkeypatch):
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        monkeypatch.setattr(migration, 'verify_migration', refuse)
+        with app.app_context():
+            ok, message, _ = migration.migrate_data(target)
+        assert ok is False, message
+        monkeypatch.undo()
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is False, message
+        assert 'reset the target' in message
+
+    def test_a_refused_migration_is_not_switched_to_afterwards_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._migrated_then_switched(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_refused_migration_is_not_switched_to_afterwards_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._migrated_then_switched(app, pg_target, monkeypatch)
+
+    def _standalone_accepted(self, app, target):
+        _standalone_target(app, target)
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is True, message
+        assert 'already has users' in message
+
+    def test_a_standalone_target_with_accounts_is_accepted_sqlite(self, app, sqlite_target):
+        self._standalone_accepted(app, sqlite_target)
+
+    @_needs_pg
+    def test_a_standalone_target_with_accounts_is_accepted_postgresql(self, app, pg_target):
+        self._standalone_accepted(app, pg_target)
+
+    def _verified_then_cut_before_the_counters(self, app, auth_client, create_user, target,
+                                               monkeypatch):
+        gone = _deleted_last_user(app, auth_client, create_user)
+        real = migration.carry_id_high_water
+        calls = []
+
+        def cut_once(*args, **kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise _Killed()
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(migration, 'carry_id_high_water', cut_once)
+        with app.app_context():
+            with pytest.raises(_Killed):
+                migration.bootstrap_auth_to_target(target)
+            ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is True, message
+        assert _next_user_id(target) > gone
+
+    def test_a_verified_copy_cut_before_its_counters_resumes_sqlite(
+            self, app, auth_client, create_user, sqlite_target, monkeypatch):
+        self._verified_then_cut_before_the_counters(
+            app, auth_client, create_user, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_verified_copy_cut_before_its_counters_resumes_postgresql(
+            self, app, auth_client, create_user, pg_target, monkeypatch):
+        self._verified_then_cut_before_the_counters(
+            app, auth_client, create_user, pg_target, monkeypatch)

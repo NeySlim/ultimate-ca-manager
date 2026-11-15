@@ -75,6 +75,11 @@ IGNORED_TABLES = frozenset({"alembic_version", "flask_sessions"})
 #       migration against a schema that already has them.
 INTERNAL_TABLES = frozenset({"_migrations"})
 
+# Present on a target from the start of a copy until its verification passed: accounts beside
+# it are refused by the switch. Empty and never copied; a migration may restart over it.
+TRANSFER_MARKER = "_transfer_unverified"
+
+
 # {table: {column: reason}} — columns an installation still carries and the
 # models no longer declare, so ``create_all`` does not create them on the
 # target and their values cannot go anywhere.
@@ -344,7 +349,7 @@ def check_target_is_empty(target_engine) -> Dict[str, int]:
     inspector = _inspector(target_engine, "target")
     tables = _table_names(inspector, "target")
 
-    known = set(expected) | INTERNAL_TABLES | IGNORED_TABLES
+    known = set(expected) | INTERNAL_TABLES | IGNORED_TABLES | {TRANSFER_MARKER}
     foreign = sorted(t for t in tables if t not in known)
     if foreign:
         raise PreflightError(
