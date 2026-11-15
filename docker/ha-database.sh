@@ -75,6 +75,25 @@ _ucm_df() {
     df -Pk "$1" 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { print $1, $4 }'
 }
 
+# Device id of the filesystem holding a directory (its nearest existing parent), nothing when unknown.
+_ucm_dev() {
+    local d=$1 dev
+    until dev=$(stat -c %d "$d" 2>/dev/null) && [ -n "$dev" ]; do
+        [ "$d" = "/" ] || [ "$d" = "." ] && return 0
+        d=$(dirname "$d")
+    done
+    echo "$dev"
+}
+
+# True when both directories share a filesystem; an unreadable device id counts as shared, the
+# cautious reading (the needs add up against the smaller room). df names are not identities.
+_ucm_same_fs() {
+    local a b
+    a=$(_ucm_dev "$1")
+    b=$(_ucm_dev "$2")
+    [ -z "$a" ] || [ -z "$b" ] || [ "$a" = "$b" ]
+}
+
 # Prints the refusal and fails when `df` line $3 has less than $2 KB for directory $1.
 _ucm_room_short() {
     local avail_kb=${3##* }
@@ -96,7 +115,9 @@ ucm_sqlite_disk_room() {
     [ "$UCM_BACKUP_ENABLED" = "true" ] && copy_need=$size_kb
     [ "$db_need" -gt 0 ] && db_df=$(_ucm_df "$db_dir")
     [ "$copy_need" -gt 0 ] && copy_df=$(_ucm_df "$UCM_SQLITE_BACKUP_DIR")
-    if [ -n "$db_df" ] && [ "${db_df% *}" = "${copy_df% *}" ]; then
+    if [ -n "$db_df" ] && [ -n "$copy_df" ] && _ucm_same_fs "$db_dir" "$UCM_SQLITE_BACKUP_DIR"; then
+        # one filesystem: the smaller of the two readings is the room
+        [ "${copy_df##* }" -lt "${db_df##* }" ] && db_df=$copy_df
         if _ucm_room_short "$db_dir" $(( db_need + copy_need )) "$db_df"; then
             echo "   The database is $size_mb MB; upgrading it needs its size for the upgrade's journal and growth,"
             echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."

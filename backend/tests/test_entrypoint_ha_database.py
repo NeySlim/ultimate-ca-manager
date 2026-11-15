@@ -86,9 +86,12 @@ def test_the_first_run_notice_says_both_sources_refuse_the_start(tmp_path):
     assert 'the one you provided' not in r.stdout and 'Op-Chosen-1!' not in r.stdout
 
 
+_STAT_ONE_DEVICE = 'stat() { if [ "$2" = %d ]; then echo 7; else command stat "$@"; fi; }; '
+
+
 def _df(avail_kb):
-    """df -Pk stubbed: one data line whose fourth column is the space available."""
-    return f'df() {{ echo "Filesystem 1024-blocks Used Available Capacity Mounted"; echo "/dev/x 100 0 {avail_kb} 0% /"; }}; '
+    """df -Pk stubbed: one data line whose fourth column is the space available; one device."""
+    return _STAT_ONE_DEVICE + f'df() {{ echo "Filesystem 1024-blocks Used Available Capacity Mounted"; echo "/dev/x 100 0 {avail_kb} 0% /"; }}; '
 
 
 @pytest.mark.parametrize('backup,needed_kb', [('true', 2 * 3000), ('false', 3000)])
@@ -307,7 +310,9 @@ def test_a_database_lacking_one_migration_of_several_counts_as_an_upgrade(tmp_pa
 def _df_two(tmp_path, db_kb, copy_kb):
     """Two filesystems: the backups directory on its own, the database's directory on another."""
     backups = tmp_path / 'backups'
-    return (f'UCM_SQLITE_BACKUP_DIR={backups}; df() {{ echo "Filesystem 1024-blocks Used Available Capacity Mounted"; '
+    return (f'UCM_SQLITE_BACKUP_DIR={backups}; '
+            f'stat() {{ if [ "$2" = %d ]; then if [ "$3" = "{backups}" ]; then echo 2; else echo 1; fi; '
+            f'else command stat "$@"; fi; }}; df() {{ echo "Filesystem 1024-blocks Used Available Capacity Mounted"; '
             f'if [ "$2" = "{backups}" ]; then echo "/dev/b 100 0 {copy_kb} 0% /b"; '
             f'else echo "/dev/a 100 0 {db_kb} 0% /a"; fi; }}; ')
 
@@ -354,3 +359,40 @@ def test_an_empty_database_url_still_checks_and_copies_the_sqlite_file(tmp_path)
     _database(tmp_path, NAMES)
     r = _run(_df(3000) + _START, env, tmp_path)
     assert r.returncode == 0 and 'cp ' in r.stdout, r.stdout
+
+
+def _df_names(db_kb, copy_kb, db_dev, copy_dev, name_db='tmpfs', name_copy='tmpfs'):
+    """Both directories named alike by df, whatever their device ids say."""
+    backups = '/ucm-test-backups'
+    return (f'UCM_SQLITE_BACKUP_DIR={backups}; '
+            f'stat() {{ if [ "$2" = %d ]; then if [ "$3" = "{backups}" ]; then echo {copy_dev}; else echo {db_dev}; fi; '
+            f'else command stat "$@"; fi; }}; df() {{ echo "Filesystem 1024-blocks Used Available Capacity Mounted"; '
+            f'if [ "$2" = "{backups}" ]; then echo "{name_copy} 100 0 {copy_kb} 0% /b"; '
+            f'else echo "{name_db} 100 0 {db_kb} 0% /a"; fi; }}; ')
+
+
+def test_two_mounts_with_one_df_name_are_measured_apart(tmp_path):
+    # two tmpfs both print "tmpfs": the backups' room must still be measured on its own
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
+    r = _run(_df_names(90000, 100, 1, 2) + _START, env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
+    assert 'Not enough disk space in /ucm-test-backups' in r.stdout, r.stdout
+
+
+def test_one_filesystem_under_two_df_names_is_measured_on_the_total(tmp_path):
+    # the same export mounted twice: one device, so the upgrade and the copy add up
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
+    r = _run(_df_names(5999, 5999, 4, 4, 'nfs:/a', 'nfs:/b') + _START, env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
+    assert 'needs 6 MB free' in r.stdout, r.stdout
+
+
+def test_a_device_that_cannot_be_read_is_measured_on_the_total(tmp_path):
+    # stat failing: the cautious reading is one filesystem, the smaller room against the sum
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
+    r = _run(_df_names(9000, 5999, '', '', 'a', 'b') + _START, env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
+    assert 'needs 6 MB free, 5 MB available' in r.stdout, r.stdout
