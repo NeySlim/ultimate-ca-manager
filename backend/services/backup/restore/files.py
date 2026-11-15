@@ -146,7 +146,11 @@ class StagedFiles:
                     prefix=self._prefix,
                     dir=str(self._base_dir) if self._base_dir else None))
                 os.chmod(staging, 0o700)
-                fd = os.open(staging, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                try:
+                    fd = os.open(staging, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                except OSError:
+                    shutil.rmtree(staging, ignore_errors=True)
+                    raise
                 try:
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     # Swept by another instance before the lock was taken: start again
@@ -155,6 +159,10 @@ class StagedFiles:
                         break
                 except BlockingIOError:
                     pass
+                except BaseException:
+                    os.close(fd)
+                    shutil.rmtree(staging, ignore_errors=True)
+                    raise
                 os.close(fd)
             else:
                 raise OSError(errno.EAGAIN, "Could not hold a restore staging directory")

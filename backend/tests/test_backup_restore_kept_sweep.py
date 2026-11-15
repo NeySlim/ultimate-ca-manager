@@ -373,3 +373,15 @@ def test_a_staging_swept_before_its_lock_is_taken_is_made_again(system_tmp, monk
     finally:
         monkeypatch.undo()
         staged.discard()
+
+
+def test_a_staging_that_cannot_be_locked_is_not_left_behind(system_tmp, monkeypatch):
+    real_flock = files.fcntl.flock
+
+    def flock(fd, operation):
+        raise OSError(errno.ENOLCK, 'no locks')
+    monkeypatch.setattr(files.fcntl, 'flock', flock)
+    with pytest.raises(OSError):
+        StagedFiles().stage(system_tmp / 'k.key', b'secret')
+    monkeypatch.setattr(files.fcntl, 'flock', real_flock)
+    assert not list(system_tmp.glob('ucm_restore_files_*'))
