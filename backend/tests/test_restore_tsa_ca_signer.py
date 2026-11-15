@@ -104,3 +104,13 @@ def test_a_30_archive_is_restored_without_the_setting(here):
     blob = _forged(['configuration'], mutate=as_30)
     _service().restore_backup(blob, PASSWORD, mode='merge')
     assert _stored() is None
+
+
+def test_a_2x_archive_with_a_windows_configuration_keeps_its_ca_signer(here):
+    """The Windows conversion adds the section that marks a 3.0 archive: the TSA rule runs first."""
+    def with_windows(data):
+        _as_2x_tsa(data)
+        data['configuration']['settings']['kerberos_spn'] = 'HTTP/ucm.example.test@EXAMPLE.TEST'
+    blob = _forged(['configuration'], mutate=with_windows)
+    _service().restore_backup(blob, PASSWORD, mode='merge')
+    assert _stored() == 'false'
