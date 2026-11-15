@@ -226,3 +226,53 @@ def test_each_provider_type_with_an_unreadable_secret_builds_no_client(
             HsmConfigError, match=f'HSM provider 11 {field} cannot be decrypted'):
         HsmService._get_provider_instance(row).connect()
     assert built == []
+
+
+def _stored(row):
+    import json
+    return json.loads(row.config)
+
+
+def test_repairing_legacy_pkcs11_keys_keeps_a_pin_this_node_cannot_open(app):
+    import json
+    from models.hsm import HsmProvider
+    from services.hsm import HsmService
+    token = _foreign_token('1234')
+    row = HsmProvider(id=12, name='legacy', type='pkcs11', config=json.dumps({
+        'library_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 't', 'pin': token}))
+    with app.app_context():
+        assert HsmService.repair_pkcs11_provider_config(row) is True
+    assert _stored(row)['user_pin'] == token and 'pin' not in _stored(row)
+
+
+def test_a_masked_field_keeps_a_secret_this_node_cannot_open(app):
+    import json
+    from models.hsm import HsmProvider
+    token = _foreign_token()
+    row = HsmProvider(id=13, name='bao', type='openbao', config=json.dumps({
+        'url': 'http://bao.invalid:8200', 'token': token}))
+    with app.app_context():
+        row.set_config({'url': 'http://bao.invalid:8200', 'token': '********', 'mount_path': 'm'})
+    assert _stored(row)['token'] == token
+
+
+def test_an_edit_keeps_a_previous_pin_this_node_cannot_open(app):
+    import json
+    from models import db
+    from models.hsm import HsmProvider
+    from services.hsm import HsmService
+    from utils.encryption import encrypt_value
+    old = _foreign_token('0000')
+    with app.app_context():
+        row = HsmProvider(name=f'pin-{uuid.uuid4().hex[:6]}', type='pkcs11', config=json.dumps({
+            'module_path': '/usr/lib/x.so', 'token_label': 't',
+            'user_pin': encrypt_value('1234'), 'previous_user_pin': old}))
+        db.session.add(row)
+        db.session.commit()
+        try:
+            HsmService.update_provider(row.id, config={
+                'module_path': '/usr/lib/x.so', 'token_label': 't', 'user_pin': '********'})
+            assert _stored(db.session.get(HsmProvider, row.id))['previous_user_pin'] == old
+        finally:
+            db.session.delete(db.session.get(HsmProvider, row.id))
+            db.session.commit()
