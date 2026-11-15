@@ -2,11 +2,12 @@
 conditions they replace, no correlated subquery that walks a table for each
 certificate, and a cost that grows linearly with the number of certificates."""
 import json
+import re
 import uuid
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import String, and_, cast, event, false, func, insert, literal, or_, select, true
+from sqlalchemy import String, and_, cast, event, false, func, insert, literal, or_, select, text, true
 from sqlalchemy.orm import aliased
 
 from models import CA, Certificate, SystemConfig, db
@@ -196,8 +197,8 @@ def _cert(rows, name, days, **kw):
 
 
 def _reject(rows, data, created_days=0):
-    text = data if isinstance(data, str) else json.dumps(data)
-    return rows.add(ApprovalRequest(request_type='renewal', status='rejected', request_data=text,
+    body = data if isinstance(data, str) else json.dumps(data)
+    return rows.add(ApprovalRequest(request_type='renewal', status='rejected', request_data=body,
                                     created_at=utc_now() - timedelta(days=created_days)))
 
 
@@ -365,13 +366,13 @@ def _sqlite_violations(statement, parameters):
         return False
 
     bad = []
-    for node, text in detail.items():
+    for node, step in detail.items():
         if not correlated(node):
             continue
-        if text.startswith('SCAN '):
-            bad.append(text)
-        elif text.startswith('SEARCH certificates') and 'subject_cn=?' not in text:
-            bad.append(text)
+        if step.startswith('SCAN '):
+            bad.append(step)
+        elif step.startswith('SEARCH certificates') and 'subject_cn=?' not in step:
+            bad.append(step)
     return bad
 
 
@@ -385,10 +386,14 @@ def _pg_violations(statement, parameters):
         if isinstance(plan, str):
             plan = json.loads(plan)
     bad = []
+    # A hashed subplan runs once; PostgreSQL names it so only where the expression uses it
+    dumped = json.dumps(plan)
 
     def walk(node, per_row):
+        name = str(node.get('Subplan Name', ''))
         per_row = per_row or (node.get('Parent Relationship') == 'SubPlan'
-                              and not str(node.get('Subplan Name', '')).startswith('hashed'))
+                              and not re.search(rf'hashed {re.escape(name)}\b', dumped)
+                              and not name.startswith('hashed'))
         kind = node.get('Node Type', '')
         if per_row and kind == 'Seq Scan':
             bad.append(f"Seq Scan on {node.get('Relation Name')}")
@@ -409,6 +414,12 @@ def test_no_correlated_subquery_walks_a_table_for_each_certificate(app, auth_cli
         for key, value in SCENARIOS[scenario].items():
             _set(key, value)
         db.session.commit()
+        if db.engine.dialect.name == 'postgresql':
+            # PostgreSQL plans from statistics: give it a CA of some size, as an installation has
+            _grow(rows, _ca(rows, 'plan-ca'), uuid.uuid4().hex[:6], 0, 2000)
+            for table in ('certificates', 'acme_client_orders', 'system_config', 'approval_requests'):
+                db.session.execute(text(f'ANALYZE {table}'))
+            db.session.commit()
     calls = {
         'queue': lambda: auth_client.get('/api/v2/dashboard/queue'),
         **{f'list:{k}': (lambda k=k: auth_client.get('/api/v2/certificates', query_string={'renewal': k}))
