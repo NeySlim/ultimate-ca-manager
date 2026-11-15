@@ -148,3 +148,19 @@ def test_a_merge_of_the_authority_already_on_the_key_is_restored_on_sqlite(app, 
         _service().restore_backup(blob, PASSWORD, mode='merge')
         assert _holders(token.key.id) == [f'{kind}:same']
         db.session.remove()
+
+
+def test_a_key_shared_before_the_restore_does_not_stop_it_on_sqlite(app, tmp_path):
+    """Two authorities on one key from an earlier release: the merge is not theirs to refuse."""
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'restore.db'}"), app.app_context():
+        token = _Token()
+        token.x509_ca('earlier')
+        db.session.add(SSHCertificateAuthority(
+            refid=str(uuid.uuid4()), descr='shared', ca_type='host', public_key='x', private_key='',
+            key_source='hsm', hsm_key_id=token.key.id, key_type='ecdsa-p256', fingerprint='SHA256:x'))
+        db.session.commit()
+        blob = _service().create_backup(PASSWORD, include=_only('hsm_keys', 'hsm_providers'))
+        _service().restore_backup(blob, PASSWORD, mode='merge')
+        assert _holders(token.key.id) == ['ssh:shared', 'x509:earlier']
+        db.session.remove()
