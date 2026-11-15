@@ -188,13 +188,14 @@ class Box:
         """What a wrapper of `name` runs in the end: the guard for cp, mv, rm and rename."""
         return self.inner / name if name in ('mv', 'cp', 'rm', 'rename') else REAL[name]
 
-    def run(self, default_parent=False, timeout=60, interpreter=None):
+    def run(self, default_parent=False, timeout=60, interpreter=None, env=None):
         """interpreter: what UCM_PYTHON names (default: the `rename` wrapper). Fails the test
         when a guarded command was handed a path of the installation or of its archives."""
         if not any(self.bin.iterdir()):
             self.wrap()
         env = {'PATH': f'{self.bin}:/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C',
-               'UCM_PYTHON': str(self.bin / 'rename') if interpreter is None else interpreter}
+               'UCM_PYTHON': str(self.bin / 'rename') if interpreter is None else interpreter,
+               'UCM_OS_RELEASE': str(self.tmp / 'no-os-release'), **(env or {})}
         # A session of its own: a wrapper that kills the run kills its process group only
         out = subprocess.run(
             [POSIX_SH, str(SCRIPT), str(self.home), str(self.data), str(self.config),
@@ -1758,3 +1759,32 @@ def test_without_an_interpreter_to_rename_with_the_database_is_not_even_asked_ab
     assert out.returncode == 1, (out.stdout, out.stderr)
     assert 'no interpreter to rename files with' in out.stdout and 'could not read' not in out.stdout
     assert snapshot(box) == before and not box.parent.exists()
+
+
+@pytest.mark.parametrize('os_release, named', [
+    ('ID=debian\nVERSION_ID="13"\n', ['sudo apt install --allow-downgrades ./ucm_2.254_all.deb']),
+    ('ID=ubuntu\nID_LIKE=debian\nVERSION_ID="24.04"\n', ['sudo apt install --allow-downgrades ./ucm_2.254_all.deb']),
+    ('ID=fedora\nVERSION_ID=43\n', ['sudo dnf downgrade ./ucm-2.254-1.fc43.noarch.rpm']),
+    ('ID="almalinux"\nID_LIKE="rhel centos fedora"\nVERSION_ID="9.6"\n',
+     ['sudo dnf downgrade ./ucm-el9-2.254-1.el9.noarch.rpm']),
+    ('ID="rhel"\nID_LIKE="fedora"\nVERSION_ID="9.4"\n', ['sudo dnf downgrade ./ucm-el9-2.254-1.el9.noarch.rpm']),
+    ('ID="almalinux"\nID_LIKE="rhel centos fedora"\nVERSION_ID="10.0"\n',
+     ['no UCM 2.254 package was published for this system']),
+    (None, ['./ucm_2.254_all.deb', './ucm-2.254-1.fc43.noarch.rpm', './ucm-el9-2.254-1.el9.noarch.rpm']),
+])
+def test_the_way_back_names_the_2_254_package_published_for_this_system(tmp_path, os_release, named):
+    """The asset names of the 2.254 release; none was published for EL10."""
+    box = Box(tmp_path, python='stub')
+    env = {}
+    if os_release is not None:
+        (tmp_path / 'os-release').write_text(os_release)
+        env = {'UCM_OS_RELEASE': str(tmp_path / 'os-release')}
+    assert box.run(env=env).returncode == 0
+    readme = (box.archive / 'README.txt').read_text()
+    flat = ' '.join(readme.split())
+    for text in named:
+        assert text in flat, flat
+    assert '<dist>' not in readme
+    published = ('./ucm_2.254_all.deb', './ucm-2.254-1.fc43.noarch.rpm', './ucm-el9-2.254-1.el9.noarch.rpm')
+    assert sum(p in flat for p in published) == (3 if os_release is None else
+                                                 0 if 'published for this system' in named[0] else 1)

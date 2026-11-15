@@ -328,6 +328,28 @@ local_lines() {
     done
 }
 
+# The 2.254 package published for this system, by the names of the 2.254 release assets
+OS_RELEASE=${UCM_OS_RELEASE:-/etc/os-release}
+os_field() {
+    [ -r "$OS_RELEASE" ] && sed -n -E "s/^$1=//p" "$OS_RELEASE" | tail -n 1 | sed -E 's/^"(.*)"$/\1/'
+}
+install_254() {
+    id=$(os_field ID) like=" $(os_field ID_LIKE) " ver=$(os_field VERSION_ID)
+    deb="sudo apt install --allow-downgrades ./ucm_2.254_all.deb"
+    fc="sudo dnf downgrade ./ucm-2.254-1.fc43.noarch.rpm"
+    el9="sudo dnf downgrade ./ucm-el9-2.254-1.el9.noarch.rpm"
+    case "$id$like" in
+        rhel*|almalinux*|rocky*|centos*|*" rhel "*|*" centos "*)
+            if [ "${ver%%.*}" = 9 ]; then echo "$el9"; else
+                echo "no UCM 2.254 package was published for this system: put the archive back"
+                echo "     on a system 2.254 was published for (Debian, Ubuntu, Fedora, EL9)"
+            fi ;;
+        fedora*) echo "$fc" ;;
+        debian*|ubuntu*|*" debian "*|*" ubuntu "*) echo "$deb" ;;
+        *) printf '%s\n' "Debian, Ubuntu: $deb;" "     Fedora: $fc;" "     EL9: $el9" ;;
+    esac
+}
+
 write_readme() {
     if [ "$LOCALS" != "$NL" ]; then
         BESIDE="
@@ -389,9 +411,8 @@ make a directory removed there again, empty (mkdir -p), before a retry puts back
 
 To put that installation back in service
   1. Stop UCM: sudo systemctl stop ucm
-  2. Install UCM 2.254 in place of this release (Debian, Ubuntu:
-     sudo apt install --allow-downgrades ./ucm_2.254_all.deb; RHEL, Fedora:
-     sudo dnf downgrade ./ucm-2.254-1.<dist>.noarch.rpm), then stop it again.
+  2. Install UCM 2.254 in place of this release, then stop it again:
+     $(install_254)
   3. Move aside what the new installation wrote in $DATA and $CONFIG (all but
      the directories named .ucm-archive-*$ENV_KEEP), then put these back: the contents of data/
      into $DATA$CONFIG_RESTORE$DB_RESTORE$LOCAL_RESTORE; then
