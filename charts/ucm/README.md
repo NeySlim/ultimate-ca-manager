@@ -19,7 +19,7 @@ Then `kubectl -n ucm port-forward svc/ucm 8443:8443` and open <https://localhost
 
 - Kubernetes 1.23+
 - Helm 3.8+ (uses `lookup` to persist generated secrets across upgrades)
-- With `ha.enabled`, `get` on `serviceaccounts` and `secrets` in the release namespace for the account that runs `helm`: the chart's `lookup` reads them, and without that right the render stops with Kubernetes' `forbidden` error
+- With `ha.enabled`, `get` on `serviceaccounts`, `secrets` and `persistentvolumeclaims` in the release namespace for the account that runs `helm`: the chart's `lookup` reads them, and without that right the render stops with Kubernetes' `forbidden` error
 - A default StorageClass providing **ReadWriteOnce** volumes
 
 ## One instance, or several with `ha.enabled`
