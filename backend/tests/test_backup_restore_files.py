@@ -357,3 +357,17 @@ class TestPublicationCost:
         staged.unpublish()
         assert gone.read_bytes() == b'the key in use' and _mode(gone) == 0o600
         staged.discard()
+
+    def test_a_previous_content_is_copied_when_it_cannot_be_linked(self, tmp_path, monkeypatch):
+        # Another filesystem, or a file the service may read but not link
+        destination = tmp_path / 'certs' / 'c.pem'
+        destination.parent.mkdir()
+        destination.write_bytes(b'in use')
+        monkeypatch.setattr(os, 'link', lambda *a, **k: (_ for _ in ()).throw(OSError(errno.EXDEV, 'cross-device')))
+        staged = StagedFiles(base_dir=tmp_path / 'staging')
+        staged.stage(destination, b'restored')
+        staged.publish()
+        assert destination.read_bytes() == b'restored'
+        staged.unpublish()
+        assert destination.read_bytes() == b'in use'
+        staged.discard()
