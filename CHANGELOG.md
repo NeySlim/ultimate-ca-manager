@@ -98,7 +98,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- **A start no longer loads every certificate into memory.** While the HTTPS certificate is not a managed one, each start looked for it among the managed certificates by loading all of them with their keys (about 1.5 GB for 255,000 certificates); it now reads them in batches of 500.
+- **A start no longer loads every certificate into memory.** While the HTTPS certificate is not a managed one, each start looked for it among the managed certificates by loading all of them with their keys; it now reads them in batches of 500, and the start of a 255,000 certificate database peaks at 250 MB instead of 1.8 GB (2.7 GB on PostgreSQL).
 - **A killed start no longer holds PostgreSQL locks.** The migration session now asks the server to check its client every 10 seconds (PostgreSQL 14 and later) and uses the keepalives of the application's connections, so a start killed during a long migration releases its locks within seconds instead of when the server finishes the statement.
 - **`RATE_LIMIT_ENABLED=1`, `yes` or `on` no longer drops the route limits (sign-in, password reset and the default of 200 per minute and 2000 per hour).** Only `true` turned on the route limits while the tiered limiter also took `1`, `yes` and `on`; both now read the variable the same way (any case), and an empty value keeps the default, on.
 - **WebSocket events through Redis on a Unix socket.** With a `unix://` `REDIS_URL`, the event relay passed TCP keepalive options that a Unix socket connection refuses, so every WebSocket connection failed and no browser received real-time events; they now go through Redis as with a TCP address.
