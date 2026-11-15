@@ -90,6 +90,7 @@ def _write(app):
 
 def test_memory_does_not_grow_with_the_certificates(app, template, small_pages):
     _fill(app, template, SMALL)
+    _write(app)    # caches a first archive fills (compiled statements, imports) are not rows
     small_peak, _, small_size = _write(app)
     _fill(app, template, LARGE)
     large_peak, _, large_size = _write(app)
