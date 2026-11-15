@@ -320,6 +320,50 @@ class TestPublicationCost:
         assert self._fsyncs(monkeypatch, tmp_path, 40) <= 40 + 2
         assert self._fsyncs(monkeypatch, tmp_path, 160) <= 160 + 2
 
+    def test_each_directory_is_fsynced_after_its_last_rename(self, monkeypatch, tmp_path):
+        # The lower bound: a rename is durable only once its directory entry is synced
+        events = []
+        real_fsync, real_replace, real_unlink = os.fsync, os.replace, Path.unlink
+
+        def fsync(fd):
+            info = os.fstat(fd)
+            if stat.S_ISDIR(info.st_mode):
+                events.append(('sync', (info.st_dev, info.st_ino)))
+            return real_fsync(fd)
+
+        def replace(source, target, *args, **kwargs):
+            real_replace(source, target, *args, **kwargs)
+            info = os.stat(Path(target).parent)
+            events.append(('rename', (info.st_dev, info.st_ino)))
+
+        def unlink(self, *args, **kwargs):
+            real_unlink(self, *args, **kwargs)
+            info = os.stat(self.parent)
+            events.append(('rename', (info.st_dev, info.st_ino)))
+
+        directories = [tmp_path / 'out' / name for name in ('certs', 'private', 'ca')]
+        for directory in directories:
+            directory.mkdir(parents=True)
+        gone = directories[2] / 'gone.key'
+        gone.write_bytes(b'old')
+        staged = StagedFiles(base_dir=tmp_path / 'staging')
+        for index in range(6):
+            staged.stage(directories[index % 2] / f'f{index}.pem', b'x')
+        staged.stage_removal(gone)
+        monkeypatch.setattr(os, 'fsync', fsync)
+        monkeypatch.setattr(os, 'replace', replace)
+        monkeypatch.setattr(Path, 'unlink', unlink)
+        try:
+            staged.publish()
+        finally:
+            monkeypatch.undo()
+            staged.discard()
+        for directory in directories:
+            info = os.stat(directory)
+            key = (info.st_dev, info.st_ino)
+            last_rename = max(i for i, event in enumerate(events) if event == ('rename', key))
+            assert ('sync', key) in events[last_rename + 1:], directory
+
     def test_previous_contents_are_kept_on_disk_not_in_memory(self, tmp_path):
         import tracemalloc
         size, count = 256 * 1024, 16
