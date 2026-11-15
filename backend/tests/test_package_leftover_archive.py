@@ -829,6 +829,7 @@ def _layout_args(box, layout):
     }[layout]
 
 
+@pytest.mark.slow  # two minutes for the five layouts: the suites run it, not the pre-commit
 @pytest.mark.parametrize('layout', ['one filesystem', 'the data a symbolic link',
                                     'data and config on other filesystems',
                                     'each kept directory a mount point', 'overlayfs'])
@@ -1446,6 +1447,46 @@ def test_a_name_with_a_line_break_in_a_directory_kept_in_place_puts_all_back(tmp
     assert out.returncode == 1, (out.stdout, out.stderr)
     assert f'{box.data}/updates/a<newline>b has a tab' in out.stdout and 'Everything was put back' in out.stdout
     assert snapshot(box) == before
+
+
+def _owner(path):
+    return path.lstat().st_uid, path.lstat().st_gid
+
+
+def _ownership_commands(box):
+    """The ownership commands of the archive's README, the DEB postinst and the RPM spec, as
+    written, with the sandbox's paths and another owner in place of the service account."""
+    readme = next(l.strip() for l in (box.archive / 'README.txt').read_text().splitlines() if 'chown' in l)
+    assert readme.startswith('sudo ') and readme.count('ucm:ucm') == 1, readme
+    commands = {'readme': readme[5:].replace('ucm:ucm', '1:1')}
+    env = f'UCM_HOME={box.home} UCM_DATA={box.data} UCM_CONFIG={box.config} UCM_USER=1 UCM_GROUP=1; '
+    for name, path in (('postinst', 'debian/postinst'), ('spec', 'rpm/ucm.spec')):
+        lines = [l.strip() for l in (ROOT / 'packaging' / path).read_text().splitlines()
+                 if l.strip().startswith('find ') and 'chown' in l]
+        assert lines, path
+        commands[name] = env + '; '.join(lines).replace('%{name}', '1')
+    return commands
+
+
+@pytest.mark.skipif(os.getuid() != 0, reason='gives files to another owner')
+@pytest.mark.parametrize('source', ['readme', 'postinst', 'spec'])
+def test_the_ownership_commands_reach_data_kept_behind_a_link(tmp_path, source):
+    """Data on another disk behind a symbolic link: the directory it points to and its files
+    are given too, an earlier local archive there stays root's."""
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    assert box.run().returncode == 0
+    box.link(box.data)
+    real = tmp_path / 'srv' / 'data'
+    (real / 'ca' / 'root.pem').write_text('pem')
+    earlier = real / 'ca' / '.ucm-archive-20250101T000000Z'
+    earlier.mkdir(mode=0o700)
+    (earlier / 'old.key').write_text('key')
+    subprocess.run(['/bin/sh', '-c', _ownership_commands(box)[source]], check=True)
+    for path in (real, real / 'ca', real / 'ca' / 'root.pem'):
+        assert _owner(path) == (1, 1), path
+    for path in (earlier, earlier / 'old.key'):
+        assert _owner(path) == (0, 0), path
 
 
 @pytest.mark.skipif(os.getuid() != 0, reason='gives files to another owner')

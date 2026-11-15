@@ -315,7 +315,7 @@ sudo journalctl -u ucm -n 100 --no-pager
 
 # 1. Permission issues
 # A local archive (.ucm-archive-*) holds an earlier installation's keys: it stays root's
-sudo find /opt/ucm/data -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
+sudo find /opt/ucm/data/ -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
 sudo chown -R ucm:ucm /var/log/ucm
 
 # 2. Missing dependencies

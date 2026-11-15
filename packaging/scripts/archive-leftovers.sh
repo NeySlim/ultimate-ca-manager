@@ -345,7 +345,7 @@ To put that installation back in service
   3. Move aside what the new installation wrote in $DATA and $CONFIG (all but
      the directories named .ucm-archive-*), then put these back: the contents of data/
      into $DATA, of config/ into $CONFIG$DB_RESTORE$LOCAL_RESTORE; then
-     sudo find $DATA $CONFIG -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
+     sudo find $DATA/ $CONFIG/ -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
   4. Start it (sudo systemctl start ucm) and check that UCM 2.254 opens: this
      records the 2.254 migrations in the database.
   5. Install this release again: it upgrades that database.

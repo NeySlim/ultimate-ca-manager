@@ -224,9 +224,11 @@ fi
 ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 [ "$ENV_STATE" != new ] || NEW_CONFIG=1
 
-# Set permissions; a local archive of a removed UCM's files (.ucm-archive-*) stays root's
-find $UCM_HOME -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
-find $UCM_CONFIG -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
+# Set permissions, through a linked directory too (the final /); a local archive of a
+# removed UCM's files (.ucm-archive-*) stays root's
+find $UCM_HOME/ -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
+find $UCM_DATA/ -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
+find $UCM_CONFIG/ -name '.ucm-archive-*' -prune -o -exec chown -h %{name}:%{name} {} +
 chown -R %{name}:%{name} /var/log/%{name}
 chmod 750 $UCM_DATA
 
