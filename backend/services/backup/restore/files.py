@@ -37,6 +37,8 @@ _STAGING_PREFIX = 'ucm_restore_files_'
 _PUBLISH_PREFIX = '.ucm_restore_'
 _KEPT_PREFIX = '.ucm_restore_kept_'
 _JOURNAL = 'journal.json'
+# In a staging created without a lock: who owns it
+_OWNER = '.owner'
 _PREVIOUS = re.compile(r'previous_[0-9]{6}')
 # A system_config row per restore, written in its transaction: present iff it committed
 PUBLICATION_PREFIX = 'restore_publication_'
@@ -159,6 +161,18 @@ class StagedFiles:
                         break
                 except BlockingIOError:
                     pass
+                except OSError as exc:
+                    # No lock on this filesystem (ENOLCK): the staging names its live owner instead
+                    try:
+                        _write_private(staging / _OWNER, json.dumps(_owner_record()).encode(), 0o600)
+                    except BaseException:
+                        os.close(fd)
+                        shutil.rmtree(staging, ignore_errors=True)
+                        raise
+                    logger.warning("Restore staging %s holds no lock (%s); a sweep removes it "
+                                   "only once its owner process is gone", staging, exc)
+                    self._staging_dir, self._staging_lock = staging, fd
+                    break
                 except BaseException:
                     os.close(fd)
                     shutil.rmtree(staging, ignore_errors=True)
@@ -592,8 +606,11 @@ def _sweep_stale_stagings() -> None:
                 continue
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                continue    # a live restore, of this instance or another sharing the directory
+            except OSError:
+                continue    # a live restore, of this instance or another, or no lock to prove it
+            # Created without a lock: removed only once its recorded owner is proven gone
+            if os.path.lexists(os.path.join(entry.path, _OWNER)) and not _owner_is_gone(entry.path):
+                continue
             current = os.lstat(entry.path)
             if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
                 continue
@@ -607,6 +624,40 @@ def _sweep_stale_stagings() -> None:
             os.close(fd)
     if removed:
         logger.warning("Removed the staged files of interrupted restores: %s", ', '.join(removed))
+
+
+def _proc_start(pid: int) -> str:
+    """The start time of process `pid` in this pid namespace (field 22 of its stat)."""
+    with open(f'/proc/{pid}/stat') as handle:
+        return handle.read().rsplit(')', 1)[1].split()[19]
+
+
+def _owner_record() -> dict:
+    """This process, named so that its death can be proven: boot, pid namespace, pid, start."""
+    with open('/proc/sys/kernel/random/boot_id') as handle:
+        boot = handle.read().strip()
+    pid = os.getpid()
+    return {'boot': boot, 'pidns': os.readlink('/proc/self/ns/pid'), 'pid': pid,
+            'start': _proc_start(pid)}
+
+
+def _owner_is_gone(staging: str) -> bool:
+    """True only when the recorded owner provably no longer runs: same boot and pid
+    namespace as this process, and its pid absent or held by a process started later."""
+    try:
+        fd = os.open(os.path.join(staging, _OWNER), os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd) as handle:
+            owner = json.load(handle)
+        here = _owner_record()
+        if not (isinstance(owner, dict) and isinstance(owner.get('pid'), int)
+                and owner.get('boot') == here['boot'] and owner.get('pidns') == here['pidns']):
+            return False
+        try:
+            return _proc_start(owner['pid']) != owner.get('start')
+        except FileNotFoundError:
+            return True
+    except (OSError, ValueError, IndexError):
+        return False
 
 
 def _forget_lingering_publications(keep=()) -> None:

@@ -375,13 +375,49 @@ def test_a_staging_swept_before_its_lock_is_taken_is_made_again(system_tmp, monk
         staged.discard()
 
 
-def test_a_staging_that_cannot_be_locked_is_not_left_behind(system_tmp, monkeypatch):
+def test_a_staging_that_cannot_be_locked_is_kept_without_its_lock(system_tmp, monkeypatch, caplog):
+    # A filesystem without locks (ENOLCK) still restores: the staging names its owner instead
     real_flock = files.fcntl.flock
 
     def flock(fd, operation):
         raise OSError(errno.ENOLCK, 'no locks')
     monkeypatch.setattr(files.fcntl, 'flock', flock)
-    with pytest.raises(OSError):
-        StagedFiles().stage(system_tmp / 'k.key', b'secret')
-    monkeypatch.setattr(files.fcntl, 'flock', real_flock)
+    staged = StagedFiles()
+    try:
+        with caplog.at_level(logging.WARNING, logger=files.__name__):
+            staged.stage(system_tmp / 'k.key', b'secret')
+        assert (staged.staging_dir / '0000_k.key').read_bytes() == b'secret'
+        assert any(str(staged.staging_dir) in record.getMessage() for record in caplog.records)
+        monkeypatch.setattr(files.fcntl, 'flock', real_flock)
+        # Its lock free, but its owner alive: the sweep keeps it
+        files._sweep_stale_stagings()
+        assert staged.staging_dir.is_dir()
+    finally:
+        monkeypatch.setattr(files.fcntl, 'flock', real_flock)
+        staged.discard()
     assert not list(system_tmp.glob('ucm_restore_files_*'))
+
+
+def test_an_unlocked_staging_is_swept_only_once_its_owner_is_dead(system_tmp, monkeypatch):
+    staging = _killed_staging(system_tmp)
+    owner = files._owner_record()
+    (staging / files._OWNER).write_text(json.dumps(owner))
+    files._sweep_stale_stagings()
+    assert staging.exists()    # this very process: alive
+
+    (staging / files._OWNER).write_text(json.dumps(dict(owner, start='0')))
+    files._sweep_stale_stagings()
+    assert not staging.exists()    # its pid now names another process
+
+
+@pytest.mark.parametrize('damage', ['other boot', 'other namespace', 'unreadable'])
+def test_an_unlocked_staging_without_proof_of_death_is_kept(system_tmp, damage):
+    staging = _killed_staging(system_tmp)
+    owner = dict(files._owner_record(), start='0')
+    if damage == 'other boot':
+        owner['boot'] = 'another-boot'
+    elif damage == 'other namespace':
+        owner['pidns'] = 'pid:[1]'
+    (staging / files._OWNER).write_text('{' if damage == 'unreadable' else json.dumps(owner))
+    files._sweep_stale_stagings()
+    assert staging.exists()
