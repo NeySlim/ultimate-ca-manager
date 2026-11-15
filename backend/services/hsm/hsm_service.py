@@ -13,7 +13,7 @@ import logging
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
-from sqlalchemy import or_
+from sqlalchemy import or_, update
 
 import fips_mode
 from config.settings import Config
@@ -818,8 +818,10 @@ class HsmService:
                 hsm_keys = hsm.list_keys()
             listing_errors = len(getattr(hsm, 'list_errors', None) or [])
 
-            # Get existing keys in DB
-            db_keys = {k.key_identifier: k for k in provider.keys}
+            # Rows read under the provider lock: a concurrent sync commits first, then this one
+            # finds its rows, as a sync run after it would (the token is read outside the lock)
+            cls._lock_provider(provider_id)
+            db_keys = {k.key_identifier: k for k in HsmKey.query.filter_by(provider_id=provider_id)}
             hsm_key_ids = {k.key_identifier for k in hsm_keys}
             
             added = 0
@@ -884,6 +886,15 @@ class HsmService:
             db.session.rollback()
             logger.exception(f"Failed to sync HSM keys for {provider.name}")
             raise HsmOperationError(f"Failed to sync keys: {str(e)}")
+
+    @staticmethod
+    def _lock_provider(provider_id):
+        """Lock the provider row until the transaction ends: FOR UPDATE on PostgreSQL, the
+        database write lock (no-op UPDATE) on SQLite, as key_binding.lock_key does for a key."""
+        if db.session.get_bind().dialect.name == 'sqlite':
+            table = HsmProvider.__table__
+            db.session.execute(update(table).where(table.c.id == provider_id).values(id=table.c.id))
+        return HsmProvider.query.filter_by(id=provider_id).with_for_update().one_or_none()
 
     @staticmethod
     def _referenced_hsm_key_ids() -> set:
