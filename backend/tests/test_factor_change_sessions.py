@@ -272,3 +272,20 @@ def test_an_administrator_changing_a_key_closes_the_holders_sessions(app, auth_c
         assert auth_client._client.get('/api/v2/account/profile').status_code == 200
     finally:
         _cleanup(app, user)
+
+
+def test_sessions_closed_earlier_are_not_counted_again(nodes):
+    first_node, second_node = nodes
+    user = _make_user(first_node, key=SoftKey())
+    try:
+        stale = _open_session(second_node, user)
+        this = _open_session(first_node, user)
+        # The stale session makes no request: it stays in the store, at its old version
+        assert _post(this, '/api/v2/account/sessions/revoke-all').status_code == 200
+        other = _open_session(second_node, user)
+        r = _toggle_key(False)(first_node, this, user)
+        assert r.status_code == 200, r.data
+        assert r.get_json()['meta']['other_sessions_closed'] == 1
+        assert not _signed_in(other) and not _signed_in(stale) and _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
