@@ -2664,7 +2664,7 @@ Certificates counted are issued, not revoked, not archived and not expired. A ce
 | `tsa` state | meaning | `alert` | `severity` |
 |-------------|---------|---------|------------|
 | `dedicated` | a dedicated signing certificate signs | false | null |
-| `no_signer` | no signer configured, a CA without a dedicated certificate included while one is required: `/tsa` answers 503 until one is | false | null |
+| `no_signer` | no dedicated signer configured and the CA certificate cannot sign in its place (a dedicated certificate is required, or the designated CA is missing, offline, outside its validity period, revoked in its chain or without its key): `/tsa` answers 503 | false | null |
 | `ca_certificate` | the CA certificate signs (dedicated certificate no longer required): its tokens fail RFC 3161 §2.3 | true | `warning` |
 | `expiring` | dedicated signer within 30 days of expiry, `days_left` | true | `critical` |
 | `unusable` | dedicated signer that cannot sign, `reason`: `expired`, `revoked`, `key_unavailable` or `invalid` | true | `critical` |

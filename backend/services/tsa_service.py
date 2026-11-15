@@ -383,8 +383,8 @@ SIGNER_CONFIG_KEY = 'tsa_signer_cert_refid'
 
 
 def configured_signer_refid() -> str:
-    """Configured dedicated-signer refid, stripped, or '' when unset: the one reader of
-    the setting, for /tsa and for the configuration API alike."""
+    """Configured dedicated-signer refid, stripped, or '' when unset: what /tsa and the
+    configuration API read the setting through."""
     try:
         from models import SystemConfig
         cfg = SystemConfig.query.filter_by(key=SIGNER_CONFIG_KEY).first()

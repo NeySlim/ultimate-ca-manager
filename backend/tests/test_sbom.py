@@ -227,7 +227,6 @@ def test_a_package_without_its_requirements_is_refused(tmp_path):
     assert proc.returncode == 1 and 'requirements.txt' in proc.stderr
 
 
-
 @pytest.mark.parametrize('fmt,name,missing', [
     ('deb', 'ucm_3.0~rc1_all.deb', 'usr/share/doc/ucm/LICENSE'),
     ('rpm', 'ucm-el9-3.0~rc1-1.el9.noarch.rpm', 'usr/share/licenses/ucm/LICENSE'),
@@ -248,6 +247,7 @@ def test_an_rpm_with_its_legal_texts_in_the_deb_place_is_refused(tmp_path):
     tree = s.package_tree(tmp_path, tmp_path / 'frontend' / 'dist', fmt='deb')
     proc, _, _ = s.package_sbom(tmp_path, frag, 'ucm-el9-3.0~rc1-1.el9.noarch.rpm', 'rpm', tree=tree)
     assert proc.returncode == 1 and 'usr/share/licenses/ucm/LICENSE' in proc.stderr
+
 
 # ---- images -----------------------------------------------------------------------------------------
 
