@@ -221,8 +221,8 @@ export function brokenAnchors(file, markdown) {
     if (/^[a-z]+:/i.test(target)) continue
     const [rel, anchor] = target.split('#')
     const abs = rel ? path.resolve(path.dirname(path.join(docsDir, file)), rel) : path.join(docsDir, file)
-    if (!abs.endsWith('.md') || !fs.existsSync(abs)) continue
-    if (!anchor || !headingSlugs(fs.readFileSync(abs, 'utf8')).has(anchor)) broken.push(target)
+    if (!abs.endsWith('.md')) continue
+    if (!fs.existsSync(abs) || !anchor || !headingSlugs(fs.readFileSync(abs, 'utf8')).has(anchor)) broken.push(target)
   }
   return broken
 }
@@ -235,6 +235,7 @@ describe('documented heading links', () => {
   it('flags an anchor that no heading carries', () => {
     expect(brokenAnchors('USER_GUIDE.md', 'See [a](#getting-started) and [b](#nowhere).')).toEqual(['#nowhere'])
     expect(brokenAnchors('USER_GUIDE.md', 'See [a](HA.md#nowhere) and [b](HA.md#high-availability).')).toEqual(['HA.md#nowhere'])
+    expect(brokenAnchors('USER_GUIDE.md', 'See [a](NO_SUCH_GUIDE.md#intro).')).toEqual(['NO_SUCH_GUIDE.md#intro'])
     expect(headingSlugs('## A\n## A\n')).toEqual(new Set(['a', 'a-1']))
   })
 
