@@ -426,6 +426,8 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 
         if pending:
             say(f"Found {len(pending)} pending migration(s) for {backend}:")
+            if UPGRADE_MIGRATION in pending and not _copy_before_upgrade(is_pg, sqlite_path, dry_run):
+                return False
             done = (_run_pending_pg(engine, pending, dry_run) if is_pg
                     else _run_pending_sqlite(pending, dry_run, db_path=sqlite_path))
             if not done:
@@ -436,6 +438,28 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
         return _replay_serial_steps(engine, is_pg, sqlite_path) if serial_replay else True
     finally:
         engine.dispose()
+
+
+def _sqlite_file(sqlite_path):
+    return sqlite_path or os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db")
+
+
+def _copy_before_upgrade(is_pg: bool, sqlite_path, dry_run: bool) -> bool:
+    """SQLite: migration 300 starts once a verified copy exists and the marker is set, or the
+    marker shows an earlier start began it (pre_upgrade_copy.prepare)."""
+    import pre_upgrade_copy
+    if is_pg:
+        say(f"  ! {pre_upgrade_copy.PG_NOTE}")
+        return True
+    if dry_run:
+        say(f"  → {pre_upgrade_copy.plan(_sqlite_file(sqlite_path))} (dry run)")
+        return True
+    try:
+        say(f"  {pre_upgrade_copy.prepare(_sqlite_file(sqlite_path))}")
+    except pre_upgrade_copy.CopyFailed as exc:
+        say(f"  ✗ {exc}")
+        return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +560,9 @@ def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
         else:
             say("SKIP (no upgrade)")
             return False
+        if name == UPGRADE_MIGRATION:
+            import pre_upgrade_copy
+            pre_upgrade_copy.clear_started(conn)
         conn.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (name,))
         conn.commit()
         say("✓")
@@ -655,6 +682,10 @@ def show_status():
             say(f"  ✓ {n}")
         for n in pending:
             say(f"  ○ {n}")
+        if not refusal and UPGRADE_MIGRATION in pending:
+            import pre_upgrade_copy
+            sqlite_path = db_url.replace("sqlite:///", "", 1) if db_url.startswith("sqlite:///") else None
+            say(f"Copy:    {pre_upgrade_copy.PG_NOTE if is_pg else pre_upgrade_copy.plan(_sqlite_file(sqlite_path))}")
         if not refusal and UPGRADE_MIGRATION in applied and _serial_steps_pending(engine):
             say(f"Replay:  {SERIAL_REPLAY_NOTE}")
     finally:
