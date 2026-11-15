@@ -1458,6 +1458,42 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
             self, app, pg_target, monkeypatch):
         self._refused_then_retried_without_accounts(app, pg_target, monkeypatch)
 
+    def _refused_then_retried_without_a_table(self, app, target, monkeypatch):
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            with app.app_context():
+                ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is False and _marker_kinds(target) == {'switch'}, message
+
+        # An auth table dropped by hand from the unverified copy: the retry builds it again
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('DROP TABLE webauthn_credentials'))
+        finally:
+            engine.dispose()
+
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+            source = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
+        assert ok is True and stats['validation']['ok'] is True, message
+        assert _usernames(target) == source
+        assert _marker_kinds(target) is None
+
+    def test_a_retry_over_a_copy_missing_a_table_copies_again_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._refused_then_retried_without_a_table(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_retry_over_a_copy_missing_a_table_copies_again_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._refused_then_retried_without_a_table(app, pg_target, monkeypatch)
+
     def _killed_before_verification(self, app, target, monkeypatch):
         def killed(*args, **kwargs):
             raise _Killed()
