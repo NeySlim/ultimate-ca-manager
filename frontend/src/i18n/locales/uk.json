@@ -462,7 +462,12 @@
       "invalid": "Invalid",
       "ready": "Ready",
       "processing": "Processing",
-      "validating": "Validating"
+      "validating": "Validating",
+      "ok": "OK",
+      "failed": "Failed",
+      "warning": "Warning",
+      "skipped": "Skipped",
+      "never": "Never run"
     }
   },
   "commandPalette": {
@@ -6408,7 +6413,33 @@
       "scep": "SCEP",
       "est": "EST",
       "scheduler": "Планувальник",
-      "tasks": "Завдання"
+      "tasks": "Завдання",
+      "tsa": "TSA",
+      "stale": "State not published",
+      "tasksFailed_one": "{{count}} task failed",
+      "tasksFailed_other": "{{count}} tasks failed",
+      "tasksWarning_one": "{{count}} task with a warning",
+      "tasksWarning_other": "{{count}} tasks with a warning",
+      "tsaState": {
+        "ca_certificate": "Signing with the CA certificate",
+        "dedicated": "Dedicated signer",
+        "expiring_one": "Signer expires in {{count}} day",
+        "expiring_other": "Signer expires in {{count}} days",
+        "no_signer": "No signing certificate",
+        "unavailable": "Status unavailable",
+        "expiring_few": "Signer expires in {{count}} days",
+        "expiring_many": "Signer expires in {{count}} days"
+      },
+      "tsaReason": {
+        "expired": "Signer certificate expired",
+        "revoked": "Signer certificate revoked",
+        "key_unavailable": "Signer key unavailable",
+        "invalid": "Signer certificate not usable"
+      },
+      "tasksFailed_few": "{{count}} tasks failed",
+      "tasksFailed_many": "{{count}} tasks failed",
+      "tasksWarning_few": "{{count}} tasks with a warning",
+      "tasksWarning_many": "{{count}} tasks with a warning"
     },
     "filter": {
       "status": "Статус",
@@ -6448,7 +6479,9 @@
     "horizon": {
       "expiring": "Закінчуються",
       "expired": "Прострочені",
-      "soonest": "Найближчі до закінчення"
+      "soonest": "Найближчі до закінчення",
+      "tsaSigner": "TSA signer",
+      "ocspResponder": "OCSP responder"
     },
     "activity": {
       "all": "Показати всі"

@@ -1735,7 +1735,12 @@
       "invalid": "Invalide",
       "ready": "Prêt",
       "processing": "En cours",
-      "validating": "Validation"
+      "validating": "Validation",
+      "ok": "OK",
+      "failed": "Échec",
+      "warning": "Avertissement",
+      "skipped": "Ignoré",
+      "never": "Jamais exécuté"
     }
   },
   "compare": {
@@ -6331,7 +6336,27 @@
       "scep": "SCEP",
       "est": "EST",
       "scheduler": "Planificateur",
-      "tasks": "Tâches"
+      "tasks": "Tâches",
+      "tsa": "TSA",
+      "stale": "État non publié",
+      "tasksFailed_one": "{{count}} tâche en échec",
+      "tasksFailed_other": "{{count}} tâches en échec",
+      "tasksWarning_one": "{{count}} tâche avec un avertissement",
+      "tasksWarning_other": "{{count}} tâches avec un avertissement",
+      "tsaState": {
+        "ca_certificate": "Signature avec le certificat de la CA",
+        "dedicated": "Signataire dédié",
+        "expiring_one": "Le signataire expire dans {{count}} jour",
+        "expiring_other": "Le signataire expire dans {{count}} jours",
+        "no_signer": "Aucun certificat de signature",
+        "unavailable": "État indisponible"
+      },
+      "tsaReason": {
+        "expired": "Certificat du signataire expiré",
+        "revoked": "Certificat du signataire révoqué",
+        "key_unavailable": "Clé du signataire indisponible",
+        "invalid": "Certificat du signataire inutilisable"
+      }
     },
     "filter": {
       "status": "Statut",
@@ -6371,7 +6396,9 @@
     "horizon": {
       "expiring": "Expire bientôt",
       "expired": "Expirés",
-      "soonest": "Prochains à expirer"
+      "soonest": "Prochains à expirer",
+      "tsaSigner": "Signataire TSA",
+      "ocspResponder": "Répondeur OCSP"
     },
     "activity": {
       "all": "Tout voir"

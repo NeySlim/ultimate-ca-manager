@@ -30,7 +30,11 @@ export function HorizonCard() {
           {next.map((c) => (
             <li key={c.id} className="py-1.5">
               <Link to={`/certificates/${c.id}`} className="flex items-center justify-between gap-3">
-                <span className="text-sm text-text-primary truncate">{c.common_name || c.descr || '–'}</span>
+                <span className="min-w-0 flex items-center gap-2">
+                  <span className="text-sm text-text-primary truncate">{c.common_name || c.descr || '–'}</span>
+                  {c.is_tsa_signer && <span className="text-2xs text-accent-primary whitespace-nowrap">{t('overview.horizon.tsaSigner')}</span>}
+                  {c.is_ocsp_responder && <span className="text-2xs text-accent-primary whitespace-nowrap">{t('overview.horizon.ocspResponder')}</span>}
+                </span>
                 <span className="text-xs text-text-secondary">{c.valid_to ? formatDate(c.valid_to) : '–'}</span>
               </Link>
             </li>

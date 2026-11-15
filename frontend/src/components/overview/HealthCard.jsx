@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { overviewService } from '../../services'
 import { formatDate } from '../../lib/utils'
+import { stateLabel } from '../../lib/stateLabel'
 import { CardFrame, num, useCardData } from './shared'
 
-const PROTOCOLS = ['acme', 'scep', 'est', 'scheduler']
+const PROTOCOLS = ['acme', 'scep', 'est', 'tsa', 'scheduler']
+const ROW_LINKS = { tsa: '/tsa-config', scheduler: '/settings?tab=scheduler' }
 
 function Bars({ periods }) {
   const peak = Math.max(1, ...periods.map((p) => (Number(p.ok) || 0) + (Number(p.failed) || 0)))
@@ -18,6 +21,22 @@ function Bars({ periods }) {
   )
 }
 
+/** What the line says and whether it is an alert: the signer's state, the scheduler's failures, else the last status. */
+function summary(name, p, t) {
+  if (name === 'tsa') {
+    const key = p.state === 'unusable' ? `overview.health.tsaReason.${p.reason}` : `overview.health.tsaState.${p.state}`
+    return { text: t(key, { count: p.days_left, defaultValue: p.state }), alert: Boolean(p.alert) }
+  }
+  if (name === 'scheduler') {
+    const failed = Number(p.by_status?.failed) || 0
+    const warned = Number(p.by_status?.warning) || 0
+    if (p.stale) return { text: t('overview.health.stale'), alert: true }
+    if (failed > 0) return { text: t('overview.health.tasksFailed', { count: failed }), alert: true }
+    if (warned > 0) return { text: t('overview.health.tasksWarning', { count: warned }), alert: false }
+  }
+  return { text: stateLabel(t, p.last_status), alert: p.last_status === 'failed' }
+}
+
 export function HealthCard() {
   const { t } = useTranslation()
   const state = useCardData(() => overviewService.getHealth(), ['certificate'])
@@ -30,14 +49,20 @@ export function HealthCard() {
       <ul className="flex flex-col gap-2">
         {present.map((name) => {
           const p = protocols[name]
+          const { text, alert } = summary(name, p, t)
+          const label = t(`overview.health.${name}`)
+          const link = ROW_LINKS[name]
           return (
-            <li key={name} className="flex items-center justify-between gap-3">
-              <span className="text-sm text-text-primary">{t(`overview.health.${name}`)}</span>
+            <li key={name} data-testid={`health-${name}`} data-alert={alert ? 'true' : 'false'}
+              className="flex items-center justify-between gap-3">
+              {link
+                ? <Link to={link} className="text-sm text-text-primary hover:text-accent-primary">{label}</Link>
+                : <span className="text-sm text-text-primary">{label}</span>}
               <span className="flex items-center gap-3 text-xs text-text-secondary">
                 {Array.isArray(p.periods) && <Bars periods={p.periods} />}
                 {name === 'scheduler' && <span>{t('overview.health.tasks')} {num(p.tasks)}</span>}
-                <span>{p.last_status ?? '–'}</span>
-                <span>{p.last_operation_at ? formatDate(p.last_operation_at) : '–'}</span>
+                <span className={alert ? 'text-status-danger font-medium' : undefined}>{text}</span>
+                {name !== 'tsa' && <span>{p.last_operation_at ? formatDate(p.last_operation_at) : '–'}</span>}
               </span>
             </li>
           )
