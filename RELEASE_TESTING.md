@@ -18,8 +18,9 @@ Every cell is "smoke + UI checks" (below); add the fresh-database check on
 PostgreSQL, the master-key persistence recipe on the images, and the HA checks
 of `docs/HA.md` on the chart and on a shared PostgreSQL. `release-smoke.yml`
 and `test-channel.yml` automate part of this (see "Package install smoke"); a
-cell they do not cover is run by hand. Packages need Python 3.12: the
-system `python3` where it is 3.12 or later, the `python3.12` package on EL9.
+cell they do not cover is run by hand. Packages need Python 3.12 or
+later: the system `python3` where it is recent enough, the `python3.12` package
+on EL9.
 
 Run each target on a host of your own (`<host>`, `<port>` below). An RC container
 runs under a separate name and port (e.g. `ucm-rc-test`): never restart a
@@ -173,9 +174,9 @@ curl -k https://<host>:<port>/api/v2/system/security/encryption-status
    data with the certificate intact and the smoke passing. On a database 2.254
    never started, it must refuse to start and write nothing, with the message
    `UPGRADE.md` quotes.
-3. Roll back as the *Upgrading to v3.0* notes of `UPGRADE.md` describe (its
-   *Rollback* section covers the DEB only; the other deliverables follow the
-   same steps with their own package or image): stop the service,
+3. Roll back following the *Rollback* section of `UPGRADE.md` (written for the
+   DEB; the other deliverables use their own package or image), the *Upgrading
+   to v3.0* notes saying what it requires and what it loses: stop the service,
    restore the database copy taken in step 1, reinstall 2.254, start it. Do not
    restore a 3.0 backup archive on 2.254: it refuses the archive format.
 
