@@ -1,5 +1,5 @@
 """Migration 139 adds certificates.key_bits and sig_hash, filled from crt, and the
-indexes behind the dashboard aggregates; it is idempotent on both backends."""
+indexes behind the dashboard aggregates and the work queue; it is idempotent on both backends."""
 import importlib
 import os
 import sqlite3
@@ -13,8 +13,9 @@ from tests.dashboard_pem import self_signed, sha1_rsa
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 INDEXES = {
-    'certificates': {'ix_certificates_valid_to', 'ix_certificates_created_at'},
+    'certificates': {'ix_certificates_valid_to', 'ix_certificates_created_at', 'ix_certificates_caref_subject_cn'},
     'acme_orders': {'ix_acme_orders_status_created_at'},
+    'acme_client_orders': {'ix_acme_client_orders_certificate_id'},
 }
 
 
@@ -39,8 +40,9 @@ EXPECTED = [(1, 2048, 'sha256'), (2, 2048, 'sha1'), (3, 384, 'sha384'),
 
 def _sqlite_schema(conn):
     conn.execute('CREATE TABLE certificates (id INTEGER PRIMARY KEY, crt TEXT, valid_to DATETIME, '
-                 'created_at DATETIME)')
+                 'created_at DATETIME, caref VARCHAR(36), subject_cn VARCHAR(255))')
     conn.execute('CREATE TABLE acme_orders (id INTEGER PRIMARY KEY, status VARCHAR(20), created_at DATETIME)')
+    conn.execute('CREATE TABLE acme_client_orders (id INTEGER PRIMARY KEY, certificate_id INTEGER)')
 
 
 def test_sqlite_backfills_and_indexes_idempotently(monkeypatch):
@@ -91,9 +93,10 @@ def _postgres_round():
         conn.execute(text(f'CREATE SCHEMA {schema}'))
         conn.execute(text(f'SET search_path TO {schema}'))
         conn.execute(text('CREATE TABLE certificates (id SERIAL PRIMARY KEY, crt TEXT, '
-                          'valid_to TIMESTAMP, created_at TIMESTAMP)'))
+                          'valid_to TIMESTAMP, created_at TIMESTAMP, caref VARCHAR(36), subject_cn VARCHAR(255))'))
         conn.execute(text('CREATE TABLE acme_orders (id SERIAL PRIMARY KEY, status VARCHAR(20), '
                           'created_at TIMESTAMP)'))
+        conn.execute(text('CREATE TABLE acme_client_orders (id SERIAL PRIMARY KEY, certificate_id INTEGER)'))
         conn.execute(text('INSERT INTO certificates (id, crt) VALUES (:id, :crt)'),
                      [{'id': i, 'crt': c} for i, c in _rows()])
         _migration().upgrade(conn)

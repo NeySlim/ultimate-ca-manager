@@ -393,8 +393,8 @@ class AcmeClientOrder(db.Model):
         db.Integer, db.ForeignKey('acme_client_accounts.id'), nullable=True, index=True
     )
     
-    # Resulting certificate (after issuance)
-    certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))
+    # Resulting certificate (after issuance); indexed for the work queue (migration 139)
+    certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'), index=True)
     
     # Auto-renewal settings
     renewal_enabled = db.Column(db.Boolean, default=True)

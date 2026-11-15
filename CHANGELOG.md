@@ -99,6 +99,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Audit statistics on a large journal.** On SQLite, `GET /api/v2/audit/stats` read every entry of the journal to rank the users, whatever the period; it now reads the period only (about 1.3 s down to under 0.1 s with a million entries), and users with the same count are listed by name.
+- **Faster audit chain verification.** `GET /api/v2/audit/verify` reads the journal as plain rows instead of building an object per entry, which cuts its time by about a quarter on SQLite and by half on PostgreSQL with a million entries; the verdict is unchanged.
 - ACME proxy: the help and the proxy hints now point to the "Certificate Authorities (CA)" section by the exact title the screen shows, instead of "External CA Accounts".
 - **ACME, SCEP and CSR imports name the weak hash of a refused CSR.** A CSR signed with SHA-1 or MD5 is refused with "CSR signed with an unsupported hash algorithm", as EST and WSTEP say, instead of a failed proof of possession, also on CSR upload and import, smart import and Microsoft CA signing (same HTTP codes); ACME keeps `badCSR` and SCEP now answers `badAlg`, and in FIPS mode SCEP names a refused SHA-1 CMS signature.
 - **`RATE_LIMIT_ENABLED=1`, `yes` or `on` no longer drops the route limits (sign-in, password reset and the default of 200 per minute and 2000 per hour).** Only `true` turned on the route limits while the tiered limiter also took `1`, `yes` and `on`; both now read the variable the same way (any case), and an empty value keeps the default, on.
