@@ -541,3 +541,49 @@ def test_intune_test_names_an_unreadable_saved_secret(app, auth_client, monkeypa
         with app.app_context():
             db.session.delete(db.session.get(IntuneApp, app_id))
             db.session.commit()
+
+
+UNREADABLE_AD = 'AD connector 24 bind password cannot be decrypted'
+
+
+def test_ad_health_probe_names_an_unreadable_bind_password(app, ldap_binds, caplog):
+    from services.ad_connector import health
+    config = _ad_config_with_unreadable_password()
+    config.enabled = True
+    with app.app_context(), caplog.at_level(logging.WARNING):
+        assert health.probe(config) is None
+        outcome = health._probe_one(config)
+    assert outcome['status'] == 'skipped' and UNREADABLE_AD in outcome['reason']
+    assert UNREADABLE_AD in caplog.text and 'credentials missing' not in caplog.text
+    assert ldap_binds == []
+
+
+def test_ad_domain_sid_read_names_an_unreadable_bind_password(app, ldap_binds, caplog):
+    from services.ad_connector import lookup
+    with app.app_context(), caplog.at_level(logging.WARNING):
+        assert lookup.fetch_domain_sid(_ad_config_with_unreadable_password()) is None
+    assert UNREADABLE_AD in caplog.text
+    assert ldap_binds == []
+
+
+@pytest.mark.parametrize('data,refused', [
+    ({'base_dn': 'DC=corp,DC=example'}, True),
+    ({'enabled': True}, True),
+    ({'bind_password': 'typed-again'}, False),
+    ({'enabled': False}, False),
+], ids=['other-field', 'enable', 'password-typed', 'disable'])
+def test_an_enabled_ad_connector_with_an_unreadable_password_saves_only_a_new_one(
+        app, data, refused):
+    from api.v2.ad_connector import apply_fields
+    config = _ad_config_with_unreadable_password()
+    config.enabled = True
+    token = config._bind_password
+    with app.test_request_context():
+        err = apply_fields(config, data)
+    if refused:
+        response, status = err if isinstance(err, tuple) else (err, err.status_code)
+        assert status == 400
+        assert UNREADABLE_AD in response.get_json()['message']
+        assert token not in response.get_data(as_text=True)
+    else:
+        assert err is None

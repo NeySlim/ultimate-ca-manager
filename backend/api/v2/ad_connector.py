@@ -154,7 +154,11 @@ def apply_fields(config, data):
         db.session.rollback()
         return error_response('bind_dn is required while the connector is enabled', 400)
     if config.enabled and not config.bind_password:
+        # A saved password this node cannot open is named: only typing it again saves
+        unreadable = lookup.unreadable_bind_password(config)
         db.session.rollback()
+        if unreadable:
+            return error_response(unreadable, 400)
         return error_response('bind_password is required while the connector is enabled', 400)
     return None
 

@@ -303,6 +303,15 @@ def has_bind_credentials(config):
     return bool(getattr(config, 'bind_dn', None) and getattr(config, 'bind_password', None))
 
 
+def unreadable_bind_password(config):
+    """The message naming a saved bind password this node cannot open, else None."""
+    try:
+        _bind_password(config)
+    except ADSecretUnreadable as e:
+        return str(e)
+    return None
+
+
 class ADConnectorConnectionError(Exception):
     """Every configured DC refused or failed. Carries the per-server reason
     list so a caller can show *why each one* failed rather than only the
@@ -877,7 +886,13 @@ def fetch_domain_sid(config):
     """``read_domain_sid`` over a fresh bind to the first DC that accepts it; None when
     no DC binds. A save waits for it: no bind starts once the per-DC connect timeout of the
     connection test (``_LDAP_CONNECT_TIMEOUT_SECONDS``) has passed. Never raises."""
-    if not config_servers(config) or not has_bind_credentials(config):
+    if not config_servers(config):
+        return None
+    unreadable = unreadable_bind_password(config)
+    if unreadable:
+        logger.warning('AD Connector: could not bind to read the domain SID: %s', unreadable)
+        return None
+    if not has_bind_credentials(config):
         return None
     token = _bind_deadline.set(_clock() + _LDAP_CONNECT_TIMEOUT_SECONDS)
     try:
