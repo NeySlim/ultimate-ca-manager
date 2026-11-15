@@ -404,3 +404,68 @@ def test_a_kept_unreadable_secret_never_leaves_as_cleartext(auth_client, app, ca
         with app.app_context():
             db.session.delete(db.session.get(HsmProvider, pid))
             db.session.commit()
+
+
+@pytest.fixture
+def ldap_binds(monkeypatch):
+    import ldap3
+    calls = []
+
+    def connection(*args, **kwargs):
+        calls.append(kwargs)
+        raise AssertionError('no bind may be attempted')
+
+    monkeypatch.setattr(ldap3, 'Connection', connection)
+    return calls
+
+
+def _ldap_provider():
+    from models.sso import SSOProvider
+    row = SSOProvider(id=21, name='ldap', provider_type='ldap', ldap_server='ldap.invalid',
+                      ldap_port=389, ldap_use_ssl=False, ldap_bind_dn='cn=svc,dc=example',
+                      ldap_base_dn='dc=example', ldap_user_filter='(uid={username})')
+    row._ldap_bind_password = _foreign_token()
+    return row
+
+
+def test_ldap_login_with_an_unreadable_bind_password_binds_nothing(app, ldap_binds, caplog):
+    # ldap3 binds anonymously when the password is missing: no bind at all instead
+    from api.v2.sso.connection_tests import _ldap_authenticate_user
+    with app.app_context():
+        user, error = _ldap_authenticate_user(_ldap_provider(), 'alice', 'pw')
+    assert user is None and error == 'LDAP authentication failed'
+    assert ldap_binds == []
+    assert 'SSO provider 21 LDAP bind password cannot be decrypted' in caplog.text
+
+
+def test_ldap_connection_test_with_an_unreadable_bind_password_names_it(app, ldap_binds):
+    from api.v2.sso.connection_tests import _test_ldap_connection
+    with app.test_request_context():
+        response = _test_ldap_connection(_ldap_provider())
+    response = response[0] if isinstance(response, tuple) else response
+    assert ldap_binds == []
+    assert 'SSO provider 21 LDAP bind password cannot be decrypted' in response.get_json()['message']
+
+
+def test_ad_connector_with_an_unreadable_bind_password_binds_nothing(app, ldap_binds):
+    from models.ad_connector import ADConnectorConfig
+    from services.ad_connector import lookup
+    config = ADConnectorConfig(id=22, name='ad', server='dc.invalid', port=389, use_ssl=False,
+                         verify_ssl=True, base_dn='dc=example', bind_dn='cn=svc,dc=example')
+    config._bind_password = _foreign_token()
+    with app.app_context():
+        with pytest.raises(ValueError, match='AD connector 22 bind password cannot be decrypted'):
+            lookup._connect(config)
+        with pytest.raises(SecretUnreadable, match='AD connector 22 bind password'):
+            lookup._connect_to(config, 'dc.invalid', None)
+    assert ldap_binds == []
+
+
+def test_intune_with_an_unreadable_client_secret_names_it(app):
+    from models.scep import IntuneApp, ScepProfile
+    from services.scep import intune_client
+    profile = ScepProfile(name='p', intune_enabled=True)
+    profile.intune_app = IntuneApp(id=23, name='entra', tenant_id='t', client_id='c',
+                                   client_secret=_foreign_token())
+    with app.app_context(), pytest.raises(SecretUnreadable, match='Intune app 23 client secret'):
+        intune_client.client_for_profile(profile)
