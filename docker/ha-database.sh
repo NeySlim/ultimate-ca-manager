@@ -137,25 +137,17 @@ ucm_sqlite_disk_room() {
     return 0
 }
 
-# True when DATABASE_URL points the application away from the SQLite file at UCM_DATABASE_PATH:
-# any PostgreSQL URL (utils/db_url.is_postgres_url), another scheme, or another SQLite file.
-# An sqlite:/// URL on that same file leaves it in use.
+# True only for a PostgreSQL DATABASE_URL (the forms of utils/db_url.is_postgres_url). Any other
+# value may still name the SQLite file, and its spelling is not parsed here: the file is checked.
 _ucm_database_url_elsewhere() {
-    local url=${DATABASE_URL:-} path
-    [ -z "$url" ] && return 1
-    case "$url" in
-        sqlite:///*)
-            path=${url#sqlite:///}
-            path=${path%%\?*}
-            [ "$path" -ef "$UCM_DATABASE_PATH" ] && return 1
-            [ "/$path" -ef "$UCM_DATABASE_PATH" ] && return 1
-            return 0 ;;
-        *) return 0 ;;
+    case "${DATABASE_URL:-}" in
+        postgresql://*|postgres://*|postgresql+*) return 0 ;;
+        *) return 1 ;;
     esac
 }
 
-# First-run notice and pre-start copy of the SQLite file; both skipped in HA mode. A SQLite file
-# the application does not open (DATABASE_URL elsewhere) is neither checked nor copied.
+# First-run notice and pre-start copy of the SQLite file; both skipped in HA mode. With a PostgreSQL
+# DATABASE_URL the SQLite file is neither checked nor copied.
 ucm_sqlite_check_and_backup() {
     if ucm_ha_active; then
         echo -e "${GREEN:-}✅ HA mode: database is PostgreSQL, no SQLite backup${NC:-}"

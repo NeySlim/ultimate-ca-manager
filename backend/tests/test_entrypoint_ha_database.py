@@ -343,7 +343,7 @@ def test_the_copy_lands_in_the_measured_backups_directory(tmp_path):
 
 
 @pytest.mark.parametrize('url', ['postgresql://ucm@db/ucm', 'postgres://ucm@db/ucm', 'postgresql+psycopg2://ucm@db/ucm',
-                                 'sqlite:////elsewhere/other.db'])
+                                 'postgresql+psycopg://ucm@db/ucm'])
 def test_a_database_url_leaves_the_sqlite_file_unchecked_and_uncopied(tmp_path, url):
     # the application opens DATABASE_URL whenever it is set, never DATABASE_PATH
     env = _env(tmp_path, 'true')
@@ -352,6 +352,20 @@ def test_a_database_url_leaves_the_sqlite_file_unchecked_and_uncopied(tmp_path, 
     r = _run(_df(0) + _START, env, tmp_path)
     assert r.returncode == 0 and 'cp ' not in r.stdout and 'Not enough' not in r.stdout, r.stdout
     assert 'DATABASE_URL' in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize('form', ['sqlite:///{p}', 'sqlite:////{p}', 'sqlite+pysqlite:///{p}',
+                                  'sqlite:///file:{p}?uri=true', 'sqlite:////elsewhere/other.db',
+                                  'sqlite:///relative/ucm.db', 'mysql://u@h/d'])
+def test_any_other_database_url_still_checks_and_copies_the_sqlite_file(tmp_path, form):
+    # only a PostgreSQL URL is certain to leave the file alone; no other URL is parsed
+    env = _env(tmp_path, 'true')
+    env['DATABASE_URL'] = form.format(p=env['UCM_DATABASE_PATH'])
+    _database(tmp_path, NAMES)
+    r = _run(_df(2999) + _START, env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout and 'Not enough' in r.stdout, r.stdout
+    r = _run(_df(3000) + _START, env, tmp_path)
+    assert r.returncode == 0 and 'cp ' in r.stdout and 'not used' not in r.stdout, r.stdout
 
 
 def test_an_empty_database_url_still_checks_and_copies_the_sqlite_file(tmp_path):
