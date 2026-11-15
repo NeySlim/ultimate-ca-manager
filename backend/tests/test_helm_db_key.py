@@ -113,3 +113,9 @@ def test_secret_checksum_does_not_change_from_install_to_first_upgrade(tmp_path,
 
 def test_secret_checksum_follows_a_value_the_operator_sets():
     assert _checksum(_docs('--set', 'secrets.secretKey=a')) != _checksum(_docs('--set', 'secrets.secretKey=b'))
+
+
+
+def test_ha_release_notes_say_to_back_up_the_database_key(tmp_path):
+    from tests.test_helm_initial_admin_password import _notes
+    assert 'UCM_DB_ENCRYPTION_KEY' in _notes(tmp_path, *HA)
