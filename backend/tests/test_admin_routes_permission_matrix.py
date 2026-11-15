@@ -10,6 +10,9 @@ A probe never runs the route itself. The function behind ``require_auth`` is
 swapped for a recorder, so a refusal is proven to stop before the view body
 (nothing it does can have happened) and a grant is proven to reach it, without
 ever rotating a key, resetting the database or installing an update.
+
+Because the probe replaces the view body, a scope check made INSIDE a view
+(for example in `api/v2/system/service.py`) is not covered by this grid.
 """
 import contextlib
 import json
