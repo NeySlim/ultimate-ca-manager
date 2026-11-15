@@ -114,6 +114,23 @@ def _bound_spki():
     return out
 
 
+def taken_key_ids():
+    """Ids of the bound key rows and of every other row naming the same token key (same public key)."""
+    spkis = _bound_spki()
+    taken = bound_key_ids()
+    if not spkis:
+        return taken
+    wanted = set(spkis.values())
+    for row in HsmKey.query.filter(HsmKey.id.notin_(taken), HsmKey.public_key_pem.isnot(None)):
+        pem = row.public_key_pem
+        try:
+            if _spki(serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)) in wanted:
+                taken.add(row.id)
+        except ValueError:
+            continue
+    return taken
+
+
 def shared_token_keys():
     """{(key id, key id): (holder, holder)} for two bound key rows naming one token key (same public key)."""
     by_spki = {}

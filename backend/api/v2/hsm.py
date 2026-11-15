@@ -434,8 +434,8 @@ def list_keys():
     keys = HsmService.list_keys(provider_id=provider_id)
 
     if unused:
-        # Signing-capable asymmetric keys no X.509 or SSH CA holds yet
-        bound_ids = key_binding.bound_key_ids()
+        # Signing-capable asymmetric keys no X.509 or SSH CA holds yet, through this row or another
+        bound_ids = key_binding.taken_key_ids()
         keys = [
             k for k in keys
             if k.get('id') not in bound_ids

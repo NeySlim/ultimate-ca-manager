@@ -4517,7 +4517,7 @@ GET /api/v2/hsm/keys?provider_id=1
 GET /api/v2/hsm/keys?unused=true
 ```
 
-`unused=true` keeps the asymmetric signing keys no X.509 or SSH CA holds.
+`unused=true` keeps the asymmetric signing keys no X.509 or SSH CA holds, through that key row or another row with the same public key (the same token key under a second provider).
 
 ### Create HSM Key
 ```http

@@ -204,6 +204,16 @@ class TestOneKeyOneAuthority:
         listed = {k['id'] for k in auth_client.get('/api/v2/hsm/keys?unused=true').get_json()['data']}
         assert free['key'] in listed and held['key'] not in listed
 
+    @pytest.mark.parametrize('holder', ['ssh', 'x509'])
+    def test_unused_keys_leave_out_another_row_of_a_bound_token_key(self, auth_client, token_key, holder):
+        real = ec.generate_private_key(ec.SECP256R1())
+        held, twin, free = token_key(real=real), token_key(real=real), token_key()
+        r = _ssh_ca(auth_client, held['key']) if holder == 'ssh' else _x509_ca(auth_client, held['key'])[1]
+        assert r.status_code == 201, r.data
+        listed = {k['id'] for k in auth_client.get('/api/v2/hsm/keys?unused=true').get_json()['data']}
+        assert free['key'] in listed
+        assert held['key'] not in listed and twin['key'] not in listed
+
 
 def _row_writable_elsewhere(key_id):
     """True when another connection can write the key row at once: no lock is held on it."""
