@@ -17,7 +17,7 @@ INDEXES = ("CREATE INDEX IF NOT EXISTS ix_file_removals_generation ON file_remov
 
 def upgrade(conn):
     if isinstance(conn, sqlite3.Connection):
-        conn.execute(DDL.format(pk='INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT'))
+        conn.execute(DDL.format(pk='INTEGER NOT NULL PRIMARY KEY'))
         for statement in INDEXES:
             conn.execute(statement)
         conn.commit()
