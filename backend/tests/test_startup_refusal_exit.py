@@ -1,5 +1,5 @@
-"""A database this release refuses stops the service with exit 78, which the one systemd
-unit both packages install does not restart; any other failure keeps restarting it.
+"""A database this release refuses, or an upgrade that fails, stops the service with exit 78,
+which the one systemd unit both packages install does not restart; a failure once running does.
 The PostgreSQL case needs UCM_TEST_PG_URL."""
 import configparser
 import os
@@ -40,6 +40,26 @@ def test_each_refusal_of_the_runner_is_the_refusal_that_exits_78(dialect, case, 
             _occupied(monkeypatch, db)
         with pytest.raises(startup_refusal.DatabaseRefused):
             startup_refusal.migrate_or_refuse(_no_lock)
+
+
+def test_a_migration_step_that_raises_stops_the_service_with_78_too(tmp_path, monkeypatch, capsys):
+    """Deterministic, and half applied: a restart would only replay it, so the unit leaves it failed."""
+    import types
+
+    def broken(path):
+        module = types.ModuleType(path.stem)
+
+        def upgrade(conn):
+            raise RuntimeError('step failed here')
+        module.upgrade = upgrade
+        return module
+
+    for db in make_base('sqlite', tmp_path, monkeypatch, 'step'):
+        db._route()
+        monkeypatch.setattr(migration_runner, '_load_module', broken)
+        with pytest.raises(startup_refusal.DatabaseRefused):
+            startup_refusal.migrate_or_refuse(_no_lock)
+    assert 'step failed here' in capsys.readouterr().out
 
 
 def test_a_database_out_of_reach_is_not_a_refusal(monkeypatch):
