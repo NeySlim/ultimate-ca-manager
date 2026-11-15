@@ -663,11 +663,13 @@ def inventory_sync(msca_id):
     try:
         summary = MicrosoftCAService.inventory_sync(msca_id, username=_actor(), full=full)
         _audit('msca.inventory_sync', msca,
-               f"imported={summary['imported']} skipped={summary['skipped']} "
+               f"imported={summary['imported']} completed={summary['completed']} "
+               f"denied={summary['denied']} skipped={summary['skipped']} "
                f"failed={summary['failed']} full={full}")
         return success_response(
             data=summary,
-            message=f"Inventory sync complete: {summary['imported']} certificate(s) imported"
+            message=(f"Inventory sync complete: {summary['imported']} certificate(s) imported, "
+                    f"{summary['completed']} pending request(s) completed")
         )
     except MSCAAdminChannelError as e:
         _audit('msca.inventory_sync', msca, f"error={e}", success=False)

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # certutil disposition codes.
 _DISPOSITION_ISSUED = 20
 _DISPOSITION_REVOKED = 21
+_DISPOSITION_DENIED = 31
 
 # certutil -view input column names (English; the CSV *header* is localized so
 # we parse strictly by position, never by header text).
@@ -48,6 +49,10 @@ class MicrosoftCAInventoryMixin:
             raise MSCAAdminChannelError('WinRM admin channel is not configured')
 
         start_id = 0 if full else (msca.last_synced_request_id or 0)
+        # Pending requests may sit below the high-water mark: scan from the oldest
+        pending = MicrosoftCAInventoryMixin._pending_requests(msca)
+        if pending:
+            start_id = min(start_id, min(pending))
 
         try:
             rows = MicrosoftCAInventoryMixin._list_issued(msca, start_id)
@@ -60,7 +65,8 @@ class MicrosoftCAInventoryMixin:
                 db.session.rollback()
             raise
 
-        imported, skipped, failed = [], 0, 0
+        imported, skipped, failed, completed = [], 0, 0, 0
+        completed_ids = set()
         max_request_id = start_id
 
         # Preload known serials (as ints) and CA request ids so dedup is O(1)
@@ -72,6 +78,26 @@ class MicrosoftCAInventoryMixin:
             req_id, serial, template, cn = row
             max_request_id = max(max_request_id, req_id)
 
+            # A request UCM submitted that the CA now shows issued: finish it
+            if req_id in pending:
+                try:
+                    pem = MicrosoftCAInventoryMixin._fetch_cert_pem(msca, req_id)
+                    if not pem:
+                        failed += 1
+                        continue
+                    from .ca_control import MicrosoftCACAControlMixin
+                    if MicrosoftCACAControlMixin.complete_request(msca, pending[req_id], pem):
+                        completed += 1
+                        completed_ids.add(req_id)
+                    else:
+                        skipped += 1
+                except Exception as e:
+                    db.session.rollback()
+                    failed += 1
+                    logger.warning(
+                        f"MS CA '{msca.name}' inventory: failed to complete RequestId={req_id}: {e}"
+                    )
+                continue
             # Dedup level 1: this CA RequestId is already tracked by UCM
             # (exact link — covers certs signed through UCM itself).
             if req_id in known_request_ids:
@@ -109,10 +135,14 @@ class MicrosoftCAInventoryMixin:
                     f"MS CA '{msca.name}' inventory: failed to import RequestId={req_id}: {e}"
                 )
 
+        denied = MicrosoftCAInventoryMixin._deny_refused(
+            msca, {r: q for r, q in pending.items() if r not in completed_ids})
+
         msca.last_synced_request_id = max(msca.last_synced_request_id or 0, max_request_id)
         msca.last_inventory_sync_at = utc_now()
         msca.last_inventory_sync_result = (
-            f"success: {len(imported)} imported, {skipped} known, {failed} failed"
+            f"success: {len(imported)} imported, {completed} completed, {denied} denied, "
+            f"{skipped} known, {failed} failed"
         )
 
         try:
@@ -132,8 +162,8 @@ class MicrosoftCAInventoryMixin:
             resource_type='microsoft_ca',
             resource_id=msca.id,
             resource_name=msca.name,
-            details=(f"Inventory sync: {len(imported)} imported, "
-                     f"{skipped} known, {failed} failed "
+            details=(f"Inventory sync: {len(imported)} imported, {completed} completed, "
+                     f"{denied} denied, {skipped} known, {failed} failed "
                      f"(up to RequestId {max_request_id})"),
             success=True,
             username=username,
@@ -146,6 +176,8 @@ class MicrosoftCAInventoryMixin:
         return {
             'status': 'success',
             'imported': len(imported),
+            'completed': completed,
+            'denied': denied,
             'skipped': skipped,
             'failed': failed,
             'last_request_id': msca.last_synced_request_id,
@@ -311,6 +343,42 @@ class MicrosoftCAInventoryMixin:
         return ints
 
     @staticmethod
+    def _pending_requests(msca):
+        """{CA RequestId: MSCARequest} of UCM requests still awaiting the CA."""
+        return {
+            r.request_id: r for r in
+            MSCARequest.query.filter(MSCARequest.msca_id == msca.id,
+                                     MSCARequest.status == 'pending',
+                                     MSCARequest.cert_id.is_(None),
+                                     MSCARequest.request_id.isnot(None))
+            .order_by(MSCARequest.id).all()
+        }
+
+    @staticmethod
+    def _deny_refused(msca, waiting):
+        """Mark the waiting requests the CA shows denied; returns how many."""
+        if not waiting:
+            return 0
+        from .admin_channel import MicrosoftCAAdminChannelMixin
+        try:
+            config = MicrosoftCAAdminChannelMixin._config_arg(msca)
+            restrict = f"Disposition={_DISPOSITION_DENIED},RequestId>={min(waiting)}"
+            out = MicrosoftCAAdminChannelMixin._run_ps(msca, (
+                "$ErrorActionPreference='Stop';chcp 65001 | Out-Null;"
+                f'certutil {config}-view -restrict "{restrict}" -out "{_VIEW_COLUMNS}" csv'))
+            refused = {row[0] for row in MicrosoftCAInventoryMixin._parse_view_csv(out)}
+        except Exception as e:
+            logger.warning(f"MS CA '{msca.name}' inventory: denied-request lookup failed: {e}")
+            return 0
+        count = 0
+        for rid, req in waiting.items():
+            if rid in refused:
+                req.status = 'denied'
+                req.error_message = 'Denied on the CA'
+                count += 1
+        return count
+
+    @staticmethod
     def _known_request_ids(msca):
         """CA-side RequestIds already tracked by UCM for this connection."""
         return {
@@ -374,7 +442,8 @@ def scheduled_msca_inventory_sync():
             summary = MicrosoftCAInventoryMixin.inventory_sync(msca.id, username='scheduler')
             logger.info(
                 f"MS CA '{msca.name}' scheduled inventory sync: "
-                f"{summary['imported']} imported, {summary['skipped']} known"
+                f"{summary['imported']} imported, {summary['completed']} completed, "
+                f"{summary['skipped']} known"
             )
         except Exception as e:
             logger.error(f"MS CA '{msca.name}' scheduled inventory sync failed: {e}")
