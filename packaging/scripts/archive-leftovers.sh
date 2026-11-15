@@ -109,8 +109,8 @@ whole_step() {
     case $1 in *"$TAB"*"$TAB"*"$TAB"*) return 1 ;; esac
     case $1 in
         rename"$TAB"/*"$TAB"/*|mkdir"$TAB"/*"$TAB"/*|fips"$TAB"/*"$TAB"/*) return 0 ;;
-        failed"$TAB"*"$TAB"*) return 1 ;;
-        failed"$TAB"/*) return 0 ;;
+        failed"$TAB"*"$TAB"*|mount"$TAB"*"$TAB"*) return 1 ;;
+        failed"$TAB"/*|mount"$TAB"/*) return 0 ;;
     esac
     return 1
 }
@@ -162,12 +162,16 @@ is_kept() {
     return 1
 }
 
+# A mount line, before anything under mount point $1 moves: a put-back that finds it
+# unmounted (its mount point left empty) touches nothing under it
+note_mount() { ! is_mount "$1" || jot "mount$TAB$1"; }
+
 # Archives the contents of directory $1, which stays, into $2 (created here). A kept
 # directory or a mount point is never moved itself: its contents are, the same way. A
 # local archive an earlier run left is not an item: it stays, and the README names it.
 archive_contents() {
     odd_names "$1"
-    { jot "mkdir$TAB$1$TAB$2" && make_dir "$2"; } || return 1
+    { note_mount "$1" && jot "mkdir$TAB$1$TAB$2" && make_dir "$2"; } || return 1
     for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
         present "$entry" || continue
         case ${entry##*/} in "$LOCAL_PREFIX"*) EARLIER=$EARLIER$entry$NL; continue ;; esac
@@ -225,6 +229,14 @@ lost_under() {
         | while IFS= read -r d; do [ -d "$d" ] || { printf '%s\n' "$d"; break; }; done
 }
 
+# The mount point a mount line names, not mounted now, that holds path $1
+unmounted_at() {
+    printf '%s\n' "$unmounted" | while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        case $1 in "$d"|"${d%/}"/*) printf '%s\n' "$d"; break ;; esac
+    done
+}
+
 # The paths not put back or cleared, then what the next attempt does with them
 say_stuck() {
     say "Some files could not be put back or cleared (archive: $DEST):"
@@ -263,10 +275,27 @@ roll_back() {
     done <<EOF
 $lines
 EOF
+    # A mount point the archiving met, not mounted now, hides what it held: nothing under
+    # it is put back, removed or called missing, and the journal stays, until it is mounted
+    unmounted=$(printf '%s\n' "$lines" | sed -n "s/^mount$TAB//p" | while IFS= read -r d; do
+        is_mount "$d" || printf '%s\n' "$d"; done)
+    while IFS= read -r d; do
+        [ -z "$d" ] || left=1 stuck="$stuck
+  $d: not mounted: mount it again, then retry; nothing under it was put back or called missing"
+    done <<EOF
+$unmounted
+EOF
     undo=$(printf '%s\n' "$lines" | sed -n '1!G;h;$p')
     while IFS="$TAB" read -r op src dst; do
         case $op in
             rename)
+                gone=$(unmounted_at "$src")
+                [ -n "$gone" ] || gone=$(unmounted_at "$dst")
+                if [ -n "$gone" ]; then
+                    present "$dst" && stuck="$stuck
+  $dst: not put back to $src, as $gone is not mounted"
+                    continue
+                fi
                 # The directory of either side absent is a filesystem not mounted (a line
                 # written before its rename ran, too): nothing there is named lost or touched
                 absent=""
@@ -297,6 +326,7 @@ EOF
                     fi
                 fi ;;
             fips)
+                [ -z "$(unmounted_at "$src")$(unmounted_at "$dst")" ] || continue
                 # The new ucm.env goes while the archived one can take its place, once: the
                 # line goes too, or an old ucm.env put back since could pass for the new one
                 gone=""
@@ -310,6 +340,7 @@ EOF
             mkdir)
                 # Kept, not named, when it holds a path named already, there or not: removing
                 # it would lose that one, or read as not mounted at the next attempt
+                [ -z "$(unmounted_at "$dst")" ] || continue
                 if [ -d "$dst" ]; then holds_stuck "$dst" || rmdir -- "$dst" 2>/dev/null \
                     || unsettled "$dst" "could not be removed"; fi ;;
         esac
@@ -608,7 +639,7 @@ case $(normal "$DB_FILE") in
     "$(normal "$DATA")"/*|"$(normal "$CONFIG")"/*) ;;
     *)  # A database in / is named there by "/", as a journal line has no empty field
         DB_DIR=${DB_FILE%/*}
-        { jot "mkdir$TAB${DB_DIR:-/}$TAB$DEST/database" && make_dir "$DEST/database"; } \
+        { note_mount "${DB_DIR:-/}" && jot "mkdir$TAB${DB_DIR:-/}$TAB$DEST/database" && make_dir "$DEST/database"; } \
             || fail "creating $DEST/database"
         for f in "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$DB_FILE-journal"; do
             [ -e "$f" ] || continue

@@ -40,8 +40,12 @@ SEED, PAIRS = 20261114, 120
 
 def _chaos(box, layout, refused=()):
     """Every file command counts its calls in one sequence and names them; the plan fails,
-    kills, or kills right after the calls it names."""
-    box.wrap(refused=refused, **LAYOUTS[layout](box))
+    kills, or kills right after the calls it names. A database placed outside the data is
+    on a filesystem of its own."""
+    wrap = LAYOUTS[layout](box)
+    if box.outside is not None:
+        wrap['other_fs'] = (*wrap.get('other_fs', ()), box.outside)
+    box.wrap(refused=refused, **wrap)
     s = box.state
     for name in CHAOS:
         # Builtins only up to the command the wrapper ran: a run makes hundreds of these calls
@@ -68,10 +72,13 @@ def _chaos_run(box, plan=()):
     return out, int((box.state / 'count').read_text())
 
 
-def _chaos_box(tmp_path, layout, env='full', refused=False):
+def _chaos_box(tmp_path, layout, env='full', refused=False, outside=False):
     """env 'full': the ucm.env of an install, with UCM_FIPS_BUILD=1; 'fips only': that
-    line alone, the very file the new configuration is. refused: a file nothing renames."""
+    line alone, the very file the new configuration is. refused: a file nothing renames.
+    outside: DATABASE_PATH places the database outside the data, on a mount of its own."""
     box = Box(tmp_path, python='stub')
+    if outside:
+        box.place_database_outside()
     path = box.config / 'ucm.env'
     path.write_text(FIPS if env == 'fips only' else path.read_text() + FIPS)
     _chaos(box, layout, refused=(f'{box.data}/https_key.pem',) if refused else ())
@@ -127,8 +134,8 @@ class Lab:
     from the state its first run left, saved once: the runs that open each scenario
     ('fault at call i') are the same across the tests of a layout."""
 
-    def __init__(self, root, layout, env='full', refused=False):
-        self.root, self.layout, self.env, self.refused = root, layout, env, refused
+    def __init__(self, root, layout, env='full', refused=False, outside=False):
+        self.root, self.layout, self.env, self.refused, self.outside = root, layout, env, refused, outside
         self.first = {}
         self.n = 0
 
@@ -136,7 +143,7 @@ class Lab:
         key = tuple(plan)
         if key not in self.first:
             self.n += 1
-            box, data, config = _chaos_box(self.root / f'b{self.n}', self.layout, self.env, self.refused)
+            box, data, config = _chaos_box(self.root / f'b{self.n}', self.layout, self.env, self.refused, self.outside)
             before = snapshot(box)
             run = Run(box, *_chaos_run(box, plan))
             saved = self.root / f's{self.n}'
@@ -200,6 +207,10 @@ class ChaosSuite:
     @pytest.fixture(scope='class')
     def lab(self, tmp_path_factory):
         return Lab(tmp_path_factory.mktemp('lab'), self.layout, self.env)
+
+    @pytest.fixture(scope='class')
+    def outside_lab(self, tmp_path_factory):
+        return Lab(tmp_path_factory.mktemp('outside'), self.layout, self.env, outside=True)
 
     def _scenario(self, lab, first, second=None):
         """`first` = (call, mode) of the archiving run; `second` = (call, mode) of the same
@@ -363,6 +374,40 @@ class ChaosSuite:
 
     def test_a_retry_waits_for_an_empty_mount_point_then_converges_after_any_fault(self, lab):
         self._absent_data_then_any_fault(lab, empty=True)
+
+    def test_a_retry_waits_for_a_database_outside_left_unmounted_then_converges_after_any_fault(self, outside_lab):
+        """The database on a mount of its own, killed once the journal names its first rename,
+        before it ran; then unmounted, its mount point left empty: each attempt exits 2, says to
+        mount it, calls nothing missing, removes no line, writes nothing there. Mounted again,
+        each call of the next attempt fails, or kills it, in turn; then a run without fault."""
+        lab = outside_lab
+        kill = [n for n, name, args in lab.first_run().calls
+                if step(name, args) == 'rename' and args[3].endswith('/srv/db/pki.db')][0]
+
+        def unmounted(box):
+            aside = box.unmount(box.outside)
+            journal = box.archive / '.journal'
+            lines = set(journal.read_text().splitlines())
+            out = Run(box, *_chaos_run(box)).out
+            assert out.returncode == 2 and 'is missing' not in out.stdout, (self.layout, out.stdout)
+            assert f'{box.outside}: not mounted: mount it again' in out.stdout, (self.layout, out.stdout)
+            assert lines <= set(journal.read_text().splitlines()), self.layout
+            assert list(box.outside.iterdir()) == [], self.layout
+            box.remount(box.outside, aside)
+
+        box = lab._first([(kill, 'kill')])[0]
+        unmounted(box)
+        unmounted(box)
+        calls = Run(box, *_chaos_run(box)).count
+        assert calls > 20
+        for at in range(1, calls + 1):
+            for mode in FAULTS:
+                why = (self.layout, 'outside unmounted', at, mode)
+                box, data, config, before, _run = lab._first([(kill, 'kill')])
+                unmounted(box)
+                run = Run(box, *_chaos_run(box, [(at, mode)]))
+                while_failing(box, run.out, before, data, config, why)
+                converged(box, Run(box, *_chaos_run(box)).out, data, config, why)
 
     def test_only_the_journal_is_ever_moved_and_nothing_copied(self, lab):
         """cp never runs; mv only renames the journal into place (the guard of Box fails any

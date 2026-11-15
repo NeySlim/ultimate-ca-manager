@@ -175,14 +175,32 @@ class Box:
                 check = (f'n=$(( $(cat {self.state}/count) + 1 )); echo $n > {self.state}/count\n'
                          f'[ "$n" != {at} ] || {{ echo "{name}: injected failure" >&2; exit 1; }}\n')
             (self.bin / name).write_text(f'#!/bin/sh\n{check}exec {self.real(name)} "$@"\n')
-        # Asked for the target only: the mount holding a path
-        table = ''.join(f'    "{p}"|"{p}"/*) echo "{p}"; exit 0 ;;\n' for p in mounts)
-        (self.bin / 'findmnt').write_text(
-            f'#!/bin/sh\nfor last; do :; done\ncase $last in\n{table}esac\necho /\n')
+        self.mounts = mounts
+        self._findmnt(mounts)
         (self.bin / 'date').write_text(
             f'#!/bin/sh\ncase "$*" in *%Y%m%dT*) echo {STAMP} ;; *) exec {shutil.which("date")} "$@" ;; esac\n')
         for f in self.bin.iterdir():
             f.chmod(0o755)
+
+    def _findmnt(self, mounts):
+        """Asked for the target only: the mount holding a path."""
+        table = ''.join(f'    "{p}"|"{p}"/*) echo "{p}"; exit 0 ;;\n' for p in mounts)
+        (self.bin / 'findmnt').write_text(
+            f'#!/bin/sh\nfor last; do :; done\ncase $last in\n{table}esac\necho /\n')
+        (self.bin / 'findmnt').chmod(0o755)
+
+    def unmount(self, path):
+        """The filesystem mounted at `path` goes (set aside), its mount point left empty."""
+        aside = self.tmp / f'unmounted-{path.name}'
+        os.rename(path, aside)
+        path.mkdir()
+        self._findmnt([p for p in self.mounts if p != path])
+        return aside
+
+    def remount(self, path, aside):
+        path.rmdir()
+        os.rename(aside, path)
+        self._findmnt(self.mounts)
 
     def real(self, name):
         """What a wrapper of `name` runs in the end: the guard for cp, mv, rm and rename."""
@@ -1638,15 +1656,67 @@ def test_without_a_local_archive_the_readme_says_every_file_is_unchanged(tmp_pat
     assert 'belongs to root' not in flat
 
 
-def _killed_before_renaming(box, name, **wrap):
-    """The run is killed once the journal names the rename of data/<name>, before it runs."""
+def _killed_before_renaming(box, name, top=None, **wrap):
+    """The run is killed once the journal names the rename of <top or data>/<name>, before it runs."""
+    src = (top or box.data) / name
     box.wrap(**wrap)
     (box.bin / 'rename').write_text(
-        f'#!/bin/sh\n[ "$4" != {box.data}/{name} ] || kill -9 0\nexec {box.inner}/rename "$@"\n')
+        f'#!/bin/sh\n[ "$4" != {src} ] || kill -9 0\nexec {box.inner}/rename "$@"\n')
     out = box.run()
     assert out.returncode == -9, (out.stdout, out.stderr)
-    assert os.path.lexists(box.data / name)
+    assert os.path.lexists(src)
     box.wrap(**wrap)
+
+
+@pytest.mark.parametrize('item', ['pki.db', 'pki.db-wal'])
+@pytest.mark.parametrize('layout', ['another filesystem', 'a bind mount'])
+def test_a_database_outside_whose_mount_point_is_left_empty_waits_for_it(tmp_path, layout, item):
+    """DATABASE_PATH outside the data, on a mount of its own; killed once the journal names
+    the rename of the database (or of its -wal), then unmounted, its mount point left empty:
+    each attempt exits 2, says to mount it, calls nothing missing, removes no line, writes
+    nothing there; mounted again, the next attempt archives everything."""
+    box = Box(tmp_path, python='stub')
+    outside = box.place_database_outside()
+    wrap = {'other_fs' if layout == 'another filesystem' else 'other_mount': (outside,)}
+    data, config = originals(box)
+    _killed_before_renaming(box, item, top=outside, **wrap)
+    journal = box.archive / '.journal'
+    lines = set(journal.read_text().splitlines())
+    assert f'mount\t{outside}' in lines
+    aside = box.unmount(outside)
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 2, (out.stdout, out.stderr)
+        assert 'is missing' not in out.stdout and 'back in place now' not in out.stdout, out.stdout
+        assert reported(out.stdout)[str(outside)].startswith('not mounted: mount it again, then retry'), out.stdout
+        assert lines <= set(journal.read_text().splitlines())
+        assert list(outside.iterdir()) == []
+    box.remount(outside, aside)
+    out = box.run()
+    assert 'is missing' not in out.stdout, out.stdout
+    archived(box, out, data, config)
+
+
+def test_a_journal_without_mount_lines_keeps_reading_an_empty_kept_tree_as_not_mounted(tmp_path):
+    """A journal an earlier release wrote names no mount point: it is still read, and data
+    left as an empty mount point is still told by its kept directories, absent."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    _killed_before_renaming(box, 'https_key.pem', other_fs=(box.data,))
+    journal = box.archive / '.journal'
+    text = journal.read_text()
+    assert f'mount\t{box.data}\n' in text
+    journal.write_text(''.join(l for l in text.splitlines(True) if not l.startswith('mount\t')))
+    lines = set(journal.read_text().splitlines())
+    aside = box.unmount(box.data)
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert 'is missing' not in out.stdout and 'not mounted' not in out.stdout, out.stdout
+    assert 'is absent: mount what holds it' in out.stdout, out.stdout
+    assert lines <= set(journal.read_text().splitlines())
+    assert list(box.data.iterdir()) == []
+    box.remount(box.data, aside)
+    archived(box, box.run(), data, config)
 
 
 @pytest.mark.parametrize('unmounted', ['gone', 'an empty mount point'])
