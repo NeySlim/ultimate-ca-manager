@@ -157,3 +157,12 @@ def test_the_sync_endpoint_and_scheduler_report_completed(app, auth_client, ca):
     body = r.get_json()
     assert body['data']['completed'] == 1
     assert 'completed' in body['message']
+
+
+def test_a_request_that_is_not_pending_is_left_alone(app, ca):
+    msca_id = _make_msca(app, 'PC failed')
+    ca.add(21, 'pc-failed.test.local')
+    req_id, _ = _pending(app, msca_id, 21, 'pc-failed.test.local', status='failed')
+    s = _sync(app, msca_id)
+    assert (s['completed'], s['skipped']) == (0, 1)
+    assert _req(app, req_id)[:2] == ('failed', None)
