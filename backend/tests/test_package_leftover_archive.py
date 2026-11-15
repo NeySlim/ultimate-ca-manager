@@ -1221,3 +1221,23 @@ def test_an_item_removed_by_hand_is_named_and_never_said_to_be_back(tmp_path):
     assert 'are in place again.' not in out.stdout, out.stdout
     assert ('everything else it could not put back is in place again; at neither path:\n'
             f'  {box.data}/https_key.pem\n') in out.stdout, out.stdout
+
+
+# -- names the journal cannot hold ---------------------------------------------------
+
+@pytest.mark.parametrize('name, shown', [('a\tb', 'a<tab>b'), ('a\nb', 'a<newline>b')])
+@pytest.mark.parametrize('where', ['data', 'nested', 'config'])
+def test_a_name_with_a_tab_or_a_line_break_is_refused_before_anything_moves(tmp_path, name, shown, where):
+    """A journal line cannot hold it: the run stops before the first rename, exit 1, and
+    names the entry readably."""
+    box = Box(tmp_path, python='stub')
+    top = {'data': box.data, 'nested': box.data / 'updates' / 'nested', 'config': box.config}[where]
+    (top / name).write_text('x')
+    box.wrap()
+    before = snapshot(box)
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert f'{top}/{shown}' in out.stdout, out.stdout
+    assert 'Nothing was moved' in out.stdout and 'was not started' in out.stdout
+    assert snapshot(box) == before
+    assert not box.parent.exists() or not any(box.parent.iterdir())

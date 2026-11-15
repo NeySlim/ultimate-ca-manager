@@ -468,6 +468,13 @@ fail() {
     say "The installation stops here: nothing else is written, and UCM was not started."
     exit "$rc"
 }
+# A journal line cannot hold a tab or a line break: such a name stops the run before
+# anything moves (an earlier local archive is not archived, so not walked)
+odd=$({ printf '%s\n' "$DB_FILE" | grep -q "$TAB" && printf '%s' "$DB_FILE"; } \
+    || find "$DATA" "$CONFIG" -name "$LOCAL_PREFIX*" -prune -o \( -name "*$TAB*" -o -name "*$NL*" \) \
+        -print -quit 2>/dev/null)
+[ -z "$odd" ] || fail "$(printf '%s\n' "$odd" | sed -e ':a' -e '$!N' -e '$!ba' \
+    -e 's/\n/<newline>/g' -e "s/$TAB/<tab>/g") has a tab or a line break in its name, which the journal cannot hold: rename it"
 if [ ! -d "$PARENT" ]; then
     mkdir -p -- "$PARENT" || fail "cannot create $PARENT"
     MADE_PARENT=1
