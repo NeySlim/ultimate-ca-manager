@@ -245,33 +245,67 @@ def test_the_chain_repair_keeps_a_link_when_the_provider_fails(app, auth_client,
     assert _audits(app, UNLINKED, child['id']) == before
 
 
-@pytest.mark.parametrize('approved', [False, True])
-def test_the_chain_repair_trusts_a_bad_signature_only_from_a_module_that_approves_it(
-        app, auth_client, made, monkeypatch, approved):
-    """In FIPS mode a module refusing Ed25519 answers 'invalid' for any signature: that is no proof."""
+def _kid_pem(cn, key, issuer_cn, signer, named_key):
+    """A CA certificate signed by *signer* whose AKI names *named_key* (the signer's, or another for a bad signature)."""
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    name = lambda v: x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, v)])  # noqa: E731
+    cert = (x509.CertificateBuilder().subject_name(name(cn)).issuer_name(name(issuer_cn))
+            .public_key(key.public_key()).serial_number(_serial())
+            .not_valid_before(dt.datetime(2026, 1, 1)).not_valid_after(dt.datetime(2036, 1, 1))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(named_key.public_key()),
+                           critical=False)
+            .sign(signer, None if isinstance(signer, ed25519.Ed25519PrivateKey) else hashes.SHA256()))
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def _fips_root_and_child(app, auth_client, made, kind, genuine):
+    """A root of *kind* and a CA linked under it, signed by the root's key when *genuine*, else by another."""
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    gen = {'ed25519': ed25519.Ed25519PrivateKey.generate, 'rsa-2048': _key,
+           'rsa-1024': lambda: rsa.generate_private_key(65537, 1024)}[kind]
+    tag, root_key, key = _tag(), gen(), _key()
+    root_cn = f'Fips Root {tag}'
+    root = _import(auth_client, _kid_pem(root_cn, root_key, root_cn, root_key, root_key))
+    made.append(root['id'])
+    child = _import(auth_client, _kid_pem(f'Fips Child {tag}', key, root_cn, root_key if genuine else gen(), root_key))
+    made.append(child['id'])
+    with app.app_context():
+        db.session.get(CA, child['id']).caref = root['refid']  # linked by name by an earlier version
+        db.session.commit()
+    return root, child
+
+
+@pytest.mark.parametrize('kind,genuine,kept', [
+    ('ed25519', True, True),    # the module refuses Ed25519 and rejects a good signature: no proof
+    ('rsa-1024', True, True),   # the module refuses a modulus under 2048 bits the same way
+    ('ed25519', False, False),  # a module approving Ed25519: a bad signature is one
+    ('rsa-2048', False, False),
+])
+def test_the_chain_repair_trusts_a_bad_signature_only_from_a_module_that_approves_the_key(
+        app, auth_client, made, monkeypatch, kind, genuine, kept):
+    """In FIPS mode the module answers 'invalid' for a key it does not approve: that is no proof."""
     import fips_mode
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives.asymmetric import ed25519
     from services.ski_aki_backfill import backfill_ski_aki
     from utils import cert_issuer
-    tag, root_key, key = _tag(), ed25519.Ed25519PrivateKey.generate(), ed25519.Ed25519PrivateKey.generate()
-    root = _import(auth_client, _ed_pem(f'Ed Root {tag}', root_key))
-    made.append(root['id'])
-    child = _import(auth_client, _ed_pem(f'Ed Child {tag}', key, f'Ed Root {tag}', root_key))
-    made.append(child['id'])
-    assert child['caref'] == root['refid']
+    root, child = _fips_root_and_child(app, auth_client, made, kind, genuine)
+    approves_ed25519 = kind != 'ed25519' or not genuine
     real = cert_issuer.verify_certificate_signature
 
     def module(cert, public_key):
-        if isinstance(public_key, ed25519.Ed25519PublicKey):
+        if isinstance(public_key, ed25519.Ed25519PublicKey) and not approves_ed25519 or \
+                isinstance(public_key, rsa.RSAPublicKey) and public_key.key_size < 2048:
             raise InvalidSignature()
         return real(cert, public_key)
     monkeypatch.setattr(cert_issuer, 'verify_certificate_signature', module)
     monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
-    monkeypatch.setattr(fips_mode, 'module_approves', lambda algorithm: approved)
+    monkeypatch.setattr(fips_mode, 'module_approves', lambda algorithm: approves_ed25519)
     with app.app_context():
         backfill_ski_aki()
-    assert _caref(app, child['id']) == (None if approved else root['refid'])
+    assert _caref(app, child['id']) == (root['refid'] if kept else None)
 
 
 # ------------------------------------------------- name chaining (RFC 5280 6.1.3(a)(4))

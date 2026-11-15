@@ -97,8 +97,8 @@ def signature_verdict(cert: x509.Certificate, issuer: x509.Certificate):
 
 def signature_disproved(cert: x509.Certificate, issuer: x509.Certificate) -> bool:
     """Whether *issuer*'s key provably did not sign *cert*: only an InvalidSignature from a
-    provider that approves the key's algorithm. A provider error, or a FIPS module refusing
-    the algorithm (it then rejects every signature of it), proves nothing."""
+    provider that approves the key. A provider error proves nothing, nor does a FIPS module
+    refusing the key (its type, curve or size, known before the call): it rejects any signature."""
     try:
         key = issuer.public_key()
         if _fips_module_refuses(key):
@@ -113,9 +113,7 @@ def signature_disproved(cert: x509.Certificate, issuer: x509.Certificate) -> boo
 
 def _fips_module_refuses(public_key) -> bool:
     import fips_mode
-    label = (key_algorithms.label_for_public_key(public_key) or '').upper()
-    return label in fips_mode.MODULE_DEPENDENT_SIGNATURES and fips_mode.enabled() \
-        and not fips_mode.module_approves(label)
+    return fips_mode.enabled() and not key_algorithms.fips_approved_for_key(public_key)
 
 
 def _unverifiable_algorithm(cert, issuer):
