@@ -1,6 +1,8 @@
 /**
  * Every "A > B" path the guides give names a place the console has: a group and a module of
- * the Modules menu (read from the navigation registry), or a tab of the Settings page.
+ * the Modules menu (read from the navigation registry), or a tab of the Settings page. The user
+ * guide must also name every page of the menu by its full path, and links to guide headings
+ * must land on a heading that exists.
  */
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
@@ -14,6 +16,7 @@ const lookup = (key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), 
 const groupLabel = Object.fromEntries(GROUPS.map(g => [g.id, lookup(g.labelKey)]))
 const moduleLabels = (m) => [lookup(m.labelKey), m.shortKey && lookup(m.shortKey)].filter(Boolean)
 const settingsTabs = Object.values(en.settings.tabs)
+const accountTabs = [en.account.profile, en.common.security, en.account.apiKeys]
 
 // The longest label (or module id) the element starts with, as a whole word
 function leading(element, labels) {
@@ -50,6 +53,9 @@ export function problemsWith(steps) {
   if (mod.id === 'settings') {
     return leading(second, settingsTabs) && leading(second, settingsTabs) === bestLabel(second)
       ? null : `${second} is not a tab of Settings`
+  }
+  if (mod.id === 'account') {
+    return leading(second, accountTabs) ? null : `${second} is not a tab of My Account`
   }
   const own = MODULES.find(m => m.id.toLowerCase() === second.toLowerCase() || leading(second, moduleLabels(m)))
   return own ? `${second} is a module of its own (${groupLabel[own.group] || 'no group'}), not a part of ${root}` : null
@@ -95,5 +101,76 @@ describe('documented navigation paths', () => {
     expect(bad('Settings > Audit Logs:')).toHaveLength(1)
     expect(bad('System > Updates shows the target')).toHaveLength(1)
     expect(bad('Dashboard → Create Certificate Authority')).toHaveLength(1)
+  })
+})
+
+const userGuide = fs.readFileSync(path.join(docsDir, 'USER_GUIDE.md'), 'utf8')
+const guidePaths = pathsIn(userGuide)
+
+describe('user guide navigation', () => {
+  it('writes its menu paths with ">" only', () => {
+    expect(userGuide).not.toContain('\u2192')
+  })
+
+  it('gives menu paths, and every one resolves', () => {
+    expect(guidePaths.length).toBeGreaterThanOrEqual(30)
+    expect(guidePaths.map(steps => [steps.join(' > '), problemsWith(steps)]).filter(([, p]) => p)).toEqual([])
+  })
+
+  it.each(MODULES.filter(m => m.group))('names $id by its path in the Modules menu', (m) => {
+    const label = lookup(m.labelKey)
+    const hit = guidePaths.some(([root, g, page]) =>
+      root === 'Modules' && g === groupLabel[m.group] && page && (page === label || page.startsWith(label + ' ')))
+    expect(hit, `Modules > ${groupLabel[m.group]} > ${label}`).toBe(true)
+  })
+
+  it('names the account page, which sits outside the menu', () => {
+    expect(userGuide).toContain(`**${lookup(MODULES.find(m => m.id === 'account').labelKey)}**`)
+  })
+
+  it('refuses a path the registry does not have', () => {
+    const bad = (text) => pathsIn(text).map(problemsWith).filter(Boolean)
+    expect(bad('Open **Modules** > **Protocols** > **Frobnicator**')).toHaveLength(1)
+    expect(bad('Open **My Account** > **Billing**')).toHaveLength(1)
+    expect(bad('Open **My Account** > **Security**')).toEqual([])
+    expect(bad('Open **Modules** > **Governance** > **Key Recovery**')).toEqual([])
+  })
+})
+
+// GitHub's heading slugs: lower case, markup and punctuation dropped, spaces to hyphens, repeats numbered
+export function headingSlugs(markdown) {
+  const seen = {}
+  const out = new Set()
+  for (const [, title] of markdown.replace(/^```.*?^```/gms, '').matchAll(/^#{1,6}\s+(.+?)\s*#*$/gm)) {
+    const base = title.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_]/g, '').toLowerCase()
+      .replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s/g, '-')
+    const n = seen[base] = (seen[base] ?? -1) + 1
+    out.add(n ? `${base}-${n}` : base)
+  }
+  return out
+}
+
+export function brokenAnchors(file, markdown) {
+  const prose = markdown.replace(/^```.*?^```/gms, '')
+  const broken = []
+  for (const [, target] of prose.matchAll(/\]\(([^)\s]*#[^)\s]*)(?:\s+"[^"]*")?\)/g)) {
+    if (/^[a-z]+:/i.test(target)) continue
+    const [rel, anchor] = target.split('#')
+    const abs = rel ? path.resolve(path.dirname(path.join(docsDir, file)), rel) : path.join(docsDir, file)
+    if (!abs.endsWith('.md') || !fs.existsSync(abs)) continue
+    if (!anchor || !headingSlugs(fs.readFileSync(abs, 'utf8')).has(anchor)) broken.push(target)
+  }
+  return broken
+}
+
+describe('documented heading links', () => {
+  it.each(guides)('%s links to headings that exist', (file) => {
+    expect(brokenAnchors(file, fs.readFileSync(path.join(docsDir, file), 'utf8'))).toEqual([])
+  })
+
+  it('flags an anchor that no heading carries', () => {
+    expect(brokenAnchors('USER_GUIDE.md', 'See [a](#getting-started) and [b](#nowhere).')).toEqual(['#nowhere'])
+    expect(brokenAnchors('USER_GUIDE.md', 'See [a](HA.md#nowhere) and [b](HA.md#high-availability).')).toEqual(['HA.md#nowhere'])
+    expect(headingSlugs('## A\n## A\n')).toEqual(new Set(['a', 'a-1']))
   })
 })
