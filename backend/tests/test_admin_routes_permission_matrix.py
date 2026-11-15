@@ -247,10 +247,10 @@ def _row_counts():
 def _recorded(app, endpoint):
     """Swap the view behind require_auth for a recorder; yields the call list."""
     gate = _gate(app.view_functions[endpoint])
-    calls = []
+    # Without a gate there is nothing to swap: fail before the real view runs
     if gate is None:
-        yield calls
-        return
+        pytest.fail(f'{endpoint} has no require_auth; the probe would run the view')
+    calls = []
     cell = _cell(gate, 'f')
     original = cell.cell_contents
 
