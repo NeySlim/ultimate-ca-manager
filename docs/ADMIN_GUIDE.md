@@ -505,7 +505,8 @@ With `UCM_HA=1`, every node runs against the same PostgreSQL database and names 
 
 An imported CA is linked to a parent only when the parent's key verifies its signature. The same holds every time the certificate of a CA changes (import over an existing CA,
 installed renewal, restore of a self-signed certificate): the CA keeps its parent only while that
-parent's key verifies the new certificate, else it moves under the stored CA that does or is left
+parent's subject is the issuer name and its key verifies the new certificate, else it moves under the
+stored CA that does or is left
 without one, audited as `ca_parent_unlinked`. The hourly chain repair applies this to a link left
 by an earlier version. When the
 parent's key or signature algorithm is one this server cannot check (SLH-DSA, GOST), the CA is left

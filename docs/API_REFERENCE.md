@@ -645,7 +645,8 @@ the CA is left without a parent and carries its `parent_candidate` again.
 
 When the certificate of a CA changes (`POST /api/v2/cas/import`, `POST /api/v2/certificates/import`,
 the certificate upload of a pending or renewing CA, `POST /api/v2/cas/{ca_id}/restore-primary`), a
-parent linked without a confirmation stays only while its key verifies the new certificate; otherwise
+parent linked without a confirmation stays only while its subject is the issuer name and its key verifies the
+new certificate; otherwise
 the CA takes the stored CA that does or no parent, audited as `ca_parent_unlinked`.
 
 `POST /api/v2/import/execute` (smart import), `POST /api/v2/import/opnsense/import` and the

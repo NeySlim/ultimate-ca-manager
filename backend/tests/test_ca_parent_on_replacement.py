@@ -262,3 +262,35 @@ def test_the_chain_repair_trusts_a_bad_signature_only_from_a_module_that_approve
     with app.app_context():
         backfill_ski_aki()
     assert _caref(app, child['id']) == (None if approved else root['refid'])
+
+
+# ------------------------------------------------- name chaining (RFC 5280 6.1.3(a)(4))
+
+def _with_ski(app, ca_ids, ski):
+    with app.app_context():
+        for ca_id in ca_ids:
+            db.session.get(CA, ca_id).ski = ski.hex(':').upper()
+        db.session.commit()
+
+
+@pytest.mark.parametrize('route', ['/api/v2/cas/import', 'install'])
+def test_the_key_alone_does_not_pick_a_parent_of_another_name(app, auth_client, made, linked, route):
+    """Two records of one key under two names: the parent is the one the issuer name designates."""
+    w, renamed_cn = linked, f'Repl Renamed {_tag()}'
+    renamed = _import(auth_client, _rsa_pem(renamed_cn, w['root_key'], serial=_serial()))
+    made.append(renamed['id'])
+    ski = x509.SubjectKeyIdentifier.from_public_key(w['root_key'].public_key()).digest
+    _with_ski(app, [w['root']['id'], renamed['id']], ski)
+    _replace(app, auth_client, w, _aki_pem(w['cn'], w['key'], renamed_cn, w['root_key'], ski), route)
+    assert _caref(app, w['child']['id']) == renamed['refid']
+    exported = auth_client.get(f"/api/v2/cas/{w['child']['id']}/export?format=pem&include_chain=true")
+    assert _stored_pem(app, w['root']['id']) not in exported.data
+
+
+@pytest.mark.parametrize('route', ['/api/v2/cas/import', 'install'])
+def test_the_former_parent_is_dropped_when_the_issuer_name_changes(app, auth_client, linked, route):
+    """The former parent's key still verifies, but the certificate names another issuer."""
+    w = linked
+    _replace(app, auth_client, w, _rsa_pem(w['cn'], w['key'], f'Repl Nowhere {_tag()}', w['root_key'],
+                                           serial=_serial()), route)
+    assert _caref(app, w['child']['id']) is None

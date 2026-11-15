@@ -341,17 +341,23 @@ def path_length_of(cert):
 def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     """The caref a CA record should hold once *cert* is its certificate.
 
-    None for a self-signed certificate; the CA whose key verifies the
-    signature, found by AKI then by issuer name, the self-signed record
-    before a cross or link certificate of the same key; else *current_caref*
-    while its key still verifies the signature; else None (an external root
-    imported later relinks it).
+    None for a self-signed certificate; the CA whose subject is the issuer
+    name (RFC 5280 6.1.3(a)(4)) and whose key verifies the signature, found
+    by AKI then by issuer name, the self-signed record before a cross or link
+    certificate of the same key; else *current_caref* while it still names and
+    verifies the certificate; else None (an external root imported later
+    relinks it).
     """
     from models import CA
     from utils.cert_issuer import VERIFIED, authority_key_identifier_hex, is_self_signed, self_signed_first, \
         signature_verdict
+    from utils.dn_match import same_name
     if is_self_signed(cert):
         return None
+
+    def issued_by(parent_cert):
+        # A key shared by two names does not make both the issuer: the name chains too
+        return same_name(parent_cert.subject, cert.issuer) and signature_verdict(cert, parent_cert)[0] == VERIFIED
     aki = authority_key_identifier_hex(cert)
     candidates = cas_by_ski(aki) if aki else []
     if not candidates:
@@ -362,14 +368,14 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
         try:
             parent_cert = x509.load_pem_x509_certificate(base64.b64decode(parent.crt), default_backend())
             # Unverifiable here: never linked without a confirmation (services/ca/parent_confirmation)
-            if signature_verdict(cert, parent_cert)[0] == VERIFIED:
+            if issued_by(parent_cert):
                 return parent.refid
         except Exception:
             continue
     current = CA.query.filter_by(refid=current_caref).first() if current_caref else None
     try:
-        if current is not None and current.id != exclude_ca_id and current.crt and signature_verdict(
-                cert, x509.load_pem_x509_certificate(base64.b64decode(current.crt)))[0] == VERIFIED:
+        if current is not None and current.id != exclude_ca_id and current.crt and issued_by(
+                x509.load_pem_x509_certificate(base64.b64decode(current.crt))):
             return current_caref
     except Exception:
         pass
