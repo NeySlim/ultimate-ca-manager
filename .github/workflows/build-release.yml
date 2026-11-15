@@ -887,3 +887,17 @@ jobs:
           gh release edit "$TAG" --notes-file notes.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================
+  # Release smoke: definition and scripts from this tag (a workflow_run trigger would
+  # take them from the default branch)
+  # ============================================================
+  release-smoke:
+    name: Release Smoke Tests
+    needs: [build-deb, release]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-smoke.yml
+    with:
+      version: ${{ needs.build-deb.outputs.version }}
