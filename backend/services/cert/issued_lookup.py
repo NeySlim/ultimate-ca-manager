@@ -324,6 +324,8 @@ def apply_persisted_revocations(ids=None) -> list:
                 found.append((row, record))
     # Every record locked before any row is marked, as an unhold or a revocation takes them
     held = _records_still_held(record for _, record in found)
+    # Rows marked in id order, whatever order the database returned them in
+    found.sort(key=lambda pair: pair[0].id)
     return [(row, record) for row, record in found
             if record.id in held and _mark_while_recorded(row, record)]
 
