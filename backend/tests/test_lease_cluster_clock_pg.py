@@ -381,3 +381,21 @@ def test_every_event_alert_is_logged_on_the_database_clock(event_mail, event):
     assert send()[0] is True
     sent = _event_sent(resource_type, refid)
     assert len(sent) == 1 and _close(sent[0].sent_at, _db_now())
+
+
+def test_a_failing_cluster_clock_leaves_the_mail_senders_transaction(event_mail, monkeypatch):
+    """The cluster clock of the mail log reads on a connection of its own: a failed read there
+    never aborts the transaction the sender still holds on PostgreSQL."""
+    from services import email_service, scheduler_leader
+    service, skew = event_mail
+    key, resource_id = f'test.clock.{uuid.uuid4().hex[:8]}', f'clock-{uuid.uuid4().hex[:8]}'
+    monkeypatch.setattr(scheduler_leader, '_SERVER_NOW_SQL', text('SELECT 1/0'))
+    db.session.add(SystemConfig(key=key, value='kept'))
+    db.session.flush()
+    ok, _ = email_service.EmailService.send_email(
+        recipients=['ops@example.test'], subject='s', body_html='<p>x</p>', resource_type='clock',
+        resource_id=resource_id, log_clock=scheduler_leader.cluster_utc_now)
+    assert ok is True
+    db.session.expire_all()
+    assert SystemConfig.query.filter_by(key=key).one().value == 'kept'
+    assert len(_event_sent('clock', resource_id)) == 1

@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from datetime import timedelta
 
 from sqlalchemy import Boolean, DateTime, bindparam, create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 
 from utils.db_url import POSTGRES_KEEPALIVE_ARGS
@@ -225,6 +226,9 @@ def cluster_utc_now(executor=None):
     dialect = executor.dialect if hasattr(executor, 'dialect') else executor.get_bind().dialect
     if dialect.name != 'postgresql':
         return utc_now()
+    if isinstance(executor, Engine):  # a connection of its own, outside any session
+        with executor.connect() as connection:
+            return connection.execute(_SERVER_NOW_SQL).scalar()
     return executor.execute(_SERVER_NOW_SQL).scalar()
 
 

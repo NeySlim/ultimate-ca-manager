@@ -23,12 +23,13 @@ def _sanitize_header_value(value) -> str:
 
 
 def _log_instant(log_clock):
-    """The log rows' date: an unreadable caller clock never turns a sent mail into a failure."""
+    """The log rows' date: an unreadable caller clock never turns a sent mail into a failure.
+    The clock gets the engine, never the caller's session, so a failed read cannot end it."""
     if log_clock is not None:
         try:
-            return log_clock()
-        except Exception:
-            db.session.rollback()
+            return log_clock(db.engine)
+        except Exception as exc:
+            logger.warning("Mail log dated on this host's clock: %s", type(exc).__name__)
     return utc_now()
 
 
@@ -161,8 +162,9 @@ class EmailService:
             release_session: return the session's connection to the pool before
                 the SMTP exchange (callers that own their session only)
             attachments: (filename, bytes, mimetype) tuples
-            log_clock: dates the log rows (default this host's utc_now); a caller
-                whose window is read on another clock passes that clock
+            log_clock: dates the log rows (default this host's utc_now), called with
+                db.engine, never the session; a caller whose window is read on another
+                clock passes that clock (cluster_utc_now)
 
         Returns:
             (success: bool, message: str)
