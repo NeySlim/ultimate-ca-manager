@@ -50,3 +50,13 @@ def test_some_seed_moves_the_files():
     plain, _ = _collect()
     orders = {tuple(_files(_collect(f'--order-seed={s}')[0])) for s in (1, 2, 3, 4)}
     assert any(o != tuple(_files(plain)) for o in orders)
+
+
+def test_a_subset_keeps_the_relative_order_of_the_full_run():
+    full = _files(_collect('--order-seed=11')[0])
+    env = {k: v for k, v in os.environ.items() if not k.startswith('UCM_TEST_REQUIRE_')}
+    pair = [full[2], full[0]]
+    proc = subprocess.run([sys.executable, '-m', 'pytest', '--collect-only', '-q', '-p', 'no:cacheprovider',
+                           '-p', 'no:randomly', '--order-seed=11', *pair],
+                          cwd=BACKEND_DIR, capture_output=True, text=True, timeout=300, env=env)
+    assert _files([ln for ln in proc.stdout.splitlines() if '::' in ln]) == [full[0], full[2]]

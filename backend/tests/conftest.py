@@ -173,13 +173,13 @@ def pytest_report_header(config):
 
 
 def _shuffle_files(items, seed):
-    """Files in a seeded random order, the tests of a file keeping their order."""
-    import random
+    """Files in a seeded pseudo-random order, each file's place depending on its own name and the
+    seed only (a subset of the suite keeps the relative order of the full run); tests keep their order."""
+    import hashlib
     groups = {}
     for item in items:
         groups.setdefault(item.nodeid.split('::')[0], []).append(item)
-    names = sorted(groups)
-    random.Random(seed).shuffle(names)
+    names = sorted(groups, key=lambda name: hashlib.sha256(f'{seed}/{name}'.encode()).hexdigest())
     items[:] = [item for name in names for item in groups[name]]
 
 
