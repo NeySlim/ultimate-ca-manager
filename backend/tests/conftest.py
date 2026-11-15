@@ -161,8 +161,33 @@ if _pg_app.ENABLED:
     _app_module.create_app = _pg_app.isolating(_app_module.create_app, _settings.TestingConfig)
 
 
+def pytest_addoption(parser):
+    parser.addoption('--order-seed', type=int, default=None,
+                     help='shuffle the order of the test files with this seed (one process; xdist assigns files itself)')
+
+
+def pytest_report_header(config):
+    seed = config.getoption('--order-seed')
+    if seed is not None:
+        return f'order-seed: {seed}'
+
+
+def _shuffle_files(items, seed):
+    """Files in a seeded random order, the tests of a file keeping their order."""
+    import random
+    groups = {}
+    for item in items:
+        groups.setdefault(item.nodeid.split('::')[0], []).append(item)
+    names = sorted(groups)
+    random.Random(seed).shuffle(names)
+    items[:] = [item for name in names for item in groups[name]]
+
+
 def pytest_collection_modifyitems(config, items):
-    """Skip the tests marked sqlite_only when the session app runs on PostgreSQL."""
+    """Order the files by --order-seed; skip the sqlite_only tests when the session app runs on PostgreSQL."""
+    seed = config.getoption('--order-seed')
+    if seed is not None:
+        _shuffle_files(items, seed)
     if not _pg_app.ENABLED:
         return
     for item in items:
