@@ -730,7 +730,9 @@ def test_the_chain_repair_goes_on_past_a_parent_whose_extensions_cannot_be_read(
     assert _caref(app, orphan['id']) == w['other']['refid']
 
 
-def test_the_chain_repair_logs_a_ca_it_cannot_settle_and_goes_on(app, auth_client, made, linked, monkeypatch):
+@pytest.mark.parametrize('failing_step', ['may_drop_parent', 'settle_parent'])
+def test_the_chain_repair_logs_a_ca_it_cannot_settle_and_goes_on(
+        app, auth_client, made, linked, monkeypatch, failing_step):
     from services.ca import parent_confirmation
     from services.ski_aki_backfill import backfill_ski_aki
     w, other_key, other_cn = linked, _key(), f'Dup Other {_tag()}'
@@ -742,13 +744,18 @@ def test_the_chain_repair_logs_a_ca_it_cannot_settle_and_goes_on(app, auth_clien
     with app.app_context():
         db.session.get(CA, orphan['id']).caref = None
         db.session.commit()
-    real = parent_confirmation.may_drop_parent
+    real = getattr(parent_confirmation, failing_step)
 
-    def failing(ca, cert, parent):
+    def failing(ca, cert, *rest):
         if ca.id == w['child']['id']:
+            ca.caref = None  # a failure half-way leaves nothing behind
             raise ValueError('unreadable')
-        return real(ca, cert, parent)
-    monkeypatch.setattr(parent_confirmation, 'may_drop_parent', failing)
+        return real(ca, cert, *rest)
+    monkeypatch.setattr(parent_confirmation, failing_step, failing)
+    if failing_step == 'settle_parent':
+        drop = parent_confirmation.may_drop_parent
+        monkeypatch.setattr(parent_confirmation, 'may_drop_parent',
+                            lambda ca, *rest: ca.id == w['child']['id'] or drop(ca, *rest))
     with app.app_context():
         backfill_ski_aki()
     assert _caref(app, w['child']['id']) == w['root']['refid']
