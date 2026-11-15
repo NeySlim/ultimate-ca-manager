@@ -557,3 +557,123 @@ def test_totp_disable_for_an_account_deleted_meanwhile_answers_404(app, monkeypa
     finally:
         monkeypatch.undo()
         _cleanup(app, user)
+
+
+def _enrolling(c):
+    with c.session_transaction() as s:
+        s['must_enroll_2fa'] = True
+
+
+def _gate_kept(c):
+    with c.session_transaction() as s:
+        return 'must_enroll_2fa' in s
+
+
+def _enrolment_state(application, user):
+    """(keys, session_version, webauthn_2fa) of the account."""
+    keys, version = _key_state(application, user)
+    with application.app_context():
+        flag = bool(db.session.get(User, user['id']).webauthn_2fa)
+        db.session.remove()
+    return keys, version, flag
+
+
+class _FailingFlagCommit:
+    """Fails the first commit that writes webauthn_2fa = True."""
+
+    def __init__(self):
+        self.failed = False
+
+    def on_flush(self, session, _context):
+        from sqlalchemy import inspect
+        if any(isinstance(o, User) and inspect(o).attrs.webauthn_2fa.history.added == [True]
+               for o in session.dirty):
+            session.info['flag_set'] = True
+
+    def on_commit(self, session):
+        self.on_flush(session, None)
+        if session.info.pop('flag_set', False) and not self.failed:
+            self.failed = True
+            raise RuntimeError('commit refused by the test')
+
+    def on_end(self, session):
+        session.info.pop('flag_set', None)
+
+
+def test_a_key_enrolled_under_the_gate_and_its_flag_commit_together(app):
+    """The flag fails to commit: no key, no version, no flag, the gate stays."""
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+    user = _make_user(app)
+    failing = _FailingFlagCommit()
+    listeners = [('after_flush', failing.on_flush), ('before_commit', failing.on_commit),
+                 ('after_commit', failing.on_end), ('after_rollback', failing.on_end)]
+    try:
+        this = _open_session(app, user)
+        _enrolling(this)
+        before = _enrolment_state(app, user)
+        for name, fn in listeners:
+            event.listen(Session, name, fn)
+        try:
+            r = _add_key(app, this, user)
+        finally:
+            for name, fn in listeners:
+                event.remove(Session, name, fn)
+        assert failing.failed
+        assert r.status_code != 200, r.data
+        assert _enrolment_state(app, user) == before
+        assert _gate_kept(this)
+    finally:
+        _cleanup(app, user)
+
+
+def test_a_key_enrolled_under_the_gate_keeps_the_key_the_version_and_the_flag(app):
+    """Non-regression of the success path: key, version and flag move together, audited."""
+    user = _make_user(app)
+    try:
+        this = _open_session(app, user)
+        _enrolling(this)
+        keys, version, flag = _enrolment_state(app, user)
+        r = _add_key(app, this, user)
+        assert r.status_code == 200, r.data
+        new_keys, new_version, new_flag = _enrolment_state(app, user)
+        assert len(new_keys) == len(keys) + 1 and new_version == version + 1
+        assert new_flag and not flag
+        assert not _gate_kept(this)
+        assert _audit_details(app, 'webauthn_register', user) is not None
+    finally:
+        _cleanup(app, user)
+
+
+@pytest.mark.parametrize('when', ['first-lock', 'later-lock'])
+def test_a_key_enrolled_for_an_account_deleted_meanwhile_never_answers_500(app, monkeypatch, when):
+    """Deleted before the row lock: 404 and the gate stays; after it: no second lock fails."""
+    import api.v2.webauthn as webauthn
+    import auth.twofa_enforcement as enforcement
+    user = _make_user(app)
+    lock = enforcement.lock_user
+    calls = []
+
+    def _delete_then_lock(user_id):
+        calls.append(user_id)
+        if user_id == user['id'] and (when == 'first-lock') == (len(calls) == 1):
+            _delete_account(user_id)
+        return lock(user_id)
+    try:
+        this = _open_session(app, user)
+        _enrolling(this)
+        options = _post(this, '/api/v2/webauthn/register/options', {})
+        challenge = options.get_json()['data']['challenge']
+        monkeypatch.setattr(enforcement, 'lock_user', _delete_then_lock)
+        monkeypatch.setattr(webauthn, 'lock_user', _delete_then_lock, raising=False)
+        r = _post(this, '/api/v2/webauthn/register/verify',
+                  {'credential': SoftKey().attest(challenge), 'name': 'new'})
+        if when == 'first-lock':
+            assert r.status_code == 404, r.data
+            assert _gate_kept(this)
+        else:
+            assert r.status_code == 200, r.data
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+

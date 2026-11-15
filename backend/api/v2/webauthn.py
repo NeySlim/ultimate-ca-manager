@@ -9,14 +9,13 @@ import logging
 from flask import Blueprint, request, g, session
 from auth.unified import require_auth
 from auth.twofa_enforcement import (
-    ENROLL_SESSION_KEY, last_factor_refusal, lock_for_factor_change, lock_user,
+    ENROLL_SESSION_KEY, last_factor_refusal, lock_for_factor_change,
 )
 from models import db
 from models.webauthn import WebAuthnCredential
 from services.webauthn_service import WebAuthnService
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
-from utils.db_transaction import safe_commit
 from auth.session_start import closed_sessions_note, end_sessions_on_commit, sessions_closed_by
 
 logger = logging.getLogger(__name__)
@@ -144,21 +143,20 @@ def verify_registration():
     if owner is None:
         db.session.rollback()
         return error_response('User not found', 404)
+    # A key registered under forced enrolment (#141) stays the user's second factor if
+    # enforcement is lifted later: the flag rides the key's own commit, the gate goes after it.
+    enrolling = session.get(ENROLL_SESSION_KEY) is not None
+    if enrolling:
+        owner.webauthn_2fa = True
     success, message, credential = WebAuthnService.verify_registration(
         user.id, credential_data, hostname, credential_name
     )
     if not success:
         db.session.rollback()
         return error_response(message, 400)
-
-    # A registered key satisfies a forced-enrolment session (#141): lift the gate,
-    # and keep the key as this user's second factor if enforcement is lifted later.
-    if session.pop(ENROLL_SESSION_KEY, None) is not None:
+    if enrolling:
+        session.pop(ENROLL_SESSION_KEY, None)
         session.modified = True
-        owner = lock_user(user.id)
-        owner.webauthn_2fa = True
-        if not safe_commit(logger, "Failed to keep the enrolled key as second factor")[0]:
-            return error_response('Failed to complete 2FA enrolment', 500)
     closed = sessions_closed_by(owner)
 
     AuditService.log_action(
