@@ -5,7 +5,8 @@ environment: ``UCM_DB_ENCRYPTION_KEY=<key> python -m scripts.rewrap_db_key [--dr
 The secrets are read with this host's machine-derived key (the key used while
 UCM_DB_ENCRYPTION_KEY was unset), or with the key in the variable named by --from-env.
 Safe to run again: a secret already under the new key is skipped. A secret no key opens
-stops the run before anything is written. Exit code 0 done, 1 refused, 2 not run.
+stops the run before anything is written. Exit code 0 done (or nothing to do), 1 refused,
+2 not run.
 """
 import argparse
 import os
@@ -44,14 +45,23 @@ def main(argv=None) -> int:
     else:
         from utils.encryption import machine_derived_key
         source, what = machine_derived_key(create=False), 'the machine-derived key'
+    from models import db
+    from services.db_key_rewrap import RewrapRefused, rewrap, unreadable_secrets
     try:
         Fernet(source)
     except Exception:
+        # No source is needed when every secret already opens under the target key
+        with _app().app_context():
+            try:
+                left = unreadable_secrets(target.encode())
+            finally:
+                db.session.remove()
+        if not left:
+            print('Every secret is already under UCM_DB_ENCRYPTION_KEY: nothing to do')
+            return 0
         print(f'No usable source key ({what})', file=sys.stderr)
         return 2
 
-    from models import db
-    from services.db_key_rewrap import RewrapRefused, rewrap
     with _app().app_context():
         try:
             result = rewrap([source], target.encode(), dry_run=args.dry_run)

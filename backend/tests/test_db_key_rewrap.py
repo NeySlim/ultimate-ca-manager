@@ -191,3 +191,23 @@ def test_a_value_changed_during_the_run_is_not_overwritten(app, rows, old_key, m
             rewrap_mod.rewrap([old_key], _current_key())
         db.session.expire_all()
         assert db.session.get(WebhookEndpoint, rows['wh']).secret == newer
+
+
+def test_without_a_source_key_nothing_left_to_do_is_success(app, rows, old_key, monkeypatch, capsys):
+    from scripts import rewrap_db_key
+    monkeypatch.setattr(rewrap_db_key, '_app', lambda: app)
+    monkeypatch.setattr(enc, 'machine_derived_key', lambda create=True: old_key)
+    assert rewrap_db_key.main([]) == 0
+    capsys.readouterr()
+    # A host with no machine key (another node, a new container): all are already under the key
+    monkeypatch.setattr(enc, 'machine_derived_key', lambda create=True: None)
+    assert rewrap_db_key.main([]) == 0
+    assert 'nothing to do' in capsys.readouterr().out
+
+
+def test_without_a_source_key_a_secret_left_to_move_still_stops(app, rows, monkeypatch, capsys):
+    from scripts import rewrap_db_key
+    monkeypatch.setattr(rewrap_db_key, '_app', lambda: app)
+    monkeypatch.setattr(enc, 'machine_derived_key', lambda create=True: None)
+    assert rewrap_db_key.main([]) == 2
+    assert 'No usable source key' in capsys.readouterr().err
