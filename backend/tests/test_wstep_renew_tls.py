@@ -7,6 +7,7 @@ import contextlib
 import datetime
 import json
 import threading
+import time
 import uuid
 from unittest.mock import patch
 
@@ -484,19 +485,30 @@ def test_supersede_is_a_compare_and_set(app, backend):
 
 @pytest.mark.postgres
 def test_two_claims_never_lock_in_opposite_orders(app):
-    """Listed in opposite orders, two claims still lock by id: one wins, neither deadlocks."""
+    """Listed in opposite orders, two claims still lock by id: one wins, neither deadlocks.
+
+    The first claim takes its first row lock and holds it, transaction open, until the
+    second one is seen by PostgreSQL waiting on a lock; a run where that never happened
+    did not overlap, and fails."""
+    from sqlalchemy.sql.dml import Update
     from services.ca.ca_signing import _claim_superseded
     from services.cert import issued_lookup
     from tests.test_crl_persistent_revocations import _PG_URL, _make_ca, _on_postgresql
     if not _PG_URL:
         pytest.skip('UCM_TEST_PG_URL not set; skipping the PostgreSQL target')
     listed = issued_lookup._rows_holding
-    both_hold_one = threading.Barrier(2, timeout=3)
-    local, results, errors = threading.local(), [], []
+    first_holds, second_pid = threading.Event(), []
+    local, results, errors, met = threading.local(), [], [], []
 
     def rows_in_this_threads_order(*args, **kwargs):
         rows = sorted(listed(*args, **kwargs), key=lambda r: r.id)
         return rows if local.first else rows[::-1]
+
+    def waiting_on_a_lock(pid):
+        with db.engine.connect() as probe:
+            return probe.execute(text(
+                "SELECT wait_event_type FROM pg_stat_activity WHERE pid = :pid"),
+                {'pid': pid}).scalar() == 'Lock'
 
     with _on_postgresql(app):
         with app.app_context():
@@ -514,15 +526,24 @@ def test_two_claims_never_lock_in_opposite_orders(app):
             row_id = row.id
             real_execute = db.session.execute
 
-        def execute_then_meet(*args, **kwargs):
-            result = real_execute(*args, **kwargs)
-            if not getattr(local, 'met', False):
-                local.met = True
-                try:
-                    both_hold_one.wait()
-                except threading.BrokenBarrierError:
-                    pass  # the other one is waiting for this lock, as it should
-            return result
+        def execute_in_turn(statement, *args, **kwargs):
+            if not isinstance(statement, Update) or getattr(local, 'updated', False):
+                return real_execute(statement, *args, **kwargs)
+            local.updated = True
+            if local.first:
+                result = real_execute(statement, *args, **kwargs)
+                first_holds.set()
+                # Held until the second claim is blocked behind this lock, or never is
+                deadline = time.monotonic() + 15
+                while time.monotonic() < deadline and not met:
+                    if second_pid and waiting_on_a_lock(second_pid[0]):
+                        met.append(True)
+                    else:
+                        time.sleep(0.05)
+                return result
+            assert first_holds.wait(15), 'the first claim never took its lock'
+            second_pid.append(real_execute(text('SELECT pg_backend_pid()')).scalar())
+            return real_execute(statement, *args, **kwargs)
 
         def claim(first):
             local.first = first
@@ -537,13 +558,14 @@ def test_two_claims_never_lock_in_opposite_orders(app):
                     db.session.remove()
 
         with patch.object(issued_lookup, '_rows_holding', rows_in_this_threads_order), \
-                patch.object(db.session, 'execute', execute_then_meet):
+                patch.object(db.session, 'execute', execute_in_turn):
             threads = [threading.Thread(target=claim, args=(first,)) for first in (True, False)]
             for thread in threads:
                 thread.start()
             for thread in threads:
                 thread.join(60)
     assert errors == []
+    assert met, 'the second claim never waited on the lock the first one held'
     assert sorted(results) == [False, True]
 
 
