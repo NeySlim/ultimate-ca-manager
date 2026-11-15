@@ -29,15 +29,20 @@ def _stored():
     return row.value if row else None
 
 
+_TOUCHED = ('backup_max_total_mb', 'backup_min_keep', 'backup_retention_days')
+
+
 @pytest.fixture
 def restore_ceiling(app):
     with app.app_context():
-        before = _stored()
+        before = {key: getattr(SystemConfig.query.filter_by(key=key).first(), 'value', None)
+                  for key in _TOUCHED}
     yield
     with app.app_context():
-        SystemConfig.query.filter_by(key='backup_max_total_mb').delete()
-        if before is not None:
-            db.session.add(SystemConfig(key='backup_max_total_mb', value=before))
+        for key, value in before.items():
+            SystemConfig.query.filter_by(key=key).delete()
+            if value is not None:
+                db.session.add(SystemConfig(key=key, value=value))
         db.session.commit()
 
 
@@ -342,3 +347,31 @@ class TestOtherArchiveFilesAreReported:
         data = auth_client.get(SCHEDULE).get_json()['data']
         assert data['stored_bytes'] == 100 and data['stored_count'] == 1
         assert data['uncounted_count'] == 2
+
+
+@pytest.mark.usefixtures('restore_ceiling')
+class TestTheWarningNamesWhatIsProtected:
+    def test_on_disk_it_names_the_three_protections(self, app, disk):
+        from services.backup import schedule
+        _archive(disk, 'ucm_backup_20260101_000000.ucmbkp', 2 * 1024 * 1024, 1)
+        with app.app_context():
+            _set('backup_max_total_mb', '1')
+            _set('backup_min_keep', '3')
+            warning = schedule.ceiling_warning()
+        assert 'matches its validation record' in warning
+        assert 'up to 2 archives with no validation record' in warning
+        assert 'the 3 newest archives not found altered' in warning
+
+    def test_in_ha_it_names_the_minimum_kept_only(self, app, monkeypatch):
+        from datetime import datetime
+        from services.backup import schedule, shared_store
+        monkeypatch.setattr(shared_store, 'enabled', lambda: True)
+        monkeypatch.setattr(shared_store, 'list_archives', lambda: [
+            {'filename': 'ucm_backup_a.ucmbkp', 'size': 2 * 1024 * 1024, 'node': 'n1',
+             'sha256': 'ab', 'created_at': datetime.utcnow()}])
+        with app.app_context():
+            _set('backup_max_total_mb', '1')
+            _set('backup_min_keep', '3')
+            warning = schedule.ceiling_warning()
+        assert warning.endswith('retention never removes the 3 newest archives.')
+        assert 'validation record' not in warning
