@@ -41,6 +41,9 @@ from . import ws_security
 
 logger = logging.getLogger(__name__)
 
+# What the approver reads when a held template-less renewal's certificate was renewed meanwhile
+RENEWED_SUPERSEDED = 'Renewed certificate superseded by a newer one'
+
 # AD DN RDN attribute names (as ldap3's parse_dn returns them from a real
 # AD distinguishedName) -> the x509.Name attribute OID they map to. Covers
 # the components a real ADCS User certificate's directory-path subject
@@ -1245,9 +1248,11 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             return None, ServerError(renewal_identity.UNRESOLVED_MESSAGE)
         if renewed is None or _template_ext_oid(renewed) is not None:
             return None, _other_key_refusal(ca, csr, profile=profile) or NO_TEMPLATE
-        # Decided on arrival, the exemption travels with a held request: only a revocation since withdraws it
-        if approved_renewal is not None and _revoked(ca, approved_renewal):
-            return None, RENEWED_REVOKED
+        # Decided on arrival, the exemption travels with a held request: a revocation or a renewal
+        # since withdraws it (a replaced certificate produces no more), an expiry does not
+        withdrawn = _withdrawn(ca, approved_renewal) if approved_renewal is not None else None
+        if withdrawn:
+            return None, withdrawn
         exempted = renewed
     template_oid = None
     if matched_template is not None:
@@ -1545,9 +1550,10 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
     return lookup.UNREACHABLE if unreachable else None
 
 
-def _revoked(ca, cert):
-    from services.cert.issued_lookup import REVOKED, issued_certificate_status
-    return issued_certificate_status(ca, cert)[1] == REVOKED
+def _withdrawn(ca, cert):
+    """Why a held renewal of *cert* is withdrawn (revoked or superseded), else None."""
+    from services.cert.issued_lookup import REVOKED, SUPERSEDED, issued_certificate_status
+    return {REVOKED: RENEWED_REVOKED, SUPERSEDED: RENEWED_SUPERSEDED}.get(issued_certificate_status(ca, cert)[1])
 
 
 def _requester_holds(cert, principal, sam_account_name, connector, requester_sid, *, profile):

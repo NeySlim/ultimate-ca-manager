@@ -321,6 +321,47 @@ def test_an_exempted_renewal_whose_certificate_is_revoked_after_approval_is_not_
         assert reason == 'Renewed certificate revoked' and invalid == 'true'
 
 
+def _age(app, cert, *, expired=False, superseded=False):
+    with app.app_context():
+        row = Certificate.query.filter_by(serial_number=str(cert.serial_number)).one()
+        if expired:
+            row.valid_to = datetime.utcnow() - timedelta(days=1)
+        if superseded:
+            row.archived = True
+        db.session.commit()
+
+
+def test_an_exempted_renewal_whose_certificate_expires_before_approval_is_issued(
+        app, client, auth_client, world, realm_a):
+    """The exemption is decided on arrival, the requester authenticated by Kerberos: a certificate
+    that expires while the request waits for its approver does not withdraw it (AD CS issues a
+    pending request whatever happened to the certificate it renews)."""
+    with approval_policy(app, world['cas']['A']['id'], 'r20-held-expired') as pid:
+        request_id, approval_id, old = _held(app, client, world, MACHINE, pid)
+        _age(app, old, expired=True)
+        approve(auth_client, approval_id)
+        r = _query(client, world, MACHINE, request_id)
+        assert r.status_code == 200, r.data
+        assert requests_of(app, pid, 'wstep_request')[0][1] == 'approved'
+
+
+def test_an_exempted_renewal_whose_certificate_is_superseded_before_approval_is_refused(
+        app, client, auth_client, world, realm_a):
+    """Renewed meanwhile, the certificate no longer produces certificates (issued_lookup): the
+    approval issues nothing, as for the Certificate binding, and the client hears the refusal."""
+    from tests.test_protocol_approval_wstep import _fault as _held_fault
+    with approval_policy(app, world['cas']['A']['id'], 'r20-held-superseded') as pid:
+        request_id, approval_id, old = _held(app, client, world, MACHINE, pid)
+        _age(app, old, superseded=True)
+        before = _issued_count(app, world)
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.get_json()['message'] == 'Request closed'
+        assert r.get_json()['data']['issue_error'].endswith(wstep_service.RENEWED_SUPERSEDED)
+        assert _issued_count(app, world) == before
+        reason, invalid, _echo = _held_fault(_query(client, world, MACHINE, request_id))
+        assert reason == 'Refused at issuance' and invalid == 'true'
+
+
 def test_an_initial_request_without_template_is_refused_before_the_approval_gate(app, client, world, realm_a):
     with approval_policy(app, world['cas']['A']['id'], 'c15-held-initial') as pid:
         assert _fault(_post(client, world, MACHINE, _csr('c15-initial'))) == (400, 's:Sender', NO_TEMPLATE)
