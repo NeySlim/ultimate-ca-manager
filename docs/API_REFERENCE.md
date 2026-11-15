@@ -5152,7 +5152,7 @@ These endpoints are not part of the `/api/v2` management API. Clients such as AC
 | Windows enrollment (XCEP and WSTEP) | `/ADPolicyProvider_CEP_Kerberos/service.svc`, `/ADPolicyProvider_CEP_UsernamePassword/service.svc`, `/ADCertificateService_CES_Kerberos/service.svc`, `/ADCertificateService_CES_UsernamePassword/service.svc`, `/ADCertificateService_CES_Certificate/service.svc` | [Admin guide](ADMIN_GUIDE.md#windows-autoenrollment-xcepwstep-kerberosspnego), [Windows Enrollment Profiles](#windows-enrollment-profiles) |
 | SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key` | [SSH Certificates](#ssh-certificates) |
 
-Which of these routes exist depends on the configuration: a protocol that is turned off is not registered.
+The routes are always served; a protocol turned off in Settings refuses its requests (EST and XCEP answer `503`).
 
 ### Probes
 `GET /health`, `/health/ready`, `/health/live` and their `/api/health` and `/api/v2/health` forms are described under [Health](#health). `GET /metrics` and `GET /api/v2/metrics` expose Prometheus metrics, see [Metrics](#metrics). The interactive API description is served at `/api/docs`.
