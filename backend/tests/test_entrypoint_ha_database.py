@@ -433,3 +433,11 @@ def test_a_sqlite_url_on_the_same_file_still_checks_and_copies_it(tmp_path, suff
     assert r.returncode != 0 and 'cp ' not in r.stdout and 'Not enough' in r.stdout, r.stdout
     r = _run(_df(3000) + _START, env, tmp_path)
     assert r.returncode == 0 and 'cp ' in r.stdout and 'not used' not in r.stdout, r.stdout
+
+
+def test_two_tmpfs_each_holding_its_part_are_not_summed(tmp_path):
+    # same df name, distinct devices, no /dev source: two filesystems
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
+    r = _run(_df_names(3000, 3000, 1, 2) + _START, env, tmp_path)
+    assert r.returncode == 0 and 'cp ' in r.stdout, r.stdout
