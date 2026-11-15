@@ -102,14 +102,21 @@ class _Parser:
 
     def unary(self):
         if self.peek() == '!':
-            self.take()
-            return not _truthy(self.unary())
+            return self.negation()
         left = self.primary()
         if self.peek() in ('==', '!='):
             op = self.take()[1]
             right = self.primary()
             return _eq(left, right) if op == '==' else not _eq(left, right)
         return left
+
+    def negation(self):
+        # GitHub binds `!` tighter than `==`: `!a == b` is `(!a) == b`, a form refused here
+        self.take('!')
+        value = not _truthy(self.negation() if self.peek() == '!' else self.primary())
+        if self.peek() in ('==', '!='):
+            raise ValueError('`!x == y` is ambiguous here: write `!(x == y)` or `(!x) == y`')
+        return value
 
     def primary(self):
         kind, text = self.take()

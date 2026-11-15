@@ -23,6 +23,12 @@ CTX = {'github': github_context('push', 'refs/heads/sextant'), 'inputs': {'versi
     ("cancelled()", False),
     ("unknown.thing", ValueError),
     ("refs/tags/v${{ inputs.version }}", ValueError),
+    ("!github.event_name == 'push'", ValueError),  # GitHub reads (!a) == b: refused, never guessed
+    ("!!github.event_name != 'push'", ValueError),
+    ("!github.event_name", False),
+    ("!!github.event_name", True),
+    ("!cancelled() && github.event_name == 'push'", True),
+    ("(!github.event_name) == false", True),
 ])
 def test_expressions(expr, value):
     if value is ValueError:
