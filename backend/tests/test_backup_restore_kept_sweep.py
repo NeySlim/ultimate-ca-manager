@@ -289,3 +289,66 @@ def test_the_first_start_on_an_empty_database_reads_no_missing_table(caplog):
             pass
     assert not [record.getMessage() for record in caplog.records
                 if record.name == files.__name__ and record.levelno >= logging.INFO]
+
+
+@pytest.fixture
+def system_tmp(tmp_path, monkeypatch):
+    root = tmp_path / 'system-tmp'
+    root.mkdir()
+    monkeypatch.setattr(files.tempfile, 'tempdir', str(root))
+    return root
+
+
+def _killed_staging(root, name='ucm_restore_files_killed'):
+    staging = root / name
+    staging.mkdir(mode=0o700)
+    (staging / '0000_ca_x.key').write_bytes(b'PLAINTEXT KEY')
+    return staging
+
+
+def test_the_staging_of_a_killed_restore_is_removed(dirs, system_tmp):
+    staging = _killed_staging(system_tmp)
+    other = system_tmp / 'unrelated'
+    other.mkdir()
+
+    files.sweep_kept_previous_contents()
+    assert not staging.exists() and other.exists()
+
+
+def test_a_live_staging_is_kept(dirs, system_tmp):
+    # A restore of another instance sharing this temporary directory holds its staging
+    staged = StagedFiles()
+    staged.stage(dirs['private'] / 'k.key', b'live')
+    assert staged.staging_dir.parent == system_tmp
+    try:
+        files.sweep_kept_previous_contents()
+        assert (staged.staging_dir / '0000_k.key').read_bytes() == b'live'
+    finally:
+        staged.discard()
+
+
+def test_a_staging_is_swept_only_under_a_held_lock_and_never_through_a_link(
+        dirs, system_tmp, tmp_path, monkeypatch):
+    staging = _killed_staging(system_tmp)
+    target = tmp_path / 'elsewhere'
+    target.mkdir()
+    (target / 'keep').write_bytes(b'x')
+    (system_tmp / 'ucm_restore_files_link').symlink_to(target)
+    import utils.process_lock as process_lock
+
+    with monkeypatch.context() as patched:
+        patched.setattr(process_lock, '_open_lock_file',
+                        lambda path: (_ for _ in ()).throw(OSError(errno.ENOLCK, 'no locks')))
+        files.sweep_kept_previous_contents()
+    assert staging.exists()
+
+    files.sweep_kept_previous_contents()
+    assert not staging.exists()
+    assert (target / 'keep').exists() and (system_tmp / 'ucm_restore_files_link').is_symlink()
+
+
+def test_a_staging_of_another_user_is_kept(dirs, system_tmp, monkeypatch):
+    staging = _killed_staging(system_tmp)
+    monkeypatch.setattr(files.os, 'geteuid', lambda: os.stat(staging).st_uid + 1)
+    files.sweep_kept_previous_contents()
+    assert staging.exists()

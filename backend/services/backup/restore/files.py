@@ -18,6 +18,7 @@ holding a journal of that token is gone; while a journal exists, the row tells
 the truth about whether its restore committed.
 """
 import errno
+import fcntl
 import json
 import logging
 import os
@@ -108,6 +109,8 @@ class StagedFiles:
         self._base_dir = Path(base_dir) if base_dir is not None else None
         self._prefix = prefix
         self._staging_dir: Optional[Path] = None
+        # Held on the staging directory for its life: a sweep never removes a live one
+        self._staging_lock: Optional[int] = None
         self._entries: List[_Staged] = []
         # Destination to its position in _entries: one lookup per staged file
         self._index: Dict[Path, int] = {}
@@ -138,10 +141,23 @@ class StagedFiles:
         if self._staging_dir is None:
             if self._base_dir is not None:
                 self._base_dir.mkdir(parents=True, exist_ok=True)
-            self._staging_dir = Path(tempfile.mkdtemp(
-                prefix=self._prefix,
-                dir=str(self._base_dir) if self._base_dir else None))
-            os.chmod(self._staging_dir, 0o700)
+            for _attempt in range(3):
+                staging = Path(tempfile.mkdtemp(
+                    prefix=self._prefix,
+                    dir=str(self._base_dir) if self._base_dir else None))
+                os.chmod(staging, 0o700)
+                fd = os.open(staging, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    # Swept by another instance before the lock was taken: start again
+                    if os.fstat(fd).st_nlink > 0:
+                        self._staging_dir, self._staging_lock = staging, fd
+                        break
+                except BlockingIOError:
+                    pass
+                os.close(fd)
+            else:
+                raise OSError(errno.EAGAIN, "Could not hold a restore staging directory")
         return self._staging_dir
 
     def stage(self, destination, data: bytes, *, mode: int = 0o600) -> Path:
@@ -350,6 +366,7 @@ class StagedFiles:
         reason to outlive either outcome.
         """
         staging, self._staging_dir = self._staging_dir, None
+        staging_lock, self._staging_lock = self._staging_lock, None
         kept_dirs, self._kept_dirs = self._kept_dirs, {}
         self._entries = []
         self._index = {}
@@ -363,6 +380,8 @@ class StagedFiles:
                 logger.exception("Could not remove staged restore files %s", directory)
             if directory is not staging and os.path.lexists(directory):
                 left.append(directory)
+        if staging_lock is not None:
+            os.close(staging_lock)
         return left
 
     # -- context manager --------------------------------------------------
@@ -496,6 +515,10 @@ def sweep_kept_previous_contents() -> List[Path]:
                                    fail_open=False):
             if not operation_lock_held():
                 return []
+            try:
+                _sweep_stale_stagings()
+            except OSError as exc:
+                logger.warning("Stagings of interrupted restores not swept: %s", exc)
             found = _find_kept_directories()
             tokens = {journal['token'] for _, journal in found if journal is not None}
             try:
@@ -537,6 +560,43 @@ def sweep_kept_previous_contents() -> List[Path]:
         logger.warning("Removed the previous contents kept by interrupted restores: %s",
                        ', '.join(str(path) for path in removed))
     return removed
+
+
+def _sweep_stale_stagings() -> None:
+    """The stagings in the system temporary directory that no live restore holds by flock.
+
+    Only this module's prefix, a real directory of this user, never a link followed."""
+    root = tempfile.gettempdir()
+    uid = os.geteuid()
+    removed = []
+    for entry in os.scandir(root):
+        if not (entry.name.startswith(_STAGING_PREFIX) and entry.is_dir(follow_symlinks=False)):
+            continue
+        try:
+            fd = os.open(entry.path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except OSError:
+            continue
+        try:
+            info = os.fstat(fd)
+            if info.st_uid != uid:
+                continue
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                continue    # a live restore, of this instance or another sharing the directory
+            current = os.lstat(entry.path)
+            if (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+                continue
+            try:
+                shutil.rmtree(entry.path)
+                removed.append(entry.path)
+            except OSError as exc:
+                logger.warning("Could not remove the staging of an interrupted restore %s: %s",
+                               entry.path, exc)
+        finally:
+            os.close(fd)
+    if removed:
+        logger.warning("Removed the staged files of interrupted restores: %s", ', '.join(removed))
 
 
 def _forget_lingering_publications(keep=()) -> None:
