@@ -16,6 +16,7 @@ from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime
 from cryptography import x509
+from utils.dn_parse import most_specific_common_name
 from cryptography.hazmat.backends import default_backend
 
 from flask import has_request_context, request
@@ -712,9 +713,12 @@ class SmartImporter:
         """Extract CN from subject"""
         if not subject:
             return "Unknown"
-        for part in subject.split(','):
-            if part.strip().upper().startswith('CN='):
-                return part.strip()[3:]
+        try:
+            cn = most_specific_common_name(x509.Name.from_rfc4514_string(subject))
+        except ValueError:
+            cn = None
+        if cn:
+            return cn
         return "Unknown"
     
     def _log_audit(self, action: str, resource_id: int, resource_name: str,

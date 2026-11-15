@@ -262,6 +262,23 @@ def test_the_smart_import_path_records_the_most_specific_common_name(app, auth_c
             db.session.commit()
 
 
+def test_the_smart_import_path_keeps_a_comma_inside_the_common_name(app, auth_client, key):
+    """A CN such as 'Doe, John' is recorded whole, not cut at the escaped comma."""
+    import uuid
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    cert_id = _import_leaf(auth_client, key, tag, f'Doe, John {tag}')
+    with app.app_context():
+        row = db.session.get(Certificate, cert_id)
+        try:
+            assert row.subject_cn == f'Doe, John {tag}'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
 def test_most_specific_common_name_is_the_last_one():
     assert most_specific_common_name(_subject('a.example.com', 'b.example.com')) == 'b.example.com'
     assert most_specific_common_name(_subject('Doe, John')) == 'Doe, John'
