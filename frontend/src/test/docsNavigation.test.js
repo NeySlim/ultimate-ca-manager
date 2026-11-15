@@ -172,6 +172,10 @@ describe('documented navigation paths', () => {
     expect(bad('Open Settings > Windows Autoenrollment > Add profile')).toEqual([])
     expect(bad('Open ACME > Let\'s Encrypt > Certificate Authorities')).toEqual([])
     expect(bad('Open Modules > PKI > Certificates > Issue Certificate')).toEqual([])
+    // A step before the last is a label exactly; the last one may be followed by prose
+    expect(bad('Open Modules > PKI > Certificates > Issue Bogus > Export')).toHaveLength(1)
+    expect(bad('Open Modules > PKI > Certificates > Issue > Bogus')[0]).toMatch(/^Bogus is not/)
+    expect(bad('Open Modules > PKI > Certificates > Export shows the formats')).toEqual([])
   })
 })
 
