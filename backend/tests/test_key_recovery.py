@@ -202,3 +202,39 @@ class TestDualControlEnvOverride:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+def _audited(app, rid):
+    from models import AuditLog
+    with app.app_context():
+        rows = AuditLog.query.filter_by(resource_type='key_recovery', resource_id=str(rid)).all()
+        return sorted(row.action for row in rows)
+
+
+class TestWhatTheAuditTrailKeeps:
+    """The in-app help names which refusals are audited: these are the two sides of that sentence."""
+
+    def test_a_self_approval_refused_by_dual_control_is_audited(self, app, auth_client, archived_cert):
+        _set_dual_control(app, True)
+        rid = _open_request(auth_client, archived_cert)
+        r = auth_client.post(f'/api/v2/key-recovery/{rid}/approve',
+                             data=json.dumps({}), content_type='application/json')
+        assert r.status_code == 403
+        assert _audited(app, rid) == ['key_recovery.approve_denied', 'key_recovery.requested']
+
+    def test_a_call_refused_for_the_state_of_the_request_is_not(self, app, auth_client, archived_cert):
+        _set_dual_control(app, False)
+        rid = _open_request(auth_client, archived_cert)
+        r = auth_client.post(f'/api/v2/key-recovery/{rid}/recover',
+                             data=json.dumps({'password': 'recover-pw-123'}),
+                             content_type='application/json')
+        assert r.status_code == 409
+        assert _audited(app, rid) == ['key_recovery.requested']
+
+    def test_a_rejection_is_audited(self, app, auth_client, archived_cert):
+        _set_dual_control(app, False)
+        rid = _open_request(auth_client, archived_cert)
+        r = auth_client.post(f'/api/v2/key-recovery/{rid}/reject',
+                             data=json.dumps({'reason': 'not justified'}), content_type='application/json')
+        assert r.status_code == 200
+        assert _audited(app, rid) == ['key_recovery.rejected', 'key_recovery.requested']
