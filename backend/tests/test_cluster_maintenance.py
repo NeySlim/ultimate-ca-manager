@@ -168,3 +168,21 @@ def test_outside_ha_a_row_changes_nothing(app, auth_client, monkeypatch):
     r = auth_client.get('/health')
     assert 'maintenance' not in r.get_json()
     assert auth_client.get('/health/ready').get_json()['status'] != 'maintenance'
+
+
+def test_a_rollback_after_the_connection_dropped_mid_transaction_does_not_raise():
+    """A connection invalidated inside its transaction (the database dropped it) rolls back
+    cleanly: the guard's rollback hook never turns that into an error of its own."""
+    from types import SimpleNamespace
+
+    from sqlalchemy import create_engine, text
+    engine = create_engine('sqlite://')
+    cm.install_engine_guard(SimpleNamespace(extensions={}), engine)
+    conn = engine.connect()
+    conn.begin()
+    conn.execute(text('SELECT 1'))
+    conn.invalidate()
+    conn.rollback()
+    assert conn.invalidated
+    conn.close()
+    engine.dispose()
