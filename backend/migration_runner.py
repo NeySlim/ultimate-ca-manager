@@ -53,10 +53,10 @@ import time
 import importlib.util
 from pathlib import Path
 
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import create_engine, event, text, inspect
 
 from migration_marks import full_stop_reason
-from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
+from utils.db_url import is_postgres_url, postgres_engine_options, sqlalchemy_url
 
 
 def say(*args, **kwargs):
@@ -86,6 +86,34 @@ def _get_db_url() -> str:
 
 def _is_postgres(db_url: str) -> bool:
     return is_postgres_url(db_url)
+
+
+# Server side, per session: a dead peer is dropped within about a minute, and a statement whose
+# client is gone (a killed start) stops within 10 s with its locks, not at its own end
+_SESSION_KEEPALIVES = ("SELECT set_config('tcp_keepalives_idle', '30', false), "
+                       "set_config('tcp_keepalives_interval', '10', false), "
+                       "set_config('tcp_keepalives_count', '3', false)")
+_SESSION_CLIENT_CHECK = "SELECT set_config('client_connection_check_interval', '10s', false)"
+
+
+def _session_limits(dbapi_connection, _record):
+    for statement in (_SESSION_KEEPALIVES, _SESSION_CLIENT_CHECK):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute(statement)
+            dbapi_connection.commit()
+        except Exception:  # noqa: BLE001 - PostgreSQL before 14, or a platform without the check
+            dbapi_connection.rollback()
+        finally:
+            cursor.close()
+
+
+def _engine(db_url):
+    """The runner's engine: on PostgreSQL the application pool's options and the limits above."""
+    engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True, **postgres_engine_options(db_url))
+    if is_postgres_url(db_url):
+        event.listen(engine, "connect", _session_limits)
+    return engine
 
 
 def _list_migration_names() -> list[str]:
@@ -226,8 +254,7 @@ def _full_stop_holders_now():
         return []
     db_url = _get_db_url()
     try:
-        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                               connect_args=postgres_connect_args(db_url))
+        engine = _engine(db_url)
     except Exception:
         return []
     try:
@@ -277,8 +304,7 @@ def mark_node_stopped(node_id=None) -> None:
     from config.settings import Config
     db_url = _get_db_url()
     try:
-        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                               connect_args=postgres_connect_args(db_url))
+        engine = _engine(db_url)
         try:
             with engine.begin() as conn:
                 conn.execute(text("UPDATE cluster_nodes SET pid = NULL WHERE node_id = :n"),
@@ -345,8 +371,7 @@ def mark_all_applied():
     """
     db_url = _get_db_url()
     is_pg = _is_postgres(db_url)
-    engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                           connect_args=postgres_connect_args(db_url))
+    engine = _engine(db_url)
     try:
         record_fresh_registry(engine, is_pg)
     finally:
@@ -408,8 +433,7 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
     backend = "PostgreSQL" if is_pg else "SQLite"
 
     try:
-        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                           connect_args=postgres_connect_args(db_url))
+        engine = _engine(db_url)
     except Exception as exc:
         say(f"✗ Could not connect to database ({backend}): {exc}")
         return False
@@ -657,8 +681,7 @@ def show_status():
     say(f"Backend: {'PostgreSQL' if is_pg else 'SQLite'}")
     say(f"URL:     {db_url.split('@')[-1] if '@' in db_url else db_url}")
     try:
-        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                           connect_args=postgres_connect_args(db_url))
+        engine = _engine(db_url)
     except Exception as e:
         say(f"✗ Cannot connect: {e}")
         return
