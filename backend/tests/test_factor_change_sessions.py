@@ -289,3 +289,116 @@ def test_sessions_closed_earlier_are_not_counted_again(nodes):
         assert not _signed_in(other) and not _signed_in(stale) and _signed_in(this)
     finally:
         _cleanup(first_node, user)
+
+
+def _admin_key(method):
+    def _call(application, c, user, admin):
+        url = f"/api/v2/users/{user['id']}/webauthn/{user['key_id']}"
+        return admin.delete(url) if method == 'delete' else admin.patch(url, json={'enabled': False})
+    return _call
+
+
+def _own(call):
+    def _call(application, c, user, admin):
+        return call(application, c, user)
+    return _call
+
+
+def _key_state(application, user):
+    """(the account's keys as (id, enabled), session_version)."""
+    with application.app_context():
+        keys = sorted((k.id, k.enabled) for k in
+                      WebAuthnCredential.query.filter_by(user_id=user['id']).all())
+        version = db.session.get(User, user['id']).session_version or 0
+        db.session.remove()
+        return keys, version
+
+
+class _FailingCommit:
+    """Makes the first commit fail that carries a key change ('key') or the
+    session_version bump ('bump'), as a database error would."""
+
+    def __init__(self, target):
+        self.target = target
+        self.failed = False
+
+    def on_execute(self, state):
+        if state.is_update and 'session_version' in str(state.statement):
+            state.session.info['bumped'] = True
+
+    def on_flush(self, session, _context):
+        if any(isinstance(o, WebAuthnCredential)
+               for o in list(session.new) + list(session.dirty) + list(session.deleted)):
+            session.info['key_changed'] = True
+
+    def on_commit(self, session):
+        self.on_flush(session, None)  # what the commit's own flush is about to write
+        hit = session.info.pop('bumped' if self.target == 'bump' else 'key_changed', False)
+        session.info.pop('bumped', None)
+        session.info.pop('key_changed', None)
+        if hit and not self.failed:
+            self.failed = True
+            raise RuntimeError('commit refused by the test')
+
+    def on_end(self, session):
+        session.info.pop('bumped', None)
+        session.info.pop('key_changed', None)
+
+
+# key operation: (user it starts from, request)
+KEY_CHANGES = {
+    'add-key': ({}, _own(_add_key)),
+    'delete-key': ({}, _own(_delete_key)),
+    'disable-key': ({}, _own(_toggle_key(False))),
+    'enable-key': ({'key_enabled': False}, _own(_toggle_key(True))),
+    'admin-delete-key': ({}, _admin_key('delete')),
+    'admin-disable-key': ({}, _admin_key('patch')),
+}
+
+
+@pytest.mark.parametrize('target', ['key', 'bump'])
+@pytest.mark.parametrize('operation', sorted(KEY_CHANGES))
+def test_a_key_change_and_the_session_closure_commit_together(app, auth_client, operation,
+                                                              target):
+    """Whichever of the two writes fails, neither stays: no key changed with sessions open."""
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+    start, call = KEY_CHANGES[operation]
+    user = _make_user(app, key=SoftKey(), **start)
+    before = _key_state(app, user)
+    failing = _FailingCommit(target)
+    listeners = [('do_orm_execute', failing.on_execute), ('after_flush', failing.on_flush),
+                 ('before_commit', failing.on_commit), ('after_commit', failing.on_end),
+                 ('after_rollback', failing.on_end)]
+    try:
+        other = _open_session(app, user)
+        this = _open_session(app, user)
+        before = _key_state(app, user)
+        for name, fn in listeners:
+            event.listen(Session, name, fn)
+        try:
+            r = call(app, this, user, auth_client)
+        finally:
+            for name, fn in listeners:
+                event.remove(Session, name, fn)
+        assert failing.failed
+        assert r.status_code != 200, r.data
+        assert _key_state(app, user) == before
+        assert _signed_in(other)
+    finally:
+        _cleanup(app, user)
+
+
+@pytest.mark.parametrize('operation', sorted(KEY_CHANGES))
+def test_a_key_change_moves_the_key_and_the_session_version(app, auth_client, operation):
+    start, call = KEY_CHANGES[operation]
+    user = _make_user(app, key=SoftKey(), **start)
+    try:
+        this = _open_session(app, user)
+        keys, version = _key_state(app, user)
+        r = call(app, this, user, auth_client)
+        assert r.status_code == 200, r.data
+        new_keys, new_version = _key_state(app, user)
+        assert new_keys != keys and new_version == version + 1
+    finally:
+        _cleanup(app, user)

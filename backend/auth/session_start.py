@@ -99,13 +99,11 @@ def closed_sessions_note(count):
     return f"{count} other session{'' if count == 1 else 's'} closed"
 
 
-def end_sessions_now(user_id):
-    """For a change another service already committed: every session of the account
-    ends in a commit of its own, the caller's kept; returns sessions_closed_by()."""
-    from models import User, db
-    user = db.session.get(User, user_id)
-    if user is None:
-        return 0
-    user.end_sessions()
-    db.session.commit()
-    return sessions_closed_by(user)
+def end_sessions_on_commit(user_id):
+    """The account row, locked, its sessions ended in the transaction the factor change
+    commits: change and closure stand or fall together. None: no such account."""
+    from auth.twofa_enforcement import lock_user
+    owner = lock_user(user_id)
+    if owner is not None:
+        owner.end_sessions()
+    return owner

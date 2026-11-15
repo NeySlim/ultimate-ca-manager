@@ -17,7 +17,7 @@ from services.webauthn_service import WebAuthnService
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from auth.session_start import closed_sessions_note, end_sessions_now
+from auth.session_start import closed_sessions_note, end_sessions_on_commit, sessions_closed_by
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +57,16 @@ def delete_credential(credential_id):
     user = g.current_user
     if _strips_last_factor(user, credential_id):
         return last_factor_refusal(_LAST_FACTOR_MESSAGE)
-    success, message = WebAuthnService.delete_credential(credential_id, user.id)
-    
-    if not success:
-        return error_response(message, 404)
     # A factor change closes the account's other sessions, as a password change
-    closed = end_sessions_now(user.id)
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
+    success, message = WebAuthnService.delete_credential(credential_id, user.id)
+    if not success:
+        db.session.rollback()
+        return error_response(message, 404)
+    closed = sessions_closed_by(owner)
 
     AuditService.log_action(
         action='webauthn_delete',
@@ -85,12 +89,15 @@ def toggle_credential(credential_id):
     enabled = data.get('enabled', True)
     if not enabled and _strips_last_factor(user, credential_id):
         return last_factor_refusal(_LAST_FACTOR_MESSAGE)
-    
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
     success, message = WebAuthnService.toggle_credential(credential_id, user.id, enabled)
-    
     if not success:
+        db.session.rollback()
         return error_response(message, 404)
-    closed = end_sessions_now(user.id)
+    closed = sessions_closed_by(owner)
 
     AuditService.log_action(
         action='webauthn_toggle',
@@ -126,12 +133,16 @@ def verify_registration():
     credential_data = data.get('credential', {})
     credential_name = data.get('name', 'Security Key')
     hostname = request.host
-    
+
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
     success, message, credential = WebAuthnService.verify_registration(
         user.id, credential_data, hostname, credential_name
     )
-    
     if not success:
+        db.session.rollback()
         return error_response(message, 400)
 
     # A registered key satisfies a forced-enrolment session (#141): lift the gate,
@@ -142,7 +153,7 @@ def verify_registration():
         owner.webauthn_2fa = True
         if not safe_commit(logger, "Failed to keep the enrolled key as second factor")[0]:
             return error_response('Failed to complete 2FA enrolment', 500)
-    closed = end_sessions_now(user.id)
+    closed = sessions_closed_by(owner)
 
     AuditService.log_action(
         action='webauthn_register',

@@ -10,7 +10,9 @@ import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
 from auth.session_reverify import check_session_password
-from auth.session_start import closed_sessions_note, end_sessions_now, keep_own_session
+from auth.session_start import (
+    closed_sessions_note, end_sessions_on_commit, keep_own_session, sessions_closed_by,
+)
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -573,11 +575,15 @@ def delete_user_security_key(user_id, credential_id):
     if refusal:
         return refusal
     from services.webauthn_service import WebAuthnService
+    # The holder's factor changed: their sessions close, as after a password reset
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
     ok, message = WebAuthnService.remove_credential(credential)
     if not ok:
         return error_response(message, 500)
-    # The holder's factor changed: their sessions close, as after a password reset
-    closed = end_sessions_now(user.id)
+    closed = sessions_closed_by(owner)
     _audit_key('webauthn_admin_delete', user, credential, 'removed', closed)
     return success_response(message=f'Security key removed from {user.username}',
                             meta={'other_sessions_closed': closed})
@@ -607,10 +613,14 @@ def toggle_user_security_key(user_id, credential_id):
         if refusal:
             return refusal
     from services.webauthn_service import WebAuthnService
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
     ok, message = WebAuthnService.set_credential_enabled(credential, enabled)
     if not ok:
         return error_response(message, 500)
-    closed = end_sessions_now(user.id)
+    closed = sessions_closed_by(owner)
     _audit_key('webauthn_admin_enable' if enabled else 'webauthn_admin_disable', user, credential,
                'enabled' if enabled else 'disabled', closed)
     return success_response(data=credential.to_dict(), meta={'other_sessions_closed': closed})
