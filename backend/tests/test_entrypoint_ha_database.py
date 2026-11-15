@@ -287,3 +287,17 @@ def test_a_2_254_database_and_an_older_2x_database_count_as_an_upgrade(tmp_path)
         _database(tmp_path, applied)
         r = _run(_df(2999) + _START, env, tmp_path)
         assert r.returncode != 0 and 'upgrading it needs' in r.stdout, r.stdout
+
+
+def test_a_database_lacking_one_migration_of_several_counts_as_an_upgrade(tmp_path):
+    # a later release ships 300 and 301: a database that recorded only 300 still upgrades
+    migrations = tmp_path / 'migrations'
+    migrations.mkdir()
+    for name in ('300_upgrade_from_2_254', '301_later', '_helper'):
+        (migrations / f'{name}.py').write_text('')
+    env = _env(tmp_path, 'false')
+    env['UCM_MIGRATIONS_DIR'] = str(migrations)
+    _database(tmp_path, ['300_upgrade_from_2_254', '_helper'])
+    assert 'upgrading it needs' in _run(_df(2999) + _START, env, tmp_path).stdout
+    _database(tmp_path, ['300_upgrade_from_2_254', '301_later'])
+    assert _run(_df(2999) + _START, env, tmp_path).returncode == 0
