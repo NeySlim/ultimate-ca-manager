@@ -1654,3 +1654,36 @@ def test_an_item_whose_rename_never_ran_waits_for_its_absent_filesystem(tmp_path
     out = box.run()
     assert 'is missing' not in out.stdout, out.stdout
     archived(box, out, data, config)
+
+
+def _local_entries(box):
+    return [p for d in box.data.rglob('.ucm-archive-*') for p in (d, *d.rglob('*'))]
+
+
+@pytest.mark.skipif(os.getuid() != 0, reason='gives files to another owner')
+def test_a_local_archive_and_all_it_holds_are_root_s_before_and_after_the_way_back(tmp_path):
+    """The service account owned what was left: renamed into a local archive, each entry is
+    then root's, a link changed itself only. The 2.254 package of the way back gives the data
+    to that account (chown -R): the README's command gives the local archives back to root, 700."""
+    box = Box(tmp_path, python='stub')
+    outside = tmp_path / 'outside'
+    outside.write_text('not ucm')
+    os.symlink(outside, box.data / 'ca' / 'elsewhere')
+    subprocess.run(['chown', '-hR', '1:1', str(box.data), str(box.config)], check=True)
+    os.chown(outside, 2, 2)
+    box.wrap(other_fs=(box.data,))
+    assert box.run().returncode == 0
+    entries = _local_entries(box)
+    assert entries and any(p.is_symlink() for p in entries)
+    assert [str(p) for p in entries if _owner(p) != (0, 0)] == []
+    assert _owner(outside) == (2, 2) and outside.read_text() == 'not ucm'
+    subprocess.run(['chown', '-R', '1:1', str(box.data), str(box.config)], check=True)
+    assert all(_owner(p) == (1, 1) for p in entries if not p.is_symlink())
+    lines = [l.strip() for l in (box.archive / 'README.txt').read_text().splitlines() if 'chown' in l]
+    assert len(lines) == 2 and 'root:root' in lines[1], lines
+    for line in lines:
+        subprocess.run(['/bin/sh', '-c', line[5:].replace('ucm:ucm', '1:1')], check=True)
+    assert [str(p) for p in entries if _owner(p) != (0, 0)] == []
+    assert all(stat.S_IMODE(d.stat().st_mode) == 0o700 for d in box.data.rglob('.ucm-archive-*'))
+    assert _owner(outside) == (2, 2)
+    assert _owner(box.data / 'ca') == (1, 1)

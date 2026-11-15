@@ -367,6 +367,9 @@ To put that installation back in service
      the directories named .ucm-archive-*$ENV_KEEP), then put these back: the contents of data/
      into $DATA$CONFIG_RESTORE$DB_RESTORE$LOCAL_RESTORE; then
      sudo find $DATA/ $CONFIG/ -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
+     The 2.254 package gave every .ucm-archive-* directory to the service account as it
+     installed: give those left back to root, readable by root only:
+     sudo find $DATA/ $CONFIG/ -name '.ucm-archive-*' -prune -exec chown -hR root:root {} + -exec chmod 700 {} +
   4. Start it (sudo systemctl start ucm) and check that UCM 2.254 opens: this
      records the 2.254 migrations in the database.
   5. Install this release again: it upgrades that database.
@@ -546,6 +549,10 @@ if [ -n "$FIPS_BUILD" ]; then
 fi
 write_readme || fail "writing $DEST/README.txt"
 rm -f -- "$JOURNAL" || fail "removing $JOURNAL"
+# Once nothing can be put back: what a local archive holds is root's, like the directory
+[ -z "$as_root" ] || printf '%s' "$LOCALS" | while IFS= read -r d; do
+    [ -z "$d" ] || chown -hR 0:0 -- "$d" || say "UCM: what $d holds could not all be given to root."
+done
 
 say "Moved, unchanged, everything it left in $DATA and $CONFIG${DB_RESTORE:+ and $DB_FILE}"
 say "to $DEST (root only; README.txt there says how to restore it)."
