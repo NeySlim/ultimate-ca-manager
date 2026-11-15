@@ -14,10 +14,22 @@ Quick start guide for using Ultimate Certificate Manager.
 
 ### Navigation
 
-UCM uses a 3-panel layout:
-- **Sidebar** (left, 52px) -- Main navigation icons
-- **Explorer** -- List of items for current page
-- **Details** (flex) -- Selected item details and actions
+UCM has a top bar above the page:
+- **Top bar** -- the UCM logo (back to the Dashboard), **Dashboard**, **Certificates** and **CAs**, up to three modules you pinned, the **Modules** menu, search (`Ctrl K`), help, the live-link indicator, the theme menu, the notification bell and your account menu
+- **Modules** menu -- every page you may open, grouped as PKI, Protocols, Governance and Administration; pin up to three of them to the bar
+- **List** -- the items of the current page
+- **Details** -- the selected item, beside the list on wide screens (drag its edge to resize) and sliding over the page on narrower ones
+
+The bell lists what needs your attention (failed ACME orders, pending approvals, certificates to renew) and each entry opens the object it names.
+
+### Dashboard
+
+The Dashboard opens on the overview, six cards: what is waiting for you, the health of ACME, SCEP, EST, the TSA signer and the scheduler, the CA hierarchy, the expiry horizon, compliance and the latest operations.
+
+- Each entry of **To handle** opens the object it names: the approval, the SCEP or key recovery request, the ACME order, the CA or its CRL. If someone handled it meanwhile, a message says so.
+- The **TSA** line appears while the TSA is enabled and turns red when the signer is expired, revoked, without its key, missing or within 30 days of expiry. The expiry horizon marks the TSA signer and delegated OCSP responder certificates.
+- The **Scheduler** line turns red when a task failed or when its state is no longer published, even if the latest run was fine.
+- Cards reload by themselves when certificates or CAs change, when the live link comes back and when you return to the tab. **Refresh** reloads them all at once. While the live link is down, cards reload once a minute.
 
 ### Keyboard Shortcuts
 
@@ -379,13 +391,11 @@ The executive PDF report provides a comprehensive, downloadable document for man
 
 Change the UI theme:
 
-1. Click your **user avatar** (bottom of sidebar) to open the user menu
-2. Select **Theme** submenu
-3. Choose from 3 color schemes, each with Light and Dark variants:
-   - Gray (default)
-   - Purple Night
-   - Orange Sunset
-4. Or select **Follow System** to match your OS light/dark preference
+1. Click the **theme** icon (sun or moon) in the top bar
+2. Pick a **Color Theme**
+3. Pick an **Appearance Mode**: Light, Dark, or **Follow System** to match your OS light/dark preference
+
+The language is chosen in the account menu (your avatar, right end of the top bar).
 
 Theme persists across sessions.
 
@@ -395,10 +405,9 @@ Theme persists across sessions.
 
 UCM is mobile-responsive:
 
-- **Bottom Sheet** - Tap the peek bar to see explorer list
-- **Swipe** - Drag to resize the explorer
-- **Tap to Select** - Touch items to view details
-- **Auto-Close** - Sheet closes when item selected
+- **Page picker** - The top bar shows a page selector in place of the menus
+- **Tap to Select** - Touch an item to open its details over the page
+- **Close** - Use the close button of the details
 
 ---
 

@@ -53,6 +53,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Renewal: a deploy binding or the HTTPS binding that an EST, SCEP or WSTEP renewal leaves on the previous certificate (no key in UCM) is now flagged in the API (`needs_attention`), the bell, the overview queue and a `certificate.binding_left_behind` event; it can be reattached once UCM holds the key, and importing that key moves it.
 - HA preview: the HTTPS certificate can be applied or regenerated on any node and a renewal of the bound one follows: every node writes the certificate and key from the database before its TLS socket opens, then the nodes restart one at a time. An uploaded Kerberos keytab is stored in the database and written on every node.
+- **The overview follows the data.** Its cards reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when the tab returns, and a Refresh button reloads them all; the health card shows the TSA signer, and the expiry horizon marks the TSA signer and delegated OCSP responders.
 
 ### Changed
 
@@ -84,6 +85,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Overview links open their object.** The links of the work queue and the bell now open the approval, SCEP or key recovery request, ACME order or CA they name (new reads `GET /scep/requests/{id}`, `/key-recovery/{id}` and `/acme/orders/{id}`), and say so when it was handled meanwhile.
+- **Overview states in the user's language.** Request states, CA statuses and the last run of a protocol are no longer shown in English, and the scheduler line shows failed tasks and an unpublished state instead of the latest run only.
 - **HA: two nodes can no longer share a node identifier.** A node started with the `UCM_NODE_ID` of a live node (two cloned VMs keep the same host name) refuses to start with a message naming it, and a running node whose identifier another process took fails `/health/ready` and stops leading instead of overwriting its row; a node restarted after a crash waits at most three minutes for its previous heartbeat to expire. The Helm chart in HA mode adds a startup probe covering that wait, so the liveness probe no longer restarts such a container before it serves.
 - Revocation: while lifting a hold on a CA with delta CRLs, OCSP answered `revoked` with reason `unspecified` and a complete CRL listed the certificate without a reason. Until the hold is lifted, both now answer `certificateHold` with the date of the hold, a final revocation recorded for the serial still prevails, and only the delta CRL says `removeFromCRL`.
 - Docker: stopping the container now stops UCM cleanly. The server never received the stop signal and was killed when the grace period ran out, so a node in HA kept its row until its heartbeat expired.
