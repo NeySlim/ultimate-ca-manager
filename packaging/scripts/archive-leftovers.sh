@@ -577,7 +577,7 @@ until mkdir -- "$DEST" 2>/dev/null; do
 done
 JOURNAL=$DEST/.journal LOCAL_NAME=$LOCAL_PREFIX${DEST##*/}
 
-DB_LINE="" DB_RESTORE=""
+DB_LINE="" DB_RESTORE="" DB_MOVED=""
 if [ -d "$DATA" ]; then
     archive_contents "$DATA" "$DEST/data" || fail "moving $DATA"
 fi
@@ -595,9 +595,10 @@ case $(normal "$DB_FILE") in
             [ -e "$f" ] || continue
             move_item "$f" "$DEST/database/${f##*/}" || fail "moving $f"
         done
-        DB_LINE="  database/   $DB_FILE, which DATABASE_PATH placed outside $DATA
-"
-        DB_RESTORE=", of database/ into ${DB_DIR:-/}" ;;
+        DB_MOVED=1
+        # Kept beside itself, it is named with the local archives: database/ stays empty
+        [ -z "$(ls -A -- "$DEST/database")" ] || DB_LINE="  database/   $DB_FILE, which DATABASE_PATH placed outside $DATA
+" DB_RESTORE=", of database/ into ${DB_DIR:-/}" ;;
 esac
 # Written inside the journal, so that a retry after any interruption takes it back first;
 # the line names where the archived ucm.env went, centrally or beside the new one
@@ -614,7 +615,7 @@ rm -f -- "$JOURNAL" || fail "removing $JOURNAL"
     [ -z "$d" ] || chown -hR 0:0 -- "$d" || say "UCM: what $d holds could not all be given to root."
 done
 
-say "Moved, unchanged, everything it left in $DATA and $CONFIG${DB_RESTORE:+ and $DB_FILE}"
+say "Moved, unchanged, everything it left in $DATA and $CONFIG${DB_MOVED:+ and $DB_FILE}"
 say "to $DEST (root only; README.txt there says how to restore it)."
 if [ "$LOCALS" != "$NL" ]; then
     say "What could not be renamed out of its filesystem is beside it, readable by root only, in:"

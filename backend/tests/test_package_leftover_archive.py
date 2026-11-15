@@ -438,8 +438,12 @@ def test_a_database_placed_elsewhere_goes_with_its_journal_files(tmp_path, where
     assert sorted(p.name for p in elsewhere.iterdir()) == sorted(
         ['unrelated'] + ([LOCAL] if where != 'one filesystem' else []))
     readme = (box.archive / 'README.txt').read_text()
-    assert f'{elsewhere}/pki.db' in readme
-    assert (f'{elsewhere}/{LOCAL}' in readme) == (where != 'one filesystem')
+    # database/ is described, and put back, only when it holds the database
+    one = where == 'one filesystem'
+    assert (f'database/   {elsewhere}/pki.db, which DATABASE_PATH' in readme) is one, readme
+    assert (f'of database/ into {elsewhere}' in ' '.join(readme.split())) is one, readme
+    assert (f'{elsewhere}/{LOCAL}/: pki.db pki.db-wal' in readme) is not one, readme
+    assert f'{elsewhere}/pki.db' in out.stdout
 
 
 @pytest.mark.parametrize('spelling', ['{data}/./ucm.db', '{data}//ucm.db', '{home}/../ucm/data/ucm.db'])
@@ -471,7 +475,8 @@ def test_a_database_at_the_root_is_a_whole_step_and_a_later_failure_puts_all_bac
     box = box_at(tmp_path / 'count')
     box.wrap(fail='rm', at=10 ** 6)
     assert box.run().returncode == 0
-    assert 'of database/ into /;' in ' '.join((box.archive / 'README.txt').read_text().split())
+    # Nothing was at /ucm.db: database/ holds nothing, and the README does not describe it
+    assert 'database/' not in (box.archive / 'README.txt').read_text()
     last_rm = int((box.state / 'count').read_text())
     box = box_at(tmp_path / 'box')
     box.wrap(fail='rm', at=last_rm)
