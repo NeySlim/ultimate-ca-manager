@@ -342,15 +342,16 @@ def _give_row_a_cert(app, csr_id, cn, source):
     return serial
 
 
-def test_sync_leaves_a_request_whose_csr_a_local_ca_signed_meanwhile(app, ca):
+def test_sync_closes_a_request_whose_csr_a_local_ca_signed_meanwhile(app, ca):
     from models import Certificate, db
     msca_id = _make_msca(app, 'PC local')
     req_id, csr_id = _pending(app, msca_id, 904, 'pc-local.test.local')
     local_serial = _give_row_a_cert(app, csr_id, 'pc-local.test.local', 'csr')
     ca.add(904, 'pc-local.test.local')
     s = _sync(app, msca_id)
-    assert (s['completed'], s['imported'], s['skipped']) == (0, 0, 1)
-    assert _req(app, req_id)[:2] == ('pending', None)
+    # The CA's certificate enters on a row of its own
+    assert (s['completed'], s['imported'], s['skipped']) == (0, 1, 0)
+    assert _req(app, req_id)[:2] == ('superseded', None)
     with app.app_context():
         stored = str(db.session.get(Certificate, csr_id).serial_number)
         assert stored in (local_serial, str(int(local_serial, 16)))

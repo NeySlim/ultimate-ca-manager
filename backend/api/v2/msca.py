@@ -12,6 +12,7 @@ from utils.response import success_response, error_response, created_response, n
 from models import db
 from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
+from services.msca.requests import MSCASignedElsewhere, SUPERSEDED, SUPERSEDED_MESSAGE, msca_may_write_clause
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
@@ -962,6 +963,8 @@ def check_request_status(msca_id, request_id):
     from services.msca.requests import MSCAImportError
     try:
         result = MicrosoftCAService.check_request(msca_id, request_id)
+        if result.get('status') == SUPERSEDED:
+            return success_response(data=result, message=SUPERSEDED_MESSAGE)
         return success_response(data=result)
     except MSCAImportError as e:
         logger.error(f"MS CA request {request_id} issued but UCM import failed: {e}")
@@ -1068,6 +1071,10 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id, announce
         # aki/ski come from the crt listener, in the form CA lookups match
         old_serial = stored_certificate_serial(csr) if csr is not None else None
         if csr is not None:
+            # Atomic with the write: a certificate another source stored on this row stays
+            if Certificate.query.filter(Certificate.id == csr.id, msca_may_write_clause()).update(
+                    {Certificate.crt: cert_pem_b64}, synchronize_session=False) != 1:
+                raise MSCASignedElsewhere(f"CSR id={csr.id} already holds a certificate from another source")
             csr.crt = cert_pem_b64
             csr.descr = csr.descr or f"MSCA: {cn} ({template})"
             csr.cert_type = csr.cert_type or 'server'
@@ -1138,6 +1145,8 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id, announce
             emit_cert_stored(cert.to_dict(), old_serial, cert_obj.serial_number,
                              ca_refid=cert.caref, actor=actor)
 
+    except MSCASignedElsewhere:
+        raise
     except Exception as e:
         logger.error(f"Failed to import MS CA signed certificate: {e}", exc_info=True)
         raise

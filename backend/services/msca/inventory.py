@@ -51,6 +51,13 @@ class MicrosoftCAInventoryMixin:
         start_id = 0 if full else (msca.last_synced_request_id or 0)
         # Pending requests may sit below the high-water mark: scan from the oldest
         pending = MicrosoftCAInventoryMixin._pending_requests(msca)
+        # A request whose CSR another source signed is closed here, before it can pin the scan
+        from .requests import holds_foreign_certificate, supersede
+        stale = {r for r, q in pending.items()
+                 if q.csr_id and holds_foreign_certificate(db.session.get(Certificate, q.csr_id))}
+        if stale:
+            supersede([pending[r].id for r in stale], username=username, commit=False)
+            pending = {r: q for r, q in pending.items() if r not in stale}
         if pending:
             start_id = min(start_id, min(pending))
 
@@ -78,6 +85,7 @@ class MicrosoftCAInventoryMixin:
             req_id, serial, template, cn = row
             max_request_id = max(max_request_id, req_id)
 
+            pem = None
             # A request UCM submitted that the CA now shows issued: finish it
             if req_id in pending:
                 # Certificate already in UCM by serial: do not import a second copy,
@@ -88,35 +96,31 @@ class MicrosoftCAInventoryMixin:
                     completed_ids.add(req_id)
                     skipped += 1
                     continue
-                # A CSR signed elsewhere meanwhile holds a live certificate: never
-                # overwrite it unattended (an MS CA renewal has source 'msca')
-                csr_row = (db.session.get(Certificate, pending[req_id].csr_id)
-                           if pending[req_id].csr_id else None)
-                if csr_row is not None and csr_row.crt and csr_row.source != 'msca':
-                    logger.warning(
-                        f"MS CA '{msca.name}' inventory: RequestId={req_id} left pending, "
-                        f"its CSR (id={csr_row.id}) already holds a certificate from another source"
-                    )
-                    skipped += 1
-                    continue
                 try:
                     pem = MicrosoftCAInventoryMixin._fetch_cert_pem(msca, req_id)
                     if not pem:
                         failed += 1
                         continue
                     from .ca_control import MicrosoftCACAControlMixin
-                    if MicrosoftCACAControlMixin.complete_request(msca, pending[req_id], pem):
-                        completed += 1
-                        completed_ids.add(req_id)
-                    else:
-                        skipped += 1
+                    outcome, cert_id = MicrosoftCACAControlMixin.complete_request(
+                        msca, pending[req_id], pem)
                 except Exception as e:
                     db.session.rollback()
                     failed += 1
                     logger.warning(
                         f"MS CA '{msca.name}' inventory: failed to complete RequestId={req_id}: {e}"
                     )
-                continue
+                    continue
+                if outcome != 'superseded':
+                    if outcome == 'imported' or cert_id:
+                        completed += 1
+                        completed_ids.add(req_id)
+                    else:
+                        skipped += 1
+                    continue
+                # Signed elsewhere meanwhile: the certificate enters as a foreign one
+                completed_ids.add(req_id)
+                known_request_ids.discard(req_id)
             # Dedup level 1: this CA RequestId is already tracked by UCM
             # (exact link — covers certs signed through UCM itself).
             if req_id in known_request_ids:
@@ -139,7 +143,7 @@ class MicrosoftCAInventoryMixin:
             known_serials |= variants  # avoid re-importing a dup within this run
 
             try:
-                pem = MicrosoftCAInventoryMixin._fetch_cert_pem(msca, req_id)
+                pem = pem or MicrosoftCAInventoryMixin._fetch_cert_pem(msca, req_id)
                 if not pem:
                     failed += 1
                     continue
@@ -422,7 +426,10 @@ class MicrosoftCAInventoryMixin:
             row[0] for row in
             db.session.query(MSCARequest.request_id)
             .filter(MSCARequest.msca_id == msca.id,
-                    MSCARequest.request_id.isnot(None)).all()
+                    MSCARequest.request_id.isnot(None),
+                    # A superseded request owns no certificate: the CA's one is still unknown
+                    db.or_(MSCARequest.status.is_(None),
+                           MSCARequest.status != 'superseded')).all()
         }
 
     @staticmethod

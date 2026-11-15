@@ -112,26 +112,38 @@ class MicrosoftCACAControlMixin:
                .order_by(MSCARequest.id.desc()).first())
         if req is None:
             return False, None
-        return True, MicrosoftCACAControlMixin.complete_request(msca, req, pem)
+        outcome, cert_id = MicrosoftCACAControlMixin.complete_request(msca, req, pem)
+        # A request closed as superseded no longer owns the certificate: import it as foreign
+        return outcome != 'superseded', cert_id
 
     @staticmethod
     def complete_request(msca, req, pem):
         """Import the issued certificate into a request's row, claimed atomically so
-        concurrent callers import once. Returns its cert_id (None if another caller won)."""
+        concurrent callers import once. Returns (outcome, cert_id): 'imported' by this
+        call, 'lost' to another caller, or 'superseded' when the CSR was signed elsewhere."""
         from models import Certificate
         from models.msca import MSCARequest
+        from .requests import MSCASignedElsewhere, SUPERSEDED, supersede
         claimed = (MSCARequest.query
                    .filter(MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
-                           MSCARequest.status != 'issued')
+                           MSCARequest.status.notin_(('issued', SUPERSEDED)))
                    .update({MSCARequest.status: 'issued', MSCARequest.cert_pem: pem},
                            synchronize_session=False))
         if claimed != 1:
             db.session.rollback()
-            return db.session.get(MSCARequest, req.id).cert_id
+            current = db.session.get(MSCARequest, req.id)
+            if current.status == SUPERSEDED:
+                return 'superseded', None
+            return 'lost', current.cert_id
         from api.v2.msca import _import_signed_cert
         row = db.session.get(Certificate, req.csr_id) if req.csr_id else None
-        _import_signed_cert(row, pem, msca, req.template, req.id)
-        return db.session.get(MSCARequest, req.id).cert_id
+        try:
+            _import_signed_cert(row, pem, msca, req.template, req.id)
+        except MSCASignedElsewhere:
+            db.session.rollback()
+            supersede([req.id])
+            return 'superseded', None
+        return 'imported', db.session.get(MSCARequest, req.id).cert_id
 
     @staticmethod
     def deny_request(msca_id, request_id):

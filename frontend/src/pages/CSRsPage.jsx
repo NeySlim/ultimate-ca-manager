@@ -322,6 +322,10 @@ export default function CSRsPage() {
         showError(t('msca.checkDenied'))
         loadData()
         setMscaRequest(null)
+      } else if (status === 'superseded') {
+        showInfo(t('msca.checkSuperseded'))
+        loadData()
+        setMscaRequest(null)
       } else {
         showInfo(t('msca.checkStillPending'))
       }

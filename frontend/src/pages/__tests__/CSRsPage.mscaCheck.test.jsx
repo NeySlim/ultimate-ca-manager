@@ -1,6 +1,6 @@
 /**
  * A CSR waiting on a Microsoft CA offers Check status: issued and imported,
- * still pending, denied, or an error.
+ * still pending, denied, signed elsewhere, or an error.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
@@ -142,6 +142,14 @@ describe('CSRsPage Microsoft CA status check', () => {
     checkRequest.mockResolvedValue({ data: { status: 'denied' } })
     fireEvent.click(await openCSR())
     await waitFor(() => expect(showError).toHaveBeenCalledWith('msca.checkDenied'))
+  })
+
+  it('says the CSR was signed elsewhere', async () => {
+    checkRequest.mockResolvedValue({ data: { status: 'superseded' } })
+    fireEvent.click(await openCSR())
+    await waitFor(() => expect(showInfo).toHaveBeenCalledWith('msca.checkSuperseded'))
+    expect(openEntity).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByText('msca.checkStatus')).toBeNull())
   })
 
   it('reports an error', async () => {

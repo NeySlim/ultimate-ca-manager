@@ -12,6 +12,64 @@ class MSCAImportError(RuntimeError):
     """The CA issued the certificate but UCM could not store it."""
 
 
+class MSCASignedElsewhere(RuntimeError):
+    """The CSR row already holds a certificate the Microsoft CA did not issue."""
+
+
+# Terminal state of a request whose CSR received a certificate from another source
+SUPERSEDED = 'superseded'
+SUPERSEDED_MESSAGE = 'The CSR was signed elsewhere; the Microsoft CA request is closed'
+
+
+def holds_foreign_certificate(row):
+    """True when the row carries a certificate that no Microsoft CA connection issued."""
+    return bool(row is not None and row.crt and row.source != 'msca'
+                and not (row.imported_from or '').startswith('msca:'))
+
+
+def msca_may_write_clause():
+    """SQL twin of ``not holds_foreign_certificate``: the row has no certificate, or one
+    a Microsoft CA issued (a renewal replaces it in place)."""
+    from models import Certificate
+    return db.or_(Certificate.crt.is_(None), Certificate.crt == '',
+                  Certificate.source == 'msca', Certificate.imported_from.like('msca:%'))
+
+
+def supersede(req_ids, *, username='system', commit=True):
+    """Close the given open requests as superseded, audited; returns how many changed.
+    Rides the caller's transaction when ``commit`` is False."""
+    from services.audit.staging import stage_audit_entry
+    closed = 0
+    for req in MSCARequest.query.filter(MSCARequest.id.in_(list(req_ids))).all():
+        changed = (MSCARequest.query
+                   .filter(MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
+                           MSCARequest.status.in_(('submitted', 'pending')))
+                   .update({MSCARequest.status: SUPERSEDED,
+                            MSCARequest.error_message: 'CSR signed elsewhere'},
+                           synchronize_session=False))
+        if changed != 1:
+            continue
+        closed += 1
+        msca = db.session.get(MicrosoftCA, req.msca_id)
+        stage_audit_entry(action='msca.request_superseded', resource_type='microsoft_ca',
+                          resource_id=str(req.msca_id), resource_name=msca.name if msca else None,
+                          username=username,
+                          details=f"RequestId={req.request_id} csr_id={req.csr_id}: CSR signed elsewhere")
+        logger.info(f"MS CA request RequestId={req.request_id} closed: its CSR (id={req.csr_id}) "
+                    f"was signed elsewhere")
+    if commit:
+        db.session.commit()
+    return closed
+
+
+def supersede_for_csr(csr_id, *, username='system', commit=True):
+    """Close the open Microsoft CA requests of a CSR that just received a certificate."""
+    ids = [rid for (rid,) in db.session.query(MSCARequest.id).filter(
+        MSCARequest.csr_id == csr_id, MSCARequest.cert_id.is_(None),
+        MSCARequest.status.in_(('submitted', 'pending')))]
+    return supersede(ids, username=username, commit=commit) if ids else 0
+
+
 class MicrosoftCARequestsMixin:
 
     @staticmethod
@@ -22,11 +80,18 @@ class MicrosoftCARequestsMixin:
         if not req or req.msca_id != msca_id:
             raise ValueError('Request not found')
 
-        if req.status == 'issued':
+        if req.status in ('issued', SUPERSEDED):
             return req.to_dict()
 
         if not req.request_id:
             return req.to_dict()
+
+        if not req.cert_id and req.csr_id:
+            from models import Certificate
+            if holds_foreign_certificate(db.session.get(Certificate, req.csr_id)):
+                supersede([req.id])
+                db.session.refresh(req)
+                return req.to_dict()
 
         msca = db.session.get(MicrosoftCA, msca_id)
         if not msca:

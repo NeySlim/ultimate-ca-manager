@@ -41,6 +41,11 @@ def _setup(app, auth_client, create_ca, cn, bound=True):
     key = _gen()
     old = _cert(cn, key, issuer_cert=ca_cert, signer=ca_key)
     cert_id = _store_cert(app, old, key, caref=caref)
+    with app.app_context():
+        # A Microsoft CA renewal replaces a certificate that CA issued (renew_via_msca)
+        from models import db, Certificate
+        db.session.get(Certificate, cert_id).source = 'msca'
+        db.session.commit()
     if bound:
         _create_binding(auth_client, _create_target(auth_client)['id'], cert_id)
     return ca_cert, ca_key, key, cert_id
