@@ -1542,7 +1542,7 @@
     "proxyUpstreamUrl": "上游目录 URL",
     "proxyUpstreamUrlHelper": "上游 ACME 服务器的目录 URL。如果为空，默认使用 Let's Encrypt staging。",
     "proxyUsage": "certbot 使用方法：",
-    "proxyUsageNote": "前提：域名（或覆盖子域的父域）须在 ACME 域名中配置 DNS 提供商。代理仅支持 dns-01。\n\n每个外部 CA 账户可暴露专用端点：/acme/proxy/<slug>/directory（在证书颁发机构 (CA)中启用 **通过 ACME 代理暴露**）。默认路径 /acme/proxy/directory 遵循代理设置中所选账户。\n\nUCM 通过该提供商自动创建和删除 TXT 记录。--manual-auth-hook 与 --manual-cleanup-hook 可保持为 no-op（/bin/true），DNS 校验由代理完成。\n\n避免对同一名称并发发起两次请求（Certbot + UCM 界面）：第二条 TXT 记录可能覆盖第一条。若 UCM HTTPS 证书为自签名（实验环境），请为 Certbot 添加 --no-verify-ssl。",
+    "proxyUsageNote": "前提：域名（或覆盖子域的父域）须在 ACME 域名中配置 DNS 提供商。代理仅支持 dns-01。\n\n每个外部 CA 账户可暴露专用端点：/acme/proxy/<slug>/directory（在“证书颁发机构 (CA)”中启用 **通过 ACME 代理暴露**）。默认路径 /acme/proxy/directory 遵循代理设置中所选账户。\n\nUCM 通过该提供商自动创建和删除 TXT 记录。--manual-auth-hook 与 --manual-cleanup-hook 可保持为 no-op（/bin/true），DNS 校验由代理完成。\n\n避免对同一名称并发发起两次请求（Certbot + UCM 界面）：第二条 TXT 记录可能覆盖第一条。若 UCM HTTPS 证书为自签名（实验环境），请为 Certbot 添加 --no-verify-ssl。",
     "proxyRegistered": "代理已注册",
     "registerAccount": "注册账户",
     "aboutAcmeDesc": "ACME 实现自动化证书颁发。配置下方服务器，然后使用任何 ACME 客户端（certbot, acme.sh 等）连接目录 URL。",

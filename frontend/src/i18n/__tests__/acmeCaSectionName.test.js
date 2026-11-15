@@ -76,6 +76,11 @@ describe('help pointers to the section carry the exact screen title', () => {
     const item = JSON.stringify(helpContent).match(/"label":"Upstream CA account","text":"([^"]*)"/)
     expect(item[1]).toContain(title('en'))
   })
+  it('en: the ACME help never cites the section without the suffix', () => {
+    // Only the ACME entries: elsewhere the bare name is the CA page itself
+    expect(bareUses(JSON.stringify(helpContent.acme), 'en')).toBe(0)
+    expect(bareUses(JSON.stringify(helpGuides.acme), 'en')).toBe(0)
+  })
   for (const code of ['fr', 'zh']) {
     it(`${code}: the upstream account item points at the section`, () => {
       const m = helpFile(code).match(/label: ['"](?:Compte CA en amont|上游 CA 账户)['"], text: ['"]((?:[^'"\\]|\\.)*)['"]/)

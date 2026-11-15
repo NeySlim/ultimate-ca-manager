@@ -75,7 +75,7 @@ export default {
       {
         title: 'ACME 代理',
         items: [
-          { label: '上游 CA 账户', text: '选择证书颁发机构 (CA) 中的一个账户：其目录 URL（Let\'s Encrypt、ZeroSSL、任何 RFC 8555 CA）和 EAB 凭据在该账户上设置' },
+          { label: '上游 CA 账户', text: '选择“证书颁发机构 (CA)”中的一个账户：其目录 URL（Let\'s Encrypt、ZeroSSL、任何 RFC 8555 CA）和 EAB 凭据在该账户上设置' },
           { label: '账户状态', text: '显示UCM是否已在上游CA注册。账户在首次代理请求时自动注册' },
           { label: '测试连接', text: '验证与上游CA的连接性并检查是否需要EAB凭据' },
           { label: '重置账户', text: '清除所选 CA 账户的上游注册以强制重新注册' },
@@ -98,7 +98,7 @@ export default {
         title: 'ACME 代理的 DNS UPDATE (RFC 2136)',
         items: [
           { label: '功能', text: '客户端使用自己的标准 rfc2136 求解器（certbot、lego、cert-manager、acme.sh、win-acme、Posh-ACME），并指向 UCM。UCM 仍然通过自己的 DNS 提供商创建 TXT 记录' },
-          { label: '密钥', text: '在证书颁发机构 (CA)中为每个代理账户创建密钥。密钥可以关联 EAB 凭据：关联后，它只对使用该凭据注册的 ACME 账户的订单有效。UCM 只显示一次密文' },
+          { label: '密钥', text: '在“证书颁发机构 (CA)”中为每个代理账户创建密钥。密钥可以关联 EAB 凭据：关联后，它只对使用该凭据注册的 ACME 账户的订单有效。UCM 只显示一次密文' },
           { label: '接受的更改', text: 'UCM 只接受 _acme-challenge 下的 TXT 记录，且值必须与它为订单预期的值相同。其他更改会被拒绝。对删除请求，它总是回复 NOERROR' },
           { label: '端口和网络', text: '在 ACME 代理部分设置监听端口（0 表示禁用，范围 1024 到 65535，需要重启）。只在内部网络中使用。要使用端口 53，请在 Docker 或 Kubernetes 中，或用防火墙重定向，把它映射到该端口' },
           { label: '算法', text: 'hmac-sha256、hmac-sha384 和 hmac-sha512。UCM 会拒绝 md5 和 sha1（许多客户端的默认值）：请在每个客户端中设置算法。cert-manager 不支持 sha384，win-acme 对它的计算有误' },
@@ -224,7 +224,7 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 
 将 CA 的目录 URL 设置为其在**证书颁发机构 (CA)**中账户的 **ACME目录URL**。
 
-### 证书颁发机构 (CA)
+### “证书颁发机构 (CA)”
 管理 UCM 注册的所有外部 CA 账户：
 
 - **每个 CA 允许多个账户**：多个账户可共享相同的目录 URL（例如两个使用不同联系邮箱的 Let's Encrypt 账户用于管理分离，配合 dns-persist-01 很有用）。账户行本身是身份标识，而非 URL。
