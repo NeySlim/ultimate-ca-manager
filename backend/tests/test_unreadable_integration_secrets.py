@@ -131,3 +131,60 @@ def test_oauth2_login_with_an_unreadable_client_secret_is_not_attempted(app, mon
             for opid, enabled in others:
                 db.session.get(SSOProvider, opid).enabled = enabled
             db.session.commit()
+
+
+def _gcp_row(provider_id, service_account_json):
+    import json
+    from models.hsm import HsmProvider
+    return HsmProvider(id=provider_id, name='kms', type='google-kms', config=json.dumps({
+        'project_id': 'p', 'key_ring': 'r', 'service_account_json': service_account_json}))
+
+
+def test_gcp_kms_with_an_unreadable_service_account_never_falls_back_to_default_credentials(
+        app, monkeypatch):
+    from services.hsm import HsmService
+    from services.hsm import gcp_provider
+    from services.hsm.base_provider import HsmConfigError
+    built = []
+    monkeypatch.setattr(gcp_provider.kms_v1, 'KeyManagementServiceClient',
+                        lambda *a, **k: built.append(k) or MagicMock())
+    with app.app_context(), pytest.raises(
+            HsmConfigError, match='HSM provider 7 service_account_json cannot be decrypted'):
+        HsmService._get_provider_instance(_gcp_row(7, _foreign_token('{"type": "service_account"}'))).connect()
+    assert built == []
+
+
+def test_hsm_connection_test_with_an_unreadable_secret_names_the_field(app, monkeypatch):
+    from models import db
+    from services.hsm import HsmService, gcp_provider
+    built = []
+    monkeypatch.setattr(gcp_provider.kms_v1, 'KeyManagementServiceClient',
+                        lambda *a, **k: built.append(k) or MagicMock())
+    with app.app_context():
+        row = _gcp_row(None, _foreign_token('{"type": "service_account"}'))
+        row.name = f'kms-{uuid.uuid4().hex[:6]}'
+        db.session.add(row)
+        db.session.commit()
+        try:
+            result = HsmService.test_provider(row.id)
+            assert result['success'] is False
+            assert f'HSM provider {row.id} service_account_json' in result['message']
+            assert built == []
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_hsm_provider_with_a_readable_secret_still_gets_it(app):
+    from services.hsm import HsmService
+    from utils.encryption import encrypt_value
+    with app.app_context():
+        hsm = HsmService._get_provider_instance(_gcp_row(8, encrypt_value('{"a": 1}')))
+    assert hsm.service_account_json == '{"a": 1}'
+
+
+def test_hsm_provider_listing_stays_readable_with_an_unreadable_secret(app):
+    with app.app_context():
+        row = _gcp_row(9, _foreign_token())
+        assert row.get_config()['service_account_json'] is None
+        assert row.to_dict()['type'] == 'google-kms'

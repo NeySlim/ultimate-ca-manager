@@ -25,6 +25,7 @@ from services.hsm.base_provider import (
 )
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
+from utils.encryption import SecretUnreadable
 from utils.ha import SOFTHSM_LOCAL, ha_enabled, refuse_softhsm_in_ha
 from utils.process_lock import LockBusyError, process_lock
 from utils import hsm_check, pkcs11_config
@@ -154,7 +155,10 @@ class HsmService:
             )
         
         provider_class = cls._provider_registry[provider.type]
-        config = provider.get_config()
+        try:
+            config = provider.connection_config()
+        except SecretUnreadable as e:
+            raise HsmConfigError(str(e)) from e
         return provider_class(config)
     
     # =========================================================================
