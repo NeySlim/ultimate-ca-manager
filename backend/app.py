@@ -1250,6 +1250,9 @@ def create_app(config_name=None):
         return (admin_allowlist.REFUSAL_MESSAGE, 403,
                 {'Content-Type': 'text/plain; charset=utf-8'})
 
+    # Ahead of the certificate sign-in hook and of every identity check
+    from auth.session_epoch import remember_request_epoch
+    app.before_request_funcs.setdefault(None, []).insert(0, remember_request_epoch)
     app.before_request_funcs.setdefault(None, []).insert(0, enforce_admin_allowlist)
 
     # ── Global error handlers ─────────────────────────────────

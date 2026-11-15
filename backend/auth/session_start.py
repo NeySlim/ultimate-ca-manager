@@ -24,16 +24,17 @@ def account_proof(user) -> str:
 
 
 def begin_session(user):
-    """Empty session under a new identifier, bound to ``user``'s session version.
+    """Empty session under a new identifier, bound to ``user``'s session version and
+    to the epoch read as the request started, before its credentials were checked.
 
     Every login goes through here: an identifier planted before the login never
     becomes an authenticated session.
     """
-    from auth.session_epoch import SESSION_KEY, current_epoch
+    from auth.session_epoch import SESSION_KEY, request_epoch
     session.clear()
     session['session_version'] = user.session_version or 0
     session[ACCOUNT_KEY] = account_proof(user)
-    session[SESSION_KEY] = current_epoch()
+    session[SESSION_KEY] = request_epoch()
     _new_identifier()
 
 
