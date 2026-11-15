@@ -3,8 +3,8 @@
 > **Version**: 2.48+  
 > **Base URL**: `https://your-server:8443/api/v2`  
 > **Last Updated**: February 2026  
-> **Total Endpoints**: 347  
-> **Note**: All endpoints are served from `api/v2/` (34 registered blueprints). There is no separate `features/` module.
+> **Coverage**: `backend/tests/test_api_reference_routes.py` checks this file against the application's route table.  
+> **Operation format**: each operation is written `METHOD /path` at the start of a line (`{id}` marks a path parameter).
 
 ---
 
@@ -343,82 +343,80 @@ A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Beare
 
 ### WebAuthn Credentials
 
-```http
-# Check WebAuthn availability
-GET /api/v2/account/webauthn/available
-
-# List credentials
-GET /api/v2/account/webauthn/credentials
-
-# Register new credential - Step 1
-POST /api/v2/account/webauthn/register/options
-
-# Register new credential - Step 2
-POST /api/v2/account/webauthn/register/verify
-Content-Type: application/json
-
-{
-  "name": "YubiKey 5",
-  "response": { ... }  // WebAuthn attestation response
-}
-
-# Toggle credential
-POST /api/v2/account/webauthn/credentials/{credential_id}/toggle
-
-# Delete credential
-DELETE /api/v2/account/webauthn/credentials/{credential_id}
-```
+Security-key management for the signed-in account is served under `/api/v2/webauthn/`; see [WebAuthn](#webauthn). There is no `/api/v2/account/webauthn/` prefix.
 
 ### mTLS Certificates
 
+Served under `/api/v2/mtls/` (not under `/account/`). Except for the two settings routes, every route here refuses API keys: it needs an interactive session (`403` otherwise). A user works on their own enrolments; an admin may act on another user's where noted.
+
 ```http
-# List enrolled certificates
-GET /api/v2/account/mtls/certificates
-
-# List all certificates (admin)
-GET /api/v2/account/mtls/certificates/all
-
-# Create new mTLS certificate
-POST /api/v2/account/mtls/certificates/create
-Content-Type: application/json
-
-{
-  "name": "My Laptop",
-  "validity_days": 365
-}
-
-# Enroll existing certificate
-POST /api/v2/account/mtls/certificates/enroll
-
-# Download certificate
-GET /api/v2/account/mtls/certificates/{cert_id}/download?format=pem
-
-# Enable/disable certificate
-POST /api/v2/account/mtls/certificates/{cert_id}/enable
-Content-Type: application/json
-
-{
-  "enabled": true
-}
-
-# Revoke certificate
-POST /api/v2/account/mtls/certificates/{cert_id}/revoke
-
-# Delete certificate
-DELETE /api/v2/account/mtls/certificates/{cert_id}
-
-# Get mTLS settings
-GET /api/v2/account/mtls/settings
-
-# Update mTLS settings
-PUT /api/v2/account/mtls/settings
-Content-Type: application/json
-
-{
-  "enabled": true,
-  "issuing_ca_id": 1
-}
+GET /api/v2/mtls/settings
 ```
+Permission `read:settings`. Returns `enabled`, `required`, `trusted_ca_id` and `trusted_ca` (`refid`, `name`, `valid_to`, `has_private_key`, or `null`).
+
+```http
+PUT /api/v2/mtls/settings
+Content-Type: application/json
+
+{ "enabled": true, "required": false, "trusted_ca_id": "<CA refid>" }
+```
+Permission `admin:system`. Every field is optional; an empty body answers `400`. Unknown `trusted_ca_id` when enabling answers `404`. `required: true` with `enabled: true` answers `400` while no active admin has an enabled enrolled certificate. The change needs a service restart: the response carries `needs_restart` and `restart_message` (in HA mode a rolling restart is queued instead).
+
+```http
+GET /api/v2/mtls/certificates
+```
+Any authenticated user. The caller's enrolled certificates, newest first.
+
+```http
+POST /api/v2/mtls/certificates
+Content-Type: application/json
+
+{ "name": "My Laptop", "validity_days": 365, "organization": "UCM Users", "ca_id": 1 }
+```
+Permission `write:user_certificates`, session only. Issues a client certificate (CN `<username>@mtls`) from the configured mTLS CA and enrolls it. `ca_id` (numeric id or refid) overrides the configured CA and then also requires `write:cas` (`403`). `400` when no mTLS CA is configured and none is given, when `validity_days` is outside the allowed range, or when `organization` is not 1 to 64 letters, digits, spaces, dots or hyphens. Responds `201` with `id` (the enrolment id), `certificate_id`, `name`, `serial`, `certificate`, `private_key`, `created_at`, `expires_at`, `status`.
+
+```http
+DELETE /api/v2/mtls/certificates/{cert_id}
+```
+Session only. Removes an enrolment; `{cert_id}` is the enrolment id. `404` if unknown, `403` if it belongs to someone else and the caller is not an admin.
+
+```http
+GET /api/v2/mtls/certificates/{cert_id}/download?format=pem&include_chain=true&include_root=false
+POST /api/v2/mtls/certificates/{cert_id}/download
+Content-Type: application/json
+
+{ "format": "pkcs12", "password": "at-least-8-chars", "include_chain": true, "include_root": false, "legacy": false }
+```
+Session only. `format` is `pem` (default) or `pkcs12`/`p12`. PKCS12 is refused on the query-string form with `400` (the password must travel in a POST body); it also needs a stored private key. `legacy` selects the 3DES/SHA-1 profile. Returns the file as a download. `404` when the enrolment is not the caller's (admins may download any).
+
+```http
+POST /api/v2/mtls/enroll
+Content-Type: application/json
+
+{ "name": "Work laptop" }
+```
+Session only. Enrolls the client certificate presented with the request: the TLS handshake's, or one forwarded by a trusted proxy. `400` when none is presented, it is expired, not yet valid, revoked, or its issuer is revoked or unknown; `409` when already enrolled.
+
+```http
+POST /api/v2/mtls/enroll-import
+Content-Type: application/json
+
+{ "pem": "-----BEGIN CERTIFICATE-----...", "name": "Work laptop", "user_id": 2 }
+```
+Session only. Imports a PEM certificate (plain or base64 of the PEM) issued by a CA of this server and enrolls it. `pem` is required; `user_id` is honoured for admins only. `400` for unparsable data, an expired or revoked certificate, or a foreign issuer; `409` when already enrolled. Responds `201`.
+
+```http
+GET /api/v2/mtls/available-certificates
+```
+Any authenticated user. User certificates (`usr_cert`, not revoked) that no account has enrolled. Non-admins see only the ones made for them.
+
+```http
+POST /api/v2/mtls/assign
+Content-Type: application/json
+
+{ "cert_id": 12, "name": "Work laptop", "user_id": 2 }
+```
+Session only. Enrolls an existing user certificate (`cert_id` is the certificate id, required). `user_id` is honoured for admins only; a non-admin may assign only a certificate made for their account (`403`). `400` when the certificate is not a user certificate or is revoked, `404` when unknown, `409` when already enrolled. Responds `201`.
 
 ### Sessions
 
@@ -478,33 +476,6 @@ for an SLH-DSA signature, which UCM reads but cannot check). An ML-DSA CA report
 as its parameter set, e.g. `"ML-DSA-65"`, an EdDSA CA as `"Ed25519"` or `"Ed448"`. A certificate in a hybrid pair (RFC 9763) also
 reports `related_certificate_id` (the other member) and `hybrid_role` (`"classical"` or `"pq"`);
 both are `null` otherwise.
-
-### Get CA Hierarchy (Tree View)
-```http
-GET /api/v2/cas/tree
-```
-
-**Response:**
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "name": "Root CA",
-      "ca_type": "root",
-      "children": [
-        {
-          "id": 2,
-          "name": "Intermediate CA",
-          "ca_type": "intermediate",
-          "parent_id": 1,
-          "children": []
-        }
-      ]
-    }
-  ]
-}
-```
 
 ### Create CA
 ```http
@@ -1655,16 +1626,29 @@ GET /api/v2/acme/orders/{order_pk}
 ```
 The second form reads one local order (`read:acme`), whatever its age; 404 when it does not exist.
 
-### Register with Let's Encrypt Proxy
+### ACME Proxy Upstream Account
+The proxy's upstream account is a CA account of the [ACME Client](#acme-client-lets-encrypt) (`acme_account_id`, or the one selected as proxy account).
+
 ```http
-POST /api/v2/acme/proxy/register
+POST /api/v2/acme/client/proxy/register
 Content-Type: application/json
 
 {
   "email": "admin@example.com",
-  "agree_tos": true
+  "acme_account_id": 1
 }
 ```
+Permission `write:acme`. Registers the upstream account with its CA. `email` falls back to the account's own; it must be a valid address on a public domain (`400` for `.local`, `.lan`, `.internal`). `502` when the upstream CA refuses the registration. Returns `registered`, `email`, `account_url`, `acme_account_id` and `account`.
+
+```http
+POST /api/v2/acme/client/proxy/unregister
+```
+Permission `write:acme`. Body `acme_account_id` optional. Clears the upstream registration (the account row stays). Returns `registered: false`.
+
+```http
+POST /api/v2/acme/client/proxy/test-connection
+```
+Permission `read:acme`. Body `acme_account_id` or `url` optional (otherwise the proxy account's directory). The URL must be HTTPS and not target loopback or cloud metadata (`400`). Returns `connected`, `ca_name`, `directory_url`, `terms_of_service`, `website`, `eab_required` and `endpoints`; `502` when the directory cannot be fetched.
 
 ---
 
@@ -1904,7 +1888,7 @@ Per-CA toggle available via the CRL/OCSP management page or API:
 
 ```http
 GET /api/v2/cas/{ca_id}          # Returns aia_ca_issuers_enabled, aia_ca_issuers_url
-PUT /api/v2/cas/{ca_id}          # Set aia_ca_issuers_enabled: true/false
+PATCH /api/v2/cas/{ca_id}        # Set aia_ca_issuers_enabled: true/false (write:cas)
 ```
 
 When enabled, issued certificates include the CA Issuers URL in their Authority Information Access extension:
@@ -2377,27 +2361,7 @@ Content-Type: application/json
 `smtp_security` is `none`, `starttls` or `ssl` (implicit TLS, usually port 465). The older booleans `smtp_tls` and `smtp_ssl` are still accepted and are ignored when `smtp_security` is present.
 
 ### Webhooks
-```http
-# List webhooks
-GET /api/v2/settings/webhooks
-
-# Create webhook
-POST /api/v2/settings/webhooks
-Content-Type: application/json
-
-{
-  "name": "Slack Notification",
-  "url": "https://hooks.slack.com/...",
-  "events": ["certificate_issued", "certificate_expiring"],
-  "secret": "webhook-secret"
-}
-
-# Test webhook
-POST /api/v2/settings/webhooks/{webhook_id}/test
-
-# Delete webhook
-DELETE /api/v2/settings/webhooks/{webhook_id}
-```
+See [Webhooks](#webhooks): `/api/v2/settings/webhooks` does not exist.
 
 ### Backup Settings
 ```http
@@ -2460,26 +2424,61 @@ DELETE /api/v2/settings/backup/{backup_id}
 
 ### Database Operations
 ```http
-# Get database stats
-GET /api/v2/system/db/stats
+GET /api/v2/system/database/stats
+```
+Permission `read:settings`. Returns `size_mb`, `counts` (`cas`, `certificates`, `crls`, `ocsp_responses`), `last_vacuum` and `last_check` (a timestamp or `"Never"`).
 
-# Export database
-GET /api/v2/system/db/export
+```http
+GET /api/v2/system/database/export
+```
+Permission `admin:system`. Downloads a SQL dump (`application/sql`). Only a SQLite database can be dumped; on PostgreSQL the call fails.
 
-# Optimize database
-POST /api/v2/system/db/optimize
+```http
+POST /api/v2/system/database/optimize
+```
+Permission `admin:system`. Runs VACUUM and ANALYZE (SQLite and PostgreSQL).
 
-# Check integrity
-POST /api/v2/system/db/integrity-check
+```http
+POST /api/v2/system/database/integrity-check
+```
+Permission `admin:system`. Returns `passed`, `errors` and a message. On PostgreSQL the check verifies connectivity and counts the schema's tables.
 
-# Reset database (dangerous!)
-POST /api/v2/system/db/reset
+```http
+POST /api/v2/system/database/reset
+```
+Permission `admin:system`. Dangerous: drops and recreates every table, then seeds the configured administrator as at first start. No request body is read. `409` when the initial administrator password cannot be settled (nothing is dropped); `500` when the reset happened but the administrator could not be created.
+
+### Database Backend
+Moving UCM between SQLite and PostgreSQL. `switch` and `migrate` answer `409` in HA mode (`ha_mode`), `409` while a migration holds the lock or a switch awaits its restart, and `500` with a generic message on an unexpected failure. Connection URLs in responses and audit entries are redacted.
+
+```http
+GET /api/v2/database/status
+```
+Permission `read:settings`. The current backend: type, version, size, table count and health.
+
+```http
+POST /api/v2/database/test
 Content-Type: application/json
 
-{
-  "confirm": true
-}
+{ "database_url": "postgresql://..." }
 ```
+Permission `admin:settings`. Opens a test connection; returns `{success, message}`. `400` when `database_url` is missing.
+
+```http
+POST /api/v2/database/switch
+Content-Type: application/json
+
+{ "database_url": "postgresql://..." }
+```
+Permission `admin:settings`. Switches the backend without copying data: the auth, RBAC, SSO and MFA tables are bootstrapped to the empty target so administrators are not locked out, the configuration is persisted and the service restarts. An empty or null `database_url` reverts to the default SQLite file. `400` in a container (set `DATABASE_URL` on it instead) or when the target is unreachable; `503` on a transient bootstrap failure (retrying resumes). Returns `persisted`, `bootstrap`, `validation`, `restart_initiated`, `restart_message`.
+
+```http
+POST /api/v2/database/migrate
+Content-Type: application/json
+
+{ "database_url": "postgresql://..." }
+```
+Permission `admin:settings`. Copies all data from the current backend to the target and verifies it; `database_url` is required (`400`). On a native install the configuration is then persisted and the service restarts; in a container only the data moves (`docker: true`, `next_step` tells what to set). Returns `migrated`, `stats`, `proof`, `restart_initiated`. A refusal before anything was written to the target is `409`; a failure once the copy was under way is `500`.
 
 ### HTTPS Certificate
 `cert-info` returns `bound_certificate.needs_attention` (`reason`, `successor_id`, `successor_refid`, `successor_descr`,
@@ -2510,15 +2509,17 @@ Content-Type: application/json
 
 ### Backup Operations
 ```http
-# List backups (also GET /api/v2/system/backups; page, per_page, search, sort)
+# List backups (page, per_page, search, sort)
 # In HA, meta.storage is "database" and each item carries "node" and "sha256";
 # on a single node meta.storage is "disk" and meta carries the disk figures
 GET /api/v2/system/backup/list
+GET /api/v2/system/backups
 
-# Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id")
-# Also POST /api/v2/system/backup. Removes nothing for the ceiling: "warning" is set when the
+# Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id"; POST /api/v2/system/backup is the same route)
+# Removes nothing for the ceiling: "warning" is set when the
 # archives are then above it, null otherwise; the next retention applies it
 POST /api/v2/system/backup/create
+POST /api/v2/system/backup
 
 # Download backup (in HA from any node, with a Repr-Digest: sha-256=:...: header)
 # Resumable: a Range of one byte range answers 206 with Content-Range, 416 past the end;
@@ -2526,8 +2527,9 @@ POST /api/v2/system/backup/create
 # and a Range of several ranges gets the whole archive (200).
 GET /api/v2/system/backup/{filename}/download
 
-# Restore backup (also POST /api/v2/system/restore; multipart "file", "password", optional "mode")
+# Restore backup (POST /api/v2/system/restore is the same route; multipart "file", "password", optional "mode")
 POST /api/v2/system/backup/restore
+POST /api/v2/system/restore
 ```
 
 In HA mode a restore holds the cluster maintenance (see [HA](HA.md#restoring-a-backup)). It answers `409` with
@@ -2539,6 +2541,13 @@ restart one at a time". Both restore routes also answer `data.todo`, a list of s
 (sections not restored, a CA whose CRL could not be signed, a secret to enter again); it is empty when there is
 nothing to do. The backup listing's `meta.restore_limits` gives `upload_bytes` (archives before v4) and
 `archive_bytes` (v4, `0` for no ceiling), the sizes a restore accepts.
+
+```http
+DELETE /api/v2/system/backup/{filename}
+POST /api/v2/system/backups/bulk-delete
+POST /api/v2/system/backups/run-retention
+```
+All need `admin:system`. The first deletes one archive (`400` for an invalid name, `404` when missing, `409` while a backup or restore holds the lock). The second takes `{"filenames": ["..."]}` (a non-empty list of at most 1000 names) and returns the counts `deleted`, `missing`, `invalid`, `failed`. The third applies the retention policy now and returns `removed` and `warning`.
 
 ### Cluster Maintenance (HA)
 `admin:system`. A node in maintenance answers its writes with `503`, `Retry-After: 30` and code `maintenance`;
@@ -2698,24 +2707,22 @@ GET /api/v2/system/security/anomalies
 
 ### Security - Rate Limit Configuration
 ```http
-# Get rate limit settings
 GET /api/v2/system/security/rate-limit
-
-# Update rate limit settings
 PUT /api/v2/system/security/rate-limit
-Content-Type: application/json
-
-{
-  "requests_per_minute": 100,
-  "enabled": true
-}
-
-# Get rate limit statistics
 GET /api/v2/system/security/rate-limit/stats
-
-# Reset rate limit counters
 POST /api/v2/system/security/rate-limit/reset
 ```
+`GET` (`read:settings`) returns `config` and `stats`. `PUT` (`admin:system`) takes any of:
+
+```json
+{
+  "enabled": true,
+  "custom_limits": { "/api/v2/certificates": { "rpm": 300, "burst": 50 } },
+  "whitelist_add": ["192.0.2.10"],
+  "whitelist_remove": ["192.0.2.11"]
+}
+```
+`burst` defaults to a third of `rpm`. In HA mode the change is stored and applied on every node. `stats` (`read:settings`) returns the counters. `reset` (`admin:system`) clears the buckets, of one address with `{"ip": "..."}` or all, and the statistics too with `{"reset_stats": true}`.
 
 ### Audit Retention
 ```http
@@ -3880,17 +3887,19 @@ Content-Type: application/json
 
 ## WebAuthn
 
-The `/api/v2/webauthn/` blueprint provides the same WebAuthn credential management functionality as the `/api/v2/account/webauthn/` routes. Both prefixes are available for convenience.
+Credential management for the signed-in user's own security keys. Served under `/api/v2/webauthn/`; there is no `/api/v2/account/webauthn/` prefix. The login-time WebAuthn routes are under [Authentication](#authentication).
 
 ### List Credentials
 ```http
 GET /api/v2/webauthn/credentials
 ```
+Any authenticated user. Returns the caller's keys.
 
 ### Delete Credential
 ```http
 DELETE /api/v2/webauthn/credentials/{credential_id}
 ```
+Session only. Closes the account's other sessions; `meta.other_sessions_closed` carries the count. `404` when the key is not the caller's; refused when it is the last second factor of an account that requires one.
 
 ### Toggle Credential
 ```http
@@ -3901,11 +3910,13 @@ Content-Type: application/json
   "enabled": true
 }
 ```
+Session only. `enabled` defaults to `true`. Disabling the last enabled factor of an account that requires two-factor is refused. Leaving the key as it is changes nothing and closes no session.
 
 ### Register - Get Options
 ```http
 POST /api/v2/webauthn/register/options
 ```
+Session only. Returns the creation options for the host the request was made to.
 
 ### Register - Verify
 ```http
@@ -3917,12 +3928,13 @@ Content-Type: application/json
   "name": "YubiKey 5"
 }
 ```
+Session only. `name` defaults to `Security Key`. `400` when the attestation does not verify. Registering a key closes the account's other sessions.
 
 ---
 
 ## Webhooks
 
-These routes are also accessible under `/api/v2/settings/webhooks` as an alias.
+One webhook subsystem, served under `/api/v2/webhooks`. The old `/api/v2/settings/webhooks` routes no longer exist. Reads need `read:settings`, writes `write:settings`, delete `delete:settings`. Event names are dotted (`certificate.issued`); `events` defaults to `["*"]` (all) and an unknown name answers `400`. A name already in use answers `409`; a URL that targets cloud metadata services or loopback answers `400`.
 
 ### List Webhooks
 ```http
@@ -3943,7 +3955,7 @@ Content-Type: application/json
   "name": "Slack Notification",
   "url": "https://hooks.slack.com/...",
   "secret": "webhook-secret",
-  "events": ["certificate_issued", "certificate_expiring"],
+  "events": ["certificate.issued", "certificate.expiring"],
   "ca_filter": [1, 2],
   "enabled": true,
   "custom_headers": {
@@ -3951,6 +3963,7 @@ Content-Type: application/json
   }
 }
 ```
+`name` and `url` are required. `secret` is generated when omitted. Optional `auth_type` is one of `none`, `bearer`, `basic`, `api_key`, `custom`, with `auth_token` and related fields.
 
 ### Update Webhook
 ```http
@@ -3960,7 +3973,7 @@ Content-Type: application/json
 {
   "name": "Updated Name",
   "url": "https://hooks.slack.com/...",
-  "events": ["certificate_issued"],
+  "events": ["certificate.issued"],
   "enabled": true
 }
 ```
@@ -3989,6 +4002,19 @@ POST /api/v2/webhooks/{endpoint_id}/regenerate-secret
 ```http
 GET /api/v2/webhooks/events
 ```
+Returns `events` (the accepted names) and a `descriptions` map.
+
+### List Deliveries
+```http
+GET /api/v2/webhooks/{endpoint_id}/deliveries?status=failed&page=1&per_page=25
+```
+Delivery history of one endpoint, newest first. `status` is `pending`, `delivered` or `failed`; `per_page` is at most 100. `404` for an unknown endpoint.
+
+### Retry Delivery
+```http
+POST /api/v2/webhooks/{endpoint_id}/deliveries/{delivery_id}/retry
+```
+Permission `write:settings`. Re-queues a delivery for immediate redelivery with its attempts reset. `404` when the delivery does not belong to the endpoint.
 
 `certificate.binding_left_behind` is sent once per binding when an EST, SCEP or WSTEP renewal leaves a deploy
 binding or the HTTPS binding on the previous certificate, after the renewal's commit: `certificate` is the renewed
@@ -4424,9 +4450,12 @@ Returns 200 if the application process is alive, regardless of dependency status
 
 ## Rate Limiting
 
-- Default: 100 requests per minute per IP
-- Auth endpoints: 10 requests per minute per IP
-- Export endpoints: 10 requests per minute per user
+Two limiters run in every node, and a request must pass both. A refused request answers `429`; the second limiter adds `Retry-After`, `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers.
+
+- **Route limits (flask-limiter).** Fixed in code: 200 requests per minute and 2000 per hour per client address on every route without a limit of its own, and per-route limits on sign-in: `POST /api/v2/auth/login/password` 5 per minute, `POST /api/v2/auth/login/webauthn/verify` 5 per minute, `POST /api/v2/sso/ldap/login` 5 per minute, `POST /api/v2/auth/login/2fa`, `/auth/login/2fa/webauthn/options`, `/auth/login/2fa/webauthn/verify`, `/auth/login/mtls` and `/auth/login/webauthn/start` 10 per minute, `POST /api/v2/auth/forgot-password` 3 per hour and `POST /api/v2/auth/reset-password` 5 per hour.
+- **Tiered limiter (API and protocol endpoints).** Rates by path prefix in four tiers (auth, heavy, standard, protocol), each with a requests-per-minute rate and a burst. The defaults are set with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`; `RATE_LIMIT_ENABLED=false` turns this limiter off. Settings > Security, or `PUT /api/v2/system/security/rate-limit`, changes the limit of a path, the switch and the whitelist.
+
+Requests from private (RFC 1918), loopback and link-local addresses are exempt from both limiters unless `RATE_LIMIT_TRUST_LAN=false`. Counters are kept in memory, per node. Behind a proxy, set `UCM_BEHIND_PROXY` and `UCM_TRUSTED_PROXIES` so the limits see the client's address. The tier table is in [SECURITY.md](SECURITY.md#4-rate-limiting); the effect of several nodes is in [HA.md](HA.md#rate-limits).
 
 ---
 

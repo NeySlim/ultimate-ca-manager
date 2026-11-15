@@ -59,7 +59,6 @@ def _nonexistent(app):
     return sorted(documented_operations() - served_operations(app))
 
 
-@pytest.mark.xfail(reason='reference not yet corrected')
 def test_every_documented_operation_exists(app):
     missing = _nonexistent(app)
     assert not missing, f'{len(missing)} documented but not served:\n' + '\n'.join(missing)
