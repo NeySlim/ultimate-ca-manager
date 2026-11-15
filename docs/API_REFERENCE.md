@@ -550,8 +550,10 @@ An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored
 in `meta.notices`. An intermediate under an ML-DSA parent likewise takes no digest; an
 ML-DSA intermediate under an RSA or EC parent uses its parent's digest.
 
-In HA mode, a CA on a SoftHSM key (`hsm_key_id` of a key on a SoftHSM provider, or a new key
+In HA mode, a CA on a SoftHSM or OpenSC (smart card reader) key (`hsm_key_id` of a key on such a provider, or a new key
 through `hsm_provider_id`) answers `409` with code `ha_mode`, whatever the CA type.
+
+An HSM key backs one authority: `hsm_key_id` of a key an X.509 or SSH CA already holds answers `409`, naming that CA.
 
 Optional `namedUrls: true` gives the CA an immutable unique slug derived from
 its name, used instead of the random id in CDP/AIA URL paths (both forms keep
@@ -2096,6 +2098,7 @@ GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&pla
 ```
 - `GET` list filters by `search` and by `type` (repeatable).
 - `POST` creates a CA (`201`): `descr` (or `name`, required), `ca_type` (`user` by default, or `host`), `key_type`, `default_ttl`, `max_ttl` (default `0`), `default_extensions`, `allowed_principals` (a list of non-empty strings), `allow_any_principal` and `allow_custom_key_id` (JSON booleans, default off), `comment`. `400` for an invalid value.
+- `POST` with `hsm_key_id` (a JSON integer above zero, `400` otherwise) creates a CA whose key stays on an HSM token: the key must be an RSA or NIST P-256, P-384 or P-521 signing key, `key_type` is read from it and the CA carries `key_source: "hsm"` and `hsm_key_id` (`"software"` and `null` for any other CA). It requires `read:hsm` besides `write:ssh_cas` (`403` naming the missing permission otherwise). An HSM key backs one authority: `409` names the X.509 or SSH CA that already holds it. A token that cannot be reached answers `503`, a key no longer on its token `409`, a misconfigured provider `400`, any other HSM failure `502`. In FIPS mode a key FIPS mode does not approve is refused before the CA is created; in HA mode a SoftHSM or OpenSC (smart card reader) key answers `409` with code `ha_mode`.
 - `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value.
 - `DELETE` answers `204`, or `409` when the service refuses (certificates still depend on the CA).
 - `POST /import` imports an existing CA from `private_key` (required) with `descr`, `ca_type` (`user` or `host`), `default_ttl`, `max_ttl` and `comment`; `201`, or `400` for an unusable key.
@@ -4480,6 +4483,8 @@ On update, an absent or `null` `certification` keeps the declared one and `""` c
 DELETE /api/v2/hsm/providers/{provider_id}
 ```
 
+Deletes the provider and its keys. `409`, naming the authorities, while one of its keys backs an X.509 or SSH CA.
+
 ### Test HSM Provider
 ```http
 POST /api/v2/hsm/providers/{provider_id}/test
@@ -4492,11 +4497,16 @@ POST /api/v2/hsm/providers/{provider_id}/sync
 
 In HA mode, syncing a SoftHSM provider answers `409` with code `ha_mode`: its keys exist on one node only.
 
+A key the token no longer lists is removed, except a key an X.509 or SSH CA holds (counted in `missing_kept`) or any key when the listing reported errors (`listing_errors`); the CA keeps its key and its signing fails until the key is back on the token.
+
 ### List HSM Keys
 ```http
 GET /api/v2/hsm/keys
 GET /api/v2/hsm/keys?provider_id=1
+GET /api/v2/hsm/keys?unused=true
 ```
+
+`unused=true` keeps the asymmetric signing keys no X.509 or SSH CA holds.
 
 ### Create HSM Key
 ```http
@@ -4531,6 +4541,8 @@ GET /api/v2/hsm/keys/{key_id}
 ```http
 DELETE /api/v2/hsm/keys/{key_id}
 ```
+
+`409`, naming the X.509 or SSH CA, while the key backs one.
 
 ### Get Public Key
 ```http

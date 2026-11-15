@@ -24,6 +24,8 @@ class SSHCertificateAuthority(db.Model if db else object):
     """SSH Certificate Authority — manages OpenSSH CA key pairs"""
 
     __tablename__ = 'ssh_cas'
+    # One HSM key backs one SSH CA at most (migration 163); NULLs stay distinct
+    __table_args__ = (db.Index('uq_ssh_cas_hsm_key_id', 'hsm_key_id', unique=True),) if db else ()
 
     id = db.Column(db.Integer, primary_key=True)
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True,

@@ -133,26 +133,11 @@ Then configure the provider in the UCM web UI with the vendor library path.
 
 ### USB smart card (PIV, pcscd)
 
-Since the image ships `opensc` and `libpcsclite1`, a PIV card can sign directly. `pcscd` runs in its own container holding the reader, and both containers share its socket:
+The image ships `opensc` (its PKCS#11 module is `opensc-pkcs11.so`) and `libpcsclite1`, the client library of the PC/SC daemon. It does not ship `pcscd` or a container for it: the reader, the daemon that owns it and the sharing of its socket with the UCM container are the operator's to provide. `libpcsclite1` looks for the daemon's socket at `/run/pcscd/pcscd.comm` (or at the path in `PCSCLITE_CSOCK_NAME`), and the container runs as the user `ucm` (uid 1000), which must be allowed to open it.
 
-```yaml
-services:
-  pcscd:
-    build: ./pcscd-bridge      # privileged: it owns /dev/bus/usb
-    privileged: true
-    devices:
-      - /dev/bus/usb
-    volumes:
-      - pcscd_run:/run/pcscd
-  ucm:
-    image: neyslim/ultimate-ca-manager:latest
-    volumes:
-      - pcscd_run:/run/pcscd   # the same socket pcscd listens on
-```
+The provider is then created on the HSM page: type `PKCS#11`, `module_path` the image's `opensc-pkcs11.so` (`docker exec ucm sh -c 'ls /usr/lib/*/opensc-pkcs11.so'`), the slot or token label, and the card PIN. The PIN is stored in the provider's configuration, encrypted in the database. **Sync keys** registers the card's keys as HSM keys; a key a CA holds is never removed by a later sync.
 
-The provider is then created on the HSM page: type `PKCS#11`, `module_path` the image's `opensc-pkcs11.so` (`docker exec ucm ls /usr/lib/*/opensc-pkcs11.so`), `slot` or token label, and the card PIN. The PIN lives in the provider's configuration, which is encrypted by the application in the database — not in a compose file or an env var. Sync the provider to register the card's keys as HSM keys; a key a CA signs with is never dropped by a later sync.
-
-Signing asks the card for every certificate, so a `pcscd` that is down or a card nobody has touched since the reader was powered shows up as a signing error, not as a broken CA.
+In HA mode, a CA cannot be created on a key of an OpenSC provider: the reader is attached to one host.
 
 ## Cloud HSM
 

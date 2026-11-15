@@ -16,6 +16,7 @@ from utils.response import success_response, error_response, created_response, n
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
 from services.hsm.base_provider import HsmKeyExistsError
+from services.hsm.key_binding import HsmKeyBound
 from utils.process_lock import LockBusyError
 from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
@@ -726,6 +727,8 @@ def create_ca():
         )
     except (FipsRestricted, HaRestricted):
         raise
+    except HsmKeyBound as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         # Validation errors (HSM key conflicts, missing fields, etc.) -- surface to user
         logger.info(f"CA creation validation error: {e}")

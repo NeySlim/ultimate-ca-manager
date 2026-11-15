@@ -17,7 +17,7 @@ import compliance_profiles
 from fips_mode import FipsRestricted
 from models import CA, db
 from utils.ca_serial_counter import next_ca_serial
-from models.hsm import HsmKey
+from models.hsm import HsmKey, HsmProvider
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
 from services.import_service import CrossCertificateImport, refused_as_cross_certificate
@@ -190,7 +190,7 @@ class CACreationMixin:
         Returns (private_key, key_pem_bytes_or_None, hsm_key_or_None).
         key_pem is None for HSM-backed keys (no on-disk PEM).
         """
-        from services.hsm import HsmService
+        from services.hsm import HsmService, key_binding
         from services.hsm.hsm_private_key import load_hsm_private_key
 
         if hsm_key_id and (hsm_provider_id or hsm_key_label or hsm_key_algorithm):
@@ -210,29 +210,13 @@ class CACreationMixin:
             return private_key, key_pem, None
 
         if hsm_key_id:
-            # Lock the HSM key row to serialise concurrent CA creations
-            # binding the same key. The DB also enforces uq_ca_hsm_key_id
-            # (migration 032) as a defense-in-depth safety net.
-            try:
-                hsm_key = (
-                    HsmKey.query.filter_by(id=hsm_key_id)
-                    .with_for_update()
-                    .one_or_none()
-                )
-            except Exception:
-                # SQLite has no row-level locks; fall back to plain lookup.
-                hsm_key = db.session.get(HsmKey, hsm_key_id)
+            # The key row stays locked to the CA's commit: concurrent X.509 and SSH bindings serialise
+            hsm_key = key_binding.lock_key(hsm_key_id)
             if not hsm_key:
                 raise ValueError(f"HSM key {hsm_key_id} not found")
-            # A new CA never binds a SoftHSM key in HA: its token is on one node's disk
-            from services import compliance_signer
-            from utils.ha import refuse_softhsm_in_ha
-            if compliance_signer.softhsm_provider(hsm_key.provider):
-                refuse_softhsm_in_ha()
-            if CA.query.filter_by(hsm_key_id=hsm_key.id).first():
-                raise ValueError(
-                    f"HSM key {hsm_key.label} is already bound to another CA"
-                )
+            # A new CA never binds a token only one node reaches in HA, nor a key an X.509 or SSH CA holds
+            key_binding.refuse_node_local_in_ha(hsm_key.provider)
+            key_binding.refuse_bound_key(hsm_key)
             HsmService.refuse_signing_in_fips_mode(hsm_key)
         else:
             if not (hsm_provider_id and hsm_key_label and hsm_key_algorithm):
@@ -240,6 +224,7 @@ class CACreationMixin:
                     "hsm_provider_id, hsm_key_label and hsm_key_algorithm "
                     "are all required to generate a new HSM key"
                 )
+            key_binding.refuse_node_local_in_ha(db.session.get(HsmProvider, hsm_provider_id))
             hsm_key = HsmService.generate_key(
                 provider_id=hsm_provider_id,
                 label=hsm_key_label,

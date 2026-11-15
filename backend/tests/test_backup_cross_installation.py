@@ -1073,6 +1073,15 @@ def _assert_binding_follows_its_cross_certificate(app, restored):
         assert DeployBinding.query.one().chain_variant == f'cross:{landed.id}'
 
 
+def _assert_ssh_ca_on_its_hsm_key(app, restored):
+    """Checked by name: the manifest-driven loop loses the case with the reference itself."""
+    from models.ssh import SSHCertificateAuthority
+    with restored.open(app):
+        ca = SSHCertificateAuthority.query.filter_by(refid='xinst-sshca-a').one()
+        assert ca.key_source == 'hsm' and ca.private_key == ''
+        assert ca.hsm_key is not None and ca.hsm_key.key_identifier == 'xinst-key-a'
+
+
 class TestEveryReferenceLandsOnTheRowTheArchiveNames:
     """The restore used to write the source's numbers into the target."""
 
@@ -1098,6 +1107,14 @@ class TestEveryReferenceLandsOnTheRowTheArchiveNames:
         with restored_on_sqlite.open(app):
             request = SCEPRequest.query.filter_by(transaction_id='xinst-scep-tx').one()
             assert db.session.get(ScepProfile, request.profile_id).name == 'xinst-scep'
+
+    def test_an_hsm_ssh_ca_lands_on_the_key_the_archive_names_on_sqlite(self, app, restored_on_sqlite):
+        _assert_ssh_ca_on_its_hsm_key(app, restored_on_sqlite)
+
+    @_needs_pg
+    def test_an_hsm_ssh_ca_lands_on_the_key_the_archive_names_on_postgresql(
+            self, app, restored_on_postgresql):
+        _assert_ssh_ca_on_its_hsm_key(app, restored_on_postgresql)
 
     def test_a_binding_pinned_to_a_cross_certificate_follows_it_on_sqlite(
             self, app, restored_on_sqlite):
