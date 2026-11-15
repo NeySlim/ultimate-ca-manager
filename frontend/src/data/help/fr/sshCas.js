@@ -23,7 +23,7 @@ export default {
         title: 'AC SSH adossées HSM',
         items: [
           { label: 'Stockage de la clé', text: 'À la création, choisissez Local ou HSM, puis le fournisseur et une clé de signature inutilisée. L\'AC reprend son type de clé de la clé elle-même et la clé privée ne quitte jamais le HSM' },
-          { label: 'Algorithmes', text: 'Clés RSA et ECDSA P-256, P-384 ou P-521. La signature sur HSM d\'UCM ne couvre que RSA et ECDSA : les clés Ed25519, Brainpool et ML-DSA ne sont donc pas proposées ; une AC SSH Ed25519 est une clé logicielle' },
+          { label: 'Algorithmes', text: 'Clés RSA et ECDSA P-256, P-384 ou P-521. Les clés Ed25519 ne sont pas proposées : la signature sur HSM d\'UCM ne couvre pas EdDSA, une AC SSH Ed25519 est donc une clé logicielle. Les clés Brainpool et ML-DSA ne le sont pas non plus : UCM signe avec elles sur HSM pour les AC X.509, mais les certificats OpenSSH n\'ont pas de type de clé pour elles' },
           { label: 'Une clé, une autorité', text: 'Une clé sert une seule autorité, X.509 ou SSH. Une clé déjà tenue n\'est pas proposée, et une demande qui la nomme est refusée (409) avec le nom de l\'AC qui la tient. Ni la clé ni son fournisseur ne peuvent être supprimés tant que l\'AC existe' },
           { label: 'Droits', text: 'write:ssh_cas et read:hsm. Sans read:hsm, le choix HSM est désactivé, et un refus (403) nomme le droit manquant' },
           { label: 'FIPS et HA', text: 'En mode FIPS, une clé que le mode FIPS refuse n\'est pas proposée. En mode HA, une clé sur SoftHSM ou sur un lecteur de carte à puce local est refusée (409), car elle n\'existe que sur un nœud' },
@@ -133,7 +133,7 @@ Une AC SSH peut garder sa clé privée sur un fournisseur HSM.
 3. Cliquez sur **Créer**. L'AC reprend son type de clé de la clé elle-même, et la clé privée ne quitte jamais le jeton
 
 Bon à savoir :
-- La signature sur HSM d'UCM ne couvre que RSA et ECDSA : les clés Ed25519, Brainpool et ML-DSA ne sont donc pas proposées ; une AC SSH Ed25519 est une clé logicielle.
+- Une AC SSH sur HSM prend une clé RSA ou ECDSA P-256, P-384 ou P-521. Les clés Ed25519 ne sont pas proposées : la signature sur HSM d'UCM ne couvre pas EdDSA, une AC SSH Ed25519 est donc une clé logicielle. Les clés Brainpool et ML-DSA ne le sont pas non plus : UCM signe avec elles sur HSM pour les AC X.509, mais les certificats OpenSSH n'ont pas de type de clé pour elles.
 - Une clé HSM sert une seule autorité, X.509 ou SSH. Une clé qu'une AC tient déjà est refusée avec le nom de cette AC, et ni la clé ni son fournisseur ne peuvent être supprimés tant que l'AC existe.
 - Il faut \`write:ssh_cas\` et \`read:hsm\`. Sans \`read:hsm\`, le choix **HSM** est désactivé.
 - En mode FIPS, une clé que le mode FIPS refuse n'est pas proposée. En mode HA, une clé sur SoftHSM ou sur un lecteur de carte à puce local est refusée, car elle n'existe que sur un nœud.

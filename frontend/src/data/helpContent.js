@@ -2038,7 +2038,7 @@ export const helpContent = {
         icon: HardDrive,
         items: [
           { label: 'Key storage', text: 'At creation, choose Local or HSM, then the provider and an unused signing key. The CA takes its key type from the key and the private key never leaves the HSM' },
-          { label: 'Algorithms', text: 'RSA and ECDSA P-256, P-384 or P-521 keys. UCM\'s HSM signing covers RSA and ECDSA only, so Ed25519, Brainpool and ML-DSA keys are not offered; an Ed25519 SSH CA is a software key' },
+          { label: 'Algorithms', text: 'RSA and ECDSA P-256, P-384 or P-521 keys. Ed25519 keys are not offered: UCM\'s HSM signing does not cover EdDSA, so an Ed25519 SSH CA is a software key. Brainpool and ML-DSA keys are not offered either: UCM signs with them on an HSM for X.509 CAs, but OpenSSH certificates have no key type for them' },
           { label: 'One key, one authority', text: 'A key backs one authority, X.509 or SSH. A key already held is not offered, and a request naming it is refused (409) with the name of the CA that holds it. Neither the key nor its provider can be deleted while the CA exists' },
           { label: 'Permissions', text: 'write:ssh_cas and read:hsm. Without read:hsm the HSM choice is disabled, and a refusal (403) names the missing permission' },
           { label: 'FIPS and HA', text: 'In FIPS mode a key that FIPS mode refuses is not offered. In HA mode a key on SoftHSM or on a local smart card reader is refused (409), as it exists on one node only' },

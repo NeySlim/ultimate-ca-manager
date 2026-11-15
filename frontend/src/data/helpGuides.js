@@ -3523,7 +3523,7 @@ An SSH CA can keep its private key on an HSM provider.
 3. Click **Create**. The CA takes its key type from the key, and the private key never leaves the token
 
 Good to know:
-- UCM's HSM signing covers RSA and ECDSA only, so Ed25519, Brainpool and ML-DSA keys are not offered; an Ed25519 SSH CA is a software key.
+- An SSH CA on an HSM takes an RSA or ECDSA P-256, P-384 or P-521 key. Ed25519 keys are not offered: UCM's HSM signing does not cover EdDSA, so an Ed25519 SSH CA is a software key. Brainpool and ML-DSA keys are not offered either: UCM signs with them on an HSM for X.509 CAs, but OpenSSH certificates have no key type for them.
 - An HSM key backs one authority, X.509 or SSH. A key a CA already holds is refused with the name of that CA, and neither the key nor its provider can be deleted while the CA exists.
 - It needs \`write:ssh_cas\` and \`read:hsm\`. Without \`read:hsm\` the **HSM** choice is disabled.
 - In FIPS mode a key that FIPS mode refuses is not offered. In HA mode a key on SoftHSM or on a local smart card reader is refused, as it exists on one node only.

@@ -41,8 +41,8 @@ const DEFAULT_EXTENSIONS = [
 ]
 
 // An HSM key decides the SSH key type it signs with: 'EC-P384' -> 'ecdsa-p384',
-// 'RSA-3072' -> 'rsa'. UCM's HSM signing wrappers cover RSA and NIST ECDSA only
-// (Ed25519 SSH CAs exist as software keys), so nothing else is offered on an HSM.
+// 'RSA-3072' -> 'rsa'. Only RSA and NIST ECDSA are offered: the HSM wrappers do not sign
+// Ed25519, and OpenSSH certificates have no key type for Brainpool or ML-DSA.
 function hsmSshKeyType(algorithm) {
   const row = findAlgorithm(algorithm)
   if (row?.group === GROUP_RSA) return 'rsa'
