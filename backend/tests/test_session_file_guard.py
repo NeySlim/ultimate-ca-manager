@@ -162,3 +162,24 @@ def test_the_store_lock_is_free_once_released_under_gevent():
     done = subprocess.run([sys.executable, '-c', _GEVENT_PROBE], cwd=backend,
                           capture_output=True, text=True, timeout=60)
     assert done.returncode == 0, done.stderr or done.stdout
+
+
+def test_a_restore_removes_a_session_file_written_before_it_held_the_lock(file_app, monkeypatch):
+    from contextlib import contextmanager
+    from utils import session_store
+    from services.backup.restore.invalidate import _remove_session_files
+    directory = file_app.session_interface.cache._path
+    late = os.path.join(directory, 'written-before-the-lock')
+    real_lock = session_store.session_files_lock
+
+    @contextmanager
+    def lock_after_a_write(path, exclusive, *args, **kwargs):
+        with open(late, 'wb') as handle:
+            handle.write(b'session')
+        with real_lock(path, exclusive, *args, **kwargs) as state:
+            yield state
+
+    monkeypatch.setattr(session_store, 'session_files_lock', lock_after_a_write)
+    with file_app.app_context():
+        _remove_session_files()
+    assert not os.path.exists(late)
