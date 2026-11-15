@@ -5264,6 +5264,4 @@ const data = await certs.json();
 
 ---
 
-**Documentation generated**: February 2026  
-**API Version**: 2.2.x  
-**Total Endpoints**: ~276
+**Coverage**: `backend/tests/test_api_reference_routes.py` checks this file against the application's route table.
