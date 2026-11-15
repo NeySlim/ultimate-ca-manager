@@ -178,7 +178,8 @@ def _lift_unverified(target_engine) -> None:
 
 
 def _unverified_copy(target_engine):
-    """None, 'switch', or 'migration' (also an unreadable or empty marker: the strictest)."""
+    """None, 'switch', or 'migration' (also an empty marker: the strictest); a marker that
+    cannot be read raises PreflightError, so the switch stops before writing anything."""
     try:
         if TRANSFER_MARKER not in inspect(target_engine).get_table_names():
             return None

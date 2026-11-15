@@ -1722,3 +1722,39 @@ class TestTheMarkerIsNeverTakenForAVerification:
     def test_a_migration_failed_before_its_rows_is_not_switched_to_postgresql(
             self, app, a_3_0_source, pg_target, monkeypatch):
         self._migration_failed_before_its_rows_then_switched(app, pg_target, monkeypatch)
+
+
+class TestATransferStateThatCannotBeReadIsRefused:
+    """A marker the switch cannot read is neither ignored nor guessed: 409, nothing written."""
+
+    def _unreadable_marker(self, app, auth_client, target, env_file):
+        from services.database_admin.preflight import TRANSFER_MARKER
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+        _standalone_target(app, target)
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f'CREATE TABLE {TRANSFER_MARKER} (other INTEGER)'))
+        finally:
+            engine.dispose()
+        before = env_file.read_text()
+
+        response = auth_client.post('/api/v2/database/switch',
+                                    data=json.dumps({'database_url': target}),
+                                    content_type='application/json')
+
+        assert response.status_code == 409, response.data
+        assert "transfer state could not be read" in json.loads(response.data)['message']
+        assert env_file.read_text() == before
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            assert TRANSFER_MARKER in inspect(engine).get_table_names()
+        finally:
+            engine.dispose()
+
+    def test_an_unreadable_marker_is_refused_sqlite(self, app, auth_client, sqlite_target, env_file):
+        self._unreadable_marker(app, auth_client, sqlite_target, env_file)
+
+    @_needs_pg
+    def test_an_unreadable_marker_is_refused_postgresql(self, app, auth_client, pg_target, env_file):
+        self._unreadable_marker(app, auth_client, pg_target, env_file)
