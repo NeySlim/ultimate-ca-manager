@@ -94,3 +94,18 @@ def test_an_export_that_raises_leaves_no_spool(backup_dir):
     with pytest.raises(RuntimeError):
         storage.create_archive(broken())
     assert not list(backup_dir.glob('.ucm_backup_*.tmp'))
+
+
+def test_a_released_lock_does_not_count_as_held(backup_dir, monkeypatch):
+    leftover = _leftover(backup_dir)
+    with backup_operation_lock(timeout=0):
+        pass
+    import utils.process_lock as process_lock
+
+    def no_flock(path):
+        raise OSError(errno.ENOLCK, 'no locks')
+
+    monkeypatch.setattr(process_lock, '_open_lock_file', no_flock)
+    with backup_operation_lock(timeout=0):
+        assert storage.sweep_orphan_spools() == 0
+    assert leftover.exists()
