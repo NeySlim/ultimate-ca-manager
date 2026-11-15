@@ -329,7 +329,7 @@ def load_hsm_private_key(hsm_key_id: int):
         return _ML_DSA_WRAPPERS[label](hsm_key_id, public_key, label)
 
     raise ValueError(
-        f"Unsupported HSM public key type {type(public_key).__name__} "
+        f"HSM wrappers do not support public key type {type(public_key).__name__} "
         f"for key {hsm_key_id} ({hsm_key.label})"
     )
 

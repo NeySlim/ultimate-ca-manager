@@ -9,10 +9,12 @@ import base64
 import hashlib
 import json
 import logging
+import secrets
 import time
 import uuid
 
-from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import (
     Encoding, NoEncryption, PrivateFormat, PublicFormat,
@@ -57,6 +59,25 @@ def normalize_key_type(value) -> str:
 # Default TTLs (seconds)
 DEFAULT_USER_TTL = 86400       # 24 hours
 DEFAULT_HOST_TTL = 31536000    # 365 days
+
+
+def _prove_hsm_ssh_signer(wrapper):
+    """Prove possession using the digest the SSH encoder will actually name."""
+    public = wrapper.public_key()
+    digest = (hashes.SHA512() if isinstance(public, rsa.RSAPublicKey) else
+              {256: hashes.SHA256, 384: hashes.SHA384, 521: hashes.SHA512}[public.curve.key_size]())
+    if wrapper.signing_hash(digest).name != digest.name:
+        raise ValueError(f'This HSM key cannot sign SSH certificates with the required {digest.name} digest')
+    challenge = b'UCM SSH CA proof of possession\x00' + secrets.token_bytes(32)
+    try:
+        if isinstance(public, rsa.RSAPublicKey):
+            signature = wrapper.sign(challenge, padding.PKCS1v15(), digest)
+            public.verify(signature, challenge, padding.PKCS1v15(), digest)
+        else:
+            signature = wrapper.sign(challenge, ec.ECDSA(digest))
+            public.verify(signature, challenge, ec.ECDSA(digest))
+    except InvalidSignature:
+        raise ValueError('HSM proof of possession failed: signature does not verify with the public key') from None
 
 
 class SSHCAService:
@@ -322,8 +343,8 @@ class SSHCAService:
 
         Args:
             hsm_key_id: the HsmKey row naming the token key — an existing synced
-                or registered key, RSA or NIST-EC (OpenSSH format has no Ed25519
-                or Brainpool CA keys)
+                or registered key, RSA or NIST-EC. HSM wrappers do not implement
+                Ed25519; OpenSSH does not support Brainpool CA keys.
             the other arguments: as in import_ca()
 
         Returns:
@@ -360,7 +381,7 @@ class SSHCAService:
         else:
             raise ValueError(
                 f"HSM key '{key_row.label}' is neither RSA nor NIST-EC: "
-                f"an SSH CA key must be one of them")
+                f"HSM SSH CA wrappers support only RSA and NIST-EC keys")
 
         fingerprint = SSHCAService._compute_fingerprint(public_key)
         # The same token key may back one user CA and one host CA (OpenSSH keeps
@@ -378,6 +399,7 @@ class SSHCAService:
         if max_ttl is not None:
             max_ttl = parse_duration_seconds(max_ttl, field='max_ttl')
 
+        _prove_hsm_ssh_signer(wrapper)
         pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')
 
         if default_extensions is None and ca_type == 'user':
@@ -515,6 +537,15 @@ class SSHCAService:
             fips_mode.refuse_unless_approved('ED25519', f"Ed25519 key of SSH CA '{ca.descr}'")
 
     @staticmethod
+    def check_signing_public_key(ca, public_key):
+        """The stored public key and fingerprint are the authority, never the token's slot."""
+        published = ssh_serialization.load_ssh_public_key(ca.public_key.encode())
+        if (ssh_serialization.serialize_ssh_public_key(public_key)
+                != ssh_serialization.serialize_ssh_public_key(published)
+                or SSHCAService._compute_fingerprint(public_key) != ca.fingerprint):
+            raise ValueError('The signing token key no longer matches the SSH authority\'s published key')
+
+    @staticmethod
     def get_private_key_object(ca_id):
         """Load and return the CA's private key object for signing.
 
@@ -530,7 +561,9 @@ class SSHCAService:
             from services.hsm.hsm_private_key import load_hsm_private_key
             if not ca.hsm_key_id:
                 raise ValueError(f"SSH CA '{ca.descr}' is flagged HSM but names no HSM key")
-            return load_hsm_private_key(ca.hsm_key_id)
+            wrapper = load_hsm_private_key(ca.hsm_key_id)
+            SSHCAService.check_signing_public_key(ca, wrapper.public_key())
+            return wrapper
 
         SSHCAService.refuse_unusable_ca(ca)
         return SSHCAService._load_private_key(ca.private_key, f"SSH CA '{ca.descr}'")
