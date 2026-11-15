@@ -198,3 +198,147 @@ class TestRemovalsForTheCeiling:
             _set('backup_max_total_mb', '1')
         r = auth_client.post('/api/v2/system/backups/run-retention')
         assert r.get_json()['data'].get('warning') is None
+
+
+PASSWORD = 'Ceiling-Probe-Pass-9'
+
+
+@pytest.mark.usefixtures('restore_ceiling')
+class TestRetentionAnswerSurvivesAFailingWarning:
+    def test_a_failing_warning_neither_fails_the_route_nor_skips_its_audit(
+            self, app, auth_client, disk, monkeypatch):
+        from services.backup import schedule
+        _archive(disk, 'ucm_backup_20250101_000000.ucmbkp', 10, 400)
+        _archive(disk, 'ucm_backup_20250102_000000.ucmbkp', 10, 399)
+        _archive(disk, 'ucm_backup_20260101_000000.ucmbkp', 10, 1)
+        with app.app_context():
+            _set('backup_retention_days', '30')
+            _set('backup_min_keep', '1')
+            _set('backup_max_total_mb', '1')
+
+        def boom(*_a, **_k):
+            raise RuntimeError('listing failed')
+        monkeypatch.setattr(schedule, 'ceiling_warning', boom)
+        r = auth_client.post('/api/v2/system/backups/run-retention')
+        assert r.status_code == 200, r.data
+        data = r.get_json()['data']
+        assert data['removed'] >= 1
+        assert data['warning'] is None
+        with app.app_context():
+            entry = (AuditLog.query.filter_by(action='backup_delete')
+                     .order_by(AuditLog.id.desc()).first())
+            assert entry.details.startswith('Retention applied on demand')
+
+
+@pytest.mark.usefixtures('restore_ceiling')
+class TestGeneralSettingsAuditTheCeiling:
+    def test_a_changed_ceiling_names_both_values(self, app, auth_client):
+        with app.app_context():
+            _set('backup_max_total_mb', '40')
+        assert _patch(auth_client, GENERAL, {'backup_max_total_mb': 90}).status_code == 200
+        with app.app_context():
+            entry = (AuditLog.query.filter_by(action='settings_update')
+                     .order_by(AuditLog.id.desc()).first())
+            assert 'backup_max_total_mb 40 -> 90' in entry.details
+
+    def test_an_unchanged_ceiling_is_not_mentioned(self, app, auth_client):
+        with app.app_context():
+            _set('backup_max_total_mb', '40')
+        assert _patch(auth_client, GENERAL, {'backup_max_total_mb': 40}).status_code == 200
+        with app.app_context():
+            entry = (AuditLog.query.filter_by(action='settings_update')
+                     .order_by(AuditLog.id.desc()).first())
+            assert 'backup_max_total_mb' not in entry.details
+
+
+@pytest.mark.usefixtures('restore_ceiling')
+class TestManualCreationReportsTheCeiling:
+    @pytest.mark.parametrize('url', ['/api/v2/system/backup', '/api/v2/settings/backup/create'])
+    def test_a_creation_above_the_ceiling_warns_and_removes_nothing(
+            self, app, auth_client, disk, url):
+        old = _archive(disk, 'ucm_backup_20250101_000000.ucmbkp', 2 * 1024 * 1024, 5)
+        with app.app_context():
+            _set('backup_max_total_mb', '1')
+        r = auth_client.post(url, data=json.dumps({'password': PASSWORD}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+        assert 'ceiling' in r.get_json()['data']['warning']
+        assert old.exists()
+
+    @pytest.mark.parametrize('url', ['/api/v2/system/backup', '/api/v2/settings/backup/create'])
+    def test_a_creation_under_the_ceiling_carries_no_warning(self, app, auth_client, disk, url):
+        with app.app_context():
+            _set('backup_max_total_mb', '1024')
+        r = auth_client.post(url, data=json.dumps({'password': PASSWORD}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+        assert r.get_json()['data'].get('warning') is None
+
+
+class TestOneListingPerScheduleRead:
+    def _count_disk_listings(self, monkeypatch, directory):
+        import glob as glob_module
+        real = glob_module.glob
+        calls = []
+
+        def counting(pattern, *a, **k):
+            if str(pattern).startswith(str(directory)):
+                calls.append(pattern)
+            return real(pattern, *a, **k)
+        monkeypatch.setattr(glob_module, 'glob', counting)
+        return calls
+
+    @pytest.mark.usefixtures('restore_ceiling')
+    def test_the_disk_is_listed_once_and_both_figures_agree(self, app, disk, monkeypatch):
+        from services.backup import schedule
+        _archive(disk, 'ucm_backup_20260101_000000.ucmbkp', 2 * 1024 * 1024, 2)
+        with app.app_context():
+            _set('backup_max_total_mb', '1')
+            calls = self._count_disk_listings(monkeypatch, disk)
+            data = schedule.get_schedule()
+        assert len(calls) == 1, calls
+        assert data['stored_bytes'] == 2 * 1024 * 1024 and data['over_ceiling'] is True
+
+    @pytest.mark.usefixtures('restore_ceiling')
+    def test_the_shared_store_is_listed_once(self, app, monkeypatch):
+        from datetime import datetime, timedelta
+        from services.backup import schedule, shared_store
+        calls = []
+        rows = [{'filename': 'ucm_backup_b.ucmbkp', 'size': 3 * 1024 * 1024, 'node': 'n1',
+                 'sha256': 'ab', 'created_at': datetime.utcnow()},
+                {'filename': 'ucm_backup_a.ucmbkp', 'size': 1024, 'node': 'n2',
+                 'sha256': 'cd', 'created_at': datetime.utcnow() - timedelta(days=1)}]
+        monkeypatch.setattr(shared_store, 'enabled', lambda: True)
+        monkeypatch.setattr(shared_store, 'list_archives', lambda: calls.append(1) or list(rows))
+        with app.app_context():
+            _set('backup_max_total_mb', '2')
+            data = schedule.get_schedule()
+        assert len(calls) == 1
+        assert data['stored_bytes'] == 3 * 1024 * 1024 + 1024
+        assert data['stored_count'] == 2
+        assert data['over_ceiling'] is True
+        assert data['last_archive'] == 'ucm_backup_b.ucmbkp'
+
+    def test_the_scheduler_tick_does_not_list_the_archives(self, app, disk, monkeypatch):
+        from services.backup import schedule
+        _archive(disk, 'ucm_backup_20260101_000000.ucmbkp', 10, 0)
+        with app.app_context():
+            before = schedule._get('auto_backup_enabled')
+            _set('auto_backup_enabled', 'false')
+            try:
+                calls = self._count_disk_listings(monkeypatch, disk)
+                assert schedule.run_scheduled_backup()['reason'] == 'disabled'
+            finally:
+                _set('auto_backup_enabled', before or 'false')
+        assert calls == []
+
+
+class TestOtherArchiveFilesAreReported:
+    def test_files_outside_the_count_are_numbered(self, app, auth_client, disk):
+        _archive(disk, 'ucm_backup_20260101_000000.ucmbkp', 100, 1)
+        _archive(disk, 'uploaded_copy.ucmbkp', 200, 1)
+        _archive(disk, 'legacy_backup.json.enc', 300, 1)
+        _archive(disk, 'notes.txt', 50, 1)
+        data = auth_client.get(SCHEDULE).get_json()['data']
+        assert data['stored_bytes'] == 100 and data['stored_count'] == 1
+        assert data['uncounted_count'] == 2

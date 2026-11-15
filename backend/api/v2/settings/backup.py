@@ -131,6 +131,7 @@ def create_backup():
         success=True
     )
 
+    from services.backup.schedule import safe_ceiling_warning
     response_data = {
         'filename': filename,
         # `size` stays the byte count this route has always returned; both
@@ -140,6 +141,8 @@ def create_backup():
         'size': size,
         'size_bytes': size,
         'download_url': f'/api/v2/settings/backup/{filename}/download',
+        # Creation removes nothing: the next retention brings the archives under the ceiling
+        'warning': safe_ceiling_warning(),
     }
 
     # Include generated password in response so user can save it

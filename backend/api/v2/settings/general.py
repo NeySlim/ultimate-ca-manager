@@ -378,12 +378,16 @@ def update_general_settings():
         except BackupSettingError as e:
             return error_response(str(e), 400)
 
+    ceiling_change = None
     if 'backup_max_total_mb' in data:
         try:
             data['backup_max_total_mb'] = validate_max_total_mb(
                 data['backup_max_total_mb'])
         except BackupSettingError as e:
             return error_response(str(e), 400)
+        before = _int_config('backup_max_total_mb', 0)
+        if before != data['backup_max_total_mb']:
+            ceiling_change = (before, data['backup_max_total_mb'])
 
     # The screen sends every setting back: an unchanged KDF must not block an
     # unrelated save once FIPS mode refuses it
@@ -542,7 +546,9 @@ def update_general_settings():
         resource_type='settings',
         resource_name='General Settings',
         details='Updated general settings'
-        + ('; backup password cleared' if clear_backup_password else ''),
+        + ('; backup password cleared' if clear_backup_password else '')
+        + (f'; backup_max_total_mb {ceiling_change[0]} -> {ceiling_change[1]}'
+           if ceiling_change else ''),
         success=True
     )
 

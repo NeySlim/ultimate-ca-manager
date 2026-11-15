@@ -366,8 +366,8 @@ def apply_retention(retention_days: int, *, min_keep: int, max_total_bytes: int,
             if total > max_total_bytes:
                 logger.warning(
                     "Backup retention: the stored archives still take %d MiB, above the %d MiB "
-                    "ceiling, because what remains is the last restore point",
-                    total // (1024 * 1024), max_total_bytes // (1024 * 1024))
+                    "ceiling: retention never removes the %d newest archives",
+                    total // (1024 * 1024), max_total_bytes // (1024 * 1024), len(keep))
         _before_deleting(victims)
         removed = len(_delete(conn, archives, chunks, archives.c.id.in_(victims))) if victims else 0
         conn.commit()

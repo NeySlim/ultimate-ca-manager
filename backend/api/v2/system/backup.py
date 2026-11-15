@@ -206,11 +206,14 @@ def create_backup():
         success=True,
     )
 
+    from services.backup.schedule import safe_ceiling_warning
     data = {
         'filename': filename,
         'size': _format_size(size),
         'size_bytes': size,
         'download_url': f'/api/v2/system/backup/{filename}/download',
+        # Creation removes nothing: the next retention brings the archives under the ceiling
+        'warning': safe_ceiling_warning(),
     }
     message = 'Backup created successfully'
     if service.last_export_warnings:
@@ -442,11 +445,10 @@ def _bulk_delete_local(filenames, counts, deleted_names, seen) -> None:
 @require_auth(['admin:system'])
 def run_retention_now():
     """Apply the retention policy now."""
-    from services.backup.schedule import ceiling_warning, run_backup_retention
+    from services.backup.schedule import run_backup_retention, safe_ceiling_warning
 
     try:
         removed = run_backup_retention(wait=RETENTION_LOCK_WAIT)
-        warning = ceiling_warning()
     except BackupBusyError as busy:
         logger.info('Retention refused: %s', busy)
         return error_response(str(busy), 409)
@@ -460,6 +462,8 @@ def run_retention_now():
         details=f'Retention applied on demand: removed {removed} backup(s)',
         success=True,
     )
+    # After the audit: the archives are already gone whatever this answers
+    warning = safe_ceiling_warning()
     return success_response(
         data={'removed': removed, 'warning': warning},
         message=f'Retention applied: removed {removed} backup(s)')
