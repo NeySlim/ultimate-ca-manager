@@ -392,12 +392,22 @@ install_254() {
     esac
 }
 
+# $OWNERS: what became of the owner of what is kept beside, given to root once the journal
+# is gone (as root only): "" not asked, "pending", "given", "failed"
 write_readme() {
     UNCHANGED=unchanged ROOT_OWNED=""
     if [ "$LOCALS" != "$NL" ]; then
-        # Given to root once the journal is gone (see the end of the run), as root only
-        [ -z "$as_root" ] || UNCHANGED="unchanged but for the owner of what is kept beside" ROOT_OWNED="
-What they hold now belongs to root (owner and group); nothing else in it changed."
+        [ -z "$OWNERS" ] || UNCHANGED="unchanged but for the owner of what is kept beside"
+        case $OWNERS in
+            pending) ROOT_OWNED="
+What they hold is given to root (owner and group) as the archiving ends; nothing else
+in it changed." ;;
+            given) ROOT_OWNED="
+What they hold now belongs to root (owner and group); nothing else in it changed." ;;
+            failed) ROOT_OWNED="
+What they hold could not all be given to root: each entry belongs to root where the
+change could be made, and to its earlier owner elsewhere; nothing else in it changed." ;;
+        esac
         BESIDE="
 Kept beside where they were, in directories readable by root only, as each one
 could not be renamed out of its filesystem (another filesystem, a bind mount, overlayfs):
@@ -658,14 +668,26 @@ if [ -n "$FIPS_BUILD" ]; then
     { jot "fips$TAB$ENV_FILE$TAB$OLD_ENV" && printf 'UCM_FIPS_BUILD=1\n' > "$ENV_FILE"; } \
         || fail "writing UCM_FIPS_BUILD=1 into $ENV_FILE"
 fi
+OWNERS=""
+[ -z "$as_root" ] || [ "$LOCALS" = "$NL" ] || OWNERS=pending
 write_readme || fail "writing $DEST/README.txt"
 rm -f -- "$JOURNAL" || fail "removing $JOURNAL"
-# Once nothing can be put back: what a local archive holds is root's, like the directory
-[ -z "$as_root" ] || printf '%s' "$LOCALS" | while IFS= read -r d; do
-    [ -z "$d" ] || chown -hR 0:0 -- "$d" || say "UCM: what $d holds could not all be given to root."
-done
+# Once nothing can be put back: what a local archive holds is root's, like the directory;
+# the README is written again to say whether it all is
+UNCHANGED=unchanged
+if [ -n "$OWNERS" ]; then
+    OWNERS=given
+    while IFS= read -r d; do
+        [ -z "$d" ] || chown -hR 0:0 -- "$d" || { say "UCM: what $d holds could not all be given to root."; OWNERS=failed; }
+    done <<EOF
+$LOCALS
+EOF
+    write_readme || say "UCM: $DEST/README.txt could not be written again to say who owns what is kept beside."
+    UNCHANGED="unchanged but for the owner of what is kept beside"
+    [ "$OWNERS" = given ] || UNCHANGED="$UNCHANGED (given to root where it could be)"
+fi
 
-say "Moved, unchanged, everything it left in $DATA and $CONFIG${DB_MOVED:+ and $DB_FILE}"
+say "Moved, $UNCHANGED, everything it left in $DATA and $CONFIG${DB_MOVED:+ and $DB_FILE}"
 say "to $DEST (root only; README.txt there says how to restore it)."
 if [ "$LOCALS" != "$NL" ]; then
     say "What could not be renamed out of its filesystem is beside it, readable by root only, in:"

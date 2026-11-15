@@ -1791,6 +1791,30 @@ def test_a_local_archive_and_all_it_holds_are_root_s_before_and_after_the_way_ba
     assert _owner(box.data / 'ca') == (1, 1)
 
 
+@pytest.mark.skipif(os.getuid() != 0, reason='gives files to another owner')
+@pytest.mark.parametrize('given', [True, False])
+def test_the_readme_and_the_last_lines_say_whether_what_is_kept_beside_became_root_s(tmp_path, given):
+    """The owner of a local archive changes once the journal is gone: the README and the
+    console say so after the fact, and say it could not when chown failed."""
+    box = Box(tmp_path, python='stub')
+    subprocess.run(['chown', '-hR', '1:1', str(box.data)], check=True)
+    box.wrap(other_fs=(box.data,))
+    if not given:
+        (box.bin / 'chown').write_text(
+            f'#!/bin/sh\ncase "$*" in *{LOCAL}*) echo "chown: injected failure" >&2; exit 1 ;; esac\n'
+            f'exec {shutil.which("chown")} "$@"\n')
+        (box.bin / 'chown').chmod(0o755)
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    flat = ' '.join((box.archive / 'README.txt').read_text().split())
+    assert 'Moved, unchanged, everything' not in out.stdout, out.stdout
+    assert ('What they hold now belongs to root (owner and group); nothing else in it changed.' in flat) is given, flat
+    assert ('could not all be given to root' in flat) is not given, flat
+    assert ('Moved, unchanged but for the owner of what is kept beside, everything it left in'
+            in out.stdout) is given, out.stdout
+    assert ('could not all be given to root' in out.stdout) is not given, out.stdout
+
+
 # -- dnf5 cuts a scriptlet's lines at 80 columns ---------------------------------------
 
 @pytest.mark.parametrize('case', ['archived', 'failed', 'nothing to say'])
