@@ -152,9 +152,9 @@ def _move_ca_dependents(db, dupe, keeper):
 def _drop_disproven_parents(db, CA, stats):
     """Phase 1b: a parent linked without a confirmation whose key does not verify the CA's
     certificate (left by an earlier version) is replaced by the one that does, or none; audited.
-    Only an INVALID signature counts: a link this build cannot check is kept."""
+    Only a proven bad signature counts: a link this build or its provider cannot check is kept."""
     from services.ca import parent_confirmation
-    from utils.cert_issuer import INVALID, signature_verdict
+    from utils.cert_issuer import signature_disproved
     by_refid = {c.refid: c for c in CA.query.all()}
     dropped = []
     for ca in by_refid.values():
@@ -163,7 +163,7 @@ def _drop_disproven_parents(db, CA, stats):
             continue
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
-            if signature_verdict(cert, x509.load_pem_x509_certificate(base64.b64decode(parent.crt)))[0] != INVALID:
+            if not signature_disproved(cert, x509.load_pem_x509_certificate(base64.b64decode(parent.crt))):
                 continue
         except Exception:
             continue

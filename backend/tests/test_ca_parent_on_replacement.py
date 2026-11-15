@@ -208,3 +208,57 @@ def test_a_renewal_whose_key_identifier_names_another_stored_key_keeps_the_verif
         db.session.commit()
     _import(auth_client, _aki_pem(w['cn'], w['key'], w['root_cn'], w['root_key'], ski), cross_mode='replace')
     assert _caref(app, w['child']['id']) == w['root']['refid']
+
+
+def _ed_pem(cn, key, issuer_cn=None, signer=None):
+    name = lambda v: x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, v)])  # noqa: E731
+    cert = (x509.CertificateBuilder().subject_name(name(cn)).issuer_name(name(issuer_cn or cn))
+            .public_key(key.public_key()).serial_number(_serial())
+            .not_valid_before(dt.datetime(2026, 1, 1)).not_valid_after(dt.datetime(2036, 1, 1))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .sign(signer or key, None))
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def test_the_chain_repair_keeps_a_link_when_the_provider_fails(app, auth_client, linked, monkeypatch):
+    """A verification that errors (a provider refusing the algorithm) proves nothing: no unlink, no audit."""
+    from services.ski_aki_backfill import backfill_ski_aki
+    from utils import cert_issuer
+
+    def failing(cert, key):
+        raise RuntimeError('provider refused the operation')
+    monkeypatch.setattr(cert_issuer, 'verify_certificate_signature', failing)
+    before = _audits(app, UNLINKED, linked['child']['id'])
+    with app.app_context():
+        backfill_ski_aki()
+    assert _caref(app, linked['child']['id']) == linked['root']['refid']
+    assert _audits(app, UNLINKED, linked['child']['id']) == before
+
+
+@pytest.mark.parametrize('approved', [False, True])
+def test_the_chain_repair_trusts_a_bad_signature_only_from_a_module_that_approves_it(
+        app, auth_client, made, monkeypatch, approved):
+    """In FIPS mode a module refusing Ed25519 answers 'invalid' for any signature: that is no proof."""
+    import fips_mode
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from services.ski_aki_backfill import backfill_ski_aki
+    from utils import cert_issuer
+    tag, root_key, key = _tag(), ed25519.Ed25519PrivateKey.generate(), ed25519.Ed25519PrivateKey.generate()
+    root = _import(auth_client, _ed_pem(f'Ed Root {tag}', root_key))
+    made.append(root['id'])
+    child = _import(auth_client, _ed_pem(f'Ed Child {tag}', key, f'Ed Root {tag}', root_key))
+    made.append(child['id'])
+    assert child['caref'] == root['refid']
+    real = cert_issuer.verify_certificate_signature
+
+    def module(cert, public_key):
+        if isinstance(public_key, ed25519.Ed25519PublicKey):
+            raise InvalidSignature()
+        return real(cert, public_key)
+    monkeypatch.setattr(cert_issuer, 'verify_certificate_signature', module)
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    monkeypatch.setattr(fips_mode, 'module_approves', lambda algorithm: approved)
+    with app.app_context():
+        backfill_ski_aki()
+    assert _caref(app, child['id']) == (None if approved else root['refid'])

@@ -95,6 +95,29 @@ def signature_verdict(cert: x509.Certificate, issuer: x509.Certificate):
         return UNVERIFIABLE, _unverifiable_algorithm(cert, issuer)
 
 
+def signature_disproved(cert: x509.Certificate, issuer: x509.Certificate) -> bool:
+    """Whether *issuer*'s key provably did not sign *cert*: only an InvalidSignature from a
+    provider that approves the key's algorithm. A provider error, or a FIPS module refusing
+    the algorithm (it then rejects every signature of it), proves nothing."""
+    try:
+        key = issuer.public_key()
+        if _fips_module_refuses(key):
+            return False
+        verify_certificate_signature(cert, key)
+    except InvalidSignature:
+        return True
+    except Exception:
+        return False
+    return False
+
+
+def _fips_module_refuses(public_key) -> bool:
+    import fips_mode
+    label = (key_algorithms.label_for_public_key(public_key) or '').upper()
+    return label in fips_mode.MODULE_DEPENDENT_SIGNATURES and fips_mode.enabled() \
+        and not fips_mode.module_approves(label)
+
+
 def _unverifiable_algorithm(cert, issuer):
     from utils.foreign_algorithms import describe_public_key
     from utils.signature_label import signature_algorithm_label
