@@ -261,8 +261,8 @@ class StagedFiles:
         data = entry.staged_path.read_bytes()
 
         _atomic_replace(entry.destination, data, entry.mode)
-        # Recorded before the directory fsync: the rename has already taken
-        # effect, so a failing fsync must still compensate this file.
+        # Set before the directories are fsynced at the end of publish(): the rename
+        # has already taken effect, so a failing fsync must still compensate this file.
         entry.published = True
         return True
 
