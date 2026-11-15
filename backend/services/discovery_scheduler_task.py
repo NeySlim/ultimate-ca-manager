@@ -7,6 +7,7 @@ import logging
 from datetime import timedelta
 
 from models import db, ScanProfile, ScanRun
+from services.scheduler_leader import cluster_utc_now
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -128,7 +129,7 @@ class DiscoverySchedulerTask:
     def execute() -> None:
         """Check all enabled profiles and trigger scans for those due."""
         try:
-            now = utc_now()
+            now = cluster_utc_now()  # next_scan_at is claimed on the cluster clock
             due_profiles = ScanProfile.query.filter(
                 ScanProfile.schedule_enabled == True,
                 ScanProfile.next_scan_at <= now,

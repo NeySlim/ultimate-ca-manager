@@ -12,7 +12,7 @@ from sqlalchemy import or_
 
 from models import db
 from models.acme_models import AcmeClientOrder
-from utils.datetime_utils import utc_now
+from services.scheduler_leader import cluster_utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class OrderLease:
     @classmethod
     def take(cls, order_id: int) -> Optional['OrderLease']:
         """The lease, or None while another holder's is live. Commits the session."""
-        now = utc_now()
+        now = cluster_utc_now()  # every node writes and compares the lease on one clock
         taken = AcmeClientOrder.query.filter(
             AcmeClientOrder.id == order_id,
             or_(AcmeClientOrder.renewal_claimed_at.is_(None),
@@ -51,7 +51,7 @@ class OrderLease:
     def refresh(self) -> bool:
         """Restart the lease and commit the session while it is this holder's; once it is
         another's, roll the session back and answer False."""
-        now = utc_now()
+        now = cluster_utc_now()  # every node writes and compares the lease on one clock
         if self._held().update({'renewal_claimed_at': now}, synchronize_session=False) != 1:
             db.session.rollback()
             return False

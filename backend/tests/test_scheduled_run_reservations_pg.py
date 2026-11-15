@@ -217,7 +217,7 @@ def _interrupted_then_retried(app, monkeypatch, tmp_path):
         raise _Killed()
 
     clock = {'now': _NOW}
-    monkeypatch.setattr(schedule, 'utc_now', lambda: clock['now'])
+    monkeypatch.setattr(schedule, '_cluster_now', lambda: clock['now'])
     with app.app_context():
         _set('backup.last_outcome', 'ok')
         _set('backup.last_outcome_at', '2026-01-01T00:05:00Z')
@@ -249,7 +249,7 @@ def test_a_run_killed_during_the_export_is_retried_after_the_lease(app, monkeypa
 def test_a_concluded_run_is_not_retried_after_the_lease(app, monkeypatch, tmp_path):
     exported = _backup_schedule(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z')
     clock = {'now': _NOW}
-    monkeypatch.setattr(schedule, 'utc_now', lambda: clock['now'])
+    monkeypatch.setattr(schedule, '_cluster_now', lambda: clock['now'])
     try:
         with app.app_context():
             assert schedule.run_scheduled_backup()['status'] == 'ok'
@@ -265,7 +265,7 @@ def _killed(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z'):
     exported = _backup_schedule(app, monkeypatch, tmp_path, last_run=last_run)
     real_export = schedule.storage.export_archive
     clock = {'now': _NOW}
-    monkeypatch.setattr(schedule, 'utc_now', lambda: clock['now'])
+    monkeypatch.setattr(schedule, '_cluster_now', lambda: clock['now'])
     monkeypatch.setattr(schedule.storage, 'export_archive',
                         lambda *a, **k: (_ for _ in ()).throw(_Killed()))
     with app.app_context():
@@ -364,7 +364,7 @@ def test_the_schedule_reports_a_reservation_in_flight(app, monkeypatch, tmp_path
 def test_an_outcome_lost_once_brings_no_second_archive(app, monkeypatch, tmp_path):
     exported = _backup_schedule(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z')
     clock = {'now': _NOW}
-    monkeypatch.setattr(schedule, 'utc_now', lambda: clock['now'])
+    monkeypatch.setattr(schedule, '_cluster_now', lambda: clock['now'])
     record, failures = schedule._record_outcome, []
 
     def record_with_a_failing_commit(*a, **k):

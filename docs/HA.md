@@ -11,7 +11,7 @@ UCM can run on two or more nodes that share one PostgreSQL database. This page c
 - **`UCM_HA=1`** on every node.
 - **A load balancer** in front of the nodes. Probe `/health/ready`. Without Redis (see [REDIS.md](REDIS.md)) UI sessions are kept per node: use cookie affinity so a user stays on one node.
 - **One gunicorn worker per node**, which is the default (`workers = 1`). Do not raise it.
-- **Synchronised clocks** (NTP): node heartbeats are compared across hosts.
+- **Synchronised clocks** (NTP): heartbeats, leases and run reservations are compared on the PostgreSQL server's clock, but each node dates the certificates, CRLs and tokens it issues with its own.
 
 Generate the keys once:
 

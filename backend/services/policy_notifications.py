@@ -186,13 +186,13 @@ def _dispatch(policy_id, kind, resource_id, details):
 
 def _recently_logged(kind, resource_id, exclude_id=None):
     from models.email_notification import NotificationLog
-    from utils.datetime_utils import utc_now
-    # Sent, or being sent by another worker: a failed attempt does not count
+    from services.scheduler_leader import cluster_utc_now
+    # Sent, or being sent by another worker or node: a failed attempt does not count
     query = NotificationLog.query.filter(
         NotificationLog.type == kind, NotificationLog.resource_type == 'policy',
         NotificationLog.resource_id == resource_id,
         NotificationLog.status.in_(('sent', 'pending')),
-        NotificationLog.sent_at >= utc_now() - DEDUP_WINDOW)
+        NotificationLog.sent_at >= cluster_utc_now() - DEDUP_WINDOW)
     if exclude_id is not None:
         query = query.filter(NotificationLog.id != exclude_id)
     return query.first() is not None
@@ -206,12 +206,13 @@ def _claim_in_db(kind, resource_id, recipients_label):
     from sqlalchemy import text
     from models import db
     from models.email_notification import NotificationLog
-    from utils.datetime_utils import utc_now
+    from services.scheduler_leader import cluster_utc_now
     if db.engine.dialect.name == 'postgresql':
         lock = int(hashlib.sha256(f'{kind}:{resource_id}'.encode()).hexdigest()[:15], 16)
         db.session.execute(text('SELECT pg_advisory_xact_lock(:k)'), {'k': lock})
     claim = NotificationLog(type=kind, recipient=recipients_label[:255], status='pending',
-                            resource_type='policy', resource_id=resource_id, sent_at=utc_now())
+                            resource_type='policy', resource_id=resource_id,
+                            sent_at=cluster_utc_now())  # the window is read on the cluster clock
     db.session.add(claim)
     db.session.flush()
     if _recently_logged(kind, resource_id, exclude_id=claim.id):
