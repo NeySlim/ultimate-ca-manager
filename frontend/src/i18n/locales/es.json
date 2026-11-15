@@ -275,6 +275,7 @@
     "source": "Fuente",
     "addDnsProvider": "Añadir proveedor",
     "test": "Probar",
+    "syncKeys": "Sincronizar claves",
     "dnsProviderTestFailed": "Prueba de conexión fallida",
     "providerName": "Nombre del proveedor",
     "providerType": "Tipo de proveedor",
@@ -4693,7 +4694,8 @@
         "template": "Error al exportar la plantilla"
       },
       "hsm": {
-        "testFailed": "Error en la prueba de conexión"
+        "testFailed": "Error en la prueba de conexión",
+        "syncFailed": "Error al sincronizar claves"
       },
       "https": {
         "applyFailed": "Error al aplicar el certificado",
@@ -4822,7 +4824,8 @@
         "template": "Plantilla exportada exitosamente"
       },
       "hsm": {
-        "connectionOk": "Conexión exitosa"
+        "connectionOk": "Conexión exitosa",
+        "keysSynced": "Claves sincronizadas: {{added}} nuevas, {{removed}} eliminadas, {{unchanged}} sin cambios"
       },
       "https": {
         "applied": "Certificado HTTPS aplicado. El servidor se reiniciará.",

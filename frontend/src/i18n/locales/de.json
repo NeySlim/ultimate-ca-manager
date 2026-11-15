@@ -275,6 +275,7 @@
     "source": "Quelle",
     "addDnsProvider": "Anbieter hinzufügen",
     "test": "Testen",
+    "syncKeys": "Schlüssel synchronisieren",
     "dnsProviderTestFailed": "Verbindungstest fehlgeschlagen",
     "providerName": "Anbietername",
     "providerType": "Anbietertyp",
@@ -4693,7 +4694,8 @@
         "template": "Vorlage konnte nicht exportiert werden"
       },
       "hsm": {
-        "testFailed": "Verbindungstest fehlgeschlagen"
+        "testFailed": "Verbindungstest fehlgeschlagen",
+        "syncFailed": "Synchronisierung der Schlüssel fehlgeschlagen"
       },
       "https": {
         "applyFailed": "Zertifikat konnte nicht angewendet werden",
@@ -4822,7 +4824,8 @@
         "template": "Vorlage erfolgreich exportiert"
       },
       "hsm": {
-        "connectionOk": "Verbindung erfolgreich"
+        "connectionOk": "Verbindung erfolgreich",
+        "keysSynced": "Schlüssel synchronisiert: {{added}} neu, {{removed}} entfernt, {{unchanged}} unverändert"
       },
       "https": {
         "applied": "HTTPS-Zertifikat angewendet. Server wird neu gestartet.",

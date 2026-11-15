@@ -275,6 +275,7 @@
     "source": "来源",
     "addDnsProvider": "添加提供商",
     "test": "测试",
+    "syncKeys": "同步密钥",
     "dnsProviderTestFailed": "连接测试失败",
     "providerName": "提供商名称",
     "providerType": "提供商类型",
@@ -4693,7 +4694,8 @@
         "template": "导出模板失败"
       },
       "hsm": {
-        "testFailed": "连接测试失败"
+        "testFailed": "连接测试失败",
+        "syncFailed": "密钥同步失败"
       },
       "https": {
         "applyFailed": "应用证书失败",
@@ -4822,7 +4824,8 @@
         "template": "模板导出成功"
       },
       "hsm": {
-        "connectionOk": "连接成功"
+        "connectionOk": "连接成功",
+        "keysSynced": "密钥已同步：新增 {{added}}，删除 {{removed}}，未变 {{unchanged}}"
       },
       "https": {
         "applied": "HTTPS 证书已应用，服务器将重启。",

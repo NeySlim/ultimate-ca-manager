@@ -159,6 +159,20 @@ export default function HSMPage() {
     }
   }
 
+  const handleSyncKeys = async (provider) => {
+    try {
+      const response = await hsmService.syncKeys(provider.id)
+      const d = response.data || {}
+      showSuccess(t('messages.success.hsm.keysSynced', {
+        added: d.added || 0, removed: d.removed || 0, unchanged: d.unchanged || 0
+      }))
+      loadData()
+      if (selectedProvider?.id === provider.id) loadKeys(provider.id)
+    } catch (error) {
+      showError(error.message || t('messages.errors.hsm.syncFailed'))
+    }
+  }
+
   const handleSave = async (formData) => {
     try {
       if (modalMode === 'create') {
@@ -290,6 +304,7 @@ export default function HSMPage() {
 
   const rowActions = (row) => [
     { label: t('common.test'), icon: TestTube, onClick: () => handleTest(row) },
+    ...(canWrite('hsm') ? [{ label: t('common.syncKeys'), icon: ArrowsClockwise, onClick: () => handleSyncKeys(row) }] : []),
     ...(canWrite('hsm') ? [{ label: t('common.edit'), icon: PencilSimple, onClick: () => handleEdit(row) }] : []),
     ...(canDelete('hsm') ? [{ label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }] : [])
   ]
@@ -354,6 +369,12 @@ export default function HSMPage() {
             {testing ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
             {testing ? t('common.testing') : t('common.test')}
           </Button>
+          {canWrite('hsm') && (
+          <Button type="button" size="sm" variant="secondary" onClick={() => handleSyncKeys(provider)}>
+            <ArrowsClockwise size={14} />
+            {t('common.syncKeys')}
+          </Button>
+          )}
           {canWrite('hsm') && (
           <Button type="button" size="sm" variant="secondary" onClick={() => handleEdit(provider)}>
             <PencilSimple size={14} />
