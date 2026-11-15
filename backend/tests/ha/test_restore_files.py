@@ -79,9 +79,15 @@ def test_after_a_restore_on_a_every_node_holds_the_files_of_the_database(cluster
     b.start()
     wait_until(b.ready, READY_TIMEOUT, 'B ready on the shared directory')
 
-    r = admin.http.post(a.url('/api/v2/system/restore'), headers=admin._headers(),
-                        files={'file': (name, archive.content)}, data={'password': PASSWORD},
-                        timeout=300)
+    def restore():
+        # B's scheduler process acknowledges once its start is done: refused until then
+        found = admin.http.post(a.url('/api/v2/system/restore'), headers=admin._headers(),
+                                files={'file': (name, archive.content)},
+                                data={'password': PASSWORD}, timeout=300)
+        if found.status_code == 409 and 'maintenance_not_acknowledged' in found.text:
+            return None
+        return [found]
+    (r,) = wait_until(restore, 240, 'the restore acknowledged by every node')
     assert r.status_code == 200, r.text[:1000]
     assert r.json()['data']['files']['removals'] >= 1
     assert (a.data_dir / 'certs' / kept_name).read_bytes() == base64.b64decode(other_crt), \
