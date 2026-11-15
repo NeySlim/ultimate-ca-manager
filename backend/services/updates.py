@@ -751,6 +751,10 @@ def _auto_install(result):
     in_ha = ha_enabled()
     if not in_ha and not result.get('download_url'):
         return
+    if not in_ha and not result.get('checksum_url'):
+        # Before the marker: a package published ahead of its checksum is installed next check
+        logger.info(f"Auto-update to {latest} waits: not published yet: SHA256 checksum")
+        return
     if in_ha:
         from services import update_campaign
         from migration_marks import FULL_STOP_ASSET
@@ -789,8 +793,6 @@ def _auto_install(result):
         update_campaign.campaign_tick()
         return
 
-    if not result.get('checksum_url'):
-        return refuse('release publishes no SHA256 checksum')
     try:
         expected = fetch_expected_sha256(result['checksum_url'], result['package_name'])
     except Exception as e:

@@ -577,6 +577,25 @@ def test_outside_ha_the_scheduled_install_stays_local(app, monkeypatch):
     assert calls == [('download', SHA), ('install', '/nowhere/p.deb', '3.1')]
 
 
+def test_outside_ha_a_package_before_its_checksum_keeps_the_attempt(app, monkeypatch):
+    """A .deb published before its .sha256 waits: the next check installs once it appears."""
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    monkeypatch.delenv('UCM_DOCKER', raising=False)
+    monkeypatch.setattr(updates, 'fetch_expected_sha256', lambda url, name: SHA)
+    calls = []
+    _witnesses(monkeypatch, calls)
+    from models import SystemConfig, db
+    with app.app_context():
+        SystemConfig.query.filter_by(key=updates._ATTEMPTED_VERSION_KEY).delete()
+        db.session.commit()
+        updates._auto_install(_release(checksum_url=None, assets=ASSETS[:1]))
+        assert calls == []
+        updates._auto_install(_release())
+        SystemConfig.query.filter_by(key=updates._ATTEMPTED_VERSION_KEY).delete()
+        db.session.commit()
+    assert calls == [('download', SHA), ('install', '/nowhere/p.deb', '3.1')]
+
+
 def test_a_stop_is_audited_and_pushed_to_the_browsers(app, ha, monkeypatch):
     import websocket.emitters as ws
     from services.audit_service import AuditService
