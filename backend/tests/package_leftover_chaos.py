@@ -24,6 +24,8 @@ LAYOUTS = {
     'a mount point inside the data': lambda box: {'other_fs': (box.data / 'updates',)},
     'each kept directory a mount point': lambda box: {'other_fs': tuple(box.data / d for d in KEPT)},
     'overlayfs': lambda box: {'fstype': 'overlay'},
+    # DATABASE_PATH outside the data, on a filesystem of its own (the database/ branch)
+    'a database outside the data': lambda box: {'other_fs': (box.place_database_outside(),)},
 }
 # The steps whose every call meets every fault: the archiving run's, and the put-back's
 STEPS = {'rename', 'mkdir', 'rmdir', 'journal'}
@@ -204,6 +206,7 @@ class ChaosSuite:
         box, data, config, before, runs = lab.chain(*plans, check=lambda box, data, config, before, run:
                                                     while_failing(box, run.out, before, data, config, why))
         converged(box, runs[-1].out, data, config, why)
+        return runs
 
     def _calls(self, lab, plan=()):
         return lab.first_run(plan).count
@@ -222,20 +225,25 @@ class ChaosSuite:
 
     def test_every_step_of_a_put_back_meets_every_fault(self, lab):
         """Each kind of step a roll-back takes (renames back, directories removed, the
-        journal updated) fails, kills, or kills right after, once at least; with the test
-        above, every rename, mkdir, rmdir and journal write meets every fault."""
+        journal updated) fails, kills, or kills right after, once at least, a journal write
+        is also cut short; counted on the calls the faulty runs really made."""
         backs = {}
         for at in range(1, self._calls(lab) + 1):
-            for kind, calls in lab.first_run([(at, 'fail')]).steps(after=at).items():
-                backs.setdefault(kind, []).extend((at, n) for n in calls)
+            run = lab.first_run([(at, 'fail')])
+            for n, name, args in run.calls:
+                if n > at and step(name, args):
+                    backs.setdefault(step(name, args), []).append((at, n, name))
         assert {'rename', 'rmdir', 'journal'} <= set(backs), set(backs)
-        covered = {(kind, mode) for kind in lab.first_run().steps() for mode in FAULTS}
+        covered = set()
         for kind, pairs in backs.items():
-            for i, mode in enumerate(('fail', 'kill', 'done')):
-                at, n = pairs[(i * 7) % len(pairs)]
-                self._scenario(lab, (at, 'fail'), (n, mode))
-                covered.add((kind, mode))
-        assert {(k, m) for k in STEPS for m in FAULTS} <= covered, covered
+            for i, mode in enumerate(('fail', 'kill', 'done') + (TORN if kind == 'journal' else ())):
+                fit = [p for p in pairs if mode not in TORN or p[2] == 'tee']
+                at, n, _name = fit[(i * 7) % len(fit)]
+                faulty = self._scenario(lab, (at, 'fail'), (n, mode))[0]
+                hit = [(step(name, args), mode) for k, name, args in faulty.calls if k == n]
+                covered.update(hit)
+        assert {(k, m) for k in ('rename', 'rmdir', 'journal') for m in ('fail', 'kill', 'done')} <= covered, covered
+        assert {('journal', m) for m in TORN} <= covered, covered
 
     def test_a_mount_point_is_never_renamed_nor_removed(self, lab):
         """A mount point kept in place is a directory of the archiving, never an item: no

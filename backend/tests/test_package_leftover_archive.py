@@ -57,6 +57,9 @@ class Box:
         self.bin = tmp_path / 'bin'
         self.inner = tmp_path / 'inner'
         self.state = tmp_path / 'state'
+        # The database, and the directory DATABASE_PATH placed it in outside the data, if any
+        self.db, self.outside, self.outside_original = self.data / 'ucm.db', None, {}
+        self.kind = python
         for d in (self.home / 'venv' / 'bin', self.config, self.bin, self.state):
             d.mkdir(parents=True)
         (self.home / 'VERSION').write_text('3.0\n')
@@ -93,15 +96,32 @@ class Box:
             exe.unlink(missing_ok=True)
             return
         else:
-            line = first or f'sqlite {self.data}/ucm.db'
+            line = first or f'sqlite {self.db}'
             reason = ('This database names 1 migration(s) this release does not know.' if code == 6
                       else 'This database was last started by a release older than 2.254.')
             body = f'echo "{line}"\necho "{reason}"\nexit {code}'
             if code == 4 and first is None:
                 # Once archived, the database is gone: a new installation
-                body = f'[ -e "{self.data}/ucm.db" ] || {{ echo "sqlite {self.data}/ucm.db"; exit 3; }}\n' + body
+                body = f'[ -e "{self.db}" ] || {{ echo "sqlite {self.db}"; exit 3; }}\n' + body
         exe.write_text(f'#!/bin/sh\n{body}\n')
         exe.chmod(0o755)
+
+    def place_database_outside(self):
+        """DATABASE_PATH places the database, with its -wal, in a directory of its own
+        beside an unrelated file; returns that directory (once moved, moved no more)."""
+        if self.outside is None:
+            self.outside = self.tmp / 'srv' / 'db'
+            self.outside.mkdir(parents=True)
+            shutil.move(self.data / 'ucm.db', self.outside / 'pki.db')
+            (self.outside / 'pki.db-wal').write_bytes(b'wal')
+            (self.outside / 'unrelated').write_text('stays')
+            env = self.config / 'ucm.env'
+            env.write_text(env.read_text().replace(f'{self.data}/ucm.db', f'{self.outside}/pki.db'))
+            self.db = self.outside / 'pki.db'
+            self.outside_original = tree(self.outside)
+            if self.kind == 'stub':
+                self.python('stub')
+        return self.outside
 
     def _guard(self, name, allowed=(), arms=''):
         """`name` fails, and records the call in state/forbidden, when an argument is a path
@@ -229,7 +249,8 @@ def files(top):
 
 
 def snapshot(box, *extra):
-    return {str(p): tree(p) for p in (box.data, box.config, *extra)}
+    outside = (box.outside,) if box.outside else ()
+    return {str(p): tree(p) for p in (box.data, box.config, *outside, *extra)}
 
 
 # A group the files can be given that is not theirs: any as root, else a secondary one
@@ -249,7 +270,7 @@ def plain(rel, local=True):
 def places(box, sub):
     """{path it had: [(where it is, entry)]} of every entry under the data (sub 'data') or
     the configuration, local archives included, and under `sub` in every central archive."""
-    top = box.data if sub == 'data' else box.config
+    top = {'data': box.data, 'config': box.config, 'database': box.outside}[sub]
     archives = sorted(box.parent.iterdir()) if box.parent.exists() else []
     out = {}
     for base in (top, *(a / sub for a in archives)):
@@ -267,7 +288,8 @@ def exactly_once(box, data, config, why='', skip=()):
     """Every original file, link and special file is whole at exactly one path: its own,
     a central archive or a local one (never none, never two); every original directory
     whole at one at least. The ucm.env the script wrote does not count; nor does `skip`."""
-    for sub, originals in (('data', data), ('config', config)):
+    outside = (('database', box.outside_original),) if box.outside else ()
+    for sub, originals in (('data', data), ('config', config), *outside):
         found = places(box, sub)
         for rel, entry in originals.items():
             if rel in skip or not plain(rel):
@@ -288,8 +310,11 @@ def archived(box, out, data, config, why=''):
     assert [a.name for a in box.parent.iterdir()] == [STAMP], (why, out.stdout)
     assert (box.archive / 'README.txt').is_file() and not (box.archive / '.journal').exists(), why
     exactly_once(box, data, config, why)
-    for sub, top in (('data', box.data), ('config', box.config)):
+    outside = (('database', box.outside),) if box.outside else ()
+    for sub, top in (('data', box.data), ('config', box.config), *outside):
         for rel, entry in tree(top).items():
+            if sub == 'database' and rel == 'unrelated':
+                continue
             # An earlier archiving's local archive stays where it is, as it was
             if rel == plain(rel) and entry[0] != 'dir' and '/.ucm-archive-' not in f'/{rel}':
                 assert sub == 'config' and rel == 'ucm.env' and _fips_written(top / rel), (why, rel)
@@ -299,7 +324,8 @@ def archived(box, out, data, config, why=''):
 
 def locals_of(box):
     """The local archive directories under the data and the configuration."""
-    return sorted(p for top in (box.data, box.config) if top.exists()
+    outside = (box.outside,) if box.outside else ()
+    return sorted(p for top in (box.data, box.config, *outside) if top.exists()
                   for p in top.rglob('.ucm-archive-*') if p.is_dir())
 
 
