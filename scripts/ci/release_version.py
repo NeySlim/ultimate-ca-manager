@@ -88,7 +88,8 @@ def _section(heading, text, stop):
 
 
 def changelog_section(version, text):
-    """Body of `## [version]` up to the next `## [` heading, blank lines dropped, led by one blank line."""
+    """Body of `## [version]` up to the next `## [` heading, blank lines dropped, led by one blank
+    line; empty when it holds no entry (sub-headings alone are none)."""
     parse(version)
     return (_section(re.compile(r'^## \[' + re.escape(version) + r'\]'), text, '## [')
             or _section(re.compile(r'^## ' + re.escape(version) + r'(\s|$)'), text, '## '))
