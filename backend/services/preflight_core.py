@@ -29,13 +29,14 @@ class Detector:
     title: str
     remedy: str
     find: Callable[..., List[str]]  # one name per affected object
+    reads_database: bool = True
 
 
 def registry_detector(registry: List[Detector]):
     """A ``detector(id, severity, title, remedy)`` decorator that appends to *registry*."""
-    def detector(id: str, severity: str, title: str, remedy: str):
+    def detector(id: str, severity: str, title: str, remedy: str, reads_database: bool = True):
         def register(find):
-            registry.append(Detector(id, severity, title, remedy, find))
+            registry.append(Detector(id, severity, title, remedy, find, reads_database))
             return find
         return register
     return detector

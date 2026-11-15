@@ -589,7 +589,7 @@ def _backup_archives():
           'UCM refuses to start in FIPS mode',
           'Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL; '
           'for a server on the same host, connect through its Unix socket instead: '
-          'postgresql://ucm:<password>@/ucm?host=/var/run/postgresql')
+          'postgresql://ucm:<password>@/ucm?host=/var/run/postgresql', reads_database=False)
 def _database():
     problem = postgres_tls_problem(current_app.config.get('SQLALCHEMY_DATABASE_URI') or '')
     return [f'DATABASE_URL: {problem}'] if problem else []
@@ -599,7 +599,7 @@ def _database():
           'PostgreSQL is set to use GSSAPI encryption, which runs in the Kerberos library '
           'outside the FIPS module: UCM refuses to start in FIPS mode',
           'Remove gssencmode from DATABASE_URL and PGGSSENCMODE from the environment, or set '
-          'them to disable: TLS then protects the connection.')
+          'them to disable: TLS then protects the connection.', reads_database=False)
 def _database_gssenc():
     problem = postgres_gssenc_problem(current_app.config.get('SQLALCHEMY_DATABASE_URI') or '')
     return [f'DATABASE_URL: {problem}'] if problem else []
@@ -620,7 +620,7 @@ def _no_master_key():
 
 @detector('https.unapproved_key', BLOCKER,
           'The HTTPS certificate has an Ed25519/Ed448, ML-DSA or weak key: the web server cannot use it in FIPS mode',
-          'Install an RSA 2048+ or ECDSA P-256/P-384/P-521 certificate in the HTTPS settings.')
+          'Install an RSA 2048+ or ECDSA P-256/P-384/P-521 certificate in the HTTPS settings.', reads_database=False)
 def _https():
     path = current_app.config.get('HTTPS_CERT_PATH')
     if not path or not os.path.isfile(str(path)):

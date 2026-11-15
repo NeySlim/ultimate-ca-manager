@@ -269,3 +269,53 @@ class TestScheduledBackupKdf:
                 for key in ('auto_backup_enabled', 'backup_password', 'backup_kdf', 'backup.last_run',
                             'backup.concluded_run'):
                     _delete(key)
+
+
+def _registry(engine, names):
+    with engine.begin() as connection:
+        connection.execute(text('CREATE TABLE IF NOT EXISTS _migrations '
+                                '(id INTEGER PRIMARY KEY, name VARCHAR(255) UNIQUE)'))
+        for name in names:
+            connection.execute(text('INSERT INTO _migrations (name) VALUES (:n)'), {'n': name})
+
+
+class TestBeforeTheUpgrade:
+    """Installed over 2.254, the package runs the report before the first start applies the
+    upgrade: the checks that read the database wait for it, the others run."""
+
+    def _run(self, monkeypatch, capsys, config, *args):
+        monkeypatch.setattr(cli, 'read_only_app', lambda: _READ_ONLY_APP(config))
+        code = cli.main(list(args))
+        return code, capsys.readouterr().out
+
+    def test_a_database_waiting_for_its_upgrade_defers_the_checks_that_read_it(
+            self, instance_db, monkeypatch, capsys):
+        from migrations._from_2_254 import PIVOT_NAMES
+        engine, config = instance_db
+        _registry(engine, sorted(PIVOT_NAMES))
+        with engine.begin() as connection:
+            # A table of the 3.0 model the 2.254 schema lacks
+            connection.execute(text('DROP TABLE users'))
+        code, out = self._run(monkeypatch, capsys, config)
+        assert code == 0, out
+        assert '[ERROR]' not in out and 'could not run' not in out, out
+        deferred = [d for d in cli.fips_preflight.DETECTORS if d.reads_database]
+        line = [l for l in out.splitlines() if 'checks need the upgraded database' in l]
+        assert line == [f'[INFO] {len(deferred)} checks need the upgraded database: run cd '
+                        f'{cli.Path(cli.__file__).resolve().parents[1]} && sudo -u '
+                        f'{cli.pwd.getpwuid(os.geteuid()).pw_name} {cli.sys.executable} '
+                        f'-m scripts.fips_preflight after the first start'], out
+        report = json.loads(self._run(monkeypatch, capsys, config, '--json')[1])
+        assert sorted(report['checked']) == sorted(
+            d.id for d in cli.fips_preflight.DETECTORS if not d.reads_database)
+        assert report['errors'] == []
+
+    def test_an_upgraded_database_runs_every_check(self, instance_db, monkeypatch, capsys):
+        from migration_runner import _list_migration_names
+        engine, config = instance_db
+        _registry(engine, _list_migration_names())
+        code, out = self._run(monkeypatch, capsys, config, '--json')
+        report = json.loads(out)
+        assert code == 0, out
+        assert 'deferred' not in report
+        assert sorted(report['checked']) == sorted(d.id for d in cli.fips_preflight.DETECTORS)

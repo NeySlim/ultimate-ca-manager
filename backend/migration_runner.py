@@ -373,6 +373,19 @@ def build_fresh_schema(create_all):
     create_all()
 
 
+def _pending(applied):
+    return [n for n in _list_migration_names() if n not in applied]
+
+
+def pending_migrations(engine) -> list[str]:
+    """What this release applies at its next start to the database of *engine*: none for a
+    fresh one (built whole) or one it refuses."""
+    state, applied = _get_state(engine)
+    if state == "fresh" or pivot_refusal(state, applied):
+        return []
+    return _pending(applied)
+
+
 def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
     """Apply pending migrations to the configured database.
 
@@ -406,8 +419,7 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
             say(f"✗ {refusal}")
             return False
 
-        all_names = _list_migration_names()
-        pending = [n for n in all_names if n not in applied]
+        pending = _pending(applied)
         try:
             refusal = full_stop_refusal(engine, pending)
         except ValueError as exc:
