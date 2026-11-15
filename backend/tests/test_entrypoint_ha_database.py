@@ -130,10 +130,45 @@ def test_a_database_the_runner_starts_on_goes_on_as_before(tmp_path, db_state, c
     assert ('cp ' in r.stdout) is copied
 
 
-def test_the_entrypoint_refuses_before_its_first_write_to_the_volumes():
-    """Text of the entrypoint: the refusal comes before the data migration, the directories,
-    the ownership, the configuration file and the copy of the database."""
-    text = (ROOT / 'docker' / 'entrypoint.sh').read_text()
-    guard = text.index('ucm_refuse_unstartable_database || exit $?')
-    for write in ('mkdir -p "$DATA_PATH"', 'chown -R', 'cp -a', 'ucm_sqlite_check_and_backup\n'):
-        assert guard < text.index(write), write
+def _fingerprint(top):
+    import hashlib
+    return {str(p.relative_to(top)): (p.is_dir(), p.stat().st_mode, None if p.is_dir() else
+                                       hashlib.sha256(p.read_bytes()).hexdigest())
+            for p in sorted(top.rglob('*'))}
+
+
+def _volume_start(tmp_path, where, db_state):
+    """The entrypoint's steps from its refusal to the copy of the database, on a temporary
+    volume: the data at its path, and a path from before 2.70 that still holds files."""
+    volume = tmp_path / 'volume'
+    data, old = volume / 'opt/ucm/data', volume / 'opt/ucm/backend/data'
+    data.mkdir(parents=True)
+    (old / 'ca').mkdir(parents=True)
+    (old / 'ca' / 'root.pem').write_text('ca')
+    _registry((data if where == 'current' else old) / 'ucm.db', db_state == '2.254')
+    env = {'UCM_DATABASE_PATH': str(data / 'ucm.db'), 'UCM_BACKUP_ENABLED': 'true',
+           'UCM_BACKUP_RETENTION_DAYS': '30', 'UCM_BASE_PATH': str(ROOT), 'DATA_PATH': str(data),
+           'UCM_OLD_DATA_PATHS': f'{old} {volume}/app/backend/data', 'UCM_INITIAL_ADMIN_USERNAME': 'admin',
+           'PATH': f'{pathlib.Path(sys.executable).parent}:/usr/bin:/bin'}
+    script = (f'. {HELPER}; ucm_refuse_unstartable_database || exit $?; '
+              'ucm_carry_old_data_paths; mkdir -p "$DATA_PATH/backups"; ucm_sqlite_check_and_backup')
+    before = _fingerprint(volume)
+    r = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True,
+                       cwd=tmp_path, timeout=60)
+    return r, before, _fingerprint(volume), data
+
+
+@pytest.mark.parametrize('where', ['current', 'from before 2.70'])
+def test_a_refused_database_at_either_path_leaves_the_whole_volume_unchanged(tmp_path, where):
+    r, before, after, _data = _volume_start(tmp_path, where, '2.253')
+    assert r.returncode == 78, (r.stdout, r.stderr)
+    assert 'older than 2.254' in r.stdout and 'Nothing was written to the volume' in r.stdout
+    assert after == before
+
+
+@pytest.mark.parametrize('where', ['current', 'from before 2.70'])
+def test_a_2_254_database_at_either_path_is_carried_over_and_copied(tmp_path, where):
+    r, _before, _after, data = _volume_start(tmp_path, where, '2.254')
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert (data / 'ucm.db').is_file() and (data / 'ca' / 'root.pem').read_text() == 'ca'
+    assert len(list((data / 'backups').glob('ucm-backup-*.db'))) == 1

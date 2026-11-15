@@ -47,22 +47,68 @@ ucm_initial_admin_notice() {
 
 # 78 (EX_CONFIG): a SQLite database the runner refuses (older than 2.254, or written by a
 # later release) stops the start before anything is written to the volume; any other
-# answer leaves the decision to the application
+# answer leaves the decision to the application. The database a path from before 2.70 still
+# holds is asked about too, before ucm_carry_old_data_paths copies it into the data.
 ucm_refuse_unstartable_database() {
-    local out rc=0
+    local db out rc
     ucm_ha_active && return 0
     [ -n "${DATABASE_URL:-}" ] && return 0
-    [ -f "$UCM_DATABASE_PATH" ] || return 0
-    out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 DATABASE_URL= \
-        DATABASE_PATH="$UCM_DATABASE_PATH" python3 migration_runner.py check 2>&1) || rc=$?
-    case $rc in
-        4|6) ;;
-        *) return 0 ;;
-    esac
-    echo -e "${RED:-}❌ This release cannot start on $UCM_DATABASE_PATH:${NC:-}"
-    printf '%s\n' "$out" | sed -n '2,4p' | sed 's/^/   /'
-    echo "   Nothing was written to the volume. See UPGRADE.md, Upgrading to v3.0."
-    return 78
+    for db in "$UCM_DATABASE_PATH" "$(ucm_old_database)"; do
+        [ -f "$db" ] || continue
+        rc=0
+        out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 DATABASE_URL= \
+            DATABASE_PATH="$db" python3 migration_runner.py check 2>&1) || rc=$?
+        case $rc in
+            4|6) ;;
+            *) continue ;;
+        esac
+        echo -e "${RED:-}❌ This release cannot start on $db:${NC:-}"
+        printf '%s\n' "$out" | sed -n '2,4p' | sed 's/^/   /'
+        echo "   Nothing was written to the volume. See UPGRADE.md, Upgrading to v3.0."
+        return 78
+    done
+}
+
+# The data directories of the images before 2.70, which some volumes are still mounted at
+ucm_old_data_paths() {
+    # shellcheck disable=SC2086  # a list of paths without spaces
+    printf '%s\n' ${UCM_OLD_DATA_PATHS:-/opt/ucm/backend/data /app/backend/data}
+}
+
+# The database ucm_carry_old_data_paths would copy into the data, if any
+ucm_old_database() {
+    local old
+    [ ! -e "${DATA_PATH:-/opt/ucm/data}/ucm.db" ] || return 0
+    for old in $(ucm_old_data_paths); do
+        [ ! -f "$old/ucm.db" ] || { printf '%s\n' "$old/ucm.db"; return 0; }
+    done
+}
+
+# Copies into the data what a path from before 2.70 holds and the data lacks ('cas' is 'ca')
+ucm_carry_old_data_paths() {
+    local data=${DATA_PATH:-/opt/ucm/data} old item name sub
+    for old in $(ucm_old_data_paths); do
+        [ -d "$old" ] && [ -n "$(ls -A "$old" 2>/dev/null)" ] || continue
+        echo -e "${YELLOW:-}   Checking for data migration from $old...${NC:-}"
+        for item in "$old"/*; do
+            [ -e "$item" ] || continue
+            name=$(basename "$item")
+            [ "$name" != cas ] || name=ca
+            if [ ! -e "$data/$name" ]; then
+                echo -e "${YELLOW:-}   Migrating $(basename "$item") → $name...${NC:-}"
+                cp -a "$item" "$data/$name" 2>/dev/null || true
+            elif [ -d "$item" ] && [ -d "$data/$name" ]; then
+                for sub in "$item"/*; do
+                    [ -e "$sub" ] || continue
+                    if [ ! -e "$data/$name/$(basename "$sub")" ]; then
+                        echo -e "${YELLOW:-}   Migrating $name/$(basename "$sub")...${NC:-}"
+                        cp -a "$sub" "$data/$name/" 2>/dev/null || true
+                    fi
+                done
+            fi
+        done
+        echo -e "${GREEN:-}✅ Data migration complete${NC:-}"
+    done
 }
 
 # First-run notice and pre-start copy of the SQLite file; both skipped in HA mode.
@@ -79,7 +125,7 @@ ucm_sqlite_check_and_backup() {
 
         # Database backup if enabled
         if [ "$UCM_BACKUP_ENABLED" = "true" ]; then
-            BACKUP_DIR="/opt/ucm/data/backups"
+            BACKUP_DIR="${DATA_PATH:-/opt/ucm/data}/backups"
             BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
 
             # Create backup
