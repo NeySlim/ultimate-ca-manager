@@ -302,3 +302,13 @@ class TestFipsAndHa:
 
     def test_without_ha_a_reader_key_is_taken(self, auth_client, token_key):
         assert _ssh_ca(auth_client, token_key(module=OPENSC)['key']).status_code == 201
+
+    def test_ha_generates_no_x509_ca_key_on_a_reader(self, auth_client, token_key, monkeypatch):
+        key = token_key(module=OPENSC)
+        monkeypatch.setattr(Config, 'HA_MODE', True)
+        with patch('services.hsm.HsmService.generate_key') as generated:
+            r = auth_client.post('/api/v2/cas', json={
+                'commonName': 'reader-ca', 'descr': 'reader-ca', 'validityYears': 1,
+                'hsm_provider_id': key['provider'], 'hsm_key_label': 'new', 'hsm_key_algorithm': 'EC-P256'})
+        assert r.status_code == 409 and r.get_json()['code'] == 'ha_mode', r.data
+        generated.assert_not_called()
