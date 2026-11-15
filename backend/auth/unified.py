@@ -220,8 +220,9 @@ class AuthManager:
         """Whether the session ``data`` is past its maximum lifetime or its inactivity
         timeout at ``now``; ``limits`` = (max lifetime, inactivity timeout) in seconds."""
         max_lifetime, inactivity_timeout = limits or cls.session_limits()
-        for key, limit, reason in (('login_time', max_lifetime, 'max lifetime'),
-                                   ('last_activity', inactivity_timeout, 'inactivity')):
+        for key, limit, reason, name in (('login_time', max_lifetime, 'max lifetime', 'max'),
+                                         ('last_activity', inactivity_timeout, 'inactivity',
+                                          'timeout')):
             value = data.get(key)
             if not value:
                 continue
@@ -229,7 +230,7 @@ class AuthManager:
                 if (now - datetime.fromisoformat(value)).total_seconds() > limit:
                     if log:
                         logger.info(f"Session expired ({reason}): user={label}, {key}={value}, "
-                                    f"max={limit}s")
+                                    f"{name}={limit}s")
                     return True
             except (ValueError, TypeError) as e:
                 if log:
