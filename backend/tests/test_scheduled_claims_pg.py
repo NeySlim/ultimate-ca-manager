@@ -44,7 +44,9 @@ def _pg(app):
 def _twice_at_once(app, run, meet_in, attribute):
     """Run *run* in two threads that meet in *attribute* before going on. Called after the
     read the claim rests on and before the claim, it makes both read before either writes;
-    two runs that never met ran one after the other, and the test fails."""
+    two runs that never met ran one after the other, and the test fails. A caller that
+    meets in the read itself (the lease tests) gets its overlap from holding the first run
+    until the other is refused."""
     original = getattr(meet_in, attribute)
     both = threading.Barrier(2, timeout=30)
     met = []
