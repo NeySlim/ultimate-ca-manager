@@ -249,15 +249,13 @@ _BOOTSTRAP_STEPS = (_step_registry, _step_schema, _step_mark, _step_copy, _step_
 _RESUME_STEPS = (_step_sequences, _step_high_water)
 
 
-def _reverify_copy(run: _Bootstrap):
-    """The whole verification of a committed copy, against the source's counts as they are now."""
-    with consistent_live_source() as (src, _view, source_is_pg):
-        plan = _bootstrap_plan(src.engine, run.target)
-        counts = {entry.name: int(src.execute(
-            text(f'SELECT COUNT(*) FROM "{_safe_ident(entry.name)}"')).scalar() or 0)
-            for entry in plan}
-        run.high_water = read_id_high_water(src, source_is_pg)
-    return verify_migration(run.target, counts, target_is_pg=run.is_pg)
+def _empty_auth_tables(target_engine) -> None:
+    """One transaction, children first: a copy never verified is replaced, never reused, since
+    a row count cannot see a password, role or key changed on the source since."""
+    order = [t for t in _topo_sort_tables(inspect(target_engine)) if t in set(BOOTSTRAP_AUTH_TABLES)]
+    with target_engine.begin() as tx:
+        for name in reversed(order):
+            tx.execute(text(f'DELETE FROM "{_safe_ident(name)}"'))
 
 
 def _source_high_water() -> Dict[str, int]:
@@ -474,7 +472,7 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     bootstrap is skipped (we assume the operator manages that DB themselves),
     once its registry shows that this release will start on it; the counters
     of a target already upgraded are still moved up to the source's. Accounts
-    an earlier attempt copied without a passed verification are verified again.
+    an earlier attempt copied without a passed verification are copied again.
 
     Every table goes over in **one** transaction. It used to be one
     transaction per table, with each failure appended to a ``skipped`` list
@@ -511,15 +509,10 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         if refusal:
             raise PreflightError(refusal)
         if has_users and unverified:
-            # A switch's copy that never passed its verification: verified now against the source
+            # The marker proves this switch wrote those rows: emptied, then copied afresh below
             stats["target_written"] = True
-            run = _Bootstrap(target_engine, target_is_pg)
-            _step_sequences(run)    # the verification checks them, as after a first copy
-            stats["validation"] = _reverify_copy(run)
-            _lift_unverified(target_engine)
-            _step_high_water(run)
-            return True, "The copy left by an earlier attempt was verified; switch resumed.", stats
-        if has_users:
+            _empty_auth_tables(target_engine)
+        elif has_users:
             # A copy committed by an attempt cut short before its counters: they are moved up
             # now. A target still awaiting its upgrade is no such copy and is left as it is.
             if UPGRADE_MIGRATION in _get_state(target_engine)[1]:

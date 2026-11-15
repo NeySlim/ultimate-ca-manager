@@ -1353,6 +1353,49 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
             self, app, pg_target, monkeypatch):
         self._killed_before_verification(app, pg_target, monkeypatch)
 
+    def _source_changed_between_attempts(self, app, target, monkeypatch):
+        def killed(*args, **kwargs):
+            raise _Killed()
+
+        def on_source(sql, **params):
+            with app.app_context():
+                db.session.execute(text(sql), params)
+                db.session.commit()
+
+        on_source("INSERT INTO users (username, email, password_hash, role, auth_source) "
+                  "VALUES ('resumed', 'resumed@test', 'OLD', 'admin', 'local')")
+        try:
+            monkeypatch.setattr(migration, 'verify_migration', killed)
+            with app.app_context():
+                with pytest.raises(_Killed):
+                    migration.bootstrap_auth_to_target(target)
+            # Same row count, different contents: a count cannot see it
+            on_source("UPDATE users SET role = 'viewer', password_hash = 'CHANGED' "
+                      "WHERE username = 'resumed'")
+            monkeypatch.undo()
+            with app.app_context():
+                ok, message, _ = migration.bootstrap_auth_to_target(target)
+        finally:
+            on_source("DELETE FROM users WHERE username = 'resumed'")
+        assert ok is True, message
+        engine = create_engine(target)
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(text(
+                    "SELECT role, password_hash FROM users WHERE username = 'resumed'")).one()
+        finally:
+            engine.dispose()
+        assert tuple(row) == ('viewer', 'CHANGED')
+
+    def test_a_copy_resumed_carries_the_source_as_it_is_now_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._source_changed_between_attempts(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_copy_resumed_carries_the_source_as_it_is_now_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._source_changed_between_attempts(app, pg_target, monkeypatch)
+
     def _migrated_then_switched(self, app, target, monkeypatch):
         def refuse(*args, **kwargs):
             raise VerificationError('users: 3 rows copied, 2 on the target')
