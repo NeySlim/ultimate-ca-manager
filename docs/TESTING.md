@@ -208,6 +208,8 @@ UCM_LAB=1 UCM_E2E_BASE_URL=https://ucm.example.test:8443 UCM_E2E_ADMIN_PASSWORD=
   npx playwright test e2e/lab/acme-dns-preferred-chain.spec.ts
 ```
 
+Without `UCM_E2E_MANAGED=1`, which only `scripts/ci/e2e.sh` sets, the suite leaves the instance as it is: the global setup changes no setting and the backup restore test does not run.
+
 ## Advanced Features Test Infrastructure
 
 For testing advanced features (SSO, LDAP, HSM), a Docker Compose stack is available:

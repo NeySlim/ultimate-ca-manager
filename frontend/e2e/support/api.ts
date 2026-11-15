@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import type { APIRequestContext } from '@playwright/test'
 
 export const ADMIN_USER = 'admin'
-export const ADMIN_PASSWORD = process.env.UCM_E2E_ADMIN_PASSWORD || process.env.UCM_PASSWORD || ''
+export const ADMIN_PASSWORD = process.env.UCM_E2E_ADMIN_PASSWORD || ''
 
 export class ApiError extends Error {
   constructor(public status: number, public body: unknown, what: string) {

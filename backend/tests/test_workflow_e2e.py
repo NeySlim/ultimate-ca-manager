@@ -102,7 +102,7 @@ exec {sys.executable} "$@"
     (bin_dir / 'npm').write_text('#!/bin/sh\nexit 0\n')
     (bin_dir / 'npx').write_text(f'''#!/bin/sh
 [ "$2" = "install" ] && exit 0
-echo "$UCM_E2E_BASE_URL $UCM_E2E_ADMIN_PASSWORD $*" > {state}/playwright
+echo "$UCM_E2E_MANAGED $UCM_E2E_BASE_URL $UCM_E2E_ADMIN_PASSWORD $*" > {state}/playwright
 exit 7
 ''')
     for f in bin_dir.iterdir():
@@ -133,7 +133,9 @@ def test_the_script_returns_playwrights_code_and_always_stops_the_instance(tmp_p
     root, bin_dir, state = _fake_tree(tmp_path)
     proc = _run(root, bin_dir, tmp_path, '--grep', 'login')
     assert proc.returncode == 7, proc.stdout + proc.stderr
-    url, password, *args = (state / 'playwright').read_text().split()
+    managed, url, password, *args = (state / 'playwright').read_text().split()
+    # The global setup and the restore project act only on the instance the script started
+    assert managed == '1'
     assert url.startswith('https://127.0.0.1:') and password
     assert args == ['playwright', 'test', '--grep', 'login']
     pid = int((state / 'server.pid').read_text())

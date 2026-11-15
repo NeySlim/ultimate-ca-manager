@@ -111,7 +111,8 @@ fi
 echo "== Playwright"
 cd frontend || exit 2
 npx playwright install chromium || { echo "e2e: browser download failed" >&2; exit 2; }
-UCM_E2E_BASE_URL="$BASE_URL" UCM_E2E_ADMIN_PASSWORD="$PASSWORD" npx playwright test "$@"
+# UCM_E2E_MANAGED: the instance is this script's own, so the setup may change it and restore over it
+UCM_E2E_MANAGED=1 UCM_E2E_BASE_URL="$BASE_URL" UCM_E2E_ADMIN_PASSWORD="$PASSWORD" npx playwright test "$@"
 RC=$?
 if [ "$RC" -ne 0 ]; then dump_logs; fi
 exit "$RC"
