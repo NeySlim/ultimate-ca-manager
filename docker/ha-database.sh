@@ -67,30 +67,53 @@ PY
     return 0
 }
 
-# Room for the start next to the database: its copy when enabled, plus its size again when an
-# upgrade may run, for its journal and growth (measured: 1.7 times the database with the copy).
-# Fails with what is needed and available; a df that cannot answer lets the start go on.
+# Where the image puts its pre-start copy of the database.
+UCM_SQLITE_BACKUP_DIR=/opt/ucm/data/backups
+
+# "<filesystem> <KB available>" for a directory, nothing when df cannot answer.
+_ucm_df() {
+    df -Pk "$1" 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { print $1, $4 }'
+}
+
+# Prints the refusal and fails when `df` line $3 has less than $2 KB for directory $1.
+_ucm_room_short() {
+    local avail_kb=${3##* }
+    [ -z "$3" ] || [ "$avail_kb" -ge "$2" ] && return 1
+    # needed rounded up, available down: the message never shows a need it satisfies
+    echo -e "${RED:-}❌ Not enough disk space in $1: the start needs $(( ($2 + 1023) / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
+}
+
+# Room for the start: the copy on the backups' filesystem when enabled, the database's size
+# again on its own filesystem when an upgrade may run (journal and growth), summed when both
+# are one filesystem. Fails with what is needed and available; a df that cannot answer passes.
 ucm_sqlite_disk_room() {
-    local dir bytes size_kb need_kb=0 avail_kb upgrade=false
-    dir=$(dirname "$UCM_DATABASE_PATH")
+    local db_dir bytes size_kb size_mb db_need=0 copy_need=0 db_df="" copy_df="" short=false
+    db_dir=$(dirname "$UCM_DATABASE_PATH")
     bytes=$(stat -c %s "$UCM_DATABASE_PATH" 2>/dev/null || wc -c < "$UCM_DATABASE_PATH")
     size_kb=$(( (bytes + 1023) / 1024 ))
-    ucm_sqlite_upgrade_possible && upgrade=true && need_kb=$size_kb
-    [ "$UCM_BACKUP_ENABLED" = "true" ] && need_kb=$(( need_kb + size_kb ))
-    [ "$need_kb" -eq 0 ] && return 0
-    avail_kb=$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print $4 }') || avail_kb=""
-    case "$avail_kb" in ''|*[!0-9]*) return 0 ;; esac
-    [ "$avail_kb" -ge "$need_kb" ] && return 0
-    # needed rounded up, available down: the message never shows a need it satisfies
-    echo -e "${RED:-}❌ Not enough disk space in $dir: the start needs $(( (need_kb + 1023) / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
-    if [ "$upgrade" = "true" ]; then
-        echo "   The database is $(( (size_kb + 1023) / 1024 )) MB; upgrading it needs its size for the upgrade's journal and growth,"
-        echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
-    else
-        echo "   The database is $(( (size_kb + 1023) / 1024 )) MB; the pre-start copy needs its size (UCM_BACKUP_ENABLED=false skips it)."
-        echo "   Free space, then start again."
+    size_mb=$(( (size_kb + 1023) / 1024 ))
+    ucm_sqlite_upgrade_possible && db_need=$size_kb
+    [ "$UCM_BACKUP_ENABLED" = "true" ] && copy_need=$size_kb
+    [ "$db_need" -gt 0 ] && db_df=$(_ucm_df "$db_dir")
+    [ "$copy_need" -gt 0 ] && copy_df=$(_ucm_df "$UCM_SQLITE_BACKUP_DIR")
+    if [ -n "$db_df" ] && [ "${db_df% *}" = "${copy_df% *}" ]; then
+        if _ucm_room_short "$db_dir" $(( db_need + copy_need )) "$db_df"; then
+            echo "   The database is $size_mb MB; upgrading it needs its size for the upgrade's journal and growth,"
+            echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
+            return 1
+        fi
+        return 0
     fi
-    return 1
+    if _ucm_room_short "$db_dir" "$db_need" "$db_df"; then
+        echo "   The database is $size_mb MB; upgrading it needs its size beside it for the upgrade's journal and growth."
+        short=true
+    fi
+    if _ucm_room_short "$UCM_SQLITE_BACKUP_DIR" "$copy_need" "$copy_df"; then
+        echo "   The database is $size_mb MB; the pre-start copy needs its size (UCM_BACKUP_ENABLED=false skips it)."
+        short=true
+    fi
+    [ "$short" = "true" ] && echo "   Free space, then start again." && return 1
+    return 0
 }
 
 # First-run notice and pre-start copy of the SQLite file; both skipped in HA mode.
@@ -108,7 +131,7 @@ ucm_sqlite_check_and_backup() {
 
         # Database backup if enabled
         if [ "$UCM_BACKUP_ENABLED" = "true" ]; then
-            BACKUP_DIR="/opt/ucm/data/backups"
+            BACKUP_DIR="$UCM_SQLITE_BACKUP_DIR"
             BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
 
             # Create backup

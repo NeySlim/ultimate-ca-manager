@@ -302,3 +302,36 @@ def test_a_database_lacking_one_migration_of_several_counts_as_an_upgrade(tmp_pa
     assert 'upgrading it needs' in _run(_df(2999) + _START, env, tmp_path).stdout
     _database(tmp_path, ['300_upgrade_from_2_254', '301_later'])
     assert _run(_df(2999) + _START, env, tmp_path).returncode == 0
+
+
+def _df_two(tmp_path, db_kb, copy_kb):
+    """Two filesystems: the backups directory on its own, the database's directory on another."""
+    backups = tmp_path / 'backups'
+    return (f'UCM_SQLITE_BACKUP_DIR={backups}; df() {{ echo "Filesystem 1024-blocks Used Available Capacity Mounted"; '
+            f'if [ "$2" = "{backups}" ]; then echo "/dev/b 100 0 {copy_kb} 0% /b"; '
+            f'else echo "/dev/a 100 0 {db_kb} 0% /a"; fi; }}; ')
+
+
+@pytest.mark.parametrize('db_kb,copy_kb,refused_in', [
+    (3000, 3000, None),           # each filesystem holds its part: no sum
+    (2999, 9000, 'db'),           # the upgrade's room beside the database
+    (9000, 2999, 'backups'),      # the copy's room in the backups directory
+])
+def test_the_copy_and_the_upgrade_are_measured_on_their_own_filesystems(tmp_path, db_kb, copy_kb, refused_in):
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
+    r = _run(_df_two(tmp_path, db_kb, copy_kb) + _START, env, tmp_path)
+    if refused_in is None:
+        assert r.returncode == 0 and 'cp ' in r.stdout, r.stdout
+        return
+    assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
+    where = tmp_path / 'backups' if refused_in == 'backups' else tmp_path
+    assert f'Not enough disk space in {where}: the start needs 3 MB free, 2 MB available' in r.stdout, r.stdout
+    assert ('upgrading it needs' in r.stdout) is (refused_in == 'db'), r.stdout
+
+
+def test_the_copy_lands_in_the_measured_backups_directory(tmp_path):
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, NAMES)
+    r = _run(_df_two(tmp_path, 0, 3000) + _START, env, tmp_path)
+    assert r.returncode == 0 and f"cp {env['UCM_DATABASE_PATH']} {tmp_path / 'backups'}/ucm-backup-" in r.stdout, r.stdout
