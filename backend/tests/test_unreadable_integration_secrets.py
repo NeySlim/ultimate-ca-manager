@@ -587,3 +587,63 @@ def test_an_enabled_ad_connector_with_an_unreadable_password_saves_only_a_new_on
         assert token not in response.get_data(as_text=True)
     else:
         assert err is None
+
+
+@pytest.fixture
+def unreadable_rfc2136(app):
+    """An RFC 2136 provider whose credentials this node's key does not open."""
+    from models import db, DnsProvider
+    token = _foreign_token('{"server": "ns1.example", "tsig_key_name": "k.", '
+                           '"tsig_key_secret": "c2VjcmV0LXNlY3JldC1zZWNyZXQ="}')
+    with app.app_context():
+        row = DnsProvider(name=f'dns-{uuid.uuid4().hex[:6]}', provider_type='rfc2136')
+        row._credentials = token
+        db.session.add(row)
+        db.session.commit()
+        pid = row.id
+    yield pid, token
+    with app.app_context():
+        db.session.delete(db.session.get(DnsProvider, pid))
+        db.session.commit()
+
+
+def _stored_credentials(app, pid):
+    from models import db, DnsProvider
+    with app.app_context():
+        return db.session.get(DnsProvider, pid)._credentials
+
+
+@pytest.mark.parametrize('credentials', [
+    {'server': 'ns2.example'},
+    {'tsig_key_secret': ''},
+    {'server': 'ns1.example', 'tsig_key_name': 'k.', 'tsig_key_secret': ''},
+], ids=['moved', 'blank', 'all-but-the-secret'])
+def test_dns_credentials_this_node_cannot_open_are_kept_until_entered_again(
+        app, auth_client, unreadable_rfc2136, credentials):
+    pid, token = unreadable_rfc2136
+    r = auth_client.patch(f'/api/v2/dns-providers/{pid}', json={'credentials': credentials})
+    assert r.status_code == 400
+    assert f'DNS provider {pid} credentials cannot be decrypted' in r.get_json()['message']
+    assert token not in r.get_data(as_text=True)
+    assert _stored_credentials(app, pid) == token
+
+
+def test_dns_credentials_this_node_cannot_open_are_replaced_by_a_full_entry(
+        app, auth_client, unreadable_rfc2136):
+    import json
+    from utils.encryption import decrypt_value
+    pid, token = unreadable_rfc2136
+    entry = {'server': 'ns1.example', 'tsig_key_name': 'k.',
+             'tsig_key_secret': 'bmV3LXNlY3JldC1uZXctc2VjcmV0'}
+    r = auth_client.patch(f'/api/v2/dns-providers/{pid}', json={'credentials': entry})
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert json.loads(decrypt_value(_stored_credentials(app, pid))) == entry
+
+
+def test_dns_provider_rename_keeps_credentials_this_node_cannot_open(
+        app, auth_client, unreadable_rfc2136):
+    pid, token = unreadable_rfc2136
+    r = auth_client.patch(f'/api/v2/dns-providers/{pid}',
+                          json={'name': f'renamed-{uuid.uuid4().hex[:6]}'})
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert _stored_credentials(app, pid) == token
