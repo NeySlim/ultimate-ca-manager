@@ -3,9 +3,9 @@
  * missing or extra entry shifts every following one onto the wrong text.
  */
 import { describe, it, expect } from 'vitest'
-import { helpContent } from '../../helpContent'
+import { helpContent } from '../helpContent'
 
-const pages = import.meta.glob(['../*/*.js', '!../__tests__/*'])
+const pages = import.meta.glob('../help/*/*.js')
 
 const LISTS = ['items', 'definitions']
 const shape = (page) => (page?.sections || []).map((sec) => LISTS.map((k) => (sec[k] || []).length).join('/'))
