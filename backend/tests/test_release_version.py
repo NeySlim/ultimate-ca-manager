@@ -221,18 +221,20 @@ def test_the_fallback_heading_does_not_bite_on_a_longer_version():
     assert 'three' in rv.changelog_section('2.254.1', text) and 'two' not in rv.changelog_section('2.254.1', text)
 
 
-@pytest.mark.parametrize('version,expected', [
-    ('3.2', ['3.1', '3.0']),
-    ('3.1-rc1', ['3.0']),
-    ('3.0', []),
-    ('3.0-rc2', []),
-    ('2.254.2', ['2.254.1', '2.254']),
-])
-def test_the_history_stays_on_the_line_of_the_version(version, expected):
-    text = ('## [Unreleased]\n- u\n\n## [3.1] - d\n- a\n\n## [3.0] - d\n- b\n\n'
-            '## [2.254.1] - d\n- c\n\n## [2.254] - d\n- e\n\n## [2.253] - d\n- f\n')
-    heads = re.findall(r'^## \[([^\]]+)\]', _load().changelog_history(version, text), re.M)
-    assert heads == [h for h in expected]
+def test_a_rc_with_a_section_of_its_own_name_still_takes_unreleased(tmp_path):
+    text = CHANGELOG.replace('## [3.0] - 2026-12-20', '## [3.0-rc1] - 2026-12-01\n- Named.\n\n## [3.0] - 2026-12-20')
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert 'Next thing.' in r.stdout and 'Named.' not in r.stdout
+
+
+def test_a_corrective_release_candidate_takes_unreleased(tmp_path):
+    r = _notes(tmp_path, '2.254.2-rc1')
+    assert 'Next thing.' in r.stdout and 'Maintenance' not in r.stdout
+
+
+def test_the_history_command_is_gone(tmp_path):
+    assert _notes(tmp_path, '3.0').returncode == 0
+    assert _cli('history', '3.0', str(tmp_path / 'CHANGELOG.md')).returncode == 2
 
 
 def _notes_step(tmp_path, v, changelog):
@@ -256,8 +258,9 @@ def test_the_release_notes_step_names_the_published_files(tmp_path, v):
     for name in _load().asset_names(v).values():
         assert name in text, name
     assert f'releases/download/v{v}/' in text and 'Marker.' in text
-    # 2.200 belongs to another line than every accepted version but 2.254.N
-    assert ('Old.' in text) is v.startswith('2.')
+    # earlier sections are not copied: a link to the CHANGELOG at the tag stands in
+    assert 'Old.' not in text and 'Recent release history' not in text
+    assert f'https://github.com/o/r/blob/v{v}/CHANGELOG.md' in text
 
 
 @pytest.mark.parametrize('v,changelog', [('3.0', '## [Unreleased]\n- x\n'), ('3.0-rc1', '## [2.254] - d\n- x\n')])

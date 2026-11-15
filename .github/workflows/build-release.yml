@@ -769,10 +769,7 @@ jobs:
           
           # RC: the [Unreleased] section; stable: its own section. A missing section stops the release.
           CHANGES_FILE=$(mktemp)
-          PREVIOUS_FILE=$(mktemp)
           python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md > "$CHANGES_FILE"
-          # Recent history: earlier releases of the same major line only
-          python3 scripts/ci/release_version.py history "$VERSION" CHANGELOG.md > "$PREVIOUS_FILE"
           
           # Build release notes
           {
@@ -784,18 +781,10 @@ jobs:
               echo "---"
               echo ""
             fi
-            if [ -s "$PREVIOUS_FILE" ]; then
-              echo "<details>"
-              echo "<summary><strong>📜 Recent release history (last 2 versions)</strong></summary>"
-              echo ""
-              cat "$PREVIOUS_FILE"
-              echo ""
-              echo "Full history: [CHANGELOG.md](https://github.com/REPO/blob/main/CHANGELOG.md)"
-              echo "</details>"
-              echo ""
-              echo "---"
-              echo ""
-            fi
+            echo "Earlier releases: [CHANGELOG.md](https://github.com/REPO/blob/v${VERSION}/CHANGELOG.md)"
+            echo ""
+            echo "---"
+            echo ""
             cat << 'INSTALL_EOF'
           ## Installation
           
@@ -896,7 +885,7 @@ jobs:
           sed -i "s|REPO|$REPO|g" notes.md
           sed -i "s|VERSION|$VERSION|g" notes.md
           
-          rm -f "$CHANGES_FILE" "$PREVIOUS_FILE"
+          rm -f "$CHANGES_FILE"
           cat notes.md
       
       - name: Publish the full-stop marks of the migrations
