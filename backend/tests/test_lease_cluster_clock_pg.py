@@ -229,6 +229,39 @@ def test_a_notification_sent_by_a_node_behind_still_closes_the_window(cluster):
     assert policy_notifications._claim_in_db('policy_violation', resource_id, 'a@x.invalid') is None
 
 
+def test_a_node_behind_notifies_once_through_the_real_mail_log(cluster, monkeypatch):
+    import json as _json
+    from models.email_notification import SMTPConfig
+    from models.policy import CertificatePolicy
+    from services import email_service
+
+    class FakeServer:
+        def sendmail(self, *a):
+            pass
+
+        def quit(self):
+            pass
+    monkeypatch.setattr(email_service, '_smtp_connect', lambda cfg, timeout: FakeServer())
+    monkeypatch.setattr(email_service, '_smtp_authenticate', lambda server, cfg: None)
+    db.session.add(SMTPConfig(enabled=True, smtp_host='smtp.example.test', smtp_port=25,
+                              smtp_from='ucm@example.test', smtp_auth=False, smtp_use_tls=False))
+    policy = CertificatePolicy(name=f'clock-{uuid.uuid4().hex[:8]}', rules='{}',
+                               notification_emails=_json.dumps(['ops@example.test']))
+    db.session.add(policy)
+    db.session.commit()
+    policy_id, resource_id = policy.id, f'clock-{uuid.uuid4().hex[:8]}'
+    # The per-recipient 'sent' rows keep the window closed once the claim is gone
+    cluster(-2 * policy_notifications.DEDUP_WINDOW)
+    monkeypatch.setattr(email_service, 'utc_now', lambda: datetime_utils.utc_now(), raising=False)
+    for _ in range(2):
+        assert policy_notifications._send(policy_id, policy_notifications.VIOLATION, resource_id,
+                                          {'operation': 'issue'}, own_session=True)
+    sent = NotificationLog.query.filter_by(resource_type='policy', resource_id=resource_id,
+                                           status='sent').all()
+    assert len(sent) == 1, f'notified {len(sent)} times within the window'
+    assert _close(sent[0].sent_at, _db_now())
+
+
 # ------------------------------------------------------------------ discovery schedule
 
 def test_a_node_ahead_does_not_scan_a_profile_claimed_elsewhere(cluster, monkeypatch):

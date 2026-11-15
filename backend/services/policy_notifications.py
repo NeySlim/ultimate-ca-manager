@@ -228,6 +228,7 @@ def _send(policy_id, kind, resource_id, details, *, own_session) -> bool:
     from models.email_notification import NotificationLog
     from models.policy import CertificatePolicy
     from services.email_service import EmailService
+    from services.scheduler_leader import cluster_utc_now
     try:
         config = EmailService.get_smtp_config()
         if config is None or not config.enabled:
@@ -247,7 +248,8 @@ def _send(policy_id, kind, resource_id, details, *, own_session) -> bool:
             return True  # another worker told them already
         ok, _msg = EmailService.send_email(recipients=to, subject=subject, body_html=body,
                                            notification_type=kind, resource_type='policy',
-                                           resource_id=resource_id, release_session=own_session)
+                                           resource_id=resource_id, release_session=own_session,
+                                           log_clock=cluster_utc_now)  # the window's clock
         if claim_id is not None:
             # The service logged the outcome per recipient; the claim has served
             NotificationLog.query.filter_by(id=claim_id).delete()

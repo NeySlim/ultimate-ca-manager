@@ -22,6 +22,16 @@ def _sanitize_header_value(value) -> str:
     return str(value).replace('\r', ' ').replace('\n', ' ').strip()
 
 
+def _log_instant(log_clock):
+    """The log rows' date: an unreadable caller clock never turns a sent mail into a failure."""
+    if log_clock is not None:
+        try:
+            return log_clock()
+        except Exception:
+            db.session.rollback()
+    return utc_now()
+
+
 def _smtp_connect(config: SMTPConfig, timeout: int) -> smtplib.SMTP:
     """Open the SMTP session: implicit TLS (port 465 style) wins over STARTTLS."""
     if config.smtp_use_ssl:
@@ -135,6 +145,7 @@ class EmailService:
         threshold_days: Optional[int] = None,
         release_session: bool = False,
         attachments: Optional[List[tuple]] = None,
+        log_clock=None,
     ) -> tuple[bool, str]:
         """
         Send email to recipients
@@ -150,6 +161,8 @@ class EmailService:
             release_session: return the session's connection to the pool before
                 the SMTP exchange (callers that own their session only)
             attachments: (filename, bytes, mimetype) tuples
+            log_clock: dates the log rows (default this host's utc_now); a caller
+                whose window is read on another clock passes that clock
 
         Returns:
             (success: bool, message: str)
@@ -239,6 +252,7 @@ class EmailService:
                         pass
 
             # Log success for each recipient
+            logged_at = _log_instant(log_clock)
             for recipient in recipients:
                 log = NotificationLog(
                     type=notification_type,
@@ -249,7 +263,7 @@ class EmailService:
                     resource_type=resource_type,
                     resource_id=resource_id,
                     threshold_days=threshold_days,
-                    sent_at=utc_now()
+                    sent_at=logged_at
                 )
                 db.session.add(log)
 
@@ -268,6 +282,7 @@ class EmailService:
             logger.error(f"Failed to send email: {error_msg}")
             
             # Log failure for each recipient
+            logged_at = _log_instant(log_clock)
             for recipient in recipients:
                 log = NotificationLog(
                     type=notification_type,
@@ -279,7 +294,7 @@ class EmailService:
                     resource_type=resource_type,
                     resource_id=resource_id,
                     threshold_days=threshold_days,
-                    sent_at=utc_now()
+                    sent_at=logged_at
                 )
                 db.session.add(log)
             
