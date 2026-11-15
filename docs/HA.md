@@ -9,7 +9,7 @@ UCM can run on two or more nodes that share one PostgreSQL database. This page c
 - **The same `KEY_ENCRYPTION_KEY` on every node**, a Fernet key. It decrypts every private key in the database: losing it makes them unrecoverable. Do not keep a different `master.key` file on a node: a local file overrides the variable.
 - **A distinct `UCM_NODE_ID` per node** (default: the host name). Two VMs cloned from one image keep the same host name: set it explicitly. A node whose identifier a live node already uses refuses to start, see [Node identifier](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
 - **`UCM_HA=1`** on every node.
-- **A load balancer** in front of the nodes. Probe `/health/ready`. UI sessions are stored in PostgreSQL (in Redis when `REDIS_URL` is set, see [REDIS.md](REDIS.md)) and shared by every node, so no request needs a given node. Cookie affinity is still advised, for the WebSocket polling fallback: see [Session affinity](#session-affinity).
+- **A load balancer** in front of the nodes. Probe `/health/ready`. UI sessions are stored in PostgreSQL (in Redis when `REDIS_URL` is set, see [REDIS.md](REDIS.md)) and shared by every node, so no request needs a given node. The balancer must pass the WebSocket upgrade, see [Session affinity](#session-affinity).
 - **One gunicorn worker per node**, which is the default (`workers = 1`). Do not raise it.
 - **Synchronised clocks** (NTP). Heartbeats, leases and the staleness test are written and compared on the PostgreSQL server's clock, so a skew between nodes does not move them; everything else UCM timestamps (certificate validity, logs) reads the clock of the node that serves the request.
 
@@ -77,7 +77,7 @@ The network uses the fixed subnet `172.28.0.0/24`, trusted as the proxy. When `u
 1. Install the package on both hosts.
 2. In `/etc/ucm/ucm.env` on each host set the same `DATABASE_URL`, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, `UCM_HA=1`, and a different `UCM_NODE_ID` (a host cloned from the other keeps its host name, the default). The packages generate a random key per node at install: replace it on both hosts.
 3. Every node must hold the same encryption key: either no `/etc/ucm/master.key` and `KEY_ENCRYPTION_KEY` in `ucm.env`, or the same `master.key` copied to every node (a local file wins over the variable).
-4. Restart `ucm` on each host, one at a time, and check `/health/ready` through the balancer (HAProxy, nginx or any layer 7 balancer; cookie affinity is advised, see [Session affinity](#session-affinity)).
+4. Restart `ucm` on each host, one at a time, and check `/health/ready` through the balancer (HAProxy, nginx or any layer 7 balancer; it must pass the WebSocket upgrade, see [Session affinity](#session-affinity)).
 
 ## From one node to a cluster
 
@@ -149,9 +149,9 @@ Before restoring a `pg_dump`, make sure every node runs with the key-encryption 
 
 ### Session affinity
 
-Sign-in sessions do not need it: they are stored in PostgreSQL (in Redis when `REDIS_URL` is set), so any node accepts a session another one opened. Two things still depend on the node that received the first request:
+Sign-in sessions do not need it: they are stored in PostgreSQL (in Redis when `REDIS_URL` is set), so any node accepts a session another one opened. Only the Kerberos handshake depends on the node that received the first request:
 
-- **Socket.IO.** The browser opens a WebSocket and falls back to HTTP long polling when it cannot. A Socket.IO session lives in the memory of the node that accepted it, and each polling request, like the upgrade from polling to WebSocket, carries its identifier. A request that reaches another node is answered `400` (`Invalid session`), and the browser reconnects. Without affinity, a browser that uses WebSocket is not affected; one that falls back to polling reconnects again and again and may miss live updates until the page is reloaded. Events emitted on one node reach the browsers connected to the others (through PostgreSQL, or Redis when set). The cookie affinity of the Helm example and of `docker-compose.ha.yml` is there for this.
+- **Socket.IO needs no affinity, but the balancer must pass the WebSocket upgrade.** The UI opens a WebSocket only and never falls back to HTTP requests. One WebSocket is one connection to one node, and the sign-in session is shared, so any node can accept it. A balancer that does not pass the upgrade gives no live updates whatever its affinity: the browser retries 5 times, then stops until the page is reloaded. Events emitted on one node reach the browsers connected to the others (through PostgreSQL, or Redis when set).
 - **Kerberos enrollment.** A SPNEGO handshake of more than one request needs source-address affinity, see [Windows enrollment](#windows-enrollment-kerberos).
 
 ### Rate limits
