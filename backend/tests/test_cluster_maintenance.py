@@ -246,3 +246,14 @@ def test_a_completion_whose_session_cleanup_fails_says_so_and_stays_completed(ap
             db.session.execute(text("DELETE FROM cluster_maintenance"))
             db.session.execute(text("DELETE FROM cluster_commands"))
             db.session.commit()
+
+
+def test_a_login_on_a_node_in_maintenance_is_refused_before_the_session_epoch_is_read(
+        app, client, held, monkeypatch):
+    from auth import session_epoch
+
+    def unreadable():
+        raise RuntimeError('the database is away')
+    monkeypatch.setattr(session_epoch, 'current_epoch', unreadable)
+    r = client.post('/api/v2/auth/login/password', json={'username': 'admin', 'password': 'x'})
+    assert r.status_code == 503 and r.get_json()['code'] == 'maintenance'

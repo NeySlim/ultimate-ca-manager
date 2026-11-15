@@ -153,7 +153,7 @@ def process_client_certificate():
     # Store cert_info in g for /auth/methods to use without re-parsing
     g.mtls_cert_info = cert_info
 
-    # Before the certificate is checked: a page (the SPA shell) skipped the global read
+    # Before the certificate is checked: every path outside LOGIN_PATHS skipped the global read
     note_request_epoch()
     user, auth_cert, error = MTLSAuthService.authenticate_certificate(cert_info)
 

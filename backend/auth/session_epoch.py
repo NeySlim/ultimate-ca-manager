@@ -25,7 +25,8 @@ def current_epoch() -> int:
 _AT_START = 'session_epoch_at_start'
 
 
-# Every route that calls begin_session; the certificate middleware reads for itself.
+# Every route that calls begin_session, and the few beside them that prepare a login;
+# the certificate middleware reads for itself.
 LOGIN_PATHS = ('/api/v2/auth/login', '/api/v2/sso/ldap/login', '/api/v2/sso/callback/')
 
 
@@ -35,7 +36,7 @@ def opens_sessions(path) -> bool:
 
 
 def remember_request_epoch():
-    """before_request, ahead of every hook that may sign in."""
+    """before_request, after the maintenance gate and before a login route runs."""
     from flask import request
     if opens_sessions(request.path):
         note_request_epoch()

@@ -1047,6 +1047,10 @@ def create_app(config_name=None):
     # HA cluster maintenance: first hook, so a node in maintenance refuses before any other work
     from services import cluster_maintenance
     cluster_maintenance.init_app(app)
+    # After the gate (a node in maintenance refuses without a read), before a login route
+    # checks an identity; the certificate hook reads the epoch for itself
+    from auth.session_epoch import remember_request_epoch
+    app.before_request(remember_request_epoch)
     # Before the CSRF check registered below: a failed load is retried before a token is checked
     app.before_request(reload_if_pending)
     
@@ -1250,9 +1254,6 @@ def create_app(config_name=None):
         return (admin_allowlist.REFUSAL_MESSAGE, 403,
                 {'Content-Type': 'text/plain; charset=utf-8'})
 
-    # Ahead of the certificate sign-in hook and of every identity check
-    from auth.session_epoch import remember_request_epoch
-    app.before_request_funcs.setdefault(None, []).insert(0, remember_request_epoch)
     app.before_request_funcs.setdefault(None, []).insert(0, enforce_admin_allowlist)
 
     # ── Global error handlers ─────────────────────────────────

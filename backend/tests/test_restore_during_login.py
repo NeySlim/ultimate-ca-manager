@@ -331,11 +331,11 @@ def test_a_restore_during_a_request_that_opens_no_session_refuses_no_later_login
 
 
 def test_the_start_epoch_is_read_once_per_request(app, monkeypatch):
-    """The API hook and the certificate middleware both ask for it: one SELECT, one value."""
+    """The login hook and the certificate middleware both ask for it: one SELECT, one value."""
     from auth import session_epoch
     reads = []
     monkeypatch.setattr(session_epoch, 'current_epoch', lambda: reads.append(1) or len(reads))
-    with app.test_request_context('/api/v2/account/profile'):
+    with app.test_request_context('/api/v2/auth/login/password'):
         session_epoch.remember_request_epoch()
         session_epoch.note_request_epoch()
         assert session_epoch.request_epoch() == 1 and len(reads) == 1
