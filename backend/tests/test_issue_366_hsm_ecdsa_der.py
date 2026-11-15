@@ -40,7 +40,7 @@ class TestEcdsaToDer:
         curve, size, digest = CURVES[algorithm]
         key = ec.generate_private_key(curve)
         der = key.sign(b'tbs', ec.ECDSA(digest))
-        converted = ecdsa_to_der(_raw(der, size), coordinate_bytes(algorithm))
+        converted = ecdsa_to_der(_raw(der, size), coordinate_bytes(algorithm), 'raw')
         assert converted == der
         key.public_key().verify(converted, b'tbs', ec.ECDSA(digest))
 
@@ -58,9 +58,18 @@ class TestEcdsaToDer:
         assert ecdsa_to_der(der, 48, 'der') == der
 
     def test_unknown_key_is_left_alone_but_wrong_raw_length_is_refused(self):
-        assert ecdsa_to_der(b'\x00' * 96, None) == b'\x00' * 96
+        assert ecdsa_to_der(b'\x00' * 96, None, 'raw') == b'\x00' * 96
         with pytest.raises(ValueError, match='length'):
-            ecdsa_to_der(b'\x00' * 95, 48)
+            ecdsa_to_der(b'\x00' * 95, 48, 'raw')
+
+    @pytest.mark.parametrize('signature', [b'signature', b'', b'\x30\x06\x02\x01\x01\x02\x01\x01\x00'])
+    def test_malformed_der_is_refused_without_parser_text(self, signature):
+        with pytest.raises(ValueError, match=r'^Invalid DER HSM ECDSA signature$'):
+            ecdsa_to_der(signature, 48, 'der')
+
+    def test_signature_format_has_no_default(self):
+        with pytest.raises(TypeError):
+            ecdsa_to_der(b'\x00' * 96, 48)
 
     def test_coordinate_bytes_from_algorithm_or_public_key(self):
         assert coordinate_bytes('EC-P521') == 66
@@ -210,7 +219,7 @@ def test_pkcs11_provider_falls_back_to_raw_ecdsa_on_softhsm(tmp_path, monkeypatc
             public_key = serialization.load_pem_public_key(provider.get_public_key(info.key_identifier).encode())
             signature = provider.sign(info.key_identifier, b'tbs', 'EC-P384', hash_algorithm='sha384')
             assert len(signature) == 96
-            public_key.verify(ecdsa_to_der(signature, 48), b'tbs', ec.ECDSA(hashes.SHA384()))
+            public_key.verify(ecdsa_to_der(signature, 48, 'raw'), b'tbs', ec.ECDSA(hashes.SHA384()))
     finally:
         _release_pkcs11_lib(pkcs11, lib_path)
 

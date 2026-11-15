@@ -34,12 +34,16 @@ def coordinate_bytes(key_algorithm: Optional[str], public_key_pem: Optional[str]
 
 
 def ecdsa_to_der(signature: bytes, coordinate_size: Optional[int],
-                 signature_format: str = 'raw') -> bytes:
+                 signature_format: str) -> bytes:
     """Decode the provider's declared format, never guess from ambiguous signature bytes."""
     if not coordinate_size:
         return signature
     if signature_format == 'der':
-        r, s = decode_dss_signature(signature)
+        # The parser's own text never reaches the user: it describes ASN.1 internals
+        try:
+            r, s = decode_dss_signature(signature)
+        except ValueError:
+            raise ValueError('Invalid DER HSM ECDSA signature') from None
         return encode_dss_signature(r, s)
     if signature_format != 'raw':
         raise ValueError('Unknown HSM ECDSA signature format')
