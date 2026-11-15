@@ -371,3 +371,27 @@ class TestPublicationCost:
         staged.unpublish()
         assert destination.read_bytes() == b'in use'
         staged.discard()
+
+    def test_a_previous_content_kept_on_another_filesystem_comes_back(
+            self, tmp_path, monkeypatch):
+        # Neither a link nor a rename works across filesystems: the content is rewritten
+        destination = tmp_path / 'certs' / 'c.pem'
+        destination.parent.mkdir()
+        destination.write_bytes(b'in use')
+        os.chmod(destination, 0o644)
+        real_replace = os.replace
+
+        def replace(source, target, *args, **kwargs):
+            if Path(target) == destination and Path(source).name.startswith('previous_'):
+                raise OSError(errno.EXDEV, 'cross-device')
+            return real_replace(source, target, *args, **kwargs)
+        monkeypatch.setattr(os, 'link', lambda *a, **k: (_ for _ in ()).throw(OSError(errno.EXDEV, 'cross-device')))
+        monkeypatch.setattr(os, 'replace', replace)
+
+        staged = StagedFiles(base_dir=tmp_path / 'staging')
+        staged.stage(destination, b'restored', mode=0o600)
+        staged.publish()
+        assert destination.read_bytes() == b'restored'
+        staged.unpublish()
+        assert destination.read_bytes() == b'in use' and _mode(destination) == 0o644
+        staged.discard()
