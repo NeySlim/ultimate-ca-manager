@@ -1,7 +1,8 @@
 """A 2.x archive whose TSA signs with its CA certificate keeps doing so once restored.
 
 The same rule as migration 162 (services.tsa_upgrade), applied to the archived settings before
-the plan is built: the explicit ``tsa_require_dedicated_cert = false`` joins them.
+the plan is built: the explicit ``tsa_require_dedicated_cert = false`` joins them, or replaces
+a key row 2.x read as "no".
 """
 from services.tsa_upgrade import KEY, ca_signer_refid_kept
 

@@ -2,7 +2,8 @@
 
 3.0 reads an absent ``tsa_require_dedicated_cert`` as true (RFC 3161 §2.3 dedicated signer).
 A 2.x install whose TSA is on (no ``tsa_enabled`` row, or one 2.x read as true), points at an
-existing CA and has no dedicated signer gets the key written ``false``; nothing else is written.
+existing CA and has no dedicated signer gets the key written ``false``, over a key row 2.x read
+as "no" (any value but lower case ``true``); nothing else is written.
 """
 import logging
 import sqlite3
@@ -25,7 +26,8 @@ def upgrade(conn):
             f"SELECT key, value FROM {SETTINGS} WHERE key IN ({','.join('?' * len(READ))})", READ))
         refid = ca_signer_refid_kept(settings)
         if refid and conn.execute(f"SELECT 1 FROM {CAS} WHERE refid = ?", (refid,)).fetchone():
-            conn.execute(f"INSERT INTO {SETTINGS} (key, value) VALUES (?, 'false')", (KEY,))
+            conn.execute(f"UPDATE {SETTINGS} SET value = 'false' WHERE key = ?" if KEY in settings
+                         else f"INSERT INTO {SETTINGS} (key, value) VALUES (?, 'false')", (KEY,))
             logger.info("[162] the TSA keeps signing with its CA certificate (SQLite)")
         conn.commit()
         return
@@ -37,7 +39,8 @@ def upgrade(conn):
             bindparam('keys', expanding=True)), {'keys': list(READ)}).fetchall())
     refid = ca_signer_refid_kept(settings)
     if refid and conn.execute(text(f"SELECT 1 FROM {CAS} WHERE refid = :r"), {'r': refid}).first():
-        conn.execute(text(f"INSERT INTO {SETTINGS} (key, value) VALUES (:k, 'false')"), {'k': KEY})
+        conn.execute(text(f"UPDATE {SETTINGS} SET value = 'false' WHERE key = :k" if KEY in settings
+                          else f"INSERT INTO {SETTINGS} (key, value) VALUES (:k, 'false')"), {'k': KEY})
         logger.info("[162] the TSA keeps signing with its CA certificate (PostgreSQL)")
 
 

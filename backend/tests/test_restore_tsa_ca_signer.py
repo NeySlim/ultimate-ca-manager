@@ -35,8 +35,15 @@ def _archive(settings, cas=(CA_REFID,), v30=False):
     ({'tsa_enabled': None, 'tsa_ca_refid': CA_REFID}, (CA_REFID,), False, False),
     ({'tsa_enabled': ' true', 'tsa_ca_refid': CA_REFID}, (CA_REFID,), False, False),
     ({'tsa_enabled': 'TRUE', 'tsa_ca_refid': CA_REFID}, (CA_REFID,), False, True),
+    ({'tsa_ca_refid': CA_REFID, KEY: ''}, (CA_REFID,), False, True),
+    ({'tsa_ca_refid': CA_REFID, KEY: None}, (CA_REFID,), False, True),
+    ({'tsa_ca_refid': CA_REFID, KEY: 'no'}, (CA_REFID,), False, True),
+    ({'tsa_ca_refid': CA_REFID, KEY: ' true'}, (CA_REFID,), False, True),
+    ({'tsa_ca_refid': CA_REFID, KEY: 'TRUE'}, (CA_REFID,), False, False),
+    ({'tsa_enabled': 'false', 'tsa_ca_refid': CA_REFID, KEY: 'no'}, (CA_REFID,), False, False),
 ], ids=['default_on', 'explicit', 'v30_archive', 'dedicated', 'disabled', 'key_set', 'no_ca', 'ca_unknown',
-        'enabled_null', 'enabled_padded', 'enabled_upper'])
+        'enabled_null', 'enabled_padded', 'enabled_upper', 'key_empty', 'key_null', 'key_no', 'key_padded',
+        'key_upper_true', 'key_no_disabled'])
 def test_the_rule_on_the_archived_settings(app, settings, cas, v30, written):
     data = _archive(settings, cas, v30)
     with app.app_context():
@@ -118,6 +125,17 @@ def test_a_2x_archive_with_a_windows_configuration_keeps_its_ca_signer(here):
     blob = _forged(['configuration'], mutate=with_windows)
     _service().restore_backup(blob, PASSWORD, mode='merge')
     assert _stored() == 'false'
+
+
+@pytest.mark.parametrize('archived,stored', [('', 'false'), ('no', 'false'), ('true', 'true')])
+def test_a_2x_archive_whose_key_read_as_no_keeps_its_ca_signer(here, archived, stored):
+    """2.x read the key as lower() == 'true': any other row signed with the CA, so it is restored as false."""
+    def with_key(data):
+        _as_2x_tsa(data)
+        data['configuration']['settings'][KEY] = archived
+    blob = _forged(['configuration'], mutate=with_key)
+    _service().restore_backup(blob, PASSWORD, mode='merge')
+    assert _stored() == stored
 
 
 @pytest.mark.parametrize('enabled', [None, ' true'])

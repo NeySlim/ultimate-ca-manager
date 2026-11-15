@@ -33,6 +33,11 @@ CASES = [
     ('tsa_enabled_padded', {'tsa_enabled': ' true', 'tsa_ca_refid': CA_REFID}, None),
     ('tsa_enabled_upper_case', {'tsa_enabled': 'TRUE', 'tsa_ca_refid': CA_REFID},
      {'tsa_enabled': 'TRUE', 'tsa_ca_refid': CA_REFID, KEY: 'false'}),
+    # 2.x read the key as str(value).lower() == 'true': any other row was "no", 3.0 reads it as yes
+    *[(f'key_read_as_no_{i}', {'tsa_ca_refid': CA_REFID, KEY: v}, {'tsa_ca_refid': CA_REFID, KEY: 'false'})
+      for i, v in enumerate(('', None, 'no', '0', ' true', 'False'))],
+    ('key_upper_case_true', {'tsa_ca_refid': CA_REFID, KEY: 'TRUE'}, None),
+    ('key_read_as_no_tsa_disabled', {'tsa_enabled': 'false', 'tsa_ca_refid': CA_REFID, KEY: ''}, None),
 ]
 
 
