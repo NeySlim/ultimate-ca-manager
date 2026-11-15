@@ -2,7 +2,7 @@
  * Settings Page - Horizontal tabs for desktop, scrollable for mobile
  * Uses DetailCard design system
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -207,6 +207,19 @@ export default function SettingsPage() {
   const [backupLoading, setBackupLoading] = useState(false)
   const [restoreProgress, setRestoreProgress] = useState(null)
   const [restoreReport, setRestoreReport] = useState(null)
+  // Off the page the report can no longer show: the held sign-out goes with it
+  const mounted = useRef(true)
+  const holdingSignOut = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      if (holdingSignOut.current) {
+        holdingSignOut.current = false
+        holdSignOut(false)
+      }
+    }
+  }, [])
   
   // HTTPS import modal
   const [showHttpsImportModal, setShowHttpsImportModal] = useState(false)
@@ -1372,16 +1385,23 @@ export default function SettingsPage() {
     setBackupLoading(true)
     // Requests answered after the restore revoked the sessions get 401: the report stays first
     holdSignOut()
+    holdingSignOut.current = true
     try {
       setRestoreProgress(0)
       const result = await systemService.restore(restoreFile, restorePassword, {
         onProgress: (loaded, total) => setRestoreProgress(Math.floor((loaded / total) * 100)),
       })
+      // Restored after the page was left: the session is revoked, the reload leads to sign-in
+      if (!mounted.current) {
+        window.location.reload()
+        return
+      }
       setShowRestoreModal(false)
       setRestorePassword('')
       setRestoreFile(null)
       setRestoreReport(result.data || {})
     } catch (error) {
+      holdingSignOut.current = false
       holdSignOut(false)
       showError(error.message || t('messages.errors.backup.restoreFailed'))
     } finally {

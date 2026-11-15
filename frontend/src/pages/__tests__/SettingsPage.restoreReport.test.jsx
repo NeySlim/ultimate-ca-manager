@@ -3,7 +3,7 @@
  * with things to do stays, one without reloads as before.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('../settings/BackupSection', () => ({
@@ -26,6 +26,7 @@ beforeEach(() => {
   vi.stubGlobal('location', { ...window.location, reload })
 })
 afterEach(() => {
+  cleanup() // the unmount releases the hold: before the calls are cleared
   vi.useRealTimers()
   vi.unstubAllGlobals()
   reload.mockClear()
@@ -33,7 +34,7 @@ afterEach(() => {
 })
 
 async function startRestore() {
-  render(
+  const view = render(
     <MemoryRouter initialEntries={['/settings?tab=backup']}>
       <SettingsPage />
     </MemoryRouter>,
@@ -42,6 +43,7 @@ async function startRestore() {
   fireEvent.change(screen.getByPlaceholderText('settings.enterBackupPassword'),
     { target: { value: 'a-long-enough-password' } })
   await act(async () => { screen.getByText('settings.restoreBackup').click() })
+  return view
 }
 
 describe('SettingsPage: restore report', () => {
@@ -78,6 +80,37 @@ describe('SettingsPage: restore report', () => {
   it('releases the held sign-out when the restore is refused', async () => {
     systemService.restore = vi.fn().mockRejectedValue(Object.assign(new Error('Invalid password'), { status: 400 }))
     await startRestore()
+    expect(holdSignOut.mock.calls).toEqual([[], [false]])
+  })
+
+  it('leaving the page during the upload releases the sign-out and reloads once restored', async () => {
+    let finish
+    systemService.restore = vi.fn(() => new Promise((resolve) => { finish = resolve }))
+    const { unmount } = await startRestore()
+    unmount()
+    expect(holdSignOut.mock.calls).toEqual([[], [false]])
+    expect(reload).not.toHaveBeenCalled()
+    await act(async () => { finish({ data: { users: 1, cas: 1, certificates: 1, restart_requested: true, todo: ['x'] } }) })
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaving the page after a refused restore neither holds nor reloads', async () => {
+    let fail
+    systemService.restore = vi.fn(() => new Promise((resolve, reject) => { fail = reject }))
+    const { unmount } = await startRestore()
+    unmount()
+    await act(async () => { fail(Object.assign(new Error('Invalid password'), { status: 400 })) })
+    expect(holdSignOut.mock.calls.at(-1)).toEqual([false])
+    expect(reload).not.toHaveBeenCalled()
+  })
+
+  it('leaving the page under its report releases the sign-out', async () => {
+    systemService.restore = vi.fn().mockResolvedValue({
+      data: { users: 1, cas: 1, certificates: 1, restart_requested: true, todo: ['x'] },
+    })
+    const { unmount } = await startRestore()
+    expect(await screen.findByText('settings.restoreReportTitle')).toBeTruthy()
+    unmount()
     expect(holdSignOut.mock.calls).toEqual([[], [false]])
   })
 
