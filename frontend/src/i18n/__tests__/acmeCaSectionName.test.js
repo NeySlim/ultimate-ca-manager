@@ -10,9 +10,9 @@ const LOCALES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
 const load = (code) => JSON.parse(readFileSync(join(dir, '..', 'locales', `${code}.json`), 'utf8'))
 const helpFile = (code) => readFileSync(join(dir, '..', '..', 'data', 'help', code, 'acme.js'), 'utf8')
 
-// One rule: a string that points at the section contains the screen title
-// (acme.certificateAuthorities) without its trailing "(CA)" suffix.
-const sectionName = (acme) => acme.certificateAuthorities.replace(/\s*\(CA\)\s*$/, '')
+// One rule: a string that points at the section contains the exact screen title
+// (acme.certificateAuthorities), suffix included.
+const sectionName = (acme) => acme.certificateAuthorities
 const POINTERS = ['proxyUsageNote', 'proxyUpstreamCAAccountHelper', 'proxyNoCaAccounts', 'proxyManageCaAccountsHint']
 
 describe('ACME proxy strings name the CA section as the screen does', () => {
@@ -28,7 +28,7 @@ describe('ACME proxy strings name the CA section as the screen does', () => {
   }
 })
 
-// Old section names; plain account wording ("each external CA account") is not matched.
+// Old section names in the built-in help; plain account wording ("each external CA account") is not matched.
 const OLD_SECTION = [
   /External CA Accounts/,
   /Comptes CA externes/,
@@ -47,6 +47,28 @@ describe('built-in help does not cite the old section name', () => {
         const m = text.match(re)
         expect(m && m[0], `${code} still cites ${re}`).toBeNull()
       }
+    })
+  }
+})
+
+describe('help pointers to the section carry the exact screen title', () => {
+  const title = (code) => load(code).acme.certificateAuthorities
+  const bare = (code) => title(code).replace(/\s*\(CA\)\s*$/, '')
+  // The bare name must always be followed by the "(CA)" suffix.
+  const bareUses = (text, code) => text.split(bare(code)).slice(1).filter((rest) => !rest.startsWith(' (CA)')).length
+
+  it('en: the upstream account item points at the section', () => {
+    const item = JSON.stringify(helpContent).match(/"label":"Upstream CA account","text":"([^"]*)"/)
+    expect(item[1]).toContain(title('en'))
+  })
+  for (const code of ['fr', 'zh']) {
+    it(`${code}: the upstream account item points at the section`, () => {
+      const m = helpFile(code).match(/label: ['"](?:Compte CA en amont|上游 CA 账户)['"], text: ['"]((?:[^'"\\]|\\.)*)['"]/)
+      expect(m, `${code} item`).not.toBeNull()
+      expect(m[1]).toContain(title(code))
+    })
+    it(`${code}: help never cites the section without the suffix`, () => {
+      expect(bareUses(helpFile(code), code)).toBe(0)
     })
   }
 })

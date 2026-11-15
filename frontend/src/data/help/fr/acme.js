@@ -19,7 +19,7 @@ export default {
         items: [
           { label: 'Client', text: 'Demander des certificats depuis tout CA ACME, Let\'s Encrypt, ZeroSSL, HARICA ou personnalisé' },
           { label: 'Onglet des orders (v2.219)', text: 'Les orders du client ont leur propre onglet « Let\'s Encrypt orders » dans la barre latérale, avec compteur visibles/total et filtre de statut, à l\'image de la vue Local orders' },
-          { label: 'Autorités de certification', text: 'Un ou plusieurs comptes par CA, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let\'s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let\'s Encrypt Production' },
+          { label: 'Autorités de certification (CA)', text: 'Un ou plusieurs comptes par CA, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let\'s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let\'s Encrypt Production' },
           { label: 'Serveur personnalisé', text: 'Définir une URL de répertoire ACME personnalisée pour utiliser tout CA conforme RFC 8555' },
           { label: 'EAB', text: 'Prise en charge de la liaison de compte externe pour les CA nécessitant une pré-inscription (ZeroSSL, HARICA, etc.)' },
           { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 pour les clés de certificat ; ML-DSA n\'est pas proposé sur un build qui ne l\'inclut pas, ni en mode FIPS quand le module FIPS ne l\'approuve pas. Un défaut configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048 (v2.248)' },
@@ -75,11 +75,11 @@ export default {
       {
         title: 'Proxy ACME',
         items: [
-          { label: 'Compte CA en amont', text: 'Sélectionnez l\'un des comptes CA externes : son URL de répertoire (Let\'s Encrypt, ZeroSSL, tout CA RFC 8555) et ses identifiants EAB sont définis sur ce compte' },
+          { label: 'Compte CA en amont', text: 'Sélectionnez l\'un des comptes dans Autorités de certification (CA) : son URL de répertoire (Let\'s Encrypt, ZeroSSL, tout CA RFC 8555) et ses identifiants EAB sont définis sur ce compte' },
           { label: 'État du compte', text: 'Indique si UCM est enregistré auprès du CA en amont. Les comptes sont auto-enregistrés à la première requête proxy' },
           { label: 'Test de connexion', text: 'Vérifiez la connectivité avec le CA en amont et vérifiez si des identifiants EAB sont requis' },
           { label: 'Réinitialiser le compte', text: 'Effacez l\'inscription en amont du compte CA sélectionné pour forcer une nouvelle inscription' },
-          { label: 'Identifiants EAB', text: 'Identifiants External Account Binding pour les CAs qui les exigent (ex: ZeroSSL, Google Trust), saisis sur le compte CA dans Autorités de certification' },
+          { label: 'Identifiants EAB', text: 'Identifiants External Account Binding pour les CAs qui les exigent (ex: ZeroSSL, Google Trust), saisis sur le compte CA dans Autorités de certification (CA)' },
           { label: 'Défis DNS', text: 'UCM gère les défis DNS-01 pour le compte des clients en utilisant les fournisseurs DNS configurés' },
           { label: 'Purge des certificats remplacés', text: 'Bascule opt-in : quand un ordre proxy se finalise, les certificats précédemment importés par des ordres proxy pour exactement le même ensemble de domaines sont supprimés. Les certificats révoqués sont toujours conservés ; les certificats hors proxy ne sont jamais touchés. Désactivé par défaut' },
                   { label: 'Pre-checks clients (v2.217)', text: 'Le proxy publie aussi les valeurs TXT dns-01 calculées avec la clé de compte de chaque client : les pre-checks de propagation de lego/Traefik/Caddy passent sans être désactivés, sauf sur DuckDNS, Hurricane Electric et FreeDNS, qui ne tiennent qu\'une valeur : désactivez-y le pre-check du client ; un new-order retenté renvoie l\'order encore pending du compte' },
@@ -98,7 +98,7 @@ export default {
         title: 'DNS UPDATE (RFC 2136) pour le proxy ACME',
         items: [
           { label: 'Fonction', text: 'Les clients utilisent leur solveur rfc2136 standard (certbot, lego, cert-manager, acme.sh, win-acme, Posh-ACME) et le dirigent vers UCM. UCM crée toujours l\'enregistrement TXT avec son propre fournisseur DNS' },
-          { label: 'Clés', text: 'Créez des clés pour chaque compte proxy dans Autorités de certification. Une clé peut être liée à un identifiant EAB : elle ne fonctionne alors que pour les commandes du compte ACME enregistré avec cet identifiant. UCM affiche le secret une seule fois' },
+          { label: 'Clés', text: 'Créez des clés pour chaque compte proxy dans Autorités de certification (CA). Une clé peut être liée à un identifiant EAB : elle ne fonctionne alors que pour les commandes du compte ACME enregistré avec cet identifiant. UCM affiche le secret une seule fois' },
           { label: 'Modifications acceptées', text: 'UCM accepte uniquement un enregistrement TXT sous _acme-challenge avec la valeur qu\'il attend pour la commande. Il refuse les autres modifications. Il répond toujours NOERROR à une suppression' },
           { label: 'Port et réseau', text: 'Définissez le port du listener dans la section Proxy ACME (0 le désactive, 1024 à 65535, redémarrage nécessaire). À utiliser uniquement sur le réseau interne. Pour utiliser le port 53, redirigez-le dans Docker ou Kubernetes, ou avec le pare-feu' },
           { label: 'Algorithmes', text: 'hmac-sha256, hmac-sha384 et hmac-sha512. UCM refuse md5 et sha1, valeurs par défaut de nombreux clients : définissez l\'algorithme dans chaque client. cert-manager ne prend pas en charge sha384, et win-acme le calcule de façon incorrecte' },
@@ -222,9 +222,9 @@ Utilisez tout CA conforme RFC 8555, pas seulement Let's Encrypt :
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Définissez l'URL du répertoire de votre CA comme **URL du répertoire ACME** de son compte dans **Autorités de certification**.
+Définissez l'URL du répertoire de votre CA comme **URL du répertoire ACME** de son compte dans **Autorités de certification (CA)**.
 
-### Autorités de certification
+### Autorités de certification (CA)
 Gérez tous les comptes externes avec lesquels UCM s'enregistre :
 
 - **Plusieurs comptes par CA autorisés** : plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let's Encrypt avec des e-mails de contact différents pour la séparation administrative, utile avec dns-persist-01). La ligne du compte, pas l'URL, sert d'identité.
@@ -237,7 +237,7 @@ Gérez tous les comptes externes avec lesquels UCM s'enregistre :
 Certains CA nécessitent des identifiants EAB pour lier votre compte ACME à un compte existant chez le CA :
 
 1. Inscrivez-vous sur le portail de votre CA pour obtenir le **Key ID EAB** et la **clé HMAC**
-2. Entrez les deux valeurs (**Identifiant de clé EAB**, **Clé HMAC EAB**) sur le compte CA dans **Autorités de certification**
+2. Entrez les deux valeurs (**Identifiant de clé EAB**, **Clé HMAC EAB**) sur le compte CA dans **Autorités de certification (CA)**
 3. La clé HMAC est encodée en base64url (fournie par le CA)
 
 > 💡 EAB est requis par ZeroSSL, HARICA, Google Trust Services et la plupart des CA d'entreprise.
@@ -328,7 +328,7 @@ Le proxy ACME permet aux clients internes de demander des certificats à un CA p
 ### Configuration
 1. Allez dans **ACME** → onglet **Let's Encrypt**
 2. Faites défiler jusqu'à la section **Proxy ACME**
-3. Sélectionnez un **Compte CA en amont** dans **Autorités de certification** (Let's Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
+3. Sélectionnez un **Compte CA en amont** dans **Autorités de certification (CA)** (Let's Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
 4. Cliquez sur **Tester la connexion** pour vérifier la connectivité avec le CA en amont
 5. Enregistrez le compte amont si nécessaire (email + **Enregistrer le compte**)
 6. UCM enregistre automatiquement un compte à la première requête proxy si ce n'est pas déjà fait
@@ -336,7 +336,7 @@ Le proxy ACME permet aux clients internes de demander des certificats à un CA p
 ### Chemins proxy dédiés (multi-CA)
 Chaque compte CA externe peut exposer son propre endpoint proxy ACME :
 
-1. Ouvrez **Autorités de certification** (même onglet Let's Encrypt)
+1. Ouvrez **Autorités de certification (CA)** (même onglet Let's Encrypt)
 2. Modifiez ou créez un compte CA
 3. Activez **Exposer via le proxy ACME**
 4. Définissez un **Chemin proxy (slug)** unique : ex. \`actalis-production\`, \`letsencrypt-staging\`
@@ -392,7 +392,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 Les identifiants EAB du compte CA en amont sont distincts de l'EAB client : ils authentifient UCM auprès du CA en amont, pas vos clients auprès de UCM. Définissez-les sur ce compte dans **Autorités de certification**.
+> 💡 Les identifiants EAB du compte CA en amont sont distincts de l'EAB client : ils authentifient UCM auprès du CA en amont, pas vos clients auprès de UCM. Définissez-les sur ce compte dans **Autorités de certification (CA)**.
 
 > ⚠ Prérequis : le domaine (ou un domaine parent couvrant les sous-domaines) doit être configuré dans ACME Domains avec un fournisseur DNS. Le proxy ne gère que dns-01.
 

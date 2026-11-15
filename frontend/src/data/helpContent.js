@@ -711,7 +711,7 @@ export const helpContent = {
         items: [
           { label: 'Client', text: 'Request certificates from any ACME CA, Let\'s Encrypt, ZeroSSL, HARICA, or custom' },
           { label: 'Orders tab (v2.219)', text: 'The client orders have their own "Let\'s Encrypt orders" sidebar tab with a visible/total count and a status filter, mirroring the Local orders view' },
-          { label: 'Certificate Authorities', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
+          { label: 'Certificate Authorities (CA)', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
           { label: 'Custom Server', text: 'Set a custom ACME directory URL to use any RFC 8555-compliant CA' },
           { label: 'EAB', text: 'External Account Binding support for CAs that require pre-registration (ZeroSSL, HARICA, etc.)' },
           { label: 'Key Types', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87 for certificate keys; ML-DSA is not offered on a build without it, nor in FIPS mode when the FIPS module does not approve it. A configured default this instance cannot generate fails the order instead of falling back to RSA-2048 (v2.248)' },
@@ -769,11 +769,11 @@ export const helpContent = {
         title: 'ACME Proxy',
         icon: Globe,
         items: [
-          { label: 'Upstream CA account', text: 'Select one of the accounts in Certificate Authorities: its directory URL (Let\'s Encrypt, ZeroSSL, any RFC 8555 CA) and EAB credentials are set on that account' },
+          { label: 'Upstream CA account', text: 'Select one of the accounts in Certificate Authorities (CA): its directory URL (Let\'s Encrypt, ZeroSSL, any RFC 8555 CA) and EAB credentials are set on that account' },
           { label: 'Account Status', text: 'Shows whether UCM is registered with the upstream CA. Accounts are auto-registered on first proxy request' },
           { label: 'Test Connection', text: 'Verify connectivity to the upstream CA and check if EAB credentials are required' },
           { label: 'Reset Account', text: 'Clear the upstream registration of the selected CA account to force a new registration' },
-          { label: 'EAB Credentials', text: 'External Account Binding credentials for CAs that require them (e.g., ZeroSSL, Google Trust), entered on the CA account in Certificate Authorities' },
+          { label: 'EAB Credentials', text: 'External Account Binding credentials for CAs that require them (e.g., ZeroSSL, Google Trust), entered on the CA account in Certificate Authorities (CA)' },
           { label: 'DNS Challenges', text: 'UCM handles DNS-01 challenges on behalf of clients using configured DNS providers' },
           { label: 'Purge replaced certificates', text: 'Opt-in toggle: when a proxy order finalizes, certificates previously imported by proxy orders for the exact same domain set are deleted. Revoked certificates are always kept; non-proxy certificates are never touched. Off by default' },
                   { label: 'Client pre-checks (v2.217)', text: 'The proxy also publishes the dns-01 TXT values computed with each client account key, so lego/Traefik/Caddy propagation pre-checks pass without being disabled, except on DuckDNS, Hurricane Electric and FreeDNS, which hold one value: disable the client pre-check there; a retried new-order returns the account still-pending order' },
@@ -792,7 +792,7 @@ export const helpContent = {
         title: 'DNS UPDATE (RFC 2136) for the ACME proxy',
         items: [
           { label: 'What it is', text: 'Clients use their standard rfc2136 solver (certbot, lego, cert-manager, acme.sh, win-acme, Posh-ACME) and point it at UCM. UCM still creates the TXT record through its own DNS provider' },
-          { label: 'Keys', text: 'Create keys for each proxy account under Certificate Authorities. A key can be linked to an EAB credential: it then works only for orders of the ACME account registered with that credential. UCM shows the secret once' },
+          { label: 'Keys', text: 'Create keys for each proxy account under Certificate Authorities (CA). A key can be linked to an EAB credential: it then works only for orders of the ACME account registered with that credential. UCM shows the secret once' },
           { label: 'Accepted changes', text: 'UCM accepts only a TXT record under _acme-challenge with the value it expects for the order. It refuses other changes. It always answers a delete with NOERROR' },
           { label: 'Port and network', text: 'Set the listener port in the ACME proxy section (0 disables it, 1024 to 65535, a restart is needed). Use it in the internal network only. To use port 53, map it in Docker or Kubernetes, or with a firewall redirect' },
           { label: 'Algorithms', text: 'hmac-sha256, hmac-sha384 and hmac-sha512. UCM refuses md5 and sha1, the defaults of many clients: set the algorithm in every client. cert-manager does not support sha384, and win-acme computes it wrongly' },
