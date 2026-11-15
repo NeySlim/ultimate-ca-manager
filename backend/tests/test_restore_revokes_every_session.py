@@ -11,6 +11,7 @@ import uuid
 import pytest
 
 from models import APIKey, User, db
+from tests.test_sso_login_identity import oidc  # noqa: F401 (fixture)
 
 PASSWORD = 'TestPass123!'
 PROTECTED = '/api/v2/account/apikeys'
@@ -162,3 +163,98 @@ def test_a_file_request_does_not_read_the_epoch(app, monkeypatch, path):
         raise RuntimeError('database unavailable')
     monkeypatch.setattr(session_epoch, 'current_epoch', database_down)
     assert app.test_client().get(path).status_code < 500
+
+
+# Every door opens its session through begin_session, which stamps the epoch read as the
+# request started: a restore landing while the door checks credentials refuses the session.
+# After an earlier restore, a session opened without it carries no epoch and is refused.
+
+@pytest.fixture
+def a_restore_happened(app):
+    from auth.session_epoch import advance_epoch
+    with app.app_context():
+        advance_epoch()
+
+def _advance_while(result):
+    def checking(*_a, **_k):
+        from auth.session_epoch import advance_epoch
+        advance_epoch()
+        return result
+    return checking
+
+
+@pytest.mark.parametrize('restore_lands', (False, True))
+def test_a_second_factor_the_restore_overtakes_is_refused_after_it(
+        app, accounts, monkeypatch, a_restore_happened, restore_lands):
+    import pyotp
+    from auth import totp
+    name = accounts()
+    with app.app_context():
+        user = User.query.filter_by(username=name).one()
+        user.totp_secret = pyotp.random_base32()
+        user.totp_confirmed = True
+        db.session.commit()
+    client = app.test_client()
+    answer = client.post('/api/v2/auth/login', json={'username': name, 'password': PASSWORD})
+    assert answer.get_json()['data']['requires_2fa'] is True
+    if restore_lands:
+        monkeypatch.setattr(totp, 'consume_totp', _advance_while(True))
+    else:
+        monkeypatch.setattr(totp, 'consume_totp', lambda *_a, **_k: True)
+    assert client.post('/api/v2/auth/login/2fa', json={'code': '000000'}).status_code == 200
+    assert (client.get(PROTECTED).status_code == 401) is restore_lands
+
+
+@pytest.fixture
+def ldap_login(app, monkeypatch):
+    """An LDAP sign-in whose bind succeeds; returns the client it signed in."""
+    import api.v2.sso.ldap_routes as ldap_routes
+    from models.sso import SSOProvider, SSOSession
+    with app.app_context():
+        provider = SSOProvider(
+            name=f'restore-ldap-{uuid.uuid4().hex[:6]}', provider_type='ldap', enabled=True,
+            ldap_server='ldap.example.test', ldap_port=389, ldap_base_dn='dc=example,dc=test',
+            ldap_user_filter='(uid={username})', ldap_username_attr='uid',
+            ldap_email_attr='mail', ldap_fullname_attr='cn')
+        db.session.add(provider)
+        db.session.commit()
+        provider_id = provider.id
+    names = []
+
+    def login(restore_lands):
+        name = f'restldap{uuid.uuid4().hex[:6]}'
+        names.append(name)
+        found = {'dn': f'uid={name}', 'uid': name, 'username': name,
+                 'email': f'{name}@example.test', 'fullname': name, 'groups': []}
+        bind = _advance_while((found, None)) if restore_lands else (lambda *_a: (found, None))
+        monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', bind)
+        client = app.test_client()
+        answer = client.post('/api/v2/sso/ldap/login', json={
+            'username': name, 'password': PASSWORD, 'provider_id': provider_id})
+        assert answer.status_code == 200, answer.data[:300]
+        return client
+    yield login
+    with app.app_context():
+        for user in User.query.filter(User.username.in_(names)).all():
+            SSOSession.query.filter_by(user_id=user.id).delete()
+            db.session.delete(user)
+        db.session.delete(db.session.get(SSOProvider, provider_id))
+        db.session.commit()
+
+
+@pytest.mark.parametrize('restore_lands', (False, True))
+def test_an_ldap_login_the_restore_overtakes_is_refused_after_it(
+        ldap_login, a_restore_happened, restore_lands):
+    assert (ldap_login(restore_lands).get(PROTECTED).status_code == 401) is restore_lands
+
+
+@pytest.mark.parametrize('restore_lands', (False, True))
+def test_an_oidc_login_the_restore_overtakes_is_refused_after_it(
+        oidc, monkeypatch, a_restore_happened, restore_lands):
+    from api.v2.sso import login_routes
+    sub = f'restore-{uuid.uuid4().hex[:8]}'
+    if restore_lands:
+        monkeypatch.setattr(login_routes, 'verify_id_token', _advance_while({'sub': sub}))
+    location, verify = oidc({'sub': sub, 'preferred_username': f'rest{sub[-8:]}'})
+    assert location.endswith('/login/sso-complete')
+    assert (verify.get('authenticated') is True) is not restore_lands
