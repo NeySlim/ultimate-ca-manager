@@ -364,3 +364,43 @@ def test_ocsp_of_a_ca_on_an_unreadable_provider_answers_internal_error(
                          content_type='application/ocsp-request')
     assert r.status_code == 200
     assert ocsp.load_der_ocsp_response(r.data).response_status == ocsp.OCSPResponseStatus.INTERNAL_ERROR
+
+
+def test_a_kept_unreadable_secret_never_leaves_as_cleartext(auth_client, app, caplog):
+    """editable_config keeps a foreign token as is: never exposed, never re-wrapped as a value."""
+    import json
+    from models import db
+    from models.hsm import HsmProvider
+    from models.audit_log import AuditLog
+    from services.backup.key_material import decrypt_stored_fields
+    from services.backup.manifest import SECTIONS
+    from services.backup.restore.apply import _secret_as_stored
+    token = _foreign_token('0000')
+    with app.app_context():
+        row = HsmProvider(name=f'kept-{uuid.uuid4().hex[:6]}', type='openbao', config=json.dumps(
+            {'url': 'http://bao.invalid:8200', 'token': token}))
+        db.session.add(row)
+        db.session.commit()
+        pid = row.id
+    try:
+        r = auth_client.put(f'/api/v2/hsm/providers/{pid}', data=json.dumps({'config': {
+            'url': 'http://bao.invalid:8200', 'token': '********', 'mount_path': 'm'}}),
+            content_type='application/json')
+        assert r.status_code == 200, r.get_data(as_text=True)
+        assert token not in r.get_data(as_text=True)
+        assert r.get_json()['data']['config']['token'] == '********'
+        with app.app_context():
+            row = db.session.get(HsmProvider, pid)
+            assert json.loads(row.config)['token'] == token  # stored once, not wrapped again
+            assert token not in json.dumps(row.to_dict(include_config=True))
+            assert all(token not in (a.details or '') for a in AuditLog.query.all())
+            archived = decrypt_stored_fields(row.config, label='hsm')
+            assert json.loads(archived)['token'] == token
+            restored = HsmProvider(name='r', type='openbao')
+            restored.config = _secret_as_stored(SECTIONS['hsm_providers'], 'config', archived)
+            assert 'token' not in json.loads(restored.config)
+        assert token not in caplog.text
+    finally:
+        with app.app_context():
+            db.session.delete(db.session.get(HsmProvider, pid))
+            db.session.commit()
