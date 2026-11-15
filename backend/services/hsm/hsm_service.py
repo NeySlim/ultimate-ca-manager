@@ -21,7 +21,7 @@ from services import compliance_signer
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo, brainpool_refusal, mldsa_refusal,
-    HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
+    HsmError, HsmConnectionError, HsmOperationError, HsmConfigError, HsmSecretUnreadable
 )
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
@@ -158,7 +158,7 @@ class HsmService:
         try:
             config = provider.connection_config()
         except SecretUnreadable as e:
-            raise HsmConfigError(str(e)) from e
+            raise HsmSecretUnreadable(str(e)) from e
         return provider_class(config)
     
     # =========================================================================

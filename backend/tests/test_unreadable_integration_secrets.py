@@ -276,3 +276,91 @@ def test_an_edit_keeps_a_previous_pin_this_node_cannot_open(app):
         finally:
             db.session.delete(db.session.get(HsmProvider, row.id))
             db.session.commit()
+
+
+@pytest.fixture
+def ca_on_unreadable_provider(app):
+    """An HSM-backed CA whose provider token was saved under another database key."""
+    import base64
+    import json
+    from datetime import datetime, timedelta, timezone
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+    from models import db, CA, Certificate
+    from models.hsm import HsmProvider, HsmKey
+    tag = uuid.uuid4().hex[:6]
+    key = rsa.generate_private_key(65537, 2048)
+    now = datetime.now(timezone.utc)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'Unreadable HSM CA {tag}')])
+    ca_cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+               .public_key(key.public_key()).serial_number(x509.random_serial_number())
+               .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+               .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+               .sign(key, hashes.SHA256()))
+    leaf = (x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'leaf-{tag}')]))
+            .issuer_name(name).public_key(rsa.generate_private_key(65537, 2048).public_key())
+            .serial_number(x509.random_serial_number()).not_valid_before(now - timedelta(days=1))
+            .not_valid_after(now + timedelta(days=30)).sign(key, hashes.SHA256()))
+    pem = lambda c: base64.b64encode(c.public_bytes(serialization.Encoding.PEM)).decode()
+    with app.app_context():
+        provider = HsmProvider(name=f'bao-{tag}', type='openbao', config=json.dumps(
+            {'url': 'http://bao.invalid:8200', 'token': _foreign_token()}))
+        db.session.add(provider)
+        db.session.commit()
+        hsm_key = HsmKey(provider_id=provider.id, key_identifier=f'k-{tag}', label=f'k-{tag}',
+                         algorithm='RSA-2048', key_type='asymmetric', purpose='signing',
+                         public_key_pem=key.public_key().public_bytes(
+                             serialization.Encoding.PEM,
+                             serialization.PublicFormat.SubjectPublicKeyInfo).decode())
+        db.session.add(hsm_key)
+        db.session.commit()
+        ca = CA(refid=f'unreadable-{tag}', descr=f'Unreadable HSM CA {tag}', serial=0, prv=None,
+                hsm_key_id=hsm_key.id, crt=pem(ca_cert), subject=name.rfc4514_string(),
+                issuer=name.rfc4514_string(), ocsp_enabled=True)
+        db.session.add(ca)
+        db.session.commit()
+        db.session.add(Certificate(refid=f'leaf-{tag}', descr='leaf', caref=ca.refid, crt=pem(leaf),
+                                   serial_number=str(leaf.serial_number),
+                                   subject=leaf.subject.rfc4514_string(), issuer=name.rfc4514_string()))
+        db.session.commit()
+        ids = {'ca': ca.id, 'refid': ca.refid, 'key': hsm_key.id, 'provider': provider.id}
+    yield ids, ca_cert, leaf
+    with app.app_context():
+        Certificate.query.filter_by(caref=ids['refid']).delete()
+        CA.query.filter_by(id=ids['ca']).delete()
+        HsmKey.query.filter_by(id=ids['key']).delete()
+        HsmProvider.query.filter_by(id=ids['provider']).delete()
+        db.session.commit()
+
+
+def test_issuance_from_a_ca_on_an_unreadable_provider_names_the_secret(
+        auth_client, ca_on_unreadable_provider):
+    import json
+    ids, _, _ = ca_on_unreadable_provider
+    r = auth_client.post('/api/v2/certificates', data=json.dumps(
+        {'cn': 'unreadable.example.test', 'ca_id': ids['ca'], 'validity_days': 30}),
+        content_type='application/json')
+    assert r.status_code == 500
+    assert f"HSM provider {ids['provider']} token cannot be decrypted" in r.get_json()['message']
+
+
+def test_crl_of_a_ca_on_an_unreadable_provider_names_the_secret(auth_client, ca_on_unreadable_provider):
+    ids, _, _ = ca_on_unreadable_provider
+    r = auth_client.post(f"/api/v2/crl/{ids['ca']}/regenerate")
+    assert r.status_code == 500
+    assert f"HSM provider {ids['provider']} token cannot be decrypted" in r.get_json()['message']
+
+
+def test_ocsp_of_a_ca_on_an_unreadable_provider_answers_internal_error(
+        auth_client, ca_on_unreadable_provider):
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.x509 import ocsp
+    _, ca_cert, leaf = ca_on_unreadable_provider
+    request = ocsp.OCSPRequestBuilder().add_certificate(leaf, ca_cert, hashes.SHA1()).build()
+    r = auth_client.post('/ocsp', data=request.public_bytes(serialization.Encoding.DER),
+                         content_type='application/ocsp-request')
+    assert r.status_code == 200
+    assert ocsp.load_der_ocsp_response(r.data).response_status == ocsp.OCSPResponseStatus.INTERNAL_ERROR
