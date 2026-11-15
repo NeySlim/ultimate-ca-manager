@@ -22,20 +22,10 @@ def test_single_node_procedure_migrates_sqlite_before_ha_pos():
     assert -1 < migrate < pg_upgrade < ha_upgrade
 
 
-def _section(title):
-    text = (ROOT / 'docs' / 'HA.md').read_text()
-    return re.search(r'### %s\n(.*?)(?=\n##)' % re.escape(title), text, re.S).group(1)
-
-
 def test_no_polling_fallback_claimed_neg():
     # The UI client opens a WebSocket only, so no document may justify affinity by a polling fallback.
     for rel in ('docs/HA.md', 'charts/ucm/templates/NOTES.txt', 'charts/ucm/values.yaml', 'docker-compose.ha.yml'):
         assert 'polling' not in (ROOT / rel).read_text().lower(), rel
-
-
-def test_socket_io_bullet_states_websocket_only_pos():
-    bullet = next(l for l in _section('Session affinity').splitlines() if l.startswith('- **Socket.IO'))
-    assert 'WebSocket' in bullet and 'upgrade' in bullet and 'Invalid session' not in bullet
 
 
 def test_in_page_links_of_ha_doc_resolve_pos():

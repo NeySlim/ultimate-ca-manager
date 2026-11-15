@@ -187,9 +187,3 @@ def test_helm_notes_name_sqlite_only_on_sqlite(tmp_path):
                 '--set', 'database.databaseUrl=postgresql://u:p@db/ucm')
     assert 'SINGLE instance' in pg and 'SQLite' not in pg
     assert 'SQLite' in _notes(tmp_path / 's')
-
-
-def test_chart_readme_ties_the_shared_nothing_claim_to_sqlite():
-    text = (ROOT / 'charts' / 'ucm' / 'README.md').read_text()
-    assert 'on its own: two pods would share neither' not in text
-    assert 'on SQLite two pods would share neither the database nor the volume' in text

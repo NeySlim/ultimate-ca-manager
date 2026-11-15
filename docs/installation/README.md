@@ -310,7 +310,7 @@ After installation:
 
 - [Docker Deployment Guide](docker.md)
 - [Upgrade Guide](../../UPGRADE.md)
-- [Redis (optional, shared sessions and events in high availability)](../REDIS.md)
+- [Redis (optional, holds the sessions and events of a high-availability cluster instead of PostgreSQL)](../REDIS.md)
 
 ---
 
