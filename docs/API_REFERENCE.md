@@ -648,6 +648,14 @@ Content-Type: application/json
 Withdraws a parent confirmed by hand (409 for any other link), audited as `ca_parent_unconfirmed`;
 the CA is left without a parent and carries its `parent_candidate` again.
 
+When the certificate of a CA changes (`POST /api/v2/cas/import`, `POST /api/v2/certificates/import`,
+the certificate upload of a pending or renewing CA, `POST /api/v2/cas/{ca_id}/restore-primary`), the
+CA takes the stored CA whose subject is the issuer name and whose key verifies the new certificate.
+When none does, a parent linked without a confirmation stays unless the chain repair would drop it
+(its subject is not the issuer name, or the key the authority key identifier names disproves the
+signature), audited as `ca_parent_unlinked` when dropped; a revoked CA keeps its parent while the
+certificate keeps its serial number.
+
 `POST /api/v2/import/execute` (smart import), `POST /api/v2/import/opnsense/import` and the
 result of the OPNsense file importer list such CAs in `unverifiable_parents`: `ca_id`, `ca_name`, `candidate`
 (`id`, `name`), `algorithm` and `reason`. `POST /api/v2/cas/import` and

@@ -2,6 +2,7 @@
 SKI/AKI Backfill & Chain Repair Task
 
 Phase 1: Populate missing SKI/AKI from stored PEM certificates
+Phase 1b: Drop CA parent links the issuer name or the named key disproves
 Phase 2: Re-chain orphan CAs via AKI→SKI matching
 Phase 3: Re-chain orphan certificates via AKI→SKI matching
 Phase 4: Deduplicate CAs with identical SKI and certificate (merge into best record)
@@ -173,6 +174,46 @@ def _commit(db, what):
         raise
 
 
+def _drop_disproven_parents(db, CA, stats):
+    """Phase 1b: a parent linked without a confirmation that ``may_drop_parent`` allows to remove
+    is replaced by the one that is the issuer, or none; audited."""
+    from services.ca import parent_confirmation
+    by_refid = {c.refid: c for c in CA.query.all()}
+    dropped = []
+    for ca in by_refid.values():
+        parent = by_refid.get(ca.caref) if ca.caref else None
+        if parent is None or ca.parent_confirmed_at is not None or not ca.crt:
+            continue
+        try:
+            cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+        except Exception:
+            continue
+        before = (ca.caref, ca.parent_confirmed_by, ca.parent_confirmed_at)
+        try:
+            if not parent_confirmation.may_drop_parent(ca, cert, parent):
+                continue
+            parent_confirmation.settle_parent(ca, cert)
+        except Exception:
+            # One CA that cannot be settled keeps its link and stops neither this phase nor the next
+            ca.caref, ca.parent_confirmed_by, ca.parent_confirmed_at = before
+            ca.__dict__.pop('_dropped_parent', None)
+            logger.warning(f"SKI/AKI chain repair: parent of CA '{ca.descr}' left as is", exc_info=True)
+            continue
+        dropped.append(ca)
+    stats['unlinked_cas'] = sum(1 for ca in dropped if parent_confirmation.drops_parent(ca))
+    if not dropped:
+        return
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.error('SKI/AKI chain repair: disproven parent links not dropped', exc_info=True)
+        raise
+    logger.info(f"SKI/AKI chain repair: dropped {stats['unlinked_cas']} parent links their issuer disproves")
+    for ca in dropped:
+        parent_confirmation.audit_dropped(ca, username='system')
+
+
 def backfill_ski_aki():
     """Extract and store SKI/AKI for all certs/CAs missing them, then repair chains."""
     from models import db, CA, Certificate
@@ -254,6 +295,8 @@ def backfill_ski_aki():
         logger.info(f"SKI/AKI backfill: updated {stats['updated_cas']} CAs, {stats['updated_certs']} certificates")
     else:
         logger.debug("SKI/AKI backfill: all records up to date")
+
+    _drop_disproven_parents(db, CA, stats)
 
     # --- Phase 2: Re-chain orphan CAs (caref empty but AKI available) ---
     orphan_cas_list = CA.query.filter(

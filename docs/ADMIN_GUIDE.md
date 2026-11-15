@@ -511,7 +511,20 @@ With `UCM_HA=1`, every node runs against the same PostgreSQL database and names 
 
 ### A parent whose signature cannot be verified
 
-An imported CA is linked to a parent only when the parent's key verifies its signature. When the
+An imported CA is linked to a parent only when the parent's key verifies its signature. The same holds every time the certificate of a CA changes (import over an existing CA,
+installed renewal, restore of a self-signed certificate): the CA moves under the stored CA whose
+subject is the issuer name and whose key verifies the new certificate. When none does, the former
+parent is kept unless it is provably wrong, the one rule the hourly chain repair also applies to a
+link left by an earlier version: the parent's subject is not the issuer name, or the parent holds
+the key named by the certificate's authority key identifier and that key does not verify it or is
+of another type than the signature algorithm (an Ed25519 signature under an RSA or EC key). A
+dropped link is audited as `ca_parent_unlinked`. On both paths, a parent re-keyed since the link
+(the certificate names its former key) and a link whose signature cannot be checked are kept, and a
+revoked CA keeps its parent, so the revocation stays on the parent's CRL, until a certificate of
+another serial number replaces its own. The chain repair keeps a parent confirmed by hand too. An
+installed certificate whose subject differs from the CA's former one warns when CAs issued under the
+former subject are linked to it: the chain repair drops those links, except for revoked CAs and
+parents confirmed by hand. When the
 parent's key or signature algorithm is one this server cannot check (SLH-DSA, GOST), the CA is left
 without a parent, and neither the hourly chain repair nor a re-import links it.
 
