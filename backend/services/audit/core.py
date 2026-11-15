@@ -96,13 +96,14 @@ class AuditCoreLoggingMixin:
 
     @staticmethod
     def verify_integrity(start_id: int = None, end_id: int = None) -> dict:
-        query = AuditLog.query.order_by(AuditLog.id.asc())
+        # Plain rows, not ORM objects: building one per entry cost as much as the hashing
+        query = db.select(AuditLog.__table__).order_by(AuditLog.id.asc())
         if start_id:
-            query = query.filter(AuditLog.id >= start_id)
+            query = query.where(AuditLog.id >= start_id)
         if end_id:
-            query = query.filter(AuditLog.id <= end_id)
+            query = query.where(AuditLog.id <= end_id)
 
         # Streamed: memory stays flat on a large ledger. Only a check from the
         # first row can tell a purge from a prefix deleted by hand.
-        return verify_chain(query.yield_per(2000),
+        return verify_chain(db.session.execute(query.execution_options(yield_per=2000)),
                             whole_table=start_id is None and end_id is None)
