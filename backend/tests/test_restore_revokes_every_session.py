@@ -87,6 +87,8 @@ def test_no_session_opened_before_a_restore_is_accepted_after_it(
         # The request in flight ends after the restore and saves its session
         app.session_interface.save_session(app, flask_session, app.response_class())
 
+    assert not any(h.startswith('session=') and not h.startswith('session=;')
+                   for h in answer.headers.getlist('Set-Cookie')), 'the restore re-issued its session'
     assert restorer.get(PROTECTED).status_code == 401, "the operator's session survived"
     assert _refused(app, operator), "the operator's session survived the restore"
     assert _refused(app, idle), 'an idle session survived the restore'
