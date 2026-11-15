@@ -258,6 +258,49 @@ def test_the_other_sessions_close_and_this_one_stays(nodes, operation):
         _cleanup(first_node, user)
 
 
+def _change_password(application, c, user):
+    return _post(c, '/api/v2/account/password',
+                 {'current_password': PASSWORD, 'new_password': 'An0ther-Fact0r-Change!'})
+
+
+def _close_other_sessions(application, c, user):
+    return _post(c, '/api/v2/account/sessions/revoke-all')
+
+
+# Every change that keeps the caller's session under a new identifier
+RENEWALS = {name: (start, call) for name, (start, call, _action) in OPERATIONS.items()}
+RENEWALS['change-password'] = ({}, _change_password)
+RENEWALS['close-other-sessions'] = ({}, _close_other_sessions)
+
+
+@pytest.mark.parametrize('operation', sorted(RENEWALS))
+def test_the_identifier_a_kept_session_left_is_refused_for_good(nodes, operation):
+    """Session fixation: the replaced identifier never serves again, and its refusal is the
+    authentication gate's (the client may resend the request) and leaves the new cookie alone."""
+    first_node, _second_node = nodes
+    start, call = RENEWALS[operation]
+    start = dict(start)
+    if start.pop('key', False):
+        start['key'] = SoftKey()
+    user = _make_user(first_node, **start)
+    try:
+        this = _open_session(first_node, user)
+        before = this.get_cookie('session').value
+        r = call(first_node, this, user)
+        assert r.status_code == 200, r.data
+        assert this.get_cookie('session').value != before
+        stale = first_node.test_client()
+        stale.set_cookie('session', before)
+        for _attempt in range(2):
+            refused = stale.get('/api/v2/account/profile')
+            assert refused.status_code == 401
+            assert refused.get_json()['type'] == 'urn:ucm:problem:authentication-required'
+            assert not any(h.startswith('session=') for h in refused.headers.getlist('Set-Cookie'))
+        assert _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
+
+
 @pytest.mark.parametrize('method', ['delete', 'patch'])
 def test_an_administrator_changing_a_key_closes_the_holders_sessions(app, auth_client, method):
     """The holder loses or regains a factor: their sessions close, the administrator's stays."""
