@@ -20,6 +20,17 @@ export default {
         ]
       },
       {
+        title: 'AC SSH adossées HSM',
+        items: [
+          { label: 'Stockage de la clé', text: 'À la création, choisissez Local ou HSM, puis le fournisseur et une clé de signature inutilisée. L\'AC reprend son type de clé de la clé elle-même et la clé privée ne quitte jamais le HSM' },
+          { label: 'Algorithmes', text: 'Clés RSA et ECDSA P-256, P-384 ou P-521. La signature sur HSM d\'UCM ne couvre que RSA et ECDSA : les clés Ed25519, Brainpool et ML-DSA ne sont donc pas proposées ; une AC SSH Ed25519 est une clé logicielle' },
+          { label: 'Une clé, une autorité', text: 'Une clé sert une seule autorité, X.509 ou SSH. Une clé déjà tenue n\'est pas proposée, et une demande qui la nomme est refusée (409) avec le nom de l\'AC qui la tient. Ni la clé ni son fournisseur ne peuvent être supprimés tant que l\'AC existe' },
+          { label: 'Droits', text: 'write:ssh_cas et read:hsm. Sans read:hsm, le choix HSM est désactivé, et un refus (403) nomme le droit manquant' },
+          { label: 'FIPS et HA', text: 'En mode FIPS, une clé que le mode FIPS refuse n\'est pas proposée. En mode HA, une clé sur SoftHSM ou sur un lecteur de carte à puce local est refusée (409), car elle n\'existe que sur un nœud' },
+          { label: 'Jeton injoignable', text: 'Si le fournisseur est injoignable à la création de l\'AC (503), rien n\'est créé : vérifiez le fournisseur dans la gestion HSM puis réessayez' },
+        ]
+      },
+      {
         title: 'Configuration du serveur',
         items: [
           { label: 'Script de configuration Linux/macOS', text: 'Téléchargez un script shell POSIX (.sh) qui configure automatiquement sshd pour faire confiance à cette CA. Installation rapide : curl -sSL <url> | sudo bash' },
@@ -113,6 +124,20 @@ Une Host CA signe des certificats qui authentifient les **serveurs auprès des c
 6. Listez les principals autorisés, ou cochez **Autoriser tout principal**
 7. Cliquez sur **Créer**
 
+### Sur une clé HSM
+
+Une AC SSH peut garder sa clé privée sur un fournisseur HSM.
+
+1. Dans **Créer une CA SSH**, réglez **Stockage de la clé** sur **HSM**
+2. Choisissez le **Fournisseur HSM**, puis la **Clé HSM existante** : seules les clés de signature RSA et ECDSA P-256/P-384/P-521 inutilisées sont listées
+3. Cliquez sur **Créer**. L'AC reprend son type de clé de la clé elle-même, et la clé privée ne quitte jamais le jeton
+
+Bon à savoir :
+- La signature sur HSM d'UCM ne couvre que RSA et ECDSA : les clés Ed25519, Brainpool et ML-DSA ne sont donc pas proposées ; une AC SSH Ed25519 est une clé logicielle.
+- Une clé HSM sert une seule autorité, X.509 ou SSH. Une clé qu'une AC tient déjà est refusée avec le nom de cette AC, et ni la clé ni son fournisseur ne peuvent être supprimés tant que l'AC existe.
+- Il faut \`write:ssh_cas\` et \`read:hsm\`. Sans \`read:hsm\`, le choix **HSM** est désactivé.
+- En mode FIPS, une clé que le mode FIPS refuse n'est pas proposée. En mode HA, une clé sur SoftHSM ou sur un lecteur de carte à puce local est refusée, car elle n'existe que sur un nœud.
+- Si le fournisseur est injoignable à la création de l'AC, rien n'est créé.
 ### Principals autorisés
 
 Le champ **Principals autorisés** restreint les noms pour lesquels une CA signe, sous forme de motifs séparés par des virgules (\`deploy\`, \`team-*\`, \`web??.example.com\`). Chaque principal d'une demande doit correspondre à l'un d'eux.

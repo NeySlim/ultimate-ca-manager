@@ -20,6 +20,17 @@ export default {
         ]
       },
       {
+        title: 'HSM 支持的 SSH CA',
+        items: [
+          { label: '密钥存储', text: '创建时选择本地或 HSM，然后选择提供商和一个未使用的签名密钥。CA 的密钥类型取自该密钥，私钥永远不会离开 HSM' },
+          { label: '算法', text: 'RSA 和 ECDSA P-256、P-384 或 P-521 密钥。UCM 的 HSM 签名只覆盖 RSA 和 ECDSA，因此不提供 Ed25519、Brainpool 和 ML-DSA 密钥；Ed25519 SSH CA 使用软件密钥' },
+          { label: '一个密钥一个机构', text: '一个密钥只能用于一个认证机构，X.509 或 SSH。已被持有的密钥不会提供，指定它的请求会被拒绝 (409) 并给出持有它的 CA 的名称。只要 CA 存在，密钥及其提供商就无法删除' },
+          { label: '权限', text: 'write:ssh_cas 和 read:hsm。没有 read:hsm 时 HSM 选项被禁用，拒绝 (403) 会指出缺少的权限' },
+          { label: 'FIPS 与 HA', text: '在 FIPS 模式下，FIPS 模式拒绝的密钥不会提供。在 HA 模式下，位于 SoftHSM 或本地智能卡读卡器上的密钥会被拒绝 (409)，因为它只存在于一个节点' },
+          { label: '令牌不可达', text: '创建 CA 时如果无法连接提供商 (503)，则不会创建任何内容：请在 HSM 管理中检查提供商后重试' },
+        ]
+      },
+      {
         title: '服务器配置',
         items: [
           { label: 'Linux/macOS配置脚本', text: '下载一个POSIX shell脚本（.sh），自动配置sshd以信任此CA。快速安装：curl -sSL <url> | sudo bash' },
@@ -113,6 +124,20 @@ Host CA签发用于**将服务器认证到客户端**的证书。当客户端信
 6. 列出允许的 principal，或勾选**允许任意主体**
 7. 点击**创建**
 
+### 使用 HSM 密钥
+
+SSH CA 可以把私钥保存在 HSM 提供商上。
+
+1. 在**创建 SSH CA** 中，将**密钥存储**设为 **HSM**
+2. 选择 **HSM 提供商**，再选择**现有 HSM 密钥**：只列出未使用的 RSA 和 ECDSA P-256/P-384/P-521 签名密钥
+3. 点击**创建**。CA 的密钥类型取自该密钥，私钥永远不会离开令牌
+
+须知：
+- UCM 的 HSM 签名只覆盖 RSA 和 ECDSA，因此不提供 Ed25519、Brainpool 和 ML-DSA 密钥；Ed25519 SSH CA 使用软件密钥。
+- 一个 HSM 密钥只能用于一个认证机构，X.509 或 SSH。已被某个 CA 持有的密钥会被拒绝并给出该 CA 的名称，只要 CA 存在，密钥及其提供商就无法删除。
+- 需要 \`write:ssh_cas\` 和 \`read:hsm\`。没有 \`read:hsm\` 时 **HSM** 选项被禁用。
+- 在 FIPS 模式下，FIPS 模式拒绝的密钥不会提供。在 HA 模式下，位于 SoftHSM 或本地智能卡读卡器上的密钥会被拒绝，因为它只存在于一个节点。
+- 创建 CA 时如果无法连接提供商，则不会创建任何内容。
 ### 允许的 Principal
 
 **允许的 Principal**字段限制 CA 可为哪些名称签发，格式为以逗号分隔的模式（\`deploy\`、\`team-*\`、\`web??.example.com\`）。请求中的每个 principal 都必须匹配其中之一。

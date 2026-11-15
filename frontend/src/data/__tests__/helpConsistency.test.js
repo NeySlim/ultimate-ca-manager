@@ -68,6 +68,17 @@ describe('values and buttons quoted by the translated pages', () => {
       .filter((s) => s.includes('name (2)') && !s.includes('name (3)') && /\(3\)/.test(s))
     expect(found).toEqual([])
   })
+  // The provider details have a Sync keys button; the SSH CA guide names the key storage and provider fields.
+  it.each(['en', 'fr', 'ru', 'zh'])('%s names the HSM Sync keys button and the SSH CA key fields', (lang) => {
+    const t = locales[`../../i18n/locales/${lang}.json`].default
+    const guide = (key) => (lang === 'en' ? helpGuides[key].content : pages[`../help/${lang}/${key}.js`].default.helpGuides.content)
+    expect(guide('hsm')).toContain(`**${t.common.syncKeys}**`)
+    for (const label of [t.cas.create.keyStorage, t.cas.create.hsmProvider, t.cas.create.hsmExistingKey, t.sshCas.createCA]) {
+      expect(guide('sshCas')).toContain(`**${label}**`)
+    }
+    const items = strings(page(lang, 'hsm').sections.flatMap((sec) => sec.items || []))
+    expect(items.join('\n')).toContain(t.common.syncKeys)
+  })
   // The HSM page creates a provider with its "New Provider" button.
   it.each(['en', 'fr', 'ru', 'zh'])('%s names the HSM New Provider button', (lang) => {
     const { hsm } = locales[`../../i18n/locales/${lang}.json`].default

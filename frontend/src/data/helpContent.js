@@ -177,6 +177,8 @@ export const helpContent = {
           { label: 'Use existing key', text: 'Bind the CA to an unused signing key already on the HSM' },
           { label: 'No private key export', text: 'HSM-backed keys never leave the HSM, PKCS#12, JKS and key-only exports are disabled' },
           { label: 'Prerequisite', text: 'Configure and connect an HSM provider in HSM Management first' },
+          { label: 'One authority per key', text: 'The list of existing keys offers only unused keys: an HSM key backs one authority, X.509 or SSH. A key a CA already holds is refused (409) with the name of that CA' },
+          { label: 'Permission', text: 'Creating a CA on an HSM key needs read:hsm besides write:cas; the HSM choice is disabled without it' },
         ]
       },
       {
@@ -1498,6 +1500,7 @@ export const helpContent = {
           { label: 'New Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
           { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid; for a PKCS#11 module, also record what it reports (library, manufacturer, library and firmware versions), shown on the provider page' },
           { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
+          { label: 'Sync keys', text: 'Reads the provider\'s keys again from the token: new keys are added, keys gone from the token are removed, except those a CA uses, which are kept. When the token listing fails, nothing is removed. The message gives the counts, the keys kept and the unreadable keys; the button stays disabled while the synchronization runs' },
           { label: 'Status', text: 'Monitor provider connection health' },
           { label: 'Certification', text: 'Declare the certification of the HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 level 3, FIPS 140-2 level 3 or other. Left empty, it is not declared. The eu-acm compliance profile accepts only Common Criteria EAL 4+, EUCC high, and FIPS 140-3 level 3 (until 31 December 2030) for an HSM-backed CA' },
           { label: 'Name already held (v2.249)', text: 'Generating a key under a name OpenBao or Azure Key Vault already holds is refused (409): bring an existing key in with a key sync (POST /api/v2/hsm/providers/<id>/sync)' },
@@ -1516,6 +1519,9 @@ export const helpContent = {
           { label: 'Export restrictions', text: 'PKCS#12, JKS and key-only exports are disabled for HSM-backed CAs (only the public certificate / chain can be exported)' },
           { label: 'CRL & OCSP', text: 'Both work transparently with HSM-backed CAs (signed via HSM)' },
           { label: 'Migration', text: 'Existing local CAs cannot be moved to an HSM after creation, choose at creation time' },
+          { label: 'One authority per key', text: 'An HSM key backs one authority only, X.509 or SSH. The lists of existing keys offer unused keys, a second CA on a key is refused (409) with the name of the CA that holds it, and a key or its provider cannot be deleted while a CA holds it' },
+          { label: 'Permissions', text: 'Creating a CA on an HSM key, X.509 or SSH, needs read:hsm besides write:cas or write:ssh_cas; the HSM choice is unavailable without it' },
+          { label: 'SSH CAs', text: 'An SSH user or host CA can use an RSA or ECDSA P-256/P-384/P-521 signing key (see SSH CAs). In HA mode a key on SoftHSM or on a local smart card reader is refused, as it exists on one node only' },
         ]
       },
       {
@@ -2025,6 +2031,18 @@ export const helpContent = {
           { label: 'Ed25519', text: 'Modern, fast, small keys (256-bit). Recommended for new deployments.' },
           { label: 'ECDSA P-256 / P-384 / P-521', text: 'Elliptic curve keys, widely supported. Good balance of security and compatibility.' },
           { label: 'RSA 4096', text: 'Traditional algorithm, always 4096-bit. Broadest compatibility with older systems.' },
+        ]
+      },
+      {
+        title: 'HSM-backed SSH CAs',
+        icon: HardDrive,
+        items: [
+          { label: 'Key storage', text: 'At creation, choose Local or HSM, then the provider and an unused signing key. The CA takes its key type from the key and the private key never leaves the HSM' },
+          { label: 'Algorithms', text: 'RSA and ECDSA P-256, P-384 or P-521 keys. UCM\'s HSM signing covers RSA and ECDSA only, so Ed25519, Brainpool and ML-DSA keys are not offered; an Ed25519 SSH CA is a software key' },
+          { label: 'One key, one authority', text: 'A key backs one authority, X.509 or SSH. A key already held is not offered, and a request naming it is refused (409) with the name of the CA that holds it. Neither the key nor its provider can be deleted while the CA exists' },
+          { label: 'Permissions', text: 'write:ssh_cas and read:hsm. Without read:hsm the HSM choice is disabled, and a refusal (403) names the missing permission' },
+          { label: 'FIPS and HA', text: 'In FIPS mode a key that FIPS mode refuses is not offered. In HA mode a key on SoftHSM or on a local smart card reader is refused (409), as it exists on one node only' },
+          { label: 'Unreachable token', text: 'If the provider cannot be reached when the CA is created (503), nothing is created: check the provider in HSM Management and try again' },
         ]
       },
       {

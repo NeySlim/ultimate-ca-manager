@@ -223,7 +223,8 @@ UCM can store a CA's signing key on an external Hardware Security Module instead
 ### Limitations
 - HSM-backed private keys **cannot be exported**. PKCS#12, JKS and key-only export options are hidden for HSM CAs. Only the certificate (PEM/DER/P7B) can be exported.
 - There is **no in-place migration** between Local and HSM. To "move" an existing local CA onto an HSM, create a new CA on the HSM and re-issue certificates.
-- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to another CA.
+- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to an authority, X.509 or SSH: an HSM key backs one authority only.
+- Creating a CA on an HSM key needs the \`read:hsm\` permission besides \`write:cas\`; without it the **HSM** choice is disabled.
 
 ## Offline Mode
 
@@ -2708,8 +2709,17 @@ ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are offered only on providers that
 
 Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider. An ML-DSA key signs the data itself, so no digest is chosen.
 
+### Synchronizing keys
+Click **Sync keys** in the provider details to read the keys of the token again.
+- New keys are added.
+- Keys gone from the token are removed, except keys a CA uses: they are kept.
+- If the token listing fails, nothing is removed.
+
+The message gives the counts, the number of keys kept because a CA uses them, the number of unreadable keys and the number of keys used by a CA whose material changed on the token. The button is disabled while the synchronization runs.
 ### Using HSM Keys
 When creating a CA, select an HSM provider and key instead of generating a software key. The CA's signing operations are performed on the HSM.
+
+An HSM key backs one authority, X.509 or SSH. Creating a CA on an HSM key needs the \`read:hsm\` permission besides \`write:cas\` (\`write:ssh_cas\` for an SSH CA), and a key a CA holds cannot be deleted.
 
 > ⚠ Keys generated on an HSM cannot be exported. If you lose access to the HSM, you lose the keys.
 
@@ -3504,6 +3514,20 @@ A Host CA signs certificates that authenticate **servers to clients**. When a cl
 6. List the allowed principals, or tick **Allow any principal**
 7. Click **Create**
 
+### On an HSM key
+
+An SSH CA can keep its private key on an HSM provider.
+
+1. In **Create SSH CA**, set **Key Storage** to **HSM**
+2. Pick the **HSM Provider**, then the **Existing HSM Key**: only unused RSA and ECDSA P-256/P-384/P-521 signing keys are listed
+3. Click **Create**. The CA takes its key type from the key, and the private key never leaves the token
+
+Good to know:
+- UCM's HSM signing covers RSA and ECDSA only, so Ed25519, Brainpool and ML-DSA keys are not offered; an Ed25519 SSH CA is a software key.
+- An HSM key backs one authority, X.509 or SSH. A key a CA already holds is refused with the name of that CA, and neither the key nor its provider can be deleted while the CA exists.
+- It needs \`write:ssh_cas\` and \`read:hsm\`. Without \`read:hsm\` the **HSM** choice is disabled.
+- In FIPS mode a key that FIPS mode refuses is not offered. In HA mode a key on SoftHSM or on a local smart card reader is refused, as it exists on one node only.
+- If the provider cannot be reached when the CA is created, nothing is created.
 ### Allowed Principals
 
 The **Allowed Principals** field restricts the names a CA signs for, as comma-separated patterns (\`deploy\`, \`team-*\`, \`web??.example.com\`). Every principal in a request must match one of them.

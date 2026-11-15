@@ -20,6 +20,7 @@ export default {
           { label: '新提供商', text: '配置 HSM 连接（库路径、凭据、插槽）' },
           { label: '测试连接', text: '验证 HSM 可达且凭据有效；对于 PKCS#11 模块，还会记录其上报的信息（库、制造商、库版本和固件版本），显示在提供商页面上' },
           { label: '生成密钥', text: '直接在 HSM 上创建新的密钥对' },
+          { label: '同步密钥', text: '从令牌重新读取提供商的密钥：新密钥会被添加，已从令牌消失的密钥会被移除，但 CA 正在使用的密钥会被保留。令牌列表读取失败时不会移除任何密钥。提示信息会给出各项数量、保留的密钥和无法读取的密钥；同步进行期间按钮保持禁用' },
           { label: '状态', text: '监控提供商连接健康状况' },
           { label: '认证', text: '声明 HSM 的认证：Common Criteria EAL 4+、EUCC high、FIPS 140-3 级别 3、FIPS 140-2 级别 3 或其他。留空表示未声明。对于由 HSM 支持的 CA，eu-acm 合规配置仅接受 Common Criteria EAL 4+、EUCC high 以及 FIPS 140-3 级别 3（至 2030 年 12 月 31 日）' },
           { label: '名称已存在 (v2.249)', text: '在 OpenBao 或 Azure Key Vault 已存在的名称下生成密钥会被拒绝 (409)：请通过密钥同步 (POST /api/v2/hsm/providers/<id>/sync) 引入现有密钥' },
@@ -37,6 +38,9 @@ export default {
           { label: '导出限制', text: 'HSM-CA 禁用 PKCS#12、JKS 和仅密钥导出(只能导出公共证书 / 链)' },
           { label: 'CRL 和 OCSP', text: '两者都与 HSM-CA 透明工作(通过 HSM 签名)' },
           { label: '迁移', text: '现有本地 CA 在创建后无法移至 HSM, 在创建时选择' },
+          { label: '一个密钥一个机构', text: '一个 HSM 密钥只能用于一个认证机构，X.509 或 SSH。现有密钥列表只提供未使用的密钥，同一密钥上的第二个 CA 会被拒绝 (409) 并给出持有它的 CA 的名称，只要有 CA 持有，密钥及其提供商就无法删除' },
+          { label: '权限', text: '在 HSM 密钥上创建 CA（X.509 或 SSH）除 write:cas 或 write:ssh_cas 外还需要 read:hsm；没有它则无法选择 HSM' },
+          { label: 'SSH CA', text: 'SSH 用户 CA 或主机 CA 可以使用 RSA 或 ECDSA P-256/P-384/P-521 签名密钥（见 SSH CA）。在 HA 模式下，位于 SoftHSM 或本地智能卡读卡器上的密钥会被拒绝，因为它只存在于一个节点' },
         ]
       },
       {
@@ -162,8 +166,17 @@ ML-DSA-44、ML-DSA-65 和 ML-DSA-87（FIPS 204）仅在能用其签名的提供�
 
 Azure Key Vault 和 AWS CloudHSM 提供商不持有 ML-DSA 密钥，FIPS 模式在所有提供商上都拒绝 ML-DSA。ML-DSA 密钥直接对数据签名，因此无需选择摘要。
 
+### 同步密钥
+在提供商详情中点击**同步密钥**，重新读取令牌上的密钥。
+- 新密钥会被添加。
+- 已从令牌消失的密钥会被移除，但 CA 正在使用的密钥会被保留。
+- 令牌列表读取失败时，不会移除任何密钥。
+
+提示信息会给出各项数量、因 CA 使用而保留的密钥数、无法读取的密钥数，以及被 CA 使用且其内容在令牌上已变化的密钥数。同步进行期间按钮保持禁用。
 ### 使用 HSM 密钥
 创建 CA 时，选择 HSM 提供商和密钥而非生成软件密钥。CA 的签名操作将在 HSM 上执行。
+
+一个 HSM 密钥只能用于一个认证机构，X.509 或 SSH。在 HSM 密钥上创建 CA 除 \`write:cas\`（SSH CA 为 \`write:ssh_cas\`）外还需要 \`read:hsm\` 权限，被 CA 持有的密钥无法删除。
 
 > ⚠ 在 HSM 上生成的密钥无法导出。如果您失去对 HSM 的访问权限，将丢失密钥。
 
