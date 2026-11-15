@@ -63,6 +63,8 @@ def populated(app, create_ca, create_cert):
     for index in range(3):
         create_cert(cn=f'frozen-rows-{index}.example.com', ca_id=ca['id'])
     with app.app_context():
+        # Read as None by the generic columns and False by the dedicated row: the latter wins
+        db.session.get(CA, ca['id']).offline = None
         db.session.add_all([
             RevokedSerial(caref=db.session.get(CA, ca['id']).refid,
                           serial_number='frozen-rows-serial', valid_to=datetime(2030, 1, 1)),
@@ -82,6 +84,12 @@ def test_the_dedicated_sections_carry_the_previous_rows(app, populated):
         archive = b''.join(service.iter_backup(PASSWORD, kdf='pbkdf2'))
         _key, written = service._decrypt_framed(archive, PASSWORD)
         expected = _previous_rows(service, IdentityIndex())
+        from services.backup.export_generic import export_section
+        generic_cas = export_section('certificate_authorities', IdentityIndex())
+    frozen = next(row for row in written['certificate_authorities']
+                  if row['descr'] == 'Frozen Rows CA')
+    generic = next(row for row in generic_cas if row['refid'] == frozen['refid'])
+    assert generic['offline'] is None and frozen['offline'] is False
     for name, rows in expected.items():
         assert rows, name
         assert _comparable(written[name]) == _comparable(rows), name
