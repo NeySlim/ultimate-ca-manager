@@ -1624,7 +1624,18 @@ def test_the_way_back_keeps_the_ucm_env_of_2_254_when_the_archive_holds_none(tmp
     assert (f'of config/ into {box.config}' in step3) is not purged, step3
     assert ('No ucm.env was left' in flat) is purged
     assert ('its SECRET_KEY, the session key' in flat) is purged
+    assert (f'step 4 keeps {box.config}/ucm.env, the one this installation wrote, which UCM 2.254 '
+            'keeps as it installs' in flat) is purged, flat
+    assert 'the one UCM 2.254 writes' not in flat
     assert any(l.lstrip().startswith('config/') for l in readme.splitlines()) is not purged
+
+
+def test_without_a_local_archive_the_readme_says_every_file_is_unchanged(tmp_path):
+    box = Box(tmp_path, python='stub')
+    assert box.run().returncode == 0
+    flat = ' '.join((box.archive / 'README.txt').read_text().split())
+    assert 'each one is here or in a directory listed above, unchanged.' in flat, flat
+    assert 'belongs to root' not in flat
 
 
 def _killed_before_renaming(box, name, **wrap):
@@ -1695,7 +1706,12 @@ def test_a_local_archive_and_all_it_holds_are_root_s_before_and_after_the_way_ba
     assert _owner(outside) == (2, 2) and outside.read_text() == 'not ucm'
     subprocess.run(['chown', '-R', '1:1', str(box.data), str(box.config)], check=True)
     assert all(_owner(p) == (1, 1) for p in entries if not p.is_symlink())
-    lines = [l.strip() for l in (box.archive / 'README.txt').read_text().splitlines() if 'chown' in l]
+    readme = (box.archive / 'README.txt').read_text()
+    flat = ' '.join(readme.split())
+    assert 'What they hold now belongs to root (owner and group); nothing else in it changed.' in flat, flat
+    assert ('each one is here or in a directory listed above, unchanged but for the owner of what '
+            'is kept beside') in flat, flat
+    lines = [l.strip() for l in readme.splitlines() if 'chown' in l]
     assert len(lines) == 2 and 'root:root' in lines[1], lines
     for line in lines:
         subprocess.run(['/bin/sh', '-c', line[5:].replace('ucm:ucm', '1:1')], check=True)

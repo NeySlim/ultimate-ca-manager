@@ -362,11 +362,15 @@ install_254() {
 }
 
 write_readme() {
+    UNCHANGED=unchanged ROOT_OWNED=""
     if [ "$LOCALS" != "$NL" ]; then
+        # Given to root once the journal is gone (see the end of the run), as root only
+        [ -z "$as_root" ] || UNCHANGED="unchanged but for the owner of what is kept beside" ROOT_OWNED="
+What they hold now belongs to root (owner and group); nothing else in it changed."
         BESIDE="
 Kept beside where they were, in directories readable by root only, as each one
 could not be renamed out of its filesystem (another filesystem, a bind mount, overlayfs):
-$(local_lines "$LOCALS")
+$(local_lines "$LOCALS")$ROOT_OWNED
 Nothing in them is used or removed by UCM: removing the package with its
 configuration (apt purge) leaves them where they are.
 "
@@ -385,7 +389,8 @@ that run wrote under $PARENT):
 $(printf '%s' "$EARLIER" | sed 's/^/  /')
 "
     fi
-    # A purge removed ucm.env with the package: the one 2.254 writes as it installs is kept
+    # A purge removed ucm.env with the package: the one this installation writes is kept, as
+    # 2.254 keeps an existing ucm.env that holds a SECRET_KEY
     CONFIG_LINE="  config/     what was in $CONFIG (ucm.env, master.key)
 " CONFIG_RESTORE=", of config/ into $CONFIG" ENV_KEEP="" NO_ENV=""
     [ -n "$(ls -A -- "$DEST/config" 2>/dev/null)" ] || CONFIG_LINE="" CONFIG_RESTORE=""
@@ -393,7 +398,8 @@ $(printf '%s' "$EARLIER" | sed 's/^/  /')
         ENV_KEEP=", and $CONFIG/ucm.env"
         NO_ENV="
 No ucm.env was left in $CONFIG (removing the package with its configuration, as
-apt purge does, removes it): step 4 keeps the one UCM 2.254 writes as it installs.
+apt purge does, removes it): step 4 keeps $CONFIG/ucm.env, the one this installation
+wrote, which UCM 2.254 keeps as it installs.
 What the removed one held is lost: its SECRET_KEY, the session key (open sessions
 end), and any setting written there by hand. Private keys encrypted with a
 master.key or a KEY_ENCRYPTION_KEY that was not kept cannot be decrypted.
@@ -415,7 +421,7 @@ Contents
 $CONFIG_LINE$DB_LINE$BESIDE$NO_ENV
 This directory holds private keys and the key that decrypts the database: keep it
 readable by root only. Nothing here is used or removed by UCM. Every file was renamed,
-never copied: each one is here or in a directory listed above, unchanged. A directory
+never copied: each one is here or in a directory listed above, $UNCHANGED. A directory
 that could not be renamed stays where it was, and its entries were moved the same way.
 While an attempt left a .journal in a directory under $PARENT, remove nothing from it;
 make a directory removed there again, empty (mkdir -p), before a retry puts back the rest.
