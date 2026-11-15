@@ -709,8 +709,10 @@ class SmartImporter:
         )
 
     def _get_cn(self, obj: ParsedObject, issuer: bool = False) -> str:
-        """The most specific CN the parser read on the subject (or issuer), else "Unknown"."""
-        return (obj.issuer_cn if issuer else obj.subject_cn) or "Unknown"
+        """The most specific CN the parser read on the subject (or issuer), else "Unknown".
+        A CN present but empty stays ''."""
+        cn = obj.issuer_cn if issuer else obj.subject_cn
+        return "Unknown" if cn is None else cn
 
     def _log_audit(self, action: str, resource_id: int, resource_name: str,
                    username: str, details: str = None):

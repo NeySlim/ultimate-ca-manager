@@ -387,7 +387,7 @@ class ImportValidator:
     def _get_cn(self, obj: ParsedObject, issuer: bool = False) -> str:
         """The most specific CN the parser read on the subject (or issuer), else the DN cut at 30."""
         cn = obj.issuer_cn if issuer else obj.subject_cn
-        if cn:
+        if cn is not None:  # a CN present but empty stays ''
             return cn
         dn = obj.issuer if issuer else obj.subject
         if not dn:

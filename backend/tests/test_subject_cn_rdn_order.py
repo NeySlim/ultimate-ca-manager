@@ -463,3 +463,40 @@ def test_most_specific_common_name_is_the_last_one():
     assert most_specific_common_name(_subject('a.example.com', 'b.example.com')) == 'b.example.com'
     assert most_specific_common_name(_subject('Doe, John')) == 'Doe, John'
     assert most_specific_common_name(x509.Name([])) is None
+
+
+def _empty_cn(org):
+    return x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, org),
+                      x509.NameAttribute(NameOID.COMMON_NAME, '', _validate=False)])
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_the_import_names_a_present_but_empty_cn_empty_as_before():
+    """A CN present but empty is '' (not 'Unknown' nor the DN), in both helpers."""
+    from services.smart_import.importer import SmartImporter
+    from services.smart_import.parser import SmartParser
+    from services.smart_import.validator import ImportValidator
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    obj = SmartParser()._parse_x509_cert(_self_signed(_empty_cn('Empty CN org'), key))
+    assert obj.subject_cn == ''
+    assert ImportValidator()._get_cn(obj) == ''
+    assert SmartImporter()._get_cn(obj) == ''
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_an_imported_ca_with_an_empty_cn_keeps_an_empty_name(app, auth_client):
+    import uuid
+
+    from models import CA, db
+
+    tag = uuid.uuid4().hex[:8]
+    ca_id = _import_pem(auth_client, _empty_cn(f'Empty CN CA {tag}'),
+                        rsa.generate_private_key(public_exponent=65537, key_size=2048), tag, ca=True)
+    with app.app_context():
+        row = db.session.get(CA, ca_id)
+        try:
+            assert row.descr == ''
+        finally:
+            db.session.delete(row)
+            db.session.commit()
