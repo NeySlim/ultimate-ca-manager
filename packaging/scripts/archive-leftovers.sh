@@ -376,6 +376,12 @@ To put that installation back in service
 EOF
 }
 
+# dnf 4 (EL9) ends a failed scriptlet with "Complete!" and exit 0: the line says how to tell
+stopped() {
+    say "The installation stops here: nothing else is written, and UCM was not started."
+    say "Even if dnf ends with Complete!, UCM is not running: systemctl is-active ucm"
+}
+
 # Without an interpreter, nothing is renamed: before archiving, the run stops (1); with
 # an attempt left to finish, that attempt's archive is named as it stands (2)
 no_interpreter() {
@@ -386,7 +392,7 @@ no_interpreter() {
   $DEST: still holds what could not be put back, which needs that interpreter" again="" twice="" broken=""
         say_stuck
     fi
-    say "The installation stops here: nothing else is written, and UCM was not started."
+    stopped
     exit "$1"
 }
 
@@ -411,7 +417,7 @@ for j in "$PARENT"/*/.journal; do
     else
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete."
         say_stuck
-        say "The installation stops here: nothing else is written, and UCM was not started."
+        stopped
         exit 2
     fi
 done
@@ -493,7 +499,7 @@ fail() {
         [ -z "$MADE_PARENT" ] || rmdir -- "$PARENT" 2>/dev/null
         say "Nothing was moved."
     fi
-    say "The installation stops here: nothing else is written, and UCM was not started."
+    stopped
     exit "$rc"
 }
 # A journal line holds no tab or line break: one in the path of the database or of an entry

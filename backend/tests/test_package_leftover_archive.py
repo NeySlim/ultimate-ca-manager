@@ -619,6 +619,8 @@ def test_a_file_nothing_can_rename_puts_everything_back(tmp_path):
     assert out.returncode == 1, (out.stdout, out.stderr)
     assert f'{box.data}/https_key.pem could not be renamed' in out.stdout
     assert 'Everything was put back in place' in out.stdout and 'was not started' in out.stdout
+    # dnf 4 still ends with "Complete!": the output says how to see that UCM is not running
+    assert 'Even if dnf ends with Complete!, UCM is not running: systemctl is-active ucm' in out.stdout
     assert snapshot(box) == before
     assert not box.parent.exists() or not any(box.parent.iterdir())
 
