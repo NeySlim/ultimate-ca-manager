@@ -4,8 +4,9 @@ A Kerberos request is served by the profile whose realm is the principal's, and 
 it is enabled; the UsernamePassword binding by the default profile alone (A2).
 """
 import logging
+import time
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from sqlalchemy import select
 
@@ -388,6 +389,16 @@ def default_for_write(actor=None, fill=True):
                     db.session.add(profile)
                 break
             except IntegrityError:
+                profile = default_profile()
+                if profile is not None:
+                    break
+            except OperationalError:
+                # SQLite: two writers that both read meet as a lock, and the winner commits only once
+                # this read lock is let go; safe only while the session holds nothing of the caller's
+                if db.session.get_bind().dialect.name != 'sqlite' or db.session.new or db.session.dirty or db.session.deleted:
+                    raise
+                db.session.rollback()
+                time.sleep(0.05 * (_attempt + 1))
                 profile = default_profile()
                 if profile is not None:
                     break

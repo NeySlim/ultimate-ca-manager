@@ -95,6 +95,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Two SQLite processes creating the default Windows profile at once.** The one that lost the write lock logged "Kerberos keytab not restored" at startup; it now waits for the other's profile and uses it.
 - **A first start cut short completes its schema at the next one.** On SQLite, a fresh install stopped while its tables were being created kept, at every later start, the tables and indexes it had not reached; the start now creates whatever the model holds that the database lacks.
 - **The LDAP mapping test reads group names as the login does.** A group or base DN with an escaped comma (`CN=Ops\, Paris,...`) gave the test screen a truncated group, so it predicted a role or a refusal the real login would not give; it now honours the escapes.
 - **A certificate whose extensions cannot be read is refused at import.** A certificate that repeats an extension or carries a malformed one was stored as a CA, or answered 500; every import path (file, paste, smart import, OPNsense, CA certificate install, converter) now refuses it with a 400 or a per-item error that names the extension.
