@@ -1502,10 +1502,12 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
         assert 'already has users' in message
 
     def test_a_standalone_target_with_accounts_is_accepted_sqlite(self, app, sqlite_target):
+        """Pins the standalone target accepted as it is; proves no fix."""
         self._standalone_accepted(app, sqlite_target)
 
     @_needs_pg
     def test_a_standalone_target_with_accounts_is_accepted_postgresql(self, app, pg_target):
+        """Pins the standalone target accepted as it is; proves no fix."""
         self._standalone_accepted(app, pg_target)
 
     def _verified_then_cut_before_the_counters(self, app, auth_client, create_user, target,
@@ -1530,12 +1532,14 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
 
     def test_a_verified_copy_cut_before_its_counters_resumes_sqlite(
             self, app, auth_client, create_user, sqlite_target, monkeypatch):
+        """Pins the resume of a verified copy cut before its counters; proves no fix."""
         self._verified_then_cut_before_the_counters(
             app, auth_client, create_user, sqlite_target, monkeypatch)
 
     @_needs_pg
     def test_a_verified_copy_cut_before_its_counters_resumes_postgresql(
             self, app, auth_client, create_user, pg_target, monkeypatch):
+        """Pins the resume of a verified copy cut before its counters; proves no fix."""
         self._verified_then_cut_before_the_counters(
             app, auth_client, create_user, pg_target, monkeypatch)
 
