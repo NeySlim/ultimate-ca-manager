@@ -1387,6 +1387,30 @@ def test_a_name_with_a_line_break_in_a_directory_kept_in_place_puts_all_back(tmp
     assert snapshot(box) == before
 
 
+@pytest.mark.skipif(os.getuid() != 0, reason='gives files to another owner')
+def test_the_ownership_step_3_gives_never_reaches_a_local_archive(tmp_path):
+    """Run as written (another owner in place of ucm:ucm): an earlier local archive keeps
+    root's ownership and mode, a link is changed itself, never what it points to."""
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    assert box.run().returncode == 0
+    line = next(l.strip() for l in (box.archive / 'README.txt').read_text().splitlines() if 'chown' in l)
+    assert line.startswith('sudo ') and line.count('ucm:ucm') == 1, line
+    earlier = box.data / 'ca' / '.ucm-archive-20250101T000000Z'
+    earlier.mkdir(mode=0o700)
+    (earlier / 'old.key').write_text('key')
+    (box.data / 'ca' / 'root.pem').write_text('pem')
+    outside = tmp_path / 'outside'
+    outside.write_text('not ucm')
+    os.symlink(outside, box.config / 'link')
+    subprocess.run(['/bin/sh', '-c', line[5:].replace('ucm:ucm', '1:1')], check=True)
+    for path in (box.data, box.data / 'ca', box.data / 'ca' / 'root.pem', box.config, box.config / 'link'):
+        assert (path.lstat().st_uid, path.lstat().st_gid) == (1, 1), path
+    for path in (earlier, earlier / 'old.key', outside):
+        assert (path.lstat().st_uid, path.lstat().st_gid) == (0, 0), path
+    assert stat.S_IMODE(earlier.stat().st_mode) == 0o700
+
+
 @pytest.mark.parametrize('beside', [True, False])
 def test_the_way_back_puts_back_only_the_local_archives_of_this_archiving(tmp_path, beside):
     """An earlier archiving's local archive holds another installation: step 3 sends back
