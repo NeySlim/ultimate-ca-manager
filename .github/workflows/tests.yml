@@ -574,14 +574,17 @@ jobs:
           docker run -d --name ucm-test -p 8443:8443 \
             -e SECRET_KEY=test_secret_key_for_ci \
             ucm:test
-          sleep 15
-          
+          # HTTP 200 and a healthy body within the bound, or the step fails
+          if ! scripts/ci/wait-health.sh https://localhost:8443/api/v2/health 120; then
+            docker logs ucm-test
+            exit 1
+          fi
+
           echo "=== Docker Container Logs ==="
           docker logs ucm-test
           
           if docker ps | grep ucm-test; then
             echo "✅ Container is running"
-            docker exec ucm-test curl -sk https://localhost:8443/health
           else
             echo "❌ Container exited"
             exit 1

@@ -74,14 +74,7 @@ jobs:
             -e SECRET_KEY=ci_smoke_secret_key \
             -e INITIAL_ADMIN_PASSWORD=changeme123 \
             "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}"
-          # Wait for /api/v2/health
-          for i in $(seq 1 60); do
-            if curl -sk https://localhost:8443/api/v2/health | grep -q '"status":"ok"'; then
-              echo "ucm is up after ${i}s"; exit 0
-            fi
-            sleep 1
-          done
-          echo "ucm did not become ready"; docker logs ucm-smoke; exit 1
+          scripts/ci/wait-health.sh https://localhost:8443/api/v2/health 60 || { docker logs ucm-smoke; exit 1; }
 
       - name: Run release smoke
         run: |
@@ -211,13 +204,7 @@ jobs:
             -e INITIAL_ADMIN_PASSWORD=changeme123 \
             -e DATABASE_URL=postgresql://ucm:ucm_ci_password@localhost:5432/ucm \
             "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}"
-          for i in $(seq 1 90); do
-            if curl -sk https://localhost:8443/api/v2/health | grep -q '"status":"ok"'; then
-              echo "ucm is up after ${i}s"; exit 0
-            fi
-            sleep 1
-          done
-          echo "ucm did not become ready"; docker logs ucm-smoke; exit 1
+          scripts/ci/wait-health.sh https://localhost:8443/api/v2/health 90 || { docker logs ucm-smoke; exit 1; }
 
       - name: Run release smoke
         run: |
