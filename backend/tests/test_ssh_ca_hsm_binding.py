@@ -205,6 +205,64 @@ class TestOneKeyOneAuthority:
         assert free['key'] in listed and held['key'] not in listed
 
 
+def _row_writable_elsewhere(key_id):
+    """True when another connection can write the key row at once: no lock is held on it."""
+    from sqlalchemy import text
+    with db.engine.connect() as other:
+        try:
+            if other.dialect.name == 'sqlite':
+                other.exec_driver_sql('PRAGMA busy_timeout = 100')
+            else:
+                other.execute(text("SET LOCAL lock_timeout = '200ms'"))
+            other.execute(text('UPDATE hsm_keys SET label = label WHERE id = :i'), {'i': key_id})
+            return True
+        except Exception:  # noqa: BLE001 - locked, whatever the driver calls it
+            return False
+        finally:
+            other.rollback()
+
+
+def test_the_proof_holds_no_lock_when_the_public_key_comes_from_the_token(app, tmp_path):
+    """A key row without its public key: the token is asked, the key cached and committed, then the proof.
+    On a database file of its own, so that another connection is another connection."""
+    from services.ssh_ca_service import SSHCAService
+    from tests.test_backup_cross_installation import _bound_to
+    real = ec.generate_private_key(ec.SECP256R1())
+
+    class _Token:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def get_public_key(self, identifier):
+            return _pem(real)
+
+    writable = []
+
+    def sign(key_id_, data, algo=None, hash_algorithm=None):
+        writable.append(_row_writable_elsewhere(key_id))
+        return real.sign(data, ec.ECDSA({'sha384': hashes.SHA384()}.get(hash_algorithm, hashes.SHA256())))
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'proof.db'}"), app.app_context():
+        provider = HsmProvider(type='pkcs11', name='slow', config=json.dumps({'module_path': VENDOR}))
+        db.session.add(provider)
+        db.session.flush()
+        key = HsmKey(provider_id=provider.id, key_identifier='k', label='k', algorithm='EC-P256',
+                     key_type='asymmetric', purpose='signing', public_key_pem=None)
+        db.session.add(key)
+        db.session.commit()
+        key_id = key.id
+        with patch('services.hsm.HsmService._get_provider_instance', return_value=_Token()), \
+                patch('services.hsm.HsmService.sign', side_effect=sign):
+            SSHCAService.import_hsm_ca(descr='slow', ca_type='user', hsm_key_id=key_id)
+        assert writable and all(writable), 'the key row stayed locked during the proof of possession'
+        db.session.remove()
+        assert db.session.get(HsmKey, key_id).public_key_pem == _pem(real)
+        db.session.remove()
+
+
 class TestDeletion:
 
     def test_a_provider_whose_key_backs_an_ssh_ca_stays(self, app, auth_client, token_key):

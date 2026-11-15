@@ -416,7 +416,9 @@ class SSHCAService:
         if max_ttl is not None:
             max_ttl = parse_duration_seconds(max_ttl, field='max_ttl')
 
-        # The token round trip holds no database lock; the binding is checked again under it
+        # The public key the loader cached (or repaired) is committed first: nothing else is pending
+        # here, and the token round trip then holds no lock; the binding is checked again after it
+        db.session.commit()
         _prove_hsm_ssh_signer(wrapper)
         key_row = key_binding.lock_key(hsm_key_id)
         if not key_row:
