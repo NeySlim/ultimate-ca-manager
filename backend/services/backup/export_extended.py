@@ -39,39 +39,42 @@ class ExportExtendedMixin:
             from models.ssh import SSHCertificateAuthority
         except Exception:
             return []
-        cas = []
-        for ca in SSHCertificateAuthority.query.all():
-            ca_data = {
-                'refid': getattr(ca, 'refid', None),
-                'descr': getattr(ca, 'descr', None),
-                'ca_type': getattr(ca, 'ca_type', None),
-                'key_type': getattr(ca, 'key_type', None),
-                'public_key': getattr(ca, 'public_key', None),
-                'fingerprint': getattr(ca, 'fingerprint', None),
-                'serial_counter': getattr(ca, 'serial_counter', 0),
-                'default_ttl': getattr(ca, 'default_ttl', 86400),
-                'max_ttl': getattr(ca, 'max_ttl', 0),
-                'default_extensions': getattr(ca, 'default_extensions', None),
-                'allowed_principals': getattr(ca, 'allowed_principals', None),
-                'allow_any_principal': bool(getattr(ca, 'allow_any_principal', False)),
-                'comment': getattr(ca, 'comment', None),
-                'created_at': ca.created_at.isoformat() if getattr(ca, 'created_at', None) else None,
-                'created_by': getattr(ca, 'created_by', None),
-                'owner_group_id': getattr(ca, 'owner_group_id', None),
-            }
-            # Private key: re-encrypt with master key in _encrypt_section_keys
-            # pass. SSH CAs store base64 of the OpenSSH PEM, and the restore
-            # puts that same encoding back, so the archive keeps it as stored —
-            # but a key that cannot be decrypted aborts the backup rather than
-            # travelling as its at-rest ciphertext.
-            prv = getattr(ca, 'private_key', None)
-            if prv:
-                label = f"SSH CA {getattr(ca, 'refid', None)}"
-                ca_data['_private_key_plaintext'] = ensure_key_material(
-                    decrypt_stored_key(prv, label=label), label=label
-                )
-            cas.append(ca_data)
-        return cas
+        from .export_generic import iter_model_pages
+        return [self._ssh_ca_row(ca) for page in iter_model_pages(SSHCertificateAuthority) for ca in page]
+
+    @staticmethod
+    def _ssh_ca_row(ca) -> Dict[str, Any]:
+        """The dedicated part of one SSH CA's row: the key in the clear, as stored."""
+        ca_data = {
+            'refid': getattr(ca, 'refid', None),
+            'descr': getattr(ca, 'descr', None),
+            'ca_type': getattr(ca, 'ca_type', None),
+            'key_type': getattr(ca, 'key_type', None),
+            'public_key': getattr(ca, 'public_key', None),
+            'fingerprint': getattr(ca, 'fingerprint', None),
+            'serial_counter': getattr(ca, 'serial_counter', 0),
+            'default_ttl': getattr(ca, 'default_ttl', 86400),
+            'max_ttl': getattr(ca, 'max_ttl', 0),
+            'default_extensions': getattr(ca, 'default_extensions', None),
+            'allowed_principals': getattr(ca, 'allowed_principals', None),
+            'allow_any_principal': bool(getattr(ca, 'allow_any_principal', False)),
+            'comment': getattr(ca, 'comment', None),
+            'created_at': ca.created_at.isoformat() if getattr(ca, 'created_at', None) else None,
+            'created_by': getattr(ca, 'created_by', None),
+            'owner_group_id': getattr(ca, 'owner_group_id', None),
+        }
+        # Private key: re-encrypt with master key in _encrypt_section_keys
+        # pass. SSH CAs store base64 of the OpenSSH PEM, and the restore
+        # puts that same encoding back, so the archive keeps it as stored —
+        # but a key that cannot be decrypted aborts the backup rather than
+        # travelling as its at-rest ciphertext.
+        prv = getattr(ca, 'private_key', None)
+        if prv:
+            label = f"SSH CA {getattr(ca, 'refid', None)}"
+            ca_data['_private_key_plaintext'] = ensure_key_material(
+                decrypt_stored_key(prv, label=label), label=label
+            )
+        return ca_data
 
 
 

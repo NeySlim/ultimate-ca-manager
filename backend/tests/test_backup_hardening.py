@@ -98,12 +98,12 @@ class TestExportFailuresAbortTheBackup:
             svc = _service()
             import services.backup.backup_service as service_module
 
-            def explode(name, index):
+            def explode(name, index, warnings=None, extra=None):
                 if name == 'users':
                     raise RuntimeError('table is gone')
                 return []
 
-            monkeypatch.setattr(service_module, 'export_section', explode)
+            monkeypatch.setattr(service_module, 'iter_section', explode)
             with pytest.raises(BackupExportError) as exc:
                 svc.create_backup('Correct-Horse-Battery-9')
             assert 'users' in str(exc.value)
