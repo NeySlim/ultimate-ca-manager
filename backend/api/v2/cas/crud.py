@@ -751,12 +751,10 @@ def get_ca(ca_id):
     # Add certificate count
     cert_count = Certificate.query.filter_by(caref=ca.refid).count()
     if cert_count == 0 and ca_data.get('common_name'):
-        cn = ca_data.get('common_name')
-        cert_count = Certificate.query.filter(
-            Certificate.issuer.ilike(f'CN={cn},%') |
-            Certificate.issuer.ilike(f'%,CN={cn},%') |
-            Certificate.issuer.ilike(f'%,CN={cn}')
-        ).count()
+        # The listing's match: the CN escaped as stored, on both backends
+        from services.ca import list_prefetch
+        cert_count = list_prefetch.count_by_issuer_cn(
+            list_prefetch.issuer_counts(), ca_data['common_name'])
     ca_data['certs'] = cert_count
 
     # Get CRL status

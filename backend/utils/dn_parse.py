@@ -120,15 +120,22 @@ def stored_dn_common_name(dn) -> str | None:
     """The first CN of a DN kept as text (for a stored `rfc4514_string()`, the most
     specific one), or None. Reads what `get_dn_attribute` reads, and also what RFC 4514
     allows and ldap3 refuses: a numeric OID type, an unescaped '=', an empty value."""
+    return stored_dn_attribute(dn, ('cn', '2.5.4.3'))
+
+
+def stored_dn_attribute(dn, types) -> str | None:
+    """The first value, in the string, of an attribute named in `types` (any case),
+    read as `stored_dn_common_name` reads a CN; None when there is none."""
     if not dn:
         return None
+    wanted = {t.casefold() for t in types}
     try:
         dn = _normalize_quoted_values(dn)
     except ValueError:
         pass
     for ava in _split_unescaped(dn, ',+'):
         attribute, sep, value = ava.partition('=')
-        if not sep or attribute.strip().casefold() not in ('cn', '2.5.4.3'):
+        if not sep or attribute.strip().casefold() not in wanted:
             continue
         value = value.lstrip()
         while value.endswith(' ') and not value.endswith('\\ '):

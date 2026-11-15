@@ -155,3 +155,118 @@ def test_the_system_trust_store_sync_names_a_ca_by_its_whole_cn(app, auth_client
             for row in rows:
                 db.session.delete(row)
             db.session.commit()
+
+
+# The models read a stored subject as text too: CN, issuer CN and the other
+# fields keep an escaped comma, and with several values of one attribute they
+# keep the one they returned before, the FIRST in the stored string.
+def test_a_certificate_row_reads_its_whole_cn_and_issuer_cn():
+    from models import Certificate
+
+    row = Certificate(subject=r'CN=Doe\, John,O=Acme\, Inc,OU=Ops',
+                      issuer=r'CN=Issuer\, CA,O=Example')
+    assert row.common_name == 'Doe, John'
+    assert row.organization == 'Acme, Inc'
+    assert row.organizational_unit == 'Ops'
+    assert row.issuer_name == 'Issuer, CA'
+
+
+def test_a_ca_row_reads_its_whole_cn():
+    from models import CA
+
+    row = CA(subject=r'CN=Doe\, John,O=Acme\, Inc')
+    assert (row.common_name, row.organization) == ('Doe, John', 'Acme, Inc')
+
+
+@pytest.mark.parametrize('model', ['Certificate', 'CA'])
+def test_with_several_values_the_first_in_the_stored_string_is_kept(model):
+    import models
+
+    row = getattr(models, model)(subject='CN=admin.example,CN=web.example,OU=b,OU=a')
+    assert (row.common_name, row.organizational_unit) == ('admin.example', 'b')
+
+
+@pytest.mark.parametrize('model', ['Certificate', 'CA'])
+def test_a_multivalued_rdn_does_not_leak_into_the_value(model):
+    import models
+
+    row = getattr(models, model)(subject='CN=host+O=Org,C=FR')
+    assert (row.common_name, row.organization, row.country) == ('host', 'Org', 'FR')
+
+
+def test_an_escaped_comma_cannot_smuggle_a_field():
+    from models import Certificate
+
+    assert Certificate(subject=r'O=Evil\, CN=fake', descr='d').common_name == 'd'
+
+
+def _import(auth_client, pem, kind):
+    import json
+
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+        'content': pem, 'options': {'import_certs': True, 'import_cas': True}}),
+        content_type='application/json')
+    assert r.status_code in (200, 201), r.data
+    ids = r.get_json()['data']['imported_ids'][kind]
+    assert len(ids) == 1, r.data
+    return ids[0]
+
+
+def _leaf_pem(subject, issuer):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(subject).issuer_name(issuer)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(days=1))
+            .not_valid_after(now + datetime.timedelta(days=30))
+            .sign(key, hashes.SHA256()))
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def _cn(value):
+    return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, value)])
+
+
+def test_the_certificate_list_shows_the_whole_cn_and_issuer_cn(app, auth_client):
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    cert_id = _import(auth_client, _leaf_pem(_cn(f'Doe, John {tag}'), _cn(f'Issuer, CA {tag}')),
+                      'certificates')
+    try:
+        r = auth_client.get(f'/api/v2/certificates?search={tag}&per_page=5')
+        found = [c for c in assert_success(r) if c['id'] == cert_id]
+        assert [(c['common_name'], c['cn'], c['issuer_name']) for c in found] == [
+            (f'Doe, John {tag}', f'Doe, John {tag}', f'Issuer, CA {tag}')]
+    finally:
+        with app.app_context():
+            db.session.delete(db.session.get(Certificate, cert_id))
+            db.session.commit()
+
+
+def test_the_ca_list_shows_the_whole_cn_and_counts_by_it(app, auth_client):
+    """The issuer-CN fallback of the certificate count still finds the CA's certificates."""
+    from models import CA, Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    ca_id = _import(auth_client, _ca_pem(x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, f'Doe, John {tag}'),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Example')])), 'cas')
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        orphan = Certificate(refid=f'cn-{tag}', descr=f'descr-{tag}', subject=f'CN=leaf-{tag}',
+                             issuer=ca.subject, cert_type='server_cert',
+                             serial_number=str(uuid.uuid4().int)[:30])
+        db.session.add(orphan)
+        db.session.commit()
+        orphan_id = orphan.id
+    try:
+        listed = [c for c in assert_success(auth_client.get('/api/v2/cas')) if c['id'] == ca_id]
+        assert [(c['common_name'], c['certs']) for c in listed] == [(f'Doe, John {tag}', 1)]
+        detail = assert_success(auth_client.get(f'/api/v2/cas/{ca_id}'))
+        assert (detail['common_name'], detail['certs']) == (f'Doe, John {tag}', 1)
+    finally:
+        with app.app_context():
+            db.session.delete(db.session.get(Certificate, orphan_id))
+            db.session.delete(db.session.get(CA, ca_id))
+            db.session.commit()
