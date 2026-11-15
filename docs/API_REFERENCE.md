@@ -540,8 +540,9 @@ only (no HSM provider holds one), is refused in FIPS mode unless the loaded FIPS
 EdDSA (the `-fips` Docker image does) and signs without a separate digest,
 like ML-DSA below. Web browsers (Chrome, Firefox, Safari), Windows (CryptoAPI/CNG) and SCEP clients
 do not verify an Ed25519 or Ed448 signature on a certificate, so they reject anything such a CA issues,
-whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP and XCEP
-refuse an EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
+whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP refuses
+any CA whose key is not RSA (EC, EdDSA and ML-DSA included) or is held by an HSM, XCEP refuses an
+EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
 OpenSSL 3.5 or later and is refused in FIPS mode unless the loaded FIPS module approves it (the
 `-fips` Docker image does); `keyAlgo` generates it in software, and
 an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
@@ -1966,8 +1967,8 @@ GET /api/v2/tsa/signer-candidates
 POST /api/v2/tsa/signer-certificate
 GET /api/v2/tsa/stats
 ```
-- `GET /config` returns `enabled`, `ca_refid`, `ca_id`, `ca_name`, `policy_oid`, `require_dedicated_cert`, `signer_cert_refid` (empty when the CA certificate signs) and `signer` (subject, serial, expiry, chain status and usability of the configured signer).
-- `PATCH /config` changes any of `enabled`, `ca_id` or `ca_refid`, `policy_oid` (`400` unless a valid OID), `require_dedicated_cert` and `signer_cert_refid`; `400` when the chosen CA or signer cannot sign time stamps.
+- `GET /config` returns `enabled`, `ca_refid`, `ca_id`, `ca_name`, `policy_oid`, `require_dedicated_cert` (`true` unless set to `false`: the CA certificate signs only then, which RFC 3161 does not allow), `signer_cert_refid` (empty when no dedicated signer is set) and `signer` (subject, serial, expiry, chain status and usability of the configured signer).
+- `PATCH /config` changes any of `enabled`, `ca_id` or `ca_refid`, `policy_oid` (`400` unless a valid OID), `require_dedicated_cert` and `signer_cert_refid`; `400` when the chosen signer cannot sign time stamps, when the chosen CA cannot issue, or, with `require_dedicated_cert` off and no dedicated signer (including a request that turns it off), when the CA cannot sign time stamps.
 - `signer-candidates` lists the certificates eligible as the dedicated signer.
 - `signer-certificate` (`write:settings` and `write:certificates`) issues a dedicated TSA signing certificate in one step. Optional body: `ca_refid` or `ca_id`, `cn` (a string), `validity_days`, `key_type`, `key_size`, `curve`, and `select` (a boolean: make it the signer; defaults to selecting it when the current signer is not usable).
 - `stats` returns `total`, `successful` and `failed` requests counted from the audit log.
@@ -2658,7 +2659,16 @@ Certificates counted are issued, not revoked, not archived and not expired. A ce
 
 `href_hint` carries the object in the query (`request`, `order`, `ca`) and the tab (`tab`) the page reads; `contracts/queue_links.json` lists them. `GET /api/v2/key-recovery/{id}` (`read:key_recovery`) reads one recovery request like the two reads above.
 
-`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled: `state` is `ca_certificate` or `dedicated` (healthy), `no_signer` (no signer configured, not an alert: `/tsa` answers 503 until one is), `expiring` (dedicated signer within 30 days of expiry, `days_left`), `unusable` (`reason`: `expired`, `revoked`, `key_unavailable` or `invalid`) or `unavailable`; `alert` is true for `expiring`, `unusable` and `unavailable`. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `smtp`, `webhooks` and `auto_renewal` are present only for a caller holding `read:settings`, with a `state` and no series: `smtp` is `not_configured`, `disabled`, `incomplete` (port or From address missing) or `ready`; `webhooks` is `not_configured`, `none_active` or `active` (`count`); `auto_renewal` is `enabled` or `disabled`; a witness whose read fails is `unavailable`, with `alert` true. `alert` is true for `disabled` and `incomplete` mail and for `none_active`, never for a setting that is simply not configured. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled, with the `state`, `alert` and `severity` of the table below. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `smtp`, `webhooks` and `auto_renewal` are present only for a caller holding `read:settings`, with a `state` and no series: `smtp` is `not_configured`, `disabled`, `incomplete` (port or From address missing) or `ready`; `webhooks` is `not_configured`, `none_active` or `active` (`count`); `auto_renewal` is `enabled` or `disabled`; a witness whose read fails is `unavailable`, with `alert` true. `alert` is true for `disabled` and `incomplete` mail and for `none_active`, never for a setting that is simply not configured. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+
+| `tsa` state | meaning | `alert` | `severity` |
+|-------------|---------|---------|------------|
+| `dedicated` | a dedicated signing certificate signs | false | null |
+| `no_signer` | no dedicated signer configured and the CA certificate cannot sign in its place (a dedicated certificate is required, or no CA is designated, or the designated CA is not found, has no certificate or key, is offline, outside its validity period, revoked in its chain or has a key that does not sign timestamps): `/tsa` answers 503 | false | null |
+| `ca_certificate` | the CA certificate signs (dedicated certificate no longer required): its tokens fail RFC 3161 §2.3 | true | `warning` |
+| `expiring` | dedicated signer within 30 days of expiry, `days_left` | true | `critical` |
+| `unusable` | dedicated signer that cannot sign, `reason`: `expired`, `revoked`, `key_unavailable` or `invalid` | true | `critical` |
+| `unavailable` | the check itself failed | true | `critical` |
 
 #### Certificate list filters
 
@@ -3461,6 +3471,8 @@ GET /api/v2/system/fips-preflight
 {
   "data": {
     "fips_active": false,
+    "module_known": true,           # false: no FIPS module was asked (no loaded module, no
+                                    # build record of the -fips image), EdDSA and ML-DSA listed as refused
     "ready": false,                 # no blocker and every check ran
     "summary": {"blocker": 1, "warning": 0, "info": 0},
     "findings": [{
@@ -5140,12 +5152,12 @@ These endpoints are not part of the `/api/v2` management API. Clients such as AC
 
 | Protocol | Paths | Guide |
 |----------|-------|-------|
-| ACME (RFC 8555) | `/acme/directory`, `/acme/new-nonce`, `/acme/new-account`, `/acme/new-order`, `/acme/new-authz`, `/acme/order/{id}`, `/acme/order/{id}/finalize`, `/acme/authz/{id}`, `/acme/challenge/{id}`, `/acme/cert/{id}`, `/acme/cert/{id}/alt/{variant}`, `/acme/acct/{id}`, `/acme/acct/{id}/orders`, `/acme/key-change`, `/acme/revoke-cert`, `/acme/renewalInfo/{certid}`, `/acme/terms`, `/acme/health` | [User guide](USER_GUIDE.md#acme-server), [admin guide](ADMIN_GUIDE.md#acme-administration) |
+| ACME (RFC 8555) | `/acme/directory`, `/acme/new-nonce`, `/acme/new-account`, `/acme/new-order`, `/acme/new-authz`, `/acme/order/{id}`, `/acme/order/{id}/finalize`, `/acme/authz/{id}`, `/acme/challenge/{id}`, `/acme/cert/{id}`, `/acme/cert/{id}/alt/{variant}`, `/acme/acct/{id}`, `/acme/acct/{id}/orders`, `/acme/key-change`, `/acme/revoke-cert`, `/acme/renewalInfo/{certid}`, `/acme/terms`, `/acme/health` | [User guide](USER_GUIDE.md#acme), [admin guide](ADMIN_GUIDE.md#acme-administration) |
 | ACME proxy | `/acme/proxy/` and `/acme/proxy/{slug}/` followed by `directory`, `new-nonce`, `new-account`, `new-order`, `order/{id}`, `order/{id}/finalize`, `authz/{id}`, `challenge/{id}`, `cert/{id}`, `acct/{id}`, `acct/{id}/orders`, `key-change`, `revoke-cert`, `renewal-info/{certid}`; the proxy has no terms, health or new-authz route | [Admin guide](ADMIN_GUIDE.md#acme-administration), [proxy clients](integrations/acme-proxy-clients.md) |
 | ACME HTTP-01 | `/.well-known/acme-challenge/{token}` | [Admin guide](ADMIN_GUIDE.md#acme-client-http-01-challenges) |
-| SCEP | `/scep/pkiclient.exe`, `/scep/{profile_slug}/pkiclient.exe`, `/cgi-bin/pkiclient.exe` | [User guide](USER_GUIDE.md#scep-server), [admin guide](ADMIN_GUIDE.md#scep-administration), [Intune](integrations/intune-scep.md) |
-| EST (RFC 7030) | `/.well-known/est/` and `/.well-known/est/{label}/` followed by `cacerts`, `csrattrs`, `simpleenroll`, `simplereenroll`, `serverkeygen`, `fullcmc` | [User guide](USER_GUIDE.md#est-server), [admin guide](ADMIN_GUIDE.md#est-administration) |
-| OCSP (RFC 6960) | `/ocsp` (POST), `/ocsp/{encoded_request}` (GET) | [User guide](USER_GUIDE.md#ocsp-responder), [admin guide](ADMIN_GUIDE.md#ocsp-configuration) |
+| SCEP | `/scep/pkiclient.exe`, `/scep/{profile_slug}/pkiclient.exe`, `/cgi-bin/pkiclient.exe` | [User guide](USER_GUIDE.md#scep), [admin guide](ADMIN_GUIDE.md#scep-administration), [Intune](integrations/intune-scep.md) |
+| EST (RFC 7030) | `/.well-known/est/` and `/.well-known/est/{label}/` followed by `cacerts`, `csrattrs`, `simpleenroll`, `simplereenroll`, `serverkeygen`, `fullcmc` | [User guide](USER_GUIDE.md#est), [admin guide](ADMIN_GUIDE.md#est-administration) |
+| OCSP (RFC 6960) | `/ocsp` (POST), `/ocsp/{encoded_request}` (GET) | [User guide](USER_GUIDE.md#crl--ocsp), [admin guide](ADMIN_GUIDE.md#ocsp-configuration) |
 | CRL distribution | `/cdp/{ca_ref}.crl`, `/cdp/{ca_ref}-delta.crl` | [Admin guide](ADMIN_GUIDE.md#crl-distribution) |
 | CA issuers (AIA) | `/ca/{ca_ref}.cer`, `/ca/{ca_ref}.pem`, `/ca/{ca_ref}.p7c`, `/ca/{ca_ref}/cross/{xid}.cer` | [AIA CA Issuers](#aia-ca-issuers) |
 | Time stamping (RFC 3161) | `/tsa` (POST) | [Time Stamping (TSA)](#time-stamping-tsa) |

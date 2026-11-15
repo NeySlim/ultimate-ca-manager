@@ -308,6 +308,7 @@ class TestTsaSystemStatus:
             SystemConfig.query.filter(
                 SystemConfig.key.in_([
                     'tsa_enabled', 'tsa_signer_cert_refid', 'tsa_ca_refid',
+                    'tsa_require_dedicated_cert',
                 ])
             ).delete(synchronize_session=False)
             db.session.commit()
@@ -328,16 +329,26 @@ class TestTsaSystemStatus:
         finally:
             self._clear(app)
 
-    def test_online_ca_certificate_when_no_dedicated_signer(
+    def test_warning_ca_certificate_when_the_strict_mode_is_off(
         self, app, auth_client, create_ca
     ):
         refid = self._ca_refid(app, create_ca, 'status-tsa-ca')
         self._set(app, tsa_enabled='true', tsa_signer_cert_refid='',
-                  tsa_ca_refid=refid)
+                  tsa_ca_refid=refid, tsa_require_dedicated_cert='false')
         try:
             tsa = self._tsa(auth_client)
-            assert tsa['status'] == 'online'
-            assert 'CA certificate' in tsa['message']
+            assert tsa['status'] == 'warning'
+            assert 'CA certificate' in tsa['message'] and 'RFC 3161' in tsa['message']
+        finally:
+            self._clear(app)
+
+    def test_offline_ca_certificate_by_default(self, app, auth_client, create_ca):
+        # The strict default refuses the CA certificate: /tsa answers 503, so does the widget
+        refid = self._ca_refid(app, create_ca, 'status-tsa-ca-strict')
+        self._set(app, tsa_enabled='true', tsa_signer_cert_refid='', tsa_ca_refid=refid)
+        try:
+            assert self._tsa(auth_client) == {
+                'status': 'offline', 'message': 'No signing certificate configured'}
         finally:
             self._clear(app)
 
@@ -376,7 +387,8 @@ class TestTsaSystemStatus:
             ca = CA.query.filter_by(refid=refid).first()
             ca.crt = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode()
             db.session.commit()
-        self._set(app, tsa_enabled='true', tsa_signer_cert_refid='', tsa_ca_refid=refid)
+        self._set(app, tsa_enabled='true', tsa_signer_cert_refid='', tsa_ca_refid=refid,
+                  tsa_require_dedicated_cert='false')
         try:
             assert self._tsa(auth_client)['status'] == 'offline'
         finally:
@@ -389,9 +401,10 @@ class TestTsaSystemStatus:
         treats the missing row as enabled, so the widget must too, not offline
         (#315 review, case 1b)."""
         refid = self._ca_refid(app, create_ca, 'status-tsa-grandfathered-ca')
-        self._set(app, tsa_ca_refid=refid)  # note: tsa_enabled deliberately unset
+        # note: tsa_enabled deliberately unset
+        self._set(app, tsa_ca_refid=refid, tsa_require_dedicated_cert='false')
         try:
-            assert self._tsa(auth_client)['status'] == 'online'
+            assert self._tsa(auth_client)['status'] == 'warning'
         finally:
             self._clear(app)
 

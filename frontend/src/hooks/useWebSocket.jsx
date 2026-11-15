@@ -136,8 +136,8 @@ function announceEverythingChanged() {
  *
  * `t` is the i18next translator, passed in by the provider so this stays a
  * plain function. Events that already have a `notifications.*` key (present in
- * all nine locales) go through it; the rest keep their English sentence rather
- * than inventing keys that would have to be translated nine times.
+ * all ten locales) go through it; the rest keep their English sentence rather
+ * than inventing keys that would have to be translated ten times.
  */
 export function getEventNotification(payload, t) {
   const { type, data } = payload;

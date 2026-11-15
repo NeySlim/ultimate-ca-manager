@@ -102,6 +102,7 @@ vi.mock('../../services', () => ({
     getEnabled: vi.fn().mockResolvedValue({ data: [] }),
     getTemplates: vi.fn().mockResolvedValue({ data: ['WebServer'] }),
     signCSR: (...a) => signCSR(...a),
+    getPendingRequests: vi.fn().mockResolvedValue({ data: [] }),
   },
   ekuService: { getKnown: vi.fn().mockResolvedValue({ data: { ekus: [] } }) },
 }))

@@ -21,6 +21,7 @@ PostgreSQL (`UCM_TEST_PG_URL`); SQLite serializes writers on its own.
 | ACME proxy challenge resolves on any node | Challenge → (order, identifier, authorization) stored in `acme_proxy_challenge_links` | `services/acme/acme_proxy_service.py` |
 | Approval requests decided once | `FOR UPDATE` / `SKIP LOCKED` | `services/approval_gate.py` |
 | SSH CA serials unique | Counter row `FOR UPDATE` | `services/ssh_ca_service.py` |
+| A Microsoft CA certificate never replaces one from another source on a CSR row | Row rewritten only while it holds no certificate or one a Microsoft CA issued (rowcount 1); otherwise the request is closed as `superseded` and the certificate enters through the inventory as a separate row | `api/v2/msca.py` `_import_signed_cert`, `services/msca/ca_control.py` `complete_request` |
 | A due discovery profile starts one scan | `next_scan_at` moved only while still due and the schedule enabled (rowcount 1) | `services/discovery_scheduler_task.py` |
 | A delegated OCSP responder is renewed once | Binding rebound only if it still names the old certificate | `services/ocsp_responder_renewal.py` |
 | An HA backup archive is listed only once whole | Row and chunks in one transaction, read back before the commit | `services/backup/shared_store.py` `store_archive` |

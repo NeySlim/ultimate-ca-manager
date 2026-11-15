@@ -23,13 +23,15 @@ def _pending(app, cert_id):
 
 
 def _poll(app, auth_client, new, ids):
+    from services.msca.connection import MicrosoftCAConnectionMixin
     msca_id, req_id = ids
-    answer = {'status': 'issued', 'cert_pem': _pem(new)}
-    with patch('api.v2.msca.MicrosoftCAService.check_request', return_value=answer):
-        with app.app_context():
-            from models import db, MSCARequest
-            db.session.get(MSCARequest, req_id).cert_pem = _pem(new)
-            db.session.commit()
+
+    class _Client:
+        def get_existing_cert(self, request_id, encoding='b64'):
+            return _pem(new)
+
+    with patch.object(MicrosoftCAConnectionMixin, '_get_client', staticmethod(lambda m: _Client())), \
+            patch.object(MicrosoftCAConnectionMixin, '_cleanup_client', staticmethod(lambda c: None)):
         return auth_client.get(f'/api/v2/microsoft-cas/{msca_id}/requests/{req_id}')
 
 
@@ -39,6 +41,11 @@ def _setup(app, auth_client, create_ca, cn, bound=True):
     key = _gen()
     old = _cert(cn, key, issuer_cert=ca_cert, signer=ca_key)
     cert_id = _store_cert(app, old, key, caref=caref)
+    with app.app_context():
+        # A Microsoft CA renewal replaces a certificate that CA issued (renew_via_msca)
+        from models import db, Certificate
+        db.session.get(Certificate, cert_id).source = 'msca'
+        db.session.commit()
     if bound:
         _create_binding(auth_client, _create_target(auth_client)['id'], cert_id)
     return ca_cert, ca_key, key, cert_id

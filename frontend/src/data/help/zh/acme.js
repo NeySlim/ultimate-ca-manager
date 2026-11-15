@@ -19,7 +19,7 @@ export default {
         items: [
           { label: '客户端', text: '从任何 ACME CA 请求证书，Let\'s Encrypt、ZeroSSL、HARICA 或自定义' },
           { label: '订单标签页 (v2.219)', text: '客户端订单现在有专属的侧边栏标签页「Let\'s Encrypt orders」，带有可见/总数计数和状态过滤器，与 Local orders 视图保持一致' },
-          { label: '外部 CA 账户', text: '每个 CA 可以有多个账户，多个账户可以共享同一个目录 URL（例如两个 Let\'s Encrypt 账户用于管理分离）；目录 URL 留空默认为 Let\'s Encrypt 生产环境' },
+          { label: '证书颁发机构 (CA)', text: '每个 CA 可以有多个账户，多个账户可以共享同一个目录 URL（例如两个 Let\'s Encrypt 账户用于管理分离）；目录 URL 留空默认为 Let\'s Encrypt 生产环境' },
           { label: '自定义服务器', text: '设置自定义 ACME 目录 URL 以使用任何符合 RFC 8555 的 CA' },
           { label: 'EAB', text: '支持外部账户绑定，用于需要预注册的 CA（ZeroSSL、HARICA 等）' },
           { label: '密钥类型', text: '证书密钥支持 RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 或 P-384、ML-DSA-44、ML-DSA-65 或 ML-DSA-87；不含 ML-DSA 的构建中不提供 ML-DSA，FIPS 模块不批准它时 FIPS 模式下也不提供。已配置但本实例无法生成的默认类型会使订单失败，而不是回退到 RSA-2048 (v2.248)' },
@@ -75,11 +75,11 @@ export default {
       {
         title: 'ACME 代理',
         items: [
-          { label: '上游 CA 账户', text: '选择其中一个外部 CA 账户：其目录 URL（Let\'s Encrypt、ZeroSSL、任何 RFC 8555 CA）和 EAB 凭据在该账户上设置' },
+          { label: '上游 CA 账户', text: '选择“证书颁发机构 (CA)”中的一个账户：其目录 URL（Let\'s Encrypt、ZeroSSL、任何 RFC 8555 CA）和 EAB 凭据在该账户上设置' },
           { label: '账户状态', text: '显示UCM是否已在上游CA注册。账户在首次代理请求时自动注册' },
           { label: '测试连接', text: '验证与上游CA的连接性并检查是否需要EAB凭据' },
           { label: '重置账户', text: '清除所选 CA 账户的上游注册以强制重新注册' },
-          { label: 'EAB凭据', text: '需要EAB的CA的External Account Binding凭据（如ZeroSSL、Google Trust），在“外部 CA 账户”中的 CA 账户上输入' },
+          { label: 'EAB凭据', text: '需要EAB的CA的External Account Binding凭据（如ZeroSSL、Google Trust），在“证书颁发机构 (CA)”中的 CA 账户上输入' },
           { label: 'DNS挑战', text: 'UCM使用配置的DNS提供商代表客户端处理DNS-01挑战' },
           { label: '清除被替换的证书', text: '可选开关：当代理订单 finalize 时，删除之前由代理订单为完全相同域名集合导入的证书。已吊销证书始终保留；非代理证书绝不受影响。默认关闭' },
                   { label: '客户端预检 (v2.217)', text: '代理还会发布用每个客户端账户密钥计算的 dns-01 TXT 值：lego/Traefik/Caddy 的传播预检无需禁用即可通过，但 DuckDNS、Hurricane Electric 和 FreeDNS 例外，它们只保留一个值：请在这些提供商上禁用客户端预检；重试的 new-order 会返回该账户仍在等待的订单' },
@@ -98,7 +98,7 @@ export default {
         title: 'ACME 代理的 DNS UPDATE (RFC 2136)',
         items: [
           { label: '功能', text: '客户端使用自己的标准 rfc2136 求解器（certbot、lego、cert-manager、acme.sh、win-acme、Posh-ACME），并指向 UCM。UCM 仍然通过自己的 DNS 提供商创建 TXT 记录' },
-          { label: '密钥', text: '在外部 CA 账户中为每个代理账户创建密钥。密钥可以关联 EAB 凭据：关联后，它只对使用该凭据注册的 ACME 账户的订单有效。UCM 只显示一次密文' },
+          { label: '密钥', text: '在“证书颁发机构 (CA)”中为每个代理账户创建密钥。密钥可以关联 EAB 凭据：关联后，它只对使用该凭据注册的 ACME 账户的订单有效。UCM 只显示一次密文' },
           { label: '接受的更改', text: 'UCM 只接受 _acme-challenge 下的 TXT 记录，且值必须与它为订单预期的值相同。其他更改会被拒绝。对删除请求，它总是回复 NOERROR' },
           { label: '端口和网络', text: '在 ACME 代理部分设置监听端口（0 表示禁用，范围 1024 到 65535，需要重启）。只在内部网络中使用。要使用端口 53，请在 Docker 或 Kubernetes 中，或用防火墙重定向，把它映射到该端口' },
           { label: '算法', text: 'hmac-sha256、hmac-sha384 和 hmac-sha512。UCM 会拒绝 md5 和 sha1（许多客户端的默认值）：请在每个客户端中设置算法。cert-manager 不支持 sha384，win-acme 对它的计算有误' },
@@ -222,9 +222,9 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-将 CA 的目录 URL 设置为其在**外部 CA 账户**中账户的 **ACME目录URL**。
+将 CA 的目录 URL 设置为其在**证书颁发机构 (CA)**中账户的 **ACME目录URL**。
 
-### 外部 CA 账户
+### 证书颁发机构 (CA)
 管理 UCM 注册的所有外部 CA 账户：
 
 - **每个 CA 允许多个账户**：多个账户可共享相同的目录 URL（例如两个使用不同联系邮箱的 Let's Encrypt 账户用于管理分离，配合 dns-persist-01 很有用）。账户行本身是身份标识，而非 URL。
@@ -237,7 +237,7 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 某些 CA 需要 EAB 凭据将您的 ACME 账户与 CA 上的现有账户关联：
 
 1. 在 CA 的门户网站注册以获取 **EAB 密钥 ID** 和 **HMAC 密钥**
-2. 在**外部 CA 账户**中的 CA 账户上输入这两个值（**EAB密钥ID**、**EAB HMAC密钥**）
+2. 在**证书颁发机构 (CA)**中的 CA 账户上输入这两个值（**EAB密钥ID**、**EAB HMAC密钥**）
 3. HMAC 密钥是 base64url 编码的（由 CA 提供）
 
 > 💡 ZeroSSL、HARICA、Google Trust Services 和大多数企业 CA 都需要 EAB。
@@ -328,7 +328,7 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 ### 配置
 1. 转到 **ACME** → **Let's Encrypt** 选项卡
 2. 滚动到 **ACME代理** 部分
-3. 在 **外部 CA 账户** 中选择 **上游 CA 账户**（Let's Encrypt、Actalis、ZeroSSL、自定义 URL、EAB）
+3. 在 **证书颁发机构 (CA)** 中选择 **上游 CA 账户**（Let's Encrypt、Actalis、ZeroSSL、自定义 URL、EAB）
 4. 点击 **测试连接** 验证与上游 CA 的连接
 5. 如需要，注册上游账户（邮箱 + **注册账户**）
 6. 若尚未注册，UCM 在首次代理请求时自动注册
@@ -336,7 +336,7 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 ### 专用代理路径（多 CA）
 每个外部 CA 账户可暴露自己的 ACME 代理端点：
 
-1. 打开 **外部 CA 账户**（同一 Let's Encrypt 选项卡）
+1. 打开 **证书颁发机构 (CA)**（同一 Let's Encrypt 选项卡）
 2. 编辑或创建 CA 账户
 3. 启用 **通过 ACME 代理暴露**
 4. 设置唯一的 **代理路径 (slug)**: 如 \`actalis-production\`
@@ -392,7 +392,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 上游 CA 账户的 EAB 凭据与客户端 EAB 不同：用于 UCM 向上游 CA 认证，而不是客户端向 UCM 认证。请在**外部 CA 账户**中的该账户上设置它们。
+> 💡 上游 CA 账户的 EAB 凭据与客户端 EAB 不同：用于 UCM 向上游 CA 认证，而不是客户端向 UCM 认证。请在**证书颁发机构 (CA)**中的该账户上设置它们。
 
 > ⚠ 前提：域名须在 ACME Domains 中配置 DNS 提供商。代理仅支持 dns-01。
 

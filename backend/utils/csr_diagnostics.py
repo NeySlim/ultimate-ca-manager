@@ -27,3 +27,11 @@ def weak_csr_hash_algorithm(csr):
     if algo is not None and algo.name in WEAK_CSR_HASH_ALGORITHMS:
         return algo.name
     return None
+
+
+def weak_csr_hash_error(csr):
+    """The refusal every enrollment door gives a CSR signed with a weak hash, else None."""
+    weak = weak_csr_hash_algorithm(csr)
+    if weak is None:
+        return None
+    return f'CSR signed with an unsupported hash algorithm ({weak}); use SHA-256 or stronger'

@@ -35,6 +35,7 @@ from .restore.replace import plan_replacement, remove_after_writes, remove_befor
 from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
+from .restore.tsa_signer import upgrade_archived_tsa_signer
 from .restore.windows_profiles import link_restored_connectors, upgrade_archived_windows_profiles
 
 logger = logging.getLogger(__name__)
@@ -352,6 +353,8 @@ class RestoreCoreMixin:
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
         windows_warnings: List[str] = []
+        # Before the profiles: their section is what marks a 3.0 archive
+        upgrade_archived_tsa_signer(backup_data)
         upgrade_archived_windows_profiles(backup_data, windows_warnings)
         if mode not in ('replace', 'merge'):
             raise BackupSchemaError(

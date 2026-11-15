@@ -166,8 +166,10 @@ WORKDIR /opt/ucm
 COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
 COPY --chown=ucm:ucm LICENSE NOTICE COMMERCIAL-LICENSE.md /opt/ucm/
 COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
+COPY --chown=ucm:ucm docker/fips-module.sh /fips-module.sh
 # FIPS variant: what the module approves, asked of it under the configuration the
-# entrypoint writes, so the readiness check judges keys by it before the switch
+# entrypoint writes, so the readiness check judges keys by it before the switch; and the
+# module-mac of this install, root-owned, that the entrypoint compares at each start
 RUN if [ "$UCM_FIPS_BUILD" = 1 ]; then \
         set -eu; \
         tmp="$(mktemp -d)"; \
@@ -183,6 +185,10 @@ RUN if [ "$UCM_FIPS_BUILD" = 1 ]; then \
 import fips_mode; fips_mode.write_build_capability(sys.argv[1])' /usr/share/ucm/fips-module.json; \
         chmod 0644 /usr/share/ucm/fips-module.json; \
         cat /usr/share/ucm/fips-module.json; \
+        . /fips-module.sh; fips_module_mac "$tmp/fipsmodule.cnf" > /usr/share/ucm/fips-module.mac; \
+        grep -Eq '^([0-9A-F]{2}:){31}[0-9A-F]{2}$' /usr/share/ucm/fips-module.mac; \
+        chmod 0444 /usr/share/ucm/fips-module.mac; \
+        cat /usr/share/ucm/fips-module.mac; \
         rm -rf "$tmp"; \
     fi
 # Only the built interface: the server serves frontend/dist, while frontend/
