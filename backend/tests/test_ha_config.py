@@ -60,12 +60,14 @@ def test_valid_ha_config_starts(ha_cfg, caplog):
     assert 'sessions' not in caplog.text
 
 
-def test_ha_without_redis_does_not_warn_about_sessions(ha_cfg, monkeypatch, caplog):
+def test_ha_without_redis_does_not_warn_about_sessions(ha_cfg, monkeypatch, caplog, tmp_path):
+    """A valid HA start without Redis logs nothing at WARNING or above."""
     monkeypatch.delenv('REDIS_URL')
     monkeypatch.delenv('UCM_REDIS_URL', raising=False)
+    monkeypatch.setattr('security.encryption.MASTER_KEY_PATH', tmp_path / 'master.key')
     with caplog.at_level(logging.WARNING):
         ha.validate_ha_config(Config)
-    assert 'sessions' not in caplog.text
+    assert [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING] == []
 
 
 def test_without_ha_nothing_checked_or_logged(monkeypatch, caplog):
