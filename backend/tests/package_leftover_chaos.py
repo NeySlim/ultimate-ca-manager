@@ -20,6 +20,8 @@ from tests.test_package_leftover_archive import (
 CHAOS = ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'rename', 'tee')
 LAYOUTS = {
     'one filesystem': lambda box: {},
+    # The data on another disk, reached through a symbolic link
+    'the data a symbolic link': lambda box: box.link(box.data) or {},
     'data and config are mount points': lambda box: {'other_fs': (box.data, box.config)},
     'a mount point inside the data': lambda box: {'other_fs': (box.data / 'updates',)},
     'each kept directory a mount point': lambda box: {'other_fs': tuple(box.data / d for d in KEPT)},

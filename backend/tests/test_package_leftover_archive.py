@@ -123,6 +123,13 @@ class Box:
                 self.python('stub')
         return self.outside
 
+    def link(self, top):
+        """Moves directory `top` to srv/ (another disk, say) and leaves a symbolic link to it."""
+        real = self.tmp / 'srv' / top.name
+        real.parent.mkdir(exist_ok=True)
+        shutil.move(top, real)
+        os.symlink(os.path.relpath(real, top.parent), top)
+
     def _guard(self, name, allowed=(), arms=''):
         """`name` fails, and records the call in state/forbidden, when an argument is a path
         of the earlier installation or of its archives that `allowed` (case patterns) and
@@ -788,6 +795,8 @@ def _fail_everywhere(tmp_path, layout):
     for command in COMMANDS:
         for at in range(1, 200):
             box = Box(tmp_path / f'{command}-{at}', python='stub')
+            if layout == 'the data a symbolic link':
+                box.link(box.data)
             box.wrap(fail=command, at=at, **_layout_args(box, layout))
             before = snapshot(box)
             data, config = originals(box)
@@ -811,13 +820,15 @@ def _fail_everywhere(tmp_path, layout):
 def _layout_args(box, layout):
     return {
         'one filesystem': {},
+        'the data a symbolic link': {},
         'data and config on other filesystems': {'other_fs': (box.data, box.config)},
         'each kept directory a mount point': {'other_fs': tuple(box.data / d for d in KEPT)},
         'overlayfs': {'fstype': 'overlay'},
     }[layout]
 
 
-@pytest.mark.parametrize('layout', ['one filesystem', 'data and config on other filesystems',
+@pytest.mark.parametrize('layout', ['one filesystem', 'the data a symbolic link',
+                                    'data and config on other filesystems',
                                     'each kept directory a mount point', 'overlayfs'])
 def test_a_failure_at_any_step_puts_everything_back(tmp_path, layout):
     assert _fail_everywhere(tmp_path, layout) > 5
@@ -1360,6 +1371,33 @@ def test_a_name_with_a_tab_or_a_line_break_is_refused_before_anything_moves(tmp_
     assert 'Nothing was moved' in out.stdout and 'was not started' in out.stdout
     assert snapshot(box) == before
     assert not box.parent.exists() or not any(box.parent.iterdir())
+
+
+@pytest.mark.parametrize('where', ['data', 'config'])
+def test_a_name_with_a_line_break_under_a_linked_directory_is_refused_before_anything_moves(tmp_path, where):
+    """The data or the configuration a symbolic link to another disk: its entries are
+    checked through the link, as the walk reads them."""
+    box = Box(tmp_path, python='stub')
+    top = {'data': box.data, 'config': box.config}[where]
+    box.link(top)
+    (top / 'a\nb').write_text('x')
+    box.wrap()
+    before = snapshot(box)
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert f'{top}/a<newline>b has a tab or a line break' in out.stdout, out.stdout
+    assert 'Nothing was moved' in out.stdout
+    assert snapshot(box) == before and (tmp_path / 'srv' / top.name / 'a\nb').is_file()
+
+
+def test_a_kept_directory_that_is_a_link_is_moved_whole_whatever_it_holds(tmp_path):
+    """A link is renamed itself: the names behind it never enter the journal."""
+    box = Box(tmp_path, python='stub')
+    box.link(box.data / 'sessions')
+    (tmp_path / 'srv' / 'sessions' / 'a\nb').write_text('x')
+    data, config = originals(box)
+    archived(box, box.run(), data, config)
+    assert (box.archive / 'data' / 'sessions').is_symlink()
 
 
 @pytest.mark.parametrize('where', ['updates/nested', 'backups/old', 'conf.d'])

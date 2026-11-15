@@ -473,15 +473,15 @@ fail() {
     exit "$rc"
 }
 # A journal line holds no tab or line break: one in the path of the database or of an entry
-# of the directories $@ (those the run walks) stops it, shown visibly, a last one too
+# of the directories $@ (those the run walks, through a link too) stops it, shown visibly
 odd_names() {
-    odd=$(find "$@" -maxdepth 1 \( -path "*$TAB*" -o -path "*$NL*" \) -printf '%p.' -quit 2>/dev/null)
+    odd=$(find -H "$@" -maxdepth 1 \( -path "*$TAB*" -o -path "*$NL*" \) -printf '%p.' -quit 2>/dev/null)
     case $DB_FILE in *"$TAB"*) odd=${odd:-$DB_FILE.} ;; esac
     [ -z "$odd" ] || fail "$(printf '%s' "$odd" | sed -e ':a' -e '$!N' -e '$!ba' -e 's/\n/<newline>/g' \
         -e "s/$TAB/<tab>/g" -e 's/\.$//') has a tab or a line break in its name, which the journal cannot hold: rename it"
 }
-# Before anything moves: the entries of the data, the configuration and the kept directories
-set --; for d in $KEEP_DIRS; do set -- "$@" "$DATA/$d"; done; odd_names "$DATA" "$CONFIG" "$@"
+# Before anything moves: the entries of the data, the configuration, each kept directory not a link
+set --; for d in $KEEP_DIRS; do [ -L "$DATA/$d" ] || set -- "$@" "$DATA/$d"; done; odd_names "$DATA" "$CONFIG" "$@"
 [ -d "$PARENT" ] || { mkdir -p -- "$PARENT" || fail "cannot create $PARENT"; MADE_PARENT=1; }
 chmod 700 "$PARENT" || fail "cannot restrict $PARENT"
 [ -z "$as_root" ] || chown 0:0 "$PARENT" || fail "cannot give $PARENT to root"
