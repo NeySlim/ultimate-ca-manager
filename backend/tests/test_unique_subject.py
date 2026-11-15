@@ -897,6 +897,26 @@ def test_an_issuance_by_a_twin_record_locks_the_lowest_twin_before_its_own(app, 
     assert outcome['cross'] == 'issued', outcome
 
 
+@pytest.mark.parametrize('record', ['root', 'cross'])
+def test_counting_an_issuance_never_flushes_the_caller_s_pending_row(app, twins, record):
+    """The twin lookup runs without autoflush: a caller that added its row without flushing
+    (the TSA signer, an approval) handles that row's flush itself, never inside the count."""
+    from utils.ca_serial_counter import next_ca_serial
+    ca_id = dict(zip(('root', 'cross'), twins))[record]
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        ca.enforce_unique_subject = True
+        db.session.commit()
+        db.session.refresh(ca)  # loaded, as a caller holds it
+        pending = Certificate(descr='pending, refid not set yet')  # refid is NOT NULL
+        db.session.add(pending)
+        try:
+            assert next_ca_serial(ca) == 1
+            assert pending in db.session.new
+        finally:
+            db.session.rollback()
+
+
 @pytest.fixture
 def straddling(app):
     """Roots A, B, C and B's cross-certificate by A, in id order: ``(root B, C, cross)``."""
