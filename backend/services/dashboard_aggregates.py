@@ -506,8 +506,14 @@ def _scheduler_health():
             'last_operation_at': last_run, 'last_status': last_status}
 
 
-# No signer configured is "not configured", not a fault: the protocol answers 503 by design
-_TSA_QUIET = ('ca_certificate', 'dedicated', 'no_signer')
+# No signer configured is "not configured", not a fault: the protocol answers 503 by design.
+# The CA certificate signing (strict mode turned off) is a warning: its tokens fail RFC 3161 §2.3.
+_TSA_QUIET = ('dedicated', 'no_signer')
+_TSA_WARNING = ('ca_certificate',)
+
+
+def _tsa_severity(state):
+    return None if state in _TSA_QUIET else 'warning' if state in _TSA_WARNING else 'critical'
 
 
 def _tsa_health():
@@ -530,7 +536,7 @@ def _tsa_health():
                 state = 'expiring'
         return {'basis': 'signer', 'periods': None, 'state': state, 'reason': reason,
                 'days_left': days_left, 'alert': state not in _TSA_QUIET,
-                'last_operation_at': None, 'last_status': None}
+                'severity': _tsa_severity(state), 'last_operation_at': None, 'last_status': None}
     except Exception:
         # A resolver bug is exactly when the overview must not claim health
         logger.debug('TSA health check failed', exc_info=True)
@@ -540,7 +546,8 @@ def _tsa_health():
         except Exception:
             pass
         return {'basis': 'signer', 'periods': None, 'state': 'unavailable', 'reason': None,
-                'days_left': None, 'alert': True, 'last_operation_at': None, 'last_status': None}
+                'days_left': None, 'alert': True, 'severity': 'critical',
+                'last_operation_at': None, 'last_status': None}
 
 
 def _witness(state, alert=False, count=None):

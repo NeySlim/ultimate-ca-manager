@@ -7,7 +7,7 @@ from tests.conftest import get_json
 
 URL = '/api/v2/dashboard/health'
 TS_OID = '1.3.6.1.5.5.7.3.8'
-KEYS = ('tsa_enabled', 'tsa_signer_cert_refid', 'tsa_ca_refid')
+KEYS = ('tsa_enabled', 'tsa_signer_cert_refid', 'tsa_ca_refid', 'tsa_require_dedicated_cert')
 
 
 def _clear(app):
@@ -42,13 +42,25 @@ def test_absent_when_the_tsa_is_disabled(auth_client, tsa_config):
     assert _tsa(auth_client) is None
 
 
-def test_ca_certificate_path_is_healthy(app, auth_client, tsa_config, create_ca):
+def test_ca_certificate_signing_is_a_warning(app, auth_client, tsa_config, create_ca):
+    # The compatibility mode a 2.x upgrade keeps: tokens that fail RFC 3161 §2.3
     ca = create_ca(cn='tsa-health-ca')
+    with app.app_context():
+        refid = db.session.get(CA, ca['id']).refid
+    tsa_config(tsa_enabled='true', tsa_signer_cert_refid='', tsa_ca_refid=refid,
+               tsa_require_dedicated_cert='false')
+    tsa = _tsa(auth_client)
+    assert (tsa['state'], tsa['alert'], tsa['severity']) == ('ca_certificate', True, 'warning')
+
+
+def test_a_ca_without_a_dedicated_signer_is_not_configured_by_default(
+        app, auth_client, tsa_config, create_ca):
+    ca = create_ca(cn='tsa-health-ca-strict')
     with app.app_context():
         refid = db.session.get(CA, ca['id']).refid
     tsa_config(tsa_enabled='true', tsa_signer_cert_refid='', tsa_ca_refid=refid)
     tsa = _tsa(auth_client)
-    assert (tsa['state'], tsa['alert']) == ('ca_certificate', False)
+    assert (tsa['state'], tsa['alert'], tsa['severity']) == ('no_signer', False, None)
 
 
 def test_enabled_without_any_signer_is_not_an_alert(auth_client, tsa_config):
@@ -60,14 +72,14 @@ def test_enabled_without_any_signer_is_not_an_alert(auth_client, tsa_config):
 def test_untouched_install_is_not_configured_without_alert(auth_client, tsa_config):
     # No tsa_enabled row (on by default) and no tsa_ca_refid: nothing to sign with, nothing broken
     tsa = _tsa(auth_client)
-    assert (tsa['state'], tsa['alert']) == ('no_signer', False)
+    assert (tsa['state'], tsa['alert'], tsa['severity']) == ('no_signer', False, None)
 
 
 def test_healthy_dedicated_signer(auth_client, tsa_config, create_cert):
     signer = create_cert(cn='tsa-health-ok', validity_days=365, extra_ekus=[TS_OID])
     tsa_config(tsa_enabled='true', tsa_signer_cert_refid=signer['refid'])
     tsa = _tsa(auth_client)
-    assert (tsa['state'], tsa['alert']) == ('dedicated', False)
+    assert (tsa['state'], tsa['alert'], tsa['severity']) == ('dedicated', False, None)
     assert tsa['days_left'] > 300
 
 
@@ -75,7 +87,7 @@ def test_signer_near_expiry_is_an_alert(auth_client, tsa_config, create_cert):
     signer = create_cert(cn='tsa-health-near', validity_days=10, extra_ekus=[TS_OID])
     tsa_config(tsa_enabled='true', tsa_signer_cert_refid=signer['refid'])
     tsa = _tsa(auth_client)
-    assert (tsa['state'], tsa['alert']) == ('expiring', True)
+    assert (tsa['state'], tsa['alert'], tsa['severity']) == ('expiring', True, 'critical')
     assert 0 < tsa['days_left'] <= 10
 
 

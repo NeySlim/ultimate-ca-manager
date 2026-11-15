@@ -57,7 +57,8 @@ def timestamp_request():
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
         from services.tsa_service import (
             TSAConfigurationError, TSAService, certificate_validity_problem,
-            load_configured_signer, tsa_is_enabled, tsa_signer_key_problem,
+            load_configured_signer, tsa_is_enabled, tsa_requires_dedicated_signer,
+            tsa_signer_key_problem,
         )
         from models import SystemConfig
 
@@ -104,6 +105,13 @@ def timestamp_request():
             if not tsa_ca_refid:
                 logger.warning("TSA request refused: no CA configured for TSA")
                 response = make_response('TSA not configured', 503)
+                response.headers['Content-Type'] = 'text/plain'
+                return response
+            # RFC 3161 §2.3: the CA key never signs a token unless the operator turned this off
+            if tsa_requires_dedicated_signer():
+                logger.warning("TSA request refused: no dedicated signer and "
+                               "tsa_require_dedicated_cert is on")
+                response = make_response('TSA configuration invalid', 503)
                 response.headers['Content-Type'] = 'text/plain'
                 return response
             ca = CA.query.filter_by(refid=tsa_ca_refid).first()

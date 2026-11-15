@@ -602,8 +602,9 @@ def get_system_status():
             signer = describe_configured_signer()
             if not signer.get('configured'):
                 if tsa_ca_certificate_path_ready():
-                    status['tsa'] = {'status': 'online',
-                                     'message': 'Signing with CA certificate'}
+                    # Only with tsa_require_dedicated_cert turned off: RFC 3161 §2.3 refuses these tokens
+                    status['tsa'] = {'status': 'warning',
+                                     'message': 'Signing with CA certificate, not RFC 3161 compliant'}
                 else:
                     status['tsa'] = {'status': 'offline',
                                      'message': 'No signing certificate configured'}

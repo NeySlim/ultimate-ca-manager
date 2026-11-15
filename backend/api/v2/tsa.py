@@ -203,12 +203,8 @@ def get_tsa_config():
         'ca_id': ca_id,
         'ca_name': ca_name,
         'policy_oid': get_config('tsa_policy_oid', '1.2.3.4.1'),
-        # Off by default: pre-2.200 deployments sign with the CA certificate
-        # itself and must keep working. TSAService reads this key at signing
-        # time; before it was surfaced here the toggle was settable only by
-        # editing the database row directly.
-        'require_dedicated_cert':
-            get_config('tsa_require_dedicated_cert', 'false') == 'true',
+        # On unless the operator wrote false (RFC 3161 §2.3); the same reader as /tsa
+        'require_dedicated_cert': effective('tsa_require_dedicated_cert'),
         # Dedicated end-entity signer (#312). Empty string = the historical
         # CA-certificate signer. `signer` describes the configured certificate
         # (subject / serial / notAfter / chain status / usability).
