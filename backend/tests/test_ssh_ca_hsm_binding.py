@@ -214,6 +214,21 @@ class TestInput:
         with app.app_context():
             assert SSHCertificateAuthority.query.filter_by(hsm_key_id=key['key']).count() == 0
 
+    @pytest.mark.parametrize('error,status', [
+        (HsmConnectionError('socket refused'), 503),
+        (HsmKeyNotFoundError('CKR_OBJECT_HANDLE_INVALID'), 409),
+        (HsmOperationError('CKR_DEVICE_ERROR'), 502),
+    ])
+    def test_a_cached_public_key_still_reaches_the_token(self, app, auth_client, token_key, error, status):
+        """The public key is read from the row: only the proof of possession reaches the token."""
+        key = token_key()
+        with patch('services.hsm.HsmService.sign', side_effect=error):
+            r = _ssh_ca(auth_client, key['key'])
+        assert r.status_code == status, r.data
+        assert str(error) not in _detail(r)
+        with app.app_context():
+            assert SSHCertificateAuthority.query.filter_by(hsm_key_id=key['key']).count() == 0
+
     def test_the_audit_names_the_key_its_fingerprint_and_provider(self, app, auth_client, token_key):
         key = token_key()
         r = _ssh_ca(auth_client, key['key'])
