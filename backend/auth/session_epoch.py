@@ -16,6 +16,24 @@ def current_epoch() -> int:
     return int(value) if value else 0
 
 
+def remember_request_epoch():
+    """before_request: the epoch as this request starts, before any identity check.
+    Protocol and probe paths never open a session and skip the read."""
+    from flask import g, request
+    from utils.admin_allowlist import is_exempt_path
+    if not is_exempt_path(request.path):
+        g.session_epoch_at_start = current_epoch()
+
+
+def request_epoch() -> int:
+    """The epoch a session opened by this request carries: the one read as it started,
+    so a restore that lands during the login refuses the session it opens."""
+    from flask import g, has_request_context
+    if has_request_context() and 'session_epoch_at_start' in g:
+        return g.session_epoch_at_start
+    return current_epoch()
+
+
 def holds_current_epoch(data) -> bool:
     return (data.get(SESSION_KEY) or 0) == current_epoch()
 

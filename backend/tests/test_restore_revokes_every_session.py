@@ -130,3 +130,24 @@ def test_an_archive_carrying_nothing_closes_no_session(app, accounts, monkeypatc
     for url in ROUTES:
         assert _restore(restorer, url).status_code == 200
     assert restorer.get(PROTECTED).status_code == 200
+
+
+def test_a_login_the_restore_overtakes_is_refused_after_it(app, accounts, monkeypatch):
+    """The password was checked against the rows before the restore; the session the
+    login opens after it, on the restored row with the same id, is not accepted."""
+    from datetime import timedelta
+    from auth import twofa_enforcement
+    from auth.session_epoch import advance_epoch
+    name = accounts()
+
+    def restore_lands(user):
+        row = db.session.get(User, user.id)
+        row.role = 'admin'
+        row.created_at = row.created_at - timedelta(days=30)
+        db.session.commit()
+        advance_epoch()
+        return []
+    monkeypatch.setattr(twofa_enforcement, 'second_factor_methods', restore_lands)
+    client = _login(app, name)
+    assert client.get(PROTECTED).status_code == 401, 'a login begun before the restore survived it'
+    assert client.get('/api/v2/auth/verify').get_json().get('data', {}).get('authenticated') is not True
