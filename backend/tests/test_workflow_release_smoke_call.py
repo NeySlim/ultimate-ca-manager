@@ -8,7 +8,7 @@ import subprocess
 
 import pytest
 
-from tests.workflow_support import evaluate, github_context, load, render, triggers
+from tests.workflow_support import ROOT, evaluate, github_context, load, render, triggers
 
 SMOKE = './.github/workflows/release-smoke.yml'
 TAG_PUSH = github_context('push', 'refs/tags/v3.0-rc1')
@@ -95,7 +95,7 @@ def test_the_version_step_validates_the_input(tmp_path, version, image, ok):
         out = tmp_path / f'{name}.out'
         env = {k: render(v, {'inputs': {'version': version, 'image': image}, 'github': TAG_PUSH})
                for k, v in step.get('env', {}).items()}
-        run = subprocess.run(['bash', '-e', '-c', step['run']], capture_output=True, text=True,
+        run = subprocess.run(['bash', '-e', '-c', step['run']], capture_output=True, text=True, cwd=ROOT,
                              env={**env, 'GITHUB_OUTPUT': str(out), 'PATH': os.environ['PATH']})
         uses_image = 'INPUT_IMAGE' in step.get('env', {})
         expect_ok = ok or (not uses_image and version in ('3.0', '3.0-rc1'))

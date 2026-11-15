@@ -3,24 +3,37 @@
 Cross-distro validation matrix for every release candidate (`-rcN`) and stable
 tag. **6/6 mandatory**: 3 distros × 2 backends.
 
-| Target            | Host:Port           | SQLite | PostgreSQL |
-|-------------------|---------------------|--------|------------|
-| DEB package       | <deb-host>:8445     | smoke + UC | smoke + UC + 33-migration from-scratch |
-| RPM package       | <rpm-host>:8443     | smoke + UC | smoke + UC |
-| Docker container  | <docker-host>:8444  | smoke + UC | smoke + UC |
+| Target            | SQLite | PostgreSQL |
+|-------------------|--------|------------|
+| DEB package       | smoke + UI | smoke + UI + fresh database |
+| RPM package       | smoke + UI | smoke + UI |
+| Docker container  | smoke + UI | smoke + UI |
 
-> RC test containers always go on **8444** under a separate name (e.g.
-> `ucm-rc-test`). Never restart a production container with an RC image.
+Each target is a host of its own (`<host>`, `<port>` below). An RC container
+runs under a separate name and port (e.g. `ucm-rc-test`): never restart a
+production container with an RC image.
 
-## Smoke + UC scripts
+"Fresh database" means an empty PostgreSQL database: its schema is built in one
+pass, not migration by migration. The boot log must show `Database: POSTGRESQL`,
+`Fresh PostgreSQL database` and `migration baseline marked`, and no line starting with `✗`.
 
-| Script                              | Scope                          |
-|-------------------------------------|--------------------------------|
-| `<scripts>/smoke.py`            | API smoke (urllib + cookie + CSRF) |
-| `<scripts>/playwright_uc.py`    | 11 real-UI workflows (Chromium headless) |
+## Smoke and UI checks
 
-Bump the version assertion line in `smoke.py` for every release. Currently
-matches `2.X-dev`, `2.X-rcN`, and `2.X`.
+`scripts/smoke_release.py` checks `/api/v2/health` (the version it reports must
+equal `--version` exactly), the login, the permissions and the CSRF token:
+
+```bash
+UCM_SMOKE_ADMIN_PASSWORD=<password> python3 scripts/smoke_release.py \
+    --base-url https://<host>:<port> --version <X.Y-rcN> --allow-rc
+```
+
+UCM has no default password: on a fresh install, read the generated one in
+`/opt/ucm/data/initial-admin-password` (Docker: `docker exec <container> cat
+/opt/ucm/data/initial-admin-password`) and change it at first login, or set
+`INITIAL_ADMIN_PASSWORD_FILE` before the first start.
+
+The UI checks are the workflows of "Mandatory functional smoke tests" below,
+run in a browser on every target.
 
 ## Package install smoke
 
@@ -30,11 +43,12 @@ matches `2.X-dev`, `2.X-rcN`, and `2.X`.
 
 ```bash
 # 1. Install / pull the RC artefact
-ssh <host> "dpkg -i ucm_<X.Y-rcN>_all.deb && apt-get install -f -y"        # DEB
-ssh <rpm-host> "dnf install -y ./ucm-<X.Y-rcN>-1.noarch.rpm"                    # RPM
-ssh <docker-host> "docker rm -f ucm-rc-test 2>/dev/null; \
-           docker run -d --name ucm-rc-test -p 8444:8443 \
-             -e UCM_DOCKER=1 \
+# Asset names carry dots: 3.0-rc1 ships as ucm_3.0.rc1_all.deb
+ssh <host> "apt-get install -y ./ucm_<X.Y.rcN>_all.deb"                        # DEB
+ssh <host> "dnf install -y ./ucm-<X.Y.rcN>-1.fc43.noarch.rpm"                 # RPM, Fedora
+ssh <host> "dnf install -y ./ucm-el9-<X.Y.rcN>-1.el9.noarch.rpm"              # RPM, EL9 (el10: ucm-el10-...el10)
+ssh <host> "docker rm -f ucm-rc-test 2>/dev/null; \
+           docker run -d --name ucm-rc-test -p <port>:8443 \
              -v /srv/ucm-rc-test/etc:/etc/ucm \
              -v /srv/ucm-rc-test/data:/opt/ucm/data \
              neyslim/ultimate-ca-manager:<X.Y-rcN>"                        # Docker
@@ -43,38 +57,38 @@ ssh <docker-host> "docker rm -f ucm-rc-test 2>/dev/null; \
 ssh <host> "journalctl -u ucm -n 80 --no-pager | grep -E 'Database|migration|listening'"
 curl -k https://<host>:<port>/api/v2/health   # → {"status":"ok"}
 
-# 3. Run smoke + UC
-UCM_BASE=https://<host>:<port> python3 <scripts>/smoke.py
-UCM_BASE=https://<host>:<port> python3 <scripts>/playwright_uc.py
+# 3. Run the smoke, then the UI checks
+UCM_SMOKE_ADMIN_PASSWORD=<password> python3 scripts/smoke_release.py \
+    --base-url https://<host>:<port> --version <X.Y-rcN> --allow-rc
 ```
 
 ## PostgreSQL sub-test (DEB / RPM)
 
 ```bash
-# Throwaway PG on the Docker host
-ssh <docker-host> "docker run -d --name ucm-rc-pg -p 0.0.0.0:5444:5432 \
+# Throwaway PostgreSQL on a host with Docker
+ssh <pg-host> "docker run -d --name ucm-rc-pg -p <pg-port>:5432 \
     -e POSTGRES_USER=ucm -e POSTGRES_PASSWORD=ucmtest -e POSTGRES_DB=ucm \
     postgres:16-alpine"
 
 # Switch backend (env file is sourced by systemd)
 ssh <host> "cp /etc/ucm/ucm.env /etc/ucm/ucm.env.pre-pg && \
-    echo 'DATABASE_URL=postgresql://ucm:ucmtest@<docker-host-ip>:5444/ucm' >> /etc/ucm/ucm.env && \
+    echo 'DATABASE_URL=postgresql://ucm:ucmtest@<pg-host>:<pg-port>/ucm' >> /etc/ucm/ucm.env && \
     systemctl restart ucm"
 
-# Boot log MUST show: ✓ Database: POSTGRESQL + applied migration count
+# Boot log MUST show: ✓ Database: POSTGRESQL and, on a fresh database, the migration baseline marked
 ssh <host> "journalctl -u ucm -n 100 --no-pager | grep -E 'Database|migration'"
 
-# Re-run smoke + UC
-UCM_BASE=https://<host>:<port> python3 <scripts>/smoke.py
-UCM_BASE=https://<host>:<port> python3 <scripts>/playwright_uc.py
+# Re-run the smoke and the UI checks
+UCM_SMOKE_ADMIN_PASSWORD=<password> python3 scripts/smoke_release.py \
+    --base-url https://<host>:<port> --version <X.Y-rcN> --allow-rc
 
 # Restore + cleanup
 ssh <host> "mv /etc/ucm/ucm.env.pre-pg /etc/ucm/ucm.env && systemctl restart ucm"
-ssh <docker-host> "docker rm -f ucm-rc-pg"
+ssh <pg-host> "docker rm -f ucm-rc-pg"
 ```
 
 Docker → PG: add `--add-host=host.docker.internal:host-gateway` and use
-`host.docker.internal:5444`. IPv6 docker-proxy can be unreliable: use the
+`host.docker.internal:<pg-port>`. IPv6 docker-proxy can be unreliable: use the
 FQDN or `127.0.0.1`, never `localhost`.
 
 ## Mandatory functional smoke tests
@@ -108,8 +122,8 @@ SSH CA, webhook secrets) unrecoverable.
 
 ```bash
 # 1. Bind-mount both volumes
-ssh <docker-host> "docker rm -f ucm-rc-test 2>/dev/null; \
-         docker run -d --name ucm-rc-test -p 8444:8443 \
+ssh <host> "docker rm -f ucm-rc-test 2>/dev/null; \
+         docker run -d --name ucm-rc-test -p <port>:8443 \
            -v /srv/ucm-rc-test/etc:/etc/ucm \
            -v /srv/ucm-rc-test/data:/opt/ucm/data \
            neyslim/ultimate-ca-manager:<X.Y-rcN>"
@@ -118,18 +132,18 @@ ssh <docker-host> "docker rm -f ucm-rc-test 2>/dev/null; \
 #    → Backup modal MUST appear, MUST require download + checkbox before close
 
 # 3. Confirm master.key was created on the host
-ssh <docker-host> "ls -la /srv/ucm-rc-test/etc/master.key"
+ssh <host> "ls -la /srv/ucm-rc-test/etc/master.key"
 #    → -rw------- ucm ucm
 
 # 4. Recreate container (simulates upgrade / image change)
-ssh <docker-host> "docker rm -f ucm-rc-test && \
-         docker run -d --name ucm-rc-test -p 8444:8443 \
+ssh <host> "docker rm -f ucm-rc-test && \
+         docker run -d --name ucm-rc-test -p <port>:8443 \
            -v /srv/ucm-rc-test/etc:/etc/ucm \
            -v /srv/ucm-rc-test/data:/opt/ucm/data \
            neyslim/ultimate-ca-manager:<X.Y-rcN>"
 
 # 5. Verify NO safe-mode banner, encryption still enabled
-curl -k https://<docker-host>:8444/api/v2/system/security/encryption-status
+curl -k https://<host>:<port>/api/v2/system/security/encryption-status
 #    → {"data": {"enabled": true, "key_source": "file", ...}}
 
 # 6. Test the existing-key download endpoint
@@ -141,11 +155,11 @@ curl -k https://<docker-host>:8444/api/v2/system/security/encryption-status
 
 A release is **not** stable until **6/6** targets pass:
 
-- [ ] DEB / SQLite: smoke + UC + functional smoke tests
-- [ ] DEB / PostgreSQL: smoke + UC + 33-migration-from-scratch
-- [ ] RPM / SQLite: smoke + UC + functional smoke tests
-- [ ] RPM / PostgreSQL: smoke + UC
-- [ ] Docker / SQLite: smoke + UC + master-key persistence
-- [ ] Docker / PostgreSQL: smoke + UC
+- [ ] DEB / SQLite: smoke + UI + functional smoke tests
+- [ ] DEB / PostgreSQL: smoke + UI + fresh database
+- [ ] RPM / SQLite: smoke + UI + functional smoke tests
+- [ ] RPM / PostgreSQL: smoke + UI
+- [ ] Docker / SQLite: smoke + UI + master-key persistence
+- [ ] Docker / PostgreSQL: smoke + UI
 
 Skipping a target is how distro-specific regressions ship.

@@ -2389,6 +2389,15 @@ GET /api/v2/settings/backup
 # last_run: the latest reservation; last_outcome / last_outcome_at: the latest run that reported
 # in_progress: true while a run reserved last_run and has not written its archive (two-hour lease);
 #   last_run is then that run's, the outcome still the previous run's
+# max_total_mb: the ceiling; stored_bytes / stored_count: what the archives retention counts take now
+#   (every archive of the database in HA, the ucm_backup_*.ucmbkp files of the disk otherwise);
+#   over_ceiling: true when they are above it; uncounted_count: other archive files of the directory
+#   (0 in HA), neither counted nor removed by retention
+# Retention (daily, or POST /api/v2/system/backups/run-retention, which returns "warning" while the
+#   archives are still above the ceiling) removes the oldest archives over the ceiling and audits each
+#   one (backup_delete). It never removes, on disk, the newest archive that matches its validation
+#   record, up to 2 archives with no validation record and the backup_min_keep newest archives not
+#   found altered; in HA, the backup_min_keep newest archives
 GET /api/v2/settings/backup/schedule
 
 # Update backup schedule
@@ -2400,10 +2409,12 @@ Content-Type: application/json
   "frequency": "daily",
   "time": "02:00",
   "retention_days": 30,
+  "max_total_mb": 0,              # size ceiling of all archives in MiB, 0 = none (400 when negative, above 1048576 or not a whole number)
   "kdf": "pbkdf2"                 # auto (default), pbkdf2 or argon2id; argon2id refused in FIPS mode
 }
 
 # Create backup ("kdf": "pbkdf2" writes an archive a FIPS-mode instance can restore)
+# Removes nothing for the ceiling: "warning" is set when the archives are then above it, null otherwise
 POST /api/v2/settings/backup/create
 {
   "password": "...",
@@ -2486,6 +2497,8 @@ Content-Type: application/json
 GET /api/v2/system/backup/list
 
 # Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id")
+# Also POST /api/v2/system/backup. Removes nothing for the ceiling: "warning" is set when the
+# archives are then above it, null otherwise; the next retention applies it
 POST /api/v2/system/backup/create
 
 # Download backup (in HA from any node, with a Repr-Digest: sha-256=:...: header)

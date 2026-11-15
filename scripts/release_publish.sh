@@ -13,7 +13,7 @@
 #   scripts/release_publish.sh --draft           # create as draft
 #   scripts/release_publish.sh --edit            # edit existing release notes
 #
-# Requires: gh, git. Repository must be the current working directory.
+# Requires: gh, git, python3 (scripts/ci/release_version.py). Repository must be the current working directory.
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -54,26 +54,11 @@ if ! git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "$TAG"; then
     exit 1
 fi
 
-# Extract changelog section for this version.
-extract_changelog() {
-    local v="$1"
-    # Match "## [VERSION]" up to the next "## [" or EOF.
-    awk -v ver="$v" '
-        BEGIN { inblk=0 }
-        /^## \[/ {
-            if (inblk) exit
-            if ($0 ~ "^## \\[" ver "\\]") { inblk=1; next }
-        }
-        inblk { print }
-    ' CHANGELOG.md
-}
-
-NOTES="$(extract_changelog "$VERSION" | sed -e 's/[[:space:]]*$//')"
-if [[ -z "$NOTES" ]]; then
-    echo "No CHANGELOG section found for [${VERSION}]." >&2
-    echo "Add a '## [${VERSION}] - YYYY-MM-DD' block to CHANGELOG.md first." >&2
+# Same section as the workflow: [Unreleased] for a RC, its own section for a stable.
+NOTES="$(python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md | sed -e 's/[[:space:]]*$//')" || {
+    echo "A RC needs an '## [Unreleased]' block; a stable needs '## [${VERSION}] - YYYY-MM-DD'." >&2
     exit 1
-fi
+}
 
 NOTES_FILE="$(mktemp -t ucm-relnotes.XXXXXX.md)"
 trap 'rm -f "$NOTES_FILE"' EXIT
