@@ -3,12 +3,13 @@ restore advances it, so no session begun before a restore is accepted after it.
 
 One system_config row, never exported nor restored (services/backup/installation.py),
 shared by every node and worker whatever store holds the sessions. It is read twice:
-- once as a request starts, before any identity check (remember_request_epoch, and the
-  certificate sign-in on a page), and a session the request opens carries that value: a
-  restore that commits while a login checks old credentials refuses the session it opens;
+- once as a login request starts, before any identity check (remember_request_epoch on
+  the LOGIN_PATHS, and the certificate middleware before it signs in), and the session
+  the request opens carries that value: a restore that commits while a login checks old
+  credentials refuses the session it opens;
 - by every request that presents a session (holds_current_epoch), against the row as it
   is then.
-Protocol and probe paths, static files and the SPA shell open no session and skip the first.
+No other request reads the first; a session opened without it raises (request_epoch).
 """
 from models import SystemConfig, db
 
@@ -24,10 +25,13 @@ def current_epoch() -> int:
 _AT_START = 'session_epoch_at_start'
 
 
+# Every route that calls begin_session; the certificate middleware reads for itself.
+LOGIN_PATHS = ('/api/v2/auth/login', '/api/v2/sso/ldap/login', '/api/v2/sso/callback/')
+
+
 def opens_sessions(path) -> bool:
-    """Only the API signs in (the certificate middleware on a page reads for itself)."""
-    from utils.admin_allowlist import is_exempt_path
-    return path.startswith('/api/') and not is_exempt_path(path)
+    return (path == LOGIN_PATHS[0] or path.startswith(LOGIN_PATHS[0] + '/')
+            or path.startswith(LOGIN_PATHS[1:]))
 
 
 def remember_request_epoch():
@@ -45,11 +49,16 @@ def note_request_epoch():
 
 
 def request_epoch() -> int:
-    """The epoch a session opened by this request carries: the one read as it started."""
+    """The epoch a session opened by this request carries: the one read as it started.
+
+    Fails closed: a request that opens a session without that value is a login route
+    missing from LOGIN_PATHS, and a later read would hide a restore it overlapped."""
     from flask import g, has_request_context
-    if has_request_context() and _AT_START in g:
-        return g.get(_AT_START)
-    return current_epoch()
+    if not has_request_context():
+        return current_epoch()
+    if _AT_START not in g:
+        raise RuntimeError('session opened without the epoch read as its request started')
+    return g.get(_AT_START)
 
 
 def holds_current_epoch(data) -> bool:

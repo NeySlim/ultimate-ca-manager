@@ -64,6 +64,14 @@ def test_a_password_login_a_restore_overtakes_opens_no_valid_session(app, user, 
     assert _signed_in(again)
 
 
+def test_the_legacy_login_route_a_restore_overtakes_opens_no_valid_session(app, user, monkeypatch):
+    done = _restore_meanwhile(monkeypatch, User, 'check_password')
+    c = app.test_client()
+    r = _post(c, '/api/v2/auth/login', {'username': user['username'], 'password': PASSWORD})
+    assert r.status_code == 200, r.data
+    assert done and not _signed_in(c)
+
+
 def test_a_password_step_before_a_restore_cannot_finish_with_its_second_factor(
         app, totp_user, monkeypatch):
     done = _restore_meanwhile(monkeypatch, User, 'check_password')
@@ -262,6 +270,7 @@ NO_SESSION_PATHS = [
     ('get', '/assets/index-abc123.js'), ('get', '/favicon.ico'), ('get', '/'),
     ('get', '/certificates'), ('get', '/api/v2/health'), ('get', '/health/ready'),
     ('post', '/ocsp'), ('get', '/cgi-bin/pkiclient.exe?operation=GetCACaps'),
+    ('get', '/api/v2/auth/verify'), ('get', '/api/v2/auth/methods'),
 ]
 
 
@@ -272,7 +281,8 @@ def test_a_request_that_opens_no_session_never_reads_the_epoch(app, method, path
     assert seen.epoch == 0, (path, seen.all)
 
 
-@pytest.mark.parametrize('path', ['/assets/index-abc123.js', '/favicon.ico', '/', '/certificates'])
+@pytest.mark.parametrize('path', ['/assets/index-abc123.js', '/favicon.ico', '/', '/certificates',
+                                  '/api/v2/auth/verify', '/api/v2/auth/methods'])
 def test_files_and_the_shell_are_served_when_the_epoch_cannot_be_read(app, monkeypatch, path):
     from auth import session_epoch
 
@@ -280,6 +290,26 @@ def test_files_and_the_shell_are_served_when_the_epoch_cannot_be_read(app, monke
         raise RuntimeError('database away')
     monkeypatch.setattr(session_epoch, 'current_epoch', away)
     assert app.test_client().get(path).status_code < 500
+
+
+@pytest.mark.parametrize('path', ['/api/v2/account/profile', '/api/v2/auth/verify'])
+def test_a_signed_in_call_that_opens_no_session_reads_no_start_epoch(app, user, path):
+    """Only the login routes read it as they start: a signed-in call pays no extra SELECT."""
+    from flask import g
+    from auth.session_epoch import _AT_START
+    c = app.test_client()
+    assert _password_step(c, user).status_code == 200
+    with c:
+        assert c.get(path).status_code == 200
+        assert _AT_START not in g
+
+
+def test_a_session_opened_without_a_start_epoch_is_refused_loudly(app):
+    """A login route missing from the list fails instead of stamping a later epoch."""
+    from auth import session_epoch
+    with app.test_request_context('/api/v2/some/new/login', method='POST'):
+        with pytest.raises(RuntimeError):
+            session_epoch.request_epoch()
 
 
 def test_a_login_reads_the_epoch_once(app, user):
