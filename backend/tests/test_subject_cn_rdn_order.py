@@ -196,7 +196,12 @@ def test_the_external_certificate_path_records_the_first_common_name(app, auth_c
     assert r.status_code == 200, r.data
     assert r.get_json()['data']['id'] == csr_id
     with app.app_context():
-        assert db.session.get(Certificate, csr_id).subject_cn == f'web-{tag}.example.com'
+        row = db.session.get(Certificate, csr_id)
+        try:
+            assert row.subject_cn == f'web-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
 
 
 def test_the_est_path_records_the_most_specific_common_name(app, create_ca, key):
