@@ -667,6 +667,32 @@ def test_a_subject_change_on_install_warns_that_the_cas_issued_under_the_former_
     assert (_caref(app, sub['id']) == w['child']['refid']) is revoked
 
 
+@pytest.mark.parametrize('with_unconfirmed', [False, True])
+def test_a_subject_change_does_not_warn_of_a_parent_confirmed_by_hand(app, auth_client, made, linked, with_unconfirmed):
+    """The chain repair leaves a parent confirmed by hand: only an unconfirmed link is announced lost."""
+    from services.ski_aki_backfill import backfill_ski_aki
+    w = linked
+    subs = []
+    for _ in range(2 if with_unconfirmed else 1):
+        sub = _import(auth_client, _rsa_pem(f'Repl Sub {_tag()}', _key(), w['cn'], w['key'], serial=_serial()))
+        made.append(sub['id'])
+        assert sub['caref'] == w['child']['refid']
+        subs.append(sub)
+    with app.app_context():
+        confirmed = db.session.get(CA, subs[0]['id'])
+        confirmed.parent_confirmed_by, confirmed.parent_confirmed_at = 'admin', dt.datetime(2026, 3, 1)
+        db.session.commit()
+    r = auth_client.post(f"/api/v2/cas/{w['child']['id']}/certificate", content_type='multipart/form-data', data={
+        'pem_content': _rsa_pem(f"{w['cn']} Renamed", w['key'], w['root_cn'], w['root_key'], serial=_serial())})
+    assert r.status_code == 200, r.data
+    said = [m for m in get_json(r)['data']['warnings'] if m.startswith('Certificate subject differs')]
+    assert len(said) == 1
+    assert ('lose this CA as their parent at the next chain repair' in said[0]) is with_unconfirmed
+    with app.app_context():
+        backfill_ski_aki()
+    assert _caref(app, subs[0]['id']) == w['child']['refid']
+
+
 # ------------------------------------------------- a parent whose extensions cannot be read
 
 def _root_pem(cn, key):

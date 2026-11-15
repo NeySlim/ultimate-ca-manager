@@ -515,7 +515,8 @@ dropped link is audited as `ca_parent_unlinked`. On both paths, a parent re-keye
 revoked CA keeps its parent, so the revocation stays on the parent's CRL, until a certificate of
 another serial number replaces its own. The chain repair keeps a parent confirmed by hand too. An
 installed certificate whose subject differs from the CA's former one warns when CAs issued under the
-former subject are linked to it: the chain repair drops those links, revoked CAs excepted. When the
+former subject are linked to it: the chain repair drops those links, except for revoked CAs and
+parents confirmed by hand. When the
 parent's key or signature algorithm is one this server cannot check (SLH-DSA, GOST), the CA is left
 without a parent, and neither the hourly chain repair nor a re-import links it.
 

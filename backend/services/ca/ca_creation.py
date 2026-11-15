@@ -161,11 +161,14 @@ def _bears_name(record, name):
 
 def _orphaned_by_subject_change(ca, cert):
     """The warning's tail when CAs linked under *ca* name its former subject as their issuer: the
-    chain repair drops them once *cert* holds another (RFC 5280 6.1.3 (a)(4)), revoked ones excepted."""
+    chain repair drops them once *cert* holds another (RFC 5280 6.1.3 (a)(4)), revoked ones and
+    those confirmed by hand excepted."""
     from utils.dn_match import same_name
     for child in CA.query.filter(CA.caref == ca.refid, CA.id != ca.id).all():
+        if child.parent_confirmed_at is not None or child.is_revoked:
+            continue
         stored = _stored_certificate(child)
-        if stored is not None and not child.is_revoked and not same_name(stored.issuer, cert.subject):
+        if stored is not None and not same_name(stored.issuer, cert.subject):
             return ': the CAs issued under the former subject lose this CA as their parent at the next chain repair'
     return ''
 
