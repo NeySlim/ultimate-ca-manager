@@ -1141,6 +1141,7 @@ export const helpContent = {
         items: [
           { label: "Cadence", text: "Daily / weekly / monthly" },
           { label: "Retention", text: "Backups older than the set number of days (30 by default) are pruned" },
+          { label: "Size ceiling", text: "A ceiling in MiB for all archives (0 for none): the oldest are removed, each audited, until the total fits. The newest archive and the minimum kept stay, so one archive larger than the ceiling is kept and reported. Settings > Backup shows the space used" },
           { label: "Encryption", text: "Backups are encrypted with the configured backup password" },
           { label: "High availability", text: "In HA the archives are stored in PostgreSQL: every node lists them with the node that wrote them and downloads them, and retention runs on the leader. They are lost with the database: download the ones you keep out of the cluster, and back PostgreSQL up with its own tools" },
           { label: "Key derivation", text: "Automatic (Argon2id when available, PBKDF2 in FIPS mode), PBKDF2-HMAC-SHA256 or Argon2id. Archives written with Argon2id cannot be restored on an instance in FIPS mode" },

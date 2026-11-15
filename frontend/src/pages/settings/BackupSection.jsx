@@ -23,6 +23,9 @@ export default function BackupSection({
   const diskHigh = typeof backupMeta.disk_used_pct === 'number' && backupMeta.disk_used_pct >= 85
   // HA: the archives live in the shared database, listed the same from every node
   const sharedStore = backupMeta.storage === 'database'
+  // The ceiling is in MiB, 0 for none; the figures are those of every stored archive
+  const ceilingMb = Number(settings.backup_max_total_mb) || 0
+  const overCeiling = ceilingMb > 0 && (backupMeta.total_size_all_bytes ?? 0) > ceilingMb * 1024 * 1024
 
   const sortOptions = [
     { value: 'created_desc', label: t('settings.backupSortNewest') },
@@ -132,6 +135,26 @@ export default function BackupSection({
             max="3650"
             helperText={t('settings.retentionHelper')}
           />
+          <Input
+            label={t('settings.backupMaxTotalMb')}
+            type="number"
+            value={settings.backup_max_total_mb ?? 0}
+            onChange={(e) => updateSetting('backup_max_total_mb', parseInt(e.target.value, 10) || 0)}
+            min="0"
+            max="1048576"
+            helperText={t('settings.backupMaxTotalMbHelper')}
+          />
+          {backupMeta.total_size_all !== undefined && (
+            <p className="text-xs text-text-secondary" data-testid="backup-space-used">
+              {t('settings.backupSpaceUsed', { size: backupMeta.total_size_all, count: backupMeta.total_all ?? 0 })}
+            </p>
+          )}
+          {overCeiling && (
+            <p className="flex items-start gap-2 text-xs text-status-warning" role="alert">
+              <WarningCircle size={14} className="flex-shrink-0 mt-0.5" />
+              <span>{t('settings.backupOverCeiling', { ceiling: ceilingMb })}</span>
+            </p>
+          )}
           {(canWriteSettings || isAdmin) && (
             <div className="flex gap-2">
               {canWriteSettings && (

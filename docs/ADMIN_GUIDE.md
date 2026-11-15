@@ -315,6 +315,8 @@ The `certificate.expired` webhooks of a pass cover what expired since the previo
 3. Enter encryption password
 4. Download `.ucmbkp` file
 
+Settings > Backup shows the space the stored archives take and sets a size ceiling for all of them, in MiB (0, the default, for none). Retention removes the oldest archives until the total fits and audits each removal by name; the newest archive and the minimum kept are never removed, so a single archive larger than the ceiling stays, and the screen, the log and the retention response say that the ceiling is exceeded. In HA the figure is that of the archives in the database.
+
 Backups, retention and restores take the same lock, so an archive never holds half of a restore: a manual backup started meanwhile waits up to 30 seconds, then answers 409; the scheduled one runs at the next minute.
 
 **Via command line (SQLite):**

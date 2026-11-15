@@ -2366,6 +2366,11 @@ GET /api/v2/settings/backup
 # last_run: the latest reservation; last_outcome / last_outcome_at: the latest run that reported
 # in_progress: true while a run reserved last_run and has not written its archive (two-hour lease);
 #   last_run is then that run's, the outcome still the previous run's
+# max_total_mb: the ceiling; stored_bytes / stored_count: what the stored archives take now (the
+#   database's in HA, the disk's otherwise); over_ceiling: true when they are above it
+# Retention (daily, or POST /api/v2/system/backups/run-retention, which returns "warning" while the
+#   archives are still above the ceiling) removes the oldest archives over the ceiling and audits each
+#   one (backup_delete); the newest archive and the backup_min_keep newest are never removed
 GET /api/v2/settings/backup/schedule
 
 # Update backup schedule
@@ -2377,6 +2382,7 @@ Content-Type: application/json
   "frequency": "daily",
   "time": "02:00",
   "retention_days": 30,
+  "max_total_mb": 0,              # size ceiling of all archives in MiB, 0 = none (400 above 1048576 or not a whole number)
   "kdf": "pbkdf2"                 # auto (default), pbkdf2 or argon2id; argon2id refused in FIPS mode
 }
 

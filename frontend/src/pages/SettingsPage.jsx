@@ -456,7 +456,9 @@ export default function SettingsPage() {
     setBackupBusy(true)
     try {
       const res = await systemService.runBackupRetention()
-      showSuccess(t('settings.backupRetentionRemoved', { count: (res.data || res).removed ?? 0 }))
+      const outcome = res.data || res
+      showSuccess(t('settings.backupRetentionRemoved', { count: outcome.removed ?? 0 }))
+      if (outcome.warning) showWarning(t('settings.backupOverCeilingKept'))
       loadBackups()
     } catch (error) {
       showError(error.message || t('common.error'))

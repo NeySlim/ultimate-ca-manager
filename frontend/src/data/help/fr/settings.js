@@ -51,6 +51,7 @@ export default {
         items: [
           { label: "Cadence", text: "Quotidienne / hebdomadaire / mensuelle" },
           { label: "Rétention", text: "Les sauvegardes plus anciennes que le nombre de jours défini (30 par défaut) sont purgées" },
+          { label: "Plafond de taille", text: "Un plafond en Mio pour toutes les archives (0 pour aucun) : les plus anciennes sont supprimées, chacune auditée, jusqu'à ce que le total passe dessous. La plus récente et le minimum conservé restent : une archive seule plus grosse que le plafond est gardée et signalée. Réglages > Sauvegarde affiche la place occupée" },
           { label: "Chiffrement", text: "Les sauvegardes sont chiffrées avec le mot de passe de sauvegarde configuré" },
           { label: "Haute disponibilité", text: "En HA, les archives sont stockées dans PostgreSQL : chaque nœud les liste, avec le nœud qui les a écrites, et les télécharge, et la rétention s'exécute sur le leader. Elles disparaissent avec la base : téléchargez celles que vous gardez hors du cluster, et sauvegardez PostgreSQL avec ses propres outils" },
           { label: "Dérivation de clé", text: "Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS" },
