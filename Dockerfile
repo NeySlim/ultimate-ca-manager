@@ -135,8 +135,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -r -u 1000 -s /bin/false -d /opt/ucm ucm && \
     usermod -aG softhsm ucm
 
-# FIPS variant: fips.so in the module directory of this platform's libcrypto,
-# and /run/ucm where the entrypoint writes the module configuration at start
+# FIPS variant: fips.so in the module directory of this platform's libcrypto, its
+# module-mac (root, read-only) that the entrypoint compares at each start, and
+# /run/ucm where the entrypoint writes the module configuration at start
+COPY docker/fips-module.sh /fips-module.sh
 RUN --mount=type=bind,from=fips-provider,target=/tmp/fips-provider \
     if [ "$UCM_FIPS_BUILD" = 1 ]; then \
         set -eu; \
@@ -146,7 +148,15 @@ RUN --mount=type=bind,from=fips-provider,target=/tmp/fips-provider \
         moddir="$(openssl version -m | sed -E 's/^MODULESDIR: "(.*)"$/\1/')"; \
         test "$moddir" = "/usr/lib/$triplet/ossl-modules"; \
         install -m 0644 /tmp/fips-provider/out/fips.so "$moddir/fips.so"; \
-        openssl fipsinstall -module "$moddir/fips.so" -provider_name fips -out /dev/null; \
+        tmp="$(mktemp -d)"; \
+        openssl fipsinstall -pedantic -module "$moddir/fips.so" -provider_name fips \
+            -out "$tmp/fipsmodule.cnf" >/dev/null; \
+        install -d -m 0755 /usr/share/ucm; \
+        . /fips-module.sh; fips_module_mac "$tmp/fipsmodule.cnf" > /usr/share/ucm/fips-module.mac; \
+        grep -Eq '^([0-9A-F]{2}:){31}[0-9A-F]{2}$' /usr/share/ucm/fips-module.mac; \
+        chmod 0444 /usr/share/ucm/fips-module.mac; \
+        cat /usr/share/ucm/fips-module.mac; \
+        rm -rf "$tmp"; \
         install -d -o ucm -g ucm -m 0700 /run/ucm; \
     fi
 
