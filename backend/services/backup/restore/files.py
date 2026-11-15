@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 _STAGING_PREFIX = 'ucm_restore_files_'
 _PUBLISH_PREFIX = '.ucm_restore_'
+_KEPT_PREFIX = '.ucm_restore_kept_'
 
 
 def _atomic_replace(destination: Path, data: bytes, mode: int) -> None:
@@ -64,7 +65,7 @@ class _Staged:
     The previous content is kept at publication time rather than at staging
     time: between the two, the transaction has run, and only what is on disk
     when the replace happens is what a compensation has to put back. It is
-    kept as a file of the staging directory, never in memory.
+    kept as a file beside the destination, never in memory.
     """
 
     __slots__ = ('destination', 'staged_path', 'mode', 'remove',
@@ -99,6 +100,8 @@ class StagedFiles:
         self._entries: List[_Staged] = []
         # Destination to its position in _entries: one lookup per staged file
         self._index: Dict[Path, int] = {}
+        # Destination directory to its private directory of kept previous contents
+        self._kept_dirs: Dict[Path, Path] = {}
 
     # -- staging ----------------------------------------------------------
 
@@ -205,13 +208,30 @@ class StagedFiles:
 
         return published
 
+    def _kept_dir(self, directory: Path) -> Path:
+        """A private directory inside ``directory``, for its previous contents.
+
+        Inside the destination's own directory, so the hard link that keeps a
+        previous content never crosses a mount (a private /tmp, a container's
+        /tmp on tmpfs); the staging directory only when it cannot be created.
+        """
+        kept_dir = self._kept_dirs.get(directory)
+        if kept_dir is None:
+            try:
+                kept_dir = Path(tempfile.mkdtemp(prefix=_KEPT_PREFIX, dir=str(directory)))
+                os.chmod(kept_dir, 0o700)
+            except OSError:
+                kept_dir = self._staging()
+            self._kept_dirs[directory] = kept_dir
+        return kept_dir
+
     def _capture_previous(self, entry: _Staged, position: int) -> None:
         """Keep what the destination holds, before anything overwrites it.
 
-        A hard link when the staging shares the destination's filesystem, a
-        copy otherwise. A destination that cannot be kept is a destination
-        that could not be put back, so the failure stops the publication here
-        instead of producing a file nothing can undo.
+        A hard link beside the destination, a copy when the file cannot be
+        linked. A destination that cannot be kept is a destination that could
+        not be put back, so the failure stops the publication here instead of
+        producing a file nothing can undo.
         """
         try:
             info = os.stat(entry.destination)
@@ -220,7 +240,7 @@ class StagedFiles:
             entry.previous_path = None
             entry.previous_mode = entry.mode
             return
-        kept = self._staging() / f"previous_{position:06d}"
+        kept = self._kept_dir(entry.destination.parent) / f"previous_{position:06d}"
         try:
             os.link(entry.destination, kept)
         except OSError:
@@ -287,14 +307,16 @@ class StagedFiles:
         reason to outlive either outcome.
         """
         staging, self._staging_dir = self._staging_dir, None
+        kept_dirs, self._kept_dirs = self._kept_dirs, {}
         self._entries = []
         self._index = {}
-        if staging is None:
-            return
-        try:
-            shutil.rmtree(staging)
-        except OSError:
-            logger.exception("Could not remove staged restore files %s", staging)
+        for directory in dict.fromkeys([*kept_dirs.values(), staging]):
+            if directory is None:
+                continue
+            try:
+                shutil.rmtree(directory)
+            except OSError:
+                logger.exception("Could not remove staged restore files %s", directory)
 
     # -- context manager --------------------------------------------------
 

@@ -372,6 +372,33 @@ class TestPublicationCost:
         assert destination.read_bytes() == b'in use'
         staged.discard()
 
+    def test_a_previous_content_is_linked_when_the_staging_is_elsewhere(
+            self, tmp_path, monkeypatch):
+        # The staging on another mount (a private /tmp, a container's /tmp): no copy is made
+        import services.backup.restore.files as files
+        staging = tmp_path / 'staging'
+        destination = tmp_path / 'private' / 'k.key'
+        destination.parent.mkdir()
+        destination.write_bytes(b'in use')
+        os.chmod(destination, 0o640)
+        real_link = os.link
+
+        def link(source, target, *args, **kwargs):
+            if Path(target).is_relative_to(staging):
+                raise OSError(errno.EXDEV, 'cross-device')
+            return real_link(source, target, *args, **kwargs)
+        monkeypatch.setattr(os, 'link', link)
+        monkeypatch.setattr(files, '_copy_private', lambda *a: pytest.fail('copied'))
+
+        staged = StagedFiles(base_dir=staging)
+        staged.stage(destination, b'restored')
+        staged.publish()
+        assert destination.read_bytes() == b'restored'
+        staged.unpublish()
+        assert destination.read_bytes() == b'in use' and _mode(destination) == 0o640
+        staged.discard()
+        assert sorted(p.name for p in destination.parent.iterdir()) == ['k.key']
+
     def test_a_previous_content_kept_on_another_filesystem_comes_back(
             self, tmp_path, monkeypatch):
         # Neither a link nor a rename works across filesystems: the content is rewritten
