@@ -767,7 +767,7 @@ jobs:
           IMAGE="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
           REPO="${{ github.repository }}"
           
-          # RC: the [Unreleased] section; stable: its own section. A missing section stops the release.
+          # Its own section; a RC without one takes [Unreleased]. A missing stable section stops the release.
           CHANGES_FILE=$(mktemp)
           python3 scripts/ci/release_version.py notes "$VERSION" CHANGELOG.md > "$CHANGES_FILE"
           

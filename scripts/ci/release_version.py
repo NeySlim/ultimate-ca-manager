@@ -91,12 +91,15 @@ def changelog_section(version, text):
 
 
 def release_notes(version, text):
-    """A RC ships what `[Unreleased]` holds; a stable ships its own section, renamed by the release commit."""
-    heading = 'Unreleased' if not is_stable(version) else version
-    body = (_section(re.compile(r'^## \[Unreleased\]'), text, '## [') if heading == 'Unreleased'
-            else changelog_section(version, text))
+    """Its own section when it has entries; a RC without one ships `[Unreleased]`, a stable fails."""
+    body = changelog_section(version, text)
+    if body.strip():
+        return body
+    if is_stable(version):
+        raise ValueError(f'CHANGELOG.md has no [{version}] section with entries for {version}')
+    body = _section(re.compile(r'^## \[Unreleased\]'), text, '## [')
     if not body.strip():
-        raise ValueError(f'CHANGELOG.md has no [{heading}] section with entries for {version}')
+        raise ValueError(f'CHANGELOG.md has no [{version}] or [Unreleased] section with entries for {version}')
     return body
 
 

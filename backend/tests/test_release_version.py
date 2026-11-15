@@ -221,10 +221,17 @@ def test_the_fallback_heading_does_not_bite_on_a_longer_version():
     assert 'three' in rv.changelog_section('2.254.1', text) and 'two' not in rv.changelog_section('2.254.1', text)
 
 
-def test_a_rc_with_a_section_of_its_own_name_still_takes_unreleased(tmp_path):
+def test_a_rc_with_a_section_of_its_own_name_takes_that_section(tmp_path):
     text = CHANGELOG.replace('## [3.0] - 2026-12-20', '## [3.0-rc1] - 2026-12-01\n- Named.\n\n## [3.0] - 2026-12-20')
     r = _notes(tmp_path, '3.0-rc1', text)
-    assert 'Next thing.' in r.stdout and 'Named.' not in r.stdout
+    assert r.returncode == 0 and 'Named.' in r.stdout and 'Next thing.' not in r.stdout
+
+
+def test_a_rc_section_is_used_when_unreleased_is_empty(tmp_path):
+    text = '## [Unreleased]\n\n## [3.0-rc1] - 2026-12-01\n- Named.\n\n## [2.254] - 2026-11-13\n- Old.\n'
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert r.returncode == 0, r.stderr
+    assert 'Named.' in r.stdout and 'Old.' not in r.stdout
 
 
 def test_a_corrective_release_candidate_takes_unreleased(tmp_path):
