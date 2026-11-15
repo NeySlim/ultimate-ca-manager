@@ -9,7 +9,8 @@ import { Button } from './Button'
 
 function formatSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
-  return `${(bytes / 1024 / 1024).toFixed(0)}MB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(0)}MB`
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}GB`
 }
 
 export function FileUpload({ 
@@ -20,7 +21,7 @@ export function FileUpload({
   helperText,
   label,
   compact = false, // Compact mode: smaller drop zone
-  maxSize = 10 * 1024 * 1024, // 10MB default
+  maxSize = 10 * 1024 * 1024, // 10MB default; 0 for no ceiling
   className 
 }) {
   const { t } = useTranslation()

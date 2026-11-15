@@ -75,6 +75,26 @@ if (typeof window !== 'undefined') {
   })
 }
 
+// POST through XMLHttpRequest, answering like the part of a fetch Response the client reads.
+function xhrUpload(url, config, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    xhr.withCredentials = config.credentials === 'include'
+    for (const [name, value] of Object.entries(config.headers || {})) xhr.setRequestHeader(name, value)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded, event.total)
+    }
+    xhr.onload = () => resolve({
+      ok: xhr.status >= 200 && xhr.status < 300,
+      status: xhr.status,
+      json: async () => JSON.parse(xhr.responseText),
+    })
+    xhr.onerror = () => reject(new TypeError('Network error'))
+    xhr.send(config.body)
+  })
+}
+
 class APIClient {
   constructor() {
     this.baseURL = API_BASE_URL
@@ -233,19 +253,23 @@ class APIClient {
       headers['X-CSRF-Token'] = csrfToken
     }
     
+    const { onProgress, ...fetchOptions } = options
     const config = {
       method: 'POST',
       body: formData,
       credentials: 'include',
       headers,
       // Don't set Content-Type - browser will set it with boundary for FormData
-      ...options,
+      ...fetchOptions,
     }
 
     if (import.meta.env.DEV) console.log(`📡 API UPLOAD ${url}`)
 
     try {
-      const response = await fetch(url, config)
+      // fetch reports no upload progress: a caller that wants it gets XHR, the same body.
+      const response = onProgress
+        ? await xhrUpload(url, config, onProgress)
+        : await fetch(url, config)
       const data = await response.json()
 
       if (!response.ok) {

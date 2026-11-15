@@ -2503,7 +2503,10 @@ code `maintenance_in_progress` while another maintenance holds, `maintenance_not
 fresh heartbeat did not acknowledge it within 30 s (`nodes` maps each one to the processes missing, `web` or
 `scheduler`), and `maintenance_lost` when the maintenance ended or was lifted before the commit; in each case
 nothing is restored. A successful restore answers `restart_detail` "Rolling restart requested: the nodes
-restart one at a time".
+restart one at a time". Both restore routes also answer `data.todo`, a list of strings with one line per warning
+(sections not restored, a CA whose CRL could not be signed, a secret to enter again); it is empty when there is
+nothing to do. The backup listing's `meta.restore_limits` gives `upload_bytes` (archives before v4) and
+`archive_bytes` (v4, `0` for no ceiling), the sizes a restore accepts.
 
 ### Cluster Maintenance (HA)
 `admin:system`. A node in maintenance answers its writes with `503`, `Retry-After: 30` and code `maintenance`;

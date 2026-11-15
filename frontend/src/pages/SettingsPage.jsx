@@ -55,6 +55,7 @@ import EmailSection from './settings/EmailSection'
 import SecuritySection from './settings/SecuritySection'
 import SsoSection from './settings/SsoSection'
 import BackupSection from './settings/BackupSection'
+import RestoreReport from './settings/RestoreReport'
 import AuditSection from './settings/AuditSection'
 import DatabaseSection from './settings/DatabaseSection'
 import { afterDatabaseReset } from './settings/databaseReset'
@@ -201,6 +202,8 @@ export default function SettingsPage() {
   const [restorePassword, setRestorePassword] = useState('')
   const [restoreFile, setRestoreFile] = useState(null)
   const [backupLoading, setBackupLoading] = useState(false)
+  const [restoreProgress, setRestoreProgress] = useState(null)
+  const [restoreReport, setRestoreReport] = useState(null)
   
   // HTTPS import modal
   const [showHttpsImportModal, setShowHttpsImportModal] = useState(false)
@@ -1348,16 +1351,19 @@ export default function SettingsPage() {
     
     setBackupLoading(true)
     try {
-      const result = await systemService.restore(restoreFile, restorePassword)
-      showSuccess(t('settings.backupRestored', { users: result.data?.users || 0, cas: result.data?.cas || 0, certs: result.data?.certificates || 0 }))
+      setRestoreProgress(0)
+      const result = await systemService.restore(restoreFile, restorePassword, {
+        onProgress: (loaded, total) => setRestoreProgress(Math.floor((loaded / total) * 100)),
+      })
       setShowRestoreModal(false)
       setRestorePassword('')
       setRestoreFile(null)
-      setTimeout(() => window.location.reload(), 2000)
+      setRestoreReport(result.data || {})
     } catch (error) {
       showError(error.message || t('messages.errors.backup.restoreFailed'))
     } finally {
       setBackupLoading(false)
+      setRestoreProgress(null)
     }
   }
 
@@ -1873,11 +1879,17 @@ export default function SettingsPage() {
               onClick={handleRestoreBackup} 
               disabled={backupLoading || !restorePassword || restorePassword.length < 12}
             >
-              {backupLoading ? t('settings.restoring') : t('settings.restoreBackup')}
+              {backupLoading
+                ? (restoreProgress !== null && restoreProgress < 100
+                  ? t('settings.restoreUploading', { percent: restoreProgress })
+                  : t('settings.restoring'))
+                : t('settings.restoreBackup')}
             </Button>
           </div>
         </div>
       </Modal>
+
+      <RestoreReport data={restoreReport} onClose={() => setRestoreReport(null)} />
 
       {/* SSO Provider Modal */}
       <Modal

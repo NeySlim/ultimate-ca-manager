@@ -60,6 +60,7 @@ export default {
         title: "恢复 (v2.251)",
         items: [
           { label: "替换或合并", text: "从备份恢复会用归档中的数据替换此处的数据，并移除归档中没有的内容；审计条目会列出被移除的内容。API 还接受 mode=merge，将归档添加到此处的数据中" },
+          { label: "报告与大小", text: "选择器接受服务器接受的归档大小，并显示上传进度。恢复结束后，报告会一直显示到关闭为止：已恢复的内容，以及“待办”列表，每条警告一行（未恢复的部分、无法签发 CRL 的 CA、需要重新输入的机密），还有重启状态。报告不会被保存：恢复本身记录在审计日志中" },
           { label: "共享锁", text: "备份和恢复共用一个锁：备份运行期间恢复会被拒绝 (409)，手动备份则等待正在运行的恢复完成" },
           { label: "HA mode", text: "In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer's rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted" },
           { label: "上传限制", text: "3.0 起创建的归档按分块方式恢复，除非通过 BACKUP_MAX_ARCHIVE_MB 设置上限，否则不限制大小。更早的归档最大接受 BACKUP_MAX_UPLOAD_MB（默认 512 MB）。两者均在服务器环境中设置，被拒绝时会指明对应的参数。UCM 前面的反向代理仍保留其自身的请求体大小限制" },

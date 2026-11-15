@@ -333,6 +333,8 @@ On PostgreSQL, use `pg_dump` instead. A copy of the database is not a `.ucmbkp` 
 3. Upload `.ucmbkp` file
 4. Enter encryption password
 
+The file picker accepts the sizes the server accepts (`BACKUP_MAX_UPLOAD_MB` for archives written before 3.0, `BACKUP_MAX_ARCHIVE_MB` for v4, announced by `restore_limits` in the backup listing) and refuses a larger file naming the ceiling; the upload shows its progress. When the restore ends, a report stays on screen until closed if the server had anything to warn about: what was restored, then a **To do** list with one line per warning (sections not restored, CAs whose CRL could not be signed, secrets to enter again) and the state of the restart. Without warnings the page reloads by itself after two seconds. The report is not stored; the restore itself is recorded in the audit log as `system_restore`.
+
 A restore **replaces** the instance with the archive: for every section the archive carries, the rows it does not hold are removed. Sections the archive left out are not touched, and an archive whose user list is empty is refused. `POST /api/v2/system/restore` also takes `mode=merge`, which adds and updates the archived rows and removes nothing.
 
 - The restore is one transaction: on any error nothing is changed, the answer names the row the database refused, and no file on disk is touched. The certificate, CSR and key files are published once the rows are in, and those of the removed rows are deleted with them.
