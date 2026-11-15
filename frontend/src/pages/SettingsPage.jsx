@@ -55,6 +55,7 @@ import EmailSection from './settings/EmailSection'
 import SecuritySection from './settings/SecuritySection'
 import SsoSection from './settings/SsoSection'
 import BackupSection from './settings/BackupSection'
+import { ceilingNotice } from './settings/backupCeiling'
 import AuditSection from './settings/AuditSection'
 import DatabaseSection from './settings/DatabaseSection'
 import { afterDatabaseReset } from './settings/databaseReset'
@@ -155,6 +156,7 @@ export default function SettingsPage() {
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [backups, setBackups] = useState([])
   const [backupMeta, setBackupMeta] = useState({ total: 0, pages: 1, page: 1 })
+  const [backupSchedule, setBackupSchedule] = useState({})
   const [backupQuery, setBackupQuery] = useState({ page: 1, per_page: 20, search: '', sort: 'created_desc' })
   const [selectedBackups, setSelectedBackups] = useState([])
   const [backupBusy, setBackupBusy] = useState(false)
@@ -293,6 +295,7 @@ export default function SettingsPage() {
     // Backup listing is admin:system now — don't fire a request every other
     // role is refused.
     if (hasPermission('admin:system')) loadBackups()
+    else if (hasPermission('read:settings')) loadBackupSchedule()
     loadHttpsInfo()
     loadCAs()
     loadDbStats()
@@ -397,7 +400,16 @@ export default function SettingsPage() {
     } catch (error) { reportSilentFailure('loadCAs', error) }
   }
 
-  const loadBackups = async (query = backupQuery) => {
+  // The space used and the ceiling warning, as the server counts them
+  const loadBackupSchedule = async () => {
+    try {
+      const res = await settingsService.getBackupSchedule()
+      setBackupSchedule(res?.data || {})
+    } catch (error) { reportSilentFailure('loadBackupSchedule', error) }
+  }
+
+  const loadBackups = async (query = backupQuery, { withSchedule = true } = {}) => {
+    if (withSchedule) loadBackupSchedule()
     try {
       const res = await systemService.listBackups(query)
       const data = res.data || res
@@ -418,7 +430,7 @@ export default function SettingsPage() {
     // Any change other than an explicit page jump resets to page 1.
     if (!('page' in patch)) next.page = 1
     setBackupQuery(next)
-    loadBackups(next)
+    loadBackups(next, { withSchedule: false })
   }
 
   const toggleSelectBackup = (filename) => {
@@ -458,7 +470,9 @@ export default function SettingsPage() {
       const res = await systemService.runBackupRetention()
       const outcome = res.data || res
       showSuccess(t('settings.backupRetentionRemoved', { count: outcome.removed ?? 0 }))
-      if (outcome.warning) showWarning(t('settings.backupOverCeilingKept'))
+      const notice = ceilingNotice(outcome, backupSchedule,
+        { afterRetention: true, shared: backupMeta.storage === 'database' }, t)
+      if (notice) showWarning(notice)
       loadBackups()
     } catch (error) {
       showError(error.message || t('common.error'))
@@ -1153,6 +1167,7 @@ export default function SettingsPage() {
       if (settings.date_format) setDateFormat(settings.date_format)
       if (settings.show_time !== undefined) setShowTime(settings.show_time !== 'false' && settings.show_time !== false)
       await loadSettings()
+      if (section === 'backup') await loadBackupSchedule()
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
     } finally {
@@ -1300,6 +1315,8 @@ export default function SettingsPage() {
         const blob = await systemService.downloadBackup(response.data.filename)
         downloadBlob(blob, response.data.filename)
         showSuccess(t('messages.success.backup.created'))
+        const notice = ceilingNotice(response.data, backupSchedule, {}, t)
+        if (notice) showWarning(notice)
         setShowBackupModal(false)
         setBackupPassword('')
         loadBackups()
@@ -1584,6 +1601,7 @@ export default function SettingsPage() {
             hasPermission={hasPermission}
             backups={backups}
             backupMeta={backupMeta}
+            backupSchedule={backupSchedule}
             backupQuery={backupQuery}
             updateBackupQuery={updateBackupQuery}
             selectedBackups={selectedBackups}

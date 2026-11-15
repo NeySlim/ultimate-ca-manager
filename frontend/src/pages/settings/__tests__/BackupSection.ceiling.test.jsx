@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key) => key }),
+  useTranslation: () => ({ t: (key, opts) => (opts ? `${key} ${JSON.stringify(opts)}` : key) }),
 }))
 
 vi.mock('../../../components', () => ({
@@ -27,7 +27,9 @@ vi.mock('../../../components/ui/ToggleSwitch', () => ({
 
 import BackupSection from '../BackupSection'
 
-const renderSection = ({ settings = {}, backupMeta = {}, updateSetting = vi.fn() } = {}) => render(
+const MiB = 1024 * 1024
+
+const renderSection = ({ settings = {}, backupMeta = {}, backupSchedule, updateSetting = vi.fn() } = {}) => render(
   <BackupSection
     settings={settings}
     updateSetting={updateSetting}
@@ -36,6 +38,7 @@ const renderSection = ({ settings = {}, backupMeta = {}, updateSetting = vi.fn()
     hasPermission={() => true}
     backups={[]}
     backupMeta={backupMeta}
+    backupSchedule={backupSchedule}
   />
 )
 
@@ -51,23 +54,51 @@ describe('BackupSection size ceiling', () => {
     expect(updateSetting).toHaveBeenLastCalledWith('backup_max_total_mb', 0)
   })
 
-  it('says how much room the stored archives take', () => {
-    renderSection({ backupMeta: { total_size_all: '12.5 MB', total_all: 3, total_size_all_bytes: 13107200 } })
-    expect(screen.getByTestId('backup-space-used')).toBeTruthy()
+  it('says how much room the archives retention counts take, from the server', () => {
+    renderSection({
+      backupMeta: { total_size_all: '99.0 MB', total_all: 9, total_size_all_bytes: 99 * MiB },
+      backupSchedule: { stored_bytes: 5 * MiB / 2, stored_count: 3, max_total_mb: 0, over_ceiling: false },
+    })
+    const line = screen.getByTestId('backup-space-used').textContent
+    expect(line).toContain('"size":"2.5 MiB"')
+    expect(line).toContain('"count":3')
   })
 
-  it('warns when the archives are above the ceiling, and only then', () => {
-    const meta = { total_size_all: '2.0 MB', total_all: 1, total_size_all_bytes: 2 * 1024 * 1024 }
-    const { unmount } = renderSection({ settings: { backup_max_total_mb: 1 }, backupMeta: meta })
-    expect(screen.getByRole('alert')).toBeTruthy()
-    unmount()
-    renderSection({ settings: { backup_max_total_mb: 4 }, backupMeta: meta })
+  it('names the archive files retention neither counts nor removes', () => {
+    renderSection({ backupSchedule: { stored_bytes: 0, stored_count: 0, uncounted_count: 2 } })
+    expect(screen.getByTestId('backup-uncounted').textContent).toContain('"count":2')
+  })
+
+  it('says nothing of other files when there are none', () => {
+    renderSection({ backupSchedule: { stored_bytes: 0, stored_count: 0, uncounted_count: 0 } })
+    expect(screen.queryByTestId('backup-uncounted')).toBeNull()
+  })
+
+  it('warns when the server says the archives are above the saved ceiling', () => {
+    renderSection({
+      settings: { backup_max_total_mb: 1 },
+      backupSchedule: { stored_bytes: 2 * MiB, stored_count: 1, max_total_mb: 1, over_ceiling: true },
+    })
+    const alert = screen.getByRole('alert').textContent
+    expect(alert).toContain('settings.backupOverCeiling ')
+    expect(alert).toContain('"ceiling":1')
+  })
+
+  it('does not warn from the value being typed', () => {
+    // Field at 1 MiB, archives at 2 MiB, but the saved ceiling is 4: nothing is over yet
+    renderSection({
+      settings: { backup_max_total_mb: 1 },
+      backupMeta: { total_size_all: '2.0 MB', total_all: 1, total_size_all_bytes: 2 * MiB },
+      backupSchedule: { stored_bytes: 2 * MiB, stored_count: 1, max_total_mb: 4, over_ceiling: false },
+    })
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('does not warn without a ceiling', () => {
-    renderSection({ settings: { backup_max_total_mb: 0 },
-      backupMeta: { total_size_all: '2.0 MB', total_all: 1, total_size_all_bytes: 2 * 1024 * 1024 } })
+  it('does not warn before the server has answered', () => {
+    renderSection({
+      settings: { backup_max_total_mb: 1 },
+      backupMeta: { total_size_all: '2.0 MB', total_all: 1, total_size_all_bytes: 2 * MiB },
+    })
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
