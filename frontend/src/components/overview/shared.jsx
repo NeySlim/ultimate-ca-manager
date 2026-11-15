@@ -32,8 +32,10 @@ export function useCardData(fetcher, watch = []) {
       const res = await fetcher()
       if (mine === seq.current) setState({ status: 'ready', data: res?.data ?? null, meta: res?.meta ?? null })
     } catch (error) {
-      // A background reload that fails leaves what the card shows
-      if (mine === seq.current && !quiet) setState({ status: error?.status === 403 ? 'forbidden' : 'error', data: null })
+      // A background reload that fails leaves the figures shown; with none yet, the card says the error
+      if (mine !== seq.current) return
+      const failed = { status: error?.status === 403 ? 'forbidden' : 'error', data: null }
+      setState((s) => (quiet && s.status === 'ready' ? s : failed))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

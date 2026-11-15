@@ -124,6 +124,32 @@ describe('overview cards follow the data', () => {
     for (const id of Object.keys(CARDS)) expect(counts()[id], id).toBe(2)
   })
 
+  it('a background reload that fails keeps the figures shown', async () => {
+    api.getQueue.mockResolvedValueOnce({ data: { items: [{ kind: 'manual_renewal_due', tier: 'warning', id: 1, label: 'cert-one', href_hint: '/certificates/1' }], counts: {}, total: 1 } })
+    api.getQueue.mockRejectedValueOnce(Object.assign(new Error('down'), { status: 500 }))
+    render(<MemoryRouter><QueueCard /></MemoryRouter>)
+    await settle()
+    act(() => { window.dispatchEvent(new Event(REFRESH_EVENT)) })
+    await settle()
+    expect(api.getQueue).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('cert-one')).toBeTruthy()
+  })
+
+  it('a background reload that fails during the first load does not leave the card loading', async () => {
+    let finish
+    api.getQueue.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+    api.getQueue.mockRejectedValueOnce(Object.assign(new Error('down'), { status: 500 }))
+    render(<MemoryRouter><QueueCard /></MemoryRouter>)
+    await settle()
+    act(() => { window.dispatchEvent(new Event(REFRESH_EVENT)) })
+    await settle()
+    await act(async () => { finish({ data: { items: [], counts: {}, total: 0 } }) })
+    await settle()
+    expect(api.getQueue).toHaveBeenCalledTimes(2)
+    expect(screen.queryByText('overview.state.loading')).toBeNull()
+    expect(screen.getByTestId('card-queue').textContent).toMatch(/overview\.state\.(error|empty)/)
+  })
+
   it('the tab coming back to the foreground reloads the cards', async () => {
     await mountAll()
     const before = counts()
