@@ -1250,3 +1250,38 @@ def test_the_banner_names_the_configured_administrator(tmp_path):
     result = _sourced_banner(tmp_path, 'INITIAL_ADMIN_USERNAME=operator\n')
     assert result.returncode == 0, result.stderr
     assert ' Admin:    operator' in result.stdout
+
+
+# ----------------------------------------------------------------- without hostname
+
+def _path_without_hostname(tmp_path):
+    """Every command of the host but hostname, as on a Fedora 43 image without it."""
+    bin_dir = tmp_path / 'nohostname'
+    bin_dir.mkdir()
+    for d in ('/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'):
+        if not os.path.isdir(d):
+            continue
+        for name in os.listdir(d):
+            target = bin_dir / name
+            if name != 'hostname' and not target.exists() and not target.is_symlink():
+                os.symlink(os.path.join(d, name), target)
+    return str(bin_dir)
+
+
+def test_without_hostname_the_banner_and_the_name_come_from_uname(tmp_path):
+    path = _path_without_hostname(tmp_path)
+    name = os.uname().nodename
+    result = _run(['host-name'], _env(tmp_path, extra={'PATH': path}))
+    assert (result.returncode, result.stdout, result.stderr) == (0, f'{name}\n', '')
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('HTTPS_PORT=9443\n')
+    result = _run(['banner', str(envfile), 'rpm'], _env(tmp_path, extra={'PATH': path}))
+    assert result.returncode == 0 and 'command not found' not in result.stderr, result.stderr
+    assert f' Access:   https://{name}:9443' in result.stdout, result.stdout
+
+
+def test_with_hostname_its_fully_qualified_name_comes_first(tmp_path):
+    bin_dir = tmp_path / 'bin'
+    _stub(bin_dir / 'hostname', '[ "$1" = -f ] && echo ucm.example.test || echo ucm')
+    result = _run(['host-name'], _env(tmp_path, extra={'PATH': f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"}))
+    assert result.stdout == 'ucm.example.test\n'

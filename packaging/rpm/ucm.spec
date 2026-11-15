@@ -250,7 +250,7 @@ fi
 if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
     echo "Generating HTTPS certificate..."
     # Detect hostname and IPs for SAN
-    CERT_HOST=$(hostname -f 2>/dev/null || hostname)
+    CERT_HOST=$(bash "$UCM_SETUP" host-name)
     CERT_IPS=""
     for ip in $(hostname -I 2>/dev/null); do
         CERT_IPS="${CERT_IPS},IP:${ip}"

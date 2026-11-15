@@ -495,6 +495,16 @@ cmd_fips_build_ok() {
     return 1
 }
 
+# This host's name: hostname is not installed everywhere (Fedora 43 container images), uname
+# is coreutils
+host_name() {
+    local name
+    name=$(hostname -f 2>/dev/null) || name=""
+    [ -n "$name" ] || name=$(hostname 2>/dev/null) || name=""
+    [ -n "$name" ] || name=$(uname -n 2>/dev/null) || name=""
+    printf '%s\n' "${name:-localhost}"
+}
+
 # Post-install banner; IPv6 addresses are bracketed in the URLs.
 cmd_banner() {
     local envfile=$1 pkg=$2 host port ips ip pwfile data user
@@ -503,7 +513,7 @@ cmd_banner() {
     pwfile=$(env_value "$envfile" INITIAL_ADMIN_PASSWORD_FILE)
     data=$(env_value "$envfile" DATA_DIR)
     echo ""
-    host=$(hostname -f 2>/dev/null || hostname)
+    host=$(host_name)
     port=$(grep "^HTTPS_PORT=" "$envfile" 2>/dev/null | cut -d= -f2)
     port=${port:-8443}
     ips=$(hostname -I 2>/dev/null | xargs)
@@ -563,9 +573,10 @@ case "${1:-}" in
     update-precheck) cmd_update_precheck "$2" "$3" ;;
     fips-build-ok) cmd_fips_build_ok "$2" ;;
     banner) cmd_banner "$2" "$3" ;;
+    host-name) host_name ;;
     *) die "usage: $0 env <ucm.env> <data dir>
   | venv <ucm home> <python> <deb|rpm> <ucm.env> | venv-ok <ucm home>
   | fips-finish <ucm home> <ucm.env> <data dir> <user> | fips-requested <ucm.env>
   | check-build-tools <python> <deb|rpm> | update-precheck <ucm home> <ucm.env>
-  | fips-build-ok <ucm.env> | banner <ucm.env> <deb|rpm>" ;;
+  | fips-build-ok <ucm.env> | banner <ucm.env> <deb|rpm> | host-name" ;;
 esac
