@@ -48,6 +48,13 @@ def _name_connectors(backup_data) -> list:
     return sorted(rows, key=lambda r: r['id'] if isinstance(r.get('id'), int) else 0)
 
 
+def _describes(backup_data, name) -> bool:
+    """Whether the archive says what section *name* holds: written, and not excluded at export."""
+    from ..section_store import section_kind
+    excluded = (backup_data.get('metadata') or {}).get('excluded_sections') or []
+    return section_kind(backup_data, name) == 'list' and name not in excluded
+
+
 def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Dict[str, Any]]:
     """Convert a 2.x archive in place; returns the profile row written, None for a 3.0 archive.
     What the operator must know is appended to *warnings*."""
@@ -81,7 +88,11 @@ def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Di
         if warnings is not None:
             warnings.append(message)
     row = dict(profile, keytab=base64.b64encode(keytab).decode('ascii') if keytab else None)
-    row[f'connector_id{REFERENCE_SUFFIX}'] = {'name': first['name']} if first else None
+    if _describes(backup_data, 'ad_connector'):
+        row[f'connector_id{REFERENCE_SUFFIX}'] = {'name': first['name']} if first else None
+    else:
+        # Written without its connectors, the archive does not say the profile has none: a merge keeps the link
+        row.pop('connector_id', None)
     backup_data[PROFILES] = [row]
     for cert in backup_data.get('certificates') or []:
         if isinstance(cert, dict) and cert.get('source') == 'wstep' and not cert.get('windows_profile_id'):
