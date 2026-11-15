@@ -18,8 +18,10 @@ INDEX = 'ix_certificates_caref_subject_key'
 # _ACME_HOLDERS finds a certificate's orders through it, never by a scan per certificate
 ORDER_INDEX = 'ix_acme_orders_certificate_id'
 CREATE_ORDER_INDEX = f"CREATE INDEX IF NOT EXISTS {ORDER_INDEX} ON acme_orders (certificate_id)"
-_PENDING = ("SELECT id, crt FROM certificates WHERE crt IS NOT NULL AND crt <> '' "
-            "AND subject_key IS NULL AND id > {cursor} ORDER BY id")
+# The rows left to fill: the batches read them, the progress total counts them
+_LEFT = "certificates WHERE crt IS NOT NULL AND crt <> '' AND subject_key IS NULL"
+_PENDING = "SELECT id, crt FROM " + _LEFT + " AND id > {cursor} ORDER BY id"
+_COUNT = "SELECT COUNT(*) FROM " + _LEFT
 _BATCH = 500
 # The account of the order a certificate was issued for (the lowest order id when several name it)
 _ACME_HOLDERS = ("UPDATE certificates SET subject_holder = 'acme:' || (SELECT o.account_id FROM acme_orders o "
@@ -76,7 +78,7 @@ def _upgrade_sqlite(conn):
     _backfill(
         lambda c: conn.execute(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}").fetchall(),
         lambda values: conn.executemany("UPDATE certificates SET subject_key = ? WHERE id = ?", values),
-        conn.execute("SELECT COUNT(*) FROM certificates").fetchone()[0])
+        conn.execute(_COUNT).fetchone()[0])
     conn.execute(f"CREATE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, subject_key)")
     if 'acme_orders' in tables:
         conn.execute(CREATE_ORDER_INDEX)
@@ -105,7 +107,7 @@ def _upgrade_pg(conn):
     _backfill(
         lambda c: conn.execute(text(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}")).fetchall(),
         lambda values: conn.execute(update, [{'key': k, 'id': i} for k, i in values]),
-        conn.execute(text("SELECT COUNT(*) FROM certificates")).scalar())
+        conn.execute(text(_COUNT)).scalar())
     conn.execute(text(f"CREATE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, subject_key)"))
     if 'acme_orders' in tables:
         conn.execute(text(CREATE_ORDER_INDEX))

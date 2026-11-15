@@ -30,8 +30,9 @@ SET_PENDING = (f"INSERT INTO {CONFIG} (key, value, encrypted, description, updat
                "VALUES ('" + PENDING_KEY + "', {value}, {false}, "
                "'Upgrade steps 142/144 pending: certificates of one CA share a serial number', "
                "CURRENT_TIMESTAMP)")
-_CERTS = (f"SELECT id, caref, serial_number, crt FROM {TABLE} "
-          "WHERE serial_number IS NOT NULL AND serial_number <> '' ORDER BY id")
+# The rows read, and counted for the progress total
+_WITH_SERIAL = f"{TABLE} WHERE serial_number IS NOT NULL AND serial_number <> ''"
+_CERTS = f"SELECT id, caref, serial_number, crt FROM {_WITH_SERIAL} ORDER BY id"
 _REVOKED = f"SELECT id, serial_number, certificate_id FROM {REVOKED} ORDER BY id"
 
 
@@ -96,7 +97,7 @@ def _apply(execute, executemany, stream, tables, value_param, false_literal, ind
         return
     revoked_rows = execute(_REVOKED, None).fetchall() if REVOKED in tables else []
     # Streamed: only the ids and serials stay in memory, never every certificate's PEM
-    total = execute(f"SELECT COUNT(*) FROM {TABLE}", None).fetchone()[0]
+    total = execute(f"SELECT COUNT(*) FROM {_WITH_SERIAL}", None).fetchone()[0]
     cert_updates, revoked_updates, pending = plan(_read(stream(_CERTS), total), revoked_rows)
     # Two passes: a target spelling may still be another converted row's current one
     executemany(f"UPDATE {TABLE} SET serial_number = {{p}}s WHERE id = {{p}}i",

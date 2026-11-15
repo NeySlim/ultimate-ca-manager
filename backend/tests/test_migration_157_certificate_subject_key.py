@@ -304,14 +304,20 @@ class _Clock:
         return self.now
 
 
-@pytest.mark.parametrize('seconds,lines', [(31, ['2 of 5', '4 of 5']), (1, [])])
-def test_sqlite_backfill_logs_its_progress_at_most_every_30_seconds(monkeypatch, capsys, seconds, lines):
+# The total counts the rows the loop reads (no crt: none), a resumed run only those left
+@pytest.mark.parametrize('seconds,resume,lines', [(31, False, ['2 of 4', '4 of 4']), (1, False, []),
+                                                  (31, True, ['2 of 2'])])
+def test_sqlite_backfill_logs_its_progress_at_most_every_30_seconds(monkeypatch, capsys, seconds, resume, lines):
     import migrations._from_2_254 as package
     monkeypatch.setattr(_migration(), '_BATCH', 2)
-    monkeypatch.setattr(package, '_clock', _Clock(seconds))
     conn = sqlite3.connect(':memory:')
     conn.execute('CREATE TABLE certificates (id INTEGER PRIMARY KEY, caref VARCHAR(36), crt TEXT)')
     conn.executemany('INSERT INTO certificates (id, crt) VALUES (?, ?)', _rows())
+    if resume:
+        _migration().upgrade(conn)
+        conn.execute('UPDATE certificates SET subject_key = NULL WHERE id = 1')
+        capsys.readouterr()
+    monkeypatch.setattr(package, '_clock', _Clock(seconds))
     _migration().upgrade(conn)
     out = [line for line in capsys.readouterr().out.splitlines() if '157_certificate_subject_key' in line]
     assert out == [f'    step 157_certificate_subject_key: {n} rows' for n in lines]

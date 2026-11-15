@@ -107,7 +107,8 @@ def say(line):
 
 
 class Progress:
-    """Called with the rows done after each batch: one line at most every PROGRESS_SECONDS."""
+    """Called with the count of rows done, after each batch or each row as the step reads them;
+    prints one line at most every PROGRESS_SECONDS, none for a step shorter than that."""
 
     def __init__(self, label, total):
         self.label, self.total = label, total

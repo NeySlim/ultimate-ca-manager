@@ -16,8 +16,10 @@ INDEXES = (
     ('certificates', 'ix_certificates_created_at', ('created_at',)),
     ('acme_orders', 'ix_acme_orders_status_created_at', ('status', 'created_at')),
 )
-_PENDING = ("SELECT id, crt FROM certificates WHERE crt IS NOT NULL AND crt <> '' "
-            "AND key_bits IS NULL AND sig_hash IS NULL AND id > {cursor} ORDER BY id")
+# The rows left to fill: the batches read them, the progress total counts them
+_LEFT = "certificates WHERE crt IS NOT NULL AND crt <> '' AND key_bits IS NULL AND sig_hash IS NULL"
+_PENDING = "SELECT id, crt FROM " + _LEFT + " AND id > {cursor} ORDER BY id"
+_COUNT = "SELECT COUNT(*) FROM " + _LEFT
 _UPDATE = "UPDATE certificates SET key_bits = {p}, sig_hash = {p} WHERE id = {p}"
 _BATCH = 500
 
@@ -68,7 +70,7 @@ def _upgrade_sqlite(conn):
         _backfill(
             lambda c: conn.execute(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}").fetchall(),
             lambda values: conn.executemany(_UPDATE.format(p='?'), values),
-            conn.execute("SELECT COUNT(*) FROM certificates").fetchone()[0])
+            conn.execute(_COUNT).fetchone()[0])
     for table, index, cols in INDEXES:
         if table in tables:
             conn.execute(f"CREATE INDEX IF NOT EXISTS {index} ON {table} ({', '.join(cols)})")
@@ -89,7 +91,7 @@ def _upgrade_pg(conn):
         _backfill(
             lambda c: conn.execute(text(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}")).fetchall(),
             lambda values: conn.execute(update, [{'bits': b, 'hash': h, 'id': i} for b, h, i in values]),
-            conn.execute(text("SELECT COUNT(*) FROM certificates")).scalar())
+            conn.execute(text(_COUNT)).scalar())
     for table, index, cols in INDEXES:
         if table in tables:
             conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index} ON {table} ({', '.join(cols)})"))
