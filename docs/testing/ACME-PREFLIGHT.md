@@ -19,7 +19,7 @@ Depends on #161 (key_source fields used during CSR validation in preflight).
 |---|--------|----------|
 | 1 | Run preflight, mode Validate only | Steps: domains, email, ca_connectivity, account_eab |
 | 2 | Production CA selected | Directory URL in report = staging LE |
-| 3 | Settings → Default Environment | Unchanged after preflight |
+| 3 | ACME, Let's Encrypt tab: Default Environment | Unchanged after preflight |
 
 ### Full (staging order + TXT)
 

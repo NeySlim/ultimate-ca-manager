@@ -299,10 +299,10 @@ With a generated password, UCM asks for a new one right after login. Until it is
 After installation:
 
 1. **Log in and set your password**: see [First Access](#first-access); there is no default password
-2. **Configure HTTPS certificate** — Upload a trusted certificate or use the auto-generated one
-3. **Create your first CA** — Dashboard → Create Certificate Authority
-4. **Configure email notifications** (optional) — Settings → SMTP
-5. **Enable ACME/SCEP** (optional) — ACME / SCEP pages
+2. **Configure HTTPS certificate**: upload a trusted certificate or use the auto-generated one
+3. **Create your first CA**: Modules → PKI → Certificate Authorities
+4. **Configure email notifications** (optional): Settings → Email
+5. **Enable ACME/SCEP** (optional): ACME and SCEP pages
 
 ---
 

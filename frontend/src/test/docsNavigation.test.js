@@ -21,9 +21,14 @@ function leading(element, labels) {
   return hits.sort((a, b) => b.length - a.length)[0]
 }
 
-const ROOTS = ['Modules', ...Object.values(groupLabel), ...MODULES.flatMap(moduleLabels)]
+// Roots the earlier console had and this one has not: a path under one of them is always stale
+const GONE = ['System', 'Admin', 'Dashboard']
+const ROOTS = ['Modules', ...GONE, ...Object.values(groupLabel), ...MODULES.flatMap(moduleLabels)]
   .sort((a, b) => b.length - a.length)
 const ROOT_RE = new RegExp(`(?:^|[^\\w])(${ROOTS.map(r => r.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|')})((?:\\s*(?:>|→)\\s*[A-Z][^>→()\`*,.;:|\\n]*)+)`, 'g')
+
+// Paths of another product's console, quoted by an integration guide
+const ELSEWHERE = ['Templates > SCEP certificate']
 
 export function pathsIn(markdown) {
   const prose = markdown.replace(/^```.*?^```/gms, '').replace(/\*\*|`/g, '')
@@ -33,6 +38,7 @@ export function pathsIn(markdown) {
 export function problemsWith(steps) {
   const [root, ...rest] = steps
   const second = rest[0]
+  if (GONE.includes(root)) return `${root} is not a place of this console`
   if (root === 'Modules') {
     const group = GROUPS.find(g => groupLabel[g.id] === second)
     if (!group) return `${second} is not a group of the Modules menu`
@@ -60,12 +66,13 @@ function moduleProblem(groupId, element) {
   return mod ? null : `${element} is not a module of the ${groupLabel[groupId]} group`
 }
 
-const guides = fs.readdirSync(docsDir).filter(f => f.endsWith('.md')).sort()
+const guides = fs.readdirSync(docsDir, { recursive: true }).filter(f => f.endsWith('.md')).sort()
 
 describe('documented navigation paths', () => {
   it.each(guides)('%s names places the console has', (file) => {
     const found = pathsIn(fs.readFileSync(path.join(docsDir, file), 'utf8'))
-    const bad = found.map(steps => [steps.join(' > '), problemsWith(steps)]).filter(([, p]) => p)
+    const bad = found.map(steps => [steps.join(' > '), problemsWith(steps)])
+      .filter(([text, p]) => p && !ELSEWHERE.includes(text))
     expect(bad).toEqual([])
   })
 
@@ -86,5 +93,7 @@ describe('documented navigation paths', () => {
     expect(bad('Open Modules > Protocols > HSM')).toHaveLength(1)
     expect(bad('in Settings > Backup shows the space')).toEqual([])
     expect(bad('Settings > Audit Logs:')).toHaveLength(1)
+    expect(bad('System > Updates shows the target')).toHaveLength(1)
+    expect(bad('Dashboard → Create Certificate Authority')).toHaveLength(1)
   })
 })

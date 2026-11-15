@@ -32,7 +32,7 @@ startup repair, migration 057 SQLite rewrite.
 
 1. Deploy UCM image with `HSM_DEFAULT_PIN` set and SoftHSM token initialized.
 2. Start application — logs should contain `Auto-registered SoftHSM provider 'SoftHSM-Default'`.
-3. **Admin → HSM** → provider **SoftHSM-Default** shows library path and token label.
+3. **Modules → Administration → HSM Management** → provider **SoftHSM-Default** shows library path and token label.
 4. Click **Test connection** → expect success (not `module_path is required`).
 5. DB check: `config` JSON contains `module_path` and `user_pin`, not `library_path` / `pin`.
 

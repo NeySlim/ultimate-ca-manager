@@ -17,7 +17,7 @@ FENCE = re.compile(r'^```(\w*)\n(.*?)^```', re.M | re.S)
 
 def _doc_files():
     files = list((ROOT / 'docs').rglob('*.md'))
-    files += [ROOT / 'DOCKERHUB_README.md', ROOT / 'DOCKER_QUICKSTART.md']
+    files += [ROOT / name for name in ('DOCKERHUB_README.md', 'DOCKER_QUICKSTART.md', 'README.md', 'UPGRADE.md')]
     return sorted(files)
 
 

@@ -7,7 +7,7 @@ All features are included in UCM as core functionality. There is no separate "Pr
 | Feature | Status | Backend Module |
 |---------|--------|----------------|
 | Certificate Management | Stable | `api/v2/certificates/` |
-| Multiple CAs | Stable | `api/v2/cas.py` |
+| Multiple CAs | Stable | `api/v2/cas/` |
 | ACME Protocol | Stable | `api/v2/acme.py` |
 | SCEP Protocol | Stable | `api/v2/scep.py` |
 | User Groups | Stable | `api/v2/groups.py` |
