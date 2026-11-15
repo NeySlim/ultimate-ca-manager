@@ -1534,16 +1534,13 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
     own (``_requester_holds``); None for an initial enrollment or the certificate of another,
     ``lookup.UNREACHABLE`` when the directory could not say whose it is."""
     from services.ad_connector import lookup
-    from services.cert.issued_lookup import find_issued_rows
     from services.windows_profiles import certificate_profile
     unreachable = False
     for cert in _envelope_certificates(outer_signed_data):
         row, refusal = _renewal_refusal(ca, cert)
         if row is None or refusal or _verify_renewal_signer(outer_signed_data, cert) is not None:
             continue
-        # A live twin (an imported copy) may be listed first: the row that carries the profile answers
-        row = next((r for r in find_issued_rows(ca, cert) if not r.archived
-                    and (r.windows_profile_id is not None or r.source == 'wstep')), row)
+        row = _windows_row(ca, cert, row)
         recorded, _refusal = certificate_profile(row)
         if recorded is None or profile is None or recorded.id != profile.id:
             continue
@@ -1609,7 +1606,15 @@ def _renewable_certificate(ca, cert):
             NOT_YET_VALID: 'Signing certificate is not yet valid',
             SUPERSEDED: 'Signing certificate has been superseded by a newer one',
         }.get(status, 'Signing certificate is not recognized')
-    return db_cert, None
+    return _windows_row(ca, cert, db_cert), None
+
+
+def _windows_row(ca, cert, row):
+    """The live row of *cert* that carries a Windows profile (or a ``wstep`` source), else *row*:
+    an imported twin listed first never decides a renewal's profile."""
+    from services.cert.issued_lookup import find_issued_rows
+    return next((r for r in find_issued_rows(ca, cert) if not r.archived
+                 and (r.windows_profile_id is not None or r.source == 'wstep')), row)
 
 
 def _renewal_pattern_subject(template, found, *, profile):
