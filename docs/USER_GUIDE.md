@@ -22,7 +22,7 @@ A menu path in this guide such as **Modules** > **PKI** > **Certificates** means
 - the **Modules** menu, which lists every page you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Pages you have no right to are not shown. The pin button next to a page keeps it in the bar
 - search (`Ctrl K`), the help button, the live-link indicator, the theme menu, the notification bell and your account menu
 
-The bell lists what needs your attention (critical items and pending approvals from the To handle queue, plus failed backups or restores and revoked sessions from the audit log) and each entry opens the page of the item; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
+The bell lists what needs your attention: critical items and pending approvals from the To handle queue (ACME order failed, ACME renewal failed, Approval pending, CRL due, CRL missing, Manual renewal due, Automatic renewal blocked, CA expiring, Deployment left on the old certificate, HTTPS left on the old certificate), plus Backup failed, Restore failed, Session revoked and Sessions revoked from the audit log. Each entry opens the page of the item; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
 
 A status bar shows whether the service is running and the UCM version; on an instance in HA mode it also names the node and whether it is the leader.
 

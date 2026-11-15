@@ -9,6 +9,7 @@ import fs from 'fs'
 import path from 'path'
 import { GROUPS, MODULES } from '../navigation/registry'
 import en from '../i18n/locales/en.json'
+import { BELL_KINDS, FAILURE_ACTIONS, SESSION_ACTIONS } from '../components/shell/notifications'
 
 const docsDir = path.resolve(__dirname, '../../../docs')
 const lookup = (key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), en)
@@ -255,6 +256,15 @@ describe('user guide claims about the bell and SCEP tabs', () => {
     const bell = guide.split('\n').find(l => l.startsWith('The bell lists'))
     expect(bell).toBeDefined()
     expect(bell).not.toMatch(/SCEP requests|key recoveries/)
+  })
+
+  it('names every kind the bell can show by the label the console gives it', () => {
+    const bell = guide.split('\n').find(l => l.startsWith('The bell lists'))
+    for (const kind of [...BELL_KINDS, ...FAILURE_ACTIONS, ...SESSION_ACTIONS]) {
+      const label = en.shell.bell.kinds[kind]
+      expect(label, kind).toBeTruthy()
+      expect(bell.toLowerCase(), label).toContain(label.toLowerCase())
+    }
   })
 
   it('places the SCEP challenge password on the Challenges tab, not Configuration', () => {
