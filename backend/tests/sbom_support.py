@@ -95,7 +95,11 @@ pyspnego>=0.11 ; sys_platform != "win32"
 """
 
 
-def package_tree(tmp, dist_from, name='deb-root'):
+# Where each package format puts the legal texts: debian/rules, %license of the RPM spec
+LEGAL_DIRS = {'deb': ('usr', 'share', 'doc', 'ucm'), 'rpm': ('usr', 'share', 'licenses', 'ucm')}
+
+
+def package_tree(tmp, dist_from, name='deb-root', fmt='deb'):
     root = tmp / name
     app = root / 'opt' / 'ucm'
     shutil.copytree(dist_from, app / 'frontend' / 'dist')
@@ -105,7 +109,7 @@ def package_tree(tmp, dist_from, name='deb-root'):
     (app / 'requirements.txt').write_text(REQUIREMENTS)
     (app / 'scripts').mkdir()
     shutil.copy(ROOT / 'packaging' / 'scripts' / 'native-setup.sh', app / 'scripts' / 'native-setup.sh')
-    doc = root / 'usr' / 'share' / 'doc' / 'ucm'
+    doc = root.joinpath(*LEGAL_DIRS[fmt])
     doc.mkdir(parents=True)
     for f in ('LICENSE', 'NOTICE', 'COMMERCIAL-LICENSE.md'):
         (doc / f).write_text(f)
@@ -117,7 +121,7 @@ RPM_DEPENDS = 'Requires: python3 >= 3.12\nRequires: /bin/sh\nRecommends: softhsm
 
 
 def package_sbom(tmp, frag, file_name, fmt='deb', tree=None, out_dir=None, body=None, depends=None):
-    tree = tree or package_tree(tmp, tmp / 'frontend' / 'dist', name=f'root-{file_name}')
+    tree = tree or package_tree(tmp, tmp / 'frontend' / 'dist', name=f'root-{file_name}', fmt=fmt)
     out_dir = out_dir or tmp
     pkg = out_dir / file_name
     pkg.write_bytes(body or f'package {file_name}'.encode())

@@ -161,3 +161,55 @@ def test_a_failed_statement_in_the_check_leaves_the_session_usable(app, tsa_conf
     with app.test_request_context(URL):
         assert dashboard_aggregates._tsa_health()['state'] == 'unavailable'
         assert SystemConfig.query.filter_by(key='tsa_enabled').first().value == 'true'
+
+
+def _reference_tsa_rows():
+    """The `tsa` state table of docs/API_REFERENCE.md: {state: (alert, severity)}."""
+    import os
+    import re
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    with open(os.path.join(repo, 'docs', 'API_REFERENCE.md'), encoding='utf-8') as fh:
+        lines = fh.read().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith('| `tsa` state |'))
+    rows = {}
+    for line in lines[start + 2:]:
+        if not line.startswith('|'):
+            break
+        cells = [c.strip() for c in line.strip('|').split('|')]
+        severity = cells[3].strip('`')
+        rows[cells[0].strip('`')] = (cells[2] == 'true', None if severity == 'null' else severity)
+    return rows
+
+
+def test_the_reference_names_every_state_the_route_returns(
+        app, auth_client, tsa_config, create_ca, create_cert, monkeypatch):
+    import services.tsa_service as tsa_service
+    seen = {}
+
+    def record():
+        tsa = _tsa(auth_client)
+        seen[tsa['state']] = (tsa['alert'], tsa['severity'])
+
+    tsa_config(tsa_enabled='true', tsa_signer_cert_refid='')
+    record()
+    ca = create_ca(cn='tsa-health-ref-ca')
+    with app.app_context():
+        refid = db.session.get(CA, ca['id']).refid
+    tsa_config(tsa_ca_refid=refid, tsa_require_dedicated_cert='false')
+    record()
+    tsa_config(tsa_signer_cert_refid=create_cert(
+        cn='tsa-health-ref-ok', validity_days=365, extra_ekus=[TS_OID])['refid'])
+    record()
+    tsa_config(tsa_signer_cert_refid=create_cert(
+        cn='tsa-health-ref-near', validity_days=10, extra_ekus=[TS_OID])['refid'])
+    record()
+    revoked = create_cert(cn='tsa-health-ref-revoked', validity_days=200, extra_ekus=[TS_OID])
+    with app.app_context():
+        Certificate.query.filter_by(refid=revoked['refid']).first().revoked = True
+        db.session.commit()
+    tsa_config(tsa_signer_cert_refid=revoked['refid'])
+    record()
+    monkeypatch.setattr(tsa_service, 'describe_configured_signer',
+                        lambda: (_ for _ in ()).throw(RuntimeError('boom')))
+    record()
+    assert seen == _reference_tsa_rows()

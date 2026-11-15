@@ -10,7 +10,8 @@ from utils.response import success_response, error_response
 from models import db, SystemConfig, CA, Certificate, AuditLog
 from services.audit_service import AuditService
 from services.settings_registry import effective
-from services.tsa_service import describe_configured_signer, tsa_signer_key_problem
+from services.tsa_service import (
+    configured_signer_refid, describe_configured_signer, tsa_signer_key_problem)
 import logging
 import re
 
@@ -208,7 +209,7 @@ def get_tsa_config():
         # Dedicated end-entity signer (#312). Empty string = the historical
         # CA-certificate signer. `signer` describes the configured certificate
         # (subject / serial / notAfter / chain status / usability).
-        'signer_cert_refid': get_config('tsa_signer_cert_refid', ''),
+        'signer_cert_refid': configured_signer_refid(),
         'signer': describe_configured_signer(),
     })
 
@@ -218,7 +219,7 @@ def get_tsa_config():
 def update_tsa_config():
     """Update TSA configuration in database"""
     data = request.json or {}
-    stored_signer = get_config('tsa_signer_cert_refid', '')
+    stored_signer = configured_signer_refid()
     # In strict mode the CA only issues the dedicated signer: its key is judged as a token
     # signer only in compatibility mode, including when this request switches to it
     strict_before = effective('tsa_require_dedicated_cert')
