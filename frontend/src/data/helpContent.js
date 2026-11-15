@@ -373,7 +373,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Enroll new mTLS certificates from Account → mTLS tab',
+      'Enroll new mTLS certificates from My Account → Security',
       'Certificates are stored and managed by UCM like any other certificate',
       'Use the stats bar to quickly filter by status',
       'Click a row to view full certificate details in the inspector',
@@ -1073,7 +1073,7 @@ export const helpContent = {
         icon: Database,
         items: [
           { label: 'Export', text: 'Download logs in JSON or CSV format' },
-          { label: 'Cleanup', text: 'Purge old logs with configurable retention (days)' },
+          { label: 'Cleanup Old Logs', text: 'Purge old logs with configurable retention (days)' },
           { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering' },
         ]
       },
@@ -1309,7 +1309,7 @@ export const helpContent = {
         items: [
           { label: 'Full Name', text: 'Your display name shown across the application' },
           { label: 'Email', text: 'Used for notifications and account recovery' },
-          { label: 'Account Info', text: 'Creation date, last login, total login count' },
+          { label: 'Account Information', text: 'Creation date, last login, total login count' },
         ]
       },
       {
@@ -1320,7 +1320,7 @@ export const helpContent = {
           { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
           { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
           { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
-          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt offers Log out instead of Skip. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
+          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt cannot be skipped and offers only Logout. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
         ]
       },
       {
@@ -1328,7 +1328,7 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Create Key', text: 'Generate a new API key, optionally expiring after a number of days' },
-          { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
+          { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating, offered by the API only, keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
           { label: 'Revoke', text: 'Immediately invalidate an API key' },
           { label: 'Deactivated users', text: 'API keys belonging to a deactivated user are rejected even if the key itself is still valid' },
           { label: 'Interactive session only', text: 'API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: sign in interactively' },
@@ -1495,7 +1495,7 @@ export const helpContent = {
         title: 'Actions',
         icon: Key,
         items: [
-          { label: 'Add Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
+          { label: 'New Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
           { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid; for a PKCS#11 module, also record what it reports (library, manufacturer, library and firmware versions), shown on the provider page' },
           { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
           { label: 'Status', text: 'Monitor provider connection health' },
@@ -1599,7 +1599,7 @@ export const helpContent = {
           { label: 'Base DN', text: 'Search base for user lookups' },
           { label: 'User Filter', text: 'LDAP filter to match users (e.g., (uid={username}))' },
           { label: 'Attribute Mapping', text: 'Map LDAP attributes to username, email, full name' },
-          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink then Link to SSO.' },
+          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink SSO then Link to SSO.' },
         ]
       },
     ],
@@ -1627,7 +1627,7 @@ export const helpContent = {
         icon: Lock,
         items: [
           { label: 'Status & counters', text: 'Shows whether encryption is enabled and how many stored private keys are encrypted vs unencrypted' },
-          { label: 'Enable / Disable', text: 'Encrypt all CA and certificate private keys with AES-128 (Fernet, with HMAC-SHA256) under a master key file. Enabling also removes plaintext key mirrors, while disabling recreates them. A disable stopped before every value was decrypted is shown as left half-way: run it again to finish it. After a disable, enabling again waits until every node has reloaded, then two minutes (ten at most, unless a live node never reloads). The data keys stay for reading only for seven days, so a value written late under them still opens; a daily sweep decrypts any such value, and each key is deleted after its date once a sweep finds nothing under it. Outside HA master.key is removed with the last of them' },
+          { label: 'Enable / Disable', text: 'Encrypt all CA and certificate private keys with AES-128 (Fernet, with HMAC-SHA256) under a master key file. Enabling also removes plaintext key mirrors, while disabling recreates them. A disable stopped before every value was decrypted is shown as left half-way: run it again to finish it. After a disable, enabling again waits until every node has reloaded, then two minutes (ten at most, unless a live node never reloads). The data keys stay for reading only for seven days, so a value written late under them still opens; a daily sweep decrypts any such value, and each key is deleted after its date once a sweep finds nothing under it. Outside HA master.key is removed with the last of them; a key set by KEY_ENCRYPTION_KEY, and the key in HA, stay configured but unused' },
           { label: 'First start', text: 'Without a master key, UCM creates /etc/ucm/master.key (0600) at startup and encrypts the keys already stored. A container does so only when /etc/ucm is a named volume or a host directory. Skipped with KEY_ENCRYPTION_KEY set, with encrypted keys or a keyed audit chain already in the database, after encryption was disabled here, or with UCM_AUTO_MASTER_KEY=false. At each start a loaded key also encrypts the values still stored unencrypted, and a key that does not decrypt them puts UCM in safe mode. Back up the key file' },
           { label: 'Key files on disk', text: 'Shows how many plaintext key mirrors remain; use deploy hooks when another service needs a key file' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Opt-in environment variable: refuse to start without an explicit database encryption key' },
@@ -1715,7 +1715,7 @@ export const helpContent = {
         items: [
           { label: 'Max Validity', text: 'Maximum certificate lifetime in days' },
           { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used, ML-DSA-44, ML-DSA-65 and ML-DSA-87 included; FIPS mode removes ML-DSA when the FIPS module does not approve it' },
-          { label: 'Allowed Signature Schemes', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
+          { label: 'Signature schemes (API only)', text: 'The allowed_signature_schemes rule, absent from the policy form: PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
           { label: 'SAN Restrictions', text: 'Limit the number of DNS names (other SAN types are not counted); one DNS pattern per policy (*.company.com, or company.com to include the domain itself) scopes the policy to the matching names' },
           { label: 'Allowed Signature Hashes', text: 'SHA-256, SHA-384 or SHA-512; none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes' },
         ]
@@ -2129,7 +2129,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Use short-lived certificates (8h–24h) for user access to minimize the impact of key compromise.',
+      'Use short-lived certificates (8h-24h) for user access to minimize the impact of key compromise.',
       'Sign mode is preferred: the user\'s private key never leaves their machine.',
       'Where a CA lets requesters set the key ID, keep it descriptive (e.g. "jdoe-prod-2025") for easy log auditing.',
       'For host certificates, the principal must match the hostname clients use to connect.',

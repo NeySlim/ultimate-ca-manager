@@ -65,7 +65,7 @@ L'autorité d'horodatage (TSA) implémente le **RFC 3161** pour fournir des horo
 
 1. **Activer TSA** : Basculer le serveur TSA on ou off
 2. **CA de signature** : Sélectionner quelle autorité de certification signe les jetons d'horodatage
-3. **OID de politique** : Identifiant d'objet pour la politique TSA (par ex. \`1.2.3.4.1\`), inclus dans chaque réponse d'horodatage
+3. **OID de politique** : Identifiant d'objet pour la politique TSA, inclus dans chaque réponse d'horodatage
 4. **Exiger un certificat TSA dédié** : Activé par défaut : refuse de signer des horodatages avec le certificat de la CA lui-même, \`/tsa\` répond donc 503 tant qu'aucun certificat de signature final dédié avec un **EKU timeStamping critique** (RFC 3161) n'est défini. **Générer un certificat de signature** en émet un depuis la CA de signature et le sélectionne. Désactiver l'option laisse signer le certificat de la CA, ce qui n'est pas conforme à la RFC 3161 ; une installation montée depuis la 2.x dont la TSA signait avec sa CA la garde désactivée, et la vue d'ensemble affiche un avertissement
 
 ### Choisir une CA de signature
@@ -107,7 +107,7 @@ openssl ts -query -data file.txt -sha256 -cert -out request.tsq
 # Envoyer la requête et recevoir une réponse d'horodatage
 curl -s -H "Content-Type: application/timestamp-query" \\
   --data-binary @request.tsq \\
-  https://votre-serveur:8443/tsa -o response.tsr
+  https://your-server:8443/tsa -o response.tsr
 \`\`\`
 
 ### Vérifier un horodatage
@@ -127,11 +127,11 @@ Lors de la signature de code, ajoutez l'URL TSA pour garantir que les signatures
 \`\`\`bash
 # Signer avec horodatage (osslsigncode)
 osslsigncode sign -certs cert.pem -key key.pem \\
-  -ts https://votre-serveur:8443/tsa \\
+  -ts https://your-server:8443/tsa \\
   -in app.exe -out app-signed.exe
 
 # Signer avec horodatage (signtool.exe sous Windows)
-signtool sign /fd SHA256 /tr https://votre-serveur:8443/tsa \\
+signtool sign /fd SHA256 /tr https://your-server:8443/tsa \\
   /td SHA256 /f cert.pfx app.exe
 \`\`\`
 
@@ -144,7 +144,7 @@ openssl ts -query -data document.pdf -sha256 -cert \\
 
 curl -s -H "Content-Type: application/timestamp-query" \\
   --data-binary @document.tsq \\
-  https://votre-serveur:8443/tsa -o document.tsr
+  https://your-server:8443/tsa -o document.tsr
 \`\`\`
 
 ## Détails du protocole

@@ -4078,7 +4078,7 @@
     "bindingLeftBehind": "更新により {{name}} が以前の証明書に残りました"
   },
   "help": {
-    "englishOnlyNotice": "ヘルプは英語、フランス語、中国語で提供されています。",
+    "englishOnlyNotice": "ヘルプは英語、フランス語、ロシア語、中国語で提供されています。",
     "aboutCertificates": "証明書について",
     "statusLegend": "ステータス凡例",
     "exportFormats": "エクスポート形式",

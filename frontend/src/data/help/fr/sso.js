@@ -49,7 +49,7 @@ export default {
           { label: 'DN de base', text: 'Base de recherche pour les recherches d\'utilisateurs' },
           { label: 'Filtre utilisateur', text: 'Filtre LDAP pour la correspondance des utilisateurs (par ex. (uid={username}))' },
           { label: 'Mappage d\'attributs', text: 'Mapper les attributs LDAP au nom d\'utilisateur, e-mail et nom complet' },
-          { label: 'Attribut d\'ID unique', text: 'Identifiant immuable qui reconnaît le compte (entryUUID, objectGUID). Un compte lié par son DN passe à cet identifiant à sa prochaine connexion ; passer d\'un attribut d\'identifiant à un autre refuse tous les utilisateurs liés jusqu\'à Délier puis Lier au SSO.' },
+          { label: 'Attribut d\'ID unique', text: 'Identifiant immuable qui reconnaît le compte (entryUUID, objectGUID). Un compte lié par son DN passe à cet identifiant à sa prochaine connexion ; passer d\'un attribut d\'identifiant à un autre refuse tous les utilisateurs liés jusqu\'à Délier du SSO puis Lier au SSO.' },
         ]
       },
     ],
@@ -78,7 +78,7 @@ SSO permet aux utilisateurs de s'authentifier en utilisant le fournisseur d'iden
 UCM fournit une **URL de métadonnées du fournisseur de services (SP)** que vous pouvez donner à votre IDP pour la configuration automatique :
 
 \`\`\`
-https://votre-hote-ucm:8443/api/v2/sso/saml/metadata
+https://your-ucm-host:8443/api/v2/sso/saml/metadata
 \`\`\`
 
 Cette URL retourne un document XML conforme SAML 2.0 contenant :
@@ -95,7 +95,7 @@ Copiez cette URL dans la configuration « Ajouter un fournisseur de services » 
 ### Configuration
 1. Obtenez l'URL de métadonnées IDP ou le fichier XML de votre fournisseur d'identité
 2. Dans UCM, allez dans **Paramètres → SSO**
-3. Cliquez sur **Ajouter un fournisseur** → SAML
+3. Sur la carte **SAML 2.0**, cliquez sur **Configurer**
 4. Entrez l'**URL de métadonnées IDP** : UCM remplit automatiquement l'Entity ID, les URL SSO/SLO et le certificat
 5. Ou collez directement le XML de métadonnées IDP
 6. Configurez le **mappage d'attributs** (nom d'utilisateur, e-mail, groupes)
@@ -117,10 +117,10 @@ Une connexion lancée depuis le portail de l'IdP arrive sans requête d'UCM. **A
 
 ### Configuration
 1. Enregistrez UCM comme client dans votre fournisseur OAuth2/OIDC
-2. Définissez l'**URI de redirection** à : \`https://votre-hote-ucm:8443/api/v2/sso/callback/oauth2\`
+2. Définissez l'**URI de redirection** à : \`https://your-ucm-host:8443/api/v2/sso/callback/oauth2\`
 3. Copiez le **Client ID** et le **Client Secret**
 4. Dans UCM, allez dans **Paramètres → SSO**
-5. Cliquez sur **Ajouter un fournisseur** → OAuth2
+5. Sur la carte **OAuth2 / OIDC**, cliquez sur **Configurer**
 6. Entrez l'**URL d'autorisation** et l'**URL de jeton**
 7. Entrez l'**URL d'info utilisateur** (pour récupérer les attributs utilisateur après la connexion)
 8. Entrez le Client ID et le Secret
@@ -135,7 +135,7 @@ Lorsqu'elle est activée, un nouveau compte utilisateur UCM est automatiquement 
 ### Correspondance d'identité
 Une connexion ouvre le compte lié à l'identifiant de l'IdP : \`sub\` OIDC, NameID persistant SAML, \`entryUUID\` ou \`objectGUID\` LDAP. Un nom d'utilisateur ou un e-mail ne correspond qu'à un compte du même fournisseur qui n'est pas encore lié (créé avant les identifiants stables, ou lié par un administrateur) ; un e-mail que l'IdP OIDC marque non vérifié (\`email_verified\` faux) ne correspond à aucun. Un compte local, ou lié à une autre identité, n'est jamais ouvert par une connexion SSO : la connexion est refusée et consignée dans le journal d'audit. Pour fusionner un compte local dans une identité SSO, utilisez d'abord **Lier au SSO** sur cet utilisateur ; sa prochaine connexion via ce fournisseur lie l'identifiant de l'IdP.
 
-Quand un fournisseur est supprimé, ses utilisateurs sont conservés : un fournisseur recréé pour le même IdP (même émetteur, entity ID, ou serveur LDAP et DN de base) les reprend à leur prochaine connexion. Sinon, et pour les utilisateurs qu'une restauration a laissés sans fournisseur, utilisez **Délier** puis **Lier au SSO** sur chaque compte.
+Quand un fournisseur est supprimé, ses utilisateurs sont conservés : un fournisseur recréé pour le même IdP (même émetteur, entity ID, ou serveur LDAP et DN de base) les reprend à leur prochaine connexion. Sinon, et pour les utilisateurs qu'une restauration a laissés sans fournisseur, utilisez **Délier du SSO** puis **Lier au SSO** sur chaque compte.
 
 ### Règles de mappage de rôles
 - **Au moins une règle** : un utilisateur qu'aucune règle ne retient est refusé à chaque connexion SSO (OIDC, SAML, LDAP), que le compte soit nouveau ou existe déjà ; une connexion par passkey ou certificat n'est pas contrôlée
@@ -149,13 +149,13 @@ La section **Provisionnement des utilisateurs** s'ouvre d'elle-même et affiche 
 
 ### Configuration
 1. Dans UCM, allez dans **Paramètres → SSO**
-2. Cliquez sur **Ajouter un fournisseur** → LDAP
+2. Sur la carte **LDAP / Active Directory**, cliquez sur **Configurer**
 3. Entrez le **serveur LDAP** nom d'hôte et **port** (389 pour LDAP, 636 pour LDAPS)
 4. Activez **Utiliser SSL/TLS** (LDAPS, port 636) ou, sur le port 389, **Utiliser StartTLS** : la connexion passe en TLS avant tout bind, avec la même vérification de certificat. Sans l'un ni l'autre, le bind et les mots de passe des utilisateurs circulent en clair sur le réseau
 5. Entrez le **DN de liaison** et le **mot de passe de liaison** (identifiants du compte de service)
 6. Entrez le **DN de base** (base de recherche pour les recherches d'utilisateurs)
 7. Configurez le **filtre utilisateur** (par ex. \`(uid={username})\` ou \`(sAMAccountName={username})\` pour AD)
-8. Mappez les attributs LDAP : **nom d'utilisateur**, **e-mail**, **nom complet**, et l'**attribut d'ID unique** (\`entryUUID\`, \`objectGUID\`). Un compte lié par son DN passe à cet identifiant à sa prochaine connexion ; passer d'un attribut d'identifiant à un autre refuse tous les utilisateurs liés jusqu'à **Délier** puis **Lier au SSO**
+8. Mappez les attributs LDAP : **nom d'utilisateur**, **e-mail**, **nom complet**, et l'**attribut d'ID unique** (\`entryUUID\`, \`objectGUID\`). Un compte lié par son DN passe à cet identifiant à sa prochaine connexion ; passer d'un attribut d'identifiant à un autre refuse tous les utilisateurs liés jusqu'à **Délier du SSO** puis **Lier au SSO**
 9. Cliquez sur **Tester la connexion** pour vérifier, puis **Enregistrer** et **Activer**
 
 ### Active Directory
@@ -167,7 +167,7 @@ Pour Microsoft Active Directory, utilisez :
 - Attribut nom complet : \`displayName\`
 
 ## Flux de connexion
-1. L'utilisateur clique sur **Se connecter avec SSO** sur la page de connexion UCM (ou entre les identifiants LDAP)
+1. L'utilisateur clique sur le bouton de son fournisseur sur la page de connexion UCM (ou entre les identifiants LDAP)
 2. Pour SAML/OAuth2 : l'utilisateur est redirigé vers l'IDP, s'authentifie, puis est redirigé
 3. Pour LDAP : les identifiants sont vérifiés directement contre le serveur LDAP
 4. UCM crée ou met à jour le compte utilisateur

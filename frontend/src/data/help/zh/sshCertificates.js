@@ -14,7 +14,7 @@ export default {
       {
         title: '证书字段',
         items: [
-          { label: 'Key ID', text: 'sshd 记录的持有者标识符。由 CA 设置为 principals@CA 名称，除非该 CA 允许请求者自行选择。' },
+          { label: 'Key ID', text: 'sshd 记录的持有者标识符。由 CA 设置为 principals@CA name，除非该 CA 允许请求者自行选择。' },
           { label: 'Principals', text: '此证书有效的用户名（用户证书）或主机名（主机证书）。以逗号分隔。' },
           { label: '有效期', text: '证书的生命周期。选择预设（1h、8h、24h、7d、30d、90d、365d）或设置自定义秒数。在签发前 5 分钟起生效，适用于时钟落后的服务器 (v2.252)。' },
           { label: 'Extensions', text: 'SSH扩展，如permit-pty、permit-agent-forwarding。仅适用于用户证书。' },
@@ -37,7 +37,7 @@ export default {
       },
     ],
     tips: [
-      '使用短期证书（8h–24h）进行用户访问，以最大限度减少密钥泄露的影响。',
+      '使用短期证书（8h-24h）进行用户访问，以最大限度减少密钥泄露的影响。',
       '建议使用签名模式：用户的私钥永远不会离开其机器。',
       '若CA允许请求者设置Key ID，请使其具有描述性（例如"jdoe-prod-2025"），便于日志审计。',
       '对于主机证书，principal必须与客户端连接使用的主机名匹配。',
@@ -96,7 +96,7 @@ UCM同时生成密钥对和证书。当需要集中配置凭据时使用。
 ### Key ID
 嵌入证书中的标识符。证书被使用时，SSH服务器会将其记录为持有者的身份。
 
-CA 将其设置为 \`principals@CA 名称\`（例如 \`deploy@Production User CA\`）。只有在勾选了**允许请求者设置 Key ID** 的 CA 上，请求者才能选择其他 Key ID；在其他 CA 上此类请求会被拒绝。
+CA 将其设置为 \`principals@CA name\`（例如 \`deploy@Production User CA\`）。只有在勾选了**允许请求者设置 Key ID** 的 CA 上，请求者才能选择其他 Key ID；在其他 CA 上此类请求会被拒绝。
 
 **良好的Key ID示例（在允许的情况下）：** \`jdoe-prod-2025\`、\`webserver-01\`、\`deploy-ci-pipeline\`
 
@@ -121,7 +121,7 @@ Principals定义证书对**谁**（用户证书）或**什么**（主机证书�
 | 30天 | 月度轮换 |
 | 365天 | 长期服务账户 |
 
-建议人工用户使用短期证书（8h–24h）。自动化服务账户可接受更长的有效期。
+建议人工用户使用短期证书（8h-24h）。自动化服务账户可接受更长的有效期。
 
 证书自签发前 5 分钟起生效，因此时钟略微落后的服务器也能立即接受它；有效期仍从签发时起算 (v2.252)。
 
