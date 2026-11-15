@@ -99,6 +99,34 @@ def _spki(public_key):
     return public_key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
 
 
+def _bound_spki():
+    """{key id: SPKI} of every bound key row whose public key UCM holds."""
+    bound = bound_key_ids()
+    out = {}
+    if not bound:
+        return out
+    for row in HsmKey.query.filter(HsmKey.id.in_(bound), HsmKey.public_key_pem.isnot(None)):
+        pem = row.public_key_pem
+        try:
+            out[row.id] = _spki(serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem))
+        except ValueError:
+            continue
+    return out
+
+
+def shared_token_keys():
+    """{(key id, key id): (holder, holder)} for two bound key rows naming one token key (same public key)."""
+    by_spki = {}
+    for key_id, spki in sorted(_bound_spki().items()):
+        by_spki.setdefault(spki, []).append(key_id)
+    pairs = {}
+    for ids in by_spki.values():
+        for i, first in enumerate(ids):
+            for second in ids[i + 1:]:
+                pairs[(first, second)] = (holders(key_id=first)[0], holders(key_id=second)[0])
+    return pairs
+
+
 def refuse_same_token_key(key, public_key):
     """HsmKeyBound when another key row with *public_key* backs an authority: it is the same token key."""
     spki = _spki(public_key)

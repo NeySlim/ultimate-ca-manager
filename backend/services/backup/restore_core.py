@@ -460,6 +460,7 @@ class RestoreCoreMixin:
                 from services.hsm import key_binding
                 # A key two authorities held before the restore is not the restore's doing
                 shared_before = set(key_binding.shared_keys())
+                token_shared_before = set(key_binding.shared_token_keys())
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
@@ -484,6 +485,14 @@ class RestoreCoreMixin:
                     if key_id not in shared_before:
                         raise BackupSchemaError(
                             f"Cannot restore: HSM key '{key_binding.label_of(key_id)}' would back both the "
+                            f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
+                            "nothing has been changed.")
+                # Two key rows naming one token key are one key (refuse_same_token_key)
+                for (first, second), held in key_binding.shared_token_keys().items():
+                    if (first, second) not in token_shared_before:
+                        raise BackupSchemaError(
+                            f"Cannot restore: HSM keys '{key_binding.label_of(first)}' and "
+                            f"'{key_binding.label_of(second)}' are one token key and would back both the "
                             f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
                             "nothing has been changed.")
                 # The rows written take the revocation their CA records, as the hourly pass does

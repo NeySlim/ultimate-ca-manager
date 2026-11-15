@@ -36,8 +36,8 @@ def _only(*names):
 class _Token:
     """One provider and one key row, its signatures made by a local twin."""
 
-    def __init__(self):
-        self.real = ec.generate_private_key(ec.SECP256R1())
+    def __init__(self, real=None):
+        self.real = real or ec.generate_private_key(ec.SECP256R1())
         self.pem = self.real.public_key().public_bytes(
             serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
         tag = uuid.uuid4().hex[:8]
@@ -198,3 +198,32 @@ def test_an_archive_giving_one_key_to_two_x509_cas_is_refused_on_sqlite(app, tmp
         assert 'UNIQUE' not in message.upper() and 'nothing has been changed' in message, message
         assert CA.query.count() == 0 and HsmKey.query.count() == 0
         db.session.remove()
+
+
+def _token_key_on_two_rows(app, tmp_path, archived, here, mode='merge'):
+    """The archive's authority on its own provider row, the target's on another row of the same token key."""
+    from tests.test_backup_cross_installation import _bound_to
+    real = ec.generate_private_key(ec.SECP256R1())
+    with _bound_to(app, f"sqlite:///{tmp_path / 'source.db'}"), app.app_context():
+        archived(_Token(real))
+        blob = _service().create_backup(PASSWORD, include=_only(*SECTIONS))
+        db.session.remove()
+    with _bound_to(app, f"sqlite:///{tmp_path / 'target.db'}"), app.app_context():
+        token = _Token(real)
+        here(token)
+        before = sorted(_holders(token.key.id))
+        with pytest.raises(BackupSchemaError) as refused:
+            _service().restore_backup(blob, PASSWORD, mode=mode)
+        db.session.rollback()
+        assert sorted(_holders(token.key.id)) == before
+        assert HsmKey.query.count() == 1
+        db.session.remove()
+    return str(refused.value)
+
+
+@pytest.mark.parametrize('case', sorted(CASES))
+def test_a_merge_onto_another_row_of_a_token_key_taken_here_is_refused(app, tmp_path, case):
+    archived, here, archived_name, here_name = CASES[case]
+    message = _token_key_on_two_rows(app, tmp_path, archived, here)
+    assert archived_name in message and here_name in message, message
+    assert 'nothing has been changed' in message, message
