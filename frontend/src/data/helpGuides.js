@@ -982,9 +982,9 @@ Use any RFC 8555-compliant CA, not just Let's Encrypt:
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Set your CA's directory URL as the **ACME Directory URL** of its account in **External CA Accounts**.
+Set your CA's directory URL as the **ACME Directory URL** of its account in **Certificate Authorities (CA)**.
 
-### External CA Accounts
+### Certificate Authorities (CA)
 Manage every external CA account UCM registers with:
 
 - **Multiple accounts per CA allowed**: several accounts can share the same directory URL (e.g. two Let's Encrypt accounts with different contact emails for administrative separation, useful alongside dns-persist-01). The account row, not the URL, is the identity.
@@ -997,7 +997,7 @@ Manage every external CA account UCM registers with:
 Some CAs require EAB credentials to link your ACME account with an existing account at the CA:
 
 1. Register at your CA's portal to obtain **EAB Key ID** and **HMAC Key**
-2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **External CA Accounts**
+2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **Certificate Authorities (CA)**
 3. The HMAC key is base64url-encoded (provided by the CA)
 
 > 💡 EAB is required by ZeroSSL, HARICA, Google Trust Services, and most enterprise CAs.
@@ -1087,7 +1087,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Configuration
 1. Go to **ACME** → **Let's Encrypt** tab
 2. Scroll down to the **ACME Proxy** section
-3. Select an **Upstream CA account** from **External CA Accounts** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
+3. Select an **Upstream CA account** from **Certificate Authorities (CA)** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
 4. Click **Test Connection** to verify connectivity with the upstream CA
 5. Register the upstream account if needed (email + **Register Account**)
 6. UCM automatically registers an account on first proxy request if not already done
@@ -1095,7 +1095,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Dedicated proxy paths (multi-CA)
 Each external CA account can expose its own ACME proxy endpoint:
 
-1. Open **External CA Accounts** (same Let's Encrypt tab)
+1. Open **Certificate Authorities (CA)** (same Let's Encrypt tab)
 2. Edit or create a CA account
 3. Enable **Expose via ACME proxy**
 4. Set a unique **Proxy path (slug)**: e.g. \`actalis-production\`, \`letsencrypt-staging\`
@@ -1151,7 +1151,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **External CA Accounts**.
+> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **Certificate Authorities (CA)**.
 
 > ⚠ Prerequisite: the domain (or a parent domain covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy supports dns-01 only.
 
