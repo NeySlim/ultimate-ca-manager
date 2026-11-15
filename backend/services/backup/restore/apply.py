@@ -288,9 +288,19 @@ def _restored_chain_variant(row, value, plan):
     if target is None:
         logger.warning("Deploy binding chain_variant %s: its cross-certificate is not on this "
                        "installation, the binding falls back to 'auto'", value)
-        plan.chain_variant_fallbacks.append(str(value))
+        plan.chain_variant_fallbacks.append(_binding_label(row))
         return 'auto'
     return f'cross:{target.id}'
+
+
+def _binding_label(row) -> str:
+    """A deploy binding by the names an operator finds it under here: certificate and target."""
+    from models import Certificate
+    target = (row.get(f'target_id{REFERENCE_SUFFIX}') or {}).get('name') or '?'
+    refid = (row.get(f'certificate_id{REFERENCE_SUFFIX}') or {}).get('refid')
+    with db.session.no_autoflush:
+        cert = Certificate.query.filter_by(refid=refid).first() if refid else None
+    return f"certificate '{cert.descr if cert else refid or '?'}' on target '{target}'"
 
 
 _row_label = row_label

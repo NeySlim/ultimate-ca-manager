@@ -176,10 +176,9 @@ def restore_todo_lines(results: Dict[str, Any]) -> list:
               for name in results.get('sections_not_restored') or []]
     lines += [f"Private key is not its certificate's and cannot sign: {name}"
               for name in results.get('key_mismatches') or []]
-    fallbacks = results.get('chain_variant_fallbacks') or []
-    if fallbacks:
-        lines.append(f'{len(fallbacks)} deploy binding(s) pinned to a cross-certificate '
-                     'absent here were reset to the automatic chain')
+    lines += [f'Deploy binding of {name} was pinned to a cross-certificate absent here and now '
+              'deploys the automatic chain: choose its chain again in the certificate\'s deployments'
+              for name in results.get('chain_variant_fallbacks') or []]
     lines += [f"Restored under another name: {_RENAMED_KIND.get(e['section'], e['section'])} "
               f"{e['from']} as {e['to']}" for e in results.get('renamed') or []]
     for key, label in (('cleared_dependents', 'Deleted with a removed row'),

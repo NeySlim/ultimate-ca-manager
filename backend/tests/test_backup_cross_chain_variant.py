@@ -139,6 +139,23 @@ def test_fallback_to_auto_reaches_the_administrator(app, pinned):
         assert 'cross-certificate' in with_restore_warnings('Restored.', results)
 
 
+def test_each_fallback_names_its_binding_on_the_to_do_list(app, pinned):
+    from models import Certificate
+    from services.backup.restore_report import restore_todo_lines
+    with app.app_context():
+        blob = _service().create_backup(PASSWORD, include=_only(
+            'certificate_authorities', 'certificates', 'deploy_targets', 'deploy_bindings'))
+        target = db.session.get(DeployTarget, pinned['target']).name
+        cert = db.session.get(Certificate, pinned['cert']).descr
+        CACrossCertificate.query.filter_by(id=pinned['cross_id']).delete()
+        DeployBinding.query.filter_by(target_id=pinned['target']).delete()
+        db.session.commit()
+        results = _service().restore_backup(blob, PASSWORD)
+        lines = [line for line in restore_todo_lines(results) if 'cross-certificate' in line]
+        assert len(lines) == 1, lines
+        assert target in lines[0] and cert in lines[0], lines
+
+
 @pytest.mark.parametrize('count, phrase', [
     (1, '1 deploy binding pinned to a cross-certificate absent from this installation was reset'),
     (2, '2 deploy bindings pinned to a cross-certificate absent from this installation were reset'),
