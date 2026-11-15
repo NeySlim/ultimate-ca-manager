@@ -6290,7 +6290,8 @@
         "session_revoke": "Session revoked",
         "session_revoke_all": "Sessions revoked",
         "deploy_binding_left_behind": "Deployment left on the old certificate",
-        "https_binding_left_behind": "HTTPS left on the old certificate"
+        "https_binding_left_behind": "HTTPS left on the old certificate",
+        "truststore_expiring": "Trust store certificate expiring or expired"
       }
     }
   },
@@ -6339,7 +6340,8 @@
       "renewal_declined": "Renewal declined",
       "ca_expiring": "CA expiring",
       "deploy_binding_left_behind": "Deployment left on the old certificate",
-      "https_binding_left_behind": "HTTPS left on the old certificate"
+      "https_binding_left_behind": "HTTPS left on the old certificate",
+      "truststore_expiring": "Trust store certificate expiring or expired"
     },
     "compliance": {
       "rsa_below_3072": "RSA below 3072 bits",
@@ -6375,6 +6377,29 @@
         "revoked": "Signer certificate revoked",
         "key_unavailable": "Signer key unavailable",
         "invalid": "Signer certificate not usable"
+      },
+      "smtp": "Email",
+      "webhooks": "Webhooks",
+      "auto_renewal": "Auto-Renewal",
+      "witness": {
+        "smtp": {
+          "not_configured": "Not configured",
+          "disabled": "Configured but disabled",
+          "incomplete": "Enabled, port or From address missing",
+          "ready": "Ready"
+        },
+        "webhooks": {
+          "not_configured": "No endpoints",
+          "none_active_one": "{{count}} endpoint, none active",
+          "none_active_other": "{{count}} endpoints, none active",
+          "active_one": "{{count}} active endpoint",
+          "active_other": "{{count}} active endpoints"
+        },
+        "auto_renewal": {
+          "enabled": "Enabled",
+          "disabled": "Disabled"
+        },
+        "unavailable": "Status unavailable"
       }
     },
     "filter": {

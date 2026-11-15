@@ -6367,7 +6367,8 @@
         "session_revoke": "Сеанс відкликано",
         "session_revoke_all": "Сеанси відкликано",
         "deploy_binding_left_behind": "Розгортання залишилося на старому сертифікаті",
-        "https_binding_left_behind": "HTTPS залишився на старому сертифікаті"
+        "https_binding_left_behind": "HTTPS залишився на старому сертифікаті",
+        "truststore_expiring": "Сертифікат у сховищі довіри скоро закінчується або закінчився"
       }
     }
   },
@@ -6416,7 +6417,8 @@
       "renewal_declined": "Оновлення відхилено",
       "ca_expiring": "ЦС скоро закінчується",
       "deploy_binding_left_behind": "Розгортання залишилося на старому сертифікаті",
-      "https_binding_left_behind": "HTTPS залишився на старому сертифікаті"
+      "https_binding_left_behind": "HTTPS залишився на старому сертифікаті",
+      "truststore_expiring": "Сертифікат у сховищі довіри скоро закінчується або закінчився"
     },
     "compliance": {
       "rsa_below_3072": "RSA менше 3072 біт",
@@ -6458,7 +6460,34 @@
       "tasksFailed_few": "{{count}} tasks failed",
       "tasksFailed_many": "{{count}} tasks failed",
       "tasksWarning_few": "{{count}} tasks with a warning",
-      "tasksWarning_many": "{{count}} tasks with a warning"
+      "tasksWarning_many": "{{count}} tasks with a warning",
+      "smtp": "Пошта",
+      "webhooks": "Webhooks",
+      "auto_renewal": "Авто-поновлення",
+      "witness": {
+        "smtp": {
+          "not_configured": "Не налаштовано",
+          "disabled": "Налаштовано, але вимкнено",
+          "incomplete": "Увімкнено, бракує порту або адреси відправника",
+          "ready": "Готово"
+        },
+        "webhooks": {
+          "not_configured": "Немає кінцевих точок",
+          "none_active_one": "{{count}} кінцева точка, не активна",
+          "none_active_few": "{{count}} кінцеві точки, жодна не активна",
+          "none_active_many": "{{count}} кінцевих точок, жодна не активна",
+          "none_active_other": "{{count}} кінцевих точок, жодна не активна",
+          "active_one": "{{count}} активна кінцева точка",
+          "active_few": "{{count}} активні кінцеві точки",
+          "active_many": "{{count}} активних кінцевих точок",
+          "active_other": "{{count}} активних кінцевих точок"
+        },
+        "auto_renewal": {
+          "enabled": "Увімкнено",
+          "disabled": "Вимкнено"
+        },
+        "unavailable": "Стан недоступний"
+      }
     },
     "filter": {
       "status": "Статус",

@@ -2080,19 +2080,18 @@ A database failure returns 500, never an empty `activity` list.
 GET /api/v2/dashboard/system-status
 ```
 
+Any authenticated caller. Each service is a `{status, message}` pair, `status` being `online`, `warning` or `offline`: `database`, `acme`, `scep`, `est`, `ocsp`, `crl`, `tsa` and `core` for every caller, `key_encryption` only for a caller holding `admin:system`, and `smtp`, `webhooks` and `auto_renewal` only for a caller holding `read:settings` (the gate and the rules of the same witnesses on `/dashboard/health`; one that cannot be read is `{"status": "warning", "message": "Status unavailable"}`).
+
 **Response:**
 ```json
 {
   "data": {
-    "status": "healthy",
-    "database": "connected",
-    "disk_usage": {
-      "used": "2.1GB",
-      "total": "50GB",
-      "percent": 4.2
-    },
-    "uptime": "15 days, 3:42:15",
-    "version": "2.x"
+    "database": { "status": "online", "message": "Connected" },
+    "acme": { "status": "online", "message": "Enabled" },
+    "smtp": { "status": "online", "message": "Host: mail.example.com" },
+    "webhooks": { "status": "offline", "message": "No endpoints" },
+    "auto_renewal": { "status": "online", "message": "Scheduled" },
+    "core": { "status": "online", "message": "Operational" }
   }
 }
 ```
@@ -2124,7 +2123,7 @@ GET /api/v2/dashboard/issuance?days=7
 ```
 Scope `read:dashboard`. A `days` outside its range is refused with 400.
 
-`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at` (at most `limit`, 100), with the full total per kind in `counts`. A repeated `kind` restricts the items, not the counts, to those kinds; an unknown kind is refused with 400:
+`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at` (at most `limit`, 100); an expired trust anchor comes after the other critical items, the most recently expired first, with the full total per kind in `counts`. A repeated `kind` restricts the items, not the counts, to those kinds; an unknown kind is refused with 400:
 
 | kind | critical | warning |
 |------|----------|---------|
@@ -2141,12 +2140,15 @@ Scope `read:dashboard`. A `days` outside its range is refused with 400.
 | `ca_expiring` | expires within 90 days | expires within a year |
 | `deploy_binding_left_behind` | deploy binding a renewal left on the previous certificate; `href_hint` is `/certificates/{certificate_id}?binding={id}` | |
 | `https_binding_left_behind` | HTTPS binding a renewal left on the previous certificate | |
+| `truststore_expiring` | trust anchor already expired, however long ago | trust anchor expiring within 90 days |
+
+`truststore_expiring` needs `read:truststore`: without it the kind is neither listed nor counted. `href_hint` is `/truststore/{id}`.
 
 Certificates counted are issued, not revoked, not archived and not expired. A certificate appears under one kind only, by precedence `auto_renewal_blocked` > `renewal_declined` > `manual_renewal_due` > `client_renewal_overdue`. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
 
 `href_hint` carries the object in the query (`request`, `order`, `ca`) and the tab (`tab`) the page reads; `contracts/queue_links.json` lists them. `GET /api/v2/key-recovery/{id}` (`read:key_recovery`) reads one recovery request like the two reads above.
 
-`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled: `state` is `ca_certificate` or `dedicated` (healthy), `no_signer` (no signer configured, not an alert: `/tsa` answers 503 until one is), `expiring` (dedicated signer within 30 days of expiry, `days_left`), `unusable` (`reason`: `expired`, `revoked`, `key_unavailable` or `invalid`) or `unavailable`; `alert` is true for `expiring`, `unusable` and `unavailable`. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled: `state` is `ca_certificate` or `dedicated` (healthy), `no_signer` (no signer configured, not an alert: `/tsa` answers 503 until one is), `expiring` (dedicated signer within 30 days of expiry, `days_left`), `unusable` (`reason`: `expired`, `revoked`, `key_unavailable` or `invalid`) or `unavailable`; `alert` is true for `expiring`, `unusable` and `unavailable`. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `smtp`, `webhooks` and `auto_renewal` are present only for a caller holding `read:settings`, with a `state` and no series: `smtp` is `not_configured`, `disabled`, `incomplete` (port or From address missing) or `ready`; `webhooks` is `not_configured`, `none_active` or `active` (`count`); `auto_renewal` is `enabled` or `disabled`; a witness whose read fails is `unavailable`, with `alert` true. `alert` is true for `disabled` and `incomplete` mail and for `none_active`, never for a setting that is simply not configured. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
 
 #### Certificate list filters
 

@@ -64,3 +64,10 @@ def test_seeded_roles_keep_every_checked_permission(app):
             granted = set(custom_role_permissions(role))
             lost = [p for p in role.permissions or [] if p in _checked(app) and p not in granted]
             assert not lost, f'{name} loses {lost}'
+
+
+def test_dashboard_permission_tables_are_declared():
+    """The overview gates scopes through tables, which the literal inventory cannot see."""
+    from services.dashboard_aggregates import KIND_PERMISSION, WITNESS_PERMISSION
+    gated = set(KIND_PERMISSION.values()) | set(WITNESS_PERMISSION.values())
+    assert gated <= INLINE_CHECKED_PERMISSIONS, sorted(gated - INLINE_CHECKED_PERMISSIONS)
