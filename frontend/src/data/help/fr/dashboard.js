@@ -56,7 +56,7 @@ Chaque compteur qui a une liste ouvre la page Certificats filtrée sur exactemen
 Choisissez le préréglage **Opérateur**, **Responsable** ou **Toutes les cartes** dans l'en-tête de la page pour définir les cartes affichées. La disposition est enregistrée avec votre compte et vous suit d'un navigateur à l'autre.
 
 ## Actualisation
-Les cartes se chargent à l'ouverture de la page ; une carte en erreur propose **Réessayer**. L'icône de connexion de la barre supérieure indique l'état du lien en direct, et la barre d'état en bas affiche la version et si le service répond.
+Les cartes se chargent à l'ouverture de la page puis se rechargent d'elles-mêmes, sans quitter la page, quand des certificats ou des CA changent, quand le lien en direct revient et quand vous revenez sur l'onglet ; **Actualiser** les recharge toutes d'un coup. Tant que le lien en direct est coupé, elles se rechargent une fois par minute. Une carte en erreur propose **Réessayer**. L'icône de connexion de la barre supérieure indique l'état du lien en direct, et la barre d'état en bas affiche la version et si le service répond.
 `
   }
 }

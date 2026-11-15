@@ -155,6 +155,16 @@ def list_scep_requests():
     return success_response(data=data)
 
 
+@bp.route('/api/v2/scep/requests/<int:request_id>', methods=['GET'])
+@require_auth(['read:scep'])
+def get_scep_request(request_id):
+    """One SCEP request, whatever its age (the list holds only the latest)."""
+    scep_req = db.session.get(SCEPRequest, request_id)
+    if not scep_req:
+        return error_response('Request not found', 404)
+    return success_response(data=scep_req.to_dict())
+
+
 def _issuing_service(scep_req):
     """The service that issues for a stored request: with the template of
     the profile the request came through (its validity and key usages

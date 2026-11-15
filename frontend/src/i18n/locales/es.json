@@ -447,7 +447,28 @@
     "continue": "Continuar",
     "keyRecovery": "Recuperación de claves",
     "preparing": "Preparando…",
-    "systemLogs": "Registros del sistema"
+    "systemLogs": "Registros del sistema",
+    "states": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "cancelled": "Cancelled",
+      "issued": "Issued",
+      "recovered": "Recovered",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "ready": "Ready",
+      "processing": "Processing",
+      "validating": "Validating",
+      "ok": "OK",
+      "failed": "Failed",
+      "warning": "Warning",
+      "skipped": "Skipped",
+      "never": "Never run",
+      "active": "Active",
+      "revoked": "Revoked"
+    }
   },
   "commandPalette": {
     "searchPlaceholder": "Buscar comandos, certificados, CAs, usuarios...",
@@ -6331,7 +6352,27 @@
       "scep": "SCEP",
       "est": "EST",
       "scheduler": "Planificador",
-      "tasks": "Tareas"
+      "tasks": "Tareas",
+      "tsa": "TSA",
+      "stale": "State not published",
+      "tasksFailed_one": "{{count}} task failed",
+      "tasksFailed_other": "{{count}} tasks failed",
+      "tasksWarning_one": "{{count}} task with a warning",
+      "tasksWarning_other": "{{count}} tasks with a warning",
+      "tsaState": {
+        "ca_certificate": "Signing with the CA certificate",
+        "dedicated": "Dedicated signer",
+        "expiring_one": "Signer expires in {{count}} day",
+        "expiring_other": "Signer expires in {{count}} days",
+        "no_signer": "Not configured",
+        "unavailable": "Status unavailable"
+      },
+      "tsaReason": {
+        "expired": "Signer certificate expired",
+        "revoked": "Signer certificate revoked",
+        "key_unavailable": "Signer key unavailable",
+        "invalid": "Signer certificate not usable"
+      }
     },
     "filter": {
       "status": "Estado",
@@ -6371,10 +6412,17 @@
     "horizon": {
       "expiring": "Por expirar",
       "expired": "Expirado",
-      "soonest": "Próximo en expirar"
+      "soonest": "Próximo en expirar",
+      "tsaSigner": "TSA signer",
+      "ocspResponder": "OCSP responder"
     },
     "activity": {
       "all": "Ver todo"
-    }
+    },
+    "link": {
+      "handled": "Item #{{id}} no longer waits for action (status: {{status}}).",
+      "gone": "Item #{{id}} no longer exists."
+    },
+    "refresh": "Refresh"
   }
 }

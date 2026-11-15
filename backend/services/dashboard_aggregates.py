@@ -5,13 +5,14 @@ statements whatever the table sizes. Nothing here loads ``crt`` or ``prv``:
 key size and signature hash are the ``key_bits`` / ``sig_hash`` columns, set
 whenever a certificate is stored (``models/certificate.py``).
 """
+import logging
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import aliased
 from sqlalchemy import (DateTime, String, and_, case, cast, false, func, literal, literal_column,
                         or_, select, true, type_coerce, union_all)
 
-from models import CA, Certificate, DeployBinding, DeployTarget, SystemConfig
+from models import CA, Certificate, DeployBinding, DeployTarget, SystemConfig, db
 from models.acme_models import AcmeClientOrder, AcmeOrder
 from models.audit_log import AuditLog
 from models.certificate_template import CertificateTemplate
@@ -21,7 +22,10 @@ from models.policy import ApprovalRequest
 from models.scep import SCEPRequest
 from services.ocsp_responder_renewal import renewed_by_responder_task
 from utils.cert_status import EXPIRY_WINDOW_DAYS, holds_certificate, orphan_condition
-from utils.datetime_utils import utc_isoformat, utc_now
+from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
+from utils.days_remaining import days_remaining
+
+logger = logging.getLogger(__name__)
 
 QUEUE_KINDS = ('acme_order_failed', 'acme_client_renewal_failed', 'approval_pending',
                'scep_request_pending', 'key_recovery_pending', 'crl_due', 'crl_missing',
@@ -29,6 +33,8 @@ QUEUE_KINDS = ('acme_order_failed', 'acme_client_renewal_failed', 'approval_pend
                'renewal_declined', 'ca_expiring', 'deploy_binding_left_behind',
                'https_binding_left_behind')
 ACME_FAILURE_LOOKBACK_DAYS = 7
+# A dedicated TSA signer this close to expiry is an alert (the renewal window of the signer)
+TSA_SIGNER_WARN_DAYS = 30
 CRITICAL_WITHIN = timedelta(hours=24)
 DEFAULT_CRL_VALIDITY_DAYS = 7
 CA_EXPIRY_WARNING_DAYS = 365
@@ -43,8 +49,8 @@ CLIENT_RENEWED_SOURCES = ('acme', 'letsencrypt', 'scep', 'est', 'wstep')
 CLIENT_RENEWAL_OVERDUE_DAYS = 7
 
 _HREF = {
-    'acme_order_failed': '/acme?tab=orders&order={id}',
-    'acme_client_renewal_failed': '/acme?tab=client&order={id}',
+    'acme_order_failed': '/acme?tab=localorders&order={id}',
+    'acme_client_renewal_failed': '/acme?tab=letsencryptorders&order={id}',
     'approval_pending': '/approvals?request={id}',
     'scep_request_pending': '/scep-config?tab=requests&request={id}',
     'key_recovery_pending': '/key-recovery?request={id}',
@@ -469,19 +475,57 @@ def _scheduler_health():
             'last_operation_at': last_run, 'last_status': last_status}
 
 
+# No signer configured is "not configured", not a fault: the protocol answers 503 by design
+_TSA_QUIET = ('ca_certificate', 'dedicated', 'no_signer')
+
+
+def _tsa_health():
+    """The TSA signer's state, or None while the TSA is off. Coarse states only: no refid, no error text."""
+    try:
+        from services.tsa_service import (
+            describe_configured_signer, tsa_ca_certificate_path_ready, tsa_is_enabled)
+        if not tsa_is_enabled():
+            return None
+        state, reason, days_left = 'dedicated', None, None
+        signer = describe_configured_signer()
+        if not signer.get('configured'):
+            state = 'ca_certificate' if tsa_ca_certificate_path_ready() else 'no_signer'
+        elif not signer.get('usable'):
+            state, reason = 'unusable', signer.get('reason') or 'invalid'
+        else:
+            not_after = signer.get('not_after')
+            days_left = days_remaining(to_naive_utc(datetime.fromisoformat(not_after))) if not_after else None
+            if days_left is not None and days_left <= TSA_SIGNER_WARN_DAYS:
+                state = 'expiring'
+        return {'basis': 'signer', 'periods': None, 'state': state, 'reason': reason,
+                'days_left': days_left, 'alert': state not in _TSA_QUIET,
+                'last_operation_at': None, 'last_status': None}
+    except Exception:
+        # A resolver bug is exactly when the overview must not claim health
+        logger.debug('TSA health check failed', exc_info=True)
+        # On PostgreSQL a failed statement aborts the transaction for the rest of the request
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return {'basis': 'signer', 'periods': None, 'state': 'unavailable', 'reason': None,
+                'days_left': None, 'alert': True, 'last_operation_at': None, 'last_status': None}
+
+
 def protocol_health(session, days, now=None):
     """Per protocol, ``days`` UTC calendar days of ok/failed counts, oldest first."""
     now = now or utc_now()
     start, dates = _window(days, now)
-    return {
-        'days': days, 'from': dates[0], 'to': dates[-1],
-        'protocols': {
-            'acme': _acme_health(session, start, dates),
-            'scep': _scep_health(session, start, dates),
-            'est': _est_health(session, start, dates),
-            'scheduler': _scheduler_health(),
-        },
+    protocols = {
+        'acme': _acme_health(session, start, dates),
+        'scep': _scep_health(session, start, dates),
+        'est': _est_health(session, start, dates),
+        'scheduler': _scheduler_health(),
     }
+    tsa = _tsa_health()
+    if tsa is not None:
+        protocols['tsa'] = tsa
+    return {'days': days, 'from': dates[0], 'to': dates[-1], 'protocols': protocols}
 
 
 # ------------------------------------------------------------- compliance

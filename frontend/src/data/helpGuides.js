@@ -42,7 +42,7 @@ Every counter that has a list opens the Certificates page filtered to exactly th
 Pick the **Operator**, **Manager** or **All cards** preset in the page header to choose which cards are shown. The layout is saved with your account and follows you across browsers.
 
 ## Refreshing
-Cards load when the page opens; a card in error offers **Retry**. The connection icon in the top bar shows the state of the live link, and the status bar at the bottom shows the version and whether the service answers.
+Cards load when the page opens and reload on their own, without leaving the page, when certificates or CAs change, when the live link comes back and when you return to the tab; **Refresh** reloads them all at once. While the live link is down they reload once a minute. A card in error offers **Retry**. The connection icon in the top bar shows the state of the live link, and the status bar at the bottom shows the version and whether the service answers.
 `
   },
 

@@ -8,7 +8,7 @@ const COUNTERS = ['rsa_below_3072', 'weak_signature_hash', 'server_lifetime_over
 
 export function ComplianceCard() {
   const { t } = useTranslation()
-  const state = useCardData(() => overviewService.getCompliance())
+  const state = useCardData(() => overviewService.getCompliance(), ['certificate', 'ca'])
   const data = state.data || {}
   const counters = data.counters || {}
   const algos = Array.isArray(data.by_key_algorithm) ? data.by_key_algorithm : []

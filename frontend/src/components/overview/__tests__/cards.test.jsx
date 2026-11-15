@@ -13,6 +13,10 @@ vi.mock('../../../services', () => ({
   casService: { getAll: api.getAll },
   dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity },
 }))
+vi.mock('../../../hooks/useWebSocket', () => ({
+  useWebSocket: () => ({ connectionState: 'connected' }),
+  ConnectionState: { CONNECTED: 'connected', DISCONNECTED: 'disconnected', CONNECTING: 'connecting', ERROR: 'error' },
+}))
 vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))
 
 import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard } from '..'

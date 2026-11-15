@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { casService, overviewService } from '../../services'
+import { stateLabel } from '../../lib/stateLabel'
 import { CardFrame, num, settle, useCardData } from './shared'
 
 const DAYS = 7
@@ -27,7 +28,7 @@ function Node({ ca, kids, issued, t }) {
         <span className="min-w-0">
           <span className="block text-sm text-text-primary truncate">{ca.descr || ca.common_name || '–'}</span>
           <span className="block text-xs text-text-secondary">
-            {ca.status && ca.status !== 'Active' ? `${ca.status} · ` : ''}
+            {ca.status && ca.status !== 'Active' ? `${stateLabel(t, ca.status)} · ` : ''}
             {ca.offline ? `${t('overview.hierarchy.offline')} · ` : ''}
             {ca.cross_certificate_count > 0 ? `${t('overview.hierarchy.crossSigned')} · ` : ''}
             {t(ca.cdp_enabled ? 'overview.hierarchy.crlOn' : 'overview.hierarchy.crlOff')}
@@ -71,7 +72,7 @@ export function HierarchyCard() {
       { cas: () => casService.getAll(), issuance: () => overviewService.getIssuance(DAYS) },
       (g) => Boolean(g.cas) || g.issuance?.data?.by_ca?.length > 0)
     return { data: { cas: got.cas?.data, issuance: got.issuance?.data, missing }, meta: got.cas?.meta }
-  })
+  }, ['ca', 'certificate'])
   const casLoaded = Array.isArray(state.data?.cas)
   const cas = casLoaded ? state.data.cas : []
   const byCa = state.data?.issuance?.by_ca

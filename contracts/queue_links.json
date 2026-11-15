@@ -1,0 +1,19 @@
+{
+  "_doc": "Where each work-queue link leads. `template` is the server's href (backend/services/dashboard_aggregates.py _HREF); `route`, `tab` and `param` are what the target page reads. A page that does not read `param` opens nothing.",
+  "links": [
+    {"kind": "acme_order_failed", "template": "/acme?tab=localorders&order={id}", "route": "/acme", "tab": "localorders", "param": "order"},
+    {"kind": "acme_client_renewal_failed", "template": "/acme?tab=letsencryptorders&order={id}", "route": "/acme", "tab": "letsencryptorders", "param": "order"},
+    {"kind": "approval_pending", "template": "/approvals?request={id}", "route": "/approvals", "tab": null, "param": "request"},
+    {"kind": "scep_request_pending", "template": "/scep-config?tab=requests&request={id}", "route": "/scep-config", "tab": "requests", "param": "request"},
+    {"kind": "key_recovery_pending", "template": "/key-recovery?request={id}", "route": "/key-recovery", "tab": null, "param": "request"},
+    {"kind": "crl_due", "template": "/crl-ocsp?ca={id}", "route": "/crl-ocsp", "tab": null, "param": "ca"},
+    {"kind": "crl_missing", "template": "/crl-ocsp?ca={id}", "route": "/crl-ocsp", "tab": null, "param": "ca"},
+    {"kind": "manual_renewal_due", "template": "/certificates/{id}", "route": "/certificates", "tab": null, "param": null},
+    {"kind": "client_renewal_overdue", "template": "/certificates/{id}", "route": "/certificates", "tab": null, "param": null},
+    {"kind": "auto_renewal_blocked", "template": "/certificates/{id}", "route": "/certificates", "tab": null, "param": null},
+    {"kind": "renewal_declined", "template": "/certificates/{id}", "route": "/certificates", "tab": null, "param": null},
+    {"kind": "ca_expiring", "template": "/cas/{id}", "route": "/cas", "tab": null, "param": null},
+    {"kind": "deploy_binding_left_behind", "template": "/certificates/{certificate_id}?binding={id}", "route": "/certificates", "tab": null, "param": null},
+    {"kind": "https_binding_left_behind", "template": "/settings?tab=https", "route": "/settings", "tab": "https", "param": null}
+  ]
+}

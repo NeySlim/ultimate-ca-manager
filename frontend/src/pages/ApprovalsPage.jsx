@@ -4,7 +4,6 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
 import {
   Stamp, CheckCircle, XCircle, Clock, Warning, User,
   ChatText, Gavel, Certificate, Funnel
@@ -17,7 +16,9 @@ import { approvalsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { useLinkedId } from '../hooks/useLinkedId'
 import { formatDate, cn } from '../lib/utils'
+import { stateLabel } from '../lib/stateLabel'
 import { showNotices } from '../lib/notices'
 import { approvedLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
 
@@ -59,7 +60,7 @@ const STATUS_ICONS = {
 
 export default function ApprovalsPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError, showWarning } = useNotification()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const { canWrite } = usePermission()
   const openEntity = useOpenEntity()
 
@@ -97,17 +98,26 @@ export default function ApprovalsPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Deep link from a notification e-mail: /approvals?id=N opens that request
-  const [searchParams] = useSearchParams()
-  const linkedId = searchParams.get('id')
+  // /approvals?request=N (work queue) and ?id=N (e-mails already sent) open that request
+  const linkedId = useLinkedId('request', 'id')
   useEffect(() => {
-    if (!linkedId || !/^\d+$/.test(linkedId)) return
+    if (!linkedId) return
     let cancelled = false
     approvalsService.getById(linkedId)
-      .then(res => { if (!cancelled && res?.data) setSelectedRequest(res.data) })
-      .catch(() => { if (!cancelled) showError(t('approvals.loadFailed')) })
+      .then(res => {
+        if (cancelled || !res?.data) return
+        setSelectedRequest(res.data)
+        if (res.data.status !== 'pending') {
+          showInfo(t('overview.link.handled', { id: res.data.id, status: stateLabel(t, res.data.status) }))
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        if (err?.status === 404) showInfo(t('overview.link.gone', { id: linkedId }))
+        else showError(t('approvals.loadFailed'))
+      })
     return () => { cancelled = true }
-  }, [linkedId, showError, t])
+  }, [linkedId, showError, showInfo, t])
 
   // Stats bar
   const statItems = useMemo(() => [
@@ -197,7 +207,7 @@ export default function ApprovalsPage() {
         return (
           <Badge variant={STATUS_VARIANTS[val] || 'default'}>
             <Icon size={12} weight="fill" className="mr-1" />
-            {val}
+            {stateLabel(t, val)}
           </Badge>
         )
       },
@@ -290,7 +300,7 @@ export default function ApprovalsPage() {
       {/* Status */}
       <div className="flex items-center gap-2">
         <Badge variant={STATUS_VARIANTS[selectedRequest.status]} size="lg">
-          {selectedRequest.status}
+          {stateLabel(t, selectedRequest.status)}
         </Badge>
         <RequestTypeBadge type={selectedRequest.request_type} t={t} />
       </div>

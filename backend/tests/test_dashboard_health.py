@@ -157,5 +157,19 @@ def test_scheduler_reads_the_published_state(app, auth_client, monkeypatch, tmp_
     assert _health(auth_client)['protocols']['scheduler']['stale'] is True
 
 
+def test_scheduler_last_status_hides_an_older_failure(app, auth_client, monkeypatch, tmp_path):
+    """The latest run being fine says nothing of a task that failed before it: by_status carries it."""
+    names = list(scheduler_service.get_scheduler().tasks)
+    monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '1')
+    monkeypatch.setattr(scheduler_service, '_data_path', lambda name: str(tmp_path / name))
+    tasks = {name: {'last_status': 'ok', 'last_run': '2026-01-01T12:00:00Z'} for name in names}
+    tasks[names[0]] = {'last_status': 'failed', 'last_run': '2026-01-01T09:00:00Z', 'last_error': 'x'}
+    (tmp_path / scheduler_service.STATE_FILE).write_text(
+        json.dumps({'pid': 1, 'published_at': time.time(), 'tasks': tasks}))
+    sched = _health(auth_client)['protocols']['scheduler']
+    assert sched['last_status'] == 'ok'
+    assert sched['by_status']['failed'] == 1
+
+
 def test_requires_auth(client):
     assert client.get(URL).status_code == 401

@@ -8,6 +8,7 @@ import { Button } from '../components'
 import {
   ActivityCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, QueueCard,
 } from '../components/overview'
+import { REFRESH_EVENT } from '../lib/overviewRefresh'
 import { KeyEncryptionBanner } from '../components/overview/KeyEncryptionBanner'
 import { getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
 import { PRESETS, normalizeLayout, presetLayout, visibleCards } from '../lib/overviewLayout'
@@ -29,6 +30,12 @@ export default function OverviewPage() {
     <div className="p-4 flex flex-col gap-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-text-primary">{t('overview.title')}</h1>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="secondary"
+            onClick={() => window.dispatchEvent(new Event(REFRESH_EVENT))}>
+            {t('overview.refresh')}
+          </Button>
+        </div>
         <div role="group" aria-label={t('overview.presets.label')} className="flex gap-2">
           {Object.keys(PRESETS).map((name) => (
             <Button key={name} type="button" size="sm" variant="secondary"

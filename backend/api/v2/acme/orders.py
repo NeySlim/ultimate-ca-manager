@@ -58,6 +58,23 @@ def order_validation_method(order) -> str:
     return ', '.join(t.upper() for t in types) if types else 'N/A'
 
 
+def _order_row(order):
+    """One local order as the list and the by-id read show it."""
+    identifiers_str = ", ".join([i.get('value', '') for i in order.identifiers_list])
+    account = order.account
+    return {
+        'id': order.id,
+        'order_id': order.order_id,
+        'domain': identifiers_str,
+        'account': account.account_id if account else "Unknown",
+        'status': order.status.capitalize(),
+        'expires': order.expires.strftime('%Y-%m-%d'),
+        'method': order_validation_method(order),
+        'certificate_id': order.certificate_id,
+        'created_at': utc_isoformat(order.created_at)
+    }
+
+
 @bp.route('/api/v2/acme/orders', methods=['GET'])
 @require_auth(['read:acme'])
 def list_acme_orders():
@@ -75,31 +92,22 @@ def list_acme_orders():
     orders = (query.order_by(AcmeOrder.created_at.desc())
               .offset((page - 1) * per_page).limit(per_page).all())
 
-    data = []
-    for order in orders:
-        # Extract identifiers for display
-        identifiers_str = ", ".join([i.get('value', '') for i in order.identifiers_list])
-
-        # Get account info
-        account = order.account
-        account_name = account.account_id if account else "Unknown"
-
-        data.append({
-            'id': order.id,
-            'order_id': order.order_id,
-            'domain': identifiers_str,
-            'account': account_name,
-            'status': order.status.capitalize(),
-            'expires': order.expires.strftime('%Y-%m-%d'),
-            'method': order_validation_method(order),
-            'certificate_id': order.certificate_id,
-            'created_at': utc_isoformat(order.created_at)
-        })
+    data = [_order_row(order) for order in orders]
 
     return success_response(data={
         'items': data,
         'meta': {'page': page, 'per_page': per_page, 'total': total},
     })
+
+
+@bp.route('/api/v2/acme/orders/<int:order_pk>', methods=['GET'])
+@require_auth(['read:acme'])
+def get_acme_order(order_pk):
+    """One local ACME order, whatever its age (the list is paginated)."""
+    order = db.session.get(AcmeOrder, order_pk)
+    if not order:
+        return error_response('Order not found', 404)
+    return success_response(data=_order_row(order))
 
 
 @bp.route('/api/v2/acme/orders/<int:order_pk>', methods=['DELETE'])

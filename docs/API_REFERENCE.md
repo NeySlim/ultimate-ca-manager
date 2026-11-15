@@ -1643,7 +1643,9 @@ GET /api/v2/acme/accounts
 ### List ACME Orders
 ```http
 GET /api/v2/acme/orders
+GET /api/v2/acme/orders/{order_pk}
 ```
+The second form reads one local order (`read:acme`), whatever its age; 404 when it does not exist.
 
 ### Register with Let's Encrypt Proxy
 ```http
@@ -1699,7 +1701,9 @@ GET /api/v2/scep/stats
 ```http
 GET /api/v2/scep/requests
 GET /api/v2/scep/requests?status=pending
+GET /api/v2/scep/requests/{request_id}
 ```
+The list holds the latest 50; the last form reads any one request (`read:scep`), 404 when it does not exist.
 
 ### Approve Request
 ```http
@@ -2132,7 +2136,9 @@ Scope `read:dashboard`. A `days` outside its range is refused with 400.
 
 Certificates counted are issued, not revoked, not archived and not expired. A certificate appears under one kind only, by precedence `auto_renewal_blocked` > `renewal_declined` > `manual_renewal_due` > `client_renewal_overdue`. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
 
-`health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+`href_hint` carries the object in the query (`request`, `order`, `ca`) and the tab (`tab`) the page reads; `contracts/queue_links.json` lists them. `GET /api/v2/key-recovery/{id}` (`read:key_recovery`) reads one recovery request like the two reads above.
+
+`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled: `state` is `ca_certificate` or `dedicated` (healthy), `no_signer` (no signer configured, not an alert: `/tsa` answers 503 until one is), `expiring` (dedicated signer within 30 days of expiry, `days_left`), `unusable` (`reason`: `expired`, `revoked`, `key_unavailable` or `invalid`) or `unavailable`; `alert` is true for `expiring`, `unusable` and `unavailable`. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
 
 #### Certificate list filters
 
