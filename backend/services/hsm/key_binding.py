@@ -59,12 +59,12 @@ def bound_key_ids():
 
 
 def refuse_node_local_in_ha(provider):
-    """HaRestricted for a new CA on a token only one node reaches: SoftHSM, an OpenSC reader."""
+    """HaRestricted for a new CA on a token only one node reaches: SoftHSM, a local smart card reader."""
     from services import compliance_signer
     from utils.ha import refuse_reader_in_ha, refuse_softhsm_in_ha
     if compliance_signer.softhsm_provider(provider):
         refuse_softhsm_in_ha()
-    elif compliance_signer.opensc_provider(provider):
+    elif compliance_signer.local_reader_provider(provider):
         refuse_reader_in_ha()
 
 

@@ -55,7 +55,7 @@ def refuse_softhsm_in_ha():
         raise HaRestricted(SOFTHSM_LOCAL)
 
 
-READER_LOCAL = ("Not available in HA mode: a smart card reader (OpenSC) is attached to one node only, "
+READER_LOCAL = ("Not available in HA mode: a smart card reader (OpenSC, YubiKey PIV) is attached to one node only, "
                 "use a network HSM or a KMS provider")
 
 

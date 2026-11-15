@@ -20,6 +20,7 @@ from services.hsm.base_provider import (HsmConfigError, HsmConnectionError, HsmK
 
 SSH_CAS = '/api/v2/ssh/cas'
 OPENSC = '/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so'
+YKCS11 = '/usr/lib/x86_64-linux-gnu/libykcs11.so'
 SOFT = '/nonexistent/softhsm/libsofthsm2.so'
 VENDOR = '/opt/vendor/lib/libcs_pkcs11_R3.so'
 
@@ -378,7 +379,8 @@ class TestFipsAndHa:
         assert 'RSA 1024' in json.dumps(r.get_json())
         loaded.assert_not_called()
 
-    @pytest.mark.parametrize('module,word', [(SOFT, 'SoftHSM'), (OPENSC, 'smart card reader')])
+    @pytest.mark.parametrize('module,word', [(SOFT, 'SoftHSM'), (OPENSC, 'smart card reader'),
+                                             (YKCS11, 'smart card reader')])
     def test_ha_refuses_a_token_one_node_reaches(self, app, auth_client, token_key, monkeypatch, module, word):
         key = token_key(module=module)
         monkeypatch.setattr(Config, 'HA_MODE', True)
