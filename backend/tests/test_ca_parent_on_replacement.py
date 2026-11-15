@@ -193,3 +193,18 @@ def test_the_chain_repair_keeps_a_link_it_cannot_check(app, auth_client, made):
     with app.app_context():
         backfill_ski_aki()
     assert _caref(app, child['id']) == gost['refid']
+
+
+def test_a_renewal_whose_key_identifier_names_another_stored_key_keeps_the_verified_parent(
+        app, auth_client, made, linked):
+    """The AKI only names a key: the former parent stays because its key still verifies the signature."""
+    w, stray_key = linked, _key()
+    stray_cn = f'Repl Named {_tag()}'
+    stray = _import(auth_client, _rsa_pem(stray_cn, stray_key, serial=_serial()))
+    made.append(stray['id'])
+    ski = x509.SubjectKeyIdentifier.from_public_key(stray_key.public_key()).digest
+    with app.app_context():
+        db.session.get(CA, stray['id']).ski = ski.hex(':').upper()
+        db.session.commit()
+    _import(auth_client, _aki_pem(w['cn'], w['key'], w['root_cn'], w['root_key'], ski), cross_mode='replace')
+    assert _caref(app, w['child']['id']) == w['root']['refid']
