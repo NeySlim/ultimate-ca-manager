@@ -80,7 +80,7 @@ def test_exclusions_name_real_routes_and_give_a_reason(app):
 
 def test_no_hand_written_endpoint_count():
     # The route table is the count; a number typed into the reference goes stale.
-    count = re.compile(r'(?i)(total\s+endpoints|\d+\+?\s+endpoints)')
+    count = re.compile(r'(?i)(total\s+endpoints|\d+\+?\s+(endpoints|routes|operations)\b)')
     with open(_REFERENCE, encoding='utf-8') as fh:
         stale = [line.strip() for line in fh if count.search(line)]
     assert not stale, 'endpoint count written by hand:\n' + '\n'.join(stale)

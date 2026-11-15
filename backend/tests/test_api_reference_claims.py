@@ -1,31 +1,68 @@
 """Claims in docs/API_REFERENCE.md checked against the application."""
+import contextlib
 import json
 import random
-import os
 
-_REF = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))), 'docs', 'API_REFERENCE.md')
+from tests.fresh_app import fresh_app
 
-
-def _doc():
-    with open(_REF, encoding='utf-8') as fh:
-        return fh.read()
+_EST = '/.well-known/est/cacerts'
+_XCEP = '/ADPolicyProvider_CEP_Kerberos/service.svc'
 
 
-def test_protocol_routes_are_registered_and_the_doc_says_so(app):
-    rules = {r.rule for r in app.url_map.iter_rules()}
-    assert '/tsa' in rules
-    assert any(r.startswith('/.well-known/est') for r in rules)
-    assert 'is not registered' not in _doc()
+@contextlib.contextmanager
+def _setting(app, key, value):
+    from models import SystemConfig, db
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=key).first()
+        before = row.value if row else None
+        if row is None:
+            row = SystemConfig(key=key)
+            db.session.add(row)
+        row.value = value
+        db.session.commit()
+    try:
+        yield
+    finally:
+        with app.app_context():
+            row = SystemConfig.query.filter_by(key=key).first()
+            if before is None:
+                db.session.delete(row)
+            else:
+                row.value = before
+            db.session.commit()
 
 
-def test_rate_limit_switch_turns_off_both_limiters_in_the_doc():
-    doc = _doc()
-    assert 'Fixed in code' not in doc
-    assert 'turns off both limiters' in doc
+def test_a_protocol_turned_off_answers_503(app):
+    c = app.test_client()
+    with _setting(app, 'est_enabled', 'false'), _setting(app, 'xcep_enabled', 'false'):
+        assert c.get(_EST).status_code == 503
+        assert c.get(_XCEP).status_code == 503
+    # Turned on, neither answers that it is turned off (an unconfigured EST also gives 503).
+    with _setting(app, 'est_enabled', 'true'), _setting(app, 'xcep_enabled', 'true'):
+        assert c.get(_EST).get_data(as_text=True) != 'EST disabled'
+        assert c.get(_XCEP).get_data(as_text=True) != 'XCEP disabled'
 
 
-def test_mtls_list_routes_accept_api_keys_and_the_doc_says_so(auth_client, app):
+def test_rate_limit_enabled_false_lets_six_failed_logins_through(monkeypatch):
+    from app import limiter
+    from security.rate_limiter import RateLimitConfig
+    saved = RateLimitConfig._enabled, limiter.initialized
+    monkeypatch.setenv('RATE_LIMIT_ENABLED', 'false')
+    # Process state a server builds once: the app starts from a new process's.
+    RateLimitConfig._enabled, limiter.initialized = None, False
+    try:
+        with fresh_app() as application:
+            c, addr = application.test_client(), _public_addr()
+            codes = [c.post('/api/v2/auth/login/password', environ_base={'REMOTE_ADDR': addr},
+                            content_type='application/json',
+                            data=json.dumps({'username': 'nobody-off', 'password': 'wrong'})).status_code
+                     for _ in range(6)]
+    finally:
+        RateLimitConfig._enabled, limiter.initialized = saved
+    assert codes == [401] * 6
+
+
+def test_mtls_list_routes_accept_api_keys(auth_client, app):
     r = auth_client.post('/api/v2/account/apikeys',
                          data=json.dumps({'name': 'mtls-doc',
                                           'permissions': ['read:certificates']}),
@@ -33,9 +70,8 @@ def test_mtls_list_routes_accept_api_keys_and_the_doc_says_so(auth_client, app):
     key = r.get_json()['data']['key']
     c = app.test_client()
     for path in ('/api/v2/mtls/certificates', '/api/v2/mtls/available-certificates'):
-        assert c.get(path, headers={'X-API-Key': key}).status_code != 403, path
-    assert ('Except for the two settings routes and the two GET lists '
-            '(certificates, available-certificates)') in _doc()
+        assert c.get(path, headers={'X-API-Key': key}).status_code == 200, path
+        assert c.get(path, headers={'X-API-Key': key[:-4] + 'zzzz'}).status_code == 401, path
 
 
 def _public_addr():
