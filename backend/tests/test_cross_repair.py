@@ -127,6 +127,25 @@ def test_restore_primary_puts_the_self_signed_back_and_keeps_the_cross_certifica
     assert ok, out
 
 
+@pytest.mark.parametrize('confirmed', [False, True])
+def test_restore_primary_audits_the_parent_it_drops(app, auth_client, confirmed):
+    from models.audit_log import AuditLog
+    pki, ids = _world(app, with_root_b=False)
+    action = 'ca_parent_unconfirmed' if confirmed else 'ca_parent_unlinked'
+    with app.app_context():
+        if confirmed:
+            from utils.datetime_utils import utc_now
+            record = db.session.get(CA, ids['x'])
+            record.parent_confirmed_by, record.parent_confirmed_at = 'admin', utc_now()
+            db.session.commit()
+        before = AuditLog.query.filter_by(action=action, resource_id=str(ids['x'])).count()
+    r = auth_client.post(f"/api/v2/cas/{ids['x']}/restore-primary", json={'certificate': pem(pki.root_b)})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert db.session.get(CA, ids['x']).caref is None
+        assert AuditLog.query.filter_by(action=action, resource_id=str(ids['x'])).count() == before + 1
+
+
 def test_restore_primary_refuses_a_foreign_or_non_self_signed_certificate(app, auth_client):
     pki, ids = _world(app, with_root_b=False)
     other = build_cross_pki()

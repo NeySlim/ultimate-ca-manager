@@ -142,29 +142,42 @@ def keeps_confirmed_parent(ca, cert):
     return found is not None and found.parent.refid == ca.caref
 
 
-def settle_confirmed_parent(ca, cert):
-    """Before *ca* takes *cert*: True while its parent confirmed by hand still holds, else that
-    link and its mark are cleared (a verified parent, if any, is the caller's to set) and the
-    caller audits it after its commit with ``audit_dropped``."""
+def settle_parent(ca, cert):
+    """Before *ca* takes *cert*: ``caref`` becomes its parent confirmed by hand while that is still
+    the proposal, else the CA whose key verifies *cert* (the former parent only if it still does),
+    else None. Returns whether the confirmed parent held; the caller audits a dropped link after
+    its commit with ``audit_dropped``."""
     if keeps_confirmed_parent(ca, cert):
         return True
-    if ca.parent_confirmed_at is not None:
-        ca._dropped_confirmed_parent = ca.caref
-        ca.caref = None
-        ca.parent_confirmed_by = None
-        ca.parent_confirmed_at = None
+    from services.import_service import relink_parent_caref
+    former, confirmed = ca.caref, ca.parent_confirmed_at is not None
+    ca.caref = relink_parent_caref(cert, None if confirmed else former, exclude_ca_id=ca.id)
+    ca.parent_confirmed_by = None
+    ca.parent_confirmed_at = None
+    if former and (confirmed or ca.caref != former):
+        ca._dropped_parent = (former, confirmed)
     return False
 
 
 def audit_dropped(ca, username=None):
-    """After the caller's commit: the audit entry of a parent ``settle_confirmed_parent`` dropped."""
-    former = ca.__dict__.pop('_dropped_confirmed_parent', None)
-    if former is None:
+    """After the caller's commit: the audit entry of a parent ``settle_parent`` dropped
+    (``ca_parent_unconfirmed`` for one confirmed by hand, ``ca_parent_unlinked`` otherwise)."""
+    dropped = ca.__dict__.pop('_dropped_parent', None)
+    if dropped is None:
         return
+    former, confirmed = dropped
     from models import CA
     from services.audit_service import AuditService
     parent = CA.query.filter_by(refid=former).first()
+    name = parent.descr if parent else former
+    if confirmed:
+        AuditService.log_ca(
+            'ca_parent_unconfirmed', ca,
+            f'Parent "{name}" confirmed by hand dropped: the new certificate of this CA is not under it',
+            username=username)
+        return
+    now = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
     AuditService.log_ca(
-        'ca_parent_unconfirmed', ca,
-        f'Parent "{parent.descr if parent else former}" confirmed by hand dropped: '
-        'the new certificate of this CA is not under it', username=username)
+        'ca_parent_unlinked', ca,
+        f'Parent "{name}" dropped: its key does not verify the certificate of this CA'
+        + (f'; linked under "{now.descr}"' if now else ''), username=username)

@@ -824,7 +824,8 @@ class CACreationMixin:
         #    imported later, and chain-repair re-links orphans.
         #    The first candidate that verifies wins, a self-signed root before
         #    a cross or link certificate of the same key.
-        caref = None
+        # The parent follows the rule of every certificate change (parent_confirmation.settle_parent);
+        # the candidates only word the warnings
         candidates = []
         aki_hex = authority_key_identifier_hex(cert)
         if aki_hex:
@@ -833,21 +834,9 @@ class CACreationMixin:
             candidates = self_signed_first(CA.query.filter(
                 CA.subject == cert.issuer.rfc4514_string(), CA.id != ca.id
             ).order_by(CA.id).all())
-        for parent in candidates:
-            if not parent.crt:
-                continue
-            try:
-                parent_cert = x509.load_pem_x509_certificate(
-                    base64.b64decode(parent.crt), default_backend()
-                )
-                cert.verify_directly_issued_by(parent_cert)
-            except Exception:
-                continue
-            caref = parent.refid
-            break
-        # A parent confirmed by hand stays only while it is still the proposal for this certificate
         from services.ca import parent_confirmation
-        kept_confirmed = parent_confirmation.settle_confirmed_parent(ca, cert)
+        kept_confirmed = parent_confirmation.settle_parent(ca, cert)
+        caref = None if kept_confirmed else ca.caref
         proposed = None if caref or kept_confirmed else parent_confirmation.proposal_for(cert, ca.id)
         if proposed is not None:
             # Unverifiable is not invalid: the operator may confirm this parent by hand
@@ -884,8 +873,6 @@ class CACreationMixin:
         ca.valid_from = cert.not_valid_before_utc
         ca.valid_to = cert.not_valid_after_utc
         ca.path_length = new_path_length
-        if caref and not kept_confirmed:
-            ca.caref = caref
         ca.csr = None  # the outstanding CSR is fulfilled
 
         try:

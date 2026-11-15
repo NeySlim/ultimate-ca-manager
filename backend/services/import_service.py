@@ -343,8 +343,9 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
 
     None for a self-signed certificate; the CA whose key verifies the
     signature, found by AKI then by issuer name, the self-signed record
-    before a cross or link certificate of the same key; *current_caref*
-    when UCM holds no such CA (an external root imported later relinks it).
+    before a cross or link certificate of the same key; else *current_caref*
+    while its key still verifies the signature; else None (an external root
+    imported later relinks it).
     """
     from models import CA
     from utils.cert_issuer import VERIFIED, authority_key_identifier_hex, is_self_signed, self_signed_first, \
@@ -365,7 +366,14 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
                 return parent.refid
         except Exception:
             continue
-    return current_caref
+    current = CA.query.filter_by(refid=current_caref).first() if current_caref else None
+    try:
+        if current is not None and current.id != exclude_ca_id and current.crt and signature_verdict(
+                cert, x509.load_pem_x509_certificate(base64.b64decode(current.crt)))[0] == VERIFIED:
+            return current_caref
+    except Exception:
+        pass
+    return None
 
 
 def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=None, encrypted_prv=None, name=None):
@@ -417,9 +425,7 @@ def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=Non
         existing_ca.invalidity_at = None
     existing_ca.serial_number = str(cert.serial_number)
     from services.ca import parent_confirmation
-    # A parent confirmed by hand stays while it is still the proposal for the new certificate
-    if not parent_confirmation.settle_confirmed_parent(existing_ca, cert):
-        existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
+    parent_confirmation.settle_parent(existing_ca, cert)
     existing_ca.path_length = path_length_of(cert)
     # Deleted after its revocation and imported again, or renewed into a serial its parent revoked (#343)
     CAService.apply_persisted_revocation(existing_ca)
