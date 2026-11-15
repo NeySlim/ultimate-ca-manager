@@ -208,7 +208,7 @@ UCM_LAB=1 UCM_E2E_BASE_URL=https://ucm.example.test:8443 UCM_E2E_ADMIN_PASSWORD=
   npx playwright test e2e/lab/acme-dns-preferred-chain.spec.ts
 ```
 
-Without `UCM_E2E_MANAGED=1`, which only `scripts/ci/e2e.sh` sets, the suite leaves the instance as it is: the global setup changes no setting and the backup restore test does not run.
+Without `UCM_E2E_MANAGED=1`, which only `scripts/ci/e2e.sh` sets, and always with `UCM_LAB=1`, the global setup changes no setting and the backup restore test does not run. The other tests still create objects and save settings: on a shared instance, name the lab files to run, as above.
 
 ## Advanced Features Test Infrastructure
 

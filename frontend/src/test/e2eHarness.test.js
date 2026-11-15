@@ -75,6 +75,11 @@ describe('end-to-end harness', () => {
     expect(calls).toEqual([])
   })
 
+  it('leaves a lab instance untouched even with the managed flag set by hand', async () => {
+    await runSetup({ UCM_E2E_MANAGED: '1', UCM_LAB: '1' })
+    expect(calls).toEqual([])
+  })
+
   it('sets the protocol URL on its own instance', async () => {
     await runSetup({ UCM_E2E_MANAGED: '1' })
     expect(calls).toContainEqual(['PATCH', '/api/v2/settings/general'])

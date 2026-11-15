@@ -7,7 +7,7 @@ import { Api, ADMIN_USER, ADMIN_PASSWORD, dismissSupportCard } from './api'
 export default async function globalSetup(config: FullConfig) {
   const { baseURL } = config.projects[0].use
   if (!baseURL) throw new Error('UCM_E2E_BASE_URL is not set: run the suite with scripts/ci/e2e.sh')
-  if (process.env.UCM_E2E_MANAGED !== '1') return
+  if (process.env.UCM_E2E_MANAGED !== '1' || process.env.UCM_LAB === '1') return
   const context = await request.newContext({ baseURL, ignoreHTTPSErrors: true })
   const api = await Api.login(context, ADMIN_USER, ADMIN_PASSWORD)
   await dismissSupportCard(api)
