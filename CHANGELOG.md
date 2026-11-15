@@ -66,6 +66,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **The Docker image checks the disk before a SQLite start.** It refuses to start, before its copy of the database, when the volume has less free space than twice the database (once with `UCM_BACKUP_ENABLED=false`), and says how much is needed and available.
+- **The start log times each migration.** Each migration and each step of the 3.0 upgrade logs its start, its end and its duration, and a step that reads certificates in batches logs its progress at most every 30 seconds.
 - Docker images: the `latest` and `latest-fips` tags now go to the highest stable version published, so a maintenance release of an older line no longer moves them.
 - **A Windows profile keeps its policy identity.** The MS-XCEP policy identifier and template OIDs belong to the profile, not to its CA: changing the policy or issuing CA no longer changes the identifier and OIDs registered clients cached (such a change made them fail with `0x8007000d`), two profiles on one CA no longer share an identifier, and the default profile upgraded from 2.254 keeps the values 2.254 served.
 - **FIPS mode allows what the loaded FIPS module approves.** The `-fips` image moves to the OpenSSL FIPS Provider 3.5.9 (CMVP certificate #5586), and ML-DSA, Ed25519 and Ed448 are allowed in FIPS mode when the module answers that it approves them, refused as before otherwise (RHEL 9, Ubuntu 24.04, 3.1.2); Ed25519 deployment keys and ML-DSA keys on an HSM or OpenBao stay refused, as they are signed outside the module.
@@ -95,6 +97,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **A killed start no longer holds PostgreSQL locks.** The migration session now asks the server to check its client every 10 seconds (PostgreSQL 14 and later) and uses the keepalives of the application's connections, so a start killed during a long migration releases its locks within seconds instead of when the server finishes the statement.
 - **`RATE_LIMIT_ENABLED=1`, `yes` or `on` no longer drops the route limits (sign-in, password reset and the default of 200 per minute and 2000 per hour).** Only `true` turned on the route limits while the tiered limiter also took `1`, `yes` and `on`; both now read the variable the same way (any case), and an empty value keeps the default, on.
 - **WebSocket events through Redis on a Unix socket.** With a `unix://` `REDIS_URL`, the event relay passed TCP keepalive options that a Unix socket connection refuses, so every WebSocket connection failed and no browser received real-time events; they now go through Redis as with a TCP address.
 - **A WSTEP renewal is served beside an imported copy.** When the same certificate was also stored under a second record of its CA and that copy was read first, a Kerberos renewal without template, a renewal authenticated by the certificate (TLS or WS-Security) and its approval were refused; the row that carries the Windows profile now decides.
