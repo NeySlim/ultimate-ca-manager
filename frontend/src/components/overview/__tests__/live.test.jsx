@@ -103,6 +103,27 @@ describe('overview cards follow the data', () => {
     for (const id of Object.keys(CARDS)) expect(after[id], id).toBe(before[id] + 1)
   })
 
+  it('the first connection after opening the page does not reload the cards', async () => {
+    const tree = () => <MemoryRouter>{Object.entries(CARDS).map(([id, [Card]]) => <Card key={id} />)}</MemoryRouter>
+    ws.state = 'disconnected'
+    const view = render(tree())
+    await settle()
+    ws.state = 'connecting'
+    view.rerender(tree())
+    await settle(100)
+    ws.state = 'connected'
+    view.rerender(tree())
+    await settle(5000)
+    for (const id of Object.keys(CARDS)) expect(counts()[id], id).toBe(1)
+    ws.state = 'disconnected'
+    view.rerender(tree())
+    await settle(100)
+    ws.state = 'connected'
+    view.rerender(tree())
+    await settle(5000)
+    for (const id of Object.keys(CARDS)) expect(counts()[id], id).toBe(2)
+  })
+
   it('the tab coming back to the foreground reloads the cards', async () => {
     await mountAll()
     const before = counts()

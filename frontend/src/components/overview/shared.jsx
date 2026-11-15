@@ -63,12 +63,15 @@ export function useCardData(fetcher, watch = []) {
 
   const { connectionState } = useWebSocket()
   const lostLink = useRef(false)
+  // The link counts as lost only once it was up: the provider starts disconnected
+  const seen = useRef(connectionState === ConnectionState.CONNECTED)
   const down = connectionState === ConnectionState.DISCONNECTED || connectionState === ConnectionState.ERROR
   useEffect(() => {
     if (connectionState === ConnectionState.CONNECTED) {
       if (lostLink.current) schedule()
       lostLink.current = false
-    } else if (connectionState !== ConnectionState.CONNECTING) {
+      seen.current = true
+    } else if (connectionState !== ConnectionState.CONNECTING && seen.current) {
       lostLink.current = true
     }
   }, [connectionState, schedule])
