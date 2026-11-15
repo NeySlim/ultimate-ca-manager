@@ -6,7 +6,8 @@ here once and by the listener on every write after: an issuance checked for a un
 finds the certificates of its CA carrying the same subject through the index, never a scan.
 ``subject_holder`` names who the subject was certified to; an ACME certificate takes its order's
 account here, and the post-quantum member of an RFC 9763 pair the lineage of the classical one it
-names. ``enforce_unique_subject`` starts off on every CA.
+names, found through the index of acme_orders.certificate_id. ``enforce_unique_subject`` starts
+off on every CA.
 Idempotent, dual-backend (SQLite + PostgreSQL).
 """
 import sqlite3
@@ -14,6 +15,9 @@ import sqlite3
 pg_compatible = True
 
 INDEX = 'ix_certificates_caref_subject_key'
+# The holders below find a certificate's orders through it, never by a scan per certificate
+ORDER_INDEX = 'ix_acme_orders_certificate_id'
+CREATE_ORDER_INDEX = f"CREATE INDEX IF NOT EXISTS {ORDER_INDEX} ON acme_orders (certificate_id)"
 _PENDING = ("SELECT id, crt FROM certificates WHERE crt IS NOT NULL AND crt <> '' "
             "AND subject_key IS NULL AND id > {cursor} ORDER BY id")
 _BATCH = 500
@@ -70,6 +74,7 @@ def _upgrade_sqlite(conn):
         lambda values: conn.executemany("UPDATE certificates SET subject_key = ? WHERE id = ?", values))
     conn.execute(f"CREATE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, subject_key)")
     if 'acme_orders' in tables:
+        conn.execute(CREATE_ORDER_INDEX)
         conn.execute(_ACME_HOLDERS)
     if {'hybrid_role', 'related_certificate_id'} <= columns:
         conn.execute(_PAIR_HOLDERS)
@@ -97,6 +102,7 @@ def _upgrade_pg(conn):
         lambda values: conn.execute(update, [{'key': k, 'id': i} for k, i in values]))
     conn.execute(text(f"CREATE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, subject_key)"))
     if 'acme_orders' in tables:
+        conn.execute(text(CREATE_ORDER_INDEX))
         conn.execute(text(_ACME_HOLDERS))
     if {'hybrid_role', 'related_certificate_id'} <= columns:
         conn.execute(text(_PAIR_HOLDERS))
