@@ -172,7 +172,12 @@ class MicrosoftCAConnectionMixin:
         from types import SimpleNamespace
         from .templates import MicrosoftCATemplatesMixin
 
+        # _get_client reads the stored columns (_password, _client_key_pem) and id;
+        # here they hold the plaintext typed in the form, which decrypt_required passes through.
         fake_msca = SimpleNamespace(
+            id='unsaved',
+            _password=data.get('password', ''),
+            _client_key_pem=data.get('client_key_pem', ''),
             server=data.get('server', ''),
             ca_name=data.get('ca_name', ''),
             auth_method=data.get('auth_method', 'basic'),
