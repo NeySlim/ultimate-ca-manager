@@ -1391,6 +1391,34 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
         self._refused_then_retried(app, auth_client, pg_target, env_file, restart_signal,
                                    monkeypatch)
 
+    def _refused_then_retried_unordered(self, app, target, monkeypatch):
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            with app.app_context():
+                ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is False and _marker_kinds(target) == {'switch'}, message
+
+        # The target's tables cannot be listed for ordering: the copy is still emptied
+        monkeypatch.setattr(migration, '_topo_sort_tables', lambda insp: [])
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+            source = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
+        assert ok is True and stats['validation']['ok'] is True, message
+        assert _usernames(target) == source
+        assert _marker_kinds(target) is None
+
+    def test_a_retry_whose_tables_cannot_be_ordered_copies_again_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._refused_then_retried_unordered(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_retry_whose_tables_cannot_be_ordered_copies_again_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._refused_then_retried_unordered(app, pg_target, monkeypatch)
+
     def _killed_before_verification(self, app, target, monkeypatch):
         def killed(*args, **kwargs):
             raise _Killed()

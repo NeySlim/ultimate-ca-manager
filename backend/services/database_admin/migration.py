@@ -254,6 +254,9 @@ def _empty_auth_tables(target_engine) -> None:
     """One transaction, children first: a copy never verified is replaced, never reused, since
     a row count cannot see a password, role or key changed on the source since."""
     order = [t for t in _topo_sort_tables(inspect(target_engine)) if t in set(BOOTSTRAP_AUTH_TABLES)]
+    # A listing that failed still empties every table: the list is parents first, and the
+    # only references of users that point later are ON DELETE SET NULL
+    order += [t for t in BOOTSTRAP_AUTH_TABLES if t not in order]
     with target_engine.begin() as tx:
         for name in reversed(order):
             tx.execute(text(f'DELETE FROM "{_safe_ident(name)}"'))
