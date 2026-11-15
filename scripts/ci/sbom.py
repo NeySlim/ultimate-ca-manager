@@ -42,6 +42,8 @@ ARCHES = ('amd64', 'arm64')
 def is_legal_text(path):
     """A legal text by its file name, also when the package tool compressed it (dh_compress)."""
     return path.rsplit('/', 1)[-1].removesuffix('.gz') in LEGAL
+
+
 INDEX = 'sbom-index.json'
 HEX64 = re.compile(r'[0-9a-f]{64}')
 
