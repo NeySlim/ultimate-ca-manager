@@ -724,3 +724,18 @@ def test_custom_command_credentials_this_node_cannot_open_need_every_required_fi
         assert _stored_credentials(app, pid) == token
     finally:
         _drop_provider(app, pid)
+
+
+def test_a_partial_dns_entry_over_unreadable_credentials_names_what_is_missing(
+        app, auth_client, unreadable_rfc2136):
+    pid, token = unreadable_rfc2136
+    r = auth_client.patch(f'/api/v2/dns-providers/{pid}', json={
+        'credentials': {'tsig_key_secret': 'bmV3LXNlY3JldC1uZXctc2VjcmV0'}})
+    assert r.status_code == 400
+    message = r.get_json()['message']
+    assert 'missing: server, tsig_key_name' in message
+    assert 'bmV3LXNlY3JldC1uZXctc2VjcmV0' not in message
+    r = auth_client.patch(f'/api/v2/dns-providers/{pid}', json={
+        'credentials': {'server': 'ns1.example', 'tsig_key_name': 'k.'}})
+    assert r.get_json()['message'].endswith('missing: tsig_key_secret')
+    assert _stored_credentials(app, pid) == token

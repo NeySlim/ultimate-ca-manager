@@ -173,16 +173,19 @@ def _saved_credentials(provider, credentials):
     are replaced only by a full entry (every required field and a secret), never merged."""
     try:
         stored = decrypt_required(provider._credentials, f'DNS provider {provider.id} credentials')
-    except SecretUnreadable:
+    except SecretUnreadable as e:
         provider_class = get_provider_class(provider.provider_type)
         given = {k for k, v in credentials.items() if _given(v)}
         required = set(provider_class.REQUIRED_CREDENTIALS) if provider_class else set()
         schema = provider_class.get_credential_schema() if provider_class else []
         # A schema with no secret field (custom_command) is full with its required fields alone
-        has_secret = bool(_secret_names(schema, {f['name'] for f in schema}))
-        if required <= given and (_secret_names(schema, given) or not has_secret):
+        secrets = sorted(_secret_names(schema, {f['name'] for f in schema}))
+        if required <= given and (_secret_names(schema, given) or not secrets):
             return {}
-        raise
+        missing = sorted(required - given) or [f"a secret ({', '.join(secrets)})"]
+        need = 'every required field and a secret' if secrets else 'every required field'
+        raise SecretUnreadable(f"{e} in full, {need} in one request; "
+                               f"missing: {', '.join(missing)}") from None
     return json.loads(stored) if stored else None
 
 
