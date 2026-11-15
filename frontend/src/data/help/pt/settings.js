@@ -71,7 +71,9 @@ export default {
         content: 'Definições › Atualizações: uma verificação diária em segundo plano de novas versões e uma instalação não assistida opcional.',
         items: [
           { label: "Canal", text: "Stable segue apenas as releases finais; Release candidates aceita adicionalmente somente versões rcN, nunca alfa/beta" },
-          { label: 'Notificação', text: 'Uma nova versão disponível dispara o evento webhook/e-mail system.update_available, uma vez por versão' },
+          { label: 'Notificação', text: 'Uma nova versão disponível dispara o evento webhook system.update_available, uma vez por versão' },
+          { label: "Versões principais", text: "As atualizações ficam dentro da versão principal instalada. Uma versão principal posterior publicada como versão final é proposta à parte como atualização recomendada, instalada apenas a pedido explícito e confirmado; as atualizações automáticas nunca a instalam, e system.update_available é emitido uma vez por versão principal, com major_upgrade definido" },
+          { label: "Manutenção de segurança", text: "Esta linha de versões está em manutenção de segurança: as correções de segurança continuarão a chegar, as novas funcionalidades não. A página Atualizações mostra este aviso em permanência" },
           { label: 'Instalação automática', text: 'Desativada por padrão. Quando ativada, o UCM baixa, verifica e instala a atualização na hora escolhida e depois reinicia, apenas instalações DEB/RPM' },
           { label: 'Checksum', text: 'Uma instalação não assistida exige o SHA256 publicado da release para verificação; uma instalação manual também verifica sempre que um checksum é publicado' },
           { label: 'Docker', text: 'Os containers não podem se atualizar sozinhos, a verificação e a notificação continuam funcionando; faça pull da nova imagem para atualizar' },

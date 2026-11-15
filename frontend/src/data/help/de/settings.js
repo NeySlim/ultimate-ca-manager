@@ -71,7 +71,9 @@ export default {
         content: 'Einstellungen › Updates: eine tägliche Hintergrundprüfung auf neue Versionen und eine optionale unbeaufsichtigte Installation.',
         items: [
           { label: "Kanal", text: "Stabil folgt nur finalen Releases; Release-Kandidaten nimmt zusätzlich nur rcN-Versionen an, Alpha/Beta niemals" },
-          { label: 'Benachrichtigung', text: 'Eine neu verfügbare Version löst das Webhook-/E-Mail-Ereignis system.update_available aus, einmal pro Version' },
+          { label: 'Benachrichtigung', text: 'Eine neu verfügbare Version löst das Webhook-Ereignis system.update_available aus, einmal pro Version' },
+          { label: "Hauptversionen", text: "Updates bleiben innerhalb der installierten Hauptversion. Eine spätere Hauptversion, die als finale Version veröffentlicht ist, wird separat als empfohlenes Upgrade angeboten und nur auf ausdrückliche, bestätigte Anforderung installiert; automatische Updates installieren sie nie, und system.update_available wird einmal pro Hauptversion ausgelöst, mit gesetztem major_upgrade" },
+          { label: "Sicherheitswartung", text: "Diese Versionslinie befindet sich in der Sicherheitswartung: Sicherheitskorrekturen erscheinen weiterhin, neue Funktionen nicht. Die Seite Updates zeigt diesen Hinweis jederzeit an" },
           { label: 'Auto-Installation', text: 'Standardmäßig aus. Wenn aktiviert, lädt UCM das Update zur gewählten Stunde herunter, verifiziert und installiert es und startet dann neu, nur DEB/RPM-Installationen' },
           { label: 'Prüfsumme', text: 'Eine unbeaufsichtigte Installation erfordert die veröffentlichte SHA256 des Releases zur Verifizierung; eine manuelle Installation verifiziert ebenfalls, wann immer eine Prüfsumme veröffentlicht ist' },
           { label: 'Docker', text: 'Container können sich nicht selbst aktualisieren, Prüfung und Benachrichtigung funktionieren weiterhin; ziehen Sie das neue Image, um zu aktualisieren' },

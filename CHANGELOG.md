@@ -7,6 +7,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- Updates: the update check, the update notification and the unattended install now stay within the installed major version, so a later major version is never installed automatically and this line's maintenance releases stay visible (releases are now read 100 per page).
+- Updates: a later major version published as a final release is offered apart as a recommended upgrade with its release notes, installed only on an explicit, confirmed request (`major_upgrade: true` and its `version` on `POST /api/v2/system/updates/install`); `system.update_available` announces it once per major version, with `major_upgrade` set.
+- Updates: the Updates page states that this version line is in security maintenance: security fixes will keep coming, new features will not.
+
 ## [2.254.1] - 2026-11-14
 
 ### Security

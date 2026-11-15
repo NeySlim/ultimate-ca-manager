@@ -2152,7 +2152,9 @@ Manage the TLS certificate used by the UCM web interface:
 - Check for new UCM versions from GitHub releases
 - View the changelog for available updates
 - Current version and build information
-- **Auto-update**: on supported installations (DEB/RPM), click **Install Update** to download and install the latest version automatically
+- **Auto-update**: on supported installations (DEB/RPM), click **Install Update** to download and install the latest version of the installed major version automatically
+- **Later major version**: offered apart as a recommended upgrade with its release notes, installed only after confirmation, never by automatic updates; under Docker, change the image tag instead
+- **Security maintenance**: a notice states that this version line receives security fixes and no new features
 - **Update channel**: stable, pre-release (release candidates) or dev
 
 ## Webhooks

@@ -71,7 +71,9 @@ export default {
         content: 'Impostazioni › Aggiornamenti: un controllo giornaliero in background delle nuove versioni e un\'installazione non presidiata opzionale.',
         items: [
           { label: "Canale", text: "Versioni stabili segue solo i rilasci finali; Release candidate accetta in più soltanto le versioni rcN, mai alpha/beta" },
-          { label: 'Notifica', text: 'Una nuova versione disponibile attiva l\'evento webhook/email system.update_available, una volta per versione' },
+          { label: 'Notifica', text: 'Una nuova versione disponibile attiva l\'evento webhook system.update_available, una volta per versione' },
+          { label: "Versioni principali", text: "Gli aggiornamenti restano all'interno della versione principale installata. Una versione principale successiva pubblicata come versione finale viene proposta a parte come aggiornamento consigliato, installato solo su richiesta esplicita e confermata; gli aggiornamenti automatici non la installano mai, e system.update_available viene emesso una volta per versione principale, con major_upgrade impostato" },
+          { label: "Manutenzione di sicurezza", text: "Questa linea di versioni è in manutenzione di sicurezza: le correzioni di sicurezza continueranno ad arrivare, le nuove funzionalità no. La pagina Aggiornamenti mostra sempre questo avviso" },
           { label: 'Installazione automatica', text: 'Disattivata per impostazione predefinita. Se abilitata, UCM scarica, verifica e installa l\'aggiornamento all\'ora scelta, poi si riavvia, solo installazioni DEB/RPM' },
           { label: 'Checksum', text: 'Un\'installazione non presidiata richiede lo SHA256 pubblicato del rilascio per la verifica; anche un\'installazione manuale verifica ogni volta che un checksum è pubblicato' },
           { label: 'Docker', text: 'I container non possono aggiornarsi da soli, il controllo e la notifica funzionano comunque; esegui il pull della nuova immagine per aggiornare' },
