@@ -316,9 +316,10 @@ class TestPublicationCost:
             staged.discard()
 
     def test_one_fsync_per_file_and_one_per_directory(self, monkeypatch, tmp_path):
-        # The content is synced once, where it is published; each directory once, at the end
-        assert self._fsyncs(monkeypatch, tmp_path, 40) <= 40 + 2
-        assert self._fsyncs(monkeypatch, tmp_path, 160) <= 160 + 2
+        # The content is synced once, where it is published; each of the two directories
+        # four times: its journal, its kept directory, itself before and after the renames
+        assert self._fsyncs(monkeypatch, tmp_path, 40) <= 40 + 2 * 4
+        assert self._fsyncs(monkeypatch, tmp_path, 160) <= 160 + 2 * 4
 
     def test_each_directory_is_fsynced_after_its_last_rename(self, monkeypatch, tmp_path):
         # The lower bound: a rename is durable only once its directory entry is synced

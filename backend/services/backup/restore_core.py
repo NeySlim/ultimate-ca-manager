@@ -23,7 +23,7 @@ from services.file_regen_service import insert_file_writes_suspended
 from . import container, installation
 from .errors import BackupSchemaError
 from .restore import RestorePlan, single_transaction
-from .restore.files import StagedFiles
+from .restore.files import StagedFiles, forget_publication, record_publication
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import apply_columns, apply_section, relink_references
@@ -498,6 +498,8 @@ class RestoreCoreMixin:
 
                 for path in sorted(files_before - _row_file_paths()):
                     staged.stage_removal(path)
+                # Committed with the rows: a restart tells a kill before the commit from one after
+                record_publication(staged.token)
                 # Published inside the transaction, so a file that cannot be
                 # placed rolls the database back with it. The window that
                 # remains is the commit itself, and it is compensated below.
@@ -519,6 +521,7 @@ class RestoreCoreMixin:
             raise
         finally:
             staged.discard()
+        forget_publication(staged.token)
 
         if keytab_published:
             self._write_keytab_here()

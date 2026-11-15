@@ -14,10 +14,13 @@ earlier replaces overwrote, rather than leaving the instance with half of a
 restore's files.
 """
 import errno
+import json
 import logging
 import os
+import re
 import shutil
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -28,6 +31,10 @@ logger = logging.getLogger(__name__)
 _STAGING_PREFIX = 'ucm_restore_files_'
 _PUBLISH_PREFIX = '.ucm_restore_'
 _KEPT_PREFIX = '.ucm_restore_kept_'
+_JOURNAL = 'journal.json'
+_PREVIOUS = re.compile(r'previous_[0-9]{6}')
+# A system_config row per restore, written in its transaction: present iff it committed
+PUBLICATION_PREFIX = 'restore_publication_'
 
 
 def _atomic_replace(destination: Path, data: bytes, mode: int) -> None:
@@ -102,6 +109,8 @@ class StagedFiles:
         self._index: Dict[Path, int] = {}
         # Destination directory to its private directory of kept previous contents
         self._kept_dirs: Dict[Path, Path] = {}
+        # Names this restore in the journals and in its publication row
+        self.token = uuid.uuid4().hex
 
     # -- staging ----------------------------------------------------------
 
@@ -189,6 +198,7 @@ class StagedFiles:
         published: List[Path] = []
         directories: Dict[Path, None] = {}
         try:
+            self._write_journals()
             for position, entry in enumerate(self._entries):
                 self._capture_previous(entry, position)
                 if self._publish(entry):
@@ -211,19 +221,44 @@ class StagedFiles:
     def _kept_dir(self, directory: Path) -> Path:
         """A private directory inside ``directory``, for its previous contents.
 
-        Inside the destination's own directory, so the hard link that keeps a
-        previous content never crosses a mount (a private /tmp, a container's
-        /tmp on tmpfs); the staging directory only when it cannot be created.
+        Always inside the destination's own directory, where a restart finds it
+        and where a hard link never crosses a mount: one that cannot be created
+        there stops the publication before anything is replaced.
         """
         kept_dir = self._kept_dirs.get(directory)
         if kept_dir is None:
-            try:
-                kept_dir = Path(tempfile.mkdtemp(prefix=_KEPT_PREFIX, dir=str(directory)))
-                os.chmod(kept_dir, 0o700)
-            except OSError:
-                kept_dir = self._staging()
+            directory.mkdir(parents=True, exist_ok=True)
+            kept_dir = Path(tempfile.mkdtemp(prefix=_KEPT_PREFIX, dir=str(directory)))
+            os.chmod(kept_dir, 0o700)
             self._kept_dirs[directory] = kept_dir
         return kept_dir
+
+    def _write_journals(self) -> None:
+        """Before any replace, each directory's kept directory says what it will put back.
+
+        A restore killed before its commit is undone from these at the next start
+        (`sweep_kept_previous_contents`); written and synced first, so no
+        destination changes that a journal does not name.
+        """
+        by_directory: Dict[Path, list] = {}
+        for position, entry in enumerate(self._entries):
+            try:
+                info = os.stat(entry.destination)
+            except FileNotFoundError:
+                info = None
+            by_directory.setdefault(entry.destination.parent, []).append({
+                'name': entry.destination.name, 'previous': f"previous_{position:06d}",
+                'existed': info is not None,
+                'mode': (info.st_mode & 0o777) if info is not None else None})
+        for directory, entries in by_directory.items():
+            kept_dir = self._kept_dir(directory)
+            fd = os.open(kept_dir / _JOURNAL, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, 'w') as handle:
+                json.dump({'token': self.token, 'entries': entries}, handle)
+                handle.flush()
+                os.fsync(handle.fileno())
+            _fsync_directory(kept_dir)
+            _fsync_directory(directory)
 
     def _capture_previous(self, entry: _Staged, position: int) -> None:
         """Keep what the destination holds, before anything overwrites it.
@@ -337,36 +372,141 @@ def _kept_parents() -> List[Path]:
     return list(dict.fromkeys(Path(parent) for parent in parents))
 
 
-def sweep_kept_previous_contents() -> List[Path]:
-    """Remove the kept directories of restores killed before `discard()`; return them.
+def record_publication(token: str) -> None:
+    """In the restore's transaction: the row that tells a restart this restore committed."""
+    from models import SystemConfig, db
+    db.session.add(SystemConfig(key=PUBLICATION_PREFIX + token, value='committed',
+                                description='A restore publishing its files'))
+    db.session.flush()
 
-    Closed rule: they are created under the backup lock, so only while this
-    thread holds it by flock is one known to belong to no live restore.
+
+def forget_publication(token: str) -> None:
+    """After `discard()`: the restore's kept directories are gone, so is its row."""
+    from models import SystemConfig, db
+    try:
+        SystemConfig.query.filter_by(key=PUBLICATION_PREFIX + token).delete()
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        logger.warning("Restore: its publication record was not removed: %s", exc)
+
+
+def _read_journal(kept_dir: str) -> Optional[dict]:
+    """The journal a kept directory holds, or None when publication never began there."""
+    try:
+        fd = os.open(os.path.join(kept_dir, _JOURNAL), os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+    except FileNotFoundError:
+        return None
+    try:
+        with os.fdopen(fd, 'r') as handle:
+            journal = json.load(handle)
+    except ValueError:
+        return None    # cut short while written: nothing was replaced after it
+    if not (isinstance(journal, dict) and isinstance(journal.get('token'), str)
+            and isinstance(journal.get('entries'), list)):
+        return None
+    return journal
+
+
+def _committed_tokens(tokens) -> set:
+    from models import SystemConfig
+    keys = [PUBLICATION_PREFIX + token for token in tokens]
+    rows = SystemConfig.query.filter(SystemConfig.key.in_(keys)).all() if keys else []
+    return {row.key[len(PUBLICATION_PREFIX):] for row in rows}
+
+
+def _put_back_journal(kept_dir: str, journal: dict) -> None:
+    """Undo an uncommitted publication in the directory that holds `kept_dir`."""
+    parent = Path(kept_dir).parent
+    for item in journal['entries']:
+        name, previous = item.get('name'), item.get('previous')
+        # Only a plain name in this very directory, and a kept file this module named
+        if (not isinstance(name, str) or not name or name in ('.', '..') or '/' in name
+                or name.startswith(_KEPT_PREFIX) or not isinstance(previous, str)
+                or not _PREVIOUS.fullmatch(previous)):
+            continue
+        destination = parent / name
+        kept = Path(kept_dir) / previous
+        if item.get('existed'):
+            if os.path.lexists(kept):    # kept before its replace; absent, it was never touched
+                mode = item.get('mode')
+                _put_back(kept, destination, mode if isinstance(mode, int) else 0o600)
+        else:
+            destination.unlink(missing_ok=True)
+    _fsync_directory(parent)
+
+
+def sweep_kept_previous_contents() -> List[Path]:
+    """Settle the kept directories of restores killed before `discard()`; return them.
+
+    Committed (its publication row exists): the kept contents are dropped.
+    Not committed: the destinations get them back, matching the rolled-back
+    database. A database that cannot be read settles nothing. Closed rule: they
+    are created under the backup lock, so only while this thread holds it by
+    flock is one known to belong to no live restore.
     """
     from ..locking import BackupBusyError, backup_operation_lock, operation_lock_held
     removed: List[Path] = []
+    restored: List[Path] = []
     try:
         with backup_operation_lock(timeout=0, purpose='sweeping interrupted restores',
                                    fail_open=False):
             if not operation_lock_held():
                 return []
+            found = []
             for parent in _kept_parents():
                 if not parent.is_dir():
                     continue
                 for entry in os.scandir(parent):
+                    # Never a link: its target's journal would name files elsewhere
                     if (entry.name.startswith(_KEPT_PREFIX)
                             and entry.is_dir(follow_symlinks=False)):
-                        shutil.rmtree(entry.path, ignore_errors=True)
-                        if not os.path.lexists(entry.path):
-                            removed.append(Path(entry.path))
+                        found.append((entry.path, _read_journal(entry.path)))
+            tokens = {journal['token'] for _, journal in found if journal is not None}
+            try:
+                committed = _committed_tokens(tokens)
+            except Exception as exc:
+                logger.warning("Interrupted restores not settled, the database could not "
+                               "be read: %s", exc)
+                return []
+            for path, journal in found:
+                if journal is not None and journal['token'] not in committed:
+                    _put_back_journal(path, journal)
+                    restored.append(Path(path))
+                shutil.rmtree(path, ignore_errors=True)
+                if not os.path.lexists(path):
+                    removed.append(Path(path))
+            for token in committed:
+                forget_publication(token)
+            _forget_lingering_publications()
     except BackupBusyError as exc:
         logger.debug("Interrupted restores not swept: %s", exc)
     except OSError as exc:
         logger.info("Interrupted restores not swept: %s", exc)
+    if restored:
+        logger.warning("Put back the previous contents of restores interrupted before their "
+                       "commit: %s", ', '.join(str(path) for path in restored))
     if removed:
         logger.warning("Removed the previous contents kept by interrupted restores: %s",
                        ', '.join(str(path) for path in removed))
     return removed
+
+
+def _forget_lingering_publications() -> None:
+    """Rows of restores killed after `discard()`; single node only, where every kept
+    directory is this one's (in HA another node's restore may still need its row)."""
+    from flask import has_app_context
+    from utils.ha import ha_enabled
+    if ha_enabled() or not has_app_context():
+        return
+    from models import SystemConfig, db
+    try:
+        SystemConfig.query.filter(SystemConfig.key.startswith(PUBLICATION_PREFIX)).delete(
+            synchronize_session=False)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        logger.info("Restore publication records not removed: %s", exc)
 
 
 def _write_private(path: Path, data: bytes, mode: int) -> None:

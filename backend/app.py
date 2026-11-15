@@ -378,7 +378,8 @@ def create_app(config_name=None):
     from services.backup.storage import sweep_orphan_spools
     sweep_orphan_spools()
     from services.backup.restore.files import sweep_kept_previous_contents
-    sweep_kept_previous_contents()
+    with app.app_context():    # whether a killed restore committed is read from the database
+        sweep_kept_previous_contents()
 
     # Initialize cache
     cache.init_app(app, config={

@@ -16,6 +16,8 @@ from services.scheduler_service import STATE_KEY as SCHEDULER_STATE_KEY
 from auth.initial_admin import MARKER_KEY as INITIAL_PASSWORD_MARKER_KEY
 from utils.serial_duplicates import PENDING_KEY
 
+from .restore.files import PUBLICATION_PREFIX as RESTORE_PUBLICATION_PREFIX
+
 from .errors import BackupExportError
 
 logger = logging.getLogger(__name__)
@@ -26,13 +28,13 @@ METADATA_KEY = 'installation_id'
 # serial index of the upgrade from 2.254, the scheduled backup's reservation and conclusion,
 # services/backup/schedule.py, the expiry webhooks mark, the scheduled passes' leases, the
 # session key that signs this installation's tokens, the node holding the generated
-# initial password): never exported, never restored
+# initial password, a restore's publication record): never exported, never restored
 LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SCHEDULER_STATE_KEY, PENDING_KEY,
                             'backup.last_run', 'backup.concluded_run',
                             'expiry_alerts.webhooks_mark', 'expiry_alerts.lease',
                             INITIAL_PASSWORD_MARKER_KEY)
                            + SESSION_KEY_SETTINGS)
-LOCAL_SETTING_PREFIXES = ('crl_schedule_lease_',)
+LOCAL_SETTING_PREFIXES = ('crl_schedule_lease_', RESTORE_PUBLICATION_PREFIX)
 
 
 def is_local_setting(key) -> bool:
