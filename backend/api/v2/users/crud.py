@@ -9,6 +9,7 @@ import logging
 from auth.unified import refuse_api_key_on_own_account, require_auth
 from auth.session_reverify import check_session_password
 from auth.session_start import keep_own_session
+from auth.twofa_enforcement import lock_user
 from utils.response import success_response, error_response, created_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -557,7 +558,11 @@ def delete_user(user_id):
     # Revocations already made stand: a failure past them still says what the CA was not told
     acme_meta, acme_note = _acme_untold(upstream)
     try:
-        user = db.session.get(User, user_id)
+        # The account row first, as a factor change takes it: the two never lock in reverse
+        user = lock_user(user_id)
+        if user is None:
+            db.session.rollback()
+            return error_response('User not found', 404)
         sessions_deleted = _purge_user_dependencies(user_id)
         db.session.delete(user)
         db.session.commit()

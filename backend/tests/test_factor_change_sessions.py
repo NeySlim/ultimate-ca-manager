@@ -700,3 +700,90 @@ def test_recovery_codes_for_an_account_deleted_meanwhile_answer_404(app, monkeyp
         monkeypatch.undo()
         _cleanup(app, user)
 
+
+@pytest.mark.postgres
+def test_a_key_change_and_the_deletion_of_its_account_never_deadlock(app, auth_client,
+                                                                        monkeypatch):
+    """The deletion locks the account row first, as a key change does: the two meet
+    (the key change holds the row, the deletion runs) and neither is aborted."""
+    import threading
+    import time
+    from sqlalchemy import text
+    import api.v2.users.crud as crud
+    from services.webauthn_service import WebAuthnService
+    from tests import pg_app_harness
+    if not pg_app_harness.ENABLED:
+        pytest.skip('row lock order: PostgreSQL app mode only')
+    user = _make_user(app, key=SoftKey())
+    holds_row, deletion_holds = threading.Event(), threading.Event()
+    met, statuses = [], {}
+    delete_key, purge = WebAuthnService.delete_credential, crud._purge_user_dependencies
+
+    def _blocked_by(pid):
+        with db.engine.connect() as probe:
+            return probe.execute(text('SELECT count(*) FROM pg_stat_activity '
+                                      'WHERE :pid = ANY(pg_blocking_pids(pid))'),
+                                 {'pid': pid}).scalar()
+
+    def _delete_key_once_met(credential_id, user_id):
+        # Holding the account row: wait for the deletion to hold its first lock or wait on ours
+        pid = db.session.execute(text('SELECT pg_backend_pid()')).scalar()
+        holds_row.set()
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            if deletion_holds.is_set() or _blocked_by(pid):
+                met.append(True)
+                break
+            time.sleep(0.05)
+        return delete_key(credential_id, user_id)
+
+    def _purge_then_signal(user_id):
+        answer = purge(user_id)
+        deletion_holds.set()
+        return answer
+
+    def _change_key():
+        statuses['key'] = _delete_key(app, this, user).status_code
+
+    def _delete_account():
+        holds_row.wait(20)
+        statuses['delete'] = auth_client.delete(f"/api/v2/users/{user['id']}").status_code
+    try:
+        this = _open_session(app, user)
+        monkeypatch.setattr(WebAuthnService, 'delete_credential', staticmethod(_delete_key_once_met))
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _purge_then_signal)
+        threads = [threading.Thread(target=_change_key), threading.Thread(target=_delete_account)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(60)
+        assert met == [True], 'the two requests never met'
+        assert statuses['key'] in (200, 404) and statuses['delete'] in (200, 404), statuses
+    finally:
+        monkeypatch.undo()
+        _cleanup(app, user)
+
+
+def test_the_deletion_of_an_account_locks_its_row_before_its_keys(app, auth_client):
+    """A key change locks the account row, then its keys: a deletion takes them in that order."""
+    from sqlalchemy import event
+    user = _make_user(app, key=SoftKey())
+    writes = []
+
+    def _record(_conn, _cursor, statement, _params, _context, _many):
+        head = statement.lstrip().upper()
+        if head.startswith(('UPDATE USERS', 'DELETE FROM USERS', 'DELETE FROM WEBAUTHN_CREDENTIALS')):
+            writes.append(' '.join(head.split()[:3]))
+    try:
+        with app.app_context():
+            engine = db.engine
+        event.listen(engine, 'before_cursor_execute', _record)
+        try:
+            r = auth_client.delete(f"/api/v2/users/{user['id']}")
+        finally:
+            event.remove(engine, 'before_cursor_execute', _record)
+        assert r.status_code == 200, r.data
+        assert writes and writes[0] == 'UPDATE USERS SET', writes
+        assert 'DELETE FROM WEBAUTHN_CREDENTIALS' in writes
+    finally:
+        _cleanup(app, user)
