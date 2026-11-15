@@ -255,3 +255,21 @@ def test_check_closes_a_legacy_request_the_ca_still_holds(app, auth_client, monk
     assert r.status_code == 200, r.data
     assert r.get_json()['data']['status'] == 'superseded'
     assert _req(app, req_id) == ('superseded', None)
+
+
+def test_a_superseded_request_stays_closed_once_its_csr_is_gone(app, adcs):
+    from models import MSCARequest, db
+    from services.msca_service import MicrosoftCAService
+    msca_id = _make_msca(app, 'MSE closed')
+    with app.app_context():
+        req = MSCARequest(msca_id=msca_id, template='WebServer', status='superseded', request_id=7010)
+        db.session.add(req)
+        db.session.commit()
+        req_id = req.id
+    adcs.add(7010, 'mse-closed.test.local')
+    with app.app_context():
+        result = MicrosoftCAService.approve_request(msca_id, 7010)
+        assert result['imported_cert_id']
+        other = MSCARequest.query.filter(MSCARequest.request_id == 7010, MSCARequest.id != req_id).one()
+        assert other.cert_id == result['imported_cert_id']
+    assert _req(app, req_id) == ('superseded', None)

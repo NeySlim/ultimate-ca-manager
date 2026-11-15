@@ -453,3 +453,31 @@ def test_a_failed_completion_keeps_the_closure_of_a_request_signed_elsewhere(app
     _pending(app, msca_id, 950, 'pc-stale-bad.test.local')
     assert _sync(app, msca_id)['failed'] == 1
     assert _req(app, stale_req)[0] == 'superseded'
+
+
+
+def test_check_leaves_the_session_usable_after_a_failed_statement(app, monkeypatch):
+    """A failed statement poisons the transaction (PostgreSQL aborts it): check_request
+    rolls back before raising, so its caller can go on with the same session."""
+    import api.v2.msca as msca_api
+    from models import MSCARequest, db
+    from services.msca.connection import MicrosoftCAConnectionMixin
+    from services.msca.requests import MSCAImportError
+    from services.msca_service import MicrosoftCAService
+    from tests.test_msca_inventory import _make_cert
+    msca_id = _make_msca(app, 'PC check sql')
+    req_id, csr_id = _pending(app, msca_id, 960, 'pc-sql.test.local')
+    _, pem = _make_cert('pc-sql.test.local')
+
+    def failing_import(*a, **kw):
+        db.session.add(MSCARequest(id=req_id, msca_id=msca_id, template='dup'))
+        db.session.flush()
+
+    monkeypatch.setattr(msca_api, '_import_signed_cert', failing_import)
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_get_client', staticmethod(lambda m: _Client(pem=pem)))
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_cleanup_client', staticmethod(lambda c: None))
+    with app.app_context():
+        with pytest.raises(MSCAImportError):
+            MicrosoftCAService.check_request(msca_id, req_id)
+        req = db.session.get(MSCARequest, req_id)
+        assert (req.status, req.cert_id) == ('pending', None)
