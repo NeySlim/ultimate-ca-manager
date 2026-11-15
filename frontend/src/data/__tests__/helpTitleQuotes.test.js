@@ -1,10 +1,11 @@
 /**
  * A help title is a name, not a quotation: no section title or guide heading
- * (en, fr, zh) opens or closes with a quotation mark; quotes in the body stay.
+ * (en and every translated language) opens or closes with a quotation mark; quotes in the body stay.
  */
 import { describe, it, expect } from 'vitest'
 import { helpContent } from '../helpContent'
 import { helpGuides } from '../helpGuides'
+import { HELP_TRANSLATED_LANGUAGES } from '../helpLanguages'
 
 const pages = import.meta.glob('../help/*/*.js', { eager: true })
 const QUOTE = /^["'“”‘’«»「」『』]|["'“”‘’«»「」『』]$/
@@ -24,7 +25,7 @@ function titles(node, out = []) {
 
 const sources = {
   en: [helpContent, helpGuides],
-  ...Object.fromEntries(['fr', 'zh'].map((code) => [code, Object.entries(pages)
+  ...Object.fromEntries(HELP_TRANSLATED_LANGUAGES.map((code) => [code, Object.entries(pages)
     .filter(([path]) => path.includes(`/help/${code}/`)).map(([, mod]) => mod.default)])),
 }
 

@@ -75,6 +75,10 @@ the only way to know the fix does anything, and it keeps the bug from coming bac
 - **Translations.** UCM ships in 10 languages. A new user-facing string goes into all
   of `frontend/src/i18n/locales/*.json`, and `node scripts/check-i18n-sync.js` tells
   you if one is missing.
+- **Built-in help.** It exists in English (`helpContent.js`, `helpGuides.js`), French,
+  Russian and Chinese (`frontend/src/data/help/<lang>/<page>.js`); the other
+  interface languages show the English text. A change to a help page updates all four
+  versions, and the parity test fails when a translated page drifts from the English one.
 - **Migrations** work on SQLite *and* PostgreSQL: a file
   `backend/migrations/NNN_name.py` numbered from 301 (300 is the upgrade from
   2.254), with `pg_compatible = True` and an `upgrade(conn)` that takes a

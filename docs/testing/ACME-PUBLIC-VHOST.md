@@ -259,13 +259,13 @@ curl -sk -b cookies.txt -X PATCH https://admin.ucm.example.com:8443/api/v2/setti
 
 Expected after PATCH: the URLs above reflect `acme.ucm.example.com:8443`.
 
-### 3. Contextual help (10 UI languages / 2+1 help)
+### 3. Contextual help (10 UI languages / 3+1 help)
 
 | UI language | Panel help file | i18n helpers |
 |-------------|-----------------|--------------|
 | en | `helpContent.js` + `helpGuides.js` | `en.json` |
-| fr, zh | `help/<lang>/settings.js` | `<lang>.json` |
-| de, es, it, ja, pt, ru, uk | English `helpContent.js` / `helpGuides.js` with a notice | `<lang>.json` |
+| fr, ru, zh | `help/<lang>/settings.js` | `<lang>.json` |
+| de, es, it, ja, pt, uk | English `helpContent.js` / `helpGuides.js` with a notice | `<lang>.json` |
 
 1. Open **Settings** → floating help panel
 2. **"Public ACME vhost"** section (or translated equivalent) visible

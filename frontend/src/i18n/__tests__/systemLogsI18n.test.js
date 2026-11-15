@@ -64,7 +64,7 @@ describe('system logs i18n keys (10 locales)', () => {
     for (const file of HELP_FILES) {
       const body = readFileSync(file, 'utf8')
       const counts = [...body.matchAll(/items: \[([\s\S]*?)\]/g)]
-        .map((m) => m[1].split('\n').filter((l) => l.trim().startsWith('"')).length)
+        .map((m) => m[1].split('\n').filter((l) => /^(\{ label|")/.test(l.trim())).length)
       expect(counts, `${file} lists different filters from English`).toEqual(english)
     }
   })
