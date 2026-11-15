@@ -156,6 +156,16 @@ def acme_cert(app, client, w):
     return _loads(r.data)
 
 
+@pytest.fixture(autouse=True)
+def _dual_control_back_to_its_default(app):
+    """No test leaves the setting behind: the next file reads the default (on)."""
+    yield
+    from models import SystemConfig, db
+    with app.app_context():
+        SystemConfig.query.filter_by(key='key_recovery_dual_control').delete()
+        db.session.commit()
+
+
 def key_recovery(app, client, w):
     r = client.post(f'/api/v2/certificates/{w.leaf_id}/key-recovery', json={'reason': 'chain test'})
     assert r.status_code == 201, r.data
