@@ -29,7 +29,6 @@ from services.policy_service import PolicyViolation
 from services.protocol_approval import RENEWED_REVOKED, AlreadyIssued
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
-from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
 from utils import key_algorithms
 from utils.issuance_defaults import default_issue_key_type
 from utils.key_type import validate_enrollment_csr
@@ -140,12 +139,6 @@ def _x509_name_from_dn_components(dn_components, email=None):
     if email:
         attrs.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, email))
     return x509.Name(attrs)
-
-# Why a SHA-1 CSR fails is_signature_valid, and what to tell the client about
-# it, is written once in utils/csr_diagnostics — EST had the same copy.
-_WEAK_CSR_HASH_ALGORITHMS = WEAK_CSR_HASH_ALGORITHMS
-_weak_csr_hash_algorithm = weak_csr_hash_algorithm
-
 
 def _is_naked_csr(csr):
     """No CN and no SubjectAlternativeName at all -- what real Windows GPO
