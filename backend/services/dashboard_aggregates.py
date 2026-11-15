@@ -376,7 +376,7 @@ def _short_label(kind, label):
     return (label or '')[:200]
 
 
-def _allowed(table, permissions):
+def allowed(table, permissions):
     """The names of *table* a caller holding *permissions* may see (None: no restriction)."""
     from auth.unified import has_permission
     return {name for name in table if permissions is None or has_permission(table[name], permissions)}
@@ -387,7 +387,7 @@ def work_queue(session, limit, now=None, kinds=None, permissions=None):
     *kinds* restricts the items (not the counts) to those kinds; a kind that needs a
     permission *permissions* lacks is neither listed nor counted."""
     now = now or utc_now()
-    hidden = set(KIND_PERMISSION) - _allowed(KIND_PERMISSION, permissions)
+    hidden = set(KIND_PERMISSION) - allowed(KIND_PERMISSION, permissions)
     visible = tuple(k for k in QUEUE_KINDS if k not in hidden)
     queue = _queue_union(now, session.get_bind().dialect.name, visible)
     counts = {kind: 0 for kind in QUEUE_KINDS}
@@ -577,6 +577,17 @@ def _auto_renewal_witness():
 _WITNESSES = {'smtp': _smtp_witness, 'webhooks': _webhooks_witness, 'auto_renewal': _auto_renewal_witness}
 
 
+def witness_health(name, session):
+    """One witness; a read that fails says ``unavailable`` rather than vanish (it would read as a missing permission)."""
+    try:
+        return _WITNESSES[name]()
+    except Exception as exc:
+        # The exception text may hold secrets: only its class is logged
+        logger.warning('%s witness unavailable: %s', name, type(exc).__name__)
+        session.rollback()
+        return _witness('unavailable', True)
+
+
 def protocol_health(session, days, now=None, permissions=None):
     """Per protocol, ``days`` UTC calendar days of ok/failed counts, oldest first. The mail,
     webhook and auto-renewal witnesses go only to a caller holding the setting's read right."""
@@ -591,14 +602,8 @@ def protocol_health(session, days, now=None, permissions=None):
     tsa = _tsa_health()
     if tsa is not None:
         protocols['tsa'] = tsa
-    for name in _allowed(WITNESS_PERMISSION, permissions):
-        try:
-            protocols[name] = _WITNESSES[name]()
-        except Exception as exc:
-            # Say so rather than drop the row (it would read as a missing permission); the message may hold secrets
-            logger.warning('%s witness unavailable: %s', name, type(exc).__name__)
-            session.rollback()
-            protocols[name] = _witness('unavailable', True)
+    for name in allowed(WITNESS_PERMISSION, permissions):
+        protocols[name] = witness_health(name, session)
     return {'days': days, 'from': dates[0], 'to': dates[-1], 'protocols': protocols}
 
 

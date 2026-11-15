@@ -140,3 +140,36 @@ def test_a_failing_witness_reads_unavailable_and_alerts(app, settings, monkeypat
     assert all(v is not None for v in seen.values())
     warned = [r for r in caplog.records if r.levelname == 'WARNING' and witness in r.getMessage()]
     assert warned and 'hunter2' not in caplog.text
+
+
+LEGACY = '/api/v2/dashboard/system-status'
+SCENARIOS = [
+    ('smtp', dict(), 'not_configured', 'offline'),
+    ('smtp', dict(smtp={**READY, 'enabled': False}), 'disabled', 'warning'),
+    ('smtp', dict(smtp={**READY, 'smtp_port': 0}), 'incomplete', 'warning'),
+    ('smtp', dict(smtp=READY), 'ready', 'online'),
+    ('webhooks', dict(), 'not_configured', 'offline'),
+    ('webhooks', dict(webhooks=(False, False)), 'none_active', 'warning'),
+    ('webhooks', dict(webhooks=(True, False)), 'active', 'online'),
+    ('auto_renewal', dict(), 'disabled', 'offline'),
+    ('auto_renewal', dict(renewal='true'), 'enabled', 'online'),
+]
+
+
+@pytest.mark.parametrize('witness, setup, state, status', SCENARIOS)
+def test_both_routes_rule_each_witness_the_same(app, auth_client, settings, witness, setup, state, status):
+    settings(**setup)
+    health = get_json(auth_client.get(URL))['data']['protocols'][witness]
+    legacy = get_json(auth_client.get(LEGACY))['data'][witness]
+    assert health['state'] == state
+    assert legacy['status'] == status and isinstance(legacy['message'], str)
+
+
+@pytest.mark.parametrize('witness', ['smtp', 'webhooks', 'auto_renewal'])
+def test_both_routes_say_unavailable_when_a_witness_cannot_be_read(app, auth_client, settings, monkeypatch, witness):
+    def boom():
+        raise RuntimeError('unreadable')
+    monkeypatch.setitem(agg._WITNESSES, witness, boom)
+    assert get_json(auth_client.get(URL))['data']['protocols'][witness]['state'] == 'unavailable'
+    legacy = get_json(auth_client.get(LEGACY))['data'][witness]
+    assert legacy == {'status': 'warning', 'message': 'Status unavailable'}
