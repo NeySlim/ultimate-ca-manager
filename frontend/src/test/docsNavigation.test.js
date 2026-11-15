@@ -191,3 +191,73 @@ describe('user guide claims about the bell and SCEP tabs', () => {
     expect(para).toContain(`**${en.common.challenges}**`)
   })
 })
+
+// Every key string the console source names, and every namespace it reads with a template literal
+function keysTheConsoleUses() {
+  const srcDir = path.resolve(__dirname, '..')
+  const files = fs.readdirSync(srcDir, { recursive: true })
+    .filter(f => /\.jsx?$/.test(f) && !/(^|\/)(test|__tests__|i18n)\//.test(f))
+  const keys = new Set()
+  const prefixes = new Set()
+  for (const f of files) {
+    const code = fs.readFileSync(path.join(srcDir, f), 'utf8')
+    for (const [, k] of code.matchAll(/['"`]([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)['"`]/g)) keys.add(k)
+    for (const [, p] of code.matchAll(/`([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*\.)\$\{/g)) prefixes.add(p)
+  }
+  return { keys, prefixes }
+}
+
+function flatten(obj, prefix = '', out = {}) {
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === 'string') out[prefix + k] = v
+    else if (v && typeof v === 'object') flatten(v, `${prefix}${k}.`, out)
+  }
+  return out
+}
+
+describe('user guide button names', () => {
+  const { keys, prefixes } = keysTheConsoleUses()
+  const shown = new Set(Object.entries(flatten(en))
+    .filter(([k]) => keys.has(k) || [...prefixes].some(p => k.startsWith(p)))
+    .map(([, v]) => v))
+  // The Certificates page shortens its issue button to the first word of the label
+  shown.add(en.certificates.issueCertificate.split(' ')[0])
+  // Bold text that emphasises a concept rather than naming something on screen
+  const EMPHASIS = ['list', 'details', 'deleted from UCM']
+  const prose = userGuide.replace(/^```.*?^```/gms, '')
+  const section = (title) => {
+    const at = prose.indexOf(`\n### ${title}\n`)
+    expect(at, title).toBeGreaterThanOrEqual(0)
+    const rest = prose.slice(at + 5 + title.length)
+    return rest.slice(0, rest.search(/\n#{2,3} |$/))
+  }
+
+  it('bolds only labels the console shows', () => {
+    const bold = [...prose.matchAll(/\*\*([^*\n]+)\*\*/g)].map(m => m[1])
+      .filter(b => !b.endsWith('.') && !EMPHASIS.includes(b))
+    expect(bold.filter(b => !shown.has(b))).toEqual([])
+  })
+
+  it.each([
+    ['Certificates', [en.certificates.issueCertificate.split(' ')[0]]],
+    ['Certificate Authorities', [en.common.create, en.common.import]],
+    ['Taking a CA Offline', [en.cas.takeOffline, en.cas.offlinePasswordProtected, en.cas.offlineFileExported]],
+    ['Restoring an Offline CA', [en.cas.restore]],
+    ['Certificate Signing Requests', [en.csrs.generateCSR, en.common.import, en.csrs.uploadCSR]],
+    ['Templates', [en.templates.new, en.common.copy]],
+    ['Trust Store', [en.trustStore.sync]],
+    ['HSM Management', [en.hsm.newProvider, en.common.test]],
+    ['Adding WebAuthn Key', [en.account.addKey]],
+  ])('%s names the buttons of its page', (title, labels) => {
+    const text = section(title)
+    for (const label of labels) expect(text, label).toContain(`**${label}**`)
+  })
+
+  it.each([
+    ['Certificate Authorities', [en.importExport.importCA]],
+    ['HSM Management', [en.common.addDnsProvider, 'Test Connection']],
+  ])('%s does not name buttons of another page', (title, labels) => {
+    const text = section(title)
+    for (const label of labels) expect(text, label).not.toContain(`**${label}**`)
+  })
+})

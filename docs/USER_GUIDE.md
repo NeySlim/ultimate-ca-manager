@@ -56,7 +56,7 @@ In the **Modules** menu, the arrow keys, `Home` and `End` move between pages.
 
 Open **Modules** > **PKI** > **Certificates**, or **Certificates** in the top bar.
 
-**Issuing.** Click **Issue Certificate**, fill in the common name, subject alternative names, issuing CA, template and validity, then confirm. Certificates can also be imported (PEM, DER or PKCS#12). A hybrid pair (a classical certificate and an ML-DSA one, RFC 9763) is issued from the same form.
+**Issuing.** Click **Issue**, fill in the common name, subject alternative names, issuing CA, template and validity, then confirm. Certificates can also be imported (PEM, DER or PKCS#12). A hybrid pair (a classical certificate and an ML-DSA one, RFC 9763) is issued from the same form.
 
 **Exporting.** Select a certificate and use **Export** in its details: PEM, DER, PKCS#12 or JKS. Set a password for PKCS#12.
 
@@ -68,7 +68,7 @@ Open **Modules** > **PKI** > **Certificates**, or **Certificates** in the top ba
 
 Open **Modules** > **PKI** > **Certificate Authorities**, or **Certificate Authorities** in the top bar.
 
-**Creating a CA.** Click **Create CA**. The dialog chooses what to make: a self-signed root, an intermediate signed by a parent CA, or a CA signed by an external CA (CSR). Set the common name, organization, key type and validity. RSA 4096 or ECDSA P-384 are sensible choices; ML-DSA keys are offered too. EdDSA (Ed25519, Ed448) suits only clients that verify it (OpenSSL, Go, Java 15 and later): web browsers, Windows (CryptoAPI/CNG) and SCEP clients reject what such a CA issues. **Import CA** brings in an existing CA certificate, with or without its private key.
+**Creating a CA.** Click **Create** (**Create CA** when the list is empty). The dialog chooses what to make: a self-signed root, an intermediate signed by a parent CA, or a CA signed by an external CA (CSR). Set the common name, organization, key type and validity. RSA 4096 or ECDSA P-384 are sensible choices; ML-DSA keys are offered too. EdDSA (Ed25519, Ed448) suits only clients that verify it (OpenSSL, Go, Java 15 and later): web browsers, Windows (CryptoAPI/CNG) and SCEP clients reject what such a CA issues. **Import** brings in an existing CA certificate, with or without its private key.
 
 **Views.** The page shows the hierarchy as an organigramme, in columns (one per level) or as a flat list. Select a CA to see its details and issued certificates.
 
@@ -80,17 +80,17 @@ Offline mode prevents a CA from signing anything (CSRs, certificates, intermedia
 
 1. Open the CA detail panel
 2. Click **Take Offline**
-3. Confirm, then enter and confirm an **offline password** (12+ chars, mixed case, digit, symbol: same policy as user passwords)
+3. Confirm, then enter and confirm a password (12+ chars, mixed case, digit, symbol: same policy as user passwords)
 4. Choose a mode:
-   - **Keep in UCM**: key stays in the database, re-wrapped under your password (plus the master key on top). Restore = enter password.
-   - **Download file**: key is exported as a password-encrypted PKCS#8 PEM and **deleted from UCM**. Restore = re-upload file + password. The downloaded file is the only copy: store it safely.
+   - **Password Protected**: key stays in the database, re-wrapped under your password (plus the master key on top). Restore = enter password.
+   - **Key File Exported**: key is exported as a password-encrypted PKCS#8 PEM and **deleted from UCM**. Restore = re-upload file + password. The downloaded file is the only copy: store it safely.
 
 The CA list shows an **Offline** badge while offline. Existing CRLs continue to be served via CDP; new CRLs cannot be signed until restore.
 
 ### Restoring an Offline CA
 
 1. Open the offline CA's detail panel
-2. Click **Restore**
+2. Click **Restore CA**
 3. Enter the offline password
 4. If the CA was exported to file, also select the previously downloaded `.key.pem` file
 5. The CA returns to its previous status and resumes signing
@@ -128,7 +128,7 @@ Turning the option on is allowed when subjects are already shared. UCM answers w
 
 Open **Modules** > **PKI** > **Certificate Signing Requests**.
 
-1. Click **Upload CSR** and give a PEM file or paste the PEM text, or generate a CSR with its key pair in UCM
+1. Click **Import** and, in the **Upload CSR** dialog, give a PEM file or paste the PEM text; or click **Generate CSR** to make a CSR with its key pair in UCM
 2. Select the request in the **Pending** tab and review its subject, names and key
 3. Click **Sign**, then choose the issuing CA, the template and the validity
 4. Confirm with **Sign CSR**, then download or copy the signed certificate
@@ -139,11 +139,11 @@ Signed requests move to **History**, where **Sign again** puts one back in Pendi
 
 Open **Modules** > **PKI** > **Templates**. A template holds reusable certificate settings: type, subject defaults, key usage, extended key usage, name types, validity, key type and digest.
 
-Click **Create Template** to make one, or **Duplicate Template** to start from an existing one. The built-in templates (Web Server, Email, Client Auth, Code Signing, among others) are marked System: they cannot be edited or deleted, only duplicated. A deactivated template is no longer offered by the Issue Certificate form or to Windows autoenrollment.
+Click **New** to make one, or select a template and click **Copy** to start from it. The built-in templates (Web Server, Email, Client Auth, Code Signing, among others) are marked System: they cannot be edited or deleted, only copied. A deactivated template is no longer offered by the Issue Certificate form or to Windows autoenrollment.
 
 ### Trust Store
 
-Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync from System** imports the operating system's trusted CAs, and **Export** downloads a certificate.
+Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync** imports the operating system's trusted CAs, and **Export** downloads a certificate.
 
 ### User Certificates
 
@@ -266,7 +266,7 @@ Open **Modules** > **Administration** > **Access Control** (administrators). Cus
 
 ### HSM Management
 
-Open **Modules** > **Administration** > **HSM Management**. Providers hold CA private keys in hardware or a key service: PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS and OpenBao/Vault Transit. **Add Provider** configures one, **Test Connection** checks it and a key can be generated directly on the module. In a Docker deployment see [HSM in Docker](HSM_DOCKER.md).
+Open **Modules** > **Administration** > **HSM Management**. Providers hold CA private keys in hardware or a key service: PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS and OpenBao/Vault Transit. **New Provider** configures one, **Test** checks it and a key can be generated directly on the module. In a Docker deployment see [HSM in Docker](HSM_DOCKER.md).
 
 ### Audit Logs
 
@@ -306,7 +306,7 @@ Configure SSO in **Settings** > **SSO** (administrators only). Each provider typ
 
 ## My Account
 
-Open **My Account** from the account menu (your name, right end of the top bar). Its tabs are **Profile** (name, e-mail, account information), **Security** (password, two-factor authentication, security keys, client certificates for mutual TLS) and **API Keys** (create a key with a scope, optionally expiring, and revoke it). The account menu also holds the **Language** choice and **Sign out**, and **Settings** for administrators.
+Open **My Account** from the account menu (your name, right end of the top bar). Its tabs are **Profile** (name, e-mail, account information), **Security** (password, two-factor authentication, security keys, client certificates for mutual TLS) and **API Keys** (create a key with a scope, optionally expiring, and revoke it). The account menu also holds the **Language** choice and **Sign Out**, and **Settings** for administrators.
 
 ### Enabling 2FA (TOTP)
 
@@ -319,7 +319,7 @@ Open **My Account** from the account menu (your name, right end of the top bar).
 ### Adding WebAuthn Key
 
 1. Open **My Account** > **Security**
-2. Click **Add Security Key**
+2. Click **Add Key**
 3. Insert and touch your hardware key
 4. Name the key for identification
 
