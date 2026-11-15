@@ -153,6 +153,20 @@ def unbind_https_cert():
     return success_response(message='HTTPS certificate binding cleared')
 
 
+def _ha_unrecorded_message(refid):
+    """The 500 of an HA apply whose binding was not stored: the other nodes serve what the
+    binding names, which may already be *refid*."""
+    try:
+        from services.https_binding import get_bound_refid
+        db.session.rollback()
+        if get_bound_refid() == refid:
+            return ("Certificate applied on this node: the binding could not be stored, but it "
+                    "already names this certificate, which the other nodes serve")
+    except Exception:
+        db.session.rollback()
+    return "Certificate applied on this node only: the binding could not be stored"
+
+
 def _unrecorded_message(refid=None):
     """The 500 of a pair written to disk whose binding was not stored (outside HA).
 
@@ -321,8 +335,7 @@ def apply_https_cert():
         except Exception as e:
             current_app.logger.warning(f"Could not persist HTTPS binding: {e}")
             # Not restarted: the next start writes the certificate the database still names, if any
-            message = ("Certificate applied on this node only: the binding could not be stored"
-                       if ha_enabled() else _unrecorded_message(refid))
+            message = _ha_unrecorded_message(refid) if ha_enabled() else _unrecorded_message(refid)
             AuditService.log_action(
                 action='https_apply', resource_type='system', resource_id=str(cert_id),
                 resource_name=label,

@@ -158,3 +158,25 @@ def test_applying_the_bound_certificate_again_names_it_as_the_one_served_next(
     r = _post(auth_client, 'apply', own_cert)
     assert r.status_code == 500, r.data
     assert r.get_json()['message'].endswith('its next start serves this certificate'), r.data
+
+
+@pytest.mark.parametrize('state, message', [
+    ('this', 'Certificate applied on this node: the binding could not be stored, but it already '
+             'names this certificate, which the other nodes serve'),
+    ('bound', 'Certificate applied on this node only: the binding could not be stored')])
+def test_in_ha_applying_the_bound_certificate_again_says_the_other_nodes_serve_it(
+        app, auth_client, own_cert, broken_binding, prior, monkeypatch, state, message):
+    """The other nodes write at their start the certificate the binding names: when it already
+    names this one, they serve it and the apply is not this node's alone."""
+    import api.v2.system.https as module
+    from models import db
+    from services.https_binding import BOUND_REFID_KEY, _set_config
+    prior('bound')
+    if state == 'this':
+        with app.app_context():
+            _set_config(BOUND_REFID_KEY, own_cert['refid'], 'test')
+            db.session.commit()
+    monkeypatch.setattr(module, 'ha_enabled', lambda: True)
+    r = _post(auth_client, 'apply', own_cert)
+    assert r.status_code == 500, r.data
+    assert r.get_json()['message'] == message, r.data
