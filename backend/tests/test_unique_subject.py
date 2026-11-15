@@ -503,6 +503,44 @@ def test_rows_of_one_key_renew_with_a_new_key_and_stay_one_entity(app, auth_clie
     assert _issue(auth_client, ca, cn).status_code == 409
 
 
+@pytest.mark.parametrize('how', ['button', 'api'])
+def test_a_row_with_a_holder_keeps_the_row_of_its_old_key_when_it_changes_key(app, auth_client, create_ca, how):
+    """The renewed row already names its holder (an mTLS certificate): the other row of its old
+    key, which names none, takes that holder, so a new key does not split them."""
+    cn = f'rekey-held-{how}.unique.test'
+    ca = unique_ca(app, create_ca, f'Unique rekey held {how} CA', on=False)
+    rows = _key_rows(app, ca, cn, _key())
+    with app.app_context():
+        db.session.get(Certificate, rows[0]['id']).subject_holder = 'user:4242'
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    assert _shared(app, ca) == []
+    assert [_renews(app, auth_client, held, how) for held in (rows[0], rows[1], rows[0])] == [True] * 3
+    assert _shared(app, ca) == []
+    with app.app_context():
+        assert db.session.get(Certificate, rows[1]['id']).subject_holder == 'user:4242'
+    assert _issue(auth_client, ca, cn).status_code == 409
+
+
+def test_two_holders_bound_by_one_key_alone_part_when_one_changes_key(app, auth_client, create_ca):
+    """Documented limit: each row names another holder and only the key made them one entity,
+    so nothing tells which holder is right once a renewal changes that key."""
+    cn = 'rekey-two-holders.unique.test'
+    ca = unique_ca(app, create_ca, 'Unique rekey two holders CA', on=False)
+    rows = _key_rows(app, ca, cn, _key())
+    with app.app_context():
+        db.session.get(Certificate, rows[0]['id']).subject_holder = 'user:4242'
+        db.session.get(Certificate, rows[1]['id']).subject_holder = 'user:4343'
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    assert _shared(app, ca) == []
+    assert _renews(app, auth_client, rows[0], 'button') is True
+    assert [entry['subject'] for entry in _shared(app, ca)] != []
+    assert _renews(app, auth_client, rows[1], 'button') is False
+    with app.app_context():
+        assert db.session.get(Certificate, rows[1]['id']).subject_holder == 'user:4343'
+
+
 @pytest.mark.parametrize('how', ['button', 'api', 'auto'])
 def test_rows_of_one_sid_renew_with_a_new_key_in_any_order(app, auth_client, create_ca, how):
     cn = f'rekey-sid-{how}.unique.test'

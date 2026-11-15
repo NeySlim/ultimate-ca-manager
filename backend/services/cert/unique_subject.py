@@ -151,7 +151,9 @@ def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requeste
     (manual issuance and CSR signing), return an :class:`Override` instead. ``locked=False``: the
     early check before anything is published, without the lock, repeated under it.
     ``audited=False``: the caller writes the refusal's one audit entry (WSTEP). *previous*: the
-    ``(row, certificate)`` pairs an in-place renewal replaces, the requester's by their key and SID."""
+    ``(row, certificate)`` pairs an in-place renewal replaces, the requester's by their key and SID;
+    when the check passes, their rows and the carriers of their old key get the ``subject_holder``
+    that keeps them one entity (written in the early check too, rolled back with a later refusal)."""
     if not applies(ca, pattern) or len(issued.subject) == 0:
         return None
     from models import Certificate, db
@@ -240,17 +242,22 @@ def _grouped(carriers, full, replaced=()):
 
 
 def _keep_linked(previous, flagged, who, issued):
-    """A renewed row without lineage whose new key leaves the carriers of its old key takes the
-    first one's lineage, so they stay one entity (the SID extension is copied, never lost)."""
+    """A renewed row whose new key leaves the carriers of its old key stays one entity with
+    them: without a holder it takes the first one's lineage, with one it gives its own to those
+    that name none (the SID extension is copied, never lost)."""
     from utils.dn_match import same_name
     for row, held in previous:
         old = _spki(held) if held is not None else None
-        if (row is None or row.subject_holder or old is None or old == who.spki
+        if (row is None or old is None or old == who.spki
                 or not same_name(held.subject, issued.subject)):
             continue
-        anchor = next((r for g, mine in flagged if mine for r, h in g if _spki(h) == old), None)
-        if anchor is not None:
-            row.subject_holder = lineage(anchor)
+        carriers = [r for g, mine in flagged if mine for r, h in g if r is not row and _spki(h) == old]
+        if row.subject_holder:
+            for carrier in carriers:
+                if not carrier.subject_holder:
+                    carrier.subject_holder = row.subject_holder
+        elif carriers:
+            row.subject_holder = lineage(carriers[0])
 
 
 def _audit_refusal(ca, taken, source, requester):
