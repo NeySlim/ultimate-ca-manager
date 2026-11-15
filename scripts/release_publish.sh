@@ -2,16 +2,14 @@
 #
 # UCM release publisher — generic wrapper around `gh release`.
 #
-# Reads VERSION from the repo, extracts the matching CHANGELOG section,
-# waits for the v<version> tag's CI artifacts to be available, then creates
-# (or edits) the GitHub release with those notes.
+# Reads VERSION from the repo, extracts the matching CHANGELOG section and
+# edits the notes of the existing GitHub release. A release is only created by
+# the Build & Release workflow, which attaches every deliverable with its SBOM.
 #
 # Usage:
-#   scripts/release_publish.sh                   # uses VERSION file
-#   scripts/release_publish.sh 2.143             # explicit version
-#   scripts/release_publish.sh 2.144-rc1 --pre   # mark as prerelease
-#   scripts/release_publish.sh --draft           # create as draft
-#   scripts/release_publish.sh --edit            # edit existing release notes
+#   scripts/release_publish.sh --edit            # uses VERSION file
+#   scripts/release_publish.sh 2.143 --edit      # explicit version
+#   scripts/release_publish.sh 2.144-rc1 --pre --edit   # mark as prerelease
 #
 # Requires: gh, git, python3 (scripts/ci/release_version.py). Repository must be the current working directory.
 set -euo pipefail
@@ -29,7 +27,7 @@ while [[ $# -gt 0 ]]; do
         --pre|--prerelease) PRERELEASE=1; shift ;;
         --draft)            DRAFT=1; shift ;;
         --edit)             EDIT=1; shift ;;
-        -h|--help)          sed -n '2,15p' "$0"; exit 0 ;;
+        -h|--help)          sed -n '2,13p' "$0"; exit 0 ;;
         -*)                 echo "Unknown flag: $1" >&2; exit 2 ;;
         *)                  VERSION="$1"; shift ;;
     esac
@@ -86,12 +84,9 @@ if gh release view "$TAG" >/dev/null 2>&1; then
         exit 0
     fi
 else
-    echo "Creating release ${TAG}..."
-    gh release create "$TAG" \
-        --title "UCM ${VERSION}" \
-        --notes-file "$NOTES_FILE" \
-        --verify-tag \
-        "${GH_FLAGS[@]}"
+    # Created here, a release would carry no package, image SBOM or checksum
+    echo "Release ${TAG} does not exist: the Build & Release workflow of the tag creates it." >&2
+    exit 1
 fi
 
 echo
