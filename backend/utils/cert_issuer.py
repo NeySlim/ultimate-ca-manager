@@ -184,7 +184,7 @@ def is_self_signed(cert: x509.Certificate) -> bool:
 def _subject_key_identifier_hex(cert: x509.Certificate):
     try:
         ski = cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
-    except x509.ExtensionNotFound:
+    except Exception:  # absent, or unreadable extensions (RFC 5280 4.2: one instance each)
         return None
     return ski.key_identifier.hex(':').upper()
 
@@ -193,7 +193,7 @@ def authority_key_identifier_hex(cert: x509.Certificate):
     """The AKI keyIdentifier as stored in CA.ski ("AA:BB:..."), or None."""
     try:
         aki = cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value
-    except x509.ExtensionNotFound:
+    except Exception:  # absent, or unreadable extensions (RFC 5280 4.2: one instance each)
         return None
     if not aki.key_identifier:
         return None

@@ -163,9 +163,17 @@ def _drop_disproven_parents(db, CA, stats):
             cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
         except Exception:
             continue
-        if not parent_confirmation.may_drop_parent(ca, cert, parent):
+        before = (ca.caref, ca.parent_confirmed_by, ca.parent_confirmed_at)
+        try:
+            if not parent_confirmation.may_drop_parent(ca, cert, parent):
+                continue
+            parent_confirmation.settle_parent(ca, cert)
+        except Exception:
+            # One CA that cannot be settled keeps its link and stops neither this phase nor the next
+            ca.caref, ca.parent_confirmed_by, ca.parent_confirmed_at = before
+            ca.__dict__.pop('_dropped_parent', None)
+            logger.warning(f"SKI/AKI chain repair: parent of CA '{ca.descr}' left as is", exc_info=True)
             continue
-        parent_confirmation.settle_parent(ca, cert)
         dropped.append(ca)
     stats['unlinked_cas'] = len(dropped)
     if not dropped:

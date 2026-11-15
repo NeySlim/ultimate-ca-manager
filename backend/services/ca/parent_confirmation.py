@@ -154,18 +154,16 @@ def may_drop_parent(ca, cert, parent):
     subject that is not the issuer name (RFC 5280 6.1.3 (a)(4)) or for the key the AKI names
     (4.2.1.1) when it disproves the signature; no for a parent re-keyed since (the AKI names
     another key) and whatever proves nothing."""
-    from utils.cert_issuer import signature_disproved
+    from utils.cert_issuer import _subject_key_identifier_hex, signature_disproved
     parent_cert = _certificate(parent)
     if parent_cert is None or _revoked_as(ca, cert):
         return False
     if is_self_signed(cert) or not same_name(parent_cert.subject, cert.issuer):
         return True
-    try:
-        ski = parent_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
-    except x509.ExtensionNotFound:
-        return False
+    # An SKI absent or unreadable (a duplicate extension) proves nothing: the link stays
+    ski = _subject_key_identifier_hex(parent_cert)
     aki = authority_key_identifier_hex(cert)
-    return aki is not None and aki == ski.key_identifier.hex(':').upper() and signature_disproved(cert, parent_cert)
+    return ski is not None and aki == ski and signature_disproved(cert, parent_cert)
 
 
 def settle_parent(ca, cert):

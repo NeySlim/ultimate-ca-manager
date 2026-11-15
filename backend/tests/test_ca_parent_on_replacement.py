@@ -665,3 +665,101 @@ def test_a_subject_change_on_install_warns_that_the_cas_issued_under_the_former_
     with app.app_context():
         backfill_ski_aki()
     assert (_caref(app, sub['id']) == w['child']['refid']) is revoked
+
+
+# ------------------------------------------------- a parent whose extensions cannot be read
+
+def _root_pem(cn, key):
+    name = x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, cn)])
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(_serial())
+            .not_valid_before(dt.datetime(2026, 1, 1)).not_valid_after(dt.datetime(2036, 1, 1))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(x509.KeyUsage(False, False, False, False, False, True, True, False, False), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .sign(key, hashes.SHA256()))
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def _with_duplicate_extension(app, ca_id):
+    """The stored certificate still loads, but its KeyUsage OID is the SKI's: its extensions do not read."""
+    import ssl
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        der = x509.load_pem_x509_certificate(base64.b64decode(ca.crt)).public_bytes(serialization.Encoding.DER)
+        key_usage, ski = bytes.fromhex('0603551d0f'), bytes.fromhex('0603551d0e')
+        assert der.count(key_usage) == 1
+        bad = der.replace(key_usage, ski)
+        with pytest.raises(x509.DuplicateExtension):
+            x509.load_der_x509_certificate(bad).extensions
+        ca.crt = base64.b64encode(ssl.DER_cert_to_PEM_cert(bad).encode()).decode()
+        db.session.commit()
+
+
+@pytest.fixture
+def unreadable(app, auth_client, made):
+    """A CA linked under a root whose stored certificate has unreadable extensions."""
+    tag, root_key, key = _tag(), _key(), _key()
+    root_cn = f'Dup Root {tag}'
+    root = _import(auth_client, _root_pem(root_cn, root_key))
+    made.append(root['id'])
+    child = _import(auth_client, _rsa_pem(f'Dup Child {tag}', key, root_cn, root_key, serial=_serial()) + _key_pem(key))
+    made.append(child['id'])
+    assert child['caref'] == root['refid']
+    _with_duplicate_extension(app, root['id'])
+    return root, child
+
+
+def test_the_chain_repair_goes_on_past_a_parent_whose_extensions_cannot_be_read(app, auth_client, made, unreadable):
+    """Nothing proves the link wrong: it stays, and the orphans after it are still rechained."""
+    from services.ski_aki_backfill import backfill_ski_aki
+    root, child = unreadable
+    w = {}
+    other_key, other_cn = _key(), f'Dup Other {_tag()}'
+    w['other'] = _import(auth_client, _root_pem(other_cn, other_key))
+    made.append(w['other']['id'])
+    orphan = _import(auth_client, _aki_pem(f'Dup Orphan {_tag()}', _key(), other_cn, other_key,
+                                           x509.SubjectKeyIdentifier.from_public_key(other_key.public_key()).digest))
+    made.append(orphan['id'])
+    with app.app_context():
+        db.session.get(CA, orphan['id']).caref = None
+        db.session.commit()
+    with app.app_context():
+        backfill_ski_aki()
+    assert _caref(app, child['id']) == root['refid']
+    assert _caref(app, orphan['id']) == w['other']['refid']
+
+
+def test_the_chain_repair_logs_a_ca_it_cannot_settle_and_goes_on(app, auth_client, made, linked, monkeypatch):
+    from services.ca import parent_confirmation
+    from services.ski_aki_backfill import backfill_ski_aki
+    w, other_key, other_cn = linked, _key(), f'Dup Other {_tag()}'
+    other = _import(auth_client, _root_pem(other_cn, other_key))
+    made.append(other['id'])
+    orphan = _import(auth_client, _aki_pem(f'Dup Orphan {_tag()}', _key(), other_cn, other_key,
+                                           x509.SubjectKeyIdentifier.from_public_key(other_key.public_key()).digest))
+    made.append(orphan['id'])
+    with app.app_context():
+        db.session.get(CA, orphan['id']).caref = None
+        db.session.commit()
+    real = parent_confirmation.may_drop_parent
+
+    def failing(ca, cert, parent):
+        if ca.id == w['child']['id']:
+            raise ValueError('unreadable')
+        return real(ca, cert, parent)
+    monkeypatch.setattr(parent_confirmation, 'may_drop_parent', failing)
+    with app.app_context():
+        backfill_ski_aki()
+    assert _caref(app, w['child']['id']) == w['root']['refid']
+    assert _caref(app, orphan['id']) == other['refid']
+
+
+@pytest.mark.parametrize('route', SETTLE_ROUTES)
+def test_the_same_certificate_imported_again_keeps_a_parent_whose_extensions_cannot_be_read(
+        app, auth_client, unreadable, route):
+    root, child = unreadable
+    _reimport(app, auth_client, child['id'], _stored_pem(app, child['id']).decode(), route)
+    assert _caref(app, child['id']) == root['refid']
+    assert auth_client.get(f"/api/v2/cas/{child['id']}").status_code == 200
+
