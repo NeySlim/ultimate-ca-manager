@@ -469,6 +469,8 @@ esac
 if [ ! -e "$ENV_FILE" ] && [ ! -e "$DB_PATH" ] && [ ! -L "$DB_PATH" ]; then
     exit 0
 fi
+# Nothing can be archived without it: the run stops before asking about the database
+[ -n "$RENAME" ] || no_interpreter 1
 # Bytecode is not written: the probe runs as root in a tree the service account owns
 probe=$(cd "$UCM_HOME/backend" 2>/dev/null && PYTHONDONTWRITEBYTECODE=1 \
     DATABASE_URL=$DB_URL DATABASE_PATH=$DB_PATH \
@@ -511,7 +513,6 @@ umask 077
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 say "UCM: an earlier UCM was removed and left a database this release cannot start on:"
 say "  $DB_FILE: $REASON"
-[ -n "$RENAME" ] || no_interpreter 1
 fail() {
     say "UCM: archiving what it left failed ($1)."
     case $LAST_ERR in

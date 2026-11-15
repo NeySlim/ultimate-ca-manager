@@ -1745,3 +1745,16 @@ def test_another_failure_names_no_full_disk(tmp_path):
     box.wrap(fail='mkdir', at=3)
     out = box.run()
     assert out.returncode == 1 and 'No space left' not in out.stdout, out.stdout
+
+
+@pytest.mark.parametrize('venv', ['present', 'missing'])
+def test_without_an_interpreter_to_rename_with_the_database_is_not_even_asked_about(tmp_path, venv):
+    """Out of a package, without UCM_PYTHON: exit 1, nothing moved, whether the venv that
+    answers about the database is there or not."""
+    box = Box(tmp_path, python='stub' if venv == 'present' else 'missing')
+    box.wrap()
+    before = snapshot(box)
+    out = box.run(interpreter='')
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert 'no interpreter to rename files with' in out.stdout and 'could not read' not in out.stdout
+    assert snapshot(box) == before and not box.parent.exists()
