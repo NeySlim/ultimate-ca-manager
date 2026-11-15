@@ -99,7 +99,8 @@ def test_the_start_is_refused_before_the_copy_when_the_disk_is_short(tmp_path, b
     r = _run(_df(needed_kb - 1) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
     assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
     out = r.stdout + r.stderr
-    assert f'needs {needed_kb // 1024} MB free' in out and f'{(needed_kb - 1) // 1024} MB available' in out, out
+    # needed rounded up, available down: never "needs 2 MB, 2 MB available"
+    assert f'needs {-(-needed_kb // 1024)} MB free' in out and f'{(needed_kb - 1) // 1024} MB available' in out, out
 
 
 @pytest.mark.parametrize('backup', ['true', 'false'])
@@ -163,7 +164,7 @@ def test_an_ordinary_start_still_needs_room_for_the_copy(tmp_path):
     _database(tmp_path, NAMES)
     r = _run(_df(2999) + _START, env, tmp_path)
     assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
-    assert 'needs 2 MB free' in r.stdout, r.stdout
+    assert 'needs 3 MB free, 2 MB available' in r.stdout, r.stdout
 
 
 def test_a_restored_database_claims_the_upgrade_room(tmp_path):
@@ -174,14 +175,14 @@ def test_a_restored_database_claims_the_upgrade_room(tmp_path):
     _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
     r = _run(_df(2 * 3000 - 1) + _START, env, tmp_path)
     assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
-    assert 'needs 5 MB free' in r.stdout, r.stdout
+    assert 'needs 6 MB free, 5 MB available' in r.stdout, r.stdout
 
 
 def test_a_pending_serial_replay_claims_the_upgrade_room(tmp_path):
     env = _env(tmp_path, 'false')
     _database(tmp_path, NAMES, pending_serial=True)
     r = _run(_df(2999) + _START, env, tmp_path)
-    assert r.returncode != 0 and 'needs 2 MB free' in r.stdout, r.stdout
+    assert r.returncode != 0 and 'needs 3 MB free' in r.stdout, r.stdout
 
 
 @pytest.mark.parametrize('case', ['not a database', 'no registry', 'no migrations dir'])
@@ -198,7 +199,7 @@ def test_a_database_that_cannot_be_read_claims_the_upgrade_room(tmp_path, case):
     else:
         env['UCM_MIGRATIONS_DIR'] = str(tmp_path / 'absent')
     r = _run(_df(2999) + _START, env, tmp_path)
-    assert r.returncode != 0 and 'needs 2 MB free' in r.stdout, r.stdout
+    assert r.returncode != 0 and 'needs 3 MB free' in r.stdout, r.stdout
 
 
 def test_the_check_leaves_the_database_unchanged(tmp_path):

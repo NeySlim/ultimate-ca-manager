@@ -81,12 +81,13 @@ ucm_sqlite_disk_room() {
     avail_kb=$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print $4 }') || avail_kb=""
     case "$avail_kb" in ''|*[!0-9]*) return 0 ;; esac
     [ "$avail_kb" -ge "$need_kb" ] && return 0
-    echo -e "${RED:-}❌ Not enough disk space in $dir: the start needs $(( need_kb / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
+    # needed rounded up, available down: the message never shows a need it satisfies
+    echo -e "${RED:-}❌ Not enough disk space in $dir: the start needs $(( (need_kb + 1023) / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
     if [ "$upgrade" = "true" ]; then
-        echo "   The database is $(( size_kb / 1024 )) MB; upgrading it needs its size for the upgrade's journal and growth,"
+        echo "   The database is $(( (size_kb + 1023) / 1024 )) MB; upgrading it needs its size for the upgrade's journal and growth,"
         echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
     else
-        echo "   The database is $(( size_kb / 1024 )) MB; the pre-start copy needs its size (UCM_BACKUP_ENABLED=false skips it)."
+        echo "   The database is $(( (size_kb + 1023) / 1024 )) MB; the pre-start copy needs its size (UCM_BACKUP_ENABLED=false skips it)."
         echo "   Free space, then start again."
     fi
     return 1
