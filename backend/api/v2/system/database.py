@@ -249,6 +249,10 @@ def reset_db():
             username=actor_name,
         )
 
+        # This node's file from an earlier generated password opens nothing now: dropped here,
+        # its command cursor being ahead of the recreated table (a new generated one is kept)
+        initial_admin.sweep(current_app.config)
+
         # The command to read a generated password, never the password
         if prepared.generated:
             from config.settings import Config
