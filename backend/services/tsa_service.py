@@ -382,8 +382,9 @@ class TSAService:
 SIGNER_CONFIG_KEY = 'tsa_signer_cert_refid'
 
 
-def _get_signer_refid() -> str:
-    """Configured dedicated-signer refid, or '' when unset."""
+def configured_signer_refid() -> str:
+    """Configured dedicated-signer refid, stripped, or '' when unset: the one reader of
+    the setting, for /tsa and for the configuration API alike."""
     try:
         from models import SystemConfig
         cfg = SystemConfig.query.filter_by(key=SIGNER_CONFIG_KEY).first()
@@ -515,7 +516,7 @@ def load_configured_signer():
     historical CA-certificate behaviour unchanged. Raises
     TSAConfigurationError when a signer is configured but unusable.
     """
-    refid = _get_signer_refid()
+    refid = configured_signer_refid()
     if not refid:
         return None
     _record, cert, key, chain = _load_signer_certificate(refid)
@@ -524,7 +525,7 @@ def load_configured_signer():
 
 def describe_configured_signer() -> dict:
     """Describe the configured dedicated signer for the config API. Never raises."""
-    refid = _get_signer_refid()
+    refid = configured_signer_refid()
     if not refid:
         return {'configured': False}
 
