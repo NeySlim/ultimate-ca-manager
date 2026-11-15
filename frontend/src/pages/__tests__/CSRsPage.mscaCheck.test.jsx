@@ -28,6 +28,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 let mockIsMobile = false
+let mockWritable = () => true
 const openEntity = vi.fn()
 const showWarning = vi.fn()
 const showSuccess = vi.fn()
@@ -69,7 +70,7 @@ vi.mock('../../hooks', async () => {
   return {
     useModals: common.useModals,
     usePermission: () => ({
-      canWrite: () => true, canDelete: () => true, hasPermission: () => true, canRead: () => true,
+      canWrite: (r) => mockWritable(r), canDelete: () => true, hasPermission: () => true, canRead: () => true,
     }),
   }
 })
@@ -115,6 +116,7 @@ async function openCSR() {
 describe('CSRsPage Microsoft CA status check', () => {
   beforeEach(() => {
     mockIsMobile = false
+    mockWritable = () => true
     for (const f of [showSuccess, showError, showInfo, showWarning, openEntity]) f.mockReset()
     getAll.mockReset().mockResolvedValue({ data: [CSR] })
     getHistory.mockReset().mockResolvedValue({ data: [] })
@@ -156,6 +158,16 @@ describe('CSRsPage Microsoft CA status check', () => {
     checkRequest.mockRejectedValue(new Error('boom'))
     fireEvent.click(await openCSR())
     await waitFor(() => expect(showError).toHaveBeenCalledWith('boom'))
+  })
+
+  it('is not offered without write:certificates, which the route requires', async () => {
+    mockWritable = (r) => r === 'csrs'
+    render(<MemoryRouter initialEntries={['/csrs']}><CSRsPage /></MemoryRouter>)
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    fireEvent.click(await screen.findByText('pending.example.com'))
+    await screen.findByText('csrs.sign')
+    expect(screen.queryByText('msca.checkStatus')).toBeNull()
+    expect(getPendingRequests).not.toHaveBeenCalled()
   })
 
   it('offers nothing for a CSR no Microsoft CA holds', async () => {

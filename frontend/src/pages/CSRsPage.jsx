@@ -296,7 +296,8 @@ export default function CSRsPage() {
   const selectedCsrId = selectedCSR?.id
   useEffect(() => {
     setMscaRequest(null)
-    if (!selectedCsrId || activeTab !== 'pending' || !canWrite('csrs')) return undefined
+    // The status route imports the certificate: it requires write:certificates
+    if (!selectedCsrId || activeTab !== 'pending' || !canWrite('certificates')) return undefined
     let cancelled = false
     mscaService.getPendingRequests()
       .then((res) => {
@@ -1561,7 +1562,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onCheckMsca, checki
             <SignIn size={14} /> {t('csrs.sign')}
           </Button>
         )}
-        {canWrite('csrs') && onCheckMsca && (
+        {canWrite('certificates') && onCheckMsca && (
           <Button type="button" size="sm" variant="secondary" onClick={onCheckMsca} disabled={checkingMsca}>
             <ArrowsClockwise size={14} /> {t('msca.checkStatus')}
           </Button>
