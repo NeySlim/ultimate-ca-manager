@@ -174,3 +174,20 @@ describe('documented heading links', () => {
     expect(headingSlugs('## A\n## A\n')).toEqual(new Set(['a', 'a-1']))
   })
 })
+
+describe('user guide claims about the bell and SCEP tabs', () => {
+  const guide = fs.readFileSync(path.join(docsDir, 'USER_GUIDE.md'), 'utf8')
+
+  it('does not list kinds the bell never requests', () => {
+    const bell = guide.split('\n').find(l => l.startsWith('The bell lists'))
+    expect(bell).toBeDefined()
+    expect(bell).not.toMatch(/SCEP requests|key recoveries/)
+  })
+
+  it('places the SCEP challenge password on the Challenges tab, not Configuration', () => {
+    const para = guide.split('\n').find(l => l.includes('The **Configuration** tab enables the server'))
+    expect(para).toBeDefined()
+    expect(para).not.toMatch(/holds the challenge password/)
+    expect(para).toContain(`**${en.common.challenges}**`)
+  })
+})

@@ -22,7 +22,7 @@ A menu path in this guide such as **Modules** > **PKI** > **Certificates** means
 - the **Modules** menu, which lists every page you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Pages you have no right to are not shown. The pin button next to a page keeps it in the bar
 - search (`Ctrl K`), the help button, the live-link indicator, the theme menu, the notification bell and your account menu
 
-The bell lists what needs your attention (failed ACME orders, pending approvals, SCEP requests and key recoveries, CRLs due, renewals to do, failed backups) and each entry opens the page of the item; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
+The bell lists what needs your attention (critical items and pending approvals from the To handle queue, plus failed backups or restores and revoked sessions from the audit log) and each entry opens the page of the item; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
 
 A status bar shows whether the service is running and the UCM version; on an instance in HA mode it also names the node and whether it is the leader.
 
@@ -171,7 +171,7 @@ For the server, open the **Local ACME** tab, enable it and choose the default CA
 
 ### SCEP
 
-Open **Modules** > **Protocols** > **SCEP**. SCEP enrolls network devices and MDM solutions with a challenge password. The **Configuration** tab enables the server, chooses the CA and holds the challenge password; devices use `https://your-server:8443/scep/pkiclient.exe`.
+Open **Modules** > **Protocols** > **SCEP**. SCEP enrolls network devices and MDM solutions with a challenge password. The **Configuration** tab enables the server and chooses the CA; the **Challenges** tab shows and regenerates the challenge password of each CA, and the **Information** tab summarizes the setup; devices use `https://your-server:8443/scep/pkiclient.exe`.
 
 The **Profiles** tab creates named endpoints, each with its own URL (`/scep/<segment>/pkiclient.exe`), CA, template and challenge, and the **Intune app registrations** tab lets a profile validate Microsoft Intune challenges (see [Intune SCEP](integrations/intune-scep.md)). The **Requests** tab lists the requests; pending ones are approved or rejected there.
 
