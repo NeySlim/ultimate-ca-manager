@@ -165,34 +165,6 @@ class Node:
     def pids(self) -> set:
         return group_pids(self.proc.pid) if self.proc is not None else set()
 
-    def local_ports(self) -> set:
-        """Local TCP ports of the sockets this node's processes hold (its database sessions
-        among them), read from /proc: pg_stat_activity.client_port names the node."""
-        inodes = set()
-        for pid in self.pids():
-            try:
-                fds = list(Path(f'/proc/{pid}/fd').iterdir())
-            except OSError:
-                continue
-            for fd in fds:
-                try:
-                    target = os.readlink(fd)
-                except OSError:
-                    continue
-                if target.startswith('socket:['):
-                    inodes.add(target[8:-1])
-        ports = set()
-        for table in ('/proc/net/tcp', '/proc/net/tcp6'):
-            try:
-                lines = Path(table).read_text().splitlines()[1:]
-            except OSError:
-                continue
-            for line in lines:
-                fields = line.split()
-                if len(fields) > 9 and fields[9] in inodes:
-                    ports.add(int(fields[1].rsplit(':', 1)[1], 16))
-        return ports
-
     def _signal(self, signum):
         try:
             os.killpg(self.proc.pid, signum)
@@ -254,19 +226,27 @@ class Cluster:
         self.password = f'Ha-{secrets.token_hex(8)}-9z'
         from cryptography.fernet import Fernet
         shared = {
-            'DATABASE_URL': self.database_url(),
             'SECRET_KEY': secrets.token_hex(32),
             'KEY_ENCRYPTION_KEY': Fernet.generate_key().decode(),
             'UCM_HA': '1',
             'INITIAL_ADMIN_PASSWORD': self.password,
             'FQDN': 'ucm-ha.test',
         }
-        self.nodes = [Node(name, root / name, shared) for name in names]
+        self.nodes = [Node(name, root / name, {**shared, 'DATABASE_URL': self.database_url(name)})
+                      for name in names]
 
-    def database_url(self):
+    def app_name(self, node_name):
+        """A node's application_name: it names the node in pg_stat_activity whatever client
+        address PostgreSQL sees (a published port shows the proxy's), and starts with the schema."""
+        return f'{self.schema}_{node_name}'
+
+    def app_names(self) -> list:
+        return [self.app_name(node.name) for node in self.nodes]
+
+    def database_url(self, node_name):
         separator = '&' if '?' in PG_URL else '?'
         return (f'{PG_URL}{separator}options={quote(f"-csearch_path={self.schema}")}'
-                f'&application_name={self.schema}')
+                f'&application_name={quote(self.app_name(node_name))}')
 
     def __getitem__(self, index):
         return self.nodes[index]
@@ -292,11 +272,11 @@ class Cluster:
 
     def backends(self) -> list:
         """The nodes' database sessions: dicts of pid, node (a name, or None), wait_event_type, query."""
-        rows = self.sql('SELECT pid, client_port, wait_event_type, query FROM pg_stat_activity '
-                        'WHERE application_name = %s', (self.schema,))
-        owners = {port: node.name for node in self.nodes if node.alive() for port in node.local_ports()}
-        return [{'pid': pid, 'node': owners.get(port), 'wait': wait, 'query': query or ''}
-                for pid, port, wait, query in rows]
+        rows = self.sql('SELECT pid, application_name, wait_event_type, query FROM pg_stat_activity '
+                        'WHERE application_name = ANY(%s)', (self.app_names(),))
+        owners = {self.app_name(node.name): node.name for node in self.nodes}
+        return [{'pid': pid, 'node': owners.get(app), 'wait': wait, 'query': query or ''}
+                for pid, app, wait, query in rows]
 
     def waiting_on_lock(self, node, needle='') -> int:
         """Sessions of `node` blocked on a lock, in a statement that contains `needle`."""
@@ -336,8 +316,8 @@ class Cluster:
     def sessions_left(self) -> int:
         with pg_connect(f'{self.schema}_check') as conn:
             return conn.execute(
-                "SELECT count(*) FROM pg_stat_activity WHERE application_name = %s",
-                (self.schema,)).fetchone()[0]
+                "SELECT count(*) FROM pg_stat_activity WHERE application_name = ANY(%s)",
+                (self.app_names(),)).fetchone()[0]
 
     def guard_hits(self) -> str:
         return ''.join(f'{n.name}: {hit}' for n in self.nodes for hit in n.guard_hits().splitlines(True))
@@ -357,7 +337,8 @@ class Cluster:
         if self._admin is not None:
             with self._admin.cursor() as cur:
                 cur.execute('SELECT pg_terminate_backend(pid) FROM pg_stat_activity '
-                            'WHERE application_name = %s AND pid <> pg_backend_pid()', (self.schema,))
+                            'WHERE application_name = ANY(%s) AND pid <> pg_backend_pid()',
+                            (self.app_names(),))
                 cur.execute(f'DROP SCHEMA IF EXISTS "{self.schema}" CASCADE')
             self._admin.close()
             self._admin = None

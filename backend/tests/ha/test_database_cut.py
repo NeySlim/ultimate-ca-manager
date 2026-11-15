@@ -26,7 +26,8 @@ def _advisory_locks(cluster):
     """(key, granted, node) of every advisory lock a node's session holds or waits for."""
     rows = cluster.sql(
         "SELECT l.pid, l.classid, l.objid, l.granted FROM pg_locks l JOIN pg_stat_activity a "
-        "ON a.pid = l.pid WHERE l.locktype = 'advisory' AND a.application_name = %s", (cluster.schema,))
+        "ON a.pid = l.pid WHERE l.locktype = 'advisory' AND a.application_name = ANY(%s)",
+        (cluster.app_names(),))
     owners = {b['pid']: b['node'] for b in cluster.backends()}
     return [((int(c) << 32) | int(o), granted, owners.get(pid)) for pid, c, o, granted in rows]
 
@@ -41,7 +42,7 @@ def test_every_session_cut_then_the_database_back(cluster, admin):
     probes = []
     with cluster.database_closed():
         cut = cluster.sql('SELECT pg_terminate_backend(pid) FROM pg_stat_activity '
-                          'WHERE application_name = %s', (cluster.schema,))
+                          'WHERE application_name = ANY(%s)', (cluster.app_names(),))
         assert cut and all(done for (done,) in cut), cut
         until = time.monotonic() + CUT_SECONDS
         while time.monotonic() < until:
