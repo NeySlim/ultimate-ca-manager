@@ -744,6 +744,29 @@ class TestUnreadableSavedSecret:
         _refused(_send(auth_client, 'put', f'/api/v2/microsoft-cas/{msca_id}', body))
         assert stored() == before
 
+    def _msca_with_unreadable_winrm(self, app, winrm_host):
+        from models.msca import MicrosoftCA
+        with app.app_context():
+            row = MicrosoftCA(name=f'Unreadable CA {_suffix()}', server='adcs.corp.example',
+                              auth_method='basic', username='u', enabled=True)
+            row.password = 'saved-basic'
+            row.winrm_enabled, row.winrm_transport, row.winrm_host = True, 'ntlm', winrm_host
+            row._winrm_password = _foreign_token()
+            db.session.add(row)
+            db.session.commit()
+            return f'/api/v2/microsoft-cas/{row.id}'
+
+    def test_msca_clearing_an_unreadable_winrm_password_on_the_ca_host(self, app, auth_client):
+        # The basic password would take over the WinRM channel
+        _refused(_send(auth_client, 'put', self._msca_with_unreadable_winrm(app, None),
+                       {'winrm_password': ''}))
+
+    def test_msca_an_unreadable_winrm_password_is_not_the_basic_one(self, app, auth_client):
+        # Cleared on a host of its own: the basic password never reaches it
+        r = _send(auth_client, 'put', self._msca_with_unreadable_winrm(app, 'winrm.corp.example'),
+                  {'winrm_password': '', 'winrm_port': 5985})
+        assert r.status_code == 200, r.data
+
     def test_smtp_password(self, app, auth_client):
         from models.email_notification import SMTPConfig
         with app.app_context():
