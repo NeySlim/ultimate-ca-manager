@@ -1306,8 +1306,9 @@ def _standalone_target(app, url):
 
 
 class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
-    """The copy commits before it is verified: a target left holding accounts by a refused or
-    interrupted attempt is refused by the next one, never taken as an installation of its own."""
+    """The copy commits before it is verified: accounts a refused or interrupted attempt left on
+    the target are emptied, copied again and verified again by the next one, never taken as an
+    installation of its own."""
 
     def _post(self, auth_client, target):
         return auth_client.post('/api/v2/database/switch',
@@ -1315,6 +1316,7 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
                                 content_type='application/json')
 
     def _refused_twice(self, auth_client, target, env_file, restart_signal, monkeypatch):
+        """While the verification keeps failing, every retry is refused and nothing switches."""
         def refuse(*args, **kwargs):
             raise VerificationError('users: 3 rows copied, 2 on the target')
 
@@ -1340,6 +1342,52 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
     def test_a_second_switch_after_a_refused_verification_to_postgresql(
             self, auth_client, pg_target, env_file, restart_signal, monkeypatch):
         self._refused_twice(auth_client, pg_target, env_file, restart_signal, monkeypatch)
+
+    def _refused_then_retried(self, app, auth_client, target, env_file, restart_signal,
+                              monkeypatch):
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            assert self._post(auth_client, target).status_code == 500
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            # A row the source never had: the retry must empty the copy, not top it up
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "INSERT INTO users (username, email, password_hash, role, auth_source) "
+                    "VALUES ('stray', 'stray@target', 'x', 'admin', 'local')"))
+            before = env_file.read_text()
+
+            second = self._post(auth_client, target)
+
+            assert second.status_code == 200, second.data
+            body = json.loads(second.data)['data']
+            assert body['validation']['ok'] is True
+            assert env_file.read_text() != before and restart_signal.exists()
+            with app.app_context():
+                source = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
+            with engine.connect() as conn:
+                copied = sorted(r[0] for r in conn.execute(text('SELECT username FROM users')))
+            assert copied == source and 'stray' not in copied
+            assert body['bootstrap']['tables']['users'] == len(source)
+            assert _marker_kinds(target) is None
+        finally:
+            engine.dispose()
+
+    def test_a_retry_after_a_refused_verification_copies_again_sqlite(
+            self, app, auth_client, sqlite_target, env_file, restart_signal, monkeypatch):
+        self._refused_then_retried(app, auth_client, sqlite_target, env_file, restart_signal,
+                                   monkeypatch)
+
+    @_needs_pg
+    def test_a_retry_after_a_refused_verification_copies_again_postgresql(
+            self, app, auth_client, pg_target, env_file, restart_signal, monkeypatch):
+        self._refused_then_retried(app, auth_client, pg_target, env_file, restart_signal,
+                                   monkeypatch)
 
     def _killed_before_verification(self, app, target, monkeypatch):
         def killed(*args, **kwargs):
