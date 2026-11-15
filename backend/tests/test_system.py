@@ -1013,6 +1013,19 @@ class TestUpdatesCheck:
             return _Answer()
 
         monkeypatch.setattr(updates.requests, 'get', fake_get)
+        # The forced check fills the 300 s cache: restore it on teardown
+        monkeypatch.setitem(updates._releases_cache, 'data', None)
+        monkeypatch.setitem(updates._releases_cache, 'ts', 0)
+
+    def test_the_fake_releases_do_not_outlive_the_test(self, auth_client):
+        import services.updates as updates
+        before = dict(updates._releases_cache)
+        with pytest.MonkeyPatch.context() as mp:
+            self._releases(mp, [{'tag_name': 'v999.1', 'draft': False, 'prerelease': False,
+                                 'assets': []}])
+            assert_success(auth_client.get('/api/v2/system/updates/check?force=true'))
+            assert updates._releases_cache['data']
+        assert updates._releases_cache == before
 
     def test_a_newer_stable_release_is_offered(self, auth_client, monkeypatch):
         self._releases(monkeypatch, [
