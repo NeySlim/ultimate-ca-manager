@@ -7,22 +7,22 @@ export default {
       {
         title: "Sources",
         items: [
-          "Application : le journal propre à UCM. Seule source à porter des composants",
-          "Accès : journal d'accès Gunicorn, avec les requêtes HTTP et les codes de statut, installations natives uniquement",
-          "Erreurs : journal d'erreurs Gunicorn, avec le démarrage des workers et les traces non gérées, natives uniquement",
-          "Journal : le journal de l'unité systemd, là où l'utilisateur du service peut le lire",
+          { label: "Application", text: "Le journal propre à UCM. Seule source à porter des composants" },
+          { label: "Accès", text: "Journal d'accès Gunicorn, avec les requêtes HTTP et les codes de statut, installations natives uniquement" },
+          { label: "Erreurs", text: "Journal d'erreurs Gunicorn, avec le démarrage des workers et les traces non gérées, natives uniquement" },
+          { label: "Journal", text: "Le journal de l'unité systemd, là où l'utilisateur du service peut le lire" },
         ]
       },
       {
         title: "Filtres",
         items: [
-          "Source : quel journal est lu. Seules les sources réellement présentes sont proposées",
-          "Composant : un sous-système du journal applicatif, ou tous. Tous y figurent, pas seulement ceux affichés",
-          "Niveau de journal : un plancher, pas une correspondance exacte. WARNING montre aussi erreurs et critiques",
-          "Recherche : insensible à la casse, sur le message et le nom du composant. C'est du texte, pas un motif",
-          "Exclure : retire les lignes correspondantes, le plus rapide pour faire taire un battement",
-          "Date : une fenêtre De/À, appliquée sur le serveur",
-          "Lignes : combien de lignes correspondantes renvoyer, de la plus récente à la plus ancienne",
+          { label: "Source", text: "Quel journal est lu. Seules les sources réellement présentes sont proposées" },
+          { label: "Composant", text: "Un sous-système du journal applicatif, ou tous. Tous y figurent, pas seulement ceux affichés" },
+          { label: "Niveau de journal", text: "Un plancher, pas une correspondance exacte. WARNING montre aussi erreurs et critiques" },
+          { label: "Recherche", text: "Insensible à la casse, sur le message et le nom du composant. C'est du texte, pas un motif" },
+          { label: "Exclure", text: "Retire les lignes correspondantes, le plus rapide pour faire taire un battement" },
+          { label: "Date", text: "Une fenêtre De/À, appliquée sur le serveur" },
+          { label: "Lignes", text: "Combien de lignes correspondantes renvoyer, de la plus récente à la plus ancienne" },
         ]
       },
       {

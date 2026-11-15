@@ -52,7 +52,12 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
     writer.start()
     try:
         wait_until(lambda: any(code in (200, 201) for _, code, _ in outcomes), 60, 'B issues')
+        # A session opened on B: what the SQL store holds of it is put back after the
+        # restore, as a request in flight or a Redis entry would leave it
+        on_b_before = Client.login(b, cluster.password).http.cookies.get_dict()
         started = time.monotonic()
+        cookies_before = admin.http.cookies.get_dict()
+        stored_before = cluster.sql('SELECT session_id, data, expiry FROM flask_sessions')
         r = admin.http.post(a.url('/api/v2/system/restore'), headers=admin._headers(),
                             files={'file': (name, archive.content)}, data={'password': PASSWORD},
                             timeout=300)
@@ -92,7 +97,15 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
     wait_until(lambda: cluster.sql('SELECT count(*) FROM cluster_maintenance')[0][0] == 0, 120,
                'the maintenance row removed')
     lifted_in = time.monotonic() - serving
-    # The sessions of before are gone; B serves the restored state and accepts writes
+    for row in stored_before:
+        cluster.sql('INSERT INTO flask_sessions (session_id, data, expiry) VALUES (%s, %s, %s) '
+                    'ON CONFLICT (session_id) DO NOTHING', row)
+    # No session begun before the restore is accepted, the restorer's included, on any node
+    for node in cluster.nodes:
+        for cookies in (cookies_before, on_b_before):
+            r = Client(node, cookies=cookies).get('/api/v2/account/profile')
+            assert r.status_code == 401, f'{node.name}: {r.status_code}'
+    # B serves the restored state and accepts writes
     again = Client.login(b, cluster.password)
     names = _cas(again)
     assert 'HA restore kept CA' in names and 'HA restore dropped CA' not in names, names

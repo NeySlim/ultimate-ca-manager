@@ -14,7 +14,7 @@ export default {
       {
         title: 'Champs du certificat',
         items: [
-          { label: 'Key ID', text: 'Identifiant que sshd journalise pour le titulaire. La CA le définit à principals@nom de la CA, sauf si elle laisse les demandeurs le choisir.' },
+          { label: 'Key ID', text: 'Identifiant que sshd journalise pour le titulaire. La CA le définit à principals@CA name, sauf si elle laisse les demandeurs le choisir.' },
           { label: 'Principals', text: 'Noms d\'utilisateur (certificat utilisateur) ou noms d\'hôte (certificat hôte) pour lesquels ce certificat est valide. Séparés par des virgules.' },
           { label: 'Validité', text: 'Durée de vie du certificat. Choisissez un préréglage (1h, 8h, 24h, 7j, 30j, 90j, 365j) ou définissez une durée personnalisée en secondes. Valide dès 5 minutes avant l\'émission, pour les serveurs dont l\'horloge retarde (v2.252).' },
           { label: 'Extensions', text: 'Extensions SSH telles que permit-pty, permit-agent-forwarding. Applicables uniquement aux certificats utilisateur.' },
@@ -37,7 +37,7 @@ export default {
       },
     ],
     tips: [
-      'Utilisez des certificats éphémères (8h–24h) pour l\'accès utilisateur afin de minimiser l\'impact d\'une compromission de clé.',
+      'Utilisez des certificats éphémères (8h-24h) pour l\'accès utilisateur afin de minimiser l\'impact d\'une compromission de clé.',
       'Le mode signature est préférable : la clé privée de l\'utilisateur ne quitte jamais sa machine.',
       'Lorsqu\'une CA laisse les demandeurs définir le key ID, gardez-le descriptif (ex. : « jdoe-prod-2025 ») pour faciliter l\'audit des journaux.',
       'Pour les certificats d\'hôte, le principal doit correspondre au nom d\'hôte utilisé par les clients pour se connecter.',
@@ -96,7 +96,7 @@ UCM génère à la fois la paire de clés et le certificat. Utilisez ce mode lor
 ### Key ID
 Un identifiant intégré dans le certificat. Le serveur SSH le journalise lorsque le certificat est utilisé, comme identité du titulaire.
 
-La CA le définit à \`principals@nom de la CA\` (ex. \`deploy@Production User CA\`). Un demandeur ne peut en choisir un autre que sur une CA où **Laisser les demandeurs définir l'identifiant de clé** est coché ; ailleurs, une telle demande est refusée.
+La CA le définit à \`principals@CA name\` (ex. \`deploy@Production User CA\`). Un demandeur ne peut en choisir un autre que sur une CA où **Laisser les demandeurs définir l'identifiant de clé** est coché ; ailleurs, une telle demande est refusée.
 
 **Bons exemples de Key ID, là où c'est autorisé :** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
 
@@ -121,7 +121,8 @@ Choisissez un préréglage ou définissez une durée personnalisée :
 | 30 jours | Rotation mensuelle |
 | 365 jours | Comptes de service à longue durée de vie |
 
-Les certificats éphémères (8h–24h) sont recommandés pour les utilisateurs humains. Une validité plus longue est acceptable pour les comptes de service automatisés.
+Les certificats éphémères (8h-24h) sont recommandés pour les utilisateurs humains. Une validité plus longue est acceptable pour les comptes de service automatisés.
+
 Un certificat est valide dès 5 minutes avant son émission, si bien qu'un serveur dont l'horloge retarde légèrement l'accepte aussitôt ; la durée de vie compte toujours à partir de l'émission (v2.252).
 
 ### Extensions (certificats utilisateur uniquement)
@@ -143,6 +144,7 @@ Un certificat est valide dès 5 minutes avant son émission, si bien qu'un serve
 | verify-required | Exige une clé FIDO ayant vérifié l'utilisateur (PIN ou biométrie), sans valeur |
 
 Un serveur refuse un certificat portant une option critique qu'il ne connaît pas : UCM ne signe donc que celles-ci et les options de fournisseur nommées \`name@domain\`. OpenSSH ne définit aucune option critique pour les certificats d'hôte : une demande d'hôte qui en porte une est refusée (v2.252).
+
 **Exemple :** Un certificat avec \`force-command=ls\` et \`source-address=10.0.0.0/8\` ne peut exécuter que \`ls\` et uniquement depuis le réseau 10.x.x.x.
 
 ## Utilisation des certificats
@@ -178,6 +180,7 @@ Sur les clients, ajoutez la Host CA à known_hosts :
 2. Cliquez sur **Révoquer** dans le panneau de détail
 3. Le certificat est ajouté à la liste de révocation de clés (KRL) de la CA
 4. Téléchargez et déployez la KRL mise à jour sur les serveurs (depuis la page CA SSH)
+
 Un certificat révoqué reste dans la KRL, et dans la liste, jusqu'à son expiration : le supprimer plus tôt est refusé, puisque la KRL est construite à partir de ces enregistrements et que le certificat serait de nouveau accepté. Chaque téléchargement de la KRL porte un numéro de version plus élevé (v2.252).
 
 > ⚠ La révocation ne prend effet que lorsque les serveurs vérifient la KRL via \`RevokedKeys\` dans sshd_config.
@@ -187,7 +190,7 @@ Un certificat révoqué reste dans la KRL, et dans la liste, jusqu'à son expira
 | Problème | Solution |
 |----------|----------|
 | Permission denied (publickey) | Vérifiez que la CA est approuvée sur le serveur (TrustedUserCAKeys) |
-| Certificat non utilisé | Assurez-vous que le fichier certificat est nommé \`<clé>-cert.pub\` à côté de la clé privée |
+| Certificat non utilisé | Assurez-vous que le fichier certificat est nommé \`<key>-cert.pub\` à côté de la clé privée |
 | Non-correspondance de principal | Le nom d'utilisateur SSH doit figurer dans les principals du certificat |
 | Certificat expiré | Émettez un nouveau certificat avec une validité appropriée |
 | Échec de vérification de l'hôte | Ajoutez la Host CA à known_hosts avec @cert-authority |

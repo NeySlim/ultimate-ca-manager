@@ -649,6 +649,7 @@ def run(detectors: Optional[Iterable[Detector]] = None) -> dict:
     """Every detector's findings, blockers first; a detector that fails is listed in errors."""
     result = run_detectors(DETECTORS if detectors is None else detectors, label='FIPS preflight')
     return {'fips_active': fips_mode.enabled(),
+            'module_known': fips_mode.switch_module_known(),
             'ready': not result['summary'][BLOCKER] and not result['errors'],
             'summary': result['summary'], 'findings': result['findings'],
             'errors': result['errors'], 'checked': result['checked']}

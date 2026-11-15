@@ -273,3 +273,52 @@ class TestApplyingTheBoundCertificateAgain:
         assert again.get_json()['message'] == first.get_json()['message']
         with app.app_context():
             assert get_bound_refid() == cert['refid']
+
+
+class TestBackfillMemory:
+    """The scan for a legacy binding runs at every start without one: it holds one batch, not the table."""
+
+    @staticmethod
+    def _peak_bytes(app, monkeypatch, tmp_path, n):
+        import tracemalloc
+        import uuid
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from datetime import datetime, timedelta, timezone
+        from models import Certificate, db
+
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, 'unmanaged.example')])
+        now = datetime.now(timezone.utc)
+        installed = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+                     .serial_number(1).not_valid_before(now).not_valid_after(now + timedelta(days=1))
+                     .sign(key, hashes.SHA256()))
+        cert_path = tmp_path / f'https_cert_{n}.pem'
+        cert_path.write_bytes(installed.public_bytes(serialization.Encoding.PEM))
+        monkeypatch.setattr(https_binding, '_paths', lambda: (cert_path, tmp_path / 'key.pem'))
+        prefix = f'mem-{uuid.uuid4().hex[:8]}-'
+        with app.app_context():
+            db.session.execute(Certificate.__table__.insert(), [
+                {'refid': f'{prefix}{i}', 'descr': 'scan', 'crt': 'A' * 16000, 'prv': 'k', 'renewed_times': 0}
+                for i in range(n)])
+            db.session.commit()
+            try:
+                tracemalloc.start()
+                tracemalloc.reset_peak()
+                assert backfill_legacy_https_binding() == ''
+                return tracemalloc.get_traced_memory()[1]
+            finally:
+                tracemalloc.stop()
+                db.session.rollback()
+                db.session.execute(Certificate.__table__.delete().where(Certificate.refid.startswith(prefix)))
+                db.session.commit()
+
+    def test_the_scan_holds_one_batch_whatever_the_number_of_certificates(
+        self, app, clean_binding, monkeypatch, tmp_path,
+    ):
+        monkeypatch.setattr(https_binding, '_SCAN_BATCH', 20, raising=False)
+        small = self._peak_bytes(app, monkeypatch, tmp_path, 60)
+        large = self._peak_bytes(app, monkeypatch, tmp_path, 600)
+        # 540 more rows of 16 KB: about 9 MB more if the table is held, one batch (320 KB) if not
+        assert large < small + 3 * 2**20, (small, large)

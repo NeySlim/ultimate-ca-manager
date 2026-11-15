@@ -7,13 +7,13 @@ import { helpGuides } from '../../data/helpGuides'
 import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
 
 const dir = dirname(fileURLToPath(import.meta.url))
-const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
+const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 const load = (code) => JSON.parse(readFileSync(join(dir, '..', 'locales', `${code}.json`), 'utf8'))
 const helpFile = (code) => join(dir, '..', '..', 'data', 'help', code, 'acme.js')
 
 const en = load('en').acme.dnsUpdate
 
-describe('acme.dnsUpdate i18n keys (9 locales)', () => {
+describe('acme.dnsUpdate i18n keys (10 locales)', () => {
   it('English defines the namespace', () => {
     expect(Object.keys(en).length).toBeGreaterThan(50)
   })

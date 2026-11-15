@@ -404,10 +404,13 @@ class TestTsaDedicatedCertificateSwitch:
                 .sign(key, hashes.SHA256()))
         return cert
 
-    def test_ca_cert_accepted_by_default(self, app):
-        """Backward compatibility: pre-2.200 deployments keep working."""
+    def test_ca_cert_accepted_once_the_operator_turned_it_off(self, app, monkeypatch):
+        """Compatibility: a 2.x install that signed with its CA keeps the explicit false."""
         from services.tsa_service import TSAService
 
+        monkeypatch.setattr(
+            TSAService, '_require_dedicated_tsa_cert', staticmethod(lambda: False)
+        )
         with app.app_context():
             TSAService.validate_certificate(self._ca_cert())  # must not raise
 
@@ -438,26 +441,28 @@ class TestTsaDedicatedCertToggleIsExposed:
 
     @pytest.fixture()
     def clean_toggle_row(self, app):
-        """Drop the toggle row afterwards: the DB is session-scoped, and the
-        TestTsaDedicatedCertificateSwitch default-behaviour test (and any real
-        signing test) must keep seeing the compatible default."""
-        yield
+        """No toggle row before or after: the DB is session-scoped, and the
+        default-behaviour tests must see an absent row."""
         from models import SystemConfig, db
 
-        with app.app_context():
-            SystemConfig.query.filter_by(
-                key='tsa_require_dedicated_cert'
-            ).delete(synchronize_session=False)
-            db.session.commit()
+        def drop():
+            with app.app_context():
+                SystemConfig.query.filter_by(
+                    key='tsa_require_dedicated_cert'
+                ).delete(synchronize_session=False)
+                db.session.commit()
+        drop()
+        yield
+        drop()
 
-    def test_get_exposes_the_toggle_with_its_default(self, auth_client):
+    def test_get_exposes_the_toggle_with_its_default(self, auth_client, clean_toggle_row):
         r = auth_client.get('/api/v2/tsa/config')
         assert r.status_code == 200, r.data
         body = json.loads(r.data)
         data = body.get('data') or body
-        assert data.get('require_dedicated_cert') is False, (
+        assert data.get('require_dedicated_cert') is True, (
             'GET /api/v2/tsa/config must expose require_dedicated_cert '
-            f'(default off), got: {data!r}'
+            f'(default on, RFC 3161 §2.3), got: {data!r}'
         )
 
     def test_patch_reaches_the_enforcement_read(
@@ -481,7 +486,7 @@ class TestTsaDedicatedCertToggleIsExposed:
         body = json.loads(r.data)
         assert (body.get('data') or body)['require_dedicated_cert'] is True
 
-        # Switching it back off restores the pre-2.200-compatible default.
+        # Switching it off is the compatibility mode, kept as an explicit false.
         r = auth_client.patch(
             '/api/v2/tsa/config',
             data=json.dumps({'require_dedicated_cert': False}),

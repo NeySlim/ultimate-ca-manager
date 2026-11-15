@@ -55,7 +55,7 @@ export default {
       {
         title: 'Key ID',
         items: [
-          { label: 'Défini par la CA', text: 'sshd journalise le key ID comme identité du titulaire. Par défaut, la CA nomme chaque certificat principals@nom de la CA, et une demande qui définit un autre key ID est refusée.' },
+          { label: 'Défini par la CA', text: 'sshd journalise le key ID comme identité du titulaire. Par défaut, la CA nomme chaque certificat principals@CA name, et une demande qui définit un autre key ID est refusée.' },
           { label: 'Laisser les demandeurs définir l\'identifiant de clé', text: 'Cochez cette option pour laisser les demandeurs choisir le leur, par ex. un numéro de ticket ou d\'employé.' },
           { label: 'Mise à niveau', text: 'À partir de 2.249, les CA existantes démarrent aussi avec l\'option décochée.' },
         ]
@@ -121,7 +121,7 @@ Une CA dont la liste est vide ne signe rien, sauf si **Autoriser tout principal*
 
 ### Key ID
 
-sshd journalise le key ID d'un certificat comme identité du titulaire. La CA le définit à \`principals@nom de la CA\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les CA, y compris les existantes depuis 2.249.
+sshd journalise le key ID d'un certificat comme identité du titulaire. La CA le définit à \`principals@CA name\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les CA, y compris les existantes depuis 2.249.
 
 ### Formats de TTL
 

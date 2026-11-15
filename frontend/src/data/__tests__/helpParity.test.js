@@ -9,6 +9,7 @@ const pages = import.meta.glob('../help/*/*.js')
 
 const LISTS = ['items', 'definitions']
 const shape = (page) => (page?.sections || []).map((sec) => LISTS.map((k) => (sec[k] || []).length).join('/'))
+const kinds = (page) => (page?.sections || []).flatMap((sec) => (sec.items || []).map((i) => typeof i)).join()
 const flat = (page) => ['tips', 'warnings'].map((k) => (page?.[k] || []).length).join('/')
 
 describe('translated help pages follow the English entries one for one', () => {
@@ -18,6 +19,7 @@ describe('translated help pages follow the English entries one for one', () => {
     const english = helpContent[key]
     expect(english, `helpContent.${key} exists in English`).toBeTruthy()
     expect(shape(page.helpContent), 'entries per section').toEqual(shape(english))
+    expect(kinds(page.helpContent), 'item types (text or label/text)').toEqual(kinds(english))
     expect(flat(page.helpContent), 'tips/warnings').toEqual(flat(english))
   })
 })

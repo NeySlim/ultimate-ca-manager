@@ -15,7 +15,7 @@ export default {
         title: 'Fonctionnalités',
         items: [
           { label: 'Type', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Définit les valeurs par défaut d\'utilisation de la clé, d\'EKU et de SAN' },
-          { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville et Email. Sur les certificats Email (S/MIME) et Serveur + Client (Combiné), l\'Email devient aussi un SAN' },
+          { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville et Email. L\'Email devient aussi un SAN, quel que soit le type de certificat' },
           { label: 'Utilisation de la clé', text: 'Signature numérique, chiffrement de clé, etc.' },
           { label: 'Utilisation étendue de la clé', text: 'Tout usage connu du serveur : authentification serveur, authentification client, signature de code, protection e-mail, Smartcard Logon, horodatage, signature OCSP, IPsec, Microsoft RDP et autres' },
           { label: 'Types de SAN', text: 'Les types de noms (DNS, IP, Email, URI, UPN) qu\'une demande faite avec le modèle peut porter. Avec « Appliquer les types de SAN autorisés » activé, le formulaire d\'émission, la signature de CSR, les protocoles d\'enrôlement, les renouvellements et les approbations refusent tout autre type, et un nom seulement déduit du CN est omis. Les nouveaux modèles l\'ont activé ; les anciens et les modèles intégrés l\'ont désactivé. Aucune case cochée : tous les types sont permis' },
@@ -28,12 +28,12 @@ export default {
           { label: 'OID de politique', text: 'OID de politique de certificat supplémentaires (par exemple les politiques ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd et QCP-w), ajoutés après la politique propre à la CA' },
           { label: 'Extensions personnalisées', text: 'Extensions qu\'UCM ne modélise pas, chacune un OID, un indicateur critique et la valeur DER en hexadécimal, ajoutées telles quelles à chaque certificat émis depuis le modèle (formulaire d\'émission, signature de CSR, ACME, SCEP, WSTEP, approbations ; les renouvellements les gardent). Le formulaire d\'émission peut en ajouter ou remplacer celle de même OID. Les extensions qu\'UCM pose lui-même sont refusées : passez par leurs propres réglages. Un client qui ne reconnaît pas une extension critique rejette le certificat' },
           { label: 'Type de clé', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 ou EC-P521, avec un condensat SHA-256, SHA-384 ou SHA-512, ou ML-DSA-44, ML-DSA-65 ou ML-DSA-87. Le condensat est le hachage de signature de la CA émettrice, pas celui de la clé finale : il s\'applique toujours à une clé finale ML-DSA sous une CA RSA ou EC, et une CA ML-DSA l\'ignore' },
-          { label: "Préférence de condensat (v2.251)", text: "Tout chemin qui émet depuis le template (formulaire d'émission, Sign CSR, ACME, SCEP, WSTEP, signataire TSA ; EST n'utilise aucun modèle) signe avec son condensat, relevé à celui qui correspond à la clé de l'AC : SHA-384 pour P-384, SHA-512 pour P-521. Quand une politique l'interdit, le condensat plus fort le plus proche autorisé signe à la place, et le résultat indique « Signature digest X replaced by Y by policy »" },
+          { label: "Préférence de condensat (v2.251)", text: "Tout chemin qui émet depuis le template (formulaire d'émission, Sign CSR, ACME, SCEP, WSTEP, signataire TSA ; EST n'utilise aucun modèle) signe avec son condensat, relevé à celui qui correspond à la clé de la CA : SHA-384 pour P-384, SHA-512 pour P-521. Quand une politique l'interdit, le condensat plus fort le plus proche autorisé signe à la place, et le résultat indique « Signature digest X replaced by Y by policy »" },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 et EC-BP512 (RFC 5639, regroupés sous Brainpool dans les listes de types de clé, masqués en mode FIPS). OpenSSL et Windows lisent leurs chaînes et signatures, mais Chrome, Firefox, Go, rustls, GnuTLS et Java sans Bouncy Castle les refusent pour TLS, et Windows Schannel ne les active pas par défaut. Sur un HSM, seuls les fournisseurs PKCS#11 les conservent' },
         ]
       },
       {
-        title: 'Autoenrollment Windows',
+        title: 'Auto-inscription Windows',
         items: [
           { label: 'Autoriser l\'autoenrollment', text: 'Annonce le modèle avec autoEnroll=true dans la Certificate Enrollment Policy afin que les clients GPO/Kerberos le demandent automatiquement à l\'ouverture de session. Désactivé par défaut, l\'enrôlement manuel reste possible sans lui' },
           { label: 'Construire le sujet depuis Active Directory', text: 'Dériver le sujet et les SAN depuis l\'objet AD du demandeur (via le connecteur AD) au lieu d\'exiger que le client les fournisse, pour l\'autoenrollment GPO sans intervention. Sur les endpoints Kerberos, un sujet nommé dans la requête est ignoré et les comptes d\'ordinateur sont refusés ; les modèles machine prennent toujours le nom DNS de l\'ordinateur' },
@@ -75,7 +75,7 @@ Les autorités de certification ne se créent pas à partir de modèles : créez
 1. Cliquez sur **Créer un modèle**
 2. Entrez un **nom** et une description optionnelle
 3. Sélectionnez le **type** de modèle : Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Il définit les valeurs par défaut d'utilisation de la clé, d'utilisation étendue de la clé et de SAN, que vous pouvez ensuite modifier
-4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L, CN, Email). Sur les certificats Email (S/MIME) et Serveur + Client (Combiné), l'Email devient aussi un SAN
+4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L, CN, Email). L'Email devient aussi un SAN, quel que soit le type de certificat
 5. Sélectionnez les indicateurs d'**utilisation de la clé**
 6. Sélectionnez les valeurs d'**utilisation étendue de la clé** parmi les usages connus du serveur (Smartcard Logon, Time Stamping, Microsoft RDP et autres)
 7. Définissez le **type de clé** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521, Brainpool EC-BP256/384/512 ou ML-DSA-44/65/87), le condensat et la **période de validité par défaut** en jours. Le condensat est le hachage de signature de la CA émettrice : il s'applique donc toujours à une clé ML-DSA sous une CA RSA ou EC ; une CA ML-DSA l'ignore
@@ -90,7 +90,7 @@ Lors de l'émission d'un certificat ou de la signature d'une CSR, sélectionnez 
 
 ## Indicateurs d'autoenrollment Windows
 
-Les modèles portent trois indicateurs opt-in utilisés par les protocoles d'autoenrollment Windows (XCEP/WSTEP, configurés dans **Paramètres → Autoenrollment Windows**) :
+Les modèles portent trois indicateurs opt-in utilisés par les protocoles d'autoenrollment Windows (XCEP/WSTEP, configurés par realm dans **Paramètres → Auto-inscription Windows**) :
 
 - **Autoriser l'autoenrollment** : Annonce le modèle avec \`autoEnroll=true\` dans la Certificate Enrollment Policy, afin que les clients authentifiés GPO/Kerberos le demandent automatiquement à l'ouverture de session, sans action de l'utilisateur. Désactivé par défaut : comme sur un vrai ADCS, un modèle peut toujours être enrôlé manuellement (MMC « Demander un nouveau certificat », \`certreq\`) sans cet indicateur, puisque Enroll et Autoenroll sont des permissions distinctes.
 - **Construire le sujet depuis Active Directory** : Pour l'autoenrollment GPO sans intervention : dérive le sujet et les SAN du certificat depuis l'objet AD du demandeur (via le connecteur AD) au lieu d'exiger que le client les fournisse. Sur les endpoints Kerberos, un sujet nommé dans la requête est ignoré et les comptes d'ordinateur sont refusés ; les modèles machine prennent toujours le nom DNS de l'ordinateur.

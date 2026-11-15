@@ -503,6 +503,40 @@ def _shared_tables_stay_in_their_module(request):
     warnings.warn(message, stacklevel=1)
 
 
+def _epoch_row():
+    """The stored session epoch: its value, None when absent (a fresh database)."""
+    if not _SESSION_APP:
+        return None
+    from auth.session_epoch import EPOCH_KEY
+    from models import SystemConfig, db
+    with _SESSION_APP[0].app_context():
+        value = db.session.query(SystemConfig.value).filter_by(key=EPOCH_KEY).scalar()
+        db.session.rollback()
+        return value
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _session_epoch_stays_in_its_module():
+    """A restore a file plays advances the epoch; put back the one found before the
+    file, or every session a later file opens otherwise reads as begun before it."""
+    before = _epoch_row()
+    yield
+    if not _SESSION_APP or _epoch_row() == before:
+        return
+    from auth.session_epoch import EPOCH_KEY
+    from models import SystemConfig, db
+    with _SESSION_APP[0].app_context():
+        row = SystemConfig.query.filter_by(key=EPOCH_KEY).first()
+        if before is None:
+            db.session.delete(row)
+        elif row is None:
+            db.session.add(SystemConfig(key=EPOCH_KEY, value=before))
+        else:
+            row.value = before
+        db.session.commit()
+        db.session.remove()
+
+
 def _secret_state():
     """A token under the current database key, and the encrypted values it cannot read."""
     if not _SESSION_APP:

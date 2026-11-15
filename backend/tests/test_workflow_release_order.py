@@ -257,11 +257,17 @@ def test_a_release_call_takes_the_packages_from_the_run():
     assert evaluate(take['if'], {'inputs': {'from-run': True}})
     assert not evaluate(take['if'], {'inputs': {}})
     assert take['with']['pattern'] == '*-package'
-    # Every package the release attaches is one the smoke took
-    released = [s['with']['name'] for s in _jobs()['release']['steps']
-                if str(s.get('uses', '')).startswith('actions/download-artifact@')]
+    # Every package the release attaches is one the smoke took; the other downloads (image SBOMs
+    # and digests) go by a pattern that takes no package artifact
+    downloads = [s['with'] for s in _jobs()['release']['steps']
+                 if str(s.get('uses', '')).startswith('actions/download-artifact@')]
+    released = [w['name'] for w in downloads if 'name' in w]
     assert len(released) == 4 and all(fnmatch.fnmatch(n, take['with']['pattern']) for n in released), released
+    others = [w['pattern'] for w in downloads if 'name' not in w]
+    assert len(others) + len(released) == len(downloads)
+    assert not any(fnmatch.fnmatch(n, p) for n in released for p in others), others
     assert not fnmatch.fnmatch('std-digest-amd64', take['with']['pattern'])
+    assert not fnmatch.fnmatch('std-sbom-amd64', take['with']['pattern'])
 
 
 def _run_get(tmp_path, from_run, pattern, files):

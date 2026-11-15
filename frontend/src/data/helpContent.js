@@ -26,7 +26,7 @@ export const helpContent = {
         icon: ListChecks,
         items: [
           { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record (with the right to read the trust store, the trust store certificates that expire within 90 days or have expired); a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state; the TSA signer while the TSA is enabled; and, with the right to read settings, whether email, webhooks and auto-renewal are set up' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state; the TSA signer while the TSA is enabled (a warning while the CA certificate signs); and, with the right to read settings, whether email, webhooks and auto-renewal are set up' },
           { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
           { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
           { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
@@ -373,7 +373,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Enroll new mTLS certificates from Account → mTLS tab',
+      'Enroll new mTLS certificates from My Account → Security',
       'Certificates are stored and managed by UCM like any other certificate',
       'Use the stats bar to quickly filter by status',
       'Click a row to view full certificate details in the inspector',
@@ -655,10 +655,10 @@ export const helpContent = {
         title: 'Configuration',
         icon: Gear,
         items: [
-          { label: 'Signing CA', text: 'The CA whose own certificate signs timestamp tokens when no dedicated signing certificate is set. A CA outside its validity period does not sign: /tsa answers 503. Strict verifiers (openssl ts -verify, jarsigner) refuse tokens signed by a CA certificate, and the page warns while the CA signs' },
+          { label: 'Signing CA', text: 'The CA that issues the dedicated signing certificate. Its own certificate signs timestamp tokens only when no dedicated signer is set and Require dedicated certificate is off. A CA outside its validity period does not sign: /tsa answers 503. Strict verifiers (openssl ts -verify, jarsigner) refuse tokens signed by a CA certificate, and the page warns while the CA signs' },
           { label: 'Policy OID', text: 'Object Identifier for the TSA policy, included in every timestamp response. The default 1.2.3.4.1 is OpenSSL\'s example OID, a placeholder the page warns about: use an OID from your organization\'s arc' },
           { label: 'Enable/Disable', text: 'Toggle the TSA endpoint on or off without losing configuration' },
-          { label: 'Require dedicated certificate', text: 'Opt-in: refuse to sign timestamps with the CA certificate itself, requires a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161)' },
+          { label: 'Require dedicated certificate', text: 'On by default: refuse to sign timestamps with the CA certificate itself, so /tsa answers 503 until a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161) is set. Turning it off is not RFC 3161 compliant; an installation upgraded from 2.x whose TSA signed with its CA keeps it off, and the overview shows a warning' },
                   { label: 'Signing certificate (v2.217)', text: 'Sign tokens with a dedicated end-entity certificate picked from issued certificates (timeStamping EKU, RSA, ECDSA or ML-DSA key held by UCM; Ed25519 and Ed448 certificates are not offered, nor ML-DSA in FIPS mode when the FIPS module does not approve it). Renewals are followed automatically; an expired or revoked signer fails requests with 503 and never falls back to the CA certificate' },
                   { label: 'Generate a signing certificate (v2.218)', text: 'One-click issuance of a purpose-built RFC 3161 signer: CA:FALSE, KeyUsage digitalSignature only, and a critical exclusive timeStamping EKU, the shape strict verifiers (openssl ts -verify) require. Issued from the configured TSA CA and selected automatically when no usable signer is set. The certificate has source "manual": add "manual" to the auto-renewal sources or renew it yourself before expiry' },
         ]
@@ -682,7 +682,7 @@ export const helpContent = {
       'No authentication is required: the TSA endpoint is publicly accessible like CRL/OCSP',
     ],
     warnings: [
-      'A valid signing CA must be configured before enabling TSA',
+      'A dedicated signing certificate must be set before /tsa signs: generate one on the Settings tab',
       'openssl ts -verify and jarsigner refuse tokens signed by the CA certificate: RFC 3161 requires a dedicated signer with a critical, exclusive timeStamping EKU. Generate one on the Settings tab',
       'The TSA endpoint is a public protocol endpoint: do not put sensitive data in timestamp requests',
     ],
@@ -711,7 +711,7 @@ export const helpContent = {
         items: [
           { label: 'Client', text: 'Request certificates from any ACME CA, Let\'s Encrypt, ZeroSSL, HARICA, or custom' },
           { label: 'Orders tab (v2.219)', text: 'The client orders have their own "Let\'s Encrypt orders" sidebar tab with a visible/total count and a status filter, mirroring the Local orders view' },
-          { label: 'External CA Accounts', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
+          { label: 'Certificate Authorities (CA)', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
           { label: 'Custom Server', text: 'Set a custom ACME directory URL to use any RFC 8555-compliant CA' },
           { label: 'EAB', text: 'External Account Binding support for CAs that require pre-registration (ZeroSSL, HARICA, etc.)' },
           { label: 'Key Types', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87 for certificate keys; ML-DSA is not offered on a build without it, nor in FIPS mode when the FIPS module does not approve it. A configured default this instance cannot generate fails the order instead of falling back to RSA-2048 (v2.248)' },
@@ -769,11 +769,11 @@ export const helpContent = {
         title: 'ACME Proxy',
         icon: Globe,
         items: [
-          { label: 'Upstream CA account', text: 'Select one of the External CA Accounts: its directory URL (Let\'s Encrypt, ZeroSSL, any RFC 8555 CA) and EAB credentials are set on that account' },
+          { label: 'Upstream CA account', text: 'Select one of the accounts in Certificate Authorities (CA): its directory URL (Let\'s Encrypt, ZeroSSL, any RFC 8555 CA) and EAB credentials are set on that account' },
           { label: 'Account Status', text: 'Shows whether UCM is registered with the upstream CA. Accounts are auto-registered on first proxy request' },
           { label: 'Test Connection', text: 'Verify connectivity to the upstream CA and check if EAB credentials are required' },
           { label: 'Reset Account', text: 'Clear the upstream registration of the selected CA account to force a new registration' },
-          { label: 'EAB Credentials', text: 'External Account Binding credentials for CAs that require them (e.g., ZeroSSL, Google Trust), entered on the CA account in External CA Accounts' },
+          { label: 'EAB Credentials', text: 'External Account Binding credentials for CAs that require them (e.g., ZeroSSL, Google Trust), entered on the CA account in Certificate Authorities (CA)' },
           { label: 'DNS Challenges', text: 'UCM handles DNS-01 challenges on behalf of clients using configured DNS providers' },
           { label: 'Purge replaced certificates', text: 'Opt-in toggle: when a proxy order finalizes, certificates previously imported by proxy orders for the exact same domain set are deleted. Revoked certificates are always kept; non-proxy certificates are never touched. Off by default' },
                   { label: 'Client pre-checks (v2.217)', text: 'The proxy also publishes the dns-01 TXT values computed with each client account key, so lego/Traefik/Caddy propagation pre-checks pass without being disabled, except on DuckDNS, Hurricane Electric and FreeDNS, which hold one value: disable the client pre-check there; a retried new-order returns the account still-pending order' },
@@ -792,7 +792,7 @@ export const helpContent = {
         title: 'DNS UPDATE (RFC 2136) for the ACME proxy',
         items: [
           { label: 'What it is', text: 'Clients use their standard rfc2136 solver (certbot, lego, cert-manager, acme.sh, win-acme, Posh-ACME) and point it at UCM. UCM still creates the TXT record through its own DNS provider' },
-          { label: 'Keys', text: 'Create keys for each proxy account under External CA Accounts. A key can be linked to an EAB credential: it then works only for orders of the ACME account registered with that credential. UCM shows the secret once' },
+          { label: 'Keys', text: 'Create keys for each proxy account under Certificate Authorities (CA). A key can be linked to an EAB credential: it then works only for orders of the ACME account registered with that credential. UCM shows the secret once' },
           { label: 'Accepted changes', text: 'UCM accepts only a TXT record under _acme-challenge with the value it expects for the order. It refuses other changes. It always answers a delete with NOERROR' },
           { label: 'Port and network', text: 'Set the listener port in the ACME proxy section (0 disables it, 1024 to 65535, a restart is needed). Use it in the internal network only. To use port 53, map it in Docker or Kubernetes, or with a firewall redirect' },
           { label: 'Algorithms', text: 'hmac-sha256, hmac-sha384 and hmac-sha512. UCM refuses md5 and sha1, the defaults of many clients: set the algorithm in every client. cert-manager does not support sha384, and win-acme computes it wrongly' },
@@ -1073,7 +1073,7 @@ export const helpContent = {
         icon: Database,
         items: [
           { label: 'Export', text: 'Download logs in JSON or CSV format' },
-          { label: 'Cleanup', text: 'Purge old logs with configurable retention (days)' },
+          { label: 'Cleanup Old Logs', text: 'Purge old logs with configurable retention (days)' },
           { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering' },
         ]
       },
@@ -1309,7 +1309,7 @@ export const helpContent = {
         items: [
           { label: 'Full Name', text: 'Your display name shown across the application' },
           { label: 'Email', text: 'Used for notifications and account recovery' },
-          { label: 'Account Info', text: 'Creation date, last login, total login count' },
+          { label: 'Account Information', text: 'Creation date, last login, total login count' },
         ]
       },
       {
@@ -1320,7 +1320,7 @@ export const helpContent = {
           { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
           { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
           { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
-          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt offers Log out instead of Skip. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
+          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt cannot be skipped and offers only Logout. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
         ]
       },
       {
@@ -1328,7 +1328,7 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Create Key', text: 'Generate a new API key, optionally expiring after a number of days' },
-          { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
+          { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating, offered by the API only, keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
           { label: 'Revoke', text: 'Immediately invalidate an API key' },
           { label: 'Deactivated users', text: 'API keys belonging to a deactivated user are rejected even if the key itself is still valid' },
           { label: 'Interactive session only', text: 'API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: sign in interactively' },
@@ -1495,7 +1495,7 @@ export const helpContent = {
         title: 'Actions',
         icon: Key,
         items: [
-          { label: 'Add Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
+          { label: 'New Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
           { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid; for a PKCS#11 module, also record what it reports (library, manufacturer, library and firmware versions), shown on the provider page' },
           { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
           { label: 'Status', text: 'Monitor provider connection health' },
@@ -1599,7 +1599,7 @@ export const helpContent = {
           { label: 'Base DN', text: 'Search base for user lookups' },
           { label: 'User Filter', text: 'LDAP filter to match users (e.g., (uid={username}))' },
           { label: 'Attribute Mapping', text: 'Map LDAP attributes to username, email, full name' },
-          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink then Link to SSO.' },
+          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink SSO then Link to SSO.' },
         ]
       },
     ],
@@ -1627,7 +1627,7 @@ export const helpContent = {
         icon: Lock,
         items: [
           { label: 'Status & counters', text: 'Shows whether encryption is enabled and how many stored private keys are encrypted vs unencrypted' },
-          { label: 'Enable / Disable', text: 'Encrypt all CA and certificate private keys with AES-128 (Fernet, with HMAC-SHA256) under a master key file. Enabling also removes plaintext key mirrors, while disabling recreates them. A disable stopped before every value was decrypted is shown as left half-way: run it again to finish it. After a disable, enabling again waits until every node has reloaded, then two minutes (ten at most, unless a live node never reloads). The data keys stay for reading only for seven days, so a value written late under them still opens; a daily sweep decrypts any such value, and each key is deleted after its date once a sweep finds nothing under it. Outside HA master.key is removed with the last of them' },
+          { label: 'Enable / Disable', text: 'Encrypt all CA and certificate private keys with AES-128 (Fernet, with HMAC-SHA256) under a master key file. Enabling also removes plaintext key mirrors, while disabling recreates them. A disable stopped before every value was decrypted is shown as left half-way: run it again to finish it. After a disable, enabling again waits until every node has reloaded, then two minutes (ten at most, unless a live node never reloads). The data keys stay for reading only for seven days, so a value written late under them still opens; a daily sweep decrypts any such value, and each key is deleted after its date once a sweep finds nothing under it. Outside HA master.key is removed with the last of them; a key set by KEY_ENCRYPTION_KEY, and the key in HA, stay configured but unused' },
           { label: 'First start', text: 'Without a master key, UCM creates /etc/ucm/master.key (0600) at startup and encrypts the keys already stored. A container does so only when /etc/ucm is a named volume or a host directory. Skipped with KEY_ENCRYPTION_KEY set, with encrypted keys or a keyed audit chain already in the database, after encryption was disabled here, or with UCM_AUTO_MASTER_KEY=false. At each start a loaded key also encrypts the values still stored unencrypted, and a key that does not decrypt them puts UCM in safe mode. Back up the key file' },
           { label: 'Key files on disk', text: 'Shows how many plaintext key mirrors remain; use deploy hooks when another service needs a key file' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Opt-in environment variable: refuse to start without an explicit database encryption key' },
@@ -1715,7 +1715,7 @@ export const helpContent = {
         items: [
           { label: 'Max Validity', text: 'Maximum certificate lifetime in days' },
           { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used, ML-DSA-44, ML-DSA-65 and ML-DSA-87 included; FIPS mode removes ML-DSA when the FIPS module does not approve it' },
-          { label: 'Allowed Signature Schemes', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
+          { label: 'Signature schemes (API only)', text: 'The allowed_signature_schemes rule, absent from the policy form: PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
           { label: 'SAN Restrictions', text: 'Limit the number of DNS names (other SAN types are not counted); one DNS pattern per policy (*.company.com, or company.com to include the domain itself) scopes the policy to the matching names' },
           { label: 'Allowed Signature Hashes', text: 'SHA-256, SHA-384 or SHA-512; none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes' },
         ]
@@ -1939,7 +1939,7 @@ export const helpContent = {
           { label: 'Template Selection', text: 'Choose from available certificate templates on the MS CA' },
           { label: 'Auto-Approved', text: 'Templates with autoenroll return the certificate immediately' },
           { label: 'Manager Approval', text: 'Some templates require manager approval, UCM tracks the pending request' },
-          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM, and the interface offers no status check: approve it from the CA Control Panel, which imports the certificate. Inventory sync does not complete a pending request' },
+          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM: use Check status in the CSR details, or approve it from the CA Control Panel. Inventory sync also completes a pending request the CA shows issued, and marks one it shows denied. A request whose CSR is signed elsewhere (a local CA, an import) is closed; if its details are still open, Check status shows "This CSR was signed elsewhere: its Microsoft CA request is closed". A certificate the CA still issues for it enters as a separate certificate when the request is approved from the CA Control Panel, or through a full inventory sync (full: true on POST /api/v2/microsoft-cas/{id}/inventory-sync): Import from CA now and the scheduled sync are incremental and can miss it' },
         ]
       },
       {
@@ -2129,7 +2129,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Use short-lived certificates (8h–24h) for user access to minimize the impact of key compromise.',
+      'Use short-lived certificates (8h-24h) for user access to minimize the impact of key compromise.',
       'Sign mode is preferred: the user\'s private key never leaves their machine.',
       'Where a CA lets requesters set the key ID, keep it descriptive (e.g. "jdoe-prod-2025") for easy log auditing.',
       'For host certificates, the principal must match the hostname clients use to connect.',

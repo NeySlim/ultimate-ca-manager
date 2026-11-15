@@ -247,10 +247,14 @@ def test_a_committed_restore_whose_holder_died_is_completed_by_another_node(clus
         admin = User.query.filter_by(username='admin').one()
         db.session.add(UserSession(user_id=admin.id, session_id=PREFIX + 'old'))
         db.session.commit()
+        from auth.session_epoch import current_epoch
+        epoch = current_epoch()
     _held_row(b, cm.PHASE_COMMITTED, 0.5)
     cluster.start('b')
     assert wait_for(lambda: (_row(b) or {}).get('phase') == cm.PHASE_RESTARTING, timeout=6)
     assert not _sql(a, "SELECT 1 FROM user_sessions WHERE session_id = :s", {'s': PREFIX + 'old'})
+    with a.app_context():
+        assert current_epoch() > epoch, 'the sessions begun before the restore still count'
     assert _sql(a, "SELECT count(*) FROM cluster_commands WHERE kind = 'restart' AND id > :f",
                 {'f': cluster.floor})[0][0] == 1
     # B has not restarted: still out of service, and never in between

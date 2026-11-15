@@ -29,7 +29,6 @@ from services.policy_service import PolicyViolation
 from services.protocol_approval import RENEWED_REVOKED, AlreadyIssued
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
-from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
 from utils import key_algorithms
 from utils.issuance_defaults import default_issue_key_type
 from utils.key_type import validate_enrollment_csr
@@ -141,12 +140,6 @@ def _x509_name_from_dn_components(dn_components, email=None):
         attrs.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, email))
     return x509.Name(attrs)
 
-# Why a SHA-1 CSR fails is_signature_valid, and what to tell the client about
-# it, is written once in utils/csr_diagnostics — EST had the same copy.
-_WEAK_CSR_HASH_ALGORITHMS = WEAK_CSR_HASH_ALGORITHMS
-_weak_csr_hash_algorithm = weak_csr_hash_algorithm
-
-
 def _is_naked_csr(csr):
     """No CN and no SubjectAlternativeName at all -- what real Windows GPO
     machine autoenrollment deliberately submits for machine templates,
@@ -197,13 +190,8 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
         except Exception:
             signature_valid = False
         if not signature_valid:
-            weak_algo = _weak_csr_hash_algorithm(csr)
-            if weak_algo:
-                return (
-                    f'CSR signed with an unsupported hash algorithm ({weak_algo}); '
-                    'use SHA-256 or stronger'
-                )
-            return 'CSR signature invalid (proof of possession failed)'
+            from utils.csr_diagnostics import weak_csr_hash_error
+            return weak_csr_hash_error(csr) or 'CSR signature invalid (proof of possession failed)'
 
     if not allow_naked_subject and _is_naked_csr(csr):
         return 'CSR subject must include a non-empty CN or a SubjectAltName'

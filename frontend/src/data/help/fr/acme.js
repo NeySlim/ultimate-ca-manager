@@ -19,7 +19,7 @@ export default {
         items: [
           { label: 'Client', text: 'Demander des certificats depuis tout CA ACME, Let\'s Encrypt, ZeroSSL, HARICA ou personnalisé' },
           { label: 'Onglet des orders (v2.219)', text: 'Les orders du client ont leur propre onglet « Let\'s Encrypt orders » dans la barre latérale, avec compteur visibles/total et filtre de statut, à l\'image de la vue Local orders' },
-          { label: 'Comptes CA externes', text: 'Un ou plusieurs comptes par CA, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let\'s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let\'s Encrypt Production' },
+          { label: 'Autorités de certification (CA)', text: 'Un ou plusieurs comptes par CA, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let\'s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let\'s Encrypt Production' },
           { label: 'Serveur personnalisé', text: 'Définir une URL de répertoire ACME personnalisée pour utiliser tout CA conforme RFC 8555' },
           { label: 'EAB', text: 'Prise en charge de la liaison de compte externe pour les CA nécessitant une pré-inscription (ZeroSSL, HARICA, etc.)' },
           { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 pour les clés de certificat ; ML-DSA n\'est pas proposé sur un build qui ne l\'inclut pas, ni en mode FIPS quand le module FIPS ne l\'approuve pas. Un défaut configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048 (v2.248)' },
@@ -30,19 +30,19 @@ export default {
           { label: 'Domaines', text: 'Associer des domaines aux fournisseurs DNS pour la validation automatique' },
           { label: 'HTTP-01', text: 'UCM sert le fichier de challenge de ses orders en attente sur /.well-known/acme-challenge/ via le port du protocole HTTP (8080 par défaut) : redirigez ce chemin depuis le port 80 du domaine vers UCM. Verify vérifie d\'abord le fichier, et les orders HTTP-01 se renouvellent automatiquement' },
           { label: "Renouvellement en place (v2.251)", text: "Un renouvellement conserve l'id et le refid du certificat : la liaison HTTPS, les liaisons de déploiement et les webhooks le suivent. Les certificats que d'anciens renouvellements ont importés comme nouvelles lignes restent dans l'inventaire : archivez-les ou supprimez-les à la main" },
-          { label: "Orders interrompus (v2.251)", text: "Un order laissé en traitement par un redémarrage repasse en attente avec un message, prêt pour Verify Challenge, en 15 minutes environ. Un certificat que l'AC a émis avant un redémarrage ou un import échoué est récupéré par Check Status, la finalisation ou le prochain renouvellement" },
-          { label: "Orders en attente périmés (v2.251)", text: "La tâche de renouvellement supprime, avec leurs enregistrements TXT, les orders en attente depuis plus de 7 jours dont l'order chez l'AC a expiré ou dont l'expiration est inconnue, et audite chaque suppression. Les enregistrements TXT d'un order dont la validation a échoué sont supprimés dès qu'il est invalide" },
+          { label: "Orders interrompus (v2.251)", text: "Un order laissé en traitement par un redémarrage repasse en attente avec un message, prêt pour Verify Challenge, en 15 minutes environ. Un certificat que la CA a émis avant un redémarrage ou un import échoué est récupéré par Check Status, la finalisation ou le prochain renouvellement" },
+          { label: "Orders en attente périmés (v2.251)", text: "La tâche de renouvellement supprime, avec leurs enregistrements TXT, les orders en attente depuis plus de 7 jours dont l'order chez la CA a expiré ou dont l'expiration est inconnue, et audite chaque suppression. Les enregistrements TXT d'un order dont la validation a échoué sont supprimés dès qu'il est invalide" },
           { label: "Liste des orders (v2.251)", text: "L'onglet des orders Let's Encrypt charge tous les orders, jusqu'à 5000, quatre pages à la fois, et réessaie une page refusée en 429 après son Retry-After. Une page toujours manquante laisse les orders obtenus, avec un avis que la liste est partielle" },
           { label: "Échecs de renouvellement (v2.251)", text: "Un order affiche son nombre de renouvellements échoués, avec la dernière erreur et sa date. Après 5 échecs de renouvellement planifié, il est retenté une fois par jour, et chaque échec, manuel compris, émet l'événement acme_order.renewal_failed" },
           { label: "Renouvellement automatique par order (v2.251)", text: "Un order sélectionné affiche un interrupteur Renouvellement automatique qui arrête ou reprend son renouvellement. Supprimer un certificat après l'avoir révoqué désactive le renouvellement de son order, avec un message" },
           { label: "Un renouvellement à la fois (v2.251)", text: "Un renouvellement ou une finalisation verrouille son order : un second lancé entre-temps reçoit un 409, et le planificateur ignore l'order" },
-          { label: "Compte ou fournisseur manquant (v2.251)", text: "Un order dont le compte CA a été supprimé, dont le fournisseur DNS est désactivé, ou qui réutilise la clé d'un certificat supprimé s'arrête avant l'AC avec un message qui dit quoi faire. Supprimer ou désactiver un compte CA est refusé (409) tant que des orders émis se renouvellent par lui" },
-          { label: "Clés compromises (v2.251)", text: "Une clé révoquée pour compromission, quelle que soit l'AC qui a émis son certificat, est refusée (409) à la requête et avant qu'un renouvellement n'ouvre un order, même après la suppression de ce certificat. Un renouvellement réglé pour réutiliser une telle clé en génère une nouvelle" },
-          { label: "Révocation auprès de l'AC", text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
-          { label: "Révocation au renouvellement (v2.251)", text: "Avec Révoquer l'ancien certificat après renouvellement activé (ACME local › Politique de renouvellement), l'AC reçoit la raison locale quand c'est keyCompromise, affiliationChanged, superseded ou cessationOfOperation, et aucune sinon. Une révocation échouée est retentée par la tâche de renouvellement jusqu'à l'expiration du certificat, en émettant acme_order.revocation_failed" },
-          { label: "Seuil de renouvellement (v2.249)", text: "Le seuil Jours avant expiration s'applique quand l'AC ne suggère aucune fenêtre de renouvellement (ARI). Un certificat dont la durée de vie est inférieure à 1,5 fois ce seuil se renouvelle plutôt dans son dernier tiers" },
+          { label: "Compte ou fournisseur manquant (v2.251)", text: "Un order dont le compte CA a été supprimé, dont le fournisseur DNS est désactivé, ou qui réutilise la clé d'un certificat supprimé s'arrête avant la CA avec un message qui dit quoi faire. Supprimer ou désactiver un compte CA est refusé (409) tant que des orders émis se renouvellent par lui" },
+          { label: "Clés compromises (v2.251)", text: "Une clé révoquée pour compromission, quelle que soit la CA qui a émis son certificat, est refusée (409) à la requête et avant qu'un renouvellement n'ouvre un order, même après la suppression de ce certificat. Un renouvellement réglé pour réutiliser une telle clé en génère une nouvelle" },
+          { label: "Révocation auprès de la CA", text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette CA, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si la CA ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de la CA. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
+          { label: "Révocation au renouvellement (v2.251)", text: "Avec Révoquer l'ancien certificat après renouvellement activé (ACME local › Politique de renouvellement), la CA reçoit la raison locale quand c'est keyCompromise, affiliationChanged, superseded ou cessationOfOperation, et aucune sinon. Une révocation échouée est retentée par la tâche de renouvellement jusqu'à l'expiration du certificat, en émettant acme_order.revocation_failed" },
+          { label: "Seuil de renouvellement (v2.249)", text: "Le seuil Jours avant expiration s'applique quand la CA ne suggère aucune fenêtre de renouvellement (ARI). Un certificat dont la durée de vie est inférieure à 1,5 fois ce seuil se renouvelle plutôt dans son dernier tiers" },
           { label: "Noms longs (v2.249)", text: "Un premier nom de plus de 64 caractères est placé seul dans le nom alternatif du sujet, marqué critique, au lieu de faire échouer la finalisation" },
-          { label: "Domaine et wildcard (v2.252)", text: "Un order pour un domaine et son wildcard reçoit une valeur TXT par autorisation sous le nom partagé, et les fournisseurs DNS ajoutent chaque valeur à côté des autres. DuckDNS, Hurricane Electric et FreeDNS gardent une seule valeur par nom : un tel order est donc refusé avant d'interroger l'AC, tout comme un order DuckDNS qui nomme deux hôtes sous un même sous-domaine ; demandez-les dans des orders séparés, l'un après l'autre" },
+          { label: "Domaine et wildcard (v2.252)", text: "Un order pour un domaine et son wildcard reçoit une valeur TXT par autorisation sous le nom partagé, et les fournisseurs DNS ajoutent chaque valeur à côté des autres. DuckDNS, Hurricane Electric et FreeDNS gardent une seule valeur par nom : un tel order est donc refusé avant d'interroger la CA, tout comme un order DuckDNS qui nomme deux hôtes sous un même sous-domaine ; demandez-les dans des orders séparés, l'un après l'autre" },
           { label: "Nettoyage TXT (v2.252)", text: "Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l'apex qui partagent le nom, gardent la leur. DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu'une valeur par nom : ils l'effacent seulement si aucun autre order en cours n'utilise le nom" },
           { label: "Noms uniques (v2.251)", text: "Un nom de fournisseur DNS ou de compte CA externe déjà utilisé est refusé (409), à la création comme au renommage. La mise à jour a renommé les doublons existants « nom (2) », « nom (3) », du plus ancien au plus récent" },
           { label: "Équipe Vercel (v2.251)", text: "Le fournisseur Vercel accepte un Team ID facultatif pour les domaines appartenant à une équipe" },
@@ -75,11 +75,11 @@ export default {
       {
         title: 'Proxy ACME',
         items: [
-          { label: 'Compte CA en amont', text: 'Sélectionnez l\'un des comptes CA externes : son URL de répertoire (Let\'s Encrypt, ZeroSSL, tout CA RFC 8555) et ses identifiants EAB sont définis sur ce compte' },
+          { label: 'Compte CA en amont', text: 'Sélectionnez l\'un des comptes dans Autorités de certification (CA) : son URL de répertoire (Let\'s Encrypt, ZeroSSL, tout CA RFC 8555) et ses identifiants EAB sont définis sur ce compte' },
           { label: 'État du compte', text: 'Indique si UCM est enregistré auprès du CA en amont. Les comptes sont auto-enregistrés à la première requête proxy' },
           { label: 'Test de connexion', text: 'Vérifiez la connectivité avec le CA en amont et vérifiez si des identifiants EAB sont requis' },
           { label: 'Réinitialiser le compte', text: 'Effacez l\'inscription en amont du compte CA sélectionné pour forcer une nouvelle inscription' },
-          { label: 'Identifiants EAB', text: 'Identifiants External Account Binding pour les CAs qui les exigent (ex: ZeroSSL, Google Trust), saisis sur le compte CA dans Comptes CA externes' },
+          { label: 'Identifiants EAB', text: 'Identifiants External Account Binding pour les CAs qui les exigent (ex: ZeroSSL, Google Trust), saisis sur le compte CA dans Autorités de certification (CA)' },
           { label: 'Défis DNS', text: 'UCM gère les défis DNS-01 pour le compte des clients en utilisant les fournisseurs DNS configurés' },
           { label: 'Purge des certificats remplacés', text: 'Bascule opt-in : quand un ordre proxy se finalise, les certificats précédemment importés par des ordres proxy pour exactement le même ensemble de domaines sont supprimés. Les certificats révoqués sont toujours conservés ; les certificats hors proxy ne sont jamais touchés. Désactivé par défaut' },
                   { label: 'Pre-checks clients (v2.217)', text: 'Le proxy publie aussi les valeurs TXT dns-01 calculées avec la clé de compte de chaque client : les pre-checks de propagation de lego/Traefik/Caddy passent sans être désactivés, sauf sur DuckDNS, Hurricane Electric et FreeDNS, qui ne tiennent qu\'une valeur : désactivez-y le pre-check du client ; un new-order retenté renvoie l\'order encore pending du compte' },
@@ -98,7 +98,7 @@ export default {
         title: 'DNS UPDATE (RFC 2136) pour le proxy ACME',
         items: [
           { label: 'Fonction', text: 'Les clients utilisent leur solveur rfc2136 standard (certbot, lego, cert-manager, acme.sh, win-acme, Posh-ACME) et le dirigent vers UCM. UCM crée toujours l\'enregistrement TXT avec son propre fournisseur DNS' },
-          { label: 'Clés', text: 'Créez des clés pour chaque compte proxy dans Comptes CA externes. Une clé peut être liée à un identifiant EAB : elle ne fonctionne alors que pour les commandes du compte ACME enregistré avec cet identifiant. UCM affiche le secret une seule fois' },
+          { label: 'Clés', text: 'Créez des clés pour chaque compte proxy dans Autorités de certification (CA). Une clé peut être liée à un identifiant EAB : elle ne fonctionne alors que pour les commandes du compte ACME enregistré avec cet identifiant. UCM affiche le secret une seule fois' },
           { label: 'Modifications acceptées', text: 'UCM accepte uniquement un enregistrement TXT sous _acme-challenge avec la valeur qu\'il attend pour la commande. Il refuse les autres modifications. Il répond toujours NOERROR à une suppression' },
           { label: 'Port et réseau', text: 'Définissez le port du listener dans la section Proxy ACME (0 le désactive, 1024 à 65535, redémarrage nécessaire). À utiliser uniquement sur le réseau interne. Pour utiliser le port 53, redirigez-le dans Docker ou Kubernetes, ou avec le pare-feu' },
           { label: 'Algorithmes', text: 'hmac-sha256, hmac-sha384 et hmac-sha512. UCM refuse md5 et sha1, valeurs par défaut de nombreux clients : définissez l\'algorithme dans chaque client. cert-manager ne prend pas en charge sha384, et win-acme le calcule de façon incorrecte' },
@@ -161,10 +161,10 @@ export default {
         title: 'Validation DNS persistante (dns-persist-01)',
         content: 'Le serveur ACME local peut valider des domaines via un enregistrement TXT persistant lié au compte ACME (draft-ietf-acme-dns-persist) : renouvellement sans écriture DNS. Opt-in, désactivé par défaut.',
         items: [
-          { label: 'Enregistrement', text: 'Créez _validation-persist.<domaine> TXT "<domaine-émetteur>; accounturi=<URL du compte>", l\'objet challenge annonce les deux valeurs attendues' },
+          { label: 'Enregistrement', text: 'Créez _validation-persist.<domain> TXT "<issuer-domain>; accounturi=<account URL>", l\'objet challenge annonce les deux valeurs attendues' },
           { label: 'Activation', text: 'ACME → ACME local → Validation DNS persistante (dns-persist-01)' },
           { label: 'Wildcard / sous-domaines', text: 'Ajoutez policy=wildcard pour autoriser aussi les certificats wildcard et les sous-domaines du nom validé' },
-          { label: 'persistUntil', text: 'persistUntil=<timestamp unix> optionnel : bloque les nouvelles validations après cette date' },
+          { label: 'persistUntil', text: 'persistUntil=<unix timestamp> optionnel : bloque les nouvelles validations après cette date' },
           { label: 'Sécurité', text: 'L\'enregistrement donne au compte la capacité d\'émission tant qu\'il existe, supprimez le TXT pour la révoquer' },
         ]
       }
@@ -178,7 +178,7 @@ export default {
       'Les clés ECDSA P-256 offrent une sécurité équivalente à RSA-2048 avec une taille bien plus petite',
       'Utilisez les domaines locaux pour attribuer différentes CA à différents domaines internes',
       'Toute CA avec une clé privée peut être sélectionnée comme CA émettrice',
-      'Les domaines génériques (*.exemple.com) nécessitent la validation DNS-01',
+      'Les domaines génériques (*.example.com) nécessitent la validation DNS-01',
       'Chaque compte CA conserve sa propre inscription en amont : basculer le proxy sur un autre compte utilise celle de ce compte',
       'Utilisez l\'URL du proxy avec certbot : certbot certonly --server https://votre-serveur:port/acme/proxy/directory',
     ],
@@ -210,7 +210,7 @@ Gérez la configuration de votre client ACME :
 - **Renouvellements échoués** (v2.251) : la liste des orders affiche le nombre d'échecs et la dernière erreur ; après 5 échecs de renouvellement planifié, un order est retenté une fois par jour. L'interrupteur **Renouvellement automatique** d'un order sélectionné arrête ou reprend son renouvellement
 - **Liste des orders** (v2.251) : tous les orders sont chargés, quatre pages à la fois ; une page toujours manquante après ses nouvelles tentatives laisse un avis que la liste est partielle
 - **Clés compromises** (v2.251) : une clé révoquée pour compromission est refusée (409) à la requête et avant tout renouvellement qui ouvrirait un order
-- **Révocation auprès de l'AC** : Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu'à ce que l'AC confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
+- **Révocation auprès de la CA** : Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette CA, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si la CA ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu'à ce que la CA confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de la CA. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
 
 ### Serveur ACME personnalisé
 Utilisez tout CA conforme RFC 8555, pas seulement Let's Encrypt :
@@ -222,9 +222,9 @@ Utilisez tout CA conforme RFC 8555, pas seulement Let's Encrypt :
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Définissez l'URL du répertoire de votre CA comme **URL du répertoire ACME** de son compte dans **Comptes CA externes**.
+Définissez l'URL du répertoire de votre CA comme **URL du répertoire ACME** de son compte dans **Autorités de certification (CA)**.
 
-### Comptes CA externes
+### Autorités de certification (CA)
 Gérez tous les comptes externes avec lesquels UCM s'enregistre :
 
 - **Plusieurs comptes par CA autorisés** : plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let's Encrypt avec des e-mails de contact différents pour la séparation administrative, utile avec dns-persist-01). La ligne du compte, pas l'URL, sert d'identité.
@@ -237,7 +237,7 @@ Gérez tous les comptes externes avec lesquels UCM s'enregistre :
 Certains CA nécessitent des identifiants EAB pour lier votre compte ACME à un compte existant chez le CA :
 
 1. Inscrivez-vous sur le portail de votre CA pour obtenir le **Key ID EAB** et la **clé HMAC**
-2. Entrez les deux valeurs (**Identifiant de clé EAB**, **Clé HMAC EAB**) sur le compte CA dans **Comptes CA externes**
+2. Entrez les deux valeurs (**Identifiant de clé EAB**, **Clé HMAC EAB**) sur le compte CA dans **Autorités de certification (CA)**
 3. La clé HMAC est encodée en base64url (fournie par le CA)
 
 > 💡 EAB est requis par ZeroSSL, HARICA, Google Trust Services et la plupart des CA d'entreprise.
@@ -297,7 +297,7 @@ Pour les services DNS sans pilote natif, le fournisseur **Custom Command** exéc
 - \`TTL\` : TTL de l'enregistrement en secondes
 - \`ACTION\` : \`create\` ou \`delete\`
 
-La commande exige un **chemin binaire absolu**, s'exécute sans shell (ni pipes ni expansion) et est tuée après un timeout configurable (5–300 s, 60 par défaut). Utilisez un petit script wrapper pour relier n'importe quel outillage DNS externe.
+La commande exige un **chemin binaire absolu**, s'exécute sans shell (ni pipes ni expansion) et est tuée après un timeout configurable (5-300 s, 60 par défaut). Utilisez un petit script wrapper pour relier n'importe quel outillage DNS externe.
 
 ### Résolveurs DNS personnalisés
 **Résolveurs DNS-01** choisit où UCM recherche les enregistrements TXT \`_acme-challenge\` : **Automatique** (résolveurs listés, puis serveurs autoritaires de la zone, puis résolveurs publics, puis résolveur système), **Résolveur système uniquement** ou **Résolveurs listés uniquement**. Les modes restreints n'interrogent jamais les résolveurs publics, pour les réseaux qui les bloquent. Les entrées sont des IP séparées par des virgules avec un port optionnel, par ex. \`127.0.0.1:5353\` ou \`[2001:db8::53]:5300\`.
@@ -309,11 +309,11 @@ UCM sert le fichier de challenge de ses orders en attente sur \`/.well-known/acm
 Associez vos domaines aux fournisseurs DNS. Lors de la demande d'un certificat pour un domaine, UCM utilise le fournisseur associé pour créer les enregistrements de défi DNS-01.
 
 1. Cliquez sur **Ajouter un domaine**
-2. Entrez le nom de domaine (par ex. \`exemple.com\` ou \`*.exemple.com\`)
+2. Entrez le nom de domaine (par ex. \`example.com\` ou \`*.example.com\`)
 3. Sélectionnez le fournisseur DNS
 4. Cliquez sur **Enregistrer**
 
-> 💡 Les certificats génériques (\`*.exemple.com\`) nécessitent la validation DNS-01.
+> 💡 Les certificats génériques (\`*.example.com\`) nécessitent la validation DNS-01.
 
 
 ## Mode Proxy ACME
@@ -328,7 +328,7 @@ Le proxy ACME permet aux clients internes de demander des certificats à un CA p
 ### Configuration
 1. Allez dans **ACME** → onglet **Let's Encrypt**
 2. Faites défiler jusqu'à la section **Proxy ACME**
-3. Sélectionnez un **Compte CA en amont** dans **Comptes CA externes** (Let's Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
+3. Sélectionnez un **Compte CA en amont** dans **Autorités de certification (CA)** (Let's Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
 4. Cliquez sur **Tester la connexion** pour vérifier la connectivité avec le CA en amont
 5. Enregistrez le compte amont si nécessaire (email + **Enregistrer le compte**)
 6. UCM enregistre automatiquement un compte à la première requête proxy si ce n'est pas déjà fait
@@ -336,7 +336,7 @@ Le proxy ACME permet aux clients internes de demander des certificats à un CA p
 ### Chemins proxy dédiés (multi-CA)
 Chaque compte CA externe peut exposer son propre endpoint proxy ACME :
 
-1. Ouvrez **Comptes CA externes** (même onglet Let's Encrypt)
+1. Ouvrez **Autorités de certification (CA)** (même onglet Let's Encrypt)
 2. Modifiez ou créez un compte CA
 3. Activez **Exposer via le proxy ACME**
 4. Définissez un **Chemin proxy (slug)** unique : ex. \`actalis-production\`, \`letsencrypt-staging\`
@@ -344,12 +344,12 @@ Chaque compte CA externe peut exposer son propre endpoint proxy ACME :
 
 Les clients utilisent :
 \`\`\`
-https://votre-serveur-ucm:8443/acme/proxy/<slug>/directory
+https://your-ucm-server:8443/acme/proxy/<slug>/directory
 \`\`\`
 
 Le chemin par défaut legacy reste disponible pour le compte sélectionné dans les réglages proxy :
 \`\`\`
-https://votre-serveur-ucm:8443/acme/proxy/directory
+https://your-ucm-server:8443/acme/proxy/directory
 \`\`\`
 
 Slugs réservés (interdits) : \`directory\`, \`new-order\`, \`challenge\`, \`acct\`, etc.
@@ -372,18 +372,18 @@ Dirigez vos clients ACME internes vers le répertoire proxy du CA cible.
 
 **URL par slug** (recommandé lorsque plusieurs CAs sont exposés) :
 \`\`\`
-https://votre-serveur-ucm:8443/acme/proxy/<slug>/directory
+https://your-ucm-server:8443/acme/proxy/<slug>/directory
 \`\`\`
 
 **URL par défaut** (compte sélectionné dans les réglages proxy) :
 \`\`\`
-https://votre-serveur-ucm:8443/acme/proxy/directory
+https://your-ucm-server:8443/acme/proxy/directory
 \`\`\`
 
 Exemple avec certbot (remplacez \`<slug>\` par votre slug CA) :
 \`\`\`
 certbot certonly \\
-  --server https://votre-serveur-ucm:8443/acme/proxy/<slug>/directory \\
+  --server https://your-ucm-server:8443/acme/proxy/<slug>/directory \\
   --preferred-challenges dns-01 \\
   --authenticator manual \\
   --manual-auth-hook /bin/true \\
@@ -392,7 +392,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 Les identifiants EAB du compte CA en amont sont distincts de l'EAB client : ils authentifient UCM auprès du CA en amont, pas vos clients auprès de UCM. Définissez-les sur ce compte dans **Comptes CA externes**.
+> 💡 Les identifiants EAB du compte CA en amont sont distincts de l'EAB client : ils authentifient UCM auprès du CA en amont, pas vos clients auprès de UCM. Définissez-les sur ce compte dans **Autorités de certification (CA)**.
 
 > ⚠ Prérequis : le domaine (ou un domaine parent couvrant les sous-domaines) doit être configuré dans ACME Domains avec un fournisseur DNS. Le proxy ne gère que dns-01.
 
@@ -447,7 +447,7 @@ acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<
 
 ### URL du répertoire ACME
 \`\`\`
-https://votre-serveur:8443/acme/directory
+https://your-server:8443/acme/directory
 \`\`\`
 
 Les clients comme certbot, acme.sh ou Caddy utilisent cette URL pour découvrir les points de terminaison ACME.
@@ -456,7 +456,7 @@ Les clients comme certbot, acme.sh ou Caddy utilisent cette URL pour découvrir 
 Associez des domaines internes à des CA spécifiques. Cela permet à différents domaines d'être signés par différentes CA.
 
 1. Cliquez sur **Ajouter un domaine**
-2. Entrez le domaine (par ex. \`interne.corp\` ou \`*.dev.local\`)
+2. Entrez le domaine (par ex. \`internal.corp\` ou \`*.dev.local\`)
 3. Sélectionnez la **CA émettrice**
 4. Activez/désactivez l'**approbation automatique**
 5. Cliquez sur **Enregistrer**
@@ -541,7 +541,7 @@ L'objet challenge annonce les valeurs attendues \`accounturi\` et \`issuer-domai
 
 ### Options
 - \`policy=wildcard\` : autorise aussi les certificats wildcard et les sous-domaines du nom validé (un enregistrement sur un domaine parent couvre ses enfants)
-- \`persistUntil=<timestamp-unix>\` : bloque les nouvelles validations après cette date
+- \`persistUntil=<unix-timestamp>\` : bloque les nouvelles validations après cette date
 
 > ⚠️ L'enregistrement donne la capacité d'émission à la clé du compte ACME tant qu'il existe : supprimez le TXT pour la révoquer.
 
@@ -549,37 +549,37 @@ L'objet challenge annonce les valeurs attendues \`accounturi\` et \`issuer-domai
 
 \`\`\`
 # Enregistrer un compte (Let's Encrypt : par défaut)
-certbot register --agree-tos --email admin@exemple.com
+certbot register --agree-tos --email admin@example.com
 
 # Enregistrer avec un CA ACME personnalisé + EAB
 certbot register \\
   --server 'https://acme.zerossl.com/v2/DV90' \\
-  --eab-kid 'votre-key-id' \\
-  --eab-hmac-key 'votre-cle-hmac' \\
-  --agree-tos --email admin@exemple.com
+  --eab-kid 'your-key-id' \\
+  --eab-hmac-key 'your-hmac-key' \\
+  --agree-tos --email admin@example.com
 
 # Demander un certificat avec clé ECDSA
-certbot certonly --server https://votre-serveur:8443/acme/directory \\
-  --standalone -d monserveur.interne.corp \\
+certbot certonly --server https://your-server:8443/acme/directory \\
+  --standalone -d myserver.internal.corp \\
   --key-type ecdsa --elliptic-curve secp256r1
 
 # Renouveler
-certbot renew --server https://votre-serveur:8443/acme/directory
+certbot renew --server https://your-server:8443/acme/directory
 \`\`\`
 
 ## Utiliser acme.sh
 
 \`\`\`
 # Par défaut (Let's Encrypt)
-acme.sh --issue -d exemple.com --standalone
+acme.sh --issue -d example.com --standalone
 
 # CA ACME personnalisé avec EAB et ECDSA
 acme.sh --issue \\
   --server 'https://acme-v02.harica.gr/acme/TOKEN/directory' \\
-  --eab-kid 'votre-key-id' \\
-  --eab-hmac-key 'votre-cle-hmac' \\
+  --eab-kid 'your-key-id' \\
+  --eab-hmac-key 'your-hmac-key' \\
   --keylength ec-256 \\
-  -d exemple.com --standalone
+  -d example.com --standalone
 \`\`\`
 
 > ⚠ Pour ACME interne, les clients doivent faire confiance à la CA UCM. Installez le certificat de la CA racine dans le magasin de confiance du client.

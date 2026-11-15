@@ -19,6 +19,8 @@ class Certificate(db.Model):
                  postgresql_where=text("caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''")),
         # Finds the certificates of a CA carrying a subject (migration 157)
         db.Index('ix_certificates_caref_subject_key', 'caref', 'subject_key'),
+        # The work queue looks up a later certificate of the same CN in the same CA (migration 139)
+        db.Index('ix_certificates_caref_subject_cn', 'caref', 'subject_cn'),
     )
     
     id = db.Column(db.Integer, primary_key=True)

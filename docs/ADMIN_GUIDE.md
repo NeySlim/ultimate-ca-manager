@@ -160,10 +160,10 @@ The same recommendation applies to any directory holding TLS keys or HSM PINs (`
 
 #### Reverse proxy & trusted_proxies (since v2.142)
 
-If you terminate TLS on a reverse proxy (Nginx, Traefik, HAProxy, NPM) and forward client info to UCM via headers, declare the proxy CIDR(s) in **Settings → Security → Trusted proxies**:
+If you terminate TLS on a reverse proxy (Nginx, Traefik, HAProxy, NPM) and forward client info to UCM via headers, declare the proxy addresses or CIDR networks in the `UCM_TRUSTED_PROXIES` environment variable:
 
 ```
-security.trusted_proxies = 10.0.0.5/32, 192.168.10.0/24
+UCM_TRUSTED_PROXIES=10.0.0.5,192.168.10.0/24
 ```
 
 This affects:
@@ -345,7 +345,7 @@ A restore **replaces** the instance with the archive: for every section the arch
 - An archive written by an older version is repaired as the migrations repaired the source: legacy EAB keys, dead and `ldap_*` settings, SAML providers, group permissions, duplicated ACME renewal orders.
 - ACME client orders: a merge keeps the order here when it is further along, was renewed or is being finalized since the archive was taken; a replacement restores the archived one and names the certificate it gives up.
 - Revocations: a merge never lowers a revocation made here, final or a suspension, of a certificate or a CA, with or without its revocation record; an archive that revokes it for good replaces a suspension, and between two revocations of the same weight the earlier date stays.
-- Every session is revoked and a restart is requested. A restore is refused (409) while a backend migration, another restore or a backup is running.
+- Every session is revoked and a restart is requested: no session begun before the restore is accepted after it, the restoring operator's included, on every node and whatever the session store (files, database or Redis). A restore is refused (409) while a backend migration, another restore or a backup is running.
 - In HA mode the other nodes refuse writes for the whole restore and restart in turn after it: see [HA.md](HA.md#restoring-a-backup).
 
 Archives are written as format v4: a sequence of chunks of at most 8 MB, each authenticated on its own, so a backup is created and read section by section without ever being held whole. The upload is spooled to `DATA_DIR/tmp` and each section is kept there, encrypted under a key held only in memory, until the restore needs it. When `DATA_DIR/tmp` is missing and cannot be created, or is not writable, the upload is spooled to the system temporary directory and the sections to a directory of the instance's own under it, named after a hash of `DATA_DIR`. At startup each worker removes stale stores from the directory its restores use, and only after taking the backup lock: when the lock cannot be taken, nothing is removed. Decryption and the checks made before the restore plan hold about one section at a time; the plan and the writes hold every section the archive carries. A v4 archive has no size limit unless `BACKUP_MAX_ARCHIVE_MB` sets one. Archives written before 3.0 (v1 to v3) are still restored, up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it. A reverse proxy in front of UCM applies its own body limit.

@@ -718,7 +718,8 @@ class CSROperationsMixin:
         if key_err:
             raise RequestRejected(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
-            raise RequestRejected("CSR has invalid signature")
+            from utils.csr_diagnostics import weak_csr_hash_error
+            raise RequestRejected(weak_csr_hash_error(csr) or "CSR has invalid signature")
         related_a = _verified_related_certificate(csr, cert_type)
 
         # Effective subject: an override (if any) wins outright; otherwise

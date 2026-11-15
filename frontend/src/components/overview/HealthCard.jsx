@@ -39,7 +39,8 @@ function Bars({ periods }) {
 function summary(name, p, t) {
   if (name === 'tsa') {
     const key = p.state === 'unusable' ? `overview.health.tsaReason.${p.reason}` : `overview.health.tsaState.${p.state}`
-    return { text: t(key, { count: p.days_left, defaultValue: p.state }), alert: Boolean(p.alert) }
+    return { text: t(key, { count: p.days_left, defaultValue: p.state }), alert: Boolean(p.alert),
+      warning: p.severity === 'warning' }
   }
   if (WITNESSES.includes(name)) {
     if (p.state === 'unavailable') return { text: t('overview.health.witness.unavailable'), alert: true }
@@ -69,11 +70,12 @@ export function HealthCard() {
       <ul className="flex flex-col gap-2">
         {present.map((name) => {
           const p = protocols[name]
-          const { text, alert } = summary(name, p, t)
+          const { text, alert, warning } = summary(name, p, t)
           const label = t(`overview.health.${name}`)
           const link = rowLink(name, can)
           return (
             <li key={name} data-testid={`health-${name}`} data-alert={alert ? 'true' : 'false'}
+              data-severity={alert ? (warning ? 'warning' : 'critical') : undefined}
               className="flex items-center justify-between gap-3">
               {link
                 ? <Link to={link} className="text-sm text-text-primary hover:text-accent-primary">{label}</Link>
@@ -81,7 +83,7 @@ export function HealthCard() {
               <span className="flex items-center gap-3 text-xs text-text-secondary">
                 {Array.isArray(p.periods) && <Bars periods={p.periods} />}
                 {name === 'scheduler' && <span>{t('overview.health.tasks')} {num(p.tasks)}</span>}
-                <span className={alert ? 'text-status-danger font-medium' : undefined}>{text}</span>
+                <span className={alert ? `${warning ? 'text-status-warning' : 'text-status-danger'} font-medium` : undefined}>{text}</span>
                 {name !== 'tsa' && !WITNESSES.includes(name) && <span>{p.last_operation_at ? formatDate(p.last_operation_at) : '–'}</span>}
               </span>
             </li>

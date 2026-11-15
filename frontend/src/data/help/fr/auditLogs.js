@@ -18,7 +18,7 @@ export default {
         title: 'Actions',
         items: [
           { label: 'Exporter', text: 'Télécharger les journaux au format JSON ou CSV' },
-          { label: 'Nettoyage', text: 'Purger les anciens journaux avec une rétention configurable (jours)' },
+          { label: 'Nettoyer les anciens journaux', text: 'Purger les anciens journaux avec une rétention configurable (jours)' },
           { label: 'Vérifier l\'intégrité', text: 'Vérifier l\'intégrité de la chaîne de journaux pour détecter les altérations' },
         ]
       },
@@ -80,9 +80,9 @@ Les exportations n'appliquent que la plage de dates, jusqu'à 10 000 entrées : 
 ## Nettoyage
 
 Purgez les anciens journaux selon la période de rétention :
-1. Cliquez sur **Nettoyage**
+1. Cliquez sur **Nettoyer les anciens journaux**
 2. Définissez la période de rétention en jours
-3. Confirmez le nettoyage
+3. Cliquez sur **Supprimer les anciens journaux**
 
 > ⚠ Le nettoyage des journaux est irréversible. Exportez les journaux importants avant la purge.
 
