@@ -392,10 +392,13 @@ def default_for_write(actor=None, fill=True):
                 profile = default_profile()
                 if profile is not None:
                     break
-            except OperationalError:
+            except OperationalError as e:
                 # SQLite: two writers that both read meet as a lock, and the winner commits only once
-                # this read lock is let go; safe only while the session holds nothing of the caller's
-                if db.session.get_bind().dialect.name != 'sqlite' or db.session.new or db.session.dirty or db.session.deleted:
+                # this read lock is let go; safe only while the session holds nothing of the caller's.
+                # Any other failure (read-only database, full disk) is raised as it is
+                locked = any(word in str(e.orig).lower() for word in ('locked', 'busy'))
+                if (not locked or db.session.get_bind().dialect.name != 'sqlite'
+                        or db.session.new or db.session.dirty or db.session.deleted):
                     raise
                 db.session.rollback()
                 time.sleep(0.05 * (_attempt + 1))

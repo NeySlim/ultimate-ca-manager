@@ -1111,3 +1111,26 @@ def test_two_sqlite_writers_creating_the_default_profile_leave_one_and_no_error(
     finally:
         sessions.remove()
         engine.dispose()
+
+
+def test_a_sqlite_write_error_that_is_not_a_lock_is_raised_as_it_is(app, monkeypatch):
+    """A read-only database or a full disk must name itself, not hide behind retries."""
+    from sqlalchemy import event
+    from sqlalchemy.exc import OperationalError
+    from services import windows_profiles
+
+    with app.app_context():
+        if db.session.get_bind().dialect.name != 'sqlite':
+            pytest.skip('the retry is SQLite only')
+        monkeypatch.setattr(windows_profiles, 'default_profile', lambda: None)
+
+        def refuse(session, flush_context, instances):
+            raise OperationalError('INSERT', {}, Exception('attempt to write a readonly database'))
+
+        event.listen(db.session, 'before_flush', refuse)
+        try:
+            with pytest.raises(OperationalError, match='readonly database'):
+                windows_profiles.default_for_write(actor='tester')
+        finally:
+            event.remove(db.session, 'before_flush', refuse)
+            db.session.rollback()
