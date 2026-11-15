@@ -513,9 +513,9 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         refusal = _start_refusal(target_engine, has_users)
         if refusal:
             raise PreflightError(refusal)
-        if has_users and unverified:
+        if unverified:
             # The marker proves only that a switch built this schema on a target without accounts:
-            # whatever the auth tables hold now, an instance's accounts included, is replaced
+            # whatever the auth tables hold now, with or without accounts, is replaced
             stats["target_written"] = True
             _empty_auth_tables(target_engine)
         elif has_users:

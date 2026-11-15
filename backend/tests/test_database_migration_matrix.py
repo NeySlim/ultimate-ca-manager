@@ -1419,6 +1419,45 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
             self, app, pg_target, monkeypatch):
         self._refused_then_retried_unordered(app, pg_target, monkeypatch)
 
+    def _refused_then_retried_without_accounts(self, app, target, monkeypatch):
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            with app.app_context():
+                ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is False and _marker_kinds(target) == {'switch'}, message
+
+        # The accounts removed by hand, the rest of the unverified copy left behind
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('DELETE FROM users'))
+                left = sum(conn.execute(text(f'SELECT COUNT(*) FROM "{t}"')).scalar()
+                           for t in migration.BOOTSTRAP_AUTH_TABLES if t != 'users')
+        finally:
+            engine.dispose()
+        assert left, 'the source holds no auth row besides its accounts: nothing is proven'
+
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+            source = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
+        assert ok is True and stats['validation']['ok'] is True, message
+        assert _usernames(target) == source
+        assert _marker_kinds(target) is None
+
+    def test_a_retry_over_a_copy_left_without_accounts_copies_again_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._refused_then_retried_without_accounts(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_retry_over_a_copy_left_without_accounts_copies_again_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._refused_then_retried_without_accounts(app, pg_target, monkeypatch)
+
     def _killed_before_verification(self, app, target, monkeypatch):
         def killed(*args, **kwargs):
             raise _Killed()
