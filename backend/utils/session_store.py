@@ -142,6 +142,8 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
 
     @retry_query()
     def _record_exists(self, store_id):
+        # An expired row counts too: the cookie then names that expired identifier, never
+        # a renewed one, so deleting the row and the cookie is right.
         model = self.sql_session_model
         with self._store() as s:
             return s.query(model.id).filter_by(session_id=store_id).first() is not None
