@@ -716,8 +716,9 @@ def test_the_release_downloads_every_rpm_artifact_it_builds():
     yaml = pytest.importorskip('yaml')
     jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
     built = {b['artifact'] for b in jobs['build-rpm']['strategy']['matrix']['include']}
+    # Downloads by pattern (image SBOMs and digests) name no artifact
     fetched = {s['with']['name'] for s in jobs['release']['steps']
-               if str(s.get('uses', '')).startswith('actions/download-artifact')}
+               if str(s.get('uses', '')).startswith('actions/download-artifact') and 'name' in s['with']}
     assert built <= fetched, built - fetched
 
 
