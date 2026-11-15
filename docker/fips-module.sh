@@ -11,10 +11,11 @@ fips_module_mac() {
 # computes must equal the one recorded when the image was built, or the module was modified
 install_fips_module() {
     local module=$1 run_dir=$2 reference=$3 expected actual out
-    # the provider loads fips.so from OPENSSL_MODULES when set: only the checked directory
-    if [ -n "${OPENSSL_MODULES+set}" ] && { [ -z "$OPENSSL_MODULES" ] \
+    # the provider loads fips.so from OPENSSL_MODULES when set: only the checked directory, as an
+    # absolute path (a relative one names another directory in the process that loads the module)
+    if [ -n "${OPENSSL_MODULES+set}" ] && { [ "${OPENSSL_MODULES#/}" = "$OPENSSL_MODULES" ] \
         || [ "$(realpath -m -- "$OPENSSL_MODULES")" != "$(realpath -m -- "$(dirname -- "$module")")" ]; }; then
-        echo -e "${RED:-}❌ OPENSSL_MODULES ($OPENSSL_MODULES) points outside the directory of the checked FIPS module ($(dirname -- "$module"))${NC:-}"
+        echo -e "${RED:-}❌ OPENSSL_MODULES ($OPENSSL_MODULES) is not the absolute path of the directory of the checked FIPS module ($(dirname -- "$module"))${NC:-}"
         echo "   Remove OPENSSL_MODULES: UCM does not start FIPS mode on a module it has not checked."
         return 1
     fi

@@ -164,6 +164,13 @@ def test_openssl_modules_elsewhere_is_refused_neg(bench, modules):
     assert list((bench / 'run').iterdir()) == []
 
 
+def test_a_relative_openssl_modules_is_refused_neg(bench):
+    # relative to the entrypoint's directory here, to another one in the process that loads fips.so
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), OPENSSL_MODULES=os.path.relpath(bench))
+    assert rc == 1 and 'continued' not in out and 'OPENSSL_MODULES' in out
+    assert list((bench / 'run').iterdir()) == []
+
+
 def test_build_records_the_mac_the_runtime_compares_pos(bench):
     # the build writes the reference with fips_module_mac from the same helper
     cnf = bench / 'build.cnf'
