@@ -23,7 +23,7 @@ Then `kubectl -n ucm port-forward svc/ucm 8443:8443` and open <https://localhost
 
 ## One instance, or several with `ha.enabled`
 
-By default UCM runs as **one replica** (`replicaCount: 1`, `strategy: Recreate`) on a **SQLite** database (single writer) on a RWO volume. Do not raise `replicaCount` on its own: two pods would share neither the database nor the volume.
+By default UCM runs as **one replica** (`replicaCount: 1`, `strategy: Recreate`) on a **SQLite** database (single writer) on a RWO volume. Do not raise `replicaCount` on its own: on SQLite two pods would share neither the database nor the volume.
 
 For several pods set `ha.enabled=true`, `database.type=postgresql` and `replicaCount` >= 2: the pods share the PostgreSQL database, one of them runs the scheduled tasks, and a rolling update replaces them one at a time. See `docs/HA.md`.
 

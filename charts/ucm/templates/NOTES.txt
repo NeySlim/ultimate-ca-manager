@@ -51,7 +51,7 @@ IMPORTANT
 - Sessions are shared by the nodes, so no affinity is needed. The ingress must
   pass the WebSocket upgrade (live updates); Kerberos endpoints need source-address affinity.
 {{- else }}
-- This chart runs a SINGLE instance (replicaCount=1) on a single-writer SQLite DB.
+- This chart runs a SINGLE instance (replicaCount=1).
   To run several nodes, set ha.enabled=true with PostgreSQL (see docs/HA.md).
 - The "{{ include "ucm.etcPvcName" . }}" PVC holds /etc/ucm/master.key, which
   decrypts every private key in the database. It is annotated to survive a
