@@ -386,10 +386,12 @@ class MicrosoftCAInventoryMixin:
     def _close_known(msca, req, variants):
         """Mark a pending request issued and link it to the certificate UCM already
         holds with that serial; a concurrent completion (cert_id set) wins."""
-        cert_id = next((cid for cid, raw in
-                        db.session.query(Certificate.id, Certificate.serial_number)
-                        .filter(Certificate.serial_number.isnot(None)).all()
-                        if MicrosoftCAInventoryMixin._db_serial_variants(raw) & variants), None)
+        # Stored serials are the decimal of the integer (step 144); the hex spellings
+        # cover rows that step left as they were, read both ways as _db_serial_variants does
+        forms = {f for v in variants for f in (str(v), format(v, 'x'), format(v, 'X'))}
+        cert_id = (db.session.query(Certificate.id)
+                   .filter(Certificate.serial_number.in_(sorted(forms)))
+                   .order_by(Certificate.id).limit(1).scalar())
         MSCARequest.query.filter(
             MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
             MSCARequest.status == 'pending',

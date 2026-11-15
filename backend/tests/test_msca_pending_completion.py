@@ -481,3 +481,33 @@ def test_check_leaves_the_session_usable_after_a_failed_statement(app, monkeypat
             MicrosoftCAService.check_request(msca_id, req_id)
         req = db.session.get(MSCARequest, req_id)
         assert (req.status, req.cert_id) == ('pending', None)
+
+
+def test_closing_a_known_request_looks_up_its_serial_not_the_whole_store(app, ca):
+    from sqlalchemy import event
+    from models import Certificate, MicrosoftCA, MSCARequest, db
+    from services.msca.inventory import MicrosoftCAInventoryMixin
+    msca_id = _make_msca(app, 'PC targeted')
+    serial = ca.add(970, 'pc-targeted.test.local')
+    pem = ca.rows[-1]['pem']
+    req_id, _ = _pending(app, msca_id, 970, 'pc-targeted.test.local', with_csr=False)
+    with app.app_context():
+        cert = Certificate(refid='pc-targeted', descr='manual', crt=base64.b64encode(pem.encode()).decode(),
+                           subject_cn='pc-targeted.test.local', serial_number=serial.upper())
+        db.session.add(cert)
+        db.session.commit()
+        statements = []
+
+        def record(conn, cursor, statement, *a):
+            statements.append(statement)
+
+        event.listen(db.engine, 'before_cursor_execute', record)
+        try:
+            MicrosoftCAInventoryMixin._close_known(
+                db.session.get(MicrosoftCA, msca_id), db.session.get(MSCARequest, req_id),
+                MicrosoftCAInventoryMixin._serial_int_variants(serial))
+        finally:
+            event.remove(db.engine, 'before_cursor_execute', record)
+        cert_reads = [s for s in statements if 'FROM certificates' in s]
+        assert cert_reads and all('serial_number IN' in s for s in cert_reads), cert_reads
+        assert db.session.get(MSCARequest, req_id).cert_id == cert.id
