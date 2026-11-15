@@ -231,6 +231,35 @@ def test_the_est_path_records_the_most_specific_common_name(app, create_ca, key)
             db.session.commit()
 
 
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+@pytest.mark.parametrize('cn_value', ['', None])
+def test_the_est_path_keeps_an_empty_cn_and_falls_back_only_without_one(app, create_ca, key, cn_value):
+    """A CN present but empty is recorded empty; only a subject without a CN records its DN."""
+    import uuid
+
+    from models import CA, Certificate, db
+    from services.ca_service import CAService
+
+    tag = uuid.uuid4().hex[:8]
+    attrs = [x509.NameAttribute(NameOID.ORGANIZATION_NAME, f'Empty CN {tag}')]
+    if cn_value is not None:
+        attrs.append(x509.NameAttribute(NameOID.COMMON_NAME, cn_value, _validate=False))
+    csr = x509.CertificateSigningRequestBuilder().subject_name(x509.Name(attrs)).sign(key, hashes.SHA256())
+    ca_id = create_ca(cn=f'RDN empty CN CA {tag}')['id']
+    with app.app_context():
+        pem, _serial = CAService.sign_csr_from_crypto(
+            ca=db.session.get(CA, ca_id), csr=csr, validity_days=5,
+            source='est', cert_type='device_cert')
+        leaf = x509.load_pem_x509_certificate(pem.encode())
+        row = Certificate.query.filter_by(serial_number=str(leaf.serial_number)).one()
+        try:
+            expected = '' if cn_value == '' else leaf.subject.rfc4514_string()
+            assert row.subject_cn == expected
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
 def _import_pem(auth_client, subject, key, tag, ca=False, san=None):
     """Sign `subject` (self-signed when `ca`) and run it through /import/execute."""
     import json
