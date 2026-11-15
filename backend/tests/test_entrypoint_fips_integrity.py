@@ -88,6 +88,7 @@ def test_empty_or_malformed_reference_is_refused_neg(bench, content):
     rc, out = _run(bench, _reference(bench, content))
     assert rc == 1 and 'continued' not in out
     assert 'missing, unreadable or malformed' in out and 'modified' not in out
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log']
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason='root reads a mode 000 file')
@@ -158,6 +159,7 @@ def test_openssl_modules_elsewhere_is_refused_neg(bench, modules):
     (bench / 'other').mkdir()
     rc, out = _run(bench, _reference(bench, BUILD_MAC), OPENSSL_MODULES=modules.format(bench=bench))
     assert rc == 1 and 'continued' not in out and 'OPENSSL_MODULES' in out
+    assert 'realpath' not in out
     # refused before fipsinstall: nothing written in the run directory
     assert list((bench / 'run').iterdir()) == []
 
