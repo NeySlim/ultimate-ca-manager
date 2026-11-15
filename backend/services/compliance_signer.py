@@ -39,6 +39,13 @@ def softhsm_provider(provider):
     return softhsm_config(provider.type, provider.get_config(), provider.name)
 
 
+def opensc_provider(provider):
+    """Whether an HSM provider row opens a smart card through OpenSC: a reader attached to one host."""
+    if provider is None or provider.type != 'pkcs11':
+        return False
+    return 'opensc' in str((provider.get_config() or {}).get('module_path') or '').lower()
+
+
 # Providers whose keys are all in hardware; a cloud key says so key by key
 _HARDWARE_PROVIDERS = ('pkcs11', 'aws-cloudhsm')
 _CLOUD_PROVIDERS = ('azure-keyvault', 'google-kms')

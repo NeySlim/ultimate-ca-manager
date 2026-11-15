@@ -332,12 +332,16 @@ class SSHCAService:
         if ca_type not in SSHCertificateAuthority.VALID_CA_TYPES:
             raise ValueError(f"Invalid CA type: {ca_type}. Must be 'user' or 'host'.")
 
-        from models.hsm import HsmKey
+        from services.hsm import HsmService, key_binding
         from services.hsm.hsm_private_key import load_hsm_private_key
 
-        key_row = db.session.get(HsmKey, hsm_key_id)
+        # Binding checks, before the token is asked anything: the row lock holds to the commit
+        key_row = key_binding.lock_key(hsm_key_id)
         if not key_row:
             raise ValueError(f"HSM key {hsm_key_id} not found")
+        key_binding.refuse_node_local_in_ha(key_row.provider)
+        key_binding.refuse_bound_key(key_row)
+        HsmService.refuse_signing_in_fips_mode(key_row)
 
         # Raises when the key is not a signing key or its type is unsupported.
         wrapper = load_hsm_private_key(hsm_key_id)
@@ -363,13 +367,12 @@ class SSHCAService:
                 f"an SSH CA key must be one of them")
 
         fingerprint = SSHCAService._compute_fingerprint(public_key)
-        # The same token key may back one user CA and one host CA (OpenSSH keeps
-        # the roles separate); a second CA of the same role would be a duplicate.
-        existing = SSHCertificateAuthority.query.filter_by(
-            fingerprint=fingerprint, ca_type=ca_type).first()
+        # Another key row naming the same token key is the same key (one CA per key, PROTOCOL.krl)
+        existing = SSHCertificateAuthority.query.filter_by(fingerprint=fingerprint).first()
         if existing:
-            raise ValueError(
-                f"An SSH {ca_type} CA with this HSM key already exists: {existing.descr}")
+            raise key_binding.HsmKeyBound(
+                f"HSM key '{key_row.label}' already backs the SSH {existing.ca_type} CA "
+                f"'{existing.descr}': an HSM key backs one authority only")
 
         if default_ttl is None:
             default_ttl = DEFAULT_USER_TTL if ca_type == 'user' else DEFAULT_HOST_TTL

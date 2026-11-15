@@ -161,20 +161,18 @@ class TestCreateHsmSshCa:
         finally:
             stop()
 
-    def test_one_key_backs_a_user_and_a_host_ca(self, app, hsm_key):
-        """OpenSSH keeps the two roles separate, so one token key may serve both."""
+    def test_one_key_backs_one_ca_whatever_its_role(self, app, hsm_key):
+        """One SSH CA per key: user and host CAs on one key would share a KRL serial space."""
         hsm = hsm_key(ec.generate_private_key(ec.SECP384R1()), 'EC-P384')
         stop = _with_hsm(hsm)
         try:
             with app.app_context():
                 user = SSHCAService.import_hsm_ca(
                     descr='Token user CA', ca_type='user', hsm_key_id=hsm['hsm_key_id'])
-                host = SSHCAService.import_hsm_ca(
-                    descr='Token host CA', ca_type='host', hsm_key_id=hsm['hsm_key_id'])
-                assert user.fingerprint == host.fingerprint
-                assert user.ca_type == 'user' and host.ca_type == 'host'
+                with pytest.raises(ValueError, match="already backs the SSH user CA 'Token user CA'"):
+                    SSHCAService.import_hsm_ca(
+                        descr='Token host CA', ca_type='host', hsm_key_id=hsm['hsm_key_id'])
                 SSHCAService.delete_ca(user.id)
-                SSHCAService.delete_ca(host.id)
         finally:
             stop()
 
@@ -185,7 +183,7 @@ class TestCreateHsmSshCa:
             with app.app_context():
                 ca = SSHCAService.import_hsm_ca(
                     descr='First user CA', ca_type='user', hsm_key_id=hsm['hsm_key_id'])
-                with pytest.raises(ValueError, match='already exists'):
+                with pytest.raises(ValueError, match='already backs'):
                     SSHCAService.import_hsm_ca(
                         descr='Second user CA', ca_type='user', hsm_key_id=hsm['hsm_key_id'])
                 SSHCAService.delete_ca(ca.id)
@@ -301,7 +299,7 @@ class TestHsmSshCaApi:
             assert r.status_code == 201, r.data
             r = auth_client.delete(f"/api/v2/hsm/keys/{hsm['hsm_key_id']}")
             assert r.status_code == 409, r.data
-            assert 'depend on it' in json.loads(r.data)['detail']
+            assert "it backs the SSH user CA 'API token CA'" in json.loads(r.data)['detail']
         finally:
             stop()
             with app.app_context():
