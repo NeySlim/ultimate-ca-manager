@@ -596,6 +596,16 @@ jobs:
         run: |
           cd frontend
           npm test -- --run
+
+      - name: Lint
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Check the locale files are in sync
+        run: |
+          cd frontend
+          npm run check:i18n
   
   build-test:
     name: Docker Build Test
