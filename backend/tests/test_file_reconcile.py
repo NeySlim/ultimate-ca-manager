@@ -254,3 +254,12 @@ def test_the_files_task_runs_on_every_node(app):
     from services.scheduler_service import get_scheduler
     task = get_scheduler().tasks['files_reconcile']
     assert task.per_node and task.interval == 60
+
+
+def test_an_unreadable_marker_means_a_full_pass(app, issued, writes, regen):
+    with app.app_context():
+        regen.reconcile_files(full=True)
+        issued['crt'].write_bytes(b'differs from the row')
+        (issued['crt'].parent / regen.MARKER_NAME).write_bytes(b'\xff\xfe truncated')
+        assert regen.reconcile_if_behind()['status'] == 'done'
+        assert issued['crt'].read_bytes() == issued['pem']
