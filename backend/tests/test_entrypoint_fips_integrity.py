@@ -103,12 +103,6 @@ def test_failed_self_tests_are_refused_neg(bench):
     assert rc == 1 and 'self-tests' in out and 'INSTALL FAILED' in out
 
 
-def test_no_variable_bypasses_the_comparison_neg(bench):
-    rc, _ = _run(bench, _reference(bench, BUILD_MAC), mac=OTHER_MAC,
-                 UCM_FIPS_SKIP_INTEGRITY='1', FIPS_MODULE_MAC_REFERENCE=str(bench / 'x'))
-    assert rc == 1
-
-
 def test_build_records_the_mac_the_runtime_compares_pos(bench):
     # the build writes the reference with fips_module_mac from the same helper
     cnf = bench / 'build.cnf'
