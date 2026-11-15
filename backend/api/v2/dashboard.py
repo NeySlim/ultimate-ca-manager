@@ -17,7 +17,7 @@ from utils.pagination import parse_request_limit
 # /dashboard/activity loaded and serialised the whole audit table for any
 # authenticated account.
 DASHBOARD_MAX_ROWS = 100
-from models import db, CA, Certificate
+from models import db, CA, Certificate, SystemConfig
 from utils.cert_status import (
     expired_condition, expiring_condition, issued_certificates,
     pending_requests, revoked_condition, valid_condition,
@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('dashboard_v2', __name__)
 
 # A dedicated TSA signer within this many days of expiry shows as `warning` on
-# the System Health widget. Matches the auto-renewal window used further down.
-TSA_SIGNER_WARN_DAYS = 30
+# the System Health widget; the overview alerts at the same threshold.
+from services.dashboard_aggregates import TSA_SIGNER_WARN_DAYS  # noqa: E402
 
 
 def _scep_ca_usable(ca):
@@ -241,6 +241,10 @@ def get_expiring_certificates():
         text("SELECT value FROM system_config WHERE key = 'tsa_signer_cert_refid'")
     ).scalar() or None
 
+    # Delegated OCSP responders are infrastructure too: their expiry ends OCSP answers for the CA
+    ocsp_refids = {row.value for row in SystemConfig.query.filter(
+        SystemConfig.key.startswith('ocsp_responder_cert_', autoescape=True)).all() if row.value}
+
     return success_response(data=[{
         'id': cert.id,
         'refid': cert.refid,
@@ -250,6 +254,7 @@ def get_expiring_certificates():
         'valid_from': utc_isoformat(cert.valid_from),
         'valid_to': utc_isoformat(cert.valid_to),
         'is_tsa_signer': bool(tsa_signer_refid) and cert.refid == tsa_signer_refid,
+        'is_ocsp_responder': cert.refid in ocsp_refids,
     } for cert in certs])
 
 
