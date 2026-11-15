@@ -239,22 +239,26 @@ class StagedFiles:
         """
         published: List[Path] = []
         directories: Dict[Path, None] = {}
+        failed = None
         try:
+            # Journal, then every capture, then their directories synced, then the first
+            # rename: no destination changes before what it held is durable beside it
             self._write_journals()
             for position, entry in enumerate(self._entries):
+                failed = entry.destination
                 self._capture_previous(entry, position)
+            for kept_dir in self._kept_dirs.values():
+                _fsync_directory(kept_dir)
+            for entry in self._entries:
+                failed = entry.destination
                 if self._publish(entry):
                     directories[entry.destination.parent] = None
                 published.append(entry.destination)
-            # The kept contents first, so no rename is durable without what it replaced
-            for kept_dir in self._kept_dirs.values():
-                _fsync_directory(kept_dir)
+            failed = None
             # Each directory once, after its renames: none is durable before this returns
             for directory in directories:
                 _fsync_directory(directory)
         except Exception:
-            failed = (self._entries[len(published)].destination
-                      if len(published) < len(self._entries) else None)
             logger.error(
                 "Restore: publishing %s failed after %d file(s); restoring "
                 "their previous content", failed, len(published))

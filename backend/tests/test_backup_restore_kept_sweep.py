@@ -105,7 +105,7 @@ def test_a_restore_killed_after_its_commit_keeps_what_it_published(dirs):
 
 
 def test_a_restore_killed_halfway_through_publishing_is_put_back(dirs, monkeypatch):
-    # Killed while replacing the second of three: the third was never kept nor touched
+    # Killed while replacing the second of three: the third was kept, never touched
     paths = [dirs['certs'] / f'c{index}.crt' for index in range(3)]
     for index, path in enumerate(paths):
         path.write_bytes(b'old %d' % index)

@@ -329,7 +329,7 @@ class TestPublicationCost:
     def test_kept_contents_are_durable_before_the_renames(self, monkeypatch, tmp_path):
         # A power cut must not keep a rename and lose the previous content it replaced
         events = []
-        real_fsync, real_link = os.fsync, os.link
+        real_fsync, real_link, real_replace = os.fsync, os.link, os.replace
 
         def key(path):
             info = os.stat(path)
@@ -344,7 +344,11 @@ class TestPublicationCost:
             if Path(target).name == 'previous_000001':
                 raise OSError(errno.EXDEV, 'cross-device')    # this one is copied
             real_link(source, target, *args, **kwargs)
-            events.append(('link', key(Path(target).parent)))
+
+        def replace(source, target, *args, **kwargs):
+            real_replace(source, target, *args, **kwargs)
+            if Path(target) in destinations:
+                events.append(('rename', Path(target)))
 
         directory = tmp_path / 'out'
         directory.mkdir()
@@ -356,6 +360,7 @@ class TestPublicationCost:
             staged.stage(destination, b'new')
         monkeypatch.setattr(os, 'fsync', fsync)
         monkeypatch.setattr(os, 'link', link)
+        monkeypatch.setattr(os, 'replace', replace)
         try:
             staged.publish()
             kept_dir = next(directory.glob('.ucm_restore_kept_*'))
@@ -364,10 +369,12 @@ class TestPublicationCost:
         finally:
             monkeypatch.undo()
             staged.discard()
-        last_sync = max(i for i, event in enumerate(events) if event == ('sync', key(directory)))
-        last_link = max(i for i, event in enumerate(events) if event == ('link', kept))
-        assert ('sync', kept) in events[last_link + 1:last_sync], 'kept directory'
-        assert ('sync', copy) in events[:last_sync], 'copy'
+        first_rename = min(i for i, event in enumerate(events) if event[0] == 'rename')
+        assert [event for event in events if event[0] == 'rename'] == [
+            ('rename', destination) for destination in destinations]
+        assert ('sync', copy) in events[:first_rename], 'copy'
+        last_capture_sync = max(i for i, event in enumerate(events) if event == ('sync', kept))
+        assert last_capture_sync < first_rename, 'kept directory after a rename'
 
     def test_each_directory_is_fsynced_after_its_last_rename(self, monkeypatch, tmp_path):
         # The lower bound: a rename is durable only once its directory entry is synced
