@@ -48,8 +48,54 @@ def _dispose(*applications):
             db.engine.dispose()
 
 
+@pytest.fixture
+def redis_server(tmp_path):
+    """A throwaway redis-server on a free loopback port, gone with the test."""
+    import shutil
+    import socket
+    import subprocess
+    import time
+    binary = shutil.which('redis-server')
+    if not binary:
+        pytest.skip('redis-server not installed')
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', 0))
+        port = probe.getsockname()[1]
+    proc = subprocess.Popen([binary, '--port', str(port), '--bind', '127.0.0.1', '--save', '',
+                             '--appendonly', 'no', '--dir', str(tmp_path)],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    import redis
+    client = redis.Redis(host='127.0.0.1', port=port)
+    try:
+        for _ in range(100):
+            try:
+                client.ping()
+                break
+            except redis.ConnectionError:
+                time.sleep(0.05)
+        else:
+            pytest.fail('redis-server did not start')
+        yield f'redis://127.0.0.1:{port}/0', client
+    finally:
+        client.close()
+        proc.terminate()
+        proc.wait(timeout=10)
+
+
+def _redis_store_app(monkeypatch, url, redis_url):
+    from config.settings import TestingConfig
+    from utils.db_url import sqlalchemy_url
+    monkeypatch.setenv('REDIS_URL', redis_url)
+    monkeypatch.setattr(TestingConfig, 'SQLALCHEMY_DATABASE_URI', sqlalchemy_url(url))
+    monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'redis')
+    monkeypatch.setattr(TestingConfig, 'SESSION_KEY_PREFIX', 'ucm:session:', raising=False)
+    from app import create_app
+    return create_app('testing')
+
+
 @pytest.fixture(params=[
     'files',
+    'redis',
     'sql-sqlite',
     pytest.param('sql-postgresql', marks=[
         pytest.mark.postgres,
@@ -60,6 +106,18 @@ def nodes(request, app, monkeypatch, tmp_path):
     from tests import pg_app_harness
     if request.param == 'files':
         yield app, app
+        return
+    if request.param == 'redis':
+        if pg_app_harness.ENABLED:
+            pytest.skip('Redis store over a file database, not meaningful in PostgreSQL mode')
+        server_url, _client = request.getfixturevalue('redis_server')
+        node = _redis_store_app(monkeypatch, f'sqlite:///{tmp_path / "redis-sessions.db"}',
+                                server_url)
+        try:
+            assert node.config['SESSION_TYPE'] == 'redis'
+            yield node, node
+        finally:
+            _dispose(node)
         return
     if request.param == 'sql-sqlite':
         if pg_app_harness.ENABLED:
@@ -326,8 +384,11 @@ def test_a_request_served_during_the_renewal_neither_restores_nor_resends_the_ol
                 # the version check empties the session it loaded
                 assert AuthManager().authenticate_request(request) is None
             response = second_node.response_class()
-            second_node.session_interface.save_session(second_node, flask_session, response)
+            iface = second_node.session_interface
+            iface.save_session(second_node, flask_session, response)
             assert not any(h.startswith('session=') for h in response.headers.getlist('Set-Cookie'))
+            old_sid = iface._unsign(second_node, before) if iface.use_signer else before
+            assert not iface._record_exists(iface._get_store_id(old_sid))
         stale = first_node.test_client()
         stale.set_cookie('session', before)
         refused = stale.get('/api/v2/account/profile')

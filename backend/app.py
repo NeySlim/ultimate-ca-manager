@@ -331,6 +331,9 @@ def create_app(config_name=None):
         elif app.config.get('SESSION_TYPE') == 'filesystem':
             from utils.session_store import GuardedFileSystemSessionInterface
             GuardedFileSystemSessionInterface.adopt(app)
+        elif app.config.get('SESSION_TYPE') == 'redis':
+            from utils.session_store_redis import GuardedRedisSessionInterface
+            GuardedRedisSessionInterface.adopt(app)
 
     # Ensure session directory exists with correct permissions (filesystem mode).
     # Session files contain CSRF tokens and authenticated user IDs — anyone with
