@@ -8,9 +8,9 @@ Fix: open a single transactional ``Connection`` via ``engine.begin()`` and
 hand THAT to ``mod.upgrade(conn)``. SQLite path was unaffected.
 
 This test guards against re-introduction of the regression by:
-  1. Asserting the source of `_run_pending_pg` calls `engine.begin()` and
-     passes the resulting `conn` to `mod.upgrade()` (static guard, runs in
-     the SQLite CI job too — fast, no Postgres needed).
+  1. Running `_run_pending_pg` against a recording engine and checking that
+     `mod.upgrade()` receives the transaction's Connection (runs in the
+     SQLite CI job too, no Postgres needed).
   2. When `UCM_TEST_POSTGRES_URL` is set (PG CI job only), running an actual
      migration against a real PostgreSQL instance and asserting it applied.
 
@@ -19,7 +19,6 @@ skipped in plain SQLite runs.
 """
 from __future__ import annotations
 
-import inspect
 import os
 import textwrap
 
@@ -30,28 +29,61 @@ import pytest
 # Static guard — runs in every CI job (no PG needed)
 # ---------------------------------------------------------------------------
 
-def test_run_pending_pg_uses_connection_not_engine():
-    """`_run_pending_pg` must hand a Connection (via engine.begin()) to upgrade(),
-    NOT the engine itself. This is the exact regression of #103/#104."""
+class _RecordingEngine:
+    """An engine that hands out one recording connection per transaction: no server needed."""
+
+    def __init__(self):
+        self.connections, self.committed = [], []
+
+    def begin(self):
+        engine = self
+
+        class _Conn:
+            def __init__(self):
+                self.statements = []
+
+            def execute(self, statement, params=None):
+                self.statements.append((str(statement), params))
+
+            def __enter__(self):
+                engine.connections.append(self)
+                return self
+
+            def __exit__(self, kind, value, tb):
+                if kind is None:
+                    engine.committed.append(self)
+                return False
+        return _Conn()
+
+
+def _migration(directory, name, body):
+    (directory / f"{name}.py").write_text(textwrap.dedent(body).lstrip())
+
+
+def test_run_pending_pg_uses_connection_not_engine(tmp_path, monkeypatch):
+    """`_run_pending_pg` hands upgrade() the Connection of the transaction that also
+    records it, never the engine: the exact regression of #103/#104."""
     import migration_runner
 
-    src = inspect.getsource(migration_runner._run_pending_pg)
+    _migration(tmp_path, "999_conn_probe", """
+        pg_compatible = True
+        RECEIVED = []
 
-    # Must open a transactional connection.
-    assert "engine.begin()" in src, (
-        "_run_pending_pg must use `with engine.begin() as conn:` — "
-        "regression of #103/#104 (engine vs. connection)."
-    )
+        def upgrade(conn):
+            RECEIVED.append(conn)
+    """)
+    monkeypatch.setattr(migration_runner, "MIGRATIONS_DIR", tmp_path)
+    loaded = []
+    real_load = migration_runner._load_module
+    monkeypatch.setattr(migration_runner, "_load_module",
+                        lambda path: loaded.append(real_load(path)) or loaded[-1])
+    engine = _RecordingEngine()
 
-    # Must pass the conn (not engine) to mod.upgrade.
-    # We allow either `mod.upgrade(conn)` or any call that names the conn.
-    assert "mod.upgrade(conn)" in src, (
-        "_run_pending_pg must call `mod.upgrade(conn)`, not `mod.upgrade(engine)`. "
-        "Migration modules expect a Connection."
-    )
-    assert "mod.upgrade(engine)" not in src, (
-        "Found `mod.upgrade(engine)` in _run_pending_pg — this is the #103 bug."
-    )
+    assert migration_runner._run_pending_pg(engine, ["999_conn_probe"], dry_run=False) is True
+    (conn,) = engine.committed
+    assert loaded[0].RECEIVED == [conn]
+    # The registry row is written in that same transaction
+    assert [params for _sql, params in conn.statements] == [{"n": "999_conn_probe"}]
 
 
 def _migration_sources():
@@ -172,22 +204,36 @@ def test_pg_paths_never_commit_or_roll_back():
     assert not offenders, f"commit or rollback outside the SQLite path: {offenders}"
 
 
-def test_runner_rejects_modern_migration_without_pg_compatible():
-    """The runner must raise (return False) when a migration numbered >= 020
-    lacks `pg_compatible = True`, instead of silently marking it applied.
-    """
+def test_runner_rejects_modern_migration_without_pg_compatible(tmp_path, monkeypatch):
+    """A migration numbered >= 020 without `pg_compatible = True` stops the run:
+    nothing of it or after it is applied or recorded (silent skip was #115)."""
     import migration_runner
 
-    src = inspect.getsource(migration_runner._run_pending_pg)
-    # Must reference the threshold and refuse to continue.
-    assert "PG_COMPATIBLE_REQUIRED_FROM" in src, (
-        "Runner must check PG_COMPATIBLE_REQUIRED_FROM threshold; "
-        "silent-skip caused issue #115."
-    )
-    assert "return False" in src, (
-        "Runner must return False (hard fail) on missing pg_compatible "
-        "for modern migrations, not silently skip."
-    )
+    _migration(tmp_path, "025_sqlite_only", """
+        def upgrade(conn):
+            raise AssertionError('a migration that is not pg_compatible ran')
+    """)
+    _migration(tmp_path, "026_after", """
+        pg_compatible = True
+
+        def upgrade(conn):
+            raise AssertionError('the run went on past a refused migration')
+    """)
+    # Below the threshold the same file is a legacy one: recorded, not run
+    _migration(tmp_path, "010_legacy", """
+        def upgrade(conn):
+            raise AssertionError('a legacy SQLite-only migration ran on PostgreSQL')
+    """)
+    monkeypatch.setattr(migration_runner, "MIGRATIONS_DIR", tmp_path)
+
+    legacy = _RecordingEngine()
+    assert migration_runner._run_pending_pg(legacy, ["010_legacy"], dry_run=False) is True
+    assert [p for _s, p in legacy.committed[0].statements] == [{"n": "010_legacy"}]
+
+    engine = _RecordingEngine()
+    assert migration_runner._run_pending_pg(
+        engine, ["025_sqlite_only", "026_after"], dry_run=False) is False
+    assert engine.connections == []
 
 
 # ---------------------------------------------------------------------------

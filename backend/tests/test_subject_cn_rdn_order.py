@@ -112,19 +112,58 @@ def test_subject_without_a_common_name_is_none_not_a_crash():
     assert subject_common_name(subject) is None
 
 
-def test_both_recorders_use_the_shared_helper():
-    """They had drifted into two copies of the same wrong derivation; a third
-    copy appearing is how this comes back."""
-    import inspect
+def _multi_cn_csr(key, tag):
+    return (x509.CertificateSigningRequestBuilder()
+            .subject_name(_subject(f'web-{tag}.example.com', f'admin-{tag}.example.com'))
+            .sign(key, hashes.SHA256()))
 
-    from services.cert.mixins import csr as csr_mixin
-    from services.scep import scep_service
 
-    for module in (csr_mixin, scep_service):
-        source = inspect.getsource(module)
-        assert 'subject_common_name(' in source, (
-            f'{module.__name__} should derive its CN through the shared helper'
-        )
-        assert "startswith('CN=')" not in source, (
-            f'{module.__name__} still splits an RFC 4514 string to find a CN'
-        )
+def test_the_csr_signing_path_records_the_first_common_name(app, auth_client, create_ca, key):
+    """Uploaded then signed through the API: the row names the first CN."""
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    pem = _multi_cn_csr(key, tag).public_bytes(serialization.Encoding.PEM).decode()
+    ca_id = create_ca(cn=f'RDN order CA {tag}')['id']
+    r = auth_client.post('/api/v2/csrs/upload', json={'pem': pem, 'name': f'rdn-{tag}'})
+    assert r.status_code in (200, 201), r.data
+    csr_id = r.get_json()['data']['id']
+    r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert db.session.get(Certificate, csr_id).subject_cn == f'web-{tag}.example.com'
+
+
+def test_the_scep_path_records_the_first_common_name(app, create_ca, key):
+    """Issued by the SCEP service: the row names the first CN too."""
+    import base64
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from models import CA, Certificate, SCEPRequest, db
+    from services.scep.scep_service import SCEPService
+
+    tag = uuid.uuid4().hex[:8]
+    csr = _multi_cn_csr(key, tag)
+    ca_id = create_ca(cn=f'RDN order SCEP CA {tag}')['id']
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        req = SCEPRequest(transaction_id=f'rdn-{tag}', ca_refid=ca.refid, status='pending',
+                          csr=base64.b64encode(csr.public_bytes(serialization.Encoding.DER)).decode(),
+                          subject=csr.subject.rfc4514_string())
+        db.session.add(req)
+        db.session.flush()
+        refid = SCEPService(ca_refid=ca.refid, auto_approve=True)._auto_approve_request(req, csr)
+        db.session.commit()
+        row = Certificate.query.filter_by(refid=refid).one()
+        try:
+            assert row.subject_cn == f'web-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.delete(req)
+            db.session.commit()

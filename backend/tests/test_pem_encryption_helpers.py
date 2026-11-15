@@ -17,49 +17,9 @@ Affected sites (originally only #105 was patched, this test also guards):
 """
 from __future__ import annotations
 
-import inspect
 import os
 
 import pytest
-
-
-# ---------------------------------------------------------------------------
-# Static guards — fast, no DB needed
-# ---------------------------------------------------------------------------
-
-@pytest.mark.parametrize(
-    "module_path,must_use,must_not_use",
-    [
-        # ACME client service (latent #105-class bug)
-        (
-            "services.acme.acme_client_service",
-            ["encrypt_text", "decrypt_text"],
-            ["encrypt_private_key(", "decrypt_private_key("],
-        ),
-        # ACME server account creation (latent #105-class bug)
-        (
-            "api.v2.acme.accounts",
-            ["encrypt_text"],
-            ["encrypt_private_key("],
-        ),
-    ],
-)
-def test_module_uses_text_encryption_for_pem(module_path, must_use, must_not_use):
-    import importlib
-    mod = importlib.import_module(module_path)
-    src = inspect.getsource(mod)
-
-    for needed in must_use:
-        assert needed in src, (
-            f"{module_path} must use security.encryption.{needed} for PEM at rest "
-            f"(regression of #105-class bug)."
-        )
-    for forbidden in must_not_use:
-        assert forbidden not in src, (
-            f"{module_path} still uses {forbidden} on raw PEM. "
-            f"That helper b64-decodes its input and crashes on PEM. "
-            f"Use encrypt_text/decrypt_text instead."
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -124,3 +84,44 @@ def test_encrypt_text_is_noop_when_encryption_disabled(monkeypatch, tmp_path):
     pem = "-----BEGIN PRIVATE KEY-----\nXYZ\n-----END PRIVATE KEY-----\n"
     assert enc_mod.encrypt_text(pem) == pem
     assert enc_mod.decrypt_text(pem) == pem
+
+
+def test_acme_server_account_key_is_stored_encrypted(app, auth_client, encryption_enabled):
+    """Created through the route, the account key is encrypt_text output and reads back.
+
+    The ACME client account key goes through the same helper: see
+    test_acme_proxy_key_encrypted.test_proxy_account_key_encrypted_at_rest.
+    """
+    import json
+    import uuid
+
+    from cryptography.hazmat.primitives import serialization
+
+    from api.v2.acme.accounts import _public_jwk
+    from models import AcmeAccount, SystemConfig, db
+    from security.encryption import decrypt_text
+
+    from security import encryption as enc_mod
+    # The no-op test above reloads without a key: load this module's one again
+    enc_mod.KeyEncryption().reload()
+    assert enc_mod.KeyEncryption().is_enabled
+
+    email = f'pem-{uuid.uuid4().hex[:8]}@example.test'
+    r = auth_client.post('/api/v2/acme/accounts', json={'email': email, 'agree_tos': True})
+    assert r.status_code == 200, r.data
+    account_id = r.get_json()['data']['account_id']
+    key = f'acme.account.{account_id}.private_key'
+    try:
+        with app.app_context():
+            stored = SystemConfig.query.filter_by(key=key).one().value
+            jwk = json.loads(AcmeAccount.query.filter_by(account_id=account_id).one().jwk)
+        assert '-----BEGIN' not in stored, 'the account key is stored in clear'
+        private = serialization.load_pem_private_key(decrypt_text(stored).encode(), None)
+        # The stored key is the one the account's JWK publishes
+        assert _public_jwk(private) == jwk
+    finally:
+        # Encrypted under a key this module discards: nothing may outlive it
+        with app.app_context():
+            SystemConfig.query.filter_by(key=key).delete()
+            AcmeAccount.query.filter_by(account_id=account_id).delete()
+            db.session.commit()

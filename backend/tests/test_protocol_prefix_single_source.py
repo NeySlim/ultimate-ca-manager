@@ -99,26 +99,34 @@ def test_acme_directory_still_allowed_on_the_acme_vhost(split_topology, app):
         assert check_host_access('/acme/directory', 'acme.ucm.example.com') is None
 
 
-def test_https_redirect_exemption_uses_the_shared_list():
-    """``app.py`` must not keep a second copy of the prefixes."""
-    import inspect
+def test_https_redirect_exempts_exactly_the_protocol_paths(app, monkeypatch):
+    """Over http, a protocol client is answered in place; an admin page is upgraded."""
+    from config.settings import config
+    from tests.fresh_app import fresh_app
 
-    import app as app_module
+    monkeypatch.setattr(config['testing'], 'HTTP_REDIRECT', True)
+    with fresh_app() as redirecting:
+        client = redirecting.test_client()
+        for path in _PROTOCOL_PATHS + ('/acme/directory',):
+            response = client.get(path, base_url='http://ucm.example.test')
+            assert response.status_code != 301, f'{path} was sent to https'
+        for path in _ADMIN_PAGES + ('/', '/certificates'):
+            response = client.get(path, base_url='http://ucm.example.test')
+            assert response.status_code == 301, f'{path} stayed on http'
+            assert response.headers['Location'].startswith('https://ucm.example.test')
 
-    source = inspect.getsource(app_module.create_app)
-    assert "'/ADPolicyProvider_CEP_', '/ADCertificateService_CES_'," not in source, (
-        'app.py still inlines its own protocol prefix tuple')
-    assert 'PROTOCOL_PREFIXES' in source or 'is_public_protocol_path' in source
 
-
-def test_spa_catch_all_uses_the_shared_list():
-    import inspect
-
-    from api import ui_routes
-
-    source = inspect.getsource(ui_routes)
-    assert "'ADPolicyProvider_CEP_', 'ADCertificateService_CES_'," not in source, (
-        'ui_routes.py still inlines its own protocol prefix tuple')
+def test_spa_catch_all_leaves_protocol_paths_to_404(client):
+    """An unknown path under a protocol prefix is a 404, not the SPA's index page."""
+    for prefix in PROTOCOL_PREFIXES:
+        if prefix == '/ocsp/':
+            continue  # GET /ocsp/<request> is the RFC 6960 endpoint itself
+        response = client.get(f'{prefix}no-such-route/x/y')
+        assert response.status_code == 404, prefix
+        assert not response.content_type.startswith('text/html'), prefix
+    for page in _ADMIN_PAGES[:3]:
+        response = client.get(page)
+        assert response.status_code == 200 and response.content_type.startswith('text/html'), page
 
 
 def test_csrf_exemption_covers_every_protocol_path():

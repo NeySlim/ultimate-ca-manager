@@ -43,20 +43,6 @@ class TestMtlsIssuanceScope:
             f'read-only role obtained a CA-signed certificate: {r.data!r}'
         )
 
-    def test_route_declares_an_issuance_permission(self):
-        """The decorator must carry a scope, not a bare @require_auth()."""
-        import inspect
-
-        import api.v2.mtls as mtls_module
-
-        source = inspect.getsource(mtls_module)
-        marker = source.index('def create_mtls_certificate')
-        decorators = source[:marker]
-        # The decorator immediately preceding the handler must name a scope.
-        last_require = decorators.rindex('@require_auth')
-        assert decorators[last_require:].startswith("@require_auth(['"), (
-            'create_mtls_certificate is guarded by a bare @require_auth()'
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -736,24 +722,40 @@ class TestRecoveryCodeLengthCap:
         assert len(code) == 19, code
         assert len(code) > 10, 'the old [:10] cap would truncate this'
 
-    def test_login_handler_cap_admits_a_full_recovery_code(self):
-        """The cap in the 2FA verify handler must exceed 19 characters."""
-        import inspect
-        import re
+    def test_login_handler_cap_admits_a_full_recovery_code(self, app):
+        """A 19-character recovery code signs in through the 2FA route, once."""
+        import secrets
 
-        import api.v2.auth_methods as auth_methods
+        import pyotp
 
-        source = inspect.getsource(auth_methods)
-        caps = [
-            int(m) for m in
-            re.findall(r"str\(data\['code'\]\)\.strip\(\)\.upper\(\)\[:(\d+)\]", source)
-        ]
-        assert caps, 'could not locate the 2FA code length cap'
-        for cap in caps:
-            assert cap >= 19, (
-                f'2FA code truncated to {cap} chars — a 19-char recovery code '
-                'can never match'
-            )
+        from models import User, db
+        from models.user import UserSession
+        from utils.backup_codes import hash_codes
+
+        code = '-'.join(secrets.token_hex(2).upper() for _ in range(4))
+        username = f'recovery_route_{secrets.token_hex(4)}'
+        with app.app_context():
+            user = User(username=username, email=f'{username}@test.local', role='viewer',
+                        active=True, totp_secret=pyotp.random_base32(), totp_confirmed=True,
+                        backup_codes=hash_codes([code]))
+            user.set_password('Recovery-Route-Pass1!')
+            db.session.add(user)
+            db.session.commit()
+            user_id = user.id
+        try:
+            for attempt, expected in ((code, 200), (code, 401)):
+                client = app.test_client()
+                r = client.post('/api/v2/auth/login/password', json={
+                    'username': username, 'password': 'Recovery-Route-Pass1!'})
+                assert r.status_code == 200, r.data
+                r = client.post('/api/v2/auth/login/2fa', json={'code': attempt})
+                # The second use of the same code is refused: single use
+                assert r.status_code == expected, r.data
+        finally:
+            with app.app_context():
+                UserSession.query.filter_by(user_id=user_id).delete()
+                db.session.delete(db.session.get(User, user_id))
+                db.session.commit()
 
     def test_full_length_code_round_trips_through_consume(self, app):
         """End-to-end: a full 19-char code is accepted and consumed once."""
