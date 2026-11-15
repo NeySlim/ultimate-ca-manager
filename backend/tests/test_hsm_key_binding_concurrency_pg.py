@@ -1,7 +1,7 @@
 """An X.509 and an SSH CA created at once on one HSM key: one is created, the other refused.
 
 Both creations lock the hsm_keys row before checking either table (services.hsm.key_binding);
-the first one pauses after its checks, so without the lock the second one would pass them too.
+the first one pauses after its binding check, so without the lock the second one would pass them too.
 """
 import json
 import os
@@ -54,12 +54,12 @@ def _create_x509(key_id):
 
 def _race(app, key_id, first, second):
     """Run *first* then *second* on one key, *first* pausing after its checks; their outcomes."""
-    from services.hsm import HsmService
+    from services.hsm import key_binding
     checked, outcome = threading.Event(), {}
-    real_refusal = HsmService.refuse_signing_in_fips_mode
+    real_refusal = key_binding.refuse_bound_key
 
-    def pause_first(key, fetch=True):
-        real_refusal(key, fetch)
+    def pause_first(key):
+        real_refusal(key)
         if threading.current_thread().name == 'first':
             checked.set()
             time.sleep(PAUSE)
@@ -75,7 +75,7 @@ def _race(app, key_id, first, second):
                 outcome[name] = ('refused', str(e))
             db.session.remove()
 
-    with patch.object(HsmService, 'refuse_signing_in_fips_mode', side_effect=pause_first):
+    with patch.object(key_binding, 'refuse_bound_key', side_effect=pause_first):
         threads = [threading.Thread(target=run, name='first', args=('first', first)),
                    threading.Thread(target=run, name='second', args=('second', second))]
         for t in threads:
@@ -133,5 +133,5 @@ def test_an_x509_and_an_ssh_ca_racing_on_one_key_on_sqlite(app, tmp_path, order)
         with patch('services.hsm.HsmService.sign', side_effect=_sign_with(real)), \
                 patch('services.hsm.HsmService.get_public_key', return_value=pub):
             outcome = _race(app, key_id, first, second)
-        assert sorted(v[0] for v in outcome.values()) == ['created', 'refused'], outcome
+        assert outcome['first'][0] == 'created' and outcome['second'][0] == 'refused', outcome
         assert _held(app, key_id) == 1

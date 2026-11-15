@@ -165,6 +165,20 @@ class TestDeletion:
         assert r.status_code == 409, r.data
         assert _detail(r) == f"Cannot delete key: it backs the SSH host CA '{descr}'"
 
+    def test_a_sync_that_no_longer_lists_the_key_keeps_it_for_the_ssh_ca(self, app, auth_client, token_key):
+        from services.hsm import HsmService
+        from tests.test_hsm_sync_and_listing import _ListingProvider
+        key = token_key()
+        r = _ssh_ca(auth_client, key['key'])
+        assert r.status_code == 201, r.data
+        with app.app_context(), patch.object(HsmService, '_get_provider_instance',
+                                             return_value=_ListingProvider([])):
+            result = HsmService.sync_keys(key['provider'])
+        assert result['removed'] == 0 and result['missing_kept'] == 1
+        with app.app_context():
+            ca = db.session.get(SSHCertificateAuthority, r.get_json()['data']['id'])
+            assert (ca.key_source, ca.hsm_key_id) == ('hsm', key['key'])
+
     def test_a_provider_without_bound_keys_is_deleted(self, app, auth_client, token_key):
         key = token_key()
         with patch('services.hsm.HsmService.delete_provider') as deleted:
