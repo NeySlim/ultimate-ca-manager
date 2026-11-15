@@ -20,6 +20,8 @@ from werkzeug.http import HTTP_STATUS_CODES
 # publish per-problem documentation URIs, so this is the honest default rather
 # than inventing URLs that resolve to nothing.
 PROBLEM_TYPE_BLANK = 'about:blank'
+# A 401 an authentication gate gave before the route ran: the request had no effect
+AUTHENTICATION_REQUIRED_PROBLEM = 'urn:ucm:problem:authentication-required'
 PROBLEM_CONTENT_TYPE = 'application/problem+json'
 
 

@@ -70,6 +70,26 @@ def _revoke_database_sessions() -> Dict[str, int]:
     return revoked
 
 
+def _advance_session_epoch() -> None:
+    """Refuse every session begun before now, on every store and node, or raise.
+
+    Removing the stored sessions is not enough: Redis entries stay, and a request in
+    flight may write its session back. The session it carries holds the old epoch.
+    The caller's own session is emptied too, so this response never writes it back.
+    """
+    from flask import has_request_context, session
+    from auth.session_epoch import advance_epoch
+    try:
+        epoch = advance_epoch()
+    except Exception:
+        logger.error("Restore: the session epoch could not be advanced; access granted "
+                     "before the restore may still be usable")
+        raise
+    if has_request_context():
+        session.clear()
+    logger.info("Restore: session epoch %s, every session begun before it is refused", epoch)
+
+
 def _revoke_flask_sessions() -> int:
     """Empty the SQL session store, or raise; 0 when sessions live elsewhere.
 
@@ -103,12 +123,9 @@ def _session_directory() -> Optional[Path]:
     configured = config.get('SESSION_FILE_DIR')
     if not configured:
         if str(config.get('SESSION_TYPE') or '').lower() == 'redis':
-            # The rows are gone and the restart follows, but the Redis
-            # entries themselves are not ours to delete here.
-            logger.warning(
-                "Restore: sessions are stored in Redis; their entries are not "
-                "removed by the restore"
-            )
+            # Left to expire: the session epoch already refuses each of them
+            logger.info("Restore: sessions are stored in Redis; their entries expire "
+                        "on their own and are refused meanwhile")
         return None
 
     path = Path(configured)
@@ -132,23 +149,28 @@ def _remove_session_files() -> int:
         return 0
 
     removed = 0
-    try:
-        entries = list(os.scandir(directory))
-    except OSError as exc:
-        logger.error("Restore: session store %s could not be read: %s", directory, exc)
-        return 0
-
-    for entry in entries:
+    from utils.session_store import removal_lock
+    failures = []
+    # Listed and removed under the exclusive lock: no save in flight writes a file back meanwhile
+    with removal_lock(directory, 'the restore removed the sessions'):
         try:
-            if not entry.is_file(follow_symlinks=False):
-                continue
-            os.unlink(entry.path)
-            removed += 1
+            entries = list(os.scandir(directory))
         except OSError as exc:
-            logger.error(
-                "Restore: session file %s could not be removed, the session it "
-                "holds may still be usable: %s", entry.path, exc,
-            )
+            logger.error("Restore: session store %s could not be read: %s", directory, exc)
+            return 0
+        for entry in entries:
+            try:
+                if not entry.is_file(follow_symlinks=False):
+                    continue
+                os.unlink(entry.path)
+                removed += 1
+            except OSError as exc:
+                failures.append((entry.path, exc))
+    for path, exc in failures:
+        logger.error(
+            "Restore: session file %s could not be removed, the session it "
+            "holds may still be usable: %s", path, exc,
+        )
     return removed
 
 
@@ -372,6 +394,7 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
          'crls_not_regenerated': bool,  # the regeneration itself failed, no CA was tried
          'restart_requested': bool}     # the mechanism accepted the request
     """
+    _advance_session_epoch()
     revoked = _revoke_database_sessions()
 
     summary: Dict[str, Any] = {

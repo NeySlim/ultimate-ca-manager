@@ -30,6 +30,7 @@ const mockApiClientInstance = {
 vi.mock('../../services/apiClient', () => ({
   apiClient: mockApiClientInstance,
   buildQueryString: vi.fn().mockReturnValue(''),
+  holdSignOut: vi.fn(),
   createCRUDService: (_endpoint) => ({
     getAll: vi.fn().mockResolvedValue({ data: [] }),
     getById: vi.fn().mockResolvedValue({ data: {} }),

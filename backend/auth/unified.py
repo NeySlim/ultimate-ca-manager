@@ -366,8 +366,9 @@ def require_auth(permissions=None, session_only=False):
             auth_result = auth_manager.authenticate_request(request)
             
             if not auth_result:
-                from utils.response import error_response
-                return error_response('Authentication required', 401)
+                from utils.response import error_response, AUTHENTICATION_REQUIRED_PROBLEM
+                return error_response('Authentication required', 401,
+                                      problem_type=AUTHENTICATION_REQUIRED_PROBLEM)
             if session_only and auth_result['auth_method'] != 'session':
                 return jsonify({
                     'error': 'Forbidden',

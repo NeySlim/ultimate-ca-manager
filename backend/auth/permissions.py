@@ -349,9 +349,10 @@ def require_permission(permission: str):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            from utils.response import error_response
+            from utils.response import error_response, AUTHENTICATION_REQUIRED_PROBLEM
             if not hasattr(g, 'current_user') or not g.current_user:
-                return error_response('Authentication required', 401)
+                return error_response('Authentication required', 401,
+                                         problem_type=AUTHENTICATION_REQUIRED_PROBLEM)
 
             user_role = g.current_user.role
             if not has_permission(user_role, permission):
