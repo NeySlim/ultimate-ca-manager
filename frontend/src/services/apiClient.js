@@ -278,6 +278,8 @@ class APIClient {
     return this.request(endpoint, { ...options, method: 'PATCH', body })
   }
 
+  // upload() and download() have neither the session check nor the single replay of the
+  // gate's 401 that request() has: their 401 is thrown and never signs out.
   /**
    * Upload FormData (multipart/form-data)
    * @param {string} endpoint - API endpoint
