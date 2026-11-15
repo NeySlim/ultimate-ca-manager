@@ -260,6 +260,7 @@ class TestApplyingTheBoundCertificateAgain:
     def test_the_second_apply_answers_like_the_first(
         self, app, auth_client, clean_binding, monkeypatch, tmp_path, create_cert,
     ):
+        """pins a 200 for the second apply of the bound certificate; proves no fix."""
         import api.v2.system.https as route
         monkeypatch.setenv('HTTPS_CERT_PATH', str(tmp_path / 'https_cert.pem'))
         monkeypatch.setenv('HTTPS_KEY_PATH', str(tmp_path / 'https_key.pem'))

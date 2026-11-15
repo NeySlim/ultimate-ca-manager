@@ -82,12 +82,14 @@ def test_a_2x_archive_without_its_connectors_keeps_the_targets_link(here):
 
 
 def test_a_2x_archive_saying_it_has_no_connector_is_restored_as_written(here):
+    """pins that a 2.x archive carrying an empty connector list clears the link; proves no fix."""
     blob = _forged(['configuration'], mutate=lambda data: _as_2x(data, connectors=[]))
     _service().restore_backup(blob, PASSWORD, mode='merge')
     assert _default_connector() is None
 
 
 def test_a_30_profile_without_connector_is_merged_as_written(here):
+    """pins that a 3.0 profile without connector is merged without one; proves no fix."""
     profile = WindowsEnrollmentProfile.query.filter_by(is_default=True).one()
     profile.connector_id = None
     db.session.commit()

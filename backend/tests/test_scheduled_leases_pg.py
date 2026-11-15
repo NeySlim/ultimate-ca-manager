@@ -816,7 +816,8 @@ def _a_lease_outlived_by_a_signature(app, monkeypatch):
 @pytest.mark.parametrize('_backend', [pytest.param('pg', marks=_on_pg)])
 def test_a_signature_outliving_the_lease_never_reuses_a_crl_number_on_postgresql(
         app, ha, monkeypatch, _backend):
-    """The number is allocated and committed before the signature: B, taking over the lease,
+    """pins distinct CRL numbers when a signature outlives the lease; proves no fix.
+    The number is allocated and committed before the signature: B, taking over the lease,
     gets the next one; the CRL served is B's, the higher, and A's lower one is never served."""
     with _pg(app):
         stored, served, signed_by = _a_lease_outlived_by_a_signature(app, monkeypatch)

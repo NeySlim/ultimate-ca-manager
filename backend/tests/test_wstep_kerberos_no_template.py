@@ -333,9 +333,8 @@ def _age(app, cert, *, expired=False, superseded=False):
 
 def test_an_exempted_renewal_whose_certificate_expires_before_approval_is_issued(
         app, client, auth_client, world, realm_a):
-    """The exemption is decided on arrival, the requester authenticated by Kerberos: a certificate
-    that expires while the request waits for its approver does not withdraw it (AD CS issues a
-    pending request whatever happened to the certificate it renews)."""
+    """pins that a held renewal whose certificate expires while it waits is issued; proves no fix.
+    The exemption is decided on arrival, the requester authenticated by Kerberos."""
     with approval_policy(app, world['cas']['A']['id'], 'r20-held-expired') as pid:
         request_id, approval_id, old = _held(app, client, world, MACHINE, pid)
         _age(app, old, expired=True)

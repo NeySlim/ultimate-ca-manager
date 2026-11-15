@@ -25,24 +25,28 @@ def _name(*rdns):
 
 
 def test_reordered_rdns_are_one_issuer_for_mtls_and_two_names_for_rfc_5280():
+    """pins how both comparators judge reordered RDNs; proves no fix."""
     a, b = _name([(CN, 'Issuing CA')], [(O, 'Example')]), _name([(O, 'Example')], [(CN, 'Issuing CA')])
     assert dn_attributes(a) == dn_attributes(b)
     assert not same_name(a, b)
 
 
 def test_a_multi_valued_rdn_and_two_rdns_are_one_issuer_for_mtls_only():
+    """pins how both comparators judge a multi-valued RDN against two RDNs; proves no fix."""
     a, b = _name([(CN, 'Issuing CA'), (O, 'Example')]), _name([(CN, 'Issuing CA')], [(O, 'Example')])
     assert dn_attributes(a) == dn_attributes(b)
     assert not same_name(a, b)
 
 
 def test_a_repeated_attribute_is_counted_once_by_mtls_only():
+    """pins how both comparators judge a repeated attribute; proves no fix."""
     a, b = _name([(OU, 'PKI')], [(OU, 'PKI')], [(CN, 'Issuing CA')]), _name([(OU, 'PKI')], [(CN, 'Issuing CA')])
     assert dn_attributes(a) == dn_attributes(b)
     assert not same_name(a, b)
 
 
 def test_rfc_4518_mapping_and_nfkc_make_one_name_that_mtls_reads_as_two():
+    """pins how both comparators judge names RFC 4518 maps or normalises; proves no fix."""
     # U+FF26 FULLWIDTH F is "F" after NFKC (§2.3); U+00AD SOFT HYPHEN maps to nothing (§2.2)
     for left, right in (('\uff26ile server', 'File Server'), ('Issu\u00ading CA', 'issuing ca')):
         a, b = _name([(CN, left)]), _name([(CN, right)])
@@ -51,6 +55,7 @@ def test_rfc_4518_mapping_and_nfkc_make_one_name_that_mtls_reads_as_two():
 
 
 def test_a_prohibited_code_point_is_compared_where_rfc_4518_says_undefined():
+    """pins that a prohibited code point is compared after case folding; proves no fix."""
     # RFC 4518 §2.4: a private use code point fails the preparation, the assertion is Undefined.
     # Not applied: the two names are equal after case folding, the stricter reading for a
     # unique subject (taken), and no key or account is gained by it on a renewal.
