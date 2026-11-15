@@ -91,6 +91,7 @@ def _simulate(github, smoke_result):
     smoke = _smoke_caller(jobs)
     results, pending = {}, list(jobs)
     while pending:
+        before = len(pending)
         for name in list(pending):
             needs = _needs(jobs[name])
             if any(n not in results for n in needs):
@@ -105,6 +106,7 @@ def _simulate(github, smoke_result):
                 status = 'success' if all_ok else 'failure'
                 runs = bool(evaluate(cond, ctx, status=status))
             results[name] = (smoke_result if name == smoke else 'success') if runs else 'skipped'
+        assert len(pending) < before, f'needs cycle or unknown job among {pending}'
     return results
 
 
