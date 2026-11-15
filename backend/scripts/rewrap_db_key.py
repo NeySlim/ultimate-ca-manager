@@ -31,6 +31,7 @@ def main(argv=None) -> int:
     parser.add_argument('--dry-run', action='store_true', help='count what would be re-encrypted, write nothing')
     args = parser.parse_args(argv)
 
+    import config.settings  # noqa: F401 -- reads ucm.env as the service does (DEB, RPM)
     target = os.environ.get('UCM_DB_ENCRYPTION_KEY', '')
     try:
         Fernet(target.encode())
