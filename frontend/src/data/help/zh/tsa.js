@@ -14,10 +14,10 @@ export default {
       {
         title: '配置',
         items: [
-          { label: '签名 CA', text: '未设置专用签名证书时，由其自身证书签署时间戳令牌的 CA。有效期之外的 CA 不会签名：/tsa 应答 503。严格校验器（openssl ts -verify、jarsigner）会拒绝由 CA 证书签署的令牌，CA 签名时页面会给出警告' },
+          { label: '签名 CA', text: '签发专用签名证书的 CA。只有在未设置专用签名者且关闭“要求专用证书”时，才由其自身证书签署时间戳令牌。有效期之外的 CA 不会签名：/tsa 应答 503。严格校验器（openssl ts -verify、jarsigner）会拒绝由 CA 证书签署的令牌，CA 签名时页面会给出警告' },
           { label: '策略 OID', text: 'TSA 策略的对象标识符，包含在每个时间戳响应中。默认值 1.2.3.4.1 是 OpenSSL 的示例 OID，属于页面会提示的占位符：请使用您组织 OID 弧下的 OID' },
           { label: '启用/禁用', text: '在不丢失配置的情况下开关 TSA 端点' },
-          { label: '要求专用证书', text: '可选启用：拒绝使用 CA 证书本身签署时间戳，需要一个带有关键 timeStamping EKU 的专用终端实体签名证书（RFC 3161）' },
+          { label: '要求专用证书', text: '默认开启：拒绝使用 CA 证书本身签署时间戳，因此在设置带有关键 timeStamping EKU 的专用终端实体签名证书（RFC 3161）之前，/tsa 应答 503。关闭此项不符合 RFC 3161；从 2.x 升级且其 TSA 原先由 CA 签名的安装会保持关闭，概览会显示警告' },
                   { label: '签名证书 (v2.217)', text: '使用从已签发证书中选择的专用终端实体证书（timeStamping EKU，由 UCM 持有的 RSA、ECDSA 或 ML-DSA 私钥；不提供 Ed25519 和 Ed448 证书；FIPS 模块不批准 ML-DSA 时，FIPS 模式下也不提供 ML-DSA）签署令牌。续期会被自动跟随；过期或被吊销的签名者会使请求以 503 失败，绝不回退到 CA 证书' },
                   { label: '生成签名证书 (v2.218)', text: '一键签发专用的 RFC 3161 签名证书：CA:FALSE、KeyUsage 仅含 digitalSignature，外加关键且独占的 timeStamping EKU，正是严格校验器（openssl ts -verify）所要求的形态。证书由已配置的 TSA CA 签发，并在没有可用签名者时被自动选用。该证书的来源为 "manual"：请将 "manual" 加入自动续期来源，或在到期前自行续期' },
         ]
@@ -40,7 +40,7 @@ export default {
       '无需认证：TSA 端点像 CRL/OCSP 一样是公开可访问的',
     ],
     warnings: [
-      '启用 TSA 之前必须配置有效的签名 CA',
+      '/tsa 签名之前必须设置专用签名证书：请在设置选项卡中生成一个',
       'openssl ts -verify 和 jarsigner 会拒绝由 CA 证书签署的令牌：RFC 3161 要求使用带有关键且独占的 timeStamping EKU 的专用签名者。请在设置选项卡中生成一个',
       'TSA 端点是公共协议端点：不要在时间戳请求中放入敏感数据',
     ],
@@ -56,7 +56,7 @@ export default {
 
 1. **客户端创建时间戳请求**: 使用 SHA-256/SHA-512 对文件进行哈希并创建 \`TimeStampReq\`（ASN.1 DER 编码）
 2. **客户端向 TSA 发送请求**: HTTP POST 到 \`/tsa\` 端点，Content-Type 为 \`application/timestamp-query\`
-3. **UCM 签署时间戳**: 配置的 CA 将哈希值和当前时间签署为 \`TimeStampResp\`
+3. **UCM 签署时间戳**: 专用签名证书将哈希值和当前时间签署为 \`TimeStampResp\`。只有在关闭**要求专用 TSA 证书**时，才由配置的 CA 自身证书签名
 4. **客户端接收并存储响应**: \`.tsr\` 文件可以在之后证明文档在该时间点存在
 
 ## 配置
@@ -66,7 +66,7 @@ export default {
 1. **启用 TSA**: 开关 TSA 服务器
 2. **签名 CA**: 选择哪个证书颁发机构签署时间戳令牌
 3. **策略 OID**: TSA 策略的对象标识符，包含在每个时间戳响应中
-4. **要求专用 TSA 证书**: 可选启用：拒绝使用 CA 证书本身签署时间戳。启用后，需要一个带有**关键 timeStamping EKU**（RFC 3161）的专用终端实体签名证书
+4. **要求专用 TSA 证书**: 默认开启：拒绝使用 CA 证书本身签署时间戳，因此在设置带有**关键 timeStamping EKU**（RFC 3161）的专用终端实体签名证书之前，\`/tsa\` 应答 503。**生成签名证书**会从签名 CA 签发一个并将其选中。关闭此项会让 CA 证书签名，这不符合 RFC 3161；从 2.x 升级且其 TSA 原先由 CA 签名的安装会保持关闭，概览会显示警告
 
 ### 选择签名 CA
 
@@ -75,7 +75,7 @@ export default {
 - 使用**专用子 CA** 进行时间戳签发，而不是根 CA
 - RFC 3161 §2.3 要求签名者唯一且关键的 EKU 为 **id-kp-timeStamping**（OID 1.3.6.1.5.5.7.3.8），而 CA 证书若带有它就会失去其他用途。由 CA 证书签署的令牌会被严格校验器拒绝：\`openssl ts -verify\` 报“unsuitable certificate purpose”，jarsigner 报“Certificate is not valid for timestamping”。CA 证书签名期间，设置选项卡会给出警告：请在那里为这些客户端**生成专用签名证书**
 - 确保 CA 证书有**足够的有效期**：时间戳必须在数年内保持可验证。超出有效期的 CA 不会签名：\`/tsa\` 应答 503
-- 启用**要求专用时间戳证书**，在签名时强制执行此要求，而不是依赖约定
+- 保持**要求专用 TSA 证书**开启，在签名时强制执行此要求
 
 ### 策略 OID
 

@@ -26,7 +26,7 @@ export const helpContent = {
         icon: ListChecks,
         items: [
           { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record (with the right to read the trust store, the trust store certificates that expire within 90 days or have expired); a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state; the TSA signer while the TSA is enabled; and, with the right to read settings, whether email, webhooks and auto-renewal are set up' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state; the TSA signer while the TSA is enabled (a warning while the CA certificate signs); and, with the right to read settings, whether email, webhooks and auto-renewal are set up' },
           { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
           { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
           { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
@@ -655,10 +655,10 @@ export const helpContent = {
         title: 'Configuration',
         icon: Gear,
         items: [
-          { label: 'Signing CA', text: 'The CA whose own certificate signs timestamp tokens when no dedicated signing certificate is set. A CA outside its validity period does not sign: /tsa answers 503. Strict verifiers (openssl ts -verify, jarsigner) refuse tokens signed by a CA certificate, and the page warns while the CA signs' },
+          { label: 'Signing CA', text: 'The CA that issues the dedicated signing certificate. Its own certificate signs timestamp tokens only when no dedicated signer is set and Require dedicated certificate is off. A CA outside its validity period does not sign: /tsa answers 503. Strict verifiers (openssl ts -verify, jarsigner) refuse tokens signed by a CA certificate, and the page warns while the CA signs' },
           { label: 'Policy OID', text: 'Object Identifier for the TSA policy, included in every timestamp response. The default 1.2.3.4.1 is OpenSSL\'s example OID, a placeholder the page warns about: use an OID from your organization\'s arc' },
           { label: 'Enable/Disable', text: 'Toggle the TSA endpoint on or off without losing configuration' },
-          { label: 'Require dedicated certificate', text: 'Opt-in: refuse to sign timestamps with the CA certificate itself, requires a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161)' },
+          { label: 'Require dedicated certificate', text: 'On by default: refuse to sign timestamps with the CA certificate itself, so /tsa answers 503 until a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161) is set. Turning it off is not RFC 3161 compliant; an installation upgraded from 2.x whose TSA signed with its CA keeps it off, and the overview shows a warning' },
                   { label: 'Signing certificate (v2.217)', text: 'Sign tokens with a dedicated end-entity certificate picked from issued certificates (timeStamping EKU, RSA, ECDSA or ML-DSA key held by UCM; Ed25519 and Ed448 certificates are not offered, nor ML-DSA in FIPS mode when the FIPS module does not approve it). Renewals are followed automatically; an expired or revoked signer fails requests with 503 and never falls back to the CA certificate' },
                   { label: 'Generate a signing certificate (v2.218)', text: 'One-click issuance of a purpose-built RFC 3161 signer: CA:FALSE, KeyUsage digitalSignature only, and a critical exclusive timeStamping EKU, the shape strict verifiers (openssl ts -verify) require. Issued from the configured TSA CA and selected automatically when no usable signer is set. The certificate has source "manual": add "manual" to the auto-renewal sources or renew it yourself before expiry' },
         ]
@@ -682,7 +682,7 @@ export const helpContent = {
       'No authentication is required: the TSA endpoint is publicly accessible like CRL/OCSP',
     ],
     warnings: [
-      'A valid signing CA must be configured before enabling TSA',
+      'A dedicated signing certificate must be set before /tsa signs: generate one on the Settings tab',
       'openssl ts -verify and jarsigner refuse tokens signed by the CA certificate: RFC 3161 requires a dedicated signer with a critical, exclusive timeStamping EKU. Generate one on the Settings tab',
       'The TSA endpoint is a public protocol endpoint: do not put sensitive data in timestamp requests',
     ],
