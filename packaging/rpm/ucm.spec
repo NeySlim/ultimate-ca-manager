@@ -1,3 +1,6 @@
+# Fedora and EL10 clamp file dates to SOURCE_DATE_EPOCH, read from the %changelog, the same
+# for every version: unset, each build keeps the dates of its sources (rpm buildprocess.md)
+%global source_date_epoch_from_changelog 0
 Name:           ucm
 Version:        0.0.0
 Release:        1%{?dist}
@@ -108,6 +111,10 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 UCM_HOME=%{ucm_home}
 ARCHIVE_PENDING=$UCM_HOME/.leftover-archive-pending
 [ "$1" -ne 1 ] || : > "$ARCHIVE_PENDING"
+# Bytecode written at run time is not the package's: a new source of the same size and
+# date as the old one would load the old .pyc, so it goes before any Python runs
+find "$UCM_HOME/backend" "$UCM_HOME/scripts" -name __pycache__ -type d -prune \
+    -exec rm -rf -- {} + 2>/dev/null || true
 
 %systemd_post %{name}.service
 

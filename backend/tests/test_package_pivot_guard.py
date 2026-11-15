@@ -743,3 +743,86 @@ def test_a_removal_says_where_the_data_stays_and_what_a_purge_keeps(tmp_path):
     assert f'Data preserved in {home}/data, configuration in {config}' in out.stdout, out.stdout
     assert 'apt purge ucm' in out.stdout and '.ucm-archive-* directories' in out.stdout, out.stdout
     assert 'rm -rf' not in out.stdout, out.stdout
+
+
+# -- bytecode an earlier version wrote never outlives it ----------------------------
+
+def _caches(home, data):
+    """A __pycache__ the service wrote in each place: the package's code, its venv, its data."""
+    places = {name: path / '__pycache__' for name, path in (
+        ('backend', home / 'backend' / 'models'), ('scripts', home / 'scripts'),
+        ('venv', home / 'venv' / 'lib'), ('data', data))}
+    for cache in places.values():
+        cache.mkdir(parents=True, exist_ok=True)
+        (cache / 'x.cpython-312.pyc').write_bytes(b'old')
+    return places
+
+
+def _real_rm_inside(tmp_path):
+    """rm records its call, then runs for real on paths of the sandbox only."""
+    (tmp_path / 'bin' / 'rm').write_text(
+        f'#!{POSIX_SH}\necho "rm $*" >> "$LOG"\n'
+        f'for a; do case $a in -*) ;; "{tmp_path}"/*) ;; *) exit 0 ;; esac; done\n'
+        f'exec {shutil.which("rm")} "$@"\n')
+
+
+def _purged_before_python(calls, places):
+    purge = next(i for i, c in enumerate(calls) if c.startswith('rm ') and '__pycache__' in c)
+    first_python = next(i for i, c in enumerate(calls) if c.startswith(('bash ', 'sh ')))
+    assert purge < first_python, calls
+    assert not places['backend'].exists() and not places['scripts'].exists()
+    assert places['venv'].exists() and places['data'].exists()
+
+
+@pytest.mark.parametrize('previous', ['', '2.254'])
+def test_the_deb_postinst_drops_the_bytecode_of_its_code_before_any_python_runs(tmp_path, previous):
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    places = _caches(home, data)
+    _real_rm_inside(tmp_path)
+    script = tmp_path / 'postinst.sandboxed'
+    script.write_text(_paths(POSTINST.read_text(), home, data, config, quoted=True))
+    out = subprocess.run(['/bin/bash', str(script), 'configure', previous], capture_output=True,
+                         text=True, timeout=20, env=env)
+    assert out.returncode == 0, out.stderr
+    _purged_before_python(_calls(log), places)
+
+
+@pytest.mark.parametrize('count', ['1', '2'])
+def test_the_rpm_post_drops_the_bytecode_of_its_code_before_any_python_runs(tmp_path, count):
+    env, log, home, data, config = _post_sandbox(tmp_path, 0)
+    places = _caches(home, data)
+    _real_rm_inside(tmp_path)
+    body = _post_body(tmp_path, home, data, config)
+    out = subprocess.run([POSIX_SH, '-c', body, 'post', count], capture_output=True, text=True,
+                         timeout=20, env=env)
+    assert out.returncode == 0, out.stderr
+    _purged_before_python(_calls(log), places)
+
+
+@pytest.mark.skipif(not shutil.which('rpmbuild'), reason='rpmbuild is not installed')
+def test_the_rpm_keeps_the_dates_of_its_sources_where_rpm_clamps_them(tmp_path):
+    """Built as Fedora 43 and EL10 configure rpm (dates clamped to SOURCE_DATE_EPOCH, taken
+    from the %changelog): a file keeps its own date, not the date of the last entry."""
+    lines = [l for l in SPEC.read_text().splitlines() if l.startswith('%global source_date_epoch')]
+    top = tmp_path / 'rpmbuild'
+    (top / 'SOURCES').mkdir(parents=True)
+    src = top / 'SOURCES' / 'f.py'
+    src.write_text('x = 1\n')
+    stamp = 1_800_000_000
+    os.utime(src, (stamp, stamp))
+    spec = tmp_path / 't.spec'
+    spec.write_text('\n'.join(lines) + '\nName: t\nVersion: 1\nRelease: 1\nSummary: t\nLicense: MIT\n'
+                    'BuildArch: noarch\nSource0: f.py\n%description\nt\n%install\n'
+                    'install -d %{buildroot}/opt/t\ncp -p %{SOURCE0} %{buildroot}/opt/t/f.py\n'
+                    '%files\n/opt/t/f.py\n%changelog\n* Sat Feb 07 2026 t <t@t> - 1-1\n- t\n')
+    env = {k: v for k, v in os.environ.items() if k != 'SOURCE_DATE_EPOCH'}
+    built = subprocess.run(
+        ['rpmbuild', '-bb', '--define', f'_topdir {top}', '--define', 'source_date_epoch_from_changelog 1',
+         '--define', 'build_mtime_policy clamp_to_source_date_epoch',
+         '--define', 'clamp_mtime_to_source_epoch 1', str(spec)],
+        capture_output=True, text=True, timeout=120, env=env)
+    assert built.returncode == 0, built.stderr
+    rpm = next((top / 'RPMS' / 'noarch').glob('t-1-1*.rpm'))
+    dump = subprocess.run(['rpm', '-qp', '--dump', str(rpm)], capture_output=True, text=True,
+                          timeout=20, env=env).stdout
+    assert dump.split()[2] == str(stamp), dump

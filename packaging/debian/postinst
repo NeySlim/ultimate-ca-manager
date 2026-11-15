@@ -12,6 +12,11 @@ UCM_CONFIG="/etc/ucm"
 
 case "$1" in
     configure)
+        # Bytecode written at run time is not the package's: a new source of the same size and
+        # date as the old one would load the old .pyc, so it goes before any Python runs
+        find "$UCM_HOME/backend" "$UCM_HOME/scripts" -name __pycache__ -type d -prune \
+            -exec rm -rf -- {} + 2>/dev/null || true
+
         # Create user and group
         if ! getent group "$UCM_GROUP" >/dev/null 2>&1; then
             addgroup --system "$UCM_GROUP" >/dev/null
