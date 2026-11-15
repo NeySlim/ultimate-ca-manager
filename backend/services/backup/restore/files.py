@@ -329,6 +329,46 @@ class StagedFiles:
         return False
 
 
+def _kept_parents() -> List[Path]:
+    """The directories a restore publishes into, where its kept directories live."""
+    from config.settings import Config
+    parents = [Config.CA_DIR, Config.CERT_DIR, Config.PRIVATE_DIR,
+               Path(Config.HTTPS_CERT_PATH).parent, Path(Config.HTTPS_KEY_PATH).parent]
+    return list(dict.fromkeys(Path(parent) for parent in parents))
+
+
+def sweep_kept_previous_contents() -> List[Path]:
+    """Remove the kept directories of restores killed before `discard()`; return them.
+
+    Closed rule: they are created under the backup lock, so only while this
+    thread holds it by flock is one known to belong to no live restore.
+    """
+    from ..locking import BackupBusyError, backup_operation_lock, operation_lock_held
+    removed: List[Path] = []
+    try:
+        with backup_operation_lock(timeout=0, purpose='sweeping interrupted restores',
+                                   fail_open=False):
+            if not operation_lock_held():
+                return []
+            for parent in _kept_parents():
+                if not parent.is_dir():
+                    continue
+                for entry in os.scandir(parent):
+                    if (entry.name.startswith(_KEPT_PREFIX)
+                            and entry.is_dir(follow_symlinks=False)):
+                        shutil.rmtree(entry.path, ignore_errors=True)
+                        if not os.path.lexists(entry.path):
+                            removed.append(Path(entry.path))
+    except BackupBusyError as exc:
+        logger.debug("Interrupted restores not swept: %s", exc)
+    except OSError as exc:
+        logger.info("Interrupted restores not swept: %s", exc)
+    if removed:
+        logger.warning("Removed the previous contents kept by interrupted restores: %s",
+                       ', '.join(str(path) for path in removed))
+    return removed
+
+
 def _write_private(path: Path, data: bytes, mode: int) -> None:
     """Write staged content at the mode its destination will carry.
 

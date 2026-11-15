@@ -377,6 +377,8 @@ def create_app(config_name=None):
     sweep_stale_stores(spool=app.config['UPLOAD_SPOOL_DIR'])
     from services.backup.storage import sweep_orphan_spools
     sweep_orphan_spools()
+    from services.backup.restore.files import sweep_kept_previous_contents
+    sweep_kept_previous_contents()
 
     # Initialize cache
     cache.init_app(app, config={
