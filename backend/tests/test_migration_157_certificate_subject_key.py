@@ -101,8 +101,8 @@ def test_the_app_schema_carries_the_column_and_index(app):
 
 @pytest.mark.slow
 def test_the_backfill_of_100000_certificates_is_measured(tmp_path, capsys):
-    """Each stored certificate is parsed once, in batches: the cost grows linearly with the
-    table (about 30 s per 100 000 rows on SQLite, measured; printed with -s)."""
+    """pins the SQLite duration of the backfill (printed with -s); proves no fix.
+    Each stored certificate is parsed once, in batches: the cost grows linearly with the table."""
     import time
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     pems = [self_signed(key, cn=f'host-{i}.measure.test') for i in range(50)]
@@ -118,3 +118,43 @@ def test_the_backfill_of_100000_certificates_is_measured(tmp_path, capsys):
         print(f'\nmigration 157: 100000 certificates backfilled in {elapsed:.1f} s')
     assert conn.execute('SELECT count(*) FROM certificates WHERE subject_key IS NULL').fetchone()[0] == 0
     assert elapsed < 600
+
+
+@pytest.mark.slow
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_the_backfill_of_100000_certificates_is_measured_on_postgresql(capsys):
+    """pins the PostgreSQL duration of the backfill (printed with -s); proves no fix."""
+    import time
+    from tests.conftest import pg_bench_exclusive
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pems = [self_signed(key, cn=f'host-{i}.measure.test') for i in range(50)]
+    schema = f"measure_157_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    engine = create_engine(PG_URL)
+    with pg_bench_exclusive(), engine.connect() as conn:
+        try:
+            conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
+            conn.execute(text(f'CREATE SCHEMA {schema}'))
+            conn.execute(text(f'SET search_path TO {schema}'))
+            conn.execute(text('CREATE TABLE pems (n INTEGER PRIMARY KEY, crt TEXT)'))
+            conn.execute(text('INSERT INTO pems (n, crt) VALUES (:n, :crt)'),
+                         [{'n': n, 'crt': crt} for n, crt in enumerate(pems)])
+            conn.execute(text('CREATE TABLE certificates (id SERIAL PRIMARY KEY, caref VARCHAR(36), crt TEXT)'))
+            conn.execute(text("INSERT INTO certificates (id, caref, crt) SELECT g, 'ca-measure', p.crt "
+                              "FROM generate_series(1, 100000) g JOIN pems p ON p.n = g % 50"))
+            conn.commit()
+            conn.execute(text(f'SET search_path TO {schema}'))
+            started = time.monotonic()
+            _migration().upgrade(conn)
+            conn.commit()
+            elapsed = time.monotonic() - started
+            with capsys.disabled():
+                print(f'\nmigration 157 on PostgreSQL: 100000 certificates backfilled in {elapsed:.1f} s')
+            conn.execute(text(f'SET search_path TO {schema}'))
+            assert conn.execute(text('SELECT count(*) FROM certificates WHERE subject_key IS NULL')).scalar() == 0
+            assert elapsed < 600
+        finally:
+            conn.rollback()
+            conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
+            conn.commit()
+    engine.dispose()
