@@ -65,8 +65,9 @@ def _parse_servers(data):
 
 
 def _ad_retarget_error(saved, data):
-    """The saved bind password stays with the saved DCs, port and TLS trust."""
-    if saved is None or not keeps_saved_secret(data, 'bind_password', saved.bind_password,
+    """The saved bind password stays with the saved DCs, port and TLS trust. The stored
+    token is read, so a password this node cannot open still counts as kept."""
+    if saved is None or not keeps_saved_secret(data, 'bind_password', saved._bind_password,
                                                blank_clears=True):
         return None
     current = {'port': saved.port or 389, 'use_ssl': bool(saved.use_ssl),

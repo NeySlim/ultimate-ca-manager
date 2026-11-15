@@ -346,24 +346,25 @@ def _winrm_target_fields(msca):
 
 
 def _msca_retarget_error(msca, data):
-    """Saved passwords stay with their saved host. A TLS client key is never sent."""
+    """Saved passwords stay with their saved host. A TLS client key is never sent.
+    Stored tokens are read: a password this node cannot open is kept all the same."""
     current = _winrm_target_fields(msca)
     winrm_err = retarget_error(current, data, keeps_saved_secret(
-        data, 'winrm_password', msca.winrm_password, blank_clears=True))
+        data, 'winrm_password', msca._winrm_password, blank_clears=True))
     if winrm_err:
         return winrm_err
     if msca.auth_method != 'basic' or data.get('auth_method', 'basic') != 'basic':
         return None
-    if not keeps_saved_secret(data, 'password', msca.password, blank_clears=True):
+    if not keeps_saved_secret(data, 'password', msca._password, blank_clears=True):
         return None
     # Clearing the WinRM password hands its channel to the connection password
     cleared = 'winrm_password' in data and not str(data['winrm_password'] or '').strip()
-    if cleared and msca.winrm_password and basic_password_reaches(
+    if cleared and msca._winrm_password and basic_password_reaches(
             data.get('winrm_host', msca.winrm_host), data.get('server', msca.server)):
         return retarget_error({'winrm_password': 'saved'}, {'winrm_password': 'cleared'}, True)
     current = {k: getattr(msca, k) for k in ('server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username')}
     winrm_typed = str(data.get('winrm_password') or '').strip() not in ('', *MASKS)
-    if not msca.winrm_password and not winrm_typed:
+    if not msca._winrm_password and not winrm_typed:
         # The basic password doubles as the WinRM one
         current.update(_winrm_target_fields(msca))
     return retarget_error(current, data, True)

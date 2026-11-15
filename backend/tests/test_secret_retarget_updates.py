@@ -658,3 +658,114 @@ class TestIntune:
         finally:
             # Other suites count the SCEP profiles on file
             auth_client.delete(url)
+
+
+class TestUnreadableSavedSecret:
+    """A saved secret this node cannot open is still kept by a masked or blank field,
+    so it holds its target exactly as a readable one does."""
+
+    def test_ad_bind_password(self, app, auth_client):
+        with app.app_context():
+            url = '/api/v2/ad-connectors/' + str(mount_connector(
+                server='dc1.corp.local', port=636, use_ssl=True, verify_ssl=True,
+                base_dn='DC=corp,DC=local', bind_dn='CN=svc,DC=corp,DC=local',
+                password=_foreign_token()).id)
+
+        def stored():
+            with app.app_context():
+                row = connector_row()
+                return row.server, row.port, row.use_ssl, row._bind_password
+
+        before = stored()
+        for body in ({'servers': ['dc.attacker.example'], 'bind_password': '***'},
+                     {'port': 389, 'use_ssl': False}):
+            _refused(_send(auth_client, 'put', url, body))
+            assert stored() == before
+
+    @pytest.mark.parametrize('kind', ['ldap', 'oauth2'])
+    def test_sso_secret(self, app, auth_client, kind):
+        from models.sso import SSOProvider
+        with app.app_context():
+            if kind == 'ldap':
+                row = SSOProvider(name=f'unreadable-ldap-{_suffix()}', provider_type='ldap',
+                                  enabled=False, ldap_server='ldap.example.com', ldap_port=636,
+                                  ldap_use_ssl=True, ldap_bind_dn='cn=svc')
+                row._ldap_bind_password = _foreign_token()
+                body = {'ldap_server': 'ldap.attacker.example', 'ldap_bind_password': '***'}
+            else:
+                row = SSOProvider(name=f'unreadable-oauth-{_suffix()}', provider_type='oauth2',
+                                  enabled=False, oauth2_client_id='client',
+                                  oauth2_token_url='https://idp.example.com/token')
+                row._oauth2_client_secret = _foreign_token()
+                body = {'oauth2_token_url': 'https://idp.attacker.example/token'}
+            db.session.add(row)
+            db.session.commit()
+            provider_id = row.id
+
+        def stored():
+            with app.app_context():
+                row = db.session.get(SSOProvider, provider_id)
+                return (row.ldap_server, row._ldap_bind_password, row.oauth2_token_url,
+                        row._oauth2_client_secret)
+
+        try:
+            before = stored()
+            _refused(_send(auth_client, 'put', f'/api/v2/sso/providers/{provider_id}', body))
+            assert stored() == before
+        finally:
+            _drop_sso(app, provider_id)
+
+    @pytest.mark.parametrize('which', ['basic', 'winrm'])
+    def test_msca_password(self, app, auth_client, which):
+        from models.msca import MicrosoftCA
+        with app.app_context():
+            row = MicrosoftCA(name=f'Unreadable CA {_suffix()}', server='adcs.corp.example',
+                              auth_method='basic', username='u', enabled=True)
+            row.winrm_enabled, row.winrm_transport = True, 'ntlm'
+            if which == 'basic':
+                row._password = _foreign_token()
+                body = {'server': 'adcs.attacker.example', 'password': '***'}
+            else:
+                # Certificate auth: the WinRM password is the only one in play
+                row.auth_method = 'certificate'
+                row.winrm_host = 'winrm.corp.example'
+                row._winrm_password = _foreign_token()
+                body = {'winrm_host': 'winrm.attacker.example'}
+            db.session.add(row)
+            db.session.commit()
+            msca_id = row.id
+
+        def stored():
+            with app.app_context():
+                row = db.session.get(MicrosoftCA, msca_id)
+                return row.server, row._password, row.winrm_host, row._winrm_password
+
+        before = stored()
+        _refused(_send(auth_client, 'put', f'/api/v2/microsoft-cas/{msca_id}', body))
+        assert stored() == before
+
+    def test_smtp_password(self, app, auth_client):
+        from models.email_notification import SMTPConfig
+        with app.app_context():
+            SMTPConfig.query.delete()
+            row = SMTPConfig(smtp_host='smtp.corp.example', smtp_port=587, smtp_user='mailer',
+                             smtp_use_tls=True, smtp_use_ssl=False, smtp_auth=True,
+                             smtp_auth_method='password')
+            row._smtp_password = _foreign_token()
+            db.session.add(row)
+            db.session.commit()
+
+        def stored():
+            with app.app_context():
+                row = SMTPConfig.query.first()
+                return row.smtp_host, row._smtp_password
+
+        try:
+            before = stored()
+            _refused(_send(auth_client, 'patch', TestSmtp.URL,
+                           {'smtp_host': 'smtp.attacker.example', 'smtp_password': '********'}))
+            assert stored() == before
+        finally:
+            with app.app_context():
+                SMTPConfig.query.delete()
+                db.session.commit()
