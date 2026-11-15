@@ -4,6 +4,9 @@ Each test stops a save between its existence check and its write, runs a removal
 another thread meanwhile, and checks that the removal waited and still wins.
 """
 import os
+import subprocess
+import sys
+import textwrap
 import threading
 import time
 
@@ -131,3 +134,31 @@ def test_a_save_that_cannot_take_the_lock_writes_nothing(file_app, monkeypatch):
         assert 'probe' not in iface.cache.get(store_id)
     finally:
         _cleanup(file_app, user)
+
+
+_GEVENT_PROBE = textwrap.dedent('''
+    from gevent import monkey
+    monkey.patch_all()
+    import fcntl, os, sys, tempfile
+    from utils.session_store import session_files_lock
+    directory = tempfile.mkdtemp()
+    for exclusive in (False, True):
+        with session_files_lock(directory, exclusive) as state:
+            assert state == 'held', state
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            sys.exit('still locked after the with, exclusive=%s' % exclusive)
+        finally:
+            os.close(fd)
+    os.rmdir(directory)
+''')
+
+
+def test_the_store_lock_is_free_once_released_under_gevent():
+    # A subprocess: patch_all() would otherwise patch the whole test run
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    done = subprocess.run([sys.executable, '-c', _GEVENT_PROBE], cwd=backend,
+                          capture_output=True, text=True, timeout=60)
+    assert done.returncode == 0, done.stderr or done.stdout

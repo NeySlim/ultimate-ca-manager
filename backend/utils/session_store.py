@@ -38,6 +38,7 @@ def session_files_lock(directory, exclusive, wait=2.0):
     except OSError:
         yield UNSUPPORTED
         return
+    state = None
     try:
         operation = (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | fcntl.LOCK_NB
         deadline = time.monotonic() + wait
@@ -58,7 +59,10 @@ def session_files_lock(directory, exclusive, wait=2.0):
                 delay = min(delay * 2, 0.05)
         yield state
     finally:
-        os.close(fd)  # closing releases the lock
+        # Unlocked explicitly: gevent's os.close defers closing a directory to the next loop turn
+        if state == HELD:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 class KeepsRemovedRecordsGone:
