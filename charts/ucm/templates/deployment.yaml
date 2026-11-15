@@ -6,8 +6,9 @@ metadata:
     {{- include "ucm.labels" . | nindent 4 }}
 spec:
   {{- include "ucm.haValidate" . }}
-  # Single instance: SQLite + the per-pod scheduler are not HA-safe, and the
-  # RWO volumes cannot be mounted by two pods at once.
+  # Default render (ha.enabled=false): one pod, SQLite unless database.type is
+  # postgresql. The per-pod scheduler is not HA-safe and the RWO volumes cannot
+  # be mounted by two pods at once.
   replicas: {{ .Values.replicaCount }}
   {{- if .Values.ha.enabled }}
   strategy:

@@ -73,7 +73,7 @@ services:
     volumes:
       - ucm-ha-data-2:/opt/ucm/data
 
-  # Cookie affinity (the UI session stays on one node) and /health/ready probe.
+  # Optional cookie affinity and /health/ready probe; the WebSocket upgrade is passed.
   # TLS is terminated here; the nodes keep their own self-signed certificate.
   lb:
     image: haproxy:3.0
