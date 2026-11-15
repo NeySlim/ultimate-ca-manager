@@ -28,7 +28,7 @@ const HTTP_ERROR_MESSAGES = {
   405: 'This operation is not supported.',
   408: 'The request timed out. Please try again.',
   409: 'Conflict: this resource already exists or is in use.',
-  413: 'The file is too large. Maximum upload size is 50 MB.',
+  413: 'The server or a proxy in front of it refused a request of this size.',
   415: 'Unsupported file type.',
   422: 'The data provided is invalid. Please check and try again.',
   429: 'Too many requests. Please wait a moment and try again.',
@@ -270,7 +270,13 @@ class APIClient {
       const response = onProgress
         ? await xhrUpload(url, config, onProgress)
         : await fetch(url, config)
-      const data = await response.json()
+      // A refusal from a proxy is an HTML page: its status still says what happened.
+      let data = null
+      try {
+        data = await response.json()
+      } catch (parseError) {
+        if (response.ok) throw parseError
+      }
 
       if (!response.ok) {
         const msg = buildErrorMessage(response.status, data, 'Upload failed')

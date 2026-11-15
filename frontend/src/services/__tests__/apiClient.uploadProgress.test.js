@@ -48,3 +48,30 @@ describe('apiClient.upload', () => {
     expect(fetchSpy).toHaveBeenCalled()
   })
 })
+
+describe('apiClient.upload with a body that is not JSON', () => {
+  const htmlPage = () => Promise.reject(new SyntaxError('Unexpected token <'))
+
+  it('keeps the status of a proxy 413 and says what refused it', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 413, json: htmlPage })))
+    const err = await apiClient.upload('/system/restore', new FormData()).catch((e) => e)
+    expect(err.status).toBe(413)
+    expect(err.message).toBe('The server or a proxy in front of it refused a request of this size.')
+  })
+
+  it('does the same through XHR when progress is asked', async () => {
+    class Html extends FakeXhr {
+      send(body) {
+        this.body = body
+        this.status = 413
+        this.responseText = '<html><body>413 Request Entity Too Large</body></html>'
+        this.onload()
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', Html)
+    const err = await apiClient.upload('/system/restore', new FormData(), { onProgress: () => {} }).catch((e) => e)
+    expect(err.status).toBe(413)
+    expect(err.message).toMatch(/proxy/)
+  })
+
+})
