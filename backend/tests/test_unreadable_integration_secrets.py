@@ -188,3 +188,41 @@ def test_hsm_provider_listing_stays_readable_with_an_unreadable_secret(app):
         row = _gcp_row(9, _foreign_token())
         assert row.get_config()['service_account_json'] is None
         assert row.to_dict()['type'] == 'google-kms'
+
+
+def _never(built, name):
+    return lambda *a, **k: built.append(name) or MagicMock()
+
+
+@pytest.mark.parametrize('ptype,config,field,entry_points', [
+    ('pkcs11', {'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 't'},
+     'user_pin', [('pkcs11_provider', 'cryptoki_library')]),
+    ('aws-cloudhsm', {'module_path': '/opt/cloudhsm/lib/libcloudhsm_pkcs11.so', 'token_label': 't',
+                      'hsm_user': 'cu'}, 'hsm_password', [('pkcs11_provider', 'cryptoki_library')]),
+    ('openbao', {'url': 'http://bao.invalid:8200'}, 'token', [('openbao_provider', 'requests.Session')]),
+    ('azure-keyvault', {'vault_url': 'https://v.vault.azure.net/', 'tenant_id': 't', 'client_id': 'c'},
+     'client_secret', [('azure_provider', 'ClientSecretCredential'), ('azure_provider', 'KeyClient')]),
+])
+def test_each_provider_type_with_an_unreadable_secret_builds_no_client(
+        app, monkeypatch, ptype, config, field, entry_points):
+    import importlib
+    import json
+    from models.hsm import HsmProvider
+    from services.hsm import HsmService
+    from services.hsm.base_provider import HsmConfigError
+    built = []
+    for module, attr in entry_points:
+        mod = importlib.import_module(f'services.hsm.{module}')
+        target = mod
+        *path, leaf = attr.split('.')
+        for part in path:
+            target = getattr(target, part)
+        if not hasattr(target, leaf):
+            pytest.skip(f'{module} client library not installed')
+        monkeypatch.setattr(target, leaf, _never(built, attr))
+    row = HsmProvider(id=11, name='p', type=ptype,
+                      config=json.dumps({**config, field: _foreign_token()}))
+    with app.app_context(), pytest.raises(
+            HsmConfigError, match=f'HSM provider 11 {field} cannot be decrypted'):
+        HsmService._get_provider_instance(row).connect()
+    assert built == []
