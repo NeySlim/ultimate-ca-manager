@@ -526,21 +526,13 @@ def create_app(config_name=None):
             app.logger.info("✓ Database lock acquired")
             
             try:
-                # Check if DB is already initialized by another worker
+                # Registry first, then tables, then any index a cut start left out; a failure stops the start
                 from sqlalchemy import inspect
-                inspector = inspect(db.engine)
-                tables = inspector.get_table_names()
-                
-                fresh_install = not ('users' in tables and 'certificate_authorities' in tables)
-                
-                if not fresh_install:
-                    app.logger.info("✓ Database tables already exist")
-                else:
-                    # Registry first, then tables; a failure of either stops the start
-                    from migration_runner import build_fresh_schema
-                    app.logger.info("Creating database tables...")
-                    build_fresh_schema(db.create_all)
+                from migration_runner import start_schema
+                if start_schema(db.engine, db.metadata, db.create_all):
                     app.logger.info("✓ Database tables created/verified, migration baseline marked")
+                else:
+                    app.logger.info("✓ Database tables already exist")
                 
                 # ===== EXTENDED TABLES =====
                 # Import models to register them with SQLAlchemy

@@ -517,3 +517,41 @@ def test_the_option_off_looks_up_no_renewed_row_on_the_wstep_trunk(
         assert _renew(client, world, MACHINE, old, key).status_code == 200
         counts.append(looked_up.count(old.serial_number))
     assert counts[0] - counts[1] == 1, counts
+
+
+def _copy_row(model, row, **changes):
+    values = {c.key: getattr(row, c.key) for c in model.__table__.columns if c.key != 'id'}
+    values.update(changes)
+    copy = model(**values)
+    db.session.add(copy)
+    db.session.flush()
+    return copy
+
+
+def test_an_exempted_renewal_is_served_when_an_imported_twin_is_read_first(app, client, world, realm_a):
+    """The same certificate imported under a twin record of CA A (no profile) and listed before the
+    Windows row: the renewal still finds the row that carries the profile."""
+    import uuid
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old = _template_less_certificate(app, world, key)
+    with app.app_context():
+        ca = db.session.get(CA, world['cas']['A']['id'])
+        twin_ca = _copy_row(CA, ca, refid='0000' + uuid.uuid4().hex[:28], descr=f'{ca.descr} twin',
+                            url_slug=None, hsm_key_id=None)
+        original = Certificate.query.filter_by(caref=ca.refid, serial_number=str(old.serial_number)).one()
+        _copy_row(Certificate, original, refid=uuid.uuid4().hex, caref=twin_ca.refid, source='import',
+                  windows_profile_id=None)
+        # The Windows row stored again after its twin, under a refid that sorts later: listed second
+        values = {c.key: getattr(original, c.key) for c in Certificate.__table__.columns if c.key != 'id'}
+        db.session.delete(original)
+        db.session.flush()
+        db.session.add(Certificate(**values))
+        db.session.commit()
+        from services.cert.issued_lookup import find_issued_rows
+        rows = find_issued_rows(ca, old)
+        assert [r.windows_profile_id is None for r in rows] == [True, False]
+    floor = _top_audit(app)
+    r = _renew(client, world, MACHINE, old, key)
+    assert r.status_code == 200, r.data
+    (action, _u, _n, details, ok), = _audits(app, floor)
+    assert action == 'certificate.renewed' and ok and f'old serial {old.serial_number}' in details

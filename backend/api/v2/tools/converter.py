@@ -13,6 +13,7 @@ from utils.response import success_response, error_response
 from utils.export_password import validate_export_password
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.key_codec import refuse_eddsa_key
+from utils.certificate_readability import UnreadableCertificate
 from cryptography.hazmat.primitives.serialization import pkcs7
 
 from . import tools_bp, logger
@@ -277,6 +278,8 @@ def convert_certificate():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f'Conversion failed: {e}')
         return error_response('Conversion failed', 400)

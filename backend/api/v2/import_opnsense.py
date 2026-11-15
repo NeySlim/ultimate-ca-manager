@@ -18,6 +18,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.key_codec import store_pem_bytes
 from utils.key_type import weak_ca_key_refusal
+from utils.certificate_readability import stored_pem_refusal
 from utils.safe_requests import create_session
 from utils.ssrf_protection import (
     pin_host, validate_url_not_cloud_metadata, validated_addresses)
@@ -636,6 +637,12 @@ def import_items():
                 stats['errors'].append(f"CA '{_display_name(ca_data, item_id)}' is missing refid or certificate data")
                 continue
             
+            unreadable = stored_pem_refusal(crt)
+            if unreadable:
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{_display_name(ca_data, item_id)}': {unreadable}")
+                continue
+
             # Check if already exists by refid
             existing = CA.query.filter_by(refid=ca_refid).first()
             if existing:
@@ -721,6 +728,12 @@ def import_items():
                     stats['errors'].append(f"Certificate '{_display_name(cert_data, item_id)}' is missing refid or certificate data")
                     continue
                 
+                unreadable = stored_pem_refusal(crt)
+                if unreadable:
+                    stats['certs_skipped'] += 1
+                    stats['errors'].append(f"Certificate '{_display_name(cert_data, item_id)}': {unreadable}")
+                    continue
+
                 # Check if already exists by refid
                 existing = Certificate.query.filter_by(refid=cert_refid).first()
                 if existing:

@@ -21,6 +21,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
 
 from utils.dn_parse import most_specific_common_name
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
 
 from fips_mode import FipsRestricted
 from utils.csr_extensions import csr_extensions
@@ -403,6 +404,14 @@ class SmartParser:
         """
         if not self._shared:
             self._attempts = _Attempts()
+        # The format probes below swallow their errors: an unreadable certificate is raised once they are done
+        self._unreadable: List[UnreadableCertificate] = []
+        objects = self._parse_content(content, password)
+        if self._unreadable:
+            raise self._unreadable[0]
+        return objects
+
+    def _parse_content(self, content: str | bytes, password=None) -> List[ParsedObject]:
         objects: List[ParsedObject] = []
 
         # Convert bytes to string if needed (for PEM detection)
@@ -705,6 +714,11 @@ class SmartParser:
     
     def _parse_x509_cert(self, cert: x509.Certificate) -> ParsedObject:
         """Convert x509.Certificate to ParsedObject"""
+        try:
+            require_readable_extensions(cert)
+        except UnreadableCertificate as e:
+            getattr(self, '_unreadable', []).append(e)
+            raise
         obj = ParsedObject(type=ObjectType.CERTIFICATE)
         
         obj.subject = cert.subject.rfc4514_string()
