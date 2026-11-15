@@ -91,12 +91,15 @@ def _fake_tree(tmp_path):
     bin_dir.mkdir()
     state = tmp_path / 'state'
     state.mkdir()
-    # gunicorn stays up until killed and leaves its pid; the health check answers at once
+    # gunicorn stays up until killed and leaves its pid; the health check answers once it is there
     (bin_dir / 'fakepython').write_text(f'''#!/bin/sh
 if [ "$1" = "-m" ] && [ "$2" = "gunicorn" ]; then
   echo $$ > {state}/server.pid; exec sleep 300
 fi
-if [ "$1" = "-" ]; then exit 0; fi
+if [ "$1" = "-" ]; then
+  i=0; while [ ! -s {state}/server.pid ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done
+  [ -s {state}/server.pid ]; exit $?
+fi
 exec {sys.executable} "$@"
 ''')
     (bin_dir / 'npm').write_text('#!/bin/sh\nexit 0\n')
