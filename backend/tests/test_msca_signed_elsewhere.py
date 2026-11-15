@@ -237,3 +237,21 @@ def test_a_legacy_request_signed_elsewhere_no_longer_pins_the_scan(app, adcs):
     _sync(app, msca_id, full=False)
     assert _starts(adcs) == [9000]
     assert _req(app, req_id) == ('superseded', None)
+
+
+def test_check_closes_a_legacy_request_the_ca_still_holds(app, auth_client, monkeypatch):
+    from services.msca.connection import MicrosoftCAConnectionMixin
+
+    class _Pending:
+        def get_existing_cert(self, request_id, encoding='b64'):
+            raise RuntimeError('Certificate request is pending')
+
+    msca_id = _make_msca(app, 'MSE check held')
+    csr_id, req_id = _csr_with_request(app, msca_id, 7008, 'mse-held.test.local')
+    _foreign_cert(app, csr_id)
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_get_client', staticmethod(lambda m: _Pending()))
+    monkeypatch.setattr(MicrosoftCAConnectionMixin, '_cleanup_client', staticmethod(lambda c: None))
+    r = auth_client.get(f'/api/v2/microsoft-cas/{msca_id}/requests/{req_id}')
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['status'] == 'superseded'
+    assert _req(app, req_id) == ('superseded', None)
