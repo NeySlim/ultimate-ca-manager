@@ -105,21 +105,16 @@ class AuditQueryMixin:
             db.desc('count')
         ).limit(10).all()
 
-        top_users = db.session.query(
-            AuditLog.username,
-            db.func.count(AuditLog.id).label('count')
-        ).filter(
-            AuditLog.timestamp >= since
-        ).group_by(
-            AuditLog.username
-        ).order_by(
-            db.desc('count')
-        ).limit(10).all()
+        # OFFSET 0 keeps SQLite from flattening the period into a walk of the username index
+        period = db.select(AuditLog.username).where(AuditLog.timestamp >= since).offset(0).subquery()
+        count = db.func.count().label('count')
+        top_users = db.session.execute(
+            db.select(period.c.username, count).group_by(period.c.username)
+            .order_by(db.desc(count), period.c.username).limit(10)).all()
 
         # top_users is capped at 10, so it cannot stand in for the total.
-        unique_users = db.session.query(
-            db.func.count(db.distinct(AuditLog.username))
-        ).filter(AuditLog.timestamp >= since).scalar() or 0
+        unique_users = db.session.execute(
+            db.select(db.func.count(db.distinct(period.c.username)))).scalar() or 0
 
         recent_failures = AuditLog.query.filter(
             AuditLog.timestamp >= since,
