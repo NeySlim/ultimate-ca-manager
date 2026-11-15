@@ -70,6 +70,22 @@ describe('TSA signer on the health card', () => {
     expect(line.getAttribute('data-alert')).toBe(alert ? 'true' : 'false')
   })
 
+  it('the CA certificate signing is a warning, not a critical line', async () => {
+    const card = await show({ tsa: tsa({ state: 'ca_certificate', alert: true, severity: 'warning' }) })
+    const line = row(card, 'tsa')
+    expect(line.textContent).toContain('overview.health.tsaState.ca_certificate')
+    expect(line.getAttribute('data-severity')).toBe('warning')
+    expect(line.querySelector('.text-status-warning')).not.toBeNull()
+    expect(line.querySelector('.text-status-danger')).toBeNull()
+  })
+
+  it('an expiring signer stays critical', async () => {
+    const card = await show({ tsa: tsa({ state: 'expiring', days_left: 3, alert: true, severity: 'critical' }) })
+    const line = row(card, 'tsa')
+    expect(line.getAttribute('data-severity')).toBe('critical')
+    expect(line.querySelector('.text-status-danger')).not.toBeNull()
+  })
+
   it('no signer reads as not configured, neutral, with the link to configure it', async () => {
     lang.fr = true
     const card = await show({ tsa: tsa({ state: 'no_signer', alert: false, days_left: null }) })
