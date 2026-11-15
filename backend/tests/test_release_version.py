@@ -207,11 +207,24 @@ def test_a_three_segment_section_is_extracted_alone(tmp_path):
     ('3.1', CHANGELOG),
     ('3.1-rc1', CHANGELOG.replace('## [Unreleased]', '## [Later]')),
     ('3.1-rc1', CHANGELOG.replace('### Added\n- Next thing.\n', '', 1)),
+    ('3.0', CHANGELOG.replace('### Added\n- Phare thing.\n', '', 1)),
+    ('3.0-rc1', '## [Unreleased]\n\n## [3.0-rc1] - 2026-12-01\n\n## [3.0] - 2026-12-20\n- X.\n'),
+    ('3.0', '## [3.0] - 2026-12-20\n\n   \n## [2.254] - 2026-11-13\n- Old.\n'),
 ])
 def test_a_missing_or_empty_section_fails_explicitly(tmp_path, version, text):
     r = _notes(tmp_path, version, text)
     assert r.returncode == 1 and r.stdout == ''
     assert 'CHANGELOG' in r.stderr
+    assert f'[{version}]' in r.stderr
+    if '-rc' in version:
+        assert '[Unreleased]' in r.stderr
+
+
+def test_a_rc_with_an_empty_own_section_falls_back_to_unreleased(tmp_path):
+    text = CHANGELOG.replace('## [3.0] - 2026-12-20', '## [3.0-rc1] - 2026-12-01\n\n## [3.0] - 2026-12-20')
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert r.returncode == 0, r.stderr
+    assert 'Next thing.' in r.stdout
 
 
 def test_the_fallback_heading_does_not_bite_on_a_longer_version():
