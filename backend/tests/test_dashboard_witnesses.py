@@ -202,6 +202,10 @@ def test_legacy_route_keeps_the_state_when_the_pending_renewals_cannot_be_read(a
     settings(renewal='true')
     with app.app_context(), monkeypatch.context() as patch:
         patch.setattr(Certificate, 'query', _Unreadable(Certificate.query, 0))
+        import api.v2.dashboard as route
+        resets = []
+        patch.setattr(route, '_status_rollback', lambda: resets.append(1) or db.session.rollback())
         r = auth_client.get(LEGACY)
+    assert resets, 'a failed read must reset the session: on PostgreSQL the next statement would fail'
     assert r.status_code == 200
     assert get_json(r)['data']['auto_renewal'] == {'status': 'online', 'message': 'Scheduled'}

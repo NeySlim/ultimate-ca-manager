@@ -85,6 +85,7 @@ def _legacy_detail(read):
     try:
         return read()
     except Exception:
+        logger.debug('legacy status detail unreadable', exc_info=True)
         _status_rollback()
         return None
 

@@ -2123,7 +2123,7 @@ GET /api/v2/dashboard/issuance?days=7
 ```
 Scope `read:dashboard`. A `days` outside its range is refused with 400.
 
-`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at`; an expired trust anchor comes after the other critical items, the most recently expired first (at most `limit`, 100), with the full total per kind in `counts`. A repeated `kind` restricts the items, not the counts, to those kinds; an unknown kind is refused with 400:
+`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at` (at most `limit`, 100); an expired trust anchor comes after the other critical items, the most recently expired first, with the full total per kind in `counts`. A repeated `kind` restricts the items, not the counts, to those kinds; an unknown kind is refused with 400:
 
 | kind | critical | warning |
 |------|----------|---------|
