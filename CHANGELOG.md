@@ -98,17 +98,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum, and so is a CA key that cannot be read; the same CA without a key is still imported. In a batch only that CA is skipped and named.
 - OPNsense import and smart import chain a CA under the stored CA whose key signed it, whatever the order of the batch, instead of leaving it unlinked or taking a CA of the same name. A CA whose parent signature cannot be verified here (a parent key type the server does not handle, such as SLH-DSA or GOST) is imported without a parent, where smart import used to attach it by name.
 - CA import: a CA or certificate whose issuer is stored both as a root and as a cross or link certificate of the same key is now chained under the self-signed root, on SQLite and PostgreSQL alike, including a certificate installed on a pending CA and certificates linked by Smart Import, OPNsense import and the hourly chain repair. The chain status of a CA with no recorded parent and the chain added to an export follow the same rule.
-- A CA imported after its parent is linked to it in the import itself, so SCEP `GetCACert` in chain mode serves both certificates at once instead of after the hourly backfill.
 - Behind a trusted reverse proxy, the pending Kerberos handshakes of XCEP and WSTEP are keyed by the client address instead of the proxy's, so two clients no longer share one. The keytab composed from the Windows profiles is refused above 1 MiB with a readable message.
 - Kerberos: a Kerberos Microsoft CA connection pointed `KRB5_KTNAME` at its own keytab for the whole process, so XCEP and WSTEP could accept with the wrong keys; the acceptor now names its keytab itself. A ticket for a realm without key is logged as a warning instead of an unrelated GSSAPI error.
-- ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.
 - SCEP with Intune: the Entra token and the discovered service endpoint are kept between enrolments (one client per app registration), and a 401 or 403 from Graph or the validation service makes the next request ask for a new token.
 - SCEP: a `PKIOperation` sent by GET with an unencoded `+` in its `message` is read correctly instead of failing.
-- WSTEP, EST and SCEP: a renewed certificate keeps the SID security extension (KB5014754 strong mapping) of the certificate it renews when the CA signed that certificate, never one from the CSR, so it still maps to its account on a domain controller enforcing strong mapping; with the AD Connector enabled, a SID that names no account is refused.
 - Expiry webhooks: after an outage, `certificate.expired` is announced for what expired since the last pass, at most 30 days back, on a single node as in HA (a single node used to cover the last 24 hours only); the log gives the number of older expiries left aside.
 - In HA, the update result now runs on every node, so a node that is not the leader reports an update it installed. The scheduler view shows and runs it on the node that answers.
 - HA preview: certificate and CRL expiry e-mails, the expiry webhooks, the scheduled CRL of a CA and the revocations a Microsoft CA CRL sync announces now go out once when two nodes run them during a leader change. A pass skipped because another node holds its lease runs once more 30 seconds after that lease ends (10 minutes for the expiry alerts, 15 for the CRL of a CA), however many passes were skipped; the Microsoft CA sync takes no lease, and what a node that dies mid-sync left undone goes out at its next hourly pass.
-- DEB and RPM: installing the DEB no longer fails on a host without `sudo`, and the sudoers file earlier packages wrote for the `ucm` user (unused, the service restarts through the watcher) is removed on install and update.
 - HA preview: a scheduled report or scheduled backup run twice during a leader change is sent or written once, and two nodes serving orders that share one upstream ACME proxy challenge start its dns-01 automation once. `GET /api/v2/settings/backup/schedule` reports `in_progress` while a scheduled backup is still being written, and a restore keeps the target's own schedule state.
 - Certificates: lifting a hold now emits `certificate.unheld` (webhooks, WebSocket) and lifts the hold of the other member of a related pair too, unless `unhold_related` is `false`, reporting it as `related_unheld`; a body that is not a JSON object is refused (400 or 415), and a pair on one CA gets a single delta CRL.
 - Import: an imported CA now announces `ca.created` and `ca.updated`, and a submitted CSR carries the acting user in `csr.submitted`.
@@ -135,28 +131,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Concurrency: two workers or nodes issuing under one CA no longer lose counts of the CA's issued certificates, and the database refuses a second certificate stored with the same serial under one CA (the upgrade lists existing duplicates and reports them in `/health` instead of creating the index). A discovery scan, a delegated OCSP responder renewal and an ACME proxy challenge now behave the same whichever worker or node handles them.
 - Certificates: a certificate could be stored twice under one CA, with a decimal and a hexadecimal serial, past the unique serial index; every path now stores the decimal serial, the upgrade converts existing rows (rows of one CA that would then share a serial are listed, not converted) and search finds a serial typed in hex.
 - Backup: a manual backup or a restore that failed left nothing in the audit log; it now records `system_backup` or `system_restore` with `success` false and a reason, as the scheduled backup does.
-- Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.
 
 ### Security
 
-- Account: disabling 2FA or regenerating recovery codes now checks its TOTP or recovery code against the login's second-factor lockout, so a stolen session can no longer guess the code without limit; past `max_login_attempts` both answer 429 and the account's next login waits for the lock to expire. `POST /api/v2/account/2fa/confirm` answers 409 once TOTP is enabled, instead of checking a code and issuing new recovery codes.
 - Login: failed second-factor (TOTP, recovery code, security key) and passkey attempts are counted in the database, so the lockout applies on every node, survives a restart, and parallel attempts never get more tries than `max_login_attempts`. An attempt counts when it is made rather than when it fails, and a count left idle for `lockout_duration` is forgotten.
-- Dependencies: dnspython 2.9.2, which bounds the services of a WKS record (CVE-2026-128089). UCM parses record text only for TXT values it computes, so no UCM path was exposed.
 - Backup: a merge restore no longer lowers a revocation made here, final or a hold, of a certificate or a CA, nor turns its revocation record into a hold; only a graver revocation in the archive replaces it.
-- Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.
-- OCSP: a serial the CA revoked answers `revoked`, as on its CRL, even when a non-revoked record of that serial is stored again.
-- Certificates: a certificate imported again after its revocation and deletion comes back revoked, and a certificate its CA's revocation record names is no longer renewed in place.
-- Revocation: a certificate its CA recorded as revoked is now shown and treated as revoked everywhere, and an hourly pass marks such certificates revoked, with an audit entry.
-- Revocation: when a final revocation is recorded, on the certificate or on its CA's record, lifting a hold is refused with one code (409) and one message; otherwise it removes the hold's record under every record of the CA key.
-- Revocation: revoking or suspending a certificate its CA already recorded as revoked for good answers that it is already revoked; a recorded hold can still be made final.
 - Revocation: the upgrade deletes once the suspension records that lifting a hold used to leave behind, unless a 2.x upgrade already did.
 - Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, also as the related partner of a lifted certificate, and the certificate details and list show the revocation the CA recorded.
-- Backup: restored certificates take the revocation their CA recorded at once, with an audit entry, and an archive from a release before 2.254 no longer brings back as holds the records a lifted hold left behind (the restore result counts them).
-- mTLS: an administrator importing a certificate for a user can no longer enrol a revoked certificate.
-- Renewal: a certificate whose signature no longer verifies with its CA's current key (CA re-keyed or replaced under the same name) is refused with a message asking for a new certificate.
 - Users: deleting a user, alone or in bulk, left the certificates they had enrolled for mTLS valid on the CRL and at the OCSP responder; they are now revoked (cessationOfOperation) and deleted as when an enrolment is removed; a certificate that cannot be revoked does not block the deletion but is named in the answer (`unrevoked_certificates`, or `unrevoked` per user in bulk), the warning and the audit log.
-- mTLS: the self-service routes that list, assign and enrol a user's own certificates relied on the username alone; a certificate recorded before the current account was created is no longer treated as its own, and an administrator can still assign it.
-- Sessions: a session is now bound to the account it was opened for, not only to its id, so it no longer outlives that account on SQLite; sessions opened before the update stay open, but a login waiting on its second factor at the update has to enter the password again.
 - Users: on SQLite, a new account took the id of a deleted account when it held the highest id, with the rows that still named it; ids are no longer reused, a backend switch included.
 - ACME client: revoking a certificate obtained from an ACME CA (single, bulk or approved request) only revoked it in UCM while the CA still answered "good"; the CA is now told (RFC 8555 §7.6) with reasons 1, 3, 4, 5 and 9 (privilegeWithdrawn included) and retried by the scheduler until it confirms, and the answer says when the revocation stayed local (`acme_local_only`), a hold included.
 
@@ -170,6 +152,49 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Windows enrollment: the XCEP, WSTEP and Kerberos settings become the profile `default` with an explicit realm (connector base DN, else SPN, else a single-realm keytab), migrated with the same policy ID and template OIDs; without a realm to take, Kerberos alone is refused until one is set, see UPGRADE.md.
 - Windows enrollment: a Kerberos request naming no template whose EKUs match none of the profile is refused instead of issued as a server certificate; name the template or ask for its EKUs.
 - Certificates: `serial_number` of certificates issued from the form, renewed in place, issued on policy approval, issued by a Microsoft CA or used as TSA signer is now returned in decimal like the others; the UI still shows colon hex.
+
+## [2.254.1] - 2026-11-14
+
+### Security
+
+- Account: disabling 2FA or regenerating recovery codes now counts its TOTP or recovery code against the login's second-factor lockout, so a stolen session can no longer guess the code without limit; past `max_login_attempts` both answer 429 and the account's next login waits for the lock to expire. `POST /api/v2/account/2fa/confirm` answers 409 once TOTP is enabled, instead of checking a code and issuing new recovery codes.
+- Dependencies: dnspython 2.9.2, which bounds the services of a WKS record (CVE-2026-128089). UCM parses record text only for TXT values it computes, so no UCM path was exposed.
+
+## [2.254] - 2026-11-13
+
+### Fixed
+
+- CA import: an imported CA is linked at once to the stored CA whose key signed it (CA import, certificate import, OPNsense and smart import, whatever the order of a batch), so SCEP `GetCACert` in chain mode serves the chain without waiting for the hourly repair. Smart import prefers that CA over a same-name one, and still links by name when no stored CA verifies the signature.
+- Kerberos: a Kerberos Microsoft CA connection pointed `KRB5_KTNAME` at its own keytab for the whole process, so XCEP and WSTEP could then accept with the wrong keys; it now sets its client keytab only.
+- ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.
+- Backup: a revocation record archived under a hexadecimal spelling of its serial (`0x`, colons) is restored in a spelling the CRL reads, and two spellings of one serial in an archive both stay, the gravest reason answering.
+- WSTEP, EST and SCEP: a renewed certificate keeps the SID security extension (KB5014754 strong mapping) of the certificate it renews when the CA signed that certificate, never one from the CSR, so it still maps to its account on a domain controller enforcing strong mapping; with the AD Connector enabled, a SID that names no account is refused.
+- Packages: the DEB installation no longer fails on a host without sudo; the unused sudoers file is no longer written and is removed from both the DEB and the RPM.
+
+### Security
+
+- Backup: a merge restore no longer turns a certificate or a CA revoked for good here back into a hold or a valid one, nor its revocation record into a hold.
+- Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.
+- OCSP: a serial the CA revoked answers `revoked`, as on its CRL, even when a non-revoked record of that serial is stored again.
+- Certificates: a certificate imported again after its revocation and deletion comes back revoked, and a certificate its CA's revocation record names is no longer renewed in place.
+- Revocation: a certificate its CA recorded as revoked is now shown and treated as revoked everywhere, and an hourly pass marks such certificates revoked, with an audit entry.
+- Revocation: when a final revocation is recorded, on the certificate or on its CA's record, lifting a hold is refused with one code (409) and one message; otherwise it removes the hold's record in each unambiguous spelling of its serial and under every record of the CA key.
+- Revocation: revoking or suspending a certificate its CA already recorded as revoked for good answers that it is already revoked; a recorded hold can still be made final.
+- Revocation: the upgrade deletes once the suspension records that lifting a hold used to leave behind.
+- Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, and the certificate details and list show the revocation the CA recorded.
+- Backup: restored certificates take the revocation their CA recorded at once, with an audit entry, and an archive from a release before 2.254 no longer brings back as holds the records a lifted hold left behind (the restore result counts them).
+- mTLS: an administrator importing a certificate for a user can no longer enrol a revoked certificate.
+- Renewal: a certificate whose signature no longer verifies with its CA's current key (CA re-keyed or replaced under the same name) is refused with a message asking for a new certificate.
+
+## [2.253] - 2026-11-11
+
+### Fixed
+
+- Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.
+- Users: deleting a user, alone or in bulk, dropped its mTLS enrolments without revoking their certificates, which stayed valid for anything else trusting the CA; each is now revoked (cessationOfOperation) and deleted as when removing the enrolment, and a certificate that cannot be revoked no longer blocks the deletion but is named in the answer and the audit log.
+- mTLS: the self-service routes that list, assign and enrol a user's own certificates relied on the username alone; a certificate recorded before the current account was created is no longer treated as its own, and an administrator can still assign it.
+- Sessions: a session is now bound to the account it was opened for, not only to its id, so it no longer outlives that account on SQLite; sessions opened before the update stay open, but a login waiting on its second factor at the update has to enter the password again.
+- Import: re-importing a certificate under a new serial updated the stored one but left its deploy bindings idle; it now counts as a renewal and queues them, while re-importing the same serial stays silent (discussion #440).
 
 ## [2.252] - 2026-11-08
 
