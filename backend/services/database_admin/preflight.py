@@ -381,6 +381,10 @@ def check_target_is_empty(target_engine) -> Dict[str, int]:
     conn = _connect(target_engine, "target")
     try:
         for table in sorted(tables):
+            # The marker is what a failed attempt leaves behind; the retry
+            # sets it again, and any rows copied beside it count in their table.
+            if table == TRANSFER_MARKER:
+                continue
             try:
                 count = _table_row_count(conn, table)
             except PreflightError:

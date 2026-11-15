@@ -598,6 +598,33 @@ class TestEachStepIsActuallyWired:
         finally:
             engine.dispose()
 
+    def _fail_then_retry(self, app, target, monkeypatch):
+        from services.database_admin import copy as copy_module
+
+        def broken(*args, **kwargs):
+            raise RuntimeError('the disk went away')
+
+        with monkeypatch.context() as m:
+            m.setattr(copy_module, '_copy_one', broken)
+            with app.app_context():
+                ok, _, stats = migration.migrate_data(target)
+        assert ok is False and stats['refusal'] == 'copy'
+
+        with app.app_context():
+            ok, message, _ = migration.migrate_data(target)
+        assert ok is True, message
+
+    def test_a_failed_copy_can_be_retried_on_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        """The unverified marker left by a failed copy does not make the
+        target look like somebody's database."""
+        self._fail_then_retry(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_failed_copy_can_be_retried_on_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._fail_then_retry(app, pg_target, monkeypatch)
+
 
 class TestASourceThatBreaksItsOwnRules:
     def test_an_orphan_row_in_the_source_stops_the_migration(
