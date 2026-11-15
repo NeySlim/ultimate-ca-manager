@@ -2,13 +2,14 @@
 and the CI job that installs SoftHSM and GSSAPI runs every marked test with skips forbidden."""
 import os
 import re
+import shlex
 import subprocess
 import sys
 
 import pytest
 
 from tests.optional_backends import BACKENDS, required_env
-from tests.workflow_support import ROOT, load
+from tests.workflow_support import ROOT, evaluate, github_context, load
 
 BACKEND_DIR = ROOT / 'backend'
 
@@ -126,3 +127,35 @@ def _collected(marker, files):
 def test_each_named_file_has_tests_under_its_marker():
     assert _collected('needs_softhsm', SOFTHSM_FILES) == set(SOFTHSM_FILES)
     assert _collected('needs_gssapi', GSSAPI_FILES) == set(GSSAPI_FILES)
+
+
+@pytest.mark.parametrize('event, ref, runs', [
+    ('push', 'refs/heads/feature/x', True),
+    ('push', 'refs/heads/test', True),
+    ('pull_request', 'refs/pull/1/merge', True),
+    ('workflow_dispatch', 'refs/heads/dev', True),
+    ('schedule', 'refs/heads/main', False),  # the nightly run is the sequential suite's
+])
+def test_when_the_job_runs(event, ref, runs):
+    assert bool(evaluate(_job()['if'], {'github': github_context(event, ref), 'inputs': {}})) is runs
+
+
+def _pytest_paths(run):
+    """Positional arguments of the pytest command of a step: the paths it collects."""
+    words = shlex.split(run.split('pytest', 1)[1].splitlines()[0])
+    paths, skip = [], False
+    for w in words:
+        if skip:
+            skip = False
+        elif w in ('-m', '-k', '-p', '-o', '--tb', '-n'):
+            skip = True
+        elif not w.startswith('-'):
+            paths.append(w)
+    return paths
+
+
+@pytest.mark.parametrize('backend', BACKENDS)
+def test_each_step_collects_the_whole_test_tree(backend):
+    step = next(s for s in _run_steps(_job()) if f'-m needs_{backend}' in s['run'])
+    assert 'cd backend' in step['run'].splitlines()[0]
+    assert _pytest_paths(step['run']) == ['tests/'], step['run']
