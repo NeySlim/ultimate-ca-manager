@@ -192,6 +192,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Windows enrollment: the XCEP, WSTEP and Kerberos settings become the profile `default` with an explicit realm (connector base DN, else SPN, else a single-realm keytab), migrated with the same policy ID and template OIDs; without a realm to take, Kerberos alone is refused until one is set, see UPGRADE.md.
 - Windows enrollment: a Kerberos request naming no template whose EKUs match none of the profile is refused instead of issued as a server certificate; name the template or ask for its EKUs.
 - HSM: creating an X.509 CA on an HSM key (`hsm_key_id`, or `hsm_provider_id` for a new key) now requires `read:hsm` besides `write:cas`, as for an SSH CA; add it to custom roles and API keys that do this (see UPGRADE.md).
+- HSM: a 2.254 database where two X.509 CAs share an HSM key is refused at upgrade, nothing written, naming the CAs and the key; keep one CA per key in 2.254 first (see UPGRADE.md).
 - Dashboard: an API key without `read:settings` no longer receives `smtp`, `webhooks` and `auto_renewal` from `GET /api/v2/dashboard/system-status`; add the scope to keys that read them (see UPGRADE.md).
 - Certificates: `serial_number` of certificates issued from the form, renewed in place, issued on policy approval, issued by a Microsoft CA or used as TSA signer is now returned in decimal like the others; the UI still shows colon hex.
 

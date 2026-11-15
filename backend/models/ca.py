@@ -42,6 +42,8 @@ def clear_request_caches():
 class CA(db.Model):
     """Certificate Authority model"""
     __tablename__ = "certificate_authorities"
+    # One HSM key backs one X.509 CA at most (upgrade step 163); NULLs stay distinct
+    __table_args__ = (db.Index('uq_ca_hsm_key_id', 'hsm_key_id', unique=True),)
     
     id = db.Column(db.Integer, primary_key=True)
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True)
