@@ -337,6 +337,7 @@ def test_bind_never_replaces_an_existing_external_id(app):
         finally:
             db.session.rollback()
             _cleanup(['tkbound'])
+            SSOSession.query.filter_by(provider_id=pid).delete()
             SSOProvider.query.filter_by(id=pid).delete()
             db.session.commit()
 
