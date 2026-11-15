@@ -473,12 +473,12 @@ fail() {
     exit "$rc"
 }
 # A journal line holds no tab or line break: one in the path of the database or of an entry
-# of the directories $@ (those the run walks) stops it, shown visibly
+# of the directories $@ (those the run walks) stops it, shown visibly, a last one too
 odd_names() {
-    odd=$(find "$@" -maxdepth 1 \( -path "*$TAB*" -o -path "*$NL*" \) -print -quit 2>/dev/null)
-    case $DB_FILE in *"$TAB"*) odd=${odd:-$DB_FILE} ;; esac
-    [ -z "$odd" ] || fail "$(printf '%s\n' "$odd" | sed -e ':a' -e '$!N' -e '$!ba' -e 's/\n/<newline>/g' \
-        -e "s/$TAB/<tab>/g") has a tab or a line break in its name, which the journal cannot hold: rename it"
+    odd=$(find "$@" -maxdepth 1 \( -path "*$TAB*" -o -path "*$NL*" \) -printf '%p.' -quit 2>/dev/null)
+    case $DB_FILE in *"$TAB"*) odd=${odd:-$DB_FILE.} ;; esac
+    [ -z "$odd" ] || fail "$(printf '%s' "$odd" | sed -e ':a' -e '$!N' -e '$!ba' -e 's/\n/<newline>/g' \
+        -e "s/$TAB/<tab>/g" -e 's/\.$//') has a tab or a line break in its name, which the journal cannot hold: rename it"
 }
 # Before anything moves: the entries of the data, the configuration and the kept directories
 set --; for d in $KEEP_DIRS; do set -- "$@" "$DATA/$d"; done; odd_names "$DATA" "$CONFIG" "$@"

@@ -1344,7 +1344,7 @@ def test_an_item_removed_by_hand_with_the_directory_it_came_from_is_named_missin
 
 # -- names the journal cannot hold ---------------------------------------------------
 
-@pytest.mark.parametrize('name, shown', [('a\tb', 'a<tab>b'), ('a\nb', 'a<newline>b')])
+@pytest.mark.parametrize('name, shown', [('a\tb', 'a<tab>b'), ('a\nb', 'a<newline>b'), ('a\n', 'a<newline>')])
 @pytest.mark.parametrize('where', ['data', 'kept', 'config'])
 def test_a_name_with_a_tab_or_a_line_break_is_refused_before_anything_moves(tmp_path, name, shown, where):
     """An entry the journal would name cannot be named so: the run stops before the first
