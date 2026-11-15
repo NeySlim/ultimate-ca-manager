@@ -20,6 +20,7 @@ from models.crl import CRLMetadata
 from models.key_recovery import KeyRecoveryRequest, STATUS_PENDING
 from models.policy import ApprovalRequest
 from models.scep import SCEPRequest
+from models.truststore import TrustedCertificate
 from services.ocsp_responder_renewal import renewed_by_responder_task
 from utils.cert_status import EXPIRY_WINDOW_DAYS, holds_certificate, orphan_condition
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
@@ -31,7 +32,7 @@ QUEUE_KINDS = ('acme_order_failed', 'acme_client_renewal_failed', 'approval_pend
                'scep_request_pending', 'key_recovery_pending', 'crl_due', 'crl_missing',
                'manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_blocked',
                'renewal_declined', 'ca_expiring', 'deploy_binding_left_behind',
-               'https_binding_left_behind')
+               'https_binding_left_behind', 'truststore_expiring')
 ACME_FAILURE_LOOKBACK_DAYS = 7
 # A dedicated TSA signer this close to expiry is an alert (the renewal window of the signer)
 TSA_SIGNER_WARN_DAYS = 30
@@ -39,6 +40,11 @@ CRITICAL_WITHIN = timedelta(hours=24)
 DEFAULT_CRL_VALIDITY_DAYS = 7
 CA_EXPIRY_WARNING_DAYS = 365
 CA_EXPIRY_CRITICAL_DAYS = 90
+# Trust anchors: the 2.x home page listed those expiring within 90 days and the expired ones
+TRUSTSTORE_EXPIRY_DAYS = 90
+# What a caller must hold to see a kind or a witness; absent here means ``read:dashboard`` is enough
+KIND_PERMISSION = {'truststore_expiring': 'read:truststore'}
+WITNESS_PERMISSION = {'smtp': 'read:settings', 'webhooks': 'read:settings', 'auto_renewal': 'read:settings'}
 # Python's compliance grade calls a lifetime long from 399 whole days on
 SERVER_LIFETIME_MAX_DAYS = 398
 RSA_MIN_BITS = 3072
@@ -63,6 +69,7 @@ _HREF = {
     'ca_expiring': '/cas/{id}',
     'deploy_binding_left_behind': '/certificates/{certificate_id}?binding={id}',
     'https_binding_left_behind': '/settings?tab=https',
+    'truststore_expiring': '/truststore/{id}',
 }
 
 
@@ -111,7 +118,7 @@ def _within_half_validity(next_update, now, dialect):
     return next_update < literal(now, DateTime) + func.make_interval(0, 0, 0, 0, days * 12)
 
 
-def _queue_union(now, dialect):
+def _queue_union(now, dialect, kinds=QUEUE_KINDS):
     """One SELECT per kind, all shaped (kind, rank, id, label, due_at); rank 0 is critical."""
     soon = now + CRITICAL_WITHIN
     config = _renewal_config()  # read once: four kinds depend on it
@@ -196,6 +203,16 @@ def _queue_union(now, dialect):
         CA.id.label('id'), text_label(CA.descr).label('label'), due(CA.valid_to).label('due_at'),
     ).where(_active_ca(now), CA.valid_to.isnot(None),
             CA.valid_to < now + timedelta(days=CA_EXPIRY_WARNING_DAYS)))
+
+    # No lower bound, as in 2.x: an anchor expired long ago is still listed, critical
+    if 'truststore_expiring' in kinds:
+        parts.append(select(
+            _const('truststore_expiring').label('kind'),
+            case((TrustedCertificate.not_after <= now, _CRITICAL), else_=_WARNING).label('rank'),
+            TrustedCertificate.id.label('id'), text_label(TrustedCertificate.name).label('label'),
+            due(TrustedCertificate.not_after).label('due_at'),
+        ).where(TrustedCertificate.not_after.isnot(None),
+                TrustedCertificate.not_after <= now + timedelta(days=TRUSTSTORE_EXPIRY_DAYS)))
 
     # Bindings a renewal left on the previous certificate: due when that one expires
     held = aliased(Certificate)
@@ -359,11 +376,20 @@ def _short_label(kind, label):
     return (label or '')[:200]
 
 
-def work_queue(session, limit, now=None, kinds=None):
+def _allowed(table, permissions):
+    """The names of *table* a caller holding *permissions* may see (None: no restriction)."""
+    from auth.unified import has_permission
+    return {name for name in table if permissions is None or has_permission(table[name], permissions)}
+
+
+def work_queue(session, limit, now=None, kinds=None, permissions=None):
     """Items to act on, critical first then by due date, and the total per kind.
-    *kinds* restricts the items (not the counts) to those kinds."""
+    *kinds* restricts the items (not the counts) to those kinds; a kind that needs a
+    permission *permissions* lacks is neither listed nor counted."""
     now = now or utc_now()
-    queue = _queue_union(now, session.get_bind().dialect.name)
+    hidden = set(KIND_PERMISSION) - _allowed(KIND_PERMISSION, permissions)
+    visible = tuple(k for k in QUEUE_KINDS if k not in hidden)
+    queue = _queue_union(now, session.get_bind().dialect.name, visible)
     counts = {kind: 0 for kind in QUEUE_KINDS}
     for kind, n in session.execute(select(queue.c.kind, func.count()).group_by(queue.c.kind)):
         counts[kind] = n
@@ -512,8 +538,44 @@ def _tsa_health():
                 'days_left': None, 'alert': True, 'last_operation_at': None, 'last_status': None}
 
 
-def protocol_health(session, days, now=None):
-    """Per protocol, ``days`` UTC calendar days of ok/failed counts, oldest first."""
+def _witness(state, alert=False, count=None):
+    return {'basis': 'setting', 'periods': None, 'state': state, 'count': count, 'alert': alert,
+            'last_operation_at': None, 'last_status': None}
+
+
+def _smtp_witness():
+    """The 2.x rules: no host is not configured; configured but off, or without port or From, is a warning."""
+    from models.email_notification import SMTPConfig
+    smtp = SMTPConfig.query.first()
+    if not smtp or not (smtp.smtp_host or '').strip():
+        return _witness('not_configured')
+    if not smtp.enabled:
+        return _witness('disabled', True)
+    if not (smtp.smtp_port and (smtp.smtp_from or '').strip()):
+        return _witness('incomplete', True)
+    return _witness('ready')
+
+
+def _webhooks_witness():
+    from services.webhook_service import WebhookEndpoint
+    total, active = db.session.execute(select(
+        func.count(), func.coalesce(func.sum(case((WebhookEndpoint.enabled.is_(True), 1), else_=0)), 0)
+    ).select_from(WebhookEndpoint)).one()
+    if active:
+        return _witness('active', count=int(active))
+    return _witness('none_active', True, total) if total else _witness('not_configured', count=0)
+
+
+def _auto_renewal_witness():
+    return _witness('enabled' if _renewal_config()['enabled'] else 'disabled')
+
+
+_WITNESSES = {'smtp': _smtp_witness, 'webhooks': _webhooks_witness, 'auto_renewal': _auto_renewal_witness}
+
+
+def protocol_health(session, days, now=None, permissions=None):
+    """Per protocol, ``days`` UTC calendar days of ok/failed counts, oldest first. The mail,
+    webhook and auto-renewal witnesses go only to a caller holding the setting's read right."""
     now = now or utc_now()
     start, dates = _window(days, now)
     protocols = {
@@ -525,6 +587,12 @@ def protocol_health(session, days, now=None):
     tsa = _tsa_health()
     if tsa is not None:
         protocols['tsa'] = tsa
+    for name in _allowed(WITNESS_PERMISSION, permissions):
+        try:
+            protocols[name] = _WITNESSES[name]()
+        except Exception:
+            logger.debug('%s witness failed', name, exc_info=True)
+            session.rollback()
     return {'days': days, 'from': dates[0], 'to': dates[-1], 'protocols': protocols}
 
 
