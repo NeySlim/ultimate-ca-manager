@@ -464,8 +464,8 @@ for j in "$PARENT"/*/.journal; do
     [ -n "$RENAME" ] || no_interpreter 2
     if roll_back; then
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete:"
-        put_back "the files it could not put back are in place again." \
-            "everything else it could not put back is in place again; at neither path:"
+        put_back "what it had left in its archive is back in place now." \
+            "the rest of what it had left in its archive is back in place now; at neither path:"
     else
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete."
         say_stuck

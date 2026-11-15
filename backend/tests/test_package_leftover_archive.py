@@ -1298,7 +1298,7 @@ def test_an_item_whose_filesystem_is_gone_waits_for_it_and_is_never_called_missi
     for _ in range(2):
         out = box.run()
         assert out.returncode == 2, (out.stdout, out.stderr)
-        assert 'is missing:' not in out.stdout and 'in place again' not in out.stdout, out.stdout
+        assert 'is missing:' not in out.stdout and 'back in place now' not in out.stdout, out.stdout
         lines = reported(out.stdout)
         assert lines[f'{box.data}/{LOCAL}/https_key.pem'] == (
             f'not put back to {box.data}/https_key.pem: neither is there, as {box.data}/{LOCAL} '
@@ -1321,8 +1321,8 @@ def test_an_item_removed_by_hand_is_named_and_never_said_to_be_back(tmp_path):
     (box.archive / 'data' / 'https_key.pem').unlink()
     out = box.run()
     assert out.returncode == 0, (out.stdout, out.stderr)
-    assert 'are in place again.' not in out.stdout, out.stdout
-    assert ('everything else it could not put back is in place again; at neither path:\n'
+    assert 'is back in place now.' not in out.stdout, out.stdout
+    assert ('the rest of what it had left in its archive is back in place now; at neither path:\n'
             f'  {box.data}/https_key.pem\n') in out.stdout, out.stdout
 
 
@@ -1657,7 +1657,7 @@ def test_an_item_whose_rename_never_ran_waits_for_its_absent_filesystem(tmp_path
         out = box.run()
         outs.append(out.stdout)
         assert out.returncode == 2, (out.stdout, out.stderr)
-        assert 'is missing' not in out.stdout and 'in place again' not in out.stdout, out.stdout
+        assert 'is missing' not in out.stdout and 'back in place now' not in out.stdout, out.stdout
         assert f'as {box.data} is absent: mount what holds it' in out.stdout, out.stdout
         assert lines <= set(journal.read_text().splitlines())
         assert not box.data.exists()
@@ -1808,3 +1808,15 @@ def test_the_way_back_lists_its_steps_in_the_order_they_happen(tmp_path):
     assert 'put these back' in steps[3]
     assert 'systemctl start ucm' in steps[4]
     assert 'Install this release again' in steps[5]
+
+
+def test_a_completed_put_back_says_what_is_back_without_a_contradiction(tmp_path):
+    """Killed after a rename: the next attempt puts it back first and says so plainly."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    _killed_after_renaming(box, 'https_key.pem')
+    out = box.run()
+    assert ('UCM: an earlier attempt to archive what a removed UCM left did not complete:\n'
+            'what it had left in its archive is back in place now.\n') in out.stdout, out.stdout
+    assert 'could not put back' not in out.stdout
+    archived(box, out, data, config)
