@@ -138,17 +138,23 @@ def _remove_session_files() -> int:
         logger.error("Restore: session store %s could not be read: %s", directory, exc)
         return 0
 
-    for entry in entries:
-        try:
-            if not entry.is_file(follow_symlinks=False):
-                continue
-            os.unlink(entry.path)
-            removed += 1
-        except OSError as exc:
-            logger.error(
-                "Restore: session file %s could not be removed, the session it "
-                "holds may still be usable: %s", entry.path, exc,
-            )
+    from utils.session_store import session_files_lock
+    failures = []
+    # Held exclusively: a save in flight cannot write back a file removed here
+    with session_files_lock(directory, exclusive=True):
+        for entry in entries:
+            try:
+                if not entry.is_file(follow_symlinks=False):
+                    continue
+                os.unlink(entry.path)
+                removed += 1
+            except OSError as exc:
+                failures.append((entry.path, exc))
+    for path, exc in failures:
+        logger.error(
+            "Restore: session file %s could not be removed, the session it "
+            "holds may still be usable: %s", path, exc,
+        )
     return removed
 
 

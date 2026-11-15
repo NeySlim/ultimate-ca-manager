@@ -65,15 +65,19 @@ class SessionCleanupTask:
             cutoff = time.time() - max_lifetime - 3600
             cleaned = 0
 
+            from utils.session_store import session_files_lock
             for filename in os.listdir(data_dir):
                 filepath = os.path.join(data_dir, filename)
                 if not os.path.isfile(filepath):
                     continue
                 try:
-                    mtime = os.path.getmtime(filepath)
-                    if mtime < cutoff:
-                        os.unlink(filepath)
-                        cleaned += 1
+                    if os.path.getmtime(filepath) >= cutoff:
+                        continue
+                    # Checked again under the lock: a save may have refreshed it meanwhile
+                    with session_files_lock(data_dir, exclusive=True):
+                        if os.path.getmtime(filepath) < cutoff:
+                            os.unlink(filepath)
+                            cleaned += 1
                 except OSError:
                     pass
 

@@ -4,9 +4,14 @@ Flask-Session's stock SQL interface commits ``db.session``, so it would also
 commit whatever a failed request left pending. This one owns a separate session
 on its own engine, so saving a session never waits on the request's pool.
 """
+import errno
+import fcntl
+import logging
 import os
 import random
 import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime
 
 from flask_session._utils import retry_query
@@ -16,6 +21,44 @@ from flask import current_app
 from itsdangerous import BadSignature, want_bytes
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+
+logger = logging.getLogger(__name__)
+
+HELD, BUSY, UNSUPPORTED = 'held', 'busy', 'unsupported'
+
+
+@contextmanager
+def session_files_lock(directory, exclusive, wait=2.0):
+    """flock on the session directory itself, which no removal can unlink: a guarded save
+    holds it shared around its check and write, a removal exclusively. Taken without
+    blocking and retried by sleeping, so a gevent worker yields instead of stalling."""
+    try:
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+    except OSError:
+        yield UNSUPPORTED
+        return
+    try:
+        operation = (fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH) | fcntl.LOCK_NB
+        deadline = time.monotonic() + wait
+        delay = 0.0005
+        while True:
+            try:
+                fcntl.flock(fd, operation)
+                state = HELD
+                break
+            except OSError as exc:
+                if exc.errno not in (errno.EAGAIN, errno.EWOULDBLOCK):
+                    state = UNSUPPORTED  # e.g. an exclusive flock on an NFS directory
+                    break
+                if time.monotonic() >= deadline:
+                    state = BUSY
+                    break
+                time.sleep(delay)
+                delay = min(delay * 2, 0.05)
+        yield state
+    finally:
+        os.close(fd)  # closing releases the lock
 
 
 class KeepsRemovedRecordsGone:
@@ -59,11 +102,22 @@ class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessi
     def _record_exists(self, store_id):
         return self.cache.has(store_id)
 
+    def _delete_session(self, store_id):
+        with session_files_lock(self.cache._path, exclusive=True):
+            super()._delete_session(store_id)
+
     def _upsert_session(self, session_lifetime, session, store_id):
-        if self._opened_from_store(session) and not self.cache.has(store_id):
-            session.record_gone = True
-            return
-        super()._upsert_session(session_lifetime, session, store_id)
+        if not self._opened_from_store(session):
+            return super()._upsert_session(session_lifetime, session, store_id)
+        with session_files_lock(self.cache._path, exclusive=False) as state:
+            if state == BUSY:
+                # A removal holds the store: writing without the lock could undo it
+                logger.warning("Session not saved: the session store stayed locked")
+                return
+            if not self.cache.has(store_id):
+                session.record_gone = True
+                return
+            super()._upsert_session(session_lifetime, session, store_id)
 
 
 class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInterface):
