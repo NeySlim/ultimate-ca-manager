@@ -1259,3 +1259,20 @@ def test_the_way_back_puts_back_only_the_local_archives_of_this_archiving(tmp_pa
     step3 = readme.split(' 3. ', 1)[1].split(' 4. ', 1)[0]
     assert 'each directory listed above' not in step3, step3
     assert ('each directory listed under "Kept beside where they were"' in step3) == beside, step3
+
+
+def test_a_refused_rename_leaves_no_line_that_would_ask_for_a_choice(tmp_path):
+    """Overlayfs: renaming updates/ is refused and it stays, archived entry by entry; then
+    master.key fails the run and the archive's updates/ cannot be removed. Only that is
+    named: nothing asks to choose between two sides."""
+    box = Box(tmp_path, python='stub')
+    box.wrap(fstype='overlay', refused=(f'{box.config}/master.key',))
+    data, config = originals(box)
+    held = f'{box.archive}/data/updates'
+    (box.bin / 'rmdir').write_text(
+        f'#!/bin/sh\nfor last; do :; done\n[ "$last" != "{held}" ] || exit 1\nexec {REAL["rmdir"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert reported(out.stdout) == {held: 'could not be removed'}, out.stdout
+    assert 'choose' not in out.stdout and 'exists again' not in out.stdout, out.stdout
+    exactly_once(box, data, config)
