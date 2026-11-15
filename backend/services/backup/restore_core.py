@@ -441,6 +441,8 @@ class RestoreCoreMixin:
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
+        from .restore_extended import refuse_archived_shared_keys
+        refuse_archived_shared_keys(backup_data, plan)
 
         # Files are staged during the transaction and published just before the
         # commit; a commit that fails puts them back (`unpublish()`).
@@ -987,6 +989,8 @@ class RestoreCoreMixin:
         # build one, so references still land on the row the archive names
         # rather than on whatever holds that number here.
         plan = plan if plan is not None else RestorePlan.build(backup_data)
+        from .restore_extended import _refuse_a_taken_key
+        taken = {}
 
         for ca_data in backup_data.get('certificate_authorities', []):
             ca = CA.query.filter_by(refid=ca_data['refid']).first()
@@ -1029,6 +1033,7 @@ class RestoreCoreMixin:
             ca.ski = ca_data.get('ski') or ca.ski
             self._apply_ca_fields(ca, ca_data)
             self._apply_ca_revocation(ca, ca_data, here_revocation)
+            _refuse_a_taken_key(ca, taken)
             results['cas'] += 1
 
     def _restore_certificates(self, backup_data: Dict, results: Dict, master_key: bytes,

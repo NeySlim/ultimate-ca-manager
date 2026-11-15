@@ -213,26 +213,60 @@ def _existing_row(section_name: str, identity: Dict[str, Any], plan: Optional[Re
     return next((row for row in rows if sa_inspect(row).identity[0] == taken), None)
 
 
-def _refuse_a_taken_key(sca, taken):
-    """BackupSchemaError before the flush when another authority holds the SSH CA's HSM key:
+def _authority_name(authority):
+    from models import CA
+    if isinstance(authority, CA):
+        return f"X.509 CA '{authority.descr or ''}'"
+    return f"SSH {authority.ca_type} CA '{authority.descr or ''}'"
+
+
+def _refuse_a_taken_key(authority, taken):
+    """BackupSchemaError before the flush when another authority holds the X.509 or SSH CA's HSM key:
     the unique index would refuse it with a database message naming neither authority."""
     from models import CA
     from models.ssh import SSHCertificateAuthority
     from services.hsm import key_binding
-    if sca.hsm_key_id is None:
+    if authority.hsm_key_id is None:
         return
-    name = f"SSH {sca.ca_type} CA '{sca.descr or ''}'"
+    name = _authority_name(authority)
     with db.session.no_autoflush:
-        ssh = SSHCertificateAuthority.query.filter(SSHCertificateAuthority.hsm_key_id == sca.hsm_key_id)
-        if sca.id is not None:
-            ssh = ssh.filter(SSHCertificateAuthority.id != sca.id)
-        held = ([f"X.509 CA '{c.descr or ''}'" for c in CA.query.filter_by(hsm_key_id=sca.hsm_key_id)]
-                + [f"SSH {c.ca_type} CA '{c.descr or ''}'" for c in ssh] + taken.get(sca.hsm_key_id, []))
+        x509 = CA.query.filter(CA.hsm_key_id == authority.hsm_key_id)
+        ssh = SSHCertificateAuthority.query.filter(SSHCertificateAuthority.hsm_key_id == authority.hsm_key_id)
+        if authority.id is not None:
+            if isinstance(authority, CA):
+                x509 = x509.filter(CA.id != authority.id)
+            else:
+                ssh = ssh.filter(SSHCertificateAuthority.id != authority.id)
+        held = [_authority_name(c) for c in x509] + [_authority_name(c) for c in ssh] \
+            + taken.get(authority.hsm_key_id, [])
         if held:
             raise BackupSchemaError(
-                f"Cannot restore the {name}: HSM key '{key_binding.label_of(sca.hsm_key_id)}' "
+                f"Cannot restore the {name}: HSM key '{key_binding.label_of(authority.hsm_key_id)}' "
                 f"already backs the {held[0]}. An HSM key backs one authority only; nothing has been changed.")
-    taken.setdefault(sca.hsm_key_id, []).append(name)
+    taken.setdefault(authority.hsm_key_id, []).append(name)
+
+
+def refuse_archived_shared_keys(backup_data, plan):
+    """BackupSchemaError, before any write, when the archive itself gives one HSM key to two authorities."""
+    import json
+    by_key = {}
+    for section, describe in (('certificate_authorities', lambda r: f"X.509 CA '{r.get('descr') or ''}'"),
+                              ('ssh_cas', lambda r: f"SSH {r.get('ca_type') or 'user'} CA '{r.get('descr') or ''}'")):
+        for row in backup_data.get(section) or []:
+            if not isinstance(row, dict) or row.get('hsm_key_id') is None:
+                continue
+            ref = row.get(f'hsm_key_id{REFERENCE_SUFFIX}')
+            key = json.dumps(ref, sort_keys=True, default=str) if ref else f"#{row.get('hsm_key_id')}"
+            by_key.setdefault(key, (ref, []))[1].append(describe(row))
+    for key, (ref, names) in by_key.items():
+        if len(names) < 2:
+            continue
+        label = key
+        if isinstance(ref, dict):
+            label = (plan._archived_row('hsm_keys', ref) or {}).get('label') or ref.get('key_identifier') or key
+        raise BackupSchemaError(
+            f"Cannot restore: the archive gives HSM key '{label}' to both the {names[0]} and the {names[1]}. "
+            "An HSM key backs one authority only; nothing has been changed.")
 
 
 class RestoreExtendedMixin:

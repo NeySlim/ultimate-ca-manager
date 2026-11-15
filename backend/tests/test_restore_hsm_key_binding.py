@@ -94,6 +94,8 @@ CASES = {
                     "SSH user CA 'archived'", "X.509 CA 'here'"),
     'x509_on_ssh': (lambda t: t.x509_ca('archived'), lambda t: t.ssh_ca('here', 'host'),
                     "X.509 CA 'archived'", "SSH host CA 'here'"),
+    'x509_on_x509': (lambda t: t.x509_ca('archived'), lambda t: t.x509_ca('here'),
+                     "X.509 CA 'archived'", "X.509 CA 'here'"),
 }
 
 
@@ -163,4 +165,36 @@ def test_a_key_shared_before_the_restore_does_not_stop_it_on_sqlite(app, tmp_pat
         blob = _service().create_backup(PASSWORD, include=_only('hsm_keys', 'hsm_providers'))
         _service().restore_backup(blob, PASSWORD, mode='merge')
         assert _holders(token.key.id) == ['ssh:shared', 'x509:earlier']
+        db.session.remove()
+
+
+def _archive_with_two_x509_cas_on_one_key(app, url):
+    """An archive of an installation where two X.509 CAs share one key (a 2.x race left it so)."""
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, url) as engine, app.app_context():
+        token = _Token()
+        token.x509_ca('first')
+        with engine.begin() as conn:
+            conn.exec_driver_sql('DROP INDEX uq_ca_hsm_key_id')
+        db.session.add(CA(refid=str(uuid.uuid4()), descr='second', crt='', hsm_key_id=token.key.id))
+        db.session.commit()
+        blob = _service().create_backup(PASSWORD, include=_only(*SECTIONS))
+        label = token.key.label
+        db.session.remove()
+    return blob, label
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_an_archive_giving_one_key_to_two_x509_cas_is_refused_on_sqlite(app, tmp_path, mode):
+    from tests.test_backup_cross_installation import _bound_to
+    blob, label = _archive_with_two_x509_cas_on_one_key(app, f"sqlite:///{tmp_path / 'source.db'}")
+    with _bound_to(app, f"sqlite:///{tmp_path / 'target.db'}"), app.app_context():
+        with pytest.raises(BackupSchemaError) as refused:
+            _service().restore_backup(blob, PASSWORD, mode=mode)
+        db.session.rollback()
+        message = str(refused.value)
+        assert (f"HSM key '{label}'" in message and "X.509 CA 'first'" in message
+                and "X.509 CA 'second'" in message), message
+        assert 'UNIQUE' not in message.upper() and 'nothing has been changed' in message, message
+        assert CA.query.count() == 0 and HsmKey.query.count() == 0
         db.session.remove()
