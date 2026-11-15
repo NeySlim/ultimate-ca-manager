@@ -1584,6 +1584,26 @@ class TestARefusalSaysWhetherARetryCanHelp:
         assert stats['refusal'] == 'copy'
         assert stats['transient'] is transient
 
+    @pytest.mark.parametrize('sqlstate,transient', [
+        ('08000', True), ('08001', True), ('08003', True), ('08006', True),
+        ('40001', True), ('40P01', True), ('53300', True),
+        ('57P01', True), ('57P02', True), ('57P03', True),
+        ('40002', False), ('40003', False), ('53100', False), ('53200', False),
+        ('57014', False), ('57P04', False), ('57000', False), ('23505', False),
+    ])
+    def test_only_the_sqlstates_a_retry_can_clear_are_transient(self, sqlstate, transient):
+        error = _driver_error('OperationalError', 'failed', sqlstate=sqlstate)
+        assert migration._is_transient(error) is transient
+
+    @pytest.mark.parametrize('message,transient', [
+        ('database is locked', True),
+        ('database table is locked', False),
+        ('disk I/O error', False),
+        ('database or disk is full', False),
+    ])
+    def test_only_a_locked_sqlite_database_is_transient(self, message, transient):
+        assert migration._is_transient(_driver_error('OperationalError', message)) is transient
+
     def test_a_verification_is_never_transient(self, app, sqlite_target, monkeypatch):
         def refuse(*args, **kwargs):
             raise VerificationError('users: 3 rows copied, 2 on the target')

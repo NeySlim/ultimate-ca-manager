@@ -725,10 +725,10 @@ def _refusal_kind(exc: Exception) -> str:
     return 'error'
 
 
-# SQLSTATE classes a retry can clear: connection, transaction rollback (serialization, deadlock),
-# insufficient resources, operator intervention (shutdown, cancel)
-_TRANSIENT_SQLSTATES = ('08', '40', '53', '57')
-_TRANSIENT_SQLITE = ('database is locked', 'database table is locked', 'disk i/o error')
+# Codes a retry can clear, from the PostgreSQL documentation, appendix A "PostgreSQL Error Codes":
+# class 08 (connection), serialization, deadlock, too many connections, server shut down
+_TRANSIENT_SQLSTATES = ('08', '40001', '40P01', '53300', '57P01', '57P02', '57P03')
+_TRANSIENT_SQLITE = ('database is locked',)
 
 
 def _is_transient(exc: BaseException) -> bool:
