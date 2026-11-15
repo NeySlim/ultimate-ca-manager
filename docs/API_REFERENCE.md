@@ -368,7 +368,7 @@ Security-key management for the signed-in account is served under `/api/v2/webau
 
 ### mTLS Certificates
 
-Served under `/api/v2/mtls/` (not under `/account/`). Except for the two settings routes, every route here refuses API keys: it needs an interactive session (`403` otherwise). A user works on their own enrolments; an admin may act on another user's where noted.
+Served under `/api/v2/mtls/` (not under `/account/`). Except for the two settings routes and the two GET lists (certificates, available-certificates), every route here needs an interactive session (`403` otherwise). A user works on their own enrolments; an admin may act on another user's where noted.
 
 ```http
 GET /api/v2/mtls/settings
