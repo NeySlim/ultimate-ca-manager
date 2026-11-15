@@ -35,9 +35,10 @@ def _setting(app, key, value):
 def test_a_protocol_turned_off_answers_503(app):
     c = app.test_client()
     with _setting(app, 'est_enabled', 'false'), _setting(app, 'xcep_enabled', 'false'):
-        assert c.get(_EST).status_code == 503
-        assert c.get(_XCEP).status_code == 503
-    # Turned on, neither answers that it is turned off (an unconfigured EST also gives 503).
+        # The switch's own refusal: an unconfigured EST or Kerberos binding also gives 503.
+        for path, body in ((_EST, 'EST disabled'), (_XCEP, 'XCEP disabled')):
+            r = c.get(path)
+            assert (r.status_code, r.get_data(as_text=True)) == (503, body), path
     with _setting(app, 'est_enabled', 'true'), _setting(app, 'xcep_enabled', 'true'):
         assert c.get(_EST).get_data(as_text=True) != 'EST disabled'
         assert c.get(_XCEP).get_data(as_text=True) != 'XCEP disabled'
