@@ -3,8 +3,9 @@
 A binding locks the ``hsm_keys`` row first (``lock_key``) and checks both tables under it:
 two creations racing on one key serialise on that row lock until the first one commits.
 Two rows naming one token key (two providers on one token) are matched by their public key
-(``refuse_same_token_key``), but each takes its own lock: two creations racing on the two rows
-at once are not serialised, and both may be created.
+(``refuse_same_token_key``). On PostgreSQL each takes its own row lock: two creations racing on
+the two rows at once are not serialised, and both may be created. SQLite serialises them, its
+``lock_key`` taking the database write lock.
 """
 from cryptography.hazmat.primitives import serialization
 from sqlalchemy import update

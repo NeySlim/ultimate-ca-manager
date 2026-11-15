@@ -153,7 +153,7 @@ def test_a_merge_of_the_authority_already_on_the_key_is_restored_on_sqlite(app, 
 
 
 def test_a_key_shared_before_the_restore_does_not_stop_it_on_sqlite(app, tmp_path):
-    """Two authorities on one key from an earlier release: the merge is not theirs to refuse."""
+    """An X.509 and an SSH CA on one key here before the restore (a race): not the merge's to refuse."""
     from tests.test_backup_cross_installation import _bound_to
     with _bound_to(app, f"sqlite:///{tmp_path / 'restore.db'}"), app.app_context():
         token = _Token()
