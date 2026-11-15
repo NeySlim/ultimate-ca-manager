@@ -13,7 +13,7 @@ def ha_enabled():
 
 def validate_ha_config(config=None):
     """Exit at startup when UCM_HA=1 meets a configuration that cannot span nodes."""
-    from config.settings import Config, redis_url
+    from config.settings import Config
     cfg = config or Config
     if not cfg.HA_MODE:
         return
@@ -29,8 +29,9 @@ def validate_ha_config(config=None):
             logger.warning("HA: the local master.key overrides KEY_ENCRYPTION_KEY on this node")
     elif not os.getenv('KEY_ENCRYPTION_KEY'):
         raise SystemExit("UCM_HA=1 requires KEY_ENCRYPTION_KEY set in the environment, identical on every node")
-    if not redis_url():
-        logger.warning("HA: filesystem sessions are not shared between nodes, see the sessions lot")
+    # Without Redis the sessions live in PostgreSQL, shared by every node
+    if getattr(cfg, 'SESSION_TYPE', None) == 'filesystem':
+        logger.warning("HA: filesystem sessions are not shared between nodes")
 
 
 def ha_refusal(reason):

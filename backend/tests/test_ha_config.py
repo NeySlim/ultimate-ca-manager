@@ -21,6 +21,7 @@ def ha_cfg(monkeypatch):
     monkeypatch.setenv('SECRET_KEY', 's')
     monkeypatch.setenv('KEY_ENCRYPTION_KEY', 'k')
     monkeypatch.setenv('REDIS_URL', 'redis://x')
+    monkeypatch.setattr(Config, 'SESSION_TYPE', 'redis')
     return Config
 
 
@@ -60,9 +61,18 @@ def test_valid_ha_config_starts(ha_cfg, caplog):
     assert 'sessions' not in caplog.text
 
 
-def test_ha_without_redis_warns_about_sessions(ha_cfg, monkeypatch, caplog):
+def test_ha_without_redis_keeps_sessions_in_postgresql_and_says_nothing(ha_cfg, monkeypatch, caplog):
     monkeypatch.delenv('REDIS_URL')
     monkeypatch.delenv('UCM_REDIS_URL', raising=False)
+    monkeypatch.setattr(Config, 'SESSION_TYPE', 'sqlalchemy')
+    with caplog.at_level(logging.WARNING):
+        ha.validate_ha_config(Config)
+    assert 'filesystem sessions' not in caplog.text
+
+
+def test_ha_on_filesystem_sessions_warns(ha_cfg, monkeypatch, caplog):
+    monkeypatch.delenv('REDIS_URL')
+    monkeypatch.setattr(Config, 'SESSION_TYPE', 'filesystem')
     with caplog.at_level(logging.WARNING):
         ha.validate_ha_config(Config)
     assert 'filesystem sessions are not shared' in caplog.text
