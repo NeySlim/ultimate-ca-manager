@@ -3,7 +3,7 @@ total per kind counted in SQL rather than from the truncated list."""
 import json
 import secrets
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -375,7 +375,9 @@ def test_ocsp_responder_renewal_switched_off_makes_it_manual(app, auth_client, s
 
 def test_sorted_critical_first_then_by_due_date(auth_client, seeded):
     items = _queue(auth_client)['items']
-    keys = [(0 if i['tier'] == 'critical' else 1, i['due_at']) for i in items]
+    # Instants, not their text: within one second, 'Z' sorts after a fraction of it
+    keys = [(0 if i['tier'] == 'critical' else 1, datetime.fromisoformat(i['due_at'].replace('Z', '+00:00')))
+            for i in items]
     assert keys == sorted(keys)
 
 

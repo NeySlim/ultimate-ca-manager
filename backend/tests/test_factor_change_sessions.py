@@ -92,11 +92,12 @@ def nodes(request, app, monkeypatch, tmp_path):
         admin.close()
 
 
-def _make_user(application, totp=False, key=None, choice=False, key_enabled=True):
+def _make_user(application, totp=False, key=None, choice=False, key_enabled=True, id=None):
     with application.app_context():
         user = User(username=f'factor-{uuid.uuid4().hex[:8]}', role='operator',
                     email=f'{uuid.uuid4().hex[:8]}@example.test', webauthn_2fa=choice)
         user.set_password(PASSWORD)
+        user.id = id  # None: the database gives one
         if totp:
             user.totp_secret = pyotp.random_base32()
             user.totp_confirmed = True
@@ -426,6 +427,25 @@ def test_sessions_the_application_ended_are_not_counted(nodes, expired):
         assert r.status_code == 200, r.data
         assert r.get_json()['meta']['other_sessions_closed'] == 1
         assert not _signed_in(live) and not _signed_in(old) and _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
+
+
+def test_a_session_left_by_an_earlier_account_of_the_same_id_is_not_counted(nodes):
+    """SQLite hands the id of a deleted account out again: the session that account left in
+    the store is not one of this account's, and this change closed one session, not two."""
+    first_node, second_node = nodes
+    earlier = _make_user(first_node)
+    _open_session(second_node, earlier)
+    _cleanup(first_node, earlier)
+    user = _make_user(first_node, key=SoftKey(), key_enabled=False, id=earlier['id'])
+    try:
+        _open_session(second_node, user)
+        this = _open_session(first_node, user)
+        r = _toggle_key(True)(first_node, this, user)
+        assert r.status_code == 200, r.data
+        assert r.get_json()['meta']['other_sessions_closed'] == 1
+        assert '1 other session closed' in (_audit_details(first_node, 'webauthn_toggle', user) or '')
     finally:
         _cleanup(first_node, user)
 
