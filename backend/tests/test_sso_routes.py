@@ -16,9 +16,12 @@ def _own_saml_provider(app):
     """One provider per type is allowed: a SAML row another file of the worker left would
     fail the CRUD tests, so the module starts without one and leaves none."""
     from models import SSOProvider, db
+    from models.sso import SSOSession
 
     def clear():
         with app.app_context():
+            saml = [p.id for p in SSOProvider.query.filter_by(provider_type='saml')]
+            SSOSession.query.filter(SSOSession.provider_id.in_(saml)).delete(synchronize_session=False)
             SSOProvider.query.filter_by(provider_type='saml').delete()
             db.session.commit()
 

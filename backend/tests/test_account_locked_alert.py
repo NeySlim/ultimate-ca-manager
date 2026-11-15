@@ -6,7 +6,7 @@ import pytest
 
 from models import db, User
 from models.email_notification import NotificationConfig
-from models.sso import SSOProvider
+from models.sso import SSOProvider, SSOSession
 
 PASSWORD = 'Locked-Passw0rd!'
 
@@ -94,6 +94,8 @@ def ldap_provider(app, monkeypatch):
         provider_id = provider.id
     yield provider_id
     with app.app_context():
+        # SQLite hands a deleted provider's id out again: a session an earlier test left on it goes too
+        SSOSession.query.filter_by(provider_id=provider_id).delete()
         db.session.delete(db.session.get(SSOProvider, provider_id))
         db.session.commit()
 

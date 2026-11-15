@@ -1816,7 +1816,7 @@ export const helpContent = {
     ],
     tips: [
       'Key Recovery is for keys that were not exported when the certificate was issued; it is not a replacement for restricting key export at issuance time.',
-      'Every request, approval, rejection and download is recorded in the audit trail, as are a self-approval refused by dual control and a download that failed; a call refused for any other reason is not.',
+      'Every request, approval, rejection and download is recorded in the audit trail, as are a self-approval refused by dual control and a download whose archive could not be built; a call refused for any other reason is not.',
     ],
     warnings: [
       'A certificate whose private key was never archived cannot be recovered: there is nothing to release.',
@@ -1939,7 +1939,7 @@ export const helpContent = {
           { label: 'Template Selection', text: 'Choose from available certificate templates on the MS CA' },
           { label: 'Auto-Approved', text: 'Templates with autoenroll return the certificate immediately' },
           { label: 'Manager Approval', text: 'Some templates require manager approval, UCM tracks the pending request' },
-          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM, and the page offers no status check: once it is issued on the CA, import the certificate, or let Inventory sync over the WinRM admin channel import the certificates UCM does not know yet' },
+          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM, and the interface offers no status check: approve it from the CA Control Panel, which imports the certificate. Inventory sync does not complete a pending request' },
         ]
       },
       {

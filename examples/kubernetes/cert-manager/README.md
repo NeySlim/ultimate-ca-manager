@@ -47,8 +47,8 @@ on renewal — UCM only requires EAB for **account creation**).
 
 ### Step 1 — Enable EAB in UCM
 1. Log in to UCM as **admin**.
-2. **Settings → ACME** → enable **External Account Required**.
-3. **ACME → EAB Credentials → Create**. UCM returns once:
+2. **ACME → EAB Credentials** → enable **Require External Account Binding**.
+3. **ACME → EAB Credentials → New EAB**. UCM returns once:
    ```
    kid:  XPD3ZsFCbGrWWib9pWYIMw
    hmac: sVbRLYu-AHNZz52yq69Leld02zVMU68GIIkLjHbVzlM

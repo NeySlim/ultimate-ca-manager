@@ -7,6 +7,8 @@ const lab = process.env.UCM_LAB === '1'
 const managed = process.env.UCM_E2E_MANAGED === '1' && !lab
 const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }
 const RESTORE = /backup-restore\.spec\.ts/
+// The overview lists the five latest operations: its tests need to be the only ones acting
+const OVERVIEW = /overview\.spec\.ts/
 const LAB = lab ? [] : ['lab/**']
 
 export default defineConfig({
@@ -31,8 +33,9 @@ export default defineConfig({
     navigationTimeout: 30_000,
   },
   projects: [
-    { name: 'chromium', use: desktop, testIgnore: [...LAB, RESTORE] },
+    { name: 'chromium', use: desktop, testIgnore: [...LAB, RESTORE, OVERVIEW] },
+    { name: 'overview', use: desktop, testMatch: [OVERVIEW], dependencies: ['chromium'], fullyParallel: false },
     // A restore replaces the database under every other test: it runs alone, last
-    ...(managed ? [{ name: 'restore', use: desktop, testMatch: [RESTORE], dependencies: ['chromium'] }] : []),
+    ...(managed ? [{ name: 'restore', use: desktop, testMatch: [RESTORE], dependencies: ['overview'] }] : []),
   ],
 })

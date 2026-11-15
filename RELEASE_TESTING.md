@@ -106,7 +106,7 @@ not boot, so a clean `journalctl` is **not** sufficient.
 | Cloud metadata IP    | Webhook → `http://169.254.169.254` → MUST be rejected          | SSRF under-block |
 | Discovery loopback   | Discovery scan of `127.0.0.1`                                  | Loopback over-block |
 | Public protocols     | `curl -k <host>:<port>/cdp/<ca>.crl`, `/ocsp`, `/.well-known/est/cacerts` | SPA catch-all hijack |
-| Service restart      | Settings → Restart Service (UI button)                          | Regression to `subprocess.run` |
+| Service restart      | Settings → General → Restart UCM (UI button)                          | Regression to `subprocess.run` |
 
 Tail logs while running: `ssh <host> "tail -f /var/log/ucm/ucm.log /var/log/ucm/error.log"`.
 Tracebacks land in **error.log**, not `ucm.log`.

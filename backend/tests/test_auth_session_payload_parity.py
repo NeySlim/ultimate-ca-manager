@@ -102,7 +102,7 @@ class TestSessionFieldParity:
         import pyotp
 
         import api.v2.sso.ldap_routes as ldap_routes
-        from models.sso import SSOProvider
+        from models.sso import SSOProvider, SSOSession
         from models.user import UserSession
 
         tag = uuid.uuid4().hex[:8]
@@ -145,6 +145,7 @@ class TestSessionFieldParity:
                 UserSession.query.filter(UserSession.user_id.in_(ids)).delete(
                     synchronize_session=False)
                 User.query.filter(User.id.in_(ids)).delete(synchronize_session=False)
+                SSOSession.query.filter_by(provider_id=provider_id).delete()
                 SSOProvider.query.filter_by(id=provider_id).delete()
                 db.session.commit()
 

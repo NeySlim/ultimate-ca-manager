@@ -56,6 +56,17 @@ describe('end-to-end harness', () => {
     VARS.forEach((k) => (saved[k] === undefined ? delete process.env[k] : (process.env[k] = saved[k])))
   })
 
+  it('runs the overview tests alone, after the others and before the restore', async () => {
+    const { projects } = await loadConfig({ UCM_E2E_MANAGED: '1' })
+    const by = Object.fromEntries(projects.map((p) => [p.name, p]))
+    const file = 'e2e/overview.spec.ts'
+    expect(by.chromium.testIgnore.some((re) => re instanceof RegExp && re.test(file))).toBe(true)
+    expect(by.overview.testMatch.some((re) => re.test(file))).toBe(true)
+    expect(by.overview.dependencies).toEqual(['chromium'])
+    expect(by.overview.fullyParallel).toBe(false)
+    expect(by.restore.dependencies).toEqual(['overview'])
+  })
+
   it('runs the restore project only against the instance the script started', async () => {
     const names = (c) => c.projects.map((p) => p.name)
     expect(names(await loadConfig({ UCM_E2E_MANAGED: '1' }))).toContain('restore')

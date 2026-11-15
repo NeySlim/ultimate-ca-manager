@@ -20,8 +20,12 @@ test('a queue entry opens the object it names', async ({ page, api }) => {
   const ca = await createCA(api, { validityDays: 100 })
   await page.goto('/')
   const queue = page.getByRole('region', { name: 'To handle' })
-  // Six entries are shown folded, critical ones first: unfold to list them all
-  await queue.getByRole('button', { name: 'Show the totals per kind' }).click()
+  // Six entries are shown folded, critical ones first: unfold to list them all, unless the
+  // account's saved preference already did
+  const fold = queue.getByRole('button', { name: /the totals per kind$/ })
+  await expect(queue.getByRole('status')).toHaveCount(0)
+  if (await fold.getAttribute('aria-expanded') !== 'true') await fold.click()
+  await expect(fold).toHaveAttribute('aria-expanded', 'true')
   const entry = queue.getByRole('link', { name: new RegExp(`^${ca.common_name} CA expiring`) })
   await expect(entry).toBeVisible()
   await entry.click()

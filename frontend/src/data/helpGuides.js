@@ -563,7 +563,7 @@ If Microsoft CA connections are configured, a **Microsoft CA** tab appears in th
 4. Select the **certificate template** (auto-loaded from the CA)
 5. Click **Sign**
 
-If the template requires manager approval, the request stays Pending in UCM, which offers no status check: once the certificate is issued on the CA, import it, or let Inventory sync import it over the WinRM admin channel.
+If the template requires manager approval, the request stays Pending in UCM and the interface offers no status check: approve it from the CA Control Panel of the connection, which imports the certificate.
 
 ### Enroll on Behalf Of (EOBO)
 
@@ -3364,7 +3364,7 @@ UCM integrates with Microsoft Active Directory Certificate Services (AD CS) to s
 The certificate is returned immediately and imported into UCM.
 
 ### Manager Approval Templates
-UCM saves the request as **Pending** and tracks the MS CA request ID. The page offers no status check for it: once it is issued on the Windows CA, import the certificate, or let **Inventory sync** over the WinRM admin channel import the certificates UCM does not know yet.
+UCM saves the request as **Pending** and tracks the MS CA request ID. The interface offers no status check for it: approve it from the **CA Control Panel**, which imports the certificate. **Inventory sync** does not complete a pending request, as it skips the request IDs UCM already tracks: for a request approved on the Windows CA console, call \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` (the request's id in UCM, listed by \`GET /api/v2/microsoft-cas/requests/pending\`), which fetches the certificate.
 
 ## Enroll on Behalf Of (EOBO)
 
@@ -3452,7 +3452,7 @@ The control panel (opened from the connection, requires the admin channel) manag
 | Connection test fails | Verify hostname, port 443, and that certsrv is accessible |
 | No templates found | Check that the UCM account has enrollment permissions on the CA |
 | EOBO denied | Verify enrollment agent certificate and template permissions |
-| Request stuck pending | Approve it from the CA Control Panel, or on the Windows CA console, then import the certificate or run Inventory sync |
+| Request stuck pending | Approve it from the CA Control Panel; if it was approved on the Windows CA console, fetch it with \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` |
 | Admin channel test fails | Verify WinRM is enabled on the CA, the port/transport, and that pywinrm is installed |
 | Revocation not on the CA | Enable the WinRM admin channel, without it, revocation is local to UCM |
 | Pending not detected (non-English CA) | Fixed in v2.192. UCM now recognizes localized AD CS pending pages |

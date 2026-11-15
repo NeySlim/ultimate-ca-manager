@@ -18,7 +18,7 @@ export default {
           { label: '模板选择', text: '从 MS CA 上可用的证书模板中选择' },
           { label: '自动审批', text: '启用自动注册的模板将立即返回证书' },
           { label: '管理者审批', text: '某些模板需要管理者审批，UCM 跟踪待处理请求' },
-          { label: '待处理请求', text: 'CA 为其管理员保留的请求在 UCM 中保持“待处理”，页面不提供状态检查：在 CA 上签发后，请导入证书，或让通过 WinRM 管理通道进行的清单同步导入 UCM 尚不知道的证书' },
+          { label: '待处理请求', text: 'CA 为其管理员保留的请求在 UCM 中保持“待处理”，界面不提供状态检查：请从 CA 控制面板审批，审批后证书会被导入。清单同步不会完成待处理请求' },
         ]
       },
       {
@@ -124,7 +124,7 @@ UCM 与 Microsoft Active Directory 证书服务（AD CS）集成，使用现有�
 证书立即返回并导入到 UCM。
 
 ### 管理者审批模板
-UCM 将请求保存为**待处理**状态并跟踪 MS CA 请求 ID。页面不提供状态检查：在 Windows CA 上签发后，请导入证书，或让通过 WinRM 管理通道进行的**清单同步**导入 UCM 尚不知道的证书。
+UCM 将请求保存为**待处理**状态并跟踪 MS CA 请求 ID。界面不提供状态检查：请从 **CA 控制面板**审批，审批后证书会被导入。**清单同步**不会完成待处理请求，因为它会跳过 UCM 已跟踪的请求 ID：对于在 Windows CA 控制台上审批的请求，请调用 \`GET /api/v2/microsoft-cas/{id}/requests/{request}\`（请求在 UCM 中的 ID，可通过 \`GET /api/v2/microsoft-cas/requests/pending\` 列出），它会取回证书。
 
 ## 代理注册（EOBO）
 
@@ -212,7 +212,7 @@ AD CS Web 注册没有吊销端点。吊销 AD CS 签发的证书：
 | 连接测试失败 | 验证主机名、端口 443、以及 certsrv 是否可访问 |
 | 未找到模板 | 检查 UCM 账户是否在 CA 上拥有注册权限 |
 | EOBO 被拒绝 | 验证注册代理证书和模板权限 |
-| 请求卡在待处理状态 | 从 CA 控制面板审批，或在 Windows CA 控制台上审批，然后导入证书或运行清单同步 |
+| 请求卡在待处理状态 | 从 CA 控制面板审批；如果已在 Windows CA 控制台上审批，请通过 \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` 取回 |
 | 管理通道测试失败 | 验证 CA 上已启用 WinRM、端口/传输方式正确、且已安装 pywinrm |
 | 吊销未同步到 CA | 启用 WinRM 管理通道：没有它，吊销仅在 UCM 本地生效 |
 | 未检测到待处理状态（非英语 CA） | 已在 v2.192 中修复：UCM 现在能识别本地化的 AD CS 待处理页面 |
