@@ -233,8 +233,9 @@ def create_app(config_name=None):
     # Failure here MUST stop startup: continuing with a broken schema causes
     # silent data corruption or 500s on every request. Operators should see
     # the failure immediately and fix it before the service comes back up.
-    from migration_runner import run_at_startup, _get_db_url
+    from migration_runner import _get_db_url
     from services.scheduler_leader import boot_lock
+    from startup_refusal import migrate_or_refuse
     db_path = config.DATABASE_PATH
     if db_path:
         os.environ.setdefault('DATABASE_PATH', str(db_path))
@@ -244,13 +245,7 @@ def create_app(config_name=None):
         from services.cluster_maintenance import wait_while_restoring
         wait_while_restoring(_get_db_url())
     # HA: one node at a time migrates; the next one finds nothing left to apply
-    migrated = run_at_startup(boot_lock)
-    if not migrated:
-        raise RuntimeError(
-            "Schema migration failed or the database was refused at startup. "
-            "Refusing to start with an inconsistent database. Check the migration "
-            "log above and fix the issue before restarting the service."
-        )
+    migrate_or_refuse(boot_lock)
     
     # A backend switch that asked for this restart has now been applied: the
     # configuration read above is the new one. Clearing the marker is what

@@ -83,7 +83,7 @@ install -m 644 packaging/firewall/ucm.xml %{buildroot}/usr/lib/firewalld/service
 # Log rotation for the gunicorn streams (#350)
 install -d %{buildroot}%{_sysconfdir}/logrotate.d
 install -m 644 packaging/logrotate/ucm %{buildroot}%{_sysconfdir}/logrotate.d/%{name}
-install -m 644 packaging/rpm/ucm.service %{buildroot}%{_unitdir}/%{name}.service
+install -m 644 packaging/systemd/ucm.service %{buildroot}%{_unitdir}/%{name}.service
 install -m 644 packaging/systemd/ucm-watcher.path %{buildroot}%{_unitdir}/%{name}-watcher.path
 install -m 644 packaging/systemd/ucm-watcher.service %{buildroot}%{_unitdir}/%{name}-watcher.service
 

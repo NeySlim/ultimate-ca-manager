@@ -389,7 +389,7 @@ def test_the_archive_lies_beside_the_home_outside_what_the_service_writes(tmp_pa
     out = box.run(default_parent=True)
     assert out.returncode == 0, out.stdout + out.stderr
     assert (box.home.parent / 'ucm-archive' / STAMP / 'data' / 'ucm.db').is_file()
-    for unit in ('packaging/debian/ucm.service', 'packaging/rpm/ucm.service'):
+    for unit in ('packaging/systemd/ucm.service',):
         rw = [l.split('=', 1)[1].split() for l in (ROOT / unit).read_text().splitlines()
               if l.startswith('ReadWritePaths')]
         assert rw
