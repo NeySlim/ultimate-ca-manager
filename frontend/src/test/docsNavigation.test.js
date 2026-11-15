@@ -194,12 +194,20 @@ describe('user guide navigation', () => {
 })
 
 // GitHub's heading slugs: lower case, markup and punctuation dropped, spaces to hyphens, repeats numbered
+// Heading text without its markup: emphasis markers go, literal underscores (also in code) stay
+function plainTitle(title) {
+  return title.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').split(/(`[^`]*`)/)
+    .map((part, i) => i % 2 ? part.slice(1, -1)
+      : part.replace(/\*/g, '').replace(/(^|[^\w])_+(?=\S)(.+?)_+(?=[^\w]|$)/g, '$1$2'))
+    .join('')
+}
+
 export function headingSlugs(markdown) {
   const seen = {}
   const out = new Set()
   for (const [, title] of markdown.replace(/^```.*?^```/gms, '').matchAll(/^#{1,6}\s+(.+?)\s*#*$/gm)) {
-    const base = title.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[`*_]/g, '').toLowerCase()
-      .replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s/g, '-')
+    const base = plainTitle(title).toLowerCase()
+      .replace(/[^\p{L}\p{N}\s_-]/gu, '').trim().replace(/\s/g, '-')
     const n = seen[base] = (seen[base] ?? -1) + 1
     out.add(n ? `${base}-${n}` : base)
   }
@@ -228,6 +236,14 @@ describe('documented heading links', () => {
     expect(brokenAnchors('USER_GUIDE.md', 'See [a](#getting-started) and [b](#nowhere).')).toEqual(['#nowhere'])
     expect(brokenAnchors('USER_GUIDE.md', 'See [a](HA.md#nowhere) and [b](HA.md#high-availability).')).toEqual(['HA.md#nowhere'])
     expect(headingSlugs('## A\n## A\n')).toEqual(new Set(['a', 'a-1']))
+  })
+
+  it('keeps literal underscores in a slug and drops emphasis markers', () => {
+    const slugs = headingSlugs('#### Reverse proxy & trusted_proxies (since v2.142)\n## `my_code` and _em_ **bold**\n')
+    expect(slugs).toEqual(new Set(['reverse-proxy--trusted_proxies-since-v2142', 'my_code-and-em-bold']))
+    const link = (anchor) => brokenAnchors('USER_GUIDE.md', `[a](ADMIN_GUIDE.md#${anchor})`)
+    expect(link('reverse-proxy--trusted_proxies-since-v2142')).toEqual([])
+    expect(link('reverse-proxy--trustedproxies-since-v2142')).toHaveLength(1)
   })
 })
 
