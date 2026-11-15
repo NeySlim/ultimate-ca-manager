@@ -5,6 +5,7 @@ fipsinstall (a fake openssl here) and compares the module-mac to the build refer
 """
 import os
 import pathlib
+import shutil
 import stat
 import subprocess
 
@@ -116,3 +117,16 @@ def test_build_records_the_mac_the_runtime_compares_pos(bench):
     assert mac.returncode == 0 and mac.stdout.strip() == BUILD_MAC
     rc, out = _run(bench, _reference(bench, mac.stdout))
     assert rc == 0 and 'continued' in out
+
+
+def test_the_build_shell_can_source_the_helper_pos(bench):
+    """The Dockerfile sources the helper under /bin/sh (dash) with set -eu: it must parse there."""
+    dash = shutil.which('dash')
+    if not dash:
+        pytest.skip('no dash on this host')
+    cnf = bench / 'build.cnf'
+    cnf.write_text(f'[fips_sect]\nmodule-mac = {BUILD_MAC}\n')
+    r = subprocess.run([dash, '-c', f'set -eu; . {HELPER}; fips_module_mac "{cnf}"'],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == BUILD_MAC
