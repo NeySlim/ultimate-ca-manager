@@ -309,6 +309,10 @@ class TestPublicationCost:
         try:
             for index in range(count):
                 directory = tmp_path / f'out{count}' / ('certs' if index % 2 else 'private')
+                directory.mkdir(parents=True, exist_ok=True)
+                # Every other one replaces a file, whose previous content is kept by a link
+                if index % 4 < 2:
+                    (directory / f'f{index}.pem').write_bytes(b'old')
                 staged.stage(directory / f'f{index}.pem', b'x')
             staged.publish()
             return len(calls)
@@ -317,9 +321,53 @@ class TestPublicationCost:
 
     def test_one_fsync_per_file_and_one_per_directory(self, monkeypatch, tmp_path):
         # The content is synced once, where it is published; each of the two directories
-        # four times: its journal, its kept directory, itself before and after the renames
-        assert self._fsyncs(monkeypatch, tmp_path, 40) <= 40 + 2 * 4
-        assert self._fsyncs(monkeypatch, tmp_path, 160) <= 160 + 2 * 4
+        # five times: its journal, its kept directory before and after the links, itself
+        # before and after the renames
+        assert self._fsyncs(monkeypatch, tmp_path, 40) == 40 + 2 * 5
+        assert self._fsyncs(monkeypatch, tmp_path, 160) == 160 + 2 * 5
+
+    def test_kept_contents_are_durable_before_the_renames(self, monkeypatch, tmp_path):
+        # A power cut must not keep a rename and lose the previous content it replaced
+        events = []
+        real_fsync, real_link = os.fsync, os.link
+
+        def key(path):
+            info = os.stat(path)
+            return info.st_dev, info.st_ino
+
+        def fsync(fd):
+            info = os.fstat(fd)
+            events.append(('sync', (info.st_dev, info.st_ino)))
+            return real_fsync(fd)
+
+        def link(source, target, *args, **kwargs):
+            if Path(target).name == 'previous_000001':
+                raise OSError(errno.EXDEV, 'cross-device')    # this one is copied
+            real_link(source, target, *args, **kwargs)
+            events.append(('link', key(Path(target).parent)))
+
+        directory = tmp_path / 'out'
+        directory.mkdir()
+        destinations = [directory / f'f{index}.pem' for index in range(2)]
+        for destination in destinations:
+            destination.write_bytes(b'old')
+        staged = StagedFiles(base_dir=tmp_path / 'staging')
+        for destination in destinations:
+            staged.stage(destination, b'new')
+        monkeypatch.setattr(os, 'fsync', fsync)
+        monkeypatch.setattr(os, 'link', link)
+        try:
+            staged.publish()
+            kept_dir = next(directory.glob('.ucm_restore_kept_*'))
+            copy = key(kept_dir / 'previous_000001')
+            kept = key(kept_dir)
+        finally:
+            monkeypatch.undo()
+            staged.discard()
+        last_sync = max(i for i, event in enumerate(events) if event == ('sync', key(directory)))
+        last_link = max(i for i, event in enumerate(events) if event == ('link', kept))
+        assert ('sync', kept) in events[last_link + 1:last_sync], 'kept directory'
+        assert ('sync', copy) in events[:last_sync], 'copy'
 
     def test_each_directory_is_fsynced_after_its_last_rename(self, monkeypatch, tmp_path):
         # The lower bound: a rename is durable only once its directory entry is synced

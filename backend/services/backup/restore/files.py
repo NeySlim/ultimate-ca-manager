@@ -208,6 +208,9 @@ class StagedFiles:
                 if self._publish(entry):
                     directories[entry.destination.parent] = None
                 published.append(entry.destination)
+            # The kept contents first, so no rename is durable without what it replaced
+            for kept_dir in self._kept_dirs.values():
+                _fsync_directory(kept_dir)
             # Each directory once, after its renames: none is durable before this returns
             for directory in directories:
                 _fsync_directory(directory)
@@ -582,6 +585,8 @@ def _copy_private(source: Path, kept: Path) -> None:
     fd = os.open(kept, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'wb') as out, open(source, 'rb') as handle:
         shutil.copyfileobj(handle, out)
+        out.flush()
+        os.fsync(out.fileno())
 
 
 def _put_back(kept: Path, destination: Path, mode: int) -> None:
