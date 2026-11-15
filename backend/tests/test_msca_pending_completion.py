@@ -219,3 +219,21 @@ def test_check_route_needs_write_permission(app, viewer_client, monkeypatch):
     req_id, _ = _pending(app, msca_id, 8, 'pc-perm.test.local')
     r = _check(app, viewer_client, monkeypatch, msca_id, req_id, _Client(error=RuntimeError('x')))
     assert r.status_code == 403
+
+
+def test_pending_request_whose_certificate_is_already_in_ucm_is_not_imported_again(app, ca):
+    from models import Certificate
+    msca_id = _make_msca(app, 'PC known')
+    serial = ca.add(4300, 'pc-known.test.local')
+    pem = ca.rows[-1]['pem']
+    req_id, _ = _pending(app, msca_id, 4300, 'pc-known.test.local', with_csr=False)
+    with app.app_context():
+        from models import db
+        db.session.add(Certificate(
+            refid='pc-known-manual', descr='manual', crt=base64.b64encode(pem.encode()).decode(),
+            subject_cn='pc-known.test.local', serial_number=serial.upper()))
+        db.session.commit()
+    s = _sync(app, msca_id)
+    assert (s['completed'], s['imported'], s['skipped'], s['failed']) == (0, 0, 1, 0)
+    with app.app_context():
+        assert Certificate.query.filter_by(subject_cn='pc-known.test.local').count() == 1

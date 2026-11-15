@@ -80,6 +80,10 @@ class MicrosoftCAInventoryMixin:
 
             # A request UCM submitted that the CA now shows issued: finish it
             if req_id in pending:
+                # Certificate already in UCM by serial: do not import a second copy.
+                if MicrosoftCAInventoryMixin._serial_int_variants(serial) & known_serials:
+                    skipped += 1
+                    continue
                 try:
                     pem = MicrosoftCAInventoryMixin._fetch_cert_pem(msca, req_id)
                     if not pem:
