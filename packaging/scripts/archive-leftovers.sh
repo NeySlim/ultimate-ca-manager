@@ -215,7 +215,7 @@ say_stuck() {
 # Undoes the journal, last step first, by renames back alone. Every line replays as a
 # no-op once undone, so a retry from any interrupted state converges.
 roll_back() {
-    stuck="" left="" seen="" again="" twice="" broken=""
+    stuck="" left="" seen="" again="" twice="" broken="" missing=""
     lines=$(whole_lines) || { unsettled "$JOURNAL" "could not be read"; return 1; }
     # Any line that is not a whole step stops the put-back before it touches anything
     while IFS= read -r line; do
@@ -237,7 +237,18 @@ EOF
                 elif present "$dst"; then
                     rename_item "$dst" "$src" || unsettled "$dst" "not put back to $src"
                 elif ! present "$src"; then
-                    say "UCM: $src is missing: an earlier attempt moved it to $dst, which no longer holds it either."
+                    # Removed by hand only while both directories are there: a directory
+                    # missing too is a filesystem not mounted, which may hold it
+                    gap=""
+                    for d in "${dst%/*}" "${src%/*}"; do [ -d "$d" ] || { gap=$d; break; }; done
+                    if [ -n "$gap" ]; then
+                        left=1 stuck="$stuck
+  $dst: not put back to $src: neither is there, as $gap is absent: mount what holds it, then retry"
+                    else
+                        say "UCM: $src is missing: an earlier attempt moved it to $dst, which no longer holds it either."
+                        missing="$missing
+  $src"
+                    fi
                 fi ;;
             fips)
                 # The new ucm.env goes while the archived one can take its place, once: the
@@ -265,6 +276,13 @@ EOF
     rm -f -- "$JOURNAL" || { unsettled "$JOURNAL" "could not be removed"; return 1; }
     rmdir -- "$DEST" 2>/dev/null || { unsettled "$DEST" "could not be removed"; return 1; }
     [ -z "$MADE_PARENT" ] || rmdir -- "$PARENT" 2>/dev/null || true
+}
+
+# After a complete put-back: $1, or $2 with what the journal named at neither path
+put_back() {
+    if [ -z "$missing" ]; then say "$1"; return; fi
+    say "$2"
+    printf '%s\n' "$missing" | sed 1d | while IFS= read -r line; do say "$line"; done
 }
 
 # Each local archive with what it holds, one line each
@@ -360,7 +378,8 @@ for j in "$PARENT"/*/.journal; do
     [ -n "$RENAME" ] || no_interpreter 2
     if roll_back; then
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete:"
-        say "the files it could not put back are in place again."
+        put_back "the files it could not put back are in place again." \
+            "everything else it could not put back is in place again; at neither path:"
     else
         say "UCM: an earlier attempt to archive what a removed UCM left did not complete."
         say_stuck
@@ -435,7 +454,8 @@ fail() {
     rc=1
     if [ -n "$JOURNAL" ] && [ -f "$JOURNAL" ]; then
         if roll_back; then
-            say "Everything was put back in place."
+            put_back "Everything was put back in place." \
+                "Everything else was put back in place; at neither path:"
         else
             say_stuck
             rc=2

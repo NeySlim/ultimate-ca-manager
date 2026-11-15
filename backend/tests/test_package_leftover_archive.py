@@ -1178,3 +1178,46 @@ def test_a_journal_write_cut_short_once_leaves_the_journal_whole_for_what_follow
     assert second.returncode == 2 and 'same way at the previous attempt' in second.stdout, second.stdout
     box.wrap(other_fs=(box.data,))
     archived(box, box.run(), data, config)
+
+
+# -- an item at neither path ---------------------------------------------------------
+
+def test_an_item_whose_filesystem_is_gone_waits_for_it_and_is_never_called_missing(tmp_path):
+    """Data on another filesystem, killed right after a rename beside itself; then that
+    filesystem is absent (an empty directory in its place): the retry calls nothing missing,
+    names what to mount, keeps the journal and exits 2. Mounted again, a retry archives all."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    _killed_after_renaming(box, 'https_key.pem', other_fs=(box.data,))
+    mounted = tmp_path / 'mounted'
+    box.data.rename(mounted)
+    box.data.mkdir()
+    left = snapshot(box)
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 2, (out.stdout, out.stderr)
+        assert 'is missing:' not in out.stdout and 'in place again' not in out.stdout, out.stdout
+        lines = reported(out.stdout)
+        assert lines[f'{box.data}/{LOCAL}/https_key.pem'] == (
+            f'not put back to {box.data}/https_key.pem: neither is there, as {box.data}/{LOCAL} '
+            f'is absent: mount what holds it, then retry'), out.stdout
+        assert snapshot(box) == left
+        assert (box.archive / '.journal').is_file()
+    box.data.rmdir()
+    mounted.rename(box.data)
+    out = box.run()
+    assert 'is missing' not in out.stdout, out.stdout
+    archived(box, out, data, config)
+
+
+def test_an_item_removed_by_hand_is_named_and_never_said_to_be_back(tmp_path):
+    """Its directory is there, the item in neither place: removed by hand. The retry names
+    it, says the rest is back, and goes on."""
+    box = Box(tmp_path, python='stub')
+    _killed_after_renaming(box, 'https_key.pem')
+    (box.archive / 'data' / 'https_key.pem').unlink()
+    out = box.run()
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert 'are in place again.' not in out.stdout, out.stdout
+    assert ('everything else it could not put back is in place again; at neither path:\n'
+            f'  {box.data}/https_key.pem\n') in out.stdout, out.stdout
