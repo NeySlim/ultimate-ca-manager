@@ -209,7 +209,7 @@ def test_a_second_factor_the_restore_overtakes_is_refused_after_it(
 def ldap_login(app, monkeypatch):
     """An LDAP sign-in whose bind succeeds; returns the client it signed in."""
     import api.v2.sso.ldap_routes as ldap_routes
-    from models.sso import SSOProvider, SSOSession
+    from models.sso import SSOProvider
     with app.app_context():
         provider = SSOProvider(
             name=f'restore-ldap-{uuid.uuid4().hex[:6]}', provider_type='ldap', enabled=True,
@@ -235,8 +235,9 @@ def ldap_login(app, monkeypatch):
         return client
     yield login
     with app.app_context():
+        from api.v2.users.crud import _purge_user_dependencies
         for user in User.query.filter(User.username.in_(names)).all():
-            SSOSession.query.filter_by(user_id=user.id).delete()
+            _purge_user_dependencies(user.id)
             db.session.delete(user)
         db.session.delete(db.session.get(SSOProvider, provider_id))
         db.session.commit()

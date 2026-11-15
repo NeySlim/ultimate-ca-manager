@@ -21,9 +21,9 @@ def remember_request_epoch():
     """before_request: the epoch as this request starts, before any identity check.
     Protocol, probe and static file paths never open a session and skip the read."""
     from flask import g, request
-    from middleware.mtls_middleware import _is_file_request
     from utils.admin_allowlist import is_exempt_path
-    if not (is_exempt_path(request.path) or _is_file_request(request.path)):
+    from utils.public_endpoints import is_file_request
+    if not (is_exempt_path(request.path) or is_file_request(request.path)):
         g.session_epoch_at_start = current_epoch()
 
 
