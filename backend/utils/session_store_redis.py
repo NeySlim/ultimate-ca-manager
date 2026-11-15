@@ -15,6 +15,9 @@ class GuardedRedisSessionInterface(KeepsRemovedRecordsGone, RedisSessionInterfac
     def _record_exists(self, store_id):
         return bool(self.client.exists(store_id))
 
+    def _remove_if_present(self, store_id):
+        return bool(self.client.delete(store_id))
+
     def _upsert_session(self, session_lifetime, session, store_id):
         if not self._opened_from_store(session):
             return super()._upsert_session(session_lifetime, session, store_id)

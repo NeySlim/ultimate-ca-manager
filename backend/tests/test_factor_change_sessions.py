@@ -360,6 +360,53 @@ def test_a_request_served_during_the_renewal_neither_restores_nor_resends_the_ol
         _cleanup(first_node, user)
 
 
+def test_an_emptied_session_never_deletes_a_cookie_once_its_record_went_meanwhile(nodes):
+    """The removal checked and done at once: a record another request removed between
+    the check and the removal is never answered with a cookie deletion."""
+    import threading
+    from flask import session as flask_session
+    first_node, second_node = nodes
+    user = _make_user(first_node)
+    try:
+        cookie = _open_session(first_node, user).get_cookie('session').value
+        iface = second_node.session_interface
+        sid = iface._unsign(second_node, cookie) if iface.use_signer else cookie
+        store_id = iface._get_store_id(sid)
+        exists = iface._record_exists
+        seen = {}
+
+        def remove():
+            with first_node.app_context():
+                first_node.session_interface._delete_session(store_id)
+
+        def checked(key):
+            present = exists(key)
+            if present and key == store_id and 'gone' not in seen:
+                worker = threading.Thread(target=remove)
+                worker.start()
+                worker.join(0.3)
+                seen['gone'] = not exists(key)
+                seen['worker'] = worker
+            return present
+
+        iface._record_exists = checked
+        try:
+            with second_node.test_request_context('/api/v2/account/profile',
+                                                  headers={'Cookie': f'session={cookie}'}):
+                flask_session.clear()
+                response = second_node.response_class()
+                iface.save_session(second_node, flask_session, response)
+        finally:
+            del iface._record_exists
+        if 'worker' in seen:
+            seen['worker'].join(10)
+        deleted = any(h.startswith('session=;') for h in response.headers.getlist('Set-Cookie'))
+        assert not (seen.get('gone') and deleted), 'a record removed meanwhile got a cookie deletion'
+        assert not exists(store_id)
+    finally:
+        _cleanup(first_node, user)
+
+
 @pytest.mark.parametrize('method', ['delete', 'patch'])
 def test_an_administrator_changing_a_key_closes_the_holders_sessions(app, auth_client, method):
     """The holder loses or regains a factor: their sessions close, the administrator's stays."""

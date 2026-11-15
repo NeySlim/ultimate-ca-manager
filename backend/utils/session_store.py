@@ -90,11 +90,16 @@ class KeepsRemovedRecordsGone:
         return not getattr(session, 'record_gone', False) and super().should_set_cookie(app, session)
 
     def save_session(self, app, session, response):
-        # Emptied after its record was removed: the cookie now names the new identifier, keep it
-        if (not session and session.modified and self._opened_from_store(session)
-                and not self._record_exists(self._get_store_id(session.sid))):
-            return
-        super().save_session(app, session, response)
+        if not (not session and session.modified and self._opened_from_store(session)):
+            return super().save_session(app, session, response)
+        if session.accessed:
+            response.vary.add('Cookie')
+        # Checked and removed at once: a record already removed means the cookie now names
+        # the new identifier, so it is kept
+        if self._remove_if_present(self._get_store_id(session.sid)):
+            response.delete_cookie(key=self.get_cookie_name(app), domain=self.get_cookie_domain(app),
+                                   path=self.get_cookie_path(app))
+            response.vary.add('Cookie')
 
 
 class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessionInterface):
@@ -109,6 +114,13 @@ class GuardedFileSystemSessionInterface(KeepsRemovedRecordsGone, FileSystemSessi
 
     def _record_exists(self, store_id):
         return self.cache.has(store_id)
+
+    def _remove_if_present(self, store_id):
+        with session_files_lock(self.cache._path, exclusive=True):
+            present = self._record_exists(store_id)
+            if present:
+                super()._delete_session(store_id)
+            return present
 
     def _delete_session(self, store_id):
         with session_files_lock(self.cache._path, exclusive=True):
@@ -209,6 +221,16 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
         model = self.sql_session_model
         with self._store() as s:
             return s.query(model.id).filter_by(session_id=store_id).first() is not None
+
+    @retry_query()
+    def _remove_if_present(self, store_id):
+        if self._writes_paused():
+            return self._record_exists(store_id)
+        model = self.sql_session_model
+        with self._store() as s:
+            removed = s.query(model).filter_by(session_id=store_id).delete()
+            s.commit()
+        return bool(removed)
 
     @retry_query()
     def _delete_session(self, store_id):
