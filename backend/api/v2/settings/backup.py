@@ -18,7 +18,7 @@ from services.backup.restore.plan import RestoreValidationError
 from services.backup.restore_report import safe_restore_audit_details
 from services.backup.restore_completion import (
     maintenance_refusal, record_failure, record_request_refusal, record_restore, request_restart,
-    restore_actor, restore_message)
+    restore_actor, restore_message, attach_restore_todo)
 from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
@@ -299,6 +299,7 @@ def restore_backup():
                 # said about itself, the sections this version does not restore
                 # included, reached a client from one page and not the other.
                 results['filename'] = file.filename
+                attach_restore_todo(results)
                 return success_response(
                     data=results,
                     message=restore_message(results),

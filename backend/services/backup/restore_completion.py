@@ -83,6 +83,12 @@ def restore_message(results) -> str:
     return with_restore_warnings(opening, results)
 
 
+def attach_restore_todo(results) -> None:
+    """Put the per-element "to do" lines in the answer, on both restore routes."""
+    from services.backup.restore_report import restore_todo_lines
+    results['todo'] = restore_todo_lines(results)
+
+
 def restore_actor():
     """The account asking for the restore, named in the cluster maintenance it holds."""
     from flask import g
