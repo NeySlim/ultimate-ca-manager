@@ -5,9 +5,9 @@ certificate_authorities.enforce_unique_subject.
 here once and by the listener on every write after: an issuance checked for a unique subject
 finds the certificates of its CA carrying the same subject through the index, never a scan.
 ``subject_holder`` names who the subject was certified to; an ACME certificate takes its order's
-account here, and the post-quantum member of an RFC 9763 pair the lineage of the classical one it
-names, found through the index of acme_orders.certificate_id. ``enforce_unique_subject`` starts
-off on every CA.
+account here, found through the index of acme_orders.certificate_id, and the post-quantum member
+of an RFC 9763 pair the lineage of the classical one it names, by its primary key.
+``enforce_unique_subject`` starts off on every CA.
 Idempotent, dual-backend (SQLite + PostgreSQL).
 """
 import sqlite3
@@ -15,7 +15,7 @@ import sqlite3
 pg_compatible = True
 
 INDEX = 'ix_certificates_caref_subject_key'
-# The holders below find a certificate's orders through it, never by a scan per certificate
+# _ACME_HOLDERS finds a certificate's orders through it, never by a scan per certificate
 ORDER_INDEX = 'ix_acme_orders_certificate_id'
 CREATE_ORDER_INDEX = f"CREATE INDEX IF NOT EXISTS {ORDER_INDEX} ON acme_orders (certificate_id)"
 _PENDING = ("SELECT id, crt FROM certificates WHERE crt IS NOT NULL AND crt <> '' "
