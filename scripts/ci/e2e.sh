@@ -25,8 +25,8 @@ command -v npm >/dev/null || { echo "e2e: no npm on PATH" >&2; exit 2; }
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/ucm-e2e.XXXXXX") || exit 2
 PID=""
-# The functions below run from the EXIT trap
-# shellcheck disable=SC2317
+# The functions below run from the EXIT trap (SC2317, SC2329: reached, though never called by name)
+# shellcheck disable=SC2317,SC2329
 stop_instance() {
   [ -n "$PID" ] || return 0
   # The instance runs in its own process group (setsid): TERM it, then KILL what is left
@@ -36,7 +36,7 @@ stop_instance() {
   wait "$PID" 2>/dev/null
   PID=""
 }
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 finish() {
   stop_instance
   rm -rf "$WORK"
