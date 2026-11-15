@@ -227,3 +227,20 @@ def test_a_merge_onto_another_row_of_a_token_key_taken_here_is_refused(app, tmp_
     message = _token_key_on_two_rows(app, tmp_path, archived, here)
     assert archived_name in message and here_name in message, message
     assert 'nothing has been changed' in message, message
+
+
+def test_two_rows_of_one_token_key_bound_before_the_restore_do_not_stop_it_on_sqlite(app, tmp_path):
+    """Two rows of one token key already bound here (a race on PostgreSQL): not the merge's to refuse."""
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'restore.db'}"), app.app_context():
+        real = ec.generate_private_key(ec.SECP256R1())
+        one, two = _Token(real), _Token(real)
+        one.x509_ca('earlier')
+        db.session.add(SSHCertificateAuthority(
+            refid=str(uuid.uuid4()), descr='twin', ca_type='host', public_key='x', private_key='',
+            key_source='hsm', hsm_key_id=two.key.id, key_type='ecdsa-p256', fingerprint='SHA256:x'))
+        db.session.commit()
+        blob = _service().create_backup(PASSWORD, include=_only('hsm_keys', 'hsm_providers'))
+        _service().restore_backup(blob, PASSWORD, mode='merge')
+        assert _holders(one.key.id) == ['x509:earlier'] and _holders(two.key.id) == ['ssh:twin']
+        db.session.remove()
