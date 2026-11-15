@@ -376,10 +376,10 @@ jobs:
           name: std-digest-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   # Tags the two per-arch digests as <version> and, by the latest rule, latest; tag runs only,
-  # after a green smoke of those digests
+  # after a green smoke of the standard and FIPS amd64 digests (arm64 is not smoked)
   docker-manifest:
     name: Publish Docker Image
     runs-on: ubuntu-latest
@@ -601,10 +601,10 @@ jobs:
           name: fips-digest-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   # Tags the two per-arch digests as <version>-fips and, by the latest rule, latest-fips; tag runs
-  # only, after a green smoke of the standard and FIPS digests
+  # only, after a green smoke of the standard and FIPS amd64 digests (arm64 is not smoked)
   docker-fips-manifest:
     name: Publish Docker Image (FIPS)
     runs-on: ubuntu-latest

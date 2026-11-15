@@ -44,7 +44,8 @@ def test_the_build_calls_the_smoke_before_the_release_with_the_built_version():
     build = load('build-release.yml')
     name, job = _caller(build)
     needs = job['needs'] if isinstance(job['needs'], list) else [job['needs']]
-    assert 'release' not in needs and 'build-deb' in needs
+    # Every artifact the smoke reads exists before it starts: the DEB, the RPMs, the two digests
+    assert 'release' not in needs and {'build-deb', 'build-rpm', 'smoke-targets'} <= set(needs)
     assert name in build['jobs']['release']['needs']
     ctx = {'github': TAG_PUSH, 'needs': {'build-deb': {'outputs': {'version': '3.0-rc1'}}}}
     assert render(job['with']['version'], ctx) == '3.0-rc1'
