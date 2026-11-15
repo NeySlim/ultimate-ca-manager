@@ -1134,3 +1134,27 @@ def test_a_sqlite_write_error_that_is_not_a_lock_is_raised_as_it_is(app, monkeyp
         finally:
             event.remove(db.session, 'before_flush', refuse)
             db.session.rollback()
+
+
+def test_a_sqlite_lock_that_never_lifts_is_raised_as_a_lock(app, monkeypatch):
+    """Ten refused writes are a lock, not a name clash: the last error is the one raised."""
+    from sqlalchemy import event
+    from sqlalchemy.exc import OperationalError
+    from services import windows_profiles
+
+    with app.app_context():
+        if db.session.get_bind().dialect.name != 'sqlite':
+            pytest.skip('the retry is SQLite only')
+        monkeypatch.setattr(windows_profiles, 'default_profile', lambda: None)
+        monkeypatch.setattr(windows_profiles.time, 'sleep', lambda seconds: None)
+
+        def refuse(session, flush_context, instances):
+            raise OperationalError('INSERT', {}, Exception('database is locked'))
+
+        event.listen(db.session, 'before_flush', refuse)
+        try:
+            with pytest.raises(OperationalError, match='database is locked'):
+                windows_profiles.default_for_write(actor='tester')
+        finally:
+            event.remove(db.session, 'before_flush', refuse)
+            db.session.rollback()
