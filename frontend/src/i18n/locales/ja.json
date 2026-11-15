@@ -1542,7 +1542,7 @@
     "proxyUpstreamUrl": "アップストリームディレクトリURL",
     "proxyUpstreamUrlHelper": "アップストリームACMEサーバーのディレクトリURL。空の場合、Let's Encrypt ステージングがデフォルトです。",
     "proxyUsage": "certbotでの使用方法：",
-    "proxyUsageNote": "前提: ドメイン（またはサブドメインをカバーする親ドメイン）を ACME Domains で DNS プロバイダ付きで設定してください。プロキシは dns-01 のみ対応です。\n\n各外部 CA アカウントは専用エンドポイント /acme/proxy/<slug>/directory を公開できます（外部 CA アカウントで **ACMEプロキシ経由で公開** を有効化）。既定パス /acme/proxy/directory はプロキシ設定で選択したアカウントに従います。\n\nUCM はそのプロバイダ経由で TXT レコードを自動作成・削除します。--manual-auth-hook と --manual-cleanup-hook は no-op (/bin/true) のままで構いません。DNS 検証はプロキシが行います。\n\n同じ名前で同時に 2 つの要求（Certbot + UCM UI）を行わないでください。2 つ目の TXT が 1 つ目を上書きする可能性があります。UCM の HTTPS 証明書が自己署名（ラボ）の場合は Certbot に --no-verify-ssl を追加してください。",
+    "proxyUsageNote": "前提: ドメイン（またはサブドメインをカバーする親ドメイン）を ACME Domains で DNS プロバイダ付きで設定してください。プロキシは dns-01 のみ対応です。\n\n各外部 CA アカウントは専用エンドポイント /acme/proxy/<slug>/directory を公開できます（「認証局 (CA)」で **ACMEプロキシ経由で公開** を有効化）。既定パス /acme/proxy/directory はプロキシ設定で選択したアカウントに従います。\n\nUCM はそのプロバイダ経由で TXT レコードを自動作成・削除します。--manual-auth-hook と --manual-cleanup-hook は no-op (/bin/true) のままで構いません。DNS 検証はプロキシが行います。\n\n同じ名前で同時に 2 つの要求（Certbot + UCM UI）を行わないでください。2 つ目の TXT が 1 つ目を上書きする可能性があります。UCM の HTTPS 証明書が自己署名（ラボ）の場合は Certbot に --no-verify-ssl を追加してください。",
     "proxyRegistered": "プロキシ登録済み",
     "registerAccount": "アカウント登録",
     "aboutAcmeDesc": "ACMEは自動化された証明書発行を可能にします。以下でサーバーを設定し、そのディレクトリURLをACMEクライアント（certbot、acme.shなど）で使用してください。",
@@ -1802,12 +1802,12 @@
     "customCA": "カスタムCA",
     "upstreamCAHelper": "プロキシリクエスト用のアップストリーム認証局を選択",
     "proxyUpstreamCAAccount": "アップストリームCAアカウント",
-    "proxyUpstreamCAAccountHelper": "登録済みの外部ACME CAアカウントを選択します。EABと認証情報は下の外部CAアカウントで管理します。",
+    "proxyUpstreamCAAccountHelper": "登録済みの外部ACME CAアカウントを選択します。EABと認証情報は下の「認証局 (CA)」で管理します。",
     "proxySelectCaAccount": "CAアカウントを選択…",
     "proxyPruneReplacedCertificates": "置き換えられた証明書を削除",
     "proxyPruneReplacedCertificatesDesc": "同一ドメインの更新が成功したら、プロキシ経由でインポートされた証明書を自動的に削除します。失効した証明書は常に保持されます。",
-    "proxyNoCaAccounts": "外部CAアカウントが未設定です。下の外部CAアカウントで追加してください。",
-    "proxyManageCaAccountsHint": "EABとCA別設定は下の外部CAアカウントで管理します。",
+    "proxyNoCaAccounts": "外部CAアカウントが未設定です。下の「認証局 (CA)」で追加してください。",
+    "proxyManageCaAccountsHint": "EABとCA別設定は下の「認証局 (CA)」で管理します。",
     "proxyEnabled": "ACMEプロキシ経由で公開",
     "proxySlug": "プロキシパス (slug)",
     "proxySlugHelper": "URL: /acme/proxy/<slug>/directory（小文字・数字・ハイフン）。",
@@ -3374,6 +3374,7 @@
       "nothingFound": "このプロファイルが拒否する項目は見つかりませんでした。"
     },
     "fipsPreflight": {
+      "withoutModule": "FIPS モジュールに問い合わせていません: EdDSA と ML-DSA の鍵は拒否として表示されます。Docker では、-fips イメージで UCM_FIPS を付けずにこのチェックを実行すると、そのモジュールに基づいて判定されます。",
       "title": "FIPS 対応状況",
       "hint": "このインスタンスで FIPS モードが拒否する項目と、それぞれの対処方法を一覧表示します。変更は行われません。",
       "run": "FIPS 対応状況を確認",
@@ -4913,7 +4914,7 @@
     "selectGroup": "グループを選択...",
     "subtitle": "発行ルール、鍵要件、承認ワークフローを管理します",
     "fipsRulesTitle": "FIPS ルールが有効です（読み取り専用）",
-    "fipsRulesDesc": "FIPS モードでは、これらより先にシステムポリシーが適用されます: RSA 2048 から 4096、EC P-256 から P-521 の鍵、SHA-256 から SHA-512 の署名。ここで設定するポリシーは、それをさらに絞り込むことしかできません。",
+    "fipsRulesDesc": "FIPS モードでは、これらより先にシステムポリシーが適用されます: 2048 から 16384 ビットの偶数長の RSA 鍵、EC P-256 から P-521、そして読み込まれた FIPS モジュールが承認する場合は Ed25519、Ed448、ML-DSA の鍵、SHA-256 から SHA-512 の署名。ここで設定するポリシーは、それをさらに絞り込むことしかできません。",
     "targetCA": "対象CA",
     "title": "証明書ポリシー",
     "toggleFailed": "ポリシーの切り替えに失敗しました",
@@ -5473,7 +5474,7 @@
     "inventorySyncHint": "UCM がまだ把握していない、Windows CA で発行された証明書を定期的にインポートし、UCM が証明書のライフサイクル全体を管理できるようにします。増分処理で、管理チャネルを使用します。",
     "lastInventorySync": "最終インベントリ",
     "inventorySyncNow": "今すぐ CA からインポート",
-    "inventorySyncResult": "インベントリ完了：{{imported}} 件インポート（{{skipped}} 件は既知）",
+    "inventorySyncResult": "インベントリ完了：{{imported}} 件インポート、保留中の {{completed}} 件のリクエストを完了（{{skipped}} 件は既知）",
     "inventorySyncFailed": "インベントリに失敗しました",
     "caControl": "CA コントロールパネル",
     "caControlTitle": "CA コントロール: {{name}}",
@@ -5513,6 +5514,11 @@
     "issued": "発行済み",
     "denied": "拒否",
     "checkStatus": "ステータス確認",
+    "checkIssued": "証明書が発行されインポートされました",
+    "checkStillPending": "CA での承認待ちのままです",
+    "checkDenied": "CA がこのリクエストを拒否しました",
+    "checkSuperseded": "この CSR は別の場所で署名されました。Microsoft CA へのリクエストはクローズされました",
+    "checkFailed": "ステータス確認に失敗しました",
     "refreshStatus": "ステータス更新",
     "signMode": "署名方法",
     "signLocal": "ローカルCA",
@@ -5764,13 +5770,14 @@
     "policyOidHelp": "タイムスタンプが発行されるTSAポリシーを識別するOID",
     "policyPlaceholderWarning": "1.2.3.4.1 は OpenSSL のサンプル用ポリシー OID で、誰にも割り当てられていません。本番環境では、組織の OID アークまたは CP/CPS の OID を使用してください。",
     "requireDedicatedCert": "専用のTSA証明書を必須にする",
-    "requireDedicatedCertDesc": "CA証明書自体でのタイムスタンプ署名を拒否します。クリティカルなtimeStamping EKUを持つ専用のエンドエンティティ署名証明書が必要です（RFC 3161）。",
+    "requireDedicatedCertDesc": "既定でオンです。CA 証明書自体でのタイムスタンプ署名を拒否します。RFC 3161 はクリティカルな timeStamping EKU を持つ専用のエンドエンティティ署名証明書を要求します。オフにすると RFC 3161 に準拠しません。",
     "requireDedicatedCertBlocked": "先に上で使用可能な専用署名証明書を選択してください。そうしないとすべてのタイムスタンプ要求が失敗します。",
     "signingCert": "署名証明書",
-    "signingCertDesc": "タイムスタンプトークンの署名者を選択します。CA 証明書が従来の既定です。timeStamping EKU を持つ専用のエンドエンティティ証明書が RFC 3161 の推奨です。",
+    "signingCertDesc": "タイムスタンプトークンの署名者を選択します。RFC 3161 は timeStamping EKU を持つ専用のエンドエンティティ証明書を要求します。CA 証明書は、下の厳格モードがオフの場合にのみ署名します。",
     "caSignerWarning": "タイムスタンプは CA 証明書で署名されています。openssl ts -verify や jarsigner などの厳格な検証ツールはこのトークンを拒否します。RFC 3161 は、クリティカルかつ排他的な timeStamping EKU を持つ専用の署名者を要求します。下で専用の署名証明書を選択または生成してください。",
+    "strictNoSigner": "厳格モードがオンで、専用の署名者が設定されていません。/tsa はすべてのタイムスタンプ要求を拒否します。下で署名証明書を生成してください。UCM は選択した CA から、timeStamping EKU のみをクリティカルとして持つ証明書を発行し（RFC 3161）、それを選択します。",
     "signingCertHelp": "UCM が秘密鍵を保持し、timeStamping EKU を持つ証明書のみが一覧されます。更新は自動的に追従されます。",
-    "signingCertCa": "CA 証明書（既定）",
+    "signingCertCa": "CA 証明書（厳格モードがオフの場合のみ）",
     "signerExpires": "有効期限",
     "signerChainComplete": "発行者チェーンは自己署名ルートまで到達し、各トークンに含まれます。",
     "signerChainPartial": "発行者チェーン：{{count}} 件の証明書を含みます。自己署名ルートには到達していません。",
@@ -6290,7 +6297,8 @@
         "session_revoke": "セッションの取り消し",
         "session_revoke_all": "複数セッションの取り消し",
         "deploy_binding_left_behind": "旧証明書に残ったデプロイ",
-        "https_binding_left_behind": "旧証明書に残った HTTPS"
+        "https_binding_left_behind": "旧証明書に残った HTTPS",
+        "truststore_expiring": "トラストストアの証明書の期限切れ間近または期限切れ"
       }
     }
   },
@@ -6339,7 +6347,8 @@
       "renewal_declined": "更新の拒否",
       "ca_expiring": "CAの期限切れ間近",
       "deploy_binding_left_behind": "旧証明書に残ったデプロイ",
-      "https_binding_left_behind": "旧証明書に残った HTTPS"
+      "https_binding_left_behind": "旧証明書に残った HTTPS",
+      "truststore_expiring": "トラストストアの証明書の期限切れ間近または期限切れ"
     },
     "compliance": {
       "rsa_below_3072": "3072ビット未満のRSA",
@@ -6363,7 +6372,7 @@
       "tasksWarning_one": "{{count}} 件のタスクに警告",
       "tasksWarning_other": "{{count}} 件のタスクに警告",
       "tsaState": {
-        "ca_certificate": "CA 証明書で署名中",
+        "ca_certificate": "CA 証明書で署名中: トークンは RFC 3161 に準拠しません。専用の署名者を発行してください",
         "dedicated": "専用の署名者",
         "expiring_one": "署名者の有効期限まで {{count}} 日",
         "expiring_other": "署名者の有効期限まで {{count}} 日",
@@ -6375,6 +6384,29 @@
         "revoked": "署名者の証明書が失効しています",
         "key_unavailable": "署名者の鍵を利用できません",
         "invalid": "署名者の証明書は使用できません"
+      },
+      "smtp": "メール",
+      "webhooks": "Webhooks",
+      "auto_renewal": "自動更新",
+      "witness": {
+        "smtp": {
+          "not_configured": "未設定",
+          "disabled": "設定済みですが無効です",
+          "incomplete": "有効ですが、ポートまたは送信元アドレスがありません",
+          "ready": "利用可能"
+        },
+        "webhooks": {
+          "not_configured": "エンドポイントなし",
+          "none_active_one": "エンドポイント {{count}} 件、有効なものはありません",
+          "none_active_other": "エンドポイント {{count}} 件、有効なものはありません",
+          "active_one": "有効なエンドポイント {{count}} 件",
+          "active_other": "有効なエンドポイント {{count}} 件"
+        },
+        "auto_renewal": {
+          "enabled": "有効",
+          "disabled": "無効"
+        },
+        "unavailable": "状態を取得できません"
       }
     },
     "filter": {

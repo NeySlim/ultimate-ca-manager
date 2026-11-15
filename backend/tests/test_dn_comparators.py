@@ -61,3 +61,12 @@ def test_a_prohibited_code_point_is_compared_where_rfc_4518_says_undefined():
     # unique subject (taken), and no key or account is gained by it on a renewal.
     a, b = _name([(CN, 'host\ue000')]), _name([(CN, 'HOST\ue000')])
     assert same_name(a, b)
+
+
+def test_the_index_key_and_the_comparator_agree_on_a_prohibited_code_point():
+    """pins that subject_key finds what same_name then confirms, prohibited code points included
+    (RFC 4518 §2.4 leaves both Undefined); proves no fix."""
+    from utils.dn_match import name_key
+    for left, right in (('host', 'HOST'), ('host�', 'Host�'), ('a\U000e0001b', 'A\U000e0001B')):
+        a, b = _name([(CN, left)]), _name([(CN, right)])
+        assert same_name(a, b) and name_key(a) == name_key(b)

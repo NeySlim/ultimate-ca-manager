@@ -1542,7 +1542,7 @@
     "proxyUpstreamUrl": "上游目录 URL",
     "proxyUpstreamUrlHelper": "上游 ACME 服务器的目录 URL。如果为空，默认使用 Let's Encrypt staging。",
     "proxyUsage": "certbot 使用方法：",
-    "proxyUsageNote": "前提：域名（或覆盖子域的父域）须在 ACME 域名中配置 DNS 提供商。代理仅支持 dns-01。\n\n每个外部 CA 账户可暴露专用端点：/acme/proxy/<slug>/directory（在外部 CA 账户中启用 **通过 ACME 代理暴露**）。默认路径 /acme/proxy/directory 遵循代理设置中所选账户。\n\nUCM 通过该提供商自动创建和删除 TXT 记录。--manual-auth-hook 与 --manual-cleanup-hook 可保持为 no-op（/bin/true），DNS 校验由代理完成。\n\n避免对同一名称并发发起两次请求（Certbot + UCM 界面）：第二条 TXT 记录可能覆盖第一条。若 UCM HTTPS 证书为自签名（实验环境），请为 Certbot 添加 --no-verify-ssl。",
+    "proxyUsageNote": "前提：域名（或覆盖子域的父域）须在 ACME 域名中配置 DNS 提供商。代理仅支持 dns-01。\n\n每个外部 CA 账户可暴露专用端点：/acme/proxy/<slug>/directory（在“证书颁发机构 (CA)”中启用 **通过 ACME 代理暴露**）。默认路径 /acme/proxy/directory 遵循代理设置中所选账户。\n\nUCM 通过该提供商自动创建和删除 TXT 记录。--manual-auth-hook 与 --manual-cleanup-hook 可保持为 no-op（/bin/true），DNS 校验由代理完成。\n\n避免对同一名称并发发起两次请求（Certbot + UCM 界面）：第二条 TXT 记录可能覆盖第一条。若 UCM HTTPS 证书为自签名（实验环境），请为 Certbot 添加 --no-verify-ssl。",
     "proxyRegistered": "代理已注册",
     "registerAccount": "注册账户",
     "aboutAcmeDesc": "ACME 实现自动化证书颁发。配置下方服务器，然后使用任何 ACME 客户端（certbot, acme.sh 等）连接目录 URL。",
@@ -1802,12 +1802,12 @@
     "customCA": "自定义 CA",
     "upstreamCAHelper": "选择代理请求的上游证书颁发机构",
     "proxyUpstreamCAAccount": "上游 CA 账户",
-    "proxyUpstreamCAAccountHelper": "选择已注册的外部 ACME CA 账户。EAB 和凭据在下方“外部 CA 账户”中管理。",
+    "proxyUpstreamCAAccountHelper": "选择已注册的外部 ACME CA 账户。EAB 和凭据在下方“证书颁发机构 (CA)”中管理。",
     "proxySelectCaAccount": "选择 CA 账户…",
     "proxyPruneReplacedCertificates": "清理已被替换的证书",
     "proxyPruneReplacedCertificatesDesc": "当相同域名的续期成功后，自动删除通过代理导入的证书。已吊销的证书始终保留。",
-    "proxyNoCaAccounts": "未配置外部 CA 账户。请在下方“外部 CA 账户”中添加。",
-    "proxyManageCaAccountsHint": "EAB 和各 CA 设置在下方“外部 CA 账户”中管理。",
+    "proxyNoCaAccounts": "未配置外部 CA 账户。请在下方“证书颁发机构 (CA)”中添加。",
+    "proxyManageCaAccountsHint": "EAB 和各 CA 设置在下方“证书颁发机构 (CA)”中管理。",
     "proxyEnabled": "通过 ACME 代理暴露",
     "proxySlug": "代理路径 (slug)",
     "proxySlugHelper": "URL：/acme/proxy/<slug>/directory（小写字母、数字、连字符）。",
@@ -3374,6 +3374,7 @@
       "nothingFound": "未发现此配置文件会拒绝的项目。"
     },
     "fipsPreflight": {
+      "withoutModule": "未询问任何 FIPS 模块：EdDSA 和 ML-DSA 密钥被列为拒绝。使用 Docker 时，请用 -fips 镜像（不设置 UCM_FIPS）运行此检查，按其模块判定。",
       "title": "FIPS 就绪检查",
       "hint": "列出 FIPS 模式在此实例上会拒绝的项目，并为每项给出补救办法。不会更改任何内容。",
       "run": "检查 FIPS 就绪情况",
@@ -4910,7 +4911,7 @@
     "selectGroup": "选择用户组...",
     "subtitle": "管理签发规则、密钥要求和审批工作流",
     "fipsRulesTitle": "FIPS 规则已启用（只读）",
-    "fipsRulesDesc": "FIPS 模式会优先应用系统策略：RSA 2048 至 4096 位和 EC P-256 至 P-521 密钥，SHA-256 至 SHA-512 签名。此处的策略只能进一步收窄该范围。",
+    "fipsRulesDesc": "FIPS 模式会优先应用系统策略：长度为偶数、2048 至 16384 位的 RSA 密钥，EC P-256 至 P-521，以及在已加载的 FIPS 模块批准时的 Ed25519、Ed448 和 ML-DSA 密钥；SHA-256 至 SHA-512 签名。此处的策略只能进一步收窄该范围。",
     "targetCA": "目标 CA",
     "title": "证书策略",
     "toggleFailed": "切换策略失败",
@@ -5470,7 +5471,7 @@
     "inventorySyncHint": "定期导入 Windows CA 上签发但 UCM 尚未掌握的证书，使 UCM 能管理证书的完整生命周期。增量执行，通过管理通道进行。",
     "lastInventorySync": "上次清点",
     "inventorySyncNow": "立即从 CA 导入",
-    "inventorySyncResult": "清点完成：已导入 {{imported}} 个（{{skipped}} 个已知）",
+    "inventorySyncResult": "清点完成：已导入 {{imported}} 个，已完成 {{completed}} 个待处理请求（{{skipped}} 个已知）",
     "inventorySyncFailed": "清点失败",
     "caControl": "CA 控制面板",
     "caControlTitle": "CA 控制: {{name}}",
@@ -5510,6 +5511,11 @@
     "issued": "已颁发",
     "denied": "已拒绝",
     "checkStatus": "检查状态",
+    "checkIssued": "证书已签发并导入",
+    "checkStillPending": "仍在 CA 上等待审批",
+    "checkDenied": "CA 已拒绝此请求",
+    "checkSuperseded": "此 CSR 已在别处签名：其 Microsoft CA 请求已关闭",
+    "checkFailed": "状态检查失败",
     "refreshStatus": "刷新状态",
     "signMode": "签名方法",
     "signLocal": "本地 CA",
@@ -5761,13 +5767,14 @@
     "policyOidHelp": "标识时间戳发行所依据的TSA策略的OID",
     "policyPlaceholderWarning": "1.2.3.4.1 是 OpenSSL 的示例策略 OID，未分配给任何人。生产环境中请使用您组织 OID 分支或 CP/CPS 中的 OID。",
     "requireDedicatedCert": "要求使用专用TSA证书",
-    "requireDedicatedCertDesc": "拒绝使用CA证书本身签署时间戳。需要具有关键timeStamping EKU的专用终端实体签名证书（RFC 3161）。",
+    "requireDedicatedCertDesc": "默认开启。拒绝使用 CA 证书本身签署时间戳：RFC 3161 要求使用具有关键 timeStamping EKU 的专用终端实体签名证书。关闭此项不符合 RFC 3161。",
     "requireDedicatedCertBlocked": "请先在上方选择一个可用的专用签名证书，否则所有时间戳请求都会失败。",
     "signingCert": "签名证书",
-    "signingCertDesc": "选择用什么来签署时间戳令牌。CA 证书是历史默认值；带有 timeStamping EKU 的专用终端实体证书是 RFC 3161 的建议。",
+    "signingCertDesc": "选择用什么来签署时间戳令牌。RFC 3161 要求使用带有 timeStamping EKU 的专用终端实体证书；只有在关闭下方的严格模式时，CA 证书才会签名。",
     "caSignerWarning": "时间戳由 CA 证书签名。openssl ts -verify 和 jarsigner 等严格的验证程序会拒绝这些令牌：RFC 3161 要求使用带有关键且唯一的 timeStamping EKU 的专用签名者。请在下方选择或生成专用签名证书。",
+    "strictNoSigner": "严格模式已开启，但未设置专用签名者：/tsa 会拒绝所有时间戳请求。请在下方生成签名证书：UCM 会从所选 CA 签发一个仅含关键 timeStamping EKU 的证书（RFC 3161），并将其选中。",
     "signingCertHelp": "仅列出 UCM 持有其私钥且带有 timeStamping EKU 的证书。续期会被自动跟随。",
-    "signingCertCa": "CA 证书（默认）",
+    "signingCertCa": "CA 证书（仅在关闭严格模式时）",
     "signerExpires": "到期",
     "signerChainComplete": "颁发者链可追溯到自签名根证书，并包含在每个令牌中。",
     "signerChainPartial": "颁发者链：已包含 {{count}} 个证书；未到达自签名根。",
@@ -6287,7 +6294,8 @@
         "session_revoke": "会话已吊销",
         "session_revoke_all": "多个会话已吊销",
         "deploy_binding_left_behind": "部署仍在旧证书上",
-        "https_binding_left_behind": "HTTPS 仍在旧证书上"
+        "https_binding_left_behind": "HTTPS 仍在旧证书上",
+        "truststore_expiring": "信任存储中的证书即将到期或已到期"
       }
     }
   },
@@ -6336,7 +6344,8 @@
       "renewal_declined": "续期被拒绝",
       "ca_expiring": "CA 即将到期",
       "deploy_binding_left_behind": "部署仍在旧证书上",
-      "https_binding_left_behind": "HTTPS 仍在旧证书上"
+      "https_binding_left_behind": "HTTPS 仍在旧证书上",
+      "truststore_expiring": "信任存储中的证书即将到期或已到期"
     },
     "compliance": {
       "rsa_below_3072": "RSA 低于 3072 位",
@@ -6360,7 +6369,7 @@
       "tasksWarning_one": "{{count}} 个任务有警告",
       "tasksWarning_other": "{{count}} 个任务有警告",
       "tsaState": {
-        "ca_certificate": "使用 CA 证书签名",
+        "ca_certificate": "由 CA 证书签名：令牌不符合 RFC 3161，请签发专用签名者",
         "dedicated": "专用签名者",
         "expiring_one": "签名者将在 {{count}} 天后过期",
         "expiring_other": "签名者将在 {{count}} 天后过期",
@@ -6372,6 +6381,29 @@
         "revoked": "签名者证书已吊销",
         "key_unavailable": "签名者密钥不可用",
         "invalid": "签名者证书不可用"
+      },
+      "smtp": "邮件",
+      "webhooks": "Webhooks",
+      "auto_renewal": "自动续订",
+      "witness": {
+        "smtp": {
+          "not_configured": "未配置",
+          "disabled": "已配置但已禁用",
+          "incomplete": "已启用，但缺少端口或发件人地址",
+          "ready": "就绪"
+        },
+        "webhooks": {
+          "not_configured": "没有端点",
+          "none_active_one": "{{count}} 个端点，均未启用",
+          "none_active_other": "{{count}} 个端点，均未启用",
+          "active_one": "{{count}} 个已启用的端点",
+          "active_other": "{{count}} 个已启用的端点"
+        },
+        "auto_renewal": {
+          "enabled": "已启用",
+          "disabled": "已禁用"
+        },
+        "unavailable": "状态不可用"
       }
     },
     "filter": {

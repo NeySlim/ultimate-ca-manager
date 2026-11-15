@@ -14,6 +14,7 @@
     {"kind": "renewal_declined", "template": "/certificates/{id}", "route": "/certificates", "tab": null, "param": null},
     {"kind": "ca_expiring", "template": "/cas/{id}", "route": "/cas", "tab": null, "param": null},
     {"kind": "deploy_binding_left_behind", "template": "/certificates/{certificate_id}?binding={id}", "route": "/certificates", "tab": null, "param": null},
-    {"kind": "https_binding_left_behind", "template": "/settings?tab=https", "route": "/settings", "tab": "https", "param": null}
+    {"kind": "https_binding_left_behind", "template": "/settings?tab=https", "route": "/settings", "tab": "https", "param": null},
+    {"kind": "truststore_expiring", "template": "/truststore/{id}", "route": "/truststore", "tab": null, "param": null}
   ]
 }

@@ -5,6 +5,7 @@ an upgrade interrupted after any step and started again ends in the same state. 
 2.254 ran the same cleanup as its migration 136.
 """
 import importlib
+import time
 
 STEPS = (
     '138_flask_sessions', '139_dashboard_aggregates', '141_cluster_nodes',
@@ -15,6 +16,7 @@ STEPS = (
     '152_shared_files', '153_encryption_keys', '155_windows_enrollment_profiles',
     '156_template_cn_pattern', '157_certificate_subject_key', '158_ca_parent_confirmation',
     '159_second_factor_failures', '160_backup_archives', '161_cluster_maintenance',
+    '162_tsa_ca_signer_kept',
 )
 
 # Every name a 2.254 start leaves in `_migrations` (the migration files of tag v2.254-rc1,
@@ -94,3 +96,27 @@ RECORDED_BEFORE_2_52 = frozenset((
 def step(name):
     """The module of one step."""
     return importlib.import_module(f'{__name__}.{name}')
+
+
+PROGRESS_SECONDS = 30
+_clock = time.monotonic
+
+
+def say(line):
+    """A journal line now, as the runner writes them."""
+    print(line, flush=True)
+
+
+class Progress:
+    """Called with the count of rows done, after each batch or each row as the step reads them;
+    prints one line at most every PROGRESS_SECONDS, none for a step shorter than that."""
+
+    def __init__(self, label, total):
+        self.label, self.total = label, total
+        self._last = _clock()
+
+    def __call__(self, done):
+        now = _clock()
+        if now - self._last >= PROGRESS_SECONDS:
+            self._last = now
+            say(f'    {self.label}: {done} of {self.total} rows')

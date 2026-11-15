@@ -15,6 +15,7 @@ from models import db, CA, Certificate
 from services.file_regen_service import mirror_private_key
 from utils.key_codec import store_pem_bytes
 from utils.key_type import weak_ca_key_refusal
+from utils.certificate_readability import stored_pem_refusal
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,10 @@ class ImportMixin:
                     if existing:
                         stats['skipped'] += 1
                         continue
+
+                unreadable = stored_pem_refusal(ca_data.get('crt'))
+                if unreadable:
+                    raise ValueError(f"'{ca_data.get('descr', refid)}' not imported: {unreadable}")
 
                 if ca_data.get('prv'):
                     weak = weak_ca_key_refusal(base64.b64decode(ca_data['prv']))
@@ -178,6 +183,10 @@ class ImportMixin:
                     if existing:
                         stats['skipped'] += 1
                         continue
+
+                unreadable = stored_pem_refusal(cert_data.get('crt'))
+                if unreadable:
+                    raise ValueError(f"'{cert_data.get('descr', refid)}' not imported: {unreadable}")
 
                 caref = cert_data.get('caref')
                 if caref:

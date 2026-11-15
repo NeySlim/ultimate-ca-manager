@@ -79,7 +79,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `resources` | requests 100m/512Mi, limit 1Gi | Pod resources |
 | `livenessProbe` | enabled, 40 s delay, every 30 s, timeout 10 s, 3 failures | Liveness probe on `/health/live` |
 | `readinessProbe` | enabled, 20 s delay, every 15 s, timeout 10 s, 3 failures | Readiness probe on `/health/ready` |
-| `startupProbe` | enabled, every 10 s, timeout 10 s, 36 failures | HA only: startup probe on `/health/live` |
+| `startupProbe` | enabled, every 10 s, timeout 10 s, 36 failures | Probe on `/health/live` that holds the liveness and readiness probes until UCM answers (360 s by default): a first start that upgrades a large database answers nothing until the upgrade ends |
 | `serviceAccount.create` / `serviceAccount.name` / `serviceAccount.annotations` | `true` / `""` / `{}` | Create a ServiceAccount (name defaults to the full name) |
 | `podSecurityContext` / `securityContext` | non-root UID/GID 1000, `fsGroup` 1000, seccomp `RuntimeDefault`; no privilege escalation, every capability dropped | Pod and container security contexts |
 | `nodeSelector` / `tolerations` / `affinity` | `{}` / `[]` / `{}` | Scheduling; `affinity` replaces the HA anti-affinity |

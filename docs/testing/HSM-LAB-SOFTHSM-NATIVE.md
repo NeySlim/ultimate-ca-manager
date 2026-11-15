@@ -130,7 +130,7 @@ Expected:
 
 ### Web UI
 
-**Modules → Administration → HSM Management** → **SoftHSM-Default** → **Test** → success.
+Open **Modules → Administration → HSM Management**, select the **SoftHSM-Default** provider and run **Test**: it succeeds.
 
 ## Automated setup script (lab)
 

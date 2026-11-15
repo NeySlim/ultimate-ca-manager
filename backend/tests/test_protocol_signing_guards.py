@@ -75,6 +75,8 @@ class TestTsaConfigGuard:
             db.session.commit()
             _set_config('tsa_enabled', 'true')
             _set_config('tsa_ca_refid', ca_obj.refid)
+            # The CA-certificate signer is the compatibility mode, turned on explicitly
+            _set_config('tsa_require_dedicated_cert', 'false')
         try:
             r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
                             content_type='application/timestamp-query')
@@ -84,6 +86,7 @@ class TestTsaConfigGuard:
             with app.app_context():
                 _clear_config('tsa_enabled')
                 _clear_config('tsa_ca_refid')
+                _clear_config('tsa_require_dedicated_cert')
 
     def test_tsa_signing_with_ca_certificate_is_accepted(
         self, app, client, create_ca
@@ -96,6 +99,8 @@ class TestTsaConfigGuard:
             ca_obj = db.session.get(CA, ca['id'])
             _set_config('tsa_enabled', 'true')
             _set_config('tsa_ca_refid', ca_obj.refid)
+            # The CA-certificate signer is the compatibility mode, turned on explicitly
+            _set_config('tsa_require_dedicated_cert', 'false')
         try:
             r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
                             content_type='application/timestamp-query')
@@ -104,6 +109,7 @@ class TestTsaConfigGuard:
             with app.app_context():
                 _clear_config('tsa_enabled')
                 _clear_config('tsa_ca_refid')
+                _clear_config('tsa_require_dedicated_cert')
 
     def test_tsa_enabled_absent_is_grandfathered_when_ca_configured(
         self, app, client, create_ca
@@ -115,6 +121,8 @@ class TestTsaConfigGuard:
             ca_obj = db.session.get(CA, ca['id'])
             _clear_config('tsa_enabled')
             _set_config('tsa_ca_refid', ca_obj.refid)
+            # The CA-certificate signer is the compatibility mode, turned on explicitly
+            _set_config('tsa_require_dedicated_cert', 'false')
         try:
             r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
                             content_type='application/timestamp-query')
@@ -122,6 +130,7 @@ class TestTsaConfigGuard:
         finally:
             with app.app_context():
                 _clear_config('tsa_ca_refid')
+                _clear_config('tsa_require_dedicated_cert')
 
 
 class TestScepGetNextCaCert:

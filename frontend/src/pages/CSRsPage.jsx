@@ -49,7 +49,7 @@ export default function CSRsPage() {
   const { isMobile } = useMobile()
   const navigate = useNavigate()
   const openEntity = useOpenEntity()
-  const { showSuccess, showError, showConfirm, showWarning } = useNotification()
+  const { showSuccess, showError, showInfo, showConfirm, showWarning } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
   // Direct private-key export is the admin-only read:private_keys scope,
   // as on the certificates page
@@ -287,6 +287,53 @@ export default function CSRsPage() {
       setSelectedCSR({ ...data, ...csr }) // Merge to keep signed_by info
     } catch {
       setSelectedCSR(csr)
+    }
+  }
+
+  // The Microsoft CA request still awaiting approval for the selected CSR, if any
+  const [mscaRequest, setMscaRequest] = useState(null)
+  const [checkingMsca, setCheckingMsca] = useState(false)
+  const selectedCsrId = selectedCSR?.id
+  useEffect(() => {
+    setMscaRequest(null)
+    // The status route imports the certificate: it requires write:certificates
+    if (!selectedCsrId || activeTab !== 'pending' || !canWrite('certificates')) return undefined
+    let cancelled = false
+    mscaService.getPendingRequests()
+      .then((res) => {
+        if (!cancelled) setMscaRequest((res.data || []).find((r) => r.csr_id === selectedCsrId) || null)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [selectedCsrId, activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCheckMscaStatus = async () => {
+    if (!mscaRequest) return
+    const csrId = selectedCsrId
+    setCheckingMsca(true)
+    try {
+      const res = await mscaService.checkRequest(mscaRequest.msca_id, mscaRequest.id)
+      const status = res.data?.status
+      if (status === 'issued') {
+        showSuccess(t('msca.checkIssued'))
+        loadData()
+        setSelectedCSR(null)
+        openEntity('certificate', csrId)
+      } else if (status === 'denied') {
+        showError(t('msca.checkDenied'))
+        loadData()
+        setMscaRequest(null)
+      } else if (status === 'superseded') {
+        showInfo(t('msca.checkSuperseded'))
+        loadData()
+        setMscaRequest(null)
+      } else {
+        showInfo(t('msca.checkStillPending'))
+      }
+    } catch (error) {
+      showError(error.message || t('msca.checkFailed'))
+    } finally {
+      setCheckingMsca(false)
     }
   }
 
@@ -893,6 +940,8 @@ export default function CSRsPage() {
               canWrite={canWrite}
               canDelete={canDelete}
               onSign={() => openModal('sign')}
+              onCheckMsca={mscaRequest ? handleCheckMscaStatus : undefined}
+              checkingMsca={checkingMsca}
               onDownload={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'csr'}.csr`)}
               onDownloadKey={canExportKey && selectedCSR.has_private_key ? () => handleDownloadKey(selectedCSR) : undefined}
               onDelete={() => handleDelete(selectedCSR.id)}
@@ -1490,7 +1539,7 @@ function SanRows({ rows, onChange, types, allowEmpty = false, t }) {
   )
 }
 
-function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownloadKey, onDelete, onUploadKey, onRekey, t }) {
+function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onCheckMsca, checkingMsca, onDownload, onDownloadKey, onDelete, onUploadKey, onRekey, t }) {
   return (
     <CSRPanel csr={csr}>
       {/* Actions */}
@@ -1511,6 +1560,11 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownl
         {canWrite('csrs') && (
           <Button type="button" size="sm" onClick={onSign}>
             <SignIn size={14} /> {t('csrs.sign')}
+          </Button>
+        )}
+        {canWrite('certificates') && onCheckMsca && (
+          <Button type="button" size="sm" variant="secondary" onClick={onCheckMsca} disabled={checkingMsca}>
+            <ArrowsClockwise size={14} /> {t('msca.checkStatus')}
           </Button>
         )}
         {canWrite('csrs') && onRekey && (

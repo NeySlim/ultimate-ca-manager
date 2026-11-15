@@ -67,7 +67,7 @@ vi.mock('../../services', () => ({
   certificatesService: { export: vi.fn() },
   casService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
   templatesService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
-  mscaService: { getEnabled: vi.fn().mockResolvedValue({ data: [] }) },
+  mscaService: { getEnabled: vi.fn().mockResolvedValue({ data: [] }), getPendingRequests: vi.fn().mockResolvedValue({ data: [] }) },
   ekuService: { getKnown: vi.fn().mockResolvedValue({ data: { ekus: [] } }) },
 }))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))

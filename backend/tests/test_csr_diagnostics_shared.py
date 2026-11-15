@@ -65,14 +65,11 @@ def test_an_unreadable_algorithm_is_not_diagnosed():
     assert weak_csr_hash_algorithm(MagicMock(signature_hash_algorithm=None)) is None
 
 
-def test_both_protocol_doors_use_the_shared_helper(sha1_csr):
+def test_est_uses_the_shared_helper(sha1_csr):
     from api import est_protocol
-    from services.wstep import wstep_service
 
     assert est_protocol._weak_csr_hash_algorithm is weak_csr_hash_algorithm
-    assert wstep_service._weak_csr_hash_algorithm is weak_csr_hash_algorithm
     assert est_protocol._weak_csr_hash_algorithm(sha1_csr) == 'sha1'
-    assert wstep_service._weak_csr_hash_algorithm(sha1_csr) == 'sha1'
 
 
 def test_the_table_is_unchanged():

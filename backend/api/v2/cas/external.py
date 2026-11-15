@@ -22,6 +22,7 @@ from utils.sanitize import sanitize_filename
 from services.ca_service import CAService
 from services.ca.signature_scheme import ca_public_key
 from services.import_service import CrossCertificateImport, cross_mode_from
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
 from services.crl import CRLService, ExternalCRLConflict
 from models import CA, db
 from utils import key_algorithms, notices as notices_mod
@@ -43,11 +44,9 @@ def _load_certificate_pem(data: bytes):
     """Parse an uploaded certificate (PEM or DER) and return PEM bytes."""
     try:
         cert = x509.load_pem_x509_certificate(data, default_backend())
-        return cert.public_bytes(serialization.Encoding.PEM)
     except Exception:
-        pass
-    cert = x509.load_der_x509_certificate(data, default_backend())
-    return cert.public_bytes(serialization.Encoding.PEM)
+        cert = x509.load_der_x509_certificate(data, default_backend())
+    return require_readable_extensions(cert).public_bytes(serialization.Encoding.PEM)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/csr', methods=['GET'])
@@ -106,6 +105,8 @@ def install_ca_certificate(ca_id):
 
     try:
         cert_pem = _load_certificate_pem(cert_data)
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     except Exception:
         return error_response('Invalid certificate file', 400)
 

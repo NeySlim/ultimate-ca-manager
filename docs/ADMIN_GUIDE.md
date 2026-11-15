@@ -162,10 +162,10 @@ The same recommendation applies to any directory holding TLS keys or HSM PINs (`
 
 #### Reverse proxy & trusted_proxies (since v2.142)
 
-If you terminate TLS on a reverse proxy (Nginx, Traefik, HAProxy, NPM) and forward client info to UCM via headers, declare the proxy CIDR(s) in **Settings → Security → Trusted proxies**:
+If you terminate TLS on a reverse proxy (Nginx, Traefik, HAProxy, NPM) and forward client info to UCM via headers, declare the proxy addresses or CIDR networks in the `UCM_TRUSTED_PROXIES` environment variable:
 
 ```
-security.trusted_proxies = 10.0.0.5/32, 192.168.10.0/24
+UCM_TRUSTED_PROXIES=10.0.0.5,192.168.10.0/24
 ```
 
 This affects:

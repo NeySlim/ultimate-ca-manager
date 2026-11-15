@@ -409,10 +409,10 @@ jobs:
           [ -n "$files" ]
           pytest --tb=short $files
 
-  # The tests of a real SoftHSM token and of the system GSSAPI, both installed here.
+  # The tests of a real SoftHSM token, of the system GSSAPI and of a Redis server, installed here.
   # Selected by marker; a skip of a marked test fails the job (tests/optional_backends.py).
   test-optional-backends:
-    name: Backend Tests (SoftHSM, GSSAPI)
+    name: Backend Tests (SoftHSM, GSSAPI, Redis)
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule'
     timeout-minutes: 20
@@ -428,7 +428,11 @@ jobs:
           cache: 'pip'
 
       - name: Install system dependencies
-        run: scripts/ci/apt-install.sh libkrb5-dev softhsm2
+        run: scripts/ci/apt-install.sh libkrb5-dev softhsm2 redis-server
+
+      # The tests start their own redis-server on a Unix socket: only the binary serves
+      - name: Stop the system Redis service
+        run: sudo systemctl stop redis-server
 
       - name: Install dependencies
         run: |
@@ -471,6 +475,19 @@ jobs:
         run: |
           cd backend
           pytest --tb=short -rs -m needs_gssapi tests/
+
+      - name: Run the Redis tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          UCM_TEST_REQUIRE_REDIS: '1'
+        run: |
+          cd backend
+          pytest --tb=short -rs -m needs_redis tests/
 
   # Real UCM nodes (two, then three) in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
   # Manual only: run the workflow by hand with the `ha` input ticked.

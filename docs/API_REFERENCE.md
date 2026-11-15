@@ -1,10 +1,8 @@
 # UCM API v2 - Complete Reference
 
-> **Version**: 2.48+  
 > **Base URL**: `https://your-server:8443/api/v2`  
-> **Last Updated**: February 2026  
-> **Total Endpoints**: 347  
-> **Note**: All endpoints are served from `api/v2/` (34 registered blueprints). There is no separate `features/` module.
+> **Coverage**: `backend/tests/test_api_reference_routes.py` checks this file against the application's route table.  
+> **Operation format**: each operation is written `METHOD /path` at the start of a line (`{id}` marks a path parameter).
 
 ---
 
@@ -12,37 +10,52 @@
 
 1. [Authentication](#authentication)
 2. [Account Management](#account-management)
-3. [Certificate Authorities (CAs)](#certificate-authorities)
+3. [Certificate Authorities](#certificate-authorities)
 4. [Certificates](#certificates)
 5. [User Certificates (mTLS)](#user-certificates-mtls)
-6. [Certificate Signing Requests (CSRs)](#certificate-signing-requests)
-6. [Templates](#templates)
-7. [Trust Store](#trust-store)
-8. [ACME Server](#acme-server)
-9. [SCEP](#scep)
-10. [CRL & OCSP](#crl--ocsp)
-11. [Users](#users)
-12. [Roles & Permissions (RBAC)](#roles--permissions-rbac)
-13. [Dashboard](#dashboard)
-14. [Audit Logs](#audit-logs)
-15. [Settings](#settings)
-16. [System](#system)
-17. [Import/Export](#importexport)
-18. [Certificate Tools](#certificate-tools)
-19. [Global Search](#global-search)
-20. [User Groups](#user-groups)
-21. [Smart Import](#smart-import)
-22. [DNS Providers](#dns-providers)
-23. [ACME Client (Let's Encrypt)](#acme-client-lets-encrypt)
-24. [ACME Domains](#acme-domains)
-25. [SSO (LDAP/OAuth2/SAML)](#sso-ldapoauth2saml)
-26. [HSM](#hsm)
-27. [WebAuthn](#webauthn)
-28. [Webhooks](#webhooks)
-29. [Certificate Policies & Approvals](#certificate-policies--approvals)
-30. [Reports](#reports)
-31. [WebSocket](#websocket)
-32. [Health](#health)
+6. [Certificate Signing Requests](#certificate-signing-requests)
+7. [Templates](#templates)
+8. [Trust Store](#trust-store)
+9. [ACME Server](#acme-server)
+10. [SCEP](#scep)
+11. [EST](#est)
+12. [Time Stamping (TSA)](#time-stamping-tsa)
+13. [Windows Enrollment Profiles](#windows-enrollment-profiles)
+14. [Active Directory Connectors](#active-directory-connectors)
+15. [Microsoft CA](#microsoft-ca)
+16. [SSH Certificates](#ssh-certificates)
+17. [Deployment](#deployment)
+18. [Discovery](#discovery)
+19. [Key Recovery](#key-recovery)
+20. [CRL & OCSP](#crl--ocsp)
+21. [AIA CA Issuers](#aia-ca-issuers)
+22. [Users](#users)
+23. [Roles & Permissions (RBAC)](#roles--permissions-rbac)
+24. [Dashboard](#dashboard)
+25. [Audit Logs](#audit-logs)
+26. [Settings](#settings)
+27. [System](#system)
+28. [Import/Export](#importexport)
+29. [Certificate Tools](#certificate-tools)
+30. [Global Search](#global-search)
+31. [User Groups](#user-groups)
+32. [Smart Import](#smart-import)
+33. [DNS Providers](#dns-providers)
+34. [ACME Client (Let's Encrypt)](#acme-client-lets-encrypt)
+35. [ACME Domains](#acme-domains)
+36. [SSO (LDAP/OAuth2/SAML)](#sso-ldapoauth2saml)
+37. [HSM](#hsm)
+38. [WebAuthn](#webauthn)
+39. [Webhooks](#webhooks)
+40. [Certificate Policies & Approvals](#certificate-policies--approvals)
+41. [Reports](#reports)
+42. [WebSocket](#websocket)
+43. [Health](#health)
+44. [Protocol and Health Endpoints](#protocol-and-health-endpoints)
+45. [HTTP Status Codes](#http-status-codes)
+46. [Rate Limiting](#rate-limiting)
+47. [Permissions](#permissions)
+48. [Examples](#examples)
 
 ---
 
@@ -165,27 +178,33 @@ POST /api/v2/auth/login/mtls
 
 ### Get Available Auth Methods
 ```http
+GET /api/v2/auth/methods
 POST /api/v2/auth/methods
-Content-Type: application/json
-
-{
-  "username": "admin"
-}
 ```
+Public. Both forms answer the same whatever the body: nothing is revealed about a user before sign-in.
 
 **Response:**
 ```json
 {
   "data": {
     "password": true,
-    "webauthn": true,
-    "webauthn_credentials": 2,
     "mtls": false,
     "mtls_status": "not_present",
-    "totp_enabled": true
+    "webauthn": true,
+    "webauthn_credentials": 0,
+    "mtls_certificates": 0,
+    "api_keys": true,
+    "sso_providers": []
   }
 }
 ```
+`mtls_status` is `not_present`, `enrolled`, `present_not_enrolled`, `error`, or `auto_logged_in` when the TLS handshake already signed the caller in (`mtls_user` then names the account). `sso_providers` lists the enabled providers. The two credential counts are always `0` before sign-in.
+
+### Legacy Login
+```http
+POST /api/v2/auth/login
+```
+Public. Kept for older clients: it delegates to `POST /api/v2/auth/login/password`, with the same body.
 
 ### Verify Session
 ```http
@@ -343,82 +362,90 @@ A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Beare
 
 ### WebAuthn Credentials
 
-```http
-# Check WebAuthn availability
-GET /api/v2/account/webauthn/available
-
-# List credentials
-GET /api/v2/account/webauthn/credentials
-
-# Register new credential - Step 1
-POST /api/v2/account/webauthn/register/options
-
-# Register new credential - Step 2
-POST /api/v2/account/webauthn/register/verify
-Content-Type: application/json
-
-{
-  "name": "YubiKey 5",
-  "response": { ... }  // WebAuthn attestation response
-}
-
-# Toggle credential
-POST /api/v2/account/webauthn/credentials/{credential_id}/toggle
-
-# Delete credential
-DELETE /api/v2/account/webauthn/credentials/{credential_id}
-```
+Security-key management for the signed-in account is served under `/api/v2/webauthn/`; see [WebAuthn](#webauthn). There is no `/api/v2/account/webauthn/` prefix.
 
 ### mTLS Certificates
 
+Served under `/api/v2/mtls/` (not under `/account/`). Except for the two settings routes and the two GET lists (certificates, available-certificates), every route here needs an interactive session (`403` otherwise). A user works on their own enrolments; an admin may act on another user's where noted.
+
 ```http
-# List enrolled certificates
-GET /api/v2/account/mtls/certificates
-
-# List all certificates (admin)
-GET /api/v2/account/mtls/certificates/all
-
-# Create new mTLS certificate
-POST /api/v2/account/mtls/certificates/create
-Content-Type: application/json
-
-{
-  "name": "My Laptop",
-  "validity_days": 365
-}
-
-# Enroll existing certificate
-POST /api/v2/account/mtls/certificates/enroll
-
-# Download certificate
-GET /api/v2/account/mtls/certificates/{cert_id}/download?format=pem
-
-# Enable/disable certificate
-POST /api/v2/account/mtls/certificates/{cert_id}/enable
-Content-Type: application/json
-
-{
-  "enabled": true
-}
-
-# Revoke certificate
-POST /api/v2/account/mtls/certificates/{cert_id}/revoke
-
-# Delete certificate
-DELETE /api/v2/account/mtls/certificates/{cert_id}
-
-# Get mTLS settings
-GET /api/v2/account/mtls/settings
-
-# Update mTLS settings
-PUT /api/v2/account/mtls/settings
-Content-Type: application/json
-
-{
-  "enabled": true,
-  "issuing_ca_id": 1
-}
+GET /api/v2/mtls/settings
 ```
+Permission `read:settings`. Returns `enabled`, `required`, `trusted_ca_id` and `trusted_ca` (`refid`, `name`, `valid_to`, `has_private_key`, or `null`).
+
+```http
+PUT /api/v2/mtls/settings
+Content-Type: application/json
+
+{ "enabled": true, "required": false, "trusted_ca_id": "<CA refid>" }
+```
+Permission `admin:system`. Every field is optional; an empty body answers `400`. Unknown `trusted_ca_id` when enabling answers `404`. `required: true` with `enabled: true` answers `400` while no active admin has an enabled enrolled certificate. The change needs a service restart: the response carries `needs_restart` and `restart_message` (in HA mode a rolling restart is queued instead).
+
+```http
+GET /api/v2/mtls/certificates
+```
+Any authenticated user. The caller's enrolled certificates, newest first.
+
+```http
+POST /api/v2/mtls/certificates
+Content-Type: application/json
+
+{ "name": "My Laptop", "validity_days": 365, "organization": "UCM Users", "ca_id": 1 }
+```
+Permission `write:user_certificates`, session only. Issues a client certificate (CN `<username>@mtls`) from the configured mTLS CA and enrolls it. `ca_id` (numeric id or refid) overrides the configured CA and then also requires `write:cas` (`403`). `400` when no mTLS CA is configured and none is given, when `validity_days` is outside the allowed range, or when `organization` is not 1 to 64 letters, digits, spaces, dots or hyphens. Responds `201` with `id` (the enrolment id), `certificate_id`, `name`, `serial`, `certificate`, `private_key`, `created_at`, `expires_at`, `status`.
+
+```http
+DELETE /api/v2/mtls/certificates/{cert_id}
+```
+Session only. Removes an enrolment; `{cert_id}` is the enrolment id. `404` if unknown, `403` if it belongs to someone else and the caller is not an admin.
+
+```http
+GET /api/v2/mtls/certificates/{cert_id}/download?format=pem&include_chain=true&include_root=false
+POST /api/v2/mtls/certificates/{cert_id}/download
+Content-Type: application/json
+
+{ "format": "pkcs12", "password": "at-least-8-chars", "include_chain": true, "include_root": false, "legacy": false }
+```
+Session only. `format` is `pem` (default) or `pkcs12`/`p12`. PKCS12 is refused on the query-string form with `400` (the password must travel in a POST body); it also needs a stored private key. `legacy` selects the 3DES/SHA-1 profile. Returns the file as a download. `404` when the enrolment is not the caller's (admins may download any).
+
+```http
+POST /api/v2/mtls/enroll
+Content-Type: application/json
+
+{ "name": "Work laptop" }
+```
+Session only. Enrolls the client certificate presented with the request: the TLS handshake's, or one forwarded by a trusted proxy. `400` when none is presented, it is expired, not yet valid, revoked, or its issuer is revoked or unknown; `409` when already enrolled.
+
+```http
+POST /api/v2/mtls/enroll-import
+Content-Type: application/json
+
+{ "pem": "-----BEGIN CERTIFICATE-----...", "name": "Work laptop", "user_id": 2 }
+```
+Session only. Imports a PEM certificate (plain or base64 of the PEM) issued by a CA of this server and enrolls it. `pem` is required; `user_id` is honoured for admins only. `400` for unparsable data, an expired or revoked certificate, or a foreign issuer; `409` when already enrolled. Responds `201`.
+
+```http
+GET /api/v2/mtls/available-certificates
+```
+Any authenticated user. User certificates (`usr_cert`, not revoked) that no account has enrolled. Non-admins see only the ones made for them.
+
+```http
+POST /api/v2/mtls/assign
+Content-Type: application/json
+
+{ "cert_id": 12, "name": "Work laptop", "user_id": 2 }
+```
+Session only. Enrolls an existing user certificate (`cert_id` is the certificate id, required). `user_id` is honoured for admins only; a non-admin may assign only a certificate made for their account (`403`). `400` when the certificate is not a user certificate or is revoked, `404` when unknown, `409` when already enrolled. Responds `201`.
+
+### Preferences
+```http
+GET /api/v2/account/preferences
+PUT /api/v2/account/preferences
+Content-Type: application/json
+
+{ "language": "fr", "theme_mode": "dark" }
+```
+Any authenticated user, for their own account. `PUT` replaces the stored preferences with the object sent; keys the server does not know are dropped and the persisted object is returned. `400` for a body that is not JSON, a `pins` list that is not at most 3 distinct module ids, a `notifications_read` list that is not distinct item keys, or an invalid `inspector` value.
 
 ### Sessions
 
@@ -479,33 +506,6 @@ as its parameter set, e.g. `"ML-DSA-65"`, an EdDSA CA as `"Ed25519"` or `"Ed448"
 reports `related_certificate_id` (the other member) and `hybrid_role` (`"classical"` or `"pq"`);
 both are `null` otherwise.
 
-### Get CA Hierarchy (Tree View)
-```http
-GET /api/v2/cas/tree
-```
-
-**Response:**
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "name": "Root CA",
-      "ca_type": "root",
-      "children": [
-        {
-          "id": 2,
-          "name": "Intermediate CA",
-          "ca_type": "intermediate",
-          "parent_id": 1,
-          "children": []
-        }
-      ]
-    }
-  ]
-}
-```
-
 ### Create CA
 ```http
 POST /api/v2/cas
@@ -540,8 +540,9 @@ only (no HSM provider holds one), is refused in FIPS mode unless the loaded FIPS
 EdDSA (the `-fips` Docker image does) and signs without a separate digest,
 like ML-DSA below. Web browsers (Chrome, Firefox, Safari), Windows (CryptoAPI/CNG) and SCEP clients
 do not verify an Ed25519 or Ed448 signature on a certificate, so they reject anything such a CA issues,
-whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP and XCEP
-refuse an EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
+whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP refuses
+any CA whose key is not RSA (EC, EdDSA and ML-DSA included) or is held by an HSM, XCEP refuses an
+EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
 OpenSSL 3.5 or later and is refused in FIPS mode unless the loaded FIPS module approves it (the
 `-fips` Docker image does); `keyAlgo` generates it in software, and
 an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
@@ -677,18 +678,20 @@ GET /api/v2/cas/{ca_id}/certificates?status=active&page=1&per_page=50
 GET /api/v2/cas/{ca_id}/export?format=pem
 GET /api/v2/cas/{ca_id}/export?format=der
 GET /api/v2/cas/{ca_id}/export?format=chain
+POST /api/v2/cas/{ca_id}/export
 
 # Chain through a cross-certificate (POST accepts the same field in its JSON body)
 GET /api/v2/cas/{ca_id}/export?format=pem&include_chain=true&chain_variant=cross:4
 ```
 
-`chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
+`POST` takes `format`, `include_key`, `include_chain`, `password` (required for the PKCS12, PFX and JKS formats) and `legacy` in a JSON body. `chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
 or `cross:<id>`; any other value, or one that is not part of the chain of this CA, answers 400.
 
 ### Export All CAs
 ```http
 GET /api/v2/cas/export
 GET /api/v2/cas/export?chain_variant=all
+POST /api/v2/cas/export
 ```
 
 `chain_variant` adds cross-certificates after each CA certificate: `primary` (default) adds none,
@@ -798,6 +801,55 @@ subject and key match a held self-signed root; action `convert_to_cross`) or `sa
 issued certificates and settings to the root and deletes the duplicate; `restore-primary` puts a
 self-signed certificate back and keeps the replaced one as a cross-certificate. A self-signed root that was
 overwritten or deleted only comes back from a backup or through `restore-primary`.
+
+### CAs Awaiting an External Certificate
+A CA created from an external CSR holds no certificate until one is installed. Unknown CAs answer `404`.
+
+```http
+GET /api/v2/cas/{ca_id}/csr
+POST /api/v2/cas/{ca_id}/certificate
+POST /api/v2/cas/{ca_id}/key
+POST /api/v2/cas/{ca_id}/crl
+POST /api/v2/cas/{ca_id}/renew-csr
+```
+- `csr` (`read:cas`) downloads the outstanding CSR as PEM; `404` when there is none.
+- `certificate` (`write:cas`) installs the signed certificate: a multipart `file`, or `pem_content` in a form field or a JSON body, and optionally `cross_mode` (`auto` or `replace`, else `400`). `409` when the CA is offline or the certificate conflicts with the CA's current one (the response details say how).
+- `key` (`write:cas`) attaches the private key to a CA that holds only its certificate: JSON `key` (PEM or base64 PEM, required) and optional `passphrase`. `409` for a pending CA, `400` when the CA already has a key, lives in an HSM, is offline, or the key does not match the certificate or is refused as weak.
+- `crl` (`write:crl`) installs a CRL generated elsewhere on a key-less or offline CA: a multipart `file` or `pem_content`. Returns the installed CRL's `next_update` and `revoked_count`; `409` or `400` when it is refused.
+- `renew-csr` (`write:cas`) issues a new CSR from the CA's existing key. Optional `digest` (`sha256`, `sha384` or `sha512`). `409` when the CA is offline or revoked, `400` when it has no key.
+
+### Offline CAs
+```http
+POST /api/v2/cas/{ca_id}/offline
+POST /api/v2/cas/{ca_id}/restore
+```
+Both need `write:cas`. `offline` takes `{"password": "...", "mode": "password_protected"}`: the key is re-encrypted under the password and kept (`password_protected`, the default), or returned as a `.key` download and removed from UCM (`file_exported`, which also needs `read:private_keys`). The password must meet the password policy (`400`). `409` when the CA is already offline, revoked or pending; `400` when it has no key in UCM (HSM-backed, for instance). `restore` takes the `password` (JSON or form) and, for a `file_exported` CA, the uploaded `key_file`; `401` for a wrong password, `400` when the file is not this CA's key, `409` when the CA is not offline.
+
+### Revoke a CA
+```http
+POST /api/v2/cas/{ca_id}/revoke
+Content-Type: application/json
+
+{ "reason": "keyCompromise", "invalidity_date": "2026-01-01T00:00:00Z" }
+```
+Permission `write:cas`. Revokes an intermediate CA from its parent. `reason` defaults to `unspecified`; `invalidity_date` (or `invalidity_at`) may not be in the future. `409` when the CA is already revoked, `400` for an invalid reason or date. When an approval policy applies, the answer carries `approval_required: true` and the approval instead (see [Certificate Policies & Approvals](#certificate-policies--approvals)).
+
+### Delegated OCSP Responder
+```http
+GET /api/v2/cas/{ca_id}/ocsp-responder
+POST /api/v2/cas/{ca_id}/ocsp-responder
+DELETE /api/v2/cas/{ca_id}/ocsp-responder
+GET /api/v2/cas/{ca_id}/eligible-ocsp-responders
+```
+`GET` (`read:cas`) returns `responder`, `null` when none is set. `POST` (`write:cas`) takes `{"certificate_id": 12}`: the certificate must be issued by this CA and able to sign OCSP responses (`400` with the reason otherwise); `409` while the CA awaits its certificate. `DELETE` needs `delete:cas` and answers `204`. `eligible-ocsp-responders` lists the certificates that pass those checks.
+
+### Template Pins
+```http
+GET /api/v2/cas/{ca_id}/templates
+POST /api/v2/cas/{ca_id}/templates/{template_id}/pin
+DELETE /api/v2/cas/{ca_id}/templates/{template_id}/pin
+```
+`GET` needs `read:cas` and `read:templates` and returns `ca_id`, `ca_name` and every template with an `is_pinned` flag. `POST` and `DELETE` need `write:cas` and `write:templates`. When a CA has pinned templates, the issuance form offers only those by default. `POST` answers `201` (`400` when the pin is refused); `DELETE` answers `404` when the template is not pinned.
 
 ---
 
@@ -1035,6 +1087,7 @@ Content-Type: application/json
 ### Export All Certificates
 ```http
 GET /api/v2/certificates/export
+POST /api/v2/certificates/export
 ```
 
 ### Bulk Revoke Certificates
@@ -1096,6 +1149,34 @@ Content-Type: application/json
 ```
 
 Returns a ZIP file containing the exported certificates.
+
+### Certificate Metadata, Linting and Transparency
+```http
+PATCH /api/v2/certificates/{cert_id}
+Content-Type: application/json
+
+{ "descr": "Web server" }
+```
+Permission `write:certificates`. Only the display name is mutable: `descr` is required, a non-empty string of at most 255 characters (`400` otherwise); `404` for an unknown certificate.
+
+```http
+GET /api/v2/certificates/{cert_id}/lint?profile=rfc5280
+GET /api/v2/certificates/lint/status
+GET /api/v2/certificates/compliance
+POST /api/v2/certificates/{cert_id}/submit-ct
+POST /api/v2/certificates/export
+```
+- Reads need `read:certificates`. `lint` checks one stored certificate against `profile` (`rfc5280` by default, `cabf` or `etsi`; `400` for another); `422` when the certificate cannot be linted. `lint/status` reports which linters are available and the accepted `profiles`. `compliance` returns aggregate compliance statistics (score and grade) across all certificates.
+- `submit-ct` (`write:certificates`) submits the certificate to the configured Certificate Transparency logs and returns the `logs` that accepted it with their `timestamp`. `400` when CT is not enabled in the [settings](#certificate-transparency), no valid log is configured, the certificate has no PEM, or no log accepted it.
+- `POST /certificates/export` is the body form of `GET /certificates/export`: `format` (`pem` or `p7b`, else `400`), `password` and `include_chain`; `404` when there is nothing to export.
+
+### Catalogs
+```http
+GET /api/v2/eku/known
+GET /api/v2/revocation-reasons
+GET /api/v2/export/password-policy
+```
+`eku/known` (`read:certificates`) returns the catalog of well-known Extended Key Usage OIDs. `revocation-reasons` (`read:certificates`) returns `reasons`, the CRLReason names the revocation routes accept (RFC 5280 section 5.3.1). `export/password-policy` (any authenticated user) returns `min_length` and `max_length`, the length rule every export route applies to its password.
 
 ---
 
@@ -1376,6 +1457,20 @@ Content-Type: application/json
 }
 ```
 
+### CSR Export (body form) and Resubmission
+```http
+POST /api/v2/csrs/{csr_id}/export
+Content-Type: application/json
+
+{ "format": "csr" }
+```
+Permission `read:csrs`. `format` is `csr` (default) or `key` (the private key, with an optional `password` for an encrypted export); the `GET` form refuses a `password` in the query string (`400`). `400` when the CSR has no private key for `key`; `404` for an unknown CSR.
+
+```http
+POST /api/v2/csrs/{csr_id}/resubmit
+```
+Permissions `write:csrs` and `read:certificates`. Puts a signed request back in the pending list so it can be signed again. `201` with the new pending request, `200` when one is already pending, `400` when the stored request cannot be read, `404` when the signed request is not found.
+
 ---
 
 ## Templates
@@ -1527,6 +1622,12 @@ Content-Type: application/json
 }
 ```
 
+### Duplicate a Template
+```http
+POST /api/v2/templates/{template_id}/duplicate
+```
+Permission `write:templates`. Creates a copy named `<name> (Copy)` (numbered when that name is taken); `201`, `404` for an unknown template.
+
 ---
 
 ## Trust Store
@@ -1593,6 +1694,18 @@ description: "Third-party CA"
 notes: "Optional notes"
 ```
 
+### Trust Store Bulk Operations
+```http
+POST /api/v2/truststore/add-from-ca/{ca_refid}
+POST /api/v2/truststore/bulk/delete
+GET /api/v2/truststore/expiring?days=90
+GET /api/v2/truststore/export?format=pem&purpose=all
+```
+- `add-from-ca` (`write:truststore`) adds a managed CA's certificate. Optional body `purpose` (default `root_ca` for a root, else `intermediate_ca`) and `notes`. `201`; `409` when it is already there, `400` when the CA awaits its certificate or the purpose is invalid, `404` for an unknown CA.
+- `bulk/delete` (`delete:truststore`) takes `{"ids": [1, 2]}` (a non-empty list of at most 100) and returns `success` (the removed ids) and `failed` (`{id, error}`).
+- `expiring` (`read:truststore`) lists trusted certificates expiring within `days` (default 90).
+- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`). `404` when nothing matches.
+
 ---
 
 ## ACME Server
@@ -1655,16 +1768,71 @@ GET /api/v2/acme/orders/{order_pk}
 ```
 The second form reads one local order (`read:acme`), whatever its age; 404 when it does not exist.
 
-### Register with Let's Encrypt Proxy
+### ACME Proxy Upstream Account
+The proxy's upstream account is a CA account of the [ACME Client](#acme-client-lets-encrypt) (`acme_account_id`, or the one selected as proxy account).
+
 ```http
-POST /api/v2/acme/proxy/register
+POST /api/v2/acme/client/proxy/register
 Content-Type: application/json
 
 {
   "email": "admin@example.com",
-  "agree_tos": true
+  "acme_account_id": 1
 }
 ```
+Permission `write:acme`. Registers the upstream account with its CA. `email` falls back to the account's own; it must be a valid address on a public domain (`400` for `.local`, `.lan`, `.internal`). `502` when the upstream CA refuses the registration. Returns `registered`, `email`, `account_url`, `acme_account_id` and `account`.
+
+```http
+POST /api/v2/acme/client/proxy/unregister
+```
+Permission `write:acme`. Body `acme_account_id` optional. Clears the upstream registration (the account row stays). Returns `registered: false`.
+
+```http
+POST /api/v2/acme/client/proxy/test-connection
+```
+Permission `read:acme`. Body `acme_account_id` or `url` optional (otherwise the proxy account's directory). The URL must be HTTPS and not target loopback or cloud metadata (`400`). Returns `connected`, `ca_name`, `directory_url`, `terms_of_service`, `website`, `eab_required` and `endpoints`; `502` when the directory cannot be fetched.
+
+### ACME Server Accounts
+`{account_id}` is the numeric id or the RFC 8555 account id. Unknown accounts answer `404`.
+
+```http
+POST /api/v2/acme/accounts
+Content-Type: application/json
+
+{ "email": "ops@example.com", "key_type": "...", "agree_tos": true }
+```
+Permission `write:acme`. `email` is required (`400`); `key_type` must be one of the accepted account key types (`400` lists them); an existing email answers `409`.
+
+```http
+GET /api/v2/acme/accounts/{account_id}
+PATCH /api/v2/acme/accounts/{account_id}
+DELETE /api/v2/acme/accounts/{account_id}
+POST /api/v2/acme/accounts/{account_id}/deactivate
+GET /api/v2/acme/accounts/{account_id}/orders
+GET /api/v2/acme/accounts/{account_id}/challenges
+```
+`GET` (account, orders, challenges) needs `read:acme`. `PATCH` needs `write:acme` and a string `email` (the contact address; `400` when absent or too long). `DELETE` needs `delete:acme` and removes the account with its orders, authorizations and challenges. `deactivate` needs `write:acme`.
+
+### ACME Server Orders and History
+```http
+DELETE /api/v2/acme/orders/{order_pk}
+POST /api/v2/acme/orders/purge
+GET /api/v2/acme/history?source=all
+```
+`DELETE` (`delete:acme`) removes one local order with its authorizations and challenges (`404` when unknown). `purge` (`delete:acme`) runs the expired-order purge now and returns the counts of orders, authorizations and challenges removed. `history` (`read:acme`) lists certificates issued through ACME, local and external CAs; `source` filters.
+
+### External Account Binding
+```http
+GET /api/v2/acme/eab-credentials?status=active
+POST /api/v2/acme/eab-credentials
+GET /api/v2/acme/eab-credentials/{cred_id}
+PATCH /api/v2/acme/eab-credentials/{cred_id}
+DELETE /api/v2/acme/eab-credentials/{cred_id}
+GET /api/v2/acme/eab-required
+PATCH /api/v2/acme/eab-required
+PUT /api/v2/acme/eab-required
+```
+Reads need `read:acme`, writes `write:acme`, `DELETE` `delete:acme`. `POST` body: optional `label` (255 characters at most), `expires_in_days` (a positive integer, `400` otherwise) and `allowed_domains` (a list of patterns, `["*"]` for any); the response carries the credential and, once only, its `hmac_key`. `PATCH` changes `allowed_domains` (never `null`) and `notes`. `DELETE` revokes an active credential (and its DNS UPDATE keys); a credential already revoked or used is deleted for good (`204`). The list holds at most 200, newest first, and never shows an `hmac_key`. `eab-required` reads or sets `{"eab_required": true}` (`PATCH` and `PUT` are the same route).
 
 ---
 
@@ -1738,6 +1906,73 @@ GET /api/v2/scep/challenge/{ca_id}
 POST /api/v2/scep/challenge/{ca_id}/regenerate
 ```
 
+### SCEP Profiles
+A profile serves SCEP at `/scep/<url_slug>/pkiclient.exe` with its own CA, template and challenge. Reads need `read:scep`, changes `write:scep` (including `DELETE`). Challenge passwords are never returned.
+
+```http
+GET /api/v2/scep/profiles
+POST /api/v2/scep/profiles
+PATCH /api/v2/scep/profiles/{profile_id}
+PUT /api/v2/scep/profiles/{profile_id}
+DELETE /api/v2/scep/profiles/{profile_id}
+POST /api/v2/scep/profiles/{profile_id}/challenge/regenerate
+```
+- Writable fields: `name` (required, 100 characters at most, unique), `url_slug` (1 to 64 lowercase letters, digits and hyphens, unique; derived from `name` when omitted), `description` (255 at most), `enabled` (default true), `ca_id` or `ca_refid` (required; the CA must be able to serve SCEP), `template_id` (not a CA template, not disabled), `auto_approve` (default false), `challenge_password`, `intune_enabled` and `intune_app_id`. `PATCH` and `PUT` are the same partial update. Each list item adds `ca_name` and `template_name`.
+- `DELETE` answers `409` while requests that came through the profile are pending.
+- `challenge/regenerate` returns a fresh `challenge` once.
+- `400` carries the reason for an invalid field; `409` an Intune configuration conflict.
+
+### Intune App Registrations
+Microsoft Entra app registrations that SCEP profiles use to validate Intune requests. Client secrets are stored encrypted and never returned. Reads need `read:scep`, writes `write:scep`.
+
+```http
+GET /api/v2/scep/intune-apps
+POST /api/v2/scep/intune-apps
+PATCH /api/v2/scep/intune-apps/{app_id}
+PUT /api/v2/scep/intune-apps/{app_id}
+DELETE /api/v2/scep/intune-apps/{app_id}
+POST /api/v2/scep/intune-apps/test
+POST /api/v2/scep/profiles/test-intune-connection
+```
+- `POST` takes `name`, `tenant_id`, `client_id` and `client_secret` (all required: `400`); a name, or a tenant and client pair, already in use answers `409`. `PATCH` and `PUT` are the same partial update; a blank `client_secret` keeps the saved one. `DELETE` answers `409` while a profile uses the app.
+- `test` checks the credentials, either the submitted `tenant_id`, `client_id` and `client_secret` or a saved app by `app_id`; `400` with the reason when the check fails.
+- `profiles/test-intune-connection` is the older form of the same test, which takes the profile (`profile_id` or `intune_app_id`) or the `intune_tenant_id`, `intune_client_id` and `intune_client_secret` trio.
+
+---
+
+## EST
+
+Management of the EST service (RFC 7030). The protocol itself is served under `/.well-known/est/`; see [Protocol and Health Endpoints](#protocol-and-health-endpoints).
+
+```http
+GET /api/v2/est/config
+PATCH /api/v2/est/config
+GET /api/v2/est/stats
+```
+- Reads need `read:est`, `PATCH` needs `write:est`.
+- `GET` returns `enabled`, `ca_refid`, `ca_id`, `ca_name`, `username`, `password_set`, `validity_days`, `response_include_chain`, `csrattrs_legacy_encoding`, `allow_empty_username`, `ignore_challenge_password` and `labels` (RFC 7030 section 3.2.2 CA labels, each with `ca_refid` and `ca_name`).
+- `PATCH` changes any of `enabled`, `ca_id` or `ca_refid` (`ca_id` wins when both are sent; `404` for an unknown CA, `400` when it cannot sign), `username`, `password` (stored hashed), `validity_days` (an integer), and `labels` (an object of at most 50 labels, each a CA refid or `{ca_refid}`). `csrattrs_legacy_encoding`, `allow_empty_username` and `ignore_challenge_password` must be JSON booleans (`400` otherwise).
+- `stats` returns `total`, `successful` and `failed` enrollments counted from the audit log.
+
+---
+
+## Time Stamping (TSA)
+
+Management of the RFC 3161 time-stamp authority. The protocol is served at `/tsa`; see [Protocol and Health Endpoints](#protocol-and-health-endpoints). Reads need `read:settings`, `PATCH` needs `write:settings`.
+
+```http
+GET /api/v2/tsa/config
+PATCH /api/v2/tsa/config
+GET /api/v2/tsa/signer-candidates
+POST /api/v2/tsa/signer-certificate
+GET /api/v2/tsa/stats
+```
+- `GET /config` returns `enabled`, `ca_refid`, `ca_id`, `ca_name`, `policy_oid`, `require_dedicated_cert` (`true` unless set to `false`: the CA certificate signs only then, which RFC 3161 does not allow), `signer_cert_refid` (empty when no dedicated signer is set) and `signer` (subject, serial, expiry, chain status and usability of the configured signer).
+- `PATCH /config` changes any of `enabled`, `ca_id` or `ca_refid`, `policy_oid` (`400` unless a valid OID), `require_dedicated_cert` and `signer_cert_refid`; `400` when the chosen signer cannot sign time stamps, when the chosen CA cannot issue, or, with `require_dedicated_cert` off and no dedicated signer (including a request that turns it off), when the CA cannot sign time stamps.
+- `signer-candidates` lists the certificates eligible as the dedicated signer.
+- `signer-certificate` (`write:settings` and `write:certificates`) issues a dedicated TSA signing certificate in one step. Optional body: `ca_refid` or `ca_id`, `cn` (a string), `validity_days`, `key_type`, `key_size`, `curve`, and `select` (a boolean: make it the signer; defaults to selecting it when the current signer is not usable).
+- `stats` returns `total`, `successful` and `failed` requests counted from the audit log.
+
 ---
 
 ## Windows Enrollment Profiles
@@ -1788,6 +2023,231 @@ POST /api/v2/ad-connectors/test
 - `POST /{id}/test` tests the saved connector and stores the verdict and the domain SID on its row; `POST /test` tests submitted values without saving them (an `id` in the body lends the saved password to a blank one, for the target it was saved for only).
 - `DELETE` answers 204; it is refused with 409 while a profile uses the connector (`details.profiles`, `details.total`).
 - A `PUT` that changes the domain of `base_dn` moves the realm of the profiles that use the connector, or is refused with 409: see the note under Windows Enrollment Profiles.
+
+## Microsoft CA
+
+Connections to Active Directory Certificate Services CAs, used to sign CSRs on a Windows CA and to keep UCM and that CA in step. These are separate from the [Active Directory Connectors](#active-directory-connectors), which are LDAP connections.
+
+```http
+GET /api/v2/microsoft-cas
+GET /api/v2/microsoft-cas/enabled
+POST /api/v2/microsoft-cas
+GET /api/v2/microsoft-cas/{id}
+PUT /api/v2/microsoft-cas/{id}
+DELETE /api/v2/microsoft-cas/{id}
+POST /api/v2/microsoft-cas/test
+POST /api/v2/microsoft-cas/{id}/test
+```
+- Permissions: the list, `GET /{id}` need `read:settings`; `enabled` (the enabled connections, for the signing dialog) needs `read:certificates`; `POST`, `PUT` and the two tests need `write:settings`; `DELETE` needs `delete:settings`.
+- `POST` fields: `name` (required, unique: `409`), `server` (required hostname), `auth_method` (`certificate` by default, `kerberos` or `basic`, else `400`), `ca_name`, `use_ssl` and `verify_ssl` (both default true), `ca_bundle`, `default_template` (`WebServer`), `enabled` (true), `username` and `password` (basic), `client_cert_pem` and `client_key_pem` (certificate), `kerberos_principal` and `kerberos_keytab_path`, `crl_sync_enabled`, `crl_url`, `inventory_sync_enabled`, and the WinRM admin channel fields `winrm_enabled`, `winrm_host`, `winrm_port`, `winrm_use_ssl`, `winrm_verify_ssl`, `winrm_transport`, `winrm_username`, `winrm_password`. `PUT` is a partial update of the same fields; a masked secret sent back keeps the stored one.
+- `DELETE` answers `204`, or `409` while requests are pending on the connection.
+- `POST /test` checks the connection with the submitted values before saving (`server` required); `POST /{id}/test` checks a saved one. Both answer `400` with the error when the check fails.
+
+### Signing and Requests
+```http
+GET /api/v2/microsoft-cas/{id}/templates
+POST /api/v2/microsoft-cas/{id}/sign/{csr_id}
+GET /api/v2/microsoft-cas/{id}/requests/{request_id}
+GET /api/v2/microsoft-cas/requests/pending?msca_id=1
+```
+- `templates` and both request reads need `read:certificates`; `sign` needs `write:certificates`.
+- `sign` submits the CSR `{csr_id}` to the CA. Optional body: `template` (defaults to the connection's `default_template`; `400` when none), `enrollee_name`, `enrollee_upn`. `404` when the connection or CSR is unknown, `400` when the connection is disabled, the CSR was already signed, is empty or its signature is invalid. An issued certificate is imported into UCM ("Certificate issued by Microsoft CA"); a request the CA holds for approval answers "Request pending approval" and is tracked.
+- `GET /{id}/requests/{request_id}` refreshes one request and imports the certificate once issued; `404` for an unknown request.
+
+### Synchronisation
+```http
+POST /api/v2/microsoft-cas/{id}/sync-crl
+POST /api/v2/microsoft-cas/{id}/inventory-sync
+POST /api/v2/microsoft-cas/{id}/publish-crl
+GET /api/v2/microsoft-cas/{id}/reconciliation
+```
+- `sync-crl` (`write:certificates`) fetches the CA's CRL and revokes the matching UCM certificates, one way from the CA to UCM; `400` when the connection is disabled. It returns the counts `revoked` and `checked`.
+- `inventory-sync` (`admin:system`) imports certificates issued directly on the CA that UCM does not know. Optional body `{"full": true}`. Returns the counts `imported`, `skipped` and `failed`. Needs the WinRM admin channel (`400` otherwise).
+- `publish-crl` (`admin:system`) makes the CA publish a new CRL through the admin channel.
+- `reconciliation` (`read:certificates`) compares the CA's issued certificates with the ones UCM knows, read-only.
+
+### WinRM Admin Channel
+```http
+POST /api/v2/microsoft-cas/{id}/admin-channel/test
+GET /api/v2/microsoft-cas/{id}/ca/health
+GET /api/v2/microsoft-cas/{id}/ca/pending
+POST /api/v2/microsoft-cas/{id}/ca/pending/{request_id}/approve
+POST /api/v2/microsoft-cas/{id}/ca/pending/{request_id}/deny
+```
+All answer `404` for an unknown connection and `400` when the admin channel is not enabled or configured on it. `admin-channel/test` (`admin:system`) tests the channel (connection and CA service); its body may carry the `winrm_*` fields and `ca_config` as overrides. `ca/health` and `ca/pending` (`read:certificates`) return the CA's service, certificate and CRL state, and the requests awaiting a CA manager. `approve` and `deny` (`admin:system`) resubmit or refuse a pending request on the CA; `approve` imports the issued certificate.
+
+---
+
+## SSH Certificates
+
+OpenSSH user and host certificates, signed by SSH CAs held in UCM. Permissions: `read:ssh`, `write:ssh`, `delete:ssh` for certificates; `read:ssh_cas`, `write:ssh_cas`, `delete:ssh_cas` for CAs. A missing CA or certificate answers `404`.
+
+### SSH CAs
+```http
+GET /api/v2/ssh/cas?search=prod&type=user
+POST /api/v2/ssh/cas
+GET /api/v2/ssh/cas/{ca_id}
+PUT /api/v2/ssh/cas/{ca_id}
+DELETE /api/v2/ssh/cas/{ca_id}
+POST /api/v2/ssh/cas/import
+GET /api/v2/ssh/cas/{ca_id}/public-key
+GET /api/v2/ssh/cas/{ca_id}/krl
+GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&platform=unix
+```
+- `GET` list filters by `search` and by `type` (repeatable).
+- `POST` creates a CA (`201`): `descr` (or `name`, required), `ca_type` (`user` by default, or `host`), `key_type`, `default_ttl`, `max_ttl` (default `0`), `default_extensions`, `allowed_principals` (a list of non-empty strings), `allow_any_principal` and `allow_custom_key_id` (JSON booleans, default off), `comment`. `400` for an invalid value.
+- `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value.
+- `DELETE` answers `204`, or `409` when the service refuses (certificates still depend on the CA).
+- `POST /import` imports an existing CA from `private_key` (required) with `descr`, `ca_type` (`user` or `host`), `default_ttl`, `max_ttl` and `comment`; `201`, or `400` for an unusable key.
+- `public-key` downloads the CA public key in OpenSSH format. `krl` downloads the CA's key revocation list. `setup-script` returns a server setup script for trusting the CA: `type` (`user` or `host`), `hostname` (validated, `400` when invalid) and `platform` (`unix` by default, or `windows`).
+
+### SSH Certificates
+```http
+GET /api/v2/ssh/certificates?search=alice&status=valid&type=user&ca_id=1
+POST /api/v2/ssh/certificates
+POST /api/v2/ssh/certificates/generate
+POST /api/v2/ssh/certificates/import
+POST /api/v2/ssh/certificates/verify
+GET /api/v2/ssh/certificates/{cert_id}
+GET /api/v2/ssh/certificates/{cert_id}/export
+POST /api/v2/ssh/certificates/{cert_id}/revoke
+DELETE /api/v2/ssh/certificates/{cert_id}
+GET /api/v2/ssh/stats
+```
+- The list is paginated; `status`, `type` and `ca_id` may be repeated, an unknown `status` answers `400`.
+- `POST` signs a public key (`write:ssh`, `201`). Body: `ca_id` and `public_key` (required), `cert_type` (`user` by default, or `host`), `principals` (a list or a comma-separated string, at least one, no comma inside a name, 64 at most), `validity_seconds` (an integer from 60 to ten years), `key_id`, `extensions`, `critical_options`, `descr`. `400` for any invalid field or a CA policy refusal.
+- `POST /generate` takes the same fields without `public_key`, plus `key_type`: UCM creates the key pair and returns the certificate with the `private_key` once.
+- `POST /import` stores an existing certificate: `certificate` (required), optional `descr` and `ssh_ca_id`; `201`.
+- `POST /verify` (`read:ssh`) decodes and verifies `certificate` (required) and returns the result.
+- `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate. `DELETE` answers `204` or `409` when it cannot be deleted.
+- `stats` returns the counts shown on the SSH dashboard.
+
+---
+
+## Deployment
+
+Pushes certificates and CRLs to targets: an SSH (SFTP) host, or an HTTP endpoint that receives a templated body. Reading needs `read:deploy`, creating, changing, pushing and testing `write:deploy`, deleting `delete:deploy`. A missing target, binding or delivery answers `404`. Bindings a renewal leaves on the previous certificate are described under [Deploy Bindings Left Behind by a Renewal](#deploy-bindings-left-behind-by-a-renewal); `GET /api/v2/deploy/bindings` is documented there.
+
+### Targets
+```http
+GET /api/v2/deploy/targets
+POST /api/v2/deploy/targets
+GET /api/v2/deploy/targets/{target_id}
+PATCH /api/v2/deploy/targets/{target_id}
+DELETE /api/v2/deploy/targets/{target_id}
+POST /api/v2/deploy/targets/{target_id}/test
+```
+- `POST` takes `kind`, `ssh` by default or `http` (it cannot be changed afterwards), and `name` (required, 120 characters at most, unique: `409`). `400` carries the reason for an invalid field.
+- An SSH target takes `host` (required), `port` (1 to 65535), `username` (required), `enabled` and optionally `private_key` (UCM generates a key pair when absent; the response carries the public key). Changing `host` or `port`, or sending `reset_host_key`, forgets the pinned host key; it is pinned again on the next successful test.
+- An HTTP target takes `url`, `http_method` (`POST`, `PUT` or `PATCH`; default `POST`), `http_headers`, `body_template` (required), `tls_ca_pem`, `allow_private_key` and `enabled`.
+- `GET /{target_id}` adds the target's `bindings` and `crl_bindings`.
+- `test` connects and authenticates without writing, and pins the host key of an SSH target on the first success; an HTTP target is probed. `409` or `502` carry the reason of a refusal or a failed connection.
+
+### Certificate Bindings
+```http
+POST /api/v2/deploy/bindings
+PATCH /api/v2/deploy/bindings/{binding_id}
+DELETE /api/v2/deploy/bindings/{binding_id}
+POST /api/v2/deploy/bindings/{binding_id}/deploy
+```
+- `POST` binds a certificate to a target: `target_id` and `certificate_id` (required, `404` when unknown), then for an SSH target `cert_path`, `key_path`, `fullchain_path` (absolute file paths of 512 characters at most; at least one is required and they must differ), `reload_command` (512 at most), `include_root`, `chain_variant` (default `auto`) and `enabled`. `key_path` needs a certificate whose private key UCM holds. On an HTTP target the paths and `reload_command` are refused (`400`) and a template that sends `key_pem` needs the key. The same pair twice answers `409`. A first push is queued on creation.
+- `PATCH` changes the same fields; `DELETE` removes the binding.
+- `deploy` pushes now and waits: `200` with the delivery, or `502` with its `last_error`.
+
+### CRL Bindings
+```http
+GET /api/v2/deploy/crl-bindings?ca_id=1&target_id=2
+POST /api/v2/deploy/crl-bindings
+PATCH /api/v2/deploy/crl-bindings/{binding_id}
+DELETE /api/v2/deploy/crl-bindings/{binding_id}
+POST /api/v2/deploy/crl-bindings/{binding_id}/deploy
+```
+CRL bindings need an SSH target (`400` otherwise). `POST` takes `target_id` and `ca_id` (required), `crl_path` (an absolute file path, required), `format` (`pem` by default, or `der`), `include_parent_crls` (PEM only), `reload_command` and `enabled`; the same pair twice answers `409`. Each list item carries its `last_delivery`. `deploy` pushes now (`200`, or `502` with the error).
+
+### Deliveries
+```http
+GET /api/v2/deploy/deliveries?binding_id=1&certificate_id=2&binding_type=certificate
+POST /api/v2/deploy/deliveries/{delivery_id}/retry
+```
+`binding_type` is `certificate` (default) or `crl`, else `400`. `retry` requeues a failed delivery; any other status answers `400`.
+
+---
+
+## Discovery
+
+TLS certificate discovery: scan hosts and subnets, then review what was found. Reading needs `read:certificates`; scanning and managing profiles need `admin:system`; deleting one record needs `delete:certificates`.
+
+### Discovered Certificates
+```http
+GET /api/v2/discovery?limit=50&offset=0&profile_id=1&status=new&search=example
+GET /api/v2/discovery/{disc_id}
+DELETE /api/v2/discovery/{disc_id}
+DELETE /api/v2/discovery?profile_id=1
+GET /api/v2/discovery/export?format=csv&profile_id=1&status=new
+GET /api/v2/discovery/stats?profile_id=1
+POST /api/v2/discovery/bulk-resolve-dns
+```
+- The list returns `items` and `total`; `limit` defaults to 50 (200 at most), `status` may be repeated.
+- `GET /{disc_id}` adds the parsed `extensions`, key and signature details and the SHA-1 and SHA-256 fingerprints; `404` when unknown. `DELETE /{disc_id}` answers `204`.
+- `DELETE /api/v2/discovery` (`admin:system`) deletes every record, or those of `profile_id`, and returns `deleted`.
+- `export` returns CSV (default) or JSON (`format=json`) as a download.
+- `bulk-resolve-dns` (`admin:system`) re-resolves reverse DNS for every record and returns the counts `updated` and `total`.
+
+### Scan Profiles and Runs
+```http
+GET /api/v2/discovery/profiles
+POST /api/v2/discovery/profiles
+GET /api/v2/discovery/profiles/{profile_id}
+PUT /api/v2/discovery/profiles/{profile_id}
+DELETE /api/v2/discovery/profiles/{profile_id}
+POST /api/v2/discovery/profiles/{profile_id}/scan
+POST /api/v2/discovery/scan
+GET /api/v2/discovery/runs?profile_id=1
+GET /api/v2/discovery/runs/{run_id}
+```
+- `POST /profiles` (`201`): `name` (required, unique: `409`), `targets` (required, a non-empty list of at most 1000 hostnames, IP addresses or CIDR ranges), `ports` (a non-empty list of at most 100 integers from 1 to 65535), and optionally `description`, `schedule_enabled`, `schedule_interval_minutes` (1440 by default), `notify_on_new`, `notify_on_change`, `notify_on_expiry` (all true by default), `notify_email` (one valid address), `timeout` (1 to 30, default 5), `max_workers` (1 to 50, default 20) and `resolve_dns`. `PUT` updates the same fields; `DELETE` answers `204`.
+- `POST /profiles/{profile_id}/scan` starts a scan with the profile's settings and returns `scan_run_id`.
+- `POST /scan` scans without a saved profile: `targets` (at most 500) or `subnet` (at most 1024 addresses), one of the two being required, plus `ports` (default `[443]`), `timeout` (1 to 30, default 5), `max_workers` (1 to 50, default 20) and `resolve_dns`. It returns `scan_run_id`.
+- `runs` lists scan runs (`items`, `total`); `runs/{run_id}` reads one, `404` when unknown.
+
+---
+
+## Key Recovery
+
+Recovery of a certificate's archived private key goes through a request that an approver decides. Scopes: `write:key_recovery` opens a request and collects an approved key, `read:key_recovery` reads requests, `admin:key_recovery` approves and rejects. An unknown request answers `404`.
+
+```http
+POST /api/v2/certificates/{cert_id}/key-recovery
+Content-Type: application/json
+
+{ "reason": "Server rebuilt after a disk failure" }
+```
+Opens a request (`201`). `reason` is required and at most 2000 characters; `400` when missing or when the certificate has no archived private key; `404` for an unknown certificate.
+
+```http
+GET /api/v2/key-recovery?status=pending
+GET /api/v2/key-recovery/{id}
+```
+The list returns `requests` (newest first, the latest 500) and `dual_control`, whether the approver must differ from the requester. `GET /{id}` reads one request whatever its age.
+
+```http
+POST /api/v2/key-recovery/{id}/approve
+POST /api/v2/key-recovery/{id}/reject
+Content-Type: application/json
+
+{ "note": "Ticket 1234" }
+```
+`admin:key_recovery`. `note` is optional; a longer note is cut to its first 2000 characters. `409` when the request is no longer pending. `approve` answers `403` when dual control is on and the caller is the requester, and `410` when the certificate no longer exists.
+
+```http
+POST /api/v2/key-recovery/{id}/recover
+Content-Type: application/json
+
+{ "password": "at-least-8-chars", "legacy": false }
+```
+Returns the key and certificate as a PKCS#12 download, once, after approval. `password` is required (`400` when it does not meet the export password rules); `legacy` selects the 3DES/SHA-1 profile. `409` when the request is not approved, `403` unless the caller is the requester or holds `admin:key_recovery`, `410` when the certificate or key is gone.
+
+---
 
 ## CRL & OCSP
 
@@ -1851,6 +2311,23 @@ GET /api/v2/ocsp/status
 GET /api/v2/ocsp/stats
 ```
 
+### CRL Automation
+```http
+POST /api/v2/crl/{ca_id}/auto-regen
+Content-Type: application/json
+
+{ "enabled": true }
+```
+Permission `write:crl`. Turns the CA's CRL distribution point, and so automatic regeneration, on or off; `enabled` toggles the current state when omitted. Enabling without a CDP URL generates one from the protocol base URL; `400` when none is configured in Settings.
+
+```http
+POST /api/v2/crl/{ca_id}/delta-config
+Content-Type: application/json
+
+{ "enabled": true, "interval": 24 }
+```
+Permission `write:crl`. `interval` is the delta CRL period in hours, from 1 to 168 (`400` otherwise). Both fields are optional.
+
 ---
 
 ## AIA CA Issuers
@@ -1904,7 +2381,7 @@ Per-CA toggle available via the CRL/OCSP management page or API:
 
 ```http
 GET /api/v2/cas/{ca_id}          # Returns aia_ca_issuers_enabled, aia_ca_issuers_url
-PUT /api/v2/cas/{ca_id}          # Set aia_ca_issuers_enabled: true/false
+PATCH /api/v2/cas/{ca_id}        # Set aia_ca_issuers_enabled: true/false (write:cas)
 ```
 
 When enabled, issued certificates include the CA Issuers URL in their Authority Information Access extension:
@@ -1992,6 +2469,32 @@ Content-Type: application/json
 DELETE /api/v2/users/{user_id}
 ```
 
+### More User Operations
+```http
+POST /api/v2/users/{user_id}/toggle-active
+POST /api/v2/users/{user_id}/unlock
+POST /api/v2/users/{user_id}/reset-2fa
+POST /api/v2/users/{user_id}/link-sso
+POST /api/v2/users/{user_id}/unlink-sso
+POST /api/v2/users/bulk/delete
+GET /api/v2/users/password-policy
+POST /api/v2/users/password-strength
+```
+- `toggle-active` is the same route as `PATCH /api/v2/users/{user_id}/toggle`. `403` for your own account, `409` when it would deactivate the last active admin. These routes need `write:users` and an admin caller (`403` otherwise); `404` for an unknown user.
+- `unlock` clears a lockout and answers `Account is not locked` when there was none.
+- `reset-2fa` clears the user's second factor, the break-glass for a locked-out user.
+- `link-sso` takes `{"provider_id": 1}` (required) and links a local account to an SSO provider; `400` when the user is already linked, `404` for an unknown provider. `unlink-sso` turns an SSO-linked account back into a local one (`400` when it is not linked).
+- `bulk/delete` needs `delete:users` and an admin caller, and takes `{"ids": [...]}` (a non-empty list of at most 100). Each user is deleted with the mTLS certificates it enrolled. The result lists `success` ids, `failed` entries (`{id, error}`: own account, last active admin, pending approval requests, not found) and `unrevoked` certificates left valid.
+- `password-policy` and `password-strength` are public: the first returns the password requirements, the second takes `{"password": "..."}` and returns its strength.
+
+### User mTLS Certificates (admin)
+```http
+GET /api/v2/users/{user_id}/mtls/certificates
+POST /api/v2/users/{user_id}/mtls/certificates
+DELETE /api/v2/users/{user_id}/mtls/certificates/{cert_id}
+```
+Permission `admin:users`. `POST` takes `mode`: `generate` (default) issues a certificate for the user from `ca_id` (or the configured mTLS CA; `validity_days` default 365, `name` optional) and returns the `certificate` and `private_key` once; `import` takes `pem` (required) and `name` and enrolls an existing certificate (`409` when it is already enrolled, `400` when revoked or invalid). `201` in both cases. `DELETE` removes the enrolment (`404` for an unknown user or certificate).
+
 ---
 
 ## Roles & Permissions (RBAC)
@@ -2032,6 +2535,14 @@ DELETE /api/v2/rbac/roles/{role_id}
 ```
 
 Renaming or deleting a custom role that an SSO provider's `role_mapping` cites is refused with `409`; the message lists the providers. Update the mapping first. A user's `custom_role_source` is `"sso"` when the role came from the SSO role mapping and `null` when it was assigned by hand; writing `custom_role_id` through `PUT /api/v2/users/{user_id}` resets it to `null`.
+
+### Custom Roles and Effective Permissions
+```http
+POST /api/v2/rbac/roles
+GET /api/v2/rbac/effective-permissions/{user_id}
+GET /api/v2/groups/available-permissions
+```
+Permission `admin:users` for the first two, `read:groups` for the third. `POST` creates a custom role: `name` (required, letters, digits, spaces, hyphens and underscores, not a built-in name: `409`; unique: `409`), `description`, `permissions` (a list drawn from `GET /api/v2/rbac/permissions`) and `inherits_from`. `effective-permissions` returns exactly what authorization applies to a user. `available-permissions` returns the sorted list of permissions a group may grant.
 
 ---
 
@@ -2080,19 +2591,18 @@ A database failure returns 500, never an empty `activity` list.
 GET /api/v2/dashboard/system-status
 ```
 
+Any authenticated caller. Each service is a `{status, message}` pair, `status` being `online`, `warning` or `offline`: `database`, `acme`, `scep`, `est`, `ocsp`, `crl`, `tsa` and `core` for every caller, `key_encryption` only for a caller holding `admin:system`, and `smtp`, `webhooks` and `auto_renewal` only for a caller holding `read:settings` (the gate and the rules of the same witnesses on `/dashboard/health`; one that cannot be read is `{"status": "warning", "message": "Status unavailable"}`).
+
 **Response:**
 ```json
 {
   "data": {
-    "status": "healthy",
-    "database": "connected",
-    "disk_usage": {
-      "used": "2.1GB",
-      "total": "50GB",
-      "percent": 4.2
-    },
-    "uptime": "15 days, 3:42:15",
-    "version": "2.x"
+    "database": { "status": "online", "message": "Connected" },
+    "acme": { "status": "online", "message": "Enabled" },
+    "smtp": { "status": "online", "message": "Host: mail.example.com" },
+    "webhooks": { "status": "offline", "message": "No endpoints" },
+    "auto_renewal": { "status": "online", "message": "Scheduled" },
+    "core": { "status": "online", "message": "Operational" }
   }
 }
 ```
@@ -2124,7 +2634,7 @@ GET /api/v2/dashboard/issuance?days=7
 ```
 Scope `read:dashboard`. A `days` outside its range is refused with 400.
 
-`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at` (at most `limit`, 100), with the full total per kind in `counts`. A repeated `kind` restricts the items, not the counts, to those kinds; an unknown kind is refused with 400:
+`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at` (at most `limit`, 100); an expired trust anchor comes after the other critical items, the most recently expired first, with the full total per kind in `counts`. A repeated `kind` restricts the items, not the counts, to those kinds; an unknown kind is refused with 400:
 
 | kind | critical | warning |
 |------|----------|---------|
@@ -2141,12 +2651,24 @@ Scope `read:dashboard`. A `days` outside its range is refused with 400.
 | `ca_expiring` | expires within 90 days | expires within a year |
 | `deploy_binding_left_behind` | deploy binding a renewal left on the previous certificate; `href_hint` is `/certificates/{certificate_id}?binding={id}` | |
 | `https_binding_left_behind` | HTTPS binding a renewal left on the previous certificate | |
+| `truststore_expiring` | trust anchor already expired, however long ago | trust anchor expiring within 90 days |
+
+`truststore_expiring` needs `read:truststore`: without it the kind is neither listed nor counted. `href_hint` is `/truststore/{id}`.
 
 Certificates counted are issued, not revoked, not archived and not expired. A certificate appears under one kind only, by precedence `auto_renewal_blocked` > `renewal_declined` > `manual_renewal_due` > `client_renewal_overdue`. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
 
 `href_hint` carries the object in the query (`request`, `order`, `ca`) and the tab (`tab`) the page reads; `contracts/queue_links.json` lists them. `GET /api/v2/key-recovery/{id}` (`read:key_recovery`) reads one recovery request like the two reads above.
 
-`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled: `state` is `ca_certificate` or `dedicated` (healthy), `no_signer` (no signer configured, not an alert: `/tsa` answers 503 until one is), `expiring` (dedicated signer within 30 days of expiry, `days_left`), `unusable` (`reason`: `expired`, `revoked`, `key_unavailable` or `invalid`) or `unavailable`; `alert` is true for `expiring`, `unusable` and `unavailable`. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+`health` gives per protocol (`acme`, `scep`, `est`, `tsa`, `scheduler`) the `basis` it is measured on and, for `acme`, `scep` and `est`, one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) in `periods`; `periods` is null for `tsa` and `scheduler`. `tsa` is present while the TSA is enabled, with the `state`, `alert` and `severity` of the table below. `scheduler` carries `by_status` and `stale`, which the latest `last_status` does not replace. `smtp`, `webhooks` and `auto_renewal` are present only for a caller holding `read:settings`, with a `state` and no series: `smtp` is `not_configured`, `disabled`, `incomplete` (port or From address missing) or `ready`; `webhooks` is `not_configured`, `none_active` or `active` (`count`); `auto_renewal` is `enabled` or `disabled`; a witness whose read fails is `unavailable`, with `alert` true. `alert` is true for `disabled` and `incomplete` mail and for `none_active`, never for a setting that is simply not configured. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+
+| `tsa` state | meaning | `alert` | `severity` |
+|-------------|---------|---------|------------|
+| `dedicated` | a dedicated signing certificate signs | false | null |
+| `no_signer` | no dedicated signer configured and the CA certificate cannot sign in its place (a dedicated certificate is required, or no CA is designated, or the designated CA is not found, has no certificate or key, is offline, outside its validity period, revoked in its chain or has a key that does not sign timestamps): `/tsa` answers 503 | false | null |
+| `ca_certificate` | the CA certificate signs (dedicated certificate no longer required): its tokens fail RFC 3161 §2.3 | true | `warning` |
+| `expiring` | dedicated signer within 30 days of expiry, `days_left` | true | `critical` |
+| `unusable` | dedicated signer that cannot sign, `reason`: `expired`, `revoked`, `key_unavailable` or `invalid` | true | `critical` |
+| `unavailable` | the check itself failed | true | `critical` |
 
 #### Certificate list filters
 
@@ -2377,27 +2899,7 @@ Content-Type: application/json
 `smtp_security` is `none`, `starttls` or `ssl` (implicit TLS, usually port 465). The older booleans `smtp_tls` and `smtp_ssl` are still accepted and are ignored when `smtp_security` is present.
 
 ### Webhooks
-```http
-# List webhooks
-GET /api/v2/settings/webhooks
-
-# Create webhook
-POST /api/v2/settings/webhooks
-Content-Type: application/json
-
-{
-  "name": "Slack Notification",
-  "url": "https://hooks.slack.com/...",
-  "events": ["certificate_issued", "certificate_expiring"],
-  "secret": "webhook-secret"
-}
-
-# Test webhook
-POST /api/v2/settings/webhooks/{webhook_id}/test
-
-# Delete webhook
-DELETE /api/v2/settings/webhooks/{webhook_id}
-```
+See [Webhooks](#webhooks): `/api/v2/settings/webhooks` does not exist.
 
 ### Backup Settings
 ```http
@@ -2454,32 +2956,124 @@ Content-Type: multipart/form-data
 DELETE /api/v2/settings/backup/{backup_id}
 ```
 
+### Certificate Transparency
+```http
+GET /api/v2/settings/ct
+PATCH /api/v2/settings/ct
+Content-Type: application/json
+
+{ "enabled": true, "log_urls": ["https://ct.example.com/log"], "auto_submit": false, "embed_sct": false, "required": false }
+```
+`GET` needs `read:settings`, `PATCH` needs `admin:settings`; all fields are optional. `log_urls` is a list of http or https URLs that must resolve and not to loopback or a cloud metadata address, or `null` for the built-in list (`400` otherwise). The `GET` response has the same five fields. Submission of a single certificate is `POST /api/v2/certificates/{cert_id}/submit-ct`.
+
+### Auto-Renewal
+```http
+GET /api/v2/settings/auto-renewal
+PATCH /api/v2/settings/auto-renewal
+POST /api/v2/settings/auto-renewal/run
+```
+`GET` (`read:settings`) and `PATCH` (`write:settings`) use `enabled`, `days_before_expiry` (an integer), `renewal_sources` (a list; default `manual`, `scep`, `acme`, `est`), `notify_on_renewal`, `notify_on_failure` (both default true) and `notify_emails` (a list of valid addresses); `400` for a wrongly typed value. `run` (`admin:settings`) triggers a renewal pass now and returns its counts `renewed`, `failed` and `skipped`.
+
+### Notifications
+```http
+GET /api/v2/settings/notifications
+PATCH /api/v2/settings/notifications
+GET /api/v2/settings/notifications/logs?type=cert_expiring&page=1&per_page=50
+```
+All need `read:settings` (`write:settings` for `PATCH`). `GET` returns `configs`, each with `id`, `notification_type`, `enabled`, `recipients`, `threshold_days`, `alert_days` (expiry notifications only), `cooldown_hours` and `description`. `PATCH` identifies a config by `id` (`404` when unknown) or by `notification_type` (created when it does not exist; `400` when neither is sent) and changes `enabled`, `recipients`, `threshold_days` (an integer) and `cooldown_hours` (an integer from 0 to 8760). `logs` returns `logs` (`notification_type`, `recipient`, `subject`, `sent_at`, `status`, `error_message`, `retry_count`) and `pagination`.
+
+### Email Templates and SMTP OAuth
+```http
+GET /api/v2/settings/email/template
+PATCH /api/v2/settings/email/template
+POST /api/v2/settings/email/template/preview
+POST /api/v2/settings/email/template/reset
+GET /api/v2/settings/email/oauth/providers
+POST /api/v2/settings/email/oauth/authorize-url
+GET /api/v2/settings/email/oauth/callback
+POST /api/v2/settings/email/oauth/revoke
+```
+- `template` reads need `read:settings`, changes `write:settings`. `GET` returns the HTML `template` and `text_template` in force (the defaults when none is customized), `is_custom`, `is_text_custom` and the two defaults. `PATCH` takes `template` and/or `text_template` (`400` for an empty body). `preview` renders `template` of `type` `html` (default) or `text` with sample data and returns it under `html` or `text`. `reset` restores both defaults.
+- `oauth/providers` (`read:settings`) returns the provider presets (`smtp_host`, `smtp_port`, TLS flags, `needs_tenant`, `default_tenant`).
+- `oauth/authorize-url` (`write:settings`) builds the consent URL from the saved SMTP settings (`404` when none are saved) and returns `authorize_url` and `redirect_uri`; optional `redirect_uri` in the body. The state is kept in the caller's session.
+- `oauth/callback` (`write:settings`) is the redirect target: it exchanges `code` for tokens, stores the refresh token and answers an HTML page saying whether authorization succeeded (state mismatch, missing parameters and provider errors are reported there).
+- `oauth/revoke` (`write:settings`) drops the stored refresh and access tokens (`404` when no SMTP settings exist).
+
+### Public Endpoints
+```http
+GET /api/v2/settings/public-endpoints
+PATCH /api/v2/settings/public-endpoints
+POST /api/v2/settings/public-endpoints/preflight
+```
+`GET` (`read:settings`) returns the effective public URLs, CORS origins and host-role status. `PATCH` (`write:settings`) updates the admin, protocol and ACME public endpoint settings with the same body and validation as `PATCH /api/v2/settings/general`. `preflight` (`write:settings`) runs DNS and TLS diagnostics for the configured admin and ACME hosts.
+
+### Settings Audit Logs
+```http
+GET /api/v2/settings/audit-logs?user_id=1&action=login&start_date=2026-01-01&end_date=2026-02-01&page=1&per_page=50
+```
+Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `page`, `per_page`). `start_date` and `end_date` are ISO 8601 and ignored when unparsable. The fuller audit routes are under [Audit Logs](#audit-logs).
+
 ---
 
 ## System
 
 ### Database Operations
 ```http
-# Get database stats
-GET /api/v2/system/db/stats
+GET /api/v2/system/database/stats
+```
+Permission `read:settings`. Returns `size_mb`, `counts` (`cas`, `certificates`, `crls`, `ocsp_responses`), `last_vacuum` and `last_check` (a timestamp or `"Never"`).
 
-# Export database
-GET /api/v2/system/db/export
+```http
+GET /api/v2/system/database/export
+```
+Permission `admin:system`. Downloads a SQL dump (`application/sql`). Only a SQLite database can be dumped; on PostgreSQL the call fails.
 
-# Optimize database
-POST /api/v2/system/db/optimize
+```http
+POST /api/v2/system/database/optimize
+```
+Permission `admin:system`. Runs VACUUM and ANALYZE (SQLite and PostgreSQL).
 
-# Check integrity
-POST /api/v2/system/db/integrity-check
+```http
+POST /api/v2/system/database/integrity-check
+```
+Permission `admin:system`. Returns `passed`, `errors` and a message. On PostgreSQL the check verifies connectivity and counts the schema's tables.
 
-# Reset database (dangerous!)
-POST /api/v2/system/db/reset
+```http
+POST /api/v2/system/database/reset
+```
+Permission `admin:system`. Dangerous: drops and recreates every table, then seeds the configured administrator as at first start. No request body is read. `409` when the initial administrator password cannot be settled (nothing is dropped); `500` when the reset happened but the administrator could not be created.
+
+### Database Backend
+Moving UCM between SQLite and PostgreSQL. `switch` and `migrate` answer `409` in HA mode (`ha_mode`), `409` while a migration holds the lock or a switch awaits its restart, and `500` with a generic message on an unexpected failure. Connection URLs in responses and audit entries are redacted.
+
+```http
+GET /api/v2/database/status
+```
+Permission `read:settings`. The current backend: type, version, size, table count and health.
+
+```http
+POST /api/v2/database/test
 Content-Type: application/json
 
-{
-  "confirm": true
-}
+{ "database_url": "postgresql://..." }
 ```
+Permission `admin:settings`. Opens a test connection; returns `{success, message}`. `400` when `database_url` is missing.
+
+```http
+POST /api/v2/database/switch
+Content-Type: application/json
+
+{ "database_url": "postgresql://..." }
+```
+Permission `admin:settings`. Switches the backend without copying data: the auth, RBAC, SSO and MFA tables are bootstrapped to the empty target so administrators are not locked out, the configuration is persisted and the service restarts. An empty or null `database_url` reverts to the default SQLite file. `400` in a container (set `DATABASE_URL` on it instead) or when the target is unreachable; `503` on a transient bootstrap failure (retrying resumes). Returns `persisted`, `bootstrap`, `validation`, `restart_initiated`, `restart_message`.
+
+```http
+POST /api/v2/database/migrate
+Content-Type: application/json
+
+{ "database_url": "postgresql://..." }
+```
+Permission `admin:settings`. Copies all data from the current backend to the target and verifies it; `database_url` is required (`400`). On a native install the configuration is then persisted and the service restarts; in a container only the data moves (`docker: true`, `next_step` tells what to set). Returns `migrated`, `stats`, `proof`, `restart_initiated`. A refusal before anything was written to the target is `409`; a failure once the copy was under way is `500`.
 
 ### HTTPS Certificate
 `cert-info` returns `bound_certificate.needs_attention` (`reason`, `successor_id`, `successor_refid`, `successor_descr`,
@@ -2510,15 +3104,17 @@ Content-Type: application/json
 
 ### Backup Operations
 ```http
-# List backups (also GET /api/v2/system/backups; page, per_page, search, sort)
+# List backups (page, per_page, search, sort)
 # In HA, meta.storage is "database" and each item carries "node" and "sha256";
 # on a single node meta.storage is "disk" and meta carries the disk figures
 GET /api/v2/system/backup/list
+GET /api/v2/system/backups
 
-# Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id")
-# Also POST /api/v2/system/backup. Removes nothing for the ceiling: "warning" is set when the
+# Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id"; POST /api/v2/system/backup is the same route)
+# Removes nothing for the ceiling: "warning" is set when the
 # archives are then above it, null otherwise; the next retention applies it
 POST /api/v2/system/backup/create
+POST /api/v2/system/backup
 
 # Download backup (in HA from any node, with a Repr-Digest: sha-256=:...: header)
 # Resumable: a Range of one byte range answers 206 with Content-Range, 416 past the end;
@@ -2526,8 +3122,9 @@ POST /api/v2/system/backup/create
 # and a Range of several ranges gets the whole archive (200).
 GET /api/v2/system/backup/{filename}/download
 
-# Restore backup (also POST /api/v2/system/restore; multipart "file", "password", optional "mode")
+# Restore backup (POST /api/v2/system/restore is the same route; multipart "file", "password", optional "mode")
 POST /api/v2/system/backup/restore
+POST /api/v2/system/restore
 ```
 
 In HA mode a restore holds the cluster maintenance (see [HA](HA.md#restoring-a-backup)). It answers `409` with
@@ -2539,6 +3136,13 @@ restart one at a time". Both restore routes also answer `data.todo`, a list of s
 (sections not restored, a CA whose CRL could not be signed, a secret to enter again); it is empty when there is
 nothing to do. The backup listing's `meta.restore_limits` gives `upload_bytes` (archives before v4) and
 `archive_bytes` (v4, `0` for no ceiling), the sizes a restore accepts.
+
+```http
+DELETE /api/v2/system/backup/{filename}
+POST /api/v2/system/backups/bulk-delete
+POST /api/v2/system/backups/run-retention
+```
+All need `admin:system`. The first deletes one archive (`400` for an invalid name, `404` when missing, `409` while a backup or restore holds the lock). The second takes `{"filenames": ["..."]}` (a non-empty list of at most 1000 names) and returns the counts `deleted`, `missing`, `invalid`, `failed`. The third applies the retention policy now and returns `removed` and `warning`.
 
 ### Cluster Maintenance (HA)
 `admin:system`. A node in maintenance answers its writes with `503`, `Retry-After: 30` and code `maintenance`;
@@ -2698,24 +3302,22 @@ GET /api/v2/system/security/anomalies
 
 ### Security - Rate Limit Configuration
 ```http
-# Get rate limit settings
 GET /api/v2/system/security/rate-limit
-
-# Update rate limit settings
 PUT /api/v2/system/security/rate-limit
-Content-Type: application/json
-
-{
-  "requests_per_minute": 100,
-  "enabled": true
-}
-
-# Get rate limit statistics
 GET /api/v2/system/security/rate-limit/stats
-
-# Reset rate limit counters
 POST /api/v2/system/security/rate-limit/reset
 ```
+`GET` (`read:settings`) returns `config` and `stats`. `PUT` (`admin:system`) takes any of:
+
+```json
+{
+  "enabled": true,
+  "custom_limits": { "/api/v2/certificates": { "rpm": 300, "burst": 50 } },
+  "whitelist_add": ["192.0.2.10"],
+  "whitelist_remove": ["192.0.2.11"]
+}
+```
+`burst` defaults to a third of `rpm`. In HA mode the change is stored and applied on every node. `stats` (`read:settings`) returns the counters. `reset` (`admin:system`) clears the buckets, of one address with `{"ip": "..."}` or all, and the statistics too with `{"reset_stats": true}`.
 
 ### Audit Retention
 ```http
@@ -2869,6 +3471,8 @@ GET /api/v2/system/fips-preflight
 {
   "data": {
     "fips_active": false,
+    "module_known": true,           # false: no FIPS module was asked (no loaded module, no
+                                    # build record of the -fips image), EdDSA and ML-DSA listed as refused
     "ready": false,                 # no blocker and every check ran
     "summary": {"blocker": 1, "warning": 0, "info": 0},
     "findings": [{
@@ -2992,6 +3596,41 @@ GET /api/v2/policies/effective?ca_id=3&template_id=1
 ```
 
 `default_key_type` is `null` when the policies leave no default candidate; `default_key_error` then holds the reason.
+
+### System Logs
+```http
+GET /api/v2/system/logs?source=app&level=INFO&lines=200&q=text&exclude=text&component=name&since=...&until=...
+GET /api/v2/system/logs/bundle
+```
+Permission `admin:system`. `logs` reads the tail of one source as filtered records: `source` is `app` (default), `access`, `error` or `journal`; `level` one of `DEBUG`, `INFO` (default), `WARNING`, `ERROR`, `CRITICAL`; `lines` an integer from 1 to 5000 (default 200); `q` and `exclude` are substrings (a `regex` parameter is refused); `component` filters by logger. Each invalid value answers `400`. `bundle` downloads a diagnostic ZIP.
+
+### Scheduler
+```http
+GET /api/v2/system/scheduler
+POST /api/v2/system/scheduler/{task_name}/run
+```
+`GET` (`read:settings`) lists the registered scheduler tasks with their live status and a `label`, sorted by label, with a count of tasks in warning and a `stale` flag. `run` (`admin:system`) runs a task now, or queues it; `404` for an unknown task.
+
+### Update Settings
+```http
+GET /api/v2/system/updates/settings
+PATCH /api/v2/system/updates/settings
+GET /api/v2/system/updates/whatsnew
+```
+`GET` and `PATCH` need `admin:system`. `PATCH` takes `channel` (`stable` or `rc`), `hour` (an integer from 0 to 23, the hour of automatic installation), `auto_install` (a boolean; refused with `400` on a container install) and `popup_enabled` (a boolean); the response is the stored settings. `whatsnew` (any authenticated user) returns `{"enabled": false}` while the post-update popup is off, otherwise `version`, `baseline_version`, `installed_at`, `release_notes` and `published_at`.
+
+### Encryption Key Operations
+```http
+GET /api/v2/system/security/master-key/download
+POST /api/v2/system/security/encrypt-all-keys
+POST /api/v2/system/security/rotate-encryption-key
+POST /api/v2/system/https/unbind
+```
+All need `admin:system`.
+- `master-key/download` returns the master key file (`ucm-master.key`, `no-store`) and audits the download. `400` when encryption is not enabled, `409` when the key is not stored as a file (it comes from `KEY_ENCRYPTION_KEY`, so it must be backed up by hand).
+- `encrypt-all-keys` takes `{"dry_run": true}` (the default: nothing is written) and returns `dry_run`, `encrypted`, `skipped` and `errors`.
+- `rotate-encryption-key` rotates the data-encryption key and rewrites every stored value under it; the master key does not change. `400` when encryption is not enabled. `200` when the rotation is done, `202` while some nodes have not loaded the new key yet (run it again to finish); `500` when interrupted (run it again to resume).
+- `https/unbind` stops following renewals of the bound HTTPS certificate; `400` when none is bound.
 
 ---
 
@@ -3549,6 +4188,46 @@ Requires `delete:acme`. An active key is revoked at once (answer `200` with the 
 
 Each account of `GET /api/v2/acme/client/accounts` has the integer field `dns_update_key_count`: the number of its DNS UPDATE keys of any status. It is `0` for an account without keys. The web interface uses it to show the keys of an account whose ACME proxy is off.
 
+### ACME CA Accounts
+Accounts UCM holds with external ACME CAs. Unknown accounts answer `404`.
+
+```http
+GET /api/v2/acme/client/accounts
+POST /api/v2/acme/client/accounts
+Content-Type: application/json
+
+{
+  "directory_url": "https://acme.example.com/directory",
+  "label": "Production CA",
+  "email": "ops@example.com",
+  "account_key_algorithm": "ES256",
+  "account_key_pem": "...",
+  "is_default": false,
+  "eab_kid": "...",
+  "eab_hmac_key": "..."
+}
+```
+`GET` needs `read:acme`; `POST` needs `write:acme` and answers `201`. Required: `directory_url` (HTTPS, 500 characters at most), `label` (100 at most, unique: `409`) and `email` (254 at most). `account_key_algorithm` defaults to `ES256`; `account_key_pem` imports an existing key (64 KB at most, `413` above).
+
+```http
+GET /api/v2/acme/client/accounts/{account_id}
+PATCH /api/v2/acme/client/accounts/{account_id}
+DELETE /api/v2/acme/client/accounts/{account_id}
+POST /api/v2/acme/client/accounts/{account_id}/deactivate
+POST /api/v2/acme/client/accounts/{account_id}/default
+POST /api/v2/acme/client/accounts/{account_id}/register
+```
+`PATCH` (`write:acme`) updates `label`, `email`, `account_key_algorithm`, `eab_kid`, `eab_hmac_key` and `is_default`. `DELETE` (`delete:acme`) answers `409` while issued orders still renew through the account. `deactivate` (`delete:acme`) deactivates the account at the CA (RFC 8555 section 7.3.6), then removes it; `502` when the CA refuses. `default` (`write:acme`) makes it the account used when a request names none. `register` (`write:acme`) registers or re-registers it with its CA; optional `email`, `400` without a valid contact.
+
+### ACME Client Preflight
+```http
+POST /api/v2/acme/client/preflight
+Content-Type: application/json
+
+{ "domains": ["www.example.com"], "challenge_type": "dns-01", "mode": "full" }
+```
+Permission `write:acme`. Dry-run of a certificate request; returns a report with `ok` and per-step results. `domains` is required; `challenge_type` defaults to `dns-01`; `mode` is `full` (default) or `validate_only`; optional `email`, `acme_account_id`, `dns_provider_id` (integers), `key_source` (default `generate`), `csr_pem` and `verify_dns`.
+
 ---
 
 ## ACME Domains
@@ -3608,6 +4287,18 @@ Content-Type: application/json
   "dns_provider_id": 1
 }
 ```
+
+### Local Domains
+Maps a domain to the local CA that signs for it when UCM answers ACME requests itself.
+
+```http
+GET /api/v2/acme/local-domains
+POST /api/v2/acme/local-domains
+GET /api/v2/acme/local-domains/{domain_id}
+PUT /api/v2/acme/local-domains/{domain_id}
+DELETE /api/v2/acme/local-domains/{domain_id}
+```
+Reads need `read:acme`, `POST` and `PUT` `write:acme`, `DELETE` `delete:acme`. `POST` body: `domain` (required, `400` for an invalid name), `issuing_ca_id` (required; `404` unknown, `400` when that CA cannot sign) and optional `auto_approve` (default `false`). `PUT` changes `issuing_ca_id` and `auto_approve`.
 
 ---
 
@@ -3726,6 +4417,20 @@ Content-Type: application/json
 ```
 
 No authentication required.
+
+### SAML Service Provider and LDAP Mapping
+```http
+GET /api/v2/sso/saml/sp-info
+GET /api/v2/sso/saml/certificates
+GET /api/v2/sso/saml/metadata
+POST /api/v2/sso/saml/metadata/fetch
+POST /api/v2/sso/providers/{provider_id}/test-mapping
+```
+- `sp-info` (`read:sso`) returns the service provider URLs as UCM computes them, its `metadata_url` and `origin_configured` (whether they rest on a configured origin).
+- `certificates` (`read:sso`) lists the valid certificates usable for the SP metadata, the HTTPS certificate included.
+- `metadata` is public and returns the SAML 2.0 SP metadata XML to give the IdP.
+- `metadata/fetch` (`write:sso`) fetches and parses IdP metadata from `{"metadata_url": "https://..."}` (required; http or https with a hostname, not loopback or a cloud metadata address: `400`); optional `provider_id`, `verify_ssl` (default true) and `ca_bundle`.
+- `test-mapping` (`write:sso`) is a dry run of the LDAP group lookup for `{"username": "..."}` (required) without creating a session. `400` for a provider that is not LDAP or a failed lookup.
 
 ---
 
@@ -3880,17 +4585,19 @@ Content-Type: application/json
 
 ## WebAuthn
 
-The `/api/v2/webauthn/` blueprint provides the same WebAuthn credential management functionality as the `/api/v2/account/webauthn/` routes. Both prefixes are available for convenience.
+Credential management for the signed-in user's own security keys. Served under `/api/v2/webauthn/`; there is no `/api/v2/account/webauthn/` prefix. The login-time WebAuthn routes are under [Authentication](#authentication).
 
 ### List Credentials
 ```http
 GET /api/v2/webauthn/credentials
 ```
+Any authenticated user. Returns the caller's keys.
 
 ### Delete Credential
 ```http
 DELETE /api/v2/webauthn/credentials/{credential_id}
 ```
+Session only. Closes the account's other sessions; `meta.other_sessions_closed` carries the count. `404` when the key is not the caller's; refused when it is the last second factor of an account that requires one.
 
 ### Toggle Credential
 ```http
@@ -3901,11 +4608,13 @@ Content-Type: application/json
   "enabled": true
 }
 ```
+Session only. `enabled` defaults to `true`. Disabling the last enabled factor of an account that requires two-factor is refused. Leaving the key as it is changes nothing and closes no session.
 
 ### Register - Get Options
 ```http
 POST /api/v2/webauthn/register/options
 ```
+Session only. Returns the creation options for the host the request was made to.
 
 ### Register - Verify
 ```http
@@ -3917,12 +4626,13 @@ Content-Type: application/json
   "name": "YubiKey 5"
 }
 ```
+Session only. `name` defaults to `Security Key`. `400` when the attestation does not verify. Registering a key closes the account's other sessions.
 
 ---
 
 ## Webhooks
 
-These routes are also accessible under `/api/v2/settings/webhooks` as an alias.
+One webhook subsystem, served under `/api/v2/webhooks`. The old `/api/v2/settings/webhooks` routes no longer exist. Reads need `read:settings`, writes `write:settings`, delete `delete:settings`. Event names are dotted (`certificate.issued`); `events` defaults to `["*"]` (all) and an unknown name answers `400`. A name already in use answers `409`; a URL that targets cloud metadata services or loopback answers `400`.
 
 ### List Webhooks
 ```http
@@ -3943,7 +4653,7 @@ Content-Type: application/json
   "name": "Slack Notification",
   "url": "https://hooks.slack.com/...",
   "secret": "webhook-secret",
-  "events": ["certificate_issued", "certificate_expiring"],
+  "events": ["certificate.issued", "certificate.expiring"],
   "ca_filter": [1, 2],
   "enabled": true,
   "custom_headers": {
@@ -3951,6 +4661,7 @@ Content-Type: application/json
   }
 }
 ```
+`name` and `url` are required. `secret` is generated when omitted. Optional `auth_type` is one of `none`, `bearer`, `basic`, `api_key`, `custom`, with `auth_token` and related fields.
 
 ### Update Webhook
 ```http
@@ -3960,7 +4671,7 @@ Content-Type: application/json
 {
   "name": "Updated Name",
   "url": "https://hooks.slack.com/...",
-  "events": ["certificate_issued"],
+  "events": ["certificate.issued"],
   "enabled": true
 }
 ```
@@ -3989,6 +4700,19 @@ POST /api/v2/webhooks/{endpoint_id}/regenerate-secret
 ```http
 GET /api/v2/webhooks/events
 ```
+Returns `events` (the accepted names) and a `descriptions` map.
+
+### List Deliveries
+```http
+GET /api/v2/webhooks/{endpoint_id}/deliveries?status=failed&page=1&per_page=25
+```
+Delivery history of one endpoint, newest first. `status` is `pending`, `delivered` or `failed`; `per_page` is at most 100. `404` for an unknown endpoint.
+
+### Retry Delivery
+```http
+POST /api/v2/webhooks/{endpoint_id}/deliveries/{delivery_id}/retry
+```
+Permission `write:settings`. Re-queues a delivery for immediate redelivery with its attempts reset. `404` when the delivery does not belong to the endpoint.
 
 `certificate.binding_left_behind` is sent once per binding when an EST, SCEP or WSTEP renewal leaves a deploy
 binding or the HTTPS binding on the previous certificate, after the renewal's commit: `certificate` is the renewed
@@ -4295,6 +5019,16 @@ Generates the report immediately and sends it to the specified recipient, attach
 | `recipient` | string | Yes | Email address to send the test report to |
 | `format` | string | No | `csv` or `json`, overrides the saved format |
 
+### Report Downloads and PDF Templates
+```http
+GET /api/v2/reports/download/{report_type}?format=csv&days=30
+GET /api/v2/reports/pdf/templates
+POST /api/v2/reports/pdf/generate
+```
+- `download` needs `read:audit` and `export:audit`. `format` is `csv` (default) or `json`, `days` an integer from 1 to 3650 (default 30); `400` for an unknown `report_type` or invalid value. Returns the report as a download.
+- `pdf/templates` (`read:audit`) lists the PDF templates and sections.
+- `pdf/generate` (`read:audit` and `export:audit`) builds a PDF from `template` (a template name) or an explicit `sections` list; `400` when no valid section results, `500` when PDF generation is not available.
+
 ---
 
 ## WebSocket
@@ -4403,6 +5137,38 @@ Returns 200 if the application process is alive, regardless of dependency status
 }
 ```
 
+### Metrics
+```http
+GET /api/v2/metrics
+GET /metrics
+```
+Prometheus text exposition. Off until a `metrics_token` is configured: without one the route answers `404`. With one, `Authorization: Bearer <token>` is required (`401` otherwise). No session is used.
+
+---
+
+## Protocol and Health Endpoints
+
+These endpoints are not part of the `/api/v2` management API. Clients such as ACME clients, SCEP and EST devices, OCSP and CRL consumers, time-stamp clients and Windows enrollment run them, and each protocol applies its own authentication. The admin access allowlist does not apply to them (see the [Admin guide](ADMIN_GUIDE.md#admin-access-allowlist)). The protocols are described in their own guides; only the paths are listed here. Rate limits: see [Rate Limiting](#rate-limiting).
+
+| Protocol | Paths | Guide |
+|----------|-------|-------|
+| ACME (RFC 8555) | `/acme/directory`, `/acme/new-nonce`, `/acme/new-account`, `/acme/new-order`, `/acme/new-authz`, `/acme/order/{id}`, `/acme/order/{id}/finalize`, `/acme/authz/{id}`, `/acme/challenge/{id}`, `/acme/cert/{id}`, `/acme/cert/{id}/alt/{variant}`, `/acme/acct/{id}`, `/acme/acct/{id}/orders`, `/acme/key-change`, `/acme/revoke-cert`, `/acme/renewalInfo/{certid}`, `/acme/terms`, `/acme/health` | [User guide](USER_GUIDE.md#acme), [admin guide](ADMIN_GUIDE.md#acme-administration) |
+| ACME proxy | `/acme/proxy/` and `/acme/proxy/{slug}/` followed by `directory`, `new-nonce`, `new-account`, `new-order`, `order/{id}`, `order/{id}/finalize`, `authz/{id}`, `challenge/{id}`, `cert/{id}`, `acct/{id}`, `acct/{id}/orders`, `key-change`, `revoke-cert`, `renewal-info/{certid}`; the proxy has no terms, health or new-authz route | [Admin guide](ADMIN_GUIDE.md#acme-administration), [proxy clients](integrations/acme-proxy-clients.md) |
+| ACME HTTP-01 | `/.well-known/acme-challenge/{token}` | [Admin guide](ADMIN_GUIDE.md#acme-client-http-01-challenges) |
+| SCEP | `/scep/pkiclient.exe`, `/scep/{profile_slug}/pkiclient.exe`, `/cgi-bin/pkiclient.exe` | [User guide](USER_GUIDE.md#scep), [admin guide](ADMIN_GUIDE.md#scep-administration), [Intune](integrations/intune-scep.md) |
+| EST (RFC 7030) | `/.well-known/est/` and `/.well-known/est/{label}/` followed by `cacerts`, `csrattrs`, `simpleenroll`, `simplereenroll`, `serverkeygen`, `fullcmc` | [User guide](USER_GUIDE.md#est), [admin guide](ADMIN_GUIDE.md#est-administration) |
+| OCSP (RFC 6960) | `/ocsp` (POST), `/ocsp/{encoded_request}` (GET) | [User guide](USER_GUIDE.md#crl--ocsp), [admin guide](ADMIN_GUIDE.md#ocsp-configuration) |
+| CRL distribution | `/cdp/{ca_ref}.crl`, `/cdp/{ca_ref}-delta.crl` | [Admin guide](ADMIN_GUIDE.md#crl-distribution) |
+| CA issuers (AIA) | `/ca/{ca_ref}.cer`, `/ca/{ca_ref}.pem`, `/ca/{ca_ref}.p7c`, `/ca/{ca_ref}/cross/{xid}.cer` | [AIA CA Issuers](#aia-ca-issuers) |
+| Time stamping (RFC 3161) | `/tsa` (POST) | [Time Stamping (TSA)](#time-stamping-tsa) |
+| Windows enrollment (XCEP and WSTEP) | `/ADPolicyProvider_CEP_Kerberos/service.svc`, `/ADPolicyProvider_CEP_UsernamePassword/service.svc`, `/ADCertificateService_CES_Kerberos/service.svc`, `/ADCertificateService_CES_UsernamePassword/service.svc`, `/ADCertificateService_CES_Certificate/service.svc` | [Admin guide](ADMIN_GUIDE.md#windows-autoenrollment-xcepwstep-kerberosspnego), [Windows Enrollment Profiles](#windows-enrollment-profiles) |
+| SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key` | [SSH Certificates](#ssh-certificates) |
+
+The routes are always served; a protocol turned off in Settings refuses its requests with `503` (ACME, SCEP, EST, TSA, XCEP and WSTEP).
+
+### Probes
+`GET /health`, `/health/ready`, `/health/live` and their `/api/health` and `/api/v2/health` forms are described under [Health](#health). `GET /metrics` and `GET /api/v2/metrics` expose Prometheus metrics, see [Metrics](#metrics). The interactive API description is served at `/api/docs`.
+
 ---
 
 ## HTTP Status Codes
@@ -4424,9 +5190,12 @@ Returns 200 if the application process is alive, regardless of dependency status
 
 ## Rate Limiting
 
-- Default: 100 requests per minute per IP
-- Auth endpoints: 10 requests per minute per IP
-- Export endpoints: 10 requests per minute per user
+Two limiters run in every node, and a request must pass both. A refused request answers `429` with `Retry-After`, `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers, whichever limiter refused it; a refusal by a route limit also carries `X-RateLimit-Reset`.
+
+- **Route limits (flask-limiter).** 200 requests per minute and 2000 per hour per client address on every route without a limit of its own, and per-route limits on sign-in: `POST /api/v2/auth/login/password` 5 per minute, `POST /api/v2/auth/login/webauthn/verify` 5 per minute, `POST /api/v2/sso/ldap/login` 5 per minute, `POST /api/v2/auth/login/2fa`, `/auth/login/2fa/webauthn/options`, `/auth/login/2fa/webauthn/verify`, `/auth/login/mtls` and `/auth/login/webauthn/start` 10 per minute, `POST /api/v2/auth/forgot-password` 3 per hour and `POST /api/v2/auth/reset-password` 5 per hour.
+- **Tiered limiter (API and protocol endpoints).** Rates by path prefix in four tiers (auth, heavy, standard, protocol), each with a requests-per-minute rate and a burst. The defaults are set with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`; `RATE_LIMIT_ENABLED=false` (or `0`, `no`, `off`, any case) turns off both limiters, this one and the route limits above. Settings > Security, or `PUT /api/v2/system/security/rate-limit`, changes the limit of a path, the switch and the whitelist; the switch acts on this limiter only, never on the route limits, and has no effect while `RATE_LIMIT_ENABLED` turns the limiters off.
+
+Requests from private (RFC 1918), loopback and link-local addresses are exempt from both limiters unless `RATE_LIMIT_TRUST_LAN=false`. Counters are kept in memory, per node. Behind a proxy, set `UCM_BEHIND_PROXY` and `UCM_TRUSTED_PROXIES` so the limits see the client's address. The tier table is in [SECURITY.md](SECURITY.md#4-rate-limiting); the effect of several nodes is in [HA.md](HA.md#rate-limits).
 
 ---
 
@@ -4507,6 +5276,4 @@ const data = await certs.json();
 
 ---
 
-**Documentation generated**: February 2026  
-**API Version**: 2.2.x  
-**Total Endpoints**: ~276
+**Coverage**: `backend/tests/test_api_reference_routes.py` checks this file against the application's route table.

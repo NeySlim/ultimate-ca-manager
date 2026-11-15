@@ -6,6 +6,7 @@ import os
 import pytest
 
 from tests.conftest import assert_success
+from tests.redis_support import needs_redis
 from websocket import events, socketio
 
 
@@ -92,7 +93,16 @@ class TestMessageQueue:
         (seen_url, kw), = built
         assert seen_url == url
         assert kw['redis_options']['socket_connect_timeout'] == 2
-        assert kw['redis_options']['socket_keepalive'] is True
+        # TCP keepalive on a TCP connection only: a Unix socket connection refuses the option
+        assert kw['redis_options'].get('socket_keepalive') is (None if url.startswith('unix:') else True)
+
+    @needs_redis
+    def test_a_unix_socket_manager_reaches_the_server(self, app, monkeypatch, redis_server):
+        monkeypatch.setenv('REDIS_URL', redis_server.url())
+        manager = events._message_queue(app)
+        manager._redis_connect()  # what its listener and its first emit do
+        assert manager.redis.ping()
+        assert manager.redis.publish(manager.channel, '{}') == 0
 
     def test_legacy_variable_name_is_read(self, app, monkeypatch, redis_present, built):
         monkeypatch.delenv('REDIS_URL', raising=False)

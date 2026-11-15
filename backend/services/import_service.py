@@ -14,6 +14,7 @@ from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from utils import key_algorithms
 from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import refuse_pkcs12_import
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions  # noqa: F401  # re-exported for the routes
 from services.smart_import.parser import PasswordNotTried, inspected_key, open_pkcs12
 
 
@@ -134,6 +135,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
     
     if not cert:
         raise ValueError('Could not parse certificate. Supported formats: PEM, DER, PKCS12 (.p12, .pfx), PKCS7 (.p7b)')
+    require_readable_extensions(cert)
     key_algorithms.refuse_unapproved_mldsa((cert, private_key), 'the imported file')
     
     return cert, private_key, format_type

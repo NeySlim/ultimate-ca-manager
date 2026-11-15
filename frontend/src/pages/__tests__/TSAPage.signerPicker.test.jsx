@@ -152,8 +152,9 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
     const label = await screen.findByText('tsa.requireDedicatedCert')
     const toggle = label.closest('label').querySelector('button[role="switch"]')
     expect(toggle).not.toBeDisabled()
-    expect(screen.getByText('tsa.requireDedicatedCertBlocked')).toBeInTheDocument()
+    expect(screen.getByText('tsa.strictNoSigner')).toBeInTheDocument()
   })
+
 
   it('sends signer_cert_refid in the PATCH payload on save', async () => {
     setConfig({ signer_cert_refid: 'cert-ts-1', signer: USABLE_SIGNER })

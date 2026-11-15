@@ -28,6 +28,10 @@ def render_text(report: dict) -> str:
     state = 'FIPS mode is active' if report['fips_active'] else 'FIPS mode is not active'
     lines.append(f"FIPS readiness ({state}): {summary['blocker']} blocker(s), "
                  f"{summary['warning']} warning(s), {summary['info']} info")
+    if report.get('module_known') is False:
+        lines.append('No FIPS module was asked: EdDSA and ML-DSA keys are listed as refused. '
+                     'With Docker, run this check with the -fips image, without UCM_FIPS, '
+                     'to judge them by its module.')
     for finding in report['findings']:
         lines.append('')
         lines.append(f"[{finding['severity'].upper()}] {finding['id']} ({finding['count']})")

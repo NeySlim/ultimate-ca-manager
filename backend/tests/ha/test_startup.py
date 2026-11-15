@@ -9,7 +9,8 @@ pytestmark = pytest.mark.ha
 def test_simultaneous_start_builds_the_schema_once(cluster):
     # Every process of both nodes (masters and scheduler processes) initialises the database
     logs = {node.name: node.app_log_text() for node in cluster.nodes}
-    built = {name: text.count('Creating database tables...') for name, text in logs.items()}
+    fresh = 'Database tables created/verified, migration baseline marked'
+    built = {name: text.count(fresh) for name, text in logs.items()}
     assert sorted(built.values()) == [0, 1], built
     assert all('Database tables already exist' in text for text in logs.values())
 

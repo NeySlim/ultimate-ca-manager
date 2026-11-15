@@ -99,6 +99,19 @@ Each test file covers 3 levels per endpoint:
 - No external dependencies (no Docker, no network)
 - PostgreSQL mode: `UCM_TEST_APP_PG_URL` runs the same fixtures on PostgreSQL, see [testing/postgres-harness.md](testing/postgres-harness.md)
 
+#### Optional backends: SoftHSM, GSSAPI, Redis
+
+Tests that need a system component carry a marker: `needs_softhsm`, `needs_gssapi` or `needs_redis` (`tests/optional_backends.py`). Without the component they are skipped; with `UCM_TEST_REQUIRE_SOFTHSM=1`, `UCM_TEST_REQUIRE_GSSAPI=1` or `UCM_TEST_REQUIRE_REDIS=1` a skip of a marked test fails instead. The CI job "Backend Tests (SoftHSM, GSSAPI, Redis)" installs the three and runs each marker with its variable set.
+
+The Redis tests need the `redis-server` binary on the `PATH`, nothing else: each test run starts its own server on a Unix socket in its temporary directory (`--port 0`, no persistence) and stops it at the end; a system Redis, running or not, is never used.
+
+```bash
+cd backend
+UCM_TEST_REQUIRE_REDIS=1 pytest -m needs_redis tests/
+```
+
+They run two applications on one Redis (sessions shared, closed and expired across both, Redis stopped and restarted), and three processes for the WebSocket events (two web processes with a Socket.IO client each, and one process that emits like the scheduler). The test of Redis taking precedence over the PostgreSQL session table needs `redis-server` and a PostgreSQL URL (`UCM_TEST_APP_PG_URL` or `UCM_TEST_PG_URL`) and is not marked `needs_redis`: run `pytest tests/test_redis_sessions_pg.py`. No CI job has Redis and PostgreSQL together, so CI skips it.
+
 ### Frontend Tests
 
 ```bash
@@ -156,6 +169,8 @@ describe('Button', () => {
 ## Release Smoke
 
 The release smoke (`release-smoke.yml`, with `scripts/ci/package-smoke.sh` for the packages) is called by "Build & Release" on a tag before anything is published, so its definition and scripts are those of the tag, and every checkout names the tag `v<version>`. It boots the images that run pushed without a tag, pulled by their amd64 digest (standard and FIPS), and installs the packages from that run's artifacts. Only a green smoke lets the run tag the standard and FIPS images (both registries) and update the Docker Hub page, then create the GitHub release. The smoke boots the amd64 images only: the arm64 images are tagged without it. The standard and FIPS images are tagged by two jobs side by side, so if one of them fails after a green smoke, the other's tags are public while no release is created. A failed smoke, standard or FIPS, fails the run with none of these done; its "Nothing Published" job lists the untagged digests left on the registries, which the workflow does not delete, and the git tag stays. It can also be started by hand (workflow dispatch with the version), which checks out the same tag and runs that tag's scripts (`scripts/ci/release_version.py`, `scripts/ci/wait-health.sh`): a manual smoke only checks tags that carry them, and an earlier version is checked from its own release line. A "Build & Release" run started manually on a branch builds the packages and the images to check them, but pushes no image, publishes no release and calls no smoke.
+
+Each package job and, on a tag, each image job writes the CycloneDX SBOM of what it built (`scripts/ci/sbom.py`, see [SBOM.md](SBOM.md)) and fails if it cannot. Each manifest job requires the SBOM of both architectures on the digests it is about to tag, and the release job checks every SBOM against its package file or image digest, the schema and `sbom-index.json` before it deletes or publishes an asset (`test_sbom.py`, `test_workflow_sbom.py`).
 
 The `latest` and `latest-fips` image tags, and the "Latest" mark of the GitHub release, go to a stable version that no published stable tag exceeds: never to a release candidate, never to a maintenance release of an older line, never to a branch run (`scripts/ci/release_version.py latest`).
 

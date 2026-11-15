@@ -5,8 +5,9 @@ certificate_authorities.enforce_unique_subject.
 here once and by the listener on every write after: an issuance checked for a unique subject
 finds the certificates of its CA carrying the same subject through the index, never a scan.
 ``subject_holder`` names who the subject was certified to; an ACME certificate takes its order's
-account here, and the post-quantum member of an RFC 9763 pair the lineage of the classical one it
-names. ``enforce_unique_subject`` starts off on every CA.
+account here, found through the index of acme_orders.certificate_id, and the post-quantum member
+of an RFC 9763 pair the lineage of the classical one it names, by its primary key.
+``enforce_unique_subject`` starts off on every CA.
 Idempotent, dual-backend (SQLite + PostgreSQL).
 """
 import sqlite3
@@ -14,8 +15,13 @@ import sqlite3
 pg_compatible = True
 
 INDEX = 'ix_certificates_caref_subject_key'
-_PENDING = ("SELECT id, crt FROM certificates WHERE crt IS NOT NULL AND crt <> '' "
-            "AND subject_key IS NULL AND id > {cursor} ORDER BY id")
+# _ACME_HOLDERS finds a certificate's orders through it, never by a scan per certificate
+ORDER_INDEX = 'ix_acme_orders_certificate_id'
+CREATE_ORDER_INDEX = f"CREATE INDEX IF NOT EXISTS {ORDER_INDEX} ON acme_orders (certificate_id)"
+# The rows left to fill: the batches read them, the progress total counts them
+_LEFT = "certificates WHERE crt IS NOT NULL AND crt <> '' AND subject_key IS NULL"
+_PENDING = "SELECT id, crt FROM " + _LEFT + " AND id > {cursor} ORDER BY id"
+_COUNT = "SELECT COUNT(*) FROM " + _LEFT
 _BATCH = 500
 # The account of the order a certificate was issued for (the lowest order id when several name it)
 _ACME_HOLDERS = ("UPDATE certificates SET subject_holder = 'acme:' || (SELECT o.account_id FROM acme_orders o "
@@ -43,9 +49,11 @@ def _values(rows):
     return out
 
 
-def _backfill(fetch, write):
+def _backfill(fetch, write, total):
     """Batches of _BATCH rows, keyed on id so a row nothing can fill is read once."""
-    cursor = 0
+    from migrations._from_2_254 import Progress
+    progress = Progress('step 157_certificate_subject_key', total)
+    cursor = done = 0
     while True:
         rows = fetch(cursor)
         if not rows:
@@ -54,6 +62,8 @@ def _backfill(fetch, write):
         values = _values(rows)
         if values:
             write(values)
+        done += len(rows)
+        progress(done)
 
 
 def _upgrade_sqlite(conn):
@@ -67,9 +77,11 @@ def _upgrade_sqlite(conn):
         conn.execute("ALTER TABLE certificates ADD COLUMN subject_holder VARCHAR(100)")
     _backfill(
         lambda c: conn.execute(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}").fetchall(),
-        lambda values: conn.executemany("UPDATE certificates SET subject_key = ? WHERE id = ?", values))
+        lambda values: conn.executemany("UPDATE certificates SET subject_key = ? WHERE id = ?", values),
+        conn.execute(_COUNT).fetchone()[0])
     conn.execute(f"CREATE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, subject_key)")
     if 'acme_orders' in tables:
+        conn.execute(CREATE_ORDER_INDEX)
         conn.execute(_ACME_HOLDERS)
     if {'hybrid_role', 'related_certificate_id'} <= columns:
         conn.execute(_PAIR_HOLDERS)
@@ -94,9 +106,11 @@ def _upgrade_pg(conn):
         bindparam('key'), bindparam('id'))
     _backfill(
         lambda c: conn.execute(text(_PENDING.format(cursor=int(c)) + f" LIMIT {_BATCH}")).fetchall(),
-        lambda values: conn.execute(update, [{'key': k, 'id': i} for k, i in values]))
+        lambda values: conn.execute(update, [{'key': k, 'id': i} for k, i in values]),
+        conn.execute(text(_COUNT)).scalar())
     conn.execute(text(f"CREATE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, subject_key)"))
     if 'acme_orders' in tables:
+        conn.execute(text(CREATE_ORDER_INDEX))
         conn.execute(text(_ACME_HOLDERS))
     if {'hybrid_role', 'related_certificate_id'} <= columns:
         conn.execute(text(_PAIR_HOLDERS))

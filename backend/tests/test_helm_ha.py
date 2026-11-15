@@ -91,7 +91,20 @@ def test_ha_startup_probe_outlasts_the_node_identifier_wait_pos():
     longest_wait = STALE_PASSES * WAKE_INTERVAL_SECONDS + 2 * CLAIM_POLL_SECONDS
     longest_wait += BOOT_LOCK_TIMEOUT_SECONDS
     assert probe['periodSeconds'] * probe['failureThreshold'] >= longest_wait + 30
-    assert 'startupProbe' not in _docs()['Deployment']['spec']['template']['spec']['containers'][0]
+
+
+def test_without_ha_the_startup_probe_covers_a_long_first_start_pos():
+    # an upgrade of a large database answers nothing until it ends: the liveness probe waits for it
+    container = _docs()['Deployment']['spec']['template']['spec']['containers'][0]
+    probe = container['startupProbe']
+    assert probe['httpGet']['path'] == '/health/live'
+    liveness = container['livenessProbe']
+    # the probe HA renders, twice the time the liveness probe alone gives
+    assert probe == _docs(*HA)['Deployment']['spec']['template']['spec']['containers'][0]['startupProbe']
+    assert probe['periodSeconds'] * probe['failureThreshold'] >= 2 * (
+        liveness['initialDelaySeconds'] + liveness['periodSeconds'] * liveness['failureThreshold'])
+    off = _docs('--set', 'startupProbe.enabled=false')['Deployment']['spec']['template']['spec']['containers'][0]
+    assert 'startupProbe' not in off and 'livenessProbe' in off
 
 
 def test_ha_existing_claim_keeps_the_data_pvc_pos():

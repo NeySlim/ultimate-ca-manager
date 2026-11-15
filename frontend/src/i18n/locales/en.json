@@ -1542,7 +1542,7 @@
     "proxyUpstreamUrl": "Upstream Directory URL",
     "proxyUpstreamUrlHelper": "The upstream ACME server directory URL. Defaults to Let's Encrypt staging if empty.",
     "proxyUsage": "Usage with certbot:",
-    "proxyUsageNote": "Prerequisite: the domain (or a parent covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy only supports dns-01.\n\nEach external CA account can expose a dedicated endpoint: /acme/proxy/<slug>/directory (enable **Expose via ACME proxy** in External CA Accounts). The default path /acme/proxy/directory follows the account selected in proxy settings.\n\nUCM automatically creates and removes TXT records via that provider. The --manual-auth-hook and --manual-cleanup-hook flags can stay as no-ops (/bin/true) because the proxy performs DNS validation.\n\nAvoid two concurrent requests for the same name (Certbot + UCM UI): the second TXT record can overwrite the first. If the UCM HTTPS certificate is self-signed (lab), add --no-verify-ssl to Certbot.",
+    "proxyUsageNote": "Prerequisite: the domain (or a parent covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy only supports dns-01.\n\nEach external CA account can expose a dedicated endpoint: /acme/proxy/<slug>/directory (enable **Expose via ACME proxy** in Certificate Authorities (CA)). The default path /acme/proxy/directory follows the account selected in proxy settings.\n\nUCM automatically creates and removes TXT records via that provider. The --manual-auth-hook and --manual-cleanup-hook flags can stay as no-ops (/bin/true) because the proxy performs DNS validation.\n\nAvoid two concurrent requests for the same name (Certbot + UCM UI): the second TXT record can overwrite the first. If the UCM HTTPS certificate is self-signed (lab), add --no-verify-ssl to Certbot.",
     "proxyRegistered": "Proxy Registered",
     "registerAccount": "Register Account",
     "aboutAcmeDesc": "ACME enables automated certificate issuance. Configure the server below, then use the directory URL with any ACME client (certbot, acme.sh, etc.).",
@@ -1802,12 +1802,12 @@
     "customCA": "Custom CA",
     "upstreamCAHelper": "Select the upstream Certificate Authority for proxy requests",
     "proxyUpstreamCAAccount": "Upstream CA account",
-    "proxyUpstreamCAAccountHelper": "Select a registered external ACME CA account. EAB and credentials are managed in External CA Accounts below.",
+    "proxyUpstreamCAAccountHelper": "Select a registered external ACME CA account. EAB and credentials are managed in Certificate Authorities (CA) below.",
     "proxySelectCaAccount": "Select a CA account…",
     "proxyPruneReplacedCertificates": "Purge replaced certificates",
     "proxyPruneReplacedCertificatesDesc": "Automatically delete proxy-imported certificates once a renewal for the same domains succeeds. Revoked certificates are always kept.",
-    "proxyNoCaAccounts": "No external CA accounts configured. Add one in External CA Accounts below.",
-    "proxyManageCaAccountsHint": "EAB credentials and per-CA settings are managed in External CA Accounts below.",
+    "proxyNoCaAccounts": "No external CA accounts configured. Add one in Certificate Authorities (CA) below.",
+    "proxyManageCaAccountsHint": "EAB credentials and per-CA settings are managed in Certificate Authorities (CA) below.",
     "proxyEnabled": "Expose via ACME proxy",
     "proxySlug": "Proxy path (slug)",
     "proxySlugHelper": "URL: /acme/proxy/<slug>/directory (lowercase letters, digits, hyphens).",
@@ -3375,6 +3375,7 @@
       "nothingFound": "Nothing found that this profile would refuse."
     },
     "fipsPreflight": {
+      "withoutModule": "No FIPS module was asked: EdDSA and ML-DSA keys are listed as refused. With Docker, run this check with the -fips image, without UCM_FIPS, to judge them by its module.",
       "title": "FIPS readiness",
       "hint": "Lists what FIPS mode would refuse on this instance, with a remedy for each. Nothing is changed.",
       "run": "Check FIPS readiness",
@@ -4541,7 +4542,7 @@
     "title": "Certificate Policies",
     "subtitle": "Manage issuance rules, key requirements, and approval workflows",
     "fipsRulesTitle": "FIPS rules active (read only)",
-    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA 2048 to 4096 and EC P-256 to P-521 keys, SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
+    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA keys of an even length from 2048 to 16384 bits, EC P-256 to P-521, and Ed25519, Ed448 and ML-DSA when the loaded FIPS module approves them; SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "total": "Total",
     "active": "Active",
     "inactive": "Inactive",
@@ -5473,7 +5474,7 @@
     "inventorySyncHint": "Periodically imports certificates issued on the Windows CA that UCM doesn't know yet, so UCM tracks the whole certificate lifecycle. Incremental; runs via the admin channel.",
     "lastInventorySync": "Last inventory sync",
     "inventorySyncNow": "Import from CA now",
-    "inventorySyncResult": "Inventory sync complete: {{imported}} imported ({{skipped}} already known)",
+    "inventorySyncResult": "Inventory sync complete: {{imported}} imported, {{completed}} pending request(s) completed ({{skipped}} already known)",
     "inventorySyncFailed": "Inventory sync failed",
     "caControl": "CA control panel",
     "caControlTitle": "CA control: {{name}}",
@@ -5513,6 +5514,11 @@
     "issued": "Issued",
     "denied": "Denied",
     "checkStatus": "Check Status",
+    "checkIssued": "Certificate issued and imported",
+    "checkStillPending": "Still pending manager approval on the CA",
+    "checkDenied": "The CA denied this request",
+    "checkSuperseded": "This CSR was signed elsewhere: its Microsoft CA request is closed",
+    "checkFailed": "Status check failed",
     "refreshStatus": "Refresh Status",
     "signMode": "Signing Method",
     "signLocal": "Local CA",
@@ -5764,13 +5770,14 @@
     "policyOidHelp": "OID identifying the TSA policy under which timestamps are issued",
     "policyPlaceholderWarning": "1.2.3.4.1 is OpenSSL's example policy OID, assigned to no one. Use an OID from your organization's arc or your CP/CPS in production.",
     "requireDedicatedCert": "Require a dedicated TSA certificate",
-    "requireDedicatedCertDesc": "Refuse to sign timestamps with the CA certificate itself. Requires a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161).",
+    "requireDedicatedCertDesc": "On by default. Refuses to sign timestamps with the CA certificate itself: RFC 3161 requires a dedicated end-entity signing certificate with a critical timeStamping EKU. Turning it off is not RFC 3161 compliant.",
     "requireDedicatedCertBlocked": "Select a usable dedicated signing certificate above before enabling this, otherwise every timestamp request would fail.",
     "signingCert": "Signing certificate",
-    "signingCertDesc": "Choose what signs the timestamp tokens. The CA certificate is the historical default; a dedicated end-entity certificate carrying the timeStamping EKU is the RFC 3161 recommendation.",
+    "signingCertDesc": "Choose what signs the timestamp tokens. RFC 3161 requires a dedicated end-entity certificate carrying the timeStamping EKU; the CA certificate signs only when the strict mode below is turned off.",
     "caSignerWarning": "The CA certificate signs the timestamps. Strict verifiers such as openssl ts -verify and jarsigner reject these tokens: RFC 3161 requires a dedicated signer with a critical, exclusive timeStamping EKU. Select or generate a dedicated signing certificate below.",
+    "strictNoSigner": "Strict mode is on and no dedicated signer is set: /tsa refuses every timestamp request. Generate a signing certificate below: UCM issues it from the chosen CA with the timeStamping EKU alone and critical (RFC 3161), and selects it.",
     "signingCertHelp": "Only certificates whose private key UCM holds and that carry the timeStamping EKU are listed. Renewals are followed automatically.",
-    "signingCertCa": "CA certificate (default)",
+    "signingCertCa": "CA certificate (strict mode off only)",
     "signerExpires": "Expires",
     "signerChainComplete": "Issuer chain resolves to a self-signed root and is embedded in every token.",
     "signerChainPartial": "Issuer chain: {{count}} certificate(s) embedded; does not reach a self-signed root.",
@@ -6290,7 +6297,8 @@
         "session_revoke": "Session revoked",
         "session_revoke_all": "Sessions revoked",
         "deploy_binding_left_behind": "Deployment left on the old certificate",
-        "https_binding_left_behind": "HTTPS left on the old certificate"
+        "https_binding_left_behind": "HTTPS left on the old certificate",
+        "truststore_expiring": "Trust store certificate expiring or expired"
       }
     }
   },
@@ -6339,7 +6347,8 @@
       "renewal_declined": "Renewal declined",
       "ca_expiring": "CA expiring",
       "deploy_binding_left_behind": "Deployment left on the old certificate",
-      "https_binding_left_behind": "HTTPS left on the old certificate"
+      "https_binding_left_behind": "HTTPS left on the old certificate",
+      "truststore_expiring": "Trust store certificate expiring or expired"
     },
     "compliance": {
       "rsa_below_3072": "RSA below 3072 bits",
@@ -6363,7 +6372,7 @@
       "tasksWarning_one": "{{count}} task with a warning",
       "tasksWarning_other": "{{count}} tasks with a warning",
       "tsaState": {
-        "ca_certificate": "Signing with the CA certificate",
+        "ca_certificate": "CA certificate signs: tokens fail RFC 3161, issue a dedicated signer",
         "dedicated": "Dedicated signer",
         "expiring_one": "Signer expires in {{count}} day",
         "expiring_other": "Signer expires in {{count}} days",
@@ -6375,6 +6384,29 @@
         "revoked": "Signer certificate revoked",
         "key_unavailable": "Signer key unavailable",
         "invalid": "Signer certificate not usable"
+      },
+      "smtp": "Email",
+      "webhooks": "Webhooks",
+      "auto_renewal": "Auto-Renewal",
+      "witness": {
+        "smtp": {
+          "not_configured": "Not configured",
+          "disabled": "Configured but disabled",
+          "incomplete": "Enabled, port or From address missing",
+          "ready": "Ready"
+        },
+        "webhooks": {
+          "not_configured": "No endpoints",
+          "none_active_one": "{{count}} endpoint, none active",
+          "none_active_other": "{{count}} endpoints, none active",
+          "active_one": "{{count}} active endpoint",
+          "active_other": "{{count}} active endpoints"
+        },
+        "auto_renewal": {
+          "enabled": "Enabled",
+          "disabled": "Disabled"
+        },
+        "unavailable": "Status unavailable"
       }
     },
     "filter": {

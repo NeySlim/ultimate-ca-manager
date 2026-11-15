@@ -24,6 +24,7 @@ tests/test_discovery_timestamps.py
 tests/test_health_ha.py
 tests/test_ha_softhsm.py
 tests/test_sessions_store.py
+tests/test_redis_sessions_pg.py
 tests/test_factor_change_sessions.py
 tests/test_dashboard*.py
 tests/test_protocol_approval_*.py
@@ -53,7 +54,10 @@ tests/test_migration_156*.py
 tests/test_migration_157*.py
 tests/test_migration_158*.py
 tests/test_migration_159*.py
+tests/test_migration_162*.py
+tests/test_restore_tsa_ca_signer.py
 tests/test_upgrade_from_2_254.py
+tests/test_fresh_install_interrupted.py
 tests/test_schema_rules_kept_from_2x.py
 tests/test_encryption_envelope*.py
 tests/test_session_key*.py
@@ -63,6 +67,8 @@ tests/test_ws_relay*.py
 tests/test_postgres_schema_of_its_own.py
 tests/test_db_error_parameters_hidden.py
 tests/test_audit_oversized_fields.py
+tests/test_audit_stats_scale.py
+tests/test_audit_verify_rows.py
 tests/test_sso_login_identity.py
 tests/test_sso_return_path.py
 tests/test_cas_list_query_count.py
@@ -83,3 +89,6 @@ tests/test_import_triggers_deploy.py
 tests/test_unique_subject*.py
 tests/test_migration_runner_isolation.py
 tests/test_db_key_rewrap.py
+tests/test_msca_pending_completion.py
+tests/test_msca_signed_elsewhere.py
+tests/test_msca_status_import_deploys.py

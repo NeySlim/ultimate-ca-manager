@@ -7,8 +7,13 @@ import { formatDate } from '../../lib/utils'
 import { stateLabel } from '../../lib/stateLabel'
 import { CardFrame, num, useCardData } from './shared'
 
-const PROTOCOLS = ['acme', 'scep', 'est', 'tsa', 'scheduler']
-const ROW_LINKS = { tsa: '/tsa-config', scheduler: '/settings?tab=scheduler' }
+const PROTOCOLS = ['acme', 'scep', 'est', 'tsa', 'scheduler', 'smtp', 'webhooks', 'auto_renewal']
+// Settings witnesses: a state of a setting, no series and no last operation
+const WITNESSES = ['smtp', 'webhooks', 'auto_renewal']
+const ROW_LINKS = {
+  tsa: '/tsa-config', scheduler: '/settings?tab=scheduler', smtp: '/settings?tab=email',
+  webhooks: '/settings?tab=webhooks', auto_renewal: '/settings?tab=autoRenewal',
+}
 
 /** The row's link, only when the navigation guard of its page lets this user in. */
 function rowLink(name, can) {
@@ -34,7 +39,12 @@ function Bars({ periods }) {
 function summary(name, p, t) {
   if (name === 'tsa') {
     const key = p.state === 'unusable' ? `overview.health.tsaReason.${p.reason}` : `overview.health.tsaState.${p.state}`
-    return { text: t(key, { count: p.days_left, defaultValue: p.state }), alert: Boolean(p.alert) }
+    return { text: t(key, { count: p.days_left, defaultValue: p.state }), alert: Boolean(p.alert),
+      warning: p.severity === 'warning' }
+  }
+  if (WITNESSES.includes(name)) {
+    if (p.state === 'unavailable') return { text: t('overview.health.witness.unavailable'), alert: true }
+    return { text: t(`overview.health.witness.${name}.${p.state}`, { count: p.count, defaultValue: p.state }), alert: Boolean(p.alert) }
   }
   if (name === 'scheduler') {
     const failed = Number(p.by_status?.failed) || 0
@@ -60,11 +70,12 @@ export function HealthCard() {
       <ul className="flex flex-col gap-2">
         {present.map((name) => {
           const p = protocols[name]
-          const { text, alert } = summary(name, p, t)
+          const { text, alert, warning } = summary(name, p, t)
           const label = t(`overview.health.${name}`)
           const link = rowLink(name, can)
           return (
             <li key={name} data-testid={`health-${name}`} data-alert={alert ? 'true' : 'false'}
+              data-severity={alert ? (warning ? 'warning' : 'critical') : undefined}
               className="flex items-center justify-between gap-3">
               {link
                 ? <Link to={link} className="text-sm text-text-primary hover:text-accent-primary">{label}</Link>
@@ -72,8 +83,8 @@ export function HealthCard() {
               <span className="flex items-center gap-3 text-xs text-text-secondary">
                 {Array.isArray(p.periods) && <Bars periods={p.periods} />}
                 {name === 'scheduler' && <span>{t('overview.health.tasks')} {num(p.tasks)}</span>}
-                <span className={alert ? 'text-status-danger font-medium' : undefined}>{text}</span>
-                {name !== 'tsa' && <span>{p.last_operation_at ? formatDate(p.last_operation_at) : '–'}</span>}
+                <span className={alert ? `${warning ? 'text-status-warning' : 'text-status-danger'} font-medium` : undefined}>{text}</span>
+                {name !== 'tsa' && !WITNESSES.includes(name) && <span>{p.last_operation_at ? formatDate(p.last_operation_at) : '–'}</span>}
               </span>
             </li>
           )

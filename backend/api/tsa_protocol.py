@@ -57,7 +57,8 @@ def timestamp_request():
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
         from services.tsa_service import (
             TSAConfigurationError, TSAService, certificate_validity_problem,
-            load_configured_signer, tsa_is_enabled, tsa_signer_key_problem,
+            load_configured_signer, tsa_is_enabled, tsa_requires_dedicated_signer,
+            tsa_signer_key_problem,
         )
         from models import SystemConfig
 
@@ -106,6 +107,13 @@ def timestamp_request():
                 response = make_response('TSA not configured', 503)
                 response.headers['Content-Type'] = 'text/plain'
                 return response
+            # RFC 3161 §2.3: the CA key never signs a token unless the operator turned this off
+            if tsa_requires_dedicated_signer():
+                logger.warning("TSA request refused: no dedicated signer and "
+                               "tsa_require_dedicated_cert is on")
+                response = make_response('TSA configuration invalid', 503)
+                response.headers['Content-Type'] = 'text/plain'
+                return response
             ca = CA.query.filter_by(refid=tsa_ca_refid).first()
 
             if not ca or not ca.crt or not ca.prv:
@@ -134,10 +142,16 @@ def timestamp_request():
                 response.headers['Content-Type'] = 'text/plain'
                 return response
 
-            # Load CA cert and key
-            signer_cert = x509.load_pem_x509_certificate(
-                base64.b64decode(ca.crt), default_backend()
-            )
+            # Load CA cert and key; a certificate that cannot be read is a configuration fault
+            try:
+                signer_cert = x509.load_pem_x509_certificate(
+                    base64.b64decode(ca.crt), default_backend()
+                )
+            except Exception:
+                logger.error("TSA request refused: CA '%s' certificate cannot be read", ca.descr)
+                response = make_response('TSA configuration invalid', 503)
+                response.headers['Content-Type'] = 'text/plain'
+                return response
             # A token dated outside the signer's validity verifies nowhere
             validity = certificate_validity_problem(signer_cert)
             if validity:

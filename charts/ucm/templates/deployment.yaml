@@ -154,8 +154,8 @@ spec:
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- if and .Values.ha.enabled .Values.startupProbe.enabled }}
-          # A container restarted in its pod waits for its previous heartbeat to expire (HA.md)
+          {{- if .Values.startupProbe.enabled }}
+          # A first start that upgrades the database, or in HA the wait for a previous heartbeat
           startupProbe:
             httpGet:
               path: /health/live

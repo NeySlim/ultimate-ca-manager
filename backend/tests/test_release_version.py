@@ -207,11 +207,34 @@ def test_a_three_segment_section_is_extracted_alone(tmp_path):
     ('3.1', CHANGELOG),
     ('3.1-rc1', CHANGELOG.replace('## [Unreleased]', '## [Later]')),
     ('3.1-rc1', CHANGELOG.replace('### Added\n- Next thing.\n', '', 1)),
+    ('3.0', CHANGELOG.replace('### Added\n- Phare thing.\n', '', 1)),
+    ('3.0-rc1', '## [Unreleased]\n\n## [3.0-rc1] - 2026-12-01\n\n## [3.0] - 2026-12-20\n- X.\n'),
+    ('3.0', '## [3.0] - 2026-12-20\n\n   \n## [2.254] - 2026-11-13\n- Old.\n'),
 ])
 def test_a_missing_or_empty_section_fails_explicitly(tmp_path, version, text):
     r = _notes(tmp_path, version, text)
     assert r.returncode == 1 and r.stdout == ''
     assert 'CHANGELOG' in r.stderr
+    assert f'[{version}]' in r.stderr
+    if '-rc' in version:
+        assert '[Unreleased]' in r.stderr
+
+
+def test_a_rc_with_an_empty_own_section_falls_back_to_unreleased(tmp_path):
+    text = CHANGELOG.replace('## [3.0] - 2026-12-20', '## [3.0-rc1] - 2026-12-01\n\n## [3.0] - 2026-12-20')
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert r.returncode == 0, r.stderr
+    assert 'Next thing.' in r.stdout
+
+
+def test_a_section_of_subheadings_only_has_no_entries(tmp_path):
+    empty = '### Added\n\n### Fixed\n'
+    rc = f'## [Unreleased]\n{empty}\n## [3.0-rc1] - 2026-12-01\n{empty}\n## [3.0] - 2026-12-20\n{empty}'
+    assert _notes(tmp_path, '3.0', rc).returncode == 1
+    assert _notes(tmp_path, '3.0-rc1', rc).returncode == 1
+    own = rc.replace('## [Unreleased]\n' + empty, '## [Unreleased]\n### Added\n- Next.\n')
+    r = _notes(tmp_path, '3.0-rc1', own)
+    assert r.returncode == 0 and 'Next.' in r.stdout
 
 
 def test_the_fallback_heading_does_not_bite_on_a_longer_version():
@@ -221,18 +244,27 @@ def test_the_fallback_heading_does_not_bite_on_a_longer_version():
     assert 'three' in rv.changelog_section('2.254.1', text) and 'two' not in rv.changelog_section('2.254.1', text)
 
 
-@pytest.mark.parametrize('version,expected', [
-    ('3.2', ['3.1', '3.0']),
-    ('3.1-rc1', ['3.0']),
-    ('3.0', []),
-    ('3.0-rc2', []),
-    ('2.254.2', ['2.254.1', '2.254']),
-])
-def test_the_history_stays_on_the_line_of_the_version(version, expected):
-    text = ('## [Unreleased]\n- u\n\n## [3.1] - d\n- a\n\n## [3.0] - d\n- b\n\n'
-            '## [2.254.1] - d\n- c\n\n## [2.254] - d\n- e\n\n## [2.253] - d\n- f\n')
-    heads = re.findall(r'^## \[([^\]]+)\]', _load().changelog_history(version, text), re.M)
-    assert heads == [h for h in expected]
+def test_a_rc_with_a_section_of_its_own_name_takes_that_section(tmp_path):
+    text = CHANGELOG.replace('## [3.0] - 2026-12-20', '## [3.0-rc1] - 2026-12-01\n- Named.\n\n## [3.0] - 2026-12-20')
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert r.returncode == 0 and 'Named.' in r.stdout and 'Next thing.' not in r.stdout
+
+
+def test_a_rc_section_is_used_when_unreleased_is_empty(tmp_path):
+    text = '## [Unreleased]\n\n## [3.0-rc1] - 2026-12-01\n- Named.\n\n## [2.254] - 2026-11-13\n- Old.\n'
+    r = _notes(tmp_path, '3.0-rc1', text)
+    assert r.returncode == 0, r.stderr
+    assert 'Named.' in r.stdout and 'Old.' not in r.stdout
+
+
+def test_a_corrective_release_candidate_takes_unreleased(tmp_path):
+    r = _notes(tmp_path, '2.254.2-rc1')
+    assert 'Next thing.' in r.stdout and 'Maintenance' not in r.stdout
+
+
+def test_the_history_command_is_gone(tmp_path):
+    assert _notes(tmp_path, '3.0').returncode == 0
+    assert _cli('history', '3.0', str(tmp_path / 'CHANGELOG.md')).returncode == 2
 
 
 def _notes_step(tmp_path, v, changelog):
@@ -256,8 +288,9 @@ def test_the_release_notes_step_names_the_published_files(tmp_path, v):
     for name in _load().asset_names(v).values():
         assert name in text, name
     assert f'releases/download/v{v}/' in text and 'Marker.' in text
-    # 2.200 belongs to another line than every accepted version but 2.254.N
-    assert ('Old.' in text) is v.startswith('2.')
+    # earlier sections are not copied: a link to the CHANGELOG at the tag stands in
+    assert 'Old.' not in text and 'Recent release history' not in text
+    assert f'https://github.com/o/r/blob/v{v}/CHANGELOG.md' in text
 
 
 @pytest.mark.parametrize('v,changelog', [('3.0', '## [Unreleased]\n- x\n'), ('3.0-rc1', '## [2.254] - d\n- x\n')])
@@ -471,14 +504,17 @@ def test_smoke_release_accepts_the_exact_version(monkeypatch):
 # ---- 7. the manual publisher takes the same section ---------------------------------------------
 
 def _publish(tmp_path, version, changelog, *flags):
+    """Notes the script hands to `gh release edit` (it only edits a release the workflow created)."""
     bare, work = tmp_path / 'origin.git', tmp_path / 'work'
+    # Under the pre-commit hook GIT_DIR points at the real repository: never hand it down
+    clean = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
     git = ['git', '-c', 'user.name=t', '-c', 'user.email=t@t']
-    subprocess.run(['git', 'init', '-q', '--bare', str(bare)], check=True)
-    subprocess.run(['git', 'init', '-q', str(work)], check=True)
-    subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', 'x'], cwd=work, check=True)
-    subprocess.run(['git', 'remote', 'add', 'origin', str(bare)], cwd=work, check=True)
-    subprocess.run(['git', 'tag', f'v{version}'], cwd=work, check=True)
-    subprocess.run(['git', 'push', '-q', 'origin', '--tags'], cwd=work, check=True)
+    subprocess.run(['git', 'init', '-q', '--bare', str(bare)], check=True, env=clean)
+    subprocess.run(['git', 'init', '-q', str(work)], check=True, env=clean)
+    subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', 'x'], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'remote', 'add', 'origin', str(bare)], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'tag', f'v{version}'], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'push', '-q', 'origin', '--tags'], cwd=work, check=True, env=clean)
     (work / 'scripts').mkdir()
     (work / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
     shutil.copy(ROOT / 'scripts' / 'release_publish.sh', work / 'scripts')
@@ -488,14 +524,13 @@ def _publish(tmp_path, version, changelog, *flags):
     log = tmp_path / 'gh.args'
     (fake / 'gh').write_text(
         '#!/bin/sh\n'
-        f'if [ "$1 $2" = "release view" ] && [ ! -e "{log}" ]; then exit 1; fi\n'
-        'if [ "$1 $2" = "release create" ]; then\n'
+        'if [ "$1 $2" = "release edit" ]; then\n'
         f'  for a in "$@"; do echo "$a"; done > "{log}"\n'
         f'  while [ $# -gt 0 ]; do [ "$1" = "--notes-file" ] && cp "$2" "{log}.notes"; shift; done\n'
         'fi\n')
     (fake / 'gh').chmod(0o755)
-    env = {**os.environ, 'PATH': f'{fake}:{os.environ["PATH"]}'}
-    result = subprocess.run([BASH, 'scripts/release_publish.sh', version, *flags], cwd=work, env=env,
+    env = {**clean, 'PATH': f'{fake}:{os.environ["PATH"]}'}
+    result = subprocess.run([BASH, 'scripts/release_publish.sh', version, '--edit', *flags], cwd=work, env=env,
                             capture_output=True, text=True)
     notes = pathlib.Path(str(log) + '.notes')
     return result, (notes.read_text() if notes.exists() else None)
@@ -517,6 +552,13 @@ def test_release_publish_takes_the_section_of_the_workflow(tmp_path, version, ma
 def test_release_publish_refuses_a_missing_section(tmp_path):
     result, notes = _publish(tmp_path, '3.2', PUBLISH_CHANGELOG)
     assert result.returncode != 0 and notes is None
+    assert "'## [3.2]'" in result.stderr and 'Unreleased' not in result.stderr.replace('[3.2]', '')
+
+
+def test_release_publish_names_both_sections_for_a_rc_without_notes(tmp_path):
+    result, notes = _publish(tmp_path, '3.2-rc1', '## [3.0] - 2026-12-01\n- Entry.\n')
+    assert result.returncode != 0 and notes is None
+    assert "'## [3.2-rc1]' or '## [Unreleased]'" in result.stderr
 
 
 # ---- 8. the release notes prescribe the FIPS stream of the installation guide ----------------------
