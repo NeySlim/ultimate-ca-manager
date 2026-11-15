@@ -11,6 +11,7 @@ const m = vi.hoisted(() => ({
   getWebAuthnCredentials: vi.fn(),
   setWebAuthnSecondFactor: vi.fn(),
   showPrompt: vi.fn(),
+  showSuccess: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -34,7 +35,7 @@ vi.mock('../../services', () => ({
 vi.mock('../../contexts', () => ({
   useAuth: () => ({ user: { id: 1, username: 'alice', role: 'operator' }, isAuthenticated: true, sessionChecked: true }),
   useNotification: () => ({
-    showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn(), showPrompt: m.showPrompt,
+    showSuccess: m.showSuccess, showError: vi.fn(), showConfirm: vi.fn(), showPrompt: m.showPrompt,
   }),
   useMobile: () => ({ isMobile: false, isDesktop: true, screenWidth: 1280, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [], prefs: {}, updatePrefs: vi.fn() }),
@@ -43,7 +44,7 @@ vi.mock('../../contexts', () => ({
 const auth = { user: { id: 1, username: 'alice', role: 'operator' }, isAuthenticated: true, sessionChecked: true }
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => auth, AuthProvider: ({ children }) => children }))
 vi.mock('../../contexts/NotificationContext', () => ({
-  useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn(), showPrompt: m.showPrompt }),
+  useNotification: () => ({ showSuccess: m.showSuccess, showError: vi.fn(), showConfirm: vi.fn(), showPrompt: m.showPrompt }),
   NotificationProvider: ({ children }) => children,
 }))
 vi.mock('../../contexts/MobileContext', () => ({
@@ -103,6 +104,13 @@ describe('AccountPage: security key as second factor', () => {
     await openSecurity({ webauthn_2fa: true, two_factor_methods: ['webauthn'] }, [KEY])
     fireEvent.click(screen.getByText('account.turnOffKey2fa'))
     await waitFor(() => expect(m.setWebAuthnSecondFactor).toHaveBeenCalledWith(false, 'secret-pw'))
+  })
+
+  it('says the other sessions were closed', async () => {
+    await openSecurity({ webauthn_2fa: false, two_factor_methods: [] }, [KEY])
+    fireEvent.click(screen.getByText('account.turnOnKey2fa'))
+    await waitFor(() => expect(m.showSuccess).toHaveBeenCalledWith(
+      'account.key2faEnabled account.otherSessionsClosed'))
   })
 
   it('lists the active second factors', async () => {

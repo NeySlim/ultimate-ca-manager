@@ -3623,6 +3623,7 @@
     "enterPasswordToDisableKey2fa": "ログイン時にセキュリティキーを求めないようにするには、パスワードを入力してください",
     "key2faEnabled": "セキュリティキーが 2 要素目になりました",
     "key2faDisabled": "パスワードでのログイン時にセキュリティキーは求められなくなりました",
+    "otherSessionsClosed": "Your other sessions were signed out.",
     "activeSecondFactors": "有効な 2 要素目",
     "noSecondFactor": "なし",
     "twoFactorEnforced": "管理者により必須",

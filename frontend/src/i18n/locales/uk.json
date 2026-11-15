@@ -3666,6 +3666,7 @@
     "enterPasswordToDisableKey2fa": "Введіть пароль, щоб більше не вимагати ключ безпеки під час входу",
     "key2faEnabled": "Ваш ключ безпеки тепер є другим фактором",
     "key2faDisabled": "Вхід із паролем більше не вимагає ключ безпеки",
+    "otherSessionsClosed": "Your other sessions were signed out.",
     "activeSecondFactors": "Активні другі фактори",
     "noSecondFactor": "немає",
     "twoFactorEnforced": "вимагається адміністратором",

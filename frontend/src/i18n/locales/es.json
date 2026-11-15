@@ -3622,6 +3622,7 @@
     "enterPasswordToDisableKey2fa": "Introduzca su contraseña para dejar de pedir una llave de seguridad al iniciar sesión",
     "key2faEnabled": "Su llave de seguridad es ahora su segundo factor",
     "key2faDisabled": "Un inicio de sesión con contraseña ya no pide una llave de seguridad",
+    "otherSessionsClosed": "Your other sessions were signed out.",
     "activeSecondFactors": "Segundos factores activos",
     "noSecondFactor": "ninguno",
     "twoFactorEnforced": "exigido por su administrador",

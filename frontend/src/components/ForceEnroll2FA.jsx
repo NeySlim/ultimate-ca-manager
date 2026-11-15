@@ -56,7 +56,7 @@ export function ForceEnroll2FA({ onComplete }) {
     setRegisteringKey(true)
     try {
       await accountService.registerWebAuthnKey(keyName.trim() || t('account.securityKey'))
-      showSuccess(t('account.keyRegistered'))
+      showSuccess(`${t('account.keyRegistered')} ${t('account.otherSessionsClosed')}`)
       await onComplete?.()
     } catch (error) {
       showError(error.name === 'NotAllowedError'
@@ -68,7 +68,7 @@ export function ForceEnroll2FA({ onComplete }) {
   }
 
   const handleDone = async () => {
-    showSuccess(t('account.twoFaEnabled'))
+    showSuccess(`${t('account.twoFaEnabled')} ${t('account.otherSessionsClosed')}`)
     // Re-check the session: the backend has lifted the enrolment gate, so this
     // promotes the session to full access and clears must_enroll_2fa.
     await onComplete?.()

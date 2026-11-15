@@ -3622,6 +3622,7 @@
     "enterPasswordToDisableKey2fa": "输入密码以在登录时不再要求安全密钥",
     "key2faEnabled": "您的安全密钥现已成为第二因素",
     "key2faDisabled": "密码登录不再要求安全密钥",
+    "otherSessionsClosed": "Your other sessions were signed out.",
     "activeSecondFactors": "已启用的第二因素",
     "noSecondFactor": "无",
     "twoFactorEnforced": "由管理员要求",

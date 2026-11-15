@@ -195,6 +195,9 @@ export default function AccountPage() {
     }
   }
 
+  // A second factor changed: the server closed the account's other sessions
+  const factorChanged = (key) => showSuccess(`${t(key)} ${t('account.otherSessionsClosed')}`)
+
   // 2FA handlers
   const handleToggle2FA = async () => {
     try {
@@ -206,7 +209,7 @@ export default function AccountPage() {
         })
         if (!code) return
         await accountService.disable2FA(code)
-        showSuccess(t('messages.success.other.twoFactorDisabled'))
+        factorChanged('messages.success.other.twoFactorDisabled')
         await loadAccount()
       } else {
         const response = await accountService.enable2FA()
@@ -229,10 +232,10 @@ export default function AccountPage() {
         })
         if (!password) return
         await accountService.setWebAuthnSecondFactor(false, password)
-        showSuccess(t('account.key2faDisabled'))
+        factorChanged('account.key2faDisabled')
       } else {
         await accountService.setWebAuthnSecondFactor(true)
-        showSuccess(t('account.key2faEnabled'))
+        factorChanged('account.key2faEnabled')
       }
       await loadAccount()
     } catch (error) {
@@ -243,7 +246,7 @@ export default function AccountPage() {
   const handleConfirm2FA = async () => {
     try {
       await accountService.confirm2FA(confirmCode)
-      showSuccess(t('messages.success.other.twoFactorEnabled'))
+      factorChanged('messages.success.other.twoFactorEnabled')
       setShow2FAModal(false)
       setQrData(null)
       setConfirmCode('')
@@ -264,7 +267,7 @@ export default function AccountPage() {
     try {
       await accountService.registerWebAuthnKey(webauthnName)
       
-      showSuccess(t('account.keyRegistered'))
+      factorChanged('account.keyRegistered')
       setShowWebAuthnModal(false)
       setWebauthnName('')
       await loadWebAuthnCredentials()
@@ -289,7 +292,7 @@ export default function AccountPage() {
     
     try {
       await accountService.deleteWebAuthnCredential(credentialId)
-      showSuccess(t('account.keyDeleted'))
+      factorChanged('account.keyDeleted')
       await loadWebAuthnCredentials()
     } catch (error) {
       showError(error.message || t('account.deleteKeyFailed'))
