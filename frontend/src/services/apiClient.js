@@ -28,7 +28,7 @@ const HTTP_ERROR_MESSAGES = {
   405: 'This operation is not supported.',
   408: 'The request timed out. Please try again.',
   409: 'Conflict: this resource already exists or is in use.',
-  413: 'The file is too large. Maximum upload size is 50 MB.',
+  413: 'The server or a proxy in front of it refused a request of this size.',
   415: 'Unsupported file type.',
   422: 'The data provided is invalid. Please check and try again.',
   429: 'Too many requests. Please wait a moment and try again.',
@@ -72,6 +72,26 @@ export function resetLoginRedirect() {
 if (typeof window !== 'undefined') {
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) resetLoginRedirect()
+  })
+}
+
+// POST through XMLHttpRequest, answering like the part of a fetch Response the client reads.
+function xhrUpload(url, config, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    xhr.withCredentials = config.credentials === 'include'
+    for (const [name, value] of Object.entries(config.headers || {})) xhr.setRequestHeader(name, value)
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded, event.total)
+    }
+    xhr.onload = () => resolve({
+      ok: xhr.status >= 200 && xhr.status < 300,
+      status: xhr.status,
+      json: async () => JSON.parse(xhr.responseText),
+    })
+    xhr.onerror = () => reject(new TypeError('Network error'))
+    xhr.send(config.body)
   })
 }
 
@@ -233,20 +253,30 @@ class APIClient {
       headers['X-CSRF-Token'] = csrfToken
     }
     
+    const { onProgress, ...fetchOptions } = options
     const config = {
       method: 'POST',
       body: formData,
       credentials: 'include',
       headers,
       // Don't set Content-Type - browser will set it with boundary for FormData
-      ...options,
+      ...fetchOptions,
     }
 
     if (import.meta.env.DEV) console.log(`📡 API UPLOAD ${url}`)
 
     try {
-      const response = await fetch(url, config)
-      const data = await response.json()
+      // fetch reports no upload progress: a caller that wants it gets XHR, the same body.
+      const response = onProgress
+        ? await xhrUpload(url, config, onProgress)
+        : await fetch(url, config)
+      // A refusal from a proxy is an HTML page: its status still says what happened.
+      let data = null
+      try {
+        data = await response.json()
+      } catch (parseError) {
+        if (response.ok) throw parseError
+      }
 
       if (!response.ok) {
         const msg = buildErrorMessage(response.status, data, 'Upload failed')

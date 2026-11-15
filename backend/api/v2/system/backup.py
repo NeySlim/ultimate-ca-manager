@@ -52,6 +52,7 @@ from services.backup.restore_completion import (
     request_restart as _request_restart_after_restore,
     restore_actor as _actor,
     restore_message,
+    attach_restore_todo,
 )
 # Bounds of a listing or a bulk request; a restore's upload ceiling is
 # `storage.restore_upload_limit()`.
@@ -268,6 +269,9 @@ def list_backups():
             'per_page': per_page,
             'pages': max(1, -(-total // per_page)),
             'storage': 'database' if shared else 'disk',
+            # What a restore accepts, for the file picker (archive 0 = no ceiling).
+            'restore_limits': {'upload_bytes': storage.restore_upload_limit(),
+                               'archive_bytes': storage.restore_archive_limit()},
         }
     except Exception:
         logger.exception('Failed to list backups')
@@ -554,6 +558,7 @@ def restore_backup():
                     if maintenance:
                         maintenance.lift_unchanged()
                     logger.warning('Restore: the archive carried no data section')
+                    attach_restore_todo(results)
                     return success_response(
                         data=results,
                         message=('The archive carried no data: nothing was restored, '
@@ -574,6 +579,7 @@ def restore_backup():
                 results['restart_requested'] = restart_ok
                 results['restart_detail'] = restart_detail
                 results['filename'] = file.filename
+                attach_restore_todo(results)
                 return success_response(data=results, message=restore_message(results))
             except Exception:
                 # The restore is committed and already audited as a success: no second, contradicting line
