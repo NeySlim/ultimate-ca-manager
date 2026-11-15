@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- FIPS: the `-fips` Docker image recomputed the integrity value of the FIPS module at each start, so a `fips.so` modified after the build still passed its self-tests; the start in FIPS mode now compares it to the value recorded when the image was built and refuses a modified module, a missing or malformed record, or an `OPENSSL_MODULES` that is not the directory of that module.
+
 ## [2.254.2] - 2026-11-15
 
 ### Changed

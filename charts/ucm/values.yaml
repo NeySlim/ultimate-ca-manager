@@ -78,7 +78,8 @@ proxy:
 
 ## FIPS mode: runs the <tag>-fips image with UCM_FIPS=1 and an in-memory
 ## /run/ucm for the module configuration. The pod refuses to start if the
-## OpenSSL FIPS provider is missing or fails its self-tests.
+## OpenSSL FIPS provider is missing, fails its self-tests, or was modified
+## since the image was built.
 fips:
   enabled: false
 
