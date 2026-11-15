@@ -190,6 +190,11 @@ unsettled() {
     fi
 }
 
+# The two reasons a directory of a journal line is absent, and what each one asks for
+remedy() {
+    printf '%s' "mount what holds it, or, if it was removed by hand, make it again, empty (mkdir -p $1), then retry"
+}
+
 # $1 holds a path already named in $stuck: it stays, and is not named itself
 holds_stuck() {
     case $stuck in *"$NL  $1/"*) left=1; return 0 ;; esac
@@ -249,13 +254,13 @@ EOF
                     unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"
                 elif present "$dst" && [ -n "$absent" ]; then
                     left=1 stuck="$stuck
-  $dst: not put back to $src, as $absent is absent: mount what holds it, then retry"
+  $dst: not put back to $src, as $absent is absent: $(remedy "$absent")"
                 elif present "$dst"; then
                     rename_item "$dst" "$src" || unsettled "$dst" "not put back to $src"
                 elif ! present "$src"; then
                     if [ -n "$absent" ]; then
                         left=1 stuck="$stuck
-  $dst: not put back to $src: neither is there, as $absent is absent: mount what holds it, then retry"
+  $dst: not put back to $src: neither is there, as $absent is absent: $(remedy "$absent")"
                     else
                         # Removed by hand: named once, then its line goes, as its directory
                         # removed empty below would read as not mounted at the next attempt

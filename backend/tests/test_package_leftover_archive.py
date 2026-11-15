@@ -1296,7 +1296,8 @@ def test_an_item_whose_filesystem_is_gone_waits_for_it_and_is_never_called_missi
         lines = reported(out.stdout)
         assert lines[f'{box.data}/{LOCAL}/https_key.pem'] == (
             f'not put back to {box.data}/https_key.pem: neither is there, as {box.data}/{LOCAL} '
-            f'is absent: mount what holds it, then retry'), out.stdout
+            f'is absent: mount what holds it, or, if it was removed by hand, make it again, empty '
+            f'(mkdir -p {box.data}/{LOCAL}), then retry'), out.stdout
         assert snapshot(box) == left
         assert (box.archive / '.journal').is_file()
     box.data.rmdir()
@@ -1354,7 +1355,9 @@ def test_an_archive_directory_removed_by_hand_waits_until_it_is_made_again_empty
     shutil.rmtree(held)
     for _ in range(2):
         out = box.run()
-        assert out.returncode == 2 and f'{held} is absent: mount what holds it' in out.stdout, out.stdout
+        assert out.returncode == 2 and (
+            f'{held} is absent: mount what holds it, or, if it was removed by hand, make it again, '
+            f'empty (mkdir -p {held}), then retry') in out.stdout, out.stdout
     held.mkdir(parents=True)
     out = box.run()
     assert out.returncode == 0, (out.stdout, out.stderr)
