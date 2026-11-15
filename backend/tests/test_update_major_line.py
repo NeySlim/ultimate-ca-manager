@@ -387,3 +387,45 @@ def test_no_later_major_no_notice_event(app, clean, instance, monkeypatch):
     instance('2.254.1', ['2.254.1', '3.0-rc1'])
     _tick(app)
     assert events == []
+
+
+# ---- review follow-ups -----------------------------------------------------------------------
+
+def test_an_unreadable_installed_version_offers_no_major_upgrade(instance):
+    """Without a readable version nothing says which major is installed."""
+    instance('unknown', ['2.254.2', '2.254.1'])
+    assert updates.check_for_updates(channel='stable')['major_upgrade'] is None
+
+
+def test_an_earlier_major_is_never_offered(instance):
+    instance('2.254.1', ['1.7.0', '2.254.1'])
+    result = updates.check_for_updates(channel='stable')
+    assert result['major_upgrade'] is None and result['update_available'] is False
+
+
+@pytest.mark.parametrize('body', [[1], 'text', 7])
+def test_install_route_refuses_a_json_body_that_is_not_an_object(auth_client, instance, monkeypatch, body):
+    instance('2.254.1', ['2.254.2', '3.0'])
+    _, calls = _route_install(monkeypatch)
+    r = auth_client.post(URL, json=body)
+    assert r.status_code == 400, r.data
+    assert calls == []
+
+
+@pytest.mark.parametrize('fips,suffix', [('1', '-fips'), ('', '')])
+def test_docker_image_names_the_variant_in_use(instance, monkeypatch, fips, suffix):
+    """A FIPS deployment is pointed at the -fips image, the standard one at the standard image."""
+    instance('2.254.1', MIXED, docker=True)
+    monkeypatch.setenv('UCM_FIPS', fips)
+    result = updates.check_for_updates(channel='stable')
+    assert result['download_url'] == f'ghcr.io/neyslim/ultimate-ca-manager:2.254.2{suffix}'
+    assert result['major_upgrade']['download_url'] == f'ghcr.io/neyslim/ultimate-ca-manager:3.0{suffix}'
+
+
+def test_an_ordinary_update_event_says_it_is_not_a_major_upgrade(app, clean, instance, monkeypatch):
+    instance('2.254.1', ['2.254.2'])
+    events = _capture_notices(monkeypatch)
+    _tick(app)
+    with app.app_context():
+        updates.scheduled_update_check()
+    assert [e['major_upgrade'] for e in events] == [False]

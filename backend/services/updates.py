@@ -168,6 +168,12 @@ def invalidate_update_cache():
 SECURITY_MAINTENANCE = True
 
 
+def docker_image(version):
+    """Image tag of `version` for this deployment: the -fips variant when FIPS mode is asked for."""
+    import fips_mode
+    return f"ghcr.io/neyslim/ultimate-ca-manager:{version}{'-fips' if fips_mode.requested() else ''}"
+
+
 def _pick_asset(release, version):
     """(download_url, package_name, checksum_url) of `release` for this platform."""
     download_url = package_name = checksum_url = None
@@ -181,7 +187,7 @@ def _pick_asset(release, version):
     for asset in release.get('assets', []):
         name = asset['name']
         if is_docker:
-            download_url = f"ghcr.io/neyslim/ultimate-ca-manager:{version}"
+            download_url = docker_image(version)
             package_name = name
             break
         elif name.endswith('.sha256'):
@@ -203,6 +209,8 @@ def _pick_asset(release, version):
 
 def _major_upgrade(releases, current):
     """The highest final release of a later major version, never an RC, or None."""
+    if major_of(current) == 0:
+        return None  # installed version unreadable: no major to compare with
     later = [r for r in releases
              if _is_final(r) and major_of(r.get('tag_name', '')) > major_of(current)]
     if not later:
@@ -729,6 +737,7 @@ def _notify_update_available(result):
         'latest_version': latest,
         'html_url': result.get('html_url'),
         'prerelease': result.get('prerelease', False),
+        'major_upgrade': False,
     })
     if not _cfg_set(_NOTIFIED_VERSION_KEY, latest):
         logger.warning(

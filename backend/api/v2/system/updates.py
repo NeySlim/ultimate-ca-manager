@@ -63,6 +63,8 @@ def install_update():
         )
 
         body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            return error_response("JSON object expected", 400)
         include_prereleases = body.get('include_prereleases', False)
         include_dev = body.get('include_dev', False)
         # Another major version is installed only on this explicit request,

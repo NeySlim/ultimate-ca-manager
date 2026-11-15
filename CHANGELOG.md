@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [2.254.2] - Unreleased
+## [Unreleased]
 
 ### Changed
 

@@ -100,7 +100,8 @@ describe('upgrade to a later major version', () => {
   })
 
   it('under Docker names the image tag and offers no button', async () => {
-    mocks.get.mockResolvedValue(check({ can_auto_update: false }))
+    // Under Docker the server names no package: the tag is built from the version
+    mocks.get.mockResolvedValue(check({ can_auto_update: false, major_upgrade: { ...UPGRADE, download_url: null } }))
     render(<UpdateChecker />)
     await flush()
     expect(screen.getByText(title('7.3'))).toBeInTheDocument()
@@ -108,6 +109,17 @@ describe('upgrade to a later major version', () => {
       `settings.majorUpgradeDocker:${JSON.stringify({ image: 'ghcr.io/neyslim/ultimate-ca-manager:7.3' })}`,
     )).toBeInTheDocument()
     expect(screen.queryByText('settings.majorUpgradeInstall')).toBeNull()
+  })
+
+  it('under Docker shows the image the server names, the FIPS variant included', async () => {
+    const image = 'ghcr.io/neyslim/ultimate-ca-manager:7.3-fips'
+    mocks.get.mockResolvedValue(check({
+      can_auto_update: false,
+      major_upgrade: { version: '7.3', html_url: 'https://example.invalid/r', download_url: image },
+    }))
+    render(<UpdateChecker />)
+    await flush()
+    expect(screen.getByText(`settings.majorUpgradeDocker:${JSON.stringify({ image })}`)).toBeInTheDocument()
   })
 })
 

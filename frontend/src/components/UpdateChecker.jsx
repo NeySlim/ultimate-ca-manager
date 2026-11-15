@@ -172,7 +172,7 @@ export function UpdateChecker() {
             
             {updateInfo?.update_available && !updateInfo?.can_auto_update && (
               <div className="text-xs text-text-tertiary mt-1">
-                💡 docker pull ghcr.io/neyslim/ultimate-ca-manager:{updateInfo.latest_version}
+                💡 docker pull {updateInfo.download_url || `ghcr.io/neyslim/ultimate-ca-manager:${updateInfo.latest_version}`}
               </div>
             )}
             
@@ -266,7 +266,7 @@ export function UpdateChecker() {
                 )}
                 {!updateInfo?.can_auto_update && (
                   <p className="text-xs text-text-tertiary mt-1">
-                    {t('settings.majorUpgradeDocker', { image: `ghcr.io/neyslim/ultimate-ca-manager:${majorUpgrade.version}` })}
+                    {t('settings.majorUpgradeDocker', { image: majorUpgrade.download_url || `ghcr.io/neyslim/ultimate-ca-manager:${majorUpgrade.version}` })}
                   </p>
                 )}
               </div>
