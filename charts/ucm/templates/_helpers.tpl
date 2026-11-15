@@ -80,8 +80,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if lt (int .Values.replicaCount) 2 -}}
 {{- fail "ha.enabled requires replicaCount >= 2" -}}
 {{- end -}}
-{{- /* An existing release without these keys in its Secret is a single instance moving to HA */ -}}
-{{- if .Release.IsUpgrade -}}
+{{- /* An existing release without these keys in its Secret is a single instance moving to HA;
+       without a cluster to look the Secret up in, only keys given in the values are known */ -}}
+{{- if and .Release.IsUpgrade (not (include "ucm.clusterReachable" .)) -}}
+{{- if not (and .Values.secrets.keyEncryptionKey .Values.secrets.dbEncryptionKey) -}}
+{{- fail "ha.enabled: this render cannot read the release's Secret (helm template, helm upgrade --dry-run without =server, helm diff), so it cannot tell which keys the release holds: use --dry-run=server, or set secrets.keyEncryptionKey and secrets.dbEncryptionKey (docs/HA.md)" -}}
+{{- end -}}
+{{- else if .Release.IsUpgrade -}}
 {{- if not (include "ucm.existingKek" .) -}}
 {{- fail "ha.enabled on an existing single instance requires secrets.keyEncryptionKey: set it to the content of the instance's /etc/ucm/master.key, or a new key would make its private keys unreadable (docs/HA.md, From a single node)" -}}
 {{- end -}}
@@ -93,6 +98,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- fail "replicaCount > 1 requires ha.enabled=true (and PostgreSQL): a single instance cannot run in several pods" -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+"true" when lookups reach the cluster: every namespace has its "default" ServiceAccount,
+and a render without a cluster (helm template, client-side --dry-run) finds nothing.
+*/}}
+{{- define "ucm.clusterReachable" -}}
+{{- if or (lookup "v1" "ServiceAccount" .Release.Namespace "default") (lookup "v1" "Secret" .Release.Namespace (include "ucm.secretName" .)) -}}true{{- end -}}
+{{- end -}}
 
 {{/*
 Existing or explicit KEY_ENCRYPTION_KEY ("" when none): kept whatever ha.enabled is,

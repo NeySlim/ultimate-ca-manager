@@ -12,6 +12,7 @@ CHART = ROOT / 'charts' / 'ucm'
 PG = ['--set', 'database.type=postgresql', '--set', 'database.databaseUrl=postgresql://u:p@db/ucm']
 HA = ['--set', 'ha.enabled=true', '--set', 'replicaCount=2'] + PG
 SECRET_LOOKUP = 'lookup "v1" "Secret" .Release.Namespace'
+SA_LOOKUP = '(lookup "v1" "ServiceAccount" .Release.Namespace "default")'
 
 pytestmark = pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
 
@@ -54,6 +55,22 @@ def _chart_with_existing_secret(tmp_path, data):
     return chart, ['-f', str(values)]
 
 
+def _chart_on_a_cluster(tmp_path, data=None):
+    """A copy of the chart rendered as against a cluster: the namespace's default
+    ServiceAccount is found, and the release's Secret holds `data` when given."""
+    if data is None:
+        chart = tmp_path / 'ucm'
+        shutil.copytree(CHART, chart)
+        values = []
+    else:
+        chart, values = _chart_with_existing_secret(tmp_path, data)
+    helpers = chart / 'templates' / '_helpers.tpl'
+    src = helpers.read_text()
+    assert SA_LOOKUP in src
+    helpers.write_text(src.replace(SA_LOOKUP, '(dict "kind" "ServiceAccount")'))
+    return chart, values
+
+
 def test_ha_secret_carries_a_fernet_database_key_passed_to_every_pod():
     from cryptography.fernet import Fernet
     docs = _docs(*HA)
@@ -88,7 +105,7 @@ def test_several_replicas_without_ha_are_refused():
 
 def test_moving_an_instance_to_ha_without_its_master_key_is_refused(tmp_path):
     # The single instance's Secret: no KEY_ENCRYPTION_KEY, its key is /etc/ucm/master.key
-    chart, values = _chart_with_existing_secret(tmp_path, {'UCM_SECRET_KEY': 's'})
+    chart, values = _chart_on_a_cluster(tmp_path, {'UCM_SECRET_KEY': 's'})
     r = _render(*HA, *values, '--is-upgrade', '--set', 'secrets.dbEncryptionKey=D', chart=chart, check=False)
     assert r.returncode != 0 and 'secrets.keyEncryptionKey' in r.stderr and 'master.key' in r.stderr
     r = _render(*HA, *values, '--is-upgrade', '--set', 'secrets.keyEncryptionKey=K', chart=chart, check=False)
@@ -96,6 +113,23 @@ def test_moving_an_instance_to_ha_without_its_master_key_is_refused(tmp_path):
     ok = _docs(*HA, *values, '--is-upgrade', '--set', 'secrets.keyEncryptionKey=K',
                '--set', 'secrets.dbEncryptionKey=D', chart=chart)
     assert ok['Secret']['stringData']['KEY_ENCRYPTION_KEY'] == 'K'
+
+
+def test_an_upgrade_rendered_without_a_cluster_names_the_server_dry_run():
+    # helm upgrade --dry-run (client side), helm diff: the Secret cannot be read, not absent
+    r = _render(*HA, '--is-upgrade', check=False)
+    assert r.returncode != 0 and '--dry-run=server' in r.stderr
+    assert 'existing single instance' not in r.stderr
+    given = _docs(*HA, '--is-upgrade', '--set', 'secrets.keyEncryptionKey=K',
+                  '--set', 'secrets.dbEncryptionKey=D')
+    assert given['Secret']['stringData']['UCM_DB_ENCRYPTION_KEY'] == 'D'
+
+
+def test_an_ha_upgrade_on_a_cluster_keeps_its_generated_keys(tmp_path):
+    first = _docs(*HA)['Secret']['stringData']
+    chart, values = _chart_on_a_cluster(tmp_path, first)
+    again = _docs(*HA, *values, '--is-upgrade', chart=chart)['Secret']['stringData']
+    assert again['KEY_ENCRYPTION_KEY'] == first['KEY_ENCRYPTION_KEY']
 
 
 def test_a_new_ha_release_still_generates_its_keys():
