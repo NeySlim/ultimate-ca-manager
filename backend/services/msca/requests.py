@@ -20,7 +20,8 @@ class MSCASignedElsewhere(RuntimeError):
 SUPERSEDED = 'superseded'
 SUPERSEDED_MESSAGE = 'The CSR was signed elsewhere; the Microsoft CA request is closed'
 SIGNED_MEANWHILE_MESSAGE = ('The CSR was signed elsewhere meanwhile; the Microsoft CA request is closed '
-                            'and the certificate it issued enters UCM through a full inventory sync')
+                            'and the certificate it issued enters UCM through a full inventory sync '
+                            '(which needs the WinRM admin channel)')
 
 
 def holds_foreign_certificate(row):
@@ -35,6 +36,11 @@ def msca_may_write_clause():
     from models import Certificate
     return db.or_(Certificate.crt.is_(None), Certificate.crt == '',
                   Certificate.source == 'msca', Certificate.imported_from.like('msca:%'))
+
+
+def _named(req):
+    """The CA's RequestId, or UCM's own id for a direct issue the CA gave no RequestId to."""
+    return f"RequestId={req.request_id}" if req.request_id is not None else f"request={req.id} (direct issue)"
 
 
 def supersede(req_ids, *, username=None, commit=True, states=('submitted', 'pending')):
@@ -61,8 +67,8 @@ def supersede(req_ids, *, username=None, commit=True, states=('submitted', 'pend
         stage_audit_entry(action='msca.request_superseded', resource_type='microsoft_ca',
                           resource_id=str(req.msca_id), resource_name=msca.name if msca else None,
                           username=username,
-                          details=f"RequestId={req.request_id} csr_id={req.csr_id}: CSR signed elsewhere")
-        logger.info(f"MS CA request RequestId={req.request_id} closed: its CSR (id={req.csr_id}) "
+                          details=f"{_named(req)} csr_id={req.csr_id}: CSR signed elsewhere")
+        logger.info(f"MS CA request {_named(req)} closed: its CSR (id={req.csr_id}) "
                     f"was signed elsewhere")
     if commit:
         db.session.commit()

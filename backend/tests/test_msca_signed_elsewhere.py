@@ -425,6 +425,13 @@ def test_direct_microsoft_ca_signing_loses_to_a_local_signing(app, auth_client, 
                          data=json.dumps({'template': 'WebServer'}), content_type='application/json')
     assert r.status_code == 409, r.data
     assert 'signed elsewhere' in r.get_json()['message'] and 'full inventory sync' in r.get_json()['message']
+    assert 'admin channel' in r.get_json()['message']
+    with app.app_context():
+        from models import AuditLog
+        closed = (AuditLog.query.filter_by(action='msca.request_superseded')
+                  .order_by(AuditLog.id.desc()).first())
+        assert f'csr_id={csr_id}' in closed.details and 'None' not in closed.details
+        assert 'direct issue' in closed.details
     local = _row(app, csr_id)
     assert local[1] and local[2] != 'msca'
     with app.app_context():
