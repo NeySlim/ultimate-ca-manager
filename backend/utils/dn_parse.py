@@ -129,3 +129,13 @@ def subject_common_name(subject) -> str | None:
     """
     attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     return attrs[0].value if attrs else None
+
+
+def most_specific_common_name(subject) -> str | None:
+    """The LAST commonName of an x509 subject (the leaf of a directory path), or None.
+
+    Directory subjects (EST, WSTEP, import) take this one; paths where an operator
+    chooses or a CN is verified (ACME, CSR, SCEP) take `subject_common_name`.
+    """
+    attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    return attrs[-1].value if attrs else None

@@ -1,23 +1,19 @@
-"""The recorded subject_cn must be the subject's FIRST commonName.
+"""Which commonName is recorded as `subject_cn`, per signing path.
 
-Raised by NeySlim reviewing #251: the CN was derived by splitting
-`subject.rfc4514_string()` on ',' and taking the first `CN=` token. RFC 4514
-s2.1 emits RDNs in REVERSE order, so that token is the LAST commonName. For
-`CN=web.example.com, CN=admin.example.com` the recorder stored
-`admin.example.com` -- while ACME finalize validates
-`get_attributes_for_oid(COMMON_NAME)[0]`, i.e. `web.example.com`. The name
-CHECKED and the name RECORDED disagreed exactly when a subject carried more
-than one CN, which is the case an attacker controls.
+Two rules, each deliberate:
 
-#251 closed the ACME route by rejecting a multi-CN subject at finalize, so it
-is no longer reachable there -- but the same derivation fed every other
-signing path, so the defect outlived its most dangerous caller.
+* CN verified or chosen by the operator (ACME, CSR signing, SCEP, completion
+  of an external certificate): the FIRST CN of the sequence, the one ACME
+  finalize reads (`utils.dn_parse.subject_common_name`). Raised in #251: the
+  recorder used to split `rfc4514_string()` (reverse RDN order) and stored the
+  last CN while the check read the first.
+* Directory subjects (EST, WSTEP via `CAService.sign_csr_from_crypto`, and the
+  import): the MOST SPECIFIC CN, the LAST one (`most_specific_common_name`).
+  In `CN=Roy Hagland,CN=Users,DC=...` that is the person, not the container;
+  RFC 2818 s3.1 also names "the (most specific) Common Name".
 
-These tests drive the REAL helper (`utils.dn_parse.subject_common_name`) that
-both recorders now call, and pin the agreement against the same cryptography
-API ACME finalize uses. An earlier draft of this module defined its own copy
-of the derivation and asserted against that -- which would have passed no
-matter what the production code did.
+Both helpers read the x509 Name, never a split of `rfc4514_string()`, which
+mis-handles an escaped comma inside a value.
 """
 import datetime
 
@@ -27,7 +23,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from utils.dn_parse import subject_common_name
+from utils.dn_parse import most_specific_common_name, subject_common_name
 
 
 @pytest.fixture(scope='module')
@@ -203,9 +199,8 @@ def test_the_external_certificate_path_records_the_first_common_name(app, auth_c
         assert db.session.get(Certificate, csr_id).subject_cn == f'web-{tag}.example.com'
 
 
-@pytest.mark.xfail(strict=True, reason='EST/WSTEP recorder keeps the last CN (AD directory subjects); first vs last CN is a product decision')
-def test_the_est_path_records_the_first_common_name(app, create_ca, key):
-    """Signed through CAService.sign_csr_from_crypto as EST does."""
+def test_the_est_path_records_the_most_specific_common_name(app, create_ca, key):
+    """Directory subjects: EST (via CAService.sign_csr_from_crypto) records the LAST CN."""
     import uuid
 
     from models import CA, Certificate, db
@@ -219,24 +214,22 @@ def test_the_est_path_records_the_first_common_name(app, create_ca, key):
             source='est', cert_type='device_cert')
         leaf = x509.load_pem_x509_certificate(pem.encode())
         row = Certificate.query.filter_by(serial_number=str(leaf.serial_number)).one()
-        assert row.subject_cn == f'web-{tag}.example.com'
+        try:
+            assert row.subject_cn == f'admin-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
 
 
-@pytest.mark.xfail(strict=True, reason='smart import _get_cn splits rfc4514_string and keeps the last CN; product decision pending')
-def test_the_smart_import_path_records_the_first_common_name(app, auth_client, key):
-    """An issued certificate brought in through /api/v2/import/execute."""
+def _import_leaf(auth_client, key, tag, *cns):
     import json
-    import uuid
 
     from cryptography.hazmat.primitives import serialization
 
-    from models import Certificate, db
-
-    tag = uuid.uuid4().hex[:8]
     issuer_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     now = datetime.datetime.now(datetime.timezone.utc)
     leaf = (x509.CertificateBuilder()
-            .subject_name(_subject(f'web-{tag}.example.com', f'admin-{tag}.example.com'))
+            .subject_name(_subject(*cns))
             .issuer_name(_subject(f'Import RDN CA {tag}'))
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
@@ -249,5 +242,27 @@ def test_the_smart_import_path_records_the_first_common_name(app, auth_client, k
     assert r.status_code in (200, 201), r.data
     ids = r.get_json()['data']['imported_ids']['certificates']
     assert len(ids) == 1, r.data
+    return ids[0]
+
+
+def test_the_smart_import_path_records_the_most_specific_common_name(app, auth_client, key):
+    """Import records the LAST CN, like EST and WSTEP."""
+    import uuid
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    cert_id = _import_leaf(auth_client, key, tag, f'web-{tag}.example.com', f'admin-{tag}.example.com')
     with app.app_context():
-        assert db.session.get(Certificate, ids[0]).subject_cn == f'web-{tag}.example.com'
+        row = db.session.get(Certificate, cert_id)
+        try:
+            assert row.subject_cn == f'admin-{tag}.example.com'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_most_specific_common_name_is_the_last_one():
+    assert most_specific_common_name(_subject('a.example.com', 'b.example.com')) == 'b.example.com'
+    assert most_specific_common_name(_subject('Doe, John')) == 'Doe, John'
+    assert most_specific_common_name(x509.Name([])) is None

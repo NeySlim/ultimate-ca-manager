@@ -308,11 +308,8 @@ class CASigningMixin:
         # (``CN=Roy Hagland,CN=Users,DC=hagland,DC=domain``), and in the
         # root-to-leaf DER order x509.Name encodes, the person's own name
         # is the last one, not the container ("Users") that happens first.
-        cn = ''
-        try:
-            cn = cert_obj.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[-1].value
-        except (IndexError, Exception):
-            cn = cert_obj.subject.rfc4514_string()
+        from utils.dn_parse import most_specific_common_name
+        cn = most_specific_common_name(cert_obj.subject) or cert_obj.subject.rfc4514_string()
 
         cert_pem_raw = cert_pem_bytes if isinstance(cert_pem_bytes, bytes) else cert_pem_bytes.encode()
 
