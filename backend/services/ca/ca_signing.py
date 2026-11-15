@@ -303,7 +303,7 @@ class CASigningMixin:
         # CSR's -- for WSTEP's Kerberos binding, override_subject can mean
         # the two differ entirely (a naked CSR issued with a server-derived
         # subject), and the issued cert's subject is what's actually true.
-        # [-1] (the last/most-specific CN), not [0]: a directory-path
+        # The last (most specific) CN, not the first: a directory-path
         # subject like an AD-derived user's has more than one CN RDN
         # (``CN=Roy Hagland,CN=Users,DC=hagland,DC=domain``), and in the
         # root-to-leaf DER order x509.Name encodes, the person's own name

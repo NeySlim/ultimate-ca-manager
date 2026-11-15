@@ -77,6 +77,7 @@ def test_mapping(provider_id):
                     group_dns = user_entry.memberOf.values if hasattr(user_entry.memberOf, 'values') else [str(user_entry.memberOf)]
                     for gdn in group_dns:
                         gdn_str = str(gdn)
+                        # LDAP group DN, kept as is; get_dn_attribute would honour escapes
                         for part in gdn_str.split(','):
                             part = part.strip()
                             if part.upper().startswith('CN='):
@@ -90,6 +91,7 @@ def test_mapping(provider_id):
                         group_dns = conn.entries[0].memberOf.values if hasattr(conn.entries[0].memberOf, 'values') else [str(conn.entries[0].memberOf)]
                         for gdn in group_dns:
                             gdn_str = str(gdn)
+                            # LDAP group DN, kept as is; get_dn_attribute would honour escapes
                             for part in gdn_str.split(','):
                                 part = part.strip()
                                 if part.upper().startswith('CN='):
