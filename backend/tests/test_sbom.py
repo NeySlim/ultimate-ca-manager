@@ -619,14 +619,13 @@ def test_an_index_refuses_the_sbom_of_the_other_variant(release):
     assert proc.returncode == 1
 
 
-def test_a_legal_text_the_package_tool_compressed_is_still_listed(tmp_path):
-    """dh_compress ships a large LICENSE as LICENSE.gz: it is the same legal text."""
+def test_a_compressed_file_is_not_listed_as_a_legal_text(tmp_path):
+    """dh_compress leaves the legal texts as they are (-X in packaging/debian/rules): a .gz is not one."""
     frag = s.frontend(tmp_path)
     tree = s.package_tree(tmp_path, tmp_path / 'frontend' / 'dist', name='gz-root')
-    doc_dir = tree / 'usr' / 'share' / 'doc' / 'ucm'
-    (doc_dir / 'LICENSE').rename(doc_dir / 'LICENSE.gz')
+    (tree / 'usr' / 'share' / 'doc' / 'ucm' / 'LICENSE.gz').write_bytes(b'gz')
     proc, out, _ = s.package_sbom(tmp_path, frag, 'ucm_3.0~rc1_all.deb', tree=tree)
     assert proc.returncode == 0, proc.stderr
     legal = {c['name'] for c in _doc(out)['components'] if c['name'].startswith('usr/share/doc/ucm/')}
-    assert legal == {'usr/share/doc/ucm/LICENSE.gz', 'usr/share/doc/ucm/NOTICE',
+    assert legal == {'usr/share/doc/ucm/LICENSE', 'usr/share/doc/ucm/NOTICE',
                      'usr/share/doc/ucm/COMMERCIAL-LICENSE.md'}
