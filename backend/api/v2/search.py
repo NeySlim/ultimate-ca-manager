@@ -134,11 +134,6 @@ def global_search():
 
 
 def _extract_cn(subject):
-    """Extract CN from subject string"""
-    if not subject:
-        return None
-    for part in subject.split(','):
-        part = part.strip()
-        if part.upper().startswith('CN='):
-            return part[3:]
-    return None
+    """The first CN of a stored subject string, escapes honoured."""
+    from utils.dn_parse import stored_dn_common_name
+    return stored_dn_common_name(subject)

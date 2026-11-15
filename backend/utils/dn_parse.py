@@ -99,6 +99,47 @@ def get_dn_attribute(dn: str, attribute: str) -> str | None:
     return None
 
 
+def _split_unescaped(text: str, separators: str) -> list[str]:
+    """Split on the separators a backslash does not escape, keeping the escapes."""
+    parts, current, escaped = [], [], False
+    for char in text:
+        if escaped:
+            escaped = False
+        elif char == '\\':
+            escaped = True
+        elif char in separators:
+            parts.append(''.join(current))
+            current = []
+            continue
+        current.append(char)
+    parts.append(''.join(current))
+    return parts
+
+
+def stored_dn_common_name(dn) -> str | None:
+    """The first CN of a DN kept as text (for a stored `rfc4514_string()`, the most
+    specific one), or None. Reads what `get_dn_attribute` reads, and also what RFC 4514
+    allows and ldap3 refuses: a numeric OID type, an unescaped '=', an empty value."""
+    if not dn:
+        return None
+    try:
+        dn = _normalize_quoted_values(dn)
+    except ValueError:
+        pass
+    for ava in _split_unescaped(dn, ',+'):
+        attribute, sep, value = ava.partition('=')
+        if not sep or attribute.strip().casefold() not in ('cn', '2.5.4.3'):
+            continue
+        value = value.lstrip()
+        while value.endswith(' ') and not value.endswith('\\ '):
+            value = value[:-1]
+        try:
+            return _unescape_value(value)
+        except ValueError:
+            return value
+    return None
+
+
 def get_parent_dn(dn: str) -> str:
     """Return the DN after removing its complete first RDN."""
     rdns = parse_dn(dn)

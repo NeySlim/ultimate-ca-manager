@@ -87,13 +87,8 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
         result['has_private_key'] = bool(certificate.prv)
         result['caref'] = certificate.caref
         # Extract CN from subject for CertificateDetails compatibility
-        subj = certificate.subject or ''
-        cn = ''
-        for part in subj.split(','):
-            part = part.strip()
-            if part.upper().startswith('CN='):
-                cn = part[3:]
-                break
+        from utils.dn_parse import stored_dn_common_name
+        cn = stored_dn_common_name(certificate.subject)
         result['common_name'] = cn or auth_cert.name or certificate.descr or ''
         result['cn'] = result['common_name']
         # Key info (parse from cert if available)

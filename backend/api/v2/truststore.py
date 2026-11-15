@@ -473,12 +473,8 @@ def sync_trust_store():
                 continue
 
             # Extract CN for name
-            subject = cert_details['subject']
-            cn = None
-            for part in subject.split(','):
-                if part.strip().startswith('CN='):
-                    cn = part.strip()[3:]
-                    break
+            from utils.dn_parse import stored_dn_common_name
+            cn = stored_dn_common_name(cert_details['subject'])
 
             name = cn or f"System CA {cert_details['fingerprint_sha256'][:8]}"
 
