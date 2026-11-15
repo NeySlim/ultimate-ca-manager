@@ -1584,3 +1584,28 @@ def test_the_sweep_counts_a_fault_only_at_a_call_the_run_made(tmp_path):
     assert received(run, 3, 'kill') == {('rename', 'kill')}
     assert received(run, 5, 'fail') == {('rmdir', 'fail')}
     assert received(run, 4, 'fail') == set() and received(run, 9, 'done') == set()
+
+
+# -- the README says what this archive holds -----------------------------------------
+
+def _step(readme, n):
+    flat = ' '.join(readme.split())
+    return flat.split(f' {n}. ', 1)[1].split(f' {n + 1}. ', 1)[0]
+
+
+@pytest.mark.parametrize('purged', [False, True])
+def test_the_way_back_keeps_the_ucm_env_of_2_254_when_the_archive_holds_none(tmp_path, purged):
+    """apt purge removed /etc/ucm: step 3 must not set aside the ucm.env 2.254 writes, the
+    only one there is, and the README says what went with the removed one."""
+    box = Box(tmp_path)
+    if purged:
+        shutil.rmtree(box.config)
+    assert box.run().returncode == 0
+    readme = (box.archive / 'README.txt').read_text()
+    flat = ' '.join(readme.split())
+    step3 = _step(readme, 3)
+    assert ('and ' + f'{box.config}/ucm.env' in step3) is purged, step3
+    assert (f'of config/ into {box.config}' in step3) is not purged, step3
+    assert ('No ucm.env was left' in flat) is purged
+    assert ('its SECRET_KEY, the session key' in flat) is purged
+    assert any(l.lstrip().startswith('config/') for l in readme.splitlines()) is not purged

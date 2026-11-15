@@ -315,6 +315,20 @@ that run wrote under $PARENT):
 $(printf '%s' "$EARLIER" | sed 's/^/  /')
 "
     fi
+    # A purge removed ucm.env with the package: the one 2.254 writes as it installs is kept
+    CONFIG_LINE="  config/     what was in $CONFIG (ucm.env, master.key)
+" CONFIG_RESTORE=", of config/ into $CONFIG" ENV_KEEP="" NO_ENV=""
+    [ -n "$(ls -A -- "$DEST/config" 2>/dev/null)" ] || CONFIG_LINE="" CONFIG_RESTORE=""
+    if ! present "$DEST/config/ucm.env" && ! present "$CONFIG/$LOCAL_NAME/ucm.env"; then
+        ENV_KEEP=", and $CONFIG/ucm.env"
+        NO_ENV="
+No ucm.env was left in $CONFIG (removing the package with its configuration, as
+apt purge does, removes it): step 3 keeps the one UCM 2.254 writes as it installs.
+What the removed one held is lost: its SECRET_KEY, the session key (open sessions
+end), and any setting written there by hand. Private keys encrypted with a
+master.key or a KEY_ENCRYPTION_KEY that was not kept cannot be decrypted.
+"
+    fi
     cat > "$DEST/README.txt" <<EOF
 UCM: what an earlier installation left on this machine
 
@@ -328,8 +342,7 @@ in their place.
 Contents
   data/       what was in $DATA (database, CA files, private keys, HTTPS key and
               certificate, backups, sessions)
-  config/     what was in $CONFIG (ucm.env, master.key)
-$DB_LINE$BESIDE
+$CONFIG_LINE$DB_LINE$BESIDE$NO_ENV
 This directory holds private keys and the key that decrypts the database: keep it
 readable by root only. Nothing here is used or removed by UCM. Every file was renamed,
 never copied: each one is here or in a directory listed above, unchanged. A directory
@@ -343,8 +356,8 @@ To put that installation back in service
      sudo apt install --allow-downgrades ./ucm_2.254_all.deb; RHEL, Fedora:
      sudo dnf downgrade ./ucm-2.254-1.<dist>.noarch.rpm), then stop it again.
   3. Move aside what the new installation wrote in $DATA and $CONFIG (all but
-     the directories named .ucm-archive-*), then put these back: the contents of data/
-     into $DATA, of config/ into $CONFIG$DB_RESTORE$LOCAL_RESTORE; then
+     the directories named .ucm-archive-*$ENV_KEEP), then put these back: the contents of data/
+     into $DATA$CONFIG_RESTORE$DB_RESTORE$LOCAL_RESTORE; then
      sudo find $DATA/ $CONFIG/ -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
   4. Start it (sudo systemctl start ucm) and check that UCM 2.254 opens: this
      records the 2.254 migrations in the database.
