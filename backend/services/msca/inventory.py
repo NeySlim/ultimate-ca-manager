@@ -107,7 +107,7 @@ class MicrosoftCAInventoryMixin:
                         continue
                     from .ca_control import MicrosoftCACAControlMixin
                     outcome, _cert_id = MicrosoftCACAControlMixin.complete_request(
-                        msca, pending[req_id], pem)
+                        msca, pending[req_id], pem, username=username)
                 except Exception as e:
                     db.session.rollback()
                     failed += 1

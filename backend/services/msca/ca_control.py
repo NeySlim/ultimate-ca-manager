@@ -117,10 +117,11 @@ class MicrosoftCACAControlMixin:
         return outcome != 'superseded', cert_id
 
     @staticmethod
-    def complete_request(msca, req, pem):
+    def complete_request(msca, req, pem, username=None):
         """Import the issued certificate into a request's row, claimed atomically so
         concurrent callers import once. Returns (outcome, cert_id): 'imported' by this
-        call, 'lost' to another caller, or 'superseded' when the CSR was signed elsewhere."""
+        call, 'lost' to another caller, or 'superseded' when the CSR was signed elsewhere
+        (closure audited under *username*, else the request's user)."""
         from models import Certificate
         from models.msca import MSCARequest
         from .requests import MSCASignedElsewhere, SUPERSEDED, supersede
@@ -141,7 +142,7 @@ class MicrosoftCACAControlMixin:
             _import_signed_cert(row, pem, msca, req.template, req.id)
         except MSCASignedElsewhere:
             db.session.rollback()
-            supersede([req.id])
+            supersede([req.id], username=username)
             return 'superseded', None
         return 'imported', db.session.get(MSCARequest, req.id).cert_id
 

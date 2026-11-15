@@ -438,3 +438,30 @@ def test_direct_microsoft_ca_signing_loses_to_a_local_signing(app, auth_client, 
         ms_row = Certificate.query.filter(Certificate.source == 'msca',
                                           Certificate.subject_cn == 'mse-race-direct.test.local').one()
         assert int(str(ms_row.serial_number)) == int(ms_serial, 16)
+
+
+def test_a_closure_by_the_completion_names_the_sync_caller(app, adcs, monkeypatch):
+    """The CSR is signed after the sync's pre-closure: the common completion closes the
+    request, audited under the sync's caller as the pre-closure is."""
+    from models import AuditLog, Certificate, db
+    from services.msca.inventory import MicrosoftCAInventoryMixin
+    from services.msca_service import MicrosoftCAService
+    msca_id = _make_msca(app, 'MSE audit caller')
+    csr_id, req_id = _csr_with_request(app, msca_id, 7030, 'mse-audit.test.local')
+    adcs.add(7030, 'mse-audit.test.local')
+    real_fetch = MicrosoftCAInventoryMixin._fetch_cert_pem
+
+    def fetch_after_local_signing(msca, rid):
+        if rid == 7030:
+            _foreign_cert(app, csr_id)
+        return real_fetch(msca, rid)
+
+    monkeypatch.setattr(MicrosoftCAInventoryMixin, '_fetch_cert_pem', staticmethod(fetch_after_local_signing))
+    with app.app_context():
+        MicrosoftCAService.inventory_sync(msca_id, username='scheduler', full=True)
+    assert _req(app, req_id) == ('superseded', None)
+    with app.app_context():
+        assert db.session.get(Certificate, csr_id).source == 'csr'
+        entry = (AuditLog.query.filter_by(action='msca.request_superseded')
+                 .filter(AuditLog.details.contains('RequestId=7030')).one())
+        assert entry.username == 'scheduler'
