@@ -116,7 +116,8 @@ ucm_sqlite_disk_room() {
     return 0
 }
 
-# First-run notice and pre-start copy of the SQLite file; both skipped in HA mode.
+# First-run notice and pre-start copy of the SQLite file; both skipped in HA mode. A SQLite file
+# left in place under DATABASE_URL is neither checked nor copied: the application never opens it.
 ucm_sqlite_check_and_backup() {
     if ucm_ha_active; then
         echo -e "${GREEN:-}✅ HA mode: database is PostgreSQL, no SQLite backup${NC:-}"
@@ -125,6 +126,8 @@ ucm_sqlite_check_and_backup() {
     if [ ! -f "$UCM_DATABASE_PATH" ]; then
         echo -e "${YELLOW:-}   First run detected - database will be auto-created${NC:-}"
         ucm_initial_admin_notice
+    elif [ -n "${DATABASE_URL:-}" ]; then
+        echo -e "${GREEN:-}✅ Database from DATABASE_URL: the SQLite file is not used, no SQLite backup${NC:-}"
     else
         echo -e "${GREEN:-}✅ Database exists${NC:-}"
         ucm_sqlite_disk_room || return 1

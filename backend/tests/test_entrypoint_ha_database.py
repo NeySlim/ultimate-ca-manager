@@ -335,3 +335,22 @@ def test_the_copy_lands_in_the_measured_backups_directory(tmp_path):
     _database(tmp_path, NAMES)
     r = _run(_df_two(tmp_path, 0, 3000) + _START, env, tmp_path)
     assert r.returncode == 0 and f"cp {env['UCM_DATABASE_PATH']} {tmp_path / 'backups'}/ucm-backup-" in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize('url', ['postgresql://ucm@db/ucm', 'sqlite:////elsewhere/other.db'])
+def test_a_database_url_leaves_the_sqlite_file_unchecked_and_uncopied(tmp_path, url):
+    # the application opens DATABASE_URL whenever it is set, never DATABASE_PATH
+    env = _env(tmp_path, 'true')
+    env['DATABASE_URL'] = url
+    _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
+    r = _run(_df(0) + _START, env, tmp_path)
+    assert r.returncode == 0 and 'cp ' not in r.stdout and 'Not enough' not in r.stdout, r.stdout
+    assert 'DATABASE_URL' in r.stdout, r.stdout
+
+
+def test_an_empty_database_url_still_checks_and_copies_the_sqlite_file(tmp_path):
+    env = _env(tmp_path, 'true')
+    env['DATABASE_URL'] = ''
+    _database(tmp_path, NAMES)
+    r = _run(_df(3000) + _START, env, tmp_path)
+    assert r.returncode == 0 and 'cp ' in r.stdout, r.stdout
