@@ -9,7 +9,7 @@ PR: [#169](https://github.com/NeySlim/ultimate-ca-manager/pull/169)
 - **Typed SAN enforcement**: FQDN in IP field → HTTP 400 (no silent DNS reclassification)
 - **EC curves**: `ecdsa` + `256` / `NIST P-384` / UI labels → `prime256v1` / `secp384r1` / `secp521r1`
 - **CN auto-SAN**: email CN (`fred@fred.fr`) is **not** auto-added as DNS on server certs; use **Email** or **Combined** cert type for email SAN
-- **i18n**: validation messages under `certificates.san*` (9 locales); CSR key labels under `csrs.key*`
+- **i18n**: validation messages under `certificates.san*` (10 locales); CSR key labels under `csrs.key*`
 - **UI clarity**: certificate details label **Issuer signature algorithm** (`common.issuerSignatureAlgorithm`) — distinct from **Key type** (EE public key). An EC P-521 cert issued by an RSA CA correctly shows `SHA256-RSA` as issuer signature.
 
 ## Automated tests
@@ -52,7 +52,7 @@ npm test -- --run src/i18n/__tests__/issuerSignatureI18n.test.js
 4. Add SAN type **IP** with `www.example.com` → client error (translated)
 5. Key type **ECDSA** + **NIST P-521** → certificate issued
 6. Open certificate details → **Key type** = `EC secp521r1`, **Issuer signature algorithm** = `SHA256-RSA` when CA is RSA (tooltip explains independence)
-7. Hover issuer signature label → hint visible in all 9 languages
+7. Hover issuer signature label → hint visible in all 10 languages
 
 ## Lab API smoke (optional)
 

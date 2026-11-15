@@ -5,9 +5,9 @@ import { dirname, join } from 'node:path'
 import { BELL_KINDS, FAILURE_ACTIONS, SESSION_ACTIONS } from '../../components/shell/notifications'
 
 const localesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'locales')
-const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
+const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 
-describe('bell kind labels (9 locales)', () => {
+describe('bell kind labels (10 locales)', () => {
   for (const code of LOCALE_CODES) {
     it(`${code}: every kind the bell can show has a label`, () => {
       const kinds = JSON.parse(readFileSync(join(localesDir, `${code}.json`), 'utf8')).shell?.bell?.kinds || {}

@@ -209,6 +209,7 @@ class _Walk:
             self.errors.append({'id': entry_id, 'code': code, 'error': message, **extra})
 
     def feed(self, log):
+        # *log* is an AuditLog or a row of its table: compute_hash reads attributes only
         index = self.checked
         self.checked += 1
         if self.first is None:
@@ -232,7 +233,7 @@ class _Walk:
         version = log.hash_version or SHA256_CHAIN
         keyed_ok = recomputable = False
         if version == SHA256_CHAIN:
-            computed = log.compute_hash(log.prev_hash)
+            computed = AuditLog.compute_hash(log, log.prev_hash)
             if _hmac.compare_digest(computed, log.entry_hash):
                 recomputable = True
             else:
@@ -240,7 +241,7 @@ class _Walk:
                            expected=computed, actual=log.entry_hash)
         elif version == KEYED_CHAIN:
             if self.key_id is not None and log.hash_key_id == self.key_id:
-                computed = log.compute_hash(log.prev_hash, self.key_bytes)
+                computed = AuditLog.compute_hash(log, log.prev_hash, self.key_bytes)
                 if _hmac.compare_digest(computed, log.entry_hash):
                     keyed_ok = True
                 else:

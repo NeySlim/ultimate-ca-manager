@@ -114,6 +114,23 @@ def test_local_signing_closes_the_pending_request_with_an_audit(app, auth_client
         assert entry is not None and 'RequestId=7001' in entry.details
 
 
+def test_a_pending_request_without_request_id_is_not_audited_as_a_direct_issue(
+        app, auth_client, create_ca):
+    # A localized pending page may carry no RequestId: the closure names UCM's id only
+    from models import AuditLog
+    ca = create_ca(cn='MSE sign CA no id')
+    msca_id = _make_msca(app, 'MSE sign no id')
+    csr_id, req_id = _csr_with_request(app, msca_id, None, 'mse-sign-noid.test.local')
+    _sign_locally(auth_client, csr_id, ca['id'])
+    assert _req(app, req_id) == ('superseded', None)
+    with app.app_context():
+        entry = (AuditLog.query.filter_by(action='msca.request_superseded')
+                 .filter(AuditLog.details.like(f'%csr_id={csr_id}:%'))
+                 .order_by(AuditLog.id.desc()).first())
+        assert entry is not None and f'request={req_id} ' in entry.details
+        assert 'direct issue' not in entry.details
+
+
 def test_importing_a_certificate_into_the_csr_closes_the_request(app, create_ca):
     import datetime
     from cryptography import x509

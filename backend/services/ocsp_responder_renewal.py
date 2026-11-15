@@ -47,8 +47,9 @@ def renewed_by_responder_task(model=Certificate):
     """SQL condition: *model* is bound as a CA's delegated responder and this task
     renews it (it holds the key and ``ocsp_responder_auto_renew`` is unset or 'true')."""
     from sqlalchemy import String, and_, cast, or_, select
-    bound = select(SystemConfig.id).where(
-        SystemConfig.key.like(f'{RESPONDER_KEY_PREFIX}%'), SystemConfig.value == cast(model.id, String)).exists()
+    # Uncorrelated, so read once per statement; no NULL in the list keeps NOT IN equal to NOT EXISTS
+    bound = cast(model.id, String).in_(select(SystemConfig.value).where(
+        SystemConfig.key.like(f'{RESPONDER_KEY_PREFIX}%'), SystemConfig.value.isnot(None)))
     switched_off = select(SystemConfig.id).where(
         SystemConfig.key == 'ocsp_responder_auto_renew',
         or_(SystemConfig.value.is_(None), SystemConfig.value != 'true')).exists()

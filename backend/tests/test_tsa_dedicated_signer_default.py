@@ -208,6 +208,15 @@ def test_a_signer_field_stored_empty_is_no_dedicated_signer(app, auth_client, ts
     assert _stored(app, KEY) is None
 
 
+@pytest.mark.parametrize('stored', ['  ', '\t'], ids=['spaces', 'tab'])
+def test_a_signer_stored_blank_is_no_dedicated_signer(app, auth_client, tsa, ed_ca, stored):
+    # The route reads the stored signer as /tsa does: a blank refid leaves the CA to sign
+    tsa(tsa_ca_refid=ed_ca, tsa_signer_cert_refid=stored)
+    r = _patch(auth_client, {'require_dedicated_cert': False})
+    assert r.status_code == 400 and 'EdDSA' in r.get_json()['message'], r.get_json()
+    assert _stored(app, KEY) is None
+
+
 def test_switching_to_compatibility_with_a_dedicated_signer_is_accepted(
         app, auth_client, tsa, ed_ca, create_cert):
     signer = create_cert(cn='tsa-strict-signer', validity_days=365, extra_ekus=[TS_OID])
@@ -224,3 +233,16 @@ def test_dropping_the_signer_judges_the_ca_only_in_compatibility(
     tsa(tsa_ca_refid=ed_ca, tsa_signer_cert_refid=signer['refid'], **({KEY: 'false'} if compat else {}))
     r = _patch(auth_client, {'signer_cert_refid': ''})
     assert r.status_code == status, r.get_json()
+
+
+def test_a_ca_certificate_that_cannot_be_read_is_a_503(app, client, create_ca, tsa):
+    refid = _ca_refid(app, create_ca, 'TSA compat unreadable CA')
+    with app.app_context():
+        import base64
+        ca = CA.query.filter_by(refid=refid).first()
+        ca.crt = base64.b64encode(b'not a certificate').decode()
+        db.session.commit()
+    tsa(tsa_ca_refid=refid, **{KEY: 'false'})
+    resp = _post(client, b'unreadable')
+    assert resp.status_code == 503
+    assert resp.data == b'TSA configuration invalid'

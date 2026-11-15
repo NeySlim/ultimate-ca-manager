@@ -15,7 +15,7 @@ See also: [ACME-PROXY-MULTI-CA.md](./ACME-PROXY-MULTI-CA.md), [ACME-DNS-PROPAGAT
 | **Settings API** | `api/v2/settings/general.py` — GET/PATCH `acme_public_*` |
 | **ACME settings** | `api/v2/acme/settings.py`, `api/v2/acme_client/settings.py` — `acme_public_base_url`, `acme_proxy_public_base_url` |
 | **Frontend** | `GeneralSection.jsx`, `ConfigTab.jsx`, `LetsEncryptTab.jsx` |
-| **i18n (9 languages)** | `frontend/src/i18n/locales/{en,fr,de,es,it,ja,pt,uk,zh}.json` — labels + wildcard helpers |
+| **i18n (10 languages)** | `frontend/src/i18n/locales/{en,fr,de,es,it,ja,pt,ru,uk,zh}.json`: labels + wildcard helpers |
 | **Contextual help** | `helpContent.js` / `helpGuides.js` (en) + `help/{fr,zh}/settings.js` |
 | **Tests** | `backend/tests/test_acme_public_url.py`, `test_acme.py` extensions |
 
@@ -225,7 +225,7 @@ python -m pytest tests/test_acme_public_url.py \
 ```bash
 cd frontend
 npm run check:i18n
-# Expected: 4036 keys, 9/9 locales in sync (acmePublic* keys)
+# Expected: 10 locale files checked, all in sync (acmePublic* keys)
 ```
 
 ## Manual test plan
@@ -259,13 +259,13 @@ curl -sk -b cookies.txt -X PATCH https://admin.ucm.example.com:8443/api/v2/setti
 
 Expected after PATCH: the URLs above reflect `acme.ucm.example.com:8443`.
 
-### 3. Contextual help (9 UI languages / 2+1 help)
+### 3. Contextual help (10 UI languages / 2+1 help)
 
 | UI language | Panel help file | i18n helpers |
 |-------------|-----------------|--------------|
 | en | `helpContent.js` + `helpGuides.js` | `en.json` |
 | fr, zh | `help/<lang>/settings.js` | `<lang>.json` |
-| de, es, it, ja, pt, uk | English `helpContent.js` / `helpGuides.js` with a notice | `<lang>.json` |
+| de, es, it, ja, pt, ru, uk | English `helpContent.js` / `helpGuides.js` with a notice | `<lang>.json` |
 
 1. Open **Settings** → floating help panel
 2. **"Public ACME vhost"** section (or translated equivalent) visible
@@ -312,7 +312,7 @@ Expected: account registration OK; failure only if DNS hook missing or TXT not p
 - [ ] A `*.ucm.example.com` cert covers **admin** and **ACME** (not the apex)
 - [ ] Certbot reaches the directory without timeout or hostname mismatch
 - [ ] `pytest tests/test_acme_public_url.py` — 21 passed
-- [ ] `npm run check:i18n` — 9 locales synchronized
+- [ ] `npm run check:i18n`: 10 locales synchronized
 - [ ] Help panel + helpers mention the wildcard topology in all UI languages
 - [ ] Doc and examples: `example.com` only (no lab FQDN)
 
