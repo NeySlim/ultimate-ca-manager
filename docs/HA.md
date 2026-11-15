@@ -173,7 +173,7 @@ Rate limits are counted per node, in memory, and are not shared. Two layers appl
 
 ## Scheduled passes across nodes
 
-The `certificate.expired` webhooks resume from the last pass on any node, at most 30 days back, as on a single node. A pass of the expiry alerts or of a CA's scheduled CRL skipped because another node holds its lease runs once more 30 seconds after that lease ends, instead of waiting a day or an hour. See [ADMIN_GUIDE.md](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
+The `certificate.expired` webhooks resume from the last pass on any node, at most 30 days back, as on a single node. A pass of the expiry alerts or of a CA's scheduled CRL skipped because another node holds its lease runs once more 30 seconds after that lease ends, instead of waiting a day or an hour. The CRL lease lasts 15 minutes and is not renewed while the CRL is signed: a signature that takes longer lets another node sign the next CRL too, so two CRLs of consecutive numbers are published, which changes nothing for clients: UCM serves the CRL of the highest number. Size a slow HSM provider so that a CRL signature stays well under 15 minutes. See [ADMIN_GUIDE.md](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
 
 ## When PostgreSQL is unavailable
 

@@ -824,12 +824,3 @@ def test_a_signature_outliving_the_lease_never_reuses_a_crl_number_on_postgresql
     assert sorted(signed_by) == ['A', 'B']
     assert len(numbers) == 2 and len(set(numbers)) == 2
     assert served == max(numbers) and stored[0][0] == served  # B committed first, with the higher
-
-
-@pytest.mark.xfail(strict=True, reason='the lease is not renewed during a signature: renewing it '
-                   'keeps a hung HSM call holding the CRL of its CA on every node, a design choice')
-@pytest.mark.parametrize('_backend', [pytest.param('pg', marks=_on_pg)])
-def test_a_signature_outliving_the_lease_signs_once_on_postgresql(app, ha, monkeypatch, _backend):
-    with _pg(app):
-        _stored, _served, signed_by = _a_lease_outlived_by_a_signature(app, monkeypatch)
-    assert signed_by == ['A']
