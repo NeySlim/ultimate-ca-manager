@@ -22,7 +22,7 @@ export default {
           { label: 'Approbation automatique', text: 'Approuver automatiquement les requêtes avec des mots de passe de défi valides, ou les renouvellements signés par un certificat émis par le même endpoint' },
           { label: 'Servir en HTTP simple', text: 'Désactivé par défaut. Répond aussi au SCEP sur le port du protocole HTTP (8080 par défaut), à http://votre-serveur:8080/scep/pkiclient.exe et aux URL de profil, pour les clients comme sscep qui ne peuvent pas utiliser HTTPS. RFC 8894 §7.10 : les messages SCEP sont déjà protégés, l\'enveloppe CMS garde le mot de passe de défi privé' },
           { label: 'Mot de passe de défi', text: 'Secret partagé que les appareils utilisent pour authentifier l\'inscription. Un renouvellement (RenewalReq) signé par un certificat émis par le même endpoint (profil ou global) est authentifié par ce certificat : son défi n\'est pas vérifié et changer le secret n\'empêche pas les appareils enrôlés de renouveler (RFC 8894 §2.4). Tout autre certificat a toujours besoin du défi de l\'endpoint' },
-          { label: 'Clés des appareils (v2.248)', text: 'Un appareil signe sa requête avec une clé RSA, ECDSA, Ed25519 ou ML-DSA ; une signature ML-DSA suit la RFC 9882 (condensat SHA-512). Ed448 est refusé, ML-DSA aussi en mode FIPS' },
+          { label: 'Clés des appareils (v2.248)', text: 'Un appareil signe sa requête avec une clé RSA, ECDSA, Ed25519 ou ML-DSA ; une signature ML-DSA suit la RFC 9882 (condensat SHA-512). Ed448 est refusé, ML-DSA aussi en mode FIPS quand le module FIPS ne l\'approuve pas' },
           { label: 'Noms de la requête', text: 'Une requête dont le sujet ou les noms DNS enfreignent la RFC 5280 (un CN de plus de 64 caractères, un nom DNS avec espace, apostrophe ou tiret bas, comme le nom d\'un appareil iOS) est refusée avec sa raison, une fois son défi vérifié et avant sa mise en file, et Intune est informé du refus ; un renouvellement garde les noms que porte son certificat. Construisez un SAN DNS Intune à partir d\'une valeur sûre pour le DNS' },
         ]
       },
@@ -109,7 +109,7 @@ Affiche l'URL du point de terminaison SCEP et les instructions d'intégration.
 6. Si l'approbation automatique est désactivée, un administrateur examine et approuve/rejette
 
 ### Clés des appareils
-L'appareil signe son PKCSReq avec sa propre clé : RSA, ECDSA, Ed25519 ou ML-DSA. Une signature ML-DSA est vérifiée selon la RFC 9882 (condensat SHA-512, identifiant d'algorithme propre à la clé, sans paramètres). Les signatures Ed448 sont refusées, et ML-DSA aussi en mode FIPS. La requête reste chiffrée pour la CA de signature RSA.
+L'appareil signe son PKCSReq avec sa propre clé : RSA, ECDSA, Ed25519 ou ML-DSA. Une signature ML-DSA est vérifiée selon la RFC 9882 (condensat SHA-512, identifiant d'algorithme propre à la clé, sans paramètres). Les signatures Ed448 sont refusées, et ML-DSA aussi en mode FIPS quand le module FIPS n'approuve pas ML-DSA. La requête reste chiffrée pour la CA de signature RSA.
 
 ## URL SCEP
 

@@ -93,6 +93,8 @@ Cliquez sur **Vérifier l'intégrité** pour contrôler la chaîne de journaux d
 ## Transfert Syslog
 
 Configurez le transfert syslog distant dans **Paramètres → Audit** pour envoyer les événements de journal à un serveur SIEM ou syslog externe en temps réel.
+
+Tout événement d'audit est transmis par défaut. Décocher une catégorie (Certificats, CA, CSR, Utilisateurs, ACME, SCEP, Système) n'arrête que ses événements : ACME couvre tous les événements ACME, Utilisateurs couvre les connexions et déconnexions, SSO compris. Laisser toutes les cases décochées transmet tous les événements. Les modifications de compte (création, rôle, mot de passe, MFA, activation), les modifications du transfert syslog lui-même, les purges d'audit, les clés d'API, les rôles, les paramètres et les politiques sont toujours transmis. Sous Système, les téléchargements de clé maître, les changements de chiffrement, les restaurations, les réinitialisations et bascules de base de données, les paramètres de mise à jour, les suppressions de sauvegardes et les téléchargements de lots de journaux sont aussi toujours transmis. Une modification syslog est envoyée avec la configuration précédente : le collecteur dont le périmètre est réduit ou qui est désactivé la reçoit, et un collecteur nouvellement configuré la reçoit aussi.
 `
   }
 }

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest'
 
-const pages = import.meta.glob('../*/*.js')
+const pages = import.meta.glob(['../*/*.js', '!../__tests__/*'])
 
 describe('translated help pages', () => {
   it('finds only the fr and zh pages', () => {

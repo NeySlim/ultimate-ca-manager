@@ -7,8 +7,8 @@ export default {
       {
         title: '签发模式',
         items: [
-          { label: '签名模式', text: '粘贴现有的SSH公钥进行签名。私钥保留在用户机器上,, UCM从不接触私钥。' },
-          { label: '生成模式', text: 'UCM生成新的密钥对并签名证书。请立即下载私钥,, 之后无法再获取。' },
+          { label: '签名模式', text: '粘贴现有的SSH公钥进行签名。私钥保留在用户机器上，UCM从不接触私钥。' },
+          { label: '生成模式', text: 'UCM生成新的密钥对并签名证书。请立即下载私钥，之后无法再获取。' },
         ]
       },
       {
@@ -16,9 +16,9 @@ export default {
         items: [
           { label: 'Key ID', text: 'sshd 记录的持有者标识符。由 CA 设置为 principals@CA 名称，除非该 CA 允许请求者自行选择。' },
           { label: 'Principals', text: '此证书有效的用户名（用户证书）或主机名（主机证书）。以逗号分隔。' },
-          { label: '有效期', text: '证书的生命周期。选择预设（1h、8h、24h、7d、30d、90d、365d）或设置自定义秒数。' },
+          { label: '有效期', text: '证书的生命周期。选择预设（1h、8h、24h、7d、30d、90d、365d）或设置自定义秒数。在签发前 5 分钟起生效，适用于时钟落后的服务器 (v2.252)。' },
           { label: 'Extensions', text: 'SSH扩展，如permit-pty、permit-agent-forwarding。仅适用于用户证书。' },
-          { label: 'Critical Options', text: '如force-command或source-address等限制，用于约束证书的使用范围。' },
+          { label: 'Critical Options', text: '仅限用户证书：force-command、source-address（地址或 CIDR 网络，以逗号分隔）和 verify-required，以及形如 name@domain 的厂商选项。主机证书不带任何选项，其他任何选项都会被拒绝 (v2.252)。' },
         ]
       },
       {
@@ -31,19 +31,19 @@ export default {
       {
         title: '管理',
         items: [
-          { label: '吊销', text: '将证书添加到CA的Key Revocation List（KRL）中。服务器必须配置为检查KRL。' },
+          { label: '吊销', text: '将证书添加到CA的Key Revocation List（KRL）中。服务器必须配置为检查KRL。已吊销的证书会一直保留在 KRL 中，且在过期之前无法删除 (v2.252)。' },
           { label: '下载', text: '下载证书、公钥或私钥（仅生成模式）。' },
         ]
       },
     ],
     tips: [
       '使用短期证书（8h–24h）进行用户访问，以最大限度减少密钥泄露的影响。',
-      '建议使用签名模式:, 用户的私钥永远不会离开其机器。',
+      '建议使用签名模式：用户的私钥永远不会离开其机器。',
       '若CA允许请求者设置Key ID，请使其具有描述性（例如"jdoe-prod-2025"），便于日志审计。',
       '对于主机证书，principal必须与客户端连接使用的主机名匹配。',
     ],
     warnings: [
-      '在生成模式下，请立即下载私钥:, 私钥不会被存储，也无法恢复。',
+      '在生成模式下，请立即下载私钥：私钥不会被存储，也无法恢复。',
       '证书吊销仅在服务器配置为检查CA的KRL文件时才有效。',
     ],
   },
@@ -80,14 +80,14 @@ ssh -i ~/.ssh/id_work user@server
 ### 生成模式
 UCM同时生成密钥对和证书。当需要集中配置凭据时使用。
 
-> ⚠ **请立即下载私钥**:, 私钥不会存储在UCM中，无法恢复。
+> ⚠ **请立即下载私钥**：私钥不会存储在UCM中，无法恢复。
 
 **工作流程：**
 1. 选择CA并填写证书详情
 2. 选择"生成"模式
 3. 点击**签发证书**
 4. 下载全部三个文件：
-   - 私钥（\`keyid\`）:: **请安全保管！**
+   - 私钥（\`keyid\`）：**请安全保管！**
    - 证书（\`keyid-cert.pub\`）
    - 公钥（\`keyid.pub\`）
 
@@ -123,6 +123,8 @@ Principals定义证书对**谁**（用户证书）或**什么**（主机证书�
 
 建议人工用户使用短期证书（8h–24h）。自动化服务账户可接受更长的有效期。
 
+证书自签发前 5 分钟起生效，因此时钟略微落后的服务器也能立即接受它；有效期仍从签发时起算 (v2.252)。
+
 ### Extensions（仅用户证书）
 
 | Extension | 说明 |
@@ -133,12 +135,15 @@ Principals定义证书对**谁**（用户证书）或**什么**（主机证书�
 | permit-port-forwarding | 允许TCP端口转发 |
 | permit-user-rc | 允许登录时执行~/.ssh/rc |
 
-### Critical Options
+### Critical Options（仅用户证书）
 
 | 选项 | 说明 |
 |--------|-------------|
 | force-command | 将证书限制为单个命令 |
-| source-address | 限制为特定的源IP地址/CIDR |
+| source-address | 限制为特定的源地址或 CIDR 网络，以逗号分隔（\`10.0.0.0/8,2001:db8::/32\`） |
+| verify-required | 要求使用已验证用户身份（PIN 或生物识别）的 FIDO 密钥，无值 |
+
+服务器会拒绝携带其不认识的关键选项的证书，因此 UCM 只签署这些选项以及形如 \`name@domain\` 的厂商选项。OpenSSH 没有为主机证书定义任何关键选项：携带关键选项的主机请求会被拒绝 (v2.252)。
 
 **示例：** 配置了\`force-command=ls\`和\`source-address=10.0.0.0/8\`的证书只能执行\`ls\`，且只能从10.x.x.x网络执行。
 
@@ -175,6 +180,8 @@ sudo systemctl restart sshd
 2. 在详情面板中点击**吊销**
 3. 证书被添加到CA的Key Revocation List（KRL）
 4. 从SSH CA页面下载并部署更新的KRL到服务器
+
+已吊销的证书会一直保留在 KRL 和列表中，直到过期：过早删除会被拒绝，因为 KRL 由这些记录构建，删除后该证书会再次被接受。每次下载 KRL 的版本号都会递增 (v2.252)。
 
 > ⚠ 吊销仅在服务器通过sshd_config中的\`RevokedKeys\`检查KRL时生效。
 

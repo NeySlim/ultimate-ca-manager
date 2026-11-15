@@ -52,7 +52,7 @@ export default {
     ],
     tips: [
       '在部署物理 HSM 前，使用 SoftHSM 进行测试',
-      '在 HSM 上生成的密钥永远不会离开硬件:, 无法导出',
+      '在 HSM 上生成的密钥永远不会离开硬件：无法导出',
       '在使用 HSM 提供商进行 CA 签名前先测试连接',
       '对于生产中长寿命的根 CA,首选 HSM 支持的密钥存储',
     ],
@@ -78,7 +78,7 @@ export default {
 - **SoftHSM**（基于软件，用于测试）
 - 任何兼容 PKCS#11 的设备
 
-> 💡 **Docker**：SoftHSM 已预装在 Docker 镜像中。首次启动时，会自动初始化默认令牌并注册为 \`SoftHSM-Default\` 提供商:, 开箱即用。在 FIPS 模式下，SoftHSM 不是经过验证的模块：不会创建默认提供商，并且会拒绝 SoftHSM 提供商，除非设置 \`UCM_FIPS_ALLOW_SOFTHSM=1\` 允许用于测试。
+> 💡 **Docker**：SoftHSM 已预装在 Docker 镜像中。首次启动时，会自动初始化默认令牌并注册为 \`SoftHSM-Default\` 提供商：开箱即用。在 FIPS 模式下，SoftHSM 不是经过验证的模块：不会创建默认提供商，并且会拒绝 SoftHSM 提供商，除非设置 \`UCM_FIPS_ALLOW_SOFTHSM=1\` 允许用于测试。
 
 配置：
 - **库路径**: PKCS#11 共享库路径（.so/.dll）
@@ -122,6 +122,8 @@ OpenBao 或 HashiCorp Vault Transit Secrets Engine。密钥通过 Transit API �
 - AES-256-GCM（对称）
 
 > 💡 OpenBao 是 HashiCorp Vault 的社区分支。UCM 两者都支持。
+
+> 💡 开发时可以用开发模式运行 OpenBao：\`docker run -d -p 8200:8200 -e BAO_DEV_ROOT_TOKEN_ID=test-token quay.io/openbao/openbao:latest server -dev\`
 
 ## 管理提供商
 

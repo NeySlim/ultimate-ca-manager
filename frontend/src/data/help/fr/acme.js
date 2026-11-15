@@ -22,7 +22,7 @@ export default {
           { label: 'Comptes CA externes', text: 'Un ou plusieurs comptes par CA, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let\'s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let\'s Encrypt Production' },
           { label: 'Serveur personnalisé', text: 'Définir une URL de répertoire ACME personnalisée pour utiliser tout CA conforme RFC 8555' },
           { label: 'EAB', text: 'Prise en charge de la liaison de compte externe pour les CA nécessitant une pré-inscription (ZeroSSL, HARICA, etc.)' },
-          { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 pour les clés de certificat ; ML-DSA n\'est pas proposé en mode FIPS ni sur un build qui ne l\'inclut pas. Un défaut configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048 (v2.248)' },
+          { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 pour les clés de certificat ; ML-DSA n\'est pas proposé sur un build qui ne l\'inclut pas, ni en mode FIPS quand le module FIPS ne l\'approuve pas. Un défaut configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048 (v2.248)' },
           { label: 'Clé réutilisée en mode FIPS', text: 'Réutiliser la clé d\'un certificat source est refusé quand le mode FIPS n\'approuve pas cette clé, ML-DSA compris (v2.248)' },
           { label: 'Clés de compte', text: 'Algorithmes ES256 (P-256), ES384 (P-384) ou RS256 pour les clés de compte ACME' },
           { label: 'Fournisseurs DNS', text: 'Configurer les fournisseurs de défi DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk passe par son API XML ; Verify TLS Certificate peut être désactivé pour un panneau auto-signé et un délai de propagation DNS ajouté' },
@@ -46,11 +46,11 @@ export default {
           { label: "Nettoyage TXT (v2.252)", text: "Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l'apex qui partagent le nom, gardent la leur. DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu'une valeur par nom : ils l'effacent seulement si aucun autre order en cours n'utilise le nom" },
           { label: "Noms uniques (v2.251)", text: "Un nom de fournisseur DNS ou de compte CA externe déjà utilisé est refusé (409), à la création comme au renommage. La mise à jour a renommé les doublons existants « nom (2) », « nom (3) », du plus ancien au plus récent" },
           { label: "Équipe Vercel (v2.251)", text: "Le fournisseur Vercel accepte un Team ID facultatif pour les domaines appartenant à une équipe" },
-          { label: "Jeton RcodeZero (v2.251)", text: "RcodeZero exige un jeton d'API avec accès en lecture et écriture à la zone, pas un jeton limité à la permission ACME" },
-          { label: "Checkdomain (v2.251)", text: "Checkdomain supprime une valeur en réécrivant les enregistrements de la zone sans elle, comme le documente son API, après avoir lu toutes les pages. Le SOA, le NS de l'apex et les copies www générées sont exclus de cette réécriture" },
           { label: 'Fournisseur RFC 2136 (v2.252)', text: 'Le serveur DNS peut être un nom d\'hôte. Une Zone renseignée est utilisée pour les noms qu\'elle contient ; pour les autres noms, ou quand elle est vide, la zone est lue dans le SOA que renvoie le serveur configuré, puis auprès du résolveur système' },
           { label: 'Moment de renouvellement ARI (v2.252)', text: 'Quand la CA suggère une fenêtre de renouvellement, chaque certificat se renouvelle lors de la dernière passe de 6 heures précédant un instant aléatoire tiré une fois dans cette fenêtre. La fenêtre est revérifiée après le Retry-After de la CA, borné entre une minute et un jour, et jamais une fois le certificat expiré (RFC 9773)' },
           { label: 'Erreurs de la CA (v2.252)', text: 'Une page d\'erreur de la CA qui n\'est pas un problème ACME (un 503 HTML) est signalée avec son statut HTTP et son Retry-After' },
+          { label: "Jeton RcodeZero (v2.251)", text: "RcodeZero exige un jeton d'API avec accès en lecture et écriture à la zone, pas un jeton limité à la permission ACME" },
+          { label: "Checkdomain (v2.251)", text: "Checkdomain supprime une valeur en réécrivant les enregistrements de la zone sans elle, comme le documente son API, après avoir lu toutes les pages. Le SOA, le NS de l'apex et les copies www générées sont exclus de cette réécriture" },
         ]
       },
       {
@@ -61,7 +61,7 @@ export default {
           { label: 'Comptes', text: 'Voir et gérer les comptes clients ACME enregistrés' },
           { label: 'E-mail du compte (v2.218)', text: 'L\'e-mail de contact d\'un compte local peut être modifié depuis son panneau de détails. Selon la RFC 8555, le contact appartient au client ACME : sa prochaine mise à jour de compte peut donc écraser la valeur' },
           { label: 'Historique', text: 'Suivre toutes les commandes d\'émission de certificats ACME' },
-                  { label: 'Orders locaux (v2.217)', text: 'L\'onglet Local orders liste les orders du serveur intégré avec filtre de statut, suppression unitaire et purge ; les orders expirés non émis sont purgés automatiquement toutes les 6 h, et un digest de signature par défaut s\'applique aux orders sans profil. Depuis la v2.218, la purge supprime aussi les défis frères résiduels encore pending des autorisations déjà validées' },
+                  { label: 'Orders locaux (v2.217)', text: 'L\'onglet Local orders liste les orders du serveur intégré avec filtre de statut, suppression unitaire et purge ; les orders expirés non émis sont purgés automatiquement toutes les 6 h, et un digest de signature par défaut s\'applique aux orders sans profil. Depuis la v2.218, la purge supprime aussi les défis frères résiduels encore pending des autorisations déjà validées, et depuis la v2.252 les nonces expirés et utilisés' },
                   { label: 'Profils et templates (v2.221)', text: 'Les profils de certificat (draft-ietf-acme-profiles) sont publiés dans le directory et choisis par le client à chaque order. Chaque profil fixe validité et digest et peut lier un template de certificat, dont les KU/EKU gouvernent alors le certificat émis' },
                   { label: 'Profil par défaut', text: 'La plupart des clients ne demandent aucun profil. Le profil par défaut, choisi sous les profils, s\'applique à leurs commandes ; sans lui, elles reçoivent 90 jours et le digest par défaut' },
                   { label: 'Révocation (v2.248)', text: 'Le certificat envoyé par un client pour le révoquer doit correspondre octet pour octet à celui stocké. Seule une clé de certificat RSA ou EC P-256, P-384 ou P-521 peut signer la requête elle-même : révoquez un certificat ML-DSA, EdDSA ou Brainpool avec le compte qui l\'a commandé' },
@@ -204,7 +204,7 @@ Gérez la configuration de votre client ACME :
 - **Environnement** : Staging (test) ou Production (certificats réels)
 - **E-mail de contact** : Requis pour l'enregistrement du compte
 - **Renouvellement automatique** : Renouveler automatiquement les certificats avant l'expiration
-- **Type de clé de certificat** : RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87. ML-DSA n'est pas proposé en mode FIPS ni sur un build qui ne l'inclut pas. Un type configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048
+- **Type de clé de certificat** : RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87. ML-DSA n'est pas proposé sur un build qui ne l'inclut pas, ni en mode FIPS quand le module FIPS ne l'approuve pas. Un type configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048
 - **Algorithme de clé de compte** : ES256, ES384 ou RS256 pour la signature du compte ACME
 - **Renouvellement en place** (v2.251) : un renouvellement conserve l'id et le refid du certificat, donc sa liaison HTTPS, ses liaisons de déploiement et ses webhooks le suivent
 - **Renouvellements échoués** (v2.251) : la liste des orders affiche le nombre d'échecs et la dernière erreur ; après 5 échecs de renouvellement planifié, un order est retenté une fois par jour. L'interrupteur **Renouvellement automatique** d'un order sélectionné arrête ou reprend son renouvellement
@@ -286,7 +286,7 @@ Configurez les fournisseurs de défi DNS-01 pour la validation de domaine. Les f
 
 Chaque fournisseur nécessite des identifiants API spécifiques au service DNS.
 
-Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l'apex qui partagent le nom, gardent la leur ; DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu'une valeur par nom : ils l'effacent seulement si aucun autre order en cours ne l'utilise, et refusent un order pour un domaine et son wildcard (v2.252). Vercel accepte un **Team ID** facultatif pour les domaines appartenant à une équipe, et RcodeZero exige un jeton avec accès en lecture et écriture à la zone. Un nom de fournisseur déjà utilisé est refusé (v2.251).
+Le nettoyage ne supprime que la valeur TXT de son order : un autre order, ou le wildcard et l'apex qui partagent le nom, gardent la leur ; DuckDNS, Hurricane Electric et FreeDNS ne tiennent qu'une valeur par nom : ils l'effacent seulement si aucun autre order en cours ne l'utilise, et refusent un order pour un domaine et son wildcard (v2.252). Vercel accepte un **Team ID** facultatif pour les domaines appartenant à une équipe, et RcodeZero exige un jeton avec accès en lecture et écriture à la zone. Un nom de fournisseur déjà utilisé est refusé (v2.251). Le fournisseur RFC 2136 accepte un nom d'hôte comme serveur DNS et utilise une **Zone** renseignée pour les noms qu'elle contient ; sinon la zone provient du SOA que renvoie le serveur configuré (v2.252).
 
 #### Fournisseur Custom Command
 Pour les services DNS sans pilote natif, le fournisseur **Custom Command** exécute des commandes locales configurées par l'admin pour créer/supprimer les enregistrements TXT. Les détails de l'enregistrement sont passés en variables d'environnement :
@@ -497,7 +497,7 @@ Parcourir les certificats émis via ACME :
 Une commande peut porter \`notBefore\` et \`notAfter\` (cert-manager avec une \`duration\`, \`--not-after\` de lego). Le certificat est émis avec exactement ces dates, ou la demande est refusée comme \`malformed\` : une fenêtre plus longue que la validité du profil (15 minutes de décalage d'horloge exclues), hors de la validité de la CA émettrice, ou déjà passée. Une fenêtre qu'une politique interdit, plus longue que sa validité maximale ou au-delà d'un horizon de type de clé, est refusée à la finalisation comme \`badCSR\`. Sans elles, la validité du profil s'applique.
 
 ### Révocation
-Un client révoque avec la clé de son compte ou avec la clé du certificat lui-même, et le certificat envoyé doit correspondre octet pour octet à celui stocké : un numéro de série seul ne suffit jamais. Seule une clé RSA ou EC P-256, P-384 ou P-521 peut signer une requête ACME ; un certificat ML-DSA, EdDSA ou Brainpool se révoque donc avec le compte qui l'a commandé, et UCM l'indique dans son refus.
+Un client révoque avec la clé de son compte ou avec la clé du certificat lui-même, et le certificat envoyé doit correspondre octet pour octet à celui stocké : un numéro de série seul ne suffit jamais. Un compte détenant des autorisations valides et non expirées pour chaque nom et chaque adresse IP d'un certificat émis par ce serveur ACME peut aussi le révoquer, quel que soit celui qui l'a commandé ; les autorisations accordées par approbation automatique ne comptent pas. Seule une clé RSA ou EC P-256, P-384 ou P-521 peut signer une requête ACME ; un certificat ML-DSA, EdDSA ou Brainpool se révoque donc avec le compte qui l'a commandé, et UCM l'indique dans son refus.
 
 ## Certificats d'adresse IP (RFC 8738)
 
@@ -523,7 +523,7 @@ Les commandes mixtes DNS + IP sont également prises en charge.
 - **TLS-ALPN-01** exige que le SubjectAltName du certificat de validation contienne exactement le nom ou l'IP validé, rien d'autre.
 
 ### Certificat émis
-Le certificat signé contient une entrée SubjectAltName **iPAddress** pour chaque IP validée.
+Le certificat signé contient une entrée SubjectAltName **iPAddress** pour chaque IP validée. La CSR peut aussi placer l'une des adresses IP de la commande dans son common name.
 
 > 💡 Les adresses internes (RFC1918, loopback) se valident nativement : le mode de déploiement principal de UCM. Les IP de métadonnées cloud restent bloquées.
 

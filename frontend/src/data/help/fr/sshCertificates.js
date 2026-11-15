@@ -16,9 +16,9 @@ export default {
         items: [
           { label: 'Key ID', text: 'Identifiant que sshd journalise pour le titulaire. La CA le définit à principals@nom de la CA, sauf si elle laisse les demandeurs le choisir.' },
           { label: 'Principals', text: 'Noms d\'utilisateur (certificat utilisateur) ou noms d\'hôte (certificat hôte) pour lesquels ce certificat est valide. Séparés par des virgules.' },
-          { label: 'Validité', text: 'Durée de vie du certificat. Choisissez un préréglage (1h, 8h, 24h, 7j, 30j, 90j, 365j) ou définissez une durée personnalisée en secondes.' },
+          { label: 'Validité', text: 'Durée de vie du certificat. Choisissez un préréglage (1h, 8h, 24h, 7j, 30j, 90j, 365j) ou définissez une durée personnalisée en secondes. Valide dès 5 minutes avant l\'émission, pour les serveurs dont l\'horloge retarde (v2.252).' },
           { label: 'Extensions', text: 'Extensions SSH telles que permit-pty, permit-agent-forwarding. Applicables uniquement aux certificats utilisateur.' },
-          { label: 'Critical Options', text: 'Restrictions telles que force-command ou source-address pour limiter l\'utilisation du certificat.' },
+          { label: 'Critical Options', text: 'Certificats utilisateur uniquement : force-command, source-address (adresses ou réseaux CIDR, séparés par des virgules) et verify-required, plus les options de fournisseur nommées name@domain. Les certificats d\'hôte n\'en portent aucune, et toute autre option est refusée (v2.252).' },
         ]
       },
       {
@@ -31,7 +31,7 @@ export default {
       {
         title: 'Gestion',
         items: [
-          { label: 'Révoquer', text: 'Ajoute un certificat à la liste de révocation de clés (KRL) de la CA. Les serveurs doivent être configurés pour vérifier la KRL.' },
+          { label: 'Révoquer', text: 'Ajoute un certificat à la liste de révocation de clés (KRL) de la CA. Les serveurs doivent être configurés pour vérifier la KRL. Un certificat révoqué reste dans la KRL et ne peut pas être supprimé avant son expiration (v2.252).' },
           { label: 'Télécharger', text: 'Téléchargez le certificat, la clé publique ou la clé privée (mode génération uniquement).' },
         ]
       },
@@ -122,6 +122,7 @@ Choisissez un préréglage ou définissez une durée personnalisée :
 | 365 jours | Comptes de service à longue durée de vie |
 
 Les certificats éphémères (8h–24h) sont recommandés pour les utilisateurs humains. Une validité plus longue est acceptable pour les comptes de service automatisés.
+Un certificat est valide dès 5 minutes avant son émission, si bien qu'un serveur dont l'horloge retarde légèrement l'accepte aussitôt ; la durée de vie compte toujours à partir de l'émission (v2.252).
 
 ### Extensions (certificats utilisateur uniquement)
 
@@ -133,13 +134,15 @@ Les certificats éphémères (8h–24h) sont recommandés pour les utilisateurs 
 | permit-port-forwarding | Autorise le transfert de port TCP |
 | permit-user-rc | Autorise l'exécution de ~/.ssh/rc à la connexion |
 
-### Critical Options
+### Options critiques (certificats utilisateur uniquement)
 
 | Option | Description |
 |--------|-------------|
 | force-command | Restreint le certificat à une seule commande |
-| source-address | Restreint à des adresses IP ou CIDR sources spécifiques |
+| source-address | Restreint à des adresses sources ou des réseaux CIDR, séparés par des virgules (\`10.0.0.0/8,2001:db8::/32\`) |
+| verify-required | Exige une clé FIDO ayant vérifié l'utilisateur (PIN ou biométrie), sans valeur |
 
+Un serveur refuse un certificat portant une option critique qu'il ne connaît pas : UCM ne signe donc que celles-ci et les options de fournisseur nommées \`name@domain\`. OpenSSH ne définit aucune option critique pour les certificats d'hôte : une demande d'hôte qui en porte une est refusée (v2.252).
 **Exemple :** Un certificat avec \`force-command=ls\` et \`source-address=10.0.0.0/8\` ne peut exécuter que \`ls\` et uniquement depuis le réseau 10.x.x.x.
 
 ## Utilisation des certificats
@@ -175,6 +178,7 @@ Sur les clients, ajoutez la Host CA à known_hosts :
 2. Cliquez sur **Révoquer** dans le panneau de détail
 3. Le certificat est ajouté à la liste de révocation de clés (KRL) de la CA
 4. Téléchargez et déployez la KRL mise à jour sur les serveurs (depuis la page CA SSH)
+Un certificat révoqué reste dans la KRL, et dans la liste, jusqu'à son expiration : le supprimer plus tôt est refusé, puisque la KRL est construite à partir de ces enregistrements et que le certificat serait de nouveau accepté. Chaque téléchargement de la KRL porte un numéro de version plus élevé (v2.252).
 
 > ⚠ La révocation ne prend effet que lorsque les serveurs vérifient la KRL via \`RevokedKeys\` dans sshd_config.
 

@@ -17,13 +17,13 @@ export default {
         title: 'Prérequis',
         items: [
           { label: 'Clé archivée', text: 'La clé privée du certificat doit être stockée dans la base de données, la récupération ne peut pas reconstruire une clé qui n\'a jamais été archivée' },
-          { label: 'Double contrôle', text: 'Activé par défaut : la demande et l\'approbation sont des actions distinctes effectuées par des personnes différentes. Les demandes, approbations et téléchargements sont consignés dans la piste d\'audit ; une approbation ou un téléchargement refusé ne l\'est pas' },
+          { label: 'Double contrôle', text: 'Activé par défaut : la demande et l\'approbation sont des actions distinctes effectuées par des personnes différentes. Les demandes, approbations, rejets et téléchargements sont consignés dans la piste d\'audit, de même qu\'une auto-approbation refusée par le double contrôle et un téléchargement dont l\'archive n\'a pas pu être construite ; un appel refusé pour une autre raison ne l\'est pas' },
         ]
       },
     ],
     tips: [
       'La récupération de clés concerne les clés qui n\'ont pas été exportées lors de l\'émission du certificat ; elle ne remplace pas la restriction de l\'export de clés au moment de l\'émission.',
-      'Chaque demande, approbation et téléchargement est enregistré dans la piste d\'audit ; les refus ne le sont pas.',
+      'Chaque demande, approbation, rejet et téléchargement est enregistré dans la piste d\'audit, de même qu\'une auto-approbation refusée par le double contrôle et un téléchargement en échec ; un appel refusé pour une autre raison ne l\'est pas.',
     ],
     warnings: [
       'Un certificat dont la clé privée n\'a jamais été archivée ne peut pas être récupéré : il n\'y a rien à délivrer.',

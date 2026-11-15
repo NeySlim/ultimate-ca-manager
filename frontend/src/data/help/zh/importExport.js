@@ -7,7 +7,7 @@ export default {
       {
         title: '导入',
         items: [
-          { label: '智能导入', text: '上传任意证书文件,, UCM 自动检测格式（PEM、DER、P12、P7B）' },
+          { label: '智能导入', text: '上传任意证书文件，UCM 自动检测格式（PEM、DER、P12、P7B）' },
           { label: 'OPNsense 导入', text: '连接到 OPNsense 防火墙并导入其证书和 CA，每次运行一次（不持续同步）' },
         ]
       },

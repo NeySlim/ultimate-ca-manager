@@ -17,7 +17,7 @@ export default {
         title: '操作',
         items: [
           { label: '导出', text: '下载为 PEM（含密钥和链）或 PKCS#12（密码保护）' },
-          { label: '吊销', text: '带原因吊销, 证书将出现在 CRL 中' },
+          { label: '吊销', text: '带原因吊销，证书将出现在 CRL 中' },
           { label: '删除', text: '从 UCM 中移除证书及其用户关联' },
         ]
       },

@@ -20,7 +20,7 @@ export default {
           { label: "管理", text: "admin.ucm.example.com, GUI 和 API（按策略 mTLS）" },
           { label: "ACME", text: "acme.ucm.example.com, /acme/* 和 /acme/proxy/*（无客户端 mTLS）" },
           { label: "通配符 TLS", text: "具体主机名（如 acme.ucm.example.com）。证书 SAN *.ucm.example.com 覆盖 admin/ACME 的 TLS, 不可将 *.ucm.example.com 填为 vhost" },
-          { label: "保存之前", text: "先确保 ACME vhost 的 DNS 和 TLS 正常工作,, 重新读取 directory 的客户端会立即切换 URL，若 vhost 不可达，续期将失败" },
+          { label: "保存之前", text: "先确保 ACME vhost 的 DNS 和 TLS 正常工作，重新读取 directory 的客户端会立即切换 URL，若 vhost 不可达，续期将失败" },
           { label: "TLS 证书 ID", text: "部署在 ACME vhost 上的证书元数据（如通配符）" },
         ]
       },
@@ -63,7 +63,7 @@ export default {
           { label: "替换或合并", text: "从备份恢复会用归档中的数据替换此处的数据，并移除归档中没有的内容；审计条目会列出被移除的内容。API 还接受 mode=merge，将归档添加到此处的数据中" },
           { label: "报告与大小", text: "选择器接受服务器接受的归档大小：它读取归档头部，在上传前应用其格式的上限，无法识别的文件交由服务器判断，并显示上传进度。恢复结束时如有待办事项，报告会一直显示到关闭为止：已恢复的内容，以及“待办”列表，每条警告一行（未恢复的部分、无法签发 CRL 的 CA、需要重新输入的机密、被重置为自动链的部署绑定），还有重启状态。没有待办事项时，页面会在两秒后重新加载。不含数据的归档不会恢复任何内容，报告会说明这一点。报告不会被保存：恢复本身记录在审计日志中" },
           { label: "共享锁", text: "备份和恢复共用一个锁：备份运行期间恢复会被拒绝 (409)，手动备份则等待正在运行的恢复完成" },
-          { label: "HA mode", text: "In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer's rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted" },
+          { label: "HA 模式", text: "在 HA 模式下，从任一节点发起恢复时，会先让每个节点拒绝写入（503）并退出负载均衡器的轮转，直到恢复结束；若有节点在 30 秒内未确认，恢复会被拒绝并指明该节点。随后各节点逐个重启，重启后各自提供恢复后的状态" },
           { label: "上传限制", text: "3.0 起创建的归档按分块方式恢复，除非通过 BACKUP_MAX_ARCHIVE_MB 设置上限，否则不限制大小。更早的归档最大接受 BACKUP_MAX_UPLOAD_MB（默认 512 MB）。两者均在服务器环境中设置，被拒绝时会指明对应的参数。UCM 前面的反向代理仍保留其自身的请求体大小限制" },
           { label: "归档包含的内容", text: "归档包含 ACME 客户端订单、批准请求和密钥恢复请求。恢复在此版本之前写入的归档时，这些行会保持此处的原样" },
           { label: "同名", text: "其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook，会恢复为“名称 (2)”，API 返回的恢复结果会列出它" },
@@ -74,12 +74,12 @@ export default {
         title: '自动更新（v2.215）',
         content: '设置 › 更新：每日后台检查新版本，并可选启用无人值守安装。',
         items: [
-          { label: "通道", text: "“稳定版”仅跟随正式发布；“候选发布版”额外仅接受 rcN 版本,, 绝不包含 alpha/beta" },
+          { label: "通道", text: "“稳定版”仅跟随正式发布；“候选发布版”额外仅接受 rcN 版本，绝不包含 alpha/beta" },
           { label: '通知', text: '发现新版本时触发 system.update_available Webhook/邮件事件，每个版本仅一次' },
-          { label: '自动安装', text: '默认关闭。启用后，UCM 会在选定的时间下载、验证并安装更新，然后重启,, 仅限 DEB/RPM 安装' },
+          { label: '自动安装', text: '默认关闭。启用后，UCM 会在选定的时间下载、验证并安装更新，然后重启，仅限 DEB/RPM 安装' },
           { label: '校验和', text: '无人值守安装要求发布版提供已公布的 SHA256 用于验证；手动安装在有校验和公布时也会进行验证' },
-          { label: 'Docker', text: '容器无法自行更新,, 检查和通知仍然有效；请拉取新镜像来完成更新' },
-          { label: 'HA mode', text: 'In HA mode on DEB/RPM, Install Update and the auto-install update the nodes one at a time; the next node starts once the previous one is back on the new version. The screen shows the nodes done, the node in progress and the node where it stopped with the reason; Resume continues from it. Docker and Kubernetes leave it to the orchestrator' },
+          { label: 'Docker', text: '容器无法自行更新，检查和通知仍然有效；请拉取新镜像来完成更新' },
+          { label: 'HA 模式', text: '在 DEB/RPM 的 HA 模式下，“安装更新”和自动安装会逐个更新节点；上一个节点以新版本恢复运行后，才开始下一个节点。界面显示已完成的节点、正在进行的节点，以及停止的节点和原因；“继续”从该处接着执行。Docker 和 Kubernetes 交由编排器处理' },
           { label: '更新后弹窗', text: '可选（v2.217）：更新安装后按用户显示一次版本说明。默认关闭' },
         ]
       },
@@ -108,8 +108,8 @@ export default {
           { label: 'HTTPS', text: 'UCM Web 界面的 TLS 证书。已应用的证书会被记住，并在其续期后自动重新应用（v2.217）；界面会显示当前绑定的证书及一个解除绑定按钮，用于停止跟随续期（v2.218）。UCM 不持有其密钥的协议续期会让 HTTPS 继续使用前一张证书并给出提示，直到导入已续期证书的密钥' },
           { label: '更新', text: '检查新版本、查看变更日志、每日计划检查并可选启用无人值守安装（DEB/RPM）' },
           { label: 'Webhook', text: '证书事件（签发、吊销、过期）的 HTTP Webhook, 允许内部 LAN URL；阻止云元数据 IP。可选出站认证：Bearer、Basic、API 密钥或自定义标头' },
-          { label: '部署', text: '部署目标提供可复用的 SSH/SFTP 连接，或 HTTP API 请求（v2.252）；证书部署和 CRL 部署各自定义路径和可选的重载命令（仅管理员，v2.215）' },
           { label: 'Webhook 名称唯一 (v2.251)', text: '创建和重命名时，已被使用的 Webhook 名称会被拒绝 (409)。升级时，先前重复的名称按创建先后依次重命名为“名称 (2)”、“名称 (3)”' },
+          { label: '部署', text: '部署目标提供可复用的 SSH/SFTP 连接，或 HTTP API 请求（v2.252）；证书部署和 CRL 部署各自定义路径和可选的重载命令（仅管理员，v2.215）' },
           { label: 'Active Directory', text: 'UCM 自身的 AD/LDAP 连接，用于与证书相关的查询（Kerberos 主体解析、AD 派生主题）' },
           { label: 'Windows 自动注册', text: 'MS-XCEP/MS-WSTEP 原生 Windows 注册：策略发现、证书签发和 Kerberos/SPNEGO 绑定' },
           { label: '关于', text: '系统信息、链接与资源和支持 UCM 链接到 Ko-fi（管理员每个 UCM 版本还会看到一次可关闭的 Ko-fi 卡片）。拥有 admin:system 时，检查 FIPS 就绪情况会列出 FIPS 模式在此实例上会拒绝的内容及各自的补救办法，且不会更改任何内容' },
@@ -120,7 +120,7 @@ export default {
         title: '部署钩子（v2.215）',
         content: '设置 › 部署（仅管理员）：用于证书和 CRL 部署的可复用 SSH/SFTP 连接或 HTTP API 请求。路径和可选的重载命令在每个 SSH 部署上单独配置。',
         items: [
-          { label: '目标', text: '主机、端口、SSH 用户。UCM 会生成一个 ed25519 密钥（将显示的公钥安装到目标主机上），也接受导入的私钥,, 均加密存储' },
+          { label: '目标', text: '主机、端口、SSH 用户。UCM 会生成一个 ed25519 密钥（将显示的公钥安装到目标主机上），也接受导入的私钥，均加密存储' },
           { label: 'HTTP API 目标 (v2.252)', text: 'URL、方法（POST、PUT、PATCH）、加密存储且不再显示的请求标头，以及带有 {{cert_pem}}、{{fullchain_pem}}、{{cn}}、{{serial}}…… 以及 |json、|jsonstr、|b64 和 |urlencode 过滤器的正文模板。JSON 正文在保存时检查。私钥（{{key_pem}}）仅在目标明确启用且使用 https URL 时才会发出；始终会验证 TLS 证书，若设备为自签名，则对照粘贴的信任锚验证。拒绝重定向，阻止云元数据地址和环回地址。仅限证书：CRL 仍使用 SSH 目标' },
           { label: '主机密钥', text: '在首次成功连接时固定（首次使用即信任，TOFU）；此后任何变化都会直接导致连接失败。更改主机后会重新固定' },
           { label: '重载命令', text: '按证书或 CRL 绑定配置的可选命令，在推送成功后运行（例如 systemctl reload nginx）：exit 0 即成功，不支持模板' },
@@ -141,7 +141,7 @@ export default {
       },
       {
         title: 'Active Directory 连接器',
-        content: 'UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的任何 LDAP 提供程序,, 后者用于登录 UCM，前者用于与证书相关的 AD 查询。',
+        content: 'UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的任何 LDAP 提供程序，后者用于登录 UCM，前者用于与证书相关的 AD 查询。',
         items: [
           { label: '用途', text: '将 Kerberos 计算机或用户主体解析为其 AD 对象，以便 UCM 能像真实 Windows CA 一样派生证书主题/SAN' },
           { label: '连接器', text: '每个目录（林或域）一个，列出其领域、已读取的域 SID 及健康状态。仍被 Windows 注册配置文件使用的连接器无法删除，拒绝时会列出这些配置文件' },
@@ -153,7 +153,7 @@ export default {
       },
       {
         title: 'Windows 自动注册（XCEP/WSTEP）',
-        content: '通过 MS-XCEP 策略发现和 MS-WSTEP 签发实现的原生 Windows 证书注册,, 支持 MMC/certreq 手动注册和无人值守的 GPO 自动注册。',
+        content: '通过 MS-XCEP 策略发现和 MS-WSTEP 签发实现的原生 Windows 证书注册，支持 MMC/certreq 手动注册和无人值守的 GPO 自动注册。',
         items: [
           { label: '配置文件', text: '每个 Active Directory 领域一个配置文件，按客户端 Kerberos 主体的领域路由：各有自己的签发 CA 与策略 CA、模板子集、AD 连接器和 keytab；UsernamePassword 账户属于默认配置文件。列表由服务器分页和筛选（名称或领域、CA、状态：完整、缺少 keytab、连接器故障、已禁用）' },
           { label: '领域', text: '使用大写字母，与 KDC 的写法完全一致（CORP.EXAMPLE）：KDC 逐字符比较领域。没有领域的默认配置文件在设置领域前拒绝 Kerberos。已禁用的配置文件拒绝其领域的计算机；其密钥仍保留在提供的 keytab 中，以便按领域拒绝并审计' },
@@ -163,11 +163,12 @@ export default {
           { label: '设置清单', text: '每个配置文件的表单列出它还缺少的内容：领域、签发 CA、keytab、可访问的连接器、允许自动注册的模板、配置文件已启用' },
           { label: '策略 URL', text: '所有配置文件相同：按领域路由，而不是按 URL' },
           { label: 'AD 派生主题', text: '模板可以选择通过 AD 连接器从 Active Directory 派生其主题/SAN，用于无人值守注册' },
-          { label: 'ML-DSA 模板 (v2.248)', text: '通过其密钥算法 OID 配合 Microsoft Software Key Storage Provider 公布，尚未使用真实 Windows 客户端测试，FIPS 模式下隐藏。基于证书的续订无法使用 ML-DSA 证书（XML-DSig 没有 ML-DSA 签名）：请注册新证书' },
-          { label: 'ECDSA 模板 (v2.251)', text: '在策略模式 3 中公布，以其曲线（ECDSA_P256、ECDSA_P384、ECDSA_P521）作为签名密钥和请求哈希，取模板摘要与曲线对应摘要中较强者。FIPS 模式之外的 RSA 模板仍为模式 2' },
+          { label: 'ML-DSA 模板 (v2.248)', text: '通过其密钥算法 OID 配合 Microsoft Software Key Storage Provider 公布，尚未使用真实 Windows 客户端测试，当 FIPS 模块不批准 ML-DSA 时在 FIPS 模式下隐藏。基于证书的续订无法使用 ML-DSA 证书（XML-DSig 没有 ML-DSA 签名）：请注册新证书' },
+          { label: 'ECDSA 模板 (v2.251)', text: '在策略模式 3 中公布，以其曲线（ECDSA_P256、ECDSA_P384、ECDSA_P521）作为签名密钥和请求哈希，取模板摘要与曲线对应摘要中较强者。FIPS 模式之外的 RSA 模板仍为模式 2，此时 Windows 用 SHA-1 签署其 CMC 请求，UCM 予以接受（用 SHA-1 签名的普通 PKCS#10 仍会被拒绝）' },
           { label: '请求中指定的模板 (v2.252)', text: '每个策略都会公布其模板扩展（szOID_CERTIFICATE_TEMPLATE），Windows 会将其复制到请求中，因此即使另一个模板具有相同的 EKU，证书也会按客户端所选的模板签发。未指定模板的请求按其 EKU 匹配。所有 EKU 都不会签发给注册者的模板（例如 OCSP 签名）不会被公布，对它的请求会被拒绝' },
           { label: '模板与密钥 (v2.251)', text: '请求密钥必须与其所签发的模板相符：相同的曲线或 ML-DSA 参数集，或不更短的 RSA 密钥，因此 P-384 请求不再在共用同一 EKU 的 P-256 模板下签发。Windows 使用 ECDSA 密钥签名的请求信封可被接受' },
-          { label: 'Windows 续期 (v2.248)', text: '只服务通过 Windows 注册签发的证书；手工签发的证书应重新注册，而不是续期。通过 TLS 时，待续期的证书即客户端证书：需要启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU，并在 CSR 不含 SubjectAltName 时保留其 SubjectAltName (v2.252)' },
+          { label: 'Windows 续期 (v2.248)', text: 'certreq ... Renew 以待续期的证书作为 TLS 客户端证书进行身份验证：需要启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。自 3.0 起，只有通过 Windows 注册签发的证书才能这样续期：在界面中签发的证书会被拒绝，必须通过 Windows 注册重新签发。续期会保留被续期证书的模板和 EKU，并在 CSR 不含 SubjectAltName 时保留其 SubjectAltName (v2.252)' },
+          { label: '按证书续期 (3.0)', text: '由证书所记录的配置文件（2.x 的 WSTEP 证书：默认配置文件）在其签发 CA 下服务；当该配置文件已被删除或已禁用时拒绝，每次拒绝都会连同配置文件和原因写入审计。只有 SID 会由该配置文件的连接器再次检查：已从组中移除的计算机在其证书被吊销前仍可续期。通过 TLS 时，要求配置文件的签发 CA 即 mTLS CA 或在其之下；其他配置文件通过 Kerberos 续期，由领域的配置文件提供服务，新证书会记录该配置文件' },
           { label: '证书类型', text: '没有服务器身份验证时，带有电子邮件保护或 EFS 的模板签发 S/MIME 证书，带有客户端身份验证或智能卡登录的模板签发客户端证书：没有 SAN 的用户请求 CN=jdoe 不会从其 CN 得到 DNS 名称。没有密钥用法的请求会获得模板配置的密钥用法，否则获得该模板类型的默认值：S/MIME 或 EFS 为数字签名、密钥加密和不可否认性，智能卡登录为数字签名和密钥加密，客户端身份验证仅为数字签名。任何其他模板或无模板则签发服务器证书' },
           { label: 'Docker 中的 Kerberos (v2.251)', text: 'Docker 镜像包含 pyspnego 的 Kerberos 后端，因此 Kerberos 绑定在容器中的工作方式与 DEB 和 RPM 安装相同' },
         ]
@@ -194,7 +195,7 @@ export default {
     ],
     warnings: [
       '更改 HTTPS 证书需要重启服务',
-      '修改安全设置可能会锁定用户:, 保存前请验证访问权限',
+      '修改安全设置可能会锁定用户：保存前请验证访问权限',
     ],
   },
   helpGuides: {
@@ -207,10 +208,10 @@ export default {
 ## 通用
 
 - **Syslog 主机名**: 在转发的 syslog 消息中作为 HOSTNAME 发送；留空则使用本机主机名
-- **基础 URL**: 管理界面和 API 的规范 HTTPS URL；其他主机名和 IP 会重定向到它
+- **基础 URL**: 管理界面和 API 的规范 HTTPS URL；其他主机名和 IP 会重定向到它。密码重置邮件链接到它，否则链接到服务器 FQDN（\`UCM_FQDN\`）；两者都没有时，登录页会隐藏“忘记密码”，且重置会被拒绝
 - **协议基础URL**: 写入 CDP 和 OCSP 地址的基础 URL；使用 http:// 以避免 TLS 验证循环，留空则使用基础 URL
-- **HTTP协议端口**: 提供 CDP 和 OCSP 的明文 HTTP 端口；0 表示禁用，更改需要重启
-- **公共 ACME vhost**: ACME 目录 URL 中的具体主机名（例如 \`acme.ucm.example.com\`，而不是 \`*.ucm.example.com\`）。通配符 \`*.ucm.example.com\` **TLS 证书 SAN** 可同时覆盖 \`admin.ucm.example.com\` 和 \`acme.ucm.example.com\`。请在保存**之前**为 ACME vhost 配置好 DNS 和 TLS:: 重新读取目录的客户端会立即切换 URL。
+- **HTTP协议端口**: 提供 CDP 和 OCSP 的明文 HTTP 端口，其“同时通过明文 HTTP 提供”选项开启时也提供 SCEP；0 表示禁用，更改需要重启
+- **公共 ACME vhost**: ACME 目录 URL 中的具体主机名（例如 \`acme.ucm.example.com\`，而不是 \`*.ucm.example.com\`）。通配符 \`*.ucm.example.com\` **TLS 证书 SAN** 可同时覆盖 \`admin.ucm.example.com\` 和 \`acme.ucm.example.com\`。请在保存**之前**为 ACME vhost 配置好 DNS 和 TLS：重新读取目录的客户端会立即切换 URL。
 
 ## 外观
 
@@ -269,7 +270,7 @@ export default {
 使用 AES-128（Fernet，带 HMAC-SHA256）加密数据库中存储的所有私钥，由主密钥文件保护。该部分显示加密状态以及**已加密 / 未加密**密钥计数器。两个可选启用的环境变量可使缺失密钥在启动时直接失败：\`UCM_REQUIRE_DB_ENCRYPTION_KEY\`（集成密钥加密）和 \`UCM_REQUIRE_KEY_ENCRYPTION\`（私钥加密）。
 全新安装会在首次启动时创建主密钥（在容器中，仅当 \`/etc/ucm\` 是独立卷时）；设置的“安全”部分显示加密状态，未加载密钥时概览会显示横幅。
 
-> 💡 安全敏感设置（会话、锁定、HSTS、公共 URL、密码策略）需要 **admin:settings** 权限,, 这些字段对操作员锁定。
+> 💡 安全敏感设置（会话、锁定、HSTS、公共 URL、密码策略）需要 **admin:settings** 权限，这些字段对操作员锁定。
 
 > ⚠ 不包含您自身地址的列表会被拒绝。如果仍然失去访问权限，请设置 \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` 并重启 UCM。
 
@@ -310,7 +311,7 @@ export default {
 上传备份文件将 UCM 恢复到之前的状态。
 
 - 备份和恢复共用一个锁：备份运行期间恢复会被拒绝 (409)，手动备份则等待正在运行的恢复完成
-- In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer's rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted
+- 在 HA 模式下，从任一节点发起恢复时，会先让每个节点拒绝写入（503）并退出负载均衡器的轮转，直到恢复结束；若有节点在 30 秒内未确认，恢复会被拒绝并指明该节点。随后各节点逐个重启，重启后各自提供恢复后的状态
 - 3.0 起创建的归档按分块方式恢复，除非通过 \`BACKUP_MAX_ARCHIVE_MB\` 设置上限，否则不限制大小；更早的归档最大接受 \`BACKUP_MAX_UPLOAD_MB\`（默认 512 MB）。两者均在服务器环境中设置，被拒绝时会指明对应的参数；UCM 前面的反向代理仍保留其自身的请求体大小限制
 - 归档包含 ACME 客户端订单、批准请求和密钥恢复请求 (v2.251)
 - 其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook 会恢复为 \`名称 (2)\`
@@ -338,7 +339,7 @@ UCM 支持两种数据库后端：
 - 数据库大小和表数量
 
 ### 测试连接
-切换前验证 \`DATABASE_URL\`（例如 \`postgresql://user:pass@host:5432/ucm\`）。测试会打开真实连接并报告任何错误。 早于版本 13 的 PostgreSQL 服务器将被拒绝, UCM 需要 PostgreSQL 13 或更高版本。
+切换前验证 \`DATABASE_URL\`（例如 \`postgresql://user:pass@host:5432/ucm\`）。测试会打开真实连接并报告任何错误。 早于版本 13 的 PostgreSQL 服务器将被拒绝，UCM 需要 PostgreSQL 13 或更高版本。
 
 ### 切换后端
 将 \`DATABASE_URL\` 持久化到 \`/etc/ucm/ucm.env\`（DEB/RPM）并重启 UCM。只有账户、角色、SSO 和 MFA 表会被复制到新后端，因此您仍可登录；如果您希望保留其他数据，请先使用**迁移**。
@@ -379,7 +380,7 @@ UCM 支持两种数据库后端：
 - 查看可用更新的变更日志
 - 当前版本和构建信息
 - **自动更新**：在支持的安装（DEB/RPM）上，点击**安装更新**自动下载和安装最新版本
-- **HA mode**: on DEB/RPM, **Install Update** and the auto-install update the nodes one at a time, and the screen follows the rolling update (nodes done, node in progress, package of each node, node where it stopped and why, **Resume**)
+- **HA 模式**：在 DEB/RPM 上，**安装更新**和自动安装会逐个更新节点，界面会跟随滚动更新（已完成的节点、正在进行的节点、各节点的软件包、停止的节点及原因、**继续**）
 - **更新通道**：稳定版、预发布版（候选发布版本）或 dev
 
 ## Webhook
@@ -448,7 +449,6 @@ UCM 支持两种数据库后端：
 - **来源**: 调度器续期服务器持有其私钥的证书：默认为通过表单或签署请求签发的证书（"manual"），以及使用服务器生成密钥的 SCEP、ACME 和 EST 注册。自行持有密钥的设备通过其协议续期
 - **等待审批**: 续期已排队等待审批的证书会交由该决定处理，前提是决定能在证书到期前作出
 - **期间已续期**: 操作员在本批次运行期间续期后的证书不会被再次续期；批次期间被删除的证书会被跳过
-- **短期证书**: 续期绝不会早于证书有效期的最后三分之一：27 天的证书在剩余 9 天时续期，而不是从签发起就续期
 - **立即运行**: 立即执行一轮续期，并报告其未处理的即将到期证书及按原因的计数：尚未进入有效期的最后三分之一、服务器未持有私钥、来源未被选中
 
 ## 计划备份
@@ -457,6 +457,7 @@ UCM 支持两种数据库后端：
 
 - **每日 / 每周 / 每月**频率
 - **保留**：早于设定天数的备份会被清理
+- **大小上限**：所有归档的总大小上限，单位 MiB（0 表示无上限）；超出时从最旧的归档开始删除并逐一审计。保留策略从不删除以下归档：单节点时为与其验证记录相符的最新归档、最多 2 个没有验证记录的归档以及保留的最少数量；HA 模式下为保留的最少数量。因此总大小可能仍高于上限，并会给出提示
 - 使用备份密码**加密**备份
 - **高可用**：归档存储在 PostgreSQL 中，因此每个节点都能列出并下载它们，并显示写入它们的节点；保留策略在主节点上执行。数据库丢失时归档也随之丢失：请将需要保留的归档下载到集群之外，并使用 PostgreSQL 自身的工具备份 PostgreSQL
 
@@ -469,7 +470,7 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 - **用途**: 将 Kerberos 计算机或用户主体解析为其 AD 对象，以便 UCM 能像真实 Windows CA 一样派生证书主题/SAN
 - **域控制器**: 每行一个，各用自己的主机名，按顺序尝试：某个域控制器宕机时，查询会故障转移到下一个。仅域名会导致证书验证失败，因为域控制器证书只包含其自身主机名
 - **LDAPS**: 切换以通过 SSL/TLS 使用 LDAP；**验证 SSL 证书** 验证域控制器的证书（当证书不受公共信任时，可选地针对自定义 CA 证书包进行验证）
-- **Base DN** 和 **Bind DN / 密码**: 用于查询的服务账户凭据；连接器启用时，Bind DN 和密码均为必填
+- **Base DN** 和 **Bind DN / 密码**: 域的基础 DN，带有其 DC 组成部分（\`DC=corp,DC=example\`，它同时命名所提供的 Kerberos 领域），位于域控制器端口（389 或 636，而非全局编录）上，以及用于查询的服务账户；连接器启用时，Bind DN 和密码均为必填
 - **测试连接**: 保存前验证连通性和凭据
 - **健康检查间隔**: 每个域控制器按此间隔通过真实绑定进行探测；无法访问的域控制器在注册时会被跳过，直到恢复。结果显示在连接器行和每个域控制器旁
 - **已禁用的连接器**: 已禁用的连接器不做任何查询，但在没有启用的连接器、SPN 或 keytab 指明领域时，其 Base DN 仍作为最后手段指明默认配置文件的领域
@@ -478,7 +479,7 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 
 ## Windows 自动注册（XCEP/WSTEP）
 
-通过 **MS-XCEP**（策略发现）和 **MS-WSTEP**（证书签发和续订）实现的原生 Windows 证书注册:, 与真实 ADCS 用于 MMC“申请新证书”、\`certreq\` 和无人值守 GPO 自动注册的协议相同。
+通过 **MS-XCEP**（策略发现）和 **MS-WSTEP**（证书签发和续订）实现的原生 Windows 证书注册：与真实 ADCS 用于 MMC“申请新证书”、\`certreq\` 和无人值守 GPO 自动注册的协议相同。
 
 ### 配置文件
 
@@ -500,7 +501,7 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 - **证书颁发机构**: 公布其模板并通过该配置文件签发证书的 CA
 - **有效期（天）**: 请求未匹配任何模板时，通过 WSTEP 签发的证书的有效期；匹配到模板时，使用该模板自身的有效期
 
-密钥类型为 **ML-DSA** 的模板通过其密钥算法 OID 公布，配合 Microsoft Software Key Storage Provider 和仅签名的密钥规格。它在 FIPS 模式下隐藏，尚未使用真实 Windows 客户端测试注册。
+密钥类型为 **ML-DSA** 的模板通过其密钥算法 OID 公布，配合 Microsoft Software Key Storage Provider 和仅签名的密钥规格。当 FIPS 模块不批准 ML-DSA 时，它在 FIPS 模式下隐藏，且尚未使用真实 Windows 客户端测试注册。
 
 **ECDSA** 模板在策略模式 3 中公布，以其曲线（\`ECDSA_P256\`、\`ECDSA_P384\`、\`ECDSA_P521\`）作为签名密钥和请求哈希，取模板摘要与曲线对应摘要中较强者；FIPS 模式之外的 RSA 模板仍为模式 2，该模式不指定请求哈希：Windows 此时用 SHA-1 签署其 CMC 请求，UCM 按这些客户端的要求予以接受；用 SHA-1 签名的普通 PKCS#10 仍会被拒绝。请求密钥必须与其所签发的模板相符：相同的曲线或 ML-DSA 参数集，或不更短的 RSA 密钥 (v2.251)。
 
@@ -526,24 +527,26 @@ Docker 镜像自 v2.251 起包含此后端。
 
 ### 证书续订绑定
 
-除用户名/密码和 Kerberos 外，WSTEP 还支持**客户端证书续订**，与真实 ADCS CES 端点一致：续订请求 (RST) 必须使用 **UCM 自身签发**的证书的私钥进行 XML-DSig 签名。出示的证书会与所配置 CA 存储的证书进行**逐字节**比对:, 仅凭序列号或主题永远不够。这使 Windows 客户端可以使用其当前证书无人值守地续订，无需凭据或 Kerberos 票证。
+除用户名/密码和 Kerberos 外，WSTEP 还支持**客户端证书续订**，与真实 ADCS CES 端点一致：续订请求 (RST) 必须使用 **UCM 自身签发**的证书的私钥进行 XML-DSig 签名。出示的证书会与所配置 CA 存储的证书进行**逐字节**比对：仅凭序列号或主题永远不够。这使 Windows 客户端可以使用其当前证书无人值守地续订，无需凭据或 Kerberos 票证。
 
 XML-DSig 没有 ML-DSA 签名方法，因此 **ML-DSA** 证书无法通过此方式续订：UCM 会在拒绝信息中指明该密钥，客户端需改为注册新证书。
 
-证书续期只服务通过 Windows 注册（WSTEP）签发的证书；手工签发的证书应重新注册，而不是续期。通过 TLS 时，待续期的证书即客户端证书：请启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU (v2.248)。监听器不信任的证书会在 TLS 握手期间被拒绝，UCM 看不到请求，因此 UCM 不会记录审计（请查看客户端输出和服务日志）。不属于 mTLS CA 的配置文件只能通过 Kerberos 续期；若 Kerberos 拒绝（请求者已从 AD 组中移除、配置文件已禁用），则无法续期。
+Windows 也可以用 \`certreq ... Renew\` 续期，以待续期的证书作为 TLS 客户端证书进行身份验证：请启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU (v2.248)。自 3.0 起，只有通过 Windows 注册签发的证书才能这样续期：在界面中签发的证书会被拒绝（\`not issued through Windows enrollment\`），必须通过 Windows 注册重新签发。
+
+自 3.0 起，按证书续期由证书所记录的配置文件（2.x 的 WSTEP 证书：默认配置文件）在该配置文件的签发 CA 下服务；当该配置文件已被删除或已禁用时拒绝，每次拒绝都会连同配置文件和原因写入审计。只有 SID 会由该配置文件的连接器再次检查：请吊销已从组中移除的计算机的证书。TLS 客户端证书仅适用于其签发 CA 即 mTLS CA 或在其之下的配置文件：监听器不信任的证书会在 TLS 握手期间被拒绝，UCM 看不到请求，因此 UCM 不会记录审计（请查看客户端输出和服务日志）。其他配置文件只能通过 Kerberos 续期（由主体所在领域的配置文件提供服务，新证书会记录该配置文件）；若 Kerberos 拒绝（请求者已从 AD 组中移除、配置文件已禁用），则无法续期。Kerberos keytab 会保留已禁用配置文件的密钥，因此其请求会被拒绝并留下审计条目：只有删除该配置文件才会移除这些密钥。
 
 ### SID 安全扩展 (KB5014754)
 
-在**经 Kerberos 身份验证的签发**中，UCM 会在签发证书的 Microsoft SID 安全扩展（\`szOID_NTDS_CA_SECURITY_EXT\`）中嵌入请求者的 AD SID。域控制器将其用于**强证书映射**（KB5014754）:, 自 AD 对基于证书的身份验证（智能卡登录、PKINIT）强制执行强映射以来，这是必需项。启用 AD 连接器时，SID 无法解析的请求会被拒绝而不是在没有它的情况下签发，其中也包括来自连接器域之外的领域的主体。WSTEP、EST 或 SCEP 续期会沿用被续期证书的 SID 扩展，绝不采用 CSR 中的 SID；启用 AD 连接器时，该 SID 必须仍对应目录中的某个账户。
+在**经 Kerberos 身份验证的签发**中，UCM 会在签发证书的 Microsoft SID 安全扩展（\`szOID_NTDS_CA_SECURITY_EXT\`）中嵌入请求者的 AD SID。域控制器将其用于**强证书映射**（KB5014754）：自 AD 对基于证书的身份验证（智能卡登录、PKINIT）强制执行强映射以来，这是必需项。启用 AD 连接器时，SID 无法解析的请求会被拒绝而不是在没有它的情况下签发，其中也包括来自连接器域之外的领域的主体。WSTEP、EST 或 SCEP 续期会沿用被续期证书的 SID 扩展，绝不采用 CSR 中的 SID；启用 AD 连接器时，该 SID 必须仍对应目录中的某个账户。
 
 ### AD 派生主题
 
-证书模板可以选择**从 Active Directory 构建主题**（模板 → 注册）：对于无人值守的 GPO 自动注册，主题和 SAN 通过 AD 连接器从请求者的 AD 对象派生，而不要求客户端提供:, 与真实 ADCS 模板配置自动注册的方式一致。与此独立，**允许自动注册** 会在证书注册策略中将模板公布为 \`autoEnroll=true\`，使经 GPO/Kerberos 身份验证的客户端在登录时自动请求它。在 Kerberos 端点上，此类模板以及每个机器模板（Web 服务器、VPN、OCSP 签名类型）的主题始终来自 Active Directory，无论请求写了什么：机器模板取计算机的 DNS 名称，用户账户不能使用它，而“从 Active Directory 构建主题”的模板不能给计算机使用。两者都不是的模板，只要配置了其 EKU，就沿用客户端提供的主题，用户名/密码端点上的每个模板也是如此，因为它们没有可用来构建主题的目录身份。在 Kerberos 端点上，未匹配任何模板的请求也从 Active Directory 获取主题：计算机用其 DNS 名称，用户仅在有模板选择启用时才可以，否则会被拒绝。
+证书模板可以选择**从 Active Directory 构建主题**（模板 → 注册）：对于无人值守的 GPO 自动注册，主题和 SAN 通过 AD 连接器从请求者的 AD 对象派生，而不要求客户端提供：与真实 ADCS 模板配置自动注册的方式一致。与此独立，**允许自动注册** 会在证书注册策略中将模板公布为 \`autoEnroll=true\`，使经 GPO/Kerberos 身份验证的客户端在登录时自动请求它。在 Kerberos 端点上，此类模板以及每个机器模板（Web 服务器、VPN、OCSP 签名类型）的主题始终来自 Active Directory，无论请求写了什么：机器模板取计算机的 DNS 名称，用户账户不能使用它，而“从 Active Directory 构建主题”的模板不能给计算机使用。两者都不是的模板，只要配置了其 EKU，就沿用客户端提供的主题，用户名/密码端点上的每个模板也是如此，因为它们没有可用来构建主题的目录身份。在 Kerberos 端点上，未匹配任何模板的请求也从 Active Directory 获取主题：计算机用其 DNS 名称，用户仅在有模板选择启用时才可以，否则会被拒绝。
 
 ## 关于
 
 - **系统信息**、**链接与资源**和**支持 UCM** 链接到 Ko-fi。管理员每个 UCM 版本还会看到一次可关闭的 Ko-fi 卡片
-- **检查 FIPS 就绪情况**（admin:system）：列出 FIPS 模式在此实例上会拒绝的内容（scrypt 密码哈希、Ed25519 颁发机构、Argon2id 备份、无 TLS 的 PostgreSQL 等），并给出各自的补救办法。不会更改任何内容。在 FIPS 模式下，其阻断项也会在每次启动时写入日志，每项一行错误及其补救措施，服务状态也会包含它们；UCM 仍会启动，并在使用时拒绝每项受影响的操作
+- **检查 FIPS 就绪情况**（admin:system）：列出 FIPS 模式在此实例上会拒绝的内容（scrypt 密码哈希、在不支持 EdDSA 的模块上的 Ed25519 颁发机构、Argon2id 备份、无 TLS 的 PostgreSQL、短于 14 字节的 HMAC 密钥等），并给出各自的补救办法。不会更改任何内容。在 FIPS 模式下，其阻断项也会在每次启动时写入日志，每项一行错误及其补救措施，服务状态也会包含它们；UCM 仍会启动，并在使用时拒绝每项受影响的操作
 `
   }
 }

@@ -212,7 +212,7 @@ Le panneau de contrôle (ouvert depuis la connexion, nécessite le canal admin) 
 | Le test de connexion échoue | Vérifiez le nom d'hôte, le port 443 et que certsrv est accessible |
 | Aucun modèle trouvé | Vérifiez que le compte UCM a les permissions d'inscription sur la CA |
 | EOBO refusé | Vérifiez le certificat d'agent d'inscription et les permissions du modèle |
-| Requête bloquée en attente | Approuvez-la depuis le panneau de contrôle CA, ou sur la console CA Windows puis actualisez le statut dans UCM |
+| Requête bloquée en attente | Approuvez-la depuis le panneau de contrôle CA, ou sur la console CA Windows, puis importez le certificat ou lancez la synchronisation de l'inventaire |
 | Le test du canal admin échoue | Vérifiez que WinRM est activé sur la CA, le port/transport, et que pywinrm est installé |
 | Révocation absente sur la CA | Activez le canal admin WinRM : sans lui, la révocation est locale à UCM |
 | Attente non détectée (CA non anglophone) | Corrigé en v2.192. UCM reconnaît désormais les pages d'attente AD CS localisées |

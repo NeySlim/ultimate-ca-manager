@@ -19,8 +19,8 @@ export default {
           { label: 'Créer un rôle', text: 'Définir un nouveau rôle avec un nom et une description' },
           { label: 'Matrice de permissions', text: 'Cocher/décocher les permissions par catégorie (CA, Certificats, Clés privées, etc.)' },
           { label: 'Couverture', text: 'Une barre et un décompte n/N des permissions accordées au rôle' },
-          { label: 'Permissions des rôles système', text: 'Un rôle système affiche les permissions que UCM lui applique ; Admin affiche toutes les permissions de la matrice' },
           { label: 'Nombre d\'utilisateurs', text: 'Voir combien d\'utilisateurs sont assignés à chaque rôle' },
+          { label: 'Permissions des rôles système', text: 'Un rôle système affiche les permissions que UCM lui applique ; Admin affiche toutes les permissions de la matrice' },
           { label: "Permissions des CA SSH (v2.248)", text: "read:ssh_cas, write:ssh_cas et delete:ssh_cas régissent les CA SSH : write:ssh ne les crée ni ne les modifie plus. Les rôles, groupes et clés d'API qui détenaient une permission SSH ont reçu la permission correspondante à la mise à jour" },
         ]
       },
@@ -40,7 +40,7 @@ RBAC fournit une gestion granulaire des permissions. Définissez des rôles pers
 
 ## Rôles système
 
-Quatre rôles intégrés qui ne peuvent pas être modifiés ou supprimés :
+Quatre rôles intégrés qui ne peuvent pas être modifiés ou supprimés. La page RBAC affiche chacun avec les permissions qu'UCM lui applique :
 
 - **Admin** : Accès complet à tout
 - **Opérateur** : Gérer les certificats, CA, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule. Pas d'accès aux utilisateurs ni au RBAC
