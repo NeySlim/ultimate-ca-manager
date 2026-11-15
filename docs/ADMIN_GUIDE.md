@@ -325,7 +325,7 @@ sudo systemctl stop ucm
 sudo cp /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
 sudo systemctl start ucm
 ```
-On PostgreSQL, use `pg_dump` instead. A copy of the database is not a `.ucmbkp` archive: the private keys stay under this installation's key-encryption key.
+On PostgreSQL, use `pg_dump` instead. A copy of the database is not a `.ucmbkp` archive and the restore action does not read it: the private keys stay under this installation's key-encryption key.
 
 ### Restoring Backups
 
@@ -407,7 +407,7 @@ The migration is **bidirectional** (SQLite ↔ PostgreSQL) and:
 
 > **Admin lockout fix (v2.141).** Switching the active backend from PostgreSQL back to SQLite (or vice versa) no longer locks out the admin account. The bcrypt password hash is preserved across the swap and the in-process SQLAlchemy session pool is rebuilt before the next login attempt. Earlier releases could leave a stale connection pool pointing at the old backend, causing `Invalid credentials` on first login after the swap.
 
-> **Backups now backend-aware (v2.141).** The **Backup** action and `/api/v2/system/backup` automatically dispatch to `pg_dump -Fc` when PostgreSQL is the active backend (custom format, suitable for `pg_restore`). SQLite continues to use file-copy snapshots. Restore handles both formats transparently.
+> **Three different backups.** **Settings** > **Backup** and `POST /api/v2/system/backup` create a password-encrypted UCM archive (`.ucmbkp`) on both database backends; restore it through UCM. The snapshot taken before **Migrate data** (`/opt/ucm/data/backups/db_migration/`, a file copy on SQLite, a `pg_dump` custom-format file on PostgreSQL) and a `pg_dump` you take yourself are not UCM archives: restore them with the database's own tools (for PostgreSQL, see [Restoring with PostgreSQL's tools](HA.md#restoring-with-postgresqls-tools)), and keep the key-encryption key of the installation they came from.
 
 ### SQLite Database
 
