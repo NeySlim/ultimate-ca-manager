@@ -61,7 +61,7 @@ from sqlalchemy import text
 import migration_runner
 engine = migration_runner._engine(sys.argv[1])
 with engine.connect() as conn:
-    conn.execute(text("SET application_name = :n"), {"n": sys.argv[2]})
+    conn.execute(text("SELECT set_config('application_name', :n, false)"), {"n": sys.argv[2]})
     conn.execute(text("SELECT pg_sleep(600)"))
 """
 
