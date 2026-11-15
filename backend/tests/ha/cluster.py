@@ -2,7 +2,8 @@
 
 Every node gets an environment built here and nothing else: its own DATA_DIR,
 UCM_CONFIG_DIR, logs and port under the bench directory, its own database URL
-(application_name = schema_node), the shared SECRET_KEY and KEY_ENCRYPTION_KEY.
+(application_name = schema_node), the shared SECRET_KEY, KEY_ENCRYPTION_KEY and
+UCM_DB_ENCRYPTION_KEY.
 The guard on its PYTHONPATH stops a node that touches an installation path.
 """
 import os
@@ -228,6 +229,7 @@ class Cluster:
         shared = {
             'SECRET_KEY': secrets.token_hex(32),
             'KEY_ENCRYPTION_KEY': Fernet.generate_key().decode(),
+            'UCM_DB_ENCRYPTION_KEY': Fernet.generate_key().decode(),
             'UCM_HA': '1',
             'INITIAL_ADMIN_PASSWORD': self.password,
             'FQDN': 'ucm-ha.test',
