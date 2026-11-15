@@ -263,6 +263,10 @@ def probe(config):
     servers = lookup.config_servers(config)
     if not servers:
         return []
+    unreadable = lookup.unreadable_bind_password(config)
+    if unreadable:
+        logger.warning('AD Connector: %s', unreadable)
+        return None
     # The same rule the lookups and the save apply: an anonymous bind is
     # not a connection this connector makes, so nothing is probed either.
     if not lookup.has_bind_credentials(config):
@@ -327,6 +331,9 @@ def _probe_one(config):
         return {'status': 'skipped', 'reason': 'not configured or disabled'}
     # A skip, not a warning: the scheduler wakes every minute, and the fix
     # for this is in the settings dialog, not in the log.
+    unreadable = lookup.unreadable_bind_password(config)
+    if unreadable:
+        return {'status': 'skipped', 'reason': unreadable}
     if not lookup.has_bind_credentials(config):
         return {'status': 'skipped', 'reason': 'bind credentials missing'}
 

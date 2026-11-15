@@ -29,6 +29,18 @@ def validate_ha_config(config=None):
             logger.warning("HA: the local master.key overrides KEY_ENCRYPTION_KEY on this node")
     elif not os.getenv('KEY_ENCRYPTION_KEY'):
         raise SystemExit("UCM_HA=1 requires KEY_ENCRYPTION_KEY set in the environment, identical on every node")
+    # The integration secrets' key: a machine-derived one differs on every node
+    db_key = os.getenv('UCM_DB_ENCRYPTION_KEY')
+    if not db_key:
+        raise SystemExit("UCM_HA=1 requires UCM_DB_ENCRYPTION_KEY set in the environment, identical on "
+                         "every node (it encrypts the integration secrets)")
+    from cryptography.fernet import Fernet
+    try:
+        Fernet(db_key.encode())
+    except Exception:
+        raise SystemExit("UCM_DB_ENCRYPTION_KEY is not a Fernet key (32 bytes, url-safe base64): generate one "
+                         "with: python -c \"from cryptography.fernet import Fernet; "
+                         "print(Fernet.generate_key().decode())\"") from None
 
 
 def ha_refusal(reason):

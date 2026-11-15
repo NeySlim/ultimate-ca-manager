@@ -68,8 +68,10 @@ def _smtp_authenticate(server: smtplib.SMTP, config: SMTPConfig) -> None:
             # attempt mints a fresh one.
             smtp_oauth.invalidate_cache(config.id)
             raise smtplib.SMTPAuthenticationError(code, resp)
-    elif config.smtp_user and config.smtp_password:
-        server.login(config.smtp_user, config.smtp_password)
+    elif config.smtp_user and config._smtp_password:
+        # A password this node cannot open fails here: the mail is never sent unauthenticated
+        from utils.encryption import decrypt_required
+        server.login(config.smtp_user, decrypt_required(config._smtp_password, 'SMTP password'))
 
 
 class EmailService:

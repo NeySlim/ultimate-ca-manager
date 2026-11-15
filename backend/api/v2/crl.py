@@ -5,6 +5,7 @@ CRL & OCSP Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from fips_mode import FipsRestricted
+from utils.encryption import SecretUnreadable
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.protocol_url import get_protocol_base_url
@@ -155,6 +156,10 @@ def regenerate_crl(ca_id):
         raise  # the app handler answers 400 with the FIPS problem type
     except CRLSigningKeyMismatch as e:
         return error_response(str(e), 409)
+    except SecretUnreadable as e:
+        # The message names the secret, never its value: the operator knows what to restore
+        logger.error(f'Failed to regenerate CRL: {e}')
+        return error_response(str(e), 500)
     except Exception as e:
         logger.error(f'Failed to regenerate CRL: {e}')
         return error_response("Failed to regenerate CRL", 500)

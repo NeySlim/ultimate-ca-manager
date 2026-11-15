@@ -36,6 +36,7 @@ account), and the falsy ``UNREACHABLE`` when no DC binds, a
 search raises or returns an LDAP error result, or the enabled connector lacks a server
 or base DN, so a caller can refuse the request or fault on its own side.
 """
+from utils.encryption import SecretUnreadable, decrypt_required
 import contextvars
 import logging
 import os
@@ -282,9 +283,33 @@ def _build_tls(config):
 BIND_CREDENTIAL_MISSING = 'bind credentials missing, refusing anonymous bind'
 
 
+class ADSecretUnreadable(ValueError, SecretUnreadable):
+    """The stored bind password this node's database key does not open; the message names it."""
+
+
+def _bind_password(config):
+    """The bind password: a saved row's token must open, a form object carries it typed."""
+    if not hasattr(config, '_bind_password'):
+        return getattr(config, 'bind_password', None)
+    try:
+        return decrypt_required(config._bind_password,
+                                f'AD connector {getattr(config, "id", None)} bind password')
+    except SecretUnreadable as e:
+        raise ADSecretUnreadable(str(e)) from e
+
+
 def has_bind_credentials(config):
     """Whether a config-like object carries both halves of the bind credential."""
     return bool(getattr(config, 'bind_dn', None) and getattr(config, 'bind_password', None))
+
+
+def unreadable_bind_password(config):
+    """The message naming a saved bind password this node cannot open, else None."""
+    try:
+        _bind_password(config)
+    except ADSecretUnreadable as e:
+        return str(e)
+    return None
 
 
 class ADConnectorConnectionError(Exception):
@@ -370,7 +395,7 @@ def _connect_to(config, host, tls, connect_timeout=None):
         tls=tls, get_info=ldap3.ALL, connect_timeout=connect_timeout or _LDAP_CONNECT_TIMEOUT_SECONDS,
     )
     return ldap3.Connection(
-        server, user=config.bind_dn, password=config.bind_password,
+        server, user=config.bind_dn, password=_bind_password(config),
         auto_bind=True, check_names=False, receive_timeout=_LDAP_RECEIVE_TIMEOUT_SECONDS,
     )
 
@@ -389,6 +414,7 @@ def _connect(config):
     servers = config_servers(config)
     if not servers:
         raise ValueError('AD Connector has no server configured')
+    _bind_password(config)  # an unreadable one is named, not taken for a missing one
     if not has_bind_credentials(config):
         raise ValueError(BIND_CREDENTIAL_MISSING)
 
@@ -860,7 +886,13 @@ def fetch_domain_sid(config):
     """``read_domain_sid`` over a fresh bind to the first DC that accepts it; None when
     no DC binds. A save waits for it: no bind starts once the per-DC connect timeout of the
     connection test (``_LDAP_CONNECT_TIMEOUT_SECONDS``) has passed. Never raises."""
-    if not config_servers(config) or not has_bind_credentials(config):
+    if not config_servers(config):
+        return None
+    unreadable = unreadable_bind_password(config)
+    if unreadable:
+        logger.warning('AD Connector: could not bind to read the domain SID: %s', unreadable)
+        return None
+    if not has_bind_credentials(config):
         return None
     token = _bind_deadline.set(_clock() + _LDAP_CONNECT_TIMEOUT_SECONDS)
     try:
@@ -903,6 +935,11 @@ def test_connection(config):
     if not servers:
         return {'success': False, 'partial': False,
                 'message': 'Server is required', 'servers': []}
+    try:
+        _bind_password(config)  # an unreadable one is named, not taken for a missing one
+    except ADSecretUnreadable as e:
+        logger.warning('AD Connector: %s', e)
+        return {'success': False, 'partial': False, 'message': str(e), 'servers': []}
     if not has_bind_credentials(config):
         logger.warning('AD Connector: %s', BIND_CREDENTIAL_MISSING)
         return {'success': False, 'partial': False,

@@ -320,12 +320,20 @@ def sso_callback(provider_type):
             code_verifier = session.pop('sso_pkce_verifier', None)
             expected_nonce = session.pop('sso_nonce', None)
 
+            from utils.encryption import SecretUnreadable, decrypt_required
+            try:
+                client_secret = decrypt_required(provider._oauth2_client_secret,
+                                                 f'SSO provider {provider.name} client secret')
+            except SecretUnreadable as e:
+                # Never a token request without the secret the provider was saved with
+                logger.error(str(e))
+                return redirect(_login_error('token_exchange_failed', oauth2_next))
             token_data = {
                 'grant_type': 'authorization_code',
                 'code': code,
                 'redirect_uri': callback_url,
                 'client_id': provider.oauth2_client_id,
-                'client_secret': provider.oauth2_client_secret,
+                'client_secret': client_secret,
             }
             if code_verifier:
                 token_data['code_verifier'] = code_verifier

@@ -190,7 +190,7 @@ pip install -r backend/requirements.txt
 python wsgi.py
 ```
 
-Building the Docker image from a clone needs the same frontend build first: the `Dockerfile` copies `frontend/dist/` as is.
+Building the Docker image from a clone needs the same frontend build first: the `Dockerfile` copies `frontend/dist/` as is. It also needs BuildKit, for the standard image as for the FIPS one: the `Dockerfile` uses `RUN --mount` steps that the legacy builder refuses ("the --mount option requires BuildKit"). Docker uses BuildKit when its buildx plugin is installed: check with `docker buildx version`, and install the `docker-buildx-plugin` package (Docker's repositories) or `docker-buildx` (Debian, Ubuntu) when the command is missing.
 
 ```bash
 (cd frontend && npm ci && npm run build)

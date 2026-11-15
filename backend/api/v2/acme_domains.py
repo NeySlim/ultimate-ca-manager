@@ -9,6 +9,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils.encryption import SecretUnreadable
 from models import db, AcmeDomain, DnsProvider, CA
 from services.acme import domain_match
 from utils.san_parse import strip_wildcard
@@ -280,11 +281,9 @@ def test_domain_access():
     
     # Test by creating/deleting a TXT record
     try:
-        from services.acme.dns_providers import create_provider
-        import json as _json
-        
-        creds_raw = provider.credentials or '{}'
-        credentials = _json.loads(creds_raw) if isinstance(creds_raw, str) else creds_raw
+        from services.acme.dns_providers import create_provider, saved_credentials
+
+        credentials = saved_credentials(provider)
         dns_client = create_provider(provider.provider_type, credentials)
         base_domain = strip_wildcard(domain)
         test_record = f"_acme-test"
@@ -309,7 +308,9 @@ def test_domain_access():
             },
             message=f'DNS access test successful for {domain} via {provider.name}'
         )
-        
+
+    except SecretUnreadable as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"DNS access test failed for domain {domain}: {e}", exc_info=True)
         return error_response(
