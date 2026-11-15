@@ -24,6 +24,7 @@ tests/test_discovery_timestamps.py
 tests/test_health_ha.py
 tests/test_ha_softhsm.py
 tests/test_sessions_store.py
+tests/test_redis_sessions_pg.py
 tests/test_factor_change_sessions.py
 tests/test_dashboard*.py
 tests/test_protocol_approval_*.py

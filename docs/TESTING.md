@@ -99,6 +99,19 @@ Each test file covers 3 levels per endpoint:
 - No external dependencies (no Docker, no network)
 - PostgreSQL mode: `UCM_TEST_APP_PG_URL` runs the same fixtures on PostgreSQL, see [testing/postgres-harness.md](testing/postgres-harness.md)
 
+#### Optional backends: SoftHSM, GSSAPI, Redis
+
+Tests that need a system component carry a marker: `needs_softhsm`, `needs_gssapi` or `needs_redis` (`tests/optional_backends.py`). Without the component they are skipped; with `UCM_TEST_REQUIRE_SOFTHSM=1`, `UCM_TEST_REQUIRE_GSSAPI=1` or `UCM_TEST_REQUIRE_REDIS=1` a skip of a marked test fails instead. The CI job "Backend Tests (SoftHSM, GSSAPI, Redis)" installs the three and runs each marker with its variable set.
+
+The Redis tests need the `redis-server` binary on the `PATH`, nothing else: each test run starts its own server on a Unix socket in its temporary directory (`--port 0`, no persistence) and stops it at the end; a system Redis, running or not, is never used.
+
+```bash
+cd backend
+UCM_TEST_REQUIRE_REDIS=1 pytest -m needs_redis tests/
+```
+
+They run two applications on one Redis (sessions shared, closed and expired across both, Redis stopped and restarted), and three processes for the WebSocket events (two web processes with a Socket.IO client each, and one process that emits like the scheduler). The test of Redis taking precedence over the PostgreSQL session table also needs a PostgreSQL URL (`UCM_TEST_APP_PG_URL` or `UCM_TEST_PG_URL`); no CI job provides both, so it runs only where both are set.
+
 ### Frontend Tests
 
 ```bash

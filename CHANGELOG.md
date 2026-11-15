@@ -96,6 +96,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - **`RATE_LIMIT_ENABLED=1`, `yes` or `on` no longer drops the route limits (sign-in, password reset and the 200 per minute default).** Only `true` turned on the route limits while the tiered limiter also took `1`, `yes` and `on`; both now read the variable the same way (any case), and an empty value keeps the default, on.
+- **WebSocket events through Redis on a Unix socket.** With a `unix://` `REDIS_URL`, the event relay passed TCP keepalive options that a Unix socket connection refuses, so every WebSocket connection failed and no browser received real-time events; they now go through Redis as with a TCP address.
 - **Form labels name their field.** Text fields, text areas and selects are now tied to their label, so assistive technologies announce the field and a click on the label focuses it.
 - **The page language follows the interface language.** The `lang` attribute of the page changes with the language chosen, so screen readers and browsers read it in that language.
 - **Recovery codes are shown when TOTP is enabled.** The enrolment dialog closed on confirmation and the codes the server returned were never shown; the dialog now lists them until they are marked as saved.
