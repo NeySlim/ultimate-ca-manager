@@ -22,6 +22,7 @@ from flasgger import Swagger
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config.settings import get_config, BASE_DIR, redis_url as config_redis_url, session_store, SESSION_TABLE
+from config.settings import rate_limit_enabled
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
@@ -382,7 +383,7 @@ def create_app(config_name=None):
     })
     
     # Initialize rate limiter
-    if config.RATE_LIMIT_ENABLED:
+    if rate_limit_enabled():
         limiter.init_app(app)
         app.logger.info("✓ Rate limiting enabled")
     
@@ -525,21 +526,13 @@ def create_app(config_name=None):
             app.logger.info("✓ Database lock acquired")
             
             try:
-                # Check if DB is already initialized by another worker
+                # Registry first, then tables, then any index a cut start left out; a failure stops the start
                 from sqlalchemy import inspect
-                inspector = inspect(db.engine)
-                tables = inspector.get_table_names()
-                
-                fresh_install = not ('users' in tables and 'certificate_authorities' in tables)
-                
-                if not fresh_install:
-                    app.logger.info("✓ Database tables already exist")
-                else:
-                    # Registry first, then tables; a failure of either stops the start
-                    from migration_runner import build_fresh_schema
-                    app.logger.info("Creating database tables...")
-                    build_fresh_schema(db.create_all)
+                from migration_runner import start_schema
+                if start_schema(db.engine, db.metadata, db.create_all):
                     app.logger.info("✓ Database tables created/verified, migration baseline marked")
+                else:
+                    app.logger.info("✓ Database tables already exist")
                 
                 # ===== EXTENDED TABLES =====
                 # Import models to register them with SQLAlchemy
@@ -1094,7 +1087,7 @@ def create_app(config_name=None):
     # Enable rate-limiting middleware (auth brute-force protection, etc.)
     try:
         from security.rate_limiter import init_rate_limiter
-        if os.environ.get('RATE_LIMIT_ENABLED', 'true').lower() in ('true', '1', 'yes', 'on'):
+        if rate_limit_enabled():
             init_rate_limiter(app)
         else:
             app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")

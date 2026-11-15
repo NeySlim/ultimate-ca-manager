@@ -6287,7 +6287,8 @@
         "session_revoke": "Sitzung widerrufen",
         "session_revoke_all": "Sitzungen widerrufen",
         "deploy_binding_left_behind": "Bereitstellung auf altem Zertifikat verblieben",
-        "https_binding_left_behind": "HTTPS auf altem Zertifikat verblieben"
+        "https_binding_left_behind": "HTTPS auf altem Zertifikat verblieben",
+        "truststore_expiring": "Zertifikat im Vertrauensspeicher läuft ab oder ist abgelaufen"
       }
     }
   },
@@ -6336,7 +6337,8 @@
       "renewal_declined": "Erneuerung abgelehnt",
       "ca_expiring": "CA läuft ab",
       "deploy_binding_left_behind": "Bereitstellung auf altem Zertifikat verblieben",
-      "https_binding_left_behind": "HTTPS auf altem Zertifikat verblieben"
+      "https_binding_left_behind": "HTTPS auf altem Zertifikat verblieben",
+      "truststore_expiring": "Zertifikat im Vertrauensspeicher läuft ab oder ist abgelaufen"
     },
     "compliance": {
       "rsa_below_3072": "RSA unter 3072 Bit",
@@ -6372,6 +6374,29 @@
         "revoked": "Signierzertifikat widerrufen",
         "key_unavailable": "Signierschlüssel nicht verfügbar",
         "invalid": "Signierzertifikat nicht verwendbar"
+      },
+      "smtp": "E-Mail",
+      "webhooks": "Webhooks",
+      "auto_renewal": "Auto-Erneuerung",
+      "witness": {
+        "smtp": {
+          "not_configured": "Nicht konfiguriert",
+          "disabled": "Konfiguriert, aber deaktiviert",
+          "incomplete": "Aktiviert, Port oder Absenderadresse fehlt",
+          "ready": "Bereit"
+        },
+        "webhooks": {
+          "not_configured": "Keine Endpunkte",
+          "none_active_one": "{{count}} Endpunkt, keiner aktiv",
+          "none_active_other": "{{count}} Endpunkte, keiner aktiv",
+          "active_one": "{{count}} aktiver Endpunkt",
+          "active_other": "{{count}} aktive Endpunkte"
+        },
+        "auto_renewal": {
+          "enabled": "Aktiviert",
+          "disabled": "Deaktiviert"
+        },
+        "unavailable": "Status nicht verfügbar"
       }
     },
     "filter": {

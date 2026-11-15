@@ -19,10 +19,10 @@ A menu path in this guide such as **Modules** > **PKI** > **Certificates** means
 - the UCM logo, which goes back to the Dashboard
 - **Dashboard**, **Certificates** and **Certificate Authorities**, always present; a count badge next to Certificates shows how many certificates are expiring or expired, and selecting it dismisses it until the count changes
 - up to three modules you pinned
-- the **Modules** menu, which lists every module you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Pages you have no right to are not shown. The pin button next to a page keeps it in the bar
+- the **Modules** menu, which lists every module you may open in four groups: **PKI**, **Protocols**, **Governance** and **Administration**. Modules you have no right to are not shown. The pin button next to a module keeps it in the bar
 - search (`Ctrl K`), the help button, the live-link indicator, the theme menu, the notification bell and your account menu
 
-The bell lists what needs your attention: critical items and pending approvals from the To handle queue (ACME order failed, ACME renewal failed, Approval pending, CRL due, CRL missing, Manual renewal due, Automatic renewal blocked, CA expiring, Deployment left on the old certificate, HTTPS left on the old certificate), plus Backup failed, Restore failed, Session revoked and Sessions revoked from the audit log. Queue entries open the page of the item, audit entries open the audit log, and a queue entry without a path has no link; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
+The bell lists what needs your attention: critical items and pending approvals from the To handle queue (ACME order failed, ACME renewal failed, Approval pending, CRL due, CRL missing, Manual renewal due, Automatic renewal blocked, CA expiring, Deployment left on the old certificate, HTTPS left on the old certificate, Trust store certificate expiring or expired), plus Backup failed, Restore failed, Session revoked and Sessions revoked from the audit log. Queue entries open the page of the item, audit entries open the audit log, and a queue entry without a path has no link; nothing is approved or retried from the bell itself. Mark an item, or all of them, as read.
 
 A status bar shows whether the service is running and the UCM version; on an instance in HA mode it also names the node and whether it is the leader.
 
@@ -33,7 +33,9 @@ On a page, the **list** holds the items and the **details** show the selected it
 Open **Dashboard** in the top bar. The overview has six cards, each loading on its own: **To handle**, **Automation health**, **Hierarchy**, **Expiry horizon**, **Compliance** and **Latest operations**. The **Operator**, **Manager** and **All cards** presets choose which cards are shown, and the layout follows your account.
 
 - Each entry of **To handle** opens the object it names: the approval, the SCEP or key recovery request, the ACME order, the CA or its CRL. If someone handled it meanwhile, a message says so.
+- With the right to read the trust store, **To handle** also lists the trust store certificates that expire within 90 days (warning) and those already expired, however long ago (critical); each opens its detail in the Trust Store page.
 - **Automation health** shows ACME, SCEP and EST successes and failures, the TSA signer and the scheduler. The TSA line appears while the TSA is enabled; until a signer is set up it reads "Not configured", without alert, and it turns red when the signer is expired, revoked, without its key or within 30 days of expiry. The Scheduler line turns red when a task failed or when its state is no longer published, even if the latest run was fine.
+- The **Email**, **Webhooks** and **Auto-Renewal** lines of the health card appear only with the right to read settings. A setting that is not configured is shown as information; email that is configured but disabled or missing its port or From address, and webhooks with none active, show as alerts. These lines read the settings when the page opens, when you return to the tab or on **Refresh**.
 - **Hierarchy** draws the CAs under their parent with their CRL and OCSP state; each opens its page.
 - **Expiry horizon** counts the expiring and expired certificates and lists the next to expire, the TSA signer and delegated OCSP responder certificates included. **Compliance** counts live certificates by key algorithm and weakness. Their counters open the certificate list filtered to what they count.
 - Cards reload by themselves when certificates or CAs change, when the live link comes back and when you return to the tab. **Refresh** reloads them all at once. While the live link is down, cards reload once a minute.
@@ -143,7 +145,7 @@ Click **New** to make one, or select a template and click **Copy** to start from
 
 ### Trust Store
 
-Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync** imports the operating system's trusted CAs, and **Export** downloads a certificate and **Export Bundle**, in the toolbar, downloads all of them as one PEM file.
+Open **Modules** > **PKI** > **Trust Store**. It keeps trusted root and intermediate CA certificates; a certificate's chain view and exports complete the chain with a trust store certificate whose subject matches the issuer. **Sync** imports the operating system's trusted CAs, **Export** downloads one certificate, and **Export Bundle** in the toolbar downloads all of them as one PEM file.
 
 ### User Certificates
 

@@ -18,10 +18,10 @@ The Overview is the home page: six independent cards over the live data of your 
 ## Cards
 
 ### To handle
-The six most urgent items, critical first, each linking to its record. A folded tier gives the total per kind; the four renewal kinds open the certificate list.
+The six most urgent items, critical first, each linking to its record. With the right to read the trust store, the trust store certificates that expire within 90 days or have already expired are listed too (the expired ones as critical). A folded tier gives the total per kind; the four renewal kinds open the certificate list.
 
 ### Automation health
-Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state.
+Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state and, while the TSA is enabled, the state of its signer. With the right to read settings, three more lines tell whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts.
 
 ### Hierarchy
 The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days. Each authority opens its page.

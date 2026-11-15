@@ -28,6 +28,7 @@ from services.cert_service import CertificateService
 from services.certificate_parser import CertificateParser
 from utils import trusted_proxy
 from utils.key_codec import load_pem_bytes
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS
 from services.mtls_enrollment import (
     certificate_row_for, enrolments_of, issuing_ca_for, made_for_account, normalized_fingerprint,
@@ -607,6 +608,10 @@ def enroll_import_certificate():
     except Exception as e:
         logger.error(f"Failed to parse imported PEM: {e}")
         return error_response('Invalid PEM certificate data', 400)
+    try:
+        require_readable_extensions(cert_obj)
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
 
     issuing_ca = issuing_ca_for(cert_obj)
     if issuing_ca is None:

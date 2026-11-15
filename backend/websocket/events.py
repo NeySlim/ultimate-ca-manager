@@ -76,14 +76,13 @@ def _message_queue(app) -> Optional[socketio_pkg.RedisManager]:
         return None
     # Bound each emit on an unreachable or silently dead Redis; a read timeout
     # would also hit the idle pub/sub listener, so keepalive detects dead peers.
+    options = {"socket_connect_timeout": 2}
+    if urlparse(url).scheme != "unix":  # TCP options: a Unix socket connection refuses them
+        options.update(socket_keepalive=True, socket_keepalive_options=_KEEPALIVE_OPTIONS)
     return socketio_pkg.RedisManager(
         url,
         channel=_queue_channel(url, app.config.get("SESSION_KEY_PREFIX", "ucm:session:")),
-        redis_options={
-            "socket_connect_timeout": 2,
-            "socket_keepalive": True,
-            "socket_keepalive_options": _KEEPALIVE_OPTIONS,
-        },
+        redis_options=options,
     )
 
 

@@ -1,8 +1,8 @@
 /**
  * Every "A > B" path the guides give names a place the console has: a group and a module of
- * the Modules menu (read from the navigation registry), or a tab of the Settings page. The user
- * guide must also name every page of the menu by its full path, and links to guide headings
- * must land on a heading that exists.
+ * the Modules menu (read from the navigation registry), or a tab of the Settings page, and every
+ * step after the module is a label its page shows. The user guide must also name every page of
+ * the menu by its full path, and links to guide headings must land on a heading that exists.
  */
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
@@ -49,7 +49,7 @@ function labelsOf(mod) {
   // A label with a trailing "(CA)" is written without it in prose
   for (const l of [...out]) out.add(l.replace(/\s*\([^)]*\)$/, ''))
   // The Certificates page shortens its issue button to the first word of the label
-  if (mod.id === 'certificates') out.add(en.certificates.issueCertificate)
+  if (mod.id === 'certificates') out.add(en.certificates.issueCertificate.split(' ')[0])
   return [...out]
 }
 const labelCache = {}
@@ -108,7 +108,9 @@ export function problemsWith(steps) {
     }
   }
   const labels = pageLabels(mod)
-  const unknown = tail.slice(mod.id === 'settings' || mod.id === 'account' ? 1 : 0).find(step => !leading(step, labels))
+  // Only the last step may carry trailing prose: every step before it is a label, exactly
+  const unknown = tail.slice(mod.id === 'settings' || mod.id === 'account' ? 1 : 0)
+    .find((step, i, steps) => (i < steps.length - 1 ? !labels.includes(step) : !leading(step, labels)))
   return unknown ? `${unknown} is not a tab, section or button of ${lookup(mod.labelKey)}` : null
 }
 
@@ -121,11 +123,23 @@ function moduleIn(groupId, element) {
   return MODULES.filter(m => m.group === groupId).find(m => leading(element, moduleLabels(m)))
 }
 
-const guides = fs.readdirSync(docsDir, { recursive: true }).filter(f => f.endsWith('.md')).sort()
+const repoDir = path.resolve(docsDir, '..')
+const markdownUnder = (dir) => fs.readdirSync(path.join(repoDir, dir), { recursive: true })
+  .filter(f => f.endsWith('.md')).map(f => path.join(dir, f))
+// Rewritten by another change: its stale path (Settings > ACME client) is left to it, not read here
+const REWRITTEN_ELSEWHERE = ['README.md']
+const guides = [...markdownUnder('docs'), ...markdownUnder('examples'),
+  'UPGRADE.md', 'README.md', 'RELEASE_TESTING.md']
+  .filter(f => !REWRITTEN_ELSEWHERE.includes(f)).sort()
 
 describe('documented navigation paths', () => {
+  it('reads the guides at the root and the examples too', () => {
+    expect(guides).toEqual(expect.arrayContaining(['UPGRADE.md', path.join('docs', 'ADMIN_GUIDE.md')]))
+    expect(guides.some(f => f.startsWith('examples'))).toBe(true)
+  })
+
   it.each(guides)('%s names places the console has', (file) => {
-    const found = pathsIn(fs.readFileSync(path.join(docsDir, file), 'utf8'))
+    const found = pathsIn(fs.readFileSync(path.join(repoDir, file), 'utf8'))
     const bad = found.map(steps => [steps.join(' > '), problemsWith(steps)])
       .filter(([text, p]) => p && !ELSEWHERE.includes(text))
     expect(bad).toEqual([])
@@ -230,7 +244,8 @@ export function brokenAnchors(file, markdown) {
 
 describe('documented heading links', () => {
   it.each(guides)('%s links to headings that exist', (file) => {
-    expect(brokenAnchors(file, fs.readFileSync(path.join(docsDir, file), 'utf8'))).toEqual([])
+    // brokenAnchors resolves from docs/: a guide of the root or of examples/ is given relative to it
+    expect(brokenAnchors(path.relative('docs', file), fs.readFileSync(path.join(repoDir, file), 'utf8'))).toEqual([])
   })
 
   it('flags an anchor that no heading carries', () => {

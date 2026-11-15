@@ -70,6 +70,49 @@ def _status_rollback():
     except Exception:
         pass
 
+_LEGACY_WITNESS = {
+    ('smtp', 'not_configured'): ('offline', 'Not configured'),
+    ('smtp', 'disabled'): ('warning', 'Configured but disabled'),
+    ('smtp', 'incomplete'): ('warning', 'Enabled, port or From address missing'),
+    ('webhooks', 'not_configured'): ('offline', 'No endpoints'),
+    ('auto_renewal', 'enabled'): ('online', 'Scheduled'),
+    ('auto_renewal', 'disabled'): ('offline', 'Disabled'),
+}
+
+
+def _legacy_detail(read):
+    """The figure a legacy message adds to its state, or None when it cannot be read."""
+    try:
+        return read()
+    except Exception:
+        logger.debug('legacy status detail unreadable', exc_info=True)
+        _status_rollback()
+        return None
+
+
+def _legacy_witness(name, witness):
+    """A witness of /health as the {status, message} pair of the historical route."""
+    state, count = witness['state'], witness['count']
+    if state == 'unavailable':
+        return {'status': 'warning', 'message': 'Status unavailable'}
+    if name == 'smtp' and state == 'ready':
+        from models.email_notification import SMTPConfig
+        host = _legacy_detail(lambda: (SMTPConfig.query.first().smtp_host or '').strip())
+        return {'status': 'online', 'message': f'Host: {host}' if host else 'Configured'}
+    if name == 'webhooks' and state == 'active':
+        return {'status': 'online', 'message': f'{count} active endpoint(s)'}
+    if name == 'webhooks' and state == 'none_active':
+        return {'status': 'warning', 'message': f'{count} endpoint(s), none active'}
+    if name == 'auto_renewal' and state == 'enabled':
+        now_dt = utc_now()
+        pending = _legacy_detail(lambda: Certificate.query.filter(
+            Certificate.revoked.isnot(True), Certificate.valid_to >= now_dt,
+            Certificate.valid_to <= now_dt + timedelta(days=30)).count())
+        return {'status': 'online', 'message': f'Scheduled ({pending} pending)' if pending else 'Scheduled'}
+    status, message = _LEGACY_WITNESS[(name, state)]
+    return {'status': status, 'message': message}
+
+
 # Client-safe messages for a dedicated TSA signer that /tsa cannot load, keyed
 # by the coarse `reason` from describe_configured_signer(). The underlying
 # detail (which can embed parse / key-loading exception text) is logged, never
@@ -412,7 +455,7 @@ def get_certificate_trend():
 @bp.route('/api/v2/dashboard/system-status', methods=['GET'])
 @require_auth()
 def get_system_status():
-    """Get system services status (no auth required - for login page)"""
+    """Get system services status (any authenticated caller)"""
     
     status = {
         'database': {'status': 'online', 'message': 'Connected'},
@@ -537,68 +580,11 @@ def get_system_status():
         _status_rollback()
         status['crl'] = {'status': 'online', 'message': 'Distribution active'}
     
-    # Auto-renewal status
-    try:
-        renewal_enabled = db.session.execute(
-            text("SELECT value FROM system_config WHERE key = 'auto_renewal_enabled'")
-        ).scalar()
-        if renewal_enabled == 'true':
-            now_dt = utc_now()
-            window_end = now_dt + timedelta(days=30)
-            pending = db.session.execute(
-                text("""SELECT COUNT(*) FROM certificates
-                    WHERE revoked IS NOT TRUE AND valid_to IS NOT NULL
-                    AND valid_to >= :now AND valid_to <= :end"""),
-                {'now': now_dt, 'end': window_end}
-            ).scalar() or 0
-            msg = f'Scheduled ({pending} pending)' if pending > 0 else 'Scheduled'
-            status['auto_renewal'] = {'status': 'online', 'message': msg}
-        else:
-            status['auto_renewal'] = {'status': 'offline', 'message': 'Disabled'}
-    except Exception:
-        _status_rollback()
-        status['auto_renewal'] = {'status': 'offline', 'message': 'Disabled'}
-    
-    # SMTP / Email notifications status. The configuration lives in the
-    # smtp_config row Settings > Email writes, not in system_config keys
-    # (#329: the tile read keys nothing ever wrote, so a working SMTP setup
-    # showed as "Not configured"). Same readiness rules as the sender:
-    # enabled, with host, port and From address.
-    try:
-        from models.email_notification import SMTPConfig
-        smtp = SMTPConfig.query.first()
-        smtp_host = (smtp.smtp_host or '').strip() if smtp else ''
-        if not smtp_host:
-            status['smtp'] = {'status': 'offline', 'message': 'Not configured'}
-        elif not smtp.enabled:
-            status['smtp'] = {'status': 'warning', 'message': 'Configured but disabled'}
-        elif not (smtp.smtp_port and (smtp.smtp_from or '').strip()):
-            status['smtp'] = {'status': 'warning', 'message': 'Enabled, port or From address missing'}
-        else:
-            status['smtp'] = {'status': 'online', 'message': f'Host: {smtp_host}'}
-    except Exception:
-        _status_rollback()
-        logger.debug('SMTP status check failed')
-        status['smtp'] = {'status': 'offline', 'message': 'Status unknown'}
-    
-    # Webhooks status
-    try:
-        webhook_count = db.session.execute(
-            text("SELECT COUNT(*) FROM webhook_endpoints WHERE enabled = true")
-        ).scalar() or 0
-        total_webhooks = db.session.execute(
-            text("SELECT COUNT(*) FROM webhook_endpoints")
-        ).scalar() or 0
-        if webhook_count > 0:
-            status['webhooks'] = {'status': 'online', 'message': f'{webhook_count} active endpoint(s)'}
-        elif total_webhooks > 0:
-            status['webhooks'] = {'status': 'warning', 'message': f'{total_webhooks} endpoint(s), none active'}
-        else:
-            status['webhooks'] = {'status': 'offline', 'message': 'No endpoints'}
-    except Exception:
-        _status_rollback()
-        status['webhooks'] = {'status': 'offline', 'message': 'Not configured'}
-    
+    # Mail, webhook and renewal witnesses: the rules and the read:settings gate of /health
+    from services.dashboard_aggregates import WITNESS_PERMISSION, allowed, witness_health
+    for name in allowed(WITNESS_PERMISSION, g.permissions or []):
+        status[name] = _legacy_witness(name, witness_health(name, db.session))
+
     # TSA (RFC 3161). A configured dedicated signer is a single point of failure:
     # /tsa returns 503 the moment it expires, is revoked, or its key stops
     # decrypting, with no CA fallback. Surface its health before that happens.

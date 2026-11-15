@@ -3,7 +3,7 @@
 Parameter parsing and the response only; the figures come from
 ``services/dashboard_aggregates.py``.
 """
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from api.v2.dashboard import DASHBOARD_MAX_ROWS
 from auth.unified import require_auth
@@ -16,6 +16,10 @@ bp = Blueprint('dashboard_overview_v2', __name__)
 
 HEALTH_MAX_DAYS = 30
 ISSUANCE_MAX_DAYS = 90
+
+
+def _permissions():
+    return list(getattr(g, 'permissions', None) or [])
 
 
 def _days(maximum):
@@ -46,7 +50,9 @@ def get_queue():
     recovery requests, ``crl_due`` within min(24 h, half the CRL validity),
     ``manual_renewal_due`` within 30 days, ``client_renewal_overdue`` (protocol
     certificate without a stored key, 7 days out), ``renewal_declined``, ``ca_expiring``
-    within a year. ``manual_renewal_due`` leaves out what auto-renewal, the enrolling
+    within a year. ``truststore_expiring``, one per trust anchor expiring within 90 days
+    (warning) or already expired (critical), only for a caller holding ``read:truststore``
+    (otherwise neither listed nor counted). ``manual_renewal_due`` leaves out what auto-renewal, the enrolling
     client, UCM's ACME client or the OCSP responder task renews, and what a later
     identical certificate supersedes.
     """
@@ -55,7 +61,8 @@ def get_queue():
     unknown = sorted(set(kinds or ()) - set(dashboard_aggregates.QUEUE_KINDS))
     if unknown:
         return error_response(f"unknown kind: {', '.join(unknown)}", 400)
-    return success_response(data=dashboard_aggregates.work_queue(db.session, limit, kinds=kinds))
+    return success_response(data=dashboard_aggregates.work_queue(
+        db.session, limit, kinds=kinds, permissions=_permissions()))
 
 
 @bp.route('/api/v2/dashboard/health', methods=['GET'])
@@ -63,11 +70,12 @@ def get_queue():
 def get_health():
     """Per protocol, ``days`` (1-30) UTC days of ``{date, ok, failed}`` and the ``basis``
     measured: ACME audit entries, SCEP requests, EST issued certificates and failed
-    audit entries; the scheduler reports its tasks by last status, without a series."""
+    audit entries; the scheduler reports its tasks by last status, without a series. The
+    ``smtp``, ``webhooks`` and ``auto_renewal`` witnesses (a ``state``, no series) need ``read:settings``."""
     days = _days(HEALTH_MAX_DAYS)
     if days is None:
         return _days_error(HEALTH_MAX_DAYS)
-    return success_response(data=dashboard_aggregates.protocol_health(db.session, days))
+    return success_response(data=dashboard_aggregates.protocol_health(db.session, days, permissions=_permissions()))
 
 
 @bp.route('/api/v2/dashboard/compliance', methods=['GET'])

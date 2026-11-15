@@ -5,9 +5,24 @@ from utils.response import success_response, error_response
 from models.sso import SSOProvider
 from .helpers import _parse_json_field, _parse_group_list, _resolve_mapped_roles, _resolve_role, sso_admission, _check_ldap_lockout, _clear_ldap_failed_attempts, _decrypt_ldap_password, _build_ldap_tls, ldap_auto_bind
 import logging
+from utils.dn_parse import get_dn_attribute, get_parent_dn
 from models import db
 
 logger = logging.getLogger(__name__)
+
+
+def _group_names(group_dns):
+    """The CN of each memberOf DN, escapes honoured, as the LDAP login reads them:
+    an unparsable DN ends the list there, as it ends the login's group fetch."""
+    names = []
+    for group_dn in group_dns:
+        try:
+            name = get_dn_attribute(str(group_dn), 'CN')
+        except ValueError:
+            break
+        if name is not None:
+            names.append(name)
+    return names
 
 
 @bp.route('/api/v2/sso/providers/<int:provider_id>/test-mapping', methods=['POST'])
@@ -75,30 +90,16 @@ def test_mapping(provider_id):
             if member_attr == 'memberof':
                 if hasattr(user_entry, 'memberOf'):
                     group_dns = user_entry.memberOf.values if hasattr(user_entry.memberOf, 'values') else [str(user_entry.memberOf)]
-                    for gdn in group_dns:
-                        gdn_str = str(gdn)
-                        # LDAP group DN, kept as is; get_dn_attribute would honour escapes
-                        for part in gdn_str.split(','):
-                            part = part.strip()
-                            if part.upper().startswith('CN='):
-                                groups.append(part[3:])
-                                break
+                    groups = _group_names(group_dns)
                 else:
                     # Fallback: re-search with memberOf attribute
                     safe_dn = escape_filter_chars(user_dn)
                     conn.search(provider.ldap_base_dn, f'(distinguishedName={safe_dn})', attributes=['memberOf'])
                     if conn.entries and hasattr(conn.entries[0], 'memberOf'):
                         group_dns = conn.entries[0].memberOf.values if hasattr(conn.entries[0].memberOf, 'values') else [str(conn.entries[0].memberOf)]
-                        for gdn in group_dns:
-                            gdn_str = str(gdn)
-                            # LDAP group DN, kept as is; get_dn_attribute would honour escapes
-                            for part in gdn_str.split(','):
-                                part = part.strip()
-                                if part.upper().startswith('CN='):
-                                    groups.append(part[3:])
-                                    break
+                        groups = _group_names(group_dns)
             else:
-                group_base = ','.join(provider.ldap_base_dn.split(',')[1:]) or provider.ldap_base_dn
+                group_base = get_parent_dn(provider.ldap_base_dn) or provider.ldap_base_dn
                 gf = provider.ldap_group_filter.strip()
                 if not gf.startswith('('):
                     gf = f'({gf})'

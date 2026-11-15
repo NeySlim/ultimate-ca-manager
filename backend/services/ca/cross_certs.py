@@ -49,11 +49,16 @@ def parse_certificate(data) -> x509.Certificate:
             raw, loaders = decoded, [x509.load_pem_x509_certificate]
         else:
             loaders = [x509.load_der_x509_certificate]
+    from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
     for load in loaders:
         try:
-            return load(raw)
+            cert = load(raw)
         except Exception:
             continue
+        try:
+            return require_readable_extensions(cert)
+        except UnreadableCertificate as e:
+            raise CrossCertError(str(e), 400, 'unreadable_extensions') from e
     raise CrossCertError('Certificate could not be parsed')
 
 

@@ -121,11 +121,12 @@ GROUP_GRANTABLE_PERMISSIONS = sorted(
 # Every scope @require_auth checks, recorded as routes are declared.
 ENFORCED_PERMISSIONS = set()
 
-# Scopes checked inline with has_permission() rather than by the decorator.
+# Scopes checked inline with has_permission(), or through the overview's permission
+# tables, rather than by the decorator.
 INLINE_CHECKED_PERMISSIONS = frozenset({
     'admin:key_recovery', 'admin:settings', 'admin:system', 'read:audit',
-    'read:cas', 'read:certificates', 'read:deploy', 'read:private_keys', 'read:system',
-    'read:users', 'read:kerberos', 'read:wstep', 'write:approvals', 'write:cas',
+    'read:cas', 'read:certificates', 'read:deploy', 'read:private_keys', 'read:settings',
+    'read:system', 'read:truststore', 'read:users', 'read:kerberos', 'read:wstep', 'write:approvals', 'write:cas',
     'write:kerberos', 'write:wstep', 'write:xcep',
 })
 
