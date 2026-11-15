@@ -601,8 +601,9 @@ def tsa_is_enabled() -> bool:
     existed. Callers that must not raise (the dashboard) wrap their own block.
     """
     from models import SystemConfig
+    from services.tsa_upgrade import tsa_enabled_reads_on
     row = SystemConfig.query.filter_by(key='tsa_enabled').first()
-    return row is None or str(row.value).lower() == 'true'
+    return tsa_enabled_reads_on(row is not None, row.value if row is not None else None)
 
 
 def tsa_ca_certificate_path_ready() -> bool:

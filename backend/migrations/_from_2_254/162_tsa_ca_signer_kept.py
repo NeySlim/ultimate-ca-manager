@@ -1,7 +1,7 @@
 """Upgrade step 162: a 2.x TSA that signs with its CA certificate keeps signing that way.
 
 3.0 reads an absent ``tsa_require_dedicated_cert`` as true (RFC 3161 §2.3 dedicated signer).
-A 2.x install whose TSA is on (no ``tsa_enabled`` row, or exactly ``true``), points at an
+A 2.x install whose TSA is on (no ``tsa_enabled`` row, or one 2.x read as true), points at an
 existing CA and has no dedicated signer gets the key written ``false``; nothing else is written.
 """
 import logging

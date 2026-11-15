@@ -32,7 +32,11 @@ def _archive(settings, cas=(CA_REFID,), v30=False):
     ({'tsa_ca_refid': CA_REFID, KEY: 'true'}, (CA_REFID,), False, False),
     ({'tsa_ca_refid': ''}, (CA_REFID,), False, False),
     ({'tsa_ca_refid': CA_REFID}, (), False, False),
-], ids=['default_on', 'explicit', 'v30_archive', 'dedicated', 'disabled', 'key_set', 'no_ca', 'ca_unknown'])
+    ({'tsa_enabled': None, 'tsa_ca_refid': CA_REFID}, (CA_REFID,), False, False),
+    ({'tsa_enabled': ' true', 'tsa_ca_refid': CA_REFID}, (CA_REFID,), False, False),
+    ({'tsa_enabled': 'TRUE', 'tsa_ca_refid': CA_REFID}, (CA_REFID,), False, True),
+], ids=['default_on', 'explicit', 'v30_archive', 'dedicated', 'disabled', 'key_set', 'no_ca', 'ca_unknown',
+        'enabled_null', 'enabled_padded', 'enabled_upper'])
 def test_the_rule_on_the_archived_settings(app, settings, cas, v30, written):
     data = _archive(settings, cas, v30)
     with app.app_context():
@@ -114,3 +118,13 @@ def test_a_2x_archive_with_a_windows_configuration_keeps_its_ca_signer(here):
     blob = _forged(['configuration'], mutate=with_windows)
     _service().restore_backup(blob, PASSWORD, mode='merge')
     assert _stored() == 'false'
+
+
+@pytest.mark.parametrize('enabled', [None, ' true'])
+def test_a_2x_archive_whose_tsa_was_off_is_restored_without_the_setting(here, enabled):
+    def with_enabled(data):
+        _as_2x_tsa(data)
+        data['configuration']['settings']['tsa_enabled'] = enabled
+    blob = _forged(['configuration'], mutate=with_enabled)
+    _service().restore_backup(blob, PASSWORD, mode='merge')
+    assert _stored() is None

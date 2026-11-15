@@ -28,6 +28,11 @@ CASES = [
     ('no_ca_configured', {'tsa_enabled': 'true', 'tsa_ca_refid': ''}, None),
     ('ca_gone', {'tsa_ca_refid': 'tsa-ca-deleted'}, None),
     ('fresh', {}, None),
+    # 2.x read tsa_enabled as "no row, or str(value).lower() == 'true'": these rows were off
+    ('tsa_enabled_null', {'tsa_enabled': None, 'tsa_ca_refid': CA_REFID}, None),
+    ('tsa_enabled_padded', {'tsa_enabled': ' true', 'tsa_ca_refid': CA_REFID}, None),
+    ('tsa_enabled_upper_case', {'tsa_enabled': 'TRUE', 'tsa_ca_refid': CA_REFID},
+     {'tsa_enabled': 'TRUE', 'tsa_ca_refid': CA_REFID, KEY: 'false'}),
 ]
 
 
