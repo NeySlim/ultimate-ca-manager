@@ -84,6 +84,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Automatic update install: a release whose package was published before its `.sha256` file got a failed `settings_update` audit entry and was never installed automatically; it now waits, audited once per version, and the next check after the file appears installs it.
+- Scheduled CRL: whether a CRL is due is judged on the CRL served, the one with the highest number, instead of the one stored last.
 - **HA: two nodes can no longer share a node identifier.** A node started with the `UCM_NODE_ID` of a live node (two cloned VMs keep the same host name) refuses to start with a message naming it, and a running node whose identifier another process took fails `/health/ready` and stops leading instead of overwriting its row; a node restarted after a crash waits at most three minutes for its previous heartbeat to expire. The Helm chart in HA mode adds a startup probe covering that wait, so the liveness probe no longer restarts such a container before it serves.
 - Revocation: while lifting a hold on a CA with delta CRLs, OCSP answered `revoked` with reason `unspecified` and a complete CRL listed the certificate without a reason. Until the hold is lifted, both now answer `certificateHold` with the date of the hold, a final revocation recorded for the serial still prevails, and only the delta CRL says `removeFromCRL`.
 - Docker: stopping the container now stops UCM cleanly. The server never received the stop signal and was killed when the grace period ran out, so a node in HA kept its row until its heartbeat expired.

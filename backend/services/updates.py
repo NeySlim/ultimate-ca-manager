@@ -645,6 +645,7 @@ UPDATE_POPUP_BASELINE_KEY = 'update_popup_baseline_version'  # version running w
 _LAST_CHECK_TS_KEY = 'update_last_check_ts'
 _NOTIFIED_VERSION_KEY = 'update_notified_version'
 _ATTEMPTED_VERSION_KEY = 'auto_update_attempted_version'
+_WAITED_VERSION_KEY = 'auto_update_waited_version'
 # op_id of the last processed watcher result — replay guard for the
 # claim/process/delete consumption (review S-02)
 _RESULT_OP_KEY = 'update_result_last_op'
@@ -737,6 +738,30 @@ def _notify_update_available(result):
     return True
 
 
+def _wait_for_assets(latest, missing):
+    """A release still missing assets waits for the next check: logged at every check,
+    audited at the first wait of each version only (one executor wins the marker)."""
+    from models import db
+    from services.audit_service import AuditService
+    logger.info(f"Auto-update to {latest} waits: not published yet: {missing}")
+    previous = _cfg_get(_WAITED_VERSION_KEY)
+    if previous == latest:
+        return
+    try:
+        first = config_compare_and_set(_WAITED_VERSION_KEY, previous, latest)
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f"Auto-update to {latest}: its wait marker could not be stored: {e}")
+        return
+    if first:
+        AuditService.log_action(
+            action='settings_update', resource_type='system', resource_id='ucm',
+            resource_name='UCM Auto-Update',
+            details=f"Unattended update to {latest} waits: not published yet: {missing}",
+            success=True,
+        )
+
+
 def _auto_install(result):
     """Unattended install — checksum verification is mandatory here."""
     from datetime import datetime
@@ -753,8 +778,7 @@ def _auto_install(result):
         return
     if not in_ha and not result.get('checksum_url'):
         # Before the marker: a package published ahead of its checksum is installed next check
-        logger.info(f"Auto-update to {latest} waits: not published yet: SHA256 checksum")
-        return
+        return _wait_for_assets(latest, 'SHA256 checksum')
     if in_ha:
         from services import update_campaign
         from migration_marks import FULL_STOP_ASSET
@@ -763,8 +787,7 @@ def _auto_install(result):
             missing.append(FULL_STOP_ASSET)
         if missing:
             # Before the marker: the next check tries again once the release has them
-            logger.info(f"Auto-update to {latest} waits: not published yet: {', '.join(missing)}")
-            return
+            return _wait_for_assets(latest, ', '.join(missing))
     if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
         return  # one attempt per version — no overnight crash loops
 

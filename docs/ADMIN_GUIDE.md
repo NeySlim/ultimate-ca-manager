@@ -460,6 +460,10 @@ psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 
 > ℹ The psycopg 3 driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
 
+### Automatic update install (DEB/RPM)
+
+The scheduled automatic install verifies the package against the `.sha256` file the release publishes beside it: on a single node, a release whose package is published before that file waits, logged at every check and audited once per version (`settings_update`, "waits: not published yet"), and the next check after the file appears installs it.
+
 ### HA mode (preview): scheduler and startup
 
 With `UCM_HA=1`, every node runs against the same PostgreSQL database and names itself with `UCM_NODE_ID` (default: the host name, which must differ between nodes).

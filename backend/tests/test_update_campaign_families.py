@@ -481,6 +481,28 @@ def test_scheduled_auto_install_in_ha_waits_for_every_asset_it_reads(app, ha, mo
             db.session.commit()
     assert _state(app) is None
 
+def test_scheduled_auto_install_in_ha_audits_the_first_wait_of_a_version_only(app, ha, monkeypatch):
+    """A release whose RPM never gets its .sha256 waits at every check, audited once."""
+    from models import SystemConfig, db
+    from services.audit_service import AuditService
+    audits = []
+    monkeypatch.delenv('UCM_DOCKER', raising=False)
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(lambda **kw: audits.append(kw)))
+    _rows(app, a='deb', b='rpm-el9')
+    keys = (updates._ATTEMPTED_VERSION_KEY, updates._WAITED_VERSION_KEY)
+    assets = [a for a in ASSETS if a['name'] != f'{EL9}.sha256']
+    with app.app_context():
+        SystemConfig.query.filter(SystemConfig.key.in_(keys)).delete()
+        db.session.commit()
+        try:
+            for _ in range(3):
+                updates._auto_install({'latest_version': '3.1', 'current_version': '3.0', 'assets': assets})
+        finally:
+            SystemConfig.query.filter(SystemConfig.key.in_(keys)).delete()
+            db.session.commit()
+    assert [a['details'] for a in audits] == ['Unattended update to 3.1 waits: not published yet: rpm-el9']
+
+
 def test_scheduled_auto_install_in_ha_refuses_a_cluster_with_a_family_without_checksum(app, ha, monkeypatch):
     from models import SystemConfig, db
     from services.audit_service import AuditService
