@@ -85,13 +85,14 @@ _ucm_dev() {
     echo "$dev"
 }
 
-# True when both directories share a filesystem; an unreadable device id counts as shared, the
-# cautious reading (the needs add up against the smaller room). df names are not identities.
+# True when both directories share a filesystem (arguments: directory, directory, df line, df line):
+# one device id, or one /dev source (btrfs subvolumes); an unreadable id counts as shared, the
+# cautious reading. Other df names (tmpfs) are not identities.
 _ucm_same_fs() {
     local a b
     a=$(_ucm_dev "$1")
     b=$(_ucm_dev "$2")
-    [ -z "$a" ] || [ -z "$b" ] || [ "$a" = "$b" ]
+    [ -z "$a" ] || [ -z "$b" ] || [ "$a" = "$b" ] || { [ "${3%% *}" = "${4%% *}" ] && [[ "$3" == /dev/* ]]; }
 }
 
 # Prints the refusal and fails when `df` line $3 has less than $2 KB for directory $1.
@@ -115,7 +116,7 @@ ucm_sqlite_disk_room() {
     [ "$UCM_BACKUP_ENABLED" = "true" ] && copy_need=$size_kb
     [ "$db_need" -gt 0 ] && db_df=$(_ucm_df "$db_dir")
     [ "$copy_need" -gt 0 ] && copy_df=$(_ucm_df "$UCM_SQLITE_BACKUP_DIR")
-    if [ -n "$db_df" ] && [ -n "$copy_df" ] && _ucm_same_fs "$db_dir" "$UCM_SQLITE_BACKUP_DIR"; then
+    if [ -n "$db_df" ] && [ -n "$copy_df" ] && _ucm_same_fs "$db_dir" "$UCM_SQLITE_BACKUP_DIR" "$db_df" "$copy_df"; then
         # one filesystem: the smaller of the two readings is the room
         shared_dir=$db_dir
         [ "${copy_df##* }" -lt "${db_df##* }" ] && db_df=$copy_df && shared_dir=$UCM_SQLITE_BACKUP_DIR

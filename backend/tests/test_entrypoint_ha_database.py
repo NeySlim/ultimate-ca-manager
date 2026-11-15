@@ -404,6 +404,15 @@ def test_one_filesystem_under_two_df_names_is_measured_on_the_total(tmp_path):
     assert 'needs 6 MB free' in r.stdout, r.stdout
 
 
+def test_two_subvolumes_of_one_block_device_are_measured_on_the_total(tmp_path):
+    # btrfs subvolumes: distinct device ids, one /dev source and one pool of free space
+    env = _env(tmp_path, 'true')
+    _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
+    r = _run(_df_names(5999, 5999, 4, 5, '/dev/sda2', '/dev/sda2') + _START, env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
+    assert 'needs 6 MB free' in r.stdout, r.stdout
+
+
 def test_a_device_that_cannot_be_read_is_measured_on_the_total(tmp_path):
     # stat failing: the cautious reading is one filesystem, the smaller room against the sum
     env = _env(tmp_path, 'true')
