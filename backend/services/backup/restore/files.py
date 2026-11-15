@@ -496,6 +496,8 @@ def settle_interrupted_restores() -> None:
     """Before a restore stages anything, under the lock it holds: an earlier journal left
     unsettled would be replayed at the next start over the files this restore publishes,
     so it is settled now, as a start would, or the restore is refused."""
+    if not _find_kept_directories():
+        return    # the usual case: nothing to settle, nothing touched
     sweep_kept_previous_contents()
     left = [path for path, journal in _find_kept_directories() if journal is not None]
     if left:
