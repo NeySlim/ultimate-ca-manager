@@ -244,3 +244,33 @@ def test_two_rows_of_one_token_key_bound_before_the_restore_do_not_stop_it_on_sq
         _service().restore_backup(blob, PASSWORD, mode='merge')
         assert _holders(one.key.id) == ['x509:earlier'] and _holders(two.key.id) == ['ssh:twin']
         db.session.remove()
+
+
+@pytest.mark.parametrize('kind', ['x509', 'ssh'])
+def test_a_replacement_whose_removed_authority_waits_for_the_writes_frees_its_key(app, tmp_path, monkeypatch,
+                                                                                kind):
+    """The authority here goes, the archived one takes its key back: the removal waiting for the writes
+    (a kept row still names it) does not keep the key from the archived authority."""
+    from services.backup.restore import replace
+    from tests.test_backup_cross_installation import _bound_to
+    section = 'certificate_authorities' if kind == 'x509' else 'ssh_cas'
+    real_defer = replace._defer_what_kept_rows_need
+
+    def defer_the_authorities(replacement):
+        real_defer(replacement)
+        doomed = replacement.doomed.get(section, set())
+        if doomed:
+            replacement.deferred = {**replacement.deferred,
+                                    section: replacement.deferred.get(section, set()) | doomed}
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'restore.db'}"), app.app_context():
+        token = _Token()
+        make = (lambda d: token.x509_ca(d)) if kind == 'x509' else (lambda d: token.ssh_ca(d, 'user'))
+        held = make('archived')
+        blob = _service().create_backup(PASSWORD, include=_only(*SECTIONS))
+        _remove(held)
+        make('here')
+        monkeypatch.setattr(replace, '_defer_what_kept_rows_need', defer_the_authorities)
+        _service().restore_backup(blob, PASSWORD, mode='replace')
+        assert _holders(token.key.id) == [f'{kind}:archived']
+        db.session.remove()

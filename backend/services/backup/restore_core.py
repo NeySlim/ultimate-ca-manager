@@ -481,6 +481,20 @@ class RestoreCoreMixin:
                 link_restored_connectors(backup_data)
                 results['repairs'] = replay_repairs(backup_data, plan)
                 db.session.flush()
+                # The rows written take the revocation their CA records, as the hourly pass does
+                aligned = self._align_restored_revocations(plan) + self._align_kept_revocations()
+                results['revoked_from_records'] = len(aligned)
+                if plan.written.get('acme_client_orders'):
+                    results['acme_client_orders_repaired'] = results['repairs'].get(
+                        '121_acme_renewal_order_duplicates', {'reissued': 0, 'dropped': 0})
+                results['settings'] += restore_setting_references(
+                    backup_data.get('configuration'), plan)
+                results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
+
+                if replacement is not None:
+                    results.update(remove_after_writes(replacement).report())
+                # On the final rows: an authority a replacement removes after the writes holds nothing
+                db.session.flush()
                 for key_id, held in key_binding.shared_keys().items():
                     if key_id not in shared_before:
                         raise BackupSchemaError(
@@ -495,18 +509,6 @@ class RestoreCoreMixin:
                             f"'{key_binding.label_of(second)}' are one token key and would back both the "
                             f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
                             "nothing has been changed.")
-                # The rows written take the revocation their CA records, as the hourly pass does
-                aligned = self._align_restored_revocations(plan) + self._align_kept_revocations()
-                results['revoked_from_records'] = len(aligned)
-                if plan.written.get('acme_client_orders'):
-                    results['acme_client_orders_repaired'] = results['repairs'].get(
-                        '121_acme_renewal_order_duplicates', {'reissued': 0, 'dropped': 0})
-                results['settings'] += restore_setting_references(
-                    backup_data.get('configuration'), plan)
-                results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
-
-                if replacement is not None:
-                    results.update(remove_after_writes(replacement).report())
                 # Lockouts are keyed by user id and name, which either mode may hand to
                 # another account; the sessions they guard are revoked after any restore
                 from models.second_factor_failure import SecondFactorFailure
