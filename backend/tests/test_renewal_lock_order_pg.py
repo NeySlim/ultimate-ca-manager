@@ -879,3 +879,107 @@ def test_a_renewal_and_the_merge_of_a_rechained_orphan_record_do_not_deadlock(ap
     assert errors == []
     assert stats and stats[0]['rechained_cas'] == 1 and stats[0]['deduplicated'] == 1
     assert gone and moved_to == kept_refid and kept_parent and renewed != first_serial
+
+
+def _cross(key, cert):
+    """A cross-certificate of *cert*'s subject and key, signed by another root."""
+    from datetime import datetime, timedelta, timezone
+    other_key, other = _authority()
+    now = datetime.now(timezone.utc)
+    crossed = (x509.CertificateBuilder()
+               .subject_name(cert.subject).issuer_name(other.subject).public_key(key.public_key())
+               .serial_number(x509.random_serial_number())
+               .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=1825))
+               .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+               .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+               .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(other_key.public_key()),
+                              critical=False)
+               .sign(other_key, hashes.SHA256()))
+    return other_key, other, crossed
+
+
+def test_a_renewal_under_a_cross_record_and_the_merge_of_its_root_records_do_not_deadlock(
+        app, monkeypatch):
+    """One key, two certificates (a root and its cross-certificate), each stored twice: two merges
+    in one pass. The first writes the lowest record, the anchor a renewal under the cross record
+    waits for while it holds its certificate; the second asks for that certificate. Every
+    certificate the pass moves is locked before its first CA write, so both finish."""
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    schema = f'renewal_cross_{uuid.uuid4().hex[:6]}'
+    with _a_schema_of_our_own(schema) as url, _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            key, cert = _authority()
+            other_key, other, crossed = _cross(key, cert)
+            root_a, root_b = _ca_row(key, cert), _ca_row(key, cert)
+            cross_a, cross_b = _ca_row(key, crossed), _ca_row(key, crossed)
+            issuer = _ca_row(other_key, other)
+            ski = cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value.digest
+            for row in (root_a, root_b, cross_a, cross_b, issuer):
+                row.ski = (ski if row is not issuer else other.extensions.get_extension_for_class(
+                    x509.SubjectKeyIdentifier).value.digest).hex(':').upper()
+                row.cdp_enabled = False
+                row.enforce_unique_subject = True
+            cross_a.caref = cross_b.caref = issuer.refid
+            db.session.commit()
+            ids = root_a.id, root_b.id, cross_a.id, cross_b.id
+            assert ids == tuple(sorted(ids))  # the first root record is the anchor of all four
+            issued = CertificateService.create_certificate(
+                descr='under the second cross record', caref=cross_b.refid,
+                dn={'CN': 'cross-merge.example.test'}, key_type='prime256v1', validity_days=30)
+            cert_id, first_serial = issued.id, issued.serial_number
+            db.session.remove()
+
+        met, errors, stats = _renewal_meets_the_repair(app, url, monkeypatch, cert_id, ids[3])
+
+        with app.app_context():
+            row = db.session.get(Certificate, cert_id)
+            moved_to, renewed = row.caref, row.serial_number
+            left = {c.id for c in CA.query.filter(CA.id.in_(ids)).all()}
+            cross_refid = db.session.get(CA, ids[2]).refid
+            db.session.remove()
+    assert met, errors
+    assert errors == []
+    assert stats and stats[0]['deduplicated'] == 2
+    assert left == {ids[0], ids[2]} and moved_to == cross_refid and renewed != first_serial
+
+
+def test_a_renewal_and_the_identifier_fill_of_its_ca_do_not_deadlock(app, monkeypatch):
+    """A CA and a certificate under it both lacking their key identifiers (phase 1): the CA row
+    is written and committed before the certificate rows are asked for, so a renewal holding its
+    certificate and waiting for the CA row is never waited on by a pass holding that row."""
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    schema = f'renewal_fill_{uuid.uuid4().hex[:6]}'
+    with _a_schema_of_our_own(schema) as url, _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            key, cert = _authority()
+            ca = _ca_row(key, cert)
+            ca.cdp_enabled, ca.enforce_unique_subject = False, True
+            db.session.commit()
+            issued = CertificateService.create_certificate(
+                descr='identifiers to fill', caref=ca.refid, dn={'CN': 'fill.example.test'},
+                key_type='prime256v1', validity_days=30)
+            cert_id, ca_id, first_serial = issued.id, ca.id, issued.serial_number
+            db.session.execute(text('UPDATE certificates SET aki = NULL, ski = NULL WHERE id = :i'),
+                               {'i': cert_id})
+            db.session.execute(text('UPDATE certificate_authorities SET ski = NULL WHERE id = :i'),
+                               {'i': ca_id})
+            db.session.commit()
+            db.session.remove()
+
+        met, errors, stats = _renewal_meets_the_repair(app, url, monkeypatch, cert_id, ca_id)
+
+        with app.app_context():
+            row = db.session.get(Certificate, cert_id)
+            renewed, aki = row.serial_number, row.aki
+            ski = db.session.get(CA, ca_id).ski
+            db.session.remove()
+    assert met, errors
+    assert errors == []
+    assert stats and stats[0]['updated_cas'] == 1 and stats[0]['updated_certs'] == 1
+    assert renewed != first_serial and aki == ski
