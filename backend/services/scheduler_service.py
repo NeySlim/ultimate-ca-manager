@@ -435,8 +435,6 @@ class SchedulerService:
         except OSError:
             listed = []
         for name in listed:
-            if name.startswith('.'):
-                continue
             try:
                 os.unlink(os.path.join(directory, name))
             except OSError:
