@@ -378,7 +378,7 @@ def test_a_kept_unreadable_secret_never_leaves_as_cleartext(auth_client, app, ca
     token = _foreign_token('0000')
     with app.app_context():
         row = HsmProvider(name=f'kept-{uuid.uuid4().hex[:6]}', type='openbao', config=json.dumps(
-            {'url': 'http://bao.invalid:8200', 'token': token}))
+            {'url': 'http://bao.invalid:8200', 'mount_path': 'm', 'token': token}))
         db.session.add(row)
         db.session.commit()
         pid = row.id
