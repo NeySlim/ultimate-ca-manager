@@ -612,6 +612,10 @@ def toggle_user_security_key(user_id, credential_id):
         refusal = _refuse_last_factor(user, credential)
         if refusal:
             return refusal
+    # A key left as it was changes no factor: no session closes, nothing is audited
+    if credential.enabled == enabled:
+        db.session.rollback()
+        return success_response(data=credential.to_dict(), meta={'other_sessions_closed': 0})
     from services.webauthn_service import WebAuthnService
     owner = end_sessions_on_commit(user.id)
     if owner is None:

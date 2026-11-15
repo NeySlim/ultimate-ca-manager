@@ -425,3 +425,51 @@ def test_sessions_the_application_ended_are_not_counted(nodes, expired):
         assert not _signed_in(live) and not _signed_in(old) and _signed_in(this)
     finally:
         _cleanup(first_node, user)
+
+
+def _disable_pending_totp(application, c, user):
+    """TOTP set up but never confirmed is no factor yet: dropping it changes none."""
+    r = _post(c, '/api/v2/account/2fa/enable')
+    assert r.status_code == 200, r.data
+    secret = r.get_json()['data']['secret']
+    return _post(c, '/api/v2/account/2fa/disable', {'code': pyotp.TOTP(secret).now()})
+
+
+def _admin_toggle(enabled):
+    def _call(application, c, user, admin):
+        return admin.patch(f"/api/v2/users/{user['id']}/webauthn/{user['key_id']}",
+                           json={'enabled': enabled})
+    return _call
+
+
+# request that leaves the factors as they are: (user it starts from, request, audit action)
+NO_CHANGES = {
+    'enable-key-already-enabled': ({}, _own(_toggle_key(True)), 'webauthn_toggle'),
+    'disable-key-already-disabled': ({'key_enabled': False}, _own(_toggle_key(False)),
+                                     'webauthn_toggle'),
+    'key-second-factor-on-already-on': ({'choice': True}, _own(_key_choice(True)),
+                                        'mfa_webauthn_enable'),
+    'key-second-factor-off-already-off': ({}, _own(_key_choice(False)), 'mfa_webauthn_disable'),
+    'disable-totp-never-confirmed': ({}, _own(_disable_pending_totp), 'mfa_disable'),
+    'admin-enable-key-already-enabled': ({}, _admin_toggle(True), 'webauthn_admin_enable'),
+    'admin-disable-key-already-disabled': ({'key_enabled': False}, _admin_toggle(False),
+                                           'webauthn_admin_disable'),
+}
+
+
+@pytest.mark.parametrize('operation', sorted(NO_CHANGES))
+def test_a_request_that_changes_no_factor_closes_no_session(app, auth_client, operation):
+    start, call, action = NO_CHANGES[operation]
+    user = _make_user(app, key=SoftKey(), **start)
+    try:
+        other = _open_session(app, user)
+        this = _open_session(app, user)
+        _keys, version = _key_state(app, user)
+        r = call(app, this, user, auth_client)
+        assert r.status_code == 200, r.data
+        assert r.get_json()['meta']['other_sessions_closed'] == 0
+        assert _signed_in(other) and _signed_in(this)
+        assert _key_state(app, user)[1] == version
+        assert _audit_details(app, action, user) is None
+    finally:
+        _cleanup(app, user)

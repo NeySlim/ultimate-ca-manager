@@ -208,15 +208,22 @@ def disable_2fa():
 
     # Disable 2FA. Under enforcement the remaining key becomes the user's own
     # second factor, so lifting enforcement later does not silently drop it.
+    before = (bool(user.totp_confirmed), bool(user.webauthn_2fa))
     if enforcement_active_for(user) and has_security_key(user):
         user.webauthn_2fa = True
     user.totp_confirmed = False
     user.totp_secret = None
     user.backup_codes = None
-    user.end_sessions()
+    # A setup never confirmed was no factor: dropping it alone closes no session
+    changed = before != (False, bool(user.webauthn_2fa))
+    if changed:
+        user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to disable 2FA")
     if not ok:
         return _err
+    if not changed:
+        return success_response(message='2FA disabled successfully',
+                                meta={'other_sessions_closed': 0})
     closed = sessions_closed_by(user)
     if counted:
         _clear_code_checks(user.id)
@@ -273,6 +280,10 @@ def set_webauthn_second_factor():
         if refused:
             return last_factor_refusal(_KEY_CHOICE_MESSAGE)
 
+    # The choice left as it was changes no factor: no session closes, nothing is audited
+    if bool(user.webauthn_2fa) == enabled:
+        db.session.rollback()
+        return success_response(data={'webauthn_2fa': enabled}, meta={'other_sessions_closed': 0})
     user.webauthn_2fa = enabled
     user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to update the security key second factor")

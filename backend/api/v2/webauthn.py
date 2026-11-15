@@ -89,6 +89,12 @@ def toggle_credential(credential_id):
     enabled = data.get('enabled', True)
     if not enabled and _strips_last_factor(user, credential_id):
         return last_factor_refusal(_LAST_FACTOR_MESSAGE)
+    # A key left as it was changes no factor: no session closes
+    current = db.session.get(WebAuthnCredential, credential_id)
+    if current and current.user_id == user.id and current.enabled == bool(enabled):
+        db.session.rollback()
+        return success_response(message=f'Credential already {"enabled" if enabled else "disabled"}',
+                                meta={'other_sessions_closed': 0})
     owner = end_sessions_on_commit(user.id)
     if owner is None:
         db.session.rollback()
