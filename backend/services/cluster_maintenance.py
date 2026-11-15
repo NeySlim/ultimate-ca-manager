@@ -641,7 +641,9 @@ def complete_committed(row, now):
     restart is asked here, as the holder would have done (one node wins the UPDATE)."""
     from models import db
     from services import cluster_commands
-    from services.backup.restore.invalidate import _revoke_database_sessions, _revoke_flask_sessions
+    from services.backup.restore.invalidate import (
+        _advance_session_epoch, _revoke_database_sessions, _revoke_flask_sessions)
+    _advance_session_epoch()
     _revoke_database_sessions()
     _revoke_flask_sessions()
     cluster_commands.emit(cluster_commands.RESTART)

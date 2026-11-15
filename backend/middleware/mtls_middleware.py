@@ -12,6 +12,7 @@ from services.mtls_auth_service import MTLSAuthService
 import logging
 from utils.datetime_utils import utc_now
 from utils.admin_allowlist import is_exempt_path
+from auth.session_epoch import holds_current_epoch
 from auth.session_start import ACCOUNT_KEY, account_proof, begin_session
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ def _join_successor(old, user, auth_cert):
     data = iface._retrieve_session_data(iface._get_store_id(entry[0]))
     if (not data or data.get('user_id') != user.id or data.get('cert_id') != auth_cert.id
             or data.get('session_version', 0) != (user.session_version or 0)
-            or data.get(ACCOUNT_KEY) != account_proof(user)):
+            or data.get(ACCOUNT_KEY) != account_proof(user) or not holds_current_epoch(data)):
         return False
     session.clear()
     session.update(data)

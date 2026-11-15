@@ -53,6 +53,7 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
     try:
         wait_until(lambda: any(code in (200, 201) for _, code, _ in outcomes), 60, 'B issues')
         started = time.monotonic()
+        cookies_before = admin.http.cookies.get_dict()
         r = admin.http.post(a.url('/api/v2/system/restore'), headers=admin._headers(),
                             files={'file': (name, archive.content)}, data={'password': PASSWORD},
                             timeout=300)
@@ -92,7 +93,11 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
     wait_until(lambda: cluster.sql('SELECT count(*) FROM cluster_maintenance')[0][0] == 0, 120,
                'the maintenance row removed')
     lifted_in = time.monotonic() - serving
-    # The sessions of before are gone; B serves the restored state and accepts writes
+    # No session begun before the restore is accepted, the restorer's included, on any node
+    for node in cluster.nodes:
+        r = Client(node, cookies=cookies_before).get('/api/v2/account/profile')
+        assert r.status_code == 401, f'{node.name}: {r.status_code}'
+    # B serves the restored state and accepts writes
     again = Client.login(b, cluster.password)
     names = _cas(again)
     assert 'HA restore kept CA' in names and 'HA restore dropped CA' not in names, names

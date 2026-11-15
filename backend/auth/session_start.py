@@ -29,9 +29,11 @@ def begin_session(user):
     Every login goes through here: an identifier planted before the login never
     becomes an authenticated session.
     """
+    from auth.session_epoch import SESSION_KEY, current_epoch
     session.clear()
     session['session_version'] = user.session_version or 0
     session[ACCOUNT_KEY] = account_proof(user)
+    session[SESSION_KEY] = current_epoch()
     _new_identifier()
 
 
@@ -53,11 +55,13 @@ def keep_own_session(user):
 
 
 def session_is_current(user) -> bool:
-    """False once the account's sessions were closed after this one began, or
-    when the session was opened for an earlier account with the same id.
-    A session opened before the proof existed gets it on its first request,
-    only if it was opened for this username after this account was created."""
-    if session.get('session_version', 0) != (user.session_version or 0) or not holds_account(session, user):
+    """False once the account's sessions were closed after this one began, once a
+    restore followed its start, or when the session was opened for an earlier account
+    with the same id. A session opened before the proof existed gets it on its first
+    request, only if it was opened for this username after this account was created."""
+    from auth.session_epoch import holds_current_epoch
+    if (session.get('session_version', 0) != (user.session_version or 0)
+            or not holds_account(session, user) or not holds_current_epoch(session)):
         return False
     if session.get(ACCOUNT_KEY) is None:
         session[ACCOUNT_KEY] = account_proof(user)
