@@ -95,7 +95,7 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 ### 配置
 1. 从身份提供商获取 IDP 元数据 URL 或 XML 文件
 2. 在 UCM 中进入**设置 → SSO**
-3. 点击**添加 SSO 提供者** → SAML
+3. 在 **SAML 2.0** 卡片上点击**配置**
 4. 输入 **IDP 元数据 URL**: UCM 自动填充 Entity ID、SSO/SLO URL 和证书
 5. 或直接粘贴 IDP 元数据 XML
 6. 配置**属性映射**（用户名、邮箱、组）
@@ -120,7 +120,7 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 2. 将**重定向 URI** 设置为：\`https://your-ucm-host:8443/api/v2/sso/callback/oauth2\`
 3. 复制**客户端 ID** 和**客户端密钥**
 4. 在 UCM 中进入**设置 → SSO**
-5. 点击**添加 SSO 提供者** → OAuth2
+5. 在 **OAuth2 / OIDC** 卡片上点击**配置**
 6. 输入**授权 URL** 和**令牌 URL**
 7. 输入**用户信息 URL**（用于登录后获取用户属性）
 8. 输入客户端 ID 和密钥
@@ -149,7 +149,7 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 
 ### 配置
 1. 在 UCM 中进入**设置 → SSO**
-2. 点击**添加 SSO 提供者** → LDAP
+2. 在 **LDAP / Active Directory** 卡片上点击**配置**
 3. 输入 **LDAP 服务器**主机名和**端口**（LDAP 用 389，LDAPS 用 636）
 4. 启用**使用 SSL/TLS**（LDAPS，端口 636），或在端口 389 上启用**使用 StartTLS**：连接会在任何绑定之前切换到 TLS，证书验证相同。两者都不启用时，绑定和用户密码会以明文在网络上传输
 5. 输入**绑定 DN** 和**绑定密码**（服务账户凭据）

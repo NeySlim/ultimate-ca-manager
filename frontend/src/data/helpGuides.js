@@ -2749,7 +2749,7 @@ Copy this URL into your IDP's "Add Service Provider" or "SAML Application" confi
 ### Configuration
 1. Obtain the IDP metadata URL or XML file from your identity provider
 2. In UCM, go to **Settings → SSO**
-3. Click **Add SSO Provider** → SAML
+3. On the **SAML 2.0** card, click **Configure**
 4. Enter the **IDP Metadata URL**: UCM auto-populates Entity ID, SSO/SLO URLs, and certificate
 5. Or paste the IDP metadata XML directly
 6. Configure **attribute mapping** (username, email, groups)
@@ -2774,7 +2774,7 @@ A login started from the IdP portal reaches UCM without a request from UCM. **Al
 2. Set the **Redirect URI** to: \`https://your-ucm-host:8443/api/v2/sso/callback/oauth2\`
 3. Copy the **Client ID** and **Client Secret**
 4. In UCM, go to **Settings → SSO**
-5. Click **Add SSO Provider** → OAuth2
+5. On the **OAuth2 / OIDC** card, click **Configure**
 6. Enter the **Authorization URL** and **Token URL**
 7. Enter the **User Info URL** (for fetching user attributes after login)
 8. Enter Client ID and Secret
@@ -2803,7 +2803,7 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 
 ### Configuration
 1. In UCM, go to **Settings → SSO**
-2. Click **Add SSO Provider** → LDAP
+2. On the **LDAP / Active Directory** card, click **Configure**
 3. Enter the **LDAP Server** hostname and **Port** (389 for LDAP, 636 for LDAPS)
 4. Enable **Use SSL/TLS** (LDAPS, port 636) or, on port 389, **Use StartTLS**: the connection switches to TLS before any bind, with the same certificate verification. Without either, the bind and user passwords cross the network in clear
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)

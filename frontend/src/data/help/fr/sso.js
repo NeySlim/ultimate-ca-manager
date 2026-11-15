@@ -95,7 +95,7 @@ Copiez cette URL dans la configuration « Ajouter un fournisseur de services » 
 ### Configuration
 1. Obtenez l'URL de métadonnées IDP ou le fichier XML de votre fournisseur d'identité
 2. Dans UCM, allez dans **Paramètres → SSO**
-3. Cliquez sur **Ajouter un fournisseur SSO** → SAML
+3. Sur la carte **SAML 2.0**, cliquez sur **Configurer**
 4. Entrez l'**URL de métadonnées IDP** : UCM remplit automatiquement l'Entity ID, les URL SSO/SLO et le certificat
 5. Ou collez directement le XML de métadonnées IDP
 6. Configurez le **mappage d'attributs** (nom d'utilisateur, e-mail, groupes)
@@ -120,7 +120,7 @@ Une connexion lancée depuis le portail de l'IdP arrive sans requête d'UCM. **A
 2. Définissez l'**URI de redirection** à : \`https://your-ucm-host:8443/api/v2/sso/callback/oauth2\`
 3. Copiez le **Client ID** et le **Client Secret**
 4. Dans UCM, allez dans **Paramètres → SSO**
-5. Cliquez sur **Ajouter un fournisseur SSO** → OAuth2
+5. Sur la carte **OAuth2 / OIDC**, cliquez sur **Configurer**
 6. Entrez l'**URL d'autorisation** et l'**URL de jeton**
 7. Entrez l'**URL d'info utilisateur** (pour récupérer les attributs utilisateur après la connexion)
 8. Entrez le Client ID et le Secret
@@ -149,7 +149,7 @@ La section **Provisionnement des utilisateurs** s'ouvre d'elle-même et affiche 
 
 ### Configuration
 1. Dans UCM, allez dans **Paramètres → SSO**
-2. Cliquez sur **Ajouter un fournisseur SSO** → LDAP
+2. Sur la carte **LDAP / Active Directory**, cliquez sur **Configurer**
 3. Entrez le **serveur LDAP** nom d'hôte et **port** (389 pour LDAP, 636 pour LDAPS)
 4. Activez **Utiliser SSL/TLS** (LDAPS, port 636) ou, sur le port 389, **Utiliser StartTLS** : la connexion passe en TLS avant tout bind, avec la même vérification de certificat. Sans l'un ni l'autre, le bind et les mots de passe des utilisateurs circulent en clair sur le réseau
 5. Entrez le **DN de liaison** et le **mot de passe de liaison** (identifiants du compte de service)
