@@ -6,11 +6,10 @@ an interruption runs them all again and ends in the same state. PostgreSQL runs 
 migration in one transaction, SQLite commits step by step. A step whose data forbids the upgrade
 names it in ``refusal(conn)``, read for every step before the first one writes.
 """
-import logging
+import time
 
-from migrations._from_2_254 import STEPS, step
+from migrations._from_2_254 import STEPS, say, step
 
-logger = logging.getLogger(__name__)
 pg_compatible = True
 requires_full_stop = "a 2.x node cannot run against the 3.0 schema: upgrade from 2.254 with every node stopped"
 
@@ -31,11 +30,13 @@ def upgrade(conn):
     if message:
         raise RuntimeError(message)
     for name in STEPS:
+        say(f"    step {name}: started")
+        started = time.monotonic()
         try:
             step(name).upgrade(conn)
         except Exception as exc:
             raise RuntimeError(f"upgrade step {name} failed: {exc}") from exc
-        logger.info("[300] step %s done", name)
+        say(f"    step {name}: done in {time.monotonic() - started:.1f} s")
 
 
 def downgrade(conn):

@@ -106,5 +106,5 @@ def test_the_leader_killed_during_a_scheduled_crl(cluster, admin):
     crl = x509.load_der_x509_crl(bytes(der))
     assert crl.extensions.get_extension_for_class(x509.CRLNumber).value.crl_number == number
     assert int(cert['serial_number']) in {entry.serial_number for entry in crl}
-    # Given back by the heir's pass
-    assert _lease(cluster, ca['id']) == ''
+    # Given back by the heir's pass, which ends its lease after the CRL is committed
+    wait_until(lambda: _lease(cluster, ca['id']) == '', MARGIN, 'the lease given back')

@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from flask import Flask
 
-from auth.session_start import ACCOUNT_KEY, account_proof
+from tests.session_support import pose_signed_in
 from auth.twofa_enforcement import ENROLL_SESSION_KEY
 from models import User, db
 from models.group import Group, GroupMember
@@ -75,15 +75,12 @@ def _session_client(app, user_id=None, **extra):
     """A Flask test client whose server-side session holds what a login would put there."""
     client = app.test_client()
     with client.session_transaction() as sess:
-        now = utc_now().isoformat()
         if user_id is not None:
-            # A real login also records the username and the account proof.
             with app.app_context():
-                user = db.session.get(User, user_id)
-                sess.update(user_id=user_id, username=user.username,
-                            **{ACCOUNT_KEY: account_proof(user)})
-        sess['login_time'] = now
-        sess['last_activity'] = now
+                pose_signed_in(sess, db.session.get(User, user_id))
+        else:
+            now = utc_now().isoformat()
+            sess.update(login_time=now, last_activity=now)
         sess.update(extra)
     return client
 
@@ -307,9 +304,7 @@ class TestRevalidation:
         with _socket(app, client) as ws:
             # A session fully valid for the other account: only the identity check can cut
             with client.session_transaction() as sess, app.app_context():
-                other = db.session.get(User, second)
-                sess.update(user_id=second, username=other.username,
-                            **{ACCOUNT_KEY: account_proof(other)})
+                pose_signed_in(sess, db.session.get(User, second))
             ws.emit('ping')
             assert not ws.is_connected()
 

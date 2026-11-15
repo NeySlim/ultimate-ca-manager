@@ -4,6 +4,7 @@ replays after an interruption; the runner refuses, untouched, any other existing
 import base64
 import hashlib
 import json
+import re
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -754,3 +755,36 @@ def test_the_hex_reading_ends_when_the_upgrade_or_the_fresh_install_ran(dialect,
             assert before <= applied <= after, (label, before, applied, after)
             assert _canonical_since(db, before - timedelta(seconds=2), monkeypatch) is True
             assert _canonical_since(db, after + timedelta(seconds=2), monkeypatch) is False
+
+
+# --- What the journal shows during a long upgrade ---------------------------------------------
+
+def test_each_step_logs_its_start_and_its_end_with_the_duration(base, capsys):
+    from migrations._from_2_254 import STEPS
+    assert base.upgrade() is True
+    lines = capsys.readouterr().out.splitlines()
+    for name in [*STEPS, '300_upgrade_from_2_254']:
+        started = [i for i, line in enumerate(lines) if line.strip().endswith(f'{name}: started')]
+        done = [i for i, line in enumerate(lines) if re.search(rf'{name}: done in \d+\.\d s$', line)]
+        assert len(started) == 1 and len(done) == 1 and started[0] < done[0], (name, lines)
+
+
+class _Clock:
+    def __init__(self, step):
+        self.now, self.step = 0.0, step
+
+    def __call__(self):
+        self.now += self.step
+        return self.now
+
+
+def test_progress_is_logged_at_most_every_30_seconds(monkeypatch, capsys):
+    import migrations._from_2_254 as package
+    clock = _Clock(10)
+    monkeypatch.setattr(package, '_clock', clock)
+    tick = package.Progress('step 999_example', 7)
+    for done in range(1, 8):
+        tick(done)
+    out = capsys.readouterr().out.splitlines()
+    # Started at 10 s, called at 20 s to 80 s: lines at 40 s (3 of 7) and 70 s (6 of 7) only
+    assert out == ['    step 999_example: 3 of 7 rows', '    step 999_example: 6 of 7 rows']

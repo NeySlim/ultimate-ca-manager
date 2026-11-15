@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { helpContent } from '../../data/helpContent'
 import { helpGuides } from '../../data/helpGuides'
+import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const LOCALES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
@@ -54,8 +55,7 @@ const OLD_SECTION = [
 describe('built-in help does not cite the old section name', () => {
   const blobs = {
     en: JSON.stringify(helpContent) + '\n' + JSON.stringify(helpGuides),
-    fr: helpFile('fr'),
-    zh: helpFile('zh'),
+    ...Object.fromEntries(HELP_TRANSLATED_LANGUAGES.map((code) => [code, helpFile(code)])),
   }
   for (const [code, text] of Object.entries(blobs)) {
     it(`${code}: no reference to the old section name`, () => {
@@ -69,9 +69,10 @@ describe('built-in help does not cite the old section name', () => {
 
 describe('help pointers to the section carry the exact screen title', () => {
   const title = (code) => load(code).acme.certificateAuthorities
-  const bare = (code) => title(code).replace(/\s*\(CA\)\s*$/, '')
-  // The bare name must always be followed by the "(CA)" suffix.
-  const bareUses = (text, code) => text.split(bare(code)).slice(1).filter((rest) => !rest.startsWith(' (CA)')).length
+  const bare = (code) => title(code).replace(/\s*\([^)]*\)\s*$/, '')
+  // The bare name must always be followed by the suffix of the screen title, "(CA)" or "(ЦС)".
+  const suffix = (code) => title(code).slice(bare(code).length)
+  const bareUses = (text, code) => text.split(bare(code)).slice(1).filter((rest) => !rest.startsWith(suffix(code))).length
 
   it('en: the upstream account item points at the section', () => {
     const item = JSON.stringify(helpContent).match(/"label":"Upstream CA account","text":"([^"]*)"/)
@@ -82,9 +83,9 @@ describe('help pointers to the section carry the exact screen title', () => {
     expect(bareUses(JSON.stringify(helpContent.acme), 'en')).toBe(0)
     expect(bareUses(JSON.stringify(helpGuides.acme), 'en')).toBe(0)
   })
-  for (const code of ['fr', 'zh']) {
+  for (const code of HELP_TRANSLATED_LANGUAGES) {
     it(`${code}: the upstream account item points at the section`, () => {
-      const m = helpFile(code).match(/label: ['"](?:Compte CA en amont|上游 CA 账户)['"], text: ['"]((?:[^'"\\]|\\.)*)['"]/)
+      const m = helpFile(code).match(/label: ['"](?:Compte CA en amont|上游 CA 账户|Учётная запись вышестоящего ЦС)['"], text: ['"]((?:[^'"\\]|\\.)*)['"]/)
       expect(m, `${code} item`).not.toBeNull()
       expect(m[1]).toContain(title(code))
     })

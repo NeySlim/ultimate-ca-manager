@@ -223,3 +223,27 @@ def test_postgresql(certs, revoked, pending):
         with admin.begin() as conn:
             conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
         admin.dispose()
+
+
+class _Clock:
+    def __init__(self, step):
+        self.now, self.step = 0.0, step
+
+    def __call__(self):
+        self.now += self.step
+        return self.now
+
+
+@pytest.mark.parametrize('seconds,lines', [(31, [f'{n} of 3' for n in (1, 2, 3)]), (1, [])])
+def test_sqlite_reading_logs_its_progress_at_most_every_30_seconds(monkeypatch, capsys, seconds, lines):
+    import migrations._from_2_254 as package
+    monkeypatch.setattr(package, '_clock', _Clock(seconds))
+    conn = sqlite3.connect(':memory:')
+    for ddl in _DDL:
+        conn.execute(ddl)
+    # the row without serial is not read, so not counted
+    conn.executemany(f'INSERT INTO {CERTS} (id, caref, serial_number) VALUES (?, ?, ?)',
+                     [(1, 'ca-p', 'ab'), (2, 'ca-p', '0x10'), (3, 'ca-p', '12'), (4, 'ca-p', '')])
+    _migration().upgrade(conn)
+    out = [line for line in capsys.readouterr().out.splitlines() if '144_canonical' in line]
+    assert out == [f'    step 144_canonical_certificate_serials: {n} rows' for n in lines]

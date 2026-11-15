@@ -189,8 +189,9 @@ livenessProbe:
   periodSeconds: 30
   timeoutSeconds: 10
   failureThreshold: 3
-## HA only: a container killed and restarted in its pod waits up to 190 s for its
-## previous heartbeat to expire before it serves; liveness and readiness start after.
+## Liveness and readiness start once /health/live answers. The first start of a release that
+## upgrades the database answers nothing until the upgrade ends (UPGRADE.md), and in HA a container
+## restarted in its pod waits up to 190 s for its previous heartbeat to expire.
 startupProbe:
   enabled: true
   periodSeconds: 10

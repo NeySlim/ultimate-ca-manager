@@ -101,9 +101,10 @@ class TestASessionOpenedBeforeTheUpdate:
 
     def test_is_refused_by_the_account_that_took_its_id(self, app, auth_client, create_user, cleanup):
         from auth.session_start import ACCOUNT_KEY
-        cleanup.extend(['proofless_first', 'proofless_second'])
+        cleanup.extend(['proofless_first', 'proofless_second', 'proofless_witness'])
         first = create_user(username='proofless_first', role='operator')
-        old_session = _login(app, 'proofless_first')
+        create_user(username='proofless_witness', role='operator')
+        old_session, witness = _login(app, 'proofless_first'), _login(app, 'proofless_witness')
         with old_session.session_transaction() as stored:
             assert stored.pop(ACCOUNT_KEY, None) is not None
 
@@ -114,13 +115,16 @@ class TestASessionOpenedBeforeTheUpdate:
         assert old_session.get(PROTECTED).status_code == 401
         with old_session.session_transaction() as stored:
             assert ACCOUNT_KEY not in stored
+        # Refused for the id it reuses: a session of the same age on another account still passes
+        assert witness.get(PROTECTED).status_code == 200
         assert _login(app, 'proofless_second').get(PROTECTED).status_code == 200
 
     def test_is_refused_by_a_namesake_that_took_its_id(self, app, auth_client, create_user, cleanup):
         from auth.session_start import ACCOUNT_KEY
-        cleanup.append('proofless_namesake')
+        cleanup.extend(['proofless_namesake', 'proofless_bystander'])
         first = create_user(username='proofless_namesake', role='operator')
-        old_session = _login(app, 'proofless_namesake')
+        create_user(username='proofless_bystander', role='operator')
+        old_session, witness = _login(app, 'proofless_namesake'), _login(app, 'proofless_bystander')
         with old_session.session_transaction() as stored:
             assert stored.pop(ACCOUNT_KEY, None) is not None
 
@@ -129,6 +133,7 @@ class TestASessionOpenedBeforeTheUpdate:
         _reuses(app, first, second)
 
         assert old_session.get(PROTECTED).status_code == 401
+        assert witness.get(PROTECTED).status_code == 200
         assert _login(app, 'proofless_namesake').get(PROTECTED).status_code == 200
 
     def test_is_refused_by_an_undated_account_that_took_its_id(self, app, auth_client, create_user, cleanup):

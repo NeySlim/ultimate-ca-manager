@@ -32,7 +32,7 @@ export default {
       },
     ],
     tips: [
-      'Enrôlez de nouveaux certificats mTLS depuis Compte → onglet mTLS',
+      'Enrôlez de nouveaux certificats mTLS depuis Mon compte → Sécurité',
       'Les certificats sont stockés et gérés par UCM comme n\'importe quel autre certificat',
       'Utilisez la barre de statistiques pour filtrer rapidement par statut',
       'Cliquez sur une ligne pour afficher les détails complets du certificat dans l\'inspecteur',
@@ -47,14 +47,14 @@ export default {
     content: `
 ## Vue d'ensemble
 
-La page Certificats utilisateur gère les certificats clients mTLS enrôlés via l'onglet **Compte → mTLS**. Contrairement aux certificats classiques, ceux-ci sont spécifiquement liés à des comptes utilisateur pour l'authentification TLS mutuelle.
+La page Certificats utilisateur gère les certificats clients mTLS enrôlés depuis **Mon compte → Sécurité**, section **Certificats clients (mTLS)**. Contrairement aux certificats classiques, ceux-ci sont spécifiquement liés à des comptes utilisateur pour l'authentification TLS mutuelle.
 
 Les certificats présents ici sont entièrement gérés par UCM : ils sont stockés en base de données avec leurs clés privées et peuvent être exportés, révoqués ou supprimés à tout moment.
 
 ## Enrôler un certificat
 
-1. Allez dans **Compte → onglet mTLS**
-2. Cliquez sur **Enrôler un certificat**
+1. Allez dans **Mon compte → Sécurité**, section **Certificats clients (mTLS)**
+2. Cliquez sur **Ajouter un certificat**, gardez **Générer** et cliquez sur **Générer le certificat**
 3. Le système génère une paire de clés et émet un certificat client signé par votre CA mTLS
 4. Le certificat apparaît sur cette page et peut être utilisé pour la connexion mTLS
 

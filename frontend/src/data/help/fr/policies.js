@@ -18,7 +18,7 @@ export default {
         items: [
           { label: 'Validité maximale', text: 'Durée de vie maximale du certificat en jours' },
           { label: 'Types de clés autorisés', text: 'Restreindre les algorithmes et tailles de clés pouvant être utilisés, ML-DSA-44, ML-DSA-65 et ML-DSA-87 compris ; le mode FIPS retire ML-DSA quand le module FIPS ne l\'approuve pas' },
-          { label: 'Schémas de signature autorisés', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA ou SLH-DSA, comparés à la clé de la CA signataire. Les algorithmes de hachage de signature autorisés ne contraignent pas une CA ML-DSA, qui signe sans digest séparé' },
+          { label: 'Schémas de signature (API seulement)', text: 'La règle allowed_signature_schemes, absente du formulaire de politique : PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA ou SLH-DSA, comparés à la clé de la CA signataire. Les algorithmes de hachage de signature autorisés ne contraignent pas une CA ML-DSA, qui signe sans digest séparé' },
           { label: 'Restrictions SAN', text: 'Limiter le nombre de noms DNS (les autres types de SAN ne sont pas comptés) ; un motif DNS par politique (*.company.com, ou company.com pour inclure le domaine lui-même) limite la politique aux noms correspondants' },
           { label: 'Algorithmes de hachage de signature autorisés', text: 'SHA-256, SHA-384 ou SHA-512 ; aucun sélectionné autorise tout. Quand personne n\'a choisi le hachage, celui par défaut s\'applique s\'il est autorisé, sinon le plus faible autorisé. Le formulaire d\'émission ne propose que les types de clé autorisés, Créer une CA que les types de clé et hachages autorisés' },
         ]
@@ -79,12 +79,12 @@ Restreindre les algorithmes et tailles de clés pouvant être utilisés :
 - **EC-P521** : Sécurité maximale (rarement nécessaire)
 - **ML-DSA-44 / ML-DSA-65 / ML-DSA-87** : Post-quantique (FIPS 204), niveaux NIST 2, 3 et 5 ; retirés en mode FIPS quand le module FIPS ne les approuve pas
 
-**Schémas de signature autorisés** restreint la façon dont signe la CA signataire (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Les algorithmes de hachage de signature autorisés ne contraignent pas une CA ML-DSA, qui signe sans digest séparé.
+La règle \`allowed_signature_schemes\`, définie par l'API seulement (le formulaire de politique ne l'affiche pas), restreint la façon dont signe la CA signataire (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Les algorithmes de hachage de signature autorisés ne contraignent pas une CA ML-DSA, qui signe sans digest séparé.
 
 **Algorithmes de hachage de signature autorisés** restreint le hachage de signature de la même façon (SHA-256, SHA-384, SHA-512) ; aucun sélectionné autorise tout. Quand personne n'a choisi le hachage, celui par défaut s'applique s'il est autorisé, sinon le plus faible autorisé. Le formulaire d'émission ne propose que les types de clé autorisés, Créer une CA que les types de clé et hachages autorisés.
 
 ### Restrictions SAN
-- **Noms DNS max** : Limiter le nombre de noms DNS du SAN ; les entrées IP, e-mail et URI ne sont pas comptées
+- **SANs max** : Limiter le nombre de noms DNS du SAN ; les entrées IP, e-mail et URI ne sont pas comptées
 - **Motif DNS** : Limite la politique aux requêtes dont le CN ou les SAN DNS correspondent, étiquette par étiquette et sans tenir compte de la casse : \`*.company.com\` couvre les noms sous company.com, \`company.com\` couvre aussi company.com. Les autres noms ne sont pas refusés : la politique ne s'applique pas à eux
 
 ## Flux d'approbation

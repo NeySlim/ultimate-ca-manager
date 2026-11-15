@@ -161,10 +161,10 @@ export default {
         title: '持久 DNS 验证 (dns-persist-01)',
         content: '本地 ACME 服务器可通过绑定到 ACME 账户的持久 TXT 记录验证域名 (draft-ietf-acme-dns-persist)：续期时无需写入 DNS。可选启用，默认关闭。',
         items: [
-          { label: '记录', text: '创建 _validation-persist.<域名> TXT "<签发者域名>; accounturi=<账户 URL>"，challenge 对象会公布这两个期望值' },
+          { label: '记录', text: '创建 _validation-persist.<domain> TXT "<issuer-domain>; accounturi=<account URL>"，challenge 对象会公布这两个期望值' },
           { label: '启用', text: 'ACME → 本地 ACME → 持久 DNS 验证 (dns-persist-01)' },
           { label: '通配符 / 子域名', text: '追加 policy=wildcard 可同时授权通配符证书及已验证名称的子域名' },
-          { label: 'persistUntil', text: '可选的 persistUntil=<unix 时间戳> 会在该时间之后阻止新的验证' },
+          { label: 'persistUntil', text: '可选的 persistUntil=<unix timestamp> 会在该时间之后阻止新的验证' },
           { label: '安全', text: '只要记录存在，账户密钥即拥有签发能力，删除 TXT 记录即可撤销' },
         ]
       }
@@ -297,7 +297,7 @@ ECDSA 密钥推荐用于现代部署：更小、更快且同样安全。
 - \`TTL\`: 记录 TTL（秒）
 - \`ACTION\`: \`create\` 或 \`delete\`
 
-命令要求**二进制文件绝对路径**，不经过 shell 运行（无管道或变量展开），并在可配置的超时后被终止（5–300 秒，默认 60）。可使用一个小的包装脚本对接任何外部 DNS 工具。
+命令要求**二进制文件绝对路径**，不经过 shell 运行（无管道或变量展开），并在可配置的超时后被终止（5-300 秒，默认 60）。可使用一个小的包装脚本对接任何外部 DNS 工具。
 
 ### 自定义 DNS 解析器
 **DNS-01 解析器**用于选择 UCM 在何处查询 \`_acme-challenge\` TXT 记录：**自动**（依次为列出的解析器、区域的权威服务器、公共解析器、系统解析器）、**仅系统解析器**或**仅列出的解析器**。受限模式从不查询公共解析器，适用于屏蔽公共解析器的网络。条目以逗号分隔，为 IP 加可选端口，例如 \`127.0.0.1:5353\` 或 \`[2001:db8::53]:5300\`。
@@ -339,7 +339,7 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 1. 打开 **证书颁发机构 (CA)**（同一 Let's Encrypt 选项卡）
 2. 编辑或创建 CA 账户
 3. 启用 **通过 ACME 代理暴露**
-4. 设置唯一的 **代理路径 (slug)**: 如 \`actalis-production\`
+4. 设置唯一的 **代理路径 (slug)**: 如 \`actalis-production\`、\`letsencrypt-staging\`
 5. 保存: URL 显示在代理部分和账户卡片上
 
 客户端使用：
@@ -541,7 +541,7 @@ challenge 对象会公布期望的 \`accounturi\` 和 \`issuer-domain-names\`。
 
 ### 选项
 - \`policy=wildcard\`: 同时授权通配符证书及已验证名称的子域名（父域名上的记录覆盖其子域名）
-- \`persistUntil=<unix 时间戳>\`: 在该时间之后阻止新的验证
+- \`persistUntil=<unix-timestamp>\`: 在该时间之后阻止新的验证
 
 > ⚠️ 只要记录存在，ACME 账户密钥即拥有签发能力：删除 TXT 记录即可撤销。
 

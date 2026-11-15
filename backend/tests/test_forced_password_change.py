@@ -8,12 +8,11 @@ from uuid import uuid4
 
 import pytest
 
-from auth.session_start import ACCOUNT_KEY, account_proof
+from tests.session_support import pose_signed_in
 from models import User, db
 from models.api_key import APIKey
 from models.user import UserSession
 from tests.conftest import assert_success
-from utils.datetime_utils import utc_now
 from websocket import socketio
 
 _FIRST = 'FirstBoot-Pass-123!'
@@ -118,14 +117,8 @@ def test_an_api_key_made_with_full_access_keeps_working(app, flagged_admin):
 @contextmanager
 def _socket(app, user_id):
     client = app.test_client()
-    with client.session_transaction() as sess:
-        now = utc_now().isoformat()
-        # A real login also records the username and the account proof.
-        with app.app_context():
-            user = db.session.get(User, user_id)
-            sess.update(user_id=user_id, username=user.username,
-                        **{ACCOUNT_KEY: account_proof(user)})
-        sess.update(login_time=now, last_activity=now)
+    with client.session_transaction() as sess, app.app_context():
+        pose_signed_in(sess, db.session.get(User, user_id))
     ws = socketio.test_client(app, flask_test_client=client)
     try:
         yield ws

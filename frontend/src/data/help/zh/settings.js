@@ -9,7 +9,7 @@ export default {
         content: "可选的 /metrics 端点，以 Prometheus 格式公开计数器（证书、CA、调度器、Webhook、ACME）。",
         items: [
           { label: "启用", text: "在设置 › 常规中设置指标令牌；未设置令牌时端点返回 404（禁用）" },
-          { label: "认证", text: "使用 Authorization: Bearer <令牌> 抓取" },
+          { label: "认证", text: "使用 Authorization: Bearer <token> 抓取" },
           { label: "计数器", text: "ucm_certificates、ucm_certificate_authorities、ucm_scheduler_task_*、ucm_webhook_deliveries、ucm_acme_*" },
         ]
       },
@@ -66,7 +66,7 @@ export default {
           { label: "HA 模式", text: "在 HA 模式下，从任一节点发起恢复时，会先让每个节点拒绝写入（503）并退出负载均衡器的轮转，直到恢复结束；若有节点在 30 秒内未确认，恢复会被拒绝并指明该节点。随后各节点逐个重启，重启后各自提供恢复后的状态" },
           { label: "上传限制", text: "3.0 起创建的归档按分块方式恢复，除非通过 BACKUP_MAX_ARCHIVE_MB 设置上限，否则不限制大小。更早的归档最大接受 BACKUP_MAX_UPLOAD_MB（默认 512 MB）。两者均在服务器环境中设置，被拒绝时会指明对应的参数。UCM 前面的反向代理仍保留其自身的请求体大小限制" },
           { label: "归档包含的内容", text: "归档包含 ACME 客户端订单、批准请求和密钥恢复请求。恢复在此版本之前写入的归档时，这些行会保持此处的原样" },
-          { label: "同名", text: "其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook，会恢复为“名称 (2)”，API 返回的恢复结果会列出它" },
+          { label: "同名", text: "其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook，会恢复为“name (2)”，API 返回的恢复结果会列出它" },
           { label: "指向某行的设置", text: "SCEP 和 ACME 签发 CA、OCSP 响应者等设置会跟随归档中的行。从较旧的归档恢复到另一个安装时，它们会被清空，需要重新选择" },
         ]
       },
@@ -108,7 +108,7 @@ export default {
           { label: 'HTTPS', text: 'UCM Web 界面的 TLS 证书。已应用的证书会被记住，并在其续期后自动重新应用（v2.217）；界面会显示当前绑定的证书及一个解除绑定按钮，用于停止跟随续期（v2.218）。UCM 不持有其密钥的协议续期会让 HTTPS 继续使用前一张证书并给出提示，直到导入已续期证书的密钥' },
           { label: '更新', text: '检查新版本、查看变更日志、每日计划检查并可选启用无人值守安装（DEB/RPM）' },
           { label: 'Webhook', text: '证书事件（签发、吊销、过期）的 HTTP Webhook, 允许内部 LAN URL；阻止云元数据 IP。可选出站认证：Bearer、Basic、API 密钥或自定义标头' },
-          { label: 'Webhook 名称唯一 (v2.251)', text: '创建和重命名时，已被使用的 Webhook 名称会被拒绝 (409)。升级时，先前重复的名称按创建先后依次重命名为“名称 (2)”、“名称 (3)”' },
+          { label: 'Webhook 名称唯一 (v2.251)', text: '创建和重命名时，已被使用的 Webhook 名称会被拒绝 (409)。升级时，先前重复的名称按创建先后依次重命名为“name (2)”、“name (3)”' },
           { label: '部署', text: '部署目标提供可复用的 SSH/SFTP 连接，或 HTTP API 请求（v2.252）；证书部署和 CRL 部署各自定义路径和可选的重载命令（仅管理员，v2.215）' },
           { label: 'Active Directory', text: 'UCM 自身的 AD/LDAP 连接，用于与证书相关的查询（Kerberos 主体解析、AD 派生主题）' },
           { label: 'Windows 自动注册', text: 'MS-XCEP/MS-WSTEP 原生 Windows 注册：策略发现、证书签发和 Kerberos/SPNEGO 绑定' },
@@ -314,7 +314,7 @@ export default {
 - 在 HA 模式下，从任一节点发起恢复时，会先让每个节点拒绝写入（503）并退出负载均衡器的轮转，直到恢复结束；若有节点在 30 秒内未确认，恢复会被拒绝并指明该节点。随后各节点逐个重启，重启后各自提供恢复后的状态
 - 3.0 起创建的归档按分块方式恢复，除非通过 \`BACKUP_MAX_ARCHIVE_MB\` 设置上限，否则不限制大小；更早的归档最大接受 \`BACKUP_MAX_UPLOAD_MB\`（默认 512 MB）。两者均在服务器环境中设置，被拒绝时会指明对应的参数；UCM 前面的反向代理仍保留其自身的请求体大小限制
 - 归档包含 ACME 客户端订单、批准请求和密钥恢复请求 (v2.251)
-- 其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook 会恢复为 \`名称 (2)\`
+- 其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook 会恢复为 \`name (2)\`
 - API 还接受 \`mode=merge\`，将归档添加到此处的数据中而不是替换
 
 > ⚠ 恢复备份将替换所有当前数据。
@@ -402,10 +402,10 @@ UCM 支持两种数据库后端：
 可选出站认证（适用于可选 HMAC 签名之外）：
 
 - **无**: 无认证标头（公开 Webhook）
-- **Bearer**: \`Authorization: Bearer <令牌>\`
-- **Basic**: \`Authorization: Basic <base64(用户:密码)>\`
-- **API 密钥**: 自定义标头（如 \`X-Api-Key: <令牌>\`）
-- **自定义**: \`Authorization: <方案> <令牌>\`（如 \`auth-key 值\`）
+- **Bearer**: Authorization: Bearer {token}
+- **Basic**: Authorization: Basic base64(username:password)
+- **API 密钥**: 自定义标头（如 X-Api-Key: {token}）
+- **自定义**: Authorization: {scheme} {token}（如 auth-key VALUE）
 
 令牌以加密方式存储，不会在 UI 中返回。
 
@@ -424,7 +424,7 @@ UCM 支持两种数据库后端：
 可选、令牌保护的 **\`/metrics\`** 端点。
 
 - 通过设置指标令牌启用（设置 › 常规）；无令牌 → 404
-- 使用 \`Authorization: Bearer <令牌>\` 标头抓取
+- 使用 \`Authorization: Bearer <token>\` 标头抓取
 - 公开 \`ucm_certificates\`、\`ucm_certificate_authorities\`、\`ucm_scheduler_task_*\`、\`ucm_webhook_deliveries\`、\`ucm_acme_*\`
 
 ## Webhook 投递历史
@@ -468,7 +468,7 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 
 - **连接器**: 每个目录（林或域）一个，在设置 → Active Directory 中列出其名称、领域、已读取的域 SID 及健康状态。Windows 注册配置文件会指定为其领域服务的连接器；仍被配置文件使用的连接器无法删除，拒绝时会列出这些配置文件
 - **用途**: 将 Kerberos 计算机或用户主体解析为其 AD 对象，以便 UCM 能像真实 Windows CA 一样派生证书主题/SAN
-- **域控制器**: 每行一个，各用自己的主机名，按顺序尝试：某个域控制器宕机时，查询会故障转移到下一个。仅域名会导致证书验证失败，因为域控制器证书只包含其自身主机名
+- **域控制器**: 每行一个，各用自己的主机名（不含端口和协议），按顺序尝试：某个域控制器宕机时，查询会故障转移到下一个。仅域名会导致证书验证失败，因为域控制器证书只包含其自身主机名
 - **LDAPS**: 切换以通过 SSL/TLS 使用 LDAP；**验证 SSL 证书** 验证域控制器的证书（当证书不受公共信任时，可选地针对自定义 CA 证书包进行验证）
 - **Base DN** 和 **Bind DN / 密码**: 域的基础 DN，带有其 DC 组成部分（\`DC=corp,DC=example\`，它同时命名所提供的 Kerberos 领域），位于域控制器端口（389 或 636，而非全局编录）上，以及用于查询的服务账户；连接器启用时，Bind DN 和密码均为必填
 - **测试连接**: 保存前验证连通性和凭据
@@ -513,7 +513,7 @@ WSTEP 仅提供 Issue 请求类型（续期也包括在内），并拒绝 \`wsu:
 
 绑定用于静默 GPO 自动注册的、经 Kerberos 身份验证的 XCEP/WSTEP 端点，使计算机和用户通过其 Kerberos 票证进行身份验证，而不是弹出凭据提示：
 - **服务主体名称 (SPN)**: 例如 \`HTTP/ucm.example.com@EXAMPLE.COM\`，与 XCEP、WSTEP 和 Kerberos 开关一样由所有配置文件共用
-- **Keytab**: 每个配置文件一个，在其领域的域控制器上使用 \`ktpass\` 或 \`ktutil\` 生成。每个条目都必须是 \`HTTP/<主机>@<配置文件的领域>\`；表单按领域列出所选文件的条目，并标出不属于该配置文件的领域。所有配置文件的 keytab 合并为一个文件提供
+- **Keytab**: 每个配置文件一个，在其领域的域控制器上使用 \`ktpass\` 或 \`ktutil\` 生成。每个条目都必须是 \`HTTP/<host>@<realm of the profile>\`；表单按领域列出所选文件的条目，并标出不属于该配置文件的领域。所有配置文件的 keytab 合并为一个文件提供
 
 > ⚠ Kerberos 需要服务器端的 **\`gssapi\` 后端**（Python 的 \`gssapi\` 库加系统 Kerberos 库）：仅有基础 SPNEGO 包是不够的。没有它，即使在此处启用，Kerberos 身份验证也无法工作，且不会公布 Kerberos 绑定；该标签页会显示警告。
 

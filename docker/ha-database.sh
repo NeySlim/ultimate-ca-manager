@@ -45,7 +45,111 @@ ucm_initial_admin_notice() {
     fi
 }
 
-# First-run notice and pre-start copy of the SQLite file; both skipped in HA mode.
+# The database itself says whether this start upgrades it: a migration of the image missing from
+# its registry, or the serial step left to run again. Read-only; any doubt counts as an upgrade.
+# A WAL database is not opened: a read-only open would create its -wal and -shm files.
+ucm_sqlite_upgrade_possible() {
+    python3 -I - "$UCM_DATABASE_PATH" "${UCM_MIGRATIONS_DIR:-/opt/ucm/backend/migrations}" <<'PY' 2>/dev/null && return 1
+import pathlib, sqlite3, sys
+path = pathlib.Path(sys.argv[1]).resolve()
+with open(path, "rb") as f:
+    head = f.read(20)
+if head[:16] != b"SQLite format 3\0" or head[18:20] != b"\1\1":
+    sys.exit(1)
+names = {p.stem for p in pathlib.Path(sys.argv[2]).glob("*.py") if not p.name.startswith("_")}
+db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+applied = {row[0] for row in db.execute("SELECT name FROM _migrations")}
+tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+pending = "system_config" in tables and db.execute(
+    "SELECT 1 FROM system_config WHERE key = 'serial_unique_index_pending'").fetchone()
+sys.exit(0 if names and names <= applied and not pending else 1)
+PY
+    return 0
+}
+
+# Where the image puts its pre-start copy of the database.
+UCM_SQLITE_BACKUP_DIR=/opt/ucm/data/backups
+
+# "<filesystem> <KB available>" for a directory, nothing when df cannot answer.
+_ucm_df() {
+    df -Pk "$1" 2>/dev/null | awk 'NR == 2 && $4 ~ /^[0-9]+$/ { print $1, $4 }'
+}
+
+# Device id of the filesystem holding a directory (its nearest existing parent), nothing when unknown.
+_ucm_dev() {
+    local d=$1 dev
+    until dev=$(stat -c %d "$d" 2>/dev/null) && [ -n "$dev" ]; do
+        [ "$d" = "/" ] || [ "$d" = "." ] && return 0
+        d=$(dirname "$d")
+    done
+    echo "$dev"
+}
+
+# True when both directories share a filesystem (arguments: directory, directory, df line, df line):
+# one device id, or one /dev source (btrfs subvolumes); an unreadable id counts as shared, the
+# cautious reading. Other df names (tmpfs) are not identities.
+_ucm_same_fs() {
+    local a b
+    a=$(_ucm_dev "$1")
+    b=$(_ucm_dev "$2")
+    [ -z "$a" ] || [ -z "$b" ] || [ "$a" = "$b" ] || { [ "${3%% *}" = "${4%% *}" ] && [[ "$3" == /dev/* ]]; }
+}
+
+# Prints the refusal and fails when `df` line $3 has less than $2 KB for directory $1.
+_ucm_room_short() {
+    local avail_kb=${3##* }
+    [ -z "$3" ] || [ "$avail_kb" -ge "$2" ] && return 1
+    # needed rounded up, available down: the message never shows a need it satisfies
+    echo -e "${RED:-}❌ Not enough disk space in $1: the start needs $(( ($2 + 1023) / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
+}
+
+# Room for the start: the copy on the backups' filesystem when enabled, the database's size
+# again on its own filesystem when an upgrade may run (journal and growth), summed when both
+# are one filesystem. Fails with what is needed and available; a df that cannot answer passes.
+ucm_sqlite_disk_room() {
+    local db_dir bytes size_kb size_mb db_need=0 copy_need=0 db_df="" copy_df="" short=false shared_dir
+    db_dir=$(dirname "$UCM_DATABASE_PATH")
+    bytes=$(stat -c %s "$UCM_DATABASE_PATH" 2>/dev/null || wc -c < "$UCM_DATABASE_PATH")
+    size_kb=$(( (bytes + 1023) / 1024 ))
+    size_mb=$(( (size_kb + 1023) / 1024 ))
+    ucm_sqlite_upgrade_possible && db_need=$size_kb
+    [ "$UCM_BACKUP_ENABLED" = "true" ] && copy_need=$size_kb
+    [ "$db_need" -gt 0 ] && db_df=$(_ucm_df "$db_dir")
+    [ "$copy_need" -gt 0 ] && copy_df=$(_ucm_df "$UCM_SQLITE_BACKUP_DIR")
+    if [ -n "$db_df" ] && [ -n "$copy_df" ] && _ucm_same_fs "$db_dir" "$UCM_SQLITE_BACKUP_DIR" "$db_df" "$copy_df"; then
+        # one filesystem: the smaller of the two readings is the room
+        shared_dir=$db_dir
+        [ "${copy_df##* }" -lt "${db_df##* }" ] && db_df=$copy_df && shared_dir=$UCM_SQLITE_BACKUP_DIR
+        if _ucm_room_short "$shared_dir" $(( db_need + copy_need )) "$db_df"; then
+            echo "   The database is $size_mb MB; upgrading it needs its size for the upgrade's journal and growth,"
+            echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
+            return 1
+        fi
+        return 0
+    fi
+    if _ucm_room_short "$db_dir" "$db_need" "$db_df"; then
+        echo "   The database is $size_mb MB; upgrading it needs its size beside it for the upgrade's journal and growth."
+        short=true
+    fi
+    if _ucm_room_short "$UCM_SQLITE_BACKUP_DIR" "$copy_need" "$copy_df"; then
+        echo "   The database is $size_mb MB; the pre-start copy needs its size (UCM_BACKUP_ENABLED=false skips it)."
+        short=true
+    fi
+    [ "$short" = "true" ] && echo "   Free space, then start again." && return 1
+    return 0
+}
+
+# True only for a PostgreSQL DATABASE_URL (the forms of utils/db_url.is_postgres_url). Any other
+# value may still name the SQLite file, and its spelling is not parsed here: the file is checked.
+_ucm_database_url_elsewhere() {
+    case "${DATABASE_URL:-}" in
+        postgresql://*|postgres://*|postgresql+*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# First-run notice and pre-start copy of the SQLite file; both skipped in HA mode. With a PostgreSQL
+# DATABASE_URL the SQLite file is neither checked nor copied.
 ucm_sqlite_check_and_backup() {
     if ucm_ha_active; then
         echo -e "${GREEN:-}✅ HA mode: database is PostgreSQL, no SQLite backup${NC:-}"
@@ -54,12 +158,15 @@ ucm_sqlite_check_and_backup() {
     if [ ! -f "$UCM_DATABASE_PATH" ]; then
         echo -e "${YELLOW:-}   First run detected - database will be auto-created${NC:-}"
         ucm_initial_admin_notice
+    elif _ucm_database_url_elsewhere; then
+        echo -e "${GREEN:-}✅ Database from DATABASE_URL: the SQLite file is not used, no SQLite backup${NC:-}"
     else
         echo -e "${GREEN:-}✅ Database exists${NC:-}"
+        ucm_sqlite_disk_room || return 1
 
         # Database backup if enabled
         if [ "$UCM_BACKUP_ENABLED" = "true" ]; then
-            BACKUP_DIR="/opt/ucm/data/backups"
+            BACKUP_DIR="$UCM_SQLITE_BACKUP_DIR"
             BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
 
             # Create backup

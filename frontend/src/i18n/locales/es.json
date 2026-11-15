@@ -4076,7 +4076,7 @@
     "bindingLeftBehind": "Una renovación dejó {{name}} en el certificado anterior"
   },
   "help": {
-    "englishOnlyNotice": "La ayuda está disponible en inglés, francés y chino.",
+    "englishOnlyNotice": "La ayuda está disponible en inglés, francés, ruso y chino.",
     "aboutCertificates": "Acerca de certificados",
     "statusLegend": "Leyenda de estados",
     "exportFormats": "Formatos de exportación",
