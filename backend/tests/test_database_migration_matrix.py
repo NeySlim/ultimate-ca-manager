@@ -1538,3 +1538,139 @@ class TestARefusalSaysWhetherARetryCanHelp:
         with app.app_context():
             ok, _, stats = migration.bootstrap_auth_to_target(sqlite_target)
         assert ok is False and stats['transient'] is False
+
+
+def _marker_kinds(url):
+    """The kinds the transfer marker holds on *url*, or None when it is absent."""
+    from services.database_admin.preflight import TRANSFER_MARKER
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        if TRANSFER_MARKER not in inspect(engine).get_table_names():
+            return None
+        with engine.connect() as conn:
+            return {r[0] for r in conn.execute(text(f'SELECT kind FROM {TRANSFER_MARKER}'))}
+    finally:
+        engine.dispose()
+
+
+class TestTheMarkerIsNeverTakenForAVerification:
+    """A data migration may start over the marker alone, never over a row beside it; a target
+    left by one kind of transfer is never taken as verified by the other kind."""
+
+    def _marker_alone_then_a_row(self, app, target):
+        from services.database_admin.preflight import (
+            PreflightError, TRANSFER_MARKER, check_target_is_empty)
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with app.app_context():
+                migration._force_register_all_models()
+                db.metadata.create_all(engine)
+                migration._mark_unverified(engine, 'migration')
+                inspected = check_target_is_empty(engine)
+                assert inspected and TRANSFER_MARKER not in inspected
+                with engine.begin() as conn:
+                    conn.execute(text(
+                        "INSERT INTO users (username, email, password_hash, role, auth_source) "
+                        "VALUES ('beside', 'beside@marker', 'x', 'admin', 'local')"))
+                with pytest.raises(PreflightError, match="not empty.*users"):
+                    check_target_is_empty(engine)
+        finally:
+            engine.dispose()
+
+    def test_the_marker_alone_is_empty_a_row_beside_it_is_not_sqlite(self, app, sqlite_target):
+        self._marker_alone_then_a_row(app, sqlite_target)
+
+    @_needs_pg
+    def test_the_marker_alone_is_empty_a_row_beside_it_is_not_postgresql(self, app, pg_target):
+        self._marker_alone_then_a_row(app, pg_target)
+
+    def _switch_cut_then_migrated(self, app, target, monkeypatch):
+        def killed(*args, **kwargs):
+            raise _Killed()
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', killed)
+            with app.app_context():
+                with pytest.raises(_Killed):
+                    migration.bootstrap_auth_to_target(target)
+        assert _marker_kinds(target) == {'switch'}
+
+        # Its accounts and registry make the target somebody's: the migration does not start
+        with app.app_context():
+            ok, message, stats = migration.migrate_data(target)
+        assert ok is False and stats['refusal'] == 'preflight', message
+        assert stats['target_written'] is False
+        assert _marker_kinds(target) == {'switch'}
+
+        # The switch still copies afresh and verifies before it lifts the marker
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is True and stats['validation']['ok'] is True, message
+        assert _marker_kinds(target) is None
+
+    def test_a_switch_cut_short_is_not_migrated_over_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._switch_cut_then_migrated(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_switch_cut_short_is_not_migrated_over_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._switch_cut_then_migrated(app, pg_target, monkeypatch)
+
+    def _migration_cut_then_switched(self, app, target, monkeypatch):
+        def killed(*args, **kwargs):
+            raise _Killed()
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', killed)
+            with app.app_context():
+                with pytest.raises(_Killed):
+                    migration.migrate_data(target)
+        assert _marker_kinds(target) == {'migration'}
+
+        # Only its accounts could be checked again by a switch: it is refused and keeps its marker
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is False and stats['refusal'] == 'preflight', message
+        assert 'data migration' in message and stats['target_written'] is False
+        assert _marker_kinds(target) == {'migration'}
+
+    def test_a_migration_cut_short_is_not_switched_to_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._migration_cut_then_switched(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_migration_cut_short_is_not_switched_to_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._migration_cut_then_switched(app, pg_target, monkeypatch)
+
+    def _migration_failed_before_its_rows_then_switched(self, app, target, monkeypatch):
+        from services.database_admin import copy as copy_module
+
+        def broken(*args, **kwargs):
+            raise RuntimeError('the disk went away')
+
+        with monkeypatch.context() as m:
+            m.setattr(copy_module, '_copy_one', broken)
+            with app.app_context():
+                ok, _, stats = migration.migrate_data(target)
+        assert ok is False and stats['refusal'] == 'copy'
+        assert _marker_kinds(target) == {'migration'}
+
+        # Its empty registry is refused by the start, before the switch writes anything
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is False and stats['refusal'] == 'preflight', message
+        assert stats['target_written'] is False
+        assert _marker_kinds(target) == {'migration'}
+
+    def test_a_migration_failed_before_its_rows_is_not_switched_to_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._migration_failed_before_its_rows_then_switched(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_migration_failed_before_its_rows_is_not_switched_to_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._migration_failed_before_its_rows_then_switched(app, pg_target, monkeypatch)
