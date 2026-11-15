@@ -1,9 +1,10 @@
 """The installation's session epoch: every session carries the one it began under, and a
 restore advances it, so no session begun before a restore is accepted after it.
 
-One system_config row, never exported nor restored (services/backup/installation.py),
-read by every request that presents a session: every worker shares it, whatever store
-holds the sessions. Absent means no restore ever completed here (epoch 0).
+One system_config row, never exported nor restored (services/backup/installation.py):
+every worker shares it, whatever store holds the sessions. Read as each request starts,
+except protocol, probe and static file paths, which never open a session, and again
+when a request presents a session. Absent means no restore ever completed here (epoch 0).
 """
 from models import SystemConfig, db
 
@@ -18,10 +19,11 @@ def current_epoch() -> int:
 
 def remember_request_epoch():
     """before_request: the epoch as this request starts, before any identity check.
-    Protocol and probe paths never open a session and skip the read."""
+    Protocol, probe and static file paths never open a session and skip the read."""
     from flask import g, request
+    from middleware.mtls_middleware import _is_file_request
     from utils.admin_allowlist import is_exempt_path
-    if not is_exempt_path(request.path):
+    if not (is_exempt_path(request.path) or _is_file_request(request.path)):
         g.session_epoch_at_start = current_epoch()
 
 

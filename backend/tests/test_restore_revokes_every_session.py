@@ -151,3 +151,14 @@ def test_a_login_the_restore_overtakes_is_refused_after_it(app, accounts, monkey
     client = _login(app, name)
     assert client.get(PROTECTED).status_code == 401, 'a login begun before the restore survived it'
     assert client.get('/api/v2/auth/verify').get_json().get('data', {}).get('authenticated') is not True
+
+
+@pytest.mark.parametrize('path', ('/favicon.ico', '/assets/index-abc123.js'))
+def test_a_file_request_does_not_read_the_epoch(app, monkeypatch, path):
+    """Static files never open a session: no epoch read, even with the database down."""
+    from auth import session_epoch
+
+    def database_down():
+        raise RuntimeError('database unavailable')
+    monkeypatch.setattr(session_epoch, 'current_epoch', database_down)
+    assert app.test_client().get(path).status_code < 500
