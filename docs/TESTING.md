@@ -110,7 +110,7 @@ cd backend
 UCM_TEST_REQUIRE_REDIS=1 pytest -m needs_redis tests/
 ```
 
-They run two applications on one Redis (sessions shared, closed and expired across both, Redis stopped and restarted), and three processes for the WebSocket events (two web processes with a Socket.IO client each, and one process that emits like the scheduler). The test of Redis taking precedence over the PostgreSQL session table also needs `UCM_TEST_PG_URL`.
+They run two applications on one Redis (sessions shared, closed and expired across both, Redis stopped and restarted), and three processes for the WebSocket events (two web processes with a Socket.IO client each, and one process that emits like the scheduler). The test of Redis taking precedence over the PostgreSQL session table also needs a PostgreSQL URL (`UCM_TEST_APP_PG_URL` or `UCM_TEST_PG_URL`); no CI job provides both, so it runs only where both are set.
 
 ### Frontend Tests
 
