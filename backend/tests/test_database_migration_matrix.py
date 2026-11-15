@@ -1368,12 +1368,12 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
         assert 'reset the target' in message
 
     def test_a_refused_migration_is_not_switched_to_afterwards_sqlite(
-            self, app, sqlite_target, monkeypatch):
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
         self._migrated_then_switched(app, sqlite_target, monkeypatch)
 
     @_needs_pg
     def test_a_refused_migration_is_not_switched_to_afterwards_postgresql(
-            self, app, pg_target, monkeypatch):
+            self, app, a_3_0_source, pg_target, monkeypatch):
         self._migrated_then_switched(app, pg_target, monkeypatch)
 
     def _standalone_accepted(self, app, target):
