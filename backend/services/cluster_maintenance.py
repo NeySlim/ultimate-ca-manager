@@ -643,10 +643,6 @@ def complete_committed(row, now):
     from services import cluster_commands
     from services.backup.restore.invalidate import (
         _advance_session_epoch, _revoke_database_sessions, _revoke_flask_sessions)
-    _advance_session_epoch()
-    _revoke_database_sessions()
-    _revoke_flask_sessions()
-    cluster_commands.emit(cluster_commands.RESTART)
     done = db.session.execute(text(
         "UPDATE cluster_maintenance SET phase = :p, restored_at = :now, expires_at = :e "
         "WHERE id = :id AND token = :t AND phase = :was AND expires_at <= :now"),
@@ -655,7 +651,12 @@ def complete_committed(row, now):
     if done != 1:
         db.session.rollback()
         return False
-    db.session.commit()
+    # Only the node that won the UPDATE revokes: the epoch commits with the phase and
+    # the restart, so a loser never refuses the sessions opened since
+    cluster_commands.emit(cluster_commands.RESTART)
+    _advance_session_epoch()
+    _revoke_database_sessions()
+    _revoke_flask_sessions()
     logger.warning(f"Cluster maintenance: the restore committed by node {row['node_id']} was "
                    "completed here (sessions revoked, rolling restart requested)")
     return True
