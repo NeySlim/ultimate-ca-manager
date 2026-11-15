@@ -6,10 +6,11 @@ key size and signature hash are the ``key_bits`` / ``sig_hash`` columns, set
 whenever a certificate is stored (``models/certificate.py``).
 """
 import logging
+import re
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import aliased
-from sqlalchemy import (DateTime, String, and_, case, cast, false, func, literal, literal_column,
+from sqlalchemy import (DateTime, String, and_, bindparam, case, cast, false, func, literal, literal_column,
                         or_, select, true, type_coerce, union_all)
 
 from models import CA, Certificate, DeployBinding, DeployTarget, SystemConfig, db
@@ -108,6 +109,25 @@ def _renewal_config():
     return AutoRenewalService.get_renewal_config()
 
 
+# Superset of what LIKE '%"certificate_id": <id>,%' matches: '_' is any character, ASCII case folds on SQLite
+_NAMED_ID = re.compile(r'"certificate.id": ([0-9]+),', re.IGNORECASE | re.DOTALL)
+
+
+def _declined_ids():
+    """Every id a rejected renewal request may name, read once: only those run the correlated LIKE."""
+    found = set()
+    for (data,) in db.session.execute(select(ApprovalRequest.request_data).where(
+            ApprovalRequest.request_type == 'renewal', ApprovalRequest.status == 'rejected',
+            ApprovalRequest.request_data.isnot(None))):
+        found.update(int(m) for m in _NAMED_ID.findall(data))
+    return sorted(found)
+
+
+def renewal_inputs():
+    """What the four renewal kinds read outside their statement: the auto-renewal settings, the declined ids."""
+    return {**_renewal_config(), 'declined_ids': _declined_ids()}
+
+
 # ------------------------------------------------------------------ queue
 
 def _within_half_validity(next_update, now, dialect):
@@ -121,7 +141,7 @@ def _within_half_validity(next_update, now, dialect):
 def _queue_union(now, dialect, kinds=QUEUE_KINDS):
     """One SELECT per kind, all shaped (kind, rank, id, label, due_at); rank 0 is critical."""
     soon = now + CRITICAL_WITHIN
-    config = _renewal_config()  # read once: four kinds depend on it
+    config = renewal_inputs()  # read once: four kinds depend on it
     # type_coerce, not CAST: SQLite would turn CAST(... AS DATETIME) into a number
     text_label = lambda col: type_coerce(col, String)  # noqa: E731
     due = lambda col: type_coerce(col, DateTime)  # noqa: E731
@@ -293,7 +313,7 @@ def _manual_renewal_conditions(now, config):
         ~_renewed_by_acme_client(),
         ~_client_renewed(),
         ~_superseded(now),
-        ~_renewal_declined(),
+        ~_renewal_declined(config),
         ~renewed_by_responder_task(),
     ]
 
@@ -316,7 +336,7 @@ def _issuer_cannot_sign(now):
             CA.valid_to <= now)).exists()
 
 
-def _renewal_declined(auto_only=False):
+def _renewal_declined(config, auto_only=False):
     """Any rejected renewal request naming the certificate in its current lifetime, whatever
     its trigger (not checked); ``auto_only`` keeps the scheduler's own requests."""
     named = literal('%"certificate_id": ', String) + cast(Certificate.id, String) + literal(',%', String)
@@ -326,7 +346,12 @@ def _renewal_declined(auto_only=False):
         or_(Certificate.valid_from.is_(None), ApprovalRequest.created_at >= Certificate.valid_from)]
     if auto_only:
         conditions.append(ApprovalRequest.request_data.like('%"trigger": "auto"%'))
-    return select(ApprovalRequest.id).where(*conditions).exists()
+    exists = select(ApprovalRequest.id).where(*conditions).exists()
+    ids = config.get('declined_ids')
+    if ids is None:
+        return exists
+    # Inlined integers: no bound-parameter limit however many certificates were declined
+    return and_(Certificate.id.in_(bindparam(None, ids, expanding=True, literal_execute=True)), exists)
 
 
 def _and_blocked(now, config, dialect):
@@ -349,19 +374,19 @@ def _blocked_conditions(now, config, dialect):
     """Due for auto-renewal (inside days_before_expiry and the last third of its lifetime), which
     then fails on every pass because the CA cannot sign; only an automatic refusal parks it."""
     return [*_live_until(now, config['days_before_expiry']), _past_last_third(now, dialect),
-            _auto_renewed(config), _issuer_cannot_sign(now), ~_renewal_declined(auto_only=True)]
+            _auto_renewed(config), _issuer_cannot_sign(now), ~_renewal_declined(config, auto_only=True)]
 
 
 def _declined_conditions(now, config, dialect):
     """Precedence auto_renewal_blocked > renewal_declined: a certificate is queued once."""
-    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined(), ~_superseded(now),
+    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined(config), ~_superseded(now),
             ~_and_blocked(now, config, dialect)]
 
 
-def _client_overdue_conditions(now):
+def _client_overdue_conditions(now, config):
     """A client-renewed certificate its client has not replaced a week before expiry."""
     return [*_live_until(now, CLIENT_RENEWAL_OVERDUE_DAYS), _client_renewed(), ~_superseded(now),
-            ~_renewal_declined()]
+            ~_renewal_declined(config)]
 
 
 def _short_label(kind, label):
@@ -661,11 +686,12 @@ RENEWAL_KINDS = ('manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_b
 
 
 def renewal_conditions(kind, now, config, dialect):
-    """The rows of one certificate queue kind: the queue and the list's ``renewal`` filter."""
+    """The rows of one certificate queue kind: the queue and the list's ``renewal`` filter.
+    *config* comes from renewal_inputs(); the auto-renewal settings alone give the same rows, slower."""
     if kind == 'manual_renewal_due':
         return _manual_renewal_conditions(now, config)
     if kind == 'client_renewal_overdue':
-        return _client_overdue_conditions(now)
+        return _client_overdue_conditions(now, config)
     if kind == 'auto_renewal_blocked':
         return _blocked_conditions(now, config, dialect)
     if kind == 'renewal_declined':
@@ -728,7 +754,7 @@ def certificate_list_conditions(args, dialect, now=None):
         bad = [k for k in kinds if k not in RENEWAL_KINDS]
         if bad:
             raise ValueError(f"Unknown renewal kind: {', '.join(bad)}")
-        config = _renewal_config()
+        config = renewal_inputs()
         conditions.append(or_(*[and_(*renewal_conditions(k, now, config, dialect)) for k in kinds]))
     return conditions
 

@@ -3,8 +3,8 @@
 ``certificates.key_bits`` and ``certificates.sig_hash`` hold the key size and
 the signature hash, filled from ``crt`` here once and on every write after, so
 the compliance counters never parse a certificate. The indexes serve the
-expiry window and the issuance range on certificates, and the recently
-failed ACME orders.
+expiry window and the issuance range on certificates, the recently failed
+ACME orders, and the work queue's lookups by CN and by ACME client order.
 """
 import sqlite3
 
@@ -15,6 +15,9 @@ INDEXES = (
     ('certificates', 'ix_certificates_valid_to', ('valid_to',)),
     ('certificates', 'ix_certificates_created_at', ('created_at',)),
     ('acme_orders', 'ix_acme_orders_status_created_at', ('status', 'created_at')),
+    # The work queue: a later certificate of the same CN in the CA, the ACME client order of a certificate
+    ('certificates', 'ix_certificates_caref_subject_cn', ('caref', 'subject_cn')),
+    ('acme_client_orders', 'ix_acme_client_orders_certificate_id', ('certificate_id',)),
 )
 _PENDING = ("SELECT id, crt FROM certificates WHERE crt IS NOT NULL AND crt <> '' "
             "AND key_bits IS NULL AND sig_hash IS NULL AND id > {cursor} ORDER BY id")
