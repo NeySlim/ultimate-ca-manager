@@ -1,14 +1,21 @@
 """A valid PKCS#11 signature can also be a canonical DER pair of other integers."""
+import base64
 import hashlib
+from types import SimpleNamespace
+
+import pytest
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+from cryptography.hazmat.primitives.asymmetric.utils import (
+    Prehashed, decode_dss_signature, encode_dss_signature,
+)
 
 from models import db
 from models.hsm import HsmKey
 from services.hsm import HsmService
-from services.hsm.pkcs11_provider import Pkcs11Provider
+from services.hsm.openbao_provider import OpenBaoProvider
+from services.hsm.pkcs11_provider import AwsCloudHsmProvider, Pkcs11Provider
 from tests.test_hsm_key_material import pem
 from tests.test_hsm_sync_and_listing import (
     Attribute, KeyType, ObjectClass, _FakeObject, _FakeSession, _provider_with_keys,
@@ -87,3 +94,76 @@ def test_ambiguous_signature_through_real_pkcs11_sign_path(app, monkeypatch):
             got = HsmService.sign(ids['01'], message, hash_algorithm='sha256')
             assert got == expected
             public.verify(got, message, ec.ECDSA(hashes.SHA256()))
+
+
+def _azure(key, monkeypatch):
+    import services.hsm.azure_provider as azure
+    from azure.keyvault.keys import KeyType as AzureKeyType
+
+    class _Client:
+        def __init__(self, *a, **kw):
+            pass
+
+        def sign(self, algorithm, digest):
+            r, s = decode_dss_signature(key.sign(digest, ec.ECDSA(Prehashed(hashes.SHA256()))))
+            return SimpleNamespace(signature=r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))  # JWS R || S
+    monkeypatch.setattr(azure, 'CryptographyClient', _Client)
+    provider = azure.AzureKeyVaultProvider.__new__(azure.AzureKeyVaultProvider)
+    provider._key_client = SimpleNamespace(get_key=lambda name: SimpleNamespace(key_type=AzureKeyType.ec))
+    provider._credential = None
+    return provider
+
+
+def _gcp(key, monkeypatch):
+    from services.hsm.gcp_provider import GcpKmsProvider
+    provider = GcpKmsProvider.__new__(GcpKmsProvider)
+    provider._client = SimpleNamespace(
+        get_crypto_key=lambda **kw: SimpleNamespace(primary=SimpleNamespace(name='v/1')),
+        get_crypto_key_version=lambda **kw: SimpleNamespace(algorithm='EC_SIGN_P256_SHA256'),
+        asymmetric_sign=lambda **kw: SimpleNamespace(signature=key.sign(  # DER
+            kw['digest']['sha256'], ec.ECDSA(Prehashed(hashes.SHA256())))))
+    return provider
+
+
+def _openbao(key, monkeypatch):
+    provider = OpenBaoProvider.__new__(OpenBaoProvider)
+
+    def api(method, path, json=None):
+        if method == 'GET':
+            return {'data': {'type': 'ecdsa-p256'}}
+        der = key.sign(base64.b64decode(json['input']), ec.ECDSA(hashes.SHA256()))  # asn1 marshaling
+        return {'data': {'signature': 'vault:v1:' + base64.b64encode(der).decode()}}
+    provider._api = api
+    return provider
+
+
+def _pkcs11(key, monkeypatch, cls=Pkcs11Provider):
+    provider = cls.__new__(cls)
+    private = _FakeObject({Attribute.CLASS: ObjectClass.PRIVATE_KEY,
+                           Attribute.KEY_TYPE: KeyType.EC, Attribute.ID: b'\x01'})
+
+    def sign(data, **kw):
+        r, s = decode_dss_signature(key.sign(data, ec.ECDSA(hashes.SHA256())))
+        return r.to_bytes(32, 'big') + s.to_bytes(32, 'big')  # PKCS#11 CKM_ECDSA_SHA256
+    private.sign = sign
+    provider._session = _FakeSession([private])
+    provider._connected = True
+    return provider
+
+
+@pytest.mark.parametrize('build', [_azure, _gcp, _openbao, _pkcs11,
+                                   lambda k, m: _pkcs11(k, m, AwsCloudHsmProvider)],
+                         ids=['azure', 'gcp', 'openbao', 'pkcs11', 'aws-cloudhsm'])
+def test_each_provider_declares_the_ecdsa_encoding_its_service_returns(app, monkeypatch, build):
+    key = ec.generate_private_key(ec.SECP256R1())
+    message = b'provider contract'
+    provider = build(key, monkeypatch)
+    monkeypatch.setattr(provider, 'connect', lambda: True, raising=False)
+    monkeypatch.setattr(provider, 'disconnect', lambda: None, raising=False)
+    monkeypatch.setattr(HsmService, '_get_provider_instance', lambda *a: provider)
+    with _provider_with_keys(app, f'contract-{build.__name__}', ['01']) as (_, ids, _):
+        with app.app_context():
+            db.session.get(HsmKey, ids['01']).public_key_pem = pem(key.public_key())
+            db.session.commit()
+            signature = HsmService.sign(ids['01'], message, hash_algorithm='sha256')
+    key.public_key().verify(signature, message, ec.ECDSA(hashes.SHA256()))
