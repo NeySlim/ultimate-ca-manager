@@ -628,7 +628,8 @@ def test_the_ownership_given_to_the_service_never_reaches_a_local_archive(tmp_pa
     chowned = [c for c in _calls(log) if c.startswith('chown ')]
     named = ' '.join(chowned)
     assert '.ucm-archive-' not in named, chowned
-    for path in (data / 'ca' / 'kept.pem', config / 'kept.env', data, config):
+    # The starting points end in /: a data or configuration directory behind a link is reached
+    for path in (data / 'ca' / 'kept.pem', config / 'kept.env', f'{data}/', f'{config}/'):
         assert f' {path} ' in f'{named} ', (path, chowned)
     assert not any(c.startswith('chown -R ') and (str(data) in c or str(config) in c or c.endswith(str(home)))
                    for c in chowned), chowned
