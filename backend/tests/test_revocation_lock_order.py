@@ -127,6 +127,7 @@ def test_a_revocation_during_the_pass_does_not_deadlock(app, auth_client, issuer
     real, key = _leaf('order-pass-hex.example.test', ca_cert, ca_key, days=200, serial=0x12345678)
     other_id = _store(app, other_real, refid, key=other_key)
     row_id = _store(app, real, refid, key=key)
+    assert other_id < row_id  # the pass marks rows in id order: the decimal one first
     lower = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
     higher = _record(app, refid, other_real, certificate_id=other_id)
     assert lower < higher
