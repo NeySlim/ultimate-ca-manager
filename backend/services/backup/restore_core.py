@@ -23,7 +23,9 @@ from services.file_regen_service import insert_file_writes_suspended
 from . import container, installation
 from .errors import BackupSchemaError
 from .restore import RestorePlan, single_transaction
-from .restore.files import StagedFiles, forget_publication, record_publication
+from .restore.files import (
+    StagedFiles, forget_publication, record_publication, settle_interrupted_restores,
+)
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import apply_columns, apply_section, relink_references
@@ -344,6 +346,8 @@ class RestoreCoreMixin:
 
     def _restore_payload(self, backup_data, master_key: bytes, mode: str) -> Dict[str, Any]:
         """Everything after decryption: a payload dict, or a v4 `SectionStore`."""
+        # First: an earlier restore's journal would otherwise undo this one at the next start
+        settle_interrupted_restores()
         # Everything the payload claims about itself is checked here, before
         # the first write: a schema this version cannot read, or a section
         # holding fewer rows than the archive says it holds, must not be

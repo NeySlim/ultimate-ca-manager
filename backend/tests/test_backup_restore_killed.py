@@ -8,6 +8,8 @@ and stay. A kill is simulated by an exception no handler catches, with the
 cleanup a dead process never runs disabled.
 """
 import base64
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -130,6 +132,46 @@ def test_a_kept_directory_discard_cannot_remove_keeps_the_row(app, diverged, mon
         assert files.sweep_kept_previous_contents()
         assert path.read_bytes() == archived_pem == _database_pem(refid)
         assert not list(path.parent.glob('.ucm_restore_kept_*'))
+
+
+def _stale_journal(directory, name):
+    """A journal of a restore rolled back whose settling never finished: it would remove `name`."""
+    import json
+    kept = Path(tempfile.mkdtemp(prefix='.ucm_restore_kept_', dir=directory))
+    entries = [{'name': name, 'previous': 'previous_000000', 'existed': False, 'mode': None}]
+    (kept / 'journal.json').write_text(json.dumps({'token': 'a' * 32, 'entries': entries}))
+    return kept
+
+
+def test_an_older_journal_is_settled_before_a_restore_publishes(app, diverged):
+    from services.backup.restore.files import sweep_kept_previous_contents
+    from services.backup_service import BackupService
+    archive, refid, path, archived_pem = diverged
+    with app.app_context():
+        kept = _stale_journal(path.parent, path.name)
+        BackupService().restore_backup_from_path(archive, PASSWORD, mode='replace')
+        assert path.read_bytes() == archived_pem
+
+        sweep_kept_previous_contents()    # the next start
+        assert path.read_bytes() == archived_pem == _database_pem(refid)
+        assert not kept.exists()
+
+
+def test_a_restore_is_refused_while_an_older_journal_remains(app, diverged, monkeypatch):
+    from services.backup.restore import files
+    from services.backup_service import BackupService
+    archive, refid, path, archived_pem = diverged
+    with app.app_context():
+        before = _database_pem(refid)
+        kept = _stale_journal(path.parent, 'never-published.crt')
+        with monkeypatch.context() as patched:
+            patched.setattr(files.shutil, 'rmtree', lambda *args, **kwargs: None)
+            with pytest.raises(files.InterruptedRestorePending):
+                BackupService().restore_backup_from_path(archive, PASSWORD, mode='replace')
+        assert kept.exists()
+        assert _database_pem(refid) == before == path.read_bytes()
+        files.sweep_kept_previous_contents()
+        assert not kept.exists()
 
 
 def test_a_restore_that_ends_leaves_no_publication_row(app, diverged):

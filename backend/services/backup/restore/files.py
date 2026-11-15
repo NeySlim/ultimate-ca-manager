@@ -445,6 +445,37 @@ def _put_back_journal(kept_dir: str, journal: dict) -> None:
     _fsync_directory(parent)
 
 
+class InterruptedRestorePending(RuntimeError):
+    """A journal of an earlier restore is still on disk: a new restore would be undone by it."""
+
+
+def _find_kept_directories() -> list:
+    """Every kept directory with its journal (None when it holds none readable)."""
+    found = []
+    for parent in _kept_parents():
+        if not parent.is_dir():
+            continue
+        for entry in os.scandir(parent):
+            # Never a link: its target's journal would name files elsewhere
+            if entry.name.startswith(_KEPT_PREFIX) and entry.is_dir(follow_symlinks=False):
+                found.append((entry.path, _read_journal(entry.path)))
+    return found
+
+
+def settle_interrupted_restores() -> None:
+    """Before a restore stages anything, under the lock it holds: an earlier journal left
+    unsettled would be replayed at the next start over the files this restore publishes,
+    so it is settled now, as a start would, or the restore is refused."""
+    sweep_kept_previous_contents()
+    left = [path for path, journal in _find_kept_directories() if journal is not None]
+    if left:
+        logger.error("Restore refused: interrupted restores could not be settled, remove or "
+                     "repair %s and restart", ', '.join(left))
+        raise InterruptedRestorePending(
+            "An interrupted restore could not be settled; nothing has been changed. "
+            "See the server log.")
+
+
 def sweep_kept_previous_contents() -> List[Path]:
     """Settle the kept directories of restores killed before `discard()`; return them.
 
@@ -462,15 +493,7 @@ def sweep_kept_previous_contents() -> List[Path]:
                                    fail_open=False):
             if not operation_lock_held():
                 return []
-            found = []
-            for parent in _kept_parents():
-                if not parent.is_dir():
-                    continue
-                for entry in os.scandir(parent):
-                    # Never a link: its target's journal would name files elsewhere
-                    if (entry.name.startswith(_KEPT_PREFIX)
-                            and entry.is_dir(follow_symlinks=False)):
-                        found.append((entry.path, _read_journal(entry.path)))
+            found = _find_kept_directories()
             tokens = {journal['token'] for _, journal in found if journal is not None}
             try:
                 committed = _committed_tokens(tokens)
