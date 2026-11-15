@@ -3133,10 +3133,10 @@
     "backupCount": "{{count}} backup(s)",
     "backupTotalSize": "Taille totale",
     "diskFree": "Disque libre",
-    "backupNode": "Node",
+    "backupNode": "Nœud",
     "backupSha256": "SHA-256",
-    "backupCopySha256": "Copy the full SHA-256",
-    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
+    "backupCopySha256": "Copier le SHA-256 complet",
+    "backupSharedStoreNote": "En haute disponibilité, les archives sont conservées dans la base PostgreSQL, que tous les nœuds lisent : elles sont perdues avec cette base. Téléchargez celles que vous gardez vers un emplacement extérieur au cluster, et sauvegardez PostgreSQL avec ses propres outils.",
     "backupSearchPlaceholder": "Rechercher des backups…",
     "backupSortNewest": "Plus récents d'abord",
     "backupSortOldest": "Plus anciens d'abord",
@@ -3551,7 +3551,7 @@
           "remedy": "Saisissez à nouveau le mot de passe dans les paramètres du protocole : il est alors stocké en hash PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
+          "title": "CA avec une clé Ed25519 ou Ed448 : elles ne peuvent pas signer en mode FIPS sur un HSM, ou sur un module qui n'approuve pas EdDSA",
           "remedy": "Créez une CA RSA ou ECDSA (P-256/P-384/P-521) et déplacez-y l'émission avant la bascule ; la clé d'une CA ne peut pas être convertie."
         },
         "ca_weak_key": {
@@ -3559,11 +3559,11 @@
           "remedy": "Créez une CA en RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission."
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
+          "title": "CA avec une clé ML-DSA : elles ne peuvent pas signer en mode FIPS sur un HSM, ou sur un module qui n'approuve pas ML-DSA",
           "remedy": "Créez une CA RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission avant la bascule, ou laissez le mode FIPS désactivé tant que l'émission ML-DSA est nécessaire."
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
+          "title": "CA SSH avec une clé Ed25519 : elles ne peuvent pas signer en mode FIPS sur un module qui n'approuve pas EdDSA",
           "remedy": "Créez une CA SSH ECDSA ou RSA et distribuez sa clé publique aux hôtes avant la bascule."
         },
         "ssh_certificates_eddsa_key": {
@@ -3612,15 +3612,15 @@
         },
         "hsm_unapproved_keys": {
           "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
-          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
+          "remedy": "Remplacez-les par des clés RSA 2048+, ECDSA P-256/P-384/P-521 ou AES ; en mode FIPS, les clés de ces types d'OpenBao et de Vault Transit ne sont plus listées."
         },
         "dns_tsig_hmac_md5": {
           "title": "Fournisseurs DNS RFC 2136 signant avec TSIG hmac-md5 : les mises à jour DNS-01 sont refusées en mode FIPS",
           "remedy": "Créez une clé TSIG hmac-sha256 sur le serveur DNS et saisissez-la dans le fournisseur."
         },
         "session_short_secret_key": {
-          "title": "The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be issued or checked with it, so every sign-in fails",
-          "remedy": "Set a SECRET_KEY of 32 characters or more in the service environment and restart."
+          "title": "La clé de session (SECRET_KEY) fait moins de 14 octets : en mode FIPS, aucun jeton CSRF ne peut être émis ni vérifié avec elle, et chaque connexion échoue",
+          "remedy": "Définissez une SECRET_KEY de 32 caractères ou plus dans l'environnement du service, puis redémarrez."
         },
         "hmac_short_secret": {
           "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",

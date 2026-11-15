@@ -451,25 +451,25 @@
     "preparing": "Підготовка…",
     "systemLogs": "Системні журнали",
     "states": {
-      "pending": "Pending",
-      "approved": "Approved",
-      "rejected": "Rejected",
-      "expired": "Expired",
-      "cancelled": "Cancelled",
-      "issued": "Issued",
-      "recovered": "Recovered",
-      "valid": "Valid",
-      "invalid": "Invalid",
-      "ready": "Ready",
-      "processing": "Processing",
-      "validating": "Validating",
+      "pending": "Очікує",
+      "approved": "Схвалено",
+      "rejected": "Відхилено",
+      "expired": "Строк дії завершився",
+      "cancelled": "Скасовано",
+      "issued": "Видано",
+      "recovered": "Відновлено",
+      "valid": "Дійсний",
+      "invalid": "Недійсний",
+      "ready": "Готово",
+      "processing": "Обробляється",
+      "validating": "Перевіряється",
       "ok": "OK",
-      "failed": "Failed",
-      "warning": "Warning",
-      "skipped": "Skipped",
-      "never": "Never run",
-      "active": "Active",
-      "revoked": "Revoked"
+      "failed": "Не вдалося",
+      "warning": "Попередження",
+      "skipped": "Пропущено",
+      "never": "Ніколи не запускалося",
+      "active": "Активний",
+      "revoked": "Відкликано"
     }
   },
   "commandPalette": {
@@ -892,9 +892,9 @@
       "bulkRelatedRenewed": "Разом із вибраними поновлено пов'язаних сертифікатів: {{count}}"
     },
     "renewed": "Сертифікат поновлено",
-    "subjectTakenTitle": "Subject already in use",
-    "subjectTakenConfirm": "The subject {{subject}} is already carried by certificate serial {{serial}} of this CA. Confirm only if this certificate is for the same entity as the one that already carries this subject: it is then issued to that entity, and your confirmation is recorded in the audit log.",
-    "issueAnyway": "Issue to the same entity"
+    "subjectTakenTitle": "Суб'єкт уже використовується",
+    "subjectTakenConfirm": "Суб'єкт {{subject}} уже належить сертифікату з серійним номером {{serial}} цього ЦС. Підтверджуйте, лише якщо цей сертифікат призначений тому самому об'єкту, якому належить цей суб'єкт: тоді його буде видано цьому об'єкту, а ваше підтвердження буде записано в журнал аудиту.",
+    "issueAnyway": "Видати тому самому об'єкту"
   },
   "cas": {
     "chainRevoked": "Відкликано вище",
@@ -1159,18 +1159,18 @@
     "withdrawParentWarning": "Цей ЦС залишиться без батьківського, доки зв'язок не буде підтверджено знову.",
     "withdrawParentDone": "Зв'язок із батьківським ЦС знято",
     "withdrawParentFailed": "Не вдалося зняти зв'язок із батьківським ЦС",
-    "uniqueSubject": "Unique subject",
-    "uniqueSubjectEnforced": "Enforced",
-    "uniqueSubjectNotEnforced": "Not enforced",
-    "uniqueSubjectHelp": "When enforced, this CA refuses a certificate whose subject a certificate of another entity already carries, even an expired or revoked one (RFC 5280 §4.1.2.6).",
-    "enforceUniqueSubject": "Enforce",
-    "stopEnforcingUniqueSubject": "Stop enforcing",
-    "uniqueSubjectChanged": "Unique subject setting updated",
-    "uniqueSubjectChangeFailed": "Could not update the unique subject setting",
-    "uniqueSubjectShared_one": "{{count}} subject is already carried by several entities: {{examples}}. Nothing tells which one a new certificate is for: renewals of its certificates are refused as they are, and only a manual issuance or a CSR signing of it goes through, with the override",
+    "uniqueSubject": "Унікальний суб'єкт",
+    "uniqueSubjectEnforced": "Застосовується",
+    "uniqueSubjectNotEnforced": "Не застосовується",
+    "uniqueSubjectHelp": "Якщо застосовується, цей ЦС відмовляє у видачі сертифіката, суб'єкт якого вже належить сертифікату іншого об'єкта, навіть простроченому чи відкликаному (RFC 5280 §4.1.2.6).",
+    "enforceUniqueSubject": "Застосовувати",
+    "stopEnforcingUniqueSubject": "Припинити застосування",
+    "uniqueSubjectChanged": "Параметр унікального суб'єкта оновлено",
+    "uniqueSubjectChangeFailed": "Не вдалося оновити параметр унікального суб'єкта",
+    "uniqueSubjectShared_one": "{{count}} суб'єкт уже належить кільком об'єктам: {{examples}}. Невідомо, для якого з них новий сертифікат: поновлення його сертифікатів відхиляються як є, і лише ручна видача або підписання CSR для нього проходить із перевизначенням",
     "uniqueSubjectShared_few": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for: renewals of their certificates are refused as they are, and only a manual issuance or a CSR signing of them goes through, with the override",
     "uniqueSubjectShared_many": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for: renewals of their certificates are refused as they are, and only a manual issuance or a CSR signing of them goes through, with the override",
-    "uniqueSubjectShared_other": "{{count}} subjects are already carried by several entities, among them {{examples}}. Nothing tells which one a new certificate is for: renewals of their certificates are refused as they are, and only a manual issuance or a CSR signing of them goes through, with the override"
+    "uniqueSubjectShared_other": "Суб'єкти ({{count}}) уже належать кільком об'єктам, серед них {{examples}}. Невідомо, для якого з них новий сертифікат: поновлення їхніх сертифікатів відхиляються як є, і лише ручна видача або підписання CSR для них проходить із перевизначенням"
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",
@@ -2902,21 +2902,21 @@
     "noBackups": "Немає резервних копій",
     "noBackupsHint": "Створіть резервну копію для захисту ваших даних",
     "retentionHelper": "Старіші резервні копії видаляються автоматично (перевірка щодня). Стосується всіх копій.",
-    "backupMaxTotalMb": "Size ceiling for all backups (MiB)",
-    "backupMaxTotalMbHelper": "The oldest backups are removed, each one audited, until the total fits. 0 means no ceiling. The backups retention protects are never removed (the minimum kept and, on a single node, the newest validated backup and up to 2 with no validation record), so the total can stay above it.",
-    "backupSpaceUsed": "Space used by the stored backups: {{size}} in {{count}} backup(s)",
-    "backupOverCeiling": "The stored backups take more than the {{ceiling}} MiB ceiling: the next retention removes the oldest ones until they fit, except those it never removes.",
-    "backupOverCeilingKept": "The backups are still above the size ceiling: retention never removes the newest backup that matches its validation record, up to 2 backups with no validation record, nor the {{minKeep}} newest backups not found altered.",
-    "backupOverCeilingKeptShared": "The backups are still above the size ceiling: retention never removes the {{minKeep}} newest backups.",
-    "backupUncountedFiles": "{{count}} other backup file(s) in the backup directory are neither counted against the ceiling nor removed by retention.",
+    "backupMaxTotalMb": "Обмеження розміру всіх резервних копій (МіБ)",
+    "backupMaxTotalMbHelper": "Найстаріші резервні копії видаляються (кожне видалення фіксується в аудиті), доки загальний розмір не вкладеться в обмеження. 0 означає без обмеження. Копії, які захищає політика зберігання, ніколи не видаляються (мінімальна кількість і, на одному вузлі, найновіша перевірена копія та до 2 копій без запису про перевірку), тому загальний розмір може лишатися вищим за обмеження.",
+    "backupSpaceUsed": "Місце, зайняте збереженими резервними копіями: {{size}} у {{count}} копіях",
+    "backupOverCeiling": "Збережені резервні копії перевищують обмеження в {{ceiling}} МіБ: наступне очищення видалить найстаріші, доки вони не вкладуться, окрім тих, які ніколи не видаляються.",
+    "backupOverCeilingKept": "Резервні копії все ще перевищують обмеження розміру: політика зберігання ніколи не видаляє найновішу копію, що збігається з записом про перевірку, до 2 копій без запису про перевірку, ані {{minKeep}} найновіших копій, у яких не виявлено змін.",
+    "backupOverCeilingKeptShared": "Резервні копії все ще перевищують обмеження розміру: політика зберігання ніколи не видаляє {{minKeep}} найновіших копій.",
+    "backupUncountedFiles": "Інші файли резервних копій ({{count}}) у каталозі резервних копій не враховуються в обмеженні й не видаляються політикою зберігання.",
     "backupCleanupNow": "Очистити зараз",
     "backupCount": "{{count}} копій",
     "backupTotalSize": "Загальний розмір",
     "diskFree": "Вільно на диску",
-    "backupNode": "Node",
+    "backupNode": "Вузол",
     "backupSha256": "SHA-256",
-    "backupCopySha256": "Copy the full SHA-256",
-    "backupSharedStoreNote": "In high availability the archives are kept in the PostgreSQL database, which every node reads: they are lost with that database. Download the ones you keep to a place outside the cluster, and back PostgreSQL up with its own tools.",
+    "backupCopySha256": "Скопіювати повний SHA-256",
+    "backupSharedStoreNote": "У режимі високої доступності архіви зберігаються в базі даних PostgreSQL, яку читає кожен вузол: вони втрачаються разом із цією базою. Завантажте потрібні архіви в місце поза кластером і резервуйте PostgreSQL його власними засобами.",
     "backupSearchPlaceholder": "Пошук копій…",
     "backupSortNewest": "Спочатку новіші",
     "backupSortOldest": "Спочатку старіші",
@@ -2947,15 +2947,15 @@
     "restoreFromBackupDesc": "Завантажте файл .ucmbkp для відновлення всіх даних",
     "restoreWarning": "Це ЗАМІНЮЄ всі поточні дані: зокрема користувачів, приватні ключі та збережені секрети, вмістом резервної копії, і це незворотно. Відновлюйте лише резервну копію, яку створили самі: копія, пароль якої контролює зловмисник, може імплантувати постійний обліковий запис адміністратора.",
     "restoring": "Відновлення...",
-    "restoreUploading": "Uploading {{percent}}%...",
-    "restoreTooLargeLegacy": "An archive written before 3.0 is accepted up to {{size}} (BACKUP_MAX_UPLOAD_MB): this one is larger.",
-    "restoreReportTitle": "Restore report",
-    "restoreReportTodo": "To do",
-    "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",
-    "restoreReportRestartRequested": "A restart of the service was requested. Sign in again once it is back.",
-    "restoreReportRestartManual": "The service was not restarted. Restart it to finish: {{detail}}",
-    "restoreReportAudit": "The restore is recorded in the audit log (action: system restore).",
-    "restoreReportAuditLink": "Open the audit log",
+    "restoreUploading": "Вивантаження {{percent}}%...",
+    "restoreTooLargeLegacy": "Архів, створений до 3.0, приймається розміром до {{size}} (BACKUP_MAX_UPLOAD_MB): цей більший.",
+    "restoreReportTitle": "Звіт про відновлення",
+    "restoreReportTodo": "Що зробити",
+    "restoreReportNothingRestored": "Нічого не відновлено: архів не містив даних, перезапуск не потрібен.",
+    "restoreReportRestartRequested": "Запитано перезапуск служби. Увійдіть знову, коли вона запрацює.",
+    "restoreReportRestartManual": "Службу не перезапущено. Перезапустіть її, щоб завершити: {{detail}}",
+    "restoreReportAudit": "Відновлення записано в журнал аудиту (дія: system restore).",
+    "restoreReportAuditLink": "Відкрити журнал аудиту",
     "retentionPeriod": "Період зберігання (дні)",
     "rowCount": "Всього рядків",
     "saveSettings": "Зберегти налаштування",
@@ -3450,7 +3450,7 @@
           "remedy": "Введіть пароль повторно в налаштуваннях протоколу: тоді він зберігається як хеш PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve EdDSA",
+          "title": "Центри сертифікації з ключем Ed25519 або Ed448: вони не можуть підписувати в режимі FIPS на HSM або на модулі, що не схвалює EdDSA",
           "remedy": "Створіть центр сертифікації RSA або ECDSA (P-256/P-384/P-521) і перенесіть на нього видачу до перемикання; ключ центру сертифікації не можна перетворити."
         },
         "ca_weak_key": {
@@ -3458,11 +3458,11 @@
           "remedy": "Створіть центр сертифікації з RSA 2048+ або ECDSA P-256/P-384/P-521 і перенесіть на нього видачу."
         },
         "ca_unapproved_algorithm": {
-          "title": "Certificate authorities with an ML-DSA key: they cannot sign in FIPS mode on an HSM, or on a module that does not approve ML-DSA",
+          "title": "Центри сертифікації з ключем ML-DSA: вони не можуть підписувати в режимі FIPS на HSM або на модулі, що не схвалює ML-DSA",
           "remedy": "Створіть центр сертифікації RSA 2048+ або ECDSA P-256/P-384/P-521 і перенесіть на нього видачу до перемикання або залиште режим FIPS вимкненим, поки потрібна видача ML-DSA."
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode on a module that does not approve EdDSA",
+          "title": "SSH-центри сертифікації з ключем Ed25519: вони не можуть підписувати в режимі FIPS на модулі, що не схвалює EdDSA",
           "remedy": "Створіть SSH-центр сертифікації ECDSA або RSA і розповсюдьте його відкритий ключ на хости до перемикання."
         },
         "ssh_certificates_eddsa_key": {
@@ -3511,15 +3511,15 @@
         },
         "hsm_unapproved_keys": {
           "title": "HSM keys FIPS mode refuses (RSA under 2048 bits, curves other than P-256/P-384/P-521, Ed25519, Ed448, ML-DSA, ChaCha20-Poly1305, unknown types)",
-          "remedy": "Replace them with RSA 2048+, ECDSA P-256/P-384/P-521 or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
+          "remedy": "Замініть їх ключами RSA 2048+, ECDSA P-256/P-384/P-521 або AES; у режимі FIPS ключі таких типів OpenBao і Vault Transit більше не перелічуються."
         },
         "dns_tsig_hmac_md5": {
           "title": "DNS-провайдери RFC 2136 з підписом TSIG hmac-md5: оновлення DNS-01 відхиляються в режимі FIPS",
           "remedy": "Створіть ключ TSIG hmac-sha256 на DNS-сервері та введіть його в провайдері."
         },
         "session_short_secret_key": {
-          "title": "The session key (SECRET_KEY) is under 14 bytes: in FIPS mode no CSRF token can be issued or checked with it, so every sign-in fails",
-          "remedy": "Set a SECRET_KEY of 32 characters or more in the service environment and restart."
+          "title": "Ключ сесії (SECRET_KEY) коротший за 14 байтів: у режимі FIPS з ним не можна ні видати, ні перевірити токен CSRF, тому всі входи завершуються помилкою",
+          "remedy": "Задайте SECRET_KEY довжиною від 32 символів у середовищі служби та перезапустіть її."
         },
         "hmac_short_secret": {
           "title": "Webhook secrets or RFC 2136 TSIG keys under 14 bytes: the FIPS module does not approve HMAC keys this short, and FIPS mode refuses to save them",
@@ -3718,7 +3718,7 @@
     "enterPasswordToDisableKey2fa": "Введіть пароль, щоб більше не вимагати ключ безпеки під час входу",
     "key2faEnabled": "Ваш ключ безпеки тепер є другим фактором",
     "key2faDisabled": "Вхід із паролем більше не вимагає ключ безпеки",
-    "otherSessionsClosed": "Your other sessions were signed out.",
+    "otherSessionsClosed": "Ваші інші сесії завершено.",
     "activeSecondFactors": "Активні другі фактори",
     "noSecondFactor": "немає",
     "twoFactorEnforced": "вимагається адміністратором",
@@ -6434,26 +6434,26 @@
       "scheduler": "Планувальник",
       "tasks": "Завдання",
       "tsa": "TSA",
-      "stale": "State not published",
-      "tasksFailed_one": "{{count}} task failed",
-      "tasksFailed_other": "{{count}} tasks failed",
-      "tasksWarning_one": "{{count}} task with a warning",
-      "tasksWarning_other": "{{count}} tasks with a warning",
+      "stale": "Стан не опубліковано",
+      "tasksFailed_one": "{{count}} завдання завершилося помилкою",
+      "tasksFailed_other": "Завдань із помилкою: {{count}}",
+      "tasksWarning_one": "{{count}} завдання з попередженням",
+      "tasksWarning_other": "Завдань із попередженням: {{count}}",
       "tsaState": {
-        "ca_certificate": "Signing with the CA certificate",
-        "dedicated": "Dedicated signer",
-        "expiring_one": "Signer expires in {{count}} day",
-        "expiring_other": "Signer expires in {{count}} days",
-        "no_signer": "Not configured",
-        "unavailable": "Status unavailable",
+        "ca_certificate": "Підписання сертифікатом ЦС",
+        "dedicated": "Окремий підписувач",
+        "expiring_one": "Строк дії підписувача спливає за {{count}} день",
+        "expiring_other": "Строк дії підписувача спливає за днів: {{count}}",
+        "no_signer": "Не налаштовано",
+        "unavailable": "Стан недоступний",
         "expiring_few": "Signer expires in {{count}} days",
         "expiring_many": "Signer expires in {{count}} days"
       },
       "tsaReason": {
-        "expired": "Signer certificate expired",
-        "revoked": "Signer certificate revoked",
-        "key_unavailable": "Signer key unavailable",
-        "invalid": "Signer certificate not usable"
+        "expired": "Строк дії сертифіката підписувача завершився",
+        "revoked": "Сертифікат підписувача відкликано",
+        "key_unavailable": "Ключ підписувача недоступний",
+        "invalid": "Сертифікат підписувача непридатний"
       },
       "tasksFailed_few": "{{count}} tasks failed",
       "tasksFailed_many": "{{count}} tasks failed",
@@ -6499,16 +6499,16 @@
       "expiring": "Закінчуються",
       "expired": "Прострочені",
       "soonest": "Найближчі до закінчення",
-      "tsaSigner": "TSA signer",
-      "ocspResponder": "OCSP responder"
+      "tsaSigner": "Підписувач TSA",
+      "ocspResponder": "Респондер OCSP"
     },
     "activity": {
       "all": "Показати всі"
     },
     "link": {
-      "handled": "Item #{{id}} no longer waits for action (status: {{status}}).",
-      "gone": "Item #{{id}} no longer exists."
+      "handled": "Елемент #{{id}} більше не очікує дій (статус: {{status}}).",
+      "gone": "Елемента #{{id}} більше не існує."
     },
-    "refresh": "Refresh"
+    "refresh": "Оновити"
   }
 }
