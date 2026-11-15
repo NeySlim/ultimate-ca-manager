@@ -138,6 +138,8 @@ export default function ACMEPage() {
       const order = res?.data
       if (cancelled || !order) return
       const stillFailing = client ? order.renewal_failures > 0 : String(order.status).toLowerCase() === 'invalid'
+      // Followed from the open page, the tab does not remount: switch to the order's tab
+      setActiveTab(linkedTab)
       if (client) setSelectedClientOrder(order)
       else setLinkedLocalOrder(order)
       if (!stillFailing) {

@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, configure } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useNavigate } from 'react-router-dom'
+import { act } from 'react'
 import contract from '../../../../contracts/queue_links.json'
 
 const api = vi.hoisted(() => ({ get: vi.fn() }))
@@ -119,5 +120,17 @@ describe('work-queue links open their object', () => {
     render(<MemoryRouter initialEntries={['/approvals?request=7']}><ApprovalsPage /></MemoryRouter>)
     expect((await screen.findAllByText('linked-requester')).length).toBeGreaterThan(0)
     expect(notify.showInfo).toHaveBeenCalledWith('overview.link.handled')
+  })
+
+  it.each([
+    ['acme_order_failed', '?tab=localorders&order=7'],
+    ['acme_client_renewal_failed', '?tab=letsencryptorders&order=7'],
+  ])('%s opens its tab when followed from the open /acme page', async (kind, query) => {
+    let go
+    const Nav = () => { go = useNavigate(); return null }
+    render(<MemoryRouter initialEntries={['/acme']}><Nav /><ACMEPage /></MemoryRouter>)
+    await waitFor(() => expect(go).toBeTruthy())
+    await act(async () => { go('/acme' + query) })
+    expect((await screen.findAllByText(OBJECTS[kind].shows)).length).toBeGreaterThan(0)
   })
 })
