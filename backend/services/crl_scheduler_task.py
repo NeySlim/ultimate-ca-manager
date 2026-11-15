@@ -53,10 +53,11 @@ class CRLSchedulerTask:
             if not ca.crt:
                 return False, f"CA '{ca.descr}' is awaiting its certificate"
             
-            # Get latest CRL
+            # The CRL served, the highest number (RFC 5280 §5.2.3): a slower node may commit a
+            # lower one after it
             latest_crl = CRLMetadata.query.filter_by(
                 ca_id=ca_id, is_delta=False
-            ).order_by(CRLMetadata.created_at.desc()).first()
+            ).order_by(CRLMetadata.crl_number.desc()).first()
             
             if not latest_crl:
                 return True, f"No CRL exists for CA '{ca.descr}' - needs generation"
