@@ -22,6 +22,7 @@ from flasgger import Swagger
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config.settings import get_config, BASE_DIR, redis_url as config_redis_url, session_store, SESSION_TABLE
+from config.settings import rate_limit_enabled
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
@@ -382,7 +383,7 @@ def create_app(config_name=None):
     })
     
     # Initialize rate limiter
-    if config.RATE_LIMIT_ENABLED:
+    if rate_limit_enabled():
         limiter.init_app(app)
         app.logger.info("✓ Rate limiting enabled")
     
@@ -1094,7 +1095,7 @@ def create_app(config_name=None):
     # Enable rate-limiting middleware (auth brute-force protection, etc.)
     try:
         from security.rate_limiter import init_rate_limiter
-        if os.environ.get('RATE_LIMIT_ENABLED', 'true').lower() in ('true', '1', 'yes', 'on'):
+        if rate_limit_enabled():
             init_rate_limiter(app)
         else:
             app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")
