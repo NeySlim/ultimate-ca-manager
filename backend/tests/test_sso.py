@@ -156,18 +156,26 @@ class TestSSOProviderCRUD:
 
     def test_update_provider_invalid_role(self, auth_client):
         """PUT /sso/providers/<id> with an unknown role → 400, role unchanged"""
-        r = auth_client.get('/api/v2/sso/providers')
-        providers = json.loads(r.data).get('data', [])
-        test_provider = next((p for p in providers if p['name'] == 'test-ldap'), None)
-        if not test_provider:
-            pytest.skip('No test provider found')
-
+        # One LDAP provider per installation: the one there, else one of this test's own
+        providers = json.loads(auth_client.get('/api/v2/sso/providers').data)['data']
+        test_provider = next((p for p in providers if p['provider_type'] == 'ldap'), None)
+        made = test_provider is None
+        if made:
+            r = auth_client.post('/api/v2/sso/providers', data=json.dumps({
+                'name': 'role-probe-ldap', 'provider_type': 'ldap', 'enabled': False,
+                'default_role': 'viewer', 'ldap_server': 'ldap.test.com', 'ldap_port': 389,
+                'ldap_base_dn': 'ou=users,dc=test', 'ldap_user_filter': '(uid={username})'}),
+                content_type='application/json')
+            assert r.status_code in (200, 201), r.data
+            test_provider = json.loads(r.data)['data']
         r = auth_client.put(f'/api/v2/sso/providers/{test_provider["id"]}',
             data=json.dumps({'default_role': 'root'}),
             content_type='application/json')
         assert r.status_code == 400
         r = auth_client.get(f'/api/v2/sso/providers/{test_provider["id"]}')
         assert json.loads(r.data)['data']['default_role'] == test_provider['default_role']
+        if made:
+            assert auth_client.delete(f'/api/v2/sso/providers/{test_provider["id"]}').status_code in (200, 204)
 
     def test_available_providers_public(self, client):
         """GET /sso/available → public endpoint, no auth"""

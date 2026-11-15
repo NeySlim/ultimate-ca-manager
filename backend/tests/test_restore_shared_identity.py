@@ -153,8 +153,7 @@ def _archived(name, *ids):
 
 @pytest.mark.parametrize('name', SHARED)
 def test_the_oldest_row_is_the_archives_and_the_others_are_told(app, seeded, name):
-    if name not in seeded:
-        pytest.skip(f'{name}: the factory could not build a row here')
+    assert name in seeded, f'{name}: the factory could not build a row here'
     model = load_model(manifest.SECTIONS[name])
     with app.app_context():
         oldest, newer = _twin(name, seeded[name])
@@ -186,8 +185,7 @@ def test_the_oldest_row_is_the_archives_and_the_others_are_told(app, seeded, nam
 
 @pytest.mark.parametrize('name', SHARED)
 def test_an_archive_of_both_rows_puts_each_back_on_its_own(app, seeded, name):
-    if name not in seeded:
-        pytest.skip(f'{name}: the factory could not build a row here')
+    assert name in seeded, f'{name}: the factory could not build a row here'
     model = load_model(manifest.SECTIONS[name])
     with app.app_context():
         oldest, newer = _twin(name, seeded[name])
