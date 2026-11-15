@@ -20,6 +20,8 @@ from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
 
+from utils.dn_parse import most_specific_common_name
+
 from fips_mode import FipsRestricted
 from utils.csr_extensions import csr_extensions
 from utils.key_codec import MalformedKey, load_private_key_any, normalize_private_key_pem
@@ -293,6 +295,9 @@ class ParsedObject:
     # Certificate-specific
     subject: str = ""
     issuer: str = ""
+    # Read on the loaded x509.Name: its RFC 4514 string may not parse back
+    subject_cn: Optional[str] = None
+    issuer_cn: Optional[str] = None
     serial_number: str = ""
     not_before: Optional[str] = None
     not_after: Optional[str] = None
@@ -654,6 +659,7 @@ class SmartParser:
                         raw_pem=pem_block,
                         index=match.start(),
                         subject=csr.subject.rfc4514_string(),
+                        subject_cn=most_specific_common_name(csr.subject),
                     )
                     
                     # Extract key info from CSR
@@ -703,6 +709,8 @@ class SmartParser:
         
         obj.subject = cert.subject.rfc4514_string()
         obj.issuer = cert.issuer.rfc4514_string()
+        obj.subject_cn = most_specific_common_name(cert.subject)
+        obj.issuer_cn = most_specific_common_name(cert.issuer)
         obj.serial_number = str(cert.serial_number)
         obj.not_before = cert.not_valid_before_utc.isoformat() if hasattr(cert, 'not_valid_before_utc') else cert.not_valid_before.isoformat()
         obj.not_after = cert.not_valid_after_utc.isoformat() if hasattr(cert, 'not_valid_after_utc') else cert.not_valid_after.isoformat()

@@ -13,7 +13,6 @@ from typing import List, Dict, Optional
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from cryptography import x509
-from utils.dn_parse import most_specific_common_name
 from cryptography.hazmat.backends import default_backend
 
 from .parser import ParsedObject, ObjectType
@@ -174,11 +173,11 @@ class ImportValidator:
                 
                 if expiry < now:
                     result.add_warning(
-                        f"Certificate '{self._get_cn(obj.subject)}' is expired (expired {obj.not_after})"
+                        f"Certificate '{self._get_cn(obj)}' is expired (expired {obj.not_after})"
                     )
                 elif (expiry - now).days < 30:
                     result.add_warning(
-                        f"Certificate '{self._get_cn(obj.subject)}' expires in {(expiry - now).days} days"
+                        f"Certificate '{self._get_cn(obj)}' expires in {(expiry - now).days} days"
                     )
             except Exception:
                 pass
@@ -191,7 +190,7 @@ class ImportValidator:
                 
                 if not_before > now:
                     result.add_warning(
-                        f"Certificate '{self._get_cn(obj.subject)}' is not yet valid (valid from {obj.not_before})"
+                        f"Certificate '{self._get_cn(obj)}' is not yet valid (valid from {obj.not_before})"
                     )
             except Exception:
                 pass
@@ -199,7 +198,7 @@ class ImportValidator:
         # Check for weak keys
         if obj.key_algorithm == "RSA" and obj.key_size < 2048:
             result.add_warning(
-                f"Certificate '{self._get_cn(obj.subject)}' uses weak RSA key ({obj.key_size} bits)"
+                f"Certificate '{self._get_cn(obj)}' uses weak RSA key ({obj.key_size} bits)"
             )
         
         # Check for duplicates
@@ -207,7 +206,7 @@ class ImportValidator:
             duplicate = self._check_duplicate_cert(obj)
             if duplicate:
                 result.add_warning(
-                    f"Certificate '{self._get_cn(obj.subject)}' already exists in database (ID: {duplicate})"
+                    f"Certificate '{self._get_cn(obj)}' already exists in database (ID: {duplicate})"
                 )
     
     def _validate_key(self, obj: ParsedObject, result: ValidationResult):
@@ -232,7 +231,7 @@ class ImportValidator:
         # Check for weak keys
         if obj.key_algorithm == "RSA" and obj.key_size < 2048:
             result.add_warning(
-                f"CSR '{self._get_cn(obj.subject)}' uses weak RSA key ({obj.key_size} bits)"
+                f"CSR '{self._get_cn(obj)}' uses weak RSA key ({obj.key_size} bits)"
             )
         
         # Verify CSR signature
@@ -240,10 +239,10 @@ class ImportValidator:
             csr = x509.load_pem_x509_csr(obj.raw_pem.encode(), default_backend())
             unsignable = unsignable_csr_key(csr)
             if unsignable:
-                result.add_error(f"CSR '{self._get_cn(obj.subject)}' refused: {unsignable}")
+                result.add_error(f"CSR '{self._get_cn(obj)}' refused: {unsignable}")
             elif not csr.is_signature_valid:
                 result.add_error(
-                    f"CSR '{self._get_cn(obj.subject)}' has invalid signature"
+                    f"CSR '{self._get_cn(obj)}' has invalid signature"
                 )
         except Exception as e:
             result.add_error(f"Failed to validate CSR: {str(e)}")
@@ -271,7 +270,7 @@ class ImportValidator:
                 
                 if existing_ca:
                     result.add_info(
-                        f"Chain for '{self._get_cn(chain.leaf.subject)}' will be linked to existing CA '{existing_ca.common_name}'"
+                        f"Chain for '{self._get_cn(chain.leaf)}' will be linked to existing CA '{existing_ca.common_name}'"
                     )
                     chain.trust_source = 'managed_ca'
                     chain.trust_anchor = existing_ca.common_name
@@ -280,20 +279,20 @@ class ImportValidator:
                     trusted = self._find_in_trust_store(top_cert)
                     if trusted:
                         result.add_info(
-                            f"Chain for '{self._get_cn(chain.leaf.subject)}' verified against Trust Store CA '{trusted['name']}'"
+                            f"Chain for '{self._get_cn(chain.leaf)}' verified against Trust Store CA '{trusted['name']}'"
                         )
                         chain.is_complete = True
                         chain.trust_source = 'trust_store'
                         chain.trust_anchor = trusted['name']
                     else:
                         result.add_warning(
-                            f"Chain for '{self._get_cn(chain.leaf.subject)}' is incomplete - issuing CA not found in managed CAs or Trust Store"
+                            f"Chain for '{self._get_cn(chain.leaf)}' is incomplete - issuing CA not found in managed CAs or Trust Store"
                         )
                         chain.trust_source = None
                         chain.trust_anchor = None
         else:
             chain.trust_source = 'self_contained'
-            chain.trust_anchor = self._get_cn(chain.root.subject) if chain.root else None
+            chain.trust_anchor = self._get_cn(chain.root) if chain.root else None
         
         if chain.errors:
             for error in chain.errors:
@@ -319,7 +318,7 @@ class ImportValidator:
             
             if not rows:
                 # Fallback: broader search
-                cn = self._get_cn(cert.issuer)
+                cn = self._get_cn(cert, issuer=True)
                 rows = conn.execute(
                     "SELECT id, name, certificate_pem, subject, fingerprint_sha256 FROM trusted_certificates WHERE name LIKE ? OR subject LIKE ?",
                     (f'%{cn}%', f'%{cn}%')
@@ -385,14 +384,12 @@ class ImportValidator:
 
         return None
     
-    def _get_cn(self, subject: str) -> str:
-        """Extract CN from subject"""
-        if not subject:
-            return "Unknown"
-        try:
-            cn = most_specific_common_name(x509.Name.from_rfc4514_string(subject))
-        except ValueError:
-            cn = None
+    def _get_cn(self, obj: ParsedObject, issuer: bool = False) -> str:
+        """The most specific CN the parser read on the subject (or issuer), else the DN cut at 30."""
+        cn = obj.issuer_cn if issuer else obj.subject_cn
         if cn:
             return cn
-        return subject[:30] + "..." if len(subject) > 30 else subject
+        dn = obj.issuer if issuer else obj.subject
+        if not dn:
+            return "Unknown"
+        return dn[:30] + "..." if len(dn) > 30 else dn

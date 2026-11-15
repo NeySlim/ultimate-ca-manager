@@ -226,28 +226,141 @@ def test_the_est_path_records_the_most_specific_common_name(app, create_ca, key)
             db.session.commit()
 
 
-def _import_leaf(auth_client, key, tag, *cns):
+def _import_pem(auth_client, subject, key, tag, ca=False, san=None):
+    """Sign `subject` (self-signed when `ca`) and run it through /import/execute."""
     import json
 
     from cryptography.hazmat.primitives import serialization
 
-    issuer_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    issuer_key = key if ca else rsa.generate_private_key(public_exponent=65537, key_size=2048)
     now = datetime.datetime.now(datetime.timezone.utc)
-    leaf = (x509.CertificateBuilder()
-            .subject_name(_subject(*cns))
-            .issuer_name(_subject(f'Import RDN CA {tag}'))
-            .public_key(key.public_key())
-            .serial_number(x509.random_serial_number())
-            .not_valid_before(now - datetime.timedelta(days=1))
-            .not_valid_after(now + datetime.timedelta(days=30))
-            .sign(issuer_key, hashes.SHA256()))
+    builder = (x509.CertificateBuilder()
+               .subject_name(subject)
+               .issuer_name(subject if ca else _subject(f'Import RDN CA {tag}'))
+               .public_key(key.public_key())
+               .serial_number(x509.random_serial_number())
+               .not_valid_before(now - datetime.timedelta(days=1))
+               .not_valid_after(now + datetime.timedelta(days=30)))
+    if ca:
+        builder = builder.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+    if san:
+        builder = builder.add_extension(x509.SubjectAlternativeName([x509.DNSName(san)]), critical=False)
+    cert = builder.sign(issuer_key, hashes.SHA256())
     r = auth_client.post('/api/v2/import/execute', data=json.dumps({
-        'content': leaf.public_bytes(serialization.Encoding.PEM).decode(),
-        'options': {'import_certs': True}}), content_type='application/json')
+        'content': cert.public_bytes(serialization.Encoding.PEM).decode(),
+        'options': {'import_certs': True, 'import_cas': True}}), content_type='application/json')
     assert r.status_code in (200, 201), r.data
-    ids = r.get_json()['data']['imported_ids']['certificates']
+    ids = r.get_json()['data']['imported_ids']['cas' if ca else 'certificates']
     assert len(ids) == 1, r.data
     return ids[0]
+
+
+def _import_leaf(auth_client, key, tag, *cns):
+    return _import_pem(auth_client, _subject(*cns), key, tag)
+
+
+def _legacy_country(cn):
+    """A subject real certificates carry and cryptography loads, but that
+    `Name.from_rfc4514_string` refuses: a three-letter country."""
+    return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn),
+                      x509.NameAttribute(NameOID.COUNTRY_NAME, 'USA', _validate=False)])
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_the_import_reads_the_cn_of_a_subject_rfc4514_cannot_parse_back(app, auth_client, key):
+    import uuid
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    with pytest.raises(ValueError):  # the premise
+        x509.Name.from_rfc4514_string(_legacy_country('x').rfc4514_string())
+    cert_id = _import_pem(auth_client, _legacy_country(f'legacy-{tag}.example'), key, tag)
+    with app.app_context():
+        row = db.session.get(Certificate, cert_id)
+        try:
+            assert row.subject_cn == f'legacy-{tag}.example'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+def test_an_imported_ca_with_such_a_subject_is_named_after_its_cn(app, auth_client):
+    import uuid
+
+    from models import CA, db
+
+    tag = uuid.uuid4().hex[:8]
+    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    ca_id = _import_pem(auth_client, _legacy_country(f'Legacy CA {tag}'), ca_key, tag, ca=True)
+    with app.app_context():
+        row = db.session.get(CA, ca_id)
+        try:
+            assert row.descr == f'Legacy CA {tag}'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_an_imported_certificate_without_a_cn_falls_back_as_before(app, auth_client, key):
+    """No CN: the first DNS SAN, else no subject_cn (unchanged by this lot)."""
+    import uuid
+
+    from models import Certificate, db
+
+    tag = uuid.uuid4().hex[:8]
+    org = x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, f'No CN {tag}')])
+    with_san = _import_pem(auth_client, org, key, tag, san=f'san-{tag}.example')
+    bare = _import_pem(auth_client, org, rsa.generate_private_key(public_exponent=65537, key_size=2048), tag)
+    with app.app_context():
+        rows = [db.session.get(Certificate, i) for i in (with_san, bare)]
+        try:
+            assert rows[0].subject_cn == f'san-{tag}.example'
+            assert rows[1].subject_cn is None
+            assert rows[1].descr == 'Certificate'
+        finally:
+            for row in rows:
+                db.session.delete(row)
+            db.session.commit()
+
+
+def test_an_imported_ca_without_a_cn_is_named_unknown_as_before(app, auth_client):
+    import uuid
+
+    from models import CA, db
+
+    tag = uuid.uuid4().hex[:8]
+    org = x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, f'No CN CA {tag}')])
+    ca_id = _import_pem(auth_client, org, rsa.generate_private_key(public_exponent=65537, key_size=2048),
+                        tag, ca=True)
+    with app.app_context():
+        row = db.session.get(CA, ca_id)
+        try:
+            assert row.descr == 'Unknown'
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+@pytest.mark.filterwarnings('ignore:Attribute.s length')
+@pytest.mark.parametrize('subject, expected', [
+    (_legacy_country('legacy.example'), 'legacy.example'),
+    (_subject('Doe, John'), 'Doe, John'),
+    (_subject('web.example.com', 'admin.example.com'), 'admin.example.com'),
+    (x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'A long organisation without any CN')]),
+     'O=A long organisation without ...'),
+])
+def test_the_validator_names_a_certificate_by_its_parsed_cn(subject, expected):
+    """Validator messages: the most specific CN, else the subject cut at 30 characters."""
+    from services.smart_import.parser import SmartParser
+    from services.smart_import.validator import ImportValidator
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    obj = SmartParser()._parse_x509_cert(_self_signed(subject, key))
+    validator = ImportValidator()
+    assert validator._get_cn(obj) == expected
+    assert validator._get_cn(obj, issuer=True) == expected
 
 
 def test_the_smart_import_path_records_the_most_specific_common_name(app, auth_client, key):
