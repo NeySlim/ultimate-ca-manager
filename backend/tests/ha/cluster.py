@@ -1,9 +1,9 @@
-"""Two real UCM nodes (gunicorn) in HA mode on one PostgreSQL schema.
+"""Real UCM nodes (gunicorn, two or three) in HA mode on one PostgreSQL schema.
 
 Every node gets an environment built here and nothing else: its own DATA_DIR,
-UCM_CONFIG_DIR, logs and port under the bench directory, the shared database
-URL, SECRET_KEY and KEY_ENCRYPTION_KEY. The guard on its PYTHONPATH stops a node
-that touches an installation path.
+UCM_CONFIG_DIR, logs and port under the bench directory, its own database URL
+(application_name = schema_node), the shared SECRET_KEY and KEY_ENCRYPTION_KEY.
+The guard on its PYTHONPATH stops a node that touches an installation path.
 """
 import os
 import re
@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import quote
 
@@ -31,6 +32,7 @@ SCHEMA_PREFIX = 'ucm_ha_'
 READY_TIMEOUT = 240
 STOP_TIMEOUT = 45
 POLL = 0.25
+NODE_NAMES = ('node-a', 'node-b', 'node-c')
 
 
 def free_port() -> int:
@@ -60,9 +62,9 @@ def wait_until(predicate, timeout, what):
     raise AssertionError(f'{what}: not reached within {timeout}s (last: {last!r})')
 
 
-def pg_connect(application_name):
+def pg_connect(application_name, **overrides):
     import psycopg
-    return psycopg.connect(PG_URL, application_name=application_name, autocommit=True)
+    return psycopg.connect(PG_URL, application_name=application_name, autocommit=True, **overrides)
 
 
 def group_pids(pgid) -> set:
@@ -215,28 +217,36 @@ class Node:
 
 
 class Cluster:
-    """Two nodes, A and B, on a schema created here and dropped by close()."""
+    """Nodes A and B (and C), on a schema created here and dropped by close()."""
 
-    def __init__(self, root: Path, names=('node-a', 'node-b')):
+    def __init__(self, root: Path, names=NODE_NAMES[:2]):
         self.schema = f'{SCHEMA_PREFIX}{os.getpid()}_{secrets.token_hex(3)}'
         self.root = root
         self._admin = None
         self.password = f'Ha-{secrets.token_hex(8)}-9z'
         from cryptography.fernet import Fernet
         shared = {
-            'DATABASE_URL': self.database_url(),
             'SECRET_KEY': secrets.token_hex(32),
             'KEY_ENCRYPTION_KEY': Fernet.generate_key().decode(),
             'UCM_HA': '1',
             'INITIAL_ADMIN_PASSWORD': self.password,
             'FQDN': 'ucm-ha.test',
         }
-        self.nodes = [Node(name, root / name, shared) for name in names]
+        self.nodes = [Node(name, root / name, {**shared, 'DATABASE_URL': self.database_url(name)})
+                      for name in names]
 
-    def database_url(self):
+    def app_name(self, node_name):
+        """A node's application_name: it names the node in pg_stat_activity whatever client
+        address PostgreSQL sees (a published port shows the proxy's), and starts with the schema."""
+        return f'{self.schema}_{node_name}'
+
+    def app_names(self) -> list:
+        return [self.app_name(node.name) for node in self.nodes]
+
+    def database_url(self, node_name):
         separator = '&' if '?' in PG_URL else '?'
         return (f'{PG_URL}{separator}options={quote(f"-csearch_path={self.schema}")}'
-                f'&application_name={self.schema}')
+                f'&application_name={quote(self.app_name(node_name))}')
 
     def __getitem__(self, index):
         return self.nodes[index]
@@ -248,7 +258,7 @@ class Cluster:
             cur.execute(f'CREATE SCHEMA "{self.schema}"')
 
     def start(self):
-        """Both nodes at once on the empty schema, then a bounded wait for readiness."""
+        """Every node at once on the empty schema, then a bounded wait for readiness."""
         for node in self.nodes:
             node.start()
         for node in self.nodes:
@@ -260,6 +270,44 @@ class Cluster:
             cur.execute(statement, params)
             return cur.fetchall() if cur.description else None
 
+    def backends(self) -> list:
+        """The nodes' database sessions: dicts of pid, node (a name, or None), wait_event_type, query."""
+        rows = self.sql('SELECT pid, application_name, wait_event_type, query FROM pg_stat_activity '
+                        'WHERE application_name = ANY(%s)', (self.app_names(),))
+        owners = {self.app_name(node.name): node.name for node in self.nodes}
+        return [{'pid': pid, 'node': owners.get(app), 'wait': wait, 'query': query or ''}
+                for pid, app, wait, query in rows]
+
+    def waiting_on_lock(self, node, needle='') -> int:
+        """Sessions of `node` blocked on a lock, in a statement that contains `needle`."""
+        return sum(1 for b in self.backends()
+                   if b['node'] == node.name and b['wait'] == 'Lock' and needle in b['query'])
+
+    @contextmanager
+    def holding(self, statement, params=None):
+        """Run `statement` in a transaction of its own and keep its locks until the block ends:
+        the instant a node reaches them is then observable in pg_stat_activity."""
+        with pg_connect(f'{self.schema}_hold') as conn:
+            conn.autocommit = False
+            conn.execute(f'SET search_path TO "{self.schema}"')
+            conn.execute(statement, params)
+            try:
+                yield conn
+            finally:
+                conn.rollback()
+
+    @contextmanager
+    def database_closed(self):
+        """New connections to the bench's database refused until the block ends; PostgreSQL
+        changes that from another database only, its owner may (here the maintenance one)."""
+        (database,), = self.sql('SELECT current_database()')
+        with pg_connect(f'{self.schema}_gate', dbname='postgres') as gate:
+            gate.execute(f'ALTER DATABASE "{database}" WITH ALLOW_CONNECTIONS false')
+            try:
+                yield
+            finally:
+                gate.execute(f'ALTER DATABASE "{database}" WITH ALLOW_CONNECTIONS true')
+
     def schema_exists(self) -> bool:
         with pg_connect(f'{self.schema}_check') as conn:
             return conn.execute('SELECT 1 FROM pg_namespace WHERE nspname = %s',
@@ -268,8 +316,8 @@ class Cluster:
     def sessions_left(self) -> int:
         with pg_connect(f'{self.schema}_check') as conn:
             return conn.execute(
-                "SELECT count(*) FROM pg_stat_activity WHERE application_name = %s",
-                (self.schema,)).fetchone()[0]
+                "SELECT count(*) FROM pg_stat_activity WHERE application_name = ANY(%s)",
+                (self.app_names(),)).fetchone()[0]
 
     def guard_hits(self) -> str:
         return ''.join(f'{n.name}: {hit}' for n in self.nodes for hit in n.guard_hits().splitlines(True))
@@ -289,7 +337,8 @@ class Cluster:
         if self._admin is not None:
             with self._admin.cursor() as cur:
                 cur.execute('SELECT pg_terminate_backend(pid) FROM pg_stat_activity '
-                            'WHERE application_name = %s AND pid <> pg_backend_pid()', (self.schema,))
+                            'WHERE application_name = ANY(%s) AND pid <> pg_backend_pid()',
+                            (self.app_names(),))
                 cur.execute(f'DROP SCHEMA IF EXISTS "{self.schema}" CASCADE')
             self._admin.close()
             self._admin = None
@@ -341,8 +390,37 @@ class Client:
         return self.http.post(self.node.url(path), json=payload or {}, headers=self._headers(),
                               timeout=120, **kw)
 
+    def patch(self, path, payload=None, **kw):
+        return self.http.patch(self.node.url(path), json=payload or {}, headers=self._headers(),
+                               timeout=120, **kw)
+
 
 TASK_LINE = re.compile(r"Task '([A-Za-z0-9_]+)' (?:completed|skipped|failed)")
+
+
+def single_leader(nodes):
+    """The one node of `nodes` that every report names as leader, None while they disagree."""
+    reports = {node.name: node.health() for node in nodes}
+    leaders = [name for name, r in reports.items() if r['leader'] is True]
+    named = {r['cluster']['leader_node_id'] for r in reports.values()}
+    if len(leaders) > 1:
+        raise AssertionError(f'more than one leader: {reports}')
+    if len(leaders) == 1 and named == set(leaders) \
+            and all(r['leader'] is False for name, r in reports.items() if name != leaders[0]):
+        return next(node for node in nodes if node.name == leaders[0])
+    return None
+
+
+def lock_acquisitions(node) -> int:
+    """How many times this node's scheduler processes took the leader lock, restarts included."""
+    return node.app_log_text().count('Scheduler lock acquired:')
+
+
+def node_counts(*counts):
+    """Run a module's tests on a cluster of each size (the `cluster` fixture's parameter)."""
+    import pytest
+    return pytest.mark.parametrize('cluster', counts, indirect=True,
+                                   ids=[f'{n}-nodes' for n in counts])
 
 
 def task_runs(text, name) -> int:

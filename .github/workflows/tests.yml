@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       ha:
-        description: 'Also run the two-node HA bench (backend/tests/ha)'
+        description: 'Also run the three-node HA bench (backend/tests/ha)'
         type: boolean
         default: false
   schedule:
@@ -472,13 +472,13 @@ jobs:
           cd backend
           pytest --tb=short -rs -m needs_gssapi tests/
 
-  # Two real UCM nodes in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
+  # Real UCM nodes (two, then three) in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
   # Manual only: run the workflow by hand with the `ha` input ticked.
   test-ha-bench:
-    name: HA bench (two nodes)
+    name: HA bench (three nodes)
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && inputs.ha
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     services:
       postgres:

@@ -252,3 +252,39 @@ def test_store_methods_retry_a_transient_database_error(sql_store_app, monkeypat
     with app.app_context():
         getattr(interface, method)(*args)
     assert len(calls) == 2
+
+
+def test_a_purge_the_database_refuses_never_fails_the_request_it_rides(monkeypatch, tmp_path):
+    """The purge of expired sessions rides one request in N: with the database away the
+    liveness probe still answers 200, after one attempt and no retry delay."""
+    from sqlalchemy.exc import OperationalError
+    from config.settings import TestingConfig
+    from tests import pg_app_harness
+
+    if pg_app_harness.ENABLED:
+        pytest.skip('file-database fixture, not meaningful in PostgreSQL mode')
+    monkeypatch.setattr(TestingConfig, 'SQLALCHEMY_DATABASE_URI', f'sqlite:///{tmp_path / "s.db"}')
+    monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
+    monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
+    monkeypatch.setattr(TestingConfig, 'SESSION_CLEANUP_N_REQUESTS', 1, raising=False)
+    from app import create_app
+    app = create_app('testing')
+    app.config['PROPAGATE_EXCEPTIONS'] = False
+    interface, attempts, slept = app.session_interface, [], []
+
+    def away():
+        attempts.append(1)
+        raise OperationalError('SELECT 1', {}, Exception('connection refused'))
+
+    try:
+        with monkeypatch.context() as m:
+            m.setattr(interface, '_store', away)
+            m.setattr('random.randint', lambda low, high: 0)
+            m.setattr('time.sleep', slept.append)
+            assert app.test_client().get('/health/live').status_code == 200
+        assert attempts == [1] and slept == []
+    finally:
+        from models import db
+        with app.app_context():
+            db.session.remove()
+            db.engine.dispose()

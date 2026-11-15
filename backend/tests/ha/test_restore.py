@@ -1,6 +1,6 @@
-"""A restore launched on node A while node B issues certificates: B refuses from its
-acknowledgement of the maintenance on, both nodes restart in turn, then B serves the
-restored state and accepts writes again."""
+"""A restore launched on node A while node B issues certificates: it starts once every node
+acknowledged the maintenance, B refuses from its acknowledgement on, every node restarts in
+turn, then B serves the restored state and accepts writes again."""
 import threading
 import time
 
@@ -8,9 +8,9 @@ import pytest
 import requests
 
 from services.cluster_maintenance import OBSERVE_TTL_SECONDS
-from tests.ha.cluster import READY_TIMEOUT, Client, create_ca, issue, wait_until
+from tests.ha.cluster import READY_TIMEOUT, Client, create_ca, issue, node_counts, wait_until
 
-pytestmark = pytest.mark.ha
+pytestmark = [pytest.mark.ha, node_counts(2, 3)]
 
 PASSWORD = 'ha-bench-restore-2026'
 
@@ -25,7 +25,7 @@ def _cas(client):
 
 
 def test_a_restore_on_a_while_b_writes(cluster, admin):
-    a, b = cluster.nodes
+    a, b = cluster.nodes[:2]
     before = create_ca(admin, 'HA restore kept CA')
     r = admin.post('/api/v2/system/backup', {'password': PASSWORD})
     assert r.status_code == 200, r.text[:500]
@@ -69,12 +69,13 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
     # From B's acknowledgement on, every write was refused, with a delay to retry after
     assert set(codes[first:]) == {503}, codes
     assert all(retry == '30' for _, code, retry in outcomes if code == 503)
-    assert b.ready() is None  # out of the load balancer's rotation
-    # Each process of B reads the row again once its view is older than OBSERVE_TTL_SECONDS
-    wait_until(lambda: b.health()['maintenance']['phase'] == 'restarting',
-               3 * OBSERVE_TTL_SECONDS, 'node B shows the restore as done')
+    for node in cluster.nodes[1:]:
+        assert node.ready() is None, node.name  # out of the load balancer's rotation
+        # Each process reads the row again once its view is older than OBSERVE_TTL_SECONDS
+        wait_until(lambda: node.health()['maintenance']['phase'] == 'restarting',
+                   3 * OBSERVE_TTL_SECONDS, f'node {node.name} shows the restore as done')
 
-    # The rolling restart, as the watchers would run it: node A, then node B
+    # The rolling restart, as the watchers would run it: node A, then B (then C)
     for node in cluster.nodes:
         restart_file = node.data_dir / '.restart_requested'
         wait_until(lambda: restart_file.exists() or not node.alive(), READY_TIMEOUT,
@@ -85,7 +86,7 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
         wait_until(node.ready, READY_TIMEOUT, f'node {node.name} ready again')
 
     wait_until(lambda: all(n.health().get('maintenance') is None for n in cluster.nodes), 60,
-               'the maintenance lifted on both nodes')
+               'the maintenance lifted on every node')
     # Lifted once every fresh heartbeat carries a start after the restore
     serving = time.monotonic()
     wait_until(lambda: cluster.sql('SELECT count(*) FROM cluster_maintenance')[0][0] == 0, 120,

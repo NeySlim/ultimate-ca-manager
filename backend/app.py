@@ -319,7 +319,7 @@ def create_app(config_name=None):
         if app.config.get('SESSION_TYPE') == 'sqlalchemy':
             from utils.session_store import IsolatedSqlSessionInterface
             # Same object and model, only the transaction handling differs
-            app.session_interface.__class__ = IsolatedSqlSessionInterface
+            IsolatedSqlSessionInterface.adopt(app)
             # The purge filters on expiry; fresh or switched installs never ran upgrade step 138
             from sqlalchemy import Index
             model = app.session_interface.sql_session_model

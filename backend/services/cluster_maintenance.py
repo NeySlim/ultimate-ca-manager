@@ -251,7 +251,10 @@ def install_engine_guard(app, engine):
             raise MaintenanceActive(MESSAGE.format(what=_what(view)))
 
     def on_rollback(conn):
-        conn.info.pop(_WROTE, None)
+        # An invalidated connection's info is cleared when its record reconnects; reading it
+        # here would raise and turn every rollback after a disconnect into an error
+        if not conn.invalidated:
+            conn.info.pop(_WROTE, None)
 
     def on_checkin(dbapi_connection, record):
         record.info.pop(_WROTE, None)
