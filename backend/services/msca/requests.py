@@ -39,8 +39,9 @@ class MicrosoftCARequestsMixin:
             if isinstance(cert_pem, bytes):
                 cert_pem = cert_pem.decode('utf-8', errors='replace')
 
-            if req.csr_id and not req.cert_id:
-                # Claim + import in one step, shared with the CA panel and the inventory
+            if not req.cert_id:
+                # Claim + import in one step, shared with the CA panel and the inventory;
+                # a deleted CSR (csr_id None) imports into a new certificate row
                 from .ca_control import MicrosoftCACAControlMixin
                 try:
                     MicrosoftCACAControlMixin.complete_request(msca, req, cert_pem)

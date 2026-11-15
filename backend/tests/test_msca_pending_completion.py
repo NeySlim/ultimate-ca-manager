@@ -237,3 +237,19 @@ def test_pending_request_whose_certificate_is_already_in_ucm_is_not_imported_aga
     assert (s['completed'], s['imported'], s['skipped'], s['failed']) == (0, 0, 1, 0)
     with app.app_context():
         assert Certificate.query.filter_by(subject_cn='pc-known.test.local').count() == 1
+
+
+def test_check_route_completes_a_request_whose_csr_was_deleted(app, auth_client, monkeypatch, ca):
+    from models import Certificate
+    msca_id = _make_msca(app, 'PC check gone')
+    ca.add(910, 'pc-check-gone.test.local')
+    pem = ca.rows[-1]['pem']
+    req_id, _ = _pending(app, msca_id, 910, 'pc-check-gone.test.local', with_csr=False)
+    r = _check(app, auth_client, monkeypatch, msca_id, req_id, _Client(pem=pem))
+    assert r.status_code == 200, r.data
+    status, cert_id, _ = _req(app, req_id)
+    assert status == 'issued' and cert_id
+    s = _sync(app, msca_id)
+    assert (s['imported'], s['completed']) == (0, 0)
+    with app.app_context():
+        assert Certificate.query.filter_by(subject_cn='pc-check-gone.test.local').count() == 1
