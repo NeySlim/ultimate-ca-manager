@@ -1650,6 +1650,48 @@ POST /api/v2/acme/client/proxy/test-connection
 ```
 Permission `read:acme`. Body `acme_account_id` or `url` optional (otherwise the proxy account's directory). The URL must be HTTPS and not target loopback or cloud metadata (`400`). Returns `connected`, `ca_name`, `directory_url`, `terms_of_service`, `website`, `eab_required` and `endpoints`; `502` when the directory cannot be fetched.
 
+### ACME Server Accounts
+`{account_id}` is the numeric id or the RFC 8555 account id. Unknown accounts answer `404`.
+
+```http
+POST /api/v2/acme/accounts
+Content-Type: application/json
+
+{ "email": "ops@example.com", "key_type": "...", "agree_tos": true }
+```
+Permission `write:acme`. `email` is required (`400`); `key_type` must be one of the accepted account key types (`400` lists them); an existing email answers `409`.
+
+```http
+GET /api/v2/acme/accounts/{account_id}
+PATCH /api/v2/acme/accounts/{account_id}
+DELETE /api/v2/acme/accounts/{account_id}
+POST /api/v2/acme/accounts/{account_id}/deactivate
+GET /api/v2/acme/accounts/{account_id}/orders
+GET /api/v2/acme/accounts/{account_id}/challenges
+```
+`GET` (account, orders, challenges) needs `read:acme`. `PATCH` needs `write:acme` and a string `email` (the contact address; `400` when absent or too long). `DELETE` needs `delete:acme` and removes the account with its orders, authorizations and challenges. `deactivate` needs `write:acme`.
+
+### ACME Server Orders and History
+```http
+DELETE /api/v2/acme/orders/{order_pk}
+POST /api/v2/acme/orders/purge
+GET /api/v2/acme/history?source=all
+```
+`DELETE` (`delete:acme`) removes one local order with its authorizations and challenges (`404` when unknown). `purge` (`delete:acme`) runs the expired-order purge now and returns the counts of orders, authorizations and challenges removed. `history` (`read:acme`) lists certificates issued through ACME, local and external CAs; `source` filters.
+
+### External Account Binding
+```http
+GET /api/v2/acme/eab-credentials?status=active
+POST /api/v2/acme/eab-credentials
+GET /api/v2/acme/eab-credentials/{cred_id}
+PATCH /api/v2/acme/eab-credentials/{cred_id}
+DELETE /api/v2/acme/eab-credentials/{cred_id}
+GET /api/v2/acme/eab-required
+PATCH /api/v2/acme/eab-required
+PUT /api/v2/acme/eab-required
+```
+Reads need `read:acme`, writes `write:acme`, `DELETE` `delete:acme`. `POST` body: optional `label` (255 characters at most), `expires_in_days` (a positive integer, `400` otherwise) and `allowed_domains` (a list of patterns, `["*"]` for any); the response carries the credential and, once only, its `hmac_key`. `PATCH` changes `allowed_domains` (never `null`) and `notes`. `DELETE` revokes an active credential (and its DNS UPDATE keys); a credential already revoked or used is deleted for good (`204`). The list holds at most 200, newest first, and never shows an `hmac_key`. `eab-required` reads or sets `{"eab_required": true}` (`PATCH` and `PUT` are the same route).
+
 ---
 
 ## SCEP
@@ -1772,6 +1814,231 @@ POST /api/v2/ad-connectors/test
 - `POST /{id}/test` tests the saved connector and stores the verdict and the domain SID on its row; `POST /test` tests submitted values without saving them (an `id` in the body lends the saved password to a blank one, for the target it was saved for only).
 - `DELETE` answers 204; it is refused with 409 while a profile uses the connector (`details.profiles`, `details.total`).
 - A `PUT` that changes the domain of `base_dn` moves the realm of the profiles that use the connector, or is refused with 409: see the note under Windows Enrollment Profiles.
+
+## Microsoft CA
+
+Connections to Active Directory Certificate Services CAs, used to sign CSRs on a Windows CA and to keep UCM and that CA in step. These are separate from the [Active Directory Connectors](#active-directory-connectors), which are LDAP connections.
+
+```http
+GET /api/v2/microsoft-cas
+GET /api/v2/microsoft-cas/enabled
+POST /api/v2/microsoft-cas
+GET /api/v2/microsoft-cas/{id}
+PUT /api/v2/microsoft-cas/{id}
+DELETE /api/v2/microsoft-cas/{id}
+POST /api/v2/microsoft-cas/test
+POST /api/v2/microsoft-cas/{id}/test
+```
+- Permissions: the list, `GET /{id}` need `read:settings`; `enabled` (the enabled connections, for the signing dialog) needs `read:certificates`; `POST`, `PUT` and the two tests need `write:settings`; `DELETE` needs `delete:settings`.
+- `POST` fields: `name` (required, unique: `409`), `server` (required hostname), `auth_method` (`certificate` by default, `kerberos` or `basic`, else `400`), `ca_name`, `use_ssl` and `verify_ssl` (both default true), `ca_bundle`, `default_template` (`WebServer`), `enabled` (true), `username` and `password` (basic), `client_cert_pem` and `client_key_pem` (certificate), `kerberos_principal` and `kerberos_keytab_path`, `crl_sync_enabled`, `crl_url`, `inventory_sync_enabled`, and the WinRM admin channel fields `winrm_enabled`, `winrm_host`, `winrm_port`, `winrm_use_ssl`, `winrm_verify_ssl`, `winrm_transport`, `winrm_username`, `winrm_password`. `PUT` is a partial update of the same fields; a masked secret sent back keeps the stored one.
+- `DELETE` answers `204`, or `409` while requests are pending on the connection.
+- `POST /test` checks the connection with the submitted values before saving (`server` required); `POST /{id}/test` checks a saved one. Both answer `400` with the error when the check fails.
+
+### Signing and Requests
+```http
+GET /api/v2/microsoft-cas/{id}/templates
+POST /api/v2/microsoft-cas/{id}/sign/{csr_id}
+GET /api/v2/microsoft-cas/{id}/requests/{request_id}
+GET /api/v2/microsoft-cas/requests/pending?msca_id=1
+```
+- `templates` and both request reads need `read:certificates`; `sign` needs `write:certificates`.
+- `sign` submits the CSR `{csr_id}` to the CA. Optional body: `template` (defaults to the connection's `default_template`; `400` when none), `enrollee_name`, `enrollee_upn`. `404` when the connection or CSR is unknown, `400` when the connection is disabled, the CSR was already signed, is empty or its signature is invalid. An issued certificate is imported into UCM ("Certificate issued by Microsoft CA"); a request the CA holds for approval answers "Request pending approval" and is tracked.
+- `GET /{id}/requests/{request_id}` refreshes one request and imports the certificate once issued; `404` for an unknown request.
+
+### Synchronisation
+```http
+POST /api/v2/microsoft-cas/{id}/sync-crl
+POST /api/v2/microsoft-cas/{id}/inventory-sync
+POST /api/v2/microsoft-cas/{id}/publish-crl
+GET /api/v2/microsoft-cas/{id}/reconciliation
+```
+- `sync-crl` (`write:certificates`) fetches the CA's CRL and revokes the matching UCM certificates, one way from the CA to UCM; `400` when the connection is disabled. It returns the counts `revoked` and `checked`.
+- `inventory-sync` (`admin:system`) imports certificates issued directly on the CA that UCM does not know. Optional body `{"full": true}`. Returns the counts `imported`, `skipped` and `failed`. Needs the WinRM admin channel (`400` otherwise).
+- `publish-crl` (`admin:system`) makes the CA publish a new CRL through the admin channel.
+- `reconciliation` (`read:certificates`) compares the CA's issued certificates with the ones UCM knows, read-only.
+
+### WinRM Admin Channel
+```http
+POST /api/v2/microsoft-cas/{id}/admin-channel/test
+GET /api/v2/microsoft-cas/{id}/ca/health
+GET /api/v2/microsoft-cas/{id}/ca/pending
+POST /api/v2/microsoft-cas/{id}/ca/pending/{request_id}/approve
+POST /api/v2/microsoft-cas/{id}/ca/pending/{request_id}/deny
+```
+All answer `404` for an unknown connection and `400` when the admin channel is not enabled or configured on it. `admin-channel/test` (`admin:system`) tests the channel (connection and CA service); its body may carry the `winrm_*` fields and `ca_config` as overrides. `ca/health` and `ca/pending` (`read:certificates`) return the CA's service, certificate and CRL state, and the requests awaiting a CA manager. `approve` and `deny` (`admin:system`) resubmit or refuse a pending request on the CA; `approve` imports the issued certificate.
+
+---
+
+## SSH Certificates
+
+OpenSSH user and host certificates, signed by SSH CAs held in UCM. Permissions: `read:ssh`, `write:ssh`, `delete:ssh` for certificates; `read:ssh_cas`, `write:ssh_cas`, `delete:ssh_cas` for CAs. A missing CA or certificate answers `404`.
+
+### SSH CAs
+```http
+GET /api/v2/ssh/cas?search=prod&type=user
+POST /api/v2/ssh/cas
+GET /api/v2/ssh/cas/{ca_id}
+PUT /api/v2/ssh/cas/{ca_id}
+DELETE /api/v2/ssh/cas/{ca_id}
+POST /api/v2/ssh/cas/import
+GET /api/v2/ssh/cas/{ca_id}/public-key
+GET /api/v2/ssh/cas/{ca_id}/krl
+GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&platform=unix
+```
+- `GET` list filters by `search` and by `type` (repeatable).
+- `POST` creates a CA (`201`): `descr` (or `name`, required), `ca_type` (`user` by default, or `host`), `key_type`, `default_ttl`, `max_ttl` (default `0`), `default_extensions`, `allowed_principals` (a list of non-empty strings), `allow_any_principal` and `allow_custom_key_id` (JSON booleans, default off), `comment`. `400` for an invalid value.
+- `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value.
+- `DELETE` answers `204`, or `409` when the service refuses (certificates still depend on the CA).
+- `POST /import` imports an existing CA from `private_key` (required) with `descr`, `ca_type` (`user` or `host`), `default_ttl`, `max_ttl` and `comment`; `201`, or `400` for an unusable key.
+- `public-key` downloads the CA public key in OpenSSH format. `krl` downloads the CA's key revocation list. `setup-script` returns a server setup script for trusting the CA: `type` (`user` or `host`), `hostname` (validated, `400` when invalid) and `platform` (`unix` by default, or `windows`).
+
+### SSH Certificates
+```http
+GET /api/v2/ssh/certificates?search=alice&status=valid&type=user&ca_id=1
+POST /api/v2/ssh/certificates
+POST /api/v2/ssh/certificates/generate
+POST /api/v2/ssh/certificates/import
+POST /api/v2/ssh/certificates/verify
+GET /api/v2/ssh/certificates/{cert_id}
+GET /api/v2/ssh/certificates/{cert_id}/export
+POST /api/v2/ssh/certificates/{cert_id}/revoke
+DELETE /api/v2/ssh/certificates/{cert_id}
+GET /api/v2/ssh/stats
+```
+- The list is paginated; `status`, `type` and `ca_id` may be repeated, an unknown `status` answers `400`.
+- `POST` signs a public key (`write:ssh`, `201`). Body: `ca_id` and `public_key` (required), `cert_type` (`user` by default, or `host`), `principals` (a list or a comma-separated string, at least one, no comma inside a name, 64 at most), `validity_seconds` (an integer from 60 to ten years), `key_id`, `extensions`, `critical_options`, `descr`. `400` for any invalid field or a CA policy refusal.
+- `POST /generate` takes the same fields without `public_key`, plus `key_type`: UCM creates the key pair and returns the certificate with the `private_key` once.
+- `POST /import` stores an existing certificate: `certificate` (required), optional `descr` and `ssh_ca_id`; `201`.
+- `POST /verify` (`read:ssh`) decodes and verifies `certificate` (required) and returns the result.
+- `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate. `DELETE` answers `204` or `409` when it cannot be deleted.
+- `stats` returns the counts shown on the SSH dashboard.
+
+---
+
+## Deployment
+
+Pushes certificates and CRLs to targets: an SSH (SFTP) host, or an HTTP endpoint that receives a templated body. Reading needs `read:deploy`, creating, changing, pushing and testing `write:deploy`, deleting `delete:deploy`. A missing target, binding or delivery answers `404`. Bindings a renewal leaves on the previous certificate are described under [Deploy Bindings Left Behind by a Renewal](#deploy-bindings-left-behind-by-a-renewal); `GET /api/v2/deploy/bindings` is documented there.
+
+### Targets
+```http
+GET /api/v2/deploy/targets
+POST /api/v2/deploy/targets
+GET /api/v2/deploy/targets/{target_id}
+PATCH /api/v2/deploy/targets/{target_id}
+DELETE /api/v2/deploy/targets/{target_id}
+POST /api/v2/deploy/targets/{target_id}/test
+```
+- `POST` takes `kind`, `ssh` by default or `http` (it cannot be changed afterwards), and `name` (required, 120 characters at most, unique: `409`). `400` carries the reason for an invalid field.
+- An SSH target takes `host` (required), `port` (1 to 65535), `username` (required), `enabled` and optionally `private_key` (UCM generates a key pair when absent; the response carries the public key). Changing `host` or `port`, or sending `reset_host_key`, forgets the pinned host key; it is pinned again on the next successful test.
+- An HTTP target takes `url`, `http_method` (`POST`, `PUT` or `PATCH`; default `POST`), `http_headers`, `body_template` (required), `tls_ca_pem`, `allow_private_key` and `enabled`.
+- `GET /{target_id}` adds the target's `bindings` and `crl_bindings`.
+- `test` connects and authenticates without writing, and pins the host key of an SSH target on the first success; an HTTP target is probed. `409` or `502` carry the reason of a refusal or a failed connection.
+
+### Certificate Bindings
+```http
+POST /api/v2/deploy/bindings
+PATCH /api/v2/deploy/bindings/{binding_id}
+DELETE /api/v2/deploy/bindings/{binding_id}
+POST /api/v2/deploy/bindings/{binding_id}/deploy
+```
+- `POST` binds a certificate to a target: `target_id` and `certificate_id` (required, `404` when unknown), then for an SSH target `cert_path`, `key_path`, `fullchain_path` (absolute file paths of 512 characters at most; at least one is required and they must differ), `reload_command` (512 at most), `include_root`, `chain_variant` (default `auto`) and `enabled`. `key_path` needs a certificate whose private key UCM holds. On an HTTP target the paths and `reload_command` are refused (`400`) and a template that sends `key_pem` needs the key. The same pair twice answers `409`. A first push is queued on creation.
+- `PATCH` changes the same fields; `DELETE` removes the binding.
+- `deploy` pushes now and waits: `200` with the delivery, or `502` with its `last_error`.
+
+### CRL Bindings
+```http
+GET /api/v2/deploy/crl-bindings?ca_id=1&target_id=2
+POST /api/v2/deploy/crl-bindings
+PATCH /api/v2/deploy/crl-bindings/{binding_id}
+DELETE /api/v2/deploy/crl-bindings/{binding_id}
+POST /api/v2/deploy/crl-bindings/{binding_id}/deploy
+```
+CRL bindings need an SSH target (`400` otherwise). `POST` takes `target_id` and `ca_id` (required), `crl_path` (an absolute file path, required), `format` (`pem` by default, or `der`), `include_parent_crls` (PEM only), `reload_command` and `enabled`; the same pair twice answers `409`. Each list item carries its `last_delivery`. `deploy` pushes now (`200`, or `502` with the error).
+
+### Deliveries
+```http
+GET /api/v2/deploy/deliveries?binding_id=1&certificate_id=2&binding_type=certificate
+POST /api/v2/deploy/deliveries/{delivery_id}/retry
+```
+`binding_type` is `certificate` (default) or `crl`, else `400`. `retry` requeues a failed delivery; any other status answers `400`.
+
+---
+
+## Discovery
+
+TLS certificate discovery: scan hosts and subnets, then review what was found. Reading needs `read:certificates`; scanning and managing profiles need `admin:system`; deleting one record needs `delete:certificates`.
+
+### Discovered Certificates
+```http
+GET /api/v2/discovery?limit=50&offset=0&profile_id=1&status=new&search=example
+GET /api/v2/discovery/{disc_id}
+DELETE /api/v2/discovery/{disc_id}
+DELETE /api/v2/discovery?profile_id=1
+GET /api/v2/discovery/export?format=csv&profile_id=1&status=new
+GET /api/v2/discovery/stats?profile_id=1
+POST /api/v2/discovery/bulk-resolve-dns
+```
+- The list returns `items` and `total`; `limit` defaults to 50 (200 at most), `status` may be repeated.
+- `GET /{disc_id}` adds the parsed `extensions`, key and signature details and the SHA-1 and SHA-256 fingerprints; `404` when unknown. `DELETE /{disc_id}` answers `204`.
+- `DELETE /api/v2/discovery` (`admin:system`) deletes every record, or those of `profile_id`, and returns `deleted`.
+- `export` returns CSV (default) or JSON (`format=json`) as a download.
+- `bulk-resolve-dns` (`admin:system`) re-resolves reverse DNS for every record and returns the counts `updated` and `total`.
+
+### Scan Profiles and Runs
+```http
+GET /api/v2/discovery/profiles
+POST /api/v2/discovery/profiles
+GET /api/v2/discovery/profiles/{profile_id}
+PUT /api/v2/discovery/profiles/{profile_id}
+DELETE /api/v2/discovery/profiles/{profile_id}
+POST /api/v2/discovery/profiles/{profile_id}/scan
+POST /api/v2/discovery/scan
+GET /api/v2/discovery/runs?profile_id=1
+GET /api/v2/discovery/runs/{run_id}
+```
+- `POST /profiles` (`201`): `name` (required, unique: `409`), `targets` (required, a non-empty list of at most 1000 hostnames, IP addresses or CIDR ranges), `ports` (a non-empty list of at most 100 integers from 1 to 65535), and optionally `description`, `schedule_enabled`, `schedule_interval_minutes` (1440 by default), `notify_on_new`, `notify_on_change`, `notify_on_expiry` (all true by default), `notify_email` (one valid address), `timeout` (1 to 30, default 5), `max_workers` (1 to 50, default 20) and `resolve_dns`. `PUT` updates the same fields; `DELETE` answers `204`.
+- `POST /profiles/{profile_id}/scan` starts a scan with the profile's settings and returns `scan_run_id`.
+- `POST /scan` scans without a saved profile: `targets` (at most 500) or `subnet` (at most 1024 addresses), one of the two being required, plus `ports` (default `[443]`), `timeout` (1 to 30, default 5), `max_workers` (1 to 50, default 20) and `resolve_dns`. It returns `scan_run_id`.
+- `runs` lists scan runs (`items`, `total`); `runs/{run_id}` reads one, `404` when unknown.
+
+---
+
+## Key Recovery
+
+Recovery of a certificate's archived private key goes through a request that an approver decides. Scopes: `write:key_recovery` opens a request and collects an approved key, `read:key_recovery` reads requests, `admin:key_recovery` approves and rejects. An unknown request answers `404`.
+
+```http
+POST /api/v2/certificates/{cert_id}/key-recovery
+Content-Type: application/json
+
+{ "reason": "Server rebuilt after a disk failure" }
+```
+Opens a request (`201`). `reason` is required and at most 2000 characters; `400` when missing or when the certificate has no archived private key; `404` for an unknown certificate.
+
+```http
+GET /api/v2/key-recovery?status=pending
+GET /api/v2/key-recovery/{id}
+```
+The list returns `requests` (newest first, the latest 500) and `dual_control`, whether the approver must differ from the requester. `GET /{id}` reads one request whatever its age.
+
+```http
+POST /api/v2/key-recovery/{id}/approve
+POST /api/v2/key-recovery/{id}/reject
+Content-Type: application/json
+
+{ "note": "Ticket 1234" }
+```
+`admin:key_recovery`. `note` is optional (2000 characters at most). `409` when the request is no longer pending. `approve` answers `403` when dual control is on and the caller is the requester, and `410` when the certificate no longer exists.
+
+```http
+POST /api/v2/key-recovery/{id}/recover
+Content-Type: application/json
+
+{ "password": "at-least-8-chars", "legacy": false }
+```
+Returns the key and certificate as a PKCS#12 download, once, after approval. `password` is required (`400` when it does not meet the export password rules); `legacy` selects the 3DES/SHA-1 profile. `409` when the request is not approved, `403` unless the caller is the requester or holds `admin:key_recovery`, `410` when the certificate or key is gone.
+
+---
 
 ## CRL & OCSP
 
@@ -3556,6 +3823,46 @@ Requires `delete:acme`. An active key is revoked at once (answer `200` with the 
 
 Each account of `GET /api/v2/acme/client/accounts` has the integer field `dns_update_key_count`: the number of its DNS UPDATE keys of any status. It is `0` for an account without keys. The web interface uses it to show the keys of an account whose ACME proxy is off.
 
+### ACME CA Accounts
+Accounts UCM holds with external ACME CAs. Unknown accounts answer `404`.
+
+```http
+GET /api/v2/acme/client/accounts
+POST /api/v2/acme/client/accounts
+Content-Type: application/json
+
+{
+  "directory_url": "https://acme.example.com/directory",
+  "label": "Production CA",
+  "email": "ops@example.com",
+  "account_key_algorithm": "ES256",
+  "account_key_pem": "...",
+  "is_default": false,
+  "eab_kid": "...",
+  "eab_hmac_key": "..."
+}
+```
+`GET` needs `read:acme`; `POST` needs `write:acme` and answers `201`. Required: `directory_url` (HTTPS, 500 characters at most), `label` (100 at most, unique: `409`) and `email` (254 at most). `account_key_algorithm` defaults to `ES256`; `account_key_pem` imports an existing key (64 KB at most, `413` above).
+
+```http
+GET /api/v2/acme/client/accounts/{account_id}
+PATCH /api/v2/acme/client/accounts/{account_id}
+DELETE /api/v2/acme/client/accounts/{account_id}
+POST /api/v2/acme/client/accounts/{account_id}/deactivate
+POST /api/v2/acme/client/accounts/{account_id}/default
+POST /api/v2/acme/client/accounts/{account_id}/register
+```
+`PATCH` (`write:acme`) updates `label`, `email`, `account_key_algorithm`, `eab_kid`, `eab_hmac_key` and `is_default`. `DELETE` (`delete:acme`) answers `409` while issued orders still renew through the account. `deactivate` (`delete:acme`) deactivates the account at the CA (RFC 8555 section 7.3.6), then removes it; `502` when the CA refuses. `default` (`write:acme`) makes it the account used when a request names none. `register` (`write:acme`) registers or re-registers it with its CA; optional `email`, `400` without a valid contact.
+
+### ACME Client Preflight
+```http
+POST /api/v2/acme/client/preflight
+Content-Type: application/json
+
+{ "domains": ["www.example.com"], "challenge_type": "dns-01", "mode": "full" }
+```
+Permission `write:acme`. Dry-run of a certificate request; returns a report with `ok` and per-step results. `domains` is required; `challenge_type` defaults to `dns-01`; `mode` is `full` (default) or `validate_only`; optional `email`, `acme_account_id`, `dns_provider_id` (integers), `key_source` (default `generate`), `csr_pem` and `verify_dns`.
+
 ---
 
 ## ACME Domains
@@ -3615,6 +3922,18 @@ Content-Type: application/json
   "dns_provider_id": 1
 }
 ```
+
+### Local Domains
+Maps a domain to the local CA that signs for it when UCM answers ACME requests itself.
+
+```http
+GET /api/v2/acme/local-domains
+POST /api/v2/acme/local-domains
+GET /api/v2/acme/local-domains/{domain_id}
+PUT /api/v2/acme/local-domains/{domain_id}
+DELETE /api/v2/acme/local-domains/{domain_id}
+```
+Reads need `read:acme`, `POST` and `PUT` `write:acme`, `DELETE` `delete:acme`. `POST` body: `domain` (required, `400` for an invalid name), `issuing_ca_id` (required; `404` unknown, `400` when that CA cannot sign) and optional `auto_approve` (default `false`). `PUT` changes `issuing_ca_id` and `auto_approve`.
 
 ---
 
