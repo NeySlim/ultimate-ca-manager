@@ -471,14 +471,17 @@ def test_smoke_release_accepts_the_exact_version(monkeypatch):
 # ---- 7. the manual publisher takes the same section ---------------------------------------------
 
 def _publish(tmp_path, version, changelog, *flags):
+    """Notes the script hands to `gh release edit` (it only edits a release the workflow created)."""
     bare, work = tmp_path / 'origin.git', tmp_path / 'work'
+    # Under the pre-commit hook GIT_DIR points at the real repository: never hand it down
+    clean = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
     git = ['git', '-c', 'user.name=t', '-c', 'user.email=t@t']
-    subprocess.run(['git', 'init', '-q', '--bare', str(bare)], check=True)
-    subprocess.run(['git', 'init', '-q', str(work)], check=True)
-    subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', 'x'], cwd=work, check=True)
-    subprocess.run(['git', 'remote', 'add', 'origin', str(bare)], cwd=work, check=True)
-    subprocess.run(['git', 'tag', f'v{version}'], cwd=work, check=True)
-    subprocess.run(['git', 'push', '-q', 'origin', '--tags'], cwd=work, check=True)
+    subprocess.run(['git', 'init', '-q', '--bare', str(bare)], check=True, env=clean)
+    subprocess.run(['git', 'init', '-q', str(work)], check=True, env=clean)
+    subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', 'x'], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'remote', 'add', 'origin', str(bare)], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'tag', f'v{version}'], cwd=work, check=True, env=clean)
+    subprocess.run(['git', 'push', '-q', 'origin', '--tags'], cwd=work, check=True, env=clean)
     (work / 'scripts').mkdir()
     (work / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
     shutil.copy(ROOT / 'scripts' / 'release_publish.sh', work / 'scripts')
@@ -488,14 +491,13 @@ def _publish(tmp_path, version, changelog, *flags):
     log = tmp_path / 'gh.args'
     (fake / 'gh').write_text(
         '#!/bin/sh\n'
-        f'if [ "$1 $2" = "release view" ] && [ ! -e "{log}" ]; then exit 1; fi\n'
-        'if [ "$1 $2" = "release create" ]; then\n'
+        'if [ "$1 $2" = "release edit" ]; then\n'
         f'  for a in "$@"; do echo "$a"; done > "{log}"\n'
         f'  while [ $# -gt 0 ]; do [ "$1" = "--notes-file" ] && cp "$2" "{log}.notes"; shift; done\n'
         'fi\n')
     (fake / 'gh').chmod(0o755)
-    env = {**os.environ, 'PATH': f'{fake}:{os.environ["PATH"]}'}
-    result = subprocess.run([BASH, 'scripts/release_publish.sh', version, *flags], cwd=work, env=env,
+    env = {**clean, 'PATH': f'{fake}:{os.environ["PATH"]}'}
+    result = subprocess.run([BASH, 'scripts/release_publish.sh', version, '--edit', *flags], cwd=work, env=env,
                             capture_output=True, text=True)
     notes = pathlib.Path(str(log) + '.notes')
     return result, (notes.read_text() if notes.exists() else None)

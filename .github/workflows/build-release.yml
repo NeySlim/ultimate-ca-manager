@@ -122,6 +122,9 @@ jobs:
           cd frontend
           npm ci
           npm run build
+
+      - name: Record the frontend build for the SBOM
+        run: python3 scripts/ci/sbom.py frontend --frontend-dir frontend --dist frontend/dist --modules frontend/bundle-modules.json -o "$RUNNER_TEMP/frontend-build.json"
       
       - name: Install build dependencies
         run: |
@@ -154,6 +157,23 @@ jobs:
             # GitHub renames "~" to "." in asset names: write the published name so update clients match the line
             echo "$(sha256sum "$f" | cut -c1-64)  ${f//\~/.}" > "$f.sha256"
           done
+
+      # From the built file, extracted without running its scripts; a failure stops the release
+      - name: SBOM of the DEB
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          scripts/ci/sbom-venv.sh "$RUNNER_TEMP/sbom-venv"
+          for f in ucm_*.deb; do
+            root="$RUNNER_TEMP/deb-root/$f"
+            mkdir -p "$root"
+            dpkg-deb -x "$f" "$root"
+            dpkg-deb -f "$f" Pre-Depends Depends Recommends Suggests > "$RUNNER_TEMP/deb-depends"
+            "$RUNNER_TEMP/sbom-venv/bin/python" scripts/ci/sbom.py package --format deb --file "$f" --root "$root" \
+              --depends "$RUNNER_TEMP/deb-depends" --frontend "$RUNNER_TEMP/frontend-build.json" \
+              --version "$VERSION" --commit "$GITHUB_SHA" -o "${f//\~/.}.cdx.json"
+          done
       
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -162,6 +182,9 @@ jobs:
           path: |
             ucm_*.deb
             ucm_*.deb.sha256
+            ucm_*.deb.cdx.json
+            ucm_*.deb.cdx.json.sha256
+          if-no-files-found: error
 
   # ============================================================
   # Build RPM Package
@@ -213,6 +236,9 @@ jobs:
           cd frontend
           npm ci
           npm run build
+
+      - name: Record the frontend build for the SBOM
+        run: python3 scripts/ci/sbom.py frontend --frontend-dir frontend --dist frontend/dist --modules frontend/bundle-modules.json -o "$RUNNER_TEMP/frontend-build.json"
 
       - name: Build RPM in ${{ matrix.label }} container
         run: |
@@ -266,6 +292,35 @@ jobs:
               done
             '
 
+      # The RPM tools of its own distribution extract the payload and read the dependencies
+      - name: SBOM of the RPM
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          scripts/ci/sbom-venv.sh "$RUNNER_TEMP/sbom-venv"
+          mkdir -p "$RUNNER_TEMP/rpm-root"
+          docker run --rm -v /tmp/rpm-output:/output:ro -v "$RUNNER_TEMP/rpm-root:/rpm-root" "$IMAGE" bash -c '
+            set -euo pipefail
+            dnf install -y -q cpio
+            for f in /output/*.rpm; do
+              d=/rpm-root/$(basename "$f")
+              mkdir -p "$d/tree"
+              (cd "$d/tree" && rpm2cpio "$f" | cpio -idm --quiet --no-absolute-filenames)
+              { rpm -qp --requires "$f" | sed "s/^/Requires: /"
+                rpm -qp --recommends "$f" | sed "s/^/Recommends: /"
+                rpm -qp --suggests "$f" | sed "s/^/Suggests: /"; } > "$d/depends"
+            done
+            chmod -R a+rX /rpm-root'
+          for f in /tmp/rpm-output/*.rpm; do
+            name=$(basename "$f")
+            d="$RUNNER_TEMP/rpm-root/$name"
+            "$RUNNER_TEMP/sbom-venv/bin/python" scripts/ci/sbom.py package --format rpm --file "$f" --root "$d/tree" \
+              --depends "$d/depends" --frontend "$RUNNER_TEMP/frontend-build.json" \
+              --version "$VERSION" --commit "$GITHUB_SHA" -o "/tmp/rpm-output/${name//\~/.}.cdx.json"
+          done
+
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -273,6 +328,9 @@ jobs:
           path: |
             /tmp/rpm-output/*.rpm
             /tmp/rpm-output/*.rpm.sha256
+            /tmp/rpm-output/*.rpm.cdx.json
+            /tmp/rpm-output/*.rpm.cdx.json.sha256
+          if-no-files-found: error
 
   # ============================================================
   # Build Docker Image (one native runner per arch, then a manifest)
@@ -315,6 +373,9 @@ jobs:
           cd frontend
           npm ci
           npm run build
+
+      - name: Record the frontend build for the SBOM
+        run: python3 scripts/ci/sbom.py frontend --frontend-dir frontend --dist frontend/dist --modules frontend/bundle-modules.json -o "$RUNNER_TEMP/frontend-build.json"
 
       - name: Set image name
         id: image
@@ -361,6 +422,28 @@ jobs:
           cache-to: type=gha,mode=max,scope=std-${{ matrix.arch }}
           build-args: |
             VERSION=${{ needs.build-deb.outputs.version }}
+
+      # The pushed platform image, by its digest; no digest leaves this job without its SBOM
+      - name: SBOM of the pushed image
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          REPOSITORY: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          ARCH: ${{ matrix.arch }}
+          FRONTEND: ${{ runner.temp }}/frontend-build.json
+        run: scripts/ci/sbom-image.sh standard
+
+      - name: Upload the image SBOM
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: std-sbom-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/sbom/*.cdx.json
+            ${{ runner.temp }}/sbom/*.cdx.json.sha256
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Export digest
         if: startsWith(github.ref, 'refs/tags/')
@@ -418,6 +501,22 @@ jobs:
         run: |
           find . -type f -printf '%f\n'
           test "$(find . -type f | wc -l)" -eq 2
+
+      - name: Download the SBOMs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/sboms
+          pattern: std-sbom-*
+          merge-multiple: true
+
+      # Each SBOM was checked against the schema where it was made; here, that both are present
+      # and each names one of the digests about to be tagged
+      - name: Require the SBOM of each architecture
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: >-
+          python3 scripts/ci/sbom.py images --variant standard --version "$VERSION" --no-schema
+          --digests "${{ runner.temp }}/digests" --sboms "${{ runner.temp }}/sboms"
 
       - name: Set image name
         id: image
@@ -519,6 +618,9 @@ jobs:
           npm ci
           npm run build
 
+      - name: Record the frontend build for the SBOM
+        run: python3 scripts/ci/sbom.py frontend --frontend-dir frontend --dist frontend/dist --modules frontend/bundle-modules.json -o "$RUNNER_TEMP/frontend-build.json"
+
       - name: Set image name
         id: image
         run: |
@@ -587,6 +689,28 @@ jobs:
             VERSION=${{ needs.build-deb.outputs.version }}
             UCM_FIPS_BUILD=1
 
+      # The pushed platform image, by its digest; no digest leaves this job without its SBOM
+      - name: SBOM of the pushed image
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          REPOSITORY: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          ARCH: ${{ matrix.arch }}
+          FRONTEND: ${{ runner.temp }}/frontend-build.json
+        run: scripts/ci/sbom-image.sh fips
+
+      - name: Upload the image SBOM
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fips-sbom-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/sbom/*.cdx.json
+            ${{ runner.temp }}/sbom/*.cdx.json.sha256
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Export digest
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -646,6 +770,22 @@ jobs:
         run: |
           find . -type f -printf '%f\n'
           test "$(find . -type f | wc -l)" -eq 2
+
+      - name: Download the SBOMs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/sboms
+          pattern: fips-sbom-*
+          merge-multiple: true
+
+      # Each SBOM was checked against the schema where it was made; here, that both are present
+      # and each names one of the digests about to be tagged
+      - name: Require the SBOM of each architecture
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: >-
+          python3 scripts/ci/sbom.py images --variant fips --version "$VERSION" --no-schema
+          --digests "${{ runner.temp }}/digests" --sboms "${{ runner.temp }}/sboms"
 
       - name: Set image name
         id: image
@@ -902,6 +1042,31 @@ jobs:
       - name: Publish the full-stop marks of the migrations
         # A rolling update reads it and refuses a release whose pending migrations need every node stopped
         run: python3 backend/migration_marks.py backend/migrations > artifacts/full-stop-migrations.json
+
+      - name: Download the image SBOMs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ./artifacts
+          pattern: '*-sbom-*'
+          merge-multiple: true
+
+      - name: Download the image digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: '*-digest-*'
+
+      # One SBOM per package file and per image platform, each on its subject, schema-valid and
+      # indexed; anything missing, extra or mismatched stops the release here
+      - name: Check the SBOMs
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+        run: |
+          set -euo pipefail
+          scripts/ci/sbom-venv.sh "$RUNNER_TEMP/sbom-venv"
+          py="$RUNNER_TEMP/sbom-venv/bin/python"
+          "$py" scripts/ci/sbom.py index --dir artifacts --digests "$RUNNER_TEMP/digests" --version "$VERSION"
+          "$py" scripts/ci/sbom.py validate --dir artifacts --digests "$RUNNER_TEMP/digests" --version "$VERSION"
 
       - name: Delete existing release assets
         run: |

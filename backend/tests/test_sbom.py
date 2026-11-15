@@ -471,6 +471,17 @@ def _invalid_schema(art):
     _rewrite(p, doc)
 
 
+def _arch_property_lies(art):
+    p = art / 'ucm-3.0.rc1-image-standard-arm64.cdx.json'
+    doc = _doc(p)
+    for prop in doc['metadata']['component']['properties']:
+        if prop['name'] == 'ucm:arch':
+            prop['value'] = 'amd64'
+    _rewrite(p, doc)
+    # Indexed again, as the release job does just before validating: only the arch check is left
+    s.ok('index', '--dir', art, '--digests', art.parent / 'digests', '--version', s.VERSION)
+
+
 def _altered_sum(art):
     p = art / 'ucm-3.0.rc1-image-fips-amd64.cdx.json.sha256'
     p.write_text('0' * 64 + '  ucm-3.0.rc1-image-fips-amd64.cdx.json\n')
@@ -515,6 +526,7 @@ def _new_rpm(art):
     lambda art, d: _other_version(art),
     lambda art, d: _invalid_schema(art),
     lambda art, d: _altered_sum(art),
+    lambda art, d: _arch_property_lies(art),
     lambda art, d: _index_drops_one(art),
     lambda art, d: _index_wrong_hash(art),
     lambda art, d: (art / 'sbom-index.json').unlink(),
@@ -524,7 +536,7 @@ def _new_rpm(art):
     lambda art, d: shutil.rmtree(d / 'fips-digest-arm64'),
     lambda art, d: (d / 'std-digest-amd64' / ('f' * 64)).touch(),
 ], ids=['no-image-sbom', 'no-package-sbom', 'amd64-as-arm64', 'other-package', 'package-replaced',
-        'rc-asset-not-normalized', 'rc-file-not-normalized', 'other-version', 'invalid-schema', 'altered-sum',
+        'rc-asset-not-normalized', 'rc-file-not-normalized', 'other-version', 'invalid-schema', 'altered-sum', 'arch-property-lies',
         'index-incomplete', 'index-wrong-hash', 'no-index', 'empty', 'stray-sbom', 'rpm-without-sbom',
         'image-sbom-without-digest', 'two-digests'])
 def test_a_broken_release_is_refused(release, breakage):
