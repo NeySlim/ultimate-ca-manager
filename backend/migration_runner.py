@@ -373,6 +373,32 @@ def build_fresh_schema(create_all):
     create_all()
 
 
+def _server_encoding(engine) -> str:
+    """server_encoding read on a bare driver connection: SQLAlchemy's first connect reads the
+    server version with a text pattern, which a SQL_ASCII database answers in bytes (TypeError)."""
+    cargs, cparams = engine.dialect.create_connect_args(engine.url)
+    conn = engine.dialect.dbapi.connect(*cargs, **cparams)
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SHOW server_encoding")
+            value = cursor.fetchone()[0]
+    finally:
+        conn.close()
+    return value.decode("ascii", "replace") if isinstance(value, bytes) else str(value)
+
+
+def encoding_refusal(engine):
+    """None on SQLite or a UTF8 PostgreSQL database, else the message that refuses it."""
+    if engine.dialect.name != "postgresql":
+        return None
+    encoding = _server_encoding(engine)
+    if encoding.upper() in ("UTF8", "UTF-8"):
+        return None
+    return (f"This PostgreSQL database uses the encoding {encoding}; UCM needs UTF8. Create a "
+            f"database with ENCODING 'UTF8' (docs/ADMIN_GUIDE.md, PostgreSQL Backend) and point "
+            f"DATABASE_URL at it. Nothing was changed.")
+
+
 def _pending(applied):
     return [n for n in _list_migration_names() if n not in applied]
 
@@ -404,6 +430,11 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
         return False
 
     try:
+        # Before the first SQLAlchemy connection, which fails on it without naming it
+        refusal = encoding_refusal(engine)
+        if refusal:
+            say(f"✗ {refusal}")
+            return False
         state, applied = _get_state(engine)
 
         if state == "fresh":
@@ -755,6 +786,10 @@ def check_database() -> int:
         return CHECK_FRESH
     try:
         with _probe_engine(db_url) as engine:
+            refusal = encoding_refusal(engine)
+            if refusal:
+                say(f"unreadable: {refusal}")
+                return CHECK_UNREADABLE
             # _get_state takes a table listing that fails for an empty file: read it here first
             with engine.connect() as conn:
                 if sqlite_path is not None:

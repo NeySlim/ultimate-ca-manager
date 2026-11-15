@@ -429,10 +429,10 @@ sqlite3 /opt/ucm/data/ucm.db ".dump" > ucm_dump.sql
 
 UCM supports PostgreSQL 13+ as a drop-in replacement for SQLite. The schema is created automatically on first start.
 
-**Recommended PostgreSQL setup:**
+**Recommended PostgreSQL setup.** The database must use the UTF8 encoding: UCM refuses to start on any other (`SHOW server_encoding;` tells it). A cluster created under the C or POSIX locale makes its databases `SQL_ASCII` by default, hence `ENCODING 'UTF8'` and `TEMPLATE template0` here:
 ```sql
 CREATE USER ucm WITH PASSWORD 'strong-password';
-CREATE DATABASE ucm OWNER ucm;
+CREATE DATABASE ucm OWNER ucm ENCODING 'UTF8' TEMPLATE template0;
 GRANT ALL PRIVILEGES ON DATABASE ucm TO ucm;
 ```
 
