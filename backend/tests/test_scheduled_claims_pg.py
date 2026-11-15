@@ -42,13 +42,17 @@ def _pg(app):
 
 
 def _twice_at_once(app, run, meet_in, attribute):
-    """Run *run* in two threads that both pass the read before either claims."""
+    """Run *run* in two threads that meet in *attribute* before going on. Called after the
+    read the claim rests on and before the claim, it makes both read before either writes;
+    two runs that never met ran one after the other, and the test fails."""
     original = getattr(meet_in, attribute)
-    both = threading.Barrier(2, timeout=10)
+    both = threading.Barrier(2, timeout=30)
+    met = []
 
     def meet_then(*args, **kwargs):
         try:
             both.wait()
+            met.append(1)
         except threading.BrokenBarrierError:
             pass
         return original(*args, **kwargs)
@@ -73,6 +77,7 @@ def _twice_at_once(app, run, meet_in, attribute):
     finally:
         setattr(meet_in, attribute, staticmethod(original) if isinstance(meet_in, type) else original)
     assert errors == []
+    assert met, f'the two runs never met in {attribute}: they did not overlap'
     return results
 
 
