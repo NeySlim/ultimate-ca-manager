@@ -29,6 +29,7 @@ from utils.csr_extensions import csr_extensions
 from utils.custom_extensions import TemplateConfigError
 from fips_mode import FipsRestricted
 from utils import key_algorithms
+from utils.csr_diagnostics import weak_csr_hash_error
 from utils.key_type import unsignable_csr_key
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
                              san_buckets_from_general_names)
@@ -491,7 +492,7 @@ def upload_csr():
             return error_response(unsignable, 400)
         # RFC 2986 §2.2: verify CSR signature
         if not csr.is_signature_valid:
-            return error_response('CSR has invalid signature', 400)
+            return error_response(weak_csr_hash_error(csr) or 'CSR has invalid signature', 400)
         
         # Extract subject info
         subject = csr.subject
@@ -622,7 +623,7 @@ def import_csr():
             return error_response(unsignable, 400)
         # RFC 2986 §2.2: verify CSR signature
         if not csr.is_signature_valid:
-            return error_response('CSR has invalid signature', 400)
+            return error_response(weak_csr_hash_error(csr) or 'CSR has invalid signature', 400)
         
         # Extract subject info
         subject = csr.subject

@@ -143,13 +143,16 @@ export default function TSAPage() {
     : null
   const selectionUnsaved = Boolean(config.signer_cert_refid) && !signerStatus
 
-  // The strict tsa_require_dedicated_cert mode is only operable once a usable
-  // dedicated signer is saved: without one, /tsa would 503 every request.
+  // Turning the strict mode on is only offered once a usable dedicated signer is
+  // saved; it is on unless the API says false (RFC 3161 §2.3, the server default).
   const dedicatedSignerReady = Boolean(signerStatus?.usable)
+  const strictMode = config.require_dedicated_cert !== false
 
-  // Saved state: without a dedicated signer the CA certificate signs, which strict
-  // verifiers refuse (RFC 3161 §2.3 wants a critical, exclusive timeStamping EKU)
-  const caCertificateSigns = !config.signer?.configured
+  // Saved state without a dedicated signer: the CA certificate signs only with the
+  // strict mode off (tokens strict verifiers refuse); with it on, /tsa signs nothing
+  const noSavedSigner = !config.signer?.configured
+  const caCertificateSigns = noSavedSigner && !strictMode
+  const strictWithoutSigner = noSavedSigner && strictMode
   const placeholderPolicy = (config.policy_oid || DEFAULT_POLICY_OID) === DEFAULT_POLICY_OID
 
   const copyToClipboard = async (text) => {
@@ -264,11 +267,13 @@ export default function TSAPage() {
               {t('tsa.signingCert')}
             </h3>
             <p className="text-xs text-text-secondary">{t('tsa.signingCertDesc')}</p>
-            {caCertificateSigns && (
+            {(caCertificateSigns || strictWithoutSigner) && (
               <div className="p-3 rounded-lg text-xs border status-warning-bg status-warning-border" role="alert">
                 <div className="flex items-start gap-2">
                   <Warning size={16} className="status-warning-text flex-shrink-0 mt-0.5" />
-                  <p className="status-warning-text">{t('tsa.caSignerWarning')}</p>
+                  <p className="status-warning-text">
+                    {t(caCertificateSigns ? 'tsa.caSignerWarning' : 'tsa.strictNoSigner')}
+                  </p>
                 </div>
               </div>
             )}
@@ -285,15 +290,8 @@ export default function TSAPage() {
                 }))
               ]}
               value={config.signer_cert_refid || ''}
-              onChange={(val) => setConfig({
-                ...config,
-                signer_cert_refid: val,
-                // Strict mode cannot outlive its signer: clearing or changing
-                // the signer drops require_dedicated_cert so a save can never
-                // persist a strict mode with no usable dedicated signer.
-                ...((!val || val !== config.signer?.refid)
-                  ? { require_dedicated_cert: false } : {}),
-              })}
+              // The strict mode stays as it is: picking or clearing a signer never turns it off
+              onChange={(val) => setConfig({ ...config, signer_cert_refid: val })}
               disabled={!config.enabled}
               helperText={t('tsa.signingCertHelp')}
             />
@@ -368,15 +366,15 @@ export default function TSAPage() {
             )}
 
             <ToggleSwitch
-              checked={config.require_dedicated_cert || false}
+              checked={strictMode}
               onChange={(val) => setConfig({ ...config, require_dedicated_cert: val })}
               label={t('tsa.requireDedicatedCert')}
               description={
-                dedicatedSignerReady
+                dedicatedSignerReady || strictMode
                   ? t('tsa.requireDedicatedCertDesc')
                   : t('tsa.requireDedicatedCertBlocked')
               }
-              disabled={!config.enabled || (!dedicatedSignerReady && !config.require_dedicated_cert)}
+              disabled={!config.enabled || (!dedicatedSignerReady && !strictMode)}
             />
           </Card>
 

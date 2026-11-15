@@ -13,12 +13,14 @@ reader that *decides* already does, so adopting the registry changes what the
 API reports and nothing else. One entry is an exception, `mtls_enabled`,
 where the deciding reader was itself wrong.
 
-Why two flavours of boolean, rather than one:
+Why several flavours of boolean, rather than one:
 
 * `permissive` reads `yes` / `on` / `1` as true, which is what most runtime
   readers do and what an operator hand-editing the table expects;
 * `strict` accepts only the exact string `true`, which is what the readers
-  that configure a socket or grandfather a protocol endpoint do.
+  that configure a socket or grandfather a protocol endpoint do;
+* `strict_off` refuses only on the exact string `false`, for a safeguard that
+  must stay on when its row is garbled (the dedicated TSA signer).
 
 Picking one flavour for everything would silently flip real behaviour. A key
 whose deciding reader is strict keeps strict; the flavour is part of what the
@@ -77,6 +79,11 @@ def bool_strict(raw: str, default: bool) -> bool:
     return str(raw).strip().lower() == 'true'
 
 
+def bool_strict_off(raw: str, default: bool) -> bool:
+    """Only the exact word `false` disables. Anything else enables (fails closed)."""
+    return str(raw).strip().lower() != 'false'
+
+
 def integer(raw: str, default: int) -> int:
     try:
         return int(str(raw).strip())
@@ -132,6 +139,13 @@ SETTINGS = {
         True, bool_strict,
         'the row did not exist before 2.200, so a missing row is an enabled '
         'service; services/tsa_service.tsa_is_enabled decides and is strict'),
+
+    # --- absent means "on", and only the exact word turns it off: RFC 3161 §2.3 wants a
+    # dedicated signer; a 2.x TSA signing with its CA had the explicit false written (step 162)
+    'tsa_require_dedicated_cert': Setting(
+        True, bool_strict_off,
+        'services/tsa_service decides: the CA certificate signs timestamps only '
+        'when the operator wrote false'),
 
     # --- absent means "on", read forgivingly ------------------------------
     'hsts_enabled': Setting(

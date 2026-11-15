@@ -100,3 +100,36 @@ class TestPreflightBeforeTheSwitch:
         _built(fips_off, [])
         assert fips_preflight._ssh_eddsa('ed25519', None) == 'Ed25519'
         assert fips_preflight._ssh_cert_key_refused('ed448')
+
+
+class TestReportSaysWhichModuleJudged:
+    """The standard image has no build record: its report says it judged without a module."""
+
+    def test_without_record_nor_module_the_report_says_so(self, fips_off, monkeypatch, app):
+        from services import fips_preflight
+        monkeypatch.setattr(fips_mode, 'provider_info', lambda: None)
+        assert fips_mode.switch_module_known() is False
+        with app.app_context():
+            assert fips_preflight.run(detectors=[])['module_known'] is False
+
+    @pytest.mark.parametrize('how', ['record', 'loaded', 'fips_mode'])
+    def test_a_record_or_a_module_judges(self, how, fips_off, monkeypatch, app):
+        from services import fips_preflight
+        monkeypatch.setattr(fips_mode, 'provider_info', lambda: None)
+        if how == 'record':
+            _built(fips_off, [])
+        elif how == 'loaded':
+            monkeypatch.setattr(fips_mode, 'provider_info', lambda: {'name': 'OpenSSL FIPS Provider',
+                                                                      'version': '3.1.2', 'buildinfo': ''})
+        else:
+            monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        assert fips_mode.switch_module_known() is True
+        with app.app_context():
+            assert fips_preflight.run(detectors=[])['module_known'] is True
+
+    def test_the_text_report_tells_to_use_the_fips_image(self):
+        from scripts.fips_preflight import render_text
+        report = {'fips_active': False, 'module_known': False, 'findings': [], 'errors': [],
+                  'summary': {'blocker': 0, 'warning': 0, 'info': 0}}
+        assert '-fips image' in render_text(report)
+        assert '-fips image' not in render_text({**report, 'module_known': True})

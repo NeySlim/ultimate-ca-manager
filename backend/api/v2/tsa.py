@@ -10,7 +10,8 @@ from utils.response import success_response, error_response
 from models import db, SystemConfig, CA, Certificate, AuditLog
 from services.audit_service import AuditService
 from services.settings_registry import effective
-from services.tsa_service import describe_configured_signer, tsa_signer_key_problem
+from services.tsa_service import (
+    configured_signer_refid, describe_configured_signer, tsa_signer_key_problem)
 import logging
 import re
 
@@ -203,16 +204,12 @@ def get_tsa_config():
         'ca_id': ca_id,
         'ca_name': ca_name,
         'policy_oid': get_config('tsa_policy_oid', '1.2.3.4.1'),
-        # Off by default: pre-2.200 deployments sign with the CA certificate
-        # itself and must keep working. TSAService reads this key at signing
-        # time; before it was surfaced here the toggle was settable only by
-        # editing the database row directly.
-        'require_dedicated_cert':
-            get_config('tsa_require_dedicated_cert', 'false') == 'true',
+        # On unless the operator wrote false (RFC 3161 §2.3); the same reader as /tsa
+        'require_dedicated_cert': effective('tsa_require_dedicated_cert'),
         # Dedicated end-entity signer (#312). Empty string = the historical
         # CA-certificate signer. `signer` describes the configured certificate
         # (subject / serial / notAfter / chain status / usability).
-        'signer_cert_refid': get_config('tsa_signer_cert_refid', ''),
+        'signer_cert_refid': configured_signer_refid(),
         'signer': describe_configured_signer(),
     })
 
@@ -222,7 +219,16 @@ def get_tsa_config():
 def update_tsa_config():
     """Update TSA configuration in database"""
     data = request.json or {}
-    stored_signer = get_config('tsa_signer_cert_refid', '')
+    stored_signer = configured_signer_refid()
+    # In strict mode the CA only issues the dedicated signer: its key is judged as a token
+    # signer only in compatibility mode, including when this request switches to it
+    strict_before = effective('tsa_require_dedicated_cert')
+    strict = bool(data['require_dedicated_cert']) if 'require_dedicated_cert' in data else strict_before
+    # The signer this request leaves configured, as it is stored
+    dedicated = stored_signer
+    if 'signer_cert_refid' in data:
+        raw = data['signer_cert_refid']
+        dedicated = raw.strip() if isinstance(raw, str) else ''
 
     policy_oid = None
     if 'policy_oid' in data:
@@ -231,8 +237,7 @@ def update_tsa_config():
             return error_response('policy_oid must be a valid OID', 400)
 
     if 'signer_cert_refid' in data:
-        raw = data['signer_cert_refid']
-        refid = raw.strip() if isinstance(raw, str) else ''
+        refid = dedicated
         if refid:
             err, _cert = _validate_signer_refid(refid)
             if err:
@@ -240,7 +245,7 @@ def update_tsa_config():
         elif stored_signer and 'ca_refid' not in data and 'ca_id' not in data:
             # Dropping the dedicated signer hands the tokens to the configured CA
             ca = CA.query.filter_by(refid=get_config('tsa_ca_refid', '')).first()
-            problem = _ca_signer_refusal(ca) if ca is not None else None
+            problem = _ca_signer_refusal(ca) if ca is not None and not strict else None
             if problem:
                 return error_response(problem, 400)
         set_config('tsa_signer_cert_refid', refid)
@@ -248,6 +253,12 @@ def update_tsa_config():
     if 'enabled' in data:
         set_config('tsa_enabled', 'true' if data['enabled'] else 'false')
     if 'require_dedicated_cert' in data:
+        if strict_before and not strict and not dedicated and 'ca_refid' not in data and 'ca_id' not in data:
+            ca = CA.query.filter_by(refid=get_config('tsa_ca_refid', '')).first()
+            problem = _ca_signer_refusal(ca) if ca is not None else None
+            if problem:
+                return error_response(
+                    f'Turning off require_dedicated_cert makes the CA certificate sign the tokens: {problem}', 400)
         set_config(
             'tsa_require_dedicated_cert',
             'true' if data['require_dedicated_cert'] else 'false',
@@ -261,12 +272,11 @@ def update_tsa_config():
         else:
             ca = db.session.get(CA, data['ca_id']) if data['ca_id'] else None
             new_refid = ca.refid if ca else ''
-        dedicated = data['signer_cert_refid'] if 'signer_cert_refid' in data \
-            else get_config('tsa_signer_cert_refid', '')
         signer_dropped = not dedicated and stored_signer
-        if new_refid and (new_refid != get_config('tsa_ca_refid', '') or signer_dropped):
+        if new_refid and (new_refid != get_config('tsa_ca_refid', '') or signer_dropped
+                          or (strict_before and not strict)):
             problem = signing_ca_problem(ca) if new_refid != get_config('tsa_ca_refid', '') else None
-            if not problem and ca is not None and not dedicated:
+            if not problem and ca is not None and not dedicated and not strict:
                 # Without a dedicated signer, the CA certificate signs the tokens
                 problem = _ca_signer_refusal(ca)
             if problem:

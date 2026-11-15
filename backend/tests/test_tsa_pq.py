@@ -163,7 +163,7 @@ def _issue(auth_client, ca, **body):
 
 @pytest.fixture
 def tsa_settings(app):
-    keys = ('tsa_enabled', 'tsa_signer_cert_refid', 'tsa_ca_refid')
+    keys = ('tsa_enabled', 'tsa_signer_cert_refid', 'tsa_ca_refid', 'tsa_require_dedicated_cert')
     with app.app_context():
         saved = {k: getattr(SystemConfig.query.filter_by(key=k).first(), 'value', None) for k in keys}
     yield
@@ -175,7 +175,8 @@ def tsa_settings(app):
 
 def _enable(app, **values):
     with app.app_context():
-        for key, value in {'tsa_enabled': 'true', **values}.items():
+        # The CA-certificate signer is the compatibility mode: these tests turn it on explicitly
+        for key, value in {'tsa_enabled': 'true', 'tsa_require_dedicated_cert': 'false', **values}.items():
             row = SystemConfig.query.filter_by(key=key).first() or SystemConfig(key=key)
             row.value = value
             db.session.add(row)

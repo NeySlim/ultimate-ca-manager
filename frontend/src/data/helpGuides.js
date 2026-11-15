@@ -21,7 +21,7 @@ The Overview is the home page: six independent cards over the live data of your 
 The six most urgent items, critical first, each linking to its record. With the right to read the trust store, the trust store certificates that expire within 90 days or have already expired are listed too (the expired ones as critical). A folded tier gives the total per kind; the four renewal kinds open the certificate list.
 
 ### Automation health
-Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state and, while the TSA is enabled, the state of its signer. With the right to read settings, three more lines tell whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts.
+Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state and, while the TSA is enabled, the state of its signer: a warning while the CA certificate signs, since those tokens do not satisfy RFC 3161. With the right to read settings, three more lines tell whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts.
 
 ### Hierarchy
 The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days. Each authority opens its page.
@@ -563,7 +563,7 @@ If Microsoft CA connections are configured, a **Microsoft CA** tab appears in th
 4. Select the **certificate template** (auto-loaded from the CA)
 5. Click **Sign**
 
-If the template requires manager approval, the request stays Pending in UCM and the interface offers no status check: approve it from the CA Control Panel of the connection, which imports the certificate.
+If the template requires manager approval, the request stays Pending in UCM. Open it in **Pending** and click **Check status** to fetch the certificate once the CA has issued it (also needs the permission to sign CSRs), or approve it from the CA Control Panel of the connection.
 
 ### Enroll on Behalf Of (EOBO)
 
@@ -982,9 +982,9 @@ Use any RFC 8555-compliant CA, not just Let's Encrypt:
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Set your CA's directory URL as the **ACME Directory URL** of its account in **External CA Accounts**.
+Set your CA's directory URL as the **ACME Directory URL** of its account in **Certificate Authorities (CA)**.
 
-### External CA Accounts
+### Certificate Authorities (CA)
 Manage every external CA account UCM registers with:
 
 - **Multiple accounts per CA allowed**: several accounts can share the same directory URL (e.g. two Let's Encrypt accounts with different contact emails for administrative separation, useful alongside dns-persist-01). The account row, not the URL, is the identity.
@@ -997,7 +997,7 @@ Manage every external CA account UCM registers with:
 Some CAs require EAB credentials to link your ACME account with an existing account at the CA:
 
 1. Register at your CA's portal to obtain **EAB Key ID** and **HMAC Key**
-2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **External CA Accounts**
+2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **Certificate Authorities (CA)**
 3. The HMAC key is base64url-encoded (provided by the CA)
 
 > 💡 EAB is required by ZeroSSL, HARICA, Google Trust Services, and most enterprise CAs.
@@ -1087,7 +1087,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Configuration
 1. Go to **ACME** → **Let's Encrypt** tab
 2. Scroll down to the **ACME Proxy** section
-3. Select an **Upstream CA account** from **External CA Accounts** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
+3. Select an **Upstream CA account** from **Certificate Authorities (CA)** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
 4. Click **Test Connection** to verify connectivity with the upstream CA
 5. Register the upstream account if needed (email + **Register Account**)
 6. UCM automatically registers an account on first proxy request if not already done
@@ -1095,7 +1095,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Dedicated proxy paths (multi-CA)
 Each external CA account can expose its own ACME proxy endpoint:
 
-1. Open **External CA Accounts** (same Let's Encrypt tab)
+1. Open **Certificate Authorities (CA)** (same Let's Encrypt tab)
 2. Edit or create a CA account
 3. Enable **Expose via ACME proxy**
 4. Set a unique **Proxy path (slug)**: e.g. \`actalis-production\`, \`letsencrypt-staging\`
@@ -1151,7 +1151,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **External CA Accounts**.
+> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **Certificate Authorities (CA)**.
 
 > ⚠ Prerequisite: the domain (or a parent domain covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy supports dns-01 only.
 
@@ -1512,7 +1512,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 
 1. **Client creates a timestamp request**: hashes a file with SHA-256/SHA-512 and creates a \`TimeStampReq\` (ASN.1 DER-encoded)
 2. **Client sends request to TSA**: HTTP POST to the \`/tsa\` endpoint with \`Content-Type: application/timestamp-query\`
-3. **UCM signs the timestamp**: the dedicated signing certificate, or the configured CA's own certificate when none is set, signs the hash + current time into a \`TimeStampResp\`
+3. **UCM signs the timestamp**: the dedicated signing certificate signs the hash + current time into a \`TimeStampResp\`. The configured CA's own certificate signs only when **Require a dedicated TSA certificate** is turned off
 4. **Client receives and stores the response**: the \`.tsr\` file can later prove the document existed at that time
 
 ## Configuration
@@ -1522,7 +1522,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 1. **Enable TSA**: Toggle the TSA server on or off
 2. **Signing CA**: Select which Certificate Authority signs timestamp tokens
 3. **Policy OID**: Object Identifier for the TSA policy, included in every timestamp response
-4. **Require a dedicated TSA certificate**: Opt-in: refuse to sign timestamps with the CA certificate itself. When enabled, a dedicated end-entity signing certificate with a **critical timeStamping EKU** (RFC 3161) is required
+4. **Require a dedicated TSA certificate**: On by default: refuse to sign timestamps with the CA certificate itself, so \`/tsa\` answers 503 until a dedicated end-entity signing certificate with a **critical timeStamping EKU** (RFC 3161) is set. **Generate a signing certificate** issues one from the signing CA and selects it. Turning the option off lets the CA certificate sign, which is not RFC 3161 compliant; an installation upgraded from 2.x whose TSA signed with its CA keeps it off, and the overview shows a warning
 
 ### Choosing a Signing CA
 
@@ -1531,7 +1531,7 @@ The signing CA's private key is used to sign every timestamp token. Best practic
 - Use a **dedicated sub-CA** for timestamping rather than your root CA
 - RFC 3161 §2.3 requires a signer whose only, critical EKU is **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), which a CA certificate cannot carry without losing its other uses. Tokens signed by the CA certificate are refused by strict verifiers: \`openssl ts -verify\` fails with "unsuitable certificate purpose" and jarsigner with "Certificate is not valid for timestamping". The Settings tab warns while the CA certificate signs: **generate a dedicated signing certificate** there for these clients
 - Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503
-- Enable **Require a dedicated timestamping certificate** to enforce this at signing time instead of relying on convention
+- Keep **Require a dedicated TSA certificate** on to enforce this at signing time
 
 ### Policy OID
 
@@ -3364,7 +3364,7 @@ UCM integrates with Microsoft Active Directory Certificate Services (AD CS) to s
 The certificate is returned immediately and imported into UCM.
 
 ### Manager Approval Templates
-UCM saves the request as **Pending** and tracks the MS CA request ID. The interface offers no status check for it: approve it from the **CA Control Panel**, which imports the certificate. **Inventory sync** does not complete a pending request, as it skips the request IDs UCM already tracks: for a request approved on the Windows CA console, call \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` (the request's id in UCM, listed by \`GET /api/v2/microsoft-cas/requests/pending\`), which fetches the certificate.
+UCM saves the request as **Pending** and tracks the MS CA request ID. Open the CSR in **CSRs → Pending** and click **Check status**: if the CA issued the certificate (approved on the Windows CA console, for instance), UCM imports it into the request; if the CA denied it, the request becomes Denied; otherwise it stays Pending. Approving from the **CA Control Panel** imports the certificate too. **Inventory sync** completes pending requests the same way, and reports them as completed, apart from the certificates it imports. A request whose CSR is signed elsewhere (a local CA, an import) is closed; if its details are still open, **Check status** shows *This CSR was signed elsewhere: its Microsoft CA request is closed*. A certificate the CA still issues for it enters as a separate certificate when the request is approved from the **CA Control Panel**, or through a full inventory sync (\`full: true\` on \`POST /api/v2/microsoft-cas/{id}/inventory-sync\`): **Import from CA now** and the scheduled sync are incremental and can miss it.
 
 ## Enroll on Behalf Of (EOBO)
 
@@ -3452,7 +3452,7 @@ The control panel (opened from the connection, requires the admin channel) manag
 | Connection test fails | Verify hostname, port 443, and that certsrv is accessible |
 | No templates found | Check that the UCM account has enrollment permissions on the CA |
 | EOBO denied | Verify enrollment agent certificate and template permissions |
-| Request stuck pending | Approve it from the CA Control Panel; if it was approved on the Windows CA console, fetch it with \`GET /api/v2/microsoft-cas/{id}/requests/{request}\` |
+| Request stuck pending | Click Check status on the CSR, or run an Inventory sync; or approve it from the CA Control Panel |
 | Admin channel test fails | Verify WinRM is enabled on the CA, the port/transport, and that pywinrm is installed |
 | Revocation not on the CA | Enable the WinRM admin channel, without it, revocation is local to UCM |
 | Pending not detected (non-English CA) | Fixed in v2.192. UCM now recognizes localized AD CS pending pages |

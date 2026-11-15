@@ -26,3 +26,20 @@ Contact: licensing@ucm.tools
 
 Versions released before 2.243 remain available under their original licence,
 BSD 3-Clause with the Commons Clause. This change is not retroactive.
+
+---
+
+THIRD-PARTY FONTS
+
+The web interface ships these fonts, unmodified, under frontend/dist/fonts/
+(frontend/public/fonts/ in the source), each with its licence text beside it:
+
+- Inter 4.001 (Regular, Medium, SemiBold, Bold),
+  Copyright 2016 The Inter Project Authors, https://github.com/rsms/inter,
+  SIL Open Font License 1.1 (LICENSE-Inter.txt).
+- Fira Code 6.002 (Regular, Medium, SemiBold),
+  Copyright 2014-2021 The Fira Code Project Authors, https://github.com/tonsky/FiraCode,
+  SIL Open Font License 1.1 (LICENSE-FiraCode.txt).
+
+The other third-party components of each release, with their declared
+licences, are listed in its SBOM (docs/SBOM.md).

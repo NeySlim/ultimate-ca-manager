@@ -25,7 +25,7 @@ Prerequisites:
 
 - The domain (or a parent domain) is in **ACME → Domains** with a DNS provider.
 - The upstream CA account is exposed through the proxy (**ACME → Let's Encrypt →
-  External CA Accounts → Expose via ACME proxy**). See
+  Certificate Authorities → Expose via ACME proxy**). See
   [ADMIN_GUIDE.md](../ADMIN_GUIDE.md) for the proxy settings.
 - The proxy supports `dns-01` only. HTTP-01 and TLS-ALPN-01 are not available.
 

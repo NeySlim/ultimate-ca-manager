@@ -30,3 +30,5 @@ Report it privately through [GitHub Security Advisories](https://github.com/NeyS
 UCM is meant to run on premises, and reaching LAN addresses (webhooks, SSO, ACME validation) is by design. Blocking cloud metadata and loopback is in scope; reaching an RFC 1918 address an administrator configured is not.
 
 Security features and hardening notes are documented in [docs/SECURITY.md](docs/SECURITY.md).
+
+Each release publishes a CycloneDX SBOM for every package and image platform, described in [docs/SBOM.md](docs/SBOM.md).
