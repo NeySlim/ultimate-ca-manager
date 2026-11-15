@@ -9,7 +9,10 @@ import io
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
-from auth.session_start import keep_own_session
+from auth.session_reverify import check_session_password
+from auth.session_start import (
+    closed_sessions_note, end_sessions_on_commit, keep_own_session, sessions_closed_by,
+)
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -62,8 +65,12 @@ def reset_user_password(user_id):
     # (otherwise a stolen session = silent password rotation = full takeover)
     if g.current_user.id == user_id:
         current = data.get('current_password') or data.get('old_password')
-        if not current or not user.check_password(current):
+        if not current:
             return error_response('Current password is required', 400)
+        refused = check_session_password(
+            user, current, error_response('Current password is required', 400))
+        if refused:
+            return refused
 
     # SECURITY: Validate password strength
     is_valid, error_msg = validate_password_strength(data['new_password'])
@@ -512,7 +519,7 @@ def _refuse_last_factor(user, credential):
     Confirmed, the account is left as after a 2FA reset: under enforcement it
     enrols a factor again at its next login.
     """
-    from auth.twofa_enforcement import lock_for_factor_change
+    from auth.twofa_enforcement import LAST_FACTOR_REASON, lock_for_factor_change
     _user, refused = lock_for_factor_change(user.id, dropping_key=credential.id)
     if not refused or not credential.enabled or request.args.get('confirm') == _CONFIRM_LAST_FACTOR:
         return None
@@ -520,17 +527,17 @@ def _refuse_last_factor(user, credential):
     return error_response(
         'This is the last second factor of an account that requires one; confirm with '
         f'?confirm={_CONFIRM_LAST_FACTOR} and the user enrols again at next login',
-        409, {'reason': 'last_second_factor'})
+        409, {'reason': LAST_FACTOR_REASON})
 
 
-def _audit_key(action, user, credential, verb):
+def _audit_key(action, user, credential, verb, closed):
     AuditService.log_action(
         action=action,
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
         details=(f'Security key "{credential.name}" (id {credential.id}) of {user.username} '
-                 f'{verb} by {g.current_user.username}'),
+                 f'{verb} by {g.current_user.username} ({closed_sessions_note(closed)})'),
         success=True,
     )
 
@@ -568,11 +575,18 @@ def delete_user_security_key(user_id, credential_id):
     if refusal:
         return refusal
     from services.webauthn_service import WebAuthnService
+    # The holder's factor changed: their sessions close, as after a password reset
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
     ok, message = WebAuthnService.remove_credential(credential)
     if not ok:
         return error_response(message, 500)
-    _audit_key('webauthn_admin_delete', user, credential, 'removed')
-    return success_response(message=f'Security key removed from {user.username}')
+    closed = sessions_closed_by(owner)
+    _audit_key('webauthn_admin_delete', user, credential, 'removed', closed)
+    return success_response(message=f'Security key removed from {user.username}',
+                            meta={'other_sessions_closed': closed})
 
 
 @bp.route('/api/v2/users/<int:user_id>/webauthn/<int:credential_id>', methods=['PATCH'])
@@ -598,10 +612,19 @@ def toggle_user_security_key(user_id, credential_id):
         refusal = _refuse_last_factor(user, credential)
         if refusal:
             return refusal
+    # A key left as it was changes no factor: no session closes, nothing is audited
+    if credential.enabled == enabled:
+        db.session.rollback()
+        return success_response(data=credential.to_dict(), meta={'other_sessions_closed': 0})
     from services.webauthn_service import WebAuthnService
+    owner = end_sessions_on_commit(user.id)
+    if owner is None:
+        db.session.rollback()
+        return error_response('User not found', 404)
     ok, message = WebAuthnService.set_credential_enabled(credential, enabled)
     if not ok:
         return error_response(message, 500)
+    closed = sessions_closed_by(owner)
     _audit_key('webauthn_admin_enable' if enabled else 'webauthn_admin_disable', user, credential,
-               'enabled' if enabled else 'disabled')
-    return success_response(data=credential.to_dict())
+               'enabled' if enabled else 'disabled', closed)
+    return success_response(data=credential.to_dict(), meta={'other_sessions_closed': closed})

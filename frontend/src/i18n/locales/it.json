@@ -3642,6 +3642,7 @@
     "enterPasswordToDisableKey2fa": "Inserisci la password per non richiedere più una chiave di sicurezza all'accesso",
     "key2faEnabled": "La tua chiave di sicurezza è ora il tuo secondo fattore",
     "key2faDisabled": "Un accesso con password non richiede più una chiave di sicurezza",
+    "otherSessionsClosed": "Your other sessions were signed out.",
     "activeSecondFactors": "Secondi fattori attivi",
     "noSecondFactor": "nessuno",
     "twoFactorEnforced": "richiesto dal tuo amministratore",

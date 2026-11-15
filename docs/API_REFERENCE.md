@@ -144,9 +144,10 @@ PUT /api/v2/account/2fa/webauthn
 { "enabled": true }                          // needs an enabled key
 { "enabled": false, "password": "..." }      // the account password (local accounts)
 ```
+`{"enabled": false}` answers 403 (`reason: last_second_factor`) when 2FA is enforced for the account, the key second factor is on, TOTP is not confirmed and the account has an enabled key: the key stays the account's second factor once enforcement is lifted. Otherwise the request goes ahead.
 `GET /api/v2/account/profile` reports `webauthn_2fa`, `two_factor_enforced` and `two_factor_methods` (the factors a password login asks for).
 
-Under enforced 2FA, a forced-enrolment session may register a key (`/api/v2/webauthn/register/*`) instead of confirming TOTP. `POST /api/v2/account/2fa/disable` and removing or disabling one's own last key answer 403 when required 2FA (enforced, or a key turned on as second factor) would be left with neither TOTP nor an enabled key. `POST /api/v2/users/{id}/reset-2fa` also turns the key second factor off, as does removing or disabling the account's last enabled key.
+Under enforced 2FA, a forced-enrolment session may register a key (`/api/v2/webauthn/register/*`) instead of confirming TOTP. `POST /api/v2/account/2fa/disable` and removing or disabling one's own last key answer 403 (`reason: last_second_factor`) when required 2FA (enforced, or a key turned on as second factor) would be left with neither TOTP nor an enabled key. `POST /api/v2/users/{id}/reset-2fa` also turns the key second factor off, as does removing or disabling the account's last enabled key.
 
 An administrator (`write:users`) manages another user's keys, for instance to cut off a lost one, which would otherwise still sign in without a password:
 ```http
@@ -290,6 +291,10 @@ POST /api/v2/account/2fa/recovery-codes/regenerate
 ```
 
 A code checked by `2fa/disable` or `2fa/recovery-codes/regenerate` counts against the same `max_login_attempts` as the second step of a login for that account; past it, both answer 429 until `lockout_duration` has passed, and a code accepted resets the count. `2fa/confirm` answers 409 once TOTP is enabled.
+
+**Password checked in a session.** `POST /api/v2/account/password`, `PUT /api/v2/users/{id}` and `POST /api/v2/users/{id}/reset-password` on one's own account (`current_password`), and `PUT /api/v2/account/2fa/webauthn` with `"enabled": false` count each wrong password against the account, on a counter apart from the login's: after `max_login_attempts` failures they answer 429 (`Too many failed attempts. Try again later.`, with `Retry-After` and `details.retry_after` in seconds), even for the right password, until `lockout_duration` has passed. A right password before that resets the count, and the login is not locked by it.
+
+**Other sessions closed.** Confirming or disabling TOTP, regenerating recovery codes, registering, deleting or toggling a security key (`/api/v2/webauthn/...`, or an administrator's `/api/v2/users/{id}/webauthn/{key_id}`) and `PUT /api/v2/account/2fa/webauthn` close every other session of the account, as a password change does; the session making the change stays. The response's `meta.other_sessions_closed` gives how many were closed (`null` when the session store cannot be listed), and so does the audit entry. A request that leaves the factors as they are (a key or the key second factor set to its current state, a TOTP setup dropped before it was confirmed) closes none and answers `other_sessions_closed: 0`. API keys are not affected.
 
 ### API Keys
 

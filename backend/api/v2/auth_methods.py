@@ -72,8 +72,8 @@ def _check_2fa_lockout(kind: str, key: str) -> bool:
     return locked_until is not None and utc_now() < locked_until
 
 
-def _reserve_2fa_attempt(kind: str, key: str) -> bool:
-    """Count one attempt before it is verified; False when the target is locked.
+def _reserve_attempt(kind: str, key: str):
+    """Count one attempt before it is verified: its rank, or None when the target is locked.
 
     One upsert decides: parallel attempts on any node get at most the threshold, the one
     reaching it arms the lock, and a success clears the row. Expired rows are purged first.
@@ -114,7 +114,31 @@ def _reserve_2fa_attempt(kind: str, key: str) -> bool:
             counted = db.session.execute(
                 db.select(F.failures).filter_by(kind=kind, target=key)).scalar_one()
     db.session.commit()
-    return counted is not None and counted <= max_attempts
+    return counted if counted is not None and counted <= max_attempts else None
+
+
+def _reserve_2fa_attempt(kind: str, key: str) -> bool:
+    """Count one attempt before it is verified; False when the target is locked."""
+    return _reserve_attempt(kind, key) is not None
+
+
+def too_many_attempts(kind: str, key: str):
+    """The 429 of a locked target; Retry-After (RFC 6585 §4) gives the seconds left."""
+    import math
+    from models.second_factor_failure import SecondFactorFailure
+    locked_until = db.session.execute(
+        db.select(SecondFactorFailure.locked_until).filter_by(kind=kind, target=key)
+    ).scalar_one_or_none()
+    if locked_until is not None:
+        seconds = max(1, math.ceil((locked_until - utc_now()).total_seconds()))
+    else:
+        seconds = _get_2fa_lockout_settings()[1]
+    response, code = error_response('Too many failed attempts. Try again later.', 429,
+                                    {'retry_after': seconds})
+    response.headers['Retry-After'] = str(seconds)
+    return response, code
+
+
 
 
 def _clear_2fa_failures(kind: str, key: str):
@@ -451,7 +475,7 @@ def login_2fa():
     if not code or len(code) < 6:
         return error_response('Invalid verification code format', 400)
     if not _reserve_2fa_attempt(TWO_FA, lockout_key):
-        return error_response('Too many failed attempts. Try again later.', 429)
+        return too_many_attempts(TWO_FA, lockout_key)
 
     # Verify TOTP code (a key-only account has none to check), once only
     from auth.totp import consume_totp
@@ -498,7 +522,7 @@ def _pending_2fa_user():
         return None, None, error_response('No pending 2FA verification', 401)
     lockout_key = str(pending_user_id)
     if _check_2fa_lockout(TWO_FA, lockout_key):
-        return None, None, error_response('Too many failed attempts. Try again later.', 429)
+        return None, None, too_many_attempts(TWO_FA, lockout_key)
     user = db.session.get(User, pending_user_id)
     from auth.session_start import session_is_current
     if not user or not user.active or not session_is_current(user):
@@ -579,7 +603,7 @@ def login_2fa_webauthn_verify():
     if not isinstance(credential_response, dict) or len(str(credential_response)) > 50000:
         return error_response('Invalid WebAuthn response format', 400)
     if not _reserve_2fa_attempt(TWO_FA, lockout_key):
-        return error_response('Too many failed attempts. Try again later.', 429)
+        return too_many_attempts(TWO_FA, lockout_key)
 
     # One attempt per challenge: whatever the outcome, the next try needs new options.
     expected = session.pop(_2FA_WEBAUTHN_CHALLENGE, None)
@@ -806,7 +830,7 @@ def webauthn_verify():
     # SEC-04: Brute-force protection on WebAuthn. Counted before the lookup, so an unknown
     # name locks exactly like a known one; its row goes with the purge of expired rows.
     if not _reserve_2fa_attempt(WEBAUTHN, username):
-        return error_response('Too many failed attempts. Try again later.', 429)
+        return too_many_attempts(WEBAUTHN, username)
 
     # Find user. Return the SAME generic error as a failed verification so this
     # path is not an existence oracle (mirrors webauthn_start's anti-enumeration).

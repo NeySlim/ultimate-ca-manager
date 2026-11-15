@@ -3642,6 +3642,7 @@
     "enterPasswordToDisableKey2fa": "Geben Sie Ihr Passwort ein, damit bei der Anmeldung kein Sicherheitsschlüssel mehr verlangt wird",
     "key2faEnabled": "Ihr Sicherheitsschlüssel ist jetzt Ihr zweiter Faktor",
     "key2faDisabled": "Eine Anmeldung mit Passwort verlangt keinen Sicherheitsschlüssel mehr",
+    "otherSessionsClosed": "Your other sessions were signed out.",
     "activeSecondFactors": "Aktive zweite Faktoren",
     "noSecondFactor": "keiner",
     "twoFactorEnforced": "von Ihrem Administrator verlangt",

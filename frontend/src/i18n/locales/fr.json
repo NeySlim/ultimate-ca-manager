@@ -131,6 +131,7 @@
     "enterPasswordToDisableKey2fa": "Saisissez votre mot de passe pour ne plus demander de clé de sécurité à la connexion",
     "key2faEnabled": "Votre clé de sécurité est désormais votre second facteur",
     "key2faDisabled": "Une connexion par mot de passe ne demande plus de clé de sécurité",
+    "otherSessionsClosed": "Vos autres sessions ont été fermées.",
     "activeSecondFactors": "Seconds facteurs actifs",
     "noSecondFactor": "aucun",
     "twoFactorEnforced": "exigé par votre administrateur",

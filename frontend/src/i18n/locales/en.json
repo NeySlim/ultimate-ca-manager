@@ -3643,6 +3643,7 @@
     "enterPasswordToDisableKey2fa": "Enter your password to stop asking for a security key at login",
     "key2faEnabled": "Your security key is now your second factor",
     "key2faDisabled": "A password login no longer asks for a security key",
+    "otherSessionsClosed": "Your other sessions were signed out.",
     "activeSecondFactors": "Active second factors",
     "noSecondFactor": "none",
     "twoFactorEnforced": "required by your administrator",

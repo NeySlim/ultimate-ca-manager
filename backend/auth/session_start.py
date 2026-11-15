@@ -79,3 +79,31 @@ def _opened_after_creation(user) -> bool:
     created = to_naive_utc(user.created_at)
     # Every account created since the column exists has a time: NULL is never a recreated one
     return created is None or opened >= created
+
+
+def sessions_closed_by(user):
+    """After ``user.end_sessions()`` is committed: the caller's own session stays, and
+    the count of the account's other sessions that ended (None: store not listed)."""
+    keep_own_session(user)
+    replaced, _new = getattr(user, '_sessions_bump', (None, None))
+    if replaced is None:
+        return 0
+    from utils.session_census import count_sessions
+    return count_sessions(user.id, replaced)
+
+
+def closed_sessions_note(count):
+    """Audit wording of sessions_closed_by()."""
+    if count is None:
+        return 'other sessions closed'
+    return f"{count} other session{'' if count == 1 else 's'} closed"
+
+
+def end_sessions_on_commit(user_id):
+    """The account row, locked, its sessions ended in the transaction the factor change
+    commits: change and closure stand or fall together. None: no such account."""
+    from auth.twofa_enforcement import lock_user
+    owner = lock_user(user_id)
+    if owner is not None:
+        owner.end_sessions()
+    return owner

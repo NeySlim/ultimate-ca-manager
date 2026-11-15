@@ -24,6 +24,10 @@ export function ForceEnroll2FA({ onComplete }) {
   const [loading, setLoading] = useState(false)
   const [keyName, setKeyName] = useState('')
   const [registeringKey, setRegisteringKey] = useState(false)
+  const [closedSessions, setClosedSessions] = useState(undefined)
+  // The other sessions are mentioned unless the server reports it closed none
+  const enrolled = (key, closed) => showSuccess(closed === 0
+    ? t(key) : `${t(key)} ${t('account.otherSessionsClosed')}`)
   const keySupported = typeof window !== 'undefined' && window.PublicKeyCredential !== undefined
 
   // Kick off enrolment on mount: fetch the TOTP secret + QR.
@@ -42,6 +46,7 @@ export function ForceEnroll2FA({ onComplete }) {
       const data = res.data || res
       // Backup codes are returned once — force the user to acknowledge them
       // before the session is promoted.
+      setClosedSessions(res?.meta?.other_sessions_closed)
       setBackupCodes(data.backup_codes || [])
     } catch (error) {
       showError(error.message || t('auth.invalidTotpCode'))
@@ -55,8 +60,8 @@ export function ForceEnroll2FA({ onComplete }) {
   const handleRegisterKey = async () => {
     setRegisteringKey(true)
     try {
-      await accountService.registerWebAuthnKey(keyName.trim() || t('account.securityKey'))
-      showSuccess(t('account.keyRegistered'))
+      const res = await accountService.registerWebAuthnKey(keyName.trim() || t('account.securityKey'))
+      enrolled('account.keyRegistered', res?.meta?.other_sessions_closed)
       await onComplete?.()
     } catch (error) {
       showError(error.name === 'NotAllowedError'
@@ -68,7 +73,7 @@ export function ForceEnroll2FA({ onComplete }) {
   }
 
   const handleDone = async () => {
-    showSuccess(t('account.twoFaEnabled'))
+    enrolled('account.twoFaEnabled', closedSessions)
     // Re-check the session: the backend has lifted the enrolment gate, so this
     // promotes the session to full access and clears must_enroll_2fa.
     await onComplete?.()

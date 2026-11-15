@@ -247,7 +247,13 @@ With 2FA enabled (or enforced by an administrator), a registered key can answer 
 
 When an administrator enforces 2FA, registering a key fulfils it as well as a TOTP app does; the account must keep at least one of the two.
 
-Without enforcement, turn on **Security key as second factor** under **Account** → **Security** to have every password login ask for one of your keys. Keys used only for passwordless login change nothing until you do.
+Without enforcement, turn on **Security key as second factor** under **Account** → **Security** to have every password login ask for one of your keys. Keys used only for passwordless login change nothing until you do. Under enforcement, it cannot be turned off while the account has no TOTP.
+
+### Changes that sign out your other sessions
+
+Enabling or disabling 2FA, regenerating recovery codes, adding, removing, enabling or disabling a security key, and turning **Security key as second factor** on or off sign out every other session of your account, as a password change does. The session you make the change from stays open.
+
+Pages that ask for your current password (password change, turning off the security key as second factor) refuse it for a while after too many wrong tries, the right one included, with the same limit and duration as the login's second step. Signing in again is not blocked by it.
 
 ---
 
