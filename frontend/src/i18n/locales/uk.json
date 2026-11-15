@@ -2922,6 +2922,7 @@
     "restoreUploading": "Uploading {{percent}}%...",
     "restoreReportTitle": "Restore report",
     "restoreReportTodo": "To do",
+    "restoreReportNothingRestored": "Nothing was restored: the archive carried no data and no restart is needed.",
     "restoreReportRestartRequested": "A restart of the service was requested. Sign in again once it is back.",
     "restoreReportRestartManual": "The service was not restarted. Restart it to finish: {{detail}}",
     "restoreReportAudit": "The restore is recorded in the audit log (action: system restore).",

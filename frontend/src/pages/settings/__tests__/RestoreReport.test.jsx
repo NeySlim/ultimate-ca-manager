@@ -51,4 +51,12 @@ describe('RestoreReport', () => {
     act(() => { vi.advanceTimersByTime(2000) })
     expect(reload).toHaveBeenCalled()
   })
+
+  it('says nothing was restored, without a restart line, when the archive carried no section', () => {
+    show({ sections_carried: [], sections_not_restored: ['future_thing'], todo: ['Section not restored by this version: future_thing'] })
+    expect(screen.getByText('settings.restoreReportNothingRestored')).toBeTruthy()
+    expect(screen.queryByText(/restoreReportRestartManual/)).toBeNull()
+    expect(screen.queryByText(/backupRestored/)).toBeNull()
+    expect(screen.getByText('Section not restored by this version: future_thing')).toBeTruthy()
+  })
 })

@@ -3141,6 +3141,7 @@
     "restoreUploading": "Envoi {{percent}} %...",
     "restoreReportTitle": "Bilan de la restauration",
     "restoreReportTodo": "À faire",
+    "restoreReportNothingRestored": "Rien n'a été restauré : l'archive ne contenait aucune donnée et aucun redémarrage n'est nécessaire.",
     "restoreReportRestartRequested": "Un redémarrage du service a été demandé. Reconnectez-vous une fois qu'il est revenu.",
     "restoreReportRestartManual": "Le service n'a pas été redémarré. Redémarrez-le pour terminer : {{detail}}",
     "restoreReportAudit": "La restauration est consignée dans le journal d'audit (action : system restore).",

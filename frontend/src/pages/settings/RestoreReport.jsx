@@ -8,6 +8,8 @@ import { Modal, Button } from '../../components'
 export default function RestoreReport({ data, onClose }) {
   const { t } = useTranslation()
   const todo = Array.isArray(data?.todo) ? data.todo : []
+  // An archive with no section changed nothing: no restart was asked.
+  const restored = !!data && (data.restart_requested !== undefined || (data.sections_carried || []).length > 0)
 
   useEffect(() => {
     if (!data || todo.length) return undefined
@@ -22,9 +24,11 @@ export default function RestoreReport({ data, onClose }) {
       {data && (
         <div className="space-y-4">
           <p className="text-sm text-text-primary">
-            {t('settings.backupRestored', {
-              users: data.users || 0, cas: data.cas || 0, certs: data.certificates || 0,
-            })}
+            {restored
+              ? t('settings.backupRestored', {
+                users: data.users || 0, cas: data.cas || 0, certs: data.certificates || 0,
+              })
+              : t('settings.restoreReportNothingRestored')}
           </p>
           {todo.length > 0 && (
             <div className="p-3 status-warning-bg status-warning-border border rounded-lg">
@@ -34,11 +38,13 @@ export default function RestoreReport({ data, onClose }) {
               </ul>
             </div>
           )}
-          <p className="text-xs text-text-secondary">
-            {data.restart_requested
-              ? t('settings.restoreReportRestartRequested')
-              : t('settings.restoreReportRestartManual', { detail: data.restart_detail || '' })}
-          </p>
+          {restored && (
+            <p className="text-xs text-text-secondary">
+              {data.restart_requested
+                ? t('settings.restoreReportRestartRequested')
+                : t('settings.restoreReportRestartManual', { detail: data.restart_detail || '' })}
+            </p>
+          )}
           <p className="text-xs text-text-secondary">
             {t('settings.restoreReportAudit')}{' '}
             <Link to="/audit" className="underline">{t('settings.restoreReportAuditLink')}</Link>
