@@ -865,3 +865,18 @@ def test_the_rpm_post_names_its_https_certificate_without_hostname(tmp_path):
                          timeout=20, env=env)
     assert out.returncode == 0, out.stderr
     assert _cert_name(_calls(log)) == os.uname().nodename
+
+
+@pytest.mark.parametrize('nologin', [True, False])
+def test_the_rpm_pre_gives_the_account_a_shell_that_exists(rpm_pre, tmp_path, nologin):
+    """/sbin/nologin stands for a path of the sandbox, there or not (a minimal EL9)."""
+    shell = tmp_path / 'nologin'
+    if nologin:
+        shell.write_text('#!/bin/sh\nexit 1\n')
+        shell.chmod(0o755)
+    assert rpm_pre.count('/sbin/nologin') == 1
+    body = rpm_pre.replace('/sbin/nologin', str(shell))
+    out, calls, _ = _run_pre(body, tmp_path, "echo 'package ucm is not installed'; exit 1", count='1')
+    assert out.returncode == 0, out.stderr
+    useradd = next(c for c in calls if c.startswith('useradd'))
+    assert f'-s {shell if nologin else "/bin/false"} ' in useradd, useradd

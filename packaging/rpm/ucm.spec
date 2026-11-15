@@ -103,7 +103,10 @@ for ucm_version in $ucm_installed; do
     ucm_pivot_guard "$ucm_version" || exit 1
 done
 getent group %{name} >/dev/null || groupadd -r %{name}
-getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbin/nologin -c "UCM Service Account" %{name}
+# A minimal EL9 may not have nologin yet when %%pre runs: a shell that exists, no warning
+ucm_shell=/sbin/nologin
+[ -x "$ucm_shell" ] || ucm_shell=/bin/false
+getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s "$ucm_shell" -c "UCM Service Account" %{name}
 
 %post
 # Set first on a new install: a scriptlet that fails or is killed anywhere below leaves
