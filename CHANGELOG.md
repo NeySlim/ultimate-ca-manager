@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- **SSH CAs on an HSM key.** An SSH user or host CA can be created on an RSA or NIST ECDSA key of an HSM provider (`hsm_key_id`, with `read:hsm`), its private key never leaving the token; an HSM key backs one CA only, X.509 or SSH, and the Docker images ship OpenSC for smart card readers (#445).
+- **SSH CAs on an HSM key.** An SSH user or host CA can be created on an RSA or NIST ECDSA key of an HSM provider (`hsm_key_id`, with `read:hsm`), its private key never leaving the token; an HSM key backs one CA only, X.509 or SSH, and the Docker images ship OpenSC for smart card readers; a merge restore that would give one HSM key to two authorities is refused, naming both (#445).
 - **Sync keys on the HSM page.** A button reads a provider's keys again from the token, and a slot re-keyed with another algorithm no longer keeps the public key of the key it replaced (#444).
 - Russian interface language, the tenth; the in-app help stays in English for it.
 - **An SBOM for every deliverable.** Each release publishes a CycloneDX 1.6 SBOM per package file and per image platform (standard and FIPS, amd64 and arm64), bound to its file hash or image digest and listed in `sbom-index.json`; no image is tagged and no release is created without all of them (see docs/SBOM.md). The fonts of the web interface now ship with their SIL Open Font License texts, named in `NOTICE`.

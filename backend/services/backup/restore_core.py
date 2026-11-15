@@ -455,6 +455,9 @@ class RestoreCoreMixin:
         aligned = []
         try:
             with single_transaction(), insert_file_writes_suspended():
+                from services.hsm import key_binding
+                # A key two authorities held before the restore is not the restore's doing
+                shared_before = set(key_binding.shared_keys())
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
@@ -474,6 +477,13 @@ class RestoreCoreMixin:
                 results['relinked'] = relink_references(backup_data, plan)
                 link_restored_connectors(backup_data)
                 results['repairs'] = replay_repairs(backup_data, plan)
+                db.session.flush()
+                for key_id, held in key_binding.shared_keys().items():
+                    if key_id not in shared_before:
+                        raise BackupSchemaError(
+                            f"Cannot restore: HSM key '{key_binding.label_of(key_id)}' would back both the "
+                            f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
+                            "nothing has been changed.")
                 # The rows written take the revocation their CA records, as the hourly pass does
                 aligned = self._align_restored_revocations(plan) + self._align_kept_revocations()
                 results['revoked_from_records'] = len(aligned)

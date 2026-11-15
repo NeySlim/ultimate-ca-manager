@@ -213,6 +213,28 @@ def _existing_row(section_name: str, identity: Dict[str, Any], plan: Optional[Re
     return next((row for row in rows if sa_inspect(row).identity[0] == taken), None)
 
 
+def _refuse_a_taken_key(sca, taken):
+    """BackupSchemaError before the flush when another authority holds the SSH CA's HSM key:
+    the unique index would refuse it with a database message naming neither authority."""
+    from models import CA
+    from models.ssh import SSHCertificateAuthority
+    from services.hsm import key_binding
+    if sca.hsm_key_id is None:
+        return
+    name = f"SSH {sca.ca_type} CA '{sca.descr or ''}'"
+    with db.session.no_autoflush:
+        ssh = SSHCertificateAuthority.query.filter(SSHCertificateAuthority.hsm_key_id == sca.hsm_key_id)
+        if sca.id is not None:
+            ssh = ssh.filter(SSHCertificateAuthority.id != sca.id)
+        held = ([f"X.509 CA '{c.descr or ''}'" for c in CA.query.filter_by(hsm_key_id=sca.hsm_key_id)]
+                + [f"SSH {c.ca_type} CA '{c.descr or ''}'" for c in ssh] + taken.get(sca.hsm_key_id, []))
+        if held:
+            raise BackupSchemaError(
+                f"Cannot restore the {name}: HSM key '{key_binding.label_of(sca.hsm_key_id)}' "
+                f"already backs the {held[0]}. An HSM key backs one authority only; nothing has been changed.")
+    taken.setdefault(sca.hsm_key_id, []).append(name)
+
+
 class RestoreExtendedMixin:
     def _restore_ssh_cas(self, backup_data: Dict, results: Dict, master_key: bytes,
                          plan: Optional[RestorePlan] = None) -> None:
@@ -252,6 +274,7 @@ class RestoreExtendedMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('ssh_cas', plan)
 
+        taken = {}
         for sca_data in rows:
             refid = sca_data.get('refid')
             sca = _existing_row('ssh_cas', {'refid': refid})
@@ -291,6 +314,7 @@ class RestoreExtendedMixin:
                     ) from exc
             if prv:
                 sca.private_key = encrypt_private_key(prv)
+            _refuse_a_taken_key(sca, taken)
             results['ssh_cas'] += 1
 
         # One flush for the section, not a commit per row: the restore is one

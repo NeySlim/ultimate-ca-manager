@@ -58,6 +58,19 @@ def bound_key_ids():
         SSHCertificateAuthority.hsm_key_id.isnot(None))}
 
 
+def shared_keys():
+    """{key id: holders} for every key more than one authority holds."""
+    ids = [r[0] for r in db.session.query(CA.hsm_key_id).filter(CA.hsm_key_id.isnot(None))]
+    ids += [r[0] for r in db.session.query(SSHCertificateAuthority.hsm_key_id).filter(
+        SSHCertificateAuthority.hsm_key_id.isnot(None))]
+    return {key_id: holders(key_id=key_id) for key_id in sorted(set(ids)) if ids.count(key_id) > 1}
+
+
+def label_of(key_id):
+    key = db.session.get(HsmKey, key_id)
+    return key.label if key is not None else f'#{key_id}'
+
+
 def refuse_node_local_in_ha(provider):
     """HaRestricted for a new CA on a token only one node reaches: SoftHSM, a local smart card reader."""
     from services import compliance_signer
