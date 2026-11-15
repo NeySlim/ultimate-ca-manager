@@ -43,3 +43,12 @@ def test_rate_limit_figures_use_the_code_defaults_pos():
     text = _section('Rate limits')
     assert '200 × N' in text and '5 × N' in text and '2000' in text
     assert '600 × N' not in text and '30 × N' not in text
+
+
+def test_clock_bullet_names_the_leases_on_the_node_clock_pos():
+    # The ACME order lease and the scheduled backup reservation compare utc_now() of the node.
+    bullet = next(l for l in (ROOT / 'docs' / 'HA.md').read_text().splitlines()
+                  if l.startswith('- **Synchronised clocks'))
+    assert 'Heartbeats, leases and the staleness test' not in bullet
+    assert 'ACME order lease' in bullet and 'scheduled backup' in bullet
+

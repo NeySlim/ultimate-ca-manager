@@ -11,7 +11,7 @@ UCM can run on two or more nodes that share one PostgreSQL database. This page c
 - **`UCM_HA=1`** on every node.
 - **A load balancer** in front of the nodes. Probe `/health/ready`. UI sessions are stored in PostgreSQL (in Redis when `REDIS_URL` is set, see [REDIS.md](REDIS.md)) and shared by every node, so no request needs a given node. The balancer must pass the WebSocket upgrade, see [Session affinity](#session-affinity).
 - **One gunicorn worker per node**, which is the default (`workers = 1`). Do not raise it.
-- **Synchronised clocks** (NTP). Heartbeats, leases and the staleness test are written and compared on the PostgreSQL server's clock, so a skew between nodes does not move them; everything else UCM timestamps (certificate validity, logs) reads the clock of the node that serves the request.
+- **Synchronised clocks** (NTP). Heartbeats, the node registry, cluster commands, the maintenance and the expiry-alert and CRL leases are written and compared on the PostgreSQL server's clock, so a skew between nodes does not move them. The ACME order lease (10 minutes) and the scheduled backup reservation read the clock of the node, as does everything else UCM timestamps (certificate validity, logs): a node ahead by more than the lease takes over work another node still holds.
 
 Generate the keys once:
 
