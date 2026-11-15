@@ -145,6 +145,31 @@ def _default_ca_digest(caref, key_type, hsm_key_id=None, hsm_key_algorithm=None)
     return own
 
 
+def _stored_certificate(record):
+    try:
+        return x509.load_pem_x509_certificate(base64.b64decode(record.crt)) if record.crt else None
+    except Exception:
+        return None
+
+
+def _bears_name(record, name):
+    """Whether the certificate *record* holds has *name* as its subject."""
+    from utils.dn_match import same_name
+    stored = _stored_certificate(record)
+    return stored is not None and same_name(stored.subject, name)
+
+
+def _orphaned_by_subject_change(ca, cert):
+    """The warning's tail when CAs linked under *ca* name its former subject as their issuer: the
+    chain repair drops them once *cert* holds another (RFC 5280 6.1.3 (a)(4)), revoked ones excepted."""
+    from utils.dn_match import same_name
+    for child in CA.query.filter(CA.caref == ca.refid, CA.id != ca.id).all():
+        stored = _stored_certificate(child)
+        if stored is not None and not child.is_revoked and not same_name(stored.issuer, cert.subject):
+            return ': the CAs issued under the former subject lose this CA as their parent at the next chain repair'
+    return ''
+
+
 class CACreationMixin:
     """CA creation and import operations"""
 
@@ -801,7 +826,8 @@ class CACreationMixin:
         # 4. The signer is authoritative on the subject
         cert_subject = cert.subject.rfc4514_string()
         if ca.subject and cert_subject != ca.subject:
-            warnings.append("Certificate subject differs from the CSR subject")
+            warnings.append("Certificate subject differs from the CSR subject"
+                            + _orphaned_by_subject_change(ca, cert))
 
         # 5. SKI (uppercase — CA convention) and effective pathLen from the cert
         new_ski = None
@@ -822,14 +848,12 @@ class CACreationMixin:
         # 6. Chain to the issuing CA when it is known to UCM (AKI→SKI, then
         #    issuer DN). Absence is non-blocking — the offline root may be
         #    imported later, and chain-repair re-links orphans.
-        #    The first candidate that verifies wins, a self-signed root before
-        #    a cross or link certificate of the same key.
         # The parent follows the rule of every certificate change (parent_confirmation.settle_parent);
-        # the candidates only word the warnings
+        # the candidates, records of the issuer name (RFC 5280 6.1.3 (a)(4)), only word the warnings
         candidates = []
         aki_hex = authority_key_identifier_hex(cert)
         if aki_hex:
-            candidates = cas_by_ski(aki_hex, exclude_id=ca.id)
+            candidates = [c for c in cas_by_ski(aki_hex, exclude_id=ca.id) if _bears_name(c, cert.issuer)]
         if not candidates:
             candidates = self_signed_first(CA.query.filter(
                 CA.subject == cert.issuer.rfc4514_string(), CA.id != ca.id

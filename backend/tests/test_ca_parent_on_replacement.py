@@ -629,3 +629,39 @@ def test_the_chain_repair_drops_a_parent_whose_key_type_cannot_have_made_the_sig
         backfill_ski_aki()
     assert _caref(app, child['id']) is None
     assert _audits(app, UNLINKED, child['id']) == before + 1
+
+
+# ------------------------------------------------- what an installed certificate warns
+
+def test_an_installed_certificate_whose_issuer_name_ucm_does_not_hold_says_so(app, auth_client, linked):
+    """The AKI names a stored key under another name: that record is no issuer (RFC 5280 6.1.3 (a)(4))."""
+    w = linked
+    ski = x509.SubjectKeyIdentifier.from_public_key(w['root_key'].public_key()).digest
+    _with_ski(app, [w['root']['id']], ski)
+    data = _replace(app, auth_client, w, _aki_pem(w['cn'], w['key'], f'Repl Nowhere {_tag()}', w['root_key'], ski),
+                    'install')
+    assert _caref(app, w['child']['id']) is None
+    assert [m for m in data['warnings'] if m.startswith('Issuing CA not found in UCM')]
+    assert not [m for m in data['warnings'] if 'verification failed' in m]
+
+
+@pytest.mark.parametrize('revoked', [False, True])
+def test_a_subject_change_on_install_warns_that_the_cas_issued_under_the_former_one_lose_it(
+        app, auth_client, made, linked, revoked):
+    """Their issuer name no longer is its subject (RFC 5280 6.1.3 (a)(4)): the chain repair drops the link."""
+    from services.ski_aki_backfill import backfill_ski_aki
+    w = linked
+    sub = _import(auth_client, _rsa_pem(f'Repl Sub {_tag()}', _key(), w['cn'], w['key'], serial=_serial()))
+    made.append(sub['id'])
+    assert sub['caref'] == w['child']['refid']
+    if revoked:
+        _revoke_by_flag(app, sub['id'])
+    r = auth_client.post(f"/api/v2/cas/{w['child']['id']}/certificate", content_type='multipart/form-data', data={
+        'pem_content': _rsa_pem(f"{w['cn']} Renamed", w['key'], w['root_cn'], w['root_key'], serial=_serial())})
+    assert r.status_code == 200, r.data
+    said = [m for m in get_json(r)['data']['warnings'] if m.startswith('Certificate subject differs')]
+    assert len(said) == 1
+    assert ('lose this CA as their parent at the next chain repair' in said[0]) is not revoked
+    with app.app_context():
+        backfill_ski_aki()
+    assert (_caref(app, sub['id']) == w['child']['refid']) is revoked
