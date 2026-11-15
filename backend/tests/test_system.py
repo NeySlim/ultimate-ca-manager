@@ -7,6 +7,7 @@ Tests all 45 system routes for:
 - GET endpoints: full response validation
 - Dangerous POST endpoints: auth-only (no mutation)
 """
+import contextlib
 import pytest
 import json
 import os
@@ -854,6 +855,32 @@ class TestSyslogTest:
                             content_type='application/json')
         assert r.status_code == 200, r.data
 
+    @classmethod
+    @contextlib.contextmanager
+    def _restoring(cls, auth_client):
+        """Put back the syslog configuration read before the test, not fixed values."""
+        before = get_json(auth_client.get('/api/v2/system/audit/syslog'))['data']
+        try:
+            yield
+        finally:
+            cls._configure(auth_client, **before)
+
+    def test_the_configuration_read_before_is_the_one_put_back(self, auth_client):
+        with self._restoring(auth_client):
+            self._configure(auth_client, enabled=True, host='192.0.2.7', port=1514,
+                            protocol='tcp', tls=True, tls_verify=False, framing='octet',
+                            categories=['settings'])
+            self._check_put_back(auth_client)
+
+    def _check_put_back(self, auth_client):
+        read = lambda: get_json(auth_client.get('/api/v2/system/audit/syslog'))['data']  # noqa: E731
+        kept = read()
+        with self._restoring(auth_client):
+            self._configure(auth_client, enabled=False, host='', port=514,
+                            protocol='udp', framing='line')
+            assert read() != kept
+        assert read() == kept
+
     def test_the_test_message_reaches_the_collector(self, auth_client):
         import socket
         collector = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -861,19 +888,18 @@ class TestSyslogTest:
         collector.settimeout(5)
         port = collector.getsockname()[1]
         try:
-            self._configure(auth_client, enabled=True, host='127.0.0.1', port=port,
-                            protocol='udp', framing='line')
-            r = auth_client.post('/api/v2/system/audit/syslog/test',
-                                 data=json.dumps({}), content_type='application/json')
-            assert assert_success(r) is not None
-            assert get_json(r)['message'] == f'Test message sent via UDP to 127.0.0.1:{port}'
-            received = b''
-            while b'UCM syslog test message' not in received:
-                received = collector.recv(65535)
+            with self._restoring(auth_client):
+                self._configure(auth_client, enabled=True, host='127.0.0.1', port=port,
+                                protocol='udp', framing='line')
+                r = auth_client.post('/api/v2/system/audit/syslog/test',
+                                     data=json.dumps({}), content_type='application/json')
+                assert assert_success(r) is not None
+                assert get_json(r)['message'] == f'Test message sent via UDP to 127.0.0.1:{port}'
+                received = b''
+                while b'UCM syslog test message' not in received:
+                    received = collector.recv(65535)
         finally:
             collector.close()
-            self._configure(auth_client, enabled=False, host='', port=514,
-                            protocol='udp', framing='octet')
 
     def test_no_host_is_refused(self, auth_client):
         self._configure(auth_client, enabled=False, host='', port=514,
