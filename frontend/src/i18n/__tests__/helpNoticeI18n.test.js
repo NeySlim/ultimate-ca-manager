@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
-const codes = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
+const codes = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 const dir = dirname(fileURLToPath(import.meta.url))
 const load = (c) => JSON.parse(readFileSync(join(dir, '..', 'locales', `${c}.json`), 'utf8'))
 

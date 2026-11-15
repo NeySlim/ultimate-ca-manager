@@ -2,7 +2,7 @@
  * DUP-FE-006 — real-time WebSocket toasts must go through i18n.
  *
  * `getEventNotification()` used to hardcode English sentences while the
- * `notifications.*` keys sat unreferenced in all nine locales. These tests pin
+ * `notifications.*` keys sat unreferenced in all ten locales. These tests pin
  * the mapping to the existing keys, and prove the provider actually hands `t`
  * down to it (a translated function that never reaches the socket handler is
  * worth nothing).

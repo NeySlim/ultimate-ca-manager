@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const localesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'locales')
-const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
+const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 
 // Either the English term kept whole, or a translation: never half of each
 describe('templates.commonName (9 locales)', () => {

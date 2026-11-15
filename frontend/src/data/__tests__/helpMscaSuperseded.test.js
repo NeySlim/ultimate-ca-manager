@@ -11,7 +11,7 @@ import zh from '../help/zh/msca'
 
 const locales = import.meta.glob('../../i18n/locales/*.json', { eager: true })
 const msca = (lang) => locales[`../../i18n/locales/${lang}.json`].default.msca
-const LANGS = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
+const LANGS = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 
 const pending = (content) => content.sections.flatMap((s) => s.items || [])
   .find((i) => /checkStatus|Check status|Vérifier le statut|检查状态/.test(i.text) && i.text.includes('CSR')).text
