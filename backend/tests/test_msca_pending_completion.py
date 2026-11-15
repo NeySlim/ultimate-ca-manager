@@ -369,3 +369,87 @@ def test_sync_still_completes_a_renewal_of_a_microsoft_ca_certificate(app, ca):
         stored = db.session.get(Certificate, csr_id).serial_number
         assert str(stored) in (new_serial, str(int(new_serial, 16)))
         assert str(stored) not in (old_serial, str(int(old_serial, 16)))
+
+
+def test_sync_counts_only_the_completion_it_won(app, panel_ca, monkeypatch):
+    """Another caller completes the request between the fetch and the claim: the sync
+    imported nothing and says so; a known-serial closure earlier in the run survives."""
+    from models import Certificate, MSCARequest, db
+    from services.msca.inventory import MicrosoftCAInventoryMixin
+    msca_id = _make_msca(app, 'PC race')
+    serial = panel_ca.add(920, 'pc-race-known.test.local')
+    known_pem = panel_ca.rows[-1]['pem']
+    known_req, _ = _pending(app, msca_id, 920, 'pc-race-known.test.local', with_csr=False)
+    with app.app_context():
+        db.session.add(Certificate(refid='pc-race-known', descr='manual',
+                                   crt=base64.b64encode(known_pem.encode()).decode(),
+                                   subject_cn='pc-race-known.test.local', serial_number=serial.upper()))
+        db.session.commit()
+    panel_ca.add(921, 'pc-race.test.local')
+    race_req, csr_id = _pending(app, msca_id, 921, 'pc-race.test.local')
+    real_fetch = MicrosoftCAInventoryMixin._fetch_cert_pem
+
+    def fetch_then_lose(msca, rid):
+        pem = real_fetch(msca, rid)
+        if rid == 921:
+            with db.engine.begin() as conn:
+                conn.execute(db.update(MSCARequest).where(MSCARequest.id == race_req)
+                             .values(status='issued', cert_id=csr_id))
+        return pem
+
+    monkeypatch.setattr(MicrosoftCAInventoryMixin, '_fetch_cert_pem', staticmethod(fetch_then_lose))
+    s = _sync(app, msca_id)
+    assert (s['completed'], s['imported'], s['skipped']) == (0, 0, 2)
+    assert _req(app, known_req)[0] == 'issued'
+
+
+def test_a_pending_request_skipped_for_its_known_serial_is_logged(app, ca, caplog):
+    import logging
+    from models import Certificate, db
+    msca_id = _make_msca(app, 'PC known log')
+    serial = ca.add(930, 'pc-known-log.test.local')
+    pem = ca.rows[-1]['pem']
+    _pending(app, msca_id, 930, 'pc-known-log.test.local', with_csr=False)
+    with app.app_context():
+        db.session.add(Certificate(refid='pc-known-log', descr='manual',
+                                   crt=base64.b64encode(pem.encode()).decode(),
+                                   subject_cn='pc-known-log.test.local', serial_number=serial.upper()))
+        db.session.commit()
+    with caplog.at_level(logging.INFO, logger='services.msca.inventory'):
+        _sync(app, msca_id)
+    assert any('skipping RequestId 930' in r.getMessage() and serial in r.getMessage()
+               and 'serial already known' in r.getMessage() for r in caplog.records)
+
+
+def test_a_failed_completion_keeps_an_earlier_known_serial_closure(app, panel_ca):
+    from models import Certificate, db
+    msca_id = _make_msca(app, 'PC keep')
+    serial = panel_ca.add(940, 'pc-keep-known.test.local')
+    pem = panel_ca.rows[-1]['pem']
+    known_req, _ = _pending(app, msca_id, 940, 'pc-keep-known.test.local', with_csr=False)
+    with app.app_context():
+        db.session.add(Certificate(refid='pc-keep-known', descr='manual',
+                                   crt=base64.b64encode(pem.encode()).decode(),
+                                   subject_cn='pc-keep-known.test.local', serial_number=serial.upper()))
+        db.session.commit()
+    panel_ca.add(941, 'pc-keep-bad.test.local')
+    panel_ca.rows[-1]['pem'] = '-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----'
+    bad_req, _ = _pending(app, msca_id, 941, 'pc-keep-bad.test.local')
+    stale_req, stale_csr = _pending(app, msca_id, 939, 'pc-keep-stale.test.local')
+    _give_row_a_cert(app, stale_csr, 'pc-keep-stale.test.local', 'csr')
+    s = _sync(app, msca_id)
+    assert s['failed'] == 1
+    assert _req(app, known_req)[0] == 'issued'
+    assert _req(app, stale_req)[0] == 'superseded'
+    assert _req(app, bad_req)[:2] == ('pending', None)
+
+
+def test_a_failed_completion_keeps_the_closure_of_a_request_signed_elsewhere(app, panel_ca):
+    msca_id = _make_msca(app, 'PC keep stale')
+    stale_req, stale_csr = _pending(app, msca_id, 949, 'pc-stale.test.local')
+    _give_row_a_cert(app, stale_csr, 'pc-stale.test.local', 'csr')
+    panel_ca.add(950, 'pc-stale-bad.test.local')
+    panel_ca.rows[-1]['pem'] = '-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----'
+    _pending(app, msca_id, 950, 'pc-stale-bad.test.local')
+    assert _sync(app, msca_id)['failed'] == 1
+    assert _req(app, stale_req)[0] == 'superseded'

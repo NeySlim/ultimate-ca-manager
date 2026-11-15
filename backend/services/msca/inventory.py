@@ -56,7 +56,7 @@ class MicrosoftCAInventoryMixin:
         stale = {r for r, q in pending.items()
                  if q.csr_id and holds_foreign_certificate(db.session.get(Certificate, q.csr_id))}
         if stale:
-            supersede([pending[r].id for r in stale], username=username, commit=False)
+            supersede([pending[r].id for r in stale], username=username)
             pending = {r: q for r, q in pending.items() if r not in stale}
         if pending:
             start_id = min(start_id, min(pending))
@@ -92,6 +92,10 @@ class MicrosoftCAInventoryMixin:
                 # but close the request so it stops pinning the scan start.
                 variants = MicrosoftCAInventoryMixin._serial_int_variants(serial)
                 if variants & known_serials:
+                    logger.info(
+                        "MSCA inventory: skipping RequestId %s (serial %s, CN %r) "
+                        ", serial already known in UCM", req_id, serial, cn,
+                    )
                     MicrosoftCAInventoryMixin._close_known(msca, pending[req_id], variants)
                     completed_ids.add(req_id)
                     skipped += 1
@@ -102,7 +106,7 @@ class MicrosoftCAInventoryMixin:
                         failed += 1
                         continue
                     from .ca_control import MicrosoftCACAControlMixin
-                    outcome, cert_id = MicrosoftCACAControlMixin.complete_request(
+                    outcome, _cert_id = MicrosoftCACAControlMixin.complete_request(
                         msca, pending[req_id], pem)
                 except Exception as e:
                     db.session.rollback()
@@ -112,7 +116,8 @@ class MicrosoftCAInventoryMixin:
                     )
                     continue
                 if outcome != 'superseded':
-                    if outcome == 'imported' or cert_id:
+                    # Only the claim this run won imported anything
+                    if outcome == 'imported':
                         completed += 1
                         completed_ids.add(req_id)
                     else:
@@ -390,6 +395,8 @@ class MicrosoftCAInventoryMixin:
             MSCARequest.status == 'pending',
         ).update({MSCARequest.status: 'issued', MSCARequest.cert_id: cert_id,
                   MSCARequest.issued_at: utc_now()}, synchronize_session=False)
+        # Committed now: a later completion's rollback in the same run must not undo it
+        db.session.commit()
         logger.info(
             f"MS CA '{msca.name}' inventory: RequestId={req.request_id} closed, its "
             f"certificate is already in UCM (id={cert_id})"
