@@ -598,6 +598,33 @@ class TestEachStepIsActuallyWired:
         finally:
             engine.dispose()
 
+    def _fail_then_retry(self, app, target, monkeypatch):
+        from services.database_admin import copy as copy_module
+
+        def broken(*args, **kwargs):
+            raise RuntimeError('the disk went away')
+
+        with monkeypatch.context() as m:
+            m.setattr(copy_module, '_copy_one', broken)
+            with app.app_context():
+                ok, _, stats = migration.migrate_data(target)
+        assert ok is False and stats['refusal'] == 'copy'
+
+        with app.app_context():
+            ok, message, _ = migration.migrate_data(target)
+        assert ok is True, message
+
+    def test_a_failed_copy_can_be_retried_on_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        """The unverified marker left by a failed copy does not make the
+        target look like somebody's database."""
+        self._fail_then_retry(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_failed_copy_can_be_retried_on_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._fail_then_retry(app, pg_target, monkeypatch)
+
 
 class TestASourceThatBreaksItsOwnRules:
     def test_an_orphan_row_in_the_source_stops_the_migration(
@@ -727,23 +754,28 @@ class TestNothingSwitchesUnlessEverythingPassed:
         assert env_file.read_text() == before
         assert not restart_signal.exists()
 
-    @pytest.mark.parametrize('refusal,advice', [
-        ('error', 'Retrying on the same target resumes the switch.'),
-        ('copy', 'Retrying on the same target resumes the switch.'),
-        ('verification', 'failed its verification; reset the target before retrying.'),
+    @pytest.mark.parametrize('refusal,transient,written,status,advice', [
+        ('error', True, True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
+        ('copy', True, True, 503, 'A transient failure stopped it: retrying on the same target resumes the switch.'),
+        ('error', True, False, 503, 'A transient failure stopped it: retrying on the same target starts it again.'),
+        ('preflight', True, False, 503, 'A transient failure stopped it: retrying on the same target starts it again.'),
+        ('error', False, True, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
+        ('copy', False, True, 500, 'Correct the cause above, then retry: the switch resumes on the same target.'),
+        ('verification', False, True, 500, 'failed its verification; retrying copies the accounts again.'),
     ])
     def test_a_bootstrap_cut_short_says_how_to_retry(
-            self, auth_client, sqlite_target, env_file, refusal, advice, monkeypatch):
+            self, auth_client, sqlite_target, env_file, refusal, transient, written, status,
+            advice, monkeypatch):
         import api.v2.database as route_module
 
         monkeypatch.setattr(
             route_module.svc, 'bootstrap_auth_to_target',
             lambda url: (False, 'Bootstrap failed: stopped',
-                         {'refusal': refusal, 'target_written': True}))
+                         {'refusal': refusal, 'target_written': written, 'transient': transient}))
 
         response = self._post(auth_client, 'switch', {'database_url': sqlite_target})
 
-        assert response.status_code == 500, response.data
+        assert response.status_code == status, response.data
         message = json.loads(response.data)['message']
         assert message.endswith(advice), message
         assert 'carries a schema' not in message
@@ -1251,3 +1283,697 @@ class TestARevertNeverNamesAFileTheStartRefuses:
 
         assert self._post_revert(auth_client).status_code == 200
         assert not path.exists()
+
+
+class _Killed(BaseException):
+    """A process killed mid-switch: nothing in the bootstrap may catch it."""
+
+
+def _standalone_target(app, url):
+    """A target nobody transferred to: a fresh 3.0 registry, its schema, one account."""
+    import migration_runner
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        migration_runner.record_fresh_registry(engine, url.startswith('postgresql'))
+        with app.app_context():
+            migration._force_register_all_models()
+            db.metadata.create_all(engine)
+        with engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO users (username, email, password_hash, role, auth_source) "
+                "VALUES ('standalone', 'stand@alone', 'x', 'admin', 'local')"))
+    finally:
+        engine.dispose()
+
+
+class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
+    """The copy commits before it is verified: accounts a refused or interrupted attempt left on
+    the target are emptied, copied again and verified again by the next one, never taken as an
+    installation of its own."""
+
+    def _post(self, auth_client, target):
+        return auth_client.post('/api/v2/database/switch',
+                                data=json.dumps({'database_url': target}),
+                                content_type='application/json')
+
+    def _refused_twice(self, auth_client, target, env_file, restart_signal, monkeypatch):
+        """While the verification keeps failing, every retry is refused and nothing switches."""
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        monkeypatch.setattr(migration, 'verify_migration', refuse)
+        before = env_file.read_text()
+
+        first = self._post(auth_client, target)
+        assert first.status_code == 500, first.data
+        second = self._post(auth_client, target)
+
+        # Copied and verified again, and refused again only because the verification still fails
+        assert second.status_code == 500, second.data
+        assert json.loads(second.data)['message'].endswith('retrying copies the accounts again.')
+        assert env_file.read_text() == before
+        assert not restart_signal.exists()
+        assert switch_pending() is None
+
+    def test_a_second_switch_after_a_refused_verification_to_sqlite(
+            self, auth_client, sqlite_target, env_file, restart_signal, monkeypatch):
+        self._refused_twice(auth_client, sqlite_target, env_file, restart_signal, monkeypatch)
+
+    @_needs_pg
+    def test_a_second_switch_after_a_refused_verification_to_postgresql(
+            self, auth_client, pg_target, env_file, restart_signal, monkeypatch):
+        self._refused_twice(auth_client, pg_target, env_file, restart_signal, monkeypatch)
+
+    def _refused_then_retried(self, app, auth_client, target, env_file, restart_signal,
+                              monkeypatch):
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            assert self._post(auth_client, target).status_code == 500
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            # A row the source never had: the retry must empty the copy, not top it up
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "INSERT INTO users (username, email, password_hash, role, auth_source) "
+                    "VALUES ('stray', 'stray@target', 'x', 'admin', 'local')"))
+            before = env_file.read_text()
+
+            second = self._post(auth_client, target)
+
+            assert second.status_code == 200, second.data
+            body = json.loads(second.data)['data']
+            assert body['validation']['ok'] is True
+            assert env_file.read_text() != before and restart_signal.exists()
+            with app.app_context():
+                source = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
+            with engine.connect() as conn:
+                copied = sorted(r[0] for r in conn.execute(text('SELECT username FROM users')))
+            assert copied == source and 'stray' not in copied
+            assert body['bootstrap']['tables']['users'] == len(source)
+            assert _marker_kinds(target) is None
+        finally:
+            engine.dispose()
+
+    def test_a_retry_after_a_refused_verification_copies_again_sqlite(
+            self, app, auth_client, sqlite_target, env_file, restart_signal, monkeypatch):
+        self._refused_then_retried(app, auth_client, sqlite_target, env_file, restart_signal,
+                                   monkeypatch)
+
+    @_needs_pg
+    def test_a_retry_after_a_refused_verification_copies_again_postgresql(
+            self, app, auth_client, pg_target, env_file, restart_signal, monkeypatch):
+        self._refused_then_retried(app, auth_client, pg_target, env_file, restart_signal,
+                                   monkeypatch)
+
+    def _refused_then_retried_unordered(self, app, target, monkeypatch):
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            with app.app_context():
+                ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is False and _marker_kinds(target) == {'switch'}, message
+
+        # The target's tables cannot be listed for ordering: the copy is still emptied
+        monkeypatch.setattr(migration, '_topo_sort_tables', lambda insp: [])
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+            source = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
+        assert ok is True and stats['validation']['ok'] is True, message
+        assert _usernames(target) == source
+        assert _marker_kinds(target) is None
+
+    def test_a_retry_whose_tables_cannot_be_ordered_copies_again_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._refused_then_retried_unordered(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_retry_whose_tables_cannot_be_ordered_copies_again_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._refused_then_retried_unordered(app, pg_target, monkeypatch)
+
+    def _refused_then_retried_without_accounts(self, app, target, monkeypatch):
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            with app.app_context():
+                ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is False and _marker_kinds(target) == {'switch'}, message
+
+        # The accounts removed by hand, the rest of the unverified copy left behind
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('DELETE FROM users'))
+                left = sum(conn.execute(text(f'SELECT COUNT(*) FROM "{t}"')).scalar()
+                           for t in migration.BOOTSTRAP_AUTH_TABLES if t != 'users')
+        finally:
+            engine.dispose()
+        assert left, 'the source holds no auth row besides its accounts: nothing is proven'
+
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+            source = sorted(r[0] for r in db.session.execute(text('SELECT username FROM users')))
+        assert ok is True and stats['validation']['ok'] is True, message
+        assert _usernames(target) == source
+        assert _marker_kinds(target) is None
+
+    def test_a_retry_over_a_copy_left_without_accounts_copies_again_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._refused_then_retried_without_accounts(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_retry_over_a_copy_left_without_accounts_copies_again_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._refused_then_retried_without_accounts(app, pg_target, monkeypatch)
+
+    def _killed_before_verification(self, app, target, monkeypatch):
+        def killed(*args, **kwargs):
+            raise _Killed()
+
+        monkeypatch.setattr(migration, 'verify_migration', killed)
+        with app.app_context():
+            with pytest.raises(_Killed):
+                migration.bootstrap_auth_to_target(target)
+            source_users = db.session.execute(text('SELECT COUNT(*) FROM users')).scalar()
+
+        seen = []
+
+        def refuse(engine, expected, **kwargs):
+            seen.append(dict(expected))
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        monkeypatch.setattr(migration, 'verify_migration', refuse)
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is False, message
+        assert stats['refusal'] == 'verification' and stats['target_written'] is True
+        assert seen and seen[0]['users'] == source_users
+        assert set(seen[0]) == set(migration.BOOTSTRAP_AUTH_TABLES)
+
+        monkeypatch.undo()
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is True, message
+        assert stats['validation']['ok'] is True
+
+    def test_a_cut_between_the_copy_and_its_verification_to_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._killed_before_verification(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_cut_between_the_copy_and_its_verification_to_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._killed_before_verification(app, pg_target, monkeypatch)
+
+    def _source_changed_between_attempts(self, app, target, monkeypatch):
+        def killed(*args, **kwargs):
+            raise _Killed()
+
+        def on_source(sql, **params):
+            with app.app_context():
+                db.session.execute(text(sql), params)
+                db.session.commit()
+
+        on_source("INSERT INTO users (username, email, password_hash, role, auth_source) "
+                  "VALUES ('resumed', 'resumed@test', 'OLD', 'admin', 'local')")
+        try:
+            monkeypatch.setattr(migration, 'verify_migration', killed)
+            with app.app_context():
+                with pytest.raises(_Killed):
+                    migration.bootstrap_auth_to_target(target)
+            # Same row count, different contents: a count cannot see it
+            on_source("UPDATE users SET role = 'viewer', password_hash = 'CHANGED' "
+                      "WHERE username = 'resumed'")
+            monkeypatch.undo()
+            with app.app_context():
+                ok, message, _ = migration.bootstrap_auth_to_target(target)
+        finally:
+            on_source("DELETE FROM users WHERE username = 'resumed'")
+        assert ok is True, message
+        engine = create_engine(target)
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(text(
+                    "SELECT role, password_hash FROM users WHERE username = 'resumed'")).one()
+        finally:
+            engine.dispose()
+        assert tuple(row) == ('viewer', 'CHANGED')
+
+    def test_a_copy_resumed_carries_the_source_as_it_is_now_sqlite(
+            self, app, sqlite_target, monkeypatch):
+        self._source_changed_between_attempts(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_copy_resumed_carries_the_source_as_it_is_now_postgresql(
+            self, app, pg_target, monkeypatch):
+        self._source_changed_between_attempts(app, pg_target, monkeypatch)
+
+    def _migrated_then_switched(self, app, target, monkeypatch):
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        monkeypatch.setattr(migration, 'verify_migration', refuse)
+        with app.app_context():
+            ok, message, _ = migration.migrate_data(target)
+        assert ok is False, message
+        monkeypatch.undo()
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is False, message
+        assert 'reset the target' in message
+
+    def test_a_refused_migration_is_not_switched_to_afterwards_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._migrated_then_switched(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_refused_migration_is_not_switched_to_afterwards_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._migrated_then_switched(app, pg_target, monkeypatch)
+
+    def _standalone_accepted(self, app, target):
+        _standalone_target(app, target)
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is True, message
+        assert 'already has users' in message
+
+    def test_a_standalone_target_with_accounts_is_accepted_sqlite(self, app, sqlite_target):
+        """Pins the standalone target accepted as it is; proves no fix."""
+        self._standalone_accepted(app, sqlite_target)
+
+    @_needs_pg
+    def test_a_standalone_target_with_accounts_is_accepted_postgresql(self, app, pg_target):
+        """Pins the standalone target accepted as it is; proves no fix."""
+        self._standalone_accepted(app, pg_target)
+
+    def _verified_then_cut_before_the_counters(self, app, auth_client, create_user, target,
+                                               monkeypatch):
+        gone = _deleted_last_user(app, auth_client, create_user)
+        real = migration.carry_id_high_water
+        calls = []
+
+        def cut_once(*args, **kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise _Killed()
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(migration, 'carry_id_high_water', cut_once)
+        with app.app_context():
+            with pytest.raises(_Killed):
+                migration.bootstrap_auth_to_target(target)
+            ok, message, _ = migration.bootstrap_auth_to_target(target)
+        assert ok is True, message
+        assert _next_user_id(target) > gone
+
+    def test_a_verified_copy_cut_before_its_counters_resumes_sqlite(
+            self, app, auth_client, create_user, sqlite_target, monkeypatch):
+        """Pins the resume of a verified copy cut before its counters; proves no fix."""
+        self._verified_then_cut_before_the_counters(
+            app, auth_client, create_user, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_verified_copy_cut_before_its_counters_resumes_postgresql(
+            self, app, auth_client, create_user, pg_target, monkeypatch):
+        """Pins the resume of a verified copy cut before its counters; proves no fix."""
+        self._verified_then_cut_before_the_counters(
+            app, auth_client, create_user, pg_target, monkeypatch)
+
+
+def _driver_error(cls, message, *, invalidated=False, sqlstate=None):
+    """A SQLAlchemy driver error as the copy would see it."""
+    import sqlalchemy.exc as sa_exc
+
+    class Orig(Exception):
+        pass
+    orig = Orig(message)
+    if sqlstate:
+        orig.sqlstate = sqlstate
+    return getattr(sa_exc, cls)('INSERT', {}, orig, connection_invalidated=invalidated)
+
+
+class TestARefusalSaysWhetherARetryCanHelp:
+    """A lost connection is retried as it is; a row the target refuses is refused again."""
+
+    @pytest.mark.parametrize('error,transient', [
+        (lambda: _driver_error('OperationalError', 'server closed the connection', invalidated=True), True),
+        (lambda: _driver_error('OperationalError', 'deadlock detected', sqlstate='40P01'), True),
+        (lambda: _driver_error('OperationalError', 'database is locked'), True),
+        (lambda: ConnectionResetError('reset by peer'), True),
+        (lambda: _driver_error('IntegrityError', 'duplicate key', sqlstate='23505'), False),
+        (lambda: _driver_error('OperationalError', 'no such table: users'), False),
+        (lambda: RuntimeError('a bug'), False),
+    ], ids=['disconnect', 'deadlock', 'sqlite-locked', 'reset', 'integrity', 'no-table', 'bug'])
+    def test_the_bootstrap_reports_it(self, app, sqlite_target, monkeypatch, error, transient):
+        from services.database_admin import copy as copy_module
+
+        def fail(*args, **kwargs):
+            raise error()
+
+        monkeypatch.setattr(copy_module, '_copy_one', fail)
+        with app.app_context():
+            ok, _, stats = migration.bootstrap_auth_to_target(sqlite_target)
+
+        assert ok is False
+        assert stats['refusal'] == 'copy'
+        assert stats['transient'] is transient
+
+    @pytest.mark.parametrize('sqlstate,transient', [
+        ('08000', True), ('08001', True), ('08003', True), ('08006', True),
+        ('40001', True), ('40P01', True), ('53300', True),
+        ('57P01', True), ('57P02', True), ('57P03', True),
+        ('40002', False), ('40003', False), ('53100', False), ('53200', False),
+        ('57014', False), ('57P04', False), ('57000', False), ('23505', False),
+    ])
+    def test_only_the_sqlstates_a_retry_can_clear_are_transient(self, sqlstate, transient):
+        error = _driver_error('OperationalError', 'failed', sqlstate=sqlstate)
+        assert migration._is_transient(error) is transient
+
+    @pytest.mark.parametrize('message,transient', [
+        ('database is locked', True),
+        ('database table is locked', False),
+        ('disk I/O error', False),
+        ('database or disk is full', False),
+    ])
+    def test_only_a_locked_sqlite_database_is_transient(self, message, transient):
+        assert migration._is_transient(_driver_error('OperationalError', message)) is transient
+
+    def test_a_verification_is_never_transient(self, app, sqlite_target, monkeypatch):
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        monkeypatch.setattr(migration, 'verify_migration', refuse)
+        with app.app_context():
+            ok, _, stats = migration.bootstrap_auth_to_target(sqlite_target)
+        assert ok is False and stats['transient'] is False
+
+
+def _marker_kinds(url):
+    """The kinds the transfer marker holds on *url*, or None when it is absent."""
+    from services.database_admin.preflight import TRANSFER_MARKER
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        if TRANSFER_MARKER not in inspect(engine).get_table_names():
+            return None
+        with engine.connect() as conn:
+            return {r[0] for r in conn.execute(text(f'SELECT kind FROM {TRANSFER_MARKER}'))}
+    finally:
+        engine.dispose()
+
+
+class TestTheMarkerIsNeverTakenForAVerification:
+    """A data migration may start over the marker alone, never over a row beside it; a target
+    left by one kind of transfer is never taken as verified by the other kind."""
+
+    def _marker_alone_then_a_row(self, app, target):
+        from services.database_admin.preflight import (
+            PreflightError, TRANSFER_MARKER, check_target_is_empty)
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with app.app_context():
+                migration._force_register_all_models()
+                db.metadata.create_all(engine)
+                migration._mark_unverified(engine, 'migration')
+                inspected = check_target_is_empty(engine)
+                assert inspected and TRANSFER_MARKER not in inspected
+                with engine.begin() as conn:
+                    conn.execute(text(
+                        "INSERT INTO users (username, email, password_hash, role, auth_source) "
+                        "VALUES ('beside', 'beside@marker', 'x', 'admin', 'local')"))
+                with pytest.raises(PreflightError, match="not empty.*users"):
+                    check_target_is_empty(engine)
+        finally:
+            engine.dispose()
+
+    def test_the_marker_alone_is_empty_a_row_beside_it_is_not_sqlite(self, app, sqlite_target):
+        self._marker_alone_then_a_row(app, sqlite_target)
+
+    @_needs_pg
+    def test_the_marker_alone_is_empty_a_row_beside_it_is_not_postgresql(self, app, pg_target):
+        self._marker_alone_then_a_row(app, pg_target)
+
+    def _switch_cut_then_migrated(self, app, target, monkeypatch):
+        def killed(*args, **kwargs):
+            raise _Killed()
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', killed)
+            with app.app_context():
+                with pytest.raises(_Killed):
+                    migration.bootstrap_auth_to_target(target)
+        assert _marker_kinds(target) == {'switch'}
+
+        # Its accounts and registry make the target somebody's: the migration does not start
+        with app.app_context():
+            ok, message, stats = migration.migrate_data(target)
+        assert ok is False and stats['refusal'] == 'preflight', message
+        assert stats['target_written'] is False
+        assert _marker_kinds(target) == {'switch'}
+
+        # The switch still copies afresh and verifies before it lifts the marker
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is True and stats['validation']['ok'] is True, message
+        assert _marker_kinds(target) is None
+
+    def test_a_switch_cut_short_is_not_migrated_over_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._switch_cut_then_migrated(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_switch_cut_short_is_not_migrated_over_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._switch_cut_then_migrated(app, pg_target, monkeypatch)
+
+    def _migration_cut_then_switched(self, app, target, monkeypatch):
+        def killed(*args, **kwargs):
+            raise _Killed()
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', killed)
+            with app.app_context():
+                with pytest.raises(_Killed):
+                    migration.migrate_data(target)
+        assert _marker_kinds(target) == {'migration'}
+
+        # Only its accounts could be checked again by a switch: it is refused and keeps its marker
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is False and stats['refusal'] == 'preflight', message
+        assert 'data migration' in message and stats['target_written'] is False
+        assert _marker_kinds(target) == {'migration'}
+
+    def test_a_migration_cut_short_is_not_switched_to_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._migration_cut_then_switched(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_migration_cut_short_is_not_switched_to_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._migration_cut_then_switched(app, pg_target, monkeypatch)
+
+    def _migration_refused_emptied_then_switched(self, app, target, monkeypatch):
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+
+        def refuse(*args, **kwargs):
+            raise VerificationError('users: 3 rows copied, 2 on the target')
+
+        with monkeypatch.context() as m:
+            m.setattr(migration, 'verify_migration', refuse)
+            with app.app_context():
+                ok, message, _ = migration.migrate_data(target)
+        assert ok is False and _marker_kinds(target) == {'migration'}, message
+        # Its accounts removed by hand: the marker alone still says the copy was never verified
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            migration._empty_auth_tables(engine)
+        finally:
+            engine.dispose()
+        assert _usernames(target) == []
+
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is False and stats['refusal'] == 'preflight', message
+        assert 'data migration' in message and stats['target_written'] is False
+        assert _marker_kinds(target) == {'migration'}
+        assert _usernames(target) == []
+
+    def test_a_refused_migration_without_accounts_is_not_switched_to_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._migration_refused_emptied_then_switched(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_refused_migration_without_accounts_is_not_switched_to_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._migration_refused_emptied_then_switched(app, pg_target, monkeypatch)
+
+    def _migration_failed_before_its_rows_then_switched(self, app, target, monkeypatch):
+        from services.database_admin import copy as copy_module
+
+        def broken(*args, **kwargs):
+            raise RuntimeError('the disk went away')
+
+        with monkeypatch.context() as m:
+            m.setattr(copy_module, '_copy_one', broken)
+            with app.app_context():
+                ok, _, stats = migration.migrate_data(target)
+        assert ok is False and stats['refusal'] == 'copy'
+        assert _marker_kinds(target) == {'migration'}
+
+        # Its marker is refused before the switch writes anything
+        with app.app_context():
+            ok, message, stats = migration.bootstrap_auth_to_target(target)
+        assert ok is False and stats['refusal'] == 'preflight', message
+        assert stats['target_written'] is False
+        assert _marker_kinds(target) == {'migration'}
+
+    def test_a_migration_failed_before_its_rows_is_not_switched_to_sqlite(
+            self, app, a_3_0_source, sqlite_target, monkeypatch):
+        self._migration_failed_before_its_rows_then_switched(app, sqlite_target, monkeypatch)
+
+    @_needs_pg
+    def test_a_migration_failed_before_its_rows_is_not_switched_to_postgresql(
+            self, app, a_3_0_source, pg_target, monkeypatch):
+        self._migration_failed_before_its_rows_then_switched(app, pg_target, monkeypatch)
+
+
+class TestATransferStateThatCannotBeReadIsRefused:
+    """A marker the switch cannot read is neither ignored nor guessed: 409, nothing written."""
+
+    def _unreadable_marker(self, app, auth_client, target, env_file):
+        from services.database_admin.preflight import TRANSFER_MARKER
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+        _standalone_target(app, target)
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f'CREATE TABLE {TRANSFER_MARKER} (other INTEGER)'))
+        finally:
+            engine.dispose()
+        before = env_file.read_text()
+
+        response = auth_client.post('/api/v2/database/switch',
+                                    data=json.dumps({'database_url': target}),
+                                    content_type='application/json')
+
+        assert response.status_code == 409, response.data
+        assert "transfer state could not be read" in json.loads(response.data)['message']
+        assert env_file.read_text() == before
+        engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+        try:
+            assert TRANSFER_MARKER in inspect(engine).get_table_names()
+        finally:
+            engine.dispose()
+
+    def test_an_unreadable_marker_is_refused_sqlite(self, app, auth_client, sqlite_target, env_file):
+        self._unreadable_marker(app, auth_client, sqlite_target, env_file)
+
+    @_needs_pg
+    def test_an_unreadable_marker_is_refused_postgresql(self, app, auth_client, pg_target, env_file):
+        self._unreadable_marker(app, auth_client, pg_target, env_file)
+
+
+
+class TestATransientFailureBeforeTheCopyIsRetriable:
+    """A transient failure answers 503 wherever it strikes, the target written or not."""
+
+    def _cut_on(self, app, auth_client, target, env_file, monkeypatch, statement, *, marker):
+        from services.database_admin.preflight import TRANSFER_MARKER
+        from utils.db_url import postgres_connect_args, sqlalchemy_url
+        _standalone_target(app, target)
+        if marker:
+            engine = create_engine(sqlalchemy_url(target), connect_args=postgres_connect_args(target))
+            try:
+                migration._mark_unverified(engine, 'switch')
+            finally:
+                engine.dispose()
+        real = migration.create_engine
+
+        def lost_on(*args, **kwargs):
+            engine = real(*args, **kwargs)
+
+            @event.listens_for(engine, 'before_cursor_execute')
+            def cut(conn, cursor, sql, params, context, many):
+                if statement in sql:
+                    raise _driver_error('OperationalError', 'server closed the connection',
+                                        invalidated=True)
+            return engine
+
+        monkeypatch.setattr(migration, 'create_engine', lost_on)
+        before = env_file.read_text()
+
+        response = auth_client.post('/api/v2/database/switch',
+                                    data=json.dumps({'database_url': target}),
+                                    content_type='application/json')
+
+        assert response.status_code == 503, response.data
+        message = json.loads(response.data)['message']
+        # Cut before this attempt wrote anything
+        assert message.endswith('retrying on the same target starts it again.'), message
+        assert env_file.read_text() == before
+        assert (TRANSFER_MARKER in _tables(target)) is marker
+
+    def test_a_target_that_fails_its_connection_test_answers_400(
+            self, auth_client, env_file, monkeypatch):
+        """Pins that 503 starts once the target answered its connection test; proves no fix."""
+        import api.v2.database as route_module
+
+        def never(url):
+            raise AssertionError('the bootstrap must not run')
+
+        monkeypatch.setattr(route_module.svc, 'bootstrap_auth_to_target', never)
+        before = env_file.read_text()
+
+        response = auth_client.post(
+            '/api/v2/database/switch',
+            data=json.dumps({'database_url': 'postgresql://ucm:x@127.0.0.1:1/ucm'}),
+            content_type='application/json')
+
+        assert response.status_code == 400, response.data
+        assert json.loads(response.data)['message'].startswith('Target DB unreachable')
+        assert env_file.read_text() == before
+
+    @pytest.mark.parametrize('statement,marker', [
+        ('SELECT COUNT(*) FROM "users"', False),
+        ('FROM _transfer_unverified', True),
+        ('SELECT name FROM _migrations', False),
+    ], ids=['users', 'marker', 'registry'])
+    def test_a_lost_connection_answers_503_sqlite(
+            self, app, auth_client, sqlite_target, env_file, monkeypatch, statement, marker):
+        self._cut_on(app, auth_client, sqlite_target, env_file, monkeypatch, statement,
+                     marker=marker)
+
+    @_needs_pg
+    @pytest.mark.parametrize('statement,marker', [
+        ('SELECT COUNT(*) FROM "users"', False),
+        ('FROM _transfer_unverified', True),
+        ('SELECT name FROM _migrations', False),
+    ], ids=['users', 'marker', 'registry'])
+    def test_a_lost_connection_answers_503_postgresql(
+            self, app, auth_client, pg_target, env_file, monkeypatch, statement, marker):
+        self._cut_on(app, auth_client, pg_target, env_file, monkeypatch, statement,
+                     marker=marker)
+
+
+def _tables(url):
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(url), connect_args=postgres_connect_args(url))
+    try:
+        return set(inspect(engine).get_table_names())
+    finally:
+        engine.dispose()

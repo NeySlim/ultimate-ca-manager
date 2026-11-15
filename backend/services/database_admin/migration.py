@@ -56,6 +56,7 @@ from .preflight import (
     check_target_is_empty,
     check_target_schema,
     dropped_columns,
+    TRANSFER_MARKER,
 )
 from .snapshot import SnapshotError, create_source_snapshot
 from .status import test_connection
@@ -160,6 +161,37 @@ def _create_target_schema(target_engine, target_is_pg: bool) -> None:
         tx.execute(text(_migrations_ddl(target_is_pg)))
 
 
+def _mark_unverified(target_engine, kind: str) -> None:
+    """Committed before the copy and dropped only once its verification passed: a cut anywhere
+    in between leaves it, and DROP TABLE is atomic, so no failure can lift it."""
+    with target_engine.begin() as tx:
+        tx.execute(text(f"CREATE TABLE IF NOT EXISTS {TRANSFER_MARKER} (kind VARCHAR(16))"))
+        # A migration's row outweighs a switch's: its copy is refused, never verified again
+        if not tx.execute(text(f"SELECT COUNT(*) FROM {TRANSFER_MARKER} WHERE kind = :k"),
+                          {"k": kind}).scalar():
+            tx.execute(text(f"INSERT INTO {TRANSFER_MARKER} (kind) VALUES (:k)"), {"k": kind})
+
+
+def _lift_unverified(target_engine) -> None:
+    with target_engine.begin() as tx:
+        tx.execute(text(f"DROP TABLE IF EXISTS {TRANSFER_MARKER}"))
+
+
+def _unverified_copy(target_engine):
+    """None, 'switch', or 'migration' (also an empty marker: the strictest); a marker that
+    cannot be read raises PreflightError, so the switch stops before writing anything."""
+    try:
+        if TRANSFER_MARKER not in inspect(target_engine).get_table_names():
+            return None
+        with target_engine.connect() as probe:
+            kinds = {r[0] for r in probe.execute(text(f"SELECT kind FROM {TRANSFER_MARKER}"))}
+    except Exception as exc:
+        raise PreflightError(
+            f"The target's transfer state could not be read ({_short_err(str(exc))}); "
+            "the backend switch was not started.")
+    return 'switch' if kinds == {'switch'} else 'migration'
+
+
 class _Bootstrap:
     """What the steps of a switch without data hand each other."""
 
@@ -189,6 +221,10 @@ def _step_schema(run: _Bootstrap) -> None:
             index.create(run.target, checkfirst=True)
 
 
+def _step_mark(run: _Bootstrap) -> None:
+    _mark_unverified(run.target, 'switch')
+
+
 def _step_copy(run: _Bootstrap) -> None:
     with consistent_live_source() as (src, source_view, source_is_pg):
         plan = _bootstrap_plan(src.engine, run.target)
@@ -208,10 +244,22 @@ def _step_high_water(run: _Bootstrap) -> None:
     carry_id_high_water(run.target, run.high_water, run.is_pg)
 
 
-# Each step is idempotent: a switch cut short anywhere is resumed by the next one on the target
-_BOOTSTRAP_STEPS = (_step_registry, _step_schema, _step_copy, _step_sequences, _step_high_water)
-# Replayed on a target that already holds accounts: they only ever raise a counter
+# Each step is idempotent; the verification and the lift of the marker follow, then the counters
+_BOOTSTRAP_STEPS = (_step_registry, _step_schema, _step_mark, _step_copy, _step_sequences)
+# Replayed on a target holding accounts and no marker: they only ever raise a counter
 _RESUME_STEPS = (_step_sequences, _step_high_water)
+
+
+def _empty_auth_tables(target_engine) -> None:
+    """One transaction, children first: a copy never verified is replaced, never reused, since
+    a row count cannot see a password, role or key changed on the source since."""
+    order = [t for t in _topo_sort_tables(inspect(target_engine)) if t in set(BOOTSTRAP_AUTH_TABLES)]
+    # A listing that failed still empties every table: the list is parents first, and the
+    # only references of users that point later are ON DELETE SET NULL
+    order += [t for t in BOOTSTRAP_AUTH_TABLES if t not in order]
+    with target_engine.begin() as tx:
+        for name in reversed(order):
+            tx.execute(text(f'DELETE FROM "{_safe_ident(name)}"'))
 
 
 def _source_high_water() -> Dict[str, int]:
@@ -427,7 +475,8 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     Safe to call against an empty target. If the target already has any users,
     bootstrap is skipped (we assume the operator manages that DB themselves),
     once its registry shows that this release will start on it; the counters
-    of a target already upgraded are still moved up to the source's.
+    of a target already upgraded are still moved up to the source's. Accounts
+    an earlier attempt copied without a passed verification are copied again.
 
     Every table goes over in **one** transaction. It used to be one
     transaction per table, with each failure appended to a ``skipped`` list
@@ -453,11 +502,23 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         target_is_pg = target_url.startswith("postgresql")
 
         has_users = _target_has_users(target_engine)
+        # Read with or without accounts: only the auth tables can be checked again here, so a
+        # full copy never verified is refused even once its accounts were removed
+        unverified = _unverified_copy(target_engine)
+        if unverified == 'migration':
+            raise PreflightError(
+                "The target holds a data migration whose verification did not pass; reset the "
+                "target before retrying. Nothing was changed.")
         # Read before anything is written, ucm.env included: the start must accept the target
         refusal = _start_refusal(target_engine, has_users)
         if refusal:
             raise PreflightError(refusal)
-        if has_users:
+        if unverified:
+            # The marker proves only that a switch built this schema on a target without accounts:
+            # whatever the auth tables hold now, with or without accounts, is replaced
+            stats["target_written"] = True
+            _empty_auth_tables(target_engine)
+        elif has_users:
             # A copy committed by an attempt cut short before its counters: they are moved up
             # now. A target still awaiting its upgrade is no such copy and is left as it is.
             if UPGRADE_MIGRATION in _get_state(target_engine)[1]:
@@ -492,16 +553,21 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
         report = verify_migration(
             target_engine, result.tables, target_is_pg=target_is_pg)
         stats["validation"] = report
+        _lift_unverified(target_engine)
+        _step_high_water(run)
 
         return True, "Auth tables bootstrapped to target", stats
 
     except (PreflightError, CopyError, VerificationError) as exc:
         logger.error("Bootstrap refused: %s", exc)
         stats["refusal"] = _refusal_kind(exc)
+        # Wherever it struck: a PreflightError raised while reading the target keeps its cause
+        stats["transient"] = not isinstance(exc, VerificationError) and _is_transient(exc)
         return False, f"Bootstrap failed: {exc}", stats
     except Exception as e:
         logger.exception("bootstrap_auth_to_target failed")
         stats["refusal"] = "error"
+        stats["transient"] = _is_transient(e)
         return False, f"Bootstrap failed: {_short_err(str(e))}", stats
     finally:
         if target_engine is not None:
@@ -579,6 +645,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
         stats["target_written"] = True
         _create_target_schema(target_engine, target_is_pg)
         check_target_schema(target_engine)
+        _mark_unverified(target_engine, 'migration')
 
         # 5. One consistent view of the source, streamed over in batches.
         with consistent_source(snapshot) as (src, source_view, source_is_pg):
@@ -609,6 +676,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
         # 6. What landed is checked before the caller is told it can switch.
         stats["validation"] = verify_migration(
             target_engine, result.tables, target_is_pg=target_is_pg)
+        _lift_unverified(target_engine)
 
         # Measured last, so it covers the whole copy and its verification.
         drift = _source_drift(result.tables)
@@ -658,6 +726,35 @@ def _refusal_kind(exc: Exception) -> str:
         if isinstance(exc, kind):
             return name
     return 'error'
+
+
+# Codes a retry can clear, from the PostgreSQL documentation, appendix A "PostgreSQL Error Codes":
+# class 08 (connection), serialization, deadlock, too many connections, server shut down
+_TRANSIENT_SQLSTATES = ('08', '40001', '40P01', '53300', '57P01', '57P02', '57P03')
+_TRANSIENT_SQLITE = ('database is locked',)
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """Whether the failure, or one it was raised from, is one the same retry can clear."""
+    from sqlalchemy import exc as sa_exc
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if isinstance(exc, (ConnectionError, TimeoutError, sa_exc.DisconnectionError,
+                            sa_exc.TimeoutError)):
+            return True
+        if isinstance(exc, sa_exc.DBAPIError):
+            if exc.connection_invalidated:
+                return True
+            orig = exc.orig
+            state = str(getattr(orig, 'sqlstate', None) or getattr(orig, 'pgcode', None) or '')
+            if state.startswith(_TRANSIENT_SQLSTATES):
+                return True
+            if isinstance(exc, sa_exc.OperationalError) and any(
+                    marker in str(orig).lower() for marker in _TRANSIENT_SQLITE):
+                return True
+        exc = exc.__cause__ or exc.__context__
+    return False
 
 
 def _rollback_hint(target_url: str, stats: dict) -> str:

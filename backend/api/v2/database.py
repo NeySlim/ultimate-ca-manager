@@ -178,19 +178,24 @@ def _switch_backend():
         # this, the new DB has no users and the operator is locked out.
         ok_boot, boot_msg, boot_stats = svc.bootstrap_auth_to_target(database_url)
         if not ok_boot:
-            # A step cut short is resumed on the same target. A copy that failed its verification
-            # is not (the next attempt would take its accounts as they are), and a table or column
-            # the plan refused is refused again.
-            reset = ''
-            if boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
-                reset = (
-                    ' The copy on the target failed its verification; reset the target before retrying.'
-                    if boot_stats.get('refusal') == 'verification'
-                    else ' Retrying on the same target resumes the switch.')
+            # A transient failure is retried as it is, before or after the target was written. A
+            # step cut short otherwise resumes once its cause is corrected; accounts that failed
+            # their verification are emptied, copied and verified again; a refused plan stays refused.
+            advice, status = '', _refusal_status(boot_stats)
+            if boot_stats.get('transient'):
+                again = ('resumes the switch' if boot_stats.get('target_written')
+                         else 'starts it again')
+                advice = f' A transient failure stopped it: retrying on the same target {again}.'
+                status = 503
+            elif boot_stats.get('target_written') and boot_stats.get('refusal') != 'preflight':
+                if boot_stats.get('refusal') == 'verification':
+                    advice = ' The copy on the target failed its verification; retrying copies the accounts again.'
+                else:
+                    advice = ' Correct the cause above, then retry: the switch resumes on the same target.'
             return error_response(
                 'Pre-flight bootstrap failed, so the backend was not '
-                f'switched. {svc._redact_uri(boot_msg)}{reset}',
-                _refusal_status(boot_stats),
+                f'switched. {svc._redact_uri(boot_msg)}{advice}',
+                status,
             )
     else:
         # The file DATABASE_PATH names may be left by an older release: the start must accept it

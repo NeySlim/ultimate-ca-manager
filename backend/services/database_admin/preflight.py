@@ -75,6 +75,12 @@ IGNORED_TABLES = frozenset({"alembic_version", "flask_sessions"})
 #       migration against a schema that already has them.
 INTERNAL_TABLES = frozenset({"_migrations"})
 
+# Present on a target from the start of a copy until its verification passed, one row per kind:
+# a switch copies its accounts again beside 'switch' and refuses them beside 'migration'.
+# Never copied, and skipped by the emptiness count: a migration may restart over it.
+TRANSFER_MARKER = "_transfer_unverified"
+
+
 # {table: {column: reason}} — columns an installation still carries and the
 # models no longer declare, so ``create_all`` does not create them on the
 # target and their values cannot go anywhere.
@@ -344,7 +350,7 @@ def check_target_is_empty(target_engine) -> Dict[str, int]:
     inspector = _inspector(target_engine, "target")
     tables = _table_names(inspector, "target")
 
-    known = set(expected) | INTERNAL_TABLES | IGNORED_TABLES
+    known = set(expected) | INTERNAL_TABLES | IGNORED_TABLES | {TRANSFER_MARKER}
     foreign = sorted(t for t in tables if t not in known)
     if foreign:
         raise PreflightError(
@@ -376,6 +382,10 @@ def check_target_is_empty(target_engine) -> Dict[str, int]:
     conn = _connect(target_engine, "target")
     try:
         for table in sorted(tables):
+            # The marker is what a failed attempt leaves behind; the retry
+            # sets it again, and any rows copied beside it count in their table.
+            if table == TRANSFER_MARKER:
+                continue
             try:
                 count = _table_row_count(conn, table)
             except PreflightError:
