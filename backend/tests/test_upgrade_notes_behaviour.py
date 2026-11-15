@@ -1,6 +1,6 @@
-"""Behaviours the 3.0 upgrade notes state that no other test pins: discovery dates in UTC,
-the activity feed failing loudly, expiry webhooks caught up after a stop, and the
-connections a PostgreSQL deployment without Redis opens."""
+"""Behaviours the 3.0 upgrade notes state: the activity feed failing loudly, expiry webhooks
+caught up after a stop, the connections a PostgreSQL deployment without Redis opens, and
+discovery dates in UTC (also pinned by test_discovery_timestamps.py)."""
 import uuid
 from datetime import datetime, timedelta
 from types import SimpleNamespace
