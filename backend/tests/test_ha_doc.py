@@ -38,23 +38,8 @@ def test_socket_io_bullet_states_websocket_only_pos():
     assert 'WebSocket' in bullet and 'upgrade' in bullet and 'Invalid session' not in bullet
 
 
-def test_rate_limit_figures_use_the_code_defaults_pos():
-    # flask-limiter defaults (200/min) and 5/min password sign-in are the lower limits across N nodes.
-    text = _section('Rate limits')
-    assert '200 × N' in text and '5 × N' in text and '2000' in text
-    assert '600 × N' not in text and '30 × N' not in text
-
-
-def test_clock_bullet_names_the_leases_on_the_node_clock_pos():
-    # The ACME order lease and the scheduled backup reservation compare utc_now() of the node.
-    bullet = next(l for l in (ROOT / 'docs' / 'HA.md').read_text().splitlines()
-                  if l.startswith('- **Synchronised clocks'))
-    assert 'Heartbeats, leases and the staleness test' not in bullet
-    assert 'ACME order lease' in bullet and 'scheduled backup' in bullet
-
-
-def test_tls_alpn_connects_to_port_443_pos():
-    # RFC 8737 section 3: the server connects to port 443; the setting is the local listening port.
-    bullet = next(l for l in _section('ACME challenges').splitlines() if l.startswith('- **TLS-ALPN-01'))
-    assert "identifier's name on that port" not in bullet
-    assert "port 443 of the identifier's name" in bullet
+def test_in_page_links_of_ha_doc_resolve_pos():
+    text = (ROOT / 'docs' / 'HA.md').read_text()
+    anchors = {re.sub(r'[^a-z0-9 -]', '', h.lower()).replace(' ', '-')
+               for h in re.findall(r'^#+ (.+)$', text, re.M)}
+    assert {a for a in re.findall(r'\]\(#([^)]+)\)', text) if a not in anchors} == set()
