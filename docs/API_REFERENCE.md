@@ -555,7 +555,7 @@ through `hsm_provider_id`) answers `409` with code `ha_mode`, whatever the CA ty
 
 An HSM key backs one authority: `hsm_key_id` of a key an X.509 or SSH CA already holds answers `409`, naming that CA.
 
-A CA on an HSM key (`hsm_key_id`, or `hsm_provider_id` for a new key on the token), internal or `external`, requires `read:hsm` besides `write:cas`: `403` names the missing permission otherwise, before anything is checked or generated.
+A CA on an HSM key (`hsm_key_id`, or `hsm_provider_id` for a new key on the token), internal or `external`, requires `read:hsm` besides `write:cas`: `403` names the missing permission otherwise, before the key is looked up or generated.
 
 Optional `namedUrls: true` gives the CA an immutable unique slug derived from
 its name, used instead of the random id in CDP/AIA URL paths (both forms keep
