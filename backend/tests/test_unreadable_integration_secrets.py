@@ -497,3 +497,33 @@ def test_ad_connector_inline_test_with_a_blank_password_names_the_saved_one(app,
     assert status == 400
     assert 'AD connector 24 bind password cannot be decrypted' in response.get_json()['message']
     assert ldap_binds == []
+
+
+@pytest.mark.parametrize('route,body', [
+    ('/api/v2/scep/intune-apps/test', lambda app_id: {'app_id': app_id}),
+    ('/api/v2/scep/profiles/test-intune-connection', lambda app_id: {'intune_app_id': app_id}),
+], ids=['app', 'pre-092'])
+def test_intune_test_names_an_unreadable_saved_secret(app, auth_client, monkeypatch, route, body):
+    from api.v2 import scep as scep_api
+    from models import db
+    from models.scep import IntuneApp
+    tried = []
+    monkeypatch.setattr(scep_api, '_test_intune_credentials', lambda *a: tried.append(a))
+    token = _foreign_token('the-intune-secret')
+    with app.app_context():
+        row = IntuneApp(name=f'unreadable-{uuid.uuid4().hex[:6]}', tenant_id='t.example',
+                        client_id=f'c-{uuid.uuid4().hex[:6]}', client_secret=token)
+        db.session.add(row)
+        db.session.commit()
+        app_id = row.id
+    try:
+        r = auth_client.post(route, json=body(app_id))
+        assert r.status_code == 400
+        text = r.get_data(as_text=True)
+        assert f'Intune app {app_id} client secret cannot be decrypted' in text
+        assert token not in text and 'the-intune-secret' not in text
+        assert tried == []
+    finally:
+        with app.app_context():
+            db.session.delete(db.session.get(IntuneApp, app_id))
+            db.session.commit()
