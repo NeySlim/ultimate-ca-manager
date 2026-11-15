@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -149,6 +149,8 @@ describe('TrustStorePage — opens detail after add/import', () => {
   })
 })
 
+const Where = () => <span data-testid="where">{useLocation().pathname}</span>
+
 describe('TrustStorePage: the work-queue link /truststore/:id opens the anchor', () => {
   beforeEach(() => { mockIsMobile = false; openEntity.mockReset() })
 
@@ -159,9 +161,11 @@ describe('TrustStorePage: the work-queue link /truststore/:id opens the anchor',
           <Route path="/truststore/:id" element={<TrustStorePage />} />
           <Route path="/truststore" element={<TrustStorePage />} />
         </Routes>
+        <Where />
       </MemoryRouter>
     )
     await waitFor(() => expect(openEntity).toHaveBeenCalledWith('truststore', 7))
     expect(openEntity).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/truststore'))
   })
 })
