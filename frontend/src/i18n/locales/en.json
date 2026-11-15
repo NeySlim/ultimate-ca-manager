@@ -5512,7 +5512,6 @@
     "pendingMessage": "Certificate request is pending manager approval on Microsoft CA",
     "issued": "Issued",
     "denied": "Denied",
-    "superseded": "Signed elsewhere",
     "checkStatus": "Check Status",
     "checkIssued": "Certificate issued and imported",
     "checkStillPending": "Still pending manager approval on the CA",

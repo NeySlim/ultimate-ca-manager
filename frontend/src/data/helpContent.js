@@ -1939,7 +1939,7 @@ export const helpContent = {
           { label: 'Template Selection', text: 'Choose from available certificate templates on the MS CA' },
           { label: 'Auto-Approved', text: 'Templates with autoenroll return the certificate immediately' },
           { label: 'Manager Approval', text: 'Some templates require manager approval, UCM tracks the pending request' },
-          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM: use Check status in the CSR details, or approve it from the CA Control Panel. Inventory sync also completes a pending request the CA shows issued, and marks one it shows denied. A request whose CSR is signed elsewhere (a local CA, an import) is closed as Signed elsewhere, and a certificate the CA still issues for it enters through inventory sync as a separate certificate' },
+          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM: use Check status in the CSR details, or approve it from the CA Control Panel. Inventory sync also completes a pending request the CA shows issued, and marks one it shows denied. A request whose CSR is signed elsewhere (a local CA, an import) is closed, and Check status then shows "This CSR was signed elsewhere: its Microsoft CA request is closed". A certificate the CA still issues for it enters as a separate certificate when the request is approved from the CA Control Panel, or through a full inventory sync (full: true on POST /api/v2/microsoft-cas/{id}/inventory-sync): Import from CA now and the scheduled sync are incremental and can miss it' },
         ]
       },
       {
