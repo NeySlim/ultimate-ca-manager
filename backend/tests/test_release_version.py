@@ -513,3 +513,17 @@ def test_release_publish_takes_the_section_of_the_workflow(tmp_path, version, ma
 def test_release_publish_refuses_a_missing_section(tmp_path):
     result, notes = _publish(tmp_path, '3.2', PUBLISH_CHANGELOG)
     assert result.returncode != 0 and notes is None
+
+
+# ---- 8. the release notes prescribe the FIPS stream of the installation guide ----------------------
+
+def _pro_streams(text):
+    return set(re.findall(r'sudo pro enable ([a-z-]+)', text))
+
+
+def test_the_release_notes_enable_the_ubuntu_stream_of_the_guide(tmp_path):
+    result, notes = _notes_step(tmp_path, '3.0', '## [3.0] - 2026-12-01\n- Marker.\n')
+    assert result.returncode == 0, result.stderr
+    guide = (ROOT / 'docs' / 'installation' / 'README.md').read_text()
+    # The `fips` stream ships the binaries certified under CMVP #5115; `fips-updates` does not
+    assert _pro_streams(notes.read_text()) == _pro_streams(guide) == {'fips'}

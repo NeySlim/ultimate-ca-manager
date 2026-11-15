@@ -1101,7 +1101,7 @@ def test_an_inactive_provider_is_reported(tmp_path):
 
 @pytest.mark.parametrize('os_release, command', [
     (ALMA, 'sudo fips-mode-setup --enable'),
-    (UBUNTU, 'sudo pro enable fips-updates'),
+    (UBUNTU, 'sudo pro enable fips '),
 ])
 def test_a_host_outside_fips_mode_is_told_how_to_enable_it(tmp_path, os_release, command):
     envfile = tmp_path / 'ucm.env'
@@ -1109,6 +1109,7 @@ def test_a_host_outside_fips_mode_is_told_how_to_enable_it(tmp_path, os_release,
     result = _finish(tmp_path, envfile, 0, os_release)
     assert result.returncode == 0
     assert 'not in FIPS mode' in result.stdout and command in result.stdout
+    assert 'fips-updates' not in result.stdout
     assert 'UCM_FIPS=' not in envfile.read_text().replace('UCM_FIPS_BUILD=', '')
 
 
