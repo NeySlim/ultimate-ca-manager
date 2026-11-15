@@ -486,3 +486,34 @@ def test_a_compensation_that_failed_keeps_the_only_copy(dirs, monkeypatch):
 
     assert files.sweep_kept_previous_contents() == kept    # no row: it never committed
     assert pem.read_bytes() == b'UNBOUND HTTPS KEY'
+
+
+class _Kill(BaseException):
+    """A process killed: no handler runs."""
+
+
+def test_a_copy_cut_short_is_never_put_back_over_an_intact_original(dirs, monkeypatch):
+    key = dirs['private'] / 'ca.key'
+    key.write_bytes(b'INTACT ORIGINAL KEY' * 100)
+    staged = StagedFiles(base_dir=dirs['backups'].parent / 'staging')
+    staged.stage(key, b'REPLACEMENT')
+
+    def no_link(*args, **kwargs):
+        raise OSError(errno.EPERM, 'protected hardlinks')
+
+    def copy_then_die(source, target, *args, **kwargs):
+        target.write(source.read(5))
+        target.flush()
+        raise _Kill()
+    with monkeypatch.context() as patched:
+        patched.setattr(files.os, 'link', no_link)
+        patched.setattr(files.shutil, 'copyfileobj', copy_then_die)
+        with pytest.raises(_Kill):
+            staged.publish()
+    assert key.read_bytes() == b'INTACT ORIGINAL KEY' * 100
+    kept = next(dirs['private'].glob('.ucm_restore_kept_*'))
+    assert not (kept / 'previous_000000').exists()
+
+    files.sweep_kept_previous_contents()
+    assert key.read_bytes() == b'INTACT ORIGINAL KEY' * 100
+    assert not kept.exists()

@@ -729,12 +729,17 @@ def _write_private(path: Path, data: bytes, mode: int) -> None:
 
 
 def _copy_private(source: Path, kept: Path) -> None:
-    """A private copy of `source`, streamed: the previous content of a destination."""
-    fd = os.open(kept, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    """A private copy of `source`, streamed: the previous content of a destination.
+
+    Written under a name recovery never reads, synced, then renamed: a `previous_NNNNNN`
+    is always a complete copy (its directory is synced before any destination changes)."""
+    partial = kept.with_name('.copying_' + kept.name)
+    fd = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'wb') as out, open(source, 'rb') as handle:
         shutil.copyfileobj(handle, out)
         out.flush()
         os.fsync(out.fileno())
+    os.replace(partial, kept)
 
 
 def _put_back(kept: Path, destination: Path, mode: int) -> None:
