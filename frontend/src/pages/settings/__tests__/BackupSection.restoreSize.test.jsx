@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
@@ -50,6 +50,13 @@ describe('restore picker follows the server ceilings', () => {
     const file = fakeFile(11)
     pick(container, file)
     expect(setRestoreFile).toHaveBeenCalledWith(file)
+  })
+
+  it('sets no client ceiling when v4 archives have none (archive_bytes 0)', async () => {
+    const { container, setRestoreFile } = setup({ upload_bytes: 512 * MIB, archive_bytes: 0 })
+    const file = fakeFile(1024)
+    pick(container, file)
+    await waitFor(() => expect(setRestoreFile).toHaveBeenCalledWith(file))
   })
 
   it('refuses a file above the announced ceiling and says it', () => {
