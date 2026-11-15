@@ -123,12 +123,13 @@ def lock_issuer_records(ca):
 
 def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requester_sid=None,
                          pattern=False, override=False, source='manual', requester=None, locked=True,
-                         audited=True):
+                         audited=True, previous=()):
     """Raise :class:`SubjectTaken` (session rolled back, refusal audited) when another entity's
     certificate of *ca* carries *issued*'s subject; called under the CA row lock. With *override*
     (manual issuance and CSR signing), return an :class:`Override` instead. ``locked=False``: the
     early check before anything is published, without the lock, repeated under it.
-    ``audited=False``: the caller writes the refusal's one audit entry (WSTEP)."""
+    ``audited=False``: the caller writes the refusal's one audit entry (WSTEP). *previous*: the
+    ``(row, certificate)`` pairs an in-place renewal replaces, the requester's by their key and SID."""
     if not applies(ca, pattern) or len(issued.subject) == 0:
         return None
     from models import Certificate, db
@@ -151,9 +152,14 @@ def refuse_taken_subject(ca, issued, *, own=(), renews=(), holder=None, requeste
         if held is not None and same_name(held.subject, issued.subject):
             carriers.append((row, held))
     # A row is the requester's when one row of its entity is: one grouping, as the count's
-    groups = _entities(carriers, full)
-    others = [g for g in groups if not any(who.same_as(row, held, full) for row, held in g)]
+    replaced = [held for _row, held in previous if held is not None]
+    flagged = _grouped(carriers, full, replaced)
+    groups = [g for g, _mine in flagged]
+    others = [g for g, mine in flagged
+              if not mine and not any(who.same_as(row, held, full) for row, held in g)]
     if not others:
+        if full:
+            _keep_linked(previous, flagged, who, issued)
         return None
     taken = others[0][0][0]
     if override and full:
@@ -188,19 +194,41 @@ def _attested(own, groups, taken):
 def _entities(carriers, full=True):
     """The (row, certificate) pairs grouped by entity, merged on any shared proof: key, recorded
     identity or lineage, SID (the SID only for a common name pattern). In first-row order."""
+    return [g for g, _mine in _grouped(carriers, full)]
+
+
+def _grouped(carriers, full, replaced=()):
+    """``[(members, mine)]``: the grouping of :func:`_entities`, where the *replaced* certificates
+    (rowless) link by key and SID and make *mine* the groups they join; never members themselves."""
     from services.trust_store.csr_operations_mixin import ad_security_extension_sid
-    groups = []  # one entry per entity: [members, keys, identities, SIDs]
-    for row, held in carriers:
+    groups = []  # one entry per entity: [members, keys, identities, SIDs, mine]
+    entries = [(row, held, False) for row, held in carriers] + [(None, held, True) for held in replaced]
+    for row, held, is_replaced in entries:
         sid = {ad_security_extension_sid(held)} - {None}
-        mine = [[(row, held)], {_spki(held)} - {None} if full else set(),
-                _identities(row) if full else set(), sid]
+        mine = [[] if is_replaced else [(row, held)], {_spki(held)} - {None} if full else set(),
+                _identities(row) if full and row is not None else set(), sid, is_replaced]
         joined = [g for g in groups if g[1] & mine[1] or g[2] & mine[2] or g[3] & mine[3]]
         groups = [g for g in groups if all(g is not j for j in joined)]
         merged = [[m for g in [mine, *joined] for m in g[0]],
-                  *(set().union(*(g[i] for g in [mine, *joined])) for i in (1, 2, 3))]
+                  *(set().union(*(g[i] for g in [mine, *joined])) for i in (1, 2, 3)),
+                  any(g[4] for g in [mine, *joined])]
         groups.append(merged)
-    members = [sorted(g[0], key=lambda m: m[0].id) for g in groups]
-    return sorted(members, key=lambda g: g[0][0].id)
+    members = [(sorted(g[0], key=lambda m: m[0].id), g[4]) for g in groups if g[0]]
+    return sorted(members, key=lambda g: g[0][0][0].id)
+
+
+def _keep_linked(previous, flagged, who, issued):
+    """A renewed row without lineage whose new key leaves the carriers of its old key takes the
+    first one's lineage, so they stay one entity (the SID extension is copied, never lost)."""
+    from utils.dn_match import same_name
+    for row, held in previous:
+        old = _spki(held) if held is not None else None
+        if (row is None or row.subject_holder or old is None or old == who.spki
+                or not same_name(held.subject, issued.subject)):
+            continue
+        anchor = next((r for g, mine in flagged if mine for r, h in g if _spki(h) == old), None)
+        if anchor is not None:
+            row.subject_holder = lineage(anchor)
 
 
 def _audit_refusal(ca, taken, source, requester):

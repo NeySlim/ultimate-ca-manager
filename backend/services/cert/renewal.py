@@ -224,6 +224,8 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
     of a related pair is renewed with it, A first, in the same commit."""
     try:
         members = _renewal_members(cert)
+        # Read before a row takes its new certificate: the replaced ones prove the entity
+        previous = [(m, _stored(m)) for m in members]
         pair = len(members) == 2
         staged_all, renewed_a = [], None
         for index, member in enumerate(members):
@@ -236,7 +238,8 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                     known_serial=known_serial if is_cert else SERIAL_UNSET,
                     validity_days=validity_days, related_to=related_to,
                     precheck=lambda signer, issued: _refuse_taken(
-                        signer, issued, members, trigger, username, locked=False))
+                        signer, issued, members, trigger, username, locked=False,
+                        previous=previous))
             except RenewalError as e:
                 if is_cert:
                     raise
@@ -261,7 +264,8 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         # The renewed row is the same entity (RFC 5280 §4.1.2.6), and so is its pair partner
         rows = [s['cert'] for s in staged_all]
         for s in staged_all:
-            _refuse_taken(s['ca'], x509.load_pem_x509_certificate(s['cert_pem']), rows, trigger, username)
+            _refuse_taken(s['ca'], x509.load_pem_x509_certificate(s['cert_pem']), rows, trigger, username,
+                          previous=previous)
     except Exception:
         db.session.rollback()
         raise
@@ -294,14 +298,21 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
     return outcome
 
 
-def _refuse_taken(ca, issued, rows, trigger, username, locked=True):
+def _refuse_taken(ca, issued, rows, trigger, username, locked=True, previous=()):
     """RFC 5280 §4.1.2.6: the renewed rows are the same entity; another one's subject is a 409."""
     try:
         refuse_taken_subject(ca, issued, own=rows, source=f'renewal ({trigger})', requester=username,
-                             locked=locked)
+                             locked=locked, previous=previous)
     except SubjectTaken as e:
         raise RenewalError(f'{e.audited[:1].upper()}{e.audited[1:]}, issued by this CA to '
                            'another entity: the CA requires a unique subject', 409) from e
+
+
+def _stored(row):
+    try:
+        return x509.load_pem_x509_certificate(b64decode(row.crt)) if row.crt else None
+    except (ValueError, InvalidRequestError):  # unreadable or deleted: check_renewable answers
+        return None
 
 
 def _renewal_members(cert):

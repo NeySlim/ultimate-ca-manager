@@ -463,6 +463,58 @@ def test_an_override_on_rows_of_one_sid_renews_every_row(app, auth_client, creat
     assert _issue(auth_client, ca, cn).status_code == 409
 
 
+def _key_rows(app, ca, cn, key, count=2):
+    """Certificates of *ca* bound to one requester by their key alone, the server holding it."""
+    from services.ca_service import CAService
+    rows = []
+    with app.app_context():
+        for _ in range(count):
+            _pem, serial = CAService.sign_csr_from_crypto(db.session.get(CA, ca['id']), _csr(cn, key),
+                                                          validity_days=30, source='test')
+            row = Certificate.query.filter_by(caref=ca['refid'], serial_number=str(int(serial, 16))).one()
+            row.subject_holder = None
+            _keep_key(row, key)
+            db.session.commit()
+            rows.append({'id': row.id, 'refid': row.refid, 'serial_number': row.serial_number})
+    return rows
+
+
+def _shared(app, ca):
+    from services.cert.unique_subject import shared_subjects
+    with app.app_context():
+        return shared_subjects(db.session.get(CA, ca['id']))
+
+
+@pytest.mark.parametrize('first', [0, 1])
+@pytest.mark.parametrize('how', ['button', 'api', 'auto'])
+def test_rows_of_one_key_renew_with_a_new_key_and_stay_one_entity(app, auth_client, create_ca, how, first):
+    """The renewed row's replaced certificate joins its entity: a new key does not make the other
+    row of the old key another entity, and the lineage it takes keeps both renewing."""
+    cn = f'rekey-{how}-{first}.unique.test'
+    ca = unique_ca(app, create_ca, f'Unique rekey {how} {first} CA', on=False)
+    rows = _key_rows(app, ca, cn, _key())
+    with app.app_context():
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    assert _shared(app, ca) == []
+    order = [rows[first], rows[1 - first]] * 2
+    assert [_renews(app, auth_client, held, how) for held in order] == [True] * 4
+    assert _shared(app, ca) == []
+    assert _issue(auth_client, ca, cn).status_code == 409
+
+
+@pytest.mark.parametrize('how', ['button', 'api', 'auto'])
+def test_rows_of_one_sid_renew_with_a_new_key_in_any_order(app, auth_client, create_ca, how):
+    cn = f'rekey-sid-{how}.unique.test'
+    ca = unique_ca(app, create_ca, f'Unique rekey sid {how} CA', on=False)
+    rows = _sid_rows(app, ca, cn, 'S-1-5-21-1004336348-1177238915-682003330-1002')
+    with app.app_context():
+        db.session.get(CA, ca['id']).enforce_unique_subject = True
+        db.session.commit()
+    assert [_renews(app, auth_client, held, how) for held in (rows[1], rows[0], rows[1])] == [True] * 3
+    assert _shared(app, ca) == []
+
+
 def test_a_subject_two_groups_carry_stays_refused(app, auth_client, create_ca):
     """Two entities, each of two rows of one key: a request of either key is refused, the
     other entity's first row named; the count says one shared subject."""
