@@ -383,8 +383,8 @@ SIGNER_CONFIG_KEY = 'tsa_signer_cert_refid'
 
 
 def configured_signer_refid() -> str:
-    """Configured dedicated-signer refid, stripped, or '' when unset: what /tsa and the
-    configuration API read the setting through."""
+    """Configured dedicated-signer refid, stripped, or '' when unset: what /tsa, the
+    configuration API and the overview read the setting through."""
     try:
         from models import SystemConfig
         cfg = SystemConfig.query.filter_by(key=SIGNER_CONFIG_KEY).first()
@@ -613,8 +613,8 @@ def tsa_ca_certificate_path_ready() -> bool:
     Only meaningful when no dedicated signer is configured. Mirrors the gates
     in api/tsa_protocol.py: tsa_require_dedicated_cert turned off, and an
     admin-designated tsa_ca_refid resolving to a CA
-    that exists, holds its cert and key, is not offline, and is within its
-    validity period. Without this the
+    that exists, holds its cert and key, is not offline, is within its
+    validity period and has a key that signs timestamps. Without this the
     protocol returns 503, so the dashboard must not report the CA path online.
     Only consumer is the dashboard, which wraps its own block.
     """
@@ -633,4 +633,5 @@ def tsa_ca_certificate_path_ready() -> bool:
         cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
     except Exception:
         return False
-    return certificate_validity_problem(cert) is None
+    return (certificate_validity_problem(cert) is None
+            and tsa_signer_key_problem(cert.public_key()) is None)

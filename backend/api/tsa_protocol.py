@@ -142,10 +142,16 @@ def timestamp_request():
                 response.headers['Content-Type'] = 'text/plain'
                 return response
 
-            # Load CA cert and key
-            signer_cert = x509.load_pem_x509_certificate(
-                base64.b64decode(ca.crt), default_backend()
-            )
+            # Load CA cert and key; a certificate that cannot be read is a configuration fault
+            try:
+                signer_cert = x509.load_pem_x509_certificate(
+                    base64.b64decode(ca.crt), default_backend()
+                )
+            except Exception:
+                logger.error("TSA request refused: CA '%s' certificate cannot be read", ca.descr)
+                response = make_response('TSA configuration invalid', 503)
+                response.headers['Content-Type'] = 'text/plain'
+                return response
             # A token dated outside the signer's validity verifies nowhere
             validity = certificate_validity_problem(signer_cert)
             if validity:

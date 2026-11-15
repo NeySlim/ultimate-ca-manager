@@ -280,9 +280,8 @@ def get_expiring_certificates():
 
     # Flag the configured dedicated TSA signer so the widget can mark it as
     # infrastructure — its expiry means /tsa starts returning 503.
-    tsa_signer_refid = db.session.execute(
-        text("SELECT value FROM system_config WHERE key = 'tsa_signer_cert_refid'")
-    ).scalar() or None
+    from services.tsa_service import configured_signer_refid
+    tsa_signer_refid = configured_signer_refid() or None
 
     # Delegated OCSP responders are infrastructure too: their expiry ends OCSP answers for the CA
     ocsp_ids = set()

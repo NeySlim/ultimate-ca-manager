@@ -233,3 +233,16 @@ def test_dropping_the_signer_judges_the_ca_only_in_compatibility(
     tsa(tsa_ca_refid=ed_ca, tsa_signer_cert_refid=signer['refid'], **({KEY: 'false'} if compat else {}))
     r = _patch(auth_client, {'signer_cert_refid': ''})
     assert r.status_code == status, r.get_json()
+
+
+def test_a_ca_certificate_that_cannot_be_read_is_a_503(app, client, create_ca, tsa):
+    refid = _ca_refid(app, create_ca, 'TSA compat unreadable CA')
+    with app.app_context():
+        import base64
+        ca = CA.query.filter_by(refid=refid).first()
+        ca.crt = base64.b64encode(b'not a certificate').decode()
+        db.session.commit()
+    tsa(tsa_ca_refid=refid, **{KEY: 'false'})
+    resp = _post(client, b'unreadable')
+    assert resp.status_code == 503
+    assert resp.data == b'TSA configuration invalid'

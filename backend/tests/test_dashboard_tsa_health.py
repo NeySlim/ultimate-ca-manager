@@ -213,3 +213,22 @@ def test_the_reference_names_every_state_the_route_returns(
                         lambda: (_ for _ in ()).throw(RuntimeError('boom')))
     record()
     assert seen == _reference_tsa_rows()
+
+
+def test_a_ca_whose_key_cannot_sign_tokens_is_not_reported_signing(app, auth_client, tsa_config, create_ca):
+    # /tsa answers 503 for such a CA: the overview must not say the CA certificate signs
+    ca = create_ca(cn='tsa-health-ed25519', keyAlgo='EdDSA', keySize='Ed25519')
+    with app.app_context():
+        refid = db.session.get(CA, ca['id']).refid
+    tsa_config(tsa_enabled='true', tsa_signer_cert_refid='', tsa_ca_refid=refid,
+               tsa_require_dedicated_cert='false')
+    tsa = _tsa(auth_client)
+    assert (tsa['state'], tsa['alert'], tsa['severity']) == ('no_signer', False, None)
+
+
+def test_expiring_certs_flag_a_signer_stored_with_blanks(auth_client, tsa_config, create_cert):
+    signer = create_cert(cn='tsa-health-padded-signer', validity_days=20)
+    tsa_config(tsa_signer_cert_refid=f"  {signer['refid']}\n")
+    r = auth_client.get('/api/v2/dashboard/expiring-certs?limit=200')
+    by_refid = {c['refid']: c for c in get_json(r)['data']}
+    assert by_refid[signer['refid']]['is_tsa_signer'] is True
