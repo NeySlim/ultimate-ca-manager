@@ -32,7 +32,7 @@ FIPS_LINE=UCM_FIPS_BUILD=1
 # An item rename(2) cannot take out of its filesystem goes into <its directory>/$LOCAL_PREFIX<archive>
 LOCAL_PREFIX=.ucm-archive-
 # LOCALS: the local archives this run made, one per line between newlines
-DEST="" JOURNAL="" MADE_PARENT="" LOCALS=$NL EARLIER=""
+DEST="" JOURNAL="" MADE_PARENT="" LOCALS=$NL EARLIER="" LAST_ERR="" LAST_DIR=""
 
 log_line() {
     { mkdir -p "${LOG%/*}" && printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "$LOG"; } \
@@ -65,9 +65,22 @@ is_mount() {
 # rename(2) of $1 to $2 (absent), never a copy: GNU mv copies when it is refused (EXDEV),
 # outside the journal. Fails, moving nothing, without an interpreter.
 rename_item() {
-    [ -n "$PYTHON" ] && "$PYTHON" -I -c \
+    LAST_ERR=""
+    [ -n "$PYTHON" ] || return 1
+    err=$("$PYTHON" -I -c \
         'import os, sys; a, b = sys.argv[1:]; os.path.lexists(b) and sys.exit(1); os.rename(a, b)' \
-        "$1" "$2" 2>/dev/null
+        "$1" "$2" 2>&1) && return 0
+    failed_in "$(dir_of "$2")" "$(printf '%s\n' "$err" | tail -n 1)"
+    return 1
+}
+
+# A failed write keeps the system's error and the directory written in, for fail() to name
+failed_in() { LAST_DIR=$1 LAST_ERR=$2; }
+
+# mkdir of $1, mode $2 if given
+make_dir() {
+    LAST_ERR=""
+    err=$(mkdir ${2:+-m "$2"} -- "$1" 2>&1) || { failed_in "$(dir_of "$1")" "$err"; return 1; }
 }
 
 present() { [ -e "$1" ] || [ -L "$1" ]; }
@@ -84,7 +97,9 @@ jot() {
     if [ -e "$JOURNAL" ]; then
         [ -z "$(tail -c 1 -- "$JOURNAL")" ] && size=$(wc -c < "$JOURNAL") || return 1
     fi
-    printf '%s\n' "$1" | tee -a -- "$JOURNAL" >/dev/null && return 0
+    LAST_ERR=""
+    err=$(printf '%s\n' "$1" | tee -a -- "$JOURNAL" 2>&1 >/dev/null) && return 0
+    failed_in "${JOURNAL%/*}" "$err"
     truncate -s "$size" -- "$JOURNAL" 2>/dev/null
     return 1
 }
@@ -120,7 +135,7 @@ move_item() {
         *"$NL$loc$NL"*) ;;
         *)  # Another's directory of that name is never written into, nor removed
             if present "$loc"; then rc=3; else
-                { jot "mkdir$TAB${dir:-/}$TAB$loc" && mkdir -m 700 -- "$loc"; } || return 2
+                { jot "mkdir$TAB${dir:-/}$TAB$loc" && make_dir "$loc" 700; } || return 2
                 LOCALS=$LOCALS$loc$NL made=1
             fi ;;
     esac
@@ -150,7 +165,7 @@ is_kept() {
 # local archive an earlier run left is not an item: it stays, and the README names it.
 archive_contents() {
     odd_names "$1"
-    { jot "mkdir$TAB$1$TAB$2" && mkdir -- "$2"; } || return 1
+    { jot "mkdir$TAB$1$TAB$2" && make_dir "$2"; } || return 1
     for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
         present "$entry" || continue
         case ${entry##*/} in "$LOCAL_PREFIX"*) EARLIER=$EARLIER$entry$NL; continue ;; esac
@@ -499,6 +514,9 @@ say "  $DB_FILE: $REASON"
 [ -n "$RENAME" ] || no_interpreter 1
 fail() {
     say "UCM: archiving what it left failed ($1)."
+    case $LAST_ERR in
+        *"No space left on device"*) say "No space left in $LAST_DIR: $LAST_ERR" ;;
+    esac
     rc=1
     if [ -n "$JOURNAL" ] && [ -f "$JOURNAL" ]; then
         if roll_back; then
@@ -549,7 +567,7 @@ case $(normal "$DB_FILE") in
     "$(normal "$DATA")"/*|"$(normal "$CONFIG")"/*) ;;
     *)  # A database in / is named there by "/", as a journal line has no empty field
         DB_DIR=${DB_FILE%/*}
-        { jot "mkdir$TAB${DB_DIR:-/}$TAB$DEST/database" && mkdir -- "$DEST/database"; } \
+        { jot "mkdir$TAB${DB_DIR:-/}$TAB$DEST/database" && make_dir "$DEST/database"; } \
             || fail "creating $DEST/database"
         for f in "$DB_FILE" "$DB_FILE-wal" "$DB_FILE-shm" "$DB_FILE-journal"; do
             [ -e "$f" ] || continue

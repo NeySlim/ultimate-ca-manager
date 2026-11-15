@@ -1713,3 +1713,35 @@ def test_a_run_that_said_a_line_dnf5_cuts_names_the_log_once(tmp_path, case):
     assert any(len(l) > 79 for l in lines)
     assert lines.count(note) == 1 and lines[-1] == note, out.stdout
     assert box.log.read_text().count(note) == 1
+
+
+# -- a full disk is named ------------------------------------------------------------
+
+def test_a_full_disk_under_the_journal_is_named_with_the_error_and_its_directory(tmp_path):
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    _full_disk(box, f'mkdir\t{box.data}/ca\t{box.archive}/data/ca', 'mkdir\t')
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert f'No space left in {box.archive}: tee: No space left on device' in out.stdout, out.stdout
+
+
+def test_a_full_disk_under_a_directory_made_is_named_with_the_error_and_its_directory(tmp_path):
+    box = Box(tmp_path, python='stub')
+    box.wrap()
+    target = box.archive / 'data' / 'ca'
+    (box.bin / 'mkdir').write_text(
+        f'#!/bin/sh\nfor last; do :; done\n[ "$last" != "{target}" ] || '
+        f'{{ echo "mkdir: cannot create directory \'$last\': No space left on device" >&2; exit 1; }}\n'
+        f'exec {REAL["mkdir"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == 1, (out.stdout, out.stderr)
+    assert (f"No space left in {box.archive}/data: mkdir: cannot create directory '{target}': "
+            'No space left on device') in out.stdout, out.stdout
+
+
+def test_another_failure_names_no_full_disk(tmp_path):
+    box = Box(tmp_path, python='stub')
+    box.wrap(fail='mkdir', at=3)
+    out = box.run()
+    assert out.returncode == 1 and 'No space left' not in out.stdout, out.stdout
