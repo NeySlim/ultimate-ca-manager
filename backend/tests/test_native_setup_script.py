@@ -776,7 +776,7 @@ def _systemctl_lines(record):
 
 
 RESTARTED = ['SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]',
-             'SYSTEMCTL start ucm [bin good ]']
+             'SYSTEMCTL reset-failed ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
 
 
 @pytest.mark.parametrize('trigger', ['pip fails', 'SIGHUP', 'SIGHUP after the switch', 'new venv fails'])

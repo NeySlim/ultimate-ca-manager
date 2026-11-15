@@ -42,7 +42,7 @@ def _update(tmp_path, dpkg, apt_get, stale_marker=False):
     calls = tmp_path / 'calls'
     _stub(bin_dir / 'dpkg', f'echo dpkg >> {calls}\nR={root}\n{dpkg}')
     _stub(bin_dir / 'apt-get', f'echo apt-get >> {calls}\nR={root}\n{apt_get}')
-    _stub(bin_dir / 'systemctl')
+    _stub(bin_dir / 'systemctl', f'echo "$*" >> {tmp_path}/systemctl.calls')
 
     env = _env(tmp_path, UBUNTU, {'PATH': str(bin_dir), 'UCM_WATCHER_ROOT': str(root),
                                   'UCM_SETUP_BUILD_LOG': str(root / 'var/log/ucm/fips-build.log')})
@@ -87,3 +87,29 @@ def test_a_successful_update(tmp_path):
     result, steps = _update(tmp_path, dpkg=INSTALL, apt_get='exit 0')
     assert steps == ['dpkg', 'apt-get']
     assert result['status'] == 'installed' and result['installed_version'] == '99.0'
+
+
+# A restart asked for (interface, update) is not one StartLimitBurst counts: that limit is for crashes
+INTENDED = ['reset-failed ucm', 'restart ucm']
+
+
+def test_an_update_resets_the_start_limit_before_it_restarts_the_service(tmp_path):
+    _update(tmp_path, dpkg=INSTALL, apt_get='exit 0')
+    assert (tmp_path / 'systemctl.calls').read_text().splitlines() == INTENDED
+
+
+def test_a_restart_asked_for_resets_the_start_limit_before_it_restarts_the_service(tmp_path):
+    root = tmp_path / 'root'
+    (root / 'opt/ucm/data').mkdir(parents=True)
+    (root / 'var/log/ucm').mkdir(parents=True)
+    (root / 'opt/ucm/data/.restart_requested').write_text('')
+    bin_dir = tmp_path / 'bin'
+    for util in ('date', 'tee', 'rm'):
+        (bin_dir / util).parent.mkdir(exist_ok=True)
+        (bin_dir / util).symlink_to(shutil.which(util))
+    _stub(bin_dir / 'systemctl', f'echo "$*" >> {tmp_path}/systemctl.calls')
+    result = subprocess.run([BASH, str(WATCHER)], capture_output=True, text=True,
+                            env={'PATH': str(bin_dir), 'UCM_WATCHER_ROOT': str(root)})
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / 'systemctl.calls').read_text().splitlines() == INTENDED
+    assert not (root / 'opt/ucm/data/.restart_requested').exists()

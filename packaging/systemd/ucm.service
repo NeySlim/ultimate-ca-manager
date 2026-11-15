@@ -57,7 +57,8 @@ LimitNPROC=512
 
 # Restart policy. A database the release refuses exits 78 (EX_CONFIG): restarting
 # cannot change it, so the unit stays failed until the cause is fixed. Restarts
-# asked from the interface go through ucm-watcher (systemctl restart).
+# asked from the interface go through ucm-watcher, which resets the start limit
+# first: StartLimitBurst counts crashes, not restarts asked for.
 Restart=on-failure
 RestartSec=10s
 RestartPreventExitStatus=78

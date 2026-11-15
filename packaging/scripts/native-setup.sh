@@ -334,6 +334,8 @@ recover_venv() {
     esac
     if [ -n "$SERVICE_STOPPED" ] && venv_ok "$venv"; then
         say "Starting UCM again..." >&2
+        # Stopped here, not crashed: not counted by the start limit
+        systemctl reset-failed ucm 2>/dev/null
         systemctl start ucm
     fi
 }

@@ -391,6 +391,25 @@ def test_the_deb_postinst_never_archives_on_an_upgrade_or_a_reconfigure(tmp_path
     assert 'systemctl start ucm' in calls
 
 
+def _started_after_a_reset(calls):
+    """An install's start is wanted: the start limit, meant for crashes, is reset first."""
+    systemctl = [c for c in calls if c.startswith('systemctl ') and ' ucm' in f'{c} ' and 'watcher' not in c]
+    start = systemctl.index('systemctl start ucm')
+    assert 'systemctl reset-failed ucm' in systemctl[:start], systemctl
+
+
+def test_the_deb_postinst_resets_the_start_limit_before_it_starts_the_service(tmp_path):
+    out, calls, *_ = _run_postinst(tmp_path, 'configure', '2.254')
+    assert out.returncode == 0, out.stderr
+    _started_after_a_reset(calls)
+
+
+def test_the_rpm_post_resets_the_start_limit_before_it_starts_the_service(tmp_path):
+    out, calls, *_ = _run_post(tmp_path, '2')
+    assert out.returncode == 0, out.stderr
+    _started_after_a_reset(calls)
+
+
 PENDING = '.leftover-archive-pending'
 
 

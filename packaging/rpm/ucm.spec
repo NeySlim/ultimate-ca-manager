@@ -273,6 +273,8 @@ fi
 # Start/restart service
 systemctl daemon-reload
 systemctl enable %{name}
+# Wanted, not a crash: not counted by the start limit (StartLimitBurst)
+systemctl reset-failed %{name} 2>/dev/null || true
 if systemctl is-active --quiet %{name}; then
     systemctl restart %{name} || true
 else
