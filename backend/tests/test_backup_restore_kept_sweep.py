@@ -104,6 +104,33 @@ def test_a_restore_killed_after_its_commit_keeps_what_it_published(dirs):
     assert not _row_exists(token)
 
 
+def test_a_restore_killed_halfway_through_publishing_is_put_back(dirs, monkeypatch):
+    # Killed while replacing the second of three: the third was never kept nor touched
+    paths = [dirs['certs'] / f'c{index}.crt' for index in range(3)]
+    for index, path in enumerate(paths):
+        path.write_bytes(b'old %d' % index)
+    staged = StagedFiles(base_dir=dirs['backups'].parent / 'staging')
+    for path in paths:
+        staged.stage(path, b'new', mode=0o644)
+    record_publication(staged.token)
+    real_publish, calls = StagedFiles._publish, []
+
+    def publish(self, entry):
+        calls.append(entry)
+        if len(calls) == 2:
+            raise KeyboardInterrupt()    # no handler of publish() runs, as in a kill
+        return real_publish(self, entry)
+    monkeypatch.setattr(StagedFiles, '_publish', publish)
+    with pytest.raises(KeyboardInterrupt):
+        staged.publish()
+    db.session.rollback()
+    assert paths[0].read_bytes() == b'new'
+
+    assert len(files.sweep_kept_previous_contents()) == 1
+    assert [path.read_bytes() for path in paths] == [b'old 0', b'old 1', b'old 2']
+    assert not list(dirs['certs'].glob('.ucm_restore_kept_*'))
+
+
 def test_an_unreadable_database_settles_nothing(dirs, monkeypatch):
     kept, key, pem, new = _killed_after_publish(dirs, committed=False)
 
