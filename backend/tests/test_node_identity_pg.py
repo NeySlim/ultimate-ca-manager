@@ -14,7 +14,8 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import event, text
+from sqlalchemy.pool import Pool
 
 from config.settings import Config
 from services import scheduler_leader, scheduler_service
@@ -131,19 +132,28 @@ def test_the_wait_for_a_held_row_keeps_no_transaction_open(app, ha):
     _put(app, node, 'old', age=0.5)
     with app.app_context():
         engine = db.engine
-    idle = []
+    idle, mine, me = [], set(), threading.get_ident()
+
+    def note(dbapi_connection, _record, _proxy):
+        # Only what this thread opens: another test's thread between two statements is not the wait
+        if threading.get_ident() == me:
+            mine.add(dbapi_connection.info.backend_pid)
 
     def pause(_):
         with engine.connect() as probe:
             idle.append(probe.execute(text(
-                "SELECT count(*) FROM pg_stat_activity WHERE application_name = :name"
+                "SELECT pid, query FROM pg_stat_activity WHERE pid = ANY(:pids)"
                 " AND state LIKE 'idle in transaction%' AND pid <> pg_backend_pid()"),
-                {'name': pg_app_harness.SCHEMA}).scalar())
+                {'pids': sorted(mine)}).all())
         time.sleep(0.05)
-    with app.app_context():
-        scheduler_leader.claim_node_at_start(node, 'new', stale_seconds=1, poll=0.05, sleep=pause,
-                                             release_at_exit=False)
-    assert idle and set(idle) == {0}
+    event.listen(Pool, 'checkout', note)
+    try:
+        with app.app_context():
+            scheduler_leader.claim_node_at_start(node, 'new', stale_seconds=1, poll=0.05, sleep=pause,
+                                                 release_at_exit=False)
+    finally:
+        event.remove(Pool, 'checkout', note)
+    assert mine and idle and not any(idle), idle
 
 
 def test_a_row_of_a_crashed_run_is_taken_once_its_heartbeat_expires(app, ha):
