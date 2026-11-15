@@ -242,8 +242,13 @@ def get_expiring_certificates():
     ).scalar() or None
 
     # Delegated OCSP responders are infrastructure too: their expiry ends OCSP answers for the CA
-    ocsp_refids = {row.value for row in SystemConfig.query.filter(
-        SystemConfig.key.startswith('ocsp_responder_cert_', autoescape=True)).all() if row.value}
+    ocsp_ids = set()
+    for row in SystemConfig.query.filter(
+            SystemConfig.key.startswith('ocsp_responder_cert_', autoescape=True)).all():
+        try:
+            ocsp_ids.add(int(row.value))
+        except (TypeError, ValueError):
+            continue
 
     return success_response(data=[{
         'id': cert.id,
@@ -254,7 +259,7 @@ def get_expiring_certificates():
         'valid_from': utc_isoformat(cert.valid_from),
         'valid_to': utc_isoformat(cert.valid_to),
         'is_tsa_signer': bool(tsa_signer_refid) and cert.refid == tsa_signer_refid,
-        'is_ocsp_responder': cert.refid in ocsp_refids,
+        'is_ocsp_responder': cert.id in ocsp_ids,
     } for cert in certs])
 
 

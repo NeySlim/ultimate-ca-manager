@@ -109,7 +109,7 @@ def test_expiring_certs_flag_a_delegated_ocsp_responder(app, auth_client, create
     plain = create_cert(cn='horizon-not-a-responder', validity_days=20)
     key = 'ocsp_responder_cert_987654'
     with app.app_context():
-        db.session.add(SystemConfig(key=key, value=responder['refid']))
+        db.session.add(SystemConfig(key=key, value=str(responder['id'])))
         db.session.commit()
     try:
         r = auth_client.get('/api/v2/dashboard/expiring-certs?limit=200')
