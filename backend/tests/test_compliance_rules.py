@@ -560,9 +560,9 @@ class TestTsaSigner:
             with app.app_context():
                 ca_refid = db.session.get(CA, ca['id']).refid
             r = auth_client.patch('/api/v2/tsa/config', content_type=JSON,
-                                  data=json.dumps({'ca_refid': ca_refid}))
+                                  data=json.dumps({'ca_refid': ca_refid, 'require_dedicated_cert': False}))
             assert r.status_code == 400 and 'EC signer' in r.get_json()['message'], r.get_json()
-            # Dropping the dedicated signer hands the tokens to the configured CA
+            # Dropping the dedicated signer hands the tokens to the configured CA (compatibility mode)
             with app.app_context():
                 for key, value in (('tsa_ca_refid', ca_refid), ('tsa_signer_cert_refid', refid)):
                     row = SystemConfig.query.filter_by(key=key).first() or SystemConfig(key=key)
@@ -570,7 +570,7 @@ class TestTsaSigner:
                     db.session.add(row)
                 db.session.commit()
             r = auth_client.patch('/api/v2/tsa/config', content_type=JSON,
-                                  data=json.dumps({'signer_cert_refid': ''}))
+                                  data=json.dumps({'signer_cert_refid': '', 'require_dedicated_cert': False}))
             assert r.status_code == 400 and 'EC signer' in r.get_json()['message'], r.get_json()
         finally:
             with app.app_context():

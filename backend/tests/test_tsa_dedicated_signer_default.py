@@ -130,3 +130,83 @@ def test_a_ca_certificate_with_the_timestamping_eku_does_not_sign_either(app, cl
     tsa(tsa_ca_refid=refid)
     resp = _post(client, b'ca with timeStamping')
     assert (resp.status_code, resp.data) == (503, b'TSA configuration invalid')
+
+
+# ---- the signing CA in strict mode only issues the dedicated signer -----------------
+
+def _patch(auth_client, body):
+    return auth_client.patch('/api/v2/tsa/config', content_type='application/json', data=json.dumps(body))
+
+
+def _stored(app, key):
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=key).first()
+        return row.value if row else None
+
+
+@pytest.fixture
+def ed_ca(app, create_ca):
+    ca = create_ca(cn='tsa-strict-ed25519', keyAlgo='EdDSA', keySize='Ed25519')
+    with app.app_context():
+        return db.session.get(CA, ca['id']).refid
+
+
+def test_strict_mode_accepts_a_ca_that_cannot_sign_tokens(app, auth_client, tsa, ed_ca):
+    r = _patch(auth_client, {'ca_refid': ed_ca})
+    assert r.status_code == 200, r.get_json()
+    assert _stored(app, 'tsa_ca_refid') == ed_ca
+
+
+def test_strict_mode_accepts_an_mldsa_ca_in_fips_mode(app, auth_client, tsa, create_ca, monkeypatch):
+    ca = create_ca(cn='tsa-strict-mldsa', keyAlgo='ML-DSA', keySize=65)
+    with app.app_context():
+        refid = db.session.get(CA, ca['id']).refid
+    import fips_mode
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    r = _patch(auth_client, {'ca_refid': refid})
+    assert r.status_code == 200, r.get_json()
+
+
+def test_strict_mode_still_refuses_a_ca_that_cannot_issue(app, auth_client, tsa, create_ca):
+    ca = create_ca(cn='tsa-strict-offline')
+    with app.app_context():
+        row = db.session.get(CA, ca['id'])
+        row.offline, refid = True, row.refid
+        db.session.commit()
+    r = _patch(auth_client, {'ca_refid': refid})
+    assert r.status_code == 400 and 'offline' in r.get_json()['message']
+
+
+@pytest.mark.parametrize('body', [{'ca_refid': 'X'}, {'ca_refid': 'X', 'require_dedicated_cert': False}],
+                         ids=['stored_compat', 'compat_in_the_request'])
+def test_compatibility_mode_refuses_a_ca_that_cannot_sign(app, auth_client, tsa, ed_ca, body):
+    if 'require_dedicated_cert' not in body:
+        tsa(**{KEY: 'false'})
+    r = _patch(auth_client, {**body, 'ca_refid': ed_ca})
+    assert r.status_code == 400 and 'EdDSA' in r.get_json()['message']
+    assert _stored(app, 'tsa_ca_refid') is None
+
+
+def test_switching_to_compatibility_refuses_a_ca_that_cannot_sign(app, auth_client, tsa, ed_ca):
+    tsa(tsa_ca_refid=ed_ca)
+    r = _patch(auth_client, {'require_dedicated_cert': False})
+    assert r.status_code == 400 and 'EdDSA' in r.get_json()['message']
+    assert _stored(app, KEY) is None
+
+
+def test_switching_to_compatibility_with_a_dedicated_signer_is_accepted(
+        app, auth_client, tsa, ed_ca, create_cert):
+    signer = create_cert(cn='tsa-strict-signer', validity_days=365, extra_ekus=[TS_OID])
+    tsa(tsa_ca_refid=ed_ca, tsa_signer_cert_refid=signer['refid'])
+    r = _patch(auth_client, {'require_dedicated_cert': False})
+    assert r.status_code == 200, r.get_json()
+    assert _stored(app, KEY) == 'false'
+
+
+@pytest.mark.parametrize('compat,status', [(False, 200), (True, 400)], ids=['strict', 'compat'])
+def test_dropping_the_signer_judges_the_ca_only_in_compatibility(
+        app, auth_client, tsa, ed_ca, create_cert, compat, status):
+    signer = create_cert(cn=f'tsa-drop-{compat}', validity_days=365, extra_ekus=[TS_OID])
+    tsa(tsa_ca_refid=ed_ca, tsa_signer_cert_refid=signer['refid'], **({KEY: 'false'} if compat else {}))
+    r = _patch(auth_client, {'signer_cert_refid': ''})
+    assert r.status_code == status, r.get_json()

@@ -548,8 +548,9 @@ def test_an_rsa_tsa_signer_issued_by_an_eddsa_ca_signs(app, client, auth_client,
 
 
 def test_an_eddsa_ca_is_refused_as_the_tsa_signer(auth_client, ed_root, tsa_settings):
+    # Only in compatibility mode does the CA certificate sign the tokens
     r = auth_client.patch('/api/v2/tsa/config', content_type='application/json',
-                          data=json.dumps({'ca_refid': ed_root['refid']}))
+                          data=json.dumps({'ca_refid': ed_root['refid'], 'require_dedicated_cert': False}))
     assert r.status_code == 400, r.get_json()
     assert 'EdDSA' in r.get_json()['message']
 

@@ -1967,7 +1967,7 @@ POST /api/v2/tsa/signer-certificate
 GET /api/v2/tsa/stats
 ```
 - `GET /config` returns `enabled`, `ca_refid`, `ca_id`, `ca_name`, `policy_oid`, `require_dedicated_cert` (`true` unless set to `false`: the CA certificate signs only then, which RFC 3161 does not allow), `signer_cert_refid` (empty when no dedicated signer is set) and `signer` (subject, serial, expiry, chain status and usability of the configured signer).
-- `PATCH /config` changes any of `enabled`, `ca_id` or `ca_refid`, `policy_oid` (`400` unless a valid OID), `require_dedicated_cert` and `signer_cert_refid`; `400` when the chosen CA or signer cannot sign time stamps.
+- `PATCH /config` changes any of `enabled`, `ca_id` or `ca_refid`, `policy_oid` (`400` unless a valid OID), `require_dedicated_cert` and `signer_cert_refid`; `400` when the chosen signer cannot sign time stamps, when the chosen CA cannot issue, or, with `require_dedicated_cert` off and no dedicated signer (including a request that turns it off), when the CA cannot sign time stamps.
 - `signer-candidates` lists the certificates eligible as the dedicated signer.
 - `signer-certificate` (`write:settings` and `write:certificates`) issues a dedicated TSA signing certificate in one step. Optional body: `ca_refid` or `ca_id`, `cn` (a string), `validity_days`, `key_type`, `key_size`, `curve`, and `select` (a boolean: make it the signer; defaults to selecting it when the current signer is not usable).
 - `stats` returns `total`, `successful` and `failed` requests counted from the audit log.

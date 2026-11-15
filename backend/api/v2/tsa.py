@@ -219,6 +219,10 @@ def update_tsa_config():
     """Update TSA configuration in database"""
     data = request.json or {}
     stored_signer = get_config('tsa_signer_cert_refid', '')
+    # In strict mode the CA only issues the dedicated signer: its key is judged as a token
+    # signer only in compatibility mode, including when this request switches to it
+    strict_before = effective('tsa_require_dedicated_cert')
+    strict = bool(data['require_dedicated_cert']) if 'require_dedicated_cert' in data else strict_before
 
     policy_oid = None
     if 'policy_oid' in data:
@@ -236,7 +240,7 @@ def update_tsa_config():
         elif stored_signer and 'ca_refid' not in data and 'ca_id' not in data:
             # Dropping the dedicated signer hands the tokens to the configured CA
             ca = CA.query.filter_by(refid=get_config('tsa_ca_refid', '')).first()
-            problem = _ca_signer_refusal(ca) if ca is not None else None
+            problem = _ca_signer_refusal(ca) if ca is not None and not strict else None
             if problem:
                 return error_response(problem, 400)
         set_config('tsa_signer_cert_refid', refid)
@@ -244,6 +248,12 @@ def update_tsa_config():
     if 'enabled' in data:
         set_config('tsa_enabled', 'true' if data['enabled'] else 'false')
     if 'require_dedicated_cert' in data:
+        dedicated = data['signer_cert_refid'] if 'signer_cert_refid' in data else stored_signer
+        if strict_before and not strict and not dedicated and 'ca_refid' not in data and 'ca_id' not in data:
+            ca = CA.query.filter_by(refid=get_config('tsa_ca_refid', '')).first()
+            problem = _ca_signer_refusal(ca) if ca is not None else None
+            if problem:
+                return error_response(problem, 400)
         set_config(
             'tsa_require_dedicated_cert',
             'true' if data['require_dedicated_cert'] else 'false',
@@ -260,9 +270,10 @@ def update_tsa_config():
         dedicated = data['signer_cert_refid'] if 'signer_cert_refid' in data \
             else get_config('tsa_signer_cert_refid', '')
         signer_dropped = not dedicated and stored_signer
-        if new_refid and (new_refid != get_config('tsa_ca_refid', '') or signer_dropped):
+        if new_refid and (new_refid != get_config('tsa_ca_refid', '') or signer_dropped
+                          or (strict_before and not strict)):
             problem = signing_ca_problem(ca) if new_refid != get_config('tsa_ca_refid', '') else None
-            if not problem and ca is not None and not dedicated:
+            if not problem and ca is not None and not dedicated and not strict:
                 # Without a dedicated signer, the CA certificate signs the tokens
                 problem = _ca_signer_refusal(ca)
             if problem:
