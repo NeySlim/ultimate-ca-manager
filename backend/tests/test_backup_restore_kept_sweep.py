@@ -455,3 +455,34 @@ def test_a_journal_put_back_is_never_replayed_over_a_later_change(dirs, monkeypa
 
     assert sorted(files.sweep_kept_previous_contents()) == kept
     assert new.read_bytes() == b'ISSUED LATER' and pem.read_bytes() == b'RENEWED HTTPS CERT'
+
+
+def test_a_compensation_that_failed_keeps_the_only_copy(dirs, monkeypatch):
+    # A put back attempted is not a put back done: discard keeps its journal and previous content
+    pem = dirs['https'] / 'key.pem'
+    pem.write_bytes(b'UNBOUND HTTPS KEY')
+    other = dirs['certs'] / 'c.crt'
+    staged = StagedFiles(base_dir=dirs['backups'].parent / 'staging')
+    staged.stage(pem, b'REPLACEMENT KEY')
+    staged.stage(other, b'NEW CERT')
+    staged.publish()
+    staging = staged.staging_dir
+    real_replace = os.replace
+
+    def replace(source, target, *args, **kwargs):
+        if 'previous_' in os.fspath(source):
+            raise OSError(errno.EIO, 'I/O error')
+        return real_replace(source, target, *args, **kwargs)
+    with monkeypatch.context() as patched:
+        patched.setattr(files.os, 'replace', replace)
+        staged.unpublish()
+    left = staged.discard()
+
+    kept = list(dirs['https'].glob('.ucm_restore_kept_*'))
+    assert left == kept and (kept[0] / 'journal.json').exists()
+    assert not staging.exists() and not other.exists()
+    assert not list(dirs['certs'].glob('.ucm_restore_kept_*'))
+    assert pem.read_bytes() == b'REPLACEMENT KEY'
+
+    assert files.sweep_kept_previous_contents() == kept    # no row: it never committed
+    assert pem.read_bytes() == b'UNBOUND HTTPS KEY'

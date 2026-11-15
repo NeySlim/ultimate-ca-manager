@@ -118,6 +118,8 @@ class StagedFiles:
         self._index: Dict[Path, int] = {}
         # Destination directory to its private directory of kept previous contents
         self._kept_dirs: Dict[Path, Path] = {}
+        # Destination directories a compensation could not put back: their kept directory stays
+        self._unresolved: set = set()
         # Names this restore in the journals and in its publication row
         self.token = uuid.uuid4().hex
 
@@ -359,13 +361,12 @@ class StagedFiles:
         """
         self._compensate()
 
-    def _compensate(self) -> None:
-        """Put the published destinations back, newest publication first.
-
-        Compensation is best effort by necessity: it runs because something
-        on this filesystem already failed. What it cannot put back is logged
-        with the path, since at that point only an administrator can.
+    def _compensate(self) -> List[Path]:
+        """Put the published destinations back, newest publication first; return those
+        it could not put back, whose kept directory and journal `discard()` then keeps
+        for the next sweep. Best effort by necessity: something on this filesystem failed.
         """
+        unresolved: List[Path] = []
         for entry in reversed(self._entries):
             if not entry.published:
                 continue
@@ -380,6 +381,9 @@ class StagedFiles:
                 logger.exception(
                     "Restore: could not restore the previous content of %s",
                     entry.destination)
+                unresolved.append(entry.destination)
+                self._unresolved.add(entry.destination.parent)
+        return unresolved
 
     # -- disposal ---------------------------------------------------------
 
@@ -394,10 +398,18 @@ class StagedFiles:
         staging, self._staging_dir = self._staging_dir, None
         staging_lock, self._staging_lock = self._staging_lock, None
         kept_dirs, self._kept_dirs = self._kept_dirs, {}
+        unresolved, self._unresolved = self._unresolved, set()
         self._entries = []
         self._index = {}
         left: List[Path] = []
-        for directory in dict.fromkeys([*kept_dirs.values(), staging]):
+        for parent, kept_dir in kept_dirs.items():
+            if parent in unresolved:
+                # The only copy of what a failed compensation left out: settled by the next sweep
+                logger.error("Restore: kept %s, whose previous contents could not all be put "
+                             "back; the next start puts them back", kept_dir)
+                left.append(kept_dir)
+        for directory in dict.fromkeys(
+                [*(d for p, d in kept_dirs.items() if p not in unresolved), staging]):
             if directory is None:
                 continue
             try:
