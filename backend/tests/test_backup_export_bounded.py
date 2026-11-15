@@ -139,3 +139,26 @@ def test_the_identity_index_holds_one_page_of_certificates(app, template, small_
             sizes.append(len(index._by_section['certificates']))
     # The previous page's identities are forgotten: the index never grows with the table
     assert all(size <= PAGE for size in sizes), sizes
+
+
+def test_identities_are_read_without_the_key_material(app, template, small_pages):
+    from services.backup.export_generic import IdentityIndex
+    _fill(app, template, SMALL)
+    statements = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    with app.app_context():
+        ids = [row.id for row in Certificate.query.filter_by(descr='bounded-export-copy')]
+        engine = db.engine
+        event.listen(engine, 'before_cursor_execute', record)
+        try:
+            index = IdentityIndex()
+            index.prefetch('certificates', ids)
+        finally:
+            event.remove(engine, 'before_cursor_execute', record)
+        refids = {row.id: row.refid for row in Certificate.query.filter(Certificate.id.in_(ids))}
+    assert {key: value['refid'] for key, value in index._by_section['certificates'].items()} == refids
+    selects = [s for s in statements if 'FROM certificates' in s]
+    assert selects and not any('certificates.prv' in s or 'certificates.crt' in s for s in selects)

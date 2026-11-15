@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.orm import ColumnProperty
 
 from .errors import BackupExportError
 from .key_material import as_pem, decrypt_stored_fields, decrypt_stored_key, decrypt_stored_secret
@@ -125,8 +126,19 @@ class IdentityIndex:
         key_attr = mapper.get_property_by_column(primary[0]).key
         found = {}
         ordered = sorted(keys, key=repr)
+        from models import db
+        # The identity columns alone when they are columns: never a row's key material
+        attributes = [getattr(model, name, None) for name in section.identity]
+        columns_only = all(isinstance(getattr(attr, 'property', None), ColumnProperty)
+                           for attr in attributes)
         for start in range(0, len(ordered), EXPORT_BATCH):
-            for row in model.query.filter(primary[0].in_(ordered[start:start + EXPORT_BATCH])):
+            chunk = ordered[start:start + EXPORT_BATCH]
+            if columns_only:
+                for row in db.session.query(primary[0], *attributes).filter(primary[0].in_(chunk)):
+                    found[row[0]] = {name: _serialise(value)
+                                     for name, value in zip(section.identity, row[1:])}
+                continue
+            for row in model.query.filter(primary[0].in_(chunk)):
                 found[getattr(row, key_attr)] = identity_of(row, section)
         return found
 
