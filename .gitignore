@@ -5,6 +5,7 @@ frontend/dist/
 frontend/.vite/
 frontend/coverage/
 frontend/*.local
+frontend/bundle-modules.json
 
 # Python
 __pycache__/
