@@ -637,6 +637,7 @@ class HsmService:
         pem = db.session.execute(db.select(HsmKey.public_key_pem).where(HsmKey.id == key_id)).scalar_one()
         fingerprint = _spki_fingerprint(pem)
         cache_key = (key_id, fingerprint, requested)
+        # No SPKI, no cache: the row has no version to bind to; wrappers load the SPKI first, so one round trip.
         if fingerprint and cache_key in cls._signing_hash_cache:
             return cls._signing_hash_cache[cache_key]
         try:
