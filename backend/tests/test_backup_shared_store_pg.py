@@ -577,6 +577,40 @@ def test_the_size_ceiling_drops_the_oldest_and_keeps_the_restore_points(app, nod
     assert _stored_names(app) & set(names) == {names[-1]}
 
 
+def test_the_ceiling_removals_are_audited_by_name(app, nodes, retention_settings):
+    from models import AuditLog
+    retention_settings(backup_retention_days='30', backup_min_keep='1', backup_max_total_mb='1')
+    names = _make(app, nodes, 3, 'a', size=600 * 1024)
+    with app.app_context(), nodes('a'):
+        assert schedule.run_backup_retention() == 2
+        details = ' '.join(r.details for r in AuditLog.query.filter_by(action='backup_delete').all())
+    assert names[0] in details and names[1] in details and names[2] not in details
+
+
+def test_the_schedule_counts_what_the_database_holds(app, nodes, retention_settings):
+    retention_settings(backup_retention_days='30', backup_min_keep='1', backup_max_total_mb='1')
+    with app.app_context(), nodes('a'):
+        before_bytes, before_count = schedule.stored_usage()
+    names = _make(app, nodes, 2, 'b', size=1000)
+    with app.app_context(), nodes('a'):
+        data = schedule.get_schedule()
+        sizes = sum(shared_store.get_archive(n)['size'] for n in names)
+    assert data['stored_count'] == before_count + 2
+    assert data['stored_bytes'] == before_bytes + sizes
+
+
+def test_an_archive_above_the_ceiling_alone_is_kept_and_signalled(app, nodes, retention_settings, caplog):
+    retention_settings(backup_retention_days='30', backup_min_keep='1', backup_max_total_mb='1')
+    names = _make(app, nodes, 1, 'a', size=2 * 1024 * 1024)
+    with app.app_context(), nodes('a'), caplog.at_level('WARNING'):
+        schedule.run_backup_retention()
+        warning = schedule.ceiling_warning()
+        over = schedule.get_schedule()['over_ceiling']
+    assert set(names) <= _stored_names(app)
+    assert warning and 'ceiling' in warning and over is True
+    assert any('ceiling' in r.getMessage() for r in caplog.records)
+
+
 def _db_now(app):
     from models import db
     with app.app_context(), db.engine.connect() as conn:
