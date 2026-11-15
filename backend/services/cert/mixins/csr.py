@@ -299,7 +299,9 @@ class CSRMixin:
             if unsignable:
                 raise RequestRejected(f"CSR public key rejected: {unsignable}")
             if not csr_obj.is_signature_valid:
-                raise RequestRejected("CSR signature is invalid (proof-of-possession failed)")
+                from utils.csr_diagnostics import weak_csr_hash_error
+                raise RequestRejected(weak_csr_hash_error(csr_obj)
+                                      or "CSR signature is invalid (proof-of-possession failed)")
         except ValueError:
             raise
         except Exception as e:

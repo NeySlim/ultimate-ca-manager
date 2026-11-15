@@ -197,13 +197,8 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
         except Exception:
             signature_valid = False
         if not signature_valid:
-            weak_algo = _weak_csr_hash_algorithm(csr)
-            if weak_algo:
-                return (
-                    f'CSR signed with an unsupported hash algorithm ({weak_algo}); '
-                    'use SHA-256 or stronger'
-                )
-            return 'CSR signature invalid (proof of possession failed)'
+            from utils.csr_diagnostics import weak_csr_hash_error
+            return weak_csr_hash_error(csr) or 'CSR signature invalid (proof of possession failed)'
 
     if not allow_naked_subject and _is_naked_csr(csr):
         return 'CSR subject must include a non-empty CN or a SubjectAltName'
