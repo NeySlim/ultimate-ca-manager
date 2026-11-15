@@ -238,8 +238,6 @@ jobs:
   smoke-fips:
     name: Smoke (SQLite, FIPS)
     runs-on: ubuntu-latest
-    # The -fips image is best effort: its absence must not fail the standard smokes
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
