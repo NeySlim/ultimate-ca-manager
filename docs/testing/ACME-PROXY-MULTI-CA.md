@@ -160,4 +160,4 @@ E2E notes:
 - [x] Backward-compatible `/acme/proxy/directory`
 - [x] Targeted pytest tests + green suite
 - [x] Certbot E2E via slug (external CA + DNS provider)
-- [x] i18n 9 languages + help guides + contextual GUI help
+- [x] i18n 10 languages + help guides + contextual GUI help

@@ -100,4 +100,6 @@ function main() {
   }
 }
 
-main()
+if (require.main === module) main()
+
+module.exports = { flattenKeys, isLocalePluralForm, missingPluralForms }

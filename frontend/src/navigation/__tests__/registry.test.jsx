@@ -211,8 +211,8 @@ describe('labels (c)', () => {
     ...paletteCommands().flatMap(c => [c.labelKey, c.categoryKey]),
   ].filter(Boolean)
 
-  it('every key exists in the nine locales', () => {
-    expect(Object.keys(locales)).toHaveLength(9)
+  it('every key exists in the ten locales', () => {
+    expect(Object.keys(locales)).toHaveLength(10)
     for (const [file, json] of Object.entries(locales)) {
       for (const key of keys) expect(typeof lookup(json, key), `${file}: ${key}`).toBe('string')
     }

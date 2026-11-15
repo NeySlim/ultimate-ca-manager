@@ -72,7 +72,7 @@ the only way to know the fix does anything, and it keeps the bug from coming bac
   and impossible to revert cleanly.
 - **A CHANGELOG entry** under `## [Unreleased]`, one or two sentences: what was
   broken, what is no longer broken. Not the investigation.
-- **Translations.** UCM ships in 9 languages. A new user-facing string goes into all
+- **Translations.** UCM ships in 10 languages. A new user-facing string goes into all
   of `frontend/src/i18n/locales/*.json`, and `node scripts/check-i18n-sync.js` tells
   you if one is missing.
 - **Migrations** work on SQLite *and* PostgreSQL: a file

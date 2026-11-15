@@ -6,7 +6,7 @@ import { helpContent } from '../../data/helpContent'
 import { helpGuides } from '../../data/helpGuides'
 
 const dir = dirname(fileURLToPath(import.meta.url))
-const LOCALES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
+const LOCALES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'ru', 'uk', 'zh']
 const load = (code) => JSON.parse(readFileSync(join(dir, '..', 'locales', `${code}.json`), 'utf8'))
 const helpFile = (code) => readFileSync(join(dir, '..', '..', 'data', 'help', code, 'acme.js'), 'utf8')
 
@@ -22,6 +22,7 @@ const OLD_NAMES = {
   it: ['Account CA esterni'],
   ja: ['下の外部CAアカウント', '外部 CA アカウントで'],
   pt: ['Contas CA externas'],
+  ru: ['Внешние учётные записи ЦС'],
   uk: ['Зовнішніх CA'],
   zh: ['“外部 CA 账户”', '外部 CA 账户中'],
 }
