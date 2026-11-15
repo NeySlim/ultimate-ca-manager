@@ -1,69 +1,38 @@
 import { defineConfig, devices } from '@playwright/test'
 
-/**
- * UCM E2E Test Configuration
- * 
- * Environment variables:
- *   UCM_BASE_URL - UCM application URL (default: https://localhost:8443)
- *   UCM_PRO - Enable Pro features tests (default: true)
- */
+// The suite runs against the instance scripts/ci/e2e.sh starts (UCM_E2E_BASE_URL, UCM_E2E_MANAGED=1).
+// e2e/lab needs external services: it runs only when UCM_LAB=1 is set.
+const lab = process.env.UCM_LAB === '1'
+// A restore replaces the whole database: never on an instance the script did not start
+const managed = process.env.UCM_E2E_MANAGED === '1' && !lab
+const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }
+const RESTORE = /backup-restore\.spec\.ts/
+const LAB = lab ? [] : ['lab/**']
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: false, // Run sequentially for login state
+  globalSetup: './e2e/support/global-setup.ts',
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: 1,
-  reporter: [
-    ['html', { open: 'never' }],
-    ['list']
-  ],
-  
+  // A flaky test is fixed, never replayed
+  retries: 0,
+  workers: process.env.CI ? 4 : 2,
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
+  reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
+  outputDir: 'test-results',
   use: {
-    baseURL: process.env.UCM_BASE_URL || 'https://localhost:8443',
+    baseURL: process.env.UCM_E2E_BASE_URL,
+    ignoreHTTPSErrors: true,
     locale: 'en-US',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    ignoreHTTPSErrors: true, // Self-signed certs
-    actionTimeout: 10000,
-    navigationTimeout: 30000,
+    actionTimeout: 15_000,
+    navigationTimeout: 30_000,
   },
-
   projects: [
-    // Setup project - runs first to authenticate
-    {
-      name: 'setup',
-      testMatch: /.*\.setup\.ts/,
-      timeout: 60000, // WebAuthn detection may take time
-    },
-    
-    // Main tests with authenticated state
-    {
-      name: 'chromium',
-      use: { 
-        ...devices['Desktop Chrome'],
-        storageState: 'e2e/.auth/user.json',
-      },
-      dependencies: ['setup'],
-    },
-    
-    // Pro features tests
-    {
-      name: 'pro-features',
-      testMatch: /pro\/.*\.spec\.ts/,
-      use: { 
-        ...devices['Desktop Chrome'],
-        storageState: 'e2e/.auth/user.json',
-      },
-      dependencies: ['setup'],
-    },
+    { name: 'chromium', use: desktop, testIgnore: [...LAB, RESTORE] },
+    // A restore replaces the database under every other test: it runs alone, last
+    ...(managed ? [{ name: 'restore', use: desktop, testMatch: [RESTORE], dependencies: ['chromium'] }] : []),
   ],
-
-  // Web server - start dev server before tests
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:5173',
-  //   reuseExistingServer: !process.env.CI,
-  // },
 })

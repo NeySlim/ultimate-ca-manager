@@ -95,6 +95,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Form labels name their field.** Text fields, text areas and selects are now tied to their label, so assistive technologies announce the field and a click on the label focuses it.
+- **The page language follows the interface language.** The `lang` attribute of the page changes with the language chosen, so screen readers and browsers read it in that language.
+- **Recovery codes are shown when TOTP is enabled.** The enrolment dialog closed on confirmation and the codes the server returned were never shown; the dialog now lists them until they are marked as saved.
+- **A new CA appears unfolded in the hierarchy.** An intermediate created under a collapsed root was hidden until the root was opened by hand; every newly seen CA is now expanded.
 - FIPS on Ubuntu 24.04: the package and the release notes now tell to enable Ubuntu Pro's `fips` stream, which ships the binaries certified under CMVP #5115, instead of `fips-updates`, whose patched versions are not the certified binary.
 - Release notes: a release candidate lists the changes under `[Unreleased]` and a stable release its own section, with history from the same major line only; a release whose section is missing now stops instead of publishing notes from older versions. Release tooling accepts three-segment maintenance versions (`2.254.2`) and writes the npm form of the version in both npm files.
 - Automatic update install: a release whose package was published before its `.sha256` file got a failed `settings_update` audit entry and was never installed automatically; it now waits, audited once per version, and the next check after the file appears installs it.

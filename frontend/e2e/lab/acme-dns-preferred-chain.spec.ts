@@ -1,69 +1,44 @@
 /**
- * Lab integration: ACME DNS-01 via DNS provider + preferred_chain on LE Staging.
- *
- * Run against the UCM lab (not CI):
- *   UCM_LAB=1 \
- *   UCM_BASE_URL=https://admin.ucm.example.com:8443 \
- *   UCM_PASSWORD='…' \
- *   npx playwright test e2e/lab/acme-dns-preferred-chain.spec.ts
+ * Lab: ACME DNS-01 through a DNS provider, with preferred_chain, against Let's Encrypt staging.
+ * Needs a UCM with that DNS provider and the staging CA configured, outside the CI:
+ *   UCM_LAB=1 UCM_E2E_BASE_URL=https://ucm.example.test:8443 UCM_E2E_ADMIN_PASSWORD='…' \
+ *   UCM_LAB_DOMAIN_BASE=lab.example.test npx playwright test e2e/lab/acme-dns-preferred-chain.spec.ts
  */
-import { test, expect } from '@playwright/test'
-import { selectByLabel } from '../helpers/select'
+import { test, expect } from '../support/fixtures'
 
-const isLab = process.env.UCM_LAB === '1'
 const LAB_DOMAIN_BASE = process.env.UCM_LAB_DOMAIN_BASE || 'lab.ucm.example.com'
 const PREFERRED_CHAIN = 'ISRG Root X1'
 const CA_LABEL = /Let's Encrypt Staging/i
-const DNS_PROVIDER = /register-gandi/i
+const DNS_PROVIDER = new RegExp(process.env.UCM_LAB_DNS_PROVIDER || 'register-gandi', 'i')
 
-test.describe('Lab — ACME DNS + preferred_chain', () => {
-  test.skip(!isLab, 'Set UCM_LAB=1 to run against the UCM lab')
-
+test('a staging certificate is issued over DNS-01 with the preferred chain', async ({ page, api }) => {
   test.setTimeout(6 * 60 * 1000)
+  const domain = `test-pw-${Date.now()}.${LAB_DOMAIN_BASE}`
+  await page.goto('/acme')
 
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/acme')
-    await page.evaluate(() => localStorage.setItem('i18nextLng', 'en'))
-    await page.reload()
-    await page.waitForLoadState('networkidle')
-  })
+  const stagingCard = page.getByRole('main').locator('div').filter({ hasText: CA_LABEL }).first()
+  await expect(stagingCard).toBeVisible()
+  if (!(await stagingCard.getByText(PREFERRED_CHAIN).isVisible())) {
+    await stagingCard.getByRole('button', { name: 'Edit' }).click()
+    await page.getByLabel(/preferred chain/i).fill(PREFERRED_CHAIN)
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(stagingCard.getByText(PREFERRED_CHAIN)).toBeVisible()
+  }
 
-  test('issues staging cert with DNS auto-create', async ({ page }) => {
-    const domain = `test-pw-${Date.now()}.${LAB_DOMAIN_BASE}`
+  await page.getByRole('button', { name: 'Request Certificate' }).first().click()
+  const modal = page.getByRole('dialog')
+  await modal.getByRole('textbox').first().fill(domain)
+  await modal.getByLabel(/DNS Provider/i).click()
+  await page.getByRole('option', { name: DNS_PROVIDER }).click()
+  await modal.getByLabel(/Certificate Authority/i).click()
+  await page.getByRole('option', { name: CA_LABEL }).click()
+  await modal.getByRole('button', { name: 'Request Certificate', exact: true }).click()
+  await expect(modal).toBeHidden({ timeout: 30_000 })
 
-    const stagingCard = page.locator('div').filter({ hasText: CA_LABEL }).first()
-    await expect(stagingCard).toBeVisible({ timeout: 15000 })
-
-    if (!(await stagingCard.getByText(PREFERRED_CHAIN).isVisible().catch(() => false))) {
-      await stagingCard.getByRole('button', { name: /edit|modifier/i }).click()
-      await page.getByLabel(/preferred chain|chaîne préférée/i).fill(PREFERRED_CHAIN)
-      await page.getByRole('button', { name: /^save$|^enregistrer$/i }).click()
-      await expect(stagingCard.getByText(PREFERRED_CHAIN)).toBeVisible({ timeout: 10000 })
-    }
-
-    await page.getByRole('button', { name: /request certificate|demander un certificat/i }).click()
-    const modal = page.getByRole('dialog')
-    await expect(modal).toBeVisible()
-
-    await modal.locator('textarea').fill(domain)
-    await selectByLabel(page, /DNS Provider|Fournisseur DNS/i, DNS_PROVIDER, modal)
-    await selectByLabel(page, /Certificate Authority|Autorité de certification/i, CA_LABEL, modal)
-
-    await modal.getByRole('button', { name: /^request certificate$|^demander un certificat$/i }).click()
-    await expect(modal).toBeHidden({ timeout: 30000 })
-
-    const orderCard = page.locator('main div.cursor-pointer').filter({ hasText: domain }).first()
-    await expect(orderCard).toBeVisible({ timeout: 20000 })
-
-    await expect.poll(async () => {
-      await page.reload({ waitUntil: 'networkidle' })
-      const card = page.locator('main div.cursor-pointer').filter({ hasText: domain }).first()
-      if (!(await card.isVisible().catch(() => false))) return false
-      const text = await card.textContent()
-      return /issued|valid/i.test(text ?? '')
-    }, { timeout: 5 * 60 * 1000, intervals: [3000, 5000, 10000] }).toBe(true)
-
-    const issuedCard = page.locator('main div.cursor-pointer').filter({ hasText: domain }).first()
-    await expect(issuedCard.getByText(DNS_PROVIDER)).toBeVisible()
-  })
+  // The order is finalised by the provider's DNS propagation: minutes, not seconds
+  await expect.poll(async () => {
+    const data = await api.get('/acme/client/orders')
+    const orders = (Array.isArray(data) ? data : data.items || data.orders || []) as any[]
+    return orders.find(o => JSON.stringify(o).includes(domain))?.status
+  }, { timeout: 5 * 60 * 1000, intervals: [3000, 5000, 10000] }).toMatch(/valid|issued/)
 })

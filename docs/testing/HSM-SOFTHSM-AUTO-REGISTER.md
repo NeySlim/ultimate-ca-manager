@@ -53,18 +53,6 @@ startup repair, migration 057 SQLite rewrite.
 3. **Test connection** should still work (`PKCS11Provider` normalizes at read time).
 4. After restart with migration, DB row is persisted in canonical form.
 
-## Playwright (lab / staging)
-
-```bash
-cd frontend
-UCM_BASE_URL=https://admin.ucm.example.com:8443 \
-UCM_PASSWORD='…' \
-npx playwright test e2e/hsm.spec.ts
-```
-
-Smoke: page load, table/empty state, provider detail panel. Full connection test
-requires SoftHSM on the target host.
-
 ## Lab validation (native Debian)
 
 On your UCM host:
@@ -72,7 +60,6 @@ On your UCM host:
 - SoftHSM2 installed; token **UCM-Default** in `/opt/ucm/data/softhsm/tokens/`
 - `HSM_DEFAULT_PIN` in `/etc/ucm/ucm.env` → auto-register **SoftHSM-Default**
 - `POST /api/v2/hsm/providers/1/test` → **Connection successful**
-- Playwright `e2e/hsm.spec.ts`: 9/10 smoke tests pass
 
 Full install procedure: [HSM-LAB-SOFTHSM-NATIVE.md](./HSM-LAB-SOFTHSM-NATIVE.md)  
 Ops runbook: `90-docs-and-runbooks/ucm/SOFTHSM-LAB.md` + `setup-softhsm-lab.sh`

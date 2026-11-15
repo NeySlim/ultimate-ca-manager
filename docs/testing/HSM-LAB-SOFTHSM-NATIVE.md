@@ -132,14 +132,6 @@ Expected:
 
 **Administration → Gestion HSM** → **SoftHSM-Default** → **Tester la connexion** → succès.
 
-### Playwright smoke
-
-```bash
-cd frontend
-UCM_BASE_URL=https://admin.ucm.example.com:8443 UCM_PASSWORD='…' \
-  npx playwright test e2e/hsm.spec.ts --project=chromium
-```
-
 ## Automated setup script (lab)
 
 See runbook repo: `90-docs-and-runbooks/ucm/setup-softhsm-lab.sh`

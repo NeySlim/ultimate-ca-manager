@@ -8,7 +8,7 @@ UCM uses a comprehensive testing strategy with unit tests and E2E tests.
 |-----------|-----------|--------|
 | Unit Tests (Frontend) | Vitest + React Testing Library | Active |
 | Unit Tests (Backend) | pytest | Active |
-| E2E Tests | Playwright | Active |
+| E2E Tests | Playwright, against a real instance | Active (CI job "End-to-end (browser)") |
 | Linting (Frontend) | ESLint v9 | Active |
 | Linting (Backend) | Ruff | Active |
 
@@ -161,84 +161,54 @@ The `latest` and `latest-fips` image tags, and the "Latest" mark of the GitHub r
 
 ## E2E Tests
 
-### Setup
+The end-to-end suite drives Chromium against a real instance: the backend of the checkout, a fresh SQLite database in a temporary directory, and the interface built by `npm run build`. One script sets it up, the same in the CI and on a workstation.
+
+### Running
+
+```bash
+# From the repository root: builds the interface, starts UCM on a free loopback port,
+# runs Playwright, stops UCM. The exit code is Playwright's.
+bash scripts/ci/e2e.sh
+
+# Arguments go to `playwright test`: one file, one test, a headed browser
+bash scripts/ci/e2e.sh e2e/certificates.spec.ts
+bash scripts/ci/e2e.sh -g "revoked" --headed
+```
+
+The script needs `python` (or `UCM_PYTHON`) with `backend/requirements.txt` installed, `npm`, and the system libraries of Chromium (`npx playwright install-deps chromium`, as root). It downloads Chromium with `npx playwright install chromium`, into `PLAYWRIGHT_BROWSERS_PATH` when set. It writes only under a temporary directory and under `frontend/` (`dist/`, `playwright-report/`, `test-results/`). The administrator password is generated for each run and handed to the tests. It refuses to run while a `.env` file sits at the root of the checkout: the backend loads it, so its database, Redis and keys would become those of the test instance.
+
+### What it covers
+
+One file per domain under `frontend/e2e/`; every test creates its own objects through the API and checks what the screen shows and what the API returns afterwards.
+
+| File | Covers |
+|------|--------|
+| `auth.spec.ts` | Password sign-in, refused password, sign-out, a session ended by the server, French and dark mode kept across a reload |
+| `navigation.spec.ts` | Every route of `src/navigation/registry.js` (detail routes with a created object) opens with a heading, no error screen and no console error; the legacy URLs; the Modules menu |
+| `overview.spec.ts` | The overview cards load; a queue entry opens the object it names |
+| `cas.spec.ts` | A root then an intermediate created on screen, seen in the hierarchy |
+| `certificates.spec.ts` | Issue, inspector detail, renew, revoke (the next CRL lists the serial), PEM export |
+| `csrs.spec.ts`, `templates.spec.ts`, `crl-ocsp.spec.ts` | CSR import and signing, template creation, CRL generation and OCSP switch |
+| `protocols.spec.ts` | ACME, SCEP and EST settings saved and read back |
+| `truststore.spec.ts` | A managed CA added to the trust store, the certificate decoder |
+| `users.spec.ts` | An operator neither sees nor opens the administration pages (sent back to the overview); users, groups and custom roles created on screen |
+| `settings.spec.ts`, `audit.spec.ts` | A general setting saved and read back; an action of the test found in the audit log |
+| `key-recovery.spec.ts`, `account.spec.ts` | Key recovery with dual control; password change and TOTP enrolment |
+| `backup-restore.spec.ts` | A backup created then restored on screen, with its report; runs alone, after the others, since a restore replaces the database |
+
+The configuration is `frontend/playwright.config.ts`: Chromium only, no retry (a flaky test is fixed, not replayed), traces and screenshots kept on failure, English forced. A test marked `test.fail()` documents a known product defect, with its reason on the same line; it turns red once the defect is fixed, so the mark is removed then.
+
+### Lab tests
+
+`frontend/e2e/lab/` holds the tests that need external services (an ACME CA reachable on the Internet and a DNS provider). The configuration leaves them out unless `UCM_LAB=1` is set; they run against an instance prepared for them, never in the CI:
 
 ```bash
 cd frontend
-
-# Install Playwright browsers
-npx playwright install
-
-# Run E2E tests
-npm run test:e2e
-
-# Run with UI
-npm run test:e2e:headed
+UCM_LAB=1 UCM_E2E_BASE_URL=https://ucm.example.test:8443 UCM_E2E_ADMIN_PASSWORD='...' \
+  npx playwright test e2e/lab/acme-dns-preferred-chain.spec.ts
 ```
 
-### Test Structure
-
-```
-frontend/e2e/
-├── auth.setup.ts      # Authentication setup
-├── config.ts          # Test configuration
-├── dashboard.spec.ts  # Dashboard tests
-├── certificates.spec.ts
-├── cas.spec.ts
-├── csrs.spec.ts
-├── templates.spec.ts
-├── truststore.spec.ts
-├── acme.spec.ts
-├── scep.spec.ts
-├── crlocsp.spec.ts
-├── hsm.spec.ts
-├── rbac.spec.ts
-├── operations.spec.ts
-├── audit.spec.ts
-├── tools.spec.ts
-├── account.spec.ts
-├── core.spec.ts       # Users, Settings, Navigation
-└── pro/               # SSO & advanced features
-    ├── groups.spec.ts
-    ├── rbac.spec.ts
-    ├── sso.spec.ts
-    ├── hsm.spec.ts
-    └── ldap.spec.ts
-```
-
-### Configuration
-
-E2E tests are configured in `playwright.config.ts`:
-
-```typescript
-export default defineConfig({
-  testDir: './e2e',
-  baseURL: 'https://localhost:8443',
-  use: {
-    ignoreHTTPSErrors: true,
-    storageState: 'e2e/.auth/user.json',
-  },
-  projects: [
-    { name: 'setup', testMatch: /auth\.setup\.ts/ },
-    { name: 'chromium', dependencies: ['setup'] },
-    { name: 'pro-features', dependencies: ['setup'] },
-  ],
-})
-```
-
-### Writing E2E Tests
-
-```typescript
-import { test, expect } from '@playwright/test'
-
-test.describe('Dashboard', () => {
-  test('displays stats widgets', async ({ page }) => {
-    await page.goto('/dashboard')
-    await expect(page.locator('text=Certificates')).toBeVisible()
-    await expect(page.locator('text=Active CAs')).toBeVisible()
-  })
-})
-```
+Without `UCM_E2E_MANAGED=1`, which only `scripts/ci/e2e.sh` sets, and always with `UCM_LAB=1`, the global setup changes no setting and the backup restore test does not run. The other tests still create objects and save settings: on a shared instance, name the lab files to run, as above.
 
 ## Advanced Features Test Infrastructure
 
@@ -277,68 +247,21 @@ docker-compose -f docker-compose.test.yml up -d
 
 ## CI/CD Integration
 
-### GitHub Actions (recommended)
-
-```yaml
-name: Tests
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name: Install dependencies
-        run: cd frontend && npm ci
-      
-      - name: Run unit tests
-        run: cd frontend && npm test
-      
-      - name: Install Playwright
-        run: cd frontend && npx playwright install --with-deps
-      
-      - name: Run E2E tests
-        run: cd frontend && npm run test:e2e
-```
+The "End-to-end (browser)" job of `tests.yml` runs on pull requests, on each push of the 3.0 integration branch and on a manual run. It installs the backend and frontend dependencies and the browser libraries, then calls `scripts/ci/e2e.sh`; on failure the Playwright report and the traces are kept as the `e2e-report` artifact. `backend/tests/test_workflow_e2e.py` pins when the job runs and what it runs.
 
 ## Coverage Goals
 
 | Metric | Target | Current |
 |--------|--------|---------|
 | Backend Route Coverage | 80% | ~95% (347 routes) |
-| E2E Pass Rate | 95% | Active |
 | Critical Paths | 100% | Covered |
 
 ## Troubleshooting
 
-### Auth Setup Fails
+### The instance does not start
 
-UCM has a complex login flow (username → auth method detection → password). If auth fails:
+`scripts/ci/e2e.sh` prints the last lines of the server console, application log and access log when the instance is not healthy within 180 seconds or when a test fails.
 
-1. Check if WebAuthn is registered for admin user
-2. The test waits for "Use password instead" link
-3. Increase timeout if WebAuthn detection is slow
+### A test fails in the CI only
 
-### E2E Tests Timeout
-
-```typescript
-// Increase timeout for slow operations
-test.setTimeout(60000)
-
-// Or per-assertion
-await expect(locator).toBeVisible({ timeout: 10000 })
-```
-
-### SSL Certificate Errors
-
-Tests ignore HTTPS errors by default. If issues persist:
-
-```typescript
-use: {
-  ignoreHTTPSErrors: true,
-}
-```
+Download the `e2e-report` artifact and open a trace with `npx playwright show-trace <trace.zip>`; the console log of the job also holds the accessibility tree of the page at the failure.

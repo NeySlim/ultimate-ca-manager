@@ -24,6 +24,13 @@ export const languages = [
   { code: 'ja', name: '日本語', flag: '🇯🇵' },
 ]
 
+// The page's lang attribute names the language shown (screen readers, spelling, hyphenation):
+// an unsupported request (ko, ru-RU) resolves to the fallback, which is what the page reads
+i18n.on('languageChanged', (lng) => {
+  const shown = i18n.resolvedLanguage || lng
+  if (typeof document !== 'undefined' && shown) document.documentElement.lang = shown
+})
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)

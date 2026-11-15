@@ -1,75 +1,34 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, createCA, uid } from './support/fixtures'
 
-test.describe('CSRs', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/csrs')
-    await page.waitForLoadState('networkidle')
-  })
+test('a CSR imported on screen is signed by a CA', async ({ page, api }) => {
+  const ca = await createCA(api)
+  // A request made elsewhere: generated, exported, then removed from UCM
+  const cn = `${uid('csr')}.example.com`
+  const made = await api.post('/csrs', { cn, key_type: 'RSA 2048' })
+  const pem = (await api.call('GET', `/csrs/${made.id}/export`)).body as string
+  expect(pem).toContain('BEGIN CERTIFICATE REQUEST')
+  await api.del(`/csrs/${made.id}`)
 
-  test('page loads with heading', async ({ page }) => {
-    await expect(page.locator('h1')).toBeVisible()
-  })
+  await page.goto('/csrs')
+  await page.getByRole('main').getByRole('button', { name: 'Import', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Smart Import' })
+  await dialog.getByRole('textbox').fill(pem)
+  await dialog.getByRole('button', { name: 'Analyze' }).click()
+  await dialog.getByRole('button', { name: /^Import 1 Object/ }).click()
+  await dialog.getByRole('button', { name: 'Done' }).click()
 
-  test('has data table or empty state', async ({ page }) => {
-    const table = page.locator('table')
-    const empty = page.locator('h3:has-text("No Pending"), h3:has-text("Aucun")')
-    const hasTable = await table.count() > 0
-    const hasEmpty = await empty.count() > 0
-    expect(hasTable || hasEmpty).toBeTruthy()
-  })
+  await page.getByRole('main').getByRole('cell', { name: cn }).click()
+  const panel = page.getByRole('complementary').filter({ has: page.getByRole('heading', { name: cn }) })
+  await panel.getByRole('button', { name: 'Sign', exact: true }).click()
+  const sign = page.getByRole('dialog', { name: 'Sign CSR' })
+  await sign.getByLabel('Certificate Authority').click()
+  await page.getByRole('option', { name: new RegExp(ca.common_name) }).click()
+  await sign.getByRole('button', { name: 'Sign CSR' }).click()
+  await expect(sign).toBeHidden()
 
-  test('has stats bar', async ({ page }) => {
-    const stats = page.locator('[class*="stat"], [class*="indicator"], [class*="badge"]')
-    expect(await stats.count()).toBeGreaterThan(0)
-  })
-
-  test('has search input', async ({ page }) => {
-    const search = page.locator('input[type="search"], input[placeholder]').first()
-    await expect(search).toBeVisible()
-    await search.fill('test')
-    await page.waitForTimeout(500)
-  })
-
-  test('has tab buttons for Pending and History', async ({ page }) => {
-    const nav = page.locator('nav button, [role="tablist"] button, button')
-    expect(await nav.count()).toBeGreaterThanOrEqual(2)
-  })
-
-  test('can switch tabs', async ({ page }) => {
-    // Click second tab (History)
-    const tabs = page.locator('nav button')
-    if (await tabs.count() >= 2) {
-      await tabs.nth(1).click()
-      await page.waitForTimeout(1000)
-      await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
-    }
-  })
-
-  test('has import button', async ({ page }) => {
-    const importBtn = page.locator('button:has-text("Import"), button:has-text("Importer")')
-    if (await importBtn.count() > 0) {
-      await expect(importBtn.first()).toBeVisible()
-    }
-  })
-
-  test('table rows are clickable for detail', async ({ page }) => {
-    const rows = page.locator('table tbody tr')
-    if (await rows.count() > 0) {
-      await rows.first().click()
-      await page.waitForTimeout(500)
-      // Detail panel or inspector should appear
-      const detail = page.locator('[data-testid="inspector-dock"], h3:has-text("Details"), h3:has-text("CSR")')
-      expect(await detail.count()).toBeGreaterThan(0)
-    }
-  })
-
-  test('has row action buttons', async ({ page }) => {
-    const rows = page.locator('table tbody tr')
-    if (await rows.count() > 0) {
-      await rows.first().hover()
-      await page.waitForTimeout(300)
-      const actions = page.locator('button[title], [class*="action"] button')
-      expect(await actions.count()).toBeGreaterThan(0)
-    }
-  })
+  await expect.poll(async () => {
+    const data = await api.get(`/certificates?search=${encodeURIComponent(cn)}`)
+    const list = (Array.isArray(data) ? data : data.items || []) as any[]
+    return list.find(c => c.common_name === cn)?.issuer
+  }).toBe(`CN=${ca.common_name}`)
 })

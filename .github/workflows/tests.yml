@@ -614,6 +614,65 @@ jobs:
           cd frontend
           npm run check:i18n
   
+  # Playwright against a real instance: backend from this checkout, fresh SQLite, built
+  # interface, all set up by scripts/ci/e2e.sh (the same script runs it locally).
+  test-e2e:
+    name: End-to-end (browser)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/sextant')
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev
+
+      - name: Install backend dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install the browser's system libraries
+        run: |
+          cd frontend
+          npx playwright install-deps chromium
+
+      - name: Run the end-to-end suite
+        run: bash scripts/ci/e2e.sh
+
+      - name: Upload the report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 14
+
   build-test:
     name: Docker Build Test
     runs-on: ubuntu-latest
