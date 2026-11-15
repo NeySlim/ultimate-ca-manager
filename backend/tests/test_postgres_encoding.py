@@ -36,6 +36,44 @@ def test_a_utf8_database_goes_on_to_the_registry_simulated(monkeypatch):
         migration_runner.run_all_migrations()
 
 
+class _Answer:
+    """A driver connection that answers SHOW server_encoding with UTF8."""
+
+    def cursor(self):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql):
+        pass
+
+    def fetchone(self):
+        return ('UTF8',)
+
+    def close(self):
+        pass
+
+
+@pytest.mark.parametrize('query, timeout', [('', 10), ('?connect_timeout=3', '3')])
+def test_the_bare_connection_gives_up_on_an_unreachable_server_in_ten_seconds(monkeypatch, query, timeout):
+    """connect_timeout 10 s reaches the driver unless the URL sets one: no wait here."""
+    from utils.db_url import sqlalchemy_url
+    engine = create_engine(sqlalchemy_url(UNREACHABLE + query))
+    seen = {}
+
+    def connect(*args, **kwargs):
+        seen.update(kwargs)
+        return _Answer()
+
+    monkeypatch.setattr(engine.dialect.dbapi, 'connect', connect)
+    assert migration_runner._server_encoding(engine) == 'UTF8'
+    assert seen['connect_timeout'] == timeout, seen
+
+
 def test_sqlite_is_never_asked_for_an_encoding(tmp_path):
     assert migration_runner.encoding_refusal(create_engine(f'sqlite:///{tmp_path}/x.db')) is None
 

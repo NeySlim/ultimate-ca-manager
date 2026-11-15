@@ -377,6 +377,8 @@ def _server_encoding(engine) -> str:
     """server_encoding read on a bare driver connection: SQLAlchemy's first connect reads the
     server version with a text pattern, which a SQL_ASCII database answers in bytes (TypeError)."""
     cargs, cparams = engine.dialect.create_connect_args(engine.url)
+    # An unreachable server is given up in 10 s, as elsewhere, unless the URL sets its own
+    cparams.setdefault("connect_timeout", 10)
     conn = engine.dialect.dbapi.connect(*cargs, **cparams)
     try:
         with conn.cursor() as cursor:
