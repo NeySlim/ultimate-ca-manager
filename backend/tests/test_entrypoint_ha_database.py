@@ -114,3 +114,39 @@ def test_a_df_that_cannot_answer_never_blocks_the_start(tmp_path):
     env = _sqlite_env(tmp_path, None)
     r = _run('df() { return 1; }; cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
     assert r.returncode == 0 and 'cp ' in r.stdout
+
+
+def _started(tmp_path, version):
+    """Marker the application leaves next to the database after a start that migrated."""
+    (tmp_path / '.ucm-started-version').write_text(version + '\n')
+
+
+@pytest.mark.parametrize('backup,avail_kb', [('false', 2900), ('false', 0), ('true', 3000)])
+def test_an_ordinary_start_claims_only_the_copy(tmp_path, backup, avail_kb):
+    env = _sqlite_env(tmp_path, None)
+    env.update(UCM_BACKUP_ENABLED=backup, UCM_VERSION='3.0')
+    (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
+    _started(tmp_path, '3.0')
+    r = _run(_df(avail_kb) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert ('cp ' in r.stdout) is (backup == 'true')
+
+
+def test_an_ordinary_start_still_needs_room_for_the_copy(tmp_path):
+    env = _sqlite_env(tmp_path, None)
+    env['UCM_VERSION'] = '3.0'
+    (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
+    _started(tmp_path, '3.0')
+    r = _run(_df(2999) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+    assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
+    assert 'needs 2 MB free' in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize('last,current', [('2.254.1', '3.0'), ('3.0', ''), ('3.0', 'unknown')])
+def test_a_new_or_unknown_version_claims_the_upgrade_room(tmp_path, last, current):
+    env = _sqlite_env(tmp_path, None)
+    env.update(UCM_BACKUP_ENABLED='false', UCM_VERSION=current)
+    (tmp_path / 'ucm.db').write_bytes(b'\0' * 3000 * 1024)
+    _started(tmp_path, last)
+    r = _run(_df(2999) + 'cp() { echo "cp $*"; }; find() { :; }; ucm_sqlite_check_and_backup', env, tmp_path)
+    assert r.returncode != 0 and 'needs 2 MB free' in r.stdout, r.stdout

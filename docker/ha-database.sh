@@ -45,22 +45,37 @@ ucm_initial_admin_notice() {
     fi
 }
 
-# Room for the start next to the database: its copy when enabled, plus its size again for an
-# upgrade's journal and growth (measured: 1.7 times the database at the 3.0 upgrade with the copy).
+# Marker the application writes next to the database once a start has migrated it: same
+# version as the image means no upgrade can run; absent, different or unknown means one may.
+ucm_sqlite_upgrade_possible() {
+    local last
+    last=$(cat "$(dirname "$UCM_DATABASE_PATH")/.ucm-started-version" 2>/dev/null) || return 0
+    case "${UCM_VERSION:-}" in ''|unknown) return 0 ;; esac
+    [ "$last" != "$UCM_VERSION" ]
+}
+
+# Room for the start next to the database: its copy when enabled, plus its size again when an
+# upgrade may run, for its journal and growth (measured: 1.7 times the database with the copy).
 # Fails with what is needed and available; a df that cannot answer lets the start go on.
 ucm_sqlite_disk_room() {
-    local dir bytes size_kb need_kb avail_kb
+    local dir bytes size_kb need_kb=0 avail_kb upgrade=false
     dir=$(dirname "$UCM_DATABASE_PATH")
     bytes=$(stat -c %s "$UCM_DATABASE_PATH" 2>/dev/null || wc -c < "$UCM_DATABASE_PATH")
     size_kb=$(( (bytes + 1023) / 1024 ))
-    need_kb=$size_kb
-    [ "$UCM_BACKUP_ENABLED" = "true" ] && need_kb=$(( size_kb * 2 ))
+    ucm_sqlite_upgrade_possible && upgrade=true && need_kb=$size_kb
+    [ "$UCM_BACKUP_ENABLED" = "true" ] && need_kb=$(( need_kb + size_kb ))
+    [ "$need_kb" -eq 0 ] && return 0
     avail_kb=$(df -Pk "$dir" 2>/dev/null | awk 'NR == 2 { print $4 }') || avail_kb=""
     case "$avail_kb" in ''|*[!0-9]*) return 0 ;; esac
     [ "$avail_kb" -ge "$need_kb" ] && return 0
     echo -e "${RED:-}❌ Not enough disk space in $dir: the start needs $(( need_kb / 1024 )) MB free, $(( avail_kb / 1024 )) MB available.${NC:-}"
-    echo "   The database is $(( size_kb / 1024 )) MB; the start needs its size for an upgrade's journal and growth,"
-    echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
+    if [ "$upgrade" = "true" ]; then
+        echo "   The database is $(( size_kb / 1024 )) MB; a start on a new version needs its size for the upgrade's journal and growth,"
+        echo "   and its size again for the pre-start copy unless UCM_BACKUP_ENABLED=false. Free space, then start again."
+    else
+        echo "   The database is $(( size_kb / 1024 )) MB; the pre-start copy needs its size (UCM_BACKUP_ENABLED=false skips it)."
+        echo "   Free space, then start again."
+    fi
     return 1
 }
 

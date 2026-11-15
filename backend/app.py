@@ -252,6 +252,8 @@ def create_app(config_name=None):
             "Refusing to start with an inconsistent database. Check the migration "
             "log above and fix the issue before restarting the service."
         )
+    from migration_runner import record_started_version
+    record_started_version(config.APP_VERSION)
     
     # A backend switch that asked for this restart has now been applied: the
     # configuration read above is the new one. Clearing the marker is what
