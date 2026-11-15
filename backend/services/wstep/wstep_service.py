@@ -41,6 +41,11 @@ from . import ws_security
 
 logger = logging.getLogger(__name__)
 
+# What the approver reads when a held template-less renewal's certificate was renewed meanwhile
+RENEWED_SUPERSEDED = 'Renewed certificate superseded by a newer one'
+RENEWED_EXPIRED = 'Renewed certificate expired'
+RENEWED_NOT_VALID = 'Renewed certificate not valid'
+
 # AD DN RDN attribute names (as ldap3's parse_dn returns them from a real
 # AD distinguishedName) -> the x509.Name attribute OID they map to. Covers
 # the components a real ADCS User certificate's directory-path subject
@@ -1245,9 +1250,11 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             return None, ServerError(renewal_identity.UNRESOLVED_MESSAGE)
         if renewed is None or _template_ext_oid(renewed) is not None:
             return None, _other_key_refusal(ca, csr, profile=profile) or NO_TEMPLATE
-        # Decided on arrival, the exemption travels with a held request: only a revocation since withdraws it
-        if approved_renewal is not None and _revoked(ca, approved_renewal):
-            return None, RENEWED_REVOKED
+        # An approved request is processed as a new one (MS-CSRA ResubmitRequest, rule 3): the
+        # arrival's check again, so an expiry, a revocation or a renewal since withdraws it
+        withdrawn = _renewal_refusal(ca, approved_renewal)[1] if approved_renewal is not None else None
+        if withdrawn:
+            return None, withdrawn
         exempted = renewed
     template_oid = None
     if matched_template is not None:
@@ -1527,12 +1534,11 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
     own (``_requester_holds``); None for an initial enrollment or the certificate of another,
     ``lookup.UNREACHABLE`` when the directory could not say whose it is."""
     from services.ad_connector import lookup
-    from services.cert.issued_lookup import OK, issued_certificate_status
     from services.windows_profiles import certificate_profile
     unreachable = False
     for cert in _envelope_certificates(outer_signed_data):
-        row, status = issued_certificate_status(ca, cert)
-        if row is None or status != OK or _verify_renewal_signer(outer_signed_data, cert) is not None:
+        row, refusal = _renewal_refusal(ca, cert)
+        if row is None or refusal or _verify_renewal_signer(outer_signed_data, cert) is not None:
             continue
         recorded, _refusal = certificate_profile(row)
         if recorded is None or profile is None or recorded.id != profile.id:
@@ -1545,9 +1551,15 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
     return lookup.UNREACHABLE if unreachable else None
 
 
-def _revoked(ca, cert):
-    from services.cert.issued_lookup import REVOKED, issued_certificate_status
-    return issued_certificate_status(ca, cert)[1] == REVOKED
+def _renewal_refusal(ca, cert):
+    """(row, refusal): *cert*'s stored row and why it cannot be renewed, None while valid; one
+    check for a request on arrival and for a held one at its approval."""
+    from services.cert.issued_lookup import EXPIRED, OK, REVOKED, SUPERSEDED, issued_certificate_status
+    row, status = issued_certificate_status(ca, cert)
+    if status == OK:
+        return row, None
+    return row, {REVOKED: RENEWED_REVOKED, SUPERSEDED: RENEWED_SUPERSEDED,
+                 EXPIRED: RENEWED_EXPIRED}.get(status, RENEWED_NOT_VALID)
 
 
 def _requester_holds(cert, principal, sam_account_name, connector, requester_sid, *, profile):

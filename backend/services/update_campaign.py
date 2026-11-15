@@ -237,14 +237,18 @@ def _catalog(assets, families):
 
 
 def families_without_package(assets):
-    """Package families (deb, rpm-*) of the nodes beating now that ``assets`` has no package for:
-    a release still uploading them. Container and unknown families never get one."""
+    """Package families (deb, rpm-*) of the nodes beating now that ``assets`` has no package for,
+    or no ``.sha256`` asset beside it: a release still uploading them. Container and unknown
+    families never get one."""
     from services import updates
     from services.scheduler_leader import cluster_utc_now
     now, stale = cluster_utc_now(), _stale_seconds()
     present = {v.family for v in _nodes().values() if _fresh(v, now, stale)}
-    return sorted(f for f in present if f and (f == 'deb' or f.startswith('rpm-'))
-                  and updates.family_package(assets or [], f) is None)
+
+    def published(family):
+        found = updates.family_package(assets or [], family)
+        return found is not None and bool(found['checksum_url'])
+    return sorted(f for f in present if f and (f == 'deb' or f.startswith('rpm-')) and not published(f))
 
 
 def _full_stop_refusal(assets, target):

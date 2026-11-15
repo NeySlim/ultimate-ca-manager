@@ -195,3 +195,24 @@ def test_a_reset_in_ha_names_the_node_holding_the_file(app, auth_client, monkeyp
         assert 'reset-node-7' in caplog.text
     else:
         assert body['data']['node'] is None
+
+
+def test_a_reset_to_a_provided_password_drops_the_generated_file_left_here(
+        app, auth_client, monkeypatch, tmp_path):
+    """The file of an earlier generated password opens nothing once the tables are recreated:
+    the node that resets drops it at once, without waiting for its next start."""
+    from auth.initial_admin import PASSWORD_FILE_NAME
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD', 'Operator-Chosen-1!')
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD_FILE', None)
+    monkeypatch.setitem(app.config, 'DATA_DIR', str(tmp_path))
+    path = tmp_path / PASSWORD_FILE_NAME
+    path.write_text('Old-Generated-Value-7\n')
+    answer = auth_client.post('/api/v2/system/database/reset')
+    assert answer.status_code == 200, answer.data
+    with app.app_context():
+        admin = User.query.filter_by(username=app.config['INITIAL_ADMIN_USERNAME']).one()
+        assert not admin.check_password('Old-Generated-Value-7')
+        admin.set_password('changeme123')
+        admin.force_password_change = False
+        db.session.commit()
+    assert not path.exists()

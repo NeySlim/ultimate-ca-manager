@@ -42,8 +42,8 @@ def _marked_entry(row, record):
                          f'Reason: {record.revoke_reason or "unspecified"} (origin: recorded revocation)'))
 
 
-def _merge_ca_group(db, cas_with_ski, stats):
-    """Merge records of one CA into the best of them (parent link, then key)."""
+def _keeper(cas_with_ski):
+    """The record the others merge into: parent link and key, then parent link, then key."""
     keeper = None
     for c in cas_with_ski:
         if c.caref and c.prv:
@@ -61,7 +61,23 @@ def _merge_ca_group(db, cas_with_ski, stats):
                 break
     if not keeper:
         keeper = cas_with_ski[0]
+    return keeper
 
+
+def _lock_moved_certificates(db, groups):
+    """Certificate rows before CA rows, as an issuance or a renewal locks them: every certificate
+    the merges move is locked before the first CA row of the phase is written."""
+    from models import Certificate
+    moved = [c.refid for group in groups for c in group if c.id != _keeper(group).id]
+    if moved:
+        with db.session.no_autoflush:
+            db.session.query(Certificate.id).filter(Certificate.caref.in_(moved)).order_by(
+                Certificate.id).with_for_update().all()
+
+
+def _merge_ca_group(db, cas_with_ski, stats):
+    """Merge records of one CA into the best of them (parent link, then key)."""
+    keeper = _keeper(cas_with_ski)
     latest = max(cas_with_ski, key=lambda c: c.id)
     if latest.descr != keeper.descr:
         logger.info(f"SKI/AKI backfill: renaming keeper '{keeper.descr}' -> '{latest.descr}'")
@@ -148,6 +164,15 @@ def _move_ca_dependents(db, dupe, keeper):
         db.session.execute(table.update().where(table.c[column] == dupe.refid).values({column: keeper.refid}))
 
 
+def _commit(db, what):
+    try:
+        db.session.commit()
+    except Exception as _commit_err:
+        db.session.rollback()
+        logger.error(f"SKI/AKI backfill: commit of the {what} failed: {_commit_err}", exc_info=True)
+        raise
+
+
 def backfill_ski_aki():
     """Extract and store SKI/AKI for all certs/CAs missing them, then repair chains."""
     from models import db, CA, Certificate
@@ -187,6 +212,10 @@ def backfill_ski_aki():
             stats['updated_cas'] += 1
         except Exception:
             pass  # Cert may not have SKI extension
+    # CA rows written in a transaction of their own: a later phase locks certificates, which an
+    # issuance or a renewal locks before CA rows
+    if stats['updated_cas']:
+        _commit(db, 'CA identifiers')
 
     # --- Certificates: populate AKI + SKI ---
     certs = Certificate.query.filter(
@@ -221,12 +250,7 @@ def backfill_ski_aki():
             pass
 
     if stats['updated_cas'] or stats['updated_certs']:
-        try:
-            db.session.commit()
-        except Exception as _commit_err:
-            db.session.rollback()
-            logger.error(f"Commit failed in services/ski_aki_backfill.py:93: {_commit_err}", exc_info=True)
-            raise
+        _commit(db, 'certificate identifiers')
         logger.info(f"SKI/AKI backfill: updated {stats['updated_cas']} CAs, {stats['updated_certs']} certificates")
     else:
         logger.debug("SKI/AKI backfill: all records up to date")
@@ -266,6 +290,8 @@ def backfill_ski_aki():
                 logger.info(f"SKI/AKI backfill: re-chained CA '{ca.descr}' -> parent '{parent.descr}'")
         except Exception:
             pass
+    if stats['rechained_cas']:
+        _commit(db, 'CA re-chaining')
 
     # --- Phase 3: Re-chain orphan certificates ---
     # Include certs with NULL/empty caref AND certs whose caref points to a non-existent CA
@@ -311,6 +337,7 @@ def backfill_ski_aki():
     # nothing the keeper could take over.
     from sqlalchemy import func
     dupes = db.session.query(CA.ski).filter(CA.ski.isnot(None)).group_by(CA.ski).having(func.count(CA.id) > 1).all()
+    merges = []
     for (dupe_ski,) in dupes:
         cas_with_ski = CA.query.filter(CA.ski == dupe_ski).order_by(CA.id.asc()).all()
         by_cert = {}
@@ -322,9 +349,10 @@ def backfill_ski_aki():
             stats['same_key_distinct_certs'] += 1
             logger.info(f"SKI/AKI backfill: CAs {[c.id for c in cas_with_ski]} share SKI {dupe_ski} "
                            f"with distinct certificates (cross-certificate?), not merged")
-        for group in by_cert.values():
-            if len(group) > 1:
-                _merge_ca_group(db, group, stats)
+        merges.extend(group for group in by_cert.values() if len(group) > 1)
+    _lock_moved_certificates(db, merges)
+    for group in merges:
+        _merge_ca_group(db, group, stats)
 
     if (stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated']
             or stats['revoked_from_records']):

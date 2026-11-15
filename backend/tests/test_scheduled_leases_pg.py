@@ -734,3 +734,94 @@ def test_the_scheduler_reruns_the_skipped_expiry_pass_once_the_lease_is_over(app
     assert task.should_run()
     s._run_task(task)
     assert task.last_status == 'ok' and passes == [1] and task.retry_at is None
+
+
+# ------------------------------------------------------------------ a signature longer than the lease
+
+def test_the_due_check_reads_the_crl_served_not_the_last_committed(app):
+    """A slower node commits a lower number after a higher one: the CRL served is the highest
+    number (RFC 5280 §5.2.3), and the cadence follows it, not the row committed last."""
+    from models import CA
+    from models.crl import CRLMetadata
+    ca_id = _a_ca_due(app)
+    try:
+        with app.app_context():
+            ca = db.session.get(CA, ca_id)
+            ca.crl_publish_interval_hours = 1
+            now = utc_now()
+
+            def row(number, this_update, created_at):
+                return CRLMetadata(ca_id=ca_id, crl_number=number, this_update=this_update,
+                                   next_update=now + timedelta(days=7), crl_pem='-', crl_der=b'-',
+                                   is_delta=False, created_at=created_at)
+            db.session.add_all([row(2, now - timedelta(minutes=1), now - timedelta(minutes=1)),
+                                row(1, now - timedelta(hours=2), now)])
+            db.session.commit()
+            assert CRLSchedulerTask.should_regenerate_crl(ca_id) == (False, None)
+    finally:
+        _drop_ca(app, ca_id)
+
+
+def _a_lease_outlived_by_a_signature(app, monkeypatch):
+    """Node A signs the CRL past its lease; node B runs its pass meanwhile. The CRLs stored,
+    as (number, signed by) in commit order."""
+    from cryptography import x509
+    monkeypatch.setattr(CRLSchedulerTask, 'LEASE', timedelta(seconds=2))
+    ca_id = _a_ca_due(app)
+    signing, b_done, signed_by = threading.Event(), threading.Event(), []
+    sign = x509.CertificateRevocationListBuilder.sign
+
+    def slow_sign(self, *args, **kwargs):
+        signed_by.append(threading.current_thread().name)
+        if threading.current_thread().name == 'A':
+            signing.set()
+            b_done.wait(30)  # an HSM slower than the lease
+        return sign(self, *args, **kwargs)
+    monkeypatch.setattr(x509.CertificateRevocationListBuilder, 'sign', slow_sign)
+    errors = []
+
+    def node(name):
+        def run():
+            try:
+                with app.app_context():
+                    CRLSchedulerTask.execute()
+                    db.session.remove()
+            except Exception as exc:  # noqa: BLE001
+                errors.append((name, repr(exc)))
+            finally:
+                if name == 'B':
+                    b_done.set()
+        return threading.Thread(target=run, name=name)
+    a = node('A')
+    a.start()
+    assert signing.wait(30)
+    import time
+    time.sleep(2.5)  # A's lease is over, A still signs
+    b = node('B')
+    b.start()
+    b.join(60)
+    a.join(60)
+    from models.crl import CRLMetadata
+    from services.crl_service import CRLService
+    with app.app_context():
+        stored = [(r.crl_number, r.generated_by) for r in
+                  CRLMetadata.query.filter_by(ca_id=ca_id, is_delta=False).order_by(CRLMetadata.id)]
+        served = CRLService.get_latest_crl(ca_id).crl_number
+        db.session.remove()
+    _drop_ca(app, ca_id)
+    assert errors == []
+    return stored, served, signed_by
+
+
+@pytest.mark.parametrize('_backend', [pytest.param('pg', marks=_on_pg)])
+def test_a_signature_outliving_the_lease_never_reuses_a_crl_number_on_postgresql(
+        app, ha, monkeypatch, _backend):
+    """pins distinct CRL numbers when a signature outlives the lease; proves no fix.
+    The number is allocated and committed before the signature: B, taking over the lease,
+    gets the next one; the CRL served is B's, the higher, and A's lower one is never served."""
+    with _pg(app):
+        stored, served, signed_by = _a_lease_outlived_by_a_signature(app, monkeypatch)
+    numbers = [n for n, _ in stored]
+    assert sorted(signed_by) == ['A', 'B']
+    assert len(numbers) == 2 and len(set(numbers)) == 2
+    assert served == max(numbers) and stored[0][0] == served  # B committed first, with the higher

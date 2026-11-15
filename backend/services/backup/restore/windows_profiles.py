@@ -10,7 +10,7 @@ import logging
 from typing import Any, Dict, Optional, Tuple
 
 from services.windows_profiles.legacy import (MIGRATED_KEYS, connector_names, has_windows_configuration,
-                                              keytab_realms, profile_from_2x, switches_from_2x)
+                                              keytab_realms, profile_from_2x, spn_realm, switches_from_2x)
 from utils.policy_identity import identity_for
 
 from ..export_generic import REFERENCE_SUFFIX
@@ -34,6 +34,12 @@ def _keytab_here() -> Tuple[Optional[bytes], bool]:
         return None, False
 
 
+def _target_realm() -> Optional[str]:
+    from services.windows_profiles import default_profile
+    profile = default_profile()
+    return profile.realm if profile is not None else None
+
+
 def _name_connectors(backup_data) -> list:
     rows = backup_data.get('ad_connector') if 'ad_connector' in backup_data else None
     if not isinstance(rows, list):
@@ -46,6 +52,13 @@ def _name_connectors(backup_data) -> list:
         if not row.get('name'):
             row['name'] = 'default' if position == 0 else f'connector-{position + 1}'
     return sorted(rows, key=lambda r: r['id'] if isinstance(r.get('id'), int) else 0)
+
+
+def _describes(backup_data, name) -> bool:
+    """Whether the archive says what section *name* holds: written, and not excluded at export."""
+    from ..section_store import section_kind
+    excluded = (backup_data.get('metadata') or {}).get('excluded_sections') or []
+    return section_kind(backup_data, name) == 'list' and name not in excluded
 
 
 def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Dict[str, Any]]:
@@ -81,7 +94,15 @@ def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Di
         if warnings is not None:
             warnings.append(message)
     row = dict(profile, keytab=base64.b64encode(keytab).decode('ascii') if keytab else None)
-    row[f'connector_id{REFERENCE_SUFFIX}'] = {'name': first['name']} if first else None
+    if _describes(backup_data, 'ad_connector'):
+        row[f'connector_id{REFERENCE_SUFFIX}'] = {'name': first['name']} if first else None
+    else:
+        # Written without its connectors, the archive does not say the profile has none: a merge keeps the link
+        row.pop('connector_id', None)
+        if not spn_realm(archived.get('kerberos_spn')) and _target_realm():
+            # Nor its realm when the SPN names none: a realm the target holds stays, one it
+            # lacks is the realm resolved here (its keytab's)
+            row.pop('realm', None)
     backup_data[PROFILES] = [row]
     for cert in backup_data.get('certificates') or []:
         if isinstance(cert, dict) and cert.get('source') == 'wstep' and not cert.get('windows_profile_id'):
