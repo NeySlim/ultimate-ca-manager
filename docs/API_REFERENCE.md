@@ -3131,7 +3131,9 @@ In HA mode a restore holds the cluster maintenance (see [HA](HA.md#restoring-a-b
 code `maintenance_in_progress` while another maintenance holds, `maintenance_not_acknowledged` when a node with a
 fresh heartbeat did not acknowledge it within 30 s (`nodes` maps each one to the processes missing, `web` or
 `scheduler`), and `maintenance_lost` when the maintenance ended or was lifted before the commit; in each case
-nothing is restored. A successful restore answers `restart_detail` "Rolling restart requested: the nodes
+nothing is restored. Both restore routes answer `409` "An interrupted restore could not be settled: nothing
+was restored." while files left by an earlier restore that did not commit cannot be put back (the server log
+names their directory). A successful restore answers `restart_detail` "Rolling restart requested: the nodes
 restart one at a time". Both restore routes also answer `data.todo`, a list of strings with one line per warning
 (sections not restored, a CA whose CRL could not be signed, a secret to enter again); it is empty when there is
 nothing to do. The backup listing's `meta.restore_limits` gives `upload_bytes` (archives before v4) and

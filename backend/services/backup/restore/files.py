@@ -493,6 +493,10 @@ class InterruptedRestorePending(RuntimeError):
     """A journal of an earlier restore is still on disk: a new restore would be undone by it."""
 
 
+UNSETTLED_MESSAGE = ("An interrupted restore could not be settled: nothing was restored. "
+                     "See the server log.")
+
+
 def _find_kept_directories() -> list:
     """Every kept directory with its journal (None when it holds none readable)."""
     found = []
@@ -523,9 +527,7 @@ def settle_interrupted_restores() -> None:
     if left:
         logger.error("Restore refused: interrupted restores could not be settled, remove or "
                      "repair %s and restart", ', '.join(left))
-        raise InterruptedRestorePending(
-            "An interrupted restore could not be settled; nothing has been changed. "
-            "See the server log.")
+        raise InterruptedRestorePending(UNSETTLED_MESSAGE)
 
 
 def sweep_kept_previous_contents() -> List[Path]:

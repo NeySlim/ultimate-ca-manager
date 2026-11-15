@@ -14,6 +14,7 @@ from services.backup import shared_store, storage
 from fips_mode import FipsRestricted
 from services.backup.decrypt_mixin import BackupDecryptionError
 from services.backup.locking import BackupBusyError, backup_operation_lock
+from services.backup.restore.files import InterruptedRestorePending
 from services.backup.restore.plan import RestoreValidationError
 from services.backup.restore_report import safe_restore_audit_details
 from services.backup.restore_completion import (
@@ -247,6 +248,10 @@ def restore_backup():
             except BackupBusyError as busy:
                 record_request_refusal(audited_name, 'a backup or another restore is running')
                 return error_response(f"{busy} Retry once it has finished.", 409)
+            except InterruptedRestorePending as pending_restore:
+                record_failure('system_restore', audited_name,
+                               'Restore refused: an interrupted restore could not be settled')
+                return error_response(str(pending_restore), 409)
 
             # Recorded before the archive is judged empty or not, as the system
             # route does: a file that restored nothing was still uploaded and

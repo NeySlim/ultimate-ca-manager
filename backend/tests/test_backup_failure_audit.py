@@ -279,3 +279,18 @@ def test_a_restore_refused_while_busy_carries_the_request_marker(auth_client, au
     assert response.status_code == 409
     _single_refusal(audit, 'system_restore')
     assert audit[0]['details'].startswith(REQUEST_REFUSED)
+
+
+@pytest.mark.parametrize('route', RESTORE)
+def test_a_restore_refused_by_an_unsettled_interrupted_one_is_a_409(auth_client, audit, monkeypatch, route):
+    from services.backup.restore import files
+    from services.backup_service import BackupService
+
+    def unsettled(self, *a, **k):
+        raise files.InterruptedRestorePending(files.UNSETTLED_MESSAGE)
+    monkeypatch.setattr(BackupService, 'restore_backup_from_stream', unsettled)
+    response = _upload(auth_client, route)
+    assert response.status_code == 409
+    assert 'nothing was restored' in response.get_json()['message']
+    _assert_failure(audit, 'system_restore')
+    assert audit[0]['details'] == 'Restore refused: an interrupted restore could not be settled'

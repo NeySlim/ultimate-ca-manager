@@ -4,6 +4,7 @@ System Backup Operations
 
 from services.backup import shared_store, storage
 from services.backup.locking import BackupBusyError, backup_operation_lock
+from services.backup.restore.files import InterruptedRestorePending
 from services.backup.restore.plan import RestoreValidationError
 from services.backup.restore_report import safe_restore_audit_details, with_restore_warnings
 from services.database_admin.lock import (
@@ -542,6 +543,10 @@ def restore_backup():
             except BackupBusyError as busy:
                 record_request_refusal(audited_name, 'a backup or another restore is running')
                 return error_response(f'{busy} Retry once it has finished.', 409)
+            except InterruptedRestorePending as pending_restore:
+                _audit_failure('system_restore', audited_name,
+                               'Restore refused: an interrupted restore could not be settled')
+                return error_response(str(pending_restore), 409)
 
             try:
                 carried = bool((results or {}).get('sections_carried'))
