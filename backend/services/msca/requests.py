@@ -35,10 +35,15 @@ def msca_may_write_clause():
                   Certificate.source == 'msca', Certificate.imported_from.like('msca:%'))
 
 
-def supersede(req_ids, *, username='system', commit=True):
-    """Close the given open requests as superseded, audited; returns how many changed.
-    Rides the caller's transaction when ``commit`` is False."""
+def supersede(req_ids, *, username=None, commit=True):
+    """Close the given open requests as superseded, audited under *username* (else the
+    request's user, else 'system'); returns how many changed. Rides the caller's
+    transaction when ``commit`` is False."""
+    from flask import g, has_request_context
     from services.audit.staging import stage_audit_entry
+    if username is None and has_request_context():
+        username = getattr(getattr(g, 'current_user', None), 'username', None)
+    username = username or 'system'
     closed = 0
     for req in MSCARequest.query.filter(MSCARequest.id.in_(list(req_ids))).all():
         changed = (MSCARequest.query
@@ -62,7 +67,7 @@ def supersede(req_ids, *, username='system', commit=True):
     return closed
 
 
-def supersede_for_csr(csr_id, *, username='system', commit=True):
+def supersede_for_csr(csr_id, *, username=None, commit=True):
     """Close the open Microsoft CA requests of a CSR that just received a certificate."""
     ids = [rid for (rid,) in db.session.query(MSCARequest.id).filter(
         MSCARequest.csr_id == csr_id, MSCARequest.cert_id.is_(None),

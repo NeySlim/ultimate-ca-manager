@@ -255,6 +255,11 @@ def test_check_closes_a_legacy_request_the_ca_still_holds(app, auth_client, monk
     assert r.status_code == 200, r.data
     assert r.get_json()['data']['status'] == 'superseded'
     assert _req(app, req_id) == ('superseded', None)
+    from models import AuditLog
+    with app.app_context():
+        entry = (AuditLog.query.filter_by(action='msca.request_superseded')
+                 .order_by(AuditLog.id.desc()).first())
+        assert 'RequestId=7008' in entry.details and entry.username == 'admin'
 
 
 def test_a_superseded_request_stays_closed_once_its_csr_is_gone(app, adcs):
