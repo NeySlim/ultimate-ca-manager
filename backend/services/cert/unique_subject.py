@@ -102,13 +102,35 @@ def issuer_refids(ca):
     return same_key_refids(ca)
 
 
+def _anchor_id(refids):
+    from models import CA, db
+    anchor = db.session.query(CA.id).filter(CA.refid.in_(refids)).order_by(CA.id).first()
+    return anchor[0] if anchor is not None else None
+
+
 def _lock_twins(ca, refids):
     """Serialise the issuances of twin records on the lowest-id one: two twins never wait on
     each other, both wait on that one (a no-op once held in this transaction)."""
     from models import CA, db
-    anchor = db.session.query(CA.id).filter(CA.refid.in_(refids)).order_by(CA.id).first()
-    if anchor is not None and anchor[0] != ca.id:
-        db.session.query(CA.id).filter(CA.id == anchor[0]).with_for_update().first()
+    anchor = _anchor_id(refids)
+    if anchor is not None and anchor != ca.id:
+        db.session.query(CA.id).filter(CA.id == anchor).with_for_update().first()
+
+
+def lock_issuers(cas):
+    """Before counting issuances under several CAs (a pair renewal): lock their rows and the
+    lowest twin of each enforcing one, all in id order (no query when no CA enforces)."""
+    from models import CA, db
+    if not any(getattr(ca, 'enforce_unique_subject', False) for ca in cas):
+        return
+    ids = {ca.id for ca in cas}
+    with db.session.no_autoflush:
+        for ca in cas:
+            refids = issuer_refids(ca) if ca.enforce_unique_subject else []
+            if len(refids) > 1:
+                ids.add(_anchor_id(refids))
+        for ca_id in sorted(ids - {None}):
+            db.session.query(CA.id).filter(CA.id == ca_id).with_for_update().first()
 
 
 def lock_issuer_records(ca):

@@ -41,7 +41,7 @@ from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.serial_format import canonical_serial
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
 from utils.db_transaction import commit_or_rollback
-from services.cert.unique_subject import SubjectTaken, refuse_taken_subject
+from services.cert.unique_subject import SubjectTaken, lock_issuers, refuse_taken_subject
 from utils.ca_serial_counter import next_ca_serial
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
@@ -252,13 +252,14 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
             leave_pair(staged_all[0]['cert'])
-        # A renewal is an issuance, counted in its commit; the CA rows are locked last,
-        # after every certificate row written, and by id so two pairs never cross
+        # A renewal is an issuance, counted in its commit; the CA rows (twins' lowest records
+        # included) are locked last, after every certificate row written, all in id order
         try:
             db.session.flush()
         except SQLAlchemyError as e:
             logger.error(f'Failed to renew certificate {cert.id}: {e}', exc_info=True)
             raise RenewalError('Failed to renew certificate', 500) from e
+        lock_issuers([s['ca'] for s in staged_all])
         for s in sorted(staged_all, key=lambda s: s['ca'].id):
             next_ca_serial(s['ca'])
         # The renewed row is the same entity (RFC 5280 §4.1.2.6), and so is its pair partner

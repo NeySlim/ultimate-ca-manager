@@ -14,7 +14,8 @@ def next_ca_serial(ca) -> int:
     from models import CA, db
     from services.cert.unique_subject import lock_issuer_records
     table = CA.__table__
-    # CA rows are locked in id order: a twin record's lowest one first (unique subject)
+    # A twin record's lowest one is locked before this row (unique subject); a caller counting
+    # under several CAs locks them all first, in id order (lock_issuers)
     lock_issuer_records(ca)
     # The row lock (PostgreSQL) is held until the commit
     bump = (update(table).where(table.c.id == ca.id)

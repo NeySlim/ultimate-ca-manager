@@ -897,6 +897,92 @@ def test_an_issuance_by_a_twin_record_locks_the_lowest_twin_before_its_own(app, 
     assert outcome['cross'] == 'issued', outcome
 
 
+@pytest.fixture
+def straddling(app):
+    """Roots A, B, C and B's cross-certificate by A, in id order: ``(root B, C, cross)``."""
+    from tests.test_backfill_cross_dupes import _cert, _row as _ca_record
+    key_a, key_b, key_c = _key(), _key(), _key()
+    tag = secrets.token_hex(3)
+    with app.app_context():
+        root_a = _ca_record(_cert(key_a, f'Pair Root A {tag}'), key_a)
+        root_b = _ca_record(_cert(key_b, f'Pair Root B {tag}'), key_b)
+        middle = _ca_record(_cert(key_c, f'Pair Root C {tag}'), key_c)
+        cross = _ca_record(_cert(key_b, f'Pair Root B {tag}', key_a, f'Pair Root A {tag}'), key_b,
+                           caref=db.session.get(CA, root_a).refid)
+    yield root_b, middle, cross
+    with app.app_context():
+        db.session.rollback()
+        from models import RevokedSerial
+        records = [db.session.get(CA, ca_id) for ca_id in (cross, middle, root_b, root_a)]
+        for model in (RevokedSerial, Certificate):  # a renewal records the superseded serials
+            model.query.filter(model.caref.in_([r.refid for r in records])).delete(synchronize_session=False)
+        for record in records:
+            db.session.delete(record)
+        db.session.commit()
+
+
+def test_a_pair_renewal_across_twin_groups_locks_every_ca_row_in_id_order(app, straddling, monkeypatch):
+    """A under the cross record (twin of root B, the lowest id), B under a CA whose id lies between:
+    root B is locked before B's CA, so the renewal never waits against an issuance by the cross."""
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+    from tests.test_revocation_record_rule import _on_postgresql
+    if not _on_postgresql(app):
+        pytest.skip('row locks: PostgreSQL only')
+    from services.ca_service import CAService
+    from services.cert import renewal
+    root_b, middle, cross = straddling
+    tag = secrets.token_hex(3)
+    with app.app_context():
+        assert root_b < middle < cross
+        db.session.get(CA, cross).enforce_unique_subject = True
+        db.session.commit()
+        rows = []
+        for ca_id, cn in ((cross, f'pair-a-{tag}.unique.test'), (middle, f'pair-b-{tag}.unique.test')):
+            key = _key()
+            _pem, serial = CAService.sign_csr_from_crypto(db.session.get(CA, ca_id), _csr(cn, key),
+                                                          validity_days=30, source='test')
+            row = Certificate.query.filter_by(serial_number=str(int(serial, 16))).one()
+            _keep_key(row, key)
+            rows.append(row)
+        rows[0].related_certificate_id, rows[1].related_certificate_id = rows[1].id, rows[0].id
+        db.session.commit()
+        a_id = rows[0].id
+    paused, release, outcome = threading.Event(), threading.Event(), {}
+    bump = renewal.next_ca_serial
+
+    def hold(ca):
+        count = bump(ca)
+        paused.set()
+        release.wait(30)
+        return count
+    monkeypatch.setattr(renewal, 'next_ca_serial', hold)
+
+    def renew():
+        try:
+            with app.app_context():
+                outcome['related'] = renewal.renew_certificate_in_place(
+                    db.session.get(Certificate, a_id))['related']
+        except Exception as e:  # noqa: BLE001
+            outcome['error'] = repr(e)
+        finally:
+            paused.set()
+    worker = threading.Thread(target=renew)
+    worker.start()
+    try:
+        assert paused.wait(30)
+        with app.app_context():
+            with db.engine.connect() as conn:
+                with pytest.raises(OperationalError, match='could not obtain lock'):
+                    conn.execute(text('SELECT id FROM certificate_authorities WHERE id = :id FOR UPDATE NOWAIT'),
+                                 {'id': root_b})
+                conn.rollback()
+    finally:
+        release.set()
+        worker.join(60)
+    assert 'error' not in outcome and len(outcome['related']) == 1, outcome
+
+
 # --- CA API --------------------------------------------------------------------------------------
 
 def test_the_option_is_read_written_and_audited(app, auth_client, create_ca):
