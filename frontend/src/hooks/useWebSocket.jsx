@@ -228,7 +228,7 @@ export function WebSocketProvider({ children }) {
     
     const socket = io(window.location.origin, {
       path: '/socket.io',
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],  // engine.io-client only falls back with tryAllTransports
       withCredentials: true,
       reconnection: true,
       reconnectionAttempts: 5,
