@@ -1,7 +1,7 @@
 /**
  * CAs (Certificate Authorities) Page - Using ResponsiveLayout
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -167,13 +167,14 @@ export default function CAsPage() {
     }
   }, [urlCAId, loading])
 
-  // Expand all nodes that have children by default
+  // Every CA starts expanded, one created after the first load included;
+  // a node the user folded stays folded
+  const seenCAs = useRef(new Set())
   useEffect(() => {
-    if (cas.length > 0 && expandedNodes.size === 0) {
-      const parentIds = cas.filter(c => cas.some(child => child.parent_id === c.id)).map(c => c.id)
-      const rootIds = cas.filter(c => !c.parent_id || c.type === 'root').map(c => c.id)
-      setExpandedNodes(new Set([...rootIds, ...parentIds]))
-    }
+    const fresh = cas.map(c => c.id).filter(id => !seenCAs.current.has(id))
+    if (fresh.length === 0) return
+    fresh.forEach(id => seenCAs.current.add(id))
+    setExpandedNodes(prev => new Set([...prev, ...fresh]))
   }, [cas])
 
   const getParentName = (ca) => {
