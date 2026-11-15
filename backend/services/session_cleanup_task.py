@@ -65,7 +65,8 @@ class SessionCleanupTask:
             cutoff = time.time() - max_lifetime - 3600
             cleaned = 0
 
-            from utils.session_store import session_files_lock
+            from utils.session_store import HELD, session_files_lock
+            unlocked = 0
             for filename in os.listdir(data_dir):
                 filepath = os.path.join(data_dir, filename)
                 if not os.path.isfile(filepath):
@@ -74,15 +75,19 @@ class SessionCleanupTask:
                     if os.path.getmtime(filepath) >= cutoff:
                         continue
                     # Checked again under the lock: a save may have refreshed it meanwhile
-                    with session_files_lock(data_dir, exclusive=True):
+                    with session_files_lock(data_dir, exclusive=True) as state:
                         if os.path.getmtime(filepath) < cutoff:
                             os.unlink(filepath)
                             cleaned += 1
+                            unlocked += state != HELD
                 except OSError:
                     pass
 
             if cleaned > 0:
                 logger.info(f"Session cleanup: removed {cleaned} expired session files")
+            if unlocked:
+                logger.warning("Session cleanup: %s expired session files removed without the "
+                               "store's lock, a save in flight may have been lost", unlocked)
 
         except Exception as e:
             logger.error(f"Session cleanup error: {e}")

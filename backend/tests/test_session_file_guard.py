@@ -141,18 +141,22 @@ _GEVENT_PROBE = textwrap.dedent('''
     monkey.patch_all()
     import fcntl, os, sys, tempfile
     from utils.session_store import session_files_lock
-    directory = tempfile.mkdtemp()
+    parent = tempfile.mkdtemp()
+    directory = os.path.join(parent, 'sessions')
+    os.mkdir(directory)
     for exclusive in (False, True):
         with session_files_lock(directory, exclusive) as state:
             assert state == 'held', state
-        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            sys.exit('still locked after the with, exclusive=%s' % exclusive)
-        finally:
-            os.close(fd)
+        for path in (directory, parent):  # the store and its turnstile
+            fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                sys.exit('%s still locked after the with, exclusive=%s' % (path, exclusive))
+            finally:
+                os.close(fd)
     os.rmdir(directory)
+    os.rmdir(parent)
 ''')
 
 
@@ -183,3 +187,75 @@ def test_a_restore_removes_a_session_file_written_before_it_held_the_lock(file_a
     with file_app.app_context():
         _remove_session_files()
     assert not os.path.exists(late)
+
+
+def test_a_removal_is_not_starved_by_back_to_back_saves(tmp_path):
+    from utils.session_store import HELD, session_files_lock
+    directory = tmp_path / 'sessions'
+    directory.mkdir()
+    stop = threading.Event()
+
+    def save_again_and_again():
+        while not stop.is_set():
+            with session_files_lock(str(directory), exclusive=False, wait=5.0):
+                time.sleep(0.01)
+
+    savers = [threading.Thread(target=save_again_and_again) for _ in range(4)]
+    for i, saver in enumerate(savers):
+        saver.start()
+        time.sleep(0.0025)  # staggered: the shared lock is never free between two saves
+    try:
+        states = []
+        for _ in range(3):
+            with session_files_lock(str(directory), exclusive=True, wait=1.0) as state:
+                states.append(state)
+    finally:
+        stop.set()
+        for saver in savers:
+            saver.join(10)
+    assert states == [HELD] * 3, states
+
+
+def test_a_removal_without_the_lock_still_removes_and_says_so(file_app, monkeypatch, caplog):
+    import logging
+    from utils.session_store import HELD, session_files_lock
+    iface = file_app.session_interface
+    monkeypatch.setattr(iface, 'lock_wait', 0.05)
+    user = _make_user(file_app)
+    try:
+        cookie = _open_session(file_app, user).get_cookie('session').value
+        sid = iface._unsign(file_app, cookie) if iface.use_signer else cookie
+        store_id = iface._get_store_id(sid)
+        with session_files_lock(iface.cache._path, exclusive=False) as state:
+            assert state == HELD
+            with caplog.at_level(logging.WARNING, logger='utils.session_store'):
+                iface._delete_session(store_id)
+        assert not iface._record_exists(store_id)
+        assert any('without its lock (busy)' in r.getMessage() for r in caplog.records)
+    finally:
+        _cleanup(file_app, user)
+
+
+@pytest.mark.parametrize('remove', ['restore', 'purge'])
+def test_a_store_wide_removal_without_the_lock_says_so(file_app, monkeypatch, caplog, remove):
+    import logging
+    from utils import session_store
+    from utils.session_store import HELD, session_files_lock
+    real_lock = session_store.session_files_lock
+    monkeypatch.setattr(session_store, 'session_files_lock',
+                        lambda directory, exclusive, wait=2.0: real_lock(directory, exclusive, 0.05))
+    directory = file_app.session_interface.cache._path
+    stale = os.path.join(directory, 'stale-session')
+    with open(stale, 'wb') as handle:
+        handle.write(b'session')
+    old = time.time() - 10 * 86400
+    os.utime(stale, (old, old))
+    with session_files_lock(directory, exclusive=False) as state:
+        assert state == HELD
+        with caplog.at_level(logging.WARNING):
+            if remove == 'restore':
+                _remove_by_restore(file_app, None)
+            else:
+                _remove_by_purge(file_app, None)
+    assert not os.path.exists(stale)
+    assert any('without' in r.getMessage() and 'lock' in r.getMessage() for r in caplog.records)

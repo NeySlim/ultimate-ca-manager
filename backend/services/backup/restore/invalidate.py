@@ -132,10 +132,10 @@ def _remove_session_files() -> int:
         return 0
 
     removed = 0
-    from utils.session_store import session_files_lock
+    from utils.session_store import removal_lock
     failures = []
     # Listed and removed under the exclusive lock: no save in flight writes a file back meanwhile
-    with session_files_lock(directory, exclusive=True):
+    with removal_lock(directory, 'the restore removed the sessions'):
         try:
             entries = list(os.scandir(directory))
         except OSError as exc:
