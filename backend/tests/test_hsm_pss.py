@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509.oid import NameOID, SignatureAlgorithmOID
 
+from tests.optional_backends import needs
 from services.hsm.ca_key_loader import bind_signature_scheme
 from services.hsm.hsm_private_key import HsmRSAPrivateKey
 from utils.signing_hash import rsa_padding_for
@@ -150,7 +151,7 @@ def test_cloud_providers_are_refused_and_pkcs11_accepted():
         assert pss_refusal(True, 'pkcs11') is None
 
 
-@pytest.mark.skipif(not HAS_SOFTHSM, reason='SoftHSM not installed')
+@needs('softhsm', HAS_SOFTHSM, reason='SoftHSM not installed')
 @pytest.mark.parametrize('digest', ['sha256', 'sha384', 'sha512'])
 def test_softhsm_signs_pss(tmp_path, monkeypatch, digest):
     from services.hsm.pkcs11_provider import PKCS11_AVAILABLE, Pkcs11Provider

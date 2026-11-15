@@ -7,6 +7,7 @@ import types
 
 import pytest
 
+from tests.optional_backends import needs
 from services.hsm import pkcs11_provider
 
 SOFTHSM_LIB = '/usr/lib/softhsm/libsofthsm2.so'
@@ -96,7 +97,7 @@ def _child_random(lib_for_child):
         return pipe.read()
 
 
-@pytest.mark.skipif(not HAS_SOFTHSM, reason='SoftHSM not installed')
+@needs('softhsm', HAS_SOFTHSM, reason='SoftHSM not installed')
 @pytest.mark.parametrize('reset_on_fork, helper, expected', [
     ('true', True, 'fresh 32'),
     ('true', False, 'error'),  # the inherited state, the defect this guards against

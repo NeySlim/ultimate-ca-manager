@@ -38,7 +38,7 @@ export default defineConfig({
         '**/*.d.ts',
         'src/main.jsx',
         'src/App.jsx',
-        'src/pages/**',  // Pages are integration-tested via E2E
+        'src/pages/**',  // Pages: no CI job runs the browser E2E suite yet, so this is uncovered
         'src/hooks/**',  // Hooks tested via component tests
         'src/contexts/**'  // Contexts tested via component tests
       ],

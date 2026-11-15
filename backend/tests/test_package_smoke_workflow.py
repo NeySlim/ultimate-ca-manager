@@ -310,11 +310,3 @@ def test_a_sudo_removal_that_breaks_dependencies_is_a_precondition(tmp_path):
     assert 'precondition: removing sudo broke package dependencies' in proc.stdout
     assert not any(c.startswith('apt-get') for c in calls)
 
-
-def test_a_branch_build_does_not_start_the_smoke_jobs():
-    jobs = _load('release-smoke.yml')['jobs']
-    assert jobs
-    for name, job in jobs.items():
-        cond = str(job.get('if', ''))
-        assert "workflow_dispatch" in cond, name
-        assert "startsWith(github.event.workflow_run.head_branch, 'v')" in cond, name

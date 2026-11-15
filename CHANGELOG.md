@@ -64,6 +64,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- Docker images: the `latest` and `latest-fips` tags now go to the highest stable version published, so a maintenance release of an older line no longer moves them.
 - **A Windows profile keeps its policy identity.** The MS-XCEP policy identifier and template OIDs belong to the profile, not to its CA: changing the policy or issuing CA no longer changes the identifier and OIDs registered clients cached (such a change made them fail with `0x8007000d`), two profiles on one CA no longer share an identifier, and the default profile upgraded from 2.254 keeps the values 2.254 served.
 - **FIPS mode allows what the loaded FIPS module approves.** The `-fips` image moves to the OpenSSL FIPS Provider 3.5.9 (CMVP certificate #5586), and ML-DSA, Ed25519 and Ed448 are allowed in FIPS mode when the module answers that it approves them, refused as before otherwise (RHEL 9, Ubuntu 24.04, 3.1.2); Ed25519 deployment keys and ML-DSA keys on an HSM or OpenBao stay refused, as they are signed outside the module.
 - **FIPS mode: one RSA rule.** An RSA key is approved when its length is even and from 2048 to 16384 bits (FIPS 186-5), at issuance, for HSM signatures, for EST server-side key transport and in the readiness check alike: a CSR with an RSA-8192 key is now signed in FIPS mode, and an odd length or one over 16384 bits is refused everywhere.

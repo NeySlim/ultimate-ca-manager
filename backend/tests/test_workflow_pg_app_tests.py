@@ -8,8 +8,9 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LIST = ROOT / 'scripts' / 'ci' / 'pg-app-tests.txt'
 SHARD = ROOT / 'scripts' / 'ci' / 'shard-tests.sh'
-# Not gated on the variable, but HA code whose PostgreSQL behaviour must be exercised too
-ALSO_ON_PG = ('tests/test_discovery_recovery_ha.py', 'tests/test_health_ha.py')
+# Not gated on the variable, but code whose PostgreSQL branch must be exercised too
+ALSO_ON_PG = ('tests/test_discovery_recovery_ha.py', 'tests/test_health_ha.py',
+              'tests/test_migration_runner_isolation.py')
 
 
 def _step_patterns():

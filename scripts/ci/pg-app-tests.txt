@@ -79,3 +79,4 @@ tests/test_import_parent_link.py
 tests/test_relink_parent_self_signed_first.py
 tests/test_ca_parent_confirmation.py
 tests/test_unique_subject*.py
+tests/test_migration_runner_isolation.py

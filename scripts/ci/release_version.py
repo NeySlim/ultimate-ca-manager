@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Release version grammar, conversions and release notes, shared by the workflows and scripts.
+"""Release version grammar, conversions, release notes and `latest` rule, shared by the workflows and scripts.
 
 Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
 A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
-Usage: release_version.py <validate|deb|rpm|tar|file|npm|assets|notes|history> <version> [CHANGELOG]
+Usage: release_version.py <validate|deb|rpm|tar|file|npm|assets|notes|history|latest> <version> [CHANGELOG]
+`latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
 """
 import re
 import sys
@@ -116,6 +117,18 @@ def changelog_history(version, text, count=2):
     return '\n'.join(out)
 
 
+def is_latest(version, published):
+    """True for a stable `version` that no stable published tag exceeds: never a RC, never an older line."""
+    if not is_stable(version):
+        return False
+    top = numeric(version)
+    for tag in published:
+        tag = tag.strip().removeprefix('refs/tags/').removeprefix('v')
+        if VERSION_RE.fullmatch(tag) and is_stable(tag) and numeric(tag) > top:
+            return False
+    return True
+
+
 def main(argv):
     if len(argv) < 3:
         print(__doc__, file=sys.stderr)
@@ -136,6 +149,8 @@ def main(argv):
             print(npm_version(version))
         elif cmd == 'assets':
             print('\n'.join(asset_names(version).values()))
+        elif cmd == 'latest':
+            print('true' if is_latest(version, sys.stdin.read().splitlines()) else 'false')
         elif cmd in ('notes', 'history'):
             path = argv[3] if len(argv) > 3 else 'CHANGELOG.md'
             with open(path, encoding='utf-8') as fh:

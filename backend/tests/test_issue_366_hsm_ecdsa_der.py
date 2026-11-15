@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
 )
 from cryptography.x509.oid import NameOID
 
+from tests.optional_backends import needs
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 
 CURVES = {
@@ -182,9 +183,8 @@ def test_external_ca_on_an_hsm_key_gets_the_curve_digest_by_default(app, auth_cl
             auth_client.delete(f"/api/v2/cas/{ca['id']}")
 
 
-@pytest.mark.skipif(
-    not (__import__('shutil').which('softhsm2-util') and __import__('os').path.exists('/usr/lib/softhsm/libsofthsm2.so')),
-    reason='SoftHSM not installed')
+@needs('softhsm', __import__('shutil').which('softhsm2-util')
+       and __import__('os').path.exists('/usr/lib/softhsm/libsofthsm2.so'), reason='SoftHSM not installed')
 def test_pkcs11_provider_falls_back_to_raw_ecdsa_on_softhsm(tmp_path, monkeypatch):
     """SoftHSM has no ECDSA_SHA* mechanism: the provider hashes and signs raw, same signature."""
     import os
