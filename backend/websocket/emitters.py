@@ -3,7 +3,6 @@ WebSocket event integration helpers.
 Use these functions in services to emit events after actions.
 """
 
-import re
 from typing import Dict, Any, Optional
 import logging
 
@@ -14,8 +13,9 @@ def _extract_cn(subject: str) -> str:
     """Extract clean CN from a full subject string like 'CN=host.example.com,O=Org,...'."""
     if not subject:
         return 'Unknown'
-    m = re.search(r'CN=([^,/]+)', subject)
-    return m.group(1).strip() if m else subject.split(',')[0].strip()
+    from utils.dn_parse import stored_dn_common_name
+    cn = stored_dn_common_name(subject)  # escapes honoured, as the models read it
+    return cn.strip() if cn else subject.split(',')[0].strip()
 
 
 # Server-managed scope rooms; each socket joins those its permissions allow.

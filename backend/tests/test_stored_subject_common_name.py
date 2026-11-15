@@ -270,3 +270,15 @@ def test_the_ca_list_shows_the_whole_cn_and_counts_by_it(app, auth_client):
             db.session.delete(db.session.get(Certificate, orphan_id))
             db.session.delete(db.session.get(CA, ca_id))
             db.session.commit()
+
+
+@pytest.mark.parametrize('subject, expected', [
+    (r'O=Example,CN=Doe\, John', 'Doe, John'),
+    ('CN=admin.example,CN=web.example', 'admin.example'),
+    ('O=No common name,C=FR', 'O=No common name'),
+    ('', 'Unknown'),
+])
+def test_a_discovery_event_names_the_certificate_by_its_whole_cn(subject, expected):
+    from websocket.emitters import _extract_cn
+
+    assert _extract_cn(subject) == expected
