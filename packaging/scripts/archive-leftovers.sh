@@ -66,8 +66,34 @@ present() { [ -e "$1" ] || [ -L "$1" ]; }
 # $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
 normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
 
-# Appends line $1 to the journal (tee: a command, which a test can fail or kill)
-jot() { printf '%s\n' "$1" | tee -a -- "$JOURNAL" >/dev/null; }
+# Appends line $1 to the journal, whole or not at all (tee: a command a test can fail or
+# kill). A failed write is cut back to the size before it: truncating needs no free space,
+# so this holds on a full disk. Nothing is appended after a line a kill left torn.
+jot() {
+    size=0
+    if [ -e "$JOURNAL" ]; then
+        [ -z "$(tail -c 1 -- "$JOURNAL")" ] && size=$(wc -c < "$JOURNAL") || return 1
+    fi
+    printf '%s\n' "$1" | tee -a -- "$JOURNAL" >/dev/null && return 0
+    truncate -s "$size" -- "$JOURNAL" 2>/dev/null
+    return 1
+}
+
+# The journal's whole lines: a last line without its newline was never a step taken
+whole_lines() {
+    if [ -z "$(tail -c 1 -- "$JOURNAL")" ]; then cat -- "$JOURNAL"; else sed '$d' -- "$JOURNAL"; fi
+}
+
+# $1 is a line this script writes, with all its fields
+whole_step() {
+    case $1 in *"$TAB"*"$TAB"*"$TAB"*) return 1 ;; esac
+    case $1 in
+        rename"$TAB"/*"$TAB"/*|mkdir"$TAB"/*"$TAB"/*|fips"$TAB"/*"$TAB"/*) return 0 ;;
+        failed"$TAB"*"$TAB"*) return 1 ;;
+        failed"$TAB"/*) return 0 ;;
+    esac
+    return 1
+}
 
 # A rename line, then rename(2) of $1 to $2. 0: moved; 1: refused while $1 is there and $2
 # absent, its line out of the journal again; 2: any other failure.
@@ -133,7 +159,7 @@ archive_contents() {
 
 # The journal without line $1 (and $2), written aside then renamed over it
 drop_line() {
-    { grep -vxF -e "$1" -e "${2:-$1}" "$JOURNAL"; [ $? -le 1 ]; } > "$JOURNAL.new" 2>/dev/null \
+    { whole_lines | grep -vxF -e "$1" -e "${2:-$1}"; [ $? -le 1 ]; } > "$JOURNAL.new" 2>/dev/null \
         && mv -- "$JOURNAL.new" "$JOURNAL"
 }
 
@@ -173,7 +199,9 @@ say_stuck() {
   $DEST: still holds what could not be put back}" | sed 1d | while IFS= read -r line; do
         say "$line"
     done
-    if [ -n "$again" ]; then
+    if [ -n "$broken" ]; then
+        say "Nothing was put back, and retrying alone will not: do what the line says, then retry."
+    elif [ -n "$again" ]; then
         say "These failed the same way at the previous attempt: retrying alone will not put"
         say "them back. Fix what each line names, then retry; they stay where they are meanwhile."
     elif [ -n "$twice" ]; then
@@ -187,8 +215,18 @@ say_stuck() {
 # Undoes the journal, last step first, by renames back alone. Every line replays as a
 # no-op once undone, so a retry from any interrupted state converges.
 roll_back() {
-    stuck="" left="" seen="" again="" twice=""
-    undo=$(sed -n '1!G;h;$p' "$JOURNAL") || { unsettled "$JOURNAL" "could not be read"; return 1; }
+    stuck="" left="" seen="" again="" twice="" broken=""
+    lines=$(whole_lines) || { unsettled "$JOURNAL" "could not be read"; return 1; }
+    # Any line that is not a whole step stops the put-back before it touches anything
+    while IFS= read -r line; do
+        [ -z "$line" ] || whole_step "$line" && continue
+        left=1 broken=1 stuck="
+  $JOURNAL: holds a line that is not a whole step, so nothing it lists was put back: compare it with the archive, put back what it names by hand, then remove the journal"
+        return 1
+    done <<EOF
+$lines
+EOF
+    undo=$(printf '%s\n' "$lines" | sed -n '1!G;h;$p')
     while IFS="$TAB" read -r op src dst; do
         case $op in
             rename)
@@ -299,7 +337,7 @@ no_interpreter() {
     if [ -n "$DEST" ]; then
         say "An earlier attempt to archive what a removed UCM left did not complete."
         stuck="
-  $DEST: still holds what could not be put back, which needs that interpreter" again="" twice=""
+  $DEST: still holds what could not be put back, which needs that interpreter" again="" twice="" broken=""
         say_stuck
     fi
     say "The installation stops here: nothing else is written, and UCM was not started."

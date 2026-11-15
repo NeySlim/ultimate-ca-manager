@@ -689,7 +689,7 @@ def test_without_an_interpreter_an_unfinished_attempt_is_left_as_it_is(tmp_path)
     _killed_after_renaming(box, 'ucm.db')
     left = snapshot(box, box.parent)
     out = box.run(interpreter='')
-    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert out.returncode == 2 and out.stderr == '', (out.stdout, out.stderr)
     assert 'no interpreter to rename files with' in out.stdout
     assert snapshot(box, box.parent) == left
     archived(box, box.run(), data, config)
@@ -1050,3 +1050,106 @@ def test_the_kept_directories_are_those_the_packages_create():
     assert {frozenset(m.split()) for m in re.findall(r'for d in ([a-z ]+); do', spec)} == {frozenset(KEPT)}
     assert re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst) and all(
         set(m.split(',')) == set(KEPT) for m in re.findall(r'"\$UCM_DATA"/\{([a-z,]+)\}', postinst))
+
+
+# -- the journal holds whole lines only ----------------------------------------------
+
+def _full_disk(box, target, cut):
+    """tee writes the journal: from line `target` on, as on a full disk, each write stores
+    the start of its line only (`cut` for the target, half of any other) and fails."""
+    full, t, c = box.state / 'full', box.state / 'target', box.state / 'cut'
+    t.write_text(target)
+    c.write_text(cut)
+    (box.bin / 'tee').write_text(
+        f'#!/bin/sh\nline=$(cat)\nfor last; do :; done\n'
+        f'if [ -e {full} ] || [ "$line" = "$(cat {t})" ]; then\n'
+        f'    if [ -e {full} ]; then part=$(printf "%s" "$line" | head -c $((${{#line}} / 2)))\n'
+        f'    else part=$(cat {c}); : > {full}; fi\n'
+        f'    printf "%s" "$part" >> "$last"; echo "tee: No space left on device" >&2; exit 1\n'
+        f'fi\nprintf "%s\\n" "$line" | {REAL["tee"]} "$@"\n')
+    (box.bin / 'tee').chmod(0o755)
+
+
+def _torn(box):
+    return {
+        'a rename cut at the data': (
+            {'other_fs': (box.data,)},
+            f'rename\t{box.data}/ucm.db\t{box.data}/{LOCAL}/ucm.db', f'rename\t{box.data}/ucm.db\t{box.data}'),
+        'a local mkdir cut at the data': (
+            {'other_fs': (box.data,)},
+            f'mkdir\t{box.data}\t{box.data}/{LOCAL}', f'mkdir\t{box.data}\t{box.data}'),
+        'a central mkdir cut at the archive': (
+            {}, f'mkdir\t{box.data}/ca\t{box.archive}/data/ca', f'mkdir\t{box.data}/ca\t{box.archive}'),
+        'a rename cut in its source': (
+            {}, f'rename\t{box.data}/https_key.pem\t{box.archive}/data/https_key.pem', f'rename\t{box.data}/https_k'),
+    }
+
+
+@pytest.mark.parametrize('form', [
+    'a rename cut at the data', 'a local mkdir cut at the data', 'a central mkdir cut at the archive',
+    'a rename cut in its source'])
+def test_a_journal_write_cut_short_by_a_full_disk_is_never_undone(tmp_path, form):
+    """A full disk stores the start of a journal line: that line is no step. Each attempt
+    while the disk stays full puts everything back and says so, touching nothing else;
+    once space is freed, one attempt archives everything."""
+    box = Box(tmp_path, python='stub')
+    wrap, target, cut = _torn(box)[form]
+    box.wrap(**wrap)
+    _full_disk(box, target, cut)
+    data, config = originals(box)
+    before = snapshot(box)
+    outs = []
+    for _ in range(3):
+        out = box.run()
+        outs.append(out.stdout)
+        assert out.returncode == 1, (form, out.stdout, out.stderr)
+        assert 'Everything was put back in place' in out.stdout, out.stdout
+        for wrong in ('exists again', 'could not be removed', 'is missing', 'not put back'):
+            assert wrong not in out.stdout, (form, out.stdout)
+        assert snapshot(box) == before, form
+        assert not box.parent.exists() or not any(box.parent.iterdir()), form
+    assert outs[1] == outs[2], outs
+    box.wrap(**wrap)
+    archived(box, box.run(), data, config, form)
+
+
+def test_a_journal_line_torn_by_a_kill_is_ignored_by_the_next_attempt(tmp_path):
+    """Killed while the line of a rename was half written (that rename never ran): the next
+    attempt ignores that line, puts the rest back and archives everything."""
+    box = Box(tmp_path, python='stub')
+    box.wrap(other_fs=(box.data,))
+    data, config = originals(box)
+    target = f'rename\t{box.data}/ucm.db\t{box.data}/{LOCAL}/ucm.db'
+    (box.bin / 'tee').write_text(
+        f'#!/bin/sh\nline=$(cat)\nfor last; do :; done\n'
+        f'[ "$line" != "{target}" ] || {{ printf "%s" "rename\t{box.data}/ucm.db\t{box.data}" >> "$last"; kill -9 0; }}\n'
+        f'printf "%s\\n" "$line" | {REAL["tee"]} "$@"\n')
+    out = box.run()
+    assert out.returncode == -9, (out.stdout, out.stderr)
+    assert not (box.archive / '.journal').read_text().endswith('\n')
+    box.wrap(other_fs=(box.data,))
+    out = box.run()
+    for wrong in ('exists again', 'could not be removed', 'is missing'):
+        assert wrong not in out.stdout, out.stdout
+    archived(box, out, data, config)
+
+
+@pytest.mark.parametrize('line', ['rename\t{data}/ucm.db', 'rename\t{data}/a\t{archive}/data/a\textra',
+                                  'move\t{data}/a\t{archive}/data/a', 'mkdir\t\t{archive}/data',
+                                  'failed\t{data}/a\tb'])
+def test_a_journal_line_no_step_writes_stops_the_put_back_touching_nothing(tmp_path, line):
+    """A whole line that is not a step with all its fields: the put-back stops before
+    anything, exit 2, and names the journal."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    _killed_after_renaming(box, 'https_key.pem')
+    journal = box.archive / '.journal'
+    journal.write_text(journal.read_text() + line.format(data=box.data, archive=box.archive) + '\n')
+    left, held = snapshot(box, box.parent), journal.read_text()
+    out = box.run()
+    assert out.returncode == 2, (out.stdout, out.stderr)
+    assert 'not a whole step' in reported(out.stdout)[str(journal)], out.stdout
+    assert 'retrying alone will not: do what the line says' in out.stdout
+    assert snapshot(box, box.parent) == left and journal.read_text() == held
+    journal.write_text(held.replace(line.format(data=box.data, archive=box.archive) + '\n', ''))
+    archived(box, box.run(), data, config)

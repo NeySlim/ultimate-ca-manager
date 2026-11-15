@@ -28,6 +28,8 @@ LAYOUTS = {
 # The steps whose every call meets every fault: the archiving run's, and the put-back's
 STEPS = {'rename', 'mkdir', 'rmdir', 'journal'}
 FAULTS = ('fail', 'kill')
+# A journal write stores half its line, then fails (a full disk) or the run is killed
+TORN = ('short', 'torn')
 # Pairs drawn per layout from every (fault i while archiving, fault j while putting back)
 SEED, PAIRS = 20261114, 120
 
@@ -47,6 +49,9 @@ def _chaos(box, layout, refused=()):
             f'    fail) echo "{name}: injected failure" >&2; exit 1 ;;\n'
             f'    kill) kill -9 0 ;;\n'
             f'    done) {box.real(name)} "$@"; kill -9 0 ;;\n'
+            f'    short|torn) line=$(cat); for last; do :; done\n'
+            f'        printf "%s" "$line" | head -c $((${{#line}} / 2)) >> "$last"\n'
+            f'        [ "$mode" = torn ] && kill -9 0; echo "{name}: No space left on device" >&2; exit 1 ;;\n'
             f'esac\nexec {box.real(name)} "$@"\n')
         (box.bin / name).chmod(0o755)
 
@@ -209,8 +214,10 @@ class ChaosSuite:
         assert calls > 20
         # Its renames, directories made and journal writes are among these calls
         assert {'rename', 'mkdir', 'journal'} <= set(lab.first_run().steps()), lab.first_run().steps()
+        tees = {n for n, name, _a in lab.first_run().calls if name == 'tee'}
+        assert tees
         for at in range(1, calls + 1):
-            for mode in FAULTS:
+            for mode in FAULTS + (TORN if at in tees else ()):
                 self._scenario(lab, (at, mode))
 
     def test_every_step_of_a_put_back_meets_every_fault(self, lab):
