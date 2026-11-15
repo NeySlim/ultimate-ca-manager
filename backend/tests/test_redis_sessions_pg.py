@@ -1,6 +1,6 @@
 """On PostgreSQL, Redis takes precedence over the session table (docs/HA.md, REDIS.md).
 
-Needs both UCM_TEST_PG_URL and redis-server; not marked needs_redis, so a run without
+Needs redis-server and a PostgreSQL URL (UCM_TEST_APP_PG_URL or UCM_TEST_PG_URL); not marked needs_redis, so a run without
 PostgreSQL skips it even where Redis is required.
 """
 import os

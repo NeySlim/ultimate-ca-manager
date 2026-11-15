@@ -380,6 +380,7 @@ def default_for_write(actor=None, fill=True):
         connector = lowest_connector()
         # A concurrent writer may take the default or the name first: the default row wins,
         # a taken name is chosen again
+        still_locked = None
         for _attempt in range(10):
             try:
                 with db.session.begin_nested():
@@ -400,12 +401,15 @@ def default_for_write(actor=None, fill=True):
                 if (not locked or db.session.get_bind().dialect.name != 'sqlite'
                         or db.session.new or db.session.dirty or db.session.deleted):
                     raise
+                still_locked = e
                 db.session.rollback()
                 time.sleep(0.05 * (_attempt + 1))
                 profile = default_profile()
                 if profile is not None:
                     break
         else:
+            if still_locked is not None:
+                raise still_locked
             raise RuntimeError('no free name for the default Windows enrollment profile')
     profile.updated_by = actor
     if fill:

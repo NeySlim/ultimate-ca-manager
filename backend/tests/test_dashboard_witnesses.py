@@ -197,7 +197,7 @@ def test_legacy_route_keeps_the_state_when_the_smtp_host_cannot_be_read(app, aut
     assert get_json(r)['data']['smtp'] == {'status': 'online', 'message': 'Configured'}
 
 
-def test_legacy_route_keeps_the_state_when_the_pending_renewals_cannot_be_read(app, auth_client, settings, monkeypatch):
+def test_legacy_route_keeps_the_state_when_the_pending_renewals_cannot_be_read(app, auth_client, settings, monkeypatch, caplog):
     from models import Certificate
     settings(renewal='true')
     with app.app_context(), monkeypatch.context() as patch:
@@ -205,7 +205,9 @@ def test_legacy_route_keeps_the_state_when_the_pending_renewals_cannot_be_read(a
         import api.v2.dashboard as route
         resets = []
         patch.setattr(route, '_status_rollback', lambda: resets.append(1) or db.session.rollback())
-        r = auth_client.get(LEGACY)
+        with caplog.at_level('DEBUG', logger=route.__name__):
+            r = auth_client.get(LEGACY)
+    assert 'legacy status detail unreadable' in caplog.text
     assert resets, 'a failed read must reset the session: on PostgreSQL the next statement would fail'
     assert r.status_code == 200
     assert get_json(r)['data']['auto_renewal'] == {'status': 'online', 'message': 'Scheduled'}
