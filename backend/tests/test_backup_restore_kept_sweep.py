@@ -147,7 +147,7 @@ def test_an_unreadable_database_settles_nothing(dirs, monkeypatch):
 def test_a_kept_directory_without_a_journal_is_removed(dirs):
     # Killed before the journal was written: nothing had been replaced yet
     kept = dirs['private'] / '.ucm_restore_kept_early'
-    kept.mkdir()
+    kept.mkdir(mode=0o700)
     (kept / 'previous_000000').write_bytes(b'x')
     live = dirs['private'] / 'live.key'
     live.write_bytes(b'live')
@@ -160,7 +160,7 @@ def test_a_journal_names_nothing_outside_its_directory(dirs, tmp_path):
     outside = tmp_path / 'outside.key'
     outside.write_bytes(b'not ours')
     kept = dirs['private'] / '.ucm_restore_kept_forged'
-    kept.mkdir()
+    kept.mkdir(mode=0o700)
     entries = [{'name': '../outside.key', 'previous': 'previous_000000', 'existed': False},
                {'name': 'x.key', 'previous': '../../outside.key', 'existed': True, 'mode': 0o600}]
     (kept / 'journal.json').write_text(json.dumps({'token': 'f' * 32, 'entries': entries}))
@@ -276,7 +276,8 @@ def test_app_startup_sweeps_the_key_directories():
     from tests.fresh_app import fresh_app
     Config.PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
     kept = Config.PRIVATE_DIR / '.ucm_restore_kept_from_a_killed_worker'
-    kept.mkdir(exist_ok=True)
+    kept.mkdir(mode=0o700, exist_ok=True)
+    os.chmod(kept, 0o700)
     (kept / 'previous_000000').write_bytes(b'OLD PLAINTEXT KEY')
     with fresh_app():
         assert not kept.exists()
@@ -580,3 +581,53 @@ def test_a_lingering_row_stays_while_an_absence_is_not_durable(dirs, monkeypatch
     assert _row_exists('d' * 32)
     files.sweep_kept_previous_contents()
     assert not _row_exists('d' * 32)
+
+
+def _forged_kept_dir(parent, previous=None, mode=0o700, name='key.pem'):
+    kept = parent / '.ucm_restore_kept_forged'
+    kept.mkdir()
+    os.chmod(kept, mode)
+    entries = [{'name': name, 'previous': 'previous_000000', 'existed': True, 'mode': 0o666}]
+    (kept / 'journal.json').write_text(json.dumps({'token': 'c' * 32, 'entries': entries}))
+    if previous is not None:
+        previous(kept / 'previous_000000')
+    return kept
+
+
+def test_a_kept_previous_content_that_is_a_link_is_refused(dirs, tmp_path, caplog):
+    # Followed, the chmod after the rename opened a secret outside every restore root
+    secret = tmp_path / 'secret'
+    secret.write_bytes(b'unrelated secret')
+    os.chmod(secret, 0o600)
+    destination = dirs['https'] / 'key.pem'
+    destination.write_bytes(b'live key')
+    kept = _forged_kept_dir(dirs['https'], lambda path: path.symlink_to(secret))
+    with caplog.at_level(logging.WARNING, logger=files.__name__):
+        files.sweep_kept_previous_contents()
+    assert _mode(secret) == 0o600 and secret.read_bytes() == b'unrelated secret'
+    assert destination.read_bytes() == b'live key' and not destination.is_symlink()
+    assert kept.exists() and any(str(kept) in record.getMessage() for record in caplog.records)
+
+
+def test_a_kept_previous_content_that_is_not_a_file_is_refused(dirs):
+    destination = dirs['https'] / 'key.pem'
+    destination.write_bytes(b'live key')
+    kept = _forged_kept_dir(dirs['https'], lambda path: os.mkfifo(path))
+    files.sweep_kept_previous_contents()
+    assert destination.read_bytes() == b'live key' and kept.exists()
+
+
+@pytest.mark.parametrize('case', ['another owner', 'open to others'])
+def test_a_kept_directory_not_private_to_the_service_is_left_alone(dirs, monkeypatch, caplog, case):
+    destination = dirs['https'] / 'key.pem'
+    destination.write_bytes(b'live key')
+    kept = _forged_kept_dir(dirs['https'], lambda path: path.write_bytes(b'forged'),
+                            mode=0o755 if case == 'open to others' else 0o700)
+    if case == 'another owner':
+        uid = os.stat(kept).st_uid
+        monkeypatch.setattr(files.os, 'geteuid', lambda: uid + 1)
+    with caplog.at_level(logging.WARNING, logger=files.__name__):
+        files.sweep_kept_previous_contents()
+    assert destination.read_bytes() == b'live key'
+    assert (kept / 'previous_000000').read_bytes() == b'forged'
+    assert any(str(kept) in record.getMessage() for record in caplog.records)

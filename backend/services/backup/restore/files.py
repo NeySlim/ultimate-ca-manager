@@ -24,6 +24,7 @@ import logging
 import os
 import re
 import shutil
+import stat
 import tempfile
 import uuid
 from pathlib import Path
@@ -460,10 +461,29 @@ def forget_publication(token: str) -> None:
         logger.warning("Restore: its publication record was not removed: %s", exc)
 
 
-def _read_journal(kept_dir: str) -> Optional[dict]:
+def _open_kept_dir(path: str) -> Optional[int]:
+    """A descriptor on a kept directory, never through a link, or None when it is not
+    private to this service (another owner, or open to others): such a one is left alone."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError as exc:
+        logger.warning("Restore: %s is not a kept directory this service can open: %s", path, exc)
+        return None
+    info = os.fstat(fd)
+    if info.st_uid != os.geteuid() or info.st_mode & 0o077:
+        os.close(fd)
+        logger.warning("Restore: %s is left alone, it is not private to this service", path)
+        return None
+    return fd
+
+
+def _read_journal(kept_dir: str, dir_fd: Optional[int] = None) -> Optional[dict]:
     """The journal a kept directory holds, or None when publication never began there."""
     try:
-        fd = os.open(os.path.join(kept_dir, _JOURNAL), os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+        if dir_fd is None:
+            fd = os.open(os.path.join(kept_dir, _JOURNAL), os.O_RDONLY | os.O_NOFOLLOW)
+        else:
+            fd = os.open(_JOURNAL, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
     except FileNotFoundError:
         return None
     try:
@@ -487,6 +507,17 @@ def _committed_tokens(tokens) -> set:
 def _put_back_journal(kept_dir: str, journal: dict) -> None:
     """Undo an uncommitted publication in the directory that holds `kept_dir`."""
     parent = Path(kept_dir).parent
+    dir_fd = _open_kept_dir(kept_dir)
+    if dir_fd is None:
+        raise OSError(errno.EPERM, f"{kept_dir} is not private to this service")
+    try:
+        _put_back_entries(dir_fd, parent, journal)
+    finally:
+        os.close(dir_fd)
+    _fsync_directory(parent)
+
+
+def _put_back_entries(dir_fd: int, parent: Path, journal: dict) -> None:
     for item in journal['entries']:
         name, previous = item.get('name'), item.get('previous')
         # Only a plain name in this very directory, and a kept file this module named
@@ -495,14 +526,15 @@ def _put_back_journal(kept_dir: str, journal: dict) -> None:
                 or not _PREVIOUS.fullmatch(previous)):
             continue
         destination = parent / name
-        kept = Path(kept_dir) / previous
         if item.get('existed'):
-            if os.path.lexists(kept):    # kept before its replace; absent, it was never touched
-                mode = item.get('mode')
-                _put_back(kept, destination, mode if isinstance(mode, int) else 0o600)
+            mode = item.get('mode')
+            try:
+                _put_back(previous, destination, mode if isinstance(mode, int) else 0o600,
+                          dir_fd=dir_fd)
+            except FileNotFoundError:
+                pass    # kept before its replace; absent, it was never touched
         else:
             destination.unlink(missing_ok=True)
-    _fsync_directory(parent)
 
 
 class InterruptedRestorePending(RuntimeError):
@@ -522,7 +554,13 @@ def _find_kept_directories() -> list:
         for entry in os.scandir(parent):
             # Never a link: its target's journal would name files elsewhere
             if entry.name.startswith(_KEPT_PREFIX) and entry.is_dir(follow_symlinks=False):
-                found.append((entry.path, _read_journal(entry.path)))
+                dir_fd = _open_kept_dir(entry.path)
+                if dir_fd is None:
+                    continue
+                try:
+                    found.append((entry.path, _read_journal(entry.path, dir_fd)))
+                finally:
+                    os.close(dir_fd)
     return found
 
 
@@ -762,13 +800,24 @@ def _copy_private(source: Path, kept: Path) -> None:
     os.replace(partial, kept)
 
 
-def _put_back(kept: Path, destination: Path, mode: int) -> None:
-    """Return the kept previous content to `destination`, atomically."""
+def _put_back(kept, destination: Path, mode: int, dir_fd: Optional[int] = None) -> None:
+    """Return the kept previous content to `destination`, atomically.
+
+    Only a regular file, opened without following a link; its mode is set through that
+    descriptor, so nothing the rename brings in can point the change elsewhere."""
+    fd = os.open(kept, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=dir_fd)
     try:
-        os.replace(kept, destination)    # the kept link, on the destination's filesystem
-        os.chmod(destination, mode)
-        return
-    except OSError as exc:
-        if exc.errno != errno.EXDEV:
-            raise
-    _atomic_replace(destination, kept.read_bytes(), mode)
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(errno.EINVAL, f"kept content {kept} is not a regular file")
+        try:
+            # The kept link, on the destination's filesystem
+            os.replace(kept, destination, src_dir_fd=dir_fd)
+        except OSError as exc:
+            if exc.errno != errno.EXDEV:
+                raise
+            with os.fdopen(os.dup(fd), 'rb') as handle:
+                _atomic_replace(destination, handle.read(), mode)
+            return
+        os.fchmod(fd, mode)
+    finally:
+        os.close(fd)
