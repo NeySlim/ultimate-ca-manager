@@ -24,6 +24,7 @@ bp = Blueprint('truststore_v2', __name__)
 import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.days_remaining import days_remaining as compute_days_remaining
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,8 @@ def parse_certificate(pem_data):
     """
     try:
         cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
-        
+        require_readable_extensions(cert)
+
         # Extract subject and issuer
         subject = cert.subject.rfc4514_string()
         issuer = cert.issuer.rfc4514_string()
@@ -67,6 +69,8 @@ def parse_certificate(pem_data):
             'fingerprint_sha256': fp_sha256,
             'fingerprint_sha1': fp_sha1,
         }
+    except UnreadableCertificate:
+        raise
     except Exception as e:
         raise ValueError(f'Invalid certificate: {str(e)}')
 
@@ -77,6 +81,8 @@ def parse_der_certificate(der_data):
         cert = x509.load_der_x509_certificate(der_data, default_backend())
         pem_data = cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         return pem_data, parse_certificate(pem_data)
+    except UnreadableCertificate:
+        raise
     except Exception as e:
         raise ValueError(f'Invalid DER certificate: {str(e)}')
 
@@ -185,6 +191,9 @@ def import_trusted_certificate():
             message=f'Certificate "{name}" imported to trust store'
         )
         
+    except UnreadableCertificate as e:
+        db.session.rollback()
+        return error_response(str(e), 400)
     except ValueError as e:
         db.session.rollback()
         logger.error(f'Trust store import validation error: {e}')
@@ -267,6 +276,8 @@ def add_trusted_certificate():
     # Parse certificate
     try:
         cert_details = parse_certificate(data['certificate_pem'])
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     except ValueError as e:
         logger.error(f'Trust store certificate parse failed: {e}')
         return error_response('Invalid certificate data', 400)
@@ -684,7 +695,10 @@ def add_ca_to_truststore(ca_refid):
         return error_response('Failed to decode CA certificate', 500)
     
     # Check if already in Trust Store
-    cert_info = parse_certificate(pem_data)
+    try:
+        cert_info = parse_certificate(pem_data)
+    except UnreadableCertificate as e:
+        return error_response(str(e), 400)
     if not cert_info:
         return error_response('Failed to parse CA certificate', 500)
     

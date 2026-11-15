@@ -131,3 +131,81 @@ def test_the_converter_names_the_unreadable_certificate(auth_client):
     r = auth_client.post('/api/v2/tools/convert', json={'pem': pem, 'output_format': 'der'})
     assert r.status_code == 400, r.data
     assert 'extension' in get_json(r)['message'].lower()
+
+
+def _ca_record(app, cn, crt=''):
+    with app.app_context():
+        ca = CA(refid=uuid.uuid4().hex, descr=cn, crt=crt, prv=None, serial=0)
+        db.session.add(ca)
+        db.session.commit()
+        return ca.id
+
+
+def _drop_ca(app, ca_id):
+    from models.ca_cross_certificate import CACrossCertificate
+    with app.app_context():
+        CACrossCertificate.query.filter_by(ca_id=ca_id).delete()
+        CA.query.filter_by(id=ca_id).delete()
+        db.session.commit()
+
+
+def _ca_pem(cn, signer=None, issuer_cn=None):
+    """A CA certificate for *cn*, self-signed unless *signer* (another key) issues it."""
+    key = rsa.generate_private_key(65537, 2048)
+    name = x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, cn)])
+    issuer = x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, issuer_cn)]) if signer else name
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(issuer)
+            .public_key(key.public_key()).serial_number(uuid.uuid4().int >> 66)
+            .not_valid_before(dt.datetime(2026, 1, 1)).not_valid_after(dt.datetime(2036, 1, 1))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .sign(signer or key, hashes.SHA256()))
+    import base64
+    return base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode()
+
+
+def test_attaching_an_unreadable_cross_certificate_is_refused_with_400(app, auth_client):
+    from models.ca_cross_certificate import CACrossCertificate
+    cn = f'Dup Cross {uuid.uuid4().hex[:8]}'
+    ca_id = _ca_record(app, cn, _ca_pem(cn))
+    try:
+        r = auth_client.post(f'/api/v2/cas/{ca_id}/cross-certificates',
+                             json={'certificate': _pem_with_repeated_extension(cn)})
+        assert r.status_code == 400, r.data
+        assert 'extension' in get_json(r)['message'].lower()
+        with app.app_context():
+            assert CACrossCertificate.query.filter_by(ca_id=ca_id).count() == 0
+    finally:
+        _drop_ca(app, ca_id)
+
+
+def test_restoring_an_unreadable_primary_certificate_is_refused_with_400(app, auth_client):
+    cn = f'Dup Restore {uuid.uuid4().hex[:8]}'
+    crt = _ca_pem(cn, signer=rsa.generate_private_key(65537, 2048), issuer_cn=f'{cn} other')
+    ca_id = _ca_record(app, cn, crt)
+    try:
+        r = auth_client.post(f'/api/v2/cas/{ca_id}/restore-primary',
+                             json={'certificate': _pem_with_repeated_extension(cn)})
+        assert r.status_code == 400, r.data
+        assert 'extension' in get_json(r)['message'].lower()
+        with app.app_context():
+            assert db.session.get(CA, ca_id).crt == crt
+    finally:
+        _drop_ca(app, ca_id)
+
+
+@pytest.mark.parametrize('as_file', [True, False])
+def test_the_trust_store_refuses_an_unreadable_certificate(app, auth_client, as_file):
+    import io
+    from models.truststore import TrustedCertificate
+    cn = f'Dup Trust {uuid.uuid4().hex[:8]}'
+    pem = _pem_with_repeated_extension(cn)
+    if as_file:
+        r = auth_client.post('/api/v2/truststore/import', content_type='multipart/form-data',
+                             data={'file': (io.BytesIO(pem.encode()), 'dup.pem'), 'name': cn})
+    else:
+        r = auth_client.post('/api/v2/truststore', json={'name': cn, 'certificate_pem': pem})
+    assert r.status_code == 400, r.data
+    assert 'extension' in get_json(r)['message'].lower()
+    with app.app_context():
+        assert TrustedCertificate.query.filter(TrustedCertificate.subject.contains(cn)).count() == 0
+        assert TrustedCertificate.query.filter_by(name=cn).count() == 0
