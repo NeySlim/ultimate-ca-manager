@@ -335,7 +335,7 @@ class SSHCAService:
         from services.hsm import HsmService, key_binding
         from services.hsm.hsm_private_key import load_hsm_private_key
 
-        # Binding checks, before the token is asked anything: the row lock holds to the commit
+        # Binding checks come first; the key row stays locked until the commit below
         key_row = key_binding.lock_key(hsm_key_id)
         if not key_row:
             raise ValueError(f"HSM key {hsm_key_id} not found")
