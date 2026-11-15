@@ -4,6 +4,7 @@ from models import db, CA
 from services.email_service import EmailService
 from .templates import NotificationTemplatesMixin
 from ._constants import CERT_EXPIRING, CRL_EXPIRING
+from services.scheduler_leader import cluster_utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,8 @@ class NotificationSenderMixin:
             body_html=body_html,
             notification_type=CRL_EXPIRING,
             resource_type='crl',
-            resource_id=str(crl.id)
+            resource_id=str(crl.id),
+            log_clock=cluster_utc_now,  # the clock should_send reads the cooldown on
         )
 
     @staticmethod

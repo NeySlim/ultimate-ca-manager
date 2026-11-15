@@ -275,3 +275,109 @@ def test_a_node_ahead_does_not_scan_a_profile_claimed_elsewhere(cluster, monkeyp
     cluster(timedelta(minutes=65))
     DiscoverySchedulerTask.execute()
     assert started == []
+
+
+# ------------------------------------------------------------------ event notification cooldown
+
+_EVENT_COOLDOWN = timedelta(hours=1)
+
+
+@pytest.fixture
+def event_mail(cluster, monkeypatch):
+    """Event alerts with a one-hour cooldown, a fake SMTP server, and every mail-log clock skewed."""
+    import json as _json
+    from models.email_notification import NotificationConfig, SMTPConfig
+    from models import email_notification
+    from services import email_service
+    from services.notification import NotificationService
+    from services.notification.templates import NotificationTemplatesMixin
+    from services.notification._constants import (
+        CA_CREATED, CERT_ISSUED, CERT_REVOKED, CRL_EXPIRING, SECURITY_ALERT)
+
+    class FakeServer:
+        def sendmail(self, *a):
+            pass
+
+        def quit(self):
+            pass
+    monkeypatch.setattr(email_service, '_smtp_connect', lambda cfg, timeout: FakeServer())
+    monkeypatch.setattr(email_service, '_smtp_authenticate', lambda server, cfg: None)
+    db.session.add(SMTPConfig(enabled=True, smtp_host='smtp.example.test', smtp_port=25,
+                              smtp_from='ucm@example.test', smtp_auth=False, smtp_use_tls=False))
+    for kind in (CA_CREATED, CERT_ISSUED, CERT_REVOKED, CRL_EXPIRING, SECURITY_ALERT):
+        config = NotificationConfig.query.filter_by(type=kind).first() or NotificationConfig(type=kind)
+        config.enabled, config.cooldown_hours = True, int(_EVENT_COOLDOWN.total_seconds() // 3600)
+        config.recipients = _json.dumps(['ops@example.test'])
+        db.session.add(config)
+    db.session.commit()
+    for name in ('_render_cert_issued_template', '_render_cert_revoked_template',
+                 '_render_ca_created_template', '_render_security_alert_template'):
+        monkeypatch.setattr(NotificationTemplatesMixin, name, staticmethod(lambda *a, **k: '<p>x</p>'))
+    real = datetime_utils.utc_now
+
+    def skew(offset):
+        cluster(offset)
+        for module in (email_notification, email_service):
+            monkeypatch.setattr(module, 'utc_now', lambda: real() + offset)
+    return NotificationService, skew
+
+
+def _event_sent(resource_type, resource_id):
+    db.session.expire_all()
+    return NotificationLog.query.filter_by(resource_type=resource_type, resource_id=resource_id,
+                                           status='sent').all()
+
+
+def _event_logged(kind, resource_type, resource_id, sent_at):
+    db.session.add(NotificationLog(type=kind, recipient='ops@example.test', status='sent',
+                                   resource_type=resource_type, resource_id=resource_id,
+                                   sent_at=sent_at))
+    db.session.commit()
+
+
+def test_a_node_ahead_does_not_resend_an_event_alert_within_its_cooldown(event_mail):
+    service, skew = event_mail
+    resource_id = f'clock-{uuid.uuid4().hex[:8]}'
+    _event_logged('cert_revoked', 'certificate', resource_id, _db_now())
+    skew(2 * _EVENT_COOLDOWN)
+    assert service.should_send('cert_revoked', 'certificate', resource_id) is False
+
+
+def test_an_event_alert_cooldown_ends_at_the_database_hour_on_a_node_behind(event_mail):
+    service, skew = event_mail
+    resource_id = f'clock-{uuid.uuid4().hex[:8]}'
+    _event_logged('cert_revoked', 'certificate', resource_id, _db_now() - 2 * _EVENT_COOLDOWN)
+    skew(-2 * _EVENT_COOLDOWN)
+    assert service.should_send('cert_revoked', 'certificate', resource_id) is True
+
+
+def test_a_node_two_hours_behind_does_not_send_a_security_alert_twice(event_mail):
+    service, skew = event_mail
+    username = f'clock-{uuid.uuid4().hex[:8]}'
+    skew(-timedelta(hours=2))
+    assert service.on_security_alert('login_failed', username)[0] is True
+    skew(timedelta(0))
+    assert service.on_security_alert('login_failed', username) == (
+        True, 'Notification skipped (disabled or cooldown)')
+    sent = _event_sent('security', f'login_failed:{username}')
+    assert len(sent) == 1 and _close(sent[0].sent_at, _db_now())
+
+
+@pytest.mark.parametrize('event', ['cert_issued', 'cert_revoked', 'ca_created', 'crl_expiring'])
+def test_every_event_alert_is_logged_on_the_database_clock(event_mail, event):
+    from types import SimpleNamespace
+    service, skew = event_mail
+    refid = f'clock-{uuid.uuid4().hex[:8]}'
+    obj = SimpleNamespace(refid=refid, descr='d', subject='CN=clock', id=refid, ca_id=-1,
+                          next_update=_db_now() + timedelta(days=1))
+    send, resource_type = {
+        'cert_issued': (lambda: service.on_certificate_issued(obj), 'certificate'),
+        'cert_revoked': (lambda: service.on_certificate_revoked(obj), 'certificate'),
+        'ca_created': (lambda: service.on_ca_created(obj), 'ca'),
+        'crl_expiring': (lambda: service.send_crl_expiring_notification(
+            obj, 1, ['ops@example.test']), 'crl'),
+    }[event]
+    skew(-timedelta(hours=2))
+    assert send()[0] is True
+    sent = _event_sent(resource_type, refid)
+    assert len(sent) == 1 and _close(sent[0].sent_at, _db_now())
