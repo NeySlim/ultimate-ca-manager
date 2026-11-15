@@ -37,3 +37,9 @@ def test_socket_io_bullet_states_websocket_only_pos():
     bullet = next(l for l in _section('Session affinity').splitlines() if l.startswith('- **Socket.IO'))
     assert 'WebSocket' in bullet and 'upgrade' in bullet and 'Invalid session' not in bullet
 
+
+def test_rate_limit_figures_use_the_code_defaults_pos():
+    # flask-limiter defaults (200/min) and 5/min password sign-in are the lower limits across N nodes.
+    text = _section('Rate limits')
+    assert '200 × N' in text and '5 × N' in text and '2000' in text
+    assert '600 × N' not in text and '30 × N' not in text
