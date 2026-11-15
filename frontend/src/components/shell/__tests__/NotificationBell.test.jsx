@@ -77,7 +77,7 @@ describe('NotificationBell', () => {
     const panel = screen.getByRole('region', { name: 'shell.bell.title' })
     const rows = within(panel).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
     expect(rows).toEqual(['acme_order_failed:7', 'approval_pending:3', 'audit:41', 'audit:43'])
-    expect(m.getQueue).toHaveBeenCalledWith(expect.arrayContaining(['acme_order_failed', 'approval_pending']))
+    expect(m.getQueue).toHaveBeenCalledWith(expect.arrayContaining(['acme_order_failed', 'approval_pending', 'truststore_expiring']))
   })
 
   it('asks for the bindings a renewal left behind and links each to its binding', async () => {

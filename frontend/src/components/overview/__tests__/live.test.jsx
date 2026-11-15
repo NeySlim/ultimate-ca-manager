@@ -66,6 +66,16 @@ describe('overview cards follow the data', () => {
     for (const id of Object.keys(CARDS).filter((c) => c !== 'activity')) expect(after[id], id).toBe(before[id])
   })
 
+  it('a trust store change reloads the work queue and no other card', async () => {
+    await mountAll()
+    const before = counts()
+    announce('truststore')
+    await settle(5000)
+    const after = counts()
+    expect(after.queue).toBe(before.queue + 1)
+    for (const id of Object.keys(CARDS).filter((c) => c !== 'queue')) expect(after[id], id).toBe(before[id])
+  })
+
   it('a burst of events reloads a card once', async () => {
     await mountAll()
     const before = counts()
