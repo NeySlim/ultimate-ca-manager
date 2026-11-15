@@ -257,13 +257,13 @@ def refuse_archived_shared_keys(backup_data, plan):
                 continue
             ref = row.get(f'hsm_key_id{REFERENCE_SUFFIX}')
             key = json.dumps(ref, sort_keys=True, default=str) if ref else f"#{row.get('hsm_key_id')}"
-            by_key.setdefault(key, (ref, []))[1].append(describe(row))
-    for key, (ref, names) in by_key.items():
+            by_key.setdefault(key, (ref, row.get('hsm_key_id'), []))[2].append(describe(row))
+    for key, (ref, row_id, names) in by_key.items():
         if len(names) < 2:
             continue
-        label = key
+        label = f'#{row_id}'
         if isinstance(ref, dict):
-            label = (plan._archived_row('hsm_keys', ref) or {}).get('label') or ref.get('key_identifier') or key
+            label = (plan._archived_row('hsm_keys', ref) or {}).get('label') or ref.get('key_identifier') or label
         raise BackupSchemaError(
             f"Cannot restore: the archive gives HSM key '{label}' to both the {names[0]} and the {names[1]}. "
             "An HSM key backs one authority only; nothing has been changed.")

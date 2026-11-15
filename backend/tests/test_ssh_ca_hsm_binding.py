@@ -560,3 +560,25 @@ class TestFipsAndHa:
                 'hsm_provider_id': key['provider'], 'hsm_key_label': 'new', 'hsm_key_algorithm': 'EC-P256'})
         assert r.status_code == 409 and r.get_json()['code'] == 'ha_mode', r.data
         generated.assert_not_called()
+
+
+def test_archive_sharing_a_key_names_it_by_id_when_nothing_else_names_it():
+    """The refusal never prints the reference as JSON: a key with no label is '#<id>'."""
+    from services.backup.export_generic import REFERENCE_SUFFIX
+    from services.backup.restore_extended import BackupSchemaError, refuse_archived_shared_keys
+
+    class Plan:
+        @staticmethod
+        def _archived_row(table, ref):
+            return None
+
+    ref = {'provider': 'p', 'opaque': 'x'}
+    backup = {
+        'certificate_authorities': [{'descr': 'X', 'hsm_key_id': 7, f'hsm_key_id{REFERENCE_SUFFIX}': ref}],
+        'ssh_cas': [{'descr': 'S', 'ca_type': 'host', 'hsm_key_id': 7, f'hsm_key_id{REFERENCE_SUFFIX}': ref}],
+    }
+    with pytest.raises(BackupSchemaError) as raised:
+        refuse_archived_shared_keys(backup, Plan())
+    message = str(raised.value)
+    assert "HSM key '#7'" in message
+    assert '{' not in message
