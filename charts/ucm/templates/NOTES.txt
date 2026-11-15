@@ -48,12 +48,11 @@ IMPORTANT
   not on it: download the ones you keep out of the cluster, and back PostgreSQL
   up with its own tools.
 {{- end }}
-{{- if not .Values.redis.url }}
-- No redis.url: sessions are per node. Set a cookie affinity on the ingress.
-{{- end }}
+- Sessions are shared by the nodes. Set a cookie affinity on the ingress so
+  the WebSocket polling fallback stays on one node.
 {{- else }}
-- This chart runs a SINGLE instance (replicaCount=1). The bundled scheduler is
-  not HA-safe and the default SQLite DB is single-writer. Do not scale up.
+- This chart runs a SINGLE instance (replicaCount=1) on a single-writer SQLite DB.
+  To run several nodes, set ha.enabled=true with PostgreSQL (see docs/HA.md).
 - The "{{ include "ucm.etcPvcName" . }}" PVC holds /etc/ucm/master.key, which
   decrypts every private key in the database. It is annotated to survive a
   `helm uninstall`. Back it up and never delete it while data exists.

@@ -9,9 +9,9 @@ UCM can run on two or more nodes that share one PostgreSQL database. This page c
 - **The same `KEY_ENCRYPTION_KEY` on every node**, a Fernet key. It decrypts every private key in the database: losing it makes them unrecoverable. Do not keep a different `master.key` file on a node: a local file overrides the variable.
 - **A distinct `UCM_NODE_ID` per node** (default: the host name). Two VMs cloned from one image keep the same host name: set it explicitly. A node whose identifier a live node already uses refuses to start, see [Node identifier](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
 - **`UCM_HA=1`** on every node.
-- **A load balancer** in front of the nodes. Probe `/health/ready`. Without Redis (see [REDIS.md](REDIS.md)) UI sessions are kept per node: use cookie affinity so a user stays on one node.
+- **A load balancer** in front of the nodes. Probe `/health/ready`. UI sessions are stored in PostgreSQL (in Redis when `REDIS_URL` is set, see [REDIS.md](REDIS.md)) and shared by every node, so no request needs a given node. Cookie affinity is still advised, for the WebSocket polling fallback: see [Session affinity](#session-affinity).
 - **One gunicorn worker per node**, which is the default (`workers = 1`). Do not raise it.
-- **Synchronised clocks** (NTP): node heartbeats are compared across hosts.
+- **Synchronised clocks** (NTP). Heartbeats, leases and the staleness test are written and compared on the PostgreSQL server's clock, so a skew between nodes does not move them; everything else UCM timestamps (certificate validity, logs) reads the clock of the node that serves the request.
 
 Generate the keys once:
 
@@ -77,7 +77,28 @@ The network uses the fixed subnet `172.28.0.0/24`, trusted as the proxy. When `u
 1. Install the package on both hosts.
 2. In `/etc/ucm/ucm.env` on each host set the same `DATABASE_URL`, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, `UCM_HA=1`, and a different `UCM_NODE_ID` (a host cloned from the other keeps its host name, the default). The packages generate a random key per node at install: replace it on both hosts.
 3. Every node must hold the same encryption key: either no `/etc/ucm/master.key` and `KEY_ENCRYPTION_KEY` in `ucm.env`, or the same `master.key` copied to every node (a local file wins over the variable).
-4. Restart `ucm` on each host, one at a time, and check `/health/ready` through the balancer (HAProxy, nginx or any layer 7 balancer with cookie affinity).
+4. Restart `ucm` on each host, one at a time, and check `/health/ready` through the balancer (HAProxy, nginx or any layer 7 balancer; cookie affinity is advised, see [Session affinity](#session-affinity)).
+
+## From one node to a cluster
+
+A cluster needs one PostgreSQL that every node reaches, and the same secrets on every node. Whatever the packaging, the steps are the same; the Helm variant is in [From a single node](#from-a-single-node).
+
+**Identical on every node:** `DATABASE_URL`, `SECRET_KEY` (`UCM_SECRET_KEY` in Docker), the key-encryption key (`KEY_ENCRYPTION_KEY`, or the same `master.key` file), `UCM_HA=1`. **Different on each node:** `UCM_NODE_ID`. A node whose key-encryption key differs from a live peer's refuses to start (see [Shared encryption key](#shared-encryption-key)).
+
+1. **Move the existing node to PostgreSQL, still alone.** On SQLite, open Settings > Database, test the PostgreSQL URL and run **Migrate data and switch**. The migration is refused once `UCM_HA` is set, so it comes first. Check the data in the web interface.
+2. **Keep the secrets.** The existing node's `master.key` (or its `KEY_ENCRYPTION_KEY`) and `SECRET_KEY` become the cluster's: a new key cannot decrypt the database.
+3. **Set `UCM_HA=1` on that node** (in `/etc/ucm/ucm.env` for DEB and RPM, in the container environment for Docker), give it a `UCM_NODE_ID`, and restart it. Shortly after it starts, it must answer `200` on `/health/ready`.
+4. **Add each further node** with the same `DATABASE_URL`, `SECRET_KEY` and key-encryption key (copy `master.key` to the same path, or set `KEY_ENCRYPTION_KEY` and leave no `master.key`), `UCM_HA=1` and its own `UCM_NODE_ID`. Start them one at a time. The packages generate a random key per node at install: replace it. With Compose, `docker-compose.ha.yml` sets all of this for two nodes; to reuse the PostgreSQL of step 1, set `DATABASE_URL` in its shared `x-ucm-node` block and drop the `postgres` service with the `depends_on` that waits for it.
+5. **Put the nodes behind the load balancer.** Probe `/health/ready` over HTTPS (the nodes serve their own certificate, on port 8443 by default). Set `UCM_BEHIND_PROXY=1` and `UCM_TRUSTED_PROXIES` to the balancer's address on every node, or every client appears to come from the balancer. See [Behind the load balancer](#behind-the-load-balancer) for affinity, rate limits and ACME challenges.
+
+What does not follow the database: SoftHSM tokens, files a node mirrored on its disk, and archives written before HA (see [What stays local to a node](#what-stays-local-to-a-node) and [Backups](#backups)). A node does not create the first administrator again: it exists in the database.
+
+### Checking the cluster
+
+- `/health/ready` through the balancer answers `200` for each node in turn. A node answers `503` while it has never registered in `cluster_nodes`, while another live process uses its identifier, and during a restore (see [Restoring a backup](#restoring-a-backup)).
+- `/health` reports `ha`, `node_id`, `leader` and, in HA mode, `cluster: {leader_node_id, nodes, stale}`: every node you started is counted in `nodes`, none should be in `stale`, and `leader_node_id` names exactly one.
+- `GET /api/v2/system/service/status` (signed in) lists every node with its version, heartbeat, `command_seen`, `kek_fingerprint` and `package_family`: the fingerprints must be equal.
+- The status bar of the web interface shows the node that answers, whether it leads, the number of nodes and how many are late.
 
 ## First administrator
 
@@ -124,6 +145,24 @@ Before restoring a `pg_dump`, make sure every node runs with the key-encryption 
 - **Nodes stopped** (simplest): stop every node, run `pg_restore --clean --if-exists`, empty the tables above (`TRUNCATE`), and with Redis sessions delete the keys under `SESSION_KEY_PREFIX` (default `ucm:session:`). Start the nodes one at a time: a dump of an earlier release is migrated by the first one.
 - **Nodes running**: set the maintenance, list the dump (`pg_restore -l dump > list`), remove the lines of the tables above from `list`, run `pg_restore --clean --if-exists -L list`, empty the session tables, restart every node with its service manager (`systemctl restart ucm`, `kubectl rollout restart`, `docker compose restart`), then lift the maintenance. The nodes refuse writes until it is lifted, and `--clean` drops the tables they read while it runs, so expect errors on reads meanwhile.
 
+## Behind the load balancer
+
+### Session affinity
+
+Sign-in sessions do not need it: they are stored in PostgreSQL (in Redis when `REDIS_URL` is set), so any node accepts a session another one opened. Two things still depend on the node that received the first request:
+
+- **Socket.IO.** The browser opens a WebSocket and falls back to HTTP long polling when it cannot. A Socket.IO session lives in the memory of the node that accepted it, and each polling request, like the upgrade from polling to WebSocket, carries its identifier. A request that reaches another node is answered `400` (`Invalid session`), and the browser reconnects. Without affinity, a browser that uses WebSocket is not affected; one that falls back to polling reconnects again and again and may miss live updates until the page is reloaded. Events emitted on one node reach the browsers connected to the others (through PostgreSQL, or Redis when set). The cookie affinity of the Helm example and of `docker-compose.ha.yml` is there for this.
+- **Kerberos enrollment.** A SPNEGO handshake of more than one request needs source-address affinity, see [Windows enrollment](#windows-enrollment-kerberos).
+
+### Rate limits
+
+Rate limits are counted per node, in memory, and are not shared: the limits of the API and the protocol endpoints (`RATE_LIMIT_*`, Settings > Security) and the per-route limits of sign-in, password reset and two-factor routes. Clients on private networks are exempt on every node by default (`RATE_LIMIT_TRUST_LAN`). A change of the limits in Settings reaches every node, the counters do not. A client address that the balancer spreads over N nodes can therefore make up to N times the configured number of requests, burst included: with the default 600 requests per minute for the API, up to 600 × N, and for sign-in 30 × N. A client that keeps the affinity cookie stays on one node and meets the configured limit; protocol clients (ACME, EST, SCEP, OCSP) and scripts usually send no cookie and are spread. The lock-out of an account after failed sign-ins is stored with the user in the database and counts across nodes. The limits use the client address, so set `UCM_BEHIND_PROXY=1` and `UCM_TRUSTED_PROXIES` to the balancer's address, or every client shares the balancer's.
+
+### ACME challenges
+
+- **HTTP-01** (client orders): the answer is read from the database, so any node can serve the challenge file when the CA's request reaches it.
+- **TLS-ALPN-01**: the node that runs the validation opens a listener on the port set in the ACME client settings (443 by default), on all its addresses, for the duration of the challenge. That is the node that received the request for a manual validation, and the scheduler leader for an automatic renewal. The CA connects to the identifier's name on that port, so the connection must arrive at that node: a layer 7 balancer that terminates TLS cannot pass the proof, and a TCP balancer that spreads connections over the nodes reaches the listener only when it happens to pick that node. Route the port to a single node, or use HTTP-01 or DNS-01 behind a balancer.
+
 ## What stays local to a node
 
 - **Update result.** The outcome of an update is read on the node that installed it, leader or not.
@@ -136,6 +175,16 @@ Before restoring a `pg_dump`, make sure every node runs with the key-encryption 
 ## Scheduled passes across nodes
 
 The `certificate.expired` webhooks resume from the last pass on any node, at most 30 days back, as on a single node. A pass of the expiry alerts or of a CA's scheduled CRL skipped because another node holds its lease runs once more 30 seconds after that lease ends, instead of waiting a day or an hour. See [ADMIN_GUIDE.md](ADMIN_GUIDE.md#ha-mode-preview-scheduler-and-startup).
+
+## When PostgreSQL is unavailable
+
+Every node depends on the database for requests, sessions, the leader lock and the heartbeat, so a cut of PostgreSQL stops the cluster, not a node. What each node does:
+
+- **Probes.** `/health/ready` answers `503` as soon as `SELECT 1` fails, so the balancer takes every node out of rotation. `/health/live` answers `200` whatever the database does, so an orchestrator does not restart nodes for it; `/health` keeps answering, with `cluster: null` when the registry cannot be read.
+- **Requests.** Any request that reads or writes the database fails, sign-in and sessions included, as long as the database is unreachable.
+- **Scheduler.** The leader checks its lock before each task. When the dedicated connection holding it is gone, it logs `Scheduler leadership lost`, starts no further task (one already running is not interrupted) and tries to take the lock again every 5 seconds. Every node does the same from the moment the database answers: the first to take it leads, which is not necessarily the previous leader.
+- **Heartbeat.** A failed heartbeat is logged once and tried again at the next pass. After three passes (3 minutes) without one, other nodes count a node as stale: during a longer cut `/health` shows every node late until the heartbeats resume.
+- **Settings commands and WebSocket events.** The applier of setting changes and the WebSocket relay reopen their connections by themselves and read what they missed.
 
 ## Shared encryption key
 

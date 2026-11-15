@@ -21,14 +21,11 @@ Then `kubectl -n ucm port-forward svc/ucm 8443:8443` and open <https://localhost
 - Helm 3.8+ (uses `lookup` to persist generated secrets across upgrades)
 - A default StorageClass providing **ReadWriteOnce** volumes
 
-## Single instance only
+## One instance, or several with `ha.enabled`
 
-UCM runs as **one replica** (`replicaCount: 1`, `strategy: Recreate`):
+By default UCM runs as **one replica** (`replicaCount: 1`, `strategy: Recreate`) on a **SQLite** database (single writer) on a RWO volume. Do not raise `replicaCount` on its own: two pods would share neither the database nor the volume.
 
-- the default database is **SQLite** (single writer) on a RWO volume, and
-- UCM runs an in-process **background scheduler** (CRL refresh, webhook delivery, scheduled backups, auto-renewal) that is **not yet HA-safe** — two pods would double-run scheduled tasks.
-
-Pointing UCM at an external PostgreSQL gives you durable, HA-grade storage, but the application itself still runs as a single pod. Do not scale up.
+For several pods set `ha.enabled=true`, `database.type=postgresql` and `replicaCount` >= 2: the pods share the PostgreSQL database, one of them runs the scheduled tasks, and a rolling update replaces them one at a time. See `docs/HA.md`.
 
 ## ⚠️ master.key — do not lose it
 
@@ -40,7 +37,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 |-----|---------|-------------|
 | `image.repository` | `neyslim/ultimate-ca-manager` | Image repo |
 | `image.tag` | `""` (→ chart `appVersion`) | Image tag |
-| `replicaCount` | `1` | Keep at 1 (see above) |
+| `replicaCount` | `1` | Keep at 1 unless `ha.enabled` (then 2 or more) |
 | `ha.enabled` | `false` | Several nodes on one PostgreSQL (`UCM_HA=1`). Needs `database.type=postgresql` and `replicaCount` >= 2, or the render fails. Adds a PodDisruptionBudget, a preferred pod anti-affinity, a rolling update, `UCM_NODE_ID` (pod name) and a shared `KEY_ENCRYPTION_KEY`; no etc PVC. See `docs/HA.md` |
 | `ha.podDisruptionBudget.minAvailable` | `1` | Pods kept available during voluntary disruptions |
 | `redis.url` | `""` | Redis shared by the nodes (`REDIS_URL`, HA only) |
