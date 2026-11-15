@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from models import db
 
 from security.master_key_bootstrap import OPT_OUT_KEY
+from auth.session_epoch import EPOCH_KEY as SESSION_EPOCH_KEY
 
 from .errors import BackupExportError
 
@@ -18,8 +19,9 @@ logger = logging.getLogger(__name__)
 
 CONFIG_KEY = 'backup_installation_id'
 METADATA_KEY = 'installation_id'
-# Settings about this installation itself: never exported, never restored
-LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY))
+# Settings about this installation itself (the session epoch a restore advances
+# included): never exported, never restored
+LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SESSION_EPOCH_KEY))
 
 
 def installation_id(create: bool = False) -> Optional[str]:

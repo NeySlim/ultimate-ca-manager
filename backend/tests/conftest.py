@@ -341,6 +341,40 @@ def _admin_api_keys_stay_in_their_module():
         db.session.commit()
 
 
+def _epoch_row():
+    """The stored session epoch: its value, None when absent (a fresh database)."""
+    if not _SESSION_APP:
+        return None
+    from auth.session_epoch import EPOCH_KEY
+    from models import SystemConfig, db
+    with _SESSION_APP[0].app_context():
+        value = db.session.query(SystemConfig.value).filter_by(key=EPOCH_KEY).scalar()
+        db.session.rollback()
+        return value
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _session_epoch_stays_in_its_module():
+    """A restore a file plays advances the epoch; put back the one found before the
+    file, or every session a later file opens otherwise reads as begun before it."""
+    before = _epoch_row()
+    yield
+    if not _SESSION_APP or _epoch_row() == before:
+        return
+    from auth.session_epoch import EPOCH_KEY
+    from models import SystemConfig, db
+    with _SESSION_APP[0].app_context():
+        row = SystemConfig.query.filter_by(key=EPOCH_KEY).first()
+        if before is None:
+            db.session.delete(row)
+        elif row is None:
+            db.session.add(SystemConfig(key=EPOCH_KEY, value=before))
+        else:
+            row.value = before
+        db.session.commit()
+        db.session.remove()
+
+
 @pytest.fixture(autouse=True, scope='module')
 def _seeded_rows_stay_in_their_module():
     """Rows `tests.seeded_rows` wrote for a module are deleted after it."""
@@ -522,11 +556,28 @@ class _ReloggingClient:
         self._client = client
         self._login = login
 
+    @staticmethod
+    def _uploads(kwargs):
+        """The form's (stream, name) uploads as (bytes, name), to replay them afresh."""
+        data = kwargs.get('data')
+        if not isinstance(data, dict):
+            return {}
+        kept = {}
+        for field, value in data.items():
+            if isinstance(value, tuple) and value and hasattr(value[0], 'getvalue'):
+                kept[field] = (value[0].getvalue(),) + value[1:]
+        return kept
+
     def _call(self, method, *args, **kwargs):
+        uploads = self._uploads(kwargs)
         response = getattr(self._client, method)(*args, **kwargs)
         if response.status_code != 401:
             return response
         self._login(self._client)
+        if uploads:
+            import io
+            kwargs['data'] = dict(kwargs['data'], **{
+                field: (io.BytesIO(value[0]),) + value[1:] for field, value in uploads.items()})
         try:
             return getattr(self._client, method)(*args, **kwargs)
         except ValueError:

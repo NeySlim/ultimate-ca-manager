@@ -283,3 +283,13 @@ def test_a_sibling_waits_for_the_first_call_to_store_its_session(app, cert_user,
     assert r.status_code == 200 and sibling and sibling[0][1].status_code == 200
     assert _sid(sibling[0][0]) == _sid(first) and set(written) == {_sid(first)}
     assert _logins(app, cert_user[:2]) == 1
+
+
+def test_a_successor_begun_before_a_restore_is_not_joined(app, cert_user):
+    from auth.session_epoch import advance_epoch
+    _uid, _floor, sid = cert_user
+    first, _r = _call(app, sid)
+    with app.app_context():
+        advance_epoch()
+    late, r = _call(app, sid)
+    assert r.status_code == 200 and _sid(late) not in (sid, _sid(first))
