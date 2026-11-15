@@ -73,7 +73,21 @@ export default function KeyRecoveryPage() {
       })
     return () => { cancelled = true }
   }, [linkedId, showError, showInfo, t])
-  const shown = linked && !requests.some((r) => r.id === linked.id) ? [linked, ...requests] : requests
+  // The linked request comes first, in its listed copy when there is one, and only while the filter keeps its state
+  const current = linked && (requests.find((r) => r.id === linked.id) || linked)
+  const rest = current ? requests.filter((r) => r.id !== current.id) : requests
+  const shown = current && (!statusFilter || current.status === statusFilter) ? [current, ...rest] : rest
+
+  // A decision on the linked request re-reads it: the filtered list may no longer hold it
+  const refreshLinked = async (id) => {
+    if (linked?.id !== id) return
+    try {
+      const res = await keyRecoveryService.get(id)
+      setLinked(res.data || res)
+    } catch {
+      setLinked(null)
+    }
+  }
 
   const decide = async (req, action) => {
     const toastKey = action === 'approve' ? 'approved' : 'rejected'
@@ -81,6 +95,7 @@ export default function KeyRecoveryPage() {
     try {
       await keyRecoveryService[action](req.id)
       showSuccess(t(`keyRecovery.${toastKey}`))
+      await refreshLinked(req.id)
       await load()
     } catch (e) {
       showError(e.message || t('keyRecovery.actionFailed'))
@@ -97,6 +112,7 @@ export default function KeyRecoveryPage() {
       downloadBlob(blob, `${recoverFor.cert_cn || recoverFor.cert_refid || 'recovered'}.p12`)
       showSuccess(t('keyRecovery.recovered'))
       setRecoverFor(null); setPassword(''); setLegacy(false)
+      await refreshLinked(recoverFor.id)
       await load()
     } catch (e) {
       showError(e.message || t('keyRecovery.actionFailed'))
