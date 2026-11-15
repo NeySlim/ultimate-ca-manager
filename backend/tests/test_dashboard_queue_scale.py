@@ -572,3 +572,5 @@ def test_the_declined_requests_are_read_in_pages_from_the_oldest_due_issuance(ap
         assert sum(before) >= 35
         assert max(before + after) <= 10, (before, after)
         assert sum(after) == sum(before), (before, after)
+        # a short page ends the read: no further statement comes back empty
+        assert before[-1] or sum(before) % 10 == 0, before

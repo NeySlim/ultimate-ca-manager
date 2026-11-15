@@ -117,14 +117,15 @@ _NAMED_ID = re.compile(r'"certificate.id": ([0-9]+),', re.IGNORECASE | re.DOTALL
 def _declined_ids(now, days):
     """The certificates a renewal kind can list (live, due within *days*) that a rejected renewal
     request may name: only those run the correlated LIKE. Requests are read by pages of
-    DECLINED_PAGE, from the oldest such certificate's issuance (an older one declines none)."""
+    DECLINED_PAGE, from the oldest such certificate's issuance (an older one declines none; no
+    date limit when one of them has no valid_from)."""
     live = _live_until(now, days)
     total, dated, oldest = db.session.execute(select(
         func.count(), func.count(Certificate.valid_from), func.min(Certificate.valid_from)).where(*live)).one()
     query = select(ApprovalRequest.id, ApprovalRequest.request_data).where(
         ApprovalRequest.request_type == 'renewal', ApprovalRequest.status == 'rejected',
         ApprovalRequest.request_data.isnot(None))
-    # One page statement even when none is due: the statement count does not depend on the data
+    # One page statement even when none is due
     if not total:
         query = query.where(false())
     elif dated == total:
@@ -140,6 +141,9 @@ def _declined_ids(now, days):
         if named:
             found.update(db.session.execute(select(Certificate.id).where(
                 Certificate.id.in_(bindparam(None, named, expanding=True, literal_execute=True)), *live)).scalars())
+        # a short page is the last one
+        if len(page) < DECLINED_PAGE:
+            return sorted(found)
 
 
 def renewal_inputs(now=None):
