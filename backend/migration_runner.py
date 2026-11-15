@@ -763,14 +763,31 @@ def show_status():
 CHECK_STARTABLE, CHECK_FRESH, CHECK_REFUSED, CHECK_UNREADABLE, CHECK_UNKNOWN = 0, 3, 4, 5, 6
 
 
+def _journal_holds_data(path: str) -> bool:
+    """A non-empty -wal or -journal: SQLite would replay it into the read (a hot journal is
+    rolled back before any read), which a read-only open of the file cannot do unwritten."""
+    return any(os.path.isfile(path + suffix) and os.path.getsize(path + suffix) > 0
+               for suffix in ("-wal", "-journal"))
+
+
 @contextmanager
 def _probe_engine(db_url: str):
-    """An engine on *db_url* that writes nothing there: SQLite is read from a private copy
-    (with its -wal and -journal, which a read-only open would still pair with a new -shm)."""
+    """An engine on *db_url* that writes nothing there. A SQLite file whose journal is absent
+    or empty is opened in place with immutable=1 (no lock, no -wal or -shm created, as a WAL
+    database opened otherwise would); one whose journal holds data is read from a private
+    copy, with that journal."""
     if db_url.startswith("sqlite:///"):
+        path = db_url[len("sqlite:///"):]
+        if not _journal_holds_data(path):
+            from urllib.parse import quote
+            engine = create_engine(f"sqlite:///file:{quote(os.path.abspath(path))}?immutable=1&uri=true")
+            try:
+                yield engine
+            finally:
+                engine.dispose()
+            return
         import shutil
         import tempfile
-        path = db_url[len("sqlite:///"):]
         with tempfile.TemporaryDirectory(prefix="ucm-check-") as tmp:
             copy = os.path.join(tmp, "probe.db")
             shutil.copyfile(path, copy)

@@ -152,6 +152,58 @@ class TestSQLite:
         assert _fingerprint(left) == before
 
 
+def _left_by(tmp_path, mode, journal):
+    """A 2.254 database as a stopped service left it: journal 'absent' (closed cleanly), 'empty'
+    (a zero-length -wal or -journal), or 'holding rows' (a -wal with committed frames)."""
+    live, left = tmp_path / 'live', tmp_path / 'left'
+    live.mkdir()
+    left.mkdir()
+    conn = sqlite3.connect(live / 'ucm.db')
+    conn.execute(f'PRAGMA journal_mode={mode}')
+    conn.execute('PRAGMA wal_autocheckpoint=0')
+    conn.execute('CREATE TABLE users (id INTEGER PRIMARY KEY)')
+    conn.execute('CREATE TABLE _migrations (id INTEGER PRIMARY KEY, name TEXT UNIQUE)')
+    conn.commit()
+    if mode == 'WAL':
+        conn.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    conn.executemany('INSERT INTO _migrations (name) VALUES (?)', [(n,) for n in _registry('2.254')])
+    conn.commit()
+    if journal == 'holding rows':
+        for f in live.iterdir():
+            shutil.copy(f, left / f.name)
+    conn.close()
+    if journal != 'holding rows':
+        for f in live.iterdir():
+            shutil.copy(f, left / f.name)
+    if journal == 'empty':
+        (left / ('ucm.db-wal' if mode == 'WAL' else 'ucm.db-journal')).write_bytes(b'')
+    return left / 'ucm.db'
+
+
+@pytest.mark.parametrize('mode, journal, copied', [
+    ('DELETE', 'absent', False), ('DELETE', 'empty', False),
+    ('WAL', 'absent', False), ('WAL', 'empty', False), ('WAL', 'holding rows', True)])
+def test_the_probe_copies_the_database_only_when_reading_it_in_place_would_write(
+        tmp_path, monkeypatch, capsys, mode, journal, copied):
+    """Nothing is written beside the database, and a database closed cleanly is read in place."""
+    db = _left_by(tmp_path, mode, journal)
+    assert (journal == 'holding rows') == ((db.parent / 'ucm.db-wal').exists()
+                                           and (db.parent / 'ucm.db-wal').stat().st_size > 0)
+    before = _fingerprint(db.parent)
+    sys.path.insert(0, str(BACKEND))
+    import migration_runner
+    copies = []
+    real = shutil.copyfile
+    monkeypatch.setattr(shutil, 'copyfile', lambda a, b, **k: copies.append(a) or real(a, b, **k))
+    monkeypatch.setenv('DATABASE_PATH', str(db))
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    assert migration_runner.check_database() == migration_runner.CHECK_STARTABLE
+    assert bool(copies) is copied, copies
+    assert _fingerprint(db.parent) == before
+    assert _check(path=db)[0] == STARTABLE
+    assert _fingerprint(db.parent) == before
+
+
 @pytest.fixture
 def pg_url():
     from tests.conftest import pg_bench_exclusive
