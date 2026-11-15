@@ -365,7 +365,7 @@ def _df_names(db_kb, copy_kb, db_dev, copy_dev, name_db='tmpfs', name_copy='tmpf
     """Both directories named alike by df, whatever their device ids say."""
     backups = '/ucm-test-backups'
     return (f'UCM_SQLITE_BACKUP_DIR={backups}; '
-            f'stat() {{ if [ "$2" = %d ]; then if [ "$3" = "{backups}" ]; then echo {copy_dev}; else echo {db_dev}; fi; '
+            f'stat() {{ if [ "$2" = %d ]; then case "$3" in {backups}|/) echo {copy_dev};; *) echo {db_dev};; esac; '
             f'else command stat "$@"; fi; }}; df() {{ echo "Filesystem 1024-blocks Used Available Capacity Mounted"; '
             f'if [ "$2" = "{backups}" ]; then echo "{name_copy} 100 0 {copy_kb} 0% /b"; '
             f'else echo "{name_db} 100 0 {db_kb} 0% /a"; fi; }}; ')
@@ -393,6 +393,6 @@ def test_a_device_that_cannot_be_read_is_measured_on_the_total(tmp_path):
     # stat failing: the cautious reading is one filesystem, the smaller room against the sum
     env = _env(tmp_path, 'true')
     _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
-    r = _run(_df_names(9000, 5999, '', '', 'a', 'b') + _START, env, tmp_path)
+    r = _run(_df_names(9000, 5999, 1, '', 'a', 'b') + _START, env, tmp_path)
     assert r.returncode != 0 and 'cp ' not in r.stdout, r.stdout
     assert 'needs 6 MB free, 5 MB available' in r.stdout, r.stdout
