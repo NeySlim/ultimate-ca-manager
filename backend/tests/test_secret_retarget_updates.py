@@ -41,6 +41,12 @@ def _suffix():
     return uuid.uuid4().hex[:8]
 
 
+def _foreign_token(value='saved-under-another-key'):
+    """A secret this node's database key does not open (another node, another key)."""
+    from cryptography.fernet import Fernet
+    return Fernet(Fernet.generate_key()).encrypt(value.encode()).decode()
+
+
 class TestSmtp:
     URL = '/api/v2/settings/email'
 
@@ -544,6 +550,32 @@ class TestHsmProvider:
                   {'config': dict(config, **over)})
         _refused(r)
         assert self._config(app, provider_id) == config
+
+    def _stored(self, app, provider_id):
+        from models.hsm import HsmProvider
+        with app.app_context():
+            return json.loads(db.session.get(HsmProvider, provider_id).config)
+
+    @pytest.mark.parametrize('kind,config,over', [
+        ('openbao', {'url': 'https://bao.example.com', 'mount_path': 'transit', 'token': 'FOREIGN'},
+         {'url': 'http://evil.invalid:8200', 'token': '********'}),
+        ('pkcs11', {'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 'ucm',
+                    'user_pin': 'FOREIGN'},
+         {'module_path': '/tmp/evil.so', 'user_pin': '***'}),
+        ('pkcs11', {'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 'ucm',
+                    'previous_user_pin': 'FOREIGN'},
+         {'module_path': '/tmp/evil.so'}),
+    ], ids=['openbao-token', 'pkcs11-pin', 'pkcs11-previous-pin'])
+    def test_an_unreadable_kept_credential_still_needs_retyping(self, app, auth_client,
+                                                                kind, config, over):
+        # This node cannot open it, yet the update keeps it: a node that can would send it on
+        form = {k: v for k, v in config.items() if v != 'FOREIGN'}
+        provider_id = self._make(app, kind, {k: (_foreign_token() if v == 'FOREIGN' else v)
+                                             for k, v in config.items()})
+        before = self._stored(app, provider_id)
+        _refused(_send(auth_client, 'put', f'/api/v2/hsm/providers/{provider_id}',
+                       {'config': dict(form, **over)}))
+        assert self._stored(app, provider_id) == before
 
     def test_the_carried_over_previous_pin_counts_as_kept(self, app, auth_client):
         config = {'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 'ucm',
