@@ -280,8 +280,14 @@ def test_a_superseded_request_stays_closed_once_its_csr_is_gone(app, adcs):
     assert _req(app, req_id) == ('superseded', None)
 
 
-# Races between two real sessions: the other side runs in its own app context
-# (its own session and connection) and commits while this side is mid-flight.
+# Races between two real sessions: the other side runs in its own app context, its own
+# session on its own connection (SQLite moved to a file), and commits mid-flight.
+
+@pytest.fixture
+def two_connections(app, tmp_path):
+    from tests.test_unique_subject import _database_on_two_connections
+    with _database_on_two_connections(app, tmp_path / 'race.db'):
+        yield
 
 def _external_cert_for(app, csr_id, cn):
     """A certificate another CA issued for the CSR's key, as an operator would import it."""
@@ -320,7 +326,7 @@ def _once(fn):
     return run, done
 
 
-def test_an_import_into_the_csr_loses_to_a_microsoft_ca_completion(app, adcs, monkeypatch):
+def test_an_import_into_the_csr_loses_to_a_microsoft_ca_completion(app, adcs, monkeypatch, two_connections):
     import services.cert.mixins.csr as csr_mod
     from models import Certificate, db
     from services.cert_service import CertificateService
@@ -343,7 +349,7 @@ def test_an_import_into_the_csr_loses_to_a_microsoft_ca_completion(app, adcs, mo
     assert _req(app, req_id) == ('issued', csr_id)
 
 
-def test_a_microsoft_ca_completion_loses_to_an_import_into_the_csr(app, adcs, monkeypatch):
+def test_a_microsoft_ca_completion_loses_to_an_import_into_the_csr(app, adcs, monkeypatch, two_connections):
     import services.approval_gate as gate
     from models import Certificate, db
     from services.cert_service import CertificateService
@@ -365,25 +371,30 @@ def test_a_microsoft_ca_completion_loses_to_an_import_into_the_csr(app, adcs, mo
     assert _req(app, req_id) == ('superseded', None)
 
 
-def test_local_signing_loses_to_a_microsoft_ca_completion(app, auth_client, create_ca, adcs, monkeypatch):
-    import services.hsm.ca_key_loader as loader
+def test_local_signing_loses_to_a_microsoft_ca_completion(app, create_ca, adcs, two_connections):
+    """The signing read the row unsigned before the Microsoft CA completion committed
+    (its savepoint holds SQLite's lock from the first read, so the read is kept, not held)."""
+    from models import CA, Certificate, db
+    from services.cert_service import CertificateService
     ca = create_ca(cn='MSE race sign CA')
     msca_id = _make_msca(app, 'MSE race sign')
     csr_id, req_id = _csr_with_request(app, msca_id, 7022, 'mse-race-sign.test.local')
     adcs.add(7022, 'mse-race-sign.test.local')
-    ms_pem = adcs.rows[-1]['pem']
-    other, done = _once(lambda: _complete_msca(app, msca_id, req_id, ms_pem))
-    real_key = loader.get_ca_signing_key
-    monkeypatch.setattr(loader, 'get_ca_signing_key', lambda c: (other(), real_key(c))[1])
-    r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', data=json.dumps({'ca_id': ca['id'], 'validity_days': 30}),
-                         content_type='application/json')
-    assert r.status_code >= 400, r.data
-    assert done == [('imported', csr_id)]
+    with app.app_context():
+        caref = db.session.get(CA, ca['id']).refid
+        session = db.session()
+        session.expire_on_commit = False
+        stale = db.session.get(Certificate, csr_id)  # held: the identity map keeps weak references
+        assert not stale.crt
+        session.commit()
+        assert _complete_msca(app, msca_id, req_id, adcs.rows[-1]['pem']) == ('imported', csr_id)
+        with pytest.raises(ValueError, match='signed by another request'):
+            CertificateService.sign_csr(csr_id, caref, validity_days=30, username='admin')
     assert _row(app, csr_id)[2] == 'msca'
     assert _req(app, req_id) == ('issued', csr_id)
 
 
-def test_direct_microsoft_ca_signing_loses_to_a_local_signing(app, auth_client, create_ca, adcs, monkeypatch):
+def test_direct_microsoft_ca_signing_loses_to_a_local_signing(app, auth_client, create_ca, adcs, monkeypatch, two_connections):
     """The CA issues at once, but a local CA signed the CSR meanwhile: the request is
     closed superseded with a 409, and a full sync brings the CA's certificate in."""
     from models import CA, Certificate, MSCARequest, db
