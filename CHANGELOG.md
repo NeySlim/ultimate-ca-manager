@@ -95,6 +95,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Restoring many key files.** A restore that writes one key file per certificate staged them in a time that grew with the square of their number; it now grows with their number.
+- **Interrupted backups leave no temporary file.** A backup whose process was killed left a `.ucm_backup_*.tmp` in the backup directory; the next backup and each start remove those of backups no longer running.
 - **`RATE_LIMIT_ENABLED=1`, `yes` or `on` no longer drops the route limits (sign-in, password reset and the default of 200 per minute and 2000 per hour).** Only `true` turned on the route limits while the tiered limiter also took `1`, `yes` and `on`; both now read the variable the same way (any case), and an empty value keeps the default, on.
 - **WebSocket events through Redis on a Unix socket.** With a `unix://` `REDIS_URL`, the event relay passed TCP keepalive options that a Unix socket connection refuses, so every WebSocket connection failed and no browser received real-time events; they now go through Redis as with a TCP address.
 - **A WSTEP renewal is served beside an imported copy.** When the same certificate was also stored under a second record of its CA and that copy was read first, a Kerberos renewal without template, a renewal authenticated by the certificate (TLS or WS-Security) and its approval were refused; the row that carries the Windows profile now decides.
