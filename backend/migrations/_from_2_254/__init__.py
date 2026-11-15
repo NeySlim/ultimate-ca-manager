@@ -15,6 +15,7 @@ STEPS = (
     '152_shared_files', '153_encryption_keys', '155_windows_enrollment_profiles',
     '156_template_cn_pattern', '157_certificate_subject_key', '158_ca_parent_confirmation',
     '159_second_factor_failures', '160_backup_archives', '161_cluster_maintenance',
+    '162_tsa_ca_signer_kept',
 )
 
 # Every name a 2.254 start leaves in `_migrations` (the migration files of tag v2.254-rc1,
