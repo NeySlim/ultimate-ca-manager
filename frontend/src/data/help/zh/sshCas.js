@@ -55,7 +55,7 @@ export default {
       {
         title: 'Key ID',
         items: [
-          { label: '由 CA 设置', text: 'sshd 会将 Key ID 记录为持有者的身份。默认情况下，CA 将每个证书命名为 principals@CA 名称，设置了其他 Key ID 的请求会被拒绝。' },
+          { label: '由 CA 设置', text: 'sshd 会将 Key ID 记录为持有者的身份。默认情况下，CA 将每个证书命名为 principals@CA name，设置了其他 Key ID 的请求会被拒绝。' },
           { label: '允许请求者设置 Key ID', text: '勾选后，请求者可自行选择 Key ID，例如工单号或员工编号。' },
           { label: '升级', text: '自 2.249 起，现有 CA 的此选项同样默认关闭。' },
         ]
@@ -121,7 +121,7 @@ Host CA签发用于**将服务器认证到客户端**的证书。当客户端信
 
 ### Key ID
 
-sshd 会将证书的 Key ID 记录为持有者的身份。CA 将其设置为 \`principals@CA 名称\`，并拒绝设置了其他 Key ID 的请求，除非勾选了**允许请求者设置 Key ID**。此选项对所有 CA 默认关闭，自 2.249 起现有 CA 也是如此。
+sshd 会将证书的 Key ID 记录为持有者的身份。CA 将其设置为 \`principals@CA name\`，并拒绝设置了其他 Key ID 的请求，除非勾选了**允许请求者设置 Key ID**。此选项对所有 CA 默认关闭，自 2.249 起现有 CA 也是如此。
 
 ### TTL格式
 

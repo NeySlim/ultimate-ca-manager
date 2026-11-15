@@ -29,7 +29,7 @@ export default {
           { label: '/simplereenroll', text: 'Renouveler un certificat existant (nécessite mTLS ; sans certificat client : 403). Une CSR sans SubjectAltName renouvelle les noms propres du certificat, ou aucun s\'il n\'en avait pas, au lieu d\'un nom construit à partir du CN (RFC 7030 §4.2.2, v2.252)' },
           { label: '/csrattrs', text: 'Obtenir les attributs CSR recommandés par le serveur : keyUsage, subjectAltName et extKeyUsage sous forme d\'OID nus (RFC 9908 §5.2, v2.252). csrattrs_legacy_encoding, défini via PATCH /api/v2/est/config, sert l\'ancienne forme (les OID dans une extensionRequest) pour un client qui en a besoin' },
           { label: 'Erreurs', text: 'Les refus d\'inscription, limitation de débit comprise, arrivent sous forme d\'un message en texte brut (text/plain, RFC 8951 §5) qui en donne la raison, par exemple un corps qui n\'est pas du base64 ou pas une CSR PKCS#10, ou les contraintes de noms de la CA (v2.252)' },
-          { label: '/serverkeygen', text: 'Le serveur génère une paire de clés et retourne le certificat + la clé. La clé prend la force de l\'AC émettrice, dans la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l\'AC, ramenée au type autorisé le plus proche par les politiques. La clé est livrée en PKCS#8 non chiffré sous TLS ; une CSR qui nomme la clé du certificat mTLS (AsymmetricDecryptKeyIdentifier) la reçoit chiffrée vers ce certificat, par transport de clé pour une clé RSA de 2048 bits ou plus (keyEncipherment) ou par accord de clé pour une clé EC (keyAgreement), avec les algorithmes que liste la SMIMECapabilities de la CSR, dans un paquet de clé signé par un certificat « EST key generator » que l\'AC émettrice délivre à cet effet (Ed25519 sous une AC Ed448, v2.252)' },
+          { label: '/serverkeygen', text: 'Le serveur génère une paire de clés et retourne le certificat + la clé. La clé prend la force de l\'CA émettrice, dans la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l\'CA, ramenée au type autorisé le plus proche par les politiques. La clé est livrée en PKCS#8 non chiffré sous TLS ; une CSR qui nomme la clé du certificat mTLS (AsymmetricDecryptKeyIdentifier) la reçoit chiffrée vers ce certificat, par transport de clé pour une clé RSA de 2048 bits ou plus (keyEncipherment) ou par accord de clé pour une clé EC (keyAgreement), avec les algorithmes que liste la SMIMECapabilities de la CSR, dans un paquet de clé signé par un certificat « EST key generator » que l\'CA émettrice délivre à cet effet (Ed25519 sous une CA Ed448, v2.252)' },
         ]
       },
     ],
@@ -101,7 +101,7 @@ Récupérer la chaîne de certificats CA. **Aucune authentification requise.**
 Utilisez ceci pour établir la confiance : les clients récupèrent le certificat CA avant l'inscription.
 
 \`\`\`bash
-curl -k https://votre-serveur:8443/.well-known/est/cacerts | \\
+curl -k https://your-server:8443/.well-known/est/cacerts | \\
   base64 -d | openssl pkcs7 -inform DER -print_certs
 \`\`\`
 
@@ -115,7 +115,7 @@ Nécessite une authentification (mTLS ou Basic Auth).
 curl -k --user est-user:est-password \\
   -H "Content-Type: application/pkcs10" \\
   --data-binary @csr.pem \\
-  https://votre-serveur:8443/.well-known/est/simpleenroll
+  https://your-server:8443/.well-known/est/simpleenroll
 \`\`\`
 
 ### POST /simplereenroll
@@ -125,7 +125,7 @@ Renouveler un certificat existant. **Nécessite mTLS** : le client doit présent
 curl -k --cert client.pem --key client.key \\
   -H "Content-Type: application/pkcs10" \\
   --data-binary @csr.pem \\
-  https://votre-serveur:8443/.well-known/est/simplereenroll
+  https://your-server:8443/.well-known/est/simplereenroll
 \`\`\`
 
 ### GET /csrattrs
@@ -134,9 +134,9 @@ Obtenir les attributs CSR recommandés par le serveur : keyUsage, subjectAltName
 ### POST /serverkeygen
 Le serveur génère une paire de clés et retourne le certificat accompagné de la clé privée. Utile lorsque le client ne peut pas générer de clés localement.
 
-La clé générée prend la force de l'AC émettrice : la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l'AC, ramenée au type autorisé le plus proche par les politiques. 
+La clé générée prend la force de l'CA émettrice : la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l'CA, ramenée au type autorisé le plus proche par les politiques. 
 
-La clé privée est livrée en PKCS#8 non chiffré (\`application/pkcs8\`), protégée par TLS. Pour l'obtenir chiffrée, authentifiez-vous en mTLS et placez l'identifiant de clé du certificat client dans la CSR (AsymmetricDecryptKeyIdentifier) : la clé arrive alors dans un paquet de clé RFC 5958 enveloppé pour ce certificat, par transport de clé pour un certificat RSA de 2048 bits ou plus déclarant keyEncipherment, ou par accord de clé (ECDH) pour un certificat EC déclarant keyAgreement, les algorithmes de transport ou d'accord de clé et de contenu étant tirés de la SMIMECapabilities de la CSR, dans l'ordre du client. Le paquet est signé par un certificat « EST key generator » que l'AC émettrice délivre à la première utilisation et renouvelle seule ; il se rattache à l'AC que sert \`/cacerts\` et a la famille de clé de l'AC, Ed25519 sous une AC Ed448 (v2.252).
+La clé privée est livrée en PKCS#8 non chiffré (\`application/pkcs8\`), protégée par TLS. Pour l'obtenir chiffrée, authentifiez-vous en mTLS et placez l'identifiant de clé du certificat client dans la CSR (AsymmetricDecryptKeyIdentifier) : la clé arrive alors dans un paquet de clé RFC 5958 enveloppé pour ce certificat, par transport de clé pour un certificat RSA de 2048 bits ou plus déclarant keyEncipherment, ou par accord de clé (ECDH) pour un certificat EC déclarant keyAgreement, les algorithmes de transport ou d'accord de clé et de contenu étant tirés de la SMIMECapabilities de la CSR, dans l'ordre du client. Le paquet est signé par un certificat « EST key generator » que l'CA émettrice délivre à la première utilisation et renouvelle seule ; il se rattache à l'CA que sert \`/cacerts\` et a la famille de clé de l'CA, Ed25519 sous une CA Ed448 (v2.252).
 
 ## Onglet Points d'accès EST
 
@@ -152,19 +152,19 @@ Utilisez \`estclient\` avec des identifiants HTTP Basic (\`-u\` et \`-h\`) ou un
 ### Utiliser OpenSSL
 \`\`\`bash
 # Récupérer les certificats CA
-curl -k https://votre-serveur:8443/.well-known/est/cacerts | \\
+curl -k https://your-server:8443/.well-known/est/cacerts | \\
   base64 -d > cacerts.p7
 
 # Générer une CSR
 openssl req -new -newkey rsa:2048 -nodes \\
   -keyout client.key -out client.csr \\
-  -subj "/CN=mon-appareil/O=MonOrg"
+  -subj "/CN=my-device/O=MyOrg"
 
 # Inscrire (Basic Auth)
 curl -k --user est-user:est-password \\
   -H "Content-Type: application/pkcs10" \\
   --data-binary @<(openssl req -in client.csr -outform DER | base64) \\
-  https://votre-serveur:8443/.well-known/est/simpleenroll | \\
+  https://your-server:8443/.well-known/est/simpleenroll | \\
   base64 -d | openssl pkcs7 -inform DER -print_certs -out client.pem
 \`\`\`
 

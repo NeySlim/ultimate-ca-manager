@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Nom complet', text: 'Votre nom d\'affichage affiché dans toute l\'application' },
           { label: 'E-mail', text: 'Utilisé pour les notifications et la récupération de compte' },
-          { label: 'Infos du compte', text: 'Date de création, dernière connexion, nombre total de connexions' },
+          { label: 'Informations du compte', text: 'Date de création, dernière connexion, nombre total de connexions' },
         ]
       },
       {
@@ -62,7 +62,7 @@ Gérez votre profil personnel, vos paramètres de sécurité et vos clés API.
 
 - **Nom complet** : Votre nom d'affichage affiché dans UCM
 - **E-mail** : Utilisé pour les notifications et la récupération de mot de passe
-- **Infos du compte** : Date de création, horodatage de la dernière connexion, nombre total de connexions
+- **Informations du compte** : Date de création, horodatage de la dernière connexion, nombre total de connexions
 
 ## Sécurité
 
@@ -119,13 +119,13 @@ Gérez les certificats client pour l'authentification TLS mutuel :
 Incluez la clé dans l'en-tête \`X-API-Key\` :
 
 \`\`\`
-X-API-Key: <votre-cle-api>
+X-API-Key: <your-api-key>
 \`\`\`
 
-Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <votre-cle-api>\`.
+Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. **Certificats uniquement** émet des certificats X.509 et SSH et lit les CA, les CA SSH et les CRL, mais ne peut ni créer ni modifier une CA. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions.
+Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. **Certificats uniquement** émet des certificats X.509 et SSH et lit les CA, les CA SSH et les CRL, mais ne peut ni créer ni modifier une CA. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions, et cette clé expire au plus tard avec celle qui la demande. **Régénérer** conserve les permissions et la durée de la clé ; une clé révoquée ou expirée ne peut pas être régénérée.
 
 Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d'administration des utilisateurs : celles-ci exigent une session interactive.
 

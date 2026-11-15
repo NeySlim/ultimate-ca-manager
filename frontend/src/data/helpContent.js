@@ -1309,7 +1309,7 @@ export const helpContent = {
         items: [
           { label: 'Full Name', text: 'Your display name shown across the application' },
           { label: 'Email', text: 'Used for notifications and account recovery' },
-          { label: 'Account Info', text: 'Creation date, last login, total login count' },
+          { label: 'Account Information', text: 'Creation date, last login, total login count' },
         ]
       },
       {
@@ -1599,7 +1599,7 @@ export const helpContent = {
           { label: 'Base DN', text: 'Search base for user lookups' },
           { label: 'User Filter', text: 'LDAP filter to match users (e.g., (uid={username}))' },
           { label: 'Attribute Mapping', text: 'Map LDAP attributes to username, email, full name' },
-          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink then Link to SSO.' },
+          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink SSO then Link to SSO.' },
         ]
       },
     ],
@@ -1627,7 +1627,7 @@ export const helpContent = {
         icon: Lock,
         items: [
           { label: 'Status & counters', text: 'Shows whether encryption is enabled and how many stored private keys are encrypted vs unencrypted' },
-          { label: 'Enable / Disable', text: 'Encrypt all CA and certificate private keys with AES-128 (Fernet, with HMAC-SHA256) under a master key file. Enabling also removes plaintext key mirrors, while disabling recreates them. A disable stopped before every value was decrypted is shown as left half-way: run it again to finish it. After a disable, enabling again waits until every node has reloaded, then two minutes (ten at most, unless a live node never reloads). The data keys stay for reading only for seven days, so a value written late under them still opens; a daily sweep decrypts any such value, and each key is deleted after its date once a sweep finds nothing under it. Outside HA master.key is removed with the last of them' },
+          { label: 'Enable / Disable', text: 'Encrypt all CA and certificate private keys with AES-128 (Fernet, with HMAC-SHA256) under a master key file. Enabling also removes plaintext key mirrors, while disabling recreates them. A disable stopped before every value was decrypted is shown as left half-way: run it again to finish it. After a disable, enabling again waits until every node has reloaded, then two minutes (ten at most, unless a live node never reloads). The data keys stay for reading only for seven days, so a value written late under them still opens; a daily sweep decrypts any such value, and each key is deleted after its date once a sweep finds nothing under it. Outside HA master.key is removed with the last of them; a key set by KEY_ENCRYPTION_KEY, and the key in HA, stay configured but unused' },
           { label: 'First start', text: 'Without a master key, UCM creates /etc/ucm/master.key (0600) at startup and encrypts the keys already stored. A container does so only when /etc/ucm is a named volume or a host directory. Skipped with KEY_ENCRYPTION_KEY set, with encrypted keys or a keyed audit chain already in the database, after encryption was disabled here, or with UCM_AUTO_MASTER_KEY=false. At each start a loaded key also encrypts the values still stored unencrypted, and a key that does not decrypt them puts UCM in safe mode. Back up the key file' },
           { label: 'Key files on disk', text: 'Shows how many plaintext key mirrors remain; use deploy hooks when another service needs a key file' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Opt-in environment variable: refuse to start without an explicit database encryption key' },
@@ -2129,7 +2129,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Use short-lived certificates (8h–24h) for user access to minimize the impact of key compromise.',
+      'Use short-lived certificates (8h-24h) for user access to minimize the impact of key compromise.',
       'Sign mode is preferred: the user\'s private key never leaves their machine.',
       'Where a CA lets requesters set the key ID, keep it descriptive (e.g. "jdoe-prod-2025") for easy log auditing.',
       'For host certificates, the principal must match the hostname clients use to connect.',

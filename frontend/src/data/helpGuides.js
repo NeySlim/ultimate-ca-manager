@@ -1057,7 +1057,7 @@ For DNS services without a native driver, the **Custom Command** provider runs a
 - \`TTL\`: record TTL in seconds
 - \`ACTION\`: \`create\` or \`delete\`
 
-The command requires an **absolute binary path**, runs without a shell (no pipes or expansion), and is killed after a configurable timeout (5–300 s, default 60). Use a small wrapper script to bridge any external DNS tooling.
+The command requires an **absolute binary path**, runs without a shell (no pipes or expansion), and is killed after a configurable timeout (5-300 s, default 60). Use a small wrapper script to bridge any external DNS tooling.
 
 ### Custom DNS Resolvers
 **DNS-01 resolvers** chooses where UCM looks up \`_acme-challenge\` TXT records: **Automatic** (listed resolvers, then the zone's authoritative servers, then public resolvers, then the system resolver), **System resolver only**, or **Listed resolvers only**. The restricted modes never query public resolvers, for networks that block them. Entries are comma-separated IPs with an optional port, e.g. \`127.0.0.1:5353\` or \`[2001:db8::53]:5300\`.
@@ -2326,7 +2326,7 @@ Manage your personal profile, security settings, and API keys.
 
 - **Full Name**: Your display name shown across UCM
 - **Email**: Used for notifications and password recovery
-- **Account Info**: Creation date, last login timestamp, total login count
+- **Account Information**: Creation date, last login timestamp, total login count
 
 ## Security
 
@@ -2749,7 +2749,7 @@ Copy this URL into your IDP's "Add Service Provider" or "SAML Application" confi
 ### Configuration
 1. Obtain the IDP metadata URL or XML file from your identity provider
 2. In UCM, go to **Settings → SSO**
-3. Click **Add Provider** → SAML
+3. Click **Add SSO Provider** → SAML
 4. Enter the **IDP Metadata URL**: UCM auto-populates Entity ID, SSO/SLO URLs, and certificate
 5. Or paste the IDP metadata XML directly
 6. Configure **attribute mapping** (username, email, groups)
@@ -2774,7 +2774,7 @@ A login started from the IdP portal reaches UCM without a request from UCM. **Al
 2. Set the **Redirect URI** to: \`https://your-ucm-host:8443/api/v2/sso/callback/oauth2\`
 3. Copy the **Client ID** and **Client Secret**
 4. In UCM, go to **Settings → SSO**
-5. Click **Add Provider** → OAuth2
+5. Click **Add SSO Provider** → OAuth2
 6. Enter the **Authorization URL** and **Token URL**
 7. Enter the **User Info URL** (for fetching user attributes after login)
 8. Enter Client ID and Secret
@@ -2789,7 +2789,7 @@ When enabled, a new UCM user account is automatically created on first SSO login
 ### Identity matching
 A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first; its next sign-in through that provider binds the IdP identifier.
 
-When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink** then **Link to SSO** on each account.
+When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink SSO** then **Link to SSO** on each account.
 
 ### Role mapping rules
 - **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
@@ -2803,13 +2803,13 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 
 ### Configuration
 1. In UCM, go to **Settings → SSO**
-2. Click **Add Provider** → LDAP
+2. Click **Add SSO Provider** → LDAP
 3. Enter the **LDAP Server** hostname and **Port** (389 for LDAP, 636 for LDAPS)
 4. Enable **Use SSL/TLS** (LDAPS, port 636) or, on port 389, **Use StartTLS**: the connection switches to TLS before any bind, with the same certificate verification. Without either, the bind and user passwords cross the network in clear
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)
 6. Enter the **Base DN** (search base for user lookups)
 7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
-8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink** then **Link to SSO**
+8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink SSO** then **Link to SSO**
 9. Click **Test Connection** to verify, then **Save** and **Enable**
 
 ### Active Directory
@@ -2821,7 +2821,7 @@ For Microsoft Active Directory, use:
 - Full name attr: \`displayName\`
 
 ## Login Flow
-1. User clicks **Login with SSO** on the UCM login page (or enters LDAP credentials)
+1. User clicks the button of their provider on the UCM login page (or enters LDAP credentials)
 2. For SAML/OAuth2: user is redirected to the IDP, authenticates, then redirected back
 3. For LDAP: credentials are verified directly against the LDAP server
 4. UCM creates or updates the user account
@@ -2984,7 +2984,7 @@ Restrict which key algorithms and sizes can be used:
 **Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes.
 
 ### SAN Restrictions
-- **Max DNS Names**: Limit the number of DNS names in the SAN; IP, e-mail and URI entries are not counted
+- **Max SANs**: Limit the number of DNS names in the SAN; IP, e-mail and URI entries are not counted
 - **DNS Pattern**: Scopes the policy to the requests whose CN or DNS SANs match, label by label and ignoring case: \`*.company.com\` covers the names under company.com, \`company.com\` covers company.com as well. Other names are not refused: the policy does not apply to them
 
 ## Approval Workflows
@@ -3001,8 +3001,8 @@ When **Require Approval** is enabled, certificate issuance is paused until the r
 ## Priority System
 
 Policies are evaluated in priority order. Lower numbers have higher precedence:
-- **1–10**: Critical security policies (code signing, wildcard)
-- **10–20**: Standard compliance (public TLS, internal PKI)
+- **1-10**: Critical security policies (code signing, wildcard)
+- **10-20**: Standard compliance (public TLS, internal PKI)
 - **20+**: Permissive defaults
 
 When multiple policies match a certificate request, the highest-priority (lowest number) policy decides the approval; the rules of every matching policy apply together (the smallest maximum validity, the intersection of the allowed key types, and so on).
@@ -3674,7 +3674,7 @@ Choose a preset or set custom duration:
 | 30 days | Monthly rotation |
 | 365 days | Long-lived service accounts |
 
-Short-lived certificates (8h–24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
+Short-lived certificates (8h-24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
 
 A certificate is valid from 5 minutes before it is issued, so a server whose clock lags slightly behind accepts it at once; the lifetime still counts from issuance (v2.252).
 

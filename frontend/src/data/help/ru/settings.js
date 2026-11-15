@@ -402,9 +402,9 @@ UCM поддерживает два сервера баз данных:
 
 - **Нет**: без заголовка аутентификации (публичные вебхуки)
 - **Bearer**: Authorization: Bearer {token}
-- **Basic**: Authorization: Basic base64(имя_пользователя:пароль)
+- **Basic**: Authorization: Basic base64(username:password)
 - **Ключ API**: свой заголовок (например, X-Api-Key: {token})
-- **Свой**: Authorization: {scheme} {token} (например, auth-key ЗНАЧЕНИЕ)
+- **Свой**: Authorization: {scheme} {token} (например, auth-key VALUE)
 
 Токены хранятся в зашифрованном виде и никогда не возвращаются в интерфейс.
 

@@ -14,7 +14,7 @@ export default {
           { label: 'URL CDP', text: 'URL du point de distribution CRL à intégrer dans les certificats' },
           { label: 'Validité', text: 'Validité de la CRL par CA de 1 jour à 5 ans (90j/180j/1a/3a/5a pour les CA hors ligne qui ne peuvent pas re-signer à l\'échéance). Un avertissement s\'affiche au-delà d\'un an, les parties utilisatrices peuvent conserver des données de révocation périmées pendant toute la fenêtre' },
           { label: 'Digest de signature', text: 'SHA-256, SHA-384 ou SHA-512 pour une CA RSA ou EC. Une CA Ed25519, Ed448 ou ML-DSA signe sans digest : un digest enregistré auparavant est affiché comme ignoré, avec un bouton Effacer' },
-          { label: "Condensat par défaut (v2.251)", text: "Sans condensat défini, une AC P-384 ou P-521 signe ses CRL avec SHA-384 ou SHA-512. Les CRL déjà émises gardent le leur : la suivante applique la règle" },
+          { label: "Condensat par défaut (v2.251)", text: "Sans condensat défini, une CA P-384 ou P-521 signe ses CRL avec SHA-384 ou SHA-512. Les CRL déjà émises gardent le leur : la suivante applique la règle" },
           { label: 'CRL externe', text: "Les CA sans clé ou hors ligne ne peuvent pas auto-signer une CRL, téléversez depuis le panneau de détails de la CA une CRL générée auprès de la clé hors ligne ; elle est validée (signature, émetteur, monotonie) et servie à la même URL CDP (v2.215)" },
           { label: 'CRL delta', text: 'Lorsque les CRL delta sont activées, un nouveau delta est généré juste après chaque CRL complète, de sorte que le delta servi se rapporte toujours à la dernière base' },
           { label: 'Numéro de CRL', text: 'Les CRL de base et delta d\'une CA partagent un même numéro croissant, jamais attribué à deux CRL, même lorsque deux générations s\'exécutent en même temps. Le numéro le plus élevé atteint est conservé par nom et clé de CA et voyage dans les sauvegardes : une CA restaurée sur un autre serveur, ou supprimée puis réimportée, repart de ce numéro' },
@@ -79,7 +79,7 @@ Le numéro le plus élevé atteint est conservé pour chaque nom et clé de CA, 
 L'URL CDP est intégrée dans les certificats pour que les clients sachent où télécharger la CRL. Copiez l'URL depuis les détails de la CRL.
 
 \`\`\`
-http://votre-serveur:8080/cdp/{ca_refid}.crl
+http://your-server:8080/cdp/{ca_refid}.crl
 \`\`\`
 
 > 💡 **Activé automatiquement** : Lorsque vous créez une nouvelle CA, le CDP est automatiquement activé si une URL de base de protocole ou un serveur de protocole HTTP est configuré. L'URL CDP est générée automatiquement, aucune étape manuelle nécessaire.
@@ -118,13 +118,13 @@ L'extension AIA (Authority Information Access) est intégrée dans les certifica
 
 **Répondeur OCSP** : vérification de révocation en temps réel :
 \`\`\`
-http://votre-serveur:8080/ocsp
+http://your-server:8080/ocsp
 \`\`\`
 
 **CA Issuers** (RFC 5280 §4.2.2.1) : téléchargement du certificat de la CA émettrice pour la construction de chaîne :
 \`\`\`
-http://votre-serveur:8080/ca/{ca_refid}.cer   (format DER)
-http://votre-serveur:8080/ca/{ca_refid}.pem   (format PEM)
+http://your-server:8080/ca/{ca_refid}.cer   (format DER)
+http://your-server:8080/ca/{ca_refid}.pem   (format PEM)
 \`\`\`
 
 Activez CA Issuers par CA dans la section **AIA CA Issuers** du panneau de cette CA sur cette page. L'URL est générée automatiquement en utilisant le serveur de protocole HTTP et le FQDN configuré.
