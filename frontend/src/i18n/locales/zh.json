@@ -6387,8 +6387,10 @@
         },
         "webhooks": {
           "not_configured": "没有端点",
-          "none_active": "{{count}} 个端点，均未启用",
-          "active": "{{count}} 个已启用的端点"
+          "none_active_one": "{{count}} 个端点，均未启用",
+          "none_active_other": "{{count}} 个端点，均未启用",
+          "active_one": "{{count}} 个已启用的端点",
+          "active_other": "{{count}} 个已启用的端点"
         },
         "auto_renewal": {
           "enabled": "已启用",

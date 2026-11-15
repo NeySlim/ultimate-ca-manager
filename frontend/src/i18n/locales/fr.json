@@ -6390,8 +6390,10 @@
         },
         "webhooks": {
           "not_configured": "Aucun point de terminaison",
-          "none_active": "{{count}} points de terminaison, aucun actif",
-          "active": "{{count}} points de terminaison actifs"
+          "none_active_one": "{{count}} point de terminaison, aucun actif",
+          "none_active_other": "{{count}} points de terminaison, aucun actif",
+          "active_one": "{{count}} point de terminaison actif",
+          "active_other": "{{count}} points de terminaison actifs"
         },
         "auto_renewal": {
           "enabled": "Activé",

@@ -6387,8 +6387,10 @@
         },
         "webhooks": {
           "not_configured": "Nessun endpoint",
-          "none_active": "{{count}} endpoint, nessuno attivo",
-          "active": "{{count}} endpoint attivi"
+          "none_active_one": "{{count}} endpoint, nessuno attivo",
+          "none_active_other": "{{count}} endpoint, nessuno attivo",
+          "active_one": "{{count}} endpoint attivo",
+          "active_other": "{{count}} endpoint attivi"
         },
         "auto_renewal": {
           "enabled": "Attivato",

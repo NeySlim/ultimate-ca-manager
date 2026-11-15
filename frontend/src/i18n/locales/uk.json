@@ -6473,8 +6473,14 @@
         },
         "webhooks": {
           "not_configured": "Немає кінцевих точок",
-          "none_active": "Кінцевих точок: {{count}}, жодна не активна",
-          "active": "Активних кінцевих точок: {{count}}"
+          "none_active_one": "{{count}} кінцева точка, не активна",
+          "none_active_few": "{{count}} кінцеві точки, жодна не активна",
+          "none_active_many": "{{count}} кінцевих точок, жодна не активна",
+          "none_active_other": "{{count}} кінцевих точок, жодна не активна",
+          "active_one": "{{count}} активна кінцева точка",
+          "active_few": "{{count}} активні кінцеві точки",
+          "active_many": "{{count}} активних кінцевих точок",
+          "active_other": "{{count}} активних кінцевих точок"
         },
         "auto_renewal": {
           "enabled": "Увімкнено",

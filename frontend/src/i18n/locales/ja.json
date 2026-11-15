@@ -6390,8 +6390,10 @@
         },
         "webhooks": {
           "not_configured": "エンドポイントなし",
-          "none_active": "エンドポイント {{count}} 件、有効なものはありません",
-          "active": "有効なエンドポイント {{count}} 件"
+          "none_active_one": "エンドポイント {{count}} 件、有効なものはありません",
+          "none_active_other": "エンドポイント {{count}} 件、有効なものはありません",
+          "active_one": "有効なエンドポイント {{count}} 件",
+          "active_other": "有効なエンドポイント {{count}} 件"
         },
         "auto_renewal": {
           "enabled": "有効",
