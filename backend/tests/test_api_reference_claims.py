@@ -1,5 +1,6 @@
 """Claims in docs/API_REFERENCE.md checked against the application."""
 import json
+import random
 import os
 
 _REF = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
@@ -35,3 +36,32 @@ def test_mtls_list_routes_accept_api_keys_and_the_doc_says_so(auth_client, app):
         assert c.get(path, headers={'X-API-Key': key}).status_code != 403, path
     assert ('Except for the two settings routes and the two GET lists '
             '(certificates, available-certificates)') in _doc()
+
+
+def _public_addr():
+    return f'8.{random.randint(1, 254)}.{random.randint(1, 254)}.{random.randint(1, 254)}'
+
+
+_RATE_HEADERS = ('Retry-After', 'X-RateLimit-Limit', 'X-RateLimit-Remaining')
+
+
+def test_a_tiered_limiter_429_carries_the_rate_headers(app):
+    # The auth tier gives /api/v2/auth/register a burst of 9; no route limit applies there.
+    c, addr = app.test_client(), _public_addr()
+    last = [c.post('/api/v2/auth/register', environ_base={'REMOTE_ADDR': addr})
+            for _ in range(10)][-1]
+    assert last.status_code == 429 and 'retry_after' in last.get_json()
+    for name in _RATE_HEADERS:
+        assert last.headers.get(name), name
+    assert last.headers['X-RateLimit-Remaining'] == '0'
+
+
+def test_a_route_limit_429_carries_the_rate_headers_and_reset(app):
+    c, addr = app.test_client(), _public_addr()
+    last = [c.post('/api/v2/auth/login/password', environ_base={'REMOTE_ADDR': addr},
+                   content_type='application/json',
+                   data=json.dumps({'username': 'nobody-hdr', 'password': 'wrong'}))
+            for _ in range(6)][-1]
+    assert last.status_code == 429 and 'retry_after' not in last.get_json()
+    for name in _RATE_HEADERS + ('X-RateLimit-Reset',):
+        assert last.headers.get(name), name

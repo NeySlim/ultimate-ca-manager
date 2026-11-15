@@ -84,3 +84,47 @@ def test_no_hand_written_endpoint_count():
     with open(_REFERENCE, encoding='utf-8') as fh:
         stale = [line.strip() for line in fh if count.search(line)]
     assert not stale, 'endpoint count written by hand:\n' + '\n'.join(stale)
+
+
+_PROTOCOL_SECTION = '## Protocol and Health Endpoints'
+_CODE = re.compile(r'`([^`]+)`')
+
+
+def protocol_paths():
+    """Paths of the protocol table; `P` and `Q` followed by `a`, `b` stand for Pa, Pb, Qa, Qb."""
+    with open(_REFERENCE, encoding='utf-8') as fh:
+        text = fh.read()
+    section = text.split(_PROTOCOL_SECTION, 1)[1].split('\n---', 1)[0]
+    found = set()
+    for line in section.splitlines():
+        cells = [c.strip() for c in line.strip().strip('|').split('|')]
+        if not line.startswith('|') or len(cells) < 3 or cells[0] in ('Protocol', '') \
+                or set(cells[0]) <= {'-'}:
+            continue
+        head, _, tail = cells[1].partition('followed by')
+        prefixes = [p for p in _CODE.findall(head) if p.startswith('/')]
+        if tail:
+            found |= {p + s for p in prefixes for s in _CODE.findall(tail)}
+        else:
+            found |= set(prefixes)
+    return {_norm(p) for p in found}
+
+
+def _served_paths(app):
+    return {_norm(r.rule) for r in app.url_map.iter_rules()}
+
+
+def test_protocol_table_is_read():
+    paths = protocol_paths()
+    assert '/acme/directory' in paths and '/acme/proxy/{}/directory' in paths
+
+
+def test_every_cited_protocol_path_exists(app):
+    missing = sorted(protocol_paths() - _served_paths(app))
+    assert not missing, 'cited but not served:\n' + '\n'.join(missing)
+
+
+def test_every_acme_route_is_cited(app):
+    acme = {p for p in _served_paths(app) if p.startswith('/acme/')}
+    missing = sorted(acme - protocol_paths())
+    assert not missing, 'served but not cited:\n' + '\n'.join(missing)

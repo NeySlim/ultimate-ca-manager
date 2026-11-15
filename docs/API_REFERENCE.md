@@ -1,8 +1,6 @@
 # UCM API v2 - Complete Reference
 
-> **Version**: 2.48+  
 > **Base URL**: `https://your-server:8443/api/v2`  
-> **Last Updated**: February 2026  
 > **Coverage**: `backend/tests/test_api_reference_routes.py` checks this file against the application's route table.  
 > **Operation format**: each operation is written `METHOD /path` at the start of a line (`{id}` marks a path parameter).
 
@@ -2238,7 +2236,7 @@ Content-Type: application/json
 
 { "note": "Ticket 1234" }
 ```
-`admin:key_recovery`. `note` is optional (2000 characters at most). `409` when the request is no longer pending. `approve` answers `403` when dual control is on and the caller is the requester, and `410` when the certificate no longer exists.
+`admin:key_recovery`. `note` is optional; a longer note is cut to its first 2000 characters. `409` when the request is no longer pending. `approve` answers `403` when dual control is on and the caller is the requester, and `410` when the certificate no longer exists.
 
 ```http
 POST /api/v2/key-recovery/{id}/recover
@@ -5140,19 +5138,19 @@ These endpoints are not part of the `/api/v2` management API. Clients such as AC
 
 | Protocol | Paths | Guide |
 |----------|-------|-------|
-| ACME (RFC 8555) | `/acme/directory`, `/acme/new-nonce`, `/acme/new-account`, `/acme/new-order`, `/acme/order/{id}`, `/acme/order/{id}/finalize`, `/acme/authz/{id}`, `/acme/challenge/{id}`, `/acme/cert/{id}`, `/acme/acct/{id}`, `/acme/key-change`, `/acme/revoke-cert`, `/acme/renewalInfo/{certid}`, `/acme/terms`, `/acme/health` | [User guide](USER_GUIDE.md#acme-server), [admin guide](ADMIN_GUIDE.md#acme-administration) |
-| ACME proxy | the same set under `/acme/proxy/` and `/acme/proxy/{slug}/` | [Admin guide](ADMIN_GUIDE.md#acme-administration), [proxy clients](integrations/acme-proxy-clients.md) |
+| ACME (RFC 8555) | `/acme/directory`, `/acme/new-nonce`, `/acme/new-account`, `/acme/new-order`, `/acme/new-authz`, `/acme/order/{id}`, `/acme/order/{id}/finalize`, `/acme/authz/{id}`, `/acme/challenge/{id}`, `/acme/cert/{id}`, `/acme/cert/{id}/alt/{variant}`, `/acme/acct/{id}`, `/acme/acct/{id}/orders`, `/acme/key-change`, `/acme/revoke-cert`, `/acme/renewalInfo/{certid}`, `/acme/terms`, `/acme/health` | [User guide](USER_GUIDE.md#acme-server), [admin guide](ADMIN_GUIDE.md#acme-administration) |
+| ACME proxy | `/acme/proxy/` and `/acme/proxy/{slug}/` followed by `directory`, `new-nonce`, `new-account`, `new-order`, `order/{id}`, `order/{id}/finalize`, `authz/{id}`, `challenge/{id}`, `cert/{id}`, `acct/{id}`, `acct/{id}/orders`, `key-change`, `revoke-cert`, `renewal-info/{certid}`; the proxy has no terms, health or new-authz route | [Admin guide](ADMIN_GUIDE.md#acme-administration), [proxy clients](integrations/acme-proxy-clients.md) |
 | ACME HTTP-01 | `/.well-known/acme-challenge/{token}` | [Admin guide](ADMIN_GUIDE.md#acme-client-http-01-challenges) |
 | SCEP | `/scep/pkiclient.exe`, `/scep/{profile_slug}/pkiclient.exe`, `/cgi-bin/pkiclient.exe` | [User guide](USER_GUIDE.md#scep-server), [admin guide](ADMIN_GUIDE.md#scep-administration), [Intune](integrations/intune-scep.md) |
 | EST (RFC 7030) | `/.well-known/est/` and `/.well-known/est/{label}/` followed by `cacerts`, `csrattrs`, `simpleenroll`, `simplereenroll`, `serverkeygen`, `fullcmc` | [User guide](USER_GUIDE.md#est-server), [admin guide](ADMIN_GUIDE.md#est-administration) |
 | OCSP (RFC 6960) | `/ocsp` (POST), `/ocsp/{encoded_request}` (GET) | [User guide](USER_GUIDE.md#ocsp-responder), [admin guide](ADMIN_GUIDE.md#ocsp-configuration) |
 | CRL distribution | `/cdp/{ca_ref}.crl`, `/cdp/{ca_ref}-delta.crl` | [Admin guide](ADMIN_GUIDE.md#crl-distribution) |
-| CA issuers (AIA) | `/ca/{ca_ref}.cer`, `.pem`, `.p7c`, `/ca/{ca_ref}/cross/{xid}.cer` | [AIA CA Issuers](#aia-ca-issuers) |
+| CA issuers (AIA) | `/ca/{ca_ref}.cer`, `/ca/{ca_ref}.pem`, `/ca/{ca_ref}.p7c`, `/ca/{ca_ref}/cross/{xid}.cer` | [AIA CA Issuers](#aia-ca-issuers) |
 | Time stamping (RFC 3161) | `/tsa` (POST) | [Time Stamping (TSA)](#time-stamping-tsa) |
 | Windows enrollment (XCEP and WSTEP) | `/ADPolicyProvider_CEP_Kerberos/service.svc`, `/ADPolicyProvider_CEP_UsernamePassword/service.svc`, `/ADCertificateService_CES_Kerberos/service.svc`, `/ADCertificateService_CES_UsernamePassword/service.svc`, `/ADCertificateService_CES_Certificate/service.svc` | [Admin guide](ADMIN_GUIDE.md#windows-autoenrollment-xcepwstep-kerberosspnego), [Windows Enrollment Profiles](#windows-enrollment-profiles) |
 | SSH setup | `/ssh/setup/{refid}`, `/ssh/setup/{refid}/public-key` | [SSH Certificates](#ssh-certificates) |
 
-The routes are always served; a protocol turned off in Settings refuses its requests (EST and XCEP answer `503`).
+The routes are always served; a protocol turned off in Settings refuses its requests with `503` (ACME, SCEP, EST, TSA, XCEP and WSTEP).
 
 ### Probes
 `GET /health`, `/health/ready`, `/health/live` and their `/api/health` and `/api/v2/health` forms are described under [Health](#health). `GET /metrics` and `GET /api/v2/metrics` expose Prometheus metrics, see [Metrics](#metrics). The interactive API description is served at `/api/docs`.
@@ -5178,10 +5176,10 @@ The routes are always served; a protocol turned off in Settings refuses its requ
 
 ## Rate Limiting
 
-Two limiters run in every node, and a request must pass both. A refused request answers `429`; the second limiter adds `Retry-After`, `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers.
+Two limiters run in every node, and a request must pass both. A refused request answers `429` with `Retry-After`, `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers, whichever limiter refused it; a refusal by a route limit also carries `X-RateLimit-Reset`.
 
 - **Route limits (flask-limiter).** 200 requests per minute and 2000 per hour per client address on every route without a limit of its own, and per-route limits on sign-in: `POST /api/v2/auth/login/password` 5 per minute, `POST /api/v2/auth/login/webauthn/verify` 5 per minute, `POST /api/v2/sso/ldap/login` 5 per minute, `POST /api/v2/auth/login/2fa`, `/auth/login/2fa/webauthn/options`, `/auth/login/2fa/webauthn/verify`, `/auth/login/mtls` and `/auth/login/webauthn/start` 10 per minute, `POST /api/v2/auth/forgot-password` 3 per hour and `POST /api/v2/auth/reset-password` 5 per hour.
-- **Tiered limiter (API and protocol endpoints).** Rates by path prefix in four tiers (auth, heavy, standard, protocol), each with a requests-per-minute rate and a burst. The defaults are set with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`; `RATE_LIMIT_ENABLED=false` turns off both limiters, this one and the route limits above. Settings > Security, or `PUT /api/v2/system/security/rate-limit`, changes the limit of a path, the switch and the whitelist.
+- **Tiered limiter (API and protocol endpoints).** Rates by path prefix in four tiers (auth, heavy, standard, protocol), each with a requests-per-minute rate and a burst. The defaults are set with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`; `RATE_LIMIT_ENABLED=false` (or `0`, `no`, `off`, any case) turns off both limiters, this one and the route limits above. Settings > Security, or `PUT /api/v2/system/security/rate-limit`, changes the limit of a path, the switch and the whitelist; the switch acts on this limiter only, never on the route limits, and has no effect while `RATE_LIMIT_ENABLED` turns the limiters off.
 
 Requests from private (RFC 1918), loopback and link-local addresses are exempt from both limiters unless `RATE_LIMIT_TRUST_LAN=false`. Counters are kept in memory, per node. Behind a proxy, set `UCM_BEHIND_PROXY` and `UCM_TRUSTED_PROXIES` so the limits see the client's address. The tier table is in [SECURITY.md](SECURITY.md#4-rate-limiting); the effect of several nodes is in [HA.md](HA.md#rate-limits).
 
