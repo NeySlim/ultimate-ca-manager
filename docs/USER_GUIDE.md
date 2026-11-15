@@ -242,7 +242,7 @@ Configure SSO in **Settings** → **SSO** tab (admin only). Each provider type s
 
 ### Enabling 2FA (TOTP)
 
-1. Go to **Account** → **Security** tab
+1. Go to **My Account** → **Security** tab
 2. Click **Enable 2FA**
 3. Scan QR code with authenticator app
 4. Enter verification code
@@ -250,7 +250,7 @@ Configure SSO in **Settings** → **SSO** tab (admin only). Each provider type s
 
 ### Adding WebAuthn Key
 
-1. Go to **Account** → **Security** tab
+1. Go to **My Account** → **Security** tab
 2. Click **Add Security Key**
 3. Insert and touch your hardware key
 4. Name the key for identification
@@ -259,7 +259,7 @@ With 2FA enabled (or enforced by an administrator), a registered key can answer 
 
 When an administrator enforces 2FA, registering a key fulfils it as well as a TOTP app does; the account must keep at least one of the two.
 
-Without enforcement, turn on **Security key as second factor** under **Account** → **Security** to have every password login ask for one of your keys. Keys used only for passwordless login change nothing until you do. Under enforcement, it cannot be turned off while the account has no TOTP.
+Without enforcement, turn on **Security key as second factor** under **My Account** → **Security** to have every password login ask for one of your keys. Keys used only for passwordless login change nothing until you do. Under enforcement, it cannot be turned off while the account has no TOTP.
 
 ### Changes that sign out your other sessions
 
@@ -275,7 +275,7 @@ Pages that ask for your current password (password change, turning off the secur
 
 Enable Let's Encrypt-compatible certificate issuance:
 
-1. Go to **Settings** → **ACME** tab
+1. Open **Modules** > **Protocols** > **ACME**
 2. Enable ACME server
 3. Configure:
    - **Base URL** - Public URL for challenges
@@ -287,7 +287,7 @@ Enable Let's Encrypt-compatible certificate issuance:
 
 Enable device auto-enrollment:
 
-1. Go to **Settings** → **SCEP** tab
+1. Open **Modules** > **Protocols** > **SCEP**
 2. Enable SCEP server
 3. Configure:
    - **Challenge Password** - Enrollment secret
@@ -307,7 +307,7 @@ Real-time certificate validation:
 
 RFC 7030 device enrollment:
 
-1. Go to **Operations > EST**
+1. Open **Modules** > **Protocols** > **EST**
 2. Enable EST and assign a CA
 3. Devices use: `https://your-server:8443/.well-known/est`
 4. Supports simple enrollment and re-enrollment
@@ -318,7 +318,7 @@ RFC 7030 device enrollment:
 
 Scan your network for certificates:
 
-1. Go to **Operations > Discovery**
+1. Open **Modules** > **Governance** > **Certificate Discovery**
 2. Create a **Scan Profile** with target hosts/networks, ports, and schedule
 3. Run a scan manually or let it run on schedule
 4. Review discovered certificates: status, expiry, issuer, SAN

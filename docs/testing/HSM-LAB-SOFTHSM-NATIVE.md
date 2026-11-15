@@ -130,7 +130,7 @@ Expected:
 
 ### Web UI
 
-**Administration → Gestion HSM** → **SoftHSM-Default** → **Tester la connexion** → succès.
+**Modules → Administration → HSM Management** → **SoftHSM-Default** → **Test** → success.
 
 ## Automated setup script (lab)
 

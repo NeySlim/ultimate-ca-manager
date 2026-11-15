@@ -170,6 +170,6 @@ kubectl logs -n cert-manager deploy/cert-manager --tail=200 | grep -i <name>
 - **Account key change** (RFC 8555 §7.3.5) is supported and audited.
 - **Audit**: account creation, order creation, finalize, certificate
   revoke, challenge final state, and key change are written to UCM's
-  audit log (Operations → Audit Logs).
+  audit log (Modules → Administration → Audit Logs).
 - **Renewal**: cert-manager renews based on `renewBefore` (default
   2/3 of cert lifetime). UCM has no rate limit on renewals.

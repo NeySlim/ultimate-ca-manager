@@ -210,51 +210,9 @@ UCM_LAB=1 UCM_E2E_BASE_URL=https://ucm.example.test:8443 UCM_E2E_ADMIN_PASSWORD=
 
 Without `UCM_E2E_MANAGED=1`, which only `scripts/ci/e2e.sh` sets, and always with `UCM_LAB=1`, the global setup changes no setting and the backup restore test does not run. The other tests still create objects and save settings: on a shared instance, name the lab files to run, as above.
 
-## Advanced Features Test Infrastructure
-
-For testing advanced features (SSO, LDAP, HSM), a Docker Compose stack is available:
-
-```bash
-# Start test infrastructure
-cd docker
-docker-compose -f docker-compose.test.yml up -d
-```
-
-### Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| Keycloak | 8180 | SSO (OIDC/SAML) |
-| OpenLDAP | 389 | Directory |
-| phpLDAPadmin | 8181 | LDAP admin UI |
-| SoftHSM | - | HSM simulation |
-
-### Test Credentials
-
-**Keycloak:**
-- Admin: `admin` / `admin123`
-- Realm: `ucm`
-- Client: `ucm-app`
-
-**LDAP:**
-- Admin: `cn=admin,dc=ucm,dc=test` / `admin123`
-- Users: `alice`, `bob`, `charlie`, `david`, `eve` (password: `{username}123`)
-
-**SoftHSM:**
-- Token: `UCM-Test`
-- PIN: `87654321`
-- Keys: `ucm-ca-key` (RSA 2048), `ucm-root-key` (RSA 4096)
-
 ## CI/CD Integration
 
 The "End-to-end (browser)" job of `tests.yml` runs on pull requests, on each push of the 3.0 integration branch and on a manual run. It installs the backend and frontend dependencies and the browser libraries, then calls `scripts/ci/e2e.sh`; on failure the Playwright report and the traces are kept as the `e2e-report` artifact. `backend/tests/test_workflow_e2e.py` pins when the job runs and what it runs.
-
-## Coverage Goals
-
-| Metric | Target | Current |
-|--------|--------|---------|
-| Backend Route Coverage | 80% | ~95% (347 routes) |
-| Critical Paths | 100% | Covered |
 
 ## Troubleshooting
 
