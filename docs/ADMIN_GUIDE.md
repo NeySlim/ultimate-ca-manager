@@ -1088,7 +1088,8 @@ sudo journalctl -u ucm -n 100
 
 # Check permissions
 ls -la /opt/ucm/data/
-sudo chown -R ucm:ucm /opt/ucm/data/
+# A local archive (.ucm-archive-*) holds an earlier installation's keys: it stays root's
+sudo find /opt/ucm/data -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
 
 # Check port
 sudo netstat -tlpn | grep 8443

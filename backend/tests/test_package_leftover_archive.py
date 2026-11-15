@@ -1449,6 +1449,16 @@ def test_the_ownership_step_3_gives_never_reaches_a_local_archive(tmp_path):
     assert stat.S_IMODE(earlier.stat().st_mode) == 0o700
 
 
+def test_no_guide_gives_the_whole_data_or_configuration_to_the_service_account():
+    """A chown -R of the data or the configuration would give an earlier local archive,
+    root's alone, to ucm: the guides prune it as the archive's README does."""
+    import re
+    guides = [ROOT / 'UPGRADE.md', ROOT / 'README.md', *sorted((ROOT / 'docs').rglob('*.md'))]
+    whole = re.compile(r'chown -R\S* +ucm:ucm +(/opt/ucm/data|/etc/ucm)/?(\s|$)')
+    assert [f'{p.relative_to(ROOT)}: {line}' for p in guides
+            for line in p.read_text().splitlines() if whole.search(line)] == []
+
+
 @pytest.mark.parametrize('beside', [True, False])
 def test_the_way_back_puts_back_only_the_local_archives_of_this_archiving(tmp_path, beside):
     """An earlier archiving's local archive holds another installation: step 3 sends back
