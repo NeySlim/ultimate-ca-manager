@@ -6393,7 +6393,8 @@
         "auto_renewal": {
           "enabled": "Activada",
           "disabled": "Desactivada"
-        }
+        },
+        "unavailable": "Estado no disponible"
       }
     },
     "filter": {

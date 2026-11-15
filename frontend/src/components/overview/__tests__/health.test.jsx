@@ -105,6 +105,9 @@ describe('mail, webhook and auto-renewal witnesses', () => {
     ['webhooks', 'active', { count: 3 }, false, 'overview.health.witness.webhooks.active:3'],
     ['auto_renewal', 'enabled', {}, false, 'overview.health.witness.auto_renewal.enabled'],
     ['auto_renewal', 'disabled', {}, false, 'overview.health.witness.auto_renewal.disabled'],
+    ['smtp', 'unavailable', { alert: true }, true, 'overview.health.witness.unavailable'],
+    ['webhooks', 'unavailable', { alert: true }, true, 'overview.health.witness.unavailable'],
+    ['auto_renewal', 'unavailable', { alert: true }, true, 'overview.health.witness.unavailable'],
   ])('%s %s reads %s', async (name, state, over, alert, text) => {
     const card = await show({ [name]: witness(state, over) })
     const line = row(card, name)

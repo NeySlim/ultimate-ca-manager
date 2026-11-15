@@ -127,3 +127,16 @@ def test_legacy_system_status_withholds_the_witnesses_from_a_key_without_read_se
         auth_client.delete(f"/api/v2/account/apikeys/{key['id']}")
     full = get_json(auth_client.get(legacy))['data']
     assert {'smtp', 'webhooks', 'auto_renewal'} <= set(full)
+
+
+@pytest.mark.parametrize('witness', ['smtp', 'webhooks', 'auto_renewal'])
+def test_a_failing_witness_reads_unavailable_and_alerts(app, settings, monkeypatch, caplog, witness):
+    def boom():
+        raise RuntimeError('db password=hunter2')
+    monkeypatch.setitem(agg._WITNESSES, witness, boom)
+    with caplog.at_level('WARNING', logger=agg.logger.name):
+        seen = _witnesses(app)
+    assert _brief(seen[witness]) == ('unavailable', True)
+    assert all(v is not None for v in seen.values())
+    warned = [r for r in caplog.records if r.levelname == 'WARNING' and witness in r.getMessage()]
+    assert warned and 'hunter2' not in caplog.text

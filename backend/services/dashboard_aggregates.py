@@ -594,9 +594,11 @@ def protocol_health(session, days, now=None, permissions=None):
     for name in _allowed(WITNESS_PERMISSION, permissions):
         try:
             protocols[name] = _WITNESSES[name]()
-        except Exception:
-            logger.debug('%s witness failed', name, exc_info=True)
+        except Exception as exc:
+            # Say so rather than drop the row (it would read as a missing permission); the message may hold secrets
+            logger.warning('%s witness unavailable: %s', name, type(exc).__name__)
             session.rollback()
+            protocols[name] = _witness('unavailable', True)
     return {'days': days, 'from': dates[0], 'to': dates[-1], 'protocols': protocols}
 
 

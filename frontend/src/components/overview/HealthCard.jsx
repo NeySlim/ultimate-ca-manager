@@ -42,6 +42,7 @@ function summary(name, p, t) {
     return { text: t(key, { count: p.days_left, defaultValue: p.state }), alert: Boolean(p.alert) }
   }
   if (WITNESSES.includes(name)) {
+    if (p.state === 'unavailable') return { text: t('overview.health.witness.unavailable'), alert: true }
     return { text: t(`overview.health.witness.${name}.${p.state}`, { count: p.count, defaultValue: p.state }), alert: Boolean(p.alert) }
   }
   if (name === 'scheduler') {

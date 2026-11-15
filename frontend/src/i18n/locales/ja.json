@@ -6396,7 +6396,8 @@
         "auto_renewal": {
           "enabled": "有効",
           "disabled": "無効"
-        }
+        },
+        "unavailable": "状態を取得できません"
       }
     },
     "filter": {

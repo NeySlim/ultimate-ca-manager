@@ -6393,7 +6393,8 @@
         "auto_renewal": {
           "enabled": "已启用",
           "disabled": "已禁用"
-        }
+        },
+        "unavailable": "状态不可用"
       }
     },
     "filter": {

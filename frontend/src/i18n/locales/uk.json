@@ -6479,7 +6479,8 @@
         "auto_renewal": {
           "enabled": "Увімкнено",
           "disabled": "Вимкнено"
-        }
+        },
+        "unavailable": "Стан недоступний"
       }
     },
     "filter": {
