@@ -11,7 +11,10 @@ from contextlib import contextmanager
 from datetime import timedelta
 
 from sqlalchemy import Boolean, DateTime, bindparam, create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
+
+from utils.db_url import POSTGRES_KEEPALIVE_ARGS
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +25,7 @@ BOOT_LOCK_KEY = 0x55434D626F6F7421
 BOOT_LOCK_TIMEOUT_SECONDS = 120
 
 # Client side: this node notices a dead server within about a minute
-_KEEPALIVE_ARGS = {'keepalives': 1, 'keepalives_idle': 30, 'keepalives_interval': 10,
-                   'keepalives_count': 3, 'connect_timeout': 10}
+_KEEPALIVE_ARGS = POSTGRES_KEEPALIVE_ARGS
 
 # Server side: PostgreSQL drops the lock session of a vanished node (power loss, partition)
 # within about a minute instead of its kernel's default two hours, which frees the lock
@@ -224,6 +226,9 @@ def cluster_utc_now(executor=None):
     dialect = executor.dialect if hasattr(executor, 'dialect') else executor.get_bind().dialect
     if dialect.name != 'postgresql':
         return utc_now()
+    if isinstance(executor, Engine):  # a connection of its own, outside any session
+        with executor.connect() as connection:
+            return connection.execute(_SERVER_NOW_SQL).scalar()
     return executor.execute(_SERVER_NOW_SQL).scalar()
 
 

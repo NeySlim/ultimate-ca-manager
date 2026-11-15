@@ -3,6 +3,7 @@ import logging
 from typing import Tuple
 from models import CA, Certificate, User
 from services.email_service import EmailService
+from services.scheduler_leader import cluster_utc_now
 from .config import NotificationConfigMixin
 from .templates import NotificationTemplatesMixin
 from ._constants import (
@@ -36,7 +37,8 @@ class NotificationEventsMixin:
             body_html=body_html,
             notification_type=CERT_ISSUED,
             resource_type='certificate',
-            resource_id=cert.refid
+            resource_id=cert.refid,
+            log_clock=cluster_utc_now,  # the clock should_send reads the cooldown on
         )
 
     @staticmethod
@@ -61,7 +63,8 @@ class NotificationEventsMixin:
             body_html=body_html,
             notification_type=CERT_REVOKED,
             resource_type='certificate',
-            resource_id=cert.refid
+            resource_id=cert.refid,
+            log_clock=cluster_utc_now,  # the clock should_send reads the cooldown on
         )
 
     @staticmethod
@@ -86,7 +89,8 @@ class NotificationEventsMixin:
             body_html=body_html,
             notification_type=CA_CREATED,
             resource_type='ca',
-            resource_id=ca.refid
+            resource_id=ca.refid,
+            log_clock=cluster_utc_now,  # the clock should_send reads the cooldown on
         )
 
     @staticmethod
@@ -115,7 +119,8 @@ class NotificationEventsMixin:
             body_html=body_html,
             notification_type=SECURITY_ALERT,
             resource_type='security',
-            resource_id=resource_id
+            resource_id=resource_id,
+            log_clock=cluster_utc_now,  # the clock should_send reads the cooldown on
         )
 
     @staticmethod

@@ -66,6 +66,13 @@ _LAST_REASON_KEY = 'backup.last_reason'
 _LAST_OUTCOME_AT_KEY = 'backup.last_outcome_at'
 
 
+def _cluster_now() -> datetime:
+    """Reservations are written and compared on the cluster clock: of two nodes, one ahead
+    by more than the lease would otherwise take the other's run for abandoned."""
+    from services.scheduler_leader import cluster_utc_now
+    return cluster_utc_now()
+
+
 def _get(key, default=None):
     cfg = SystemConfig.query.filter_by(key=key).first()
     return cfg.value if cfg and cfg.value is not None else default
@@ -105,7 +112,7 @@ def get_schedule(with_archives: bool = True) -> dict:
         'max_total_mb': _max_total_bytes() // (1024 * 1024),
         'last_run': last_run,
         # last_run is then this run's reservation, the outcome still the previous run's
-        'in_progress': _in_flight(last_run, _get(_CONCLUDED_KEY), utc_now()),
+        'in_progress': _in_flight(last_run, _get(_CONCLUDED_KEY), _cluster_now()),
         'last_outcome': _get(_LAST_OUTCOME_KEY),
         'last_outcome_reason': _get(_LAST_REASON_KEY),
         'last_outcome_at': _get(_LAST_OUTCOME_AT_KEY),
@@ -617,7 +624,7 @@ def run_scheduled_backup() -> dict:
         _record_outcome('skipped', 'disabled')
         return {'status': 'skipped', 'reason': 'disabled'}
 
-    now = utc_now()
+    now = _cluster_now()
     sched['concluded_run'] = _get(_CONCLUDED_KEY)
     if not _is_due(sched, now):
         return {'status': 'skipped', 'reason': 'not_due'}

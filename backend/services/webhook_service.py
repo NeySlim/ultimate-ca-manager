@@ -12,6 +12,7 @@ import hmac
 import logging
 
 import fips_mode
+from services.scheduler_leader import cluster_utc_now
 from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
@@ -316,7 +317,7 @@ class WebhookService:
             logger.error(f"Webhook enqueue skipped ({event_type}): {e}")
             return
 
-        now = utc_now()
+        now = cluster_utc_now()  # next_attempt_at is a lease: one clock for every node
         payload_json = json.dumps(payload, default=str)
         ts = now.isoformat()
         queued = 0
@@ -403,7 +404,7 @@ class WebhookService:
     def process_pending_deliveries(limit: int = 50) -> dict:
         """Scheduler task: deliver due pending webhook deliveries with backoff."""
         from models import WebhookDelivery
-        now = utc_now()
+        now = cluster_utc_now()
         result = {'attempted': 0, 'delivered': 0, 'retry': 0, 'failed': 0}
         try:
             due = (WebhookDelivery.query
