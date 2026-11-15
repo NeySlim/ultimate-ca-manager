@@ -177,3 +177,17 @@ def test_ha_start_reports_the_secrets_it_cannot_open(app, rows, caplog):
     assert 'scripts.rewrap_db_key' in caplog.text
     for value in PLAIN.values():
         assert value not in caplog.text
+
+
+def test_a_value_changed_during_the_run_is_not_overwritten(app, rows, old_key, monkeypatch):
+    from services.webhook_service import WebhookEndpoint
+    with app.app_context():
+        stale = rewrap_mod.secret_values()
+        newer = Fernet(old_key).encrypt(b'entered-meanwhile').decode()
+        db.session.get(WebhookEndpoint, rows['wh']).secret = newer
+        db.session.commit()
+        monkeypatch.setattr(rewrap_mod, 'secret_values', lambda: stale)
+        with pytest.raises(RuntimeError, match='changed during the run'):
+            rewrap_mod.rewrap([old_key], _current_key())
+        db.session.expire_all()
+        assert db.session.get(WebhookEndpoint, rows['wh']).secret == newer
