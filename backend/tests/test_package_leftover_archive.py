@@ -1364,13 +1364,18 @@ def test_an_archive_directory_removed_by_hand_waits_until_it_is_made_again_empty
 
 
 def test_an_item_removed_by_hand_with_the_directory_it_came_from_is_named_missing(tmp_path):
-    """That directory gone too, nothing is there to mount: the item is named missing and the
-    retry archives the rest."""
+    """That directory gone too, it reads as not mounted until it is made again, empty: then
+    the item is named missing and the retry archives the rest."""
     box = Box(tmp_path, python='stub')
     data, config = originals(box)
     _killed_after_renaming(box, 'ca/root.key')
     (box.archive / 'data' / 'ca' / 'root.key').unlink()
     (box.data / 'ca').rmdir()
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 2, (out.stdout, out.stderr)
+        assert 'is missing' not in out.stdout and f'{box.data}/ca is absent' in out.stdout, out.stdout
+    (box.data / 'ca').mkdir()
     out = box.run()
     assert out.returncode == 0, (out.stdout, out.stderr)
     assert f'{box.data}/ca/root.key is missing' in out.stdout and 'mount' not in out.stdout, out.stdout
@@ -1609,3 +1614,43 @@ def test_the_way_back_keeps_the_ucm_env_of_2_254_when_the_archive_holds_none(tmp
     assert ('No ucm.env was left' in flat) is purged
     assert ('its SECRET_KEY, the session key' in flat) is purged
     assert any(l.lstrip().startswith('config/') for l in readme.splitlines()) is not purged
+
+
+def _killed_before_renaming(box, name, **wrap):
+    """The run is killed once the journal names the rename of data/<name>, before it runs."""
+    box.wrap(**wrap)
+    (box.bin / 'rename').write_text(
+        f'#!/bin/sh\n[ "$4" != {box.data}/{name} ] || kill -9 0\nexec {box.inner}/rename "$@"\n')
+    out = box.run()
+    assert out.returncode == -9, (out.stdout, out.stderr)
+    assert os.path.lexists(box.data / name)
+    box.wrap(**wrap)
+
+
+@pytest.mark.parametrize('layout', ['one filesystem', 'another filesystem'])
+def test_an_item_whose_rename_never_ran_waits_for_its_absent_filesystem(tmp_path, layout):
+    """Killed between the journal line of a rename and the rename, then the data absent (not
+    mounted): never called missing, no line removed, exit 2 at each attempt; the data back,
+    the next attempt archives everything."""
+    box = Box(tmp_path, python='stub')
+    wrap = {'other_fs': (box.data,)} if layout == 'another filesystem' else {}
+    data, config = originals(box)
+    _killed_before_renaming(box, 'https_key.pem', **wrap)
+    journal = box.archive / '.journal'
+    lines = set(journal.read_text().splitlines())
+    assert f'rename\t{box.data}/https_key.pem\t{box.archive}/data/https_key.pem' in lines
+    mounted = tmp_path / 'mounted'
+    box.data.rename(mounted)
+    outs = []
+    for _ in range(2):
+        out = box.run()
+        outs.append(out.stdout)
+        assert out.returncode == 2, (out.stdout, out.stderr)
+        assert 'is missing' not in out.stdout and 'in place again' not in out.stdout, out.stdout
+        assert f'as {box.data} is absent: mount what holds it' in out.stdout, out.stdout
+        assert lines <= set(journal.read_text().splitlines())
+        assert not box.data.exists()
+    mounted.rename(box.data)
+    out = box.run()
+    assert 'is missing' not in out.stdout, out.stdout
+    archived(box, out, data, config)

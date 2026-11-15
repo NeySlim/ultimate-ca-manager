@@ -62,6 +62,7 @@ rename_item() {
 }
 
 present() { [ -e "$1" ] || [ -L "$1" ]; }
+dir_of() { d=${1%/*}; printf '%s\n' "${d:-/}"; }
 
 # $1 without ".", ".." or doubled slashes (realpath -m: the path need not exist)
 normal() { realpath -m -- "$1" 2>/dev/null || printf '%s\n' "$1"; }
@@ -228,18 +229,24 @@ EOF
     while IFS="$TAB" read -r op src dst; do
         case $op in
             rename)
+                # The directory of either side absent is a filesystem not mounted (a line
+                # written before its rename ran, too): nothing there is named lost or touched
+                absent=""
+                [ -d "$(dir_of "$dst")" ] || absent=$(dir_of "$dst")
+                [ -d "$(dir_of "$src")" ] || absent=$(dir_of "$src")
                 # A rename is atomic: both there, the source was made again since
                 if present "$dst" && present "$src"; then
                     twice=1
                     unsettled "$dst" "not put back to $src, which exists again: keep one of the two, remove the other, then retry"
+                elif present "$dst" && [ -n "$absent" ]; then
+                    left=1 stuck="$stuck
+  $dst: not put back to $src, as $absent is absent: mount what holds it, then retry"
                 elif present "$dst"; then
                     rename_item "$dst" "$src" || unsettled "$dst" "not put back to $src"
                 elif ! present "$src"; then
-                    # A rename stays on one filesystem: the directory of $dst absent, that one
-                    # is not mounted (the mkdir line of that directory, earlier, runs later)
-                    if [ ! -d "${dst%/*}" ]; then
+                    if [ -n "$absent" ]; then
                         left=1 stuck="$stuck
-  $dst: not put back to $src: neither is there, as ${dst%/*} is absent: mount what holds it, then retry"
+  $dst: not put back to $src: neither is there, as $absent is absent: mount what holds it, then retry"
                     else
                         # Removed by hand: named once, then its line goes, as its directory
                         # removed empty below would read as not mounted at the next attempt
@@ -261,8 +268,9 @@ EOF
                 drop_line "fips$TAB$src$TAB$dst" \
                     || { unsettled "$JOURNAL" "could not be updated$gone, so nothing it lists was put back"; break; } ;;
             mkdir)
-                # Not named when it holds a path named already: removing it would lose that one
-                if [ -d "$dst" ]; then rmdir -- "$dst" 2>/dev/null || holds_stuck "$dst" \
+                # Kept, not named, when it holds a path named already, there or not: removing
+                # it would lose that one, or read as not mounted at the next attempt
+                if [ -d "$dst" ]; then holds_stuck "$dst" || rmdir -- "$dst" 2>/dev/null \
                     || unsettled "$dst" "could not be removed"; fi ;;
         esac
     done <<EOF
