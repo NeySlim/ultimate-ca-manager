@@ -660,10 +660,9 @@ def get_system_status():
     # Core is online if we can respond
     status['core'] = {'status': 'online', 'message': 'Operational'}
 
-    # Mail, webhook and renewal witnesses reveal settings: same gate as /health.
-    from auth.unified import has_permission
-    if not has_permission('read:settings', g.permissions or []):
-        for witness in ('smtp', 'webhooks', 'auto_renewal'):
-            status.pop(witness, None)
+    # Mail, webhook and renewal witnesses reveal settings: the gate /health uses.
+    from services.dashboard_aggregates import WITNESS_PERMISSION, _allowed
+    for witness in set(WITNESS_PERMISSION) - _allowed(WITNESS_PERMISSION, g.permissions or []):
+        status.pop(witness, None)
 
     return success_response(data=status)
