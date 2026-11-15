@@ -179,7 +179,8 @@ class RateLimitConfig:
     @classmethod
     def is_enabled(cls) -> bool:
         if cls._enabled is None:
-            cls._enabled = _get_env_bool('RATE_LIMIT_ENABLED', True)
+            from config.settings import rate_limit_enabled
+            cls._enabled = rate_limit_enabled()
         return cls._enabled
     
     @classmethod

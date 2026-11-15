@@ -57,6 +57,11 @@ def env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
+def rate_limit_enabled() -> bool:
+    """RATE_LIMIT_ENABLED, the one reading both limiters (route limits, tiered limiter) follow."""
+    return env_bool("RATE_LIMIT_ENABLED", True)
+
+
 def is_docker():
     """Detect if running in Docker container"""
     return os.path.exists('/.dockerenv') or os.environ.get('UCM_DOCKER') == '1'
@@ -282,9 +287,6 @@ class Config:
     # Set by the Helm chart for the value it generated: changed at first login like ours
     INITIAL_ADMIN_PASSWORD_FORCE_CHANGE = os.getenv("INITIAL_ADMIN_PASSWORD_FORCE_CHANGE") or None
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL", "admin@localhost")
-    
-    # Rate Limiting
-    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
     
     # Logging. LOG_FILE is the fallback application log path (utils.app_log):
     # the data directory is writable on every deployment, unlike /var/log/ucm.
