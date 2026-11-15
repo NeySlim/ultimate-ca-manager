@@ -160,7 +160,15 @@ fi
 # ── 4. Frontend ──────────────────────────────────────────────
 if [ "$VERSION_ONLY" = 0 ] && [ -n "$FRONTEND" ]; then
     echo -n "  Frontend tests (changed since HEAD)... "
-    FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --changed HEAD --no-coverage 2>&1) || true
+    # Locale and help text reach nearly every test through the import graph: their own
+    # check is the key sync, and the full suite runs before a merge, not at each commit.
+    FRONT_SRC=$(echo "$FRONTEND" | grep -E '^frontend/src/' | grep -vE '^frontend/src/(i18n/locales/|data/help)' | sed 's#^frontend/##' || true)
+    if [ -n "$FRONT_SRC" ]; then
+        # shellcheck disable=SC2086
+        FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest related $FRONT_SRC --run --no-coverage --maxWorkers=4 2>&1) || true
+    else
+        FRONT_OUT=$(cd "$ROOT/frontend" && npm run -s check:i18n 2>&1 && echo "No test files found") || true
+    fi
     FRONT_RESULT=$(echo "$FRONT_OUT" | grep "Tests" | tail -1)
     # Strict: "N failed | M passed" must fail; "No test files found" is a pass.
     if echo "$FRONT_OUT" | grep -q "No test files found"; then
