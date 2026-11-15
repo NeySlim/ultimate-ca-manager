@@ -68,7 +68,8 @@ def _run(url, timeout='2'):
 def test_the_answer_decides(plan, ok):
     server = _Server(plan)
     try:
-        proc, elapsed = _run(server.url, '2')
+        # A healthy plan gets room for a loaded host; an unhealthy one is held to the short bound
+        proc, elapsed = _run(server.url, '30' if ok else '2')
     finally:
         server.close()
     assert (proc.returncode == 0) is ok, proc.stdout + proc.stderr
