@@ -43,8 +43,8 @@ CLIENT_RENEWED_SOURCES = ('acme', 'letsencrypt', 'scep', 'est', 'wstep')
 CLIENT_RENEWAL_OVERDUE_DAYS = 7
 
 _HREF = {
-    'acme_order_failed': '/acme?tab=orders&order={id}',
-    'acme_client_renewal_failed': '/acme?tab=client&order={id}',
+    'acme_order_failed': '/acme?tab=localorders&order={id}',
+    'acme_client_renewal_failed': '/acme?tab=letsencryptorders&order={id}',
     'approval_pending': '/approvals?request={id}',
     'scep_request_pending': '/scep-config?tab=requests&request={id}',
     'key_recovery_pending': '/key-recovery?request={id}',

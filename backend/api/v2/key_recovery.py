@@ -151,6 +151,16 @@ def list_key_recovery():
     })
 
 
+@bp.route('/api/v2/key-recovery/<int:rid>', methods=['GET'])
+@require_auth(['read:key_recovery'])
+def get_key_recovery(rid):
+    """One recovery request, whatever its age (the list holds only the latest 500)."""
+    req = db.session.get(KeyRecoveryRequest, rid)
+    if not req:
+        return error_response('Recovery request not found', 404)
+    return success_response(data=req.to_dict())
+
+
 @bp.route('/api/v2/key-recovery/<int:rid>/approve', methods=['POST'])
 @require_auth(['admin:key_recovery'])
 def approve_key_recovery(rid):
