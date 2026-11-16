@@ -114,7 +114,6 @@ ucm_carry_old_data_paths() {
     done
 }
 
-# First-run notice and pre-start copy of the SQLite file; both skipped in HA mode.
 # The database itself says whether this start upgrades it: a migration of the image missing from
 # its registry, or the serial step left to run again. Read-only; any doubt counts as an upgrade.
 # A WAL database is not opened: a read-only open would create its -wal and -shm files.

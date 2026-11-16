@@ -52,7 +52,7 @@ def payload(tmp_path_factory):
             in (line.split('\t') for line in dump.stdout.splitlines())}
 
 
-def test_each_data_directory_is_laid_down_as_the_installation_leaves_it(payload):
+def test_each_data_directory_is_declared_as_the_installation_leaves_it(payload):
     got = {p: v[:3] for p, v in payload.items() if p == DATA or p.startswith(DATA + '/')}
     assert got == {p: (0o40000 | mode, 'ucm', 'ucm') for p, mode in EXPECTED.items()}
 
@@ -69,3 +69,21 @@ def test_the_package_still_carries_the_application_and_its_scripts(payload):
                  '/opt/ucm/backend/app.py', '/opt/ucm/frontend/dist/index.html',
                  '/opt/ucm/scripts/archive-leftovers.sh', '/usr/lib/systemd/system/ucm.service'):
         assert path in payload, path
+
+
+def test_post_creates_the_ghost_directories_with_the_modes_the_payload_declares(tmp_path):
+    """rpm -V compares what %post created with the %ghost entries: same modes, before any start."""
+    spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
+    start = spec.index('for d in ca certs', spec.index('\n%post\n'))
+    block = spec[start:spec.index('mkdir -p $UCM_CONFIG', start)]
+    # Only the lines that create and set the directories: nothing else of the scriptlet runs here
+    lines = [line for line in block.splitlines() if not line.startswith('#')]
+    assert lines[:3] == ['for d in ca certs private crl scep backups sessions; do',
+                         '    mkdir -p $UCM_DATA/$d', 'done'], lines
+    assert all(line.startswith('chmod ') and '$UCM_DATA/' in line for line in lines[3:]), lines
+    run = subprocess.run(['sh', '-c', 'umask 022\n' + '\n'.join(lines)], capture_output=True,
+                         text=True, cwd=tmp_path, timeout=30,
+                         env={'PATH': '/usr/bin:/bin', 'UCM_DATA': str(tmp_path)})
+    assert run.returncode == 0, run.stderr
+    assert {f'{DATA}/{p.name}': p.stat().st_mode & 0o7777 for p in tmp_path.iterdir()} == {
+        p: mode for p, mode in EXPECTED.items() if p != DATA}
