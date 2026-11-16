@@ -140,3 +140,17 @@ def test_a_connection_the_browser_dropped_does_not_break_the_next_download(conte
     lost, err, _client = _in_own_hub(scenario)
     assert isinstance(lost, (BrokenPipeError, ConnectionResetError)), lost
     assert isinstance(err, TimeoutError), f'the download was cut by {err!r}'
+
+
+def test_a_socket_class_without_the_expected_methods_is_left_alone(caplog):
+    """A gevent that renamed one: the worker module still imports, and says so."""
+    import workers
+
+    class Renamed:
+        def read(self): return 'read'
+        def write(self): return 'write'
+
+    before = dict(Renamed.__dict__)
+    assert workers.clear_tls_errors_before_io(Renamed) is False
+    assert dict(Renamed.__dict__) == before
+    assert 'TLS errors may spread between connections' in caplog.text

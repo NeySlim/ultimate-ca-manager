@@ -35,8 +35,10 @@ def clear_tls_errors_before_io(cls=gevent.ssl.SSLSocket):
     the worker shares the thread, so one dropped connection made another's wait look like a failure."""
     if cls.__dict__.get('_ucm_clears_tls_errors'):
         return True
+    calls = ('read', 'write', 'send', 'do_handshake', 'unwrap')
     clear = _openssl_clear_error()
-    if clear is None:
+    # All or nothing: a class missing one of them (another gevent) is left as it is
+    if clear is None or not all(hasattr(cls, name) for name in calls + ('_wait',)):
         logger.warning("OpenSSL error queue not reachable: TLS errors may spread between connections")
         return False
 
@@ -56,7 +58,7 @@ def clear_tls_errors_before_io(cls=gevent.ssl.SSLSocket):
                 clear()  # other greenlets ran during the wait; the TLS call is retried next
         return call
 
-    for name in ('read', 'write', 'send', 'do_handshake', 'unwrap'):
+    for name in calls:
         setattr(cls, name, before(getattr(cls, name)))
     cls._wait = after(cls._wait)
     cls._ucm_clears_tls_errors = True
