@@ -465,3 +465,33 @@ def test_the_start_sweep_keeps_active_jobs_files_only(app, fake_types, created, 
         os.unlink(os.path.join(directory, linked))
         with app.app_context():
             jobs.request_cancellation(active_id)
+
+
+# -- the verification by pages ------------------------------------------------------------
+
+def test_pages_change_nothing_in_the_report(app, monkeypatch):
+    import services.audit.core as core
+    _audit_rows(app, 5)
+    with app.app_context():
+        whole = AuditService.verify_integrity()
+        monkeypatch.setattr(core, 'VERIFY_PAGE', 2)
+        pages = []
+        paged = AuditService.verify_integrity(on_page=pages.append)
+    assert paged == whole
+    assert pages and pages == sorted(pages) and pages[-1] <= whole['checked']
+
+
+def test_a_purge_during_the_walk_starts_it_again(app, monkeypatch):
+    import services.audit.core as core
+    walks = []
+    real = core.verify_chain
+
+    def counting(logs, whole_table):
+        walks.append(whole_table)
+        return dict(real(logs, whole_table), walk=len(walks))
+    monkeypatch.setattr(core, 'verify_chain', counting)
+    firsts = iter([5, 9, 9, 9])  # before, after the first walk (purged), around the second
+    monkeypatch.setattr(core, '_first_entry_id', lambda conditions: next(firsts))
+    with app.app_context():
+        report = AuditService.verify_integrity()
+    assert report['walk'] == 2 and len(walks) == 2

@@ -192,47 +192,53 @@ def test_different_slots_run_side_by_side(database):
         assert len(store.active_jobs(session)) == 2
 
 
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_ha_lease_two_connections(app):
+def test_lease_two_connections(app, database):
     """Node A runs the job; node B leads. A lapsed lease only is concluded by B; a leader that
-    changes while A's lease holds leaves the job to A, and A's late conclusion loses once B won."""
-    schema = f"jobs_ha_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    admin = create_engine(PG_URL)
-    with admin.begin() as conn:
-        conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        conn.execute(text(f'CREATE SCHEMA {schema}'))
-    engine_a = create_engine(PG_URL, connect_args={'options': f'-csearch_path={schema}'})
-    engine_b = create_engine(PG_URL, connect_args={'options': f'-csearch_path={schema}'})
-    try:
-        BackgroundJob.__table__.create(engine_a)
-        with Session(engine_a) as a, Session(engine_b) as b, app.app_context():
-            now = utc_now()
-            job_id = _create(a, 'test_backup', 'backup', now=now)
-            # B cannot start a second one while A's is active
-            with pytest.raises(store.SlotBusy):
-                _create(b, 'test_backup', 'backup', now=now)
-            assert store.claim_job(a, job_id, 'node-a/1/x', now) is not None
-            assert store.claim_job(b, job_id, 'node-b/1/y', now) is None
-            renewed_at = now + timedelta(seconds=store.LEASE_SECONDS - 10)
-            with engine_a.begin() as conn:
-                assert store.renew_lease(conn, job_id, 'node-a/1/x', renewed_at)
-            # B now leads; past A's first lease but inside the renewed one: left to A
-            later = now + timedelta(seconds=store.LEASE_SECONDS + 5)
-            assert store.recover_orphans(b, now=later, all_running=False) == 0
-            with engine_a.begin() as conn:
-                assert store.write_progress(conn, job_id, 'node-a/1/x', 5) is False
-            # A dies: its lease lapses and B concludes; A's late moves all lose
-            dead = renewed_at + timedelta(seconds=store.LEASE_SECONDS + 1)
-            assert store.recover_orphans(b, now=dead, all_running=False) == 1
-            with engine_a.begin() as conn, pytest.raises(store.JobLost):
-                store.write_progress(conn, job_id, 'node-a/1/x', 6)
-            assert not store.conclude_job(a, job_id, state='succeeded', reason='done',
+    changes while A's lease holds leaves the job to A, and A's late moves lose once B won."""
+    _, _, engine = database
+    with Session(engine) as a, Session(engine) as b, app.app_context():
+        now = utc_now()
+        job_id = _create(a, 'test_backup', 'backup', now=now)
+        # B cannot start a second one while A's is active
+        with pytest.raises(store.SlotBusy):
+            _create(b, 'test_backup', 'backup', now=now)
+        assert store.claim_job(a, job_id, 'node-a/1/x', now) is not None
+        assert store.claim_job(b, job_id, 'node-b/1/y', now) is None
+        renewed_at = now + timedelta(seconds=store.LEASE_SECONDS - 10)
+        with engine.begin() as conn:
+            assert store.renew_lease(conn, job_id, 'node-a/1/x', renewed_at)
+        # B now leads; past A's first lease but inside the renewed one: left to A
+        later = now + timedelta(seconds=store.LEASE_SECONDS + 5)
+        assert store.recover_orphans(b, now=later, all_running=False) == 0
+        with engine.begin() as conn:
+            assert store.write_progress(conn, job_id, 'node-a/1/x', 5) is False
+            # Another executor's moves on A's job are refused
+            with pytest.raises(store.JobLost):
+                store.write_progress(conn, job_id, 'node-b/1/y', 5)
+            assert not store.renew_lease(conn, job_id, 'node-b/1/y', later)
+        assert not store.conclude_job(b, job_id, state='succeeded', reason='done',
+                                      from_states=('running',), now=later, executor='node-b/1/y')
+        # A dies: its lease lapses and B concludes; A's late moves all lose
+        dead = renewed_at + timedelta(seconds=store.LEASE_SECONDS + 1)
+        assert store.recover_orphans(b, now=dead, all_running=False) == 1
+        with engine.begin() as conn, pytest.raises(store.JobLost):
+            store.write_progress(conn, job_id, 'node-a/1/x', 6)
+        with engine.begin() as conn:
+            assert not store.renew_lease(conn, job_id, 'node-a/1/x', dead)
+        assert not store.conclude_job(a, job_id, state='succeeded', reason='done',
                                       from_states=('running',), now=dead, executor='node-a/1/x')
-            assert (store.job_row(b, job_id)['reason']) == 'executor_lost'
-    finally:
-        engine_a.dispose()
-        engine_b.dispose()
-        with admin.begin() as conn:
-            conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
-        admin.dispose()
+        assert store.job_row(b, job_id)['reason'] == 'executor_lost'
+
+
+def test_a_take_read_before_another_one_committed_loses(app, database, monkeypatch):
+    """Two executors read the same pending row: the conditional update gives it to one."""
+    _, _, engine = database
+    with Session(engine) as a, Session(engine) as b:
+        job_id = _create(a, 'test_backup', 'backup')
+        stale = store.job_row(a, job_id)
+        a.rollback()
+        assert store.claim_job(a, job_id, 'node-a/1/x', utc_now()) is not None
+        monkeypatch.setattr(store, '_job_row', lambda executor, wanted: dict(stale))
+        assert store.claim_job(b, job_id, 'node-b/1/y', utc_now()) is None
+        monkeypatch.undo()
+        assert store.job_row(b, job_id)['executor'] == 'node-a/1/x'

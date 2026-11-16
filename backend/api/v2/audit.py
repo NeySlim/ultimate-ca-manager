@@ -244,9 +244,6 @@ def verify_integrity():
         return (request.method == 'GET' and row is not None and row['kind'] == audit_verify.KIND
                 and json.loads(row['params'] or '{}') == params)
 
-    running = jobs.active_job(audit_verify.KIND)
-    if joinable(running):
-        return started_response(running['id'])
     try:
         job_id = jobs.start_job(audit_verify.KIND, params=params)
     except jobs.SlotBusy as busy:

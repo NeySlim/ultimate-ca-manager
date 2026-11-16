@@ -144,8 +144,7 @@ def write_progress(conn, job_id, executor, done=None, total=None, phase=None):
                                 ('phase', phase)) if v is not None}
     where = (T.c.id == job_id, T.c.state == RUNNING, T.c.executor == executor)
     if values:
-        if conn.execute(update(T).where(*where).values(**values)).rowcount != 1:
-            raise JobLost(job_id)
+        conn.execute(update(T).where(*where).values(**values))
     asked = conn.execute(select(T.c.cancel_requested).where(*where)).first()
     if asked is None:
         raise JobLost(job_id)
@@ -222,7 +221,7 @@ def recover_orphans(session, *, now, all_running, audit_for=None, mine=None):
     session.rollback()
     for job_id, kind in stale:
         if conclude_job(session, job_id, state=FAILED, reason=NOT_TAKEN, from_states=(PENDING,),
-                    now=now, where=(T.c.created_at < cutoff,),
+                    now=now,
                     result_line=audit_for(kind) if audit_for else None):
             logger.warning(f"Background job {job_id} ({kind}) was never taken: failed")
             concluded += 1

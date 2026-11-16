@@ -110,6 +110,18 @@ def test_prefer_respond_async_answers_202_at_once(app, auth_client, held, cleanu
     assert runner.join_local(r.get_json()['data']['job']['id'], 15)
 
 
+def test_prefer_respond_async_answers_202_even_for_a_job_already_done(app, auth_client, cleanup,
+                                                                     monkeypatch):
+    def at_once(job_id):
+        row = store.claim_job(db.session, job_id, 'test/1/x', jobs._now())
+        runner.run_job(app, row, 'test/1/x')
+    monkeypatch.setattr(runner, 'dispatch_job', at_once)
+    r = auth_client.get(VERIFY, headers={'Prefer': 'respond-async'})
+    assert r.status_code == 202 and r.headers['Preference-Applied'] == 'respond-async'
+    assert r.get_json()['data']['job']['state'] == 'succeeded'
+    assert auth_client.get(VERIFY).status_code == 200  # without the preference: as before
+
+
 def test_prefer_wait_shortens_the_wait(app, auth_client, held, cleanup):
     reached, release = held
     started = time.monotonic()

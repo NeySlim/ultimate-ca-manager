@@ -14,6 +14,10 @@ VERIFY_PAGE = 2000
 VERIFY_ATTEMPTS = 3
 
 
+def _first_entry_id(conditions):
+    return db.session.execute(db.select(db.func.min(AuditLog.id)).where(*conditions)).scalar()
+
+
 def _pages(query, on_page):
     """The rows of ``query`` by keyset pages, ``on_page(done)`` after each full one."""
     last, done = None, 0
@@ -134,14 +138,13 @@ class AuditCoreLoggingMixin:
         conditions = AuditCoreLoggingMixin._verify_range(start_id, end_id)
         # Plain rows, not ORM objects: building one per entry cost as much as the hashing
         query = db.select(AuditLog.__table__).where(*conditions).order_by(AuditLog.id.asc())
-        first_id = db.select(db.func.min(AuditLog.id)).where(*conditions)
         whole_table = start_id is None and end_id is None
         for attempt in range(VERIFY_ATTEMPTS):
-            first = db.session.execute(first_id).scalar()
+            first = _first_entry_id(conditions)
             # Each page its own statement: SQLite writers get in between two pages.
             # Only a check from the first row can tell a purge from a prefix deleted by hand.
             report = verify_chain(_pages(query, on_page), whole_table=whole_table)
-            if db.session.execute(first_id).scalar() == first or attempt == VERIFY_ATTEMPTS - 1:
+            if _first_entry_id(conditions) == first or attempt == VERIFY_ATTEMPTS - 1:
                 return report
             logger.info("Audit entries purged during the verification: it starts again")
         return report
