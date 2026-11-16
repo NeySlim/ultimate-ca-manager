@@ -999,3 +999,24 @@ def test_an_archive_without_identity_rows_orphans_a_newer_provider_under_its_idp
     assert (row.provider_id, row.orphan_of, row.external_id) == (None, key, 'sub-admin')
     assert _orphans() == []
 
+
+
+def test_a_merge_bringing_back_an_email_another_local_account_holds_is_refused(target):
+    """E-mail is unique among local accounts (#136), which no index holds any more."""
+    from models import User
+
+    _user('replace-admin')
+    _user('replace-email-a')
+    blob = _snapshot('users')
+    db.session.delete(User.query.filter_by(username='replace-email-a').one())
+    db.session.flush()
+    other = _user('replace-email-b')
+    other.email = 'replace-email-a@example.test'
+    db.session.commit()
+
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore(blob, mode='merge')
+    db.session.rollback()
+    assert 'replace-email-a@example.test' in str(refused.value)
+    assert 'Nothing has been changed' in str(refused.value)
+    assert User.query.filter_by(username='replace-email-a').first() is None

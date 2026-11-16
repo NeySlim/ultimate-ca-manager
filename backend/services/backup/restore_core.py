@@ -728,6 +728,9 @@ class RestoreCoreMixin:
                 continue
             results[name] = apply_section(name, rows, plan)
 
+        db.session.flush()
+        self._refuse_shared_local_emails(backup_data)
+
         # Rows of another installation can name user ids this one has not handed out yet
         from services.backup import user_id_counter
         if any(_carries(backup_data, name) for name in user_id_counter.SECTIONS):
@@ -780,6 +783,26 @@ class RestoreCoreMixin:
         nested = restore_nested_webauthn(backup_data, plan)
         if nested:
             results['webauthn_credentials'] = nested
+
+    @staticmethod
+    def _refuse_shared_local_emails(backup_data: Dict) -> None:
+        """E-mail is unique among local accounts (#136), which no index holds: a restored
+        local account may not share one with another local account here."""
+        from models import User
+        from models.user import local_email_holder
+        from .restore.conflict import RestoreConflictError
+
+        names = [row['username'] for row in backup_data.get('users') or []]
+        for start in range(0, len(names), 500):
+            for user in User.query.filter(User.username.in_(names[start:start + 500])):
+                if not user.email or not user.is_local:
+                    continue
+                holder = local_email_holder(user.email, other_than=user.id)
+                if holder is not None:
+                    raise RestoreConflictError(
+                        f"Refusing to restore: the local accounts {user.username!r} and "
+                        f"{holder.username!r} would share the e-mail {user.email!r}. "
+                        "Nothing has been changed.")
 
     def _restore_legacy_sso_identities(self, results: Dict) -> None:
         """The identity rows of an archive's account rows that carry their provider (2.254, or
