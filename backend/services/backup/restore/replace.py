@@ -204,6 +204,8 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'webhook_deliveries': 'delivery queue, removed with its endpoint as deleting it does',
     'deploy_deliveries': 'delivery queue, removed with its binding as deleting it does',
     'pro_sso_saml_message_ids': 'replay cache of SAML message ids',
+    # 3.0 only: a 2.254 archive carries the provider on the account row instead
+    'user_sso_identities': 'not in a 2.254 archive; removed with its account, orphaned with its provider',
 }
 
 # Integer links the schema holds without a foreign key, handled as if it had one:
@@ -247,6 +249,10 @@ CLOSED_WITH_TARGET = {('key_recovery_requests', 'cert_id')}
 # Links whose row goes with the row it names although the column allows none:
 # an approval of a certificate that is gone, as deleting the certificate does.
 REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id')}
+
+# An identity row whose provider goes keeps that provider's IdP key, as deleting the provider
+# does: only a provider for the exact same IdP takes it back (OIDC Core §5.7).
+ORPHANED_WITH_PROVIDER = ('user_sso_identities', 'provider_id')
 
 # Rows removed only after the writes, once their deletion blockers have nothing to say: the
 # rows they would leave dangling (SQLite enforces no key) are known only then.
@@ -525,6 +531,9 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         if (dependent.name, column.name) in CLOSED_WITH_TARGET:
             _close_requests(replacement, dependent, column, values)
             continue
+        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
+            _orphan_identities(replacement, dependent, values)
+            continue
         if column.nullable and (dependent.name, column.name) not in REMOVED_WITH_TARGET:
             for chunk in _chunks(values):
                 result = db.session.execute(update(dependent).where(column.in_(chunk), scope)
@@ -540,6 +549,16 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         for chunk in _chunks(values):
             result = db.session.execute(delete(dependent).where(column.in_(chunk), scope))
             _count(replacement.cleared, dependent.name, result.rowcount)
+
+
+def _orphan_identities(replacement: Replacement, table, provider_ids) -> None:
+    """The identity rows of removed providers become orphans of their IdP."""
+    from models.sso import SSOProvider
+
+    for provider in SSOProvider.query.filter(SSOProvider.id.in_(provider_ids)):
+        result = db.session.execute(update(table).where(table.c.provider_id == provider.id)
+                                    .values(provider_id=None, orphan_of=provider.idp_key()))
+        _count(replacement.unlinked, f'{table.name}.provider_id', result.rowcount)
 
 
 def _close_requests(replacement: Replacement, table, column, values) -> None:

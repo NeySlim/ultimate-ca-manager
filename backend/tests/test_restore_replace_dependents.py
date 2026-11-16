@@ -943,3 +943,59 @@ def test_an_unenforced_optional_link_is_emptied_in_a_table_the_archive_omits(tar
 
     assert AcmeEabCredential.query.one().created_by_user_id is None
     assert results['unlinked_dependents'] == {'acme_eab_credentials.created_by_user_id': 1}
+
+
+# -- accounts and their providers ---------------------------------------------
+
+def _sso_provider(name):
+    from models.sso import SSOProvider
+    row = SSOProvider(name=name, provider_type='oauth2', oauth2_issuer=f'https://{name}.example.test')
+    db.session.add(row)
+    db.session.flush()
+    return row
+
+
+def _identity(user, provider, external_id):
+    from models import UserSSOIdentity
+    row = UserSSOIdentity(user_id=user.id, provider_id=provider.id)
+    row.bind(external_id)
+    db.session.add(row)
+    db.session.flush()
+    return row
+
+
+def test_an_archive_without_identity_rows_removes_a_newer_sso_account(target):
+    """A 2.254 archive carries no user_sso_identities: a newer account goes with its rows."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    provider = _sso_provider('replace-kept-idp')
+    blob = _snapshot('users')
+    _identity(_user('replace-newer-sso'), provider, 'sub-newer')
+    db.session.commit()
+
+    _restore(blob)
+
+    assert User.query.filter_by(username='replace-newer-sso').first() is None
+    assert UserSSOIdentity.query.count() == 0
+    assert _orphans() == []
+
+
+def test_an_archive_without_identity_rows_orphans_a_newer_provider_under_its_idp(target):
+    """The provider goes, the account it opened keeps its identity under the IdP's exact key."""
+    from models import User, UserSSOIdentity
+
+    admin = _user('replace-admin')
+    blob = _snapshot('users', 'sso_providers')
+    provider = _sso_provider('replace-newer-idp')
+    key = provider.idp_key()
+    _identity(admin, provider, 'sub-admin')
+    db.session.commit()
+
+    _restore(blob)
+
+    row = UserSSOIdentity.query.filter_by(
+        user_id=User.query.filter_by(username='replace-admin').one().id).one()
+    assert (row.provider_id, row.orphan_of, row.external_id) == (None, key, 'sub-admin')
+    assert _orphans() == []
+
