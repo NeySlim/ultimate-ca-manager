@@ -359,7 +359,75 @@ def test_a_certificate_given_a_newer_partner_since_read_renews_with_it(app, tmp_
                 first if read_with == 'the previous B' else None)
             _linked_elsewhere(app, a_id, newer)
             assert renewal_partner(a).id == newer
+            # The caller's copy is left as read: its serial is what refuses a doubled renewal
+            assert a.related_certificate_id == (first if read_with == 'the previous B' else None)
             assert a.serial_number == serial
+            db.session.remove()
+
+
+def _read_then_given_a_newer_partner(app, read_with):
+    a_id, (first, newer) = _linked_rows(app, n_b=2)
+    a = db.session.get(Certificate, a_id)
+    a.related_certificate_id = first if read_with == 'the previous B' else None
+    db.session.commit()
+    assert a.serial_number  # read again, as a route holds it
+    return a, first, newer
+
+
+@pytest.mark.parametrize('read_with', ['the previous B', 'no B'])
+def test_a_certificate_given_a_newer_partner_is_renewed_with_it_alone(app, tmp_path, read_with):
+    """To the end: the newer B is renewed and names the renewed A, the previous one is left."""
+    from services.cert.renewal import renew_certificate_in_place
+    from tests.test_backup_cross_installation import _bound_to
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'newer-end.db'}"):
+        with app.app_context():
+            a, first, newer = _read_then_given_a_newer_partner(app, read_with)
+            a_id, left = a.id, db.session.get(Certificate, first).serial_number
+            _linked_elsewhere(app, a_id, newer)
+            outcome = renew_certificate_in_place(a, username='admin', regenerate_crl=False)
+            assert [r['cert_id'] for r in outcome['related']] == [newer]
+            db.session.expire_all()
+            a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, newer)
+            assert (a.related_certificate_id, b.related_certificate_id) == (newer, a_id)
+            assert _names(b) and b.renewed_times == 1
+            previous = db.session.get(Certificate, first)
+            assert previous.serial_number == left and not previous.renewed_times
+            db.session.remove()
+
+
+@pytest.mark.parametrize('read_with', ['the previous B', 'no B'])
+def test_a_partner_taken_while_the_members_were_chosen_refuses_the_renewal(
+        app, tmp_path, monkeypatch, read_with):
+    """The link is judged again on the row as the renewal locks it: nothing is renewed on a
+    choice made before a newer B took the certificate, and a retry renews with that B."""
+    from services.cert import renewal
+    from tests.test_backup_cross_installation import _bound_to
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'taken.db'}"):
+        with app.app_context():
+            a, first, newer = _read_then_given_a_newer_partner(app, read_with)
+            a_id, serials = a.id, {}
+            for row_id in (a_id, first, newer):
+                serials[row_id] = db.session.get(Certificate, row_id).serial_number
+            chosen = renewal._linked_members
+
+            def then_taken(cert):
+                members = chosen(cert)
+                _linked_elsewhere(app, a_id, newer)
+                return members
+
+            monkeypatch.setattr(renewal, '_linked_members', then_taken)
+            with pytest.raises(renewal.RenewalError) as e:
+                renewal.renew_certificate_in_place(a, username='admin', regenerate_crl=False)
+            monkeypatch.undo()
+            assert e.value.status == 409 and 'related certificate' in e.value.message.lower()
+            db.session.expire_all()
+            for row_id, serial in serials.items():
+                assert db.session.get(Certificate, row_id).serial_number == serial
+            outcome = renewal.renew_certificate_in_place(
+                db.session.get(Certificate, a_id), username='admin', regenerate_crl=False)
+            assert [r['cert_id'] for r in outcome['related']] == [newer]
             db.session.remove()
 
 
