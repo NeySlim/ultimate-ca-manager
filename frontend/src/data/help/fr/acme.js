@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'ACME',
     subtitle: 'Gestion automatisée des certificats',
-    overview: 'UCM prend en charge deux modes ACME : client ACME pour les certificats publics depuis tout AC conforme RFC 8555 (Let\'s Encrypt, ZeroSSL, HARICA, etc.), et serveur ACME local pour l\'automatisation PKI interne avec mappage multi-AC de domaines.',
+    overview: 'UCM prend en charge deux modes ACME : client ACME pour les certificats publics depuis toute AC conforme RFC 8555 (Let\'s Encrypt, ZeroSSL, HARICA, etc.), et serveur ACME local pour l\'automatisation PKI interne avec mappage multi-AC de domaines.',
     sections: [
       {
         title: "Renewal Information (ARI, RFC 9773)",
@@ -17,10 +17,10 @@ export default {
       {
         title: 'Client ACME',
         items: [
-          { label: 'Client', text: 'Demander des certificats depuis tout AC ACME, Let\'s Encrypt, ZeroSSL, HARICA ou personnalisé' },
+          { label: 'Client', text: 'Demander des certificats depuis toute AC ACME, Let\'s Encrypt, ZeroSSL, HARICA ou personnalisée' },
           { label: 'Onglet des orders (v2.219)', text: 'Les orders du client ont leur propre onglet « Let\'s Encrypt orders » dans la barre latérale, avec compteur visibles/total et filtre de statut, à l\'image de la vue Local orders' },
           { label: 'Autorités de certification (AC)', text: 'Un ou plusieurs comptes par AC, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let\'s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let\'s Encrypt Production' },
-          { label: 'Serveur personnalisé', text: 'Définir une URL de répertoire ACME personnalisée pour utiliser tout AC conforme RFC 8555' },
+          { label: 'Serveur personnalisé', text: 'Définir une URL de répertoire ACME personnalisée pour utiliser toute AC conforme RFC 8555' },
           { label: 'EAB', text: 'Prise en charge de la liaison de compte externe pour les AC nécessitant une pré-inscription (ZeroSSL, HARICA, etc.)' },
           { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 pour les clés de certificat ; ML-DSA n\'est pas proposé sur un build qui ne l\'inclut pas, ni en mode FIPS quand le module FIPS ne l\'approuve pas. Un défaut configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048 (v2.248)' },
           { label: 'Clé réutilisée en mode FIPS', text: 'Réutiliser la clé d\'un certificat source est refusé quand le mode FIPS n\'approuve pas cette clé, ML-DSA compris (v2.248)' },
@@ -75,7 +75,7 @@ export default {
       {
         title: 'Proxy ACME',
         items: [
-          { label: 'Compte AC en amont', text: 'Sélectionnez l\'un des comptes dans Autorités de certification (AC) : son URL de répertoire (Let\'s Encrypt, ZeroSSL, tout AC RFC 8555) et ses identifiants EAB sont définis sur ce compte' },
+          { label: 'Compte AC en amont', text: 'Sélectionnez l\'un des comptes dans Autorités de certification (AC) : son URL de répertoire (Let\'s Encrypt, ZeroSSL, toute AC RFC 8555) et ses identifiants EAB sont définis sur ce compte' },
           { label: 'État du compte', text: 'Indique si UCM est enregistré auprès de l\'AC en amont. Les comptes sont auto-enregistrés à la première requête proxy' },
           { label: 'Test de connexion', text: 'Vérifiez la connectivité avec l\'AC en amont et vérifiez si des identifiants EAB sont requis' },
           { label: 'Réinitialiser le compte', text: 'Effacez l\'inscription en amont du compte AC sélectionné pour forcer une nouvelle inscription' },
@@ -171,7 +171,7 @@ export default {
     ],
     tips: [
       'URL du répertoire ACME : https://votre-serveur:port/acme/directory',
-      'Utilisez une URL de répertoire personnalisée pour se connecter à ZeroSSL, HARICA ou tout AC RFC 8555',
+      'Utilisez une URL de répertoire personnalisée pour se connecter à ZeroSSL, HARICA ou toute AC RFC 8555',
       'Les identifiants EAB (Key ID + clé HMAC) sont fournis par votre AC lors de l\'inscription',
       'Quand UCM est le serveur ACME, émettez vos propres identifiants EAB dans ACME → EAB Credentials',
       'Pour Kubernetes/cert-manager : voir les manifests de référence sous examples/kubernetes/cert-manager/',
@@ -194,7 +194,7 @@ export default {
 
 UCM prend en charge ACME (Automated Certificate Management Environment) en deux modes :
 
-- **Client ACME** : Obtenir des certificats depuis tout AC conforme RFC 8555 (Let's Encrypt, ZeroSSL, HARICA ou personnalisé)
+- **Client ACME** : Obtenir des certificats depuis toute AC conforme RFC 8555 (Let's Encrypt, ZeroSSL, HARICA ou personnalisée)
 - **Serveur ACME local** : Serveur ACME intégré pour l'automatisation PKI interne avec support multi-AC
 
 ## Client ACME
@@ -213,7 +213,7 @@ Gérez la configuration de votre client ACME :
 - **Révocation auprès de l'AC** : Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu'à ce que l'AC confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
 
 ### Serveur ACME personnalisé
-Utilisez tout AC conforme RFC 8555, pas seulement Let's Encrypt :
+Utilisez toute AC conforme RFC 8555, pas seulement Let's Encrypt :
 
 | Fournisseur AC | URL du répertoire |
 |---|---|

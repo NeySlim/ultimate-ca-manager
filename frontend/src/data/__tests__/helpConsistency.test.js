@@ -54,9 +54,9 @@ describe('French wording of the certification authority', () => {
     const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])CAs?(?![\p{L}\p{N}_]).{0,20}/gu) || [])
     expect(found).toEqual([])
   })
-  // "AC" starts with a vowel: "l'AC", "d'AC", "cette AC", "une AC", never "la AC", "de AC", "l'CA".
+  // "AC" is feminine and starts with a vowel: "l'AC", "d'AC", "cette AC", "toute AC", never "la AC", "tout AC", "l'CA".
   it('elides and agrees the article before AC', () => {
-    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])(?:la|le|de|du|ce|un|sa|ma|ta|que|si)\s+AC(?![\p{L}\p{N}_]).{0,20}|[\p{L}\p{N}_]+\\?['’]CA(?![\p{L}\p{N}_]).{0,20}/giu) || [])
+    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])(?:la|le|de|du|ce|cet|au|un|sa|ma|ta|que|si|tout|nouveau|quel)\s+AC(?![\p{L}\p{N}_]).{0,20}|[\p{L}\p{N}_]+\\?['’]CA(?![\p{L}\p{N}_]).{0,20}/giu) || [])
     expect(found).toEqual([])
   })
 })
