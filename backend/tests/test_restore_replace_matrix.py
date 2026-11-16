@@ -48,7 +48,8 @@ def _account(name, thing):
     from models.acme_client_account import AcmeClientAccount
     return AcmeClientAccount(label=name, email='ops@example.test',
                              directory_url=f'https://ca-{thing}.example.test/directory',
-                             account_url=f'https://ca-{thing}.example.test/acct/1')
+                             account_url=f'https://ca-{thing}.example.test/acct/1',
+                             proxy_slug=f'slug-{thing}')
 
 
 def _domain_on(provider):
@@ -105,6 +106,7 @@ def _as_second_provider(row):
 def _as_second_account(row):
     row['directory_url'] = 'https://ca-two.example.test/directory'
     row['account_url'] = 'https://ca-two.example.test/acct/1'
+    row['proxy_slug'] = 'slug-two'
 
 
 def _provider_of(domain):
@@ -155,8 +157,9 @@ def _cases():
         for name, table in TABLES.items():
             for collision in ('same_name_same_thing', 'same_thing_other_name',
                               'same_name_other_thing', 'archive_duplicate', 'none'):
-                # A kept row can need only the row holding the name, and only where one can
-                if collision == 'same_name_other_thing' and table.dependent:
+                # A kept row can need the row holding the name, or the same thing renamed here
+                if (collision in ('same_name_other_thing', 'same_thing_other_name')
+                        and table.dependent):
                     kepts = ('yes', 'no')
                 else:
                     kepts = ('n/a',)
@@ -220,7 +223,8 @@ def test_every_restored_row_bears_the_name_the_archive_gives(target, mode, table
     assert sorted((getattr(row, table.column), table.thing(row)) for row in rows) == expected_rows
     assert sorted((entry['from'], entry['to'], entry['reason'])
                   for entry in results['renamed']) == sorted(expected_renamed)
-    if collision == 'same_name_same_thing':
+    if collision == 'same_name_same_thing' or (
+            collision == 'same_thing_other_name' and mode == 'replace' and table.keyed):
         assert [row.id for row in rows] == [archived_id]    # updated in place
     if kept == 'yes':
         restored = type(dependent).query.one()

@@ -349,8 +349,10 @@ class RestoreCoreMixin:
         # Before the plan, which finds these rows again by name.
         ambiguous_references: List[str] = []
         displaced: Dict[str, set] = {}
+        renamed_here: Dict[str, dict] = {}
         renamed = rename_clashing_rows(backup_data, ambiguous_references,
-                                       replacing=frozenset(pruned), displaced=displaced)
+                                       replacing=frozenset(pruned), displaced=displaced,
+                                       renamed_here=renamed_here)
 
         # An archive of metadata alone restores nothing. Announcing it as a
         # success made the caller revoke every session and ask for a restart
@@ -449,7 +451,8 @@ class RestoreCoreMixin:
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
-                    replacement = plan_replacement(backup_data, plan, pruned, displaced=displaced)
+                    replacement = plan_replacement(backup_data, plan, pruned, displaced=displaced,
+                                                   renamed_here=renamed_here)
                     prune_doomed_settings(replacement, plan, deferred_keys(
                         backup_data.get('configuration') if isinstance(
                             backup_data.get('configuration'), dict) else {}))

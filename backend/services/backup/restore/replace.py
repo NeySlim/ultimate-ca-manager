@@ -339,6 +339,8 @@ class Replacement:
     deferred: Dict[str, Set[Any]] = field(default_factory=dict)
     # Rows that give their name up to an archived row: they must go before the writes
     displaced: Dict[str, Set[Any]] = field(default_factory=dict)
+    # Rows the archive carries under another name: renamed in place once the names are free
+    renamed_here: Dict[str, Dict[Any, Tuple[str, str]]] = field(default_factory=dict)
     removed: Dict[str, int] = field(default_factory=dict)
     cleared: Dict[str, int] = field(default_factory=dict)
     unlinked: Dict[str, int] = field(default_factory=dict)
@@ -352,11 +354,16 @@ class Replacement:
 
 def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: Set[str], *,
                      keep: Optional[Dict[str, Set[Any]]] = None,
-                     displaced: Optional[Dict[str, Set[Any]]] = None) -> Replacement:
+                     displaced: Optional[Dict[str, Set[Any]]] = None,
+                     renamed_here: Optional[Dict[str, Dict[Any, Tuple[str, str]]]] = None
+                     ) -> Replacement:
     """The rows each pruned section loses, in the order they can go."""
     _index_tables()
-    keep = keep or {}
+    keep = {name: set(ids) for name, ids in (keep or {}).items()}
     displaced = displaced or {}
+    renamed_here = {name: dict(rows) for name, rows in (renamed_here or {}).items() if rows}
+    for name, rows in renamed_here.items():
+        keep.setdefault(name, set()).update(rows)
     pruned = {name for name in sections
               if isinstance(backup_data.get(name), list) and name not in MERGED_ONLY}
     doomed: Dict[str, Set[Any]] = {}
@@ -367,7 +374,8 @@ def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: S
             doomed[name] = ids
     return Replacement(order=[name for name in deletion_order(set(doomed))],
                        doomed=doomed, pruned=pruned,
-                       displaced={name: set(ids) for name, ids in displaced.items() if ids})
+                       displaced={name: set(ids) for name, ids in displaced.items() if ids},
+                       renamed_here=renamed_here)
 
 
 def remove_before_writes(replacement: Replacement) -> Replacement:
@@ -393,9 +401,19 @@ def remove_before_writes(replacement: Replacement) -> Replacement:
         _release_dependents(replacement, table, _primary(table), replacement.doomed[name], name)
     for name in replacement.order:
         _delete(replacement, name, replacement.doomed[name] - replacement.deferred.get(name, set()))
+    _rename_in_place(replacement)
     _release_waiting_hsm_keys(replacement)
     db.session.expire_all()
     return replacement
+
+
+def _rename_in_place(replacement: Replacement) -> None:
+    """Each kept row takes the archive's name, freed by the deletions just made."""
+    for name, rows in replacement.renamed_here.items():
+        table = _table_of(name)
+        primary = _primary(table)
+        for row_id, (column, value) in sorted(rows.items()):
+            db.session.execute(table.update().where(primary == row_id).values({column: value}))
 
 
 # An authority that waits for the writes goes with them: its HSM key is free for an archived one now
