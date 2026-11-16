@@ -4,7 +4,10 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from models import db, AuditLog
 from utils.datetime_utils import utc_now
+from utils.sqlite_hints import indexed_by
 from ._constants import CATEGORIES
+
+TIMESTAMP_INDEX = 'ix_audit_logs_timestamp'
 
 logger = logging.getLogger(__name__)
 
@@ -86,38 +89,37 @@ class AuditQueryMixin:
     def get_stats(days: int = 30) -> Dict[str, Any]:
         since = utc_now() - timedelta(days=days)
 
-        total = AuditLog.query.filter(AuditLog.timestamp >= since).count()
+        # Every statement walks the period on the timestamp index, whatever sqlite_stat1 says
+        def period(query):
+            return indexed_by(query.filter(AuditLog.timestamp >= since), AuditLog, TIMESTAMP_INDEX)
 
-        success_count = AuditLog.query.filter(
-            AuditLog.timestamp >= since,
-            AuditLog.success == True
-        ).count()
+        total = period(AuditLog.query).count()
+
+        success_count = period(AuditLog.query).filter(AuditLog.success == True).count()
         failure_count = total - success_count
 
-        top_actions = db.session.query(
+        top_actions = period(db.session.query(
             AuditLog.action,
             db.func.count(AuditLog.id).label('count')
-        ).filter(
-            AuditLog.timestamp >= since
-        ).group_by(
+        )).group_by(
             AuditLog.action
         ).order_by(
             db.desc('count')
         ).limit(10).all()
 
         # OFFSET 0 keeps SQLite from flattening the period into a walk of the username index
-        period = db.select(AuditLog.username).where(AuditLog.timestamp >= since).offset(0).subquery()
+        period_rows = indexed_by(db.select(AuditLog.username).where(AuditLog.timestamp >= since),
+                                 AuditLog, TIMESTAMP_INDEX).offset(0).subquery()
         count = db.func.count().label('count')
         top_users = db.session.execute(
-            db.select(period.c.username, count).group_by(period.c.username)
-            .order_by(db.desc(count), period.c.username).limit(10)).all()
+            db.select(period_rows.c.username, count).group_by(period_rows.c.username)
+            .order_by(db.desc(count), period_rows.c.username).limit(10)).all()
 
         # top_users is capped at 10, so it cannot stand in for the total.
         unique_users = db.session.execute(
-            db.select(db.func.count(db.distinct(period.c.username)))).scalar() or 0
+            db.select(db.func.count(db.distinct(period_rows.c.username)))).scalar() or 0
 
-        recent_failures = AuditLog.query.filter(
-            AuditLog.timestamp >= since,
+        recent_failures = period(AuditLog.query).filter(
             AuditLog.success == False
         ).order_by(AuditLog.timestamp.desc()).limit(10).all()
 
