@@ -241,6 +241,23 @@ def _named_cas(ca_certs):
     return named
 
 
+def _readable_pems(certificates):
+    """PEM bytes of the rows whose certificate parses, and the ids of the rows skipped (logged)."""
+    pems, skipped = [], []
+    for cert in certificates:
+        if not cert.crt:
+            continue
+        try:
+            pem = base64.b64decode(cert.crt)
+            x509.load_pem_x509_certificates(pem)
+        except Exception as exc:
+            logger.warning('Bulk export skips certificate %s: unreadable (%s)', cert.id, type(exc).__name__)
+            skipped.append(str(cert.id))
+            continue
+        pems.append(pem)
+    return pems, skipped
+
+
 @bp.route('/api/v2/certificates/export', methods=['GET', 'POST'])
 @require_auth(['read:certificates'])
 def export_all_certificates():
@@ -271,28 +288,15 @@ def export_all_certificates():
         return error_response('No certificates to export', 404)
 
     try:
-        if export_format == 'pem':
-            # Concatenate all PEM certificates
-            pem_data = b''
-            for cert in certificates:
-                if cert.crt:
-                    pem_data += base64.b64decode(cert.crt)
-                    if not pem_data.endswith(b'\n'):
-                        pem_data += b'\n'
-
-            return Response(
-                pem_data,
-                mimetype='application/x-pem-file',
-                headers={'Content-Disposition': 'attachment; filename="certificates.pem"'}
-            )
-
-        elif export_format == 'pkcs7' or export_format == 'p7b':
-            p7b_output = p7b_from_pems(base64.b64decode(cert.crt) for cert in certificates if cert.crt)
-            return Response(
-                p7b_output,
-                mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': 'attachment; filename="certificates.p7b"'}
-            )
+        if export_format in ('pem', 'pkcs7', 'p7b'):
+            pems, skipped = _readable_pems(certificates)
+            headers = {'X-Skipped-Certificates': ','.join(skipped)} if skipped else {}
+            if export_format == 'pem':
+                headers['Content-Disposition'] = 'attachment; filename="certificates.pem"'
+                return Response(b''.join(pem if pem.endswith(b'\n') else pem + b'\n' for pem in pems),
+                                mimetype='application/x-pem-file', headers=headers)
+            headers['Content-Disposition'] = 'attachment; filename="certificates.p7b"'
+            return Response(p7b_from_pems(pems), mimetype='application/x-pkcs7-certificates', headers=headers)
 
         else:
             return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
