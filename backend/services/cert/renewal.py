@@ -154,7 +154,8 @@ def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
     (no certificate, revoked, issued by a Microsoft CA, key not held by the
     server). Shared by the renewal itself and by the routes, which check it
     before queueing a renewal for approval: a request no renewal could honour
-    must not wait for an approver."""
+    must not wait for an approver. ``trigger`` words the refusal of a row renewed
+    since it was read."""
     if not cert.crt:
         raise RenewalError('Certificate data not available', 400)
     # Any revocation, a suspension included: renewing would hand back a good serial

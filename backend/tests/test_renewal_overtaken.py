@@ -55,6 +55,34 @@ def test_the_routes_check_on_a_row_renewed_since_read_on_sqlite(app, tmp_path):
     assert refusal.status == 409 and 'renewed by another request' in refusal.message, refusal.message
 
 
+def _delete_elsewhere(app, cert_id):
+    def run():
+        with app.app_context():
+            Certificate.query.filter_by(id=cert_id).delete()
+            db.session.commit()
+            db.session.remove()
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    thread.join(60)
+
+
+def test_a_row_deleted_since_read_is_gone_not_revoked(app, tmp_path):
+    """The record of its old serial stays; the row it was read from does not."""
+    from services.cert.renewal import RenewalError, check_renewable
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'deleted.db'}"):
+        cert_id, _, _ = _leaf(app)
+        with app.app_context():
+            cert = db.session.get(Certificate, cert_id)
+            _renew_elsewhere(app, cert_id)
+            _delete_elsewhere(app, cert_id)
+            with pytest.raises(RenewalError) as e:
+                check_renewable(cert)
+            db.session.remove()
+    assert e.value.status == 404 and 'no longer exists' in e.value.message, e.value.message
+
+
 @pytest.mark.postgres
 @pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_the_routes_check_on_a_row_renewed_since_read_on_postgresql(app):
