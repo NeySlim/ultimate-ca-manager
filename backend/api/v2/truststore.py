@@ -8,6 +8,8 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
+from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 from models import db
 from models.truststore import TrustedCertificate
 from services.audit_service import AuditService
@@ -566,47 +568,26 @@ def export_trust_bundle():
         if not certs:
             return error_response('No certificates found matching criteria', 404)
         
+        pems, skipped = readable_pems(((c.id, c.certificate_pem) for c in certs))
+        if not pems:
+            return nothing_readable(skipped)
+        headers = skipped_headers(skipped)
+        by_pem = {c.certificate_pem.encode(): c for c in certs}
         if fmt == 'pem':
             bundle_lines = []
-            for cert in certs:
-                bundle_lines.append(f'# {cert.name}')
-                bundle_lines.append(cert.certificate_pem.strip())
+            for pem in pems:
+                bundle_lines.append(f'# {by_pem[pem].name}')
+                bundle_lines.append(pem.decode().strip())
                 bundle_lines.append('')
-            
-            bundle = '\n'.join(bundle_lines)
+
             filename = f'truststore-{sanitize_filename(purpose)}-bundle.pem'
-            
-            return Response(
-                bundle,
-                mimetype='application/x-pem-file',
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
-            )
-        
-        elif fmt == 'p7b':
-            from cryptography.hazmat.primitives.serialization import pkcs7
-            
-            x509_certs = []
-            for cert in certs:
-                try:
-                    x509_cert = x509.load_pem_x509_certificate(
-                        cert.certificate_pem.encode(), default_backend()
-                    )
-                    x509_certs.append(x509_cert)
-                except Exception:
-                    continue
-            
-            if not x509_certs:
-                return error_response('No valid certificates to export', 400)
-            
-            p7b_data = pkcs7.serialize_certificates(x509_certs, serialization.Encoding.DER)
-            
-            filename = f'truststore-{sanitize_filename(purpose)}-bundle.p7b'
-            return Response(
-                p7b_data,
-                mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
-            )
-    
+            headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return Response('\n'.join(bundle_lines), mimetype='application/x-pem-file', headers=headers)
+
+        filename = f'truststore-{sanitize_filename(purpose)}-bundle.p7b'
+        headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return Response(p7b_from_pems(pems), mimetype='application/x-pkcs7-certificates', headers=headers)
+
     except Exception as e:
         logger.error(f'Failed to export trust store bundle: {e}')
         return error_response('Failed to export bundle', 500)

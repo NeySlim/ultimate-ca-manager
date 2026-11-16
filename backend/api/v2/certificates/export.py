@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 import fips_mode
 from fips_mode import FipsRestricted
 
@@ -241,23 +242,6 @@ def _named_cas(ca_certs):
     return named
 
 
-def _readable_pems(certificates):
-    """PEM bytes of the rows whose certificate parses, and the ids of the rows skipped (logged)."""
-    pems, skipped = [], []
-    for cert in certificates:
-        if not cert.crt:
-            continue
-        try:
-            pem = base64.b64decode(cert.crt)
-            x509.load_pem_x509_certificates(pem)
-        except Exception as exc:
-            logger.warning('Bulk export skips certificate %s: unreadable (%s)', cert.id, type(exc).__name__)
-            skipped.append(str(cert.id))
-            continue
-        pems.append(pem)
-    return pems, skipped
-
-
 @bp.route('/api/v2/certificates/export', methods=['GET', 'POST'])
 @require_auth(['read:certificates'])
 def export_all_certificates():
@@ -289,8 +273,10 @@ def export_all_certificates():
 
     try:
         if export_format in ('pem', 'pkcs7', 'p7b'):
-            pems, skipped = _readable_pems(certificates)
-            headers = {'X-Skipped-Certificates': ','.join(skipped)} if skipped else {}
+            pems, skipped = readable_pems(((c.id, c.crt) for c in certificates))
+            if not pems:
+                return nothing_readable(skipped)
+            headers = skipped_headers(skipped)
             if export_format == 'pem':
                 headers['Content-Disposition'] = 'attachment; filename="certificates.pem"'
                 return Response(b''.join(pem if pem.endswith(b'\n') else pem + b'\n' for pem in pems),

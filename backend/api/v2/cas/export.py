@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
 from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 import fips_mode
 from fips_mode import FipsRestricted
 from utils.key_codec import load_pem_bytes
@@ -58,14 +59,15 @@ def _bulk_pems(cas, option):
     """The CA certificates of a bulk export, each followed by the cross-certificates *option* adds.
 
     ``primary`` (default) adds none, ``auto`` the served ones, ``all`` every attached one, ``cross:<id>`` that one.
+    Returns ``(pems, skipped)``: an unreadable certificate is skipped and named (a cross-certificate as ``cross:<id>``).
     Raises ChainVariantError for any other value."""
     from services.ca import cross_certs
     from utils.ca_chain import ChainVariantError, parse_variant
     value = option or 'primary'
     wanted = parse_variant(value) if value != 'all' else 'all'
-    pems, found = [], False
+    entries, found = [], False
     for ca in cas:
-        pems.append(base64.b64decode(ca.crt))
+        entries.append((ca.id, ca.crt))
         if wanted == 'primary':
             continue
         if wanted == 'auto':
@@ -75,10 +77,10 @@ def _bulk_pems(cas, option):
         else:
             rows = [r for r in ca.cross_certificates if r.id == wanted[1]]
             found = found or bool(rows)
-        pems.extend(base64.b64decode(r.crt) for r in rows)
+        entries.extend((f'cross:{r.id}', r.crt) for r in rows)
     if isinstance(wanted, tuple) and not found:
         raise ChainVariantError(f'Cross-certificate {value} does not exist')
-    return pems
+    return readable_pems(entries, 'CA')
 
 
 # The bounds, and the reason for the ceiling, now live in
@@ -113,9 +115,12 @@ def export_all_cas():
 
     from utils.ca_chain import ChainVariantError
     try:
-        pems = _bulk_pems(cas, variant_option)
+        pems, skipped = _bulk_pems(cas, variant_option)
     except ChainVariantError as exc:
         return error_response(str(exc), 400)
+    if not pems:
+        return nothing_readable(skipped, 'CA')
+    headers = skipped_headers(skipped, 'CAs')
 
     try:
         if export_format == 'pem':
@@ -128,14 +133,14 @@ def export_all_cas():
             return Response(
                 pem_data,
                 mimetype='application/x-pem-file',
-                headers={'Content-Disposition': 'attachment; filename="ca-certificates.pem"'}
+                headers={**headers, 'Content-Disposition': 'attachment; filename="ca-certificates.pem"'}
             )
 
         elif export_format == 'pkcs7' or export_format == 'p7b':
             return Response(
                 p7b_from_pems(pems),
                 mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'}
+                headers={**headers, 'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'}
             )
 
         else:
