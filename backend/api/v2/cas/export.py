@@ -112,6 +112,8 @@ def export_all_cas():
     cas = CA.query.filter(CA.crt.isnot(None), CA.crt != '').all()
     if not cas:
         return error_response('No CAs to export', 404)
+    if export_format not in ('pem', 'pkcs7', 'p7b'):
+        return error_response('Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
 
     from utils.ca_chain import ChainVariantError
     try:
@@ -136,15 +138,11 @@ def export_all_cas():
                 headers={**headers, 'Content-Disposition': 'attachment; filename="ca-certificates.pem"'}
             )
 
-        elif export_format == 'pkcs7' or export_format == 'p7b':
-            return Response(
-                p7b_from_pems(pems),
-                mimetype='application/x-pkcs7-certificates',
-                headers={**headers, 'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'}
-            )
-
-        else:
-            return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
+        return Response(
+            p7b_from_pems(pems),
+            mimetype='application/x-pkcs7-certificates',
+            headers={**headers, 'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'}
+        )
 
     except Exception as e:
         logger.error(f"Export failed: {e}")

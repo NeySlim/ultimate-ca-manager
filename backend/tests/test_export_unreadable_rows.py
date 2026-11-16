@@ -165,6 +165,12 @@ def test_no_readable_row_answers_the_same_in_both_formats(auth_client, rows, rou
     assert answers[0].get_json() == answers[1].get_json()
 
 
+@EVERY
+def test_an_unsupported_format_is_refused_before_the_rows_are_read(auth_client, rows, route):
+    rows.corrupt_all(route)
+    assert route.call(auth_client, rows.made[route.kind], 'der').status_code == 400
+
+
 def _forms():
     """Each shape of a valid stored certificate: (label, PEM bytes, certificates it holds)."""
     bare, first, second, crlf = (_pem(f'form-{n}') for n in ('bare', 'first', 'second', 'crlf'))
