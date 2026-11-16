@@ -431,6 +431,41 @@ def test_a_partner_taken_while_the_members_were_chosen_refuses_the_renewal(
             db.session.remove()
 
 
+def test_a_partner_that_left_while_the_members_were_chosen_refuses_the_renewal(
+        app, tmp_path, monkeypatch):
+    """Each member is judged on its own stored link, B as well as A."""
+    from services.cert import renewal
+    from tests.test_backup_cross_installation import _bound_to
+
+    def leave(b_id):
+        with app.app_context():
+            db.session.get(Certificate, b_id).related_certificate_id = None
+            db.session.commit()
+            db.session.remove()
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'left-late.db'}"):
+        a_id, (b_id,) = _linked_rows(app)
+        with app.app_context():
+            a = db.session.get(Certificate, a_id)
+            serial, chosen = a.serial_number, renewal._linked_members
+
+            def then_left(cert):
+                members = chosen(cert)
+                thread = threading.Thread(target=leave, args=(b_id,))
+                thread.start()
+                thread.join(60)
+                return members
+
+            monkeypatch.setattr(renewal, '_linked_members', then_left)
+            with pytest.raises(renewal.RenewalError) as e:
+                renewal.renew_certificate_in_place(a, username='admin', regenerate_crl=False)
+            monkeypatch.undo()
+            assert e.value.status == 409 and e.value.message.startswith(f'Related certificate {b_id}: ')
+            db.session.expire_all()
+            assert db.session.get(Certificate, a_id).serial_number == serial
+            db.session.remove()
+
+
 def _chain_pair(app):
     """``(a_id, b_id)``: A names X in its certificate, B names A, A and B link each other."""
     import base64
