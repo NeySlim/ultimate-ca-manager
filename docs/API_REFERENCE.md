@@ -3245,7 +3245,7 @@ Content-Type: application/json
 }
 ```
 
-`data.key_files` says what became of the plaintext key files the disable writes: `written`, `incomplete` (a file could not be written), or `pending` when another file reconciliation held the directories for 30 seconds; they are then written at the next start, and `key_files_written` is `0`.
+`data.key_files` says what became of the plaintext key files the disable writes: `written`, `incomplete` (a file could not be written), or `pending` when the file directories were busy (another reconciliation, a restore, another node) or could not be locked; the next file reconciliation then writes them, and `key_files_written` is `0`.
 
 ### Security - Generate Encryption Key
 ```http

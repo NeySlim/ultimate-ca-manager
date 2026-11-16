@@ -73,6 +73,18 @@ def test_half_a_pair_is_left_out_with_a_warning(app, clean, half):
         assert _stored(shared_files.HTTPS_GENERATED)
         assert results['https_server'] == 0
         assert len(plan.warnings) == 1 and 'HTTPS' in plan.warnings[0]
+        missing, carried = ('key', 'certificate') if 'cert_pem' in half else ('certificate', 'key')
+        assert f'its {carried} without its {missing}' in plan.warnings[0]
+
+
+def test_a_pair_of_two_empty_files_is_said_to_carry_neither(app, clean):
+    from types import SimpleNamespace
+    plan = SimpleNamespace(warnings=[])
+    with app.app_context():
+        RestoreExtendedMixin()._restore_https_files(
+            {'https_server': {'cert_pem': '', 'key_pem': ''}}, defaultdict(int), plan)
+        assert len(plan.warnings) == 1 and 'neither' in plan.warnings[0]
+        assert 'without its' not in plan.warnings[0]
 
 
 class _Database:

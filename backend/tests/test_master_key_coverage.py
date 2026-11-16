@@ -339,8 +339,8 @@ def test_disabling_says_the_key_files_wait_when_a_reconciliation_holds_on(
         assert response.status_code == 200, response.data
         body = response.get_json()
         assert body['data']['key_files'] == 'pending' and body['data']['key_files_written'] == 0
-        assert 'key files are written at the next start' in body['message']
+        assert 'the next file reconciliation writes them' in body['message']
         disabled = [a for a in audited if a['action'] == 'encryption_disabled']
-        assert disabled and 'key files are written at the next start' in disabled[0]['details']
+        assert disabled and 'the next file reconciliation writes them' in disabled[0]['details']
     finally:
         _drop_disabled_marker(app)

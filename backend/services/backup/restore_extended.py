@@ -741,10 +741,11 @@ class RestoreExtendedMixin:
             return
         cert_pem, key_pem = https_data.get('cert_pem'), https_data.get('key_pem')
         if not cert_pem or not key_pem:
+            carried = ("neither its certificate nor its key" if not cert_pem and not key_pem
+                       else f"its {'certificate' if cert_pem else 'key'} without its "
+                            f"{'key' if cert_pem else 'certificate'}")
             warning = ("the HTTPS certificate of the archive was not restored: the archive "
-                       f"carries its {'certificate' if cert_pem else 'key'} without its "
-                       f"{'key' if cert_pem else 'certificate'}; the HTTPS certificate in "
-                       "place is kept")
+                       f"carries {carried}; the HTTPS certificate in place is kept")
             if plan is not None:
                 plan.warnings.append(warning)
             else:

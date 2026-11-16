@@ -25,6 +25,7 @@ from utils.file_naming import (
     cert_key_path,
     cert_csr_path,
 )
+from utils.process_lock import LockBusyError
 
 logger = logging.getLogger(__name__)
 
@@ -787,7 +788,7 @@ def advisory_keys(dirs):
         for d in dirs})
 
 
-class FilesBusy(Exception):
+class FilesBusy(LockBusyError):
     """Another reconciliation holds a managed directory."""
 
 
@@ -884,7 +885,7 @@ def reconcile_files(*, full=None, wait=0.0) -> dict:
                     if not _lock_not_available(exc):
                         raise
                     db.session.rollback()
-                    logger.info("Files: a restore holds the removal list; retried later")
+                    logger.info("Files: a restore or another node holds rows of the removal list; retried later")
                     return {'status': 'busy'}
             run = _Pass(opened, full, encrypting)
             run.write_rows('ca', CA)

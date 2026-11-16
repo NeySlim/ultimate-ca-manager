@@ -5,7 +5,7 @@ from models import db
 class FileRemoval(db.Model):
     """One file whose row a restore removed, as `<directory setting>/<name>` (the same on
     every node): a full reconciliation deletes the regular file there. Outside HA the node's
-    complete pass then drops the rows of its generation; in HA they stay (any node may still
+    complete pass then drops the rows up to its generation; in HA they stay (any node may still
     be behind), are replayed by every full pass, and grow with each restore. Local to the
     installation, never exported nor restored."""
     __tablename__ = 'file_removals'

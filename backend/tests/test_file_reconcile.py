@@ -172,6 +172,22 @@ def test_a_reconciliation_already_running_is_left_alone(app, issued, writes, reg
         assert writes == [] and not issued['crt'].exists()
 
 
+def test_a_pass_refused_by_a_held_lock_leaves_no_descriptor_open(app, regen):
+    import fcntl
+    from config.settings import Config
+    with app.app_context():
+        holder = os.open(Path(Config.DATA_DIR) / regen.LOCK_NAME, os.O_RDWR | os.O_CREAT)
+        fcntl.flock(holder, fcntl.LOCK_EX)
+        try:
+            assert regen.reconcile_files(full=True) == {'status': 'busy'}
+            before = len(os.listdir('/proc/self/fd'))
+            for _ in range(5):
+                assert regen.reconcile_files(full=True) == {'status': 'busy'}
+            assert len(os.listdir('/proc/self/fd')) == before
+        finally:
+            os.close(holder)
+
+
 def test_a_stale_reconciliation_never_leaves_the_old_files_under_the_new_marker(
         app, issued, regen, monkeypatch):
     """Rows read at G1, a restore to G2 then reconciled in full, the G1 writes land after."""

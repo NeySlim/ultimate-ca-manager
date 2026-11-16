@@ -443,10 +443,11 @@ def disable_encryption():
         key_files_written = (
             regeneration_stats['ca_keys'] + regeneration_stats['cert_keys']
         )
-        # A reconciliation still holding the directories: nothing written, the next start does it
+        # Directories held or their lock not taken: nothing written, a later pass does it
         files_pending = regeneration_stats['status'] == 'busy'
-        files_note = (" The key files are written at the next start: another file "
-                      "reconciliation held the directories." if files_pending else '')
+        files_note = (" The key files are not written yet: the file directories were busy "
+                      "or could not be locked; the next file reconciliation writes them."
+                      if files_pending else '')
 
         AuditService.log_action(
             action='encryption_disabled',
