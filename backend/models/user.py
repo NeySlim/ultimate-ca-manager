@@ -197,15 +197,19 @@ class User(db.Model):
             .execution_options(synchronize_session=False))
         self._reload_lockout()
 
-    def clear_failed_logins(self):
-        """Reset the stored count and lock after a success, whatever this copy holds;
-        the caller commits."""
-        db.session.execute(
-            update(User).where(User.id == self.id)
+    def clear_failed_logins(self) -> bool:
+        """Reset the stored count and lock, whatever this copy holds: True when the row
+        held either. The caller commits."""
+        from sqlalchemy import or_
+        result = db.session.execute(
+            update(User).where(User.id == self.id,
+                               or_(func.coalesce(User.failed_logins, 0) != 0,
+                                   User.locked_until.is_not(None)))
             .values(failed_logins=0, locked_until=None)
-            .execution_options(synchronize_session=False))
+            .execution_options(synchronize_session=False, preserve_rowcount=True))
         set_committed_value(self, 'failed_logins', 0)
         set_committed_value(self, 'locked_until', None)
+        return bool(result.rowcount)
 
     def _reload_lockout(self):
         row = db.session.execute(

@@ -668,6 +668,64 @@ def test_a_certificate_auto_login_leaves_the_password_count(app, username, monke
         assert tuple(_stored(username)) == (MAX_ATTEMPTS, until)
 
 
+# --- A new password, an administrator's unlock -----------------------------------
+
+def test_a_password_reset_by_link_clears_a_lock_written_meanwhile(app, username, monkeypatch):
+    """The new password restarts its count in the database, not only on the copy read."""
+    import hashlib
+    from tests.test_session_lifecycle import NEW_PASSWORD, _post
+    token = uuid.uuid4().hex
+    with app.app_context():
+        _another_node_writes(username, password_reset_token=hashlib.sha256(token.encode()).hexdigest(),
+                             password_reset_expires=utc_now() + timedelta(hours=1))
+    real = User.set_password
+
+    def another_node_locks_meanwhile(self, password):
+        _another_node_writes(self.username, failed_logins=MAX_ATTEMPTS,
+                             locked_until=utc_now() + timedelta(minutes=15))
+        return real(self, password)
+
+    monkeypatch.setattr(User, 'set_password', another_node_locks_meanwhile)
+    response = _post(app.test_client(), '/api/v2/auth/reset-password',
+                     {'token': token, 'password': NEW_PASSWORD})
+    assert response.status_code == 200, response.data
+    with app.app_context():
+        assert tuple(_stored(username)) == (0, None)
+
+
+def _locked_after_the_read(monkeypatch, uid, name):
+    """Another node locks the account just after the unlock read it."""
+    real = db.session.get
+
+    def get(entity, ident, *args, **kwargs):
+        found = real(entity, ident, *args, **kwargs)
+        if entity is User and ident == uid:
+            _another_node_writes(name, failed_logins=MAX_ATTEMPTS,
+                                 locked_until=utc_now() + timedelta(minutes=15))
+        return found
+    monkeypatch.setattr(db.session, 'get', get)
+
+
+def test_an_unlock_lifts_a_lock_written_after_the_account_was_read(
+        app, username, auth_client, monkeypatch):
+    with app.app_context():
+        uid = User.query.filter_by(username=username).one().id
+    _locked_after_the_read(monkeypatch, uid, username)
+    response = auth_client.post(f'/api/v2/users/{uid}/unlock')
+    monkeypatch.undo()
+    assert response.status_code == 200
+    assert response.get_json()['message'] == f'User {username} unlocked successfully'
+    with app.app_context():
+        assert tuple(_stored(username)) == (0, None)
+
+
+def test_an_unlock_of_an_account_without_count_says_so(app, username, auth_client):
+    with app.app_context():
+        uid = User.query.filter_by(username=username).one().id
+    response = auth_client.post(f'/api/v2/users/{uid}/unlock')
+    assert (response.status_code, response.get_json()['message']) == (200, 'Account is not locked')
+
+
 # --- Threads on one database -----------------------------------------------------
 
 WORKERS = 8

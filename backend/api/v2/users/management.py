@@ -326,12 +326,11 @@ def unlock_user(user_id):
     if not user:
         return error_response('User not found', 404)
 
-    if not user.locked_until and not user.failed_logins:
-        return success_response(data=user.to_dict(), message='Account is not locked')
-
     try:
-        user.failed_logins = 0
-        user.locked_until = None
+        # Decided on the stored row: a lock another node wrote after this read is lifted
+        if not user.clear_failed_logins():
+            db.session.rollback()
+            return success_response(data=user.to_dict(), message='Account is not locked')
         db.session.commit()
         AuditService.log_action(
             action='user_unlock',
