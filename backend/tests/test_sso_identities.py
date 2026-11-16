@@ -464,6 +464,45 @@ def test_an_anonymous_caller_attaches_nothing(app, providers, client):
     assert _rows(app, uid) == []
 
 
+def test_write_users_outside_the_administrator_role_attaches_nothing(app, providers, auth_client):
+    """write:users is reserved: a custom role or a group that stored it grants it to no one,
+    so choosing who opens an account stays the administrator's."""
+    from models.group import Group, GroupMember
+    from models.rbac import CustomRole
+    name, target = _name(), _name()
+    uid = _add(app, username=target, password_hash='hash')
+    with app.app_context():
+        role = CustomRole(name=f'{name}-role', permissions=['write:users', 'read:users'])
+        group = Group(name=f'{name}-group', permissions=['write:users'])
+        db.session.add_all([role, group])
+        db.session.flush()
+        caller = User(username=name, email=f'{name}@corp.example', role='operator',
+                      custom_role_id=role.id)
+        caller.set_password('Operator-Pass-42!')
+        db.session.add(caller)
+        db.session.flush()
+        db.session.add(GroupMember(group_id=group.id, user_id=caller.id))
+        db.session.commit()
+        caller_id, role_id, group_id = caller.id, role.id, group.id
+    try:
+        client = _session(app, caller_id)
+        assert client.post(f'/api/v2/users/{uid}/sso-identities',
+                           json={'provider_id': providers.oidc}).status_code == 403
+        assert _rows(app, uid) == []
+        assert _attach(auth_client, uid, providers.oidc).status_code == 201
+        row = _row_id(app, uid, providers.oidc)
+        assert client.post(f'/api/v2/users/{uid}/sso-identities/{row}/reset').status_code == 403
+        assert client.delete(f'/api/v2/users/{uid}/sso-identities/{row}').status_code == 403
+        assert _rows(app, uid) == [(providers.oidc, None, None)]
+    finally:
+        with app.app_context():
+            GroupMember.query.filter_by(group_id=group_id).delete()
+            db.session.delete(db.session.get(Group, group_id))
+            db.session.delete(db.session.get(User, caller_id))
+            db.session.delete(db.session.get(CustomRole, role_id))
+            db.session.commit()
+
+
 # ── A provider or an account deleted ────────────────────────────────────────
 
 def test_deleting_a_provider_orphans_its_rows_only(app, providers, auth_client):

@@ -207,12 +207,11 @@ def toggle_user_status(user_id):
 
 
 def _sso_admin_target(user_id):
-    """(account, None) for an administrator's change of who opens it, else (None, answer)."""
+    """(account, None) for an administrator's change of who opens it, else (None, answer).
+    write:users, which the routes require, is reserved to the administrator role."""
     refused = refuse_api_key_on_own_account(user_id)
     if refused:
         return None, refused
-    if g.current_user.role != 'admin':
-        return None, error_response('Insufficient permissions', 403)
     user = db.session.get(User, user_id)
     if not user:
         return None, error_response('User not found', 404)
