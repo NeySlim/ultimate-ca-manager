@@ -835,6 +835,27 @@ def test_two_identical_unknown_orphans_here_are_named_not_a_crash(app, providers
         results = _backup().restore_backup(blob, password, mode='merge')
     shared = [w for w in results['warnings'] if 'user_sso_identities' in w]
     assert len(shared) == 1 and 'orphan-twice' in shared[0], results['warnings']
+    assert 'share this user_id/provider_id/orphan_of/external_id' in shared[0]
+
+
+def test_an_orphan_archived_twice_comes_back_twice_beside_the_one_here(app, providers):
+    """The n-th archived row of an identity takes the n-th row here: the second is not folded into the first."""
+    from services.backup import manifest
+    password = 'Correct-Horse-Battery-9'
+    uid = _add(app, username=_name(), password_hash=NOPASS)
+    with app.app_context():
+        for _ in range(2):
+            row = UserSSOIdentity(user_id=uid)
+            row.bind('archived-twice')
+            db.session.add(row)
+        db.session.commit()
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        newest = UserSSOIdentity.query.filter_by(user_id=uid).order_by(UserSSOIdentity.id.desc()).first()
+        db.session.delete(newest)
+        db.session.commit()
+        _backup().restore_backup(blob, password, mode='merge')
+        assert [r.external_id for r in UserSSOIdentity.query.filter_by(user_id=uid)] == ['archived-twice'] * 2
 
 
 @pytest.mark.parametrize('merging', [True, False], ids=['merge', 'replace'])

@@ -280,8 +280,9 @@ class RestorePlan:
             query = query.filter_by(orphan_of=row.get('orphan_of'))
             if row.get('orphan_of') is None:
                 query = query.filter_by(external_id=row.get('external_id'))
-        found = query.order_by(UserSSOIdentity.id).first()
-        return found.id if found is not None else None
+        ids = [found.id for found in query.order_by(UserSSOIdentity.id)]
+        key = sso_identity_key(user_id, provider_id, row.get('orphan_of'), row.get('external_id'))
+        return self.rank(_SSO_IDENTITIES, key, row, ids)
 
     def _claimed(self, section_name: str, key: Tuple, row: Dict[str, Any]) -> Optional[Any]:
         """The row here for that identity, by rank: the n-th archived row of it takes the n-th oldest."""
@@ -405,9 +406,11 @@ class RestorePlan:
 
 
 _SSO_IDENTITIES = 'user_sso_identities'
+# What sso_identity_key is made of, in its order
+_SSO_IDENTITY_FIELDS = ('user_id', 'provider_id', 'orphan_of', 'external_id')
 
 
-def sso_identity_key(user_id, provider_id, orphan_of, external_id=None) -> Tuple:
+def sso_identity_key(user_id, provider_id, orphan_of, external_id) -> Tuple:
     """What an identity row is: its account's row for a provider, or, without a provider, its
     orphan of an IdP key, or of an unknown IdP by its identity (an account may hold several).
     The manifest's identity is never complete on its own: a live row has no orphan_of, an
@@ -547,8 +550,7 @@ def _index_of(section_name: str, section: Section):
     singleton = section.identity == ('id',)
     rows, incomplete = {}, []
     if section_name == _SSO_IDENTITIES:
-        fields = ('user_id', 'provider_id', 'orphan_of', 'external_id')
-        for key_value, values in _identities_here(model, primary[0], fields):
+        for key_value, values in _identities_here(model, primary[0], _SSO_IDENTITY_FIELDS):
             rows.setdefault(sso_identity_key(*values), []).append(key_value)
         return ({key: ids[0] for key, ids in rows.items()},
                 {key: ids for key, ids in rows.items() if len(ids) > 1}, [])
@@ -584,8 +586,9 @@ def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate:
                             others: Optional[List[Any]] = None) -> str:
     others = ids[1:] if others is None else others
     spelt = '/'.join('' if part is None else str(part) for part in key)
+    fields = _SSO_IDENTITY_FIELDS if section_name == _SSO_IDENTITIES else SECTIONS[section_name].identity
     message = (f"{section_name} {spelt}: {len(ids)} rows here share this "
-               f"{'/'.join(SECTIONS[section_name].identity)} (id {', '.join(map(str, ids))}); "
+               f"{'/'.join(fields)} (id {', '.join(map(str, ids))}); "
                "the archive's rows of it go to them oldest first")
     return f"{message}, and the others (id {', '.join(map(str, others))}) are {fate}" if others else message
 
