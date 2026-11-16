@@ -93,8 +93,12 @@ def open_boot_database(data_path: str):
     return BootDatabase(sqlite3.connect(path), '?')
 
 
-def _settings(database, keys):
-    """The stored values of *keys*; none before the schema exists (a first start)."""
+# What mtls_client_ca answers when there is no settings table to read: nothing was decided
+MTLS_UNDECIDED = object()
+
+
+def _settings(database, keys, missing=None):
+    """The stored values of *keys*; *missing* (default: none) when the table does not exist."""
     placeholders = ', '.join('?' for _ in keys)
     try:
         rows = database.rows(
@@ -102,7 +106,7 @@ def _settings(database, keys):
             tuple(keys))
     except Exception as e:
         if _missing_table(e):
-            return {}
+            return {} if missing is None else missing
         raise
     return {key: value for key, value in rows}
 
@@ -159,13 +163,16 @@ def anchor_client_verification(ctx):
 
 
 def mtls_client_ca(data_path: str):
-    """``(ca_pem, ca_name, required)`` when mTLS is on, else None."""
+    """``(ca_pem, ca_name, required)`` when mTLS is on, None when it is off, and
+    ``MTLS_UNDECIDED`` when the database has no settings table."""
     database = open_boot_database(data_path)
     if database is None:
         return None
     with database:
         config = _settings(database, (
-            'mtls_enabled', 'mtls_required', 'mtls_trusted_ca_id'))
+            'mtls_enabled', 'mtls_required', 'mtls_trusted_ca_id'), missing=MTLS_UNDECIDED)
+        if config is MTLS_UNDECIDED:
+            return MTLS_UNDECIDED
         if config.get('mtls_enabled') != 'true':
             return None
         ca_refid = config.get('mtls_trusted_ca_id')
@@ -189,7 +196,7 @@ class HttpsMaterialError(Exception):
 
 
 def _missing_table(e):
-    """Upgrade: the migrations that create a table run after the master reads it."""
+    """Whether *e* says the table does not exist: a first start, or a table an upgrade adds later."""
     import sqlite3
     if isinstance(e, sqlite3.OperationalError):
         return str(e).startswith('no such table')
@@ -216,8 +223,7 @@ def _first_certificate(pem):
 
 
 def _load_deks(database):
-    """The DEK rows, so a value a rotation rewrote opens; called after the last other read
-    (on PostgreSQL a missing table aborts the transaction). Before migration 153: the KEK alone."""
+    """The DEK rows, so a value a rotation rewrote opens. Before migration 153: the KEK alone."""
     from security.encryption import key_encryption
     if not key_encryption.kek_loaded:
         return

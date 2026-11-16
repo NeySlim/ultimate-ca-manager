@@ -120,8 +120,8 @@ def ssl_context(conf, default_ssl_context_factory):
     return ctx
 
 
-from boot_config import (HttpsMaterialError, anchor_client_verification, materialize_https,
-                         mtls_client_ca, wstep_enabled)
+from boot_config import (MTLS_UNDECIDED, HttpsMaterialError, anchor_client_verification,
+                         materialize_https, mtls_client_ca, wstep_enabled)
 
 # Drives the TLS 1.2 cap in ssl_context().
 WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
@@ -172,6 +172,11 @@ def _load_mtls_config():
 
     try:
         found = mtls_client_ca(data_path)
+        if found is MTLS_UNDECIDED:
+            # No settings table: a first start has no mode on record, a lost table keeps the last one
+            if os.path.exists(os.path.join(data_path, MTLS_MODE_FILE)):
+                _reuse_last_known_mtls()
+            return
         if not found:
             _remember_mtls_mode(False)
             return
