@@ -408,10 +408,9 @@ def sso_callback(provider_type):
             if not username:
                 return redirect(_login_error('no_username', oauth2_next))
 
-            # Token groups count only from the token of this login: nonce checked and
-            # same subject as UserInfo. An unsigned (compatibility) token counts only over
-            # verified TLS (an HTTPS token endpoint, its certificate checked): OIDC Core §3.1.3.7 steps 2-5 and 9-11 (iss, aud, azp, exp, iat,
-            # nonce) still apply; step 6 lets TLS stand in for the signature only.
+            # Token groups count only from the token of this login (nonce checked, same subject as
+            # UserInfo). Unverified (compatibility mode), only over an HTTPS token endpoint with
+            # its certificate checked: OIDC Core §3.1.3.7 step 6; steps 2-5 and 9-11 still apply.
             token_sub = (trusted_id_claims or {}).get('sub')
             token_unused = None
             if trusted_id_claims is None:
@@ -421,14 +420,14 @@ def sso_callback(provider_type):
                 token_unused = 'subject does not match UserInfo'
             elif not verification_enabled:
                 if verify is False:
-                    token_unused = 'unsigned and TLS verification is off'
+                    token_unused = 'unverified and TLS verification is off'
                 elif urllib.parse.urlsplit(provider.oauth2_token_url or '').scheme.lower() != 'https':
-                    token_unused = 'unsigned and the token endpoint is not HTTPS'
+                    token_unused = 'unverified and the token endpoint is not HTTPS'
                 else:
                     claims_error = unverified_claims_error(trusted_id_claims, provider,
                                                            expected_nonce)
                     if claims_error:
-                        token_unused = f'unsigned token rejected ({claims_error})'
+                        token_unused = f'unverified token rejected ({claims_error})'
             bound_claims = trusted_id_claims if token_unused is None else None
             external_data = dict(userinfo, groups=oidc_external_groups(
                 userinfo, bound_claims, token_unused))
