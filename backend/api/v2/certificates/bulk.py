@@ -182,7 +182,7 @@ def bulk_renew_certificates():
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
-            check_renewable(cert)  # RenewalError → reported per item below
+            check_renewable(cert, 'bulk')  # RenewalError → reported per item below
             try:
                 policy, approval = _approval_for_renewal(g.current_user, cert, data)
             except PairApprovalConflict as e:
