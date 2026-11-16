@@ -27,6 +27,7 @@ import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.days_remaining import days_remaining as compute_days_remaining
 from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
+from utils.trust_pem import PrivateKeyInEntry, canonical_certificates, certificate_blocks, holds_private_key
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 _VALID_PURPOSES = {'root_ca', 'intermediate_ca', 'system', 'custom', 'code_signing', 'email'}
 _MAX_PEM_BYTES = 256 * 1024   # 256 KB — well above any X.509 cert
 _MAX_SYNC_LIMIT = 1000
+SYSTEM_CA_BUNDLE = '/etc/ssl/certs/ca-certificates.crt'
 
 
 def _validate_purpose(purpose):
@@ -44,11 +46,7 @@ def _validate_purpose(purpose):
 
 
 def parse_certificate(pem_data):
-    """
-    Parse certificate and extract details
-    
-    Returns dict with subject, issuer, fingerprints, etc.
-    """
+    """Details of the entry's first certificate; the entry is judged and fingerprinted by it."""
     try:
         cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
         require_readable_extensions(cert)
@@ -75,6 +73,20 @@ def parse_certificate(pem_data):
         raise
     except Exception as e:
         raise ValueError(f'Invalid certificate: {str(e)}')
+
+
+def parse_entry(pem_data):
+    """``(PEM to store, details)``: the entry's certificates re-serialized, never the text received.
+
+    Raises PrivateKeyInEntry for an entry carrying a private key, ValueError for any other block that
+    is not a certificate."""
+    try:
+        pem, _ = canonical_certificates(pem_data)
+    except PrivateKeyInEntry:
+        raise
+    except Exception as e:
+        raise ValueError(f'Invalid certificate: {type(e).__name__}')
+    return pem, parse_certificate(pem)
 
 
 def parse_der_certificate(der_data):
@@ -141,10 +153,11 @@ def import_trusted_certificate():
         return error_response(err, 400)
     
     try:
+        if holds_private_key(file_content):
+            raise PrivateKeyInEntry()
         # Try PEM first
         if b'-----BEGIN CERTIFICATE-----' in file_content:
-            pem_data = file_content.decode('utf-8')
-            cert_details = parse_certificate(pem_data)
+            pem_data, cert_details = parse_entry(file_content.decode('utf-8'))
         else:
             # Try DER
             pem_data, cert_details = parse_der_certificate(file_content)
@@ -193,7 +206,7 @@ def import_trusted_certificate():
             message=f'Certificate "{name}" imported to trust store'
         )
         
-    except UnreadableCertificate as e:
+    except (UnreadableCertificate, PrivateKeyInEntry) as e:
         db.session.rollback()
         return error_response(str(e), 400)
     except ValueError as e:
@@ -276,9 +289,11 @@ def add_trusted_certificate():
         return error_response(err, 400)
     
     # Parse certificate
+    if not isinstance(pem, str):
+        return error_response('Invalid certificate data', 400)
     try:
-        cert_details = parse_certificate(data['certificate_pem'])
-    except UnreadableCertificate as e:
+        pem, cert_details = parse_entry(pem)
+    except (UnreadableCertificate, PrivateKeyInEntry) as e:
         return error_response(str(e), 400)
     except ValueError as e:
         logger.error(f'Trust store certificate parse failed: {e}')
@@ -296,7 +311,7 @@ def add_trusted_certificate():
     trusted_cert = TrustedCertificate(
         name=data['name'],
         description=data.get('description', ''),
-        certificate_pem=data['certificate_pem'],
+        certificate_pem=pem,
         fingerprint_sha256=cert_details['fingerprint_sha256'],
         fingerprint_sha1=cert_details['fingerprint_sha1'],
         subject=cert_details['subject'],
@@ -439,8 +454,8 @@ def sync_trust_store():
     if limit < 1 or limit > _MAX_SYNC_LIMIT:
         return error_response(f'limit must be between 1 and {_MAX_SYNC_LIMIT}', 400)
     
-    CA_BUNDLE_PATH = '/etc/ssl/certs/ca-certificates.crt'
-    
+    CA_BUNDLE_PATH = SYSTEM_CA_BUNDLE
+
     if source != 'system':
         return error_response('Only "system" source is currently supported', 400)
     
@@ -474,7 +489,7 @@ def sync_trust_store():
 
     for pem in certs_pem[:limit]:
         try:
-            cert_details = parse_certificate(pem)
+            pem, cert_details = parse_entry(pem)
 
             # Check if already exists
             existing = TrustedCertificate.query.filter_by(
@@ -681,9 +696,11 @@ def add_ca_to_truststore(ca_refid):
     
     # Check if already in Trust Store
     try:
-        cert_info = parse_certificate(pem_data)
-    except UnreadableCertificate as e:
+        pem_data, cert_info = parse_entry(pem_data)
+    except (UnreadableCertificate, PrivateKeyInEntry) as e:
         return error_response(str(e), 400)
+    except ValueError:
+        return error_response('Failed to parse CA certificate', 500)
     if not cert_info:
         return error_response('Failed to parse CA certificate', 500)
     
