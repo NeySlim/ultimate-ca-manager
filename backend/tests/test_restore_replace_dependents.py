@@ -1058,3 +1058,22 @@ def test_a_merge_making_a_local_account_sso_again_may_share_its_email(target):
     assert sso.email == 'replace-merge-sso@example.test'
     assert [row.external_id for row in UserSSOIdentity.query.filter_by(user_id=sso.id)] == ['sub-merge']
 
+
+def test_a_replace_from_a_254_archive_drops_a_binding_made_after_it(target):
+    """The archive says local: a provider bound here since then no longer opens the account."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    account = _user('replace-later-bound')
+    provider = _sso_provider('replace-later-idp')
+    blob = _snapshot('users', 'sso_providers')
+    _identity(account, provider, 'sub-after')
+    db.session.commit()
+
+    def as_254(row):
+        row['auth_source'] = 'local'
+    _restore(_old_form(blob, drop_from='users', edit=as_254))
+
+    account = User.query.filter_by(username='replace-later-bound').one()
+    assert UserSSOIdentity.query.filter_by(user_id=account.id).count() == 0
+    assert _orphans() == []

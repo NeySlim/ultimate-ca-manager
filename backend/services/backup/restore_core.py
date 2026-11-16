@@ -819,9 +819,14 @@ class RestoreCoreMixin:
         db.session.flush()
         provider_ids = {pid for (pid,) in db.session.query(SSOProvider.id)}
         accounts = []
+        merging = getattr(self, '_merging', False)
         for user, row in pending:
-            if user.sso_identities:
-                continue  # the account here has its own rows: a merge keeps them
+            # A merge keeps the account's own rows; a replace rebuilds them from the archive
+            held = UserSSOIdentity.query.filter_by(user_id=user.id)
+            if merging and held.first() is not None:
+                continue
+            if not merging:
+                held.delete(synchronize_session=False)
             ref = row.get('sso_provider_id_ref') or {}
             here = SSOProvider.query.filter_by(name=ref['name']).first() if ref.get('name') else None
             accounts.append((user.id, row.get('auth_source'), here.id if here else None,
