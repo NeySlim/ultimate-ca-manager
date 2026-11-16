@@ -1,6 +1,7 @@
 """The RPM, built from its spec as the release builds it (on a stand-in of the sources):
 the data directories it lays down carry the owner and mode the installation gives them."""
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -71,19 +72,44 @@ def test_the_package_still_carries_the_application_and_its_scripts(payload):
         assert path in payload, path
 
 
-def test_post_creates_the_ghost_directories_with_the_modes_the_payload_declares(tmp_path):
-    """rpm -V compares what %post created with the %ghost entries: same modes, before any start."""
+# The only lines of %post these tests run: the scriptlet must hold them word for word
+POST_DIRECTORIES = [
+    'for d in ca certs private crl scep backups sessions; do',
+    '    mkdir -p $UCM_DATA/$d',
+    'done',
+    'for d in private sessions; do',
+    '    [ -L "$UCM_DATA/$d" ] || chmod 700 "$UCM_DATA/$d"',
+    'done',
+]
+
+
+def _post_directories(data):
+    """Run the directory lines of %post over *data*, after checking they are the expected ones."""
     spec = (ROOT / 'packaging' / 'rpm' / 'ucm.spec').read_text()
     start = spec.index('for d in ca certs', spec.index('\n%post\n'))
     block = spec[start:spec.index('mkdir -p $UCM_CONFIG', start)]
-    # Only the lines that create and set the directories: nothing else of the scriptlet runs here
-    lines = [line for line in block.splitlines() if not line.startswith('#')]
-    assert lines[:3] == ['for d in ca certs private crl scep backups sessions; do',
-                         '    mkdir -p $UCM_DATA/$d', 'done'], lines
-    assert all(line.startswith('chmod ') and '$UCM_DATA/' in line for line in lines[3:]), lines
-    run = subprocess.run(['sh', '-c', 'umask 022\n' + '\n'.join(lines)], capture_output=True,
-                         text=True, cwd=tmp_path, timeout=30,
-                         env={'PATH': '/usr/bin:/bin', 'UCM_DATA': str(tmp_path)})
+    assert [line for line in block.splitlines() if not line.startswith('#')] == POST_DIRECTORIES
+    assert re.fullmatch(r'[\w/.-]+', str(data)), data
+    run = subprocess.run(['sh', '-c', 'umask 022\n' + '\n'.join(POST_DIRECTORIES)],
+                         capture_output=True, text=True, cwd=data, timeout=30,
+                         env={'PATH': '/usr/bin:/bin', 'UCM_DATA': str(data)})
     assert run.returncode == 0, run.stderr
+
+
+def test_post_creates_the_ghost_directories_with_the_modes_the_payload_declares(tmp_path):
+    """rpm -V compares what %post created with the %ghost entries: same modes, before any start."""
+    _post_directories(tmp_path)
     assert {f'{DATA}/{p.name}': p.stat().st_mode & 0o7777 for p in tmp_path.iterdir()} == {
         p: mode for p, mode in EXPECTED.items() if p != DATA}
+
+
+def test_post_leaves_a_linked_directory_as_the_operator_set_it(tmp_path):
+    """root's chmod would follow the link and shut the service account out of its target."""
+    data, elsewhere = tmp_path / 'data', tmp_path / 'elsewhere'
+    data.mkdir()
+    elsewhere.mkdir(mode=0o770)
+    elsewhere.chmod(0o770)
+    (data / 'private').symlink_to(elsewhere)
+    _post_directories(data)
+    assert elsewhere.stat().st_mode & 0o7777 == 0o770
+    assert (data / 'sessions').stat().st_mode & 0o7777 == 0o700
