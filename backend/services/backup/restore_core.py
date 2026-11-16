@@ -715,7 +715,7 @@ class RestoreCoreMixin:
         self._restore_approval_requests(backup_data, results, plan)
         self._restore_acme_client_orders(backup_data, results, plan)
         self._restore_key_recovery_requests(backup_data, results, plan)
-        self._restore_https_files(backup_data, results)
+        self._restore_https_files(backup_data, results, plan)
 
         # Sections the manifest carries and the hand-written restorers never
         # learned about: applied from the manifest, with every column and with

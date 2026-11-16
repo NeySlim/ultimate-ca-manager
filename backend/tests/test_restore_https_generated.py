@@ -1,12 +1,12 @@
 """A restored HTTPS pair is stored for the next start: served after a bound certificate,
 before a regenerated pair; outside HA applied once, then the disk is the truth again."""
 import json
+from pathlib import Path
 from collections import defaultdict
 
 import pytest
 
 from services import shared_files
-from services.backup.errors import BackupSchemaError
 from services.backup.restore_extended import RestoreExtendedMixin
 
 CERT, KEY = 'RESTORED-CERT\n', 'RESTORED-KEY\n'
@@ -58,10 +58,21 @@ def test_an_archive_without_an_https_pair_keeps_what_is_stored(app, clean):
         assert not _stored(shared_files.HTTPS_RESTORED)
 
 
-def test_half_a_pair_is_refused(app, clean):
+@pytest.mark.parametrize('half', [{'cert_pem': CERT}, {'key_pem': KEY}])
+def test_half_a_pair_is_left_out_with_a_warning(app, clean, half):
+    """The export skips a file it cannot read: the rest of such an archive still restores."""
+    from types import SimpleNamespace
+    from models import db
+    plan = SimpleNamespace(warnings=[])
     with app.app_context():
-        with pytest.raises(BackupSchemaError, match='without'):
-            _restore_pair({'https_server': {'cert_pem': CERT}})
+        _store(shared_files.HTTPS_GENERATED)
+        results = defaultdict(int)
+        RestoreExtendedMixin()._restore_https_files({'https_server': half}, results, plan)
+        db.session.commit()
+        assert not _stored(shared_files.HTTPS_RESTORED)
+        assert _stored(shared_files.HTTPS_GENERATED)
+        assert results['https_server'] == 0
+        assert len(plan.warnings) == 1 and 'HTTPS' in plan.warnings[0]
 
 
 class _Database:
@@ -196,3 +207,33 @@ def test_regenerating_the_certificate_drops_the_restored_pair(app, auth_client, 
     assert r.status_code == 200, r.data
     with app.app_context():
         assert not _stored(shared_files.HTTPS_RESTORED)
+
+
+def test_an_archive_written_without_the_https_key_restores_and_says_so(app, clean,
+                                                                        monkeypatch):
+    """A key file the export could not find: every other section restores, the todo says why
+    the HTTPS certificate did not."""
+    from config.settings import Config
+    from services.backup import manifest
+    from services.backup.restore_completion import attach_restore_todo
+    from services.backup_service import BackupService
+    password = 'Correct-Horse-Battery-436'
+    cert_path, key_path = Path(Config.HTTPS_CERT_PATH), Path(Config.HTTPS_KEY_PATH)
+    saved = {p: p.read_bytes() for p in (cert_path, key_path) if p.exists()}
+    try:
+        cert_path.write_text(CERT)
+        key_path.unlink(missing_ok=True)
+        with app.app_context():
+            service = BackupService()
+            blob = service.create_backup(password, include={
+                n: n == 'groups' for n in manifest.SECTIONS})
+            results = service.restore_backup(blob, password)
+            attach_restore_todo(results)
+            assert not _stored(shared_files.HTTPS_RESTORED)
+            assert any('HTTPS certificate of the archive was not restored' in line
+                       for line in results['todo']), results['todo']
+    finally:
+        for path in (cert_path, key_path):
+            path.unlink(missing_ok=True)
+        for path, content in saved.items():
+            path.write_bytes(content)

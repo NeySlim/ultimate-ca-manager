@@ -729,20 +729,27 @@ class RestoreExtendedMixin:
 
         db.session.flush()
 
-    def _restore_https_files(self, backup_data: Dict, results: Dict) -> None:
+    def _restore_https_files(self, backup_data: Dict, results: Dict, plan=None) -> None:
         """The archive's HTTPS pair, stored in the restore's transaction for the next start.
 
         Every node's gunicorn master writes it (boot_config.materialize_https): the
-        restore itself writes no file.
+        restore itself writes no file. Half a pair (the export skips a file it cannot
+        read) is left out with a warning: the HTTPS certificate in place is kept.
         """
         https_data = backup_data.get('https_server', {})
         if not https_data:
             return
         cert_pem, key_pem = https_data.get('cert_pem'), https_data.get('key_pem')
         if not cert_pem or not key_pem:
-            raise BackupSchemaError(
-                "Invalid backup: the https_server section carries a certificate without "
-                "its key, or a key without its certificate. Nothing has been changed.")
+            warning = ("the HTTPS certificate of the archive was not restored: the archive "
+                       f"carries its {'certificate' if cert_pem else 'key'} without its "
+                       f"{'key' if cert_pem else 'certificate'}; the HTTPS certificate in "
+                       "place is kept")
+            if plan is not None:
+                plan.warnings.append(warning)
+            else:
+                logger.warning("Restore: %s", warning)
+            return
         import json
         from services import shared_files
         shared_files.store_file(shared_files.HTTPS_RESTORED, json.dumps(
