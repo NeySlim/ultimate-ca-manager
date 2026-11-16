@@ -558,9 +558,6 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
 
     if not user and conflict:
         return _refuse_username_conflict(provider, username, conflict)
-    if not user and email_owner:
-        return _refuse_email_conflict(provider, username, email, email_owner,
-                                      _email_unverified(provider, external_data))
 
     if user and not user.active:
         # A disabled account is a refused login: every caller checks it a
@@ -678,6 +675,10 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     if not provider.auto_create_users:
         logger.warning(f"SSO user {username} not found and auto_create disabled")
         return None, 'auto_create_disabled'
+    # Only where an account was about to be created: any earlier refusal keeps its answer.
+    if email_owner:
+        return _refuse_email_conflict(provider, username, email, email_owner,
+                                      _email_unverified(provider, external_data))
 
     # Auto-create a distinct SSO account. The email may already belong to a LOCAL
     # account — that's fine: SSO identity is the stable external id, never the

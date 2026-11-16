@@ -311,6 +311,47 @@ def test_another_person_sharing_the_email_signs_in_once_an_account_is_created_an
                   email=f'{name}@corp.example') == (idp_name, None)
 
 
+def _other_provider_owns(app, providers, name):
+    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+         sso_provider_id=providers.a, sso_external_id='sub-a', password_hash=NOPASS)
+
+
+def test_an_identity_the_mapping_refuses_learns_nothing_of_the_email_owner(app, providers):
+    """The e-mail refusal falls only where an account was about to be created."""
+    with app.app_context():
+        db.session.get(SSOProvider, providers.b).role_mapping = '{"grp-x": "admin"}'
+        db.session.get(SSOProvider, providers.b).default_role = None
+        db.session.commit()
+    name, idp_name = _name(), _name()
+    _other_provider_owns(app, providers, name)
+    got = _login(app, providers.b, idp_name, {'sub': 'sub-b', 'groups': ['y']},
+                 email=f'{name}@corp.example')
+    assert got == (None, 'sso_unmapped')
+    assert _count(app, username=idp_name) == 0
+
+
+def test_a_provider_without_auto_create_answers_as_before_on_a_taken_email(
+        app, providers, monkeypatch):
+    with app.app_context():
+        db.session.get(SSOProvider, providers.b).auto_create_users = False
+        db.session.commit()
+    name, idp_name = _name(), _name()
+    _other_provider_owns(app, providers, name)
+    got = _login(app, providers.b, idp_name, {'sub': 'sub-b'}, email=f'{name}@corp.example')
+    assert got == (None, 'auto_create_disabled')
+    # The LDAP door keeps hiding the provisioning state behind its generic answer.
+    from api.v2.sso import ldap_routes
+    lid = providers(provider_type='ldap', enabled=True, ldap_server='ldap.example.test',
+                    ldap_base_dn='dc=example', auto_create_users=False)
+    entry = {'dn': f'uid={idp_name},dc=example', 'uid': str(uuid.uuid4()),
+             'email': f'{name}@corp.example'}
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
+                        lambda _p, username, _pw, before_bind=None: (dict(entry, username=username), None))
+    r = app.test_client().post('/api/v2/sso/ldap/login',
+                               json={'username': idp_name, 'password': 'pw', 'provider_id': lid})
+    assert (r.status_code, r.get_json()['message']) == (401, 'Invalid credentials')
+
+
 def test_email_of_a_local_account_still_gives_a_distinct_sso_account(app, providers):
     """E-mail is unique among local accounts only (#136): an SSO account may share it."""
     name, idp_name = _name(), _name()
