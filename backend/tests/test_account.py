@@ -87,6 +87,19 @@ class TestUpdateProfile:
         data = assert_success(r)
         assert data.get('email') == 'admin@test.local'
 
+    def test_an_email_another_local_account_holds_is_refused(self, auth_client, create_user):
+        import uuid
+        taken = f'taken-{uuid.uuid4().hex[:8]}@test.local'
+        holder = create_user(username=f'holder{uuid.uuid4().hex[:8]}', email=taken)
+        before = assert_success(auth_client.get('/api/v2/account/profile')).get('email')
+        try:
+            r = patch_json(auth_client, '/api/v2/account/profile', {'email': taken})
+            assert_error(r, 409)
+            assert assert_success(auth_client.get('/api/v2/account/profile')).get('email') == before
+        finally:
+            patch_json(auth_client, '/api/v2/account/profile', {'email': before})
+            auth_client.delete(f"/api/v2/users/{holder['id']}")
+
     def test_update_full_name(self, auth_client):
         r = patch_json(auth_client, '/api/v2/account/profile',
                        {'full_name': 'Admin User'})
