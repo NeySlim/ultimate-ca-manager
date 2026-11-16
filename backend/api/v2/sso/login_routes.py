@@ -1,6 +1,7 @@
 from . import bp, VALID_ROLES
 from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
-                      _extract_saml_groups, oidc_identity, saml_identity)
+                      _extract_saml_groups, oidc_external_groups, oidc_identity,
+                      saml_identity)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import return_path, saml_sp
 from onelogin.saml2.constants import OneLogin_Saml2_Constants
@@ -406,8 +407,20 @@ def sso_callback(provider_type):
             if not username:
                 return redirect(_login_error('no_username', oauth2_next))
 
+            # Token groups count only from the token of this login: nonce checked and
+            # same subject as UserInfo. Unsigned (compatibility) tokens came from the
+            # token endpoint over the UserInfo channel (OIDC Core 3.1.3.7, step 6).
+            token_sub = (trusted_id_claims or {}).get('sub')
+            bound_claims = trusted_id_claims if (
+                expected_nonce and isinstance(token_sub, str) and token_sub
+                and userinfo.get('sub') == token_sub) else None
+            external_data = dict(userinfo)
+            external_data.pop('roles', None)
+            external_data['groups'] = oidc_external_groups(userinfo, bound_claims)
+
             # Create or update user
-            user, error_code = _get_or_create_sso_user(provider, username, email, fullname, userinfo)
+            user, error_code = _get_or_create_sso_user(provider, username, email, fullname,
+                                                       external_data)
 
             if not user:
                 return redirect(_login_error(error_code or 'user_creation_failed', oauth2_next))
