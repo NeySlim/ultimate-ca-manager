@@ -7,6 +7,7 @@ import logging
 import os
 import signal
 import threading
+import time
 
 GRACE_ENV = 'UCM_SCHEDULER_GRACEFUL_TIMEOUT'
 
@@ -34,6 +35,9 @@ def main() -> int:
     scheduler = get_scheduler()
     scheduler.rearm_grace()
     scheduler.start(app=app)
+    # Background jobs run here; orphans are recovered once this process holds the lock
+    from services.jobs.runner import JobRunner
+    runner = JobRunner(app, scheduler).start()
     # HA: reloads this process's own copies; the web worker owns the node's restart
     from services.cluster_commands import start_applier
     start_applier(app, record=False)
@@ -46,9 +50,12 @@ def main() -> int:
             break
 
     grace = float(os.environ.get(GRACE_ENV, '30'))
+    deadline = time.monotonic() + grace
+    runner.stop()
     scheduler.relinquish()
-    # The loop and a follower's per-node task share the grace
-    if not scheduler.join(grace):
+    # The loop, a follower's per-node task and the running jobs share the grace; a job cut
+    # short stays running and is concluded by the next start (or, in HA, its lapsed lease)
+    if not scheduler.join(grace) or not runner.join(max(0.0, deadline - time.monotonic())):
         # A stop that was asked for: 0, or the arbiter logs "Worker exited with code 1"
         logger.warning("A scheduled task outlasted %ss: the scheduler process exits anyway", grace)
         stop_publisher(timeout=2)

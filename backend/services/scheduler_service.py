@@ -663,6 +663,10 @@ class SchedulerService:
             self._leader_lock_pid = os.getpid()
         return self._leader_lock
 
+    def holds_lock(self) -> bool:
+        """This loop runs the scheduled tasks: the host lock, or the HA leader lock."""
+        return bool(self._running and self._owns_lock and not self.deposed)
+
     def _still_leader(self, lock) -> bool:
         """Checked before every task: once the lock is gone no task starts here."""
         if lock.still_held():
