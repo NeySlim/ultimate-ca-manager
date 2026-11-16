@@ -20,3 +20,41 @@ def test_the_statistics_an_analyze_left_are_dropped(app):
     conftest._drop_planner_statistics()
     with app.app_context():
         assert not _has_statistics()
+
+
+def test_a_failure_while_dropping_leaves_no_open_transaction(app, monkeypatch):
+    seen = []
+
+    def refuse():
+        seen.append(db.session())
+        raise RuntimeError('commit refused')
+
+    with app.app_context():
+        if db.engine.dialect.name != 'sqlite':
+            pytest.skip('SQLite planner statistics')
+        db.session.execute(text('ANALYZE'))
+        db.session.commit()
+        db.session.remove()
+    monkeypatch.setattr(db.session, 'commit', refuse)
+    with pytest.raises(RuntimeError):
+        conftest._drop_planner_statistics()
+    monkeypatch.undo()
+    assert seen and not seen[0].in_transaction()
+    conftest._drop_planner_statistics()
+
+
+def test_a_stat4_table_is_dropped_with_stat1(app):
+    with app.app_context():
+        if db.engine.dialect.name != 'sqlite':
+            pytest.skip('SQLite planner statistics')
+        db.session.execute(text('ANALYZE'))
+        try:
+            db.session.execute(text('CREATE TABLE IF NOT EXISTS sqlite_stat4 (tbl, idx, neq, nlt, ndlt, sample)'))
+        except Exception:
+            db.session.rollback()
+            pytest.skip('this SQLite is built without STAT4')
+        db.session.commit()
+        db.session.remove()
+    conftest._drop_planner_statistics()
+    with app.app_context():
+        assert not db.session.execute(text("SELECT 1 FROM sqlite_master WHERE name LIKE 'sqlite_stat%'")).first()

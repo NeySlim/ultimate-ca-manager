@@ -530,22 +530,32 @@ def _shared_tables_stay_in_their_module(request):
 
 
 def _drop_planner_statistics():
-    """Remove the SQLite planner statistics (sqlite_stat1) an ANALYZE left; a plan test reads them."""
+    """Remove the SQLite planner statistics (sqlite_stat1, and sqlite_stat4 where SQLite is built with
+    STAT4; the CI build is not) an ANALYZE left; a plan test reads them. The session never stays open."""
     if not _SESSION_APP:
         return
     from sqlalchemy import text as _text
     from models import db
     with _SESSION_APP[0].app_context():
-        if db.engine.dialect.name == 'sqlite':
+        try:
+            if db.engine.dialect.name == 'sqlite':
+                db.session.rollback()
+                tables = [t for t in ('sqlite_stat1', 'sqlite_stat4')
+                          if db.session.execute(_text('SELECT 1 FROM sqlite_master WHERE name = :n'), {'n': t}).first()]
+                # Dropping a table leaves the loaded statistics in the connection: empty them, reload, drop
+                for table in tables:
+                    db.session.execute(_text(f'DELETE FROM {table}'))
+                if tables:
+                    db.session.execute(_text('ANALYZE sqlite_master'))
+                for table in tables:
+                    db.session.execute(_text(f'DELETE FROM {table}'))
+                    db.session.execute(_text(f'DROP TABLE {table}'))
+                db.session.commit()
+        except Exception:
             db.session.rollback()
-            # Dropping the table leaves the loaded statistics in the connection: empty them, reload, drop
-            if db.session.execute(_text("SELECT 1 FROM sqlite_master WHERE name = 'sqlite_stat1'")).first():
-                db.session.execute(_text('DELETE FROM sqlite_stat1'))
-                db.session.execute(_text('ANALYZE sqlite_master'))
-                db.session.execute(_text('DELETE FROM sqlite_stat1'))
-                db.session.execute(_text('DROP TABLE sqlite_stat1'))
-            db.session.commit()
-        db.session.remove()
+            raise
+        finally:
+            db.session.remove()
 
 
 @pytest.fixture(autouse=True, scope='module')
