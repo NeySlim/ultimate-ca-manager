@@ -167,10 +167,12 @@ LEFT_REFUSED=""
 if [ -n "$ARCHIVE_DUE" ]; then
     : > "$ARCHIVE_PENDING"
     ARCHIVE_RC=0
-    UCM_PYTHON=%{ucm_python} sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG" || ARCHIVE_RC=$?
+    UCM_RETRY="dnf reinstall ucm" UCM_PYTHON=%{ucm_python} sh "$UCM_HOME/scripts/archive-leftovers.sh" "$UCM_HOME" "$UCM_DATA" "$UCM_CONFIG" || ARCHIVE_RC=$?
     case $ARCHIVE_RC in
         0) ;;
         3) LEFT_REFUSED=1 ;;
+        # The archiver said the retry, before its last line
+        1|2) exit 1 ;;
         *) echo "UCM was not set up. Fix the cause, then run: dnf reinstall ucm"
            exit 1 ;;
     esac

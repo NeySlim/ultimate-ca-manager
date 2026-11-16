@@ -303,7 +303,7 @@ def _post_sandbox(tmp_path, archive_rc):
         # The archiver's answer, or the scriptlet killed while it runs; whether the
         # configuration existed when it ran
         # The archiver is called with the interpreter it renames with
-        'sh': record.replace('$*', '${UCM_PYTHON:+UCM_PYTHON=$UCM_PYTHON }$*') + f'\n[ -e "{config}/ucm.env" ] && echo "sh saw ucm.env" >> "$LOG"\n'
+        'sh': record.replace('$*', '${UCM_RETRY:+UCM_RETRY=$UCM_RETRY }${UCM_PYTHON:+UCM_PYTHON=$UCM_PYTHON }$*') + f'\n[ -e "{config}/ucm.env" ] && echo "sh saw ucm.env" >> "$LOG"\n'
               + {'kill': 'kill -9 $PPID; sleep 5',
                  # Puts back an archived ucm.env, archives it, carries UCM_FIPS_BUILD=1 over
                  'fips': f'printf "UCM_FIPS_BUILD=1\\n" > "{config}/ucm.env"'}.get(
@@ -370,8 +370,8 @@ def _check_order(calls, home, data, config):
     first_data = next(i for i, c in enumerate(calls) if c.startswith('mkdir') and str(data) in c)
     assert venv < archive < first_data
     assert 'sh saw ucm.env' not in calls
-    assert _archiver_calls(calls) == [
-        f'sh UCM_PYTHON=python3 {home}/scripts/{ARCHIVER} {home} {data} {config}']
+    assert [c.split(' UCM_PYTHON=')[1] for c in _archiver_calls(calls)] == [
+        f'python3 {home}/scripts/{ARCHIVER} {home} {data} {config}']
 
 
 @pytest.mark.parametrize('previous', ['', '2.253', '1.8.3'])
@@ -413,22 +413,26 @@ def test_the_rpm_post_resets_the_start_limit_before_it_starts_the_service(tmp_pa
 PENDING = '.leftover-archive-pending'
 
 
-def _stopped_at_the_archiver(out, calls, home, data, config, retry):
+def _stopped_at_the_archiver(out, calls, home, data, config, retry, archive_rc):
     """A failed archiving ends the script: no call after it, nothing in the data or the
-    configuration, no banner, the retry named, and the next run told to archive again."""
+    configuration, no banner, the next run told to archive again, and the retry named: by
+    the archiver on 1 and 2, before the line it ends with; by the script on another code."""
     assert out.returncode != 0
     archive = calls.index(_archiver_calls(calls)[0])
     assert calls[archive + 1:] == []
     assert list(data.iterdir()) == [] and list(config.iterdir()) == []
     assert 'INSTALLED' not in out.stdout
-    assert retry in out.stdout
+    assert calls[archive].startswith(f'sh UCM_RETRY={retry} UCM_PYTHON=')
+    said = f'UCM was not set up. Fix the cause, then run: {retry}'
+    assert (said in out.stdout) is (archive_rc not in (1, 2)), out.stdout
+    assert archive_rc in (1, 2) or out.stdout.splitlines()[-1] == said, out.stdout
     assert (home / PENDING).exists()
 
 
-@pytest.mark.parametrize('archive_rc', [1, 2])
+@pytest.mark.parametrize('archive_rc', [1, 2, 127])
 def test_the_deb_postinst_stops_when_archiving_failed(tmp_path, archive_rc):
     out, calls, home, data, config = _run_postinst(tmp_path, 'configure', '', archive_rc=archive_rc)
-    _stopped_at_the_archiver(out, calls, home, data, config, 'dpkg --configure -a')
+    _stopped_at_the_archiver(out, calls, home, data, config, 'dpkg --configure -a', archive_rc)
 
 
 @pytest.mark.parametrize('previous', ['', '3.0'])
@@ -457,10 +461,10 @@ def test_the_rpm_post_archives_on_a_new_install_only(tmp_path):
     assert _archiver_calls(calls) == []
 
 
-@pytest.mark.parametrize('archive_rc', [1, 2])
+@pytest.mark.parametrize('archive_rc', [1, 2, 127])
 def test_the_rpm_post_stops_when_archiving_failed(tmp_path, archive_rc):
     out, calls, home, data, config = _run_post(tmp_path, '1', archive_rc=archive_rc)
-    _stopped_at_the_archiver(out, calls, home, data, config, 'dnf reinstall ucm')
+    _stopped_at_the_archiver(out, calls, home, data, config, 'dnf reinstall ucm', archive_rc)
 
 
 def test_the_rpm_post_archives_again_on_the_reinstall_after_a_failed_attempt(tmp_path):

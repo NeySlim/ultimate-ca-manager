@@ -1889,14 +1889,19 @@ def test_a_run_killed_while_the_readme_is_first_written_is_put_back_then_archive
 
 @pytest.mark.parametrize('case', ['archived', 'failed', 'nothing to say'])
 def test_a_run_that_said_a_line_dnf5_cuts_names_the_log_once(tmp_path, case):
+    """Last, after the retry the package names."""
     box = Box(tmp_path, python='stub', registry='short' if case != 'nothing to say' else 'full')
     if case == 'nothing to say':
         box.python('stub', code=0)
     if case == 'failed':
         box.wrap(other_fs=(box.data,), refused=(f'{box.data}/https_key.pem',))
-    out = box.run()
+    out = box.run(env={'UCM_RETRY': 'dnf reinstall ucm'})
     lines = out.stdout.splitlines()
     note = f'UCM: the full text is in {box.log}'
+    retry = 'UCM was not set up. Fix the cause, then run: dnf reinstall ucm'
+    assert (retry in lines) is (case == 'failed'), out.stdout
+    if case == 'failed':
+        assert lines[-2:] == [retry, note], out.stdout
     if case == 'nothing to say':
         assert out.returncode == 0 and note not in lines, out.stdout
         return

@@ -12,7 +12,8 @@
 # place, and the service will refuse to start on it; 1: not archived, everything is back
 # in place (or nothing was moved: no interpreter to rename with); 2: not archived, some
 # files are still in the archive (the next run tries to put them back first). On 1 and 2
-# the install must stop; on 3 it must not announce a success.
+# the install must stop; on 3 it must not announce a success. UCM_RETRY: the command that
+# retries the install, said on 1 and 2.
 set -u
 
 UCM_HOME=$1
@@ -49,7 +50,16 @@ full_text() {
     tail -c +$((LOG_START + 1)) -- "$LOG" 2>/dev/null | awk 'length($0) > 100 { f = 1 } END { exit !f }' \
         && say "UCM: the full text is in $LOG"
 }
-trap full_text EXIT
+# The package stops on 1 and 2: its retry is said here, so that the line naming the log is the last
+finish() {
+    code=$?
+    case $code in
+        1|2) [ -z "${UCM_RETRY:-}" ] || say "UCM was not set up. Fix the cause, then run: $UCM_RETRY" ;;
+    esac
+    full_text
+    exit "$code"
+}
+trap finish EXIT
 
 # Last value of $2 in env file $1, unquoted; the file is read, never sourced
 env_value() {
