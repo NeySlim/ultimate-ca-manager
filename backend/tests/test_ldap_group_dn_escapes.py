@@ -17,7 +17,8 @@ USER_DN = 'uid=probe,ou=People\\, EU,dc=example,dc=test'
 
 
 class _Directory:
-    """Finds the user, answers memberOf with GROUP_DN and a member search with GROUP under BASE_DN's parent."""
+    """Finds the user, answers memberOf with GROUP_DN and a member search with GROUP under
+    the naming context holding BASE_DN."""
 
     def __init__(self):
         self.bases = []
@@ -27,14 +28,15 @@ class _Directory:
 
         class _Conn:
             def __init__(self):
-                self.user, self.entries = user, []
+                self.user, self.entries, self.result = user, [], None
 
-            def search(self, base, query, attributes=None):
+            def search(self, base, query, attributes=None, **kwargs):
                 directory.bases.append(base)
+                self.result = {'result': 0}
                 attributes = attributes or []
                 if attributes == ['cn']:  # the member/uniqueMember group search
                     group = SimpleNamespace(cn=GROUP)
-                    self.entries = [group] if base == 'dc=example,dc=test' else []
+                    self.entries = [group] if base.lower() == 'dc=example,dc=test' else []
                     return
                 entry = SimpleNamespace(entry_dn=USER_DN, uid='probe', mail='', cn='Probe')
                 if 'memberOf' in attributes or attributes == ['*', '+']:
@@ -50,11 +52,12 @@ def _patch(monkeypatch, directory):
     import ldap3
     import api.v2.sso.connection_tests as connection_tests
     import api.v2.sso.mapping_tests as mapping_tests
-    monkeypatch.setattr(ldap3, 'Server', lambda *a, **k: object())
+    server = SimpleNamespace(info=SimpleNamespace(naming_contexts=['DC=Example,DC=Test']))
+    monkeypatch.setattr(ldap3, 'Server', lambda *a, **k: server)
     monkeypatch.setattr(ldap3, 'Connection', directory.connection)
     for module in (connection_tests, mapping_tests):
         monkeypatch.setattr(module, '_build_ldap_tls', lambda provider: None)
-        monkeypatch.setattr(module, '_decrypt_ldap_password', lambda provider: 'svc')
+    monkeypatch.setattr(connection_tests, '_decrypt_ldap_password', lambda provider: 'svc')
     monkeypatch.setattr(connection_tests, 'ldap_bind', lambda conn, provider: True)
     monkeypatch.setattr(connection_tests, '_check_account_disabled', lambda *a: False)
 
