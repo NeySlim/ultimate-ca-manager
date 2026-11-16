@@ -255,6 +255,18 @@ def test_unverified_token_without_a_session_nonce_gives_no_groups(entra):
     assert entra.role_of('entra12') is None
 
 
+@pytest.mark.parametrize('verified', [True, False], ids=['verified', 'unverified'])
+def test_token_and_userinfo_without_subject_give_no_token_groups(entra, verified):
+    # None == None is no binding: the token groups need a subject equal to UserInfo's.
+    entra.configure(id_token_verify=verified)
+    name = f'nosub-{verified}'
+    claims = _valid_claims('x', groups=['grp-oid-admins'])
+    claims.pop('sub')
+    loc = entra({'preferred_username': name}, claims)
+    assert loc.endswith(UNMAPPED)
+    assert entra.role_of(name) is None
+
+
 def test_entra_groups_overage_is_reported_and_refused(entra, caplog):
     with caplog.at_level(logging.WARNING):
         loc = entra({'sub': 's9', 'preferred_username': 'entra9'},

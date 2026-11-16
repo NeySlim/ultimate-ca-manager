@@ -413,7 +413,7 @@ def sso_callback(provider_type):
             # verified TLS with every other claim valid (OIDC Core 3.1.3.7, steps 2-6, 9).
             token_sub = (trusted_id_claims or {}).get('sub')
             bound_claims = trusted_id_claims if (
-                expected_nonce and isinstance(token_sub, str) and token_sub
+                isinstance(token_sub, str) and token_sub
                 and userinfo.get('sub') == token_sub) else None
             if bound_claims is not None and not verification_enabled and (
                     verify is False
