@@ -415,11 +415,11 @@ def mapped_custom_role_names(role_mapping):
             if isinstance(name, str)}
 
 
-def validate_role_mapping(value):
+def validate_role_mapping(value, provider_type=None):
     """Check a role_mapping at save time. Returns ``(normalized_dict, error)``.
 
     Rows with no key and no value (blank editor rows) are dropped; a key is
-    saved without its edge spaces.
+    saved without its edge spaces. Two keys the provider compares equal are refused.
     """
     if isinstance(value, str):
         try:
@@ -430,7 +430,8 @@ def validate_role_mapping(value):
         return {}, None
     if not isinstance(value, dict):
         return None, "role_mapping must be an object mapping external groups to roles"
-    cleaned = {}
+    cleaned, seen = {}, set()
+    match_key = _group_match_key_of(provider_type)
     for group, entry in value.items():
         blank = entry in (None, '', {}) or (isinstance(entry, dict) and not any(entry.values()))
         if not isinstance(group, str) or not group.strip():
@@ -452,8 +453,9 @@ def validate_role_mapping(value):
         if role is None and custom is None:
             return None, f"role_mapping entry '{group}' needs a role or a custom role"
         name = group.strip()
-        if name in cleaned:
+        if match_key(name) in seen:
             return None, f"role_mapping has two entries for the external group '{name}'"
+        seen.add(match_key(name))
         cleaned[name] = entry
     return cleaned, None
 
@@ -483,13 +485,17 @@ def _external_groups(external_data):
     return groups if isinstance(groups, (list, tuple, set)) else []
 
 
+def _group_match_key_of(provider_type):
+    if provider_type == 'ldap':
+        return lambda name: str(name).strip().casefold()
+    return lambda name: name
+
+
 def group_match_key(provider):
     """How a rule key and a group name compare. LDAP: as cn does, caseIgnoreMatch
     (RFC 4519 §2.3, via name §2.18), case and edge spaces ignored. OIDC and SAML
     groups are opaque identifiers: exact."""
-    if getattr(provider, 'provider_type', None) == 'ldap':
-        return lambda name: str(name).strip().casefold()
-    return lambda name: name
+    return _group_match_key_of(getattr(provider, 'provider_type', None))
 
 
 def _external_group_keys(provider, external_data):

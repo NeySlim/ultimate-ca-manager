@@ -474,6 +474,33 @@ def test_a_rule_key_is_saved_without_edge_spaces(app, auth_client):
             db.session.commit()
 
 
+@pytest.mark.parametrize('provider_type,accepted', [('ldap', False), ('oauth2', True)])
+def test_two_rule_keys_ldap_compares_equal_are_refused_for_ldap(
+        app, auth_client, provider_type, accepted):
+    twins = {'PKI-Admins': 'viewer', 'pki-admins': 'admin'}
+    body = {'name': f'grp-twin-{uuid.uuid4().hex[:6]}', 'provider_type': provider_type,
+            'role_mapping': {'ops': 'viewer'}}
+    if provider_type == 'ldap':
+        body.update(ldap_server='ldap.example.com', ldap_base_dn='dc=example,dc=com')
+    r = auth_client.post('/api/v2/sso/providers', json={**body, 'role_mapping': twins})
+    assert (r.status_code in (200, 201)) is accepted, r.data
+    if accepted:
+        pid = r.get_json()['data']['id']
+    else:
+        assert 'two entries' in r.get_json()['message']
+        r = auth_client.post('/api/v2/sso/providers', json=body)
+        assert r.status_code in (200, 201), r.data
+        pid = r.get_json()['data']['id']
+    try:
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}',
+                            json={'role_mapping': {'PKI-Admins ': 'viewer', 'pki-ADMINS': 'admin'}})
+        assert (r.status_code == 200) is accepted, r.data
+    finally:
+        with app.app_context():
+            SSOProvider.query.filter_by(id=pid).delete()
+            db.session.commit()
+
+
 # ── 5. A failed group read says so ───────────────────────────────────────────
 
 def test_a_failed_group_read_says_the_groups_could_not_be_read(env, monkeypatch, caplog):
