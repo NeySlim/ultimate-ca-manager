@@ -60,16 +60,16 @@ def _is_pg(executor):
     return bind.dialect.name == 'postgresql'
 
 
-def _row(executor, job_id):
+def _job_row(executor, job_id):
     found = executor.execute(select(T).where(T.c.id == job_id)).mappings().first()
     return dict(found) if found is not None else None
 
 
-def get(executor, job_id):
-    return _row(executor, job_id)
+def job_row(executor, job_id):
+    return _job_row(executor, job_id)
 
 
-def active(executor, slot=None):
+def active_jobs(executor, slot=None):
     query = select(T).where(T.c.state.in_(ACTIVE_STATES)).order_by(T.c.created_at)
     if slot is not None:
         query = query.where(T.c.slot == slot)
@@ -84,7 +84,7 @@ def _conflict(session, job_id, slot, exclusive, exclusive_slots):
     return dict(found) if found is not None else None
 
 
-def create(session, *, kind, slot, exclusive, exclusive_slots, now, params=None, secret=None,
+def create_job(session, *, kind, slot, exclusive, exclusive_slots, now, params=None, secret=None,
            file_name=None, node_id=None, requester=(None, None, None), job_id=None):
     """Insert a pending job and commit, or raise SlotBusy naming the active job.
 
@@ -108,16 +108,16 @@ def create(session, *, kind, slot, exclusive, exclusive_slots, now, params=None,
         session.commit()
     except IntegrityError:
         session.rollback()
-        held = active(session, slot)
+        held = active_jobs(session, slot)
         raise SlotBusy(held[0] if held else None)
     return job_id
 
 
-def claim(session, job_id, executor, now, lease_seconds=LEASE_SECONDS):
+def claim_job(session, job_id, executor, now, lease_seconds=LEASE_SECONDS):
     """Take a pending job: the row as it was (secret included, for memory only), or None.
 
     The secret is cleared in the same transaction that takes the job."""
-    row = _row(session, job_id)
+    row = _job_row(session, job_id)
     if row is None or row['state'] != PENDING:
         session.rollback()
         return None
@@ -131,13 +131,13 @@ def claim(session, job_id, executor, now, lease_seconds=LEASE_SECONDS):
     return row
 
 
-def renew(conn, job_id, executor, now, lease_seconds=LEASE_SECONDS):
+def renew_lease(conn, job_id, executor, now, lease_seconds=LEASE_SECONDS):
     return conn.execute(update(T).where(
         T.c.id == job_id, T.c.state == RUNNING, T.c.executor == executor).values(
         lease_expires_at=now + timedelta(seconds=lease_seconds))).rowcount == 1
 
 
-def progress(conn, job_id, executor, done=None, total=None, phase=None):
+def write_progress(conn, job_id, executor, done=None, total=None, phase=None):
     """Write the progress of a running job; True when a cancellation was asked. JobLost when
     the job is no longer this executor's."""
     values = {k: v for k, v in (('progress_done', done), ('progress_total', total),
@@ -152,13 +152,13 @@ def progress(conn, job_id, executor, done=None, total=None, phase=None):
     return bool(asked[0])
 
 
-def conclude(session, job_id, *, state, reason, from_states, now, result=None, executor=None,
-             where=(), audit=None):
+def conclude_job(session, job_id, *, state, reason, from_states, now, result=None, executor=None,
+             where=(), result_line=None):
     """Move a job to a final state if it is still in one of ``from_states``; True when this
-    call did it. ``audit(row, state, reason)`` writes the job's one result line in the same
+    call did it. ``result_line(row, state, reason)`` writes the job's one result line in the same
     transaction and commits it; a falsy return undoes the conclusion."""
     assert state in FINAL_STATES
-    row = _row(session, job_id)
+    row = _job_row(session, job_id)
     conditions = [T.c.id == job_id, T.c.state.in_(tuple(from_states)), *where]
     if executor is not None:
         conditions.append(T.c.executor == executor)
@@ -168,9 +168,9 @@ def conclude(session, job_id, *, state, reason, from_states, now, result=None, e
     if done != 1:
         session.rollback()
         return False
-    if audit is not None:
+    if result_line is not None:
         try:
-            written = audit(row, state, reason)
+            written = result_line(row, state, reason)
         except Exception as e:
             logger.error(f"Job {job_id}: result line not written: {type(e).__name__}")
             written = False
@@ -184,11 +184,11 @@ def conclude(session, job_id, *, state, reason, from_states, now, result=None, e
     return True
 
 
-def request_cancel(session, job_id, now, audit=None):
+def cancel_or_flag(session, job_id, now, result_line=None):
     """'cancelled' (it was pending), 'requested' (the executor stops at its next check),
     or 'final' (already over)."""
-    if conclude(session, job_id, state=CANCELLED, reason=CANCELLED_REASON, from_states=(PENDING,),
-                now=now, audit=audit):
+    if conclude_job(session, job_id, state=CANCELLED, reason=CANCELLED_REASON, from_states=(PENDING,),
+                now=now, result_line=result_line):
         return 'cancelled'
     done = session.execute(update(T).where(T.c.id == job_id, T.c.state == RUNNING).values(
         cancel_requested=True)).rowcount
@@ -196,7 +196,7 @@ def request_cancel(session, job_id, now, audit=None):
     return 'requested' if done == 1 else 'final'
 
 
-def recover(session, *, now, all_running, audit_for=None, mine=None):
+def recover_orphans(session, *, now, all_running, audit_for=None, mine=None):
     """Conclude the jobs whose executor is gone; returns how many.
 
     ``all_running``: every running job is an orphan (single node, the scheduler process
@@ -211,9 +211,9 @@ def recover(session, *, now, all_running, audit_for=None, mine=None):
     session.rollback()
     for job_id, kind, executor in rows:
         extra = () if all_running or mine.get(job_id) == executor else (lapsed,)
-        if conclude(session, job_id, state=FAILED, reason=EXECUTOR_LOST, from_states=(RUNNING,),
+        if conclude_job(session, job_id, state=FAILED, reason=EXECUTOR_LOST, from_states=(RUNNING,),
                     now=now, executor=executor, where=extra,
-                    audit=audit_for(kind) if audit_for else None):
+                    result_line=audit_for(kind) if audit_for else None):
             logger.warning(f"Background job {job_id} ({kind}) lost its executor: failed")
             concluded += 1
     cutoff = now - timedelta(seconds=NOT_TAKEN_SECONDS)
@@ -221,9 +221,9 @@ def recover(session, *, now, all_running, audit_for=None, mine=None):
         T.c.state == PENDING, T.c.created_at < cutoff)).all()
     session.rollback()
     for job_id, kind in stale:
-        if conclude(session, job_id, state=FAILED, reason=NOT_TAKEN, from_states=(PENDING,),
+        if conclude_job(session, job_id, state=FAILED, reason=NOT_TAKEN, from_states=(PENDING,),
                     now=now, where=(T.c.created_at < cutoff,),
-                    audit=audit_for(kind) if audit_for else None):
+                    result_line=audit_for(kind) if audit_for else None):
             logger.warning(f"Background job {job_id} ({kind}) was never taken: failed")
             concluded += 1
     return concluded
@@ -280,7 +280,7 @@ def purge_file(name, directory=None):
     return True
 
 
-def sweep_files(executor, directory=None):
+def sweep_job_files(executor, directory=None):
     """At start: remove every job file whose job is final or unknown, never an active job's."""
     directory = directory or jobs_tmp_dir()
     try:
@@ -292,7 +292,7 @@ def sweep_files(executor, directory=None):
         match = _FILE_NAME.match(name)
         if not match:
             continue
-        row = _row(executor, match.group(1))
+        row = _job_row(executor, match.group(1))
         if row is not None and row['state'] in ACTIVE_STATES:
             continue
         removed += purge_file(name, directory)

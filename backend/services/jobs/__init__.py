@@ -103,7 +103,7 @@ def _node_id():
     return Config.NODE_ID
 
 
-def start(kind: str, params: Optional[dict] = None, secret: Optional[str] = None,
+def start_job(kind: str, params: Optional[dict] = None, secret: Optional[str] = None,
           file_name: Optional[str] = None, job_id: Optional[str] = None) -> str:
     """Create the job (SlotBusy when its slot is held) and hand it to an executor; its id.
 
@@ -115,19 +115,19 @@ def start(kind: str, params: Optional[dict] = None, secret: Optional[str] = None
     if secret is not None:
         from utils.encryption import encrypt_value
         cipher = encrypt_value(secret)
-    job_id = store.create(
+    job_id = store.create_job(
         db.session, kind=kind, slot=jt.slot, exclusive=jt.slot in EXCLUSIVE_SLOTS,
         exclusive_slots=EXCLUSIVE_SLOTS, now=_now(), params=params, secret=cipher,
         file_name=file_name, node_id=_node_id() if jt.node_bound and ha_enabled() else None,
         requester=_requester(), job_id=job_id)
     from services.jobs import runner
-    runner.dispatch(job_id)
+    runner.dispatch_job(job_id)
     return job_id
 
 
-def get(job_id: str) -> Optional[dict]:
+def get_job(job_id: str) -> Optional[dict]:
     from models import db
-    row = store.get(db.session, job_id)
+    row = store.job_row(db.session, job_id)
     db.session.rollback()
     return row
 
@@ -135,7 +135,7 @@ def get(job_id: str) -> Optional[dict]:
 def active_job(kind: str) -> Optional[dict]:
     from models import db
     jt = _TYPES[kind]
-    rows = [r for r in store.active(db.session, jt.slot) if r['kind'] == kind]
+    rows = [r for r in store.active_jobs(db.session, jt.slot) if r['kind'] == kind]
     db.session.rollback()
     return rows[0] if rows else None
 
@@ -156,12 +156,12 @@ def list_jobs(kinds, state: Optional[str] = None, limit: int = 20) -> list:
 
 
 def audit_writer(kind: str):
-    """The callback store.conclude() calls to write the job's result line, or None."""
+    """The callback store.conclude_job() calls to write the job's result line, or None."""
     jt = _TYPES.get(kind)
     if jt is None or jt.audit_action is None:
         return None
 
-    def write(row, state, reason, details=None):
+    def _write_job_result_line(row, state, reason, details=None):
         from services.audit_service import AuditService
         written = AuditService.log_action(
             action=jt.audit_action, resource_type=jt.resource_type, resource_name=jt.label,
@@ -171,7 +171,7 @@ def audit_writer(kind: str):
             user_id=(row or {}).get('requested_by_id'),
             ip_address=(row or {}).get('requested_ip'))
         return written is not None
-    return write
+    return _write_job_result_line
 
 
 _PHRASES = {
@@ -187,20 +187,20 @@ def _phrase(jt, state, reason):
     return (_PHRASES.get((state, reason)) or _PHRASES[(state, None)]).format(label=jt.label)
 
 
-def cancel(job_id: str) -> str:
+def request_cancellation(job_id: str) -> str:
     """'cancelled', 'requested' or 'final' (store.request_cancel)."""
     from models import db
-    row = store.get(db.session, job_id)
+    row = store.job_row(db.session, job_id)
     db.session.rollback()
-    return store.request_cancel(db.session, job_id, _now(), audit=audit_writer(row['kind']))
+    return store.cancel_or_flag(db.session, job_id, _now(), result_line=audit_writer(row['kind']))
 
 
-def wait(job_id: str, seconds: float) -> Optional[dict]:
+def wait_for_job(job_id: str, seconds: float) -> Optional[dict]:
     from services.jobs import runner
-    return runner.wait(job_id, seconds)
+    return runner.wait_for_job(job_id, seconds)
 
 
-def public(row: dict, with_result: bool = True) -> dict:
+def public_view(row: dict, with_result: bool = True) -> dict:
     """What the API shows of a job: no secret, no path, no host name."""
     from utils.datetime_utils import utc_isoformat
     out = {

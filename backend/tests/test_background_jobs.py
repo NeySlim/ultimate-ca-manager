@@ -108,15 +108,15 @@ def _start(app, kind, created, secret=None, with_file=False, params=None):
             os.makedirs(store.jobs_tmp_dir(), exist_ok=True)
             with open(os.path.join(store.jobs_tmp_dir(), name), 'wb') as handle:
                 handle.write(b'archive bytes')
-            job_id = jobs.start(kind, params=params, secret=secret, file_name=name, job_id=job_file_id)
+            job_id = jobs.start_job(kind, params=params, secret=secret, file_name=name, job_id=job_file_id)
         else:
-            job_id = jobs.start(kind, params=params, secret=secret)
+            job_id = jobs.start_job(kind, params=params, secret=secret)
     created.append(job_id)
     return job_id, name
 
 
 def _row(job_id):
-    row = store.get(db.session, job_id)
+    row = store.job_row(db.session, job_id)
     db.session.rollback()
     return row
 
@@ -129,7 +129,7 @@ def _assert_final(app, job_id, state, reason, lines_before, lines, file_name=Non
         assert row['secret'] is None and row['lease_expires_at'] is None
         assert row['finished_at'] is not None
         assert _audit_lines() - lines_before == lines
-        assert not [r for r in store.active(db.session, row['slot'])]
+        assert not [r for r in store.active_jobs(db.session, row['slot'])]
         db.session.rollback()
     if file_name:
         assert not os.path.exists(os.path.join(store.jobs_tmp_dir(), file_name))
@@ -201,7 +201,7 @@ def test_a_cancellation_stops_a_running_job(app, operation, created, monkeypatch
     job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
     gate.wait()
     with app.app_context():
-        assert jobs.cancel(job_id) == 'requested'
+        assert jobs.request_cancellation(job_id) == 'requested'
         assert _row(job_id)['state'] == 'running'
     gate.release.set()
     _assert_final(app, job_id, 'cancelled', 'cancelled', before, operation.lines, name)
@@ -209,36 +209,36 @@ def test_a_cancellation_stops_a_running_job(app, operation, created, monkeypatch
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 def test_a_pending_job_cancels_at_once(app, operation, created, monkeypatch):
-    monkeypatch.setattr(runner, 'dispatch', lambda job_id: None)  # no executor yet
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)  # no executor yet
     before = _audit_lines_in(app)
     job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
     with app.app_context():
         if operation.secret:  # encrypted while it waits
             assert _row(job_id)['secret'] not in (None, operation.secret)
-        assert jobs.cancel(job_id) == 'cancelled'
-        assert jobs.cancel(job_id) == 'final'
+        assert jobs.request_cancellation(job_id) == 'cancelled'
+        assert jobs.request_cancellation(job_id) == 'final'
     _assert_final(app, job_id, 'cancelled', 'cancelled', before, operation.lines, name)
 
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 def test_a_job_nobody_takes_ends_not_taken(app, operation, created, monkeypatch):
-    monkeypatch.setattr(runner, 'dispatch', lambda job_id: None)
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
     before = _audit_lines_in(app)
     job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
     with app.app_context():
         now = jobs._now()
         # Not yet past the delay: left alone
-        assert store.recover(db.session, now=now, all_running=False, audit_for=jobs.audit_writer) == 0
+        assert store.recover_orphans(db.session, now=now, all_running=False, audit_for=jobs.audit_writer) == 0
         later = now + timedelta(seconds=store.NOT_TAKEN_SECONDS + 1)
-        assert store.recover(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
+        assert store.recover_orphans(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
     _assert_final(app, job_id, 'failed', 'not_taken', before, operation.lines, name)
 
 
 def _taken_by_a_lost_executor(app, operation, created, monkeypatch):
-    monkeypatch.setattr(runner, 'dispatch', lambda job_id: None)
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
     job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
     with app.app_context():
-        assert store.claim(db.session, job_id, 'lost-node/1/x', jobs._now()) is not None
+        assert store.claim_job(db.session, job_id, 'lost-node/1/x', jobs._now()) is not None
         assert _row(job_id)['secret'] is None  # cleared by the take itself
     return job_id, name
 
@@ -248,7 +248,7 @@ def test_a_single_node_start_concludes_every_running_job(app, operation, created
     before = _audit_lines_in(app)
     job_id, name = _taken_by_a_lost_executor(app, operation, created, monkeypatch)
     with app.app_context():
-        assert store.recover(db.session, now=jobs._now(), all_running=True,
+        assert store.recover_orphans(db.session, now=jobs._now(), all_running=True,
                              audit_for=jobs.audit_writer) >= 1
     _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name)
 
@@ -259,10 +259,10 @@ def test_a_lapsed_lease_concludes_the_job_and_only_then(app, operation, created,
     job_id, name = _taken_by_a_lost_executor(app, operation, created, monkeypatch)
     with app.app_context():
         now = jobs._now()
-        assert store.recover(db.session, now=now, all_running=False, audit_for=jobs.audit_writer) == 0
+        assert store.recover_orphans(db.session, now=now, all_running=False, audit_for=jobs.audit_writer) == 0
         assert _row(job_id)['state'] == 'running'
         later = now + timedelta(seconds=store.LEASE_SECONDS + 1)
-        assert store.recover(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
+        assert store.recover_orphans(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
     _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name)
 
 
@@ -275,21 +275,21 @@ def test_a_run_concluded_elsewhere_never_concludes_twice(app, operation, created
     gate.wait()
     with app.app_context():
         later = jobs._now() + timedelta(seconds=store.LEASE_SECONDS + 1)
-        assert store.recover(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
+        assert store.recover_orphans(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
     gate.release.set()
     _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name)
 
 
 def test_the_conclusion_is_undone_when_its_audit_line_is_not_written(app, fake_types, created,
                                                                     monkeypatch):
-    monkeypatch.setattr(runner, 'dispatch', lambda job_id: None)
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
     job_id, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
     with app.app_context():
-        assert not store.conclude(db.session, job_id, state='cancelled', reason='cancelled',
+        assert not store.conclude_job(db.session, job_id, state='cancelled', reason='cancelled',
                                   from_states=('pending',), now=jobs._now(),
-                                  audit=lambda row, state, reason: False)
+                                  result_line=lambda row, state, reason: False)
         assert _row(job_id)['state'] == 'pending'
-        assert jobs.cancel(job_id) == 'cancelled'
+        assert jobs.request_cancellation(job_id) == 'cancelled'
 
 
 def test_the_audit_line_names_the_requester(app, fake_types, created):
@@ -305,7 +305,7 @@ def test_the_audit_line_names_the_requester(app, fake_types, created):
 # -- slots ------------------------------------------------------------------------------
 
 def test_one_active_job_per_slot_and_a_restore_excludes_all(app, fake_types, created, monkeypatch):
-    monkeypatch.setattr(runner, 'dispatch', lambda job_id: None)
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
     backup, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
     with pytest.raises(jobs.SlotBusy) as busy:
         _start(app, fake_types[jobs.SLOT_BACKUP], created)
@@ -316,28 +316,28 @@ def test_one_active_job_per_slot_and_a_restore_excludes_all(app, fake_types, cre
     verify, _ = _start(app, 'audit_verify', created)  # another slot: runs beside the backup
     with app.app_context():
         for job_id in (backup, verify):
-            assert jobs.cancel(job_id) == 'cancelled'
+            assert jobs.request_cancellation(job_id) == 'cancelled'
     restore, _ = _start(app, fake_types[jobs.SLOT_RESTORE], created)
     for kind in (fake_types[jobs.SLOT_BACKUP], 'audit_verify', fake_types[jobs.SLOT_RESTORE]):
         with pytest.raises(jobs.SlotBusy) as busy:
             _start(app, kind, created)
         assert busy.value.job['id'] == restore
     with app.app_context():
-        assert jobs.cancel(restore) == 'cancelled'
+        assert jobs.request_cancellation(restore) == 'cancelled'
     again, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
     with app.app_context():
-        assert jobs.cancel(again) == 'cancelled'
+        assert jobs.request_cancellation(again) == 'cancelled'
 
 
 def test_the_unique_index_alone_refuses_a_second_active_job(app, fake_types, created, monkeypatch):
-    monkeypatch.setattr(runner, 'dispatch', lambda job_id: None)
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
     monkeypatch.setattr(store, '_conflict', lambda *a: None)
     first, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
     with pytest.raises(jobs.SlotBusy) as busy:
         _start(app, fake_types[jobs.SLOT_BACKUP], created)
     assert busy.value.job['id'] == first
     with app.app_context():
-        assert jobs.cancel(first) == 'cancelled'
+        assert jobs.request_cancellation(first) == 'cancelled'
 
 
 def test_an_unknown_slot_is_refused():
@@ -362,7 +362,7 @@ class _Scheduler:
 def _create_pending(app, kind, created, node_id=None):
     with app.app_context():
         jt = jobs.job_type(kind)
-        job_id = store.create(db.session, kind=kind, slot=jt.slot, exclusive=False,
+        job_id = store.create_job(db.session, kind=kind, slot=jt.slot, exclusive=False,
                               exclusive_slots=jobs.EXCLUSIVE_SLOTS, now=jobs._now(),
                               node_id=node_id)
     created.append(job_id)
@@ -372,13 +372,13 @@ def _create_pending(app, kind, created, node_id=None):
 def test_the_runner_recovers_orphans_on_its_first_pass_then_takes_jobs(app, fake_types, created):
     orphan = _create_pending(app, fake_types[jobs.SLOT_RESTORE], created)
     with app.app_context():
-        store.claim(db.session, orphan, 'previous-process', jobs._now())
+        store.claim_job(db.session, orphan, 'previous-process', jobs._now())
     jr = runner.JobRunner(app, _Scheduler())
     with app.app_context():
-        jr.tick()
+        jr.run_pass()
         assert _row(orphan)['reason'] == 'executor_lost'
         waiting = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created)
-        jr.tick()
+        jr.run_pass()
     assert jr.join(10)
     with app.app_context():
         row = _row(waiting)
@@ -392,41 +392,41 @@ def test_a_runner_that_does_not_lead_takes_only_its_own_node_jobs(app, fake_type
     other = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created, node_id='another-node')
     jr = runner.JobRunner(app, _Scheduler(leads=False))
     with app.app_context():
-        jr.tick()
+        jr.run_pass()
         assert _row(other)['state'] == 'pending'
-        jobs.cancel(other)
+        jobs.request_cancellation(other)
         mine = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created, node_id=jobs._node_id())
         unbound = _create_pending(app, 'audit_verify', created)
-        jr.tick()
+        jr.run_pass()
     assert jr.join(10)
     with app.app_context():
         assert _row(mine)['state'] == 'succeeded'
         assert _row(unbound)['state'] == 'pending'  # the leader's
-        jobs.cancel(unbound)
+        jobs.request_cancellation(unbound)
 
 
 def test_a_job_whose_thread_died_unconcluded_is_concluded_by_its_runner(app, fake_types, created,
                                                                        monkeypatch):
-    monkeypatch.setattr(runner, 'execute', lambda *a, **k: None)  # dies without concluding
+    monkeypatch.setattr(runner, 'run_job', lambda *a, **k: None)  # dies without concluding
     job_id = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created)
     jr = runner.JobRunner(app, _Scheduler())
     jr._recovered = True
     with app.app_context():
-        jr.tick()
+        jr.run_pass()
         assert jr.join(5)
         assert _row(job_id)['state'] == 'running'
-        jr.tick()
+        jr.run_pass()
         assert _row(job_id)['reason'] == 'executor_lost'
 
 
 def test_purge_keeps_thirty_days_and_the_latest_of_each_kind(app, fake_types, created, monkeypatch):
-    monkeypatch.setattr(runner, 'dispatch', lambda job_id: None)
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
     kind = fake_types[jobs.SLOT_BACKUP]
 
     def finished(days_ago):
         job_id, _ = _start(app, kind, created)
         with app.app_context():
-            jobs.cancel(job_id)
+            jobs.request_cancellation(job_id)
             at = jobs._now() - timedelta(days=days_ago)
             db.session.execute(update(T).where(T.c.id == job_id).values(created_at=at, finished_at=at))
             db.session.commit()
@@ -444,7 +444,7 @@ def test_purge_keeps_thirty_days_and_the_latest_of_each_kind(app, fake_types, cr
 
 def test_the_start_sweep_keeps_active_jobs_files_only(app, fake_types, created, monkeypatch,
                                                       tmp_path):
-    monkeypatch.setattr(runner, 'dispatch', lambda job_id: None)
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
     active_id, active_name = _start(app, fake_types[jobs.SLOT_BACKUP], created, with_file=True)
     unknown = store.file_name_for('0' * 8 + '-0000-0000-0000-' + '0' * 12, '.upload')
     directory = store.jobs_tmp_dir()
@@ -456,7 +456,7 @@ def test_the_start_sweep_keeps_active_jobs_files_only(app, fake_types, created, 
     os.symlink(target, os.path.join(directory, linked))
     try:
         with app.app_context():
-            store.sweep_files(db.session)
+            store.sweep_job_files(db.session)
             db.session.rollback()
         assert os.path.exists(os.path.join(directory, active_name))
         assert not os.path.exists(os.path.join(directory, unknown))
@@ -464,4 +464,4 @@ def test_the_start_sweep_keeps_active_jobs_files_only(app, fake_types, created, 
     finally:
         os.unlink(os.path.join(directory, linked))
         with app.app_context():
-            jobs.cancel(active_id)
+            jobs.request_cancellation(active_id)

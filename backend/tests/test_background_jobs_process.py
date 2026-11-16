@@ -36,9 +36,9 @@ args = {'options': f'-csearch_path={schema}'} if schema != '-' else {}
 engine = create_engine(url, connect_args=args)
 with Session(engine) as session:
     if mode in ('kill', 'exit'):
-        assert store.claim(session, job_id, f'child/{os.getpid()}', utc_now()) is not None
+        assert store.claim_job(session, job_id, f'child/{os.getpid()}', utc_now()) is not None
         with engine.begin() as conn:
-            store.progress(conn, job_id, f'child/{os.getpid()}', 1, 10, 'working')
+            store.write_progress(conn, job_id, f'child/{os.getpid()}', 1, 10, 'working')
         open(marker, 'w').write('taken')
         if mode == 'exit':
             os._exit(0)  # a stop past the grace: no conclusion
@@ -48,7 +48,7 @@ with Session(engine) as session:
         while not os.path.exists(marker):
             time.sleep(0.005)
         try:
-            made = store.create(session, kind='test_' + slot, slot=slot, exclusive=slot == 'restore',
+            made = store.create_job(session, kind='test_' + slot, slot=slot, exclusive=slot == 'restore',
                                 exclusive_slots={'restore'}, now=utc_now())
             print('ok', made)
         except store.SlotBusy:
@@ -111,7 +111,7 @@ def _wait_for(path, child, timeout=20):
 
 
 def _create(session, kind, slot, file_name=None, now=None):
-    return store.create(session, kind=kind, slot=slot, exclusive=slot in EXCLUSIVE,
+    return store.create_job(session, kind=kind, slot=slot, exclusive=slot in EXCLUSIVE,
                         exclusive_slots=EXCLUSIVE, now=now or utc_now(), file_name=file_name,
                         secret='encrypted-elsewhere')
 
@@ -153,13 +153,13 @@ def test_a_killed_executor_is_concluded_by_the_next_start(app, database, tmp_pat
             return True
         return write
     with app.app_context(), Session(engine) as session:
-        row = store.get(session, job_id)
+        row = store.job_row(session, job_id)
         assert row['state'] == 'running' and row['secret'] is None
-        assert store.recover(session, now=utc_now(), all_running=True, audit_for=audit_for) == 1
-        row = store.get(session, job_id)
+        assert store.recover_orphans(session, now=utc_now(), all_running=True, audit_for=audit_for) == 1
+        row = store.job_row(session, job_id)
         assert (row['state'], row['reason']) == ('failed', 'executor_lost')
-        assert store.recover(session, now=utc_now(), all_running=True, audit_for=audit_for) == 0
-        assert not store.active(session)
+        assert store.recover_orphans(session, now=utc_now(), all_running=True, audit_for=audit_for) == 0
+        assert not store.active_jobs(session)
     assert len(written) == lines
     assert not os.path.exists(os.path.join(directory, name))
 
@@ -189,7 +189,7 @@ def test_different_slots_run_side_by_side(database):
     with Session(engine) as session:
         _create(session, 'test_backup', 'backup')
         _create(session, 'audit_verify', 'audit_verify')
-        assert len(store.active(session)) == 2
+        assert len(store.active_jobs(session)) == 2
 
 
 @pytest.mark.postgres
@@ -212,24 +212,24 @@ def test_ha_lease_two_connections(app):
             # B cannot start a second one while A's is active
             with pytest.raises(store.SlotBusy):
                 _create(b, 'test_backup', 'backup', now=now)
-            assert store.claim(a, job_id, 'node-a/1/x', now) is not None
-            assert store.claim(b, job_id, 'node-b/1/y', now) is None
+            assert store.claim_job(a, job_id, 'node-a/1/x', now) is not None
+            assert store.claim_job(b, job_id, 'node-b/1/y', now) is None
             renewed_at = now + timedelta(seconds=store.LEASE_SECONDS - 10)
             with engine_a.begin() as conn:
-                assert store.renew(conn, job_id, 'node-a/1/x', renewed_at)
+                assert store.renew_lease(conn, job_id, 'node-a/1/x', renewed_at)
             # B now leads; past A's first lease but inside the renewed one: left to A
             later = now + timedelta(seconds=store.LEASE_SECONDS + 5)
-            assert store.recover(b, now=later, all_running=False) == 0
+            assert store.recover_orphans(b, now=later, all_running=False) == 0
             with engine_a.begin() as conn:
-                assert store.progress(conn, job_id, 'node-a/1/x', 5) is False
+                assert store.write_progress(conn, job_id, 'node-a/1/x', 5) is False
             # A dies: its lease lapses and B concludes; A's late moves all lose
             dead = renewed_at + timedelta(seconds=store.LEASE_SECONDS + 1)
-            assert store.recover(b, now=dead, all_running=False) == 1
+            assert store.recover_orphans(b, now=dead, all_running=False) == 1
             with engine_a.begin() as conn, pytest.raises(store.JobLost):
-                store.progress(conn, job_id, 'node-a/1/x', 6)
-            assert not store.conclude(a, job_id, state='succeeded', reason='done',
+                store.write_progress(conn, job_id, 'node-a/1/x', 6)
+            assert not store.conclude_job(a, job_id, state='succeeded', reason='done',
                                       from_states=('running',), now=dead, executor='node-a/1/x')
-            assert (store.get(b, job_id)['reason']) == 'executor_lost'
+            assert (store.job_row(b, job_id)['reason']) == 'executor_lost'
     finally:
         engine_a.dispose()
         engine_b.dispose()

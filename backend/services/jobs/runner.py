@@ -38,7 +38,7 @@ def _app():
     return current_app._get_current_object()
 
 
-def dispatch(job_id):
+def dispatch_job(job_id):
     """Hand a new job to its executor. Under gunicorn the scheduler process polls for it;
     otherwise this process takes it now and runs it in a thread."""
     from services.scheduler_service import supervised
@@ -46,13 +46,13 @@ def dispatch(job_id):
         return
     from models import db
     executor = executor_id()
-    row = store.claim(db.session, job_id, executor, jobs._now())
+    row = store.claim_job(db.session, job_id, executor, jobs._now())
     if row is None:
         return
     done = threading.Event()
     with _local_lock:
         _local_done[job_id] = done
-    thread = threading.Thread(target=execute, args=(_app(), row, executor, done),
+    thread = threading.Thread(target=run_job, args=(_app(), row, executor, done),
                               name=f'job-{job_id[:8]}', daemon=True)
     thread.start()
 
@@ -68,7 +68,7 @@ class _Lease:
     def __init__(self, app, job_id, executor):
         self.app, self.job_id, self.executor = app, job_id, executor
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._loop, daemon=True, name=f'job-lease-{job_id[:8]}')
+        self._thread = threading.Thread(target=self._runner_loop, daemon=True, name=f'job-lease-{job_id[:8]}')
 
     def start(self):
         self._thread.start()
@@ -77,14 +77,14 @@ class _Lease:
     def stop(self):
         self._stop.set()
 
-    def _loop(self):
+    def _runner_loop(self):
         from models import db
         from services.cluster_maintenance import exempt
         while not self._stop.wait(RENEW_SECONDS):
             with self.app.app_context(), exempt():
                 try:
                     with db.engine.begin() as conn:
-                        if not store.renew(conn, self.job_id, self.executor, jobs._now(conn)):
+                        if not store.renew_lease(conn, self.job_id, self.executor, jobs._now(conn)):
                             return
                 except Exception as e:
                     logger.error(f"Background job lease not renewed: {type(e).__name__}")
@@ -119,7 +119,7 @@ class JobContext:
         from models import db
         from services.cluster_maintenance import exempt
         with exempt(), db.engine.begin() as conn:
-            asked = store.progress(conn, self.job_id, self.executor, done, total, phase)
+            asked = store.write_progress(conn, self.job_id, self.executor, done, total, phase)
         if asked:
             raise jobs.JobCancelled(self.job_id)
 
@@ -131,7 +131,7 @@ def _response_of(outcome):
     return {'code': outcome.code, 'message': outcome.message, 'data': outcome.data}
 
 
-def execute(app, row, executor, done=None):
+def run_job(app, row, executor, done=None):
     """Run a taken job to its one conclusion, whatever the run raises."""
     from models import db
     job_id, kind = row['id'], row['kind']
@@ -161,13 +161,14 @@ def execute(app, row, executor, done=None):
                 if not isinstance(e, Exception):
                     raised = e
             db.session.rollback()
-            writer = None
+            line = None
             if audit is not None:
-                def writer(r, s, why):
+                def _job_result_line(r, s, why):
                     return audit(r, s, why, details)
-            store.conclude(db.session, job_id, state=state, reason=reason,
+                line = _job_result_line
+            store.conclude_job(db.session, job_id, state=state, reason=reason,
                            from_states=(store.RUNNING,), now=jobs._now(), result=result,
-                           executor=executor, audit=writer)
+                           executor=executor, result_line=line)
         except Exception as e:
             logger.error(f"Background job {job_id} not concluded: {type(e).__name__}")
             db.session.rollback()
@@ -182,18 +183,18 @@ def execute(app, row, executor, done=None):
             raise raised
 
 
-def wait(job_id, seconds):
+def wait_for_job(job_id, seconds):
     """The job row once it is final or ``seconds`` have passed, whichever comes first."""
     from models import db
     with _local_lock:
         done = _local_done.get(job_id)
     if done is not None:
         done.wait(max(0.0, seconds))
-        return jobs.get(job_id)
+        return jobs.get_job(job_id)
     deadline = time.monotonic() + max(0.0, seconds)
     while True:
         db.session.rollback()  # each read sees what the executor committed since
-        row = store.get(db.session, job_id)
+        row = store.job_row(db.session, job_id)
         db.session.rollback()
         if row is None or row['state'] in store.FINAL_STATES or time.monotonic() >= deadline:
             return row
@@ -216,7 +217,7 @@ class JobRunner:
         self._last_purge = 0.0
 
     def start(self):
-        self._thread = threading.Thread(target=self._loop, daemon=True, name='JobRunner')
+        self._thread = threading.Thread(target=self._runner_loop, daemon=True, name='JobRunner')
         self._thread.start()
         return self
 
@@ -233,11 +234,11 @@ class JobRunner:
                     return False
         return True
 
-    def _loop(self):
+    def _runner_loop(self):
         while not self._stop.wait(POLL_SECONDS):
             try:
                 with self.app.app_context():
-                    self.tick()
+                    self.run_pass()
             except Exception as e:
                 logger.error(f"Background jobs pass failed: {type(e).__name__}: {e}")
             finally:
@@ -251,7 +252,7 @@ class JobRunner:
     def leads(self):
         return self.scheduler.holds_lock()
 
-    def tick(self):
+    def run_pass(self):
         from models import db
         from utils.ha import ha_enabled
         ha = ha_enabled()
@@ -265,10 +266,10 @@ class JobRunner:
                       or now_mono - self._last_recover >= RECOVER_SECONDS):
             # Single node: the first pass under the host lock finds only orphans
             all_running = not ha and not self._recovered and not self._running
-            store.recover(db.session, now=jobs._now(), all_running=all_running,
+            store.recover_orphans(db.session, now=jobs._now(), all_running=all_running,
                           audit_for=jobs.audit_writer, mine=finished)
             if not self._recovered:
-                store.sweep_files(db.session)
+                store.sweep_job_files(db.session)
                 db.session.rollback()
             self._recovered, self._last_recover = True, now_mono
         if leads and now_mono - self._last_purge >= PURGE_SECONDS:
@@ -276,9 +277,9 @@ class JobRunner:
             self._last_purge = now_mono
         if self._stop.is_set() or self.scheduler._in_maintenance():
             return
-        self._take(leads)
+        self._take_pending(leads)
 
-    def _take(self, leads):
+    def _take_pending(self, leads):
         from sqlalchemy import select
         from models import db
         T = store.T
@@ -293,10 +294,10 @@ class JobRunner:
                     continue
             elif not leads:
                 continue
-            row = store.claim(db.session, job_id, self.executor, jobs._now())
+            row = store.claim_job(db.session, job_id, self.executor, jobs._now())
             if row is None:
                 continue
-            thread = threading.Thread(target=execute, args=(self.app, row, self.executor),
+            thread = threading.Thread(target=run_job, args=(self.app, row, self.executor),
                                       name=f'job-{job_id[:8]}', daemon=True)
             self._running[job_id] = thread
             thread.start()

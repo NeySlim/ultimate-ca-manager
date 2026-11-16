@@ -55,6 +55,7 @@ from api.v2.system import https  # noqa: F401
 from api.v2.system import backup  # noqa: F401
 from api.v2.system import security  # noqa: F401
 from api.v2.system import audit  # noqa: F401
+from api.v2.system import jobs  # noqa: F401
 from api.v2.system import alerts  # noqa: F401
 from api.v2.system import updates  # noqa: F401
 from api.v2.system import service  # noqa: F401
