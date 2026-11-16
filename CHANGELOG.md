@@ -115,7 +115,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- **Files left under `backend/data` by the OPNsense import of 1.x.** Its certificate copies and plaintext private keys sat outside every reconciliation, backup and deletion; a start now moves each copy of a stored CA or certificate under `DATA_DIR`, or removes it, and reports any other file there (see UPGRADE.md).
+- **Files left under `backend/data` by UCM 1.x.** Its certificate, CSR and plaintext key files sat outside every reconciliation, backup and deletion; a start now moves each one that is a copy of a stored CA or certificate under `DATA_DIR`, or removes it, and reports any other file there (see UPGRADE.md).
 - **Bulk exports survive an unreadable row.** The certificate and CA exports answered 500 in P7B and carried the damaged data in PEM, as the trust store did in PEM while its P7B dropped the entry silently and answered 400 when none was left; each now skips the row, logs it, lists its id in `X-Skipped-Certificates` or `X-Skipped-CAs` (first 100, with `-Count`) and answers 404 in both formats when none is readable.
 - **AIA `.p7c` bundle with an unreadable certificate.** It answered 500; it now serves the readable certificates of the CA, logs the unreadable ones and answers 404 when none is readable.
 - **Renewal during a CA record merge.** An in-place renewal already stored answered with an error when the SKI/AKI repair merged the record of its CA right after; it now reports the renewal and regenerates the CRL of the record that remains.
