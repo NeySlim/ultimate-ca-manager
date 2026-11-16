@@ -214,13 +214,15 @@ def test_unverified_claims_need_a_configured_issuer_and_client_id():
 
     def check(issuer, client_id, **claims):
         provider = SimpleNamespace(oauth2_issuer=issuer, oauth2_client_id=client_id)
-        return unverified_claims_are_valid(_valid_claims('u', nonce='n', **claims), provider, 'n')
+        token = dict(_valid_claims('u', nonce='n'), **claims)
+        return unverified_claims_are_valid(token, provider, 'n')
 
     assert check('https://idp.example', 'ucm-client')
     assert not check(None, 'ucm-client', iss=None)
     assert not check('', 'ucm-client', iss='')
     assert not check('https://idp.example', '', aud='')
     assert not check('https://idp.example', None, aud=None)
+    assert not check('https://idp.example', 'ucm-client', sub='')
 
 
 def test_unverified_token_without_tls_verification_gives_no_groups(entra):
