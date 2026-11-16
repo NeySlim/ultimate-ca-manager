@@ -29,8 +29,8 @@ permissions:
 
 # A new push to a branch replaces the run of its previous commit, except on
 # test and main, where every run is a release record, and on the 3.0 integration
-# branch, whose sequential job must not die with a superseded run: one group per
-# commit there, so no run is cancelled or queued behind another
+# branch, where a push carries the FIPS build and a manual run the sequential job:
+# one group per commit and event there, so a newer commit never cancels a run
 concurrency:
   group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant') && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' && github.ref_name != 'sextant' }}
@@ -145,15 +145,15 @@ jobs:
 
   # One database for the whole suite, as a user runs it: the integration judge.
   # Release branches, the nightly run of dev, and on demand. A schedule runs only
-  # the default branch's copy, so the 3.0 line runs it on each push of the 3.0
-  # integration branch instead.
+  # the default branch's copy, so the 3.0 line runs it on a manual run of its
+  # integration branch instead, each push having played it in one process before.
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
     timeout-minutes: 150
     # On the 3.0 integration branch one run at a time: the running one finishes, the
-    # newest push waits and replaces any older waiting one; elsewhere one group per commit
+    # newest manual run waits and replaces any older waiting one; elsewhere one group per commit
     concurrency:
       group: tests-sequential-${{ github.event_name }}-${{ github.ref_name == 'sextant' && github.ref || github.sha }}
       cancel-in-progress: false
@@ -162,7 +162,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || github.ref }}
+          # The commit of the run, not the branch tip a waiting job would find later
+          ref: ${{ github.event_name == 'schedule' && 'dev' || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0

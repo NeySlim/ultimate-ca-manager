@@ -33,13 +33,21 @@ def test_when_the_sequential_job_runs(event, ref, runs):
     assert bool(evaluate(_job()['if'], _ctx(event, ref))) is runs
 
 
-def _checkout_ref(event, ref):
+def _checkout_ref(event, ref, sha='c0ffee'):
     step = next(s for s in _job()['steps'] if str(s.get('uses', '')).startswith('actions/checkout@'))
-    return evaluate(step['with']['ref'], _ctx(event, ref))
+    ctx = _ctx(event, ref)
+    ctx['github'].update(sha=sha)
+    return evaluate(step['with']['ref'], ctx)
 
 
-def test_a_push_of_the_line_branch_tests_that_branch():
-    assert _checkout_ref('push', f'refs/heads/{LINE_BRANCH}') == f'refs/heads/{LINE_BRANCH}'
+def test_a_manual_run_of_the_line_branch_tests_its_own_commit():
+    """Not the branch: a job that waited in its group would find a newer tip there."""
+    assert _checkout_ref('workflow_dispatch', f'refs/heads/{LINE_BRANCH}', 'a1b2c3') == 'a1b2c3'
+    assert _checkout_ref('push', 'refs/heads/main', 'd4e5f6') == 'd4e5f6'
+
+
+def test_the_nightly_run_tests_dev():
+    assert _checkout_ref('schedule', 'refs/heads/main') == 'dev'
 
 
 def _random_step():
@@ -59,21 +67,21 @@ def test_the_random_order_report_follows_the_same_runs(event, ref, runs):
     assert step.get('continue-on-error') is True  # a report, not a gate
 
 
-def _push(ref, sha):
-    ctx = _ctx('push', ref)
+def _run(ref, sha, event='push'):
+    ctx = _ctx(event, ref)
     ctx['github'].update(workflow='Tests', sha=sha)
     return ctx
 
 
-def _run_concurrency(ref, sha):
+def _run_concurrency(ref, sha, event='push'):
     conc = load('tests.yml')['concurrency']
-    ctx = _push(ref, sha)
+    ctx = _run(ref, sha, event)
     return render(conc['group'], ctx), bool(evaluate(conc['cancel-in-progress'], ctx))
 
 
-def _job_concurrency(ref, sha):
+def _job_concurrency(ref, sha, event='push'):
     conc = _job()['concurrency']
-    ctx = _push(ref, sha)
+    ctx = _run(ref, sha, event)
     cancel = conc['cancel-in-progress']
     return render(conc['group'], ctx), bool(evaluate(cancel, ctx) if isinstance(cancel, str) else cancel)
 
@@ -85,6 +93,14 @@ def test_a_newer_push_never_cancels_nor_queues_the_run(ref):
     assert g1 != g2 and cancel1 is False
 
 
+def test_a_manual_run_of_the_line_branch_is_not_cancelled_by_a_newer_commit_nor_by_its_push():
+    ref = f'refs/heads/{LINE_BRANCH}'
+    (g1, cancel1), (g2, _) = (_run_concurrency(ref, 'a1', 'workflow_dispatch'),
+                              _run_concurrency(ref, 'b2', 'workflow_dispatch'))
+    assert g1 != g2 and cancel1 is False
+    assert g1 != _run_concurrency(ref, 'a1')[0]  # the push of the same commit runs beside it
+
+
 def test_a_feature_branch_push_still_replaces_its_previous_run():
     (g1, cancel), (g2, _) = _run_concurrency('refs/heads/feature/x', 'a1'), _run_concurrency('refs/heads/feature/x', 'b2')
     assert g1 == g2 and cancel is True
@@ -92,7 +108,8 @@ def test_a_feature_branch_push_still_replaces_its_previous_run():
 
 def test_one_sequential_run_at_a_time_on_the_line_branch_and_it_finishes():
     ref = f'refs/heads/{LINE_BRANCH}'
-    (g1, cancel), (g2, _) = _job_concurrency(ref, 'a1'), _job_concurrency(ref, 'b2')
+    (g1, cancel), (g2, _) = (_job_concurrency(ref, 'a1', 'workflow_dispatch'),
+                             _job_concurrency(ref, 'b2', 'workflow_dispatch'))
     # Same group: the newest waits and replaces an older waiting one; the running one is never cancelled
     assert g1 == g2 and cancel is False
 
