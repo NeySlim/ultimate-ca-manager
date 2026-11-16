@@ -4,15 +4,12 @@ OPNsense importer mixin — imports parsed CAs and certificates into UCM.
 import base64
 import json
 import logging
-import os
 import traceback
-from pathlib import Path
 from typing import Dict, List
 
 from cryptography import x509
 
 from models import db, CA, Certificate
-from services.file_regen_service import mirror_private_key
 from utils.key_codec import store_pem_bytes
 from utils.key_type import weak_ca_key_refusal
 from utils.certificate_readability import stored_pem_refusal
@@ -99,28 +96,7 @@ class ImportMixin:
                 db.session.flush()
                 created.append(ca)
 
-                if ca_data.get('crt'):
-                    data_dir = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
-                    )
-                    ca_dir = os.path.join(data_dir, "ca")
-                    os.makedirs(ca_dir, exist_ok=True)
-
-                    ca_file = os.path.join(ca_dir, f"{refid}.crt")
-                    with open(ca_file, "wb") as f:
-                        f.write(base64.b64decode(ca_data['crt']))
-
-                    if ca_data.get('prv'):
-                        private_dir = os.path.join(data_dir, "private")
-                        os.makedirs(private_dir, exist_ok=True)
-
-                        key_file = os.path.join(private_dir, f"{refid}.key")
-                        mirror_private_key(
-                            Path(key_file),
-                            base64.b64decode(ca_data['prv']),
-                            context=f"OPNsense CA {ca.id}",
-                        )
-
+                # Its files come from the insert listeners, under DATA_DIR like any CA's
                 stats['imported'] += 1
 
             except Exception as e:
@@ -263,28 +239,6 @@ class ImportMixin:
                 db.session.add(cert)
                 db.session.flush()
                 created.append(cert)
-
-                if cert_data.get('crt'):
-                    data_dir = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
-                    )
-                    certs_dir = os.path.join(data_dir, "certs")
-                    os.makedirs(certs_dir, exist_ok=True)
-
-                    cert_file = os.path.join(certs_dir, f"{refid}.crt")
-                    with open(cert_file, "wb") as f:
-                        f.write(base64.b64decode(cert_data['crt']))
-
-                    if cert_data.get('prv'):
-                        private_dir = os.path.join(data_dir, "private")
-                        os.makedirs(private_dir, exist_ok=True)
-
-                        key_file = os.path.join(private_dir, f"{refid}.key")
-                        mirror_private_key(
-                            Path(key_file),
-                            base64.b64decode(cert_data['prv']),
-                            context=f"OPNsense certificate {cert.id}",
-                        )
 
                 stats['imported'] += 1
 

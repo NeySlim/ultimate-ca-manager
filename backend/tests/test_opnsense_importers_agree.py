@@ -44,9 +44,6 @@ def test_the_legacy_service_encrypts_like_the_route(
     from security.encryption import decrypt_private_key
     from services.opnsense import importer
 
-    monkeypatch.setattr(
-        importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
-
     encoded_key, plain_pem = appliance_row
     ca_refid = str(uuid.uuid4())
     cert_refid = str(uuid.uuid4())
@@ -80,9 +77,6 @@ def test_the_legacy_service_encrypts_like_the_route(
 def test_a_row_without_a_key_still_imports(app, monkeypatch, tmp_path):
     """OPNsense exports plenty of certificates it holds no key for."""
     from services.opnsense import importer
-
-    monkeypatch.setattr(
-        importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
 
     refid = str(uuid.uuid4())
     with app.app_context():
