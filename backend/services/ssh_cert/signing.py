@@ -6,6 +6,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.serialization import ssh as ssh_serialization
 
 from models import db
@@ -124,9 +125,8 @@ class SSHCertificateSigningMixin:
         valid_after = now_ts - BACKDATE_SECONDS
         valid_before = now_ts + validity_seconds
 
-        serial = SSHCAService.get_next_serial(ca_id)
-
         ca_private_key = SSHCAService.get_private_key_object(ca_id)
+        serial = SSHCAService.get_next_serial(ca_id)
 
         ssh_cert_type = (ssh_serialization.SSHCertificateType.USER
                          if cert_type == 'user'
@@ -181,6 +181,12 @@ class SSHCertificateSigningMixin:
                 )
 
         cert = builder.sign(ca_private_key)
+        # The embedded verification key must equal the stored anchor before it is trusted.
+        SSHCAService.check_signing_public_key(ca, cert.signature_key())
+        try:
+            cert.verify_cert_signature()
+        except InvalidSignature:
+            raise ValueError('SSH certificate signature verification failed against the published CA key') from None
         cert_bytes = cert.public_bytes().decode('utf-8')
 
         pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')

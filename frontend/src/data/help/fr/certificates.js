@@ -35,12 +35,12 @@ export default {
           { label: 'Révoquer', text: 'Marquer comme révoqué avec un motif, apparaîtra dans la CRL' },
           { label: 'Lever la suspension', text: 'Annuler la suspension d\'un certificat révoqué avec le motif « Suspension de certificat », restaure le statut valide' },
           { label: 'Révoquer un certificat suspendu', text: 'Un certificat suspendu peut aussi être révoqué définitivement avec un autre motif, sans repasser par valide. La CRL et l\'OCSP donnent alors le nouveau motif, et la date d\'invalidité est le début de la suspension sauf si une est fournie' },
-          { label: 'Révocation auprès de l\'AC ACME', text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
+          { label: 'Révocation auprès de la CA ACME', text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette CA, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si la CA ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de la CA. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
           { label: 'Exporter', text: 'Télécharger au format PEM, DER, PKCS#12 ou JKS' },
           { label: 'Mode compatibilité PKCS#12 (v2.222)', text: 'Les dialogues d\'export proposent un profil 3DES/SHA-1 pour les importeurs qui refusent l\'archive AES-256 par défaut comme un mot de passe incorrect : Android 15 et antérieur, macOS 14 et antérieur, Windows Server 2016 et antérieur, Java ancien. Désactivé par défaut, il protège moins bien le fichier' },
           { label: 'Comparer', text: 'Comparaison côte à côte de deux certificats' },
           { label: "Autres extensions (v2.251)", text: "Les détails des certificats et des CA listent sous Autres extensions celles pour lesquelles UCM n'a pas de section, avec leur OID, leur nom s'il est connu, leur criticité et leur valeur brute. Le formulaire d'émission peut ajouter des extensions personnalisées à celles du template" },
-          { label: "Clés compromises (v2.251)", text: "Une clé révoquée pour keyCompromise reste connue après la suppression de son certificat, quelle que soit l'AC qui l'a émis, Let's Encrypt compris : le client ACME la refuse à la requête, au renouvellement et à la finalisation, et EST refuse une CSR qui la porte. Les autres chemins d'émission ne consultent pas cette liste" },
+          { label: "Clés compromises (v2.251)", text: "Une clé révoquée pour keyCompromise reste connue après la suppression de son certificat, quelle que soit la CA qui l'a émis, Let's Encrypt compris : le client ACME la refuse à la requête, au renouvellement et à la finalisation, et EST refuse une CSR qui la porte. Les autres chemins d'émission ne consultent pas cette liste" },
           { label: "Certificats du client ACME (v2.251)", text: "Un certificat obtenu par le client ACME est lui aussi renouvelé en place, avec son id et son refid conservés. Les copies que d'anciens renouvellements ont importées comme nouvelles lignes restent dans l'inventaire jusqu'à leur archivage ou suppression" },
         ]
       },
@@ -48,7 +48,7 @@ export default {
         title: 'EKU supplémentaires personnalisés (RFC 5280 §4.2.1.12)',
         content: 'Le formulaire d\'émission et la modale de signature de CSR exposent un sélecteur multi-valeurs « EKU supplémentaires » qui ajoute des OID Extended Key Usage en plus des EKU par défaut du type de certificat :',
         items: [
-          { label: 'Catalogue', text: '26 EKU connus (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.)' },
+          { label: 'Catalogue', text: '26 EKU connus dans une liste déroulante (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.)' },
           { label: 'OID libre', text: 'Tout OID pointé bien formé respectant ^[0-2](?:\\.(?:0|[1-9]\\d*)){1,15}$' },
           { label: 'Limite', text: 'Jusqu\'à 16 OID au total par certificat' },
           { label: 'Fusion (jamais remplacement)', text: 'Les EKU par défaut du type (par ex. serverAuth) restent verrouillés, les extras s\'ajoutent par-dessus' },
@@ -101,7 +101,7 @@ export default {
       'Dans une vue liée (ouverte depuis la vue d\'ensemble), le bouton Effacer tous les filtres affiché quand rien ne correspond vide les statuts du lien et la recherche et garde les autres filtres du lien ; retirer une puce retire ce filtre, le bouton d\'effacement de la rangée de puces quitte la vue liée, et vos filtres enregistrés ne sont pas touchés',
     ],
     warnings: [
-      'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée',
+      'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée (unhold) ou rendue permanente avec un autre motif',
       'Un certificat valide non révoqué ne peut pas être supprimé seul : Supprimer explique pourquoi et propose « Révoquer, puis supprimer », pour que la révocation atteigne la CRL/OCSP ; les révocations survivent à la suppression',
       'UCM signe uniquement en SHA-256, SHA-384 ou SHA-512 : SHA-224 et les noms de hachage inconnus sont refusés au lieu d\'être remplacés par SHA-256',
     ],
@@ -127,7 +127,7 @@ Gestion centralisée de tous les certificats X.509. Émettez de nouveaux certifi
 1. Cliquez sur **Émettre un certificat**
 2. Sélectionnez la **CA de signature** (doit posséder une clé privée)
 3. Remplissez le sujet (CN obligatoire, autres champs optionnels)
-4. Ajoutez des noms alternatifs du sujet (SAN) : noms DNS, IP, e-mails
+4. Ajoutez des noms alternatifs du sujet (SAN) : noms DNS, IP, e-mails. Un nom DNS suit la RFC 5280 : étiquettes séparées par des points, un joker seulement comme première étiquette, ni espace ni point final ; un nom internationalisé est émis sous sa forme A-label. Un CN serveur ou combiné contenant un tiret bas (\`my_host.example.com\`) est refusé quand il serait le nom DNS du certificat, c'est-à-dire sans SAN fourni et avec un modèle qui autorise les noms DNS. Une adresse e-mail du sujet va aussi dans le SAN, quel que soit le type
 5. Choisissez le type et la taille de la clé
 6. Définissez la période de validité
 7. Appliquez optionnellement un **modèle** pour préremplir les paramètres
@@ -167,7 +167,7 @@ Depuis la v2.214, le renouvellement met à jour le certificat **en place** :
 
 Les certificats révoqués sont publiés dans la CRL lors de la prochaine régénération.
 
-Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu'à ce que l'AC confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
+Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette CA, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si la CA ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu'à ce que la CA confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de la CA. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
 
 > ⚠ La révocation est généralement permanente : sauf pour la **Suspension de certificat** qui peut être levée.
 
@@ -193,6 +193,7 @@ Formats d'exportation :
 - **PEM + Chaîne** : Certificat avec ses CA émettrices (**Inclure la chaîne CA**) ; la CA racine n'est ajoutée que si **Inclure l'AC racine** est coché
 - **DER** : Format binaire
 - **PKCS#12** : Certificat + clé + chaîne, protégé par mot de passe
+> ⚠ L'export de la **clé privée** (PKCS#12/PFX, JKS ou fichier de clé) exige la permission **read:private_keys**, réservée aux admins. Les rôles qui ne la détiennent pas, y compris le rôle Opérateur intégré, doivent récupérer les clés archivées par le flux **Récupération de clés**, soumis à approbation.
 
 ## Paires de certificats hybrides (RFC 9763)
 

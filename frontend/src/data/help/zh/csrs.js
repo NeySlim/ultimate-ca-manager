@@ -27,13 +27,13 @@ export default {
       },
     ],
     tips: [
-      'CSR 保留了请求者的私钥:, 私钥不会离开其系统',
+      'CSR 保留了请求者的私钥：私钥不会离开其系统',
       '“上传密钥”可为待处理的 CSR 附加私钥，使签发后的证书可导出为 PKCS#12',
       '为在 UCM 中生成的 CSR 导入证书会完成该 CSR：记录保留其私钥，因此证书可连同私钥一起导出',
       '使用 Microsoft CA 模式可在连接到 Windows PKI 时通过 AD CS 签署 CSR',
-      '签署时使用"额外 EKU"添加 Microsoft RDP、智能卡登录、IPsec 或任何 OID: CSR 现有的 EKU 将以合并集重建',
       'ML-DSA 密钥的证书只保留签名位：模板要求的 keyEncipherment、dataEncipherment 和 keyAgreement 会被移除，结果中会说明',
       '通过 API 以 related_to（需要 read:private_keys）生成的 CSR 会指明现有证书 A：签署后签发与 A 关联的证书（RFC 9763）；若其声明了 A 所没有的密钥用途或 EKU 则被拒绝',
+      '签署时使用"额外 EKU"添加 Microsoft RDP、智能卡登录、IPsec 或任何 OID: CSR 现有的 EKU 将以合并集重建',
       '当策略或签发 CA 的到期日缩短了请求的有效期时，结果会说明原因：“Issued for N day(s) instead of the M requested”',
     ],
   },
@@ -123,7 +123,7 @@ CSR 和私钥将在 UCM 中创建和存储。CSR 出现在待处理选项卡中�
 4. 选择**证书模板**（从 CA 自动加载）
 5. 点击**签署**
 
-如果模板需要管理者审批，UCM 会跟踪待处理请求。可在 CSR 详情面板中查看其状态。
+如果模板需要管理者审批，请求在 UCM 中保持“待处理”状态，请在“待处理”中打开它并点击**检查状态**，CA 签发证书后即可取回（还需要签署 CSR 的权限），也可以从该连接的 CA 控制面板审批。
 
 ### 代理注册（EOBO）
 

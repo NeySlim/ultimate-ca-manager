@@ -71,6 +71,25 @@ def _broken_step(monkeypatch, name='143_cluster_commands'):
     return lambda: monkeypatch.setattr(package, 'step', real)
 
 
+def _before_first_step(monkeypatch, before):
+    """*before* runs as the first step starts to write; reading the steps' refusals, before the
+    copy, is not running them."""
+    import migrations._from_2_254 as package
+    from migrations._from_2_254 import STEPS
+    real = package.step
+
+    class _First:
+        def __getattr__(self, attr):
+            return getattr(real(STEPS[0]), attr)
+
+        @staticmethod
+        def upgrade(conn):
+            before()
+            return real(STEPS[0]).upgrade(conn)
+    monkeypatch.setattr(package, 'step', lambda n: _First() if n == STEPS[0] else real(n))
+    return lambda: monkeypatch.setattr(package, 'step', real)
+
+
 # --- 1. Consistent ----------------------------------------------------------------------------
 
 def test_the_copy_holds_what_the_wal_holds_and_matches_the_source(base):
@@ -127,17 +146,11 @@ def test_a_copy_that_differs_from_the_database_stops_the_upgrade(sql, reason, ba
 # --- 2. Before any write of the upgrade, after the pivot guard ---------------------------------
 
 def test_the_copy_is_verified_before_the_first_step_runs(base, monkeypatch):
-    import migrations._from_2_254 as package
-    from migrations._from_2_254 import STEPS
     populate(base)
     expected = _counts(base.sqlite_path)
-    real, seen = package.step, []
-
-    def step(name):
-        if name == STEPS[0] and not seen:
-            seen.append((_copy(base).exists() and _is_2254(_copy(base)), _counts(_copy(base))))
-        return real(name)
-    monkeypatch.setattr(package, 'step', step)
+    seen = []
+    _before_first_step(monkeypatch, lambda: seen.append(
+        (_copy(base).exists() and _is_2254(_copy(base)), _counts(_copy(base)))))
     assert base.upgrade()
     assert seen == [(True, expected)]
 
@@ -247,15 +260,8 @@ def _add_300(path):
 
 
 def test_the_marker_is_set_after_the_copy_and_before_the_first_step(base, monkeypatch):
-    import migrations._from_2_254 as package
-    from migrations._from_2_254 import STEPS
-    real, seen = package.step, []
-
-    def step(name):
-        if name == STEPS[0] and not seen:
-            seen.append((_marked(base.sqlite_path), _marked(_copy(base))))
-        return real(name)
-    monkeypatch.setattr(package, 'step', step)
+    seen = []
+    _before_first_step(monkeypatch, lambda: seen.append((_marked(base.sqlite_path), _marked(_copy(base)))))
     assert base.upgrade()
     assert seen == [(True, False)]
 
@@ -348,19 +354,14 @@ def test_2254_restarted_on_a_half_upgraded_database_keeps_the_original_copy(base
 
 
 def test_a_start_cut_between_the_marker_and_the_first_step_keeps_the_copy(base, monkeypatch):
-    import migrations._from_2_254 as package
-    from migrations._from_2_254 import STEPS
     populate(base)
-    real = package.step
 
-    def step(name):
-        if name == STEPS[0]:
-            raise RuntimeError('cut before the first statement')
-        return real(name)
-    monkeypatch.setattr(package, 'step', step)
+    def cut():
+        raise RuntimeError('cut before the first statement')
+    restore = _before_first_step(monkeypatch, cut)
     assert base.upgrade() is False
     kept = _sha(_copy(base))
-    monkeypatch.setattr(package, 'step', real)
+    restore()
     assert base.upgrade()
     assert _sha(_copy(base)) == kept
 

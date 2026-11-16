@@ -877,8 +877,10 @@ def test_stop_during_a_failed_give_back_logs_it_once(app, ha, monkeypatch, caplo
 
     def action():
         monkeypatch.setattr(cc, '_RELEASE_SQL', text('SELECT cc_no_such_function()'))
-        stopper.append(threading.Thread(target=solo.stop))
-        stopper[0].start()
+        # Started before it is published: the test thread must not see a thread not yet alive
+        thread = threading.Thread(target=solo.stop)
+        thread.start()
+        stopper.append(thread)
         assert wait_for(lambda: solo._stopping)
         raise OSError('signal file not writable')
     _node_row(app, 'solo')

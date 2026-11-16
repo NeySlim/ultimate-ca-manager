@@ -16,7 +16,7 @@ from services.audit_service import AuditService
 from utils.cert_issuer import ca_signature_verdict, ca_signed, private_key_matches, signing_ca_for, stored_private_key_matches
 from utils.key_type import weak_ca_key_refusal
 from services.import_service import (
-    KeyPasswordError, parse_certificate_file, is_ca_certificate, extract_cert_info,
+    KeyPasswordError, UnreadableCertificate, parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca_for_import, cross_mode_from, finish_cross_attach,
     find_existing_certificate, find_pending_csr_for_certificate,
     AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import, install_on_pending_ca, stored_certificate_serial,
@@ -449,7 +449,7 @@ def import_certificate():
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
-    except (MalformedKey, KeyPasswordError) as e:
+    except (MalformedKey, KeyPasswordError, UnreadableCertificate) as e:
         db.session.rollback()
         return error_response(str(e), 400)
     except ValueError as e:

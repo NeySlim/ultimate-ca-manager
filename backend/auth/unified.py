@@ -366,8 +366,9 @@ def require_auth(permissions=None, session_only=False):
             auth_result = auth_manager.authenticate_request(request)
             
             if not auth_result:
-                from utils.response import error_response
-                return error_response('Authentication required', 401)
+                from utils.response import error_response, AUTHENTICATION_REQUIRED_PROBLEM
+                return error_response('Authentication required', 401,
+                                      problem_type=AUTHENTICATION_REQUIRED_PROBLEM)
             if session_only and auth_result['auth_method'] != 'session':
                 return jsonify({
                     'error': 'Forbidden',
@@ -450,6 +451,15 @@ def has_permission(required, user_permissions):
             return True
     
     return False
+
+
+def hsm_binding_refusal(authority):
+    """403 naming read:hsm when the caller may not put *authority* ('an SSH CA', 'an X.509 CA')
+    on an HSM key: binding a key takes the right to see the HSM inventory too. None otherwise."""
+    if has_permission('read:hsm', getattr(g, 'permissions', None) or []):
+        return None
+    from utils.response import error_response
+    return error_response(f'Creating {authority} on an HSM key requires the read:hsm permission', 403)
 
 
 def verify_request_auth(request_obj=None):

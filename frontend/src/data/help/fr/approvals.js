@@ -84,7 +84,7 @@ Les administrateurs contournent la file sur tous les chemins.
 - Une demande dont la cible a été **supprimée ou révoquée** est clôturée comme rejetée ; une suspension de certificat laisse la demande de renouvellement en attente jusqu'à la levée de la suspension
 - Approuver une demande **déjà satisfaite** la clôture sur le certificat existant ; approuver l'une de plusieurs demandes pour la même cible clôture les autres comme approuvées par vous
 - Approuver une demande dont la requête stockée, le certificat ou la CA **n'existe plus** la clôture comme rejetée
-- Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée (annulée si son demandeur l'a révoqué) ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l'approbation ; pendant une suspension du certificat, elle attend la levée de la suspension
+- Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée (annulée si son demandeur l'a révoqué) ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l'approbation ; approuvée pendant une suspension du certificat, elle rend la suspension définitive avec son motif
 
 Une clôture comme rejetée notifie les webhooks comme le fait un rejet ; une clôture comme approuvée n'envoie aucun webhook.
 

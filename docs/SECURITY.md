@@ -6,7 +6,9 @@ This page describes the security features of Ultimate Certificate Manager. To re
 
 ### 1. Private Key Encryption
 
-All private keys (CA and certificate) are encrypted at rest using **Fernet** encryption (AES-128-CBC with HMAC-SHA256).
+With private-key encryption enabled, private keys (CA and certificate) are encrypted at rest using **Fernet** encryption (AES-128-CBC with HMAC-SHA256).
+
+In a container, a new installation creates its master key only when `/etc/ucm` is a persistent volume of its own (a named volume or a host directory). On an anonymous volume, memory or an emptyDir, UCM creates no key, logs the reason and leaves private keys unencrypted until you mount the directory or supply the key through `KEY_ENCRYPTION_KEY`. Encryption disabled from the UI also stays disabled at the next start.
 
 #### Configuration
 
@@ -123,7 +125,7 @@ Protection against brute force and DoS attacks.
 | `/ocsp`, `/cdp/` | 500 | 100 |
 | Default | 600 | 100 |
 
-The four base rates can be changed with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`. Requests from RFC 1918, loopback and link-local addresses are not rate limited.
+The four base rates can be changed with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`. Two limiters apply, as described under [Rate limits](HA.md#rate-limits) in the HA guide: a flask-limiter default of 200 requests per minute and 2000 per hour per client address on routes without their own limit, and the UCM limiter whose tiers the table lists. Counts are kept per node. Unless `RATE_LIMIT_TRUST_LAN` is set to false, neither limiter counts requests from RFC 1918, loopback and link-local addresses.
 
 #### Response Headers
 ```
@@ -255,11 +257,10 @@ Requires SMTP configuration in Settings > Email.
 
 Two guards, because the two jobs have different answers.
 
-**Network scan endpoints** (discovery, SSL checker) use `validate_url_not_private`:
+**Network scan endpoints** (Discovery and the SSL Checker) connect to hosts you name, and UCM is installed on premises, where scanning the internal network is the point. They therefore do not block private networks:
 
-- Private/loopback IP ranges blocked by default (127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
-- DNS rebinding protection: resolved IPs are validated against the blocklist
-- Configurable allowlist for internal network scanning use cases
+- Discovery accepts RFC 1918 targets and IPv4 loopback. It rejects link-local, multicast and reserved addresses, for a literal IP address and for the address a hostname resolves to (the first one returned). It runs at most three scans at a time.
+- The SSL Checker accepts private and loopback targets. It rejects link-local and multicast addresses, and refuses a hostname when any address it resolves to is one of them or it does not resolve. The `SSRF_ALLOWED_DOMAINS` environment variable (comma-separated hostnames, exact match) lets a named host skip these checks.
 
 **User-supplied outbound URLs** (webhooks, SSO, ACME, imports) use `validate_url_not_cloud_metadata`, which blocks cloud metadata and loopback while deliberately allowing the LAN. UCM is deployed on premises: an RFC1918 webhook or an internal SSO endpoint is the primary use case, not an attack.
 
@@ -407,7 +408,7 @@ FLASK_ENV=production
 ## Security Monitoring
 
 ### Audit Dashboard
-Access security metrics at Settings > Audit Logs:
+Access security metrics at **Modules** > **Administration** > **Audit Logs**:
 - Failed login attempts
 - Rate limited requests
 - Permission denied events

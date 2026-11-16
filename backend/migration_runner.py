@@ -49,22 +49,22 @@ Public API
 import os
 import sys
 import sqlite3
+import time
 import importlib.util
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import create_engine, event, text, inspect
 
 from migration_marks import full_stop_reason
-from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
+from utils.db_url import is_postgres_url, postgres_connect_args, postgres_engine_options, sqlalchemy_url
 
 
 def say(*args, **kwargs):
     """say() that reaches the journal now, not when the process ends.
 
-    The progress line is written without a newline (``  -> name...`` then
-    ``OK``), so an unflushed stream leaves journald holding a partial line:
-    the upgrade ran, and its report only appeared at the next shutdown.
+    An unflushed stream leaves journald holding the lines of a long upgrade
+    until the process ends: the upgrade ran, its report came at shutdown.
     """
     kwargs.setdefault('flush', True)
     print(*args, **kwargs)
@@ -87,6 +87,34 @@ def _get_db_url() -> str:
 
 def _is_postgres(db_url: str) -> bool:
     return is_postgres_url(db_url)
+
+
+# Server side, per session: a dead peer is dropped within about a minute, and a statement whose
+# client is gone (a killed start) stops within 10 s with its locks, not at its own end
+_SESSION_KEEPALIVES = ("SELECT set_config('tcp_keepalives_idle', '30', false), "
+                       "set_config('tcp_keepalives_interval', '10', false), "
+                       "set_config('tcp_keepalives_count', '3', false)")
+_SESSION_CLIENT_CHECK = "SELECT set_config('client_connection_check_interval', '10s', false)"
+
+
+def _session_limits(dbapi_connection, _record):
+    for statement in (_SESSION_KEEPALIVES, _SESSION_CLIENT_CHECK):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute(statement)
+            dbapi_connection.commit()
+        except Exception:  # noqa: BLE001 - PostgreSQL before 14, or a platform without the check
+            dbapi_connection.rollback()
+        finally:
+            cursor.close()
+
+
+def _engine(db_url):
+    """The runner's engine: on PostgreSQL the application pool's options and the limits above."""
+    engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True, **postgres_engine_options(db_url))
+    if is_postgres_url(db_url):
+        event.listen(engine, "connect", _session_limits)
+    return engine
 
 
 def _list_migration_names() -> list[str]:
@@ -233,8 +261,7 @@ def _full_stop_holders_now():
         return []
     db_url = _get_db_url()
     try:
-        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                               connect_args=postgres_connect_args(db_url))
+        engine = _engine(db_url)
     except Exception:
         return []
     try:
@@ -284,8 +311,7 @@ def mark_node_stopped(node_id=None) -> None:
     from config.settings import Config
     db_url = _get_db_url()
     try:
-        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                               connect_args=postgres_connect_args(db_url))
+        engine = _engine(db_url)
         try:
             with engine.begin() as conn:
                 conn.execute(text("UPDATE cluster_nodes SET pid = NULL WHERE node_id = :n"),
@@ -352,8 +378,7 @@ def mark_all_applied():
     """
     db_url = _get_db_url()
     is_pg = _is_postgres(db_url)
-    engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                           connect_args=postgres_connect_args(db_url))
+    engine = _engine(db_url)
     try:
         record_fresh_registry(engine, is_pg)
     finally:
@@ -431,6 +456,35 @@ def pending_migrations(engine) -> list[str]:
     if state == "fresh" or pivot_refusal(state, applied):
         return []
     return _pending(applied)
+def start_schema(engine, metadata, create_all) -> bool:
+    """The schema step of a start, after the migrations: a database without its core tables is
+    built fresh (True); any other is a 3.0 one, where create_all and the index pass add only
+    what a cut fresh install left out."""
+    from sqlalchemy import inspect as _inspect
+    tables = set(_inspect(engine).get_table_names())
+    fresh = not {'users', 'certificate_authorities'} <= tables
+    if fresh:
+        build_fresh_schema(create_all)
+    else:
+        create_all()
+    create_missing_indexes(engine, metadata)
+    return fresh
+
+
+def create_missing_indexes(engine, metadata):
+    """create_all skips a table that exists, with its indexes: one a cut start left out (SQLite
+    commits each statement) is created here. Any 3.0 database already holds the model's indexes."""
+    from sqlalchemy import inspect as _inspect
+    insp = _inspect(engine)
+    tables = set(insp.get_table_names())
+    for table in metadata.sorted_tables:
+        if table.name not in tables:
+            continue
+        present = {i['name'] for i in insp.get_indexes(table.name)}
+        for index in table.indexes:
+            if index.name not in present:
+                say(f"✓ Creating index {index.name} missing from {table.name}")
+                index.create(engine)
 
 
 def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
@@ -444,8 +498,7 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
     backend = "PostgreSQL" if is_pg else "SQLite"
 
     try:
-        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                           connect_args=postgres_connect_args(db_url))
+        engine = _engine(db_url)
     except Exception as exc:
         say(f"✗ Could not connect to database ({backend}): {exc}")
         return False
@@ -490,8 +543,13 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 
         if pending:
             say(f"Found {len(pending)} pending migration(s) for {backend}:")
-            if UPGRADE_MIGRATION in pending and not _copy_before_upgrade(is_pg, sqlite_path, dry_run):
-                return False
+            if UPGRADE_MIGRATION in pending:
+                refusal = upgrade_refusal(engine)
+                if refusal:
+                    say(f"✗ {refusal}")
+                    return False
+                if not _copy_before_upgrade(is_pg, sqlite_path, dry_run):
+                    return False
             done = (_run_pending_pg(engine, pending, dry_run) if is_pg
                     else _run_pending_sqlite(pending, dry_run, db_path=sqlite_path))
             if not done:
@@ -502,6 +560,14 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
         return _replay_serial_steps(engine, is_pg, sqlite_path) if serial_replay else True
     finally:
         engine.dispose()
+
+
+def upgrade_refusal(engine):
+    """What migration 300 refuses in the 2.254 data, read before the copy and its marker are
+    written, so a refused database is left exactly as 2.254 left it."""
+    module = _load_module(MIGRATIONS_DIR / f"{UPGRADE_MIGRATION}.py")
+    with engine.connect() as conn:
+        return module.refusal(conn)
 
 
 def _sqlite_file(sqlite_path):
@@ -548,7 +614,8 @@ def _serial_steps_pending(engine) -> bool:
 def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
     """Step 144 alone, idempotent; the 300 row and its date stay as they are."""
     from migrations._from_2_254 import step
-    say("  → serial_unique_index_pending is set: upgrade step 144 runs again...", end=" ")
+    say(f"  → serial_unique_index_pending is set: upgrade step {SERIAL_STEP} runs again: started")
+    started = time.monotonic()
     try:
         if is_pg:
             with engine.begin() as conn:
@@ -560,9 +627,9 @@ def _replay_serial_steps(engine, is_pg: bool, sqlite_path) -> bool:
             finally:
                 conn.close()
     except Exception as exc:  # noqa: BLE001
-        say(f"✗ {exc}")
+        say(f"  ✗ {SERIAL_STEP}: failed after {time.monotonic() - started:.1f} s: {exc}")
         return False
-    say("✓")
+    say(f"  ✓ {SERIAL_STEP}: done in {time.monotonic() - started:.1f} s")
     return True
 
 
@@ -600,10 +667,11 @@ def _load_module(path: Path):
 
 def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
     name = path.stem
-    say(f"  → {name}...", end=" ", flush=True)
     if dry_run:
-        say("(dry run)")
+        say(f"  → {name}: (dry run)")
         return True
+    say(f"  → {name}: started")
+    started = time.monotonic()
     try:
         mod = _load_module(path)
         if hasattr(mod, "upgrade"):
@@ -622,19 +690,19 @@ def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
             else:
                 mod.upgrade(conn)
         else:
-            say("SKIP (no upgrade)")
+            say(f"  ✗ {name}: no upgrade(), skipped")
             return False
         if name == UPGRADE_MIGRATION:
             import pre_upgrade_copy
             pre_upgrade_copy.clear_started(conn)
         conn.execute("INSERT OR IGNORE INTO _migrations (name) VALUES (?)", (name,))
         conn.commit()
-        say("✓")
+        say(f"  ✓ {name}: done in {time.monotonic() - started:.1f} s")
         return True
     except Exception as e:  # noqa: BLE001
         # A failed migration is never recorded: its steps are idempotent, the next start runs it again
         conn.rollback()
-        say(f"✗ {e}")
+        say(f"  ✗ {name}: failed after {time.monotonic() - started:.1f} s: {e}")
         return False
 
 
@@ -669,10 +737,11 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
     """
     for name in pending:
         path = MIGRATIONS_DIR / f"{name}.py"
-        say(f"  → {name}...", end=" ", flush=True)
         if dry_run:
-            say("(dry run)")
+            say(f"  → {name}: (dry run)")
             continue
+        say(f"  → {name}: started")
+        started = time.monotonic()
         try:
             mod = _load_module(path)
             is_pg_compatible = getattr(mod, "pg_compatible", False)
@@ -680,7 +749,7 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
 
             if not is_pg_compatible and idx >= PG_COMPATIBLE_REQUIRED_FROM:
                 # Hard fail — refuse to silently skip a "new-era" migration.
-                say("✗")
+                say(f"  ✗ {name}: refused")
                 say(
                     f"    Migration {name} is numbered >= {PG_COMPATIBLE_REQUIRED_FROM:03d} "
                     f"but does not declare `pg_compatible = True`. "
@@ -692,9 +761,8 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
             with engine.begin() as conn:
                 if is_pg_compatible and hasattr(mod, "upgrade"):
                     mod.upgrade(conn)
-                    say("✓")
                 else:
-                    say("(SQLite-only, skipped)")
+                    say(f"    {name}: SQLite-only, skipped")
                 conn.execute(
                     text(
                         f"INSERT INTO _migrations (name, applied_at) VALUES (:n, {_PG_NOW_UTC}) "
@@ -702,8 +770,10 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
                     ),
                     {"n": name},
                 )
+            # After the commit: on PostgreSQL the step and its registry row land together
+            say(f"  ✓ {name}: done in {time.monotonic() - started:.1f} s")
         except Exception as e:  # noqa: BLE001
-            say(f"✗ {e}")
+            say(f"  ✗ {name}: failed after {time.monotonic() - started:.1f} s: {e}")
             return False
     say("✓ All migrations applied")
     return True
@@ -720,8 +790,7 @@ def show_status():
     say(f"Backend: {'PostgreSQL' if is_pg else 'SQLite'}")
     say(f"URL:     {db_url.split('@')[-1] if '@' in db_url else db_url}")
     try:
-        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True,
-                           connect_args=postgres_connect_args(db_url))
+        engine = _engine(db_url)
     except Exception as e:
         say(f"✗ Cannot connect: {e}")
         return

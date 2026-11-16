@@ -2,12 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
+import bundleModules from './scripts/bundle-modules.js'
 
 // Single source of truth: VERSION at repo root
 const appVersion = fs.readFileSync(path.resolve(__dirname, '../VERSION'), 'utf-8').trim()
 
 export default defineConfig({
-  plugins: [react()],
+  // bundle-modules.json: the modules fused into dist/, read by scripts/ci/sbom.py
+  plugins: [react(), bundleModules({ root: __dirname, file: path.resolve(__dirname, 'bundle-modules.json') })],
   // Per checkout: node_modules may be a link shared by several checkouts
   cacheDir: path.resolve(__dirname, '.vite'),
   define: {

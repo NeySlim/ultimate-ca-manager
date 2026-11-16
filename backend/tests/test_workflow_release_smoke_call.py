@@ -40,14 +40,16 @@ def test_the_smoke_is_called_with_a_version_and_never_follows_another_run():
     assert not [s for s in _strings(load('release-smoke.yml')) if 'workflow_run' in s]
 
 
-def test_the_build_calls_the_smoke_after_the_release_with_the_built_version():
+def test_the_build_calls_the_smoke_before_the_release_with_the_built_version():
     build = load('build-release.yml')
     name, job = _caller(build)
     needs = job['needs'] if isinstance(job['needs'], list) else [job['needs']]
-    assert 'release' in needs and 'build-deb' in needs
+    # Every artifact the smoke reads exists before it starts: the DEB, the RPMs, the two digests
+    assert 'release' not in needs and {'build-deb', 'build-rpm', 'smoke-targets'} <= set(needs)
+    assert name in build['jobs']['release']['needs']
     ctx = {'github': TAG_PUSH, 'needs': {'build-deb': {'outputs': {'version': '3.0-rc1'}}}}
     assert render(job['with']['version'], ctx) == '3.0-rc1'
-    # The smoke reads published assets and pulls public images: nothing more than read access
+    # The smoke reads the run's artifacts and pulls images by digest: nothing more than read access
     assert job['permissions'] == {'contents': 'read'}
 
 

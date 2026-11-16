@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
+from utils.encryption import SecretUnreadable
+
 
 @dataclass
 class HsmKeyInfo:
@@ -26,6 +28,9 @@ class BaseHsmProvider(ABC):
     Abstract base class for HSM providers.
     Implementations: PKCS11Provider, AzureKeyVaultProvider, GcpKmsProvider
     """
+
+    # ECDSA output of sign(): DER for transit/KMS, fixed-width r||s for PKCS#11/JWA.
+    ECDSA_SIGNATURE_FORMAT = 'der'
 
     # True when sign() honours padding='pss' (RSASSA-PSS, salt = digest length)
     SIGNS_PSS = False
@@ -257,3 +262,7 @@ class HsmKeyNotFoundError(HsmError):
 class HsmConfigError(HsmError):
     """HSM configuration invalid"""
     pass
+
+
+class HsmSecretUnreadable(HsmConfigError, SecretUnreadable):
+    """A provider secret this node's database key does not open; the message names it."""

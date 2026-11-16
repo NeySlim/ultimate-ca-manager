@@ -19,6 +19,7 @@ from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
 from services.audit_service import AuditService
 from utils.key_codec import load_pem_bytes
+from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
 from utils.issuance_defaults import browser_key_type
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS
 from services.mtls_enrollment import parse_validity_days, remove_enrolment
@@ -74,6 +75,10 @@ def create_user_mtls_certificate(user_id):
             cert_obj = cx509.load_pem_x509_certificate(pem_bytes, default_backend())
         except Exception as e:
             return error_response('Invalid PEM certificate data', 400)
+        try:
+            require_readable_extensions(cert_obj)
+        except UnreadableCertificate as e:
+            return error_response(str(e), 400)
 
         serial = str(cert_obj.serial_number)
         subject_dn = cert_obj.subject.rfc4514_string()

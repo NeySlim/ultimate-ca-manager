@@ -409,10 +409,10 @@ jobs:
           [ -n "$files" ]
           pytest --tb=short $files
 
-  # The tests of a real SoftHSM token and of the system GSSAPI, both installed here.
+  # The tests of a real SoftHSM token, of the system GSSAPI and of a Redis server, installed here.
   # Selected by marker; a skip of a marked test fails the job (tests/optional_backends.py).
   test-optional-backends:
-    name: Backend Tests (SoftHSM, GSSAPI)
+    name: Backend Tests (SoftHSM, GSSAPI, Redis)
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule'
     timeout-minutes: 20
@@ -428,7 +428,11 @@ jobs:
           cache: 'pip'
 
       - name: Install system dependencies
-        run: scripts/ci/apt-install.sh libkrb5-dev softhsm2
+        run: scripts/ci/apt-install.sh libkrb5-dev softhsm2 redis-server
+
+      # The tests start their own redis-server on a Unix socket: only the binary serves
+      - name: Stop the system Redis service
+        run: sudo systemctl stop redis-server
 
       - name: Install dependencies
         run: |
@@ -471,6 +475,19 @@ jobs:
         run: |
           cd backend
           pytest --tb=short -rs -m needs_gssapi tests/
+
+      - name: Run the Redis tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          UCM_TEST_REQUIRE_REDIS: '1'
+        run: |
+          cd backend
+          pytest --tb=short -rs -m needs_redis tests/
 
   # Real UCM nodes (two, then three) in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
   # Manual only: run the workflow by hand with the `ha` input ticked.
@@ -558,7 +575,7 @@ jobs:
         run: |
           helm lint charts/ucm
           helm template t charts/ucm > /dev/null
-          HA="--set ha.enabled=true --set replicaCount=2 --set database.type=postgresql --set database.databaseUrl=postgresql://u:p@db/ucm"
+          HA="--set ha.enabled=true --set replicaCount=2 --set database.type=postgresql --set database.databaseUrl=postgresql://u:p@db/ucm --set secrets.keyEncryptionKey=K --set secrets.dbEncryptionKey=D"
           helm lint charts/ucm $HA
           helm template t charts/ucm $HA > /dev/null
 
@@ -576,7 +593,7 @@ jobs:
       - name: Run the chart tests
         run: |
           cd backend
-          pytest --tb=short -rs tests/test_helm_ha.py tests/test_helm_security_context.py tests/test_helm_initial_admin_password.py tests/test_no_jwt_secret_generated.py tests/test_health_ha.py tests/test_compose_ha.py tests/test_entrypoint_ha_database.py
+          pytest --tb=short -rs tests/test_helm_ha.py tests/test_helm_db_key.py tests/test_helm_security_context.py tests/test_helm_initial_admin_password.py tests/test_no_jwt_secret_generated.py tests/test_health_ha.py tests/test_compose_ha.py tests/test_entrypoint_ha_database.py
 
   test-frontend:
     name: Frontend Tests
@@ -614,6 +631,65 @@ jobs:
           cd frontend
           npm run check:i18n
   
+  # Playwright against a real instance: backend from this checkout, fresh SQLite, built
+  # interface, all set up by scripts/ci/e2e.sh (the same script runs it locally).
+  test-e2e:
+    name: End-to-end (browser)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/sextant')
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev
+
+      - name: Install backend dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install the browser's system libraries
+        run: |
+          cd frontend
+          npx playwright install-deps chromium
+
+      - name: Run the end-to-end suite
+        run: bash scripts/ci/e2e.sh
+
+      - name: Upload the report and traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 14
+
   build-test:
     name: Docker Build Test
     runs-on: ubuntu-latest

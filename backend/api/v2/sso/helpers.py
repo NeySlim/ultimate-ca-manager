@@ -126,8 +126,14 @@ def _encrypt_ldap_password(password: str) -> str:
 
 
 def _decrypt_ldap_password(provider) -> str:
-    """Decrypt LDAP bind password from provider config."""
-    password = provider.ldap_bind_password
+    """Decrypt LDAP bind password from provider config. A stored token this node's key
+    does not open raises SecretUnreadable: ldap3 would bind anonymously without it."""
+    from utils.encryption import decrypt_required
+    if hasattr(provider, '_ldap_bind_password'):
+        password = decrypt_required(provider._ldap_bind_password,
+                                    f'SSO provider {provider.id} LDAP bind password')
+    else:
+        password = provider.ldap_bind_password
     if not password:
         return password
     from security.encryption import key_encryption

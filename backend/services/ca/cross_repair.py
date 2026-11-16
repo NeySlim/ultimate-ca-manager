@@ -256,7 +256,10 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     if row is None:
         row, warnings = cross_certs.attach_certificate(root, cert, username, commit=False)
     if not root.prv and not root.hsm_key_id:
-        root.prv, root.hsm_key_id = record.prv, record.hsm_key_id
+        # One CA per HSM key (uq_ca_hsm_key_id): the record lets the key go before the root takes it
+        key_id, record.hsm_key_id = record.hsm_key_id, None
+        db.session.flush()
+        root.prv, root.hsm_key_id = record.prv, key_id
     _move_ca_dependents(db, record, root)
     from models import SystemConfig
     scep_cfg = SystemConfig.query.filter_by(key='scep_ca_id').first()

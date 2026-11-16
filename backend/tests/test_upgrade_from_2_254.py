@@ -4,6 +4,7 @@ replays after an interruption; the runner refuses, untouched, any other existing
 import base64
 import hashlib
 import json
+import re
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -493,6 +494,55 @@ def test_a_start_cut_after_the_profiles_table_ends_with_the_2254_identity(dialec
         assert db.run(query) == served
 
 
+# 2.x migration 035 created this index on the databases it upgraded, never on a fresh install
+_INDEX_OF_2X = ("CREATE UNIQUE INDEX uq_ca_hsm_key_id ON certificate_authorities(hsm_key_id) "
+                "WHERE hsm_key_id IS NOT NULL;\n")
+
+
+def test_the_2254_fixture_has_no_x509_hsm_key_index(dialect):
+    assert 'uq_ca_hsm_key_id' not in schema_2254(dialect)
+
+
+def test_a_2254_database_with_the_index_of_2x_has_the_schema_of_a_fresh_install(dialect, tmp_path,
+                                                                                  monkeypatch):
+    for db in make_base(dialect, tmp_path, monkeypatch, 'i35', sql=schema_2254(dialect) + _INDEX_OF_2X):
+        assert db.upgrade()
+        upgraded = snapshot(db.engine)
+    (tmp_path / 'fresh').mkdir()
+    for db in make_base(dialect, tmp_path / 'fresh', monkeypatch, 'i35f', sql=''):
+        fresh_metadata().create_all(db.engine)
+        db.mark_all_applied()
+        expected = snapshot(db.engine)
+    index = [d for d in differences(upgraded, expected) if d[0] == 'index' and d[1] == 'certificate_authorities']
+    assert index == []
+    assert ('index', 'certificate_authorities', 'uq_ca_hsm_key_id') in upgraded
+
+
+def _two_cas_on_one_key(db):
+    db.run("INSERT INTO hsm_providers (id, name, type, config) VALUES (7, 'token', 'pkcs11', '{}')")
+    db.run("INSERT INTO hsm_keys (id, provider_id, key_identifier, label, algorithm, key_type, purpose) "
+           "VALUES (9, 7, 'k9', 'shared-key', 'EC-P256', 'asymmetric', 'signing')")
+    for ca_id, descr in ((3, 'Root A'), (4, 'Root B')):
+        db.run("INSERT INTO certificate_authorities (id, refid, descr, crt, signature_scheme, issuance_hidden, "
+               "hsm_key_id) VALUES (:i, :r, :d, :c, 'pkcs1v15', FALSE, 9)",
+               {'i': ca_id, 'r': f'ca-{ca_id}', 'd': descr, 'c': _material()['ca'][1]})
+
+
+def test_two_x509_cas_on_one_hsm_key_stop_the_upgrade_untouched(dialect, tmp_path, monkeypatch, capsys):
+    for db in make_base(dialect, tmp_path, monkeypatch, 'dup'):
+        _two_cas_on_one_key(db)
+        before = _untouched(db)
+        assert db.upgrade() is False
+        assert _untouched(db) == before
+        out = capsys.readouterr().out
+        assert ("HSM key 'shared-key' (#9) backs 2 X.509 CAs: 'Root A' (#3), 'Root B' (#4)" in out), out
+        assert 'Nothing was changed: 2.254 still starts on this database' in out, out
+        assert 'IntegrityError' not in out and 'UNIQUE constraint' not in out, out
+        # Once one CA leaves the key, the same database upgrades
+        db.run("UPDATE certificate_authorities SET hsm_key_id = NULL WHERE id = 4")
+        assert db.upgrade() is True, capsys.readouterr().out
+
+
 # --- Pivot guard ------------------------------------------------------------------------------
 
 def _untouched(db):
@@ -705,3 +755,36 @@ def test_the_hex_reading_ends_when_the_upgrade_or_the_fresh_install_ran(dialect,
             assert before <= applied <= after, (label, before, applied, after)
             assert _canonical_since(db, before - timedelta(seconds=2), monkeypatch) is True
             assert _canonical_since(db, after + timedelta(seconds=2), monkeypatch) is False
+
+
+# --- What the journal shows during a long upgrade ---------------------------------------------
+
+def test_each_step_logs_its_start_and_its_end_with_the_duration(base, capsys):
+    from migrations._from_2_254 import STEPS
+    assert base.upgrade() is True
+    lines = capsys.readouterr().out.splitlines()
+    for name in [*STEPS, '300_upgrade_from_2_254']:
+        started = [i for i, line in enumerate(lines) if line.strip().endswith(f'{name}: started')]
+        done = [i for i, line in enumerate(lines) if re.search(rf'{name}: done in \d+\.\d s$', line)]
+        assert len(started) == 1 and len(done) == 1 and started[0] < done[0], (name, lines)
+
+
+class _Clock:
+    def __init__(self, step):
+        self.now, self.step = 0.0, step
+
+    def __call__(self):
+        self.now += self.step
+        return self.now
+
+
+def test_progress_is_logged_at_most_every_30_seconds(monkeypatch, capsys):
+    import migrations._from_2_254 as package
+    clock = _Clock(10)
+    monkeypatch.setattr(package, '_clock', clock)
+    tick = package.Progress('step 999_example', 7)
+    for done in range(1, 8):
+        tick(done)
+    out = capsys.readouterr().out.splitlines()
+    # Started at 10 s, called at 20 s to 80 s: lines at 40 s (3 of 7) and 70 s (6 of 7) only
+    assert out == ['    step 999_example: 3 of 7 rows', '    step 999_example: 6 of 7 rows']

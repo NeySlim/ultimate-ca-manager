@@ -29,6 +29,18 @@ def validate_ha_config(config=None):
             logger.warning("HA: the local master.key overrides KEY_ENCRYPTION_KEY on this node")
     elif not os.getenv('KEY_ENCRYPTION_KEY'):
         raise SystemExit("UCM_HA=1 requires KEY_ENCRYPTION_KEY set in the environment, identical on every node")
+    # The integration secrets' key: a machine-derived one differs on every node
+    db_key = os.getenv('UCM_DB_ENCRYPTION_KEY')
+    if not db_key:
+        raise SystemExit("UCM_HA=1 requires UCM_DB_ENCRYPTION_KEY set in the environment, identical on "
+                         "every node (it encrypts the integration secrets)")
+    from cryptography.fernet import Fernet
+    try:
+        Fernet(db_key.encode())
+    except Exception:
+        raise SystemExit("UCM_DB_ENCRYPTION_KEY is not a Fernet key (32 bytes, url-safe base64): generate one "
+                         "with: python -c \"from cryptography.fernet import Fernet; "
+                         "print(Fernet.generate_key().decode())\"") from None
 
 
 def ha_refusal(reason):
@@ -53,6 +65,18 @@ SOFTHSM_LOCAL = ("Not available in HA mode: a SoftHSM token lives on one node on
 def refuse_softhsm_in_ha():
     if ha_enabled():
         raise HaRestricted(SOFTHSM_LOCAL)
+
+
+def reader_local_message():
+    """The refusal of a smart card reader key in HA mode, naming the modules UCM takes for one."""
+    from services.compliance_signer import LOCAL_READER_MODULES
+    return (f"Not available in HA mode: a smart card reader ({', '.join(LOCAL_READER_MODULES.values())}) "
+            "is attached to one node only, use a network HSM or a KMS provider")
+
+
+def refuse_reader_in_ha():
+    if ha_enabled():
+        raise HaRestricted(reader_local_message())
 
 
 LOCAL_ONLY = "Not available in HA mode: this operation only changes the local host"

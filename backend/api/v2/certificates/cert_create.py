@@ -9,6 +9,7 @@ from ipaddress import ip_address
 from flask import request, g
 from auth.unified import require_auth
 from fips_mode import FipsRestricted
+from utils.encryption import SecretUnreadable
 from utils.response import success_response, error_response, created_response
 from utils import notices as notices_mod
 from utils.dn_validation import validate_dn_field
@@ -747,6 +748,11 @@ def create_certificate():
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
+    except SecretUnreadable as e:
+        # The message names the secret, never its value: the operator knows what to restore
+        db.session.rollback()
+        logger.error(f"Failed to create certificate: {e}")
+        return error_response(str(e), 500)
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to create certificate: {e}")

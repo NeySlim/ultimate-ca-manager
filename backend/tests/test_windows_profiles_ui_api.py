@@ -252,6 +252,30 @@ def test_a_keytab_needs_both_the_xcep_and_kerberos_write_scopes(app, auth_client
         auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
 
 
+@pytest.mark.parametrize('scopes, settings_status, present, absent', [
+    # A 2.x key of GET /wstep/config and /kerberos/config: their replacements need read:xcep first
+    (['read:wstep', 'read:kerberos'], 403, (), ()),
+    (['read:xcep', 'read:wstep'], 200, ('xcep_enabled', 'wstep_enabled'),
+     ('kerberos_enabled', 'kerberos_spn', 'keytab_entries')),
+])
+def test_the_upgrade_matrix_of_the_windows_reads(app, auth_client, scopes, settings_status,
+                                                  present, absent):
+    """UPGRADE.md, Windows matrix: read:xcep gates profiles and settings, each service's
+    read scope then adds its own fields."""
+    key_id, headers = _key(auth_client, scopes)
+    try:
+        client = app.test_client()
+        assert client.get(URL, headers=headers).status_code == settings_status
+        r = client.get(f'{URL}/settings', headers=headers)
+        assert r.status_code == settings_status, r.data
+        if settings_status == 200:
+            got = r.get_json()['data']
+            assert all(k in got for k in present), got
+            assert not any(k in got for k in absent), got
+    finally:
+        auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
+
+
 def test_the_kerberos_refusal_names_the_profile_or_what_the_binding_lacks(app, monkeypatch):
     from services.windows_profiles import kerberos_refusal, kerberos_unserved_reason
     served = WindowsEnrollmentProfile(name='k-off', realm='K.EXAMPLE', enabled=False)

@@ -1,21 +1,33 @@
 # UCM Release Testing
 
-Cross-distro validation matrix for every release candidate (`-rcN`) and stable
-tag. **6/6 mandatory**: 3 distros × 2 backends.
+Validation matrix for every release candidate (`-rcN`) and stable tag. Each
+deliverable is tested on its own, on each database it supports, and the result
+of every cell is recorded separately.
 
-| Target            | SQLite | PostgreSQL |
-|-------------------|--------|------------|
-| DEB package       | smoke + UI | smoke + UI + fresh database |
-| RPM package       | smoke + UI | smoke + UI |
-| Docker container  | smoke + UI | smoke + UI |
+| Deliverable                      | Architecture | SQLite | PostgreSQL |
+|----------------------------------|--------------|--------|------------|
+| DEB package                      | all          | cell   | cell       |
+| RPM, Fedora                      | noarch       | cell   | cell       |
+| RPM, EL9 (RHEL, Rocky, Alma)     | noarch       | cell   | cell       |
+| RPM, EL10 (RHEL, Rocky, Alma)    | noarch       | cell   | cell       |
+| Docker image, standard           | amd64, arm64 | cell per architecture | cell per architecture |
+| Docker image, `-fips`            | amd64, arm64 | cell per architecture | cell per architecture |
+| Helm chart                       | n/a          | cell   | cell       |
 
-Each target is a host of its own (`<host>`, `<port>` below). An RC container
+Every cell is "smoke + UI checks" (below); add the fresh-database check on
+PostgreSQL, the master-key persistence recipe on the images, and the HA checks
+of `docs/HA.md` on the chart and on a shared PostgreSQL. `release-smoke.yml`
+and `test-channel.yml` automate part of this (see "Package install smoke"); a
+cell they do not cover is run by hand. Packages need Python 3.12 or
+later: the system `python3` where it is recent enough, the `python3.12` package
+on EL9.
+
+Run each target on a host of your own (`<host>`, `<port>` below). An RC container
 runs under a separate name and port (e.g. `ucm-rc-test`): never restart a
 production container with an RC image.
 
-"Fresh database" means an empty PostgreSQL database: its schema is built in one
-pass, not migration by migration. The boot log must show `Database: POSTGRESQL`,
-`Fresh PostgreSQL database` and `migration baseline marked`, and no line starting with `✗`.
+"Fresh database" means an empty PostgreSQL database. The boot log must show
+`Database: POSTGRESQL`, `migration baseline marked` and no line starting with `✗`.
 
 ## Smoke and UI checks
 
@@ -37,7 +49,7 @@ run in a browser on every target.
 
 ## Package install smoke
 
-`scripts/ci/package-smoke.sh` installs one DEB or RPM in a bare distribution container (no sudo, no systemd) and checks the venv imports, the application start and `/api/v2/health`. The `smoke-packages` job of `release-smoke.yml` runs it on the published assets (checksum verified first) for Debian 13, Ubuntu 24.04 and 26.04, AlmaLinux 9 and 10, and Fedora 43, after each release or by `workflow_dispatch` on a version. Debian 12 is out: the packages need python3 >= 3.12. `test-channel.yml` runs it on the sanity DEB (Debian 13, Ubuntu 24.04).
+`scripts/ci/package-smoke.sh` installs one DEB or RPM in a bare distribution container (no sudo, no systemd) and checks the venv imports, the application start and `/api/v2/health`. The `smoke-packages` job of `release-smoke.yml` runs it (checksum verified first) for Debian 13, Ubuntu 24.04 and 26.04, AlmaLinux 9 and 10, and Fedora 43: on the packages of the release run before the release is created, or on the published assets by `workflow_dispatch` on a version. Debian 12 is out: the packages need python3 >= 3.12. `test-channel.yml` runs it on the sanity DEB (Debian 13, Ubuntu 24.04).
 
 ## Per-target recipe
 
@@ -49,8 +61,8 @@ ssh <host> "dnf install -y ./ucm-<X.Y.rcN>-1.fc43.noarch.rpm"                 # 
 ssh <host> "dnf install -y ./ucm-el9-<X.Y.rcN>-1.el9.noarch.rpm"              # RPM, EL9 (el10: ucm-el10-...el10)
 ssh <host> "docker rm -f ucm-rc-test 2>/dev/null; \
            docker run -d --name ucm-rc-test -p <port>:8443 \
-             -v /srv/ucm-rc-test/etc:/etc/ucm \
-             -v /srv/ucm-rc-test/data:/opt/ucm/data \
+             -v <state-dir>/etc:/etc/ucm \
+             -v <state-dir>/data:/opt/ucm/data \
              neyslim/ultimate-ca-manager:<X.Y-rcN>"                        # Docker
 
 # 2. Verify boot
@@ -67,15 +79,15 @@ UCM_SMOKE_ADMIN_PASSWORD=<password> python3 scripts/smoke_release.py \
 ```bash
 # Throwaway PostgreSQL on a host with Docker
 ssh <pg-host> "docker run -d --name ucm-rc-pg -p <pg-port>:5432 \
-    -e POSTGRES_USER=ucm -e POSTGRES_PASSWORD=ucmtest -e POSTGRES_DB=ucm \
-    postgres:16-alpine"
+    -e POSTGRES_USER=ucm -e POSTGRES_PASSWORD=<password> -e POSTGRES_DB=ucm \
+    postgres:<major>-alpine"
 
 # Switch backend (env file is sourced by systemd)
 ssh <host> "cp /etc/ucm/ucm.env /etc/ucm/ucm.env.pre-pg && \
-    echo 'DATABASE_URL=postgresql://ucm:ucmtest@<pg-host>:<pg-port>/ucm' >> /etc/ucm/ucm.env && \
+    echo 'DATABASE_URL=postgresql://ucm:<password>@<pg-host>:<pg-port>/ucm' >> /etc/ucm/ucm.env && \
     systemctl restart ucm"
 
-# Boot log MUST show: ✓ Database: POSTGRESQL and, on a fresh database, the migration baseline marked
+# Boot log MUST show: ✓ Database: POSTGRESQL
 ssh <host> "journalctl -u ucm -n 100 --no-pager | grep -E 'Database|migration'"
 
 # Re-run the smoke and the UI checks
@@ -98,17 +110,17 @@ not boot, so a clean `journalctl` is **not** sufficient.
 
 | Feature              | What to do                                                     | Catches |
 |----------------------|----------------------------------------------------------------|---------|
-| PostgreSQL backend   | Settings → Database Backend → Test Connection                  | Missing `psycopg` (#78) |
-| HSM detect/test      | Settings → HSM → Detect / Test                                 | Provider mismatch |
+| PostgreSQL backend   | Settings → Database → Test                  | Missing `psycopg` (#78) |
+| HSM detect/test      | Modules → Administration → HSM Management → Test                                 | Provider mismatch |
 | SSO role mapping     | OIDC/SAML login that mutates a user's role                     | Audit signature drift (#79) |
 | ACME internal domain | Issue cert for `*.lan` / RFC1918                               | SSRF over-block (v2.124) |
 | Webhook to LAN       | Webhook → `http://192.168.x.x/...`                             | SSRF over-block |
 | Cloud metadata IP    | Webhook → `http://169.254.169.254` → MUST be rejected          | SSRF under-block |
 | Discovery loopback   | Discovery scan of `127.0.0.1`                                  | Loopback over-block |
 | Public protocols     | `curl -k <host>:<port>/cdp/<ca>.crl`, `/ocsp`, `/.well-known/est/cacerts` | SPA catch-all hijack |
-| Service restart      | Settings → Restart Service (UI button)                          | Regression to `subprocess.run` |
+| Service restart      | Settings → General → Restart UCM (UI button)                          | Regression to `subprocess.run` |
 
-Tail logs while running: `ssh <host> "tail -f /var/log/ucm/ucm.log /var/log/ucm/error.log"`.
+Tail logs while running: `ssh <host> "tail -f /var/log/ucm/ucm.log /var/log/ucm/error.log"` (packages).
 Tracebacks land in **error.log**, not `ucm.log`.
 
 ## Master key persistence (Docker)
@@ -124,22 +136,22 @@ SSH CA, webhook secrets) unrecoverable.
 # 1. Bind-mount both volumes
 ssh <host> "docker rm -f ucm-rc-test 2>/dev/null; \
          docker run -d --name ucm-rc-test -p <port>:8443 \
-           -v /srv/ucm-rc-test/etc:/etc/ucm \
-           -v /srv/ucm-rc-test/data:/opt/ucm/data \
+           -v <state-dir>/etc:/etc/ucm \
+           -v <state-dir>/data:/opt/ucm/data \
            neyslim/ultimate-ca-manager:<X.Y-rcN>"
 
 # 2. Login → Settings → Security → Enable Encryption
 #    → Backup modal MUST appear, MUST require download + checkbox before close
 
 # 3. Confirm master.key was created on the host
-ssh <host> "ls -la /srv/ucm-rc-test/etc/master.key"
+ssh <host> "ls -la <state-dir>/etc/master.key"
 #    → -rw------- ucm ucm
 
 # 4. Recreate container (simulates upgrade / image change)
 ssh <host> "docker rm -f ucm-rc-test && \
          docker run -d --name ucm-rc-test -p <port>:8443 \
-           -v /srv/ucm-rc-test/etc:/etc/ucm \
-           -v /srv/ucm-rc-test/data:/opt/ucm/data \
+           -v <state-dir>/etc:/etc/ucm \
+           -v <state-dir>/data:/opt/ucm/data \
            neyslim/ultimate-ca-manager:<X.Y-rcN>"
 
 # 5. Verify NO safe-mode banner, encryption still enabled
@@ -151,15 +163,29 @@ curl -k https://<host>:<port>/api/v2/system/security/encryption-status
 #    AND check audit log for master_key_downloaded entry
 ```
 
+## Upgrade from 2.254 and rollback
+
+3.0 upgrades only a database last started by 2.254 (see "Upgrading to v3.0" in
+`UPGRADE.md`). On every package and image cell, also run:
+
+1. Install 2.254 (the latest 2.254.N), start it once, create a certificate and
+   take a backup archive and a copy of the database.
+2. Install the release under test and start it. It must come up on the same
+   data with the certificate intact and the smoke passing. On a database 2.254
+   never started, it must refuse to start and write nothing, with the message
+   `UPGRADE.md` quotes.
+3. Roll back following the *Rollback* section of `UPGRADE.md` (written for the
+   DEB; the other deliverables use their own package or image), the *Upgrading
+   to v3.0* notes saying what it requires and what it loses: stop the service,
+   restore the database copy taken in step 1, reinstall 2.254, start it. Do not
+   restore a 3.0 backup archive on 2.254: it refuses the archive format.
+
 ## Pass criteria
 
-A release is **not** stable until **6/6** targets pass:
-
-- [ ] DEB / SQLite: smoke + UI + functional smoke tests
-- [ ] DEB / PostgreSQL: smoke + UI + fresh database
-- [ ] RPM / SQLite: smoke + UI + functional smoke tests
-- [ ] RPM / PostgreSQL: smoke + UI
-- [ ] Docker / SQLite: smoke + UI + master-key persistence
-- [ ] Docker / PostgreSQL: smoke + UI
-
-Skipping a target is how distro-specific regressions ship.
+A release is **not** stable until every cell of the matrix is recorded as
+passed, the upgrade and rollback run is done for each deliverable, and the
+functional smoke tests above pass on at least one cell per deliverable.
+Skipping a cell is how distro-specific regressions ship. The numbers a check
+depends on (migrations, versions, asset names) are read from the code and its
+tests, never copied here: `scripts/ci/release_version.py` for asset names and
+version forms, `UPGRADE.md` for the upgrade requirements.

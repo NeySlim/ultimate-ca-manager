@@ -5,6 +5,7 @@ frontend/dist/
 frontend/.vite/
 frontend/coverage/
 frontend/*.local
+frontend/bundle-modules.json
 
 # Python
 __pycache__/
@@ -106,6 +107,7 @@ logs/
 /migrate_*.py
 data/
 !frontend/src/data/
+!backend/tests/data/
 CLAUDE.md
 backend/static/
 SECURITY_AUDIT.md

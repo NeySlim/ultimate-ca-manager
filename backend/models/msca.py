@@ -240,6 +240,8 @@ class MSCARequest(db.Model):
     request_id = db.Column(db.Integer)
     disposition_message = db.Column(db.Text)
     template = db.Column(db.String(200), nullable=False)
+    # submitted, pending, issued, denied, failed; superseded when the CSR got a
+    # certificate from another source while the CA held the request
     status = db.Column(db.String(20), default='submitted')
     submitted_at = db.Column(db.DateTime, default=utc_now)
     issued_at = db.Column(db.DateTime)

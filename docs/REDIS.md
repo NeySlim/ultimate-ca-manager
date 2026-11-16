@@ -1,6 +1,6 @@
 # Redis
 
-Redis is optional. On a single UCM instance it has no use: sessions survive restarts, and real-time events stay within the process. In a high-availability cluster (see [HA.md](HA.md)) it moves the sessions and the WebSocket event relay from PostgreSQL to Redis.
+Redis is optional. On a single UCM instance it has no use: sessions survive restarts, and without it the scheduler process and the web workers relay real-time events through the database, on a single node as well as in a cluster. In a high-availability cluster (see [HA.md](HA.md)) it moves the sessions and the WebSocket event relay from PostgreSQL to Redis.
 
 Without Redis, sessions are kept on disk, except on PostgreSQL, where they are kept in the database and shared between nodes.
 

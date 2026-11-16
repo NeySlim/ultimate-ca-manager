@@ -15,7 +15,7 @@ export default {
         title: '功能',
         items: [
           { label: '类型', text: 'Web Server、Email、VPN Server 或 Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。决定密钥用途、扩展密钥用途和 SAN 的默认值' },
-          { label: '主题默认值', text: '预填组织、OU、国家、省/州、城市和 Email。在电子邮件及服务器 + 客户端（组合）证书上，Email 也会成为 SAN' },
+          { label: '主题默认值', text: '预填组织、OU、国家、省/州、城市和 Email。Email 也会成为 SAN，无论证书类型如何' },
           { label: '密钥用途', text: '数字签名、密钥加密等' },
           { label: '扩展密钥用途', text: '服务器已知的任何用途：服务器认证、客户端认证、代码签名、邮件保护、智能卡登录、时间戳、OCSP 签名、IPsec、Microsoft RDP 等' },
           { label: 'SAN 类型', text: '使用此模板的请求可包含的名称类型（DNS、IP、Email、URI、UPN）。启用「强制执行允许的 SAN 类型」后，签发表单、CSR 签名、各注册协议、续期和审批会拒绝其他类型，仅由 CN 推导出的名称会被省略。新模板默认启用；之前的模板和内置模板默认关闭。未勾选任何项：允许所有类型' },
@@ -24,10 +24,10 @@ export default {
           { label: '显示系统模板', text: '隐藏内置模板，只处理您自己的模板。每个浏览器单独记住此选择' },
           { label: '停用', text: '已停用的模板（包括内置模板）不会出现在签发证书表单中，也不会提供给 Windows 自动注册，并显示「非活跃」徽章。点击「激活」即可恢复。内置模板可以停用，但不能编辑：请复制一份来修改' },
           { label: '导入/导出', text: '在 UCM 实例之间以 JSON 文件共享模板：页面一次导出一个模板，导入文件可包含一个或多个模板' },
-          { label: '密钥类型', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384 或 EC-P521，搭配 SHA-256、SHA-384 或 SHA-512 摘要，或 ML-DSA-44、ML-DSA-65 或 ML-DSA-87。摘要是签发 CA 的签名哈希，而非叶子密钥的哈希：它仍适用于 RSA 或 EC CA 下的 ML-DSA 叶子证书，而 ML-DSA CA 会忽略它' },
           { label: 'qcStatements', text: '可选的 ETSI EN 319 412-5 声明，添加到使用该模板签发的每个证书：QcCompliance、QcType（签名、印章或网站）、QcSSCD、QcPDS（HTTPS URL 和两位语言代码）、QcRetentionPeriod、QcLimitValue、QcCClegislation（用于依据欧盟以外法律框架认定的合格证书）以及语义标识符。不适用于 EST、WSTEP 或 mTLS 签发，CSR 中的 qcStatements 扩展会被忽略。不支持 QcIdentMethod、QcQSCDlegislation 和 PSD2 声明' },
           { label: '策略 OID', text: '额外的证书策略 OID（例如 ETSI QCP-n、QCP-l、QCP-n-qscd、QCP-l-qscd 和 QCP-w 策略），添加在 CA 自身策略之后' },
-          { label: '自定义扩展', text: 'UCM 未建模的扩展, 每项包含一个 OID、关键标志和十六进制的 DER 值, 按原样添加到使用该模板签发的每个证书 (签发表单、签署 CSR、ACME、SCEP、WSTEP、审批; 续期时保留)。签发表单可以添加更多扩展, 或替换 OID 相同的扩展。UCM 自身设置的扩展会被拒绝: 请使用它们各自的设置。不识别关键扩展的客户端会拒绝该证书' },
+          { label: '自定义扩展', text: 'UCM 未建模的扩展，每项包含一个 OID、关键标志和十六进制的 DER 值，按原样添加到使用该模板签发的每个证书 (签发表单、签署 CSR、ACME、SCEP、WSTEP、审批; 续期时保留)。签发表单可以添加更多扩展，或替换 OID 相同的扩展。UCM 自身设置的扩展会被拒绝: 请使用它们各自的设置。不识别关键扩展的客户端会拒绝该证书' },
+          { label: '密钥类型', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384 或 EC-P521，搭配 SHA-256、SHA-384 或 SHA-512 摘要，或 ML-DSA-44、ML-DSA-65 或 ML-DSA-87。摘要是签发 CA 的签名哈希，而非叶子密钥的哈希：它仍适用于 RSA 或 EC CA 下的 ML-DSA 叶子证书，而 ML-DSA CA 会忽略它' },
           { label: '摘要偏好 (v2.251)', text: '所有基于该模板签发的路径（签发表单、签署 CSR、ACME、SCEP、WSTEP、TSA 签名者；EST 不使用模板）都使用其摘要签名，并提升到与 CA 密钥对应的摘要：P-384 为 SHA-384，P-521 为 SHA-512。策略禁止时，改用所允许的最接近的更强摘要，结果会显示“Signature digest X replaced by Y by policy”' },
           { label: 'Brainpool', text: 'EC-BP256、EC-BP384 和 EC-BP512（RFC 5639，在密钥类型列表中归入 Brainpool 分组，FIPS 模式下隐藏）。OpenSSL 和 Windows 可以读取其证书链和签名，但 Chrome、Firefox、Go、rustls、GnuTLS 以及未使用 Bouncy Castle 的 Java 在 TLS 中会拒绝它们，Windows Schannel 默认也未启用。在 HSM 上，只有 PKCS#11 提供者可以存放这些密钥' },
         ]
@@ -35,10 +35,10 @@ export default {
       {
         title: 'Windows 自动注册',
         items: [
-          { label: '允许自动注册', text: '在证书注册策略中将模板通告为 autoEnroll=true，使 GPO/Kerberos 客户端在登录时自动请求它。默认关闭, 没有它仍可手动注册' },
-          { label: '从 Active Directory 构建主题', text: '从请求者的 AD 对象（通过 AD 连接器）派生主题和 SAN，而不要求客户端提供, 用于无人值守的 GPO 自动注册' },
+          { label: '允许自动注册', text: '在证书注册策略中将模板通告为 autoEnroll=true，使 GPO/Kerberos 客户端在登录时自动请求它。默认关闭，没有它仍可手动注册' },
+          { label: '从 Active Directory 构建主题', text: '从请求者的 AD 对象（通过 AD 连接器）派生主题和 SAN，而不要求客户端提供，用于无人值守的 GPO 自动注册。在 Kerberos 端点上，请求中指明的主题会被忽略，计算机账户会被拒绝；机器模板始终取计算机的 DNS 名称' },
           { label: '将注册限制为 AD 组', text: '只有配置的 AD 组成员（包括嵌套成员）才能通过 Kerberos 端点注册。留空 = 任何已认证的主体。用户名/密码端点不强制执行' },
-          { label: '固定主题字段', text: '将 C/ST/L/O/OU 值强制应用于通过 WSTEP 签发的每个证书，覆盖 CSR 或 AD 派生的这些字段。CN 和 SAN 永不受影响, 留空字段则保持动态' },
+          { label: '固定主题字段', text: '将 C/ST/L/O/OU 值强制应用于通过 WSTEP 签发的每个证书，覆盖 CSR 或 AD 派生的这些字段。CN 和 SAN 永不受影响，留空字段则保持动态' },
           { label: '公用名模式', text: '对于由 UCM 构建主题的模板，用固定文本和目录变量构建 CN，例如 {hostname}-WiFi 或 {displayName}。只有 CN 改变：SAN 和 SID 扩展保持为目录中的值。变量为空或 CN 超过 64 个字符时请求被拒绝；同一 CA 的证书已为另一个账户携带的主题也会被拒绝' },
         ]
       },
@@ -75,7 +75,7 @@ export default {
 1. 点击**创建模板**
 2. 输入**名称**和可选描述
 3. 选择模板**类型**：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。它决定密钥用途、扩展密钥用途和 SAN 的默认值，之后您可以再修改
-4. 配置**主题默认值**（O、OU、C、ST、L、CN、Email）。在电子邮件及服务器 + 客户端（组合）证书上，Email 也会成为 SAN
+4. 配置**主题默认值**（O、OU、C、ST、L、CN、Email）。Email 也会成为 SAN，无论证书类型如何
 5. 选择**密钥用途**（数字签名、密钥加密等）
 6. 从服务器已知的用途中选择**扩展密钥用途**（智能卡登录、时间戳、Microsoft RDP 等）
 7. 设置**密钥类型**（RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521、Brainpool EC-BP256/384/512 或 ML-DSA-44/65/87）、摘要和**默认有效期**（天数）。摘要是签发 CA 的签名哈希，因此它仍适用于 RSA 或 EC CA 下的 ML-DSA 密钥；ML-DSA CA 会忽略它
@@ -90,10 +90,10 @@ export default {
 
 ## Windows 自动注册标志
 
-模板带有三个可选启用的标志，供 Windows 自动注册协议使用（XCEP/WSTEP，在**设置 → Windows 自动注册**下配置）：
+模板带有三个可选启用的标志，供 Windows 自动注册协议使用（XCEP/WSTEP，按 realm 在**设置 → Windows 自动注册**下配置）：
 
 - **允许自动注册**: 在证书注册策略中将模板通告为 \`autoEnroll=true\`，使经 GPO/Kerberos 认证的客户端在登录时自动请求它，无需用户操作。默认关闭: 与真实 ADCS 一样，没有此标志的模板仍可手动注册（MMC「申请新证书」、\`certreq\`），因为 Enroll 和 Autoenroll 是独立的权限。
-- **从 Active Directory 构建主题**: 用于无人值守的 GPO 自动注册：从请求者的 AD 对象（通过 AD 连接器）派生证书的主题和 SAN，而不要求客户端提供。
+- **从 Active Directory 构建主题**: 用于无人值守的 GPO 自动注册：从请求者的 AD 对象（通过 AD 连接器）派生证书的主题和 SAN，而不要求客户端提供。在 Kerberos 端点上，请求中指明的主题会被忽略，计算机账户会被拒绝；机器模板始终取计算机的 DNS 名称。
 - **将注册限制为 AD 组**: 只有属于配置的 Active Directory 组的主体（包括嵌套成员）才能通过 Kerberos 认证端点针对此模板注册。输入组名或完整 DN；留空则允许任何已认证的主体，与真实 ADCS 的默认行为一致。用户名/密码端点不强制执行，因为它没有可检查的每请求身份。
 
 带有这些标志的模板会在模板列表中显示 **AD**、**Auto** 和 **ACL** 徽章。
@@ -137,12 +137,7 @@ export default {
 
 ## 复制模板
 
-1. 选择一个现有模板
-2. 点击**复制**
-3. 修改名称和设置
-4. 点击**创建**
-
-复制创建一个独立的副本:, 对副本的更改不会影响原始模板。
+点击**复制**即可创建现有模板的副本。修改副本不会影响原始模板。
 
 ## 导入和导出
 

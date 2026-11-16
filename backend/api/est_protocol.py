@@ -594,11 +594,8 @@ def _validate_est_csr(csr):
                 "EST: CSR signed with weak hash algorithm %s (subject=%s)",
                 weak_algo, csr.subject.rfc4514_string(),
             )
-            return False, Response(
-                f'CSR signed with an unsupported hash algorithm ({weak_algo}); '
-                'use SHA-256 or stronger',
-                status=400,
-            )
+            from utils.csr_diagnostics import weak_csr_hash_error
+            return False, Response(weak_csr_hash_error(csr), status=400)
         logger.warning(
             "EST: CSR self-signature invalid (subject=%s)",
             csr.subject.rfc4514_string(),

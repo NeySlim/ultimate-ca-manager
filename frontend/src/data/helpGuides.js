@@ -18,10 +18,10 @@ The Overview is the home page: six independent cards over the live data of your 
 ## Cards
 
 ### To handle
-The six most urgent items, critical first, each linking to its record. A folded tier gives the total per kind; the four renewal kinds open the certificate list.
+The six most urgent items, critical first, each linking to its record. With the right to read the trust store, the trust store certificates that expire within 90 days or have already expired are listed too (the expired ones as critical). A folded tier gives the total per kind; the four renewal kinds open the certificate list.
 
 ### Automation health
-Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state.
+Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state and, while the TSA is enabled, the state of its signer: a warning while the CA certificate signs, since those tokens do not satisfy RFC 3161. With the right to read settings, three more lines tell whether email, webhooks and auto-renewal are set up: a setting that is not configured is information, not an alert; email configured but disabled or incomplete, or webhooks with none active, show as alerts.
 
 ### Hierarchy
 The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days. Each authority opens its page.
@@ -223,7 +223,8 @@ UCM can store a CA's signing key on an external Hardware Security Module instead
 ### Limitations
 - HSM-backed private keys **cannot be exported**. PKCS#12, JKS and key-only export options are hidden for HSM CAs. Only the certificate (PEM/DER/P7B) can be exported.
 - There is **no in-place migration** between Local and HSM. To "move" an existing local CA onto an HSM, create a new CA on the HSM and re-issue certificates.
-- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to another CA.
+- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to an authority, X.509 or SSH: an HSM key backs one authority only.
+- Creating a CA on an HSM key needs the \`read:hsm\` permission besides \`write:cas\`; without it the **HSM** choice is disabled.
 
 ## Offline Mode
 
@@ -408,14 +409,14 @@ The **Lint** action (certificate detail) checks X.509 standards conformance. Inf
     content: `
 ## Overview
 
-The User Certificates page manages mTLS client certificates enrolled via the **Account → mTLS** tab. Unlike regular certificates, these are specifically tied to user accounts for mutual TLS authentication.
+The User Certificates page manages mTLS client certificates enrolled from **My Account → Security**, section **Client Certificates (mTLS)**. Unlike regular certificates, these are specifically tied to user accounts for mutual TLS authentication.
 
 Certificates here are fully managed by UCM: they are stored in the database with private keys, and can be exported, revoked, or deleted at any time.
 
 ## Enrolling a Certificate
 
-1. Go to **Account → mTLS** tab
-2. Click **Enroll Certificate**
+1. Go to **My Account → Security**, section **Client Certificates (mTLS)**
+2. Click **Add Certificate**, keep **Generate** and click **Generate Certificate**
 3. The system generates a key pair and issues a client certificate signed by your mTLS CA
 4. The certificate appears on this page and can be used for mTLS login
 
@@ -563,7 +564,7 @@ If Microsoft CA connections are configured, a **Microsoft CA** tab appears in th
 4. Select the **certificate template** (auto-loaded from the CA)
 5. Click **Sign**
 
-If the template requires manager approval, UCM tracks the pending request. Check its status from the CSR detail panel.
+If the template requires manager approval, the request stays Pending in UCM. Open it in **Pending** and click **Check status** to fetch the certificate once the CA has issued it (also needs the permission to sign CSRs), or approve it from the CA Control Panel of the connection.
 
 ### Enroll on Behalf Of (EOBO)
 
@@ -982,9 +983,9 @@ Use any RFC 8555-compliant CA, not just Let's Encrypt:
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Set your CA's directory URL as the **ACME Directory URL** of its account in **External CA Accounts**.
+Set your CA's directory URL as the **ACME Directory URL** of its account in **Certificate Authorities (CA)**.
 
-### External CA Accounts
+### Certificate Authorities (CA)
 Manage every external CA account UCM registers with:
 
 - **Multiple accounts per CA allowed**: several accounts can share the same directory URL (e.g. two Let's Encrypt accounts with different contact emails for administrative separation, useful alongside dns-persist-01). The account row, not the URL, is the identity.
@@ -997,7 +998,7 @@ Manage every external CA account UCM registers with:
 Some CAs require EAB credentials to link your ACME account with an existing account at the CA:
 
 1. Register at your CA's portal to obtain **EAB Key ID** and **HMAC Key**
-2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **External CA Accounts**
+2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **Certificate Authorities (CA)**
 3. The HMAC key is base64url-encoded (provided by the CA)
 
 > 💡 EAB is required by ZeroSSL, HARICA, Google Trust Services, and most enterprise CAs.
@@ -1057,7 +1058,7 @@ For DNS services without a native driver, the **Custom Command** provider runs a
 - \`TTL\`: record TTL in seconds
 - \`ACTION\`: \`create\` or \`delete\`
 
-The command requires an **absolute binary path**, runs without a shell (no pipes or expansion), and is killed after a configurable timeout (5–300 s, default 60). Use a small wrapper script to bridge any external DNS tooling.
+The command requires an **absolute binary path**, runs without a shell (no pipes or expansion), and is killed after a configurable timeout (5-300 s, default 60). Use a small wrapper script to bridge any external DNS tooling.
 
 ### Custom DNS Resolvers
 **DNS-01 resolvers** chooses where UCM looks up \`_acme-challenge\` TXT records: **Automatic** (listed resolvers, then the zone's authoritative servers, then public resolvers, then the system resolver), **System resolver only**, or **Listed resolvers only**. The restricted modes never query public resolvers, for networks that block them. Entries are comma-separated IPs with an optional port, e.g. \`127.0.0.1:5353\` or \`[2001:db8::53]:5300\`.
@@ -1087,7 +1088,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Configuration
 1. Go to **ACME** → **Let's Encrypt** tab
 2. Scroll down to the **ACME Proxy** section
-3. Select an **Upstream CA account** from **External CA Accounts** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
+3. Select an **Upstream CA account** from **Certificate Authorities (CA)** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
 4. Click **Test Connection** to verify connectivity with the upstream CA
 5. Register the upstream account if needed (email + **Register Account**)
 6. UCM automatically registers an account on first proxy request if not already done
@@ -1095,7 +1096,7 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Dedicated proxy paths (multi-CA)
 Each external CA account can expose its own ACME proxy endpoint:
 
-1. Open **External CA Accounts** (same Let's Encrypt tab)
+1. Open **Certificate Authorities (CA)** (same Let's Encrypt tab)
 2. Edit or create a CA account
 3. Enable **Expose via ACME proxy**
 4. Set a unique **Proxy path (slug)**: e.g. \`actalis-production\`, \`letsencrypt-staging\`
@@ -1151,7 +1152,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **External CA Accounts**.
+> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **Certificate Authorities (CA)**.
 
 > ⚠ Prerequisite: the domain (or a parent domain covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy supports dns-01 only.
 
@@ -1512,7 +1513,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 
 1. **Client creates a timestamp request**: hashes a file with SHA-256/SHA-512 and creates a \`TimeStampReq\` (ASN.1 DER-encoded)
 2. **Client sends request to TSA**: HTTP POST to the \`/tsa\` endpoint with \`Content-Type: application/timestamp-query\`
-3. **UCM signs the timestamp**: the dedicated signing certificate, or the configured CA's own certificate when none is set, signs the hash + current time into a \`TimeStampResp\`
+3. **UCM signs the timestamp**: the dedicated signing certificate signs the hash + current time into a \`TimeStampResp\`. The configured CA's own certificate signs only when **Require a dedicated TSA certificate** is turned off
 4. **Client receives and stores the response**: the \`.tsr\` file can later prove the document existed at that time
 
 ## Configuration
@@ -1522,7 +1523,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 1. **Enable TSA**: Toggle the TSA server on or off
 2. **Signing CA**: Select which Certificate Authority signs timestamp tokens
 3. **Policy OID**: Object Identifier for the TSA policy, included in every timestamp response
-4. **Require a dedicated TSA certificate**: Opt-in: refuse to sign timestamps with the CA certificate itself. When enabled, a dedicated end-entity signing certificate with a **critical timeStamping EKU** (RFC 3161) is required
+4. **Require a dedicated TSA certificate**: On by default: refuse to sign timestamps with the CA certificate itself, so \`/tsa\` answers 503 until a dedicated end-entity signing certificate with a **critical timeStamping EKU** (RFC 3161) is set. **Generate a signing certificate** issues one from the signing CA and selects it. Turning the option off lets the CA certificate sign, which is not RFC 3161 compliant; an installation upgraded from 2.x whose TSA signed with its CA keeps it off, and the overview shows a warning
 
 ### Choosing a Signing CA
 
@@ -1531,7 +1532,7 @@ The signing CA's private key is used to sign every timestamp token. Best practic
 - Use a **dedicated sub-CA** for timestamping rather than your root CA
 - RFC 3161 §2.3 requires a signer whose only, critical EKU is **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), which a CA certificate cannot carry without losing its other uses. Tokens signed by the CA certificate are refused by strict verifiers: \`openssl ts -verify\` fails with "unsuitable certificate purpose" and jarsigner with "Certificate is not valid for timestamping". The Settings tab warns while the CA certificate signs: **generate a dedicated signing certificate** there for these clients
 - Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503
-- Enable **Require a dedicated timestamping certificate** to enforce this at signing time instead of relying on convention
+- Keep **Require a dedicated TSA certificate** on to enforce this at signing time
 
 ### Policy OID
 
@@ -1944,9 +1945,9 @@ Exports apply only the date range, up to 10,000 entries: the other filters are n
 ## Cleanup
 
 Purge old logs based on retention period:
-1. Click **Cleanup**
+1. Click **Cleanup Old Logs**
 2. Set the retention period in days
-3. Confirm the cleanup
+3. Click **Delete Old Logs**
 
 > ⚠ Log cleanup is irreversible. Export important logs before purging.
 
@@ -2326,7 +2327,7 @@ Manage your personal profile, security settings, and API keys.
 
 - **Full Name**: Your display name shown across UCM
 - **Email**: Used for notifications and password recovery
-- **Account Info**: Creation date, last login timestamp, total login count
+- **Account Information**: Creation date, last login timestamp, total login count
 
 ## Security
 
@@ -2390,7 +2391,7 @@ X-API-Key: <your-api-key>
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself, and that key expires no later than the one asking. **Regenerate** keeps the key's permissions and lifetime; a revoked or expired key cannot be regenerated.
+Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself, and that key expires no later than the one asking. Regenerating a key, offered by the API only (\`POST /api/v2/account/apikeys/<id>/regenerate\`), keeps its permissions and lifetime; a revoked or expired key cannot be regenerated.
 
 API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 
@@ -2441,7 +2442,7 @@ Import certificates and CAs from an OPNsense firewall, on demand (UCM does not k
 
 ### Import
 1. Select the items you want to import
-2. Click **Import Selected**
+2. Click **Import N selected** (N counts the selected items)
 
 UCM imports certificates with their private keys (if available) and preserves the CA hierarchy.
 
@@ -2708,8 +2709,17 @@ ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are offered only on providers that
 
 Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider. An ML-DSA key signs the data itself, so no digest is chosen.
 
+### Synchronizing keys
+Click **Sync keys** in the provider details to read the keys of the token again.
+- New keys are added.
+- Keys gone from the token are removed, except keys a CA uses: they are kept.
+- If the token listing fails, nothing is removed.
+
+The message gives the counts, the number of keys kept because a CA uses them, the number of unreadable keys and the number of keys used by a CA whose material changed on the token. The button is disabled while the synchronization runs.
 ### Using HSM Keys
 When creating a CA, select an HSM provider and key instead of generating a software key. The CA's signing operations are performed on the HSM.
+
+An HSM key backs one authority, X.509 or SSH. Creating a CA on an HSM key needs the \`read:hsm\` permission besides \`write:cas\` (\`write:ssh_cas\` for an SSH CA), and a key a CA holds cannot be deleted.
 
 > ⚠ Keys generated on an HSM cannot be exported. If you lose access to the HSM, you lose the keys.
 
@@ -2749,7 +2759,7 @@ Copy this URL into your IDP's "Add Service Provider" or "SAML Application" confi
 ### Configuration
 1. Obtain the IDP metadata URL or XML file from your identity provider
 2. In UCM, go to **Settings → SSO**
-3. Click **Add Provider** → SAML
+3. On the **SAML 2.0** card, click **Configure**
 4. Enter the **IDP Metadata URL**: UCM auto-populates Entity ID, SSO/SLO URLs, and certificate
 5. Or paste the IDP metadata XML directly
 6. Configure **attribute mapping** (username, email, groups)
@@ -2774,7 +2784,7 @@ A login started from the IdP portal reaches UCM without a request from UCM. **Al
 2. Set the **Redirect URI** to: \`https://your-ucm-host:8443/api/v2/sso/callback/oauth2\`
 3. Copy the **Client ID** and **Client Secret**
 4. In UCM, go to **Settings → SSO**
-5. Click **Add Provider** → OAuth2
+5. On the **OAuth2 / OIDC** card, click **Configure**
 6. Enter the **Authorization URL** and **Token URL**
 7. Enter the **User Info URL** (for fetching user attributes after login)
 8. Enter Client ID and Secret
@@ -2789,7 +2799,7 @@ When enabled, a new UCM user account is automatically created on first SSO login
 ### Identity matching
 A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first; its next sign-in through that provider binds the IdP identifier.
 
-When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink** then **Link to SSO** on each account.
+When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink SSO** then **Link to SSO** on each account.
 
 ### Role mapping rules
 - **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
@@ -2803,13 +2813,13 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 
 ### Configuration
 1. In UCM, go to **Settings → SSO**
-2. Click **Add Provider** → LDAP
+2. On the **LDAP / Active Directory** card, click **Configure**
 3. Enter the **LDAP Server** hostname and **Port** (389 for LDAP, 636 for LDAPS)
 4. Enable **Use SSL/TLS** (LDAPS, port 636) or, on port 389, **Use StartTLS**: the connection switches to TLS before any bind, with the same certificate verification. Without either, the bind and user passwords cross the network in clear
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)
 6. Enter the **Base DN** (search base for user lookups)
 7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
-8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink** then **Link to SSO**
+8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink SSO** then **Link to SSO**
 9. Click **Test Connection** to verify, then **Save** and **Enable**
 
 ### Active Directory
@@ -2821,7 +2831,7 @@ For Microsoft Active Directory, use:
 - Full name attr: \`displayName\`
 
 ## Login Flow
-1. User clicks **Login with SSO** on the UCM login page (or enters LDAP credentials)
+1. User clicks the button of their provider on the UCM login page (or enters LDAP credentials)
 2. For SAML/OAuth2: user is redirected to the IDP, authenticates, then redirected back
 3. For LDAP: credentials are verified directly against the LDAP server
 4. UCM creates or updates the user account
@@ -2979,12 +2989,12 @@ Restrict which key algorithms and sizes can be used:
 - **EC-P521**: Maximum security (rarely needed)
 - **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-quantum (FIPS 204), NIST levels 2, 3 and 5; removed in FIPS mode when the FIPS module does not approve them
 
-**Allowed Signature Schemes** restricts how the signing CA signs (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest.
+The \`allowed_signature_schemes\` rule, set through the API only (the policy form does not show it), restricts how the signing CA signs (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest.
 
 **Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes.
 
 ### SAN Restrictions
-- **Max DNS Names**: Limit the number of DNS names in the SAN; IP, e-mail and URI entries are not counted
+- **Max SANs**: Limit the number of DNS names in the SAN; IP, e-mail and URI entries are not counted
 - **DNS Pattern**: Scopes the policy to the requests whose CN or DNS SANs match, label by label and ignoring case: \`*.company.com\` covers the names under company.com, \`company.com\` covers company.com as well. Other names are not refused: the policy does not apply to them
 
 ## Approval Workflows
@@ -3001,8 +3011,8 @@ When **Require Approval** is enabled, certificate issuance is paused until the r
 ## Priority System
 
 Policies are evaluated in priority order. Lower numbers have higher precedence:
-- **1–10**: Critical security policies (code signing, wildcard)
-- **10–20**: Standard compliance (public TLS, internal PKI)
+- **1-10**: Critical security policies (code signing, wildcard)
+- **10-20**: Standard compliance (public TLS, internal PKI)
 - **20+**: Permissive defaults
 
 When multiple policies match a certificate request, the highest-priority (lowest number) policy decides the approval; the rules of every matching policy apply together (the smallest maximum validity, the intersection of the allowed key types, and so on).
@@ -3364,7 +3374,7 @@ UCM integrates with Microsoft Active Directory Certificate Services (AD CS) to s
 The certificate is returned immediately and imported into UCM.
 
 ### Manager Approval Templates
-UCM saves the request as **Pending** and tracks the MS CA request ID. The page offers no status check for it: once it is issued on the Windows CA, import the certificate, or let **Inventory sync** over the WinRM admin channel import the certificates UCM does not know yet.
+UCM saves the request as **Pending** and tracks the MS CA request ID. Open the CSR in **CSRs → Pending** and click **Check status**: if the CA issued the certificate (approved on the Windows CA console, for instance), UCM imports it into the request; if the CA denied it, the request becomes Denied; otherwise it stays Pending. Approving from the **CA Control Panel** imports the certificate too. **Inventory sync** completes pending requests the same way, and reports them as completed, apart from the certificates it imports. A request whose CSR is signed elsewhere (a local CA, an import) is closed; if its details are still open, **Check status** shows *This CSR was signed elsewhere: its Microsoft CA request is closed*. A certificate the CA still issues for it enters as a separate certificate when the request is approved from the **CA Control Panel**, or through a full inventory sync (\`full: true\` on \`POST /api/v2/microsoft-cas/{id}/inventory-sync\`): **Import from CA now** and the scheduled sync are incremental and can miss it.
 
 ## Enroll on Behalf Of (EOBO)
 
@@ -3452,7 +3462,7 @@ The control panel (opened from the connection, requires the admin channel) manag
 | Connection test fails | Verify hostname, port 443, and that certsrv is accessible |
 | No templates found | Check that the UCM account has enrollment permissions on the CA |
 | EOBO denied | Verify enrollment agent certificate and template permissions |
-| Request stuck pending | Approve it from the CA Control Panel, or on the Windows CA console then refresh status |
+| Request stuck pending | Click Check status on the CSR, or run an Inventory sync; or approve it from the CA Control Panel |
 | Admin channel test fails | Verify WinRM is enabled on the CA, the port/transport, and that pywinrm is installed |
 | Revocation not on the CA | Enable the WinRM admin channel, without it, revocation is local to UCM |
 | Pending not detected (non-English CA) | Fixed in v2.192. UCM now recognizes localized AD CS pending pages |
@@ -3504,6 +3514,20 @@ A Host CA signs certificates that authenticate **servers to clients**. When a cl
 6. List the allowed principals, or tick **Allow any principal**
 7. Click **Create**
 
+### On an HSM key
+
+An SSH CA can keep its private key on an HSM provider.
+
+1. In **Create SSH CA**, set **Key Storage** to **HSM**
+2. Pick the **HSM Provider**, then the **Existing HSM Key**: only unused RSA and ECDSA P-256/P-384/P-521 signing keys are listed
+3. Click **Create**. The CA takes its key type from the key, and the private key never leaves the token
+
+Good to know:
+- An SSH CA on an HSM takes an RSA or ECDSA P-256, P-384 or P-521 key. Ed25519 keys are not offered: UCM's HSM signing does not cover EdDSA, so an Ed25519 SSH CA is a software key. Brainpool and ML-DSA keys are not offered either: UCM signs with them on an HSM for X.509 CAs, but OpenSSH certificates have no key type for them.
+- An HSM key backs one authority, X.509 or SSH. A key a CA already holds is refused with the name of that CA, and neither the key nor its provider can be deleted while the CA exists.
+- It needs \`write:ssh_cas\` and \`read:hsm\`. Without \`read:hsm\` the **HSM** choice is disabled.
+- In FIPS mode a key that FIPS mode refuses is not offered. In HA mode a key on SoftHSM or on a local smart card reader is refused, as it exists on one node only.
+- If the provider cannot be reached when the CA is created, nothing is created.
 ### Allowed Principals
 
 The **Allowed Principals** field restricts the names a CA signs for, as comma-separated patterns (\`deploy\`, \`team-*\`, \`web??.example.com\`). Every principal in a request must match one of them.
@@ -3674,7 +3698,7 @@ Choose a preset or set custom duration:
 | 30 days | Monthly rotation |
 | 365 days | Long-lived service accounts |
 
-Short-lived certificates (8h–24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
+Short-lived certificates (8h-24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
 
 A certificate is valid from 5 minutes before it is issued, so a server whose clock lags slightly behind accepts it at once; the lifetime still counts from issuance (v2.252).
 

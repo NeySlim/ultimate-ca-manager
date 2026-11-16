@@ -1,8 +1,9 @@
 name: Release Smoke Tests
 
-# Called by Build & Release once a tag is published, so this definition and the
-# scripts it runs are those of the tag; every checkout names that tag. Boots the
-# published images and packages and runs smoke_release.py against them.
+# Called by Build & Release on a tag before anything is published, so this definition
+# and the scripts it runs are those of the tag; every checkout names that tag. A call
+# smokes the run's own output (images by digest, packages from its artifacts); a manual
+# run smokes the published images and packages. Runs smoke_release.py against them.
 
 on:
   workflow_call:
@@ -15,6 +16,21 @@ on:
         description: 'Docker image without tag or registry port'
         required: false
         default: 'neyslim/ultimate-ca-manager'
+        type: string
+      from-run:
+        description: 'Smoke the calling run: images by the digests below, packages from its artifacts'
+        required: false
+        default: false
+        type: boolean
+      image-digest:
+        description: 'Digest (sha256:...) of the standard image to pull instead of its version tag'
+        required: false
+        default: ''
+        type: string
+      fips-image-digest:
+        description: 'Digest (sha256:...) of the FIPS image to pull instead of its version tag'
+        required: false
+        default: ''
         type: string
   workflow_dispatch:
     inputs:
@@ -47,13 +63,23 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_IMAGE: ${{ inputs.image }}
+          INPUT_DIGEST: ${{ inputs.image-digest }}
+          INPUT_FROM_RUN: ${{ inputs.from-run }}
         run: |
           VER="$INPUT_VERSION"
           IMAGE="${INPUT_IMAGE:-neyslim/ultimate-ca-manager}"
           python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
+          # A release call pulls the untagged image its run built, never a tag that may be older
+          if [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
+            [[ "$INPUT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid image digest: $INPUT_DIGEST"; exit 1; }
+            REF="$IMAGE@$INPUT_DIGEST"
+          else
+            REF="$IMAGE:$VER"
+          fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
 
       - name: Determine RC flag
         id: rc
@@ -66,14 +92,14 @@ jobs:
 
       - name: Pull Docker image
         run: |
-          docker pull "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}"
+          docker pull "${{ steps.ver.outputs.ref }}"
 
       - name: Boot UCM container (SQLite)
         run: |
           docker run -d --name ucm-smoke -p 8443:8443 \
             -e SECRET_KEY=ci_smoke_secret_key \
             -e INITIAL_ADMIN_PASSWORD=changeme123 \
-            "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}"
+            "${{ steps.ver.outputs.ref }}"
           scripts/ci/wait-health.sh https://localhost:8443/api/v2/health 60 || { docker logs ucm-smoke; exit 1; }
 
       - name: Run release smoke
@@ -92,8 +118,9 @@ jobs:
         if: always()
         run: docker rm -f ucm-smoke || true
 
-  # Installs each published package in the container of its distribution. Debian 12 is
-  # not covered: the packages need python3 >= 3.12.
+  # Installs each package in the container of its distribution: from the calling run's
+  # artifacts, or the published asset by hand. Debian 12 is not covered: the packages
+  # need python3 >= 3.12.
   smoke-packages:
     name: Package ${{ matrix.image }} (${{ matrix.label }})
     runs-on: ubuntu-latest
@@ -125,15 +152,33 @@ jobs:
           python3 scripts/ci/release_version.py validate "$VER"
           echo "version=$VER" >> "$GITHUB_OUTPUT"
 
-      - name: Download the published asset and verify its checksum
+      - name: Take the packages of the calling run
+        if: inputs.from-run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: '*-package'
+          path: run-artifacts
+          merge-multiple: true
+
+      - name: Get the package and verify its checksum
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.ver.outputs.version }}
           PATTERN: ${{ matrix.pattern }}
+          FROM_RUN: ${{ inputs.from-run }}
         run: |
           mkdir pkg
-          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --dir pkg \
-            --pattern "$PATTERN" --pattern "$PATTERN.sha256"
+          if [ "$FROM_RUN" = true ]; then
+            # Under the name the release will give it ("~" turned into "."), which its checksum line carries
+            for f in run-artifacts/$PATTERN run-artifacts/$PATTERN.sha256; do
+              [ -e "$f" ] || continue
+              name=$(basename "$f")
+              cp "$f" "pkg/${name//\~/.}"
+            done
+          else
+            gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --dir pkg \
+              --pattern "$PATTERN" --pattern "$PATTERN.sha256"
+          fi
           test "$(ls pkg/*.sha256 | wc -l)" -eq 1
           (cd pkg && sha256sum -c ./*.sha256)
 
@@ -174,13 +219,23 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_IMAGE: ${{ inputs.image }}
+          INPUT_DIGEST: ${{ inputs.image-digest }}
+          INPUT_FROM_RUN: ${{ inputs.from-run }}
         run: |
           VER="$INPUT_VERSION"
           IMAGE="${INPUT_IMAGE:-neyslim/ultimate-ca-manager}"
           python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
+          # A release call pulls the untagged image its run built, never a tag that may be older
+          if [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
+            [[ "$INPUT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid image digest: $INPUT_DIGEST"; exit 1; }
+            REF="$IMAGE@$INPUT_DIGEST"
+          else
+            REF="$IMAGE:$VER"
+          fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
 
       - name: Determine RC flag
         id: rc
@@ -192,7 +247,7 @@ jobs:
           fi
 
       - name: Pull Docker image
-        run: docker pull "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}"
+        run: docker pull "${{ steps.ver.outputs.ref }}"
 
       - name: Boot UCM container (PostgreSQL)
         # Service container is reachable via host networking from job runner;
@@ -203,7 +258,7 @@ jobs:
             -e SECRET_KEY=ci_smoke_secret_key \
             -e INITIAL_ADMIN_PASSWORD=changeme123 \
             -e DATABASE_URL=postgresql://ucm:ucm_ci_password@localhost:5432/ucm \
-            "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}"
+            "${{ steps.ver.outputs.ref }}"
           scripts/ci/wait-health.sh https://localhost:8443/api/v2/health 90 || { docker logs ucm-smoke; exit 1; }
 
       - name: Run release smoke
@@ -237,13 +292,23 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_IMAGE: ${{ inputs.image }}
+          INPUT_DIGEST: ${{ inputs.fips-image-digest }}
+          INPUT_FROM_RUN: ${{ inputs.from-run }}
         run: |
           VER="$INPUT_VERSION"
           IMAGE="${INPUT_IMAGE:-neyslim/ultimate-ca-manager}"
           python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
+          # A release call pulls the untagged image its run built, never a tag that may be older
+          if [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
+            [[ "$INPUT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid image digest: $INPUT_DIGEST"; exit 1; }
+            REF="$IMAGE@$INPUT_DIGEST"
+          else
+            REF="$IMAGE:$VER-fips"
+          fi
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
 
       - name: Determine RC flag
         id: rc
@@ -257,14 +322,14 @@ jobs:
           fi
 
       - name: Pull Docker image
-        run: docker pull "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}-fips"
+        run: docker pull "${{ steps.ver.outputs.ref }}"
 
       - name: Boot UCM container (UCM_FIPS=1)
         env:
           FIPS_CHECK_KEEP: '1'
         run: |
           scripts/ci/check-fips-image.sh \
-            "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}-fips" ucm-smoke 8443
+            "${{ steps.ver.outputs.ref }}" ucm-smoke 8443
 
       - name: Run release smoke
         run: |

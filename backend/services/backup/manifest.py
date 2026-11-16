@@ -295,6 +295,7 @@ SECTIONS: Dict[str, Section] = {
         identity=('label',),
         exclude={**_SURROGATE},
         secrets=('account_key', 'eab_hmac_key'),
+        # eab_hmac_key is a property that writes under the KEK itself: no layer to name
         stored={'account_key': 'master'},
     ),
     'acme_client_orders': Section(
@@ -331,7 +332,7 @@ SECTIONS: Dict[str, Section] = {
         model='models.ssh:SSHCertificateAuthority',
         identity=('refid',),
         exclude={**_SURROGATE},
-        references={'owner_group_id': 'groups'},
+        references={'owner_group_id': 'groups', 'hsm_key_id': 'hsm_keys'},
         custom=True,
         handled={'private_key': 'private_key_pem_encrypted'},
     ),

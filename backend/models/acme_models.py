@@ -68,8 +68,10 @@ class AcmeAccount(db.Model):
 class AcmeOrder(db.Model):
     """ACME Order - RFC 8555 Section 7.1.3"""
     __tablename__ = 'acme_orders'
-    # The dashboard queue lists the orders that failed recently (migration 139)
-    __table_args__ = (db.Index('ix_acme_orders_status_created_at', 'status', 'created_at'),)
+    # The dashboard queue lists the orders that failed recently (migration 139); a certificate's
+    # orders are found by certificate_id (upgrade step 157, the ACME routes, revocation)
+    __table_args__ = (db.Index('ix_acme_orders_status_created_at', 'status', 'created_at'),
+                      db.Index('ix_acme_orders_certificate_id', 'certificate_id'))
     
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
@@ -393,8 +395,8 @@ class AcmeClientOrder(db.Model):
         db.Integer, db.ForeignKey('acme_client_accounts.id'), nullable=True, index=True
     )
     
-    # Resulting certificate (after issuance)
-    certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))
+    # Resulting certificate (after issuance); indexed for the work queue (migration 139)
+    certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'), index=True)
     
     # Auto-renewal settings
     renewal_enabled = db.Column(db.Boolean, default=True)

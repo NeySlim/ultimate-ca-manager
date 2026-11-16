@@ -64,7 +64,7 @@ def test_every_session_cut_then_the_database_back(cluster, admin):
     # back (docs/ADMIN_GUIDE.md, Leader), and /health names that node
     def led():
         holders = _advisory_locks(cluster)
-        leader = single_leader(cluster.nodes)
+        leader = single_leader(cluster.nodes, settling=True)
         return leader if leader and holders == [(LEADER_LOCK_KEY, True, leader.name)] else None
     leader = wait_until(led, LOCK_RETRY_SECONDS + MARGIN - (time.monotonic() - opened_at),
                         'one lock holder, named leader by every node')

@@ -1060,3 +1060,101 @@ def test_a_restore_of_the_connectors_alone_gives_them_to_a_default_profile_witho
     with app.app_context():
         lowest = windows_profiles.lowest_connector()
         assert lowest is not None and _default().connector_id == lowest.id
+
+
+
+def test_two_sqlite_writers_creating_the_default_profile_leave_one_and_no_error(app, monkeypatch, tmp_path):
+    """Two real transactions on a SQLite file, each on its own connection, both reading that no
+    default exists before either writes it."""
+    import threading
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import scoped_session, sessionmaker
+    from services import windows_profiles
+    engine = create_engine(f"sqlite:///{tmp_path / 'race.db'}")
+    with app.app_context():
+        db.metadata.create_all(engine)
+    sessions = scoped_session(sessionmaker(bind=engine), scopefunc=threading.get_ident)
+    monkeypatch.setattr(db, 'session', sessions)
+    real = windows_profiles.default_profile
+    both_read = threading.Barrier(2, timeout=20)
+    first_read = threading.local()
+
+    def racing():
+        found = real()
+        if not getattr(first_read, 'done', False):
+            first_read.done = True
+            both_read.wait()
+        return found
+    monkeypatch.setattr(windows_profiles, 'default_profile', racing)
+    errors, ids = [], []
+
+    def writer(name):
+        try:
+            with app.app_context():
+                windows_profiles.default_for_write(name).xcep_username = name
+                db.session.commit()
+                ids.append(real().id)
+        except Exception as e:  # noqa: BLE001  # what the caller would have been handed
+            errors.append(repr(e))
+        finally:
+            sessions.remove()
+    threads = [threading.Thread(target=writer, args=(n,)) for n in ('first', 'second')]
+    try:
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(60)
+        assert errors == []
+        with app.app_context():
+            rows = WindowsEnrollmentProfile.query.filter_by(is_default=True).all()
+            assert len(rows) == 1 and ids == [rows[0].id] * 2
+    finally:
+        sessions.remove()
+        engine.dispose()
+
+
+def test_a_sqlite_write_error_that_is_not_a_lock_is_raised_as_it_is(app, monkeypatch):
+    """A read-only database or a full disk must name itself, not hide behind retries."""
+    from sqlalchemy import event
+    from sqlalchemy.exc import OperationalError
+    from services import windows_profiles
+
+    with app.app_context():
+        if db.session.get_bind().dialect.name != 'sqlite':
+            pytest.skip('the retry is SQLite only')
+        monkeypatch.setattr(windows_profiles, 'default_profile', lambda: None)
+
+        def refuse(session, flush_context, instances):
+            raise OperationalError('INSERT', {}, Exception('attempt to write a readonly database'))
+
+        event.listen(db.session, 'before_flush', refuse)
+        try:
+            with pytest.raises(OperationalError, match='readonly database'):
+                windows_profiles.default_for_write(actor='tester')
+        finally:
+            event.remove(db.session, 'before_flush', refuse)
+            db.session.rollback()
+
+
+def test_a_sqlite_lock_that_never_lifts_is_raised_as_a_lock(app, monkeypatch):
+    """Ten refused writes are a lock, not a name clash: the last error is the one raised."""
+    from sqlalchemy import event
+    from sqlalchemy.exc import OperationalError
+    from services import windows_profiles
+
+    with app.app_context():
+        if db.session.get_bind().dialect.name != 'sqlite':
+            pytest.skip('the retry is SQLite only')
+        monkeypatch.setattr(windows_profiles, 'default_profile', lambda: None)
+        monkeypatch.setattr(windows_profiles.time, 'sleep', lambda seconds: None)
+
+        def refuse(session, flush_context, instances):
+            raise OperationalError('INSERT', {}, Exception('database is locked'))
+
+        event.listen(db.session, 'before_flush', refuse)
+        try:
+            with pytest.raises(OperationalError, match='database is locked'):
+                windows_profiles.default_for_write(actor='tester')
+        finally:
+            event.remove(db.session, 'before_flush', refuse)
+            db.session.rollback()

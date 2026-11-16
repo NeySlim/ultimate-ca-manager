@@ -3,7 +3,7 @@
 
 Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
 A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
-Usage: release_version.py <validate|deb|rpm|tar|file|npm|assets|notes|history|latest> <version> [CHANGELOG]
+Usage: release_version.py <validate|deb|rpm|tar|file|npm|assets|notes|latest> <version> [CHANGELOG]
 `latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
 """
 import re
@@ -79,42 +79,33 @@ def _section(heading, text, stop):
                 if nxt.startswith(stop):
                     break
                 body.append(nxt)
-            return '\n'.join([''] + [b for b in body if b.strip()]) + '\n'
+            kept = [b for b in body if b.strip()]
+            # Sub-headings alone are not entries.
+            if not any(not b.startswith('#') for b in kept):
+                return ''
+            return '\n'.join([''] + kept) + '\n'
     return ''
 
 
 def changelog_section(version, text):
-    """Body of `## [version]` up to the next `## [` heading, blank lines dropped, led by one blank line."""
+    """Body of `## [version]` up to the next `## [` heading, blank lines dropped, led by one blank
+    line; empty when it holds no entry (sub-headings alone are none)."""
     parse(version)
     return (_section(re.compile(r'^## \[' + re.escape(version) + r'\]'), text, '## [')
             or _section(re.compile(r'^## ' + re.escape(version) + r'(\s|$)'), text, '## '))
 
 
 def release_notes(version, text):
-    """A RC ships what `[Unreleased]` holds; a stable ships its own section, renamed by the release commit."""
-    heading = 'Unreleased' if not is_stable(version) else version
-    body = (_section(re.compile(r'^## \[Unreleased\]'), text, '## [') if heading == 'Unreleased'
-            else changelog_section(version, text))
+    """Its own section when it has entries; a RC without one ships `[Unreleased]`, a stable fails."""
+    body = changelog_section(version, text)
+    if body.strip():
+        return body
+    if is_stable(version):
+        raise ValueError(f'CHANGELOG.md has no [{version}] section with entries for {version}')
+    body = _section(re.compile(r'^## \[Unreleased\]'), text, '## [')
     if not body.strip():
-        raise ValueError(f'CHANGELOG.md has no [{heading}] section with entries for {version}')
+        raise ValueError(f'CHANGELOG.md has no [{version}] or [Unreleased] section with entries for {version}')
     return body
-
-
-def changelog_history(version, text, count=2):
-    """Up to *count* published sections below *version* on its own major line, heading and body."""
-    major, top = numeric(version)[0], numeric(version)
-    blocks = re.split(r'(?m)^(?=## \[)', text)
-    out = []
-    for block in blocks:
-        m = re.match(r'## \[([^\]]+)\]', block)
-        if not m or not VERSION_RE.fullmatch(m.group(1)) or not is_stable(m.group(1)):
-            continue
-        n = numeric(m.group(1))
-        if n[0] == major and n < top:
-            out.append(block.rstrip('\n') + '\n')
-        if len(out) >= count:
-            break
-    return '\n'.join(out)
 
 
 def is_latest(version, published):
@@ -151,11 +142,11 @@ def main(argv):
             print('\n'.join(asset_names(version).values()))
         elif cmd == 'latest':
             print('true' if is_latest(version, sys.stdin.read().splitlines()) else 'false')
-        elif cmd in ('notes', 'history'):
+        elif cmd == 'notes':
             path = argv[3] if len(argv) > 3 else 'CHANGELOG.md'
             with open(path, encoding='utf-8') as fh:
                 text = fh.read()
-            sys.stdout.write(release_notes(version, text) if cmd == 'notes' else changelog_history(version, text))
+            sys.stdout.write(release_notes(version, text))
         else:
             print(f'Unknown command: {cmd}', file=sys.stderr)
             return 2

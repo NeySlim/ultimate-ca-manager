@@ -10,12 +10,13 @@ import re
 import logging
 from datetime import datetime, timezone
 
-from auth.unified import require_auth, has_permission
+from auth.unified import hsm_binding_refusal, require_auth, has_permission
 from utils.pagination import parse_request_pagination
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
 from services.hsm.base_provider import HsmKeyExistsError
+from services.hsm.key_binding import HsmKeyBound
 from utils.process_lock import LockBusyError
 from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
@@ -423,6 +424,10 @@ def create_ca():
         hsm_key_id = data.get('hsm_key_id') or data.get('hsmKeyId')
         hsm_key_label = data.get('hsm_key_label') or data.get('hsmKeyLabel')
         hsm_key_algorithm = data.get('hsm_key_algorithm') or data.get('hsmKeyAlgorithm')
+        if hsm_key_id or hsm_provider_id or hsm_key_label or hsm_key_algorithm:
+            refusal = hsm_binding_refusal('an X.509 CA')
+            if refusal:
+                return refusal
 
         # Mutually exclusive: local vs existing-HSM-key vs new-HSM-key
         modes = []
@@ -726,6 +731,8 @@ def create_ca():
         )
     except (FipsRestricted, HaRestricted):
         raise
+    except HsmKeyBound as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         # Validation errors (HSM key conflicts, missing fields, etc.) -- surface to user
         logger.info(f"CA creation validation error: {e}")

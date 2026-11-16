@@ -6,10 +6,11 @@ key size and signature hash are the ``key_bits`` / ``sig_hash`` columns, set
 whenever a certificate is stored (``models/certificate.py``).
 """
 import logging
+import re
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import aliased
-from sqlalchemy import (DateTime, String, and_, case, cast, false, func, literal, literal_column,
+from sqlalchemy import (DateTime, String, and_, bindparam, case, cast, false, func, literal, literal_column,
                         or_, select, true, type_coerce, union_all)
 
 from models import CA, Certificate, DeployBinding, DeployTarget, SystemConfig, db
@@ -20,6 +21,7 @@ from models.crl import CRLMetadata
 from models.key_recovery import KeyRecoveryRequest, STATUS_PENDING
 from models.policy import ApprovalRequest
 from models.scep import SCEPRequest
+from models.truststore import TrustedCertificate
 from services.ocsp_responder_renewal import renewed_by_responder_task
 from utils.cert_status import EXPIRY_WINDOW_DAYS, holds_certificate, orphan_condition
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
@@ -31,7 +33,7 @@ QUEUE_KINDS = ('acme_order_failed', 'acme_client_renewal_failed', 'approval_pend
                'scep_request_pending', 'key_recovery_pending', 'crl_due', 'crl_missing',
                'manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_blocked',
                'renewal_declined', 'ca_expiring', 'deploy_binding_left_behind',
-               'https_binding_left_behind')
+               'https_binding_left_behind', 'truststore_expiring')
 ACME_FAILURE_LOOKBACK_DAYS = 7
 # A dedicated TSA signer this close to expiry is an alert (the renewal window of the signer)
 TSA_SIGNER_WARN_DAYS = 30
@@ -39,6 +41,11 @@ CRITICAL_WITHIN = timedelta(hours=24)
 DEFAULT_CRL_VALIDITY_DAYS = 7
 CA_EXPIRY_WARNING_DAYS = 365
 CA_EXPIRY_CRITICAL_DAYS = 90
+# Trust anchors: the 2.x home page listed those expiring within 90 days and the expired ones
+TRUSTSTORE_EXPIRY_DAYS = 90
+# What a caller must hold to see a kind or a witness; absent here means ``read:dashboard`` is enough
+KIND_PERMISSION = {'truststore_expiring': 'read:truststore'}
+WITNESS_PERMISSION = {'smtp': 'read:settings', 'webhooks': 'read:settings', 'auto_renewal': 'read:settings'}
 # Python's compliance grade calls a lifetime long from 399 whole days on
 SERVER_LIFETIME_MAX_DAYS = 398
 RSA_MIN_BITS = 3072
@@ -63,6 +70,7 @@ _HREF = {
     'ca_expiring': '/cas/{id}',
     'deploy_binding_left_behind': '/certificates/{certificate_id}?binding={id}',
     'https_binding_left_behind': '/settings?tab=https',
+    'truststore_expiring': '/truststore/{id}',
 }
 
 
@@ -101,6 +109,50 @@ def _renewal_config():
     return AutoRenewalService.get_renewal_config()
 
 
+DECLINED_PAGE = 500
+# Superset of what LIKE '%"certificate_id": <id>,%' matches: '_' is any character, ASCII case folds on SQLite
+_NAMED_ID = re.compile(r'"certificate.id": ([0-9]+),', re.IGNORECASE | re.DOTALL)
+
+
+def _declined_ids(now, days):
+    """The certificates a renewal kind can list (live, due within *days*) that a rejected renewal
+    request may name: only those run the correlated LIKE. Requests are read by pages of
+    DECLINED_PAGE, from the oldest such certificate's issuance (an older one declines none; no
+    date limit when one of them has no valid_from)."""
+    live = _live_until(now, days)
+    total, dated, oldest = db.session.execute(select(
+        func.count(), func.count(Certificate.valid_from), func.min(Certificate.valid_from)).where(*live)).one()
+    query = select(ApprovalRequest.id, ApprovalRequest.request_data).where(
+        ApprovalRequest.request_type == 'renewal', ApprovalRequest.status == 'rejected',
+        ApprovalRequest.request_data.isnot(None))
+    # One page statement even when none is due
+    if not total:
+        query = query.where(false())
+    elif dated == total:
+        query = query.where(ApprovalRequest.created_at >= oldest)
+    found, after = set(), None
+    while True:
+        page = db.session.execute((query if after is None else query.where(ApprovalRequest.id > after))
+                                  .order_by(ApprovalRequest.id).limit(DECLINED_PAGE)).all()
+        if not page:
+            return sorted(found)
+        after = page[-1][0]
+        named = sorted({int(m) for _, data in page for m in _NAMED_ID.findall(data)} - found)
+        if named:
+            found.update(db.session.execute(select(Certificate.id).where(
+                Certificate.id.in_(bindparam(None, named, expanding=True, literal_execute=True)), *live)).scalars())
+        # a short page is the last one
+        if len(page) < DECLINED_PAGE:
+            return sorted(found)
+
+
+def renewal_inputs(now=None):
+    """What the four renewal kinds read outside their statement: the auto-renewal settings, the declined ids."""
+    config = _renewal_config()
+    days = max(EXPIRY_WINDOW_DAYS, CLIENT_RENEWAL_OVERDUE_DAYS, config['days_before_expiry'])
+    return {**config, 'declined_ids': _declined_ids(now or utc_now(), days)}
+
+
 # ------------------------------------------------------------------ queue
 
 def _within_half_validity(next_update, now, dialect):
@@ -111,10 +163,10 @@ def _within_half_validity(next_update, now, dialect):
     return next_update < literal(now, DateTime) + func.make_interval(0, 0, 0, 0, days * 12)
 
 
-def _queue_union(now, dialect):
+def _queue_union(now, dialect, kinds=QUEUE_KINDS):
     """One SELECT per kind, all shaped (kind, rank, id, label, due_at); rank 0 is critical."""
     soon = now + CRITICAL_WITHIN
-    config = _renewal_config()  # read once: four kinds depend on it
+    config = renewal_inputs(now)  # read once: four kinds depend on it
     # type_coerce, not CAST: SQLite would turn CAST(... AS DATETIME) into a number
     text_label = lambda col: type_coerce(col, String)  # noqa: E731
     due = lambda col: type_coerce(col, DateTime)  # noqa: E731
@@ -197,6 +249,16 @@ def _queue_union(now, dialect):
     ).where(_active_ca(now), CA.valid_to.isnot(None),
             CA.valid_to < now + timedelta(days=CA_EXPIRY_WARNING_DAYS)))
 
+    # No lower bound, as in 2.x: an anchor expired long ago is still listed, critical
+    if 'truststore_expiring' in kinds:
+        parts.append(select(
+            _const('truststore_expiring').label('kind'),
+            case((TrustedCertificate.not_after <= now, _CRITICAL), else_=_WARNING).label('rank'),
+            TrustedCertificate.id.label('id'), text_label(TrustedCertificate.name).label('label'),
+            due(TrustedCertificate.not_after).label('due_at'),
+        ).where(TrustedCertificate.not_after.isnot(None),
+                TrustedCertificate.not_after <= now + timedelta(days=TRUSTSTORE_EXPIRY_DAYS)))
+
     # Bindings a renewal left on the previous certificate: due when that one expires
     held = aliased(Certificate)
     parts.append(select(
@@ -276,7 +338,7 @@ def _manual_renewal_conditions(now, config):
         ~_renewed_by_acme_client(),
         ~_client_renewed(),
         ~_superseded(now),
-        ~_renewal_declined(),
+        ~_renewal_declined(config),
         ~renewed_by_responder_task(),
     ]
 
@@ -299,7 +361,7 @@ def _issuer_cannot_sign(now):
             CA.valid_to <= now)).exists()
 
 
-def _renewal_declined(auto_only=False):
+def _renewal_declined(config, auto_only=False):
     """Any rejected renewal request naming the certificate in its current lifetime, whatever
     its trigger (not checked); ``auto_only`` keeps the scheduler's own requests."""
     named = literal('%"certificate_id": ', String) + cast(Certificate.id, String) + literal(',%', String)
@@ -309,7 +371,12 @@ def _renewal_declined(auto_only=False):
         or_(Certificate.valid_from.is_(None), ApprovalRequest.created_at >= Certificate.valid_from)]
     if auto_only:
         conditions.append(ApprovalRequest.request_data.like('%"trigger": "auto"%'))
-    return select(ApprovalRequest.id).where(*conditions).exists()
+    exists = select(ApprovalRequest.id).where(*conditions).exists()
+    ids = config.get('declined_ids')
+    if ids is None:
+        return exists
+    # Inlined integers: no bound-parameter limit however many certificates were declined
+    return and_(Certificate.id.in_(bindparam(None, ids, expanding=True, literal_execute=True)), exists)
 
 
 def _and_blocked(now, config, dialect):
@@ -332,19 +399,19 @@ def _blocked_conditions(now, config, dialect):
     """Due for auto-renewal (inside days_before_expiry and the last third of its lifetime), which
     then fails on every pass because the CA cannot sign; only an automatic refusal parks it."""
     return [*_live_until(now, config['days_before_expiry']), _past_last_third(now, dialect),
-            _auto_renewed(config), _issuer_cannot_sign(now), ~_renewal_declined(auto_only=True)]
+            _auto_renewed(config), _issuer_cannot_sign(now), ~_renewal_declined(config, auto_only=True)]
 
 
 def _declined_conditions(now, config, dialect):
     """Precedence auto_renewal_blocked > renewal_declined: a certificate is queued once."""
-    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined(), ~_superseded(now),
+    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined(config), ~_superseded(now),
             ~_and_blocked(now, config, dialect)]
 
 
-def _client_overdue_conditions(now):
+def _client_overdue_conditions(now, config):
     """A client-renewed certificate its client has not replaced a week before expiry."""
     return [*_live_until(now, CLIENT_RENEWAL_OVERDUE_DAYS), _client_renewed(), ~_superseded(now),
-            ~_renewal_declined()]
+            ~_renewal_declined(config)]
 
 
 def _short_label(kind, label):
@@ -359,19 +426,33 @@ def _short_label(kind, label):
     return (label or '')[:200]
 
 
-def work_queue(session, limit, now=None, kinds=None):
-    """Items to act on, critical first then by due date, and the total per kind.
-    *kinds* restricts the items (not the counts) to those kinds."""
+def allowed(table, permissions):
+    """The names of *table* a caller holding *permissions* may see (None: no restriction)."""
+    from auth.unified import has_permission
+    return {name for name in table if permissions is None or has_permission(table[name], permissions)}
+
+
+def work_queue(session, limit, now=None, kinds=None, permissions=None):
+    """Items to act on, critical first then by due date (expired trust anchors after the
+    other critical items, latest expiry first), and the total per kind.
+    *kinds* restricts the items (not the counts) to those kinds; a kind that needs a
+    permission *permissions* lacks is neither listed nor counted."""
     now = now or utc_now()
-    queue = _queue_union(now, session.get_bind().dialect.name)
+    hidden = set(KIND_PERMISSION) - allowed(KIND_PERMISSION, permissions)
+    visible = tuple(k for k in QUEUE_KINDS if k not in hidden)
+    queue = _queue_union(now, session.get_bind().dialect.name, visible)
     counts = {kind: 0 for kind in QUEUE_KINDS}
     for kind, n in session.execute(select(queue.c.kind, func.count()).group_by(queue.c.kind)):
         counts[kind] = n
     listing = select(queue)
     if kinds is not None:
         listing = listing.where(queue.c.kind.in_(list(kinds)))
-    rows = session.execute(
-        listing.order_by(queue.c.rank, queue.c.due_at, queue.c.kind, queue.c.id).limit(limit))
+    # An expired trust anchor stays critical but sorts after every other critical entry, newest first
+    lapsed = and_(queue.c.kind == 'truststore_expiring', queue.c.rank == 0)
+    after = case((lapsed, 1), else_=0)
+    rows = session.execute(listing.order_by(
+        queue.c.rank, after, case((lapsed, None), else_=queue.c.due_at),
+        case((lapsed, queue.c.due_at)).desc(), queue.c.kind, queue.c.id).limit(limit))
     rows = rows.all()
     # A binding's link names the certificate holding it: one lookup for the page shown
     binding_ids = [r.id for r in rows if r.kind == 'deploy_binding_left_behind']
@@ -475,8 +556,14 @@ def _scheduler_health():
             'last_operation_at': last_run, 'last_status': last_status}
 
 
-# No signer configured is "not configured", not a fault: the protocol answers 503 by design
-_TSA_QUIET = ('ca_certificate', 'dedicated', 'no_signer')
+# No signer configured is "not configured", not a fault: the protocol answers 503 by design.
+# The CA certificate signing (strict mode turned off) is a warning: its tokens fail RFC 3161 §2.3.
+_TSA_QUIET = ('dedicated', 'no_signer')
+_TSA_WARNING = ('ca_certificate',)
+
+
+def _tsa_severity(state):
+    return None if state in _TSA_QUIET else 'warning' if state in _TSA_WARNING else 'critical'
 
 
 def _tsa_health():
@@ -499,7 +586,7 @@ def _tsa_health():
                 state = 'expiring'
         return {'basis': 'signer', 'periods': None, 'state': state, 'reason': reason,
                 'days_left': days_left, 'alert': state not in _TSA_QUIET,
-                'last_operation_at': None, 'last_status': None}
+                'severity': _tsa_severity(state), 'last_operation_at': None, 'last_status': None}
     except Exception:
         # A resolver bug is exactly when the overview must not claim health
         logger.debug('TSA health check failed', exc_info=True)
@@ -509,11 +596,59 @@ def _tsa_health():
         except Exception:
             pass
         return {'basis': 'signer', 'periods': None, 'state': 'unavailable', 'reason': None,
-                'days_left': None, 'alert': True, 'last_operation_at': None, 'last_status': None}
+                'days_left': None, 'alert': True, 'severity': 'critical',
+                'last_operation_at': None, 'last_status': None}
 
 
-def protocol_health(session, days, now=None):
-    """Per protocol, ``days`` UTC calendar days of ok/failed counts, oldest first."""
+def _witness(state, alert=False, count=None):
+    return {'basis': 'setting', 'periods': None, 'state': state, 'count': count, 'alert': alert,
+            'last_operation_at': None, 'last_status': None}
+
+
+def _smtp_witness():
+    """The 2.x rules: no host is not configured; configured but off, or without port or From, is a warning."""
+    from models.email_notification import SMTPConfig
+    smtp = SMTPConfig.query.first()
+    if not smtp or not (smtp.smtp_host or '').strip():
+        return _witness('not_configured')
+    if not smtp.enabled:
+        return _witness('disabled', True)
+    if not (smtp.smtp_port and (smtp.smtp_from or '').strip()):
+        return _witness('incomplete', True)
+    return _witness('ready')
+
+
+def _webhooks_witness():
+    from services.webhook_service import WebhookEndpoint
+    total, active = db.session.execute(select(
+        func.count(), func.coalesce(func.sum(case((WebhookEndpoint.enabled.is_(True), 1), else_=0)), 0)
+    ).select_from(WebhookEndpoint)).one()
+    if active:
+        return _witness('active', count=int(active))
+    return _witness('none_active', True, total) if total else _witness('not_configured', count=0)
+
+
+def _auto_renewal_witness():
+    return _witness('enabled' if _renewal_config()['enabled'] else 'disabled')
+
+
+_WITNESSES = {'smtp': _smtp_witness, 'webhooks': _webhooks_witness, 'auto_renewal': _auto_renewal_witness}
+
+
+def witness_health(name, session):
+    """One witness; a read that fails says ``unavailable`` rather than vanish (it would read as a missing permission)."""
+    try:
+        return _WITNESSES[name]()
+    except Exception as exc:
+        # The exception text may hold secrets: only its class is logged
+        logger.warning('%s witness unavailable: %s', name, type(exc).__name__)
+        session.rollback()
+        return _witness('unavailable', True)
+
+
+def protocol_health(session, days, now=None, permissions=None):
+    """Per protocol, ``days`` UTC calendar days of ok/failed counts, oldest first. The mail,
+    webhook and auto-renewal witnesses go only to a caller holding the setting's read right."""
     now = now or utc_now()
     start, dates = _window(days, now)
     protocols = {
@@ -525,6 +660,8 @@ def protocol_health(session, days, now=None):
     tsa = _tsa_health()
     if tsa is not None:
         protocols['tsa'] = tsa
+    for name in allowed(WITNESS_PERMISSION, permissions):
+        protocols[name] = witness_health(name, session)
     return {'days': days, 'from': dates[0], 'to': dates[-1], 'protocols': protocols}
 
 
@@ -581,11 +718,12 @@ RENEWAL_KINDS = ('manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_b
 
 
 def renewal_conditions(kind, now, config, dialect):
-    """The rows of one certificate queue kind: the queue and the list's ``renewal`` filter."""
+    """The rows of one certificate queue kind: the queue and the list's ``renewal`` filter.
+    *config* comes from renewal_inputs(); the auto-renewal settings alone give the same rows, slower."""
     if kind == 'manual_renewal_due':
         return _manual_renewal_conditions(now, config)
     if kind == 'client_renewal_overdue':
-        return _client_overdue_conditions(now)
+        return _client_overdue_conditions(now, config)
     if kind == 'auto_renewal_blocked':
         return _blocked_conditions(now, config, dialect)
     if kind == 'renewal_declined':
@@ -648,7 +786,7 @@ def certificate_list_conditions(args, dialect, now=None):
         bad = [k for k in kinds if k not in RENEWAL_KINDS]
         if bad:
             raise ValueError(f"Unknown renewal kind: {', '.join(bad)}")
-        config = _renewal_config()
+        config = renewal_inputs(now)
         conditions.append(or_(*[and_(*renewal_conditions(k, now, config, dialect)) for k in kinds]))
     return conditions
 

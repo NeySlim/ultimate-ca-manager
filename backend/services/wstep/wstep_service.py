@@ -29,7 +29,6 @@ from services.policy_service import PolicyViolation
 from services.protocol_approval import RENEWED_REVOKED, AlreadyIssued
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
-from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
 from utils import key_algorithms
 from utils.issuance_defaults import default_issue_key_type
 from utils.key_type import validate_enrollment_csr
@@ -141,12 +140,6 @@ def _x509_name_from_dn_components(dn_components, email=None):
         attrs.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, email))
     return x509.Name(attrs)
 
-# Why a SHA-1 CSR fails is_signature_valid, and what to tell the client about
-# it, is written once in utils/csr_diagnostics — EST had the same copy.
-_WEAK_CSR_HASH_ALGORITHMS = WEAK_CSR_HASH_ALGORITHMS
-_weak_csr_hash_algorithm = weak_csr_hash_algorithm
-
-
 def _is_naked_csr(csr):
     """No CN and no SubjectAlternativeName at all -- what real Windows GPO
     machine autoenrollment deliberately submits for machine templates,
@@ -197,13 +190,8 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
         except Exception:
             signature_valid = False
         if not signature_valid:
-            weak_algo = _weak_csr_hash_algorithm(csr)
-            if weak_algo:
-                return (
-                    f'CSR signed with an unsupported hash algorithm ({weak_algo}); '
-                    'use SHA-256 or stronger'
-                )
-            return 'CSR signature invalid (proof of possession failed)'
+            from utils.csr_diagnostics import weak_csr_hash_error
+            return weak_csr_hash_error(csr) or 'CSR signature invalid (proof of possession failed)'
 
     if not allow_naked_subject and _is_naked_csr(csr):
         return 'CSR subject must include a non-empty CN or a SubjectAltName'
@@ -1540,6 +1528,7 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
         row, refusal = _renewal_refusal(ca, cert)
         if row is None or refusal or _verify_renewal_signer(outer_signed_data, cert) is not None:
             continue
+        row = _windows_row(ca, cert, row)
         recorded, _refusal = certificate_profile(row)
         if recorded is None or profile is None or recorded.id != profile.id:
             continue
@@ -1605,7 +1594,15 @@ def _renewable_certificate(ca, cert):
             NOT_YET_VALID: 'Signing certificate is not yet valid',
             SUPERSEDED: 'Signing certificate has been superseded by a newer one',
         }.get(status, 'Signing certificate is not recognized')
-    return db_cert, None
+    return _windows_row(ca, cert, db_cert), None
+
+
+def _windows_row(ca, cert, row):
+    """The live row of *cert* that carries a Windows profile (or a ``wstep`` source), else *row*:
+    an imported twin listed first never decides a renewal's profile."""
+    from services.cert.issued_lookup import find_issued_rows
+    return next((r for r in find_issued_rows(ca, cert) if not r.archived
+                 and (r.windows_profile_id is not None or r.source == 'wstep')), row)
 
 
 def _renewal_pattern_subject(template, found, *, profile):

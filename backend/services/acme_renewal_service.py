@@ -705,7 +705,7 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
         if not dns_provider_model.enabled:
             raise RenewalBlocked(f'The DNS provider "{dns_provider_model.name}" of this order is disabled: '
                                  'enable it to renew')
-        credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
+        credentials = dns_providers.saved_credentials(dns_provider_model)
         dns_provider = dns_providers.create_provider(
             dns_provider_model.provider_type,
             credentials,

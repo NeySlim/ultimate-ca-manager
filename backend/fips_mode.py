@@ -169,6 +169,12 @@ def switch_approves(algorithm: str) -> bool:
     return module_approves(algorithm)
 
 
+def switch_module_known() -> bool:
+    """Whether switch_approves asks a FIPS module (loaded, or the image's build record);
+    False on an image or host without one, where every module-dependent algorithm is refused."""
+    return enabled() or build_capability() is not None or provider_info() is not None
+
+
 def refuse_short_hmac_key(key: bytes, what: str) -> None:
     """In FIPS mode, refuse an HMAC key under 14 bytes (112 bits), on every module."""
     if enabled() and len(key) < MIN_HMAC_KEY_BYTES:

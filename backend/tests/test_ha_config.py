@@ -20,6 +20,7 @@ def ha_cfg(monkeypatch):
     monkeypatch.setattr(Config, 'DATABASE_TYPE', 'postgresql')
     monkeypatch.setenv('SECRET_KEY', 's')
     monkeypatch.setenv('KEY_ENCRYPTION_KEY', 'k')
+    monkeypatch.setenv('UCM_DB_ENCRYPTION_KEY', 'aW50ZWdyYXRpb24tc2VjcmV0cy1rZXktMzItYnl0ZXM=')
     monkeypatch.setenv('REDIS_URL', 'redis://x')
     return Config
 

@@ -31,8 +31,8 @@ def _built_packages(build):
             if str(step.get('uses', '')).startswith('actions/upload-artifact'):
                 paths += str(step.get('with', {}).get('path', '')) + '\n'
         tokens = [g.strip() for g in paths.splitlines() if g.strip()]
-        # Checksums and Docker digests are the only non-package uploads; anything else could hide a package.
-        stray = [t for t in tokens if not t.endswith(('.deb', '.rpm', '.sha256')) and '/digests/' not in t]
+        # Checksums, SBOMs and Docker digests are the only non-package uploads; anything else could hide a package.
+        stray = [t for t in tokens if not t.endswith(('.deb', '.rpm', '.sha256', '.cdx.json')) and '/digests/' not in t]
         if stray:
             raise AssertionError(f'{name}: uploads {stray} without a .deb/.rpm suffix')
         globs = [t for t in tokens if t.endswith(('.deb', '.rpm'))]

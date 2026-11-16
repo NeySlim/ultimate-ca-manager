@@ -70,6 +70,22 @@ describe('TSA signer on the health card', () => {
     expect(line.getAttribute('data-alert')).toBe(alert ? 'true' : 'false')
   })
 
+  it('the CA certificate signing is a warning, not a critical line', async () => {
+    const card = await show({ tsa: tsa({ state: 'ca_certificate', alert: true, severity: 'warning' }) })
+    const line = row(card, 'tsa')
+    expect(line.textContent).toContain('overview.health.tsaState.ca_certificate')
+    expect(line.getAttribute('data-severity')).toBe('warning')
+    expect(line.querySelector('.text-status-warning')).not.toBeNull()
+    expect(line.querySelector('.text-status-danger')).toBeNull()
+  })
+
+  it('an expiring signer stays critical', async () => {
+    const card = await show({ tsa: tsa({ state: 'expiring', days_left: 3, alert: true, severity: 'critical' }) })
+    const line = row(card, 'tsa')
+    expect(line.getAttribute('data-severity')).toBe('critical')
+    expect(line.querySelector('.text-status-danger')).not.toBeNull()
+  })
+
   it('no signer reads as not configured, neutral, with the link to configure it', async () => {
     lang.fr = true
     const card = await show({ tsa: tsa({ state: 'no_signer', alert: false, days_left: null }) })
@@ -88,6 +104,54 @@ describe('TSA signer on the health card', () => {
   it('is not listed while the server leaves it out', async () => {
     const card = await show({ scheduler: sched({}) })
     expect(within(card).queryByTestId('health-tsa')).toBeNull()
+  })
+})
+
+const witness = (state, over) => ({ basis: 'setting', periods: null, state, count: null, alert: false,
+  last_operation_at: null, last_status: null, ...over })
+
+describe('mail, webhook and auto-renewal witnesses', () => {
+  it.each([
+    ['smtp', 'not_configured', {}, false, 'overview.health.witness.smtp.not_configured'],
+    ['smtp', 'disabled', { alert: true }, true, 'overview.health.witness.smtp.disabled'],
+    ['smtp', 'incomplete', { alert: true }, true, 'overview.health.witness.smtp.incomplete'],
+    ['smtp', 'ready', {}, false, 'overview.health.witness.smtp.ready'],
+    ['webhooks', 'not_configured', { count: 0 }, false, 'overview.health.witness.webhooks.not_configured'],
+    ['webhooks', 'none_active', { count: 2, alert: true }, true, 'overview.health.witness.webhooks.none_active:2'],
+    ['webhooks', 'active', { count: 3 }, false, 'overview.health.witness.webhooks.active:3'],
+    ['auto_renewal', 'enabled', {}, false, 'overview.health.witness.auto_renewal.enabled'],
+    ['auto_renewal', 'disabled', {}, false, 'overview.health.witness.auto_renewal.disabled'],
+    ['smtp', 'unavailable', { alert: true }, true, 'overview.health.witness.unavailable'],
+    ['webhooks', 'unavailable', { alert: true }, true, 'overview.health.witness.unavailable'],
+    ['auto_renewal', 'unavailable', { alert: true }, true, 'overview.health.witness.unavailable'],
+  ])('%s %s reads %s', async (name, state, over, alert, text) => {
+    const card = await show({ [name]: witness(state, over) })
+    const line = row(card, name)
+    expect(line.textContent).toContain(text)
+    expect(line.getAttribute('data-alert')).toBe(alert ? 'true' : 'false')
+    expect(line.textContent).not.toContain('–')
+  })
+
+  it('a setting that is not configured is information in the user language, not an alert', async () => {
+    lang.fr = true
+    const card = await show({ smtp: witness('not_configured') })
+    const line = row(card, 'smtp')
+    expect(line.textContent).toContain('Non configuré')
+    expect(line.querySelector('.text-status-danger')).toBeNull()
+  })
+
+  it('shows only the witnesses the server sent (the right to read the setting)', async () => {
+    const card = await show({ scheduler: sched({}), webhooks: witness('active', { count: 1 }) })
+    expect(within(card).queryByTestId('health-smtp')).toBeNull()
+    expect(within(card).queryByTestId('health-auto_renewal')).toBeNull()
+    expect(within(card).getByTestId('health-webhooks')).toBeTruthy()
+  })
+
+  it('each row links to its settings tab', async () => {
+    const card = await show({ smtp: witness('ready'), webhooks: witness('active', { count: 1 }), auto_renewal: witness('enabled') })
+    expect(within(row(card, 'smtp')).getByRole('link').getAttribute('href')).toBe('/settings?tab=email')
+    expect(within(row(card, 'webhooks')).getByRole('link').getAttribute('href')).toBe('/settings?tab=webhooks')
+    expect(within(row(card, 'auto_renewal')).getByRole('link').getAttribute('href')).toBe('/settings?tab=autoRenewal')
   })
 })
 

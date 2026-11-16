@@ -4,6 +4,8 @@
 #
 # --build-arg UCM_FIPS_BUILD=1 builds the -fips variant: OpenSSL FIPS provider
 # plus crypto libraries compiled against the system libcrypto. Default 0 = standard.
+# Needs BuildKit (docker buildx), both variants: the RUN --mount steps are not
+# understood by the legacy builder, which also builds the stages a variant skips.
 ARG UCM_FIPS_BUILD=0
 # OpenSSL FIPS Provider 3.5.9, CMVP certificate #5586; 3.1.2 (#4985, SHA-256
 # a0ce69b8b97ea6a35b96875235aa453b966ba3cba8af2de23657d8b6767d6539) still builds with these args
@@ -127,6 +129,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     openssh-client \
     softhsm2 \
+    opensc \
+    libpcsclite1 \
     libkrb5-3 \
     libgssapi-krb5-2 \
     postgresql-client \
@@ -166,8 +170,10 @@ WORKDIR /opt/ucm
 COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
 COPY --chown=ucm:ucm LICENSE NOTICE COMMERCIAL-LICENSE.md /opt/ucm/
 COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
+COPY --chown=ucm:ucm docker/fips-module.sh /fips-module.sh
 # FIPS variant: what the module approves, asked of it under the configuration the
-# entrypoint writes, so the readiness check judges keys by it before the switch
+# entrypoint writes, so the readiness check judges keys by it before the switch; and the
+# module-mac of this install, root-owned, that the entrypoint compares at each start
 RUN if [ "$UCM_FIPS_BUILD" = 1 ]; then \
         set -eu; \
         tmp="$(mktemp -d)"; \
@@ -183,6 +189,10 @@ RUN if [ "$UCM_FIPS_BUILD" = 1 ]; then \
 import fips_mode; fips_mode.write_build_capability(sys.argv[1])' /usr/share/ucm/fips-module.json; \
         chmod 0644 /usr/share/ucm/fips-module.json; \
         cat /usr/share/ucm/fips-module.json; \
+        . /fips-module.sh; fips_module_mac "$tmp/fipsmodule.cnf" > /usr/share/ucm/fips-module.mac; \
+        grep -Eq '^([0-9A-F]{2}:){31}[0-9A-F]{2}$' /usr/share/ucm/fips-module.mac; \
+        chmod 0444 /usr/share/ucm/fips-module.mac; \
+        cat /usr/share/ucm/fips-module.mac; \
         rm -rf "$tmp"; \
     fi
 # Only the built interface: the server serves frontend/dist, while frontend/

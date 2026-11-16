@@ -3,8 +3,8 @@
 OWASP ASVS 5.0 §7.4.3: other sessions end after a change of any authentication
 factor. Each operation gets the password change's treatment: the session making it
 stays, every other one of the account gets 401, on the file store, on the SQL store
-(SQLite) and on the SQL store shared by two nodes on PostgreSQL (HA). The audit
-entry says how many sessions were closed.
+(SQLite), on the SQL store shared by two nodes on PostgreSQL (HA) and on Redis shared
+by two nodes. The audit entry says how many sessions were closed.
 """
 import json
 import os
@@ -15,6 +15,7 @@ import pytest
 
 from models import AuditLog, User, db
 from models.webauthn import WebAuthnCredential
+from tests.redis_support import needs_redis
 from tests.test_webauthn_second_factor import SoftKey
 
 PG_URL = os.getenv('UCM_TEST_APP_PG_URL') or os.getenv('UCM_TEST_PG_URL')
@@ -54,12 +55,24 @@ def _dispose(*applications):
     pytest.param('sql-postgresql', marks=[
         pytest.mark.postgres,
         pytest.mark.skipif(not PG_URL, reason='no PostgreSQL URL for the two-node session test')]),
+    pytest.param('redis', marks=[needs_redis]),
 ])
 def nodes(request, app, monkeypatch, tmp_path):
     """(node of the first session, node of the second): one store behind both."""
     from tests import pg_app_harness
     if request.param == 'files':
         yield app, app
+        return
+    if request.param == 'redis':
+        from tests.test_redis_sessions import dispose, redis_apps
+        server = request.getfixturevalue('redis_server')
+        server.client().flushdb()
+        created = redis_apps(monkeypatch, tmp_path, server.url())
+        try:
+            yield created[0], created[1]
+        finally:
+            dispose(*created)
+            server.client().flushdb()
         return
     if request.param == 'sql-sqlite':
         if pg_app_harness.ENABLED:
@@ -258,6 +271,142 @@ def test_the_other_sessions_close_and_this_one_stays(nodes, operation):
         _cleanup(first_node, user)
 
 
+def _change_password(application, c, user):
+    return _post(c, '/api/v2/account/password',
+                 {'current_password': PASSWORD, 'new_password': 'An0ther-Fact0r-Change!'})
+
+
+def _close_other_sessions(application, c, user):
+    return _post(c, '/api/v2/account/sessions/revoke-all')
+
+
+# Every change that keeps the caller's session under a new identifier
+RENEWALS = {name: (start, call) for name, (start, call, _action) in OPERATIONS.items()}
+RENEWALS['change-password'] = ({}, _change_password)
+RENEWALS['close-other-sessions'] = ({}, _close_other_sessions)
+
+
+@pytest.mark.parametrize('operation', sorted(RENEWALS))
+def test_the_identifier_a_kept_session_left_is_refused_for_good(nodes, operation):
+    """Session fixation: the replaced identifier never serves again, and its refusal is the
+    authentication gate's (the client may resend the request) and leaves the new cookie alone."""
+    first_node, _second_node = nodes
+    start, call = RENEWALS[operation]
+    start = dict(start)
+    if start.pop('key', False):
+        start['key'] = SoftKey()
+    user = _make_user(first_node, **start)
+    try:
+        this = _open_session(first_node, user)
+        before = this.get_cookie('session').value
+        r = call(first_node, this, user)
+        assert r.status_code == 200, r.data
+        assert this.get_cookie('session').value != before
+        stale = first_node.test_client()
+        stale.set_cookie('session', before)
+        for _attempt in range(2):
+            refused = stale.get('/api/v2/account/profile')
+            assert refused.status_code == 401
+            assert refused.get_json()['type'] == 'urn:ucm:problem:authentication-required'
+            assert not any(h.startswith('session=') for h in refused.headers.getlist('Set-Cookie'))
+        assert _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
+
+
+@pytest.mark.parametrize('authenticated', ['before-the-renewal', 'after-the-renewal'])
+@pytest.mark.parametrize('operation', ['confirm-totp', 'change-password', 'close-other-sessions'])
+def test_a_request_served_during_the_renewal_neither_restores_nor_resends_the_old_id(
+        nodes, operation, authenticated):
+    """A request opened on the old identifier and saved after the renewal writes no record
+    back and sends no cookie, not even a deletion: the browser keeps the new identifier."""
+    from flask import request, session as flask_session
+    from auth.unified import AuthManager
+    first_node, second_node = nodes
+    start, call = RENEWALS[operation]
+    user = _make_user(first_node, **start)
+    try:
+        this = _open_session(first_node, user)
+        before = this.get_cookie('session').value
+        with second_node.test_request_context('/api/v2/account/profile',
+                                              headers={'Cookie': f'session={before}'}):
+            if authenticated == 'before-the-renewal':
+                assert AuthManager().authenticate_request(request) is not None
+            r = call(first_node, this, user)
+            assert r.status_code == 200, r.data
+            assert this.get_cookie('session').value != before
+            if authenticated == 'after-the-renewal':
+                # the version check empties the session it loaded
+                assert AuthManager().authenticate_request(request) is None
+            response = second_node.response_class()
+            iface = second_node.session_interface
+            iface.save_session(second_node, flask_session, response)
+            assert not any(h.startswith('session=') for h in response.headers.getlist('Set-Cookie'))
+            old_sid = iface._unsign(second_node, before) if iface.use_signer else before
+            assert not iface._record_exists(iface._get_store_id(old_sid))
+        stale = first_node.test_client()
+        stale.set_cookie('session', before)
+        refused = stale.get('/api/v2/account/profile')
+        assert refused.status_code == 401
+        assert not any(h.startswith('session=') for h in refused.headers.getlist('Set-Cookie'))
+        assert _signed_in(this)
+        # A real sign-out still finds its record and clears the cookie
+        out = _post(this, '/api/v2/auth/logout')
+        assert out.status_code == 200, out.data
+        assert any(h.startswith('session=;') and 'Max-Age=0' in h
+                   for h in out.headers.getlist('Set-Cookie'))
+        assert not _signed_in(this)
+    finally:
+        _cleanup(first_node, user)
+
+
+def test_an_emptied_session_never_deletes_a_cookie_once_its_record_went_meanwhile(nodes):
+    """The removal checked and done at once: a record another request removed between
+    the check and the removal is never answered with a cookie deletion."""
+    import threading
+    from flask import session as flask_session
+    first_node, second_node = nodes
+    user = _make_user(first_node)
+    try:
+        cookie = _open_session(first_node, user).get_cookie('session').value
+        iface = second_node.session_interface
+        sid = iface._unsign(second_node, cookie) if iface.use_signer else cookie
+        store_id = iface._get_store_id(sid)
+        exists = iface._record_exists
+        seen = {}
+
+        def remove():
+            with first_node.app_context():
+                first_node.session_interface._delete_session(store_id)
+
+        def checked(key):
+            present = exists(key)
+            if present and key == store_id and 'gone' not in seen:
+                worker = threading.Thread(target=remove)
+                worker.start()
+                worker.join(0.3)
+                seen['gone'] = not exists(key)
+                seen['worker'] = worker
+            return present
+
+        iface._record_exists = checked
+        try:
+            with second_node.test_request_context('/api/v2/account/profile',
+                                                  headers={'Cookie': f'session={cookie}'}):
+                flask_session.clear()
+                response = second_node.response_class()
+                iface.save_session(second_node, flask_session, response)
+        finally:
+            del iface._record_exists
+        if 'worker' in seen:
+            seen['worker'].join(10)
+        deleted = any(h.startswith('session=;') for h in response.headers.getlist('Set-Cookie'))
+        assert not (seen.get('gone') and deleted), 'a record removed meanwhile got a cookie deletion'
+        assert not exists(store_id)
+    finally:
+        _cleanup(first_node, user)
+
+
 @pytest.mark.parametrize('method', ['delete', 'patch'])
 def test_an_administrator_changing_a_key_closes_the_holders_sessions(app, auth_client, method):
     """The holder loses or regains a factor: their sessions close, the administrator's stays."""
@@ -446,6 +595,37 @@ def test_a_session_left_by_an_earlier_account_of_the_same_id_is_not_counted(node
         assert r.status_code == 200, r.data
         assert r.get_json()['meta']['other_sessions_closed'] == 1
         assert '1 other session closed' in (_audit_details(first_node, 'webauthn_toggle', user) or '')
+    finally:
+        _cleanup(first_node, user)
+
+
+def _forget_proof(c):
+    """The session as a release older than the account proof stored it."""
+    from auth.session_start import ACCOUNT_KEY
+    with c.session_transaction() as s:
+        assert s.pop(ACCOUNT_KEY, None) is not None
+
+
+@pytest.mark.parametrize('left_by', ['an earlier account', 'this account'])
+def test_a_session_without_the_account_proof_is_counted_for_its_account_only(nodes, left_by):
+    """A session stored before the proof existed is this account's when it was opened for
+    its name after its creation, as the validity check reads it: counted then, and not when
+    an earlier account of the same id left it."""
+    first_node, second_node = nodes
+    earlier = _make_user(first_node)
+    if left_by == 'an earlier account':
+        _forget_proof(_open_session(second_node, earlier))
+    _cleanup(first_node, earlier)
+    user = _make_user(first_node, key=SoftKey(), key_enabled=False, id=earlier['id'])
+    try:
+        other = _open_session(second_node, user)
+        if left_by == 'this account':
+            _forget_proof(other)
+        this = _open_session(first_node, user)
+        r = _toggle_key(True)(first_node, this, user)
+        assert r.status_code == 200, r.data
+        assert r.get_json()['meta']['other_sessions_closed'] == 1
+        assert not _signed_in(other) and _signed_in(this)
     finally:
         _cleanup(first_node, user)
 

@@ -24,14 +24,17 @@ def account_proof(user) -> str:
 
 
 def begin_session(user):
-    """Empty session under a new identifier, bound to ``user``'s session version.
+    """Empty session under a new identifier, bound to ``user``'s session version and
+    to the epoch read as the request started, before its credentials were checked.
 
     Every login goes through here: an identifier planted before the login never
     becomes an authenticated session.
     """
+    from auth.session_epoch import SESSION_KEY, request_epoch
     session.clear()
     session['session_version'] = user.session_version or 0
     session[ACCOUNT_KEY] = account_proof(user)
+    session[SESSION_KEY] = request_epoch()
     _new_identifier()
 
 
@@ -53,27 +56,34 @@ def keep_own_session(user):
 
 
 def session_is_current(user) -> bool:
-    """False once the account's sessions were closed after this one began, or
-    when the session was opened for an earlier account with the same id.
-    A session opened before the proof existed gets it on its first request,
-    only if it was opened for this username after this account was created."""
-    if session.get('session_version', 0) != (user.session_version or 0):
+    """False once the account's sessions were closed after this one began, once a
+    restore followed its start, or when the session was opened for an earlier account
+    with the same id. A session opened before the proof existed gets it on its first
+    request, only if it was opened for this username after this account was created."""
+    from auth.session_epoch import holds_current_epoch
+    if (session.get('session_version', 0) != (user.session_version or 0)
+            or not holds_account(session, user) or not holds_current_epoch(session)):
         return False
-    proof = session.get(ACCOUNT_KEY)
-    if proof is None:
-        if session.get('username') != user.username or not _opened_after_creation(user):
-            return False
+    if session.get(ACCOUNT_KEY) is None:
         session[ACCOUNT_KEY] = account_proof(user)
-        return True
+    return True
+
+
+def holds_account(data, user) -> bool:
+    """Whether session ``data`` was opened for this account, not for an earlier one of its id:
+    by its proof, else by this username and a login not before the account's creation."""
+    proof = data.get(ACCOUNT_KEY)
+    if proof is None:
+        return data.get('username') == user.username and _opened_after_creation(data, user)
     return proof == account_proof(user)
 
 
-def _opened_after_creation(user) -> bool:
+def _opened_after_creation(data, user) -> bool:
     """Whether the session's login time (naive UTC) is not before the account's creation."""
     from datetime import datetime
     from utils.datetime_utils import to_naive_utc
     try:
-        opened = to_naive_utc(datetime.fromisoformat(session.get('login_time') or ''))
+        opened = to_naive_utc(datetime.fromisoformat(data.get('login_time') or ''))
     except (TypeError, ValueError):
         return False
     created = to_naive_utc(user.created_at)

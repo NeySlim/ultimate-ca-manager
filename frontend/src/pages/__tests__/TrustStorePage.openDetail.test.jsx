@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -146,5 +146,26 @@ describe('TrustStorePage — opens detail after add/import', () => {
     fireEvent.click(await screen.findByText('fire-import-complete'))
     await waitFor(() => expect(screen.queryByText('fire-import-complete')).not.toBeInTheDocument())
     expect(openEntity).not.toHaveBeenCalled()
+  })
+})
+
+const Where = () => <span data-testid="where">{useLocation().pathname}</span>
+
+describe('TrustStorePage: the work-queue link /truststore/:id opens the anchor', () => {
+  beforeEach(() => { mockIsMobile = false; openEntity.mockReset() })
+
+  it('opens the detail of the anchor named in the link, then drops the id from the address', async () => {
+    render(
+      <MemoryRouter initialEntries={['/truststore/7']}>
+        <Routes>
+          <Route path="/truststore/:id" element={<TrustStorePage />} />
+          <Route path="/truststore" element={<TrustStorePage />} />
+        </Routes>
+        <Where />
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('truststore', 7))
+    expect(openEntity).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/truststore'))
   })
 })

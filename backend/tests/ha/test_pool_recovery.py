@@ -9,7 +9,7 @@ import pytest
 pytestmark = pytest.mark.ha
 
 _KILL = ("SELECT count(pg_terminate_backend(pid, 10000)) FROM pg_stat_activity "
-         "WHERE application_name = %s AND pid <> pg_backend_pid()")
+         "WHERE application_name = ANY(%s) AND pid <> pg_backend_pid()")
 # Flask-Session's retry of a session read that met a dead pooled connection
 _SESSION_RETRY = 'Exception when querying database'
 
@@ -32,7 +32,7 @@ def test_requests_after_every_session_was_terminated_succeed(cluster, admin):
             assert client.node.http.get(client.node.url('/health/ready'), timeout=30).status_code == 200
     before = {node.name: _size(node) for node in cluster.nodes}
 
-    killed = cluster.sql(_KILL, (cluster.schema,))[0][0]
+    killed = cluster.sql(_KILL, (cluster.app_names(),))[0][0]
     assert killed >= len(cluster.nodes)
 
     # The readiness probe first: the application pool, no session read to retry it

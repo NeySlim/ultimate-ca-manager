@@ -22,6 +22,7 @@ from flasgger import Swagger
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config.settings import get_config, BASE_DIR, redis_url as config_redis_url, session_store, SESSION_TABLE
+from config.settings import rate_limit_enabled
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
@@ -319,7 +320,13 @@ def create_app(config_name=None):
                     Index(f'ix_{model.__tablename__}_expiry', model.expiry).create(db.engine, checkfirst=True)
             except Exception as exc:
                 app.logger.warning("Could not create the session expiry index: %s", exc)
-    
+        elif app.config.get('SESSION_TYPE') == 'filesystem':
+            from utils.session_store import GuardedFileSystemSessionInterface
+            GuardedFileSystemSessionInterface.adopt(app)
+        elif app.config.get('SESSION_TYPE') == 'redis':
+            from utils.session_store_redis import GuardedRedisSessionInterface
+            GuardedRedisSessionInterface.adopt(app)
+
     # Ensure session directory exists with correct permissions (filesystem mode).
     # Session files contain CSRF tokens and authenticated user IDs — anyone with
     # read access to /opt/ucm/data/sessions can hijack live sessions. Pin the
@@ -373,7 +380,7 @@ def create_app(config_name=None):
     })
     
     # Initialize rate limiter
-    if config.RATE_LIMIT_ENABLED:
+    if rate_limit_enabled():
         limiter.init_app(app)
         app.logger.info("✓ Rate limiting enabled")
     
@@ -516,21 +523,13 @@ def create_app(config_name=None):
             app.logger.info("✓ Database lock acquired")
             
             try:
-                # Check if DB is already initialized by another worker
+                # Registry first, then tables, then any index a cut start left out; a failure stops the start
                 from sqlalchemy import inspect
-                inspector = inspect(db.engine)
-                tables = inspector.get_table_names()
-                
-                fresh_install = not ('users' in tables and 'certificate_authorities' in tables)
-                
-                if not fresh_install:
-                    app.logger.info("✓ Database tables already exist")
-                else:
-                    # Registry first, then tables; a failure of either stops the start
-                    from migration_runner import build_fresh_schema
-                    app.logger.info("Creating database tables...")
-                    build_fresh_schema(db.create_all)
+                from migration_runner import start_schema
+                if start_schema(db.engine, db.metadata, db.create_all):
                     app.logger.info("✓ Database tables created/verified, migration baseline marked")
+                else:
+                    app.logger.info("✓ Database tables already exist")
                 
                 # ===== EXTENDED TABLES =====
                 # Import models to register them with SQLAlchemy
@@ -610,6 +609,10 @@ def create_app(config_name=None):
             except Exception as e:
                 db.session.rollback()
                 app.logger.error(f"HA: node identifier not claimed at start: {type(e).__name__}: {e}")
+            # Secrets saved under another key (a former single instance): named, the service starts
+            if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':
+                from services.db_key_rewrap import report_unreadable_at_start
+                report_unreadable_at_start()
 
     # FIPS mode: each blocker of the readiness check as an ERROR line, on every node; the
     # operations it names are refused at use, the service itself always starts
@@ -1035,6 +1038,10 @@ def create_app(config_name=None):
     # HA cluster maintenance: first hook, so a node in maintenance refuses before any other work
     from services import cluster_maintenance
     cluster_maintenance.init_app(app)
+    # After the gate (a node in maintenance refuses without a read), before a login route
+    # checks an identity; the certificate hook reads the epoch for itself
+    from auth.session_epoch import remember_request_epoch
+    app.before_request(remember_request_epoch)
     # Before the CSRF check registered below: a failed load is retried before a token is checked
     app.before_request(reload_if_pending)
     
@@ -1085,7 +1092,7 @@ def create_app(config_name=None):
     # Enable rate-limiting middleware (auth brute-force protection, etc.)
     try:
         from security.rate_limiter import init_rate_limiter
-        if os.environ.get('RATE_LIMIT_ENABLED', 'true').lower() in ('true', '1', 'yes', 'on'):
+        if rate_limit_enabled():
             init_rate_limiter(app)
         else:
             app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")
@@ -1558,7 +1565,8 @@ def init_database(app):
         # Another worker already created the initial data
         db.session.rollback()
     initial_admin.sweep(app.config)
-    initial_admin.announce(app.config)
+    if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':  # the web master already said it
+        initial_admin.announce(app.config)
 
     # Create system certificate templates if none exist
     try:

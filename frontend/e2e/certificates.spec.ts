@@ -1,59 +1,80 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, createCA, issueCert, uid, derHasSerial, pemBody } from './support/fixtures'
+import { readFileSync } from 'node:fs'
 
-test.describe('Certificates', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/certificates')
-    await page.waitForLoadState('networkidle')
-  })
+async function findCerts(api, cn: string) {
+  const data = await api.get(`/certificates?search=${encodeURIComponent(cn)}&per_page=100`)
+  return ((Array.isArray(data) ? data : data.items || data.certificates) as any[]).filter(c => c.common_name === cn)
+}
 
-  test('page loads with heading', async ({ page }) => {
-    await expect(page.locator('h1')).toBeVisible()
-  })
+async function openInInspector(page, cn: string) {
+  await page.goto('/certificates')
+  await page.getByRole('main').getByRole('cell', { name: cn }).click()
+  const panel = page.getByRole('tabpanel', { name: cn })
+  await expect(panel.getByRole('heading', { name: cn })).toBeVisible()
+  return panel
+}
 
-  test('has table', async ({ page }) => {
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
-  })
+test('a certificate issued on screen is signed by the chosen CA', async ({ page, api }) => {
+  const ca = await createCA(api)
+  const cn = `${uid('web')}.example.com`
+  await page.goto('/certificates')
+  await page.getByRole('main').getByRole('button', { name: 'Issue', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Issue Certificate' })
+  await dialog.getByLabel('Certificate Authority').click()
+  await page.getByRole('option', { name: new RegExp(ca.common_name) }).click()
+  await dialog.getByLabel('Common Name').fill(cn)
+  await dialog.getByRole('button', { name: 'Issue Certificate' }).click()
+  await expect(dialog).toBeHidden()
 
-  test('table has header row', async ({ page }) => {
-    await expect(page.locator('table thead')).toBeVisible({ timeout: 10000 })
-  })
+  await expect(page.getByRole('main').getByRole('cell', { name: cn })).toBeVisible()
+  const [cert] = await findCerts(api, cn)
+  expect(cert).toMatchObject({ issuer: `CN=${ca.common_name}`, revoked: false })
+})
 
-  test('has action buttons', async ({ page }) => {
-    // Certificates page has: Help, status filter, CA filter, Compare, Import, Issue
-    const buttons = page.locator('button')
-    expect(await buttons.count()).toBeGreaterThanOrEqual(4)
-  })
+test('the inspector shows the certificate the row names', async ({ page, api }) => {
+  const cert = await issueCert(api, (await createCA(api)).id)
+  const panel = await openInInspector(page, cert.common_name)
+  await expect(panel.getByText(cert.serial_number, { exact: false }).first()).toBeVisible()
+  await expect(panel).toContainText(new RegExp(`DNS:\\s*${cert.common_name.replace(/\./g, '\\.')}`))
+})
 
-  test('has help button', async ({ page }) => {
-    await expect(page.locator('button').filter({ hasText: /help/i })).toBeVisible()
-  })
+test('renewing from the inspector issues a new certificate for the same name', async ({ page, api }) => {
+  const cert = await issueCert(api, (await createCA(api)).id)
+  const panel = await openInInspector(page, cert.common_name)
+  await panel.getByRole('button', { name: 'Renew', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Renew Certificate' })
+  await dialog.getByRole('button', { name: 'Renew', exact: true }).click()
+  await expect(dialog).toBeHidden()
 
-  test('has search input', async ({ page }) => {
-    const search = page.locator('input[type="search"], input[placeholder]').first()
-    await expect(search).toBeVisible()
-  })
+  // A new serial for the same name, the old one superseded or kept beside it
+  await expect.poll(async () => (await findCerts(api, cert.common_name))
+    .some(c => c.serial_number !== cert.serial_number && !c.revoked)).toBe(true)
+})
 
-  test('search input filters results', async ({ page }) => {
-    const search = page.locator('input[type="search"], input[placeholder]').first()
-    await search.fill('nonexistent-xyz-cert')
-    await page.waitForTimeout(1000)
-    // No crash = success
-  })
+test('a certificate revoked from the inspector is listed by the next CRL', async ({ page, api }) => {
+  const ca = await createCA(api)
+  const cert = await issueCert(api, ca.id)
+  const panel = await openInInspector(page, cert.common_name)
+  await panel.getByRole('button', { name: 'Revoke', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Revoke certificate' })
+  await dialog.getByRole('button', { name: 'Revoke', exact: true }).click()
+  await expect(dialog).toBeHidden()
 
-  test('has pagination', async ({ page }) => {
-    // Pagination exists on certificates page
-    const pagination = page.locator('[class*="pagination"], nav[aria-label], button:has-text("/page")')
-    if (await pagination.count() > 0) {
-      await expect(pagination.first()).toBeVisible()
-    }
-  })
+  await expect.poll(async () => (await api.get(`/certificates/${cert.id}`)).revoked).toBe(true)
+  await api.post(`/crl/${ca.id}/regenerate`)
+  const crl = await api.get(`/crl/${ca.id}`)
+  expect(crl.revoked_count).toBe(1)
+  expect(derHasSerial(pemBody(crl.crl_pem), BigInt(cert.serial_number).toString(16))).toBe(true)
+})
 
-  test('table rows are clickable', async ({ page }) => {
-    const rows = page.locator('table tbody tr')
-    await rows.first().waitFor({ state: 'visible', timeout: 10000 })
-    if (await rows.count() > 0) {
-      await rows.first().click()
-      await page.waitForTimeout(500)
-    }
-  })
+test('the PEM exported from the inspector is the certificate', async ({ page, api }) => {
+  const cert = await issueCert(api, (await createCA(api)).id)
+  const panel = await openInInspector(page, cert.common_name)
+  await panel.getByRole('button', { name: 'Export', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Export' })
+  const download = page.waitForEvent('download')
+  await dialog.getByRole('button', { name: 'Download' }).click()
+  const file = readFileSync(await (await download).path(), 'utf8')
+  expect(file).toContain('-----BEGIN CERTIFICATE-----')
+  expect(pemBody(file.split('-----END CERTIFICATE-----')[0])).toEqual(pemBody(cert.pem))
 })

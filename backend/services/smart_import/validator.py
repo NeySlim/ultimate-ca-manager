@@ -17,6 +17,7 @@ from cryptography.hazmat.backends import default_backend
 
 from .parser import ParsedObject, ObjectType
 from .chain_builder import ChainInfo, find_ca_by_ski
+from utils.csr_diagnostics import weak_csr_hash_error
 from utils.key_type import unsignable_csr_key
 
 
@@ -241,9 +242,9 @@ class ImportValidator:
             if unsignable:
                 result.add_error(f"CSR '{self._get_cn(obj)}' refused: {unsignable}")
             elif not csr.is_signature_valid:
-                result.add_error(
-                    f"CSR '{self._get_cn(obj)}' has invalid signature"
-                )
+                weak = weak_csr_hash_error(csr)
+                result.add_error(f"CSR '{self._get_cn(obj)}' refused: {weak}" if weak
+                                 else f"CSR '{self._get_cn(obj)}' has invalid signature")
         except Exception as e:
             result.add_error(f"Failed to validate CSR: {str(e)}")
     

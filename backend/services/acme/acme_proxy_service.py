@@ -1892,7 +1892,7 @@ class AcmeProxyService:
         """Publish the dns-01 TXT record, wait for it, then submit upstream."""
         import hashlib
         from api.v2.acme_domains import find_provider_for_domain
-        from services.acme.dns_providers import create_provider
+        from services.acme.dns_providers import create_provider, saved_credentials
         from models import AcmeClientOrder
 
         # Calculate TXT value
@@ -1907,7 +1907,7 @@ class AcmeProxyService:
             return
 
         provider_model = provider_info['provider']
-        credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+        credentials = saved_credentials(provider_model)
         provider = create_provider(provider_model.provider_type, credentials)
 
         # Hand the provider the name being validated and let it
@@ -2346,7 +2346,7 @@ class AcmeProxyService:
     def _bg_cleanup_dns_records(self, app, records, order_id=None, delay=0):
         """Background task: delete DNS-01 TXT records after cert issuance (#218), after ``delay`` seconds."""
         from models import DnsProvider
-        from services.acme.dns_providers import create_provider
+        from services.acme.dns_providers import create_provider, saved_credentials
 
         if delay:
             time.sleep(delay)
@@ -2357,7 +2357,7 @@ class AcmeProxyService:
                         provider_model = db.session.get(DnsProvider, record['provider_id'])
                         if not provider_model:
                             continue
-                        credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+                        credentials = saved_credentials(provider_model)
                         provider = create_provider(provider_model.provider_type, credentials)
                         logger.info(f"[ACME Proxy] Cleaning up DNS record: {record['record_name']} in zone {record['domain']}")
                         self._delete_dns_record(provider, record['domain'], record['record_name'],

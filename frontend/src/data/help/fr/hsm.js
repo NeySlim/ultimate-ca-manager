@@ -17,9 +17,10 @@ export default {
       {
         title: 'Actions',
         items: [
-          { label: 'Ajouter un fournisseur', text: 'Configurer la connexion à un HSM (chemin de bibliothèque, identifiants, slot)' },
+          { label: 'Nouveau fournisseur', text: 'Configurer la connexion à un HSM (chemin de bibliothèque, identifiants, slot)' },
           { label: 'Tester la connexion', text: 'Vérifier que le HSM est joignable et que les identifiants sont valides ; pour un module PKCS#11, enregistre aussi ce qu\'il déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur' },
           { label: 'Générer une clé', text: 'Créer une nouvelle paire de clés directement sur le HSM' },
+          { label: 'Synchroniser les clés', text: 'Relit les clés du fournisseur depuis le jeton : les nouvelles sont ajoutées, celles qui ont disparu du jeton sont retirées, sauf celles qu\'une AC utilise, qui sont conservées. Si la lecture du jeton échoue, rien n\'est retiré. Le message donne les décomptes, les clés conservées et les clés illisibles ; le bouton reste désactivé pendant la synchronisation' },
           { label: 'Statut', text: 'Surveiller la santé de la connexion du fournisseur' },
           { label: 'Certification', text: 'Déclarer la certification du HSM : Common Criteria EAL 4+, EUCC élevé, FIPS 140-3 niveau 3, FIPS 140-2 niveau 3 ou autre. Laissée vide, elle n\'est pas déclarée. Le profil de conformité eu-acm n\'accepte que Common Criteria EAL 4+, EUCC élevé et FIPS 140-3 niveau 3 (jusqu\'au 31 décembre 2030) pour une CA adossée à un HSM' },
           { label: "Nom déjà utilisé (v2.249)", text: "Générer une clé sous un nom qu'OpenBao ou Azure Key Vault détient déjà est refusé (409) : importez une clé existante par une synchronisation de clés (POST /api/v2/hsm/providers/<id>/sync)" },
@@ -37,6 +38,9 @@ export default {
           { label: 'Restrictions d\'export', text: 'L\'export PKCS#12, JKS et clé seule est désactivé pour les CA HSM (seul le certificat public / la chaîne peut être exporté)' },
           { label: 'CRL & OCSP', text: 'Les deux fonctionnent de manière transparente avec les CA HSM (signés via HSM)' },
           { label: 'Migration', text: 'Les CA locales existantes ne peuvent pas être déplacées vers un HSM après création, choisir à la création' },
+          { label: 'Une autorité par clé', text: 'Une clé HSM sert une seule autorité, X.509 ou SSH. Les listes de clés existantes ne proposent que des clés inutilisées, une seconde AC sur une clé est refusée (409) avec le nom de l\'AC qui la tient, et une clé ou son fournisseur ne peut pas être supprimé tant qu\'une AC le tient' },
+          { label: 'Droits', text: 'Créer une AC sur une clé HSM, X.509 ou SSH, exige read:hsm en plus de write:cas ou write:ssh_cas ; sans lui, le choix HSM est indisponible' },
+          { label: 'AC SSH', text: 'Une AC SSH, utilisateur ou hôte, peut utiliser une clé de signature RSA ou ECDSA P-256/P-384/P-521 (voir AC SSH). En mode HA, une clé sur SoftHSM ou sur un lecteur de carte à puce local est refusée, car elle n\'existe que sur un nœud' },
         ]
       },
       {
@@ -162,8 +166,17 @@ Les clés ML-DSA-44, ML-DSA-65 et ML-DSA-87 (FIPS 204) ne sont proposées que su
 
 Les fournisseurs Azure Key Vault et AWS CloudHSM ne détiennent aucune clé ML-DSA, et le mode FIPS refuse ML-DSA sur tous les fournisseurs. Une clé ML-DSA signe les données elles-mêmes : aucun digest n'est choisi.
 
+### Synchroniser les clés
+Cliquez sur **Synchroniser les clés** dans les détails du fournisseur pour relire les clés du jeton.
+- Les nouvelles clés sont ajoutées.
+- Les clés qui ont disparu du jeton sont retirées, sauf celles qu'une AC utilise : elles sont conservées.
+- Si la lecture du jeton échoue, rien n'est retiré.
+
+Le message donne les décomptes, le nombre de clés conservées parce qu'une AC les utilise, le nombre de clés illisibles et le nombre de clés utilisées par une AC dont le matériel a changé sur le jeton. Le bouton est désactivé pendant la synchronisation.
 ### Utiliser les clés HSM
 Lors de la création d'une CA, sélectionnez un fournisseur HSM et une clé au lieu de générer une clé logicielle. Les opérations de signature de la CA sont effectuées sur le HSM.
+
+Une clé HSM sert une seule autorité, X.509 ou SSH. Créer une AC sur une clé HSM exige la permission \`read:hsm\` en plus de \`write:cas\` (\`write:ssh_cas\` pour une AC SSH), et une clé qu'une AC tient ne peut pas être supprimée.
 
 > ⚠ Les clés générées sur un HSM ne peuvent pas être exportées. Si vous perdez l'accès au HSM, vous perdez les clés.
 

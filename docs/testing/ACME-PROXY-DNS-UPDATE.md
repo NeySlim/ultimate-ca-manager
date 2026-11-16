@@ -13,15 +13,10 @@ python -m pytest tests/test_dns_update_tsig.py \
   tests/test_dns_update_models.py \
   tests/test_dns_update_api.py \
   tests/test_dns_update_server.py \
-  tests/test_migration_111_acme_dns_update.py \
   tests/test_entrypoint_dns_update_port.py -q
-# Reference 2026-10-24: 497 passed, 1 skipped (the PostgreSQL case)
-
-# Migration 111 on PostgreSQL too:
-UCM_TEST_PG_URL=postgresql://ucm@127.0.0.1:55432/ucmtest \
-  python -m pytest tests/test_migration_111_acme_dns_update.py -q
-# Reference: 6 passed (PostgreSQL 16)
 ```
+
+Schema changes are covered by `tests/test_upgrade_from_2_254.py`, described in [postgres-harness.md](postgres-harness.md).
 
 The test names start with the identifier of the scenario (`M…` message, `E…` EDNS, `T…` transport, `S…` TSIG, `U…` UPDATE, `Q…` query, `R…` expected values, `K…` keys, `N…` server, logs and security, `F…` regression test of a fixed defect) and end with `_pos` or `_neg`. Every scenario has a positive and a negative test.
 
@@ -33,7 +28,6 @@ The test names start with the identifier of the scenario (`M…` message, `E…`
 | `test_dns_update_keys_zones_audit.py` | Key scope (proxy account, EAB link), zone index, audit rate limits and the `reason` field |
 | `test_dns_update_api.py` | Key API (secret shown once, algorithms, EAB link, 409), port setting validation, permissions with the auditor role and a custom role with `write:acme` only, `dns_update_key_count` of the account list |
 | `test_dns_update_server.py` | UDP and TCP server (RFC 7766 framing, pipelining, idle timeout), rate limits, start and stop |
-| `test_migration_111_acme_dns_update.py` | Tables and constraints on SQLite and PostgreSQL |
 | `test_entrypoint_dns_update_port.py` | Docker entrypoint check of `UCM_DNS_UPDATE_PORT` |
 
 Frontend:

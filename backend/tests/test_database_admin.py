@@ -330,6 +330,51 @@ class TestBootstrapPlanOnAnUpgradedInstallation:
         assert order.index('pro_sso_providers') < order.index('users')
         assert order.index('users') < order.index('group_members')
 
+    @pytest.mark.parametrize('failure', ['foreign_keys', 'cycle', 'table_names'])
+    def test_the_parents_come_first_when_the_target_cannot_be_sorted(
+            self, populated_app, sqlite_target, tmp_path, monkeypatch, failure):
+        """The order of the copy holds when the target's foreign keys do not read, form a
+        cycle, or its tables cannot be listed a second time."""
+        from sqlalchemy.engine.reflection import Inspector
+        from models import db
+        from services.database_admin.migration import BOOTSTRAP_AUTH_TABLES, _bootstrap_plan
+
+        source, target = self._schemas(
+            populated_app, f"sqlite:///{tmp_path / f'src-{failure}.db'}", sqlite_target)
+        real_fks, real_names = Inspector.get_foreign_keys, Inspector.get_table_names
+
+        def foreign_keys(self, table, *a, **k):
+            if self.bind.url == target.url:
+                if failure == 'foreign_keys':
+                    raise RuntimeError('cannot read foreign keys')
+                if failure == 'cycle' and table == 'users':
+                    return real_fks(self, table, *a, **k) + [{'referred_table': 'api_keys'}]
+            return real_fks(self, table, *a, **k)
+        calls = []
+
+        def table_names(self, *a, **k):
+            if self.bind.url == target.url and failure == 'table_names':
+                calls.append(1)
+                if len(calls) > 1:
+                    raise RuntimeError('cannot list tables')
+            return real_names(self, *a, **k)
+        monkeypatch.setattr(Inspector, 'get_foreign_keys', foreign_keys)
+        monkeypatch.setattr(Inspector, 'get_table_names', table_names)
+        try:
+            order = [entry.name for entry in _bootstrap_plan(source, target)]
+        finally:
+            source.dispose()
+            target.dispose()
+
+        assert sorted(order) == sorted(BOOTSTRAP_AUTH_TABLES)
+        wanted = set(BOOTSTRAP_AUTH_TABLES)
+        with populated_app.app_context():
+            edges = [(fk.column.table.name, table.name) for table in db.metadata.sorted_tables
+                     if table.name in wanted for fk in table.foreign_keys
+                     if fk.column.table.name in wanted and fk.column.table.name != table.name]
+        assert edges
+        assert [(p, c) for p, c in edges if order.index(p) > order.index(c)] == []
+
 
 # ---------------------------------------------------------------------------
 # FK-disable fallback for non-superuser PostgreSQL roles (#126, #305)

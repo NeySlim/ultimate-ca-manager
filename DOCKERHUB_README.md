@@ -94,7 +94,7 @@ volumes:
 - **Reports and alerts** -- Scheduled PDF reports, SMTP notifications with OAuth2, expiry alerts at several thresholds
 - **Metrics** -- Opt-in, bearer-gated Prometheus endpoint
 - **Backup** -- Manual and scheduled encrypted backups with retention
-- **Interface** -- Six themes, 9 languages, command palette, WebSocket live updates, responsive down to phone width
+- **Interface** -- Six themes, 10 languages, command palette, WebSocket live updates, responsive down to phone width
 
 ---
 

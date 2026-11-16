@@ -22,14 +22,14 @@ export default {
           { label: '自动批准', text: '自动批准带有有效质询密码的请求，或由同一端点签发的证书所签署的续期请求' },
           { label: '通过纯 HTTP 提供', text: '默认关闭。同时在 HTTP 协议端口（默认 8080）上应答 SCEP，地址为 http://your-server:8080/scep/pkiclient.exe 和各配置文件 URL，供 sscep 等无法使用 HTTPS 的客户端使用。RFC 8894 §7.10：SCEP 消息本身已受保护，CMS 信封使质询密码保持私密' },
           { label: '质询密码', text: '设备用于认证注册的共享密钥。由同一端点（配置文件或全局）签发的证书所签署的续期请求（RenewalReq）由该证书认证，因此不检查其质询，更换密钥也不会阻止已注册的设备续期（RFC 8894 §2.4）。任何其他证书仍需要该端点的质询' },
-          { label: '设备密钥 (v2.248)', text: '设备使用 RSA、ECDSA、Ed25519 或 ML-DSA 密钥签署其请求；ML-DSA 签名遵循 RFC 9882（SHA-512 摘要）。Ed448 会被拒绝，FIPS 模式下 ML-DSA 也会被拒绝' },
+          { label: '设备密钥 (v2.248)', text: '设备使用 RSA、ECDSA、Ed25519 或 ML-DSA 密钥签署其请求；ML-DSA 签名遵循 RFC 9882（SHA-512 摘要）。Ed448 会被拒绝，FIPS 模块不批准 ML-DSA 时，FIPS 模式下 ML-DSA 也会被拒绝' },
           { label: '请求名称', text: '主题或 DNS 名称违反 RFC 5280 的请求（CN 超过 64 个字符，或 DNS 名称含空格、撇号或下划线，例如 iOS 设备名称）会在验证其质询之后、入队之前被拒绝并说明原因，同时通知 Intune 该拒绝；续期会沿用其证书所带的名称。请用符合 DNS 规范的值构建 Intune SAN DNS' },
         ]
       },
       {
         title: '配置文件',
         items: [
-          { label: 'URL 片段', text: '每个配置文件通过 /scep/<segment>/pkiclient.exe 提供, 将每个设备群或 MDM 配置指向其专属 URL' },
+          { label: 'URL 片段', text: '每个配置文件通过 /scep/<segment>/pkiclient.exe 提供，将每个设备群或 MDM 配置指向其专属 URL' },
           { label: '证书模板', text: '绑定模板后，其密钥用法（KU/EKU）和有效期将决定通过该配置文件签发的每个证书' },
           { label: '签名摘要 (v2.251)', text: '通过配置文件签发的证书使用其模板的摘要签名，并提升到与 CA 密钥对应的摘要，这是策略可以覆盖的偏好。没有模板时，使用 CA 密钥的摘要' },
           { label: '按配置文件的质询', text: '每个配置文件都有自己的质询密码，加密存储，过期窗口与全局质询相同' },
@@ -44,7 +44,7 @@ export default {
       '为每个 CA 使用唯一的质询密码以提高安全审计能力',
       '自动批准很方便，但在高安全环境中建议手动审核请求',
       'SCEP URL：https://your-server:8443/scep/pkiclient.exe 用于已配置的 CA，https://your-server:8443/scep/<profile>/pkiclient.exe 用于配置文件',
-      'Intune 配置文件需要启用自动批准:, Intune 的注册是同步的验证并签发往返过程，Intune 一侧没有批准队列',
+      'Intune 配置文件需要启用自动批准：Intune 的注册是同步的验证并签发往返过程，Intune 一侧没有批准队列',
     ],
     warnings: [
       '质询密码位于 CSR 中，CSR 在加密到 CA 的 CMS 信封内传输（RFC 8894 §2.4），因此纯 HTTP 不会暴露它；如果客户端把它作为信封外的签名属性发送，则会在 HTTP 上以及任何记录该请求的环节暴露',
@@ -83,7 +83,7 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 - **自己的 CA**: 不同的设备群可针对不同的 CA 注册
 - **可选的证书模板**: 绑定后，模板的密钥用法、扩展密钥用法和有效期将决定通过该配置文件签发的每个证书
 - **注册者不得持有的用途**: 绑定到配置文件的模板不能包含 OCSP 签名、时间戳、任意用途或智能卡登录，SCEP 续期也绝不会沿用这些用途；当配置文件针对 Intune 验证时允许智能卡登录，因为 Intune 为身份作担保
-- **按配置文件的质询密码**: 加密存储，过期窗口与全局质询相同
+- **按配置文件的质询密码**: 加密存储，过期窗口与全局质询相同（或 Microsoft Intune 验证，见下文）
 - **审批策略**: 每个配置文件可自动批准或手动审核
 
 将每个设备群、MDM 配置文件或租户指向其专属配置文件 URL。不带片段的 \`/scep/pkiclient.exe\` 端点继续使用全局配置，保持不变。
@@ -109,7 +109,7 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 6. 如果未启用自动批准，由管理员审核并批准或拒绝
 
 ### 设备密钥
-设备使用自己的密钥（RSA、ECDSA、Ed25519 或 ML-DSA）签署 PKCSReq。ML-DSA 签名按 RFC 9882 校验（SHA-512 摘要、密钥自身的算法标识符、无参数）。Ed448 签名会被拒绝，FIPS 模式下 ML-DSA 签名也会被拒绝。请求仍会加密到 RSA 签名 CA。
+设备使用自己的密钥（RSA、ECDSA、Ed25519 或 ML-DSA）签署 PKCSReq。ML-DSA 签名按 RFC 9882 校验（SHA-512 摘要、密钥自身的算法标识符、无参数）。Ed448 签名会被拒绝，FIPS 模块不批准 ML-DSA 时，FIPS 模式下 ML-DSA 签名也会被拒绝。请求仍会加密到 RSA 签名 CA。
 
 ## SCEP URL
 

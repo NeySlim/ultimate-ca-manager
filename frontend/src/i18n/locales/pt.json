@@ -275,6 +275,7 @@
     "source": "Origem",
     "addDnsProvider": "Adicionar provedor",
     "test": "Testar",
+    "syncKeys": "Sincronizar chaves",
     "dnsProviderTestFailed": "Teste de conexão falhou",
     "providerName": "Nome do provedor",
     "providerType": "Tipo de provedor",
@@ -1083,7 +1084,8 @@
       "noSchemeAllowedByProfile": "Nenhum esquema de assinatura RSA é permitido pelo perfil de conformidade para esta chave.",
       "profileRequiresHsm": "Este perfil exige que a chave da CA seja guardada num HSM.",
       "profileHorizon": "O perfil de conformidade aceita {{key}} até {{date}}, e esta CA ultrapassaria essa data.",
-      "noDigestAllowedByPolicy": "Nenhum hash de assinatura é permitido pelas políticas aplicáveis a esta CA."
+      "noDigestAllowedByPolicy": "Nenhum hash de assinatura é permitido pelas políticas aplicáveis a esta CA.",
+      "hsmNeedsRead": "Criar uma AC em uma chave HSM exige a permissão read:hsm."
     },
     "detail": {
       "hsmBacked": "Apoiada por HSM",
@@ -1542,7 +1544,7 @@
     "proxyUpstreamUrl": "URL do diretório upstream",
     "proxyUpstreamUrlHelper": "A URL do diretório do servidor ACME upstream. Padrão para Let's Encrypt staging se vazio.",
     "proxyUsage": "Utilização com certbot:",
-    "proxyUsageNote": "Pré-requisito: o domínio (ou um domínio pai que cubra os subdomínios) deve estar configurado em Domínios ACME com um provedor DNS. O proxy suporta apenas dns-01.\n\nCada conta CA externa pode expor um endpoint dedicado: /acme/proxy/<slug>/directory (ative **Expor via proxy ACME** em Contas CA externas). O caminho predefinido /acme/proxy/directory segue a conta selecionada nas definições do proxy.\n\nO UCM cria e remove automaticamente os registos TXT através desse provedor. As opções --manual-auth-hook e --manual-cleanup-hook podem ficar como no-ops (/bin/true), porque o proxy executa a validação DNS.\n\nEvite dois pedidos simultâneos para o mesmo nome (Certbot + interface UCM): o segundo registo TXT pode sobrepor-se ao primeiro. Se o certificado HTTPS do UCM for autoassinado (laboratório), adicione --no-verify-ssl ao Certbot.",
+    "proxyUsageNote": "Pré-requisito: o domínio (ou um domínio pai que cubra os subdomínios) deve estar configurado em Domínios ACME com um provedor DNS. O proxy suporta apenas dns-01.\n\nCada conta CA externa pode expor um endpoint dedicado: /acme/proxy/<slug>/directory (ative **Expor via proxy ACME** em Autoridades de certificação (CA)). O caminho predefinido /acme/proxy/directory segue a conta selecionada nas definições do proxy.\n\nO UCM cria e remove automaticamente os registos TXT através desse provedor. As opções --manual-auth-hook e --manual-cleanup-hook podem ficar como no-ops (/bin/true), porque o proxy executa a validação DNS.\n\nEvite dois pedidos simultâneos para o mesmo nome (Certbot + interface UCM): o segundo registo TXT pode sobrepor-se ao primeiro. Se o certificado HTTPS do UCM for autoassinado (laboratório), adicione --no-verify-ssl ao Certbot.",
     "proxyRegistered": "Proxy Registado",
     "registerAccount": "Register Conta",
     "aboutAcmeDesc": "O ACME permite a emissão automatizada de certificados. Configure o servidor abaixo e, em seguida, utilize a URL do diretório com qualquer cliente ACME (certbot, acme.sh, etc.).",
@@ -1802,12 +1804,12 @@
     "customCA": "CA personalizada",
     "upstreamCAHelper": "Selecione a autoridade de certificação upstream para solicitações proxy",
     "proxyUpstreamCAAccount": "Conta CA upstream",
-    "proxyUpstreamCAAccountHelper": "Selecione uma conta ACME externa registrada. EAB e credenciais são geridos em Contas CA externas abaixo.",
+    "proxyUpstreamCAAccountHelper": "Selecione uma conta ACME externa registrada. EAB e credenciais são geridos em Autoridades de certificação (CA) abaixo.",
     "proxySelectCaAccount": "Selecionar conta CA…",
     "proxyPruneReplacedCertificates": "Eliminar certificados substituídos",
     "proxyPruneReplacedCertificatesDesc": "Eliminar automaticamente os certificados importados pelo proxy após uma renovação bem-sucedida para os mesmos domínios. Certificados revogados são sempre mantidos.",
-    "proxyNoCaAccounts": "Nenhuma conta CA externa configurada. Adicione uma em Contas CA externas abaixo.",
-    "proxyManageCaAccountsHint": "EAB e definições por CA são geridos em Contas CA externas abaixo.",
+    "proxyNoCaAccounts": "Nenhuma conta CA externa configurada. Adicione uma em Autoridades de certificação (CA) abaixo.",
+    "proxyManageCaAccountsHint": "EAB e definições por CA são geridos em Autoridades de certificação (CA) abaixo.",
     "proxyEnabled": "Expor via proxy ACME",
     "proxySlug": "Caminho do proxy (slug)",
     "proxySlugHelper": "URL: /acme/proxy/<slug>/directory (letras minúsculas, dígitos, hífens).",
@@ -3374,6 +3376,7 @@
       "nothingFound": "Nada encontrado que este perfil recusaria."
     },
     "fipsPreflight": {
+      "withoutModule": "Nenhum módulo FIPS foi consultado: as chaves EdDSA e ML-DSA são listadas como recusadas. Com Docker, execute esta verificação com a imagem -fips, sem UCM_FIPS, para avaliá-las pelo seu módulo.",
       "title": "Preparação para FIPS",
       "hint": "Lista o que o modo FIPS recusaria nesta instância, com uma solução para cada item. Nada é alterado.",
       "run": "Verificar preparação para FIPS",
@@ -3856,7 +3859,8 @@
       "firmwareVersion": "Versão do firmware",
       "notRead": "Teste a ligação para ler o que o módulo reporta.",
       "softhsmFips": "O SoftHSM não é um módulo validado: no modo FIPS, as chaves nele armazenadas não são protegidas por FIPS."
-    }
+    },
+    "syncingKeys": "Sincronizando..."
   },
   "sso": {
     "subtitle": "Configure provedores LDAP, OAuth2 ou SAML para autenticação centralizada",
@@ -4074,7 +4078,7 @@
     "bindingLeftBehind": "Uma renovação deixou {{name}} no certificado anterior"
   },
   "help": {
-    "englishOnlyNotice": "A ajuda está disponível em inglês, francês e chinês.",
+    "englishOnlyNotice": "A ajuda está disponível em inglês, francês, russo e chinês.",
     "aboutCertificates": "Sobre certificados",
     "statusLegend": "Legenda de estados",
     "exportFormats": "Formatos de exportação",
@@ -4692,7 +4696,8 @@
         "template": "Falha ao exportar template"
       },
       "hsm": {
-        "testFailed": "Falha no teste de conexão"
+        "testFailed": "Falha no teste de conexão",
+        "syncFailed": "Falha ao sincronizar chaves"
       },
       "https": {
         "applyFailed": "Falha ao aplicar certificado",
@@ -4821,7 +4826,12 @@
         "template": "Template exportado com sucesso"
       },
       "hsm": {
-        "connectionOk": "Conexão bem-sucedida"
+        "connectionOk": "Conexão bem-sucedida",
+        "keysSynced": "Chaves sincronizadas: {{added}} novas, {{removed}} removidas, {{unchanged}} inalteradas",
+        "keysSyncedKept": "Ausentes do token, mas mantidas porque uma autoridade as usa: {{count}}.",
+        "keysSyncedUnreadable": "Chaves ilegíveis no token: {{count}}. Nenhuma chave foi removida.",
+        "keysSyncedMissingKept": "Chaves ausentes da lista e mantidas: {{count}}.",
+        "keysSyncedChanged": "Chaves usadas por uma autoridade cujo material mudou no token: {{count}}."
       },
       "https": {
         "applied": "Certificado HTTPS aplicado. O servidor será reiniciado.",
@@ -4910,7 +4920,7 @@
     "selectGroup": "Selecionar grupo...",
     "subtitle": "Gerencie regras de emissão, requisitos de chave e fluxos de aprovação",
     "fipsRulesTitle": "Regras FIPS ativas (somente leitura)",
-    "fipsRulesDesc": "O modo FIPS aplica uma política do sistema antes destas: chaves RSA 2048 a 4096 e EC P-256 a P-521, assinaturas SHA-256 a SHA-512. As políticas aqui só podem restringi-la mais.",
+    "fipsRulesDesc": "O modo FIPS aplica uma política do sistema antes destas: chaves RSA de comprimento par de 2048 a 16384 bits, EC P-256 a P-521, e Ed25519, Ed448 e ML-DSA quando o módulo FIPS carregado as aprova; assinaturas SHA-256 a SHA-512. As políticas aqui só podem restringi-la mais.",
     "targetCA": "CA Alvo",
     "title": "Políticas de Certificado",
     "toggleFailed": "Falha ao alternar política",
@@ -5470,7 +5480,7 @@
     "inventorySyncHint": "Importa periodicamente os certificados emitidos na CA do Windows que o UCM ainda não conhece, para que o UCM gira todo o ciclo de vida do certificado. Incremental; usa o canal de administração.",
     "lastInventorySync": "Último inventário",
     "inventorySyncNow": "Importar da CA agora",
-    "inventorySyncResult": "Inventário concluído: {{imported}} importados ({{skipped}} já conhecidos)",
+    "inventorySyncResult": "Inventário concluído: {{imported}} importados, {{completed}} pedido(s) pendente(s) concluído(s) ({{skipped}} já conhecidos)",
     "inventorySyncFailed": "Falha no inventário",
     "caControl": "Painel de controlo da CA",
     "caControlTitle": "Controlo da CA: {{name}}",
@@ -5510,6 +5520,11 @@
     "issued": "Emitido",
     "denied": "Negado",
     "checkStatus": "Verificar status",
+    "checkIssued": "Certificado emitido e importado",
+    "checkStillPending": "Ainda pendente de aprovação na CA",
+    "checkDenied": "A CA negou este pedido",
+    "checkSuperseded": "Esta CSR foi assinada em outro lugar: o pedido no Microsoft CA foi encerrado",
+    "checkFailed": "Falha ao verificar o estado",
     "refreshStatus": "Atualizar status",
     "signMode": "Método de assinatura",
     "signLocal": "CA local",
@@ -5761,13 +5776,14 @@
     "policyOidHelp": "OID que identifica a política TSA sob a qual os carimbos de data/hora são emitidos",
     "policyPlaceholderWarning": "1.2.3.4.1 é o OID de política de exemplo do OpenSSL, não atribuído a ninguém. Em produção, use um OID do arco da sua organização ou da sua CP/CPS.",
     "requireDedicatedCert": "Exigir um certificado TSA dedicado",
-    "requireDedicatedCertDesc": "Recusar a assinatura de carimbos de data/hora com o próprio certificado da CA. Requer um certificado de assinatura dedicado (entidade final) com uma EKU timeStamping crítica (RFC 3161).",
+    "requireDedicatedCertDesc": "Ativado por predefinição. Recusa assinar carimbos de tempo com o próprio certificado da CA: a RFC 3161 exige um certificado de assinatura dedicado (entidade final) com uma EKU timeStamping crítica. Desativá-lo não é conforme à RFC 3161.",
     "requireDedicatedCertBlocked": "Selecione primeiro um certificado de assinatura dedicado utilizável acima; caso contrário, todos os pedidos de carimbo falhariam.",
     "signingCert": "Certificado de assinatura",
-    "signingCertDesc": "Escolha o que assina os tokens de carimbo de tempo. O certificado da CA é a predefinição histórica; um certificado final dedicado com a EKU timeStamping é a recomendação da RFC 3161.",
+    "signingCertDesc": "Escolha o que assina os tokens de carimbo de tempo. A RFC 3161 exige um certificado final dedicado com a EKU timeStamping; o certificado da CA só assina quando o modo estrito abaixo está desativado.",
     "caSignerWarning": "O certificado da CA assina os carimbos de tempo. Verificadores rigorosos como openssl ts -verify e jarsigner rejeitam estes tokens: a RFC 3161 exige um signatário dedicado com um EKU timeStamping crítico e exclusivo. Selecione ou gere abaixo um certificado de assinatura dedicado.",
+    "strictNoSigner": "O modo estrito está ativado e não há nenhum signatário dedicado: /tsa recusa todos os pedidos de carimbo de tempo. Gere abaixo um certificado de assinatura: o UCM emite-o a partir da CA escolhida com a EKU timeStamping sozinha e crítica (RFC 3161) e seleciona-o.",
     "signingCertHelp": "Só são listados certificados cuja chave privada o UCM detém e que têm a EKU timeStamping. As renovações são seguidas automaticamente.",
-    "signingCertCa": "Certificado da CA (predefinição)",
+    "signingCertCa": "Certificado da CA (apenas com o modo estrito desativado)",
     "signerExpires": "Expira",
     "signerChainComplete": "A cadeia de emissores chega a uma raiz autoassinada e é incluída em cada token.",
     "signerChainPartial": "Cadeia de emissores: {{count}} certificado(s) incluídos; não chega a uma raiz autoassinada.",
@@ -5861,7 +5877,12 @@
       "allowAnyPrincipal": "Permitir qualquer principal",
       "allowAnyPrincipalHelp": "Quando nenhum principal está listado, assinar para qualquer nome, incluindo root. Sem esta opção, uma CA com a lista vazia não assina nada.",
       "allowCustomKeyId": "Permitir que os solicitantes definam o ID da chave",
-      "allowCustomKeyIdHelp": "O sshd registra o ID da chave como a identidade do titular. Sem esta opção, a CA nomeia cada certificado principals@nome da CA."
+      "allowCustomKeyIdHelp": "O sshd registra o ID da chave como a identidade do titular. Sem esta opção, a CA nomeia cada certificado principals@nome da CA.",
+      "keyStorageLockedHelp": "A chave da AC e o tipo de AC não podem ser alterados após a criação da AC.",
+      "hsmKeyHelper": "Uma AC SSH em HSM usa uma chave de assinatura RSA ou ECDSA P-256/P-384/P-521 que nenhuma outra autoridade detém. Adicione ou sincronize chaves no Gerenciamento HSM.",
+      "hsmNoUsableKeys": "Este provedor não tem nenhuma chave de assinatura RSA ou ECDSA livre. Uma chave HSM serve a uma única autoridade, X.509 ou SSH.",
+      "hsmDerivedKey": "Tipo de chave do HSM: {{keyType}}",
+      "hsmNeedsRead": "Criar uma AC SSH em uma chave HSM exige a permissão read:hsm."
     },
     "searchPlaceholder": "Pesquisar CAs SSH...",
     "downloadSetupScript": "Baixar script de configuração",
@@ -6287,7 +6308,8 @@
         "session_revoke": "Sessão revogada",
         "session_revoke_all": "Sessões revogadas",
         "deploy_binding_left_behind": "Implantação deixada no certificado antigo",
-        "https_binding_left_behind": "HTTPS deixado no certificado antigo"
+        "https_binding_left_behind": "HTTPS deixado no certificado antigo",
+        "truststore_expiring": "Certificado da loja de confiança a expirar ou expirado"
       }
     }
   },
@@ -6336,7 +6358,8 @@
       "renewal_declined": "Renovação recusada",
       "ca_expiring": "CA prestes a expirar",
       "deploy_binding_left_behind": "Implantação deixada no certificado antigo",
-      "https_binding_left_behind": "HTTPS deixado no certificado antigo"
+      "https_binding_left_behind": "HTTPS deixado no certificado antigo",
+      "truststore_expiring": "Certificado da loja de confiança a expirar ou expirado"
     },
     "compliance": {
       "rsa_below_3072": "RSA abaixo de 3072 bits",
@@ -6360,7 +6383,7 @@
       "tasksWarning_one": "{{count}} tarefa com um aviso",
       "tasksWarning_other": "{{count}} tarefas com um aviso",
       "tsaState": {
-        "ca_certificate": "Assinatura com o certificado da CA",
+        "ca_certificate": "O certificado da CA assina: tokens não conformes à RFC 3161, emita um signatário dedicado",
         "dedicated": "Assinante dedicado",
         "expiring_one": "O assinante expira em {{count}} dia",
         "expiring_other": "O assinante expira em {{count}} dias",
@@ -6372,6 +6395,29 @@
         "revoked": "Certificado do assinante revogado",
         "key_unavailable": "Chave do assinante indisponível",
         "invalid": "Certificado do assinante inutilizável"
+      },
+      "smtp": "Email",
+      "webhooks": "Webhooks",
+      "auto_renewal": "Renovação auto",
+      "witness": {
+        "smtp": {
+          "not_configured": "Não configurado",
+          "disabled": "Configurado, mas desativado",
+          "incomplete": "Ativado, porta ou endereço de remetente em falta",
+          "ready": "Pronto"
+        },
+        "webhooks": {
+          "not_configured": "Sem endpoints",
+          "none_active_one": "{{count}} endpoint, nenhum ativo",
+          "none_active_other": "{{count}} endpoints, nenhum ativo",
+          "active_one": "{{count}} endpoint ativo",
+          "active_other": "{{count}} endpoints ativos"
+        },
+        "auto_renewal": {
+          "enabled": "Ativada",
+          "disabled": "Desativada"
+        },
+        "unavailable": "Estado indisponível"
       }
     },
     "filter": {

@@ -123,7 +123,7 @@ Si des connexions Microsoft CA sont configurées, un onglet **Microsoft CA** app
 4. Sélectionnez le **modèle de certificat** (chargé automatiquement depuis la CA)
 5. Cliquez sur **Signer**
 
-Si le modèle nécessite l'approbation d'un gestionnaire, UCM suit la demande en attente. La page ne propose pas de vérification du statut : une fois le certificat émis sur la CA Microsoft, importez-le, ou laissez la **synchronisation de l'inventaire** via le canal d'administration WinRM importer les certificats que UCM ne connaît pas encore.
+Si le modèle nécessite l'approbation d'un gestionnaire, la demande reste En attente dans UCM. Ouvrez-la dans **En attente** et cliquez sur **Vérifier le statut** pour récupérer le certificat une fois émis par la CA (il faut aussi le droit de signer des CSR), ou approuvez-la depuis le panneau de contrôle CA de la connexion.
 
 ### Inscription pour le compte d'autrui (EOBO)
 

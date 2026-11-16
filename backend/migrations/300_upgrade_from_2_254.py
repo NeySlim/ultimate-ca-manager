@@ -3,24 +3,40 @@
 The runner only applies it to a database whose registry holds every name 2.254 records
 (``_from_2_254.PIVOT_NAMES``). Its steps run in order; each is idempotent, so a start after
 an interruption runs them all again and ends in the same state. PostgreSQL runs the whole
-migration in one transaction, SQLite commits step by step.
+migration in one transaction, SQLite commits step by step. A step whose data forbids the upgrade
+names it in ``refusal(conn)``, read for every step before the first one writes.
 """
-import logging
+import time
 
-from migrations._from_2_254 import STEPS, step
+from migrations._from_2_254 import STEPS, say, step
 
-logger = logging.getLogger(__name__)
 pg_compatible = True
 requires_full_stop = "a 2.x node cannot run against the 3.0 schema: upgrade from 2.254 with every node stopped"
 
 
-def upgrade(conn):
+def refusal(conn):
+    """The first refusal a step reads in the 2.254 data (``refusal(conn)`` of the step), else None."""
     for name in STEPS:
+        check = getattr(step(name), 'refusal', None)
+        message = check(conn) if check else None
+        if message:
+            return message
+    return None
+
+
+def upgrade(conn):
+    # Read before the first step: a refused upgrade leaves the 2.254 database as it found it
+    message = refusal(conn)
+    if message:
+        raise RuntimeError(message)
+    for name in STEPS:
+        say(f"    step {name}: started")
+        started = time.monotonic()
         try:
             step(name).upgrade(conn)
         except Exception as exc:
             raise RuntimeError(f"upgrade step {name} failed: {exc}") from exc
-        logger.info("[300] step %s done", name)
+        say(f"    step {name}: done in {time.monotonic() - started:.1f} s")
 
 
 def downgrade(conn):

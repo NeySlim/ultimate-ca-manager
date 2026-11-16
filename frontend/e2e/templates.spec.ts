@@ -1,53 +1,21 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, uid } from './support/fixtures'
 
-test.describe('Templates', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/templates')
-    await page.waitForLoadState('networkidle')
-  })
+test('a template created on screen is stored with its settings', async ({ page, api }) => {
+  const name = uid('tpl')
+  await page.goto('/templates')
+  await page.getByRole('main').getByRole('button', { name: 'New', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Create Template' })
+  await dialog.getByLabel('Template Name').fill(name)
+  await dialog.getByLabel('Default Validity (days)').fill('200')
+  await dialog.getByLabel('Organization (O)').fill('E2E Org')
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(dialog).toBeHidden()
 
-  test('page loads with heading', async ({ page }) => {
-    await expect(page.locator('h1')).toBeVisible()
-  })
-
-  test('has table', async ({ page }) => {
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
-  })
-
-  test('has help button', async ({ page }) => {
-    await expect(page.locator('button').filter({ hasText: /help/i })).toBeVisible()
-  })
-
-  test('has action buttons', async ({ page }) => {
-    // Templates page has: Help, type filter, New, Import
-    const buttons = page.locator('button')
-    expect(await buttons.count()).toBeGreaterThanOrEqual(3)
-  })
-
-  test('has pagination', async ({ page }) => {
-    const pagination = page.locator('[class*="pagination"], nav[aria-label], button:has-text("/page")')
-    if (await pagination.count() > 0) {
-      await expect(pagination.first()).toBeVisible()
-    }
-  })
-
-  test('create button opens dialog', async ({ page }) => {
-    // Find and click create/new button - try buttons from the right side
-    const actionButtons = page.locator('header button, [class*="header"] button, [class*="toolbar"] button, [class*="actions"] button')
-    const count = await actionButtons.count()
-    if (count > 0) {
-      for (let i = count - 1; i >= Math.max(0, count - 3); i--) {
-        await actionButtons.nth(i).click()
-        const dialog = page.locator('[role="dialog"]').first()
-        try {
-          await dialog.waitFor({ state: 'visible', timeout: 2000 })
-          await expect(dialog).toBeVisible()
-          return
-        } catch {
-          await page.keyboard.press('Escape')
-          await page.waitForTimeout(300)
-        }
-      }
-    }
-  })
+  await expect(page.getByRole('main').getByText(name).first()).toBeVisible()
+  const data = await api.get('/templates?per_page=500')
+  const list = (Array.isArray(data) ? data : data.items || data.templates) as any[]
+  const tpl = list.find(t => t.name === name)
+  expect(tpl).toBeTruthy()
+  expect(tpl.validity_days ?? tpl.default_validity_days).toBe(200)
+  expect(JSON.stringify(tpl)).toContain('E2E Org')
 })

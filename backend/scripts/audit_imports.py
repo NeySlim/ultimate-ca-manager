@@ -1,52 +1,37 @@
 #!/usr/bin/env python3
-"""
-Smoke import : importe tous les modules backend pour détecter les NameError
-et ImportError au chargement (ce que les tests pytest ne couvrent pas tant que
-le module concerné n'est pas exercé par un test).
-
-Exit code 1 si au moins un module échoue à l'import.
-
-Note : les modules entry-point (app.py, wsgi.py, gunicorn_*.py) sont skippés
-car leur import déclenche le démarrage de Flask + DB.
-"""
+"""Import smoke check, always run with pytest's isolated configuration."""
 import importlib
 import pathlib
+import subprocess
 import sys
-import os
 
 BACKEND = pathlib.Path(__file__).resolve().parent.parent
 EXCLUDE_DIRS = {'__pycache__', 'venv', '.venv', 'migrations', 'tests', 'scripts'}
 EXCLUDE_FILES = {'app.py', 'wsgi.py', 'gunicorn_config.py', 'workers.py',
                  'reset_admin.py', 'gen_keys.py', 'init_db.py'}
 
-# Travaille depuis backend/ pour que les imports relatifs marchent
-os.chdir(BACKEND)
-sys.path.insert(0, str(BACKEND))
 
-errors = []
-checked = 0
+def audit_imports():
+    """Return import failures; pytest must have installed its safe environment first."""
+    if 'tests.conftest' not in sys.modules and 'conftest' not in sys.modules:
+        raise RuntimeError('Backend import checks must run under pytest')
+    errors = []
+    for py in BACKEND.rglob('*.py'):
+        relative = py.relative_to(BACKEND)
+        if any(part in EXCLUDE_DIRS for part in relative.parts) or py.name in EXCLUDE_FILES:
+            continue
+        mod = '.'.join(relative.with_suffix('').parts)
+        if mod.endswith('.__init__'):
+            mod = mod[:-9]
+        try:
+            importlib.import_module(mod)
+        except Exception as exc:
+            errors.append(f'{mod}: {type(exc).__name__}: {exc}')
+    return errors
 
-for py in pathlib.Path('.').rglob('*.py'):
-    if any(p in EXCLUDE_DIRS for p in py.parts):
-        continue
-    if py.name in EXCLUDE_FILES:
-        continue
 
-    mod = str(py.with_suffix('')).replace('/', '.')
-    if mod.endswith('.__init__'):
-        mod = mod[:-9]
-
-    try:
-        importlib.import_module(mod)
-        checked += 1
-    except Exception as e:
-        errors.append(f'{mod}: {type(e).__name__}: {e}')
-
-if errors:
-    print(f'{len(errors)} module(s) failed to import (out of {checked + len(errors)} attempted):',
-          file=sys.stderr)
-    for e in errors:
-        print(f'  {e}', file=sys.stderr)
-    sys.exit(1)
-
-print(f'OK: {checked} backend modules imported cleanly')
+if __name__ == '__main__':
+    raise SystemExit(subprocess.call([
+        sys.executable, '-m', 'pytest', 'tests/test_backend_import_smoke.py',
+        '-q', '-p', 'no:cacheprovider',
+    ], cwd=BACKEND))

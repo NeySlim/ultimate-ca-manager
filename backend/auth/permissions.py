@@ -121,11 +121,12 @@ GROUP_GRANTABLE_PERMISSIONS = sorted(
 # Every scope @require_auth checks, recorded as routes are declared.
 ENFORCED_PERMISSIONS = set()
 
-# Scopes checked inline with has_permission() rather than by the decorator.
+# Scopes checked inline with has_permission(), or through the overview's permission
+# tables, rather than by the decorator.
 INLINE_CHECKED_PERMISSIONS = frozenset({
     'admin:key_recovery', 'admin:settings', 'admin:system', 'read:audit',
-    'read:cas', 'read:certificates', 'read:deploy', 'read:private_keys', 'read:system',
-    'read:users', 'read:kerberos', 'read:wstep', 'write:approvals', 'write:cas',
+    'read:cas', 'read:certificates', 'read:deploy', 'read:hsm', 'read:private_keys', 'read:settings',
+    'read:system', 'read:truststore', 'read:users', 'read:kerberos', 'read:wstep', 'write:approvals', 'write:cas',
     'write:kerberos', 'write:wstep', 'write:xcep',
 })
 
@@ -348,9 +349,10 @@ def require_permission(permission: str):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            from utils.response import error_response
+            from utils.response import error_response, AUTHENTICATION_REQUIRED_PROBLEM
             if not hasattr(g, 'current_user') or not g.current_user:
-                return error_response('Authentication required', 401)
+                return error_response('Authentication required', 401,
+                                         problem_type=AUTHENTICATION_REQUIRED_PROBLEM)
 
             user_role = g.current_user.role
             if not has_permission(user_role, permission):

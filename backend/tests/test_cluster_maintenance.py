@@ -186,3 +186,74 @@ def test_a_rollback_after_the_connection_dropped_mid_transaction_does_not_raise(
     assert conn.invalidated
     conn.close()
     engine.dispose()
+
+
+def test_a_node_that_loses_the_completion_leaves_the_epoch_alone(app):
+    """Another node already completed the committed restore: this one's UPDATE touches
+    no row, and it must not refuse the sessions opened since that completion."""
+    from sqlalchemy import text
+    from auth.session_epoch import advance_epoch, current_epoch
+    from models import db
+    row, now = _row(phase=cm.PHASE_COMMITTED, reason=cm.REASON_RESTORE, minutes=-1)
+    with app.app_context(), cm.exempt():
+        advance_epoch()
+        db.session.execute(text(
+            "INSERT INTO cluster_maintenance (id, token, reason, phase, started_at, expires_at, "
+            "node_id) VALUES (:id, :t, :r, :p, :s, :e, 'node-x')"),
+            {'id': cm.ROW_ID, 't': row['token'], 'r': row['reason'], 'p': cm.PHASE_RESTARTING,
+             's': row['started_at'], 'e': row['expires_at']})
+        db.session.commit()
+        try:
+            epoch = current_epoch()
+            assert cm.complete_committed(row, now) is False
+            assert current_epoch() == epoch
+        finally:
+            db.session.rollback()
+            db.session.execute(text("DELETE FROM cluster_maintenance"))
+            db.session.commit()
+
+
+def test_a_completion_whose_session_cleanup_fails_says_so_and_stays_completed(app, monkeypatch, caplog):
+    """The epoch, the phase and the restart are committed first: a cleanup that fails after
+    them is reported once, and the restore is not completed a second time."""
+    import logging
+    from sqlalchemy import text
+    from auth.session_epoch import current_epoch
+    from models import db
+    from services.backup.restore import invalidate
+    row, now = _row(phase=cm.PHASE_COMMITTED, reason=cm.REASON_RESTORE, minutes=-1)
+
+    def broken():
+        raise RuntimeError('session store away')
+    monkeypatch.setattr(invalidate, '_revoke_database_sessions', broken)
+    with app.app_context(), cm.exempt():
+        db.session.execute(text(
+            "INSERT INTO cluster_maintenance (id, token, reason, phase, started_at, expires_at, "
+            "node_id) VALUES (:id, :t, :r, :p, :s, :e, 'node-x')"),
+            {'id': cm.ROW_ID, 't': row['token'], 'r': row['reason'], 'p': row['phase'],
+             's': row['started_at'], 'e': row['expires_at']})
+        db.session.commit()
+        try:
+            epoch = current_epoch()
+            with caplog.at_level(logging.ERROR, logger=cm.logger.name):
+                assert cm.complete_committed(row, now) is True
+            assert current_epoch() != epoch
+            assert cm.read_row(db.session)['phase'] == cm.PHASE_RESTARTING
+            said = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+            assert len(said) == 1 and 'session store away' in said[0] and 'epoch' in said[0], said
+        finally:
+            db.session.rollback()
+            db.session.execute(text("DELETE FROM cluster_maintenance"))
+            db.session.execute(text("DELETE FROM cluster_commands"))
+            db.session.commit()
+
+
+def test_a_login_on_a_node_in_maintenance_is_refused_before_the_session_epoch_is_read(
+        app, client, held, monkeypatch):
+    from auth import session_epoch
+
+    def unreadable():
+        raise RuntimeError('the database is away')
+    monkeypatch.setattr(session_epoch, 'current_epoch', unreadable)
+    r = client.post('/api/v2/auth/login/password', json={'username': 'admin', 'password': 'x'})
+    assert r.status_code == 503 and r.get_json()['code'] == 'maintenance'

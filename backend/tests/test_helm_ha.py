@@ -11,7 +11,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHART = ROOT / 'charts' / 'ucm'
 GOLDEN = pathlib.Path(__file__).parent / 'fixtures' / 'helm_default_render.yaml'
 PG = ['--set', 'database.type=postgresql', '--set', 'database.databaseUrl=postgresql://u:p@db/ucm']
-HA = ['--set', 'ha.enabled=true', '--set', 'replicaCount=2'] + PG
+# helm template has no cluster: an HA render there takes both keys from the values
+HA = ['--set', 'ha.enabled=true', '--set', 'replicaCount=2', '--set', 'secrets.keyEncryptionKey=K',
+      '--set', 'secrets.dbEncryptionKey=D'] + PG
 
 pytestmark = pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
 
@@ -65,9 +67,10 @@ def test_ha_has_no_etc_volume_or_pvc_neg():
     assert 'PersistentVolumeClaim' not in docs
 
 
-def test_ha_kek_is_a_valid_fernet_key():
+def test_ha_kek_is_a_valid_fernet_key(tmp_path):
     from cryptography.fernet import Fernet
-    key = _docs(*HA)['Secret']['stringData']['KEY_ENCRYPTION_KEY']
+    from tests.test_helm_db_key import _installed
+    key = _installed(tmp_path)['Secret']['stringData']['KEY_ENCRYPTION_KEY']
     Fernet(key.encode())
 
 
@@ -88,7 +91,20 @@ def test_ha_startup_probe_outlasts_the_node_identifier_wait_pos():
     longest_wait = STALE_PASSES * WAKE_INTERVAL_SECONDS + 2 * CLAIM_POLL_SECONDS
     longest_wait += BOOT_LOCK_TIMEOUT_SECONDS
     assert probe['periodSeconds'] * probe['failureThreshold'] >= longest_wait + 30
-    assert 'startupProbe' not in _docs()['Deployment']['spec']['template']['spec']['containers'][0]
+
+
+def test_without_ha_the_startup_probe_covers_a_long_first_start_pos():
+    # an upgrade of a large database answers nothing until it ends: the liveness probe waits for it
+    container = _docs()['Deployment']['spec']['template']['spec']['containers'][0]
+    probe = container['startupProbe']
+    assert probe['httpGet']['path'] == '/health/live'
+    liveness = container['livenessProbe']
+    # the probe HA renders, twice the time the liveness probe alone gives
+    assert probe == _docs(*HA)['Deployment']['spec']['template']['spec']['containers'][0]['startupProbe']
+    assert probe['periodSeconds'] * probe['failureThreshold'] >= 2 * (
+        liveness['initialDelaySeconds'] + liveness['periodSeconds'] * liveness['failureThreshold'])
+    off = _docs('--set', 'startupProbe.enabled=false')['Deployment']['spec']['template']['spec']['containers'][0]
+    assert 'startupProbe' not in off and 'livenessProbe' in off
 
 
 def test_ha_existing_claim_keeps_the_data_pvc_pos():

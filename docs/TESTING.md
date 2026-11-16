@@ -8,7 +8,7 @@ UCM uses a comprehensive testing strategy with unit tests and E2E tests.
 |-----------|-----------|--------|
 | Unit Tests (Frontend) | Vitest + React Testing Library | Active |
 | Unit Tests (Backend) | pytest | Active |
-| E2E Tests | Playwright | Active |
+| E2E Tests | Playwright, against a real instance | Active (CI job "End-to-end (browser)") |
 | Linting (Frontend) | ESLint v9 | Active |
 | Linting (Backend) | Ruff | Active |
 
@@ -99,6 +99,19 @@ Each test file covers 3 levels per endpoint:
 - No external dependencies (no Docker, no network)
 - PostgreSQL mode: `UCM_TEST_APP_PG_URL` runs the same fixtures on PostgreSQL, see [testing/postgres-harness.md](testing/postgres-harness.md)
 
+#### Optional backends: SoftHSM, GSSAPI, Redis
+
+Tests that need a system component carry a marker: `needs_softhsm`, `needs_gssapi` or `needs_redis` (`tests/optional_backends.py`). Without the component they are skipped; with `UCM_TEST_REQUIRE_SOFTHSM=1`, `UCM_TEST_REQUIRE_GSSAPI=1` or `UCM_TEST_REQUIRE_REDIS=1` a skip of a marked test fails instead. The CI job "Backend Tests (SoftHSM, GSSAPI, Redis)" installs the three and runs each marker with its variable set.
+
+The Redis tests need the `redis-server` binary on the `PATH`, nothing else: each test run starts its own server on a Unix socket in its temporary directory (`--port 0`, no persistence) and stops it at the end; a system Redis, running or not, is never used.
+
+```bash
+cd backend
+UCM_TEST_REQUIRE_REDIS=1 pytest -m needs_redis tests/
+```
+
+They run two applications on one Redis (sessions shared, closed and expired across both, Redis stopped and restarted), and three processes for the WebSocket events (two web processes with a Socket.IO client each, and one process that emits like the scheduler). The test of Redis taking precedence over the PostgreSQL session table needs `redis-server` and a PostgreSQL URL (`UCM_TEST_APP_PG_URL` or `UCM_TEST_PG_URL`) and is not marked `needs_redis`: run `pytest tests/test_redis_sessions_pg.py`. No CI job has Redis and PostgreSQL together, so CI skips it.
+
 ### Frontend Tests
 
 ```bash
@@ -155,190 +168,73 @@ describe('Button', () => {
 
 ## Release Smoke
 
-The release smoke (`release-smoke.yml`, with `scripts/ci/package-smoke.sh` for the packages) is called by "Build & Release" once a tag is published, so its definition and scripts are those of the tag, and every checkout names the tag `v<version>`. A failed smoke fails that release run. It can also be started by hand (workflow dispatch with the version), which checks out the same tag and runs that tag's scripts (`scripts/ci/release_version.py`, `scripts/ci/wait-health.sh`): a manual smoke only checks tags that carry them, and an earlier version is checked from its own release line. A "Build & Release" run started manually on a branch builds the packages and the images to check them, but pushes no image, publishes no release and calls no smoke.
+The release smoke (`release-smoke.yml`, with `scripts/ci/package-smoke.sh` for the packages) is called by "Build & Release" on a tag before anything is published, so its definition and scripts are those of the tag, and every checkout names the tag `v<version>`. It boots the images that run pushed without a tag, pulled by their amd64 digest (standard and FIPS), and installs the packages from that run's artifacts. Only a green smoke lets the run tag the standard and FIPS images (both registries) and update the Docker Hub page, then create the GitHub release. The smoke boots the amd64 images only: the arm64 images are tagged without it. The standard and FIPS images are tagged by two jobs side by side, so if one of them fails after a green smoke, the other's tags are public while no release is created. A failed smoke, standard or FIPS, fails the run with none of these done; its "Nothing Published" job lists the untagged digests left on the registries, which the workflow does not delete, and the git tag stays. It can also be started by hand (workflow dispatch with the version), which checks out the same tag and runs that tag's scripts (`scripts/ci/release_version.py`, `scripts/ci/wait-health.sh`): a manual smoke only checks tags that carry them, and an earlier version is checked from its own release line. A "Build & Release" run started manually on a branch builds the packages and the images to check them, but pushes no image, publishes no release and calls no smoke.
+
+Each package job and, on a tag, each image job writes the CycloneDX SBOM of what it built (`scripts/ci/sbom.py`, see [SBOM.md](SBOM.md)) and fails if it cannot. Each manifest job requires the SBOM of both architectures on the digests it is about to tag, and the release job checks every SBOM against its package file or image digest, the schema and `sbom-index.json` before it deletes or publishes an asset (`test_sbom.py`, `test_workflow_sbom.py`).
 
 The `latest` and `latest-fips` image tags, and the "Latest" mark of the GitHub release, go to a stable version that no published stable tag exceeds: never to a release candidate, never to a maintenance release of an older line, never to a branch run (`scripts/ci/release_version.py latest`).
 
 ## E2E Tests
 
-### Setup
+The end-to-end suite drives Chromium against a real instance: the backend of the checkout, a fresh SQLite database in a temporary directory, and the interface built by `npm run build`. One script sets it up, the same in the CI and on a workstation.
+
+### Running
+
+```bash
+# From the repository root: builds the interface, starts UCM on a free loopback port,
+# runs Playwright, stops UCM. The exit code is Playwright's.
+bash scripts/ci/e2e.sh
+
+# Arguments go to `playwright test`: one file, one test, a headed browser
+bash scripts/ci/e2e.sh e2e/certificates.spec.ts
+bash scripts/ci/e2e.sh -g "revoked" --headed
+```
+
+The script needs `python` (or `UCM_PYTHON`) with `backend/requirements.txt` installed, `npm`, and the system libraries of Chromium (`npx playwright install-deps chromium`, as root). It downloads Chromium with `npx playwright install chromium`, into `PLAYWRIGHT_BROWSERS_PATH` when set. It writes only under a temporary directory and under `frontend/` (`dist/`, `playwright-report/`, `test-results/`). The administrator password is generated for each run and handed to the tests. It refuses to run while a `.env` file sits at the root of the checkout: the backend loads it, so its database, Redis and keys would become those of the test instance.
+
+### What it covers
+
+One file per domain under `frontend/e2e/`; every test creates its own objects through the API and checks what the screen shows and what the API returns afterwards.
+
+| File | Covers |
+|------|--------|
+| `auth.spec.ts` | Password sign-in, refused password, sign-out, a session ended by the server, French and dark mode kept across a reload |
+| `navigation.spec.ts` | Every route of `src/navigation/registry.js` (detail routes with a created object) opens with a heading, no error screen and no console error; the legacy URLs; the Modules menu |
+| `overview.spec.ts` | The overview cards load; a queue entry opens the object it names |
+| `cas.spec.ts` | A root then an intermediate created on screen, seen in the hierarchy |
+| `certificates.spec.ts` | Issue, inspector detail, renew, revoke (the next CRL lists the serial), PEM export |
+| `csrs.spec.ts`, `templates.spec.ts`, `crl-ocsp.spec.ts` | CSR import and signing, template creation, CRL generation and OCSP switch |
+| `protocols.spec.ts` | ACME, SCEP and EST settings saved and read back |
+| `truststore.spec.ts` | A managed CA added to the trust store, the certificate decoder |
+| `users.spec.ts` | An operator neither sees nor opens the administration pages (sent back to the overview); users, groups and custom roles created on screen |
+| `settings.spec.ts`, `audit.spec.ts` | A general setting saved and read back; an action of the test found in the audit log |
+| `key-recovery.spec.ts`, `account.spec.ts` | Key recovery with dual control; password change and TOTP enrolment |
+| `backup-restore.spec.ts` | A backup created then restored on screen, with its report; runs alone, after the others, since a restore replaces the database |
+
+The configuration is `frontend/playwright.config.ts`: Chromium only, no retry (a flaky test is fixed, not replayed), traces and screenshots kept on failure, English forced. A test marked `test.fail()` documents a known product defect, with its reason on the same line; it turns red once the defect is fixed, so the mark is removed then.
+
+### Lab tests
+
+`frontend/e2e/lab/` holds the tests that need external services (an ACME CA reachable on the Internet and a DNS provider). The configuration leaves them out unless `UCM_LAB=1` is set; they run against an instance prepared for them, never in the CI:
 
 ```bash
 cd frontend
-
-# Install Playwright browsers
-npx playwright install
-
-# Run E2E tests
-npm run test:e2e
-
-# Run with UI
-npm run test:e2e:headed
+UCM_LAB=1 UCM_E2E_BASE_URL=https://ucm.example.test:8443 UCM_E2E_ADMIN_PASSWORD='...' \
+  npx playwright test e2e/lab/acme-dns-preferred-chain.spec.ts
 ```
 
-### Test Structure
-
-```
-frontend/e2e/
-├── auth.setup.ts      # Authentication setup
-├── config.ts          # Test configuration
-├── dashboard.spec.ts  # Dashboard tests
-├── certificates.spec.ts
-├── cas.spec.ts
-├── csrs.spec.ts
-├── templates.spec.ts
-├── truststore.spec.ts
-├── acme.spec.ts
-├── scep.spec.ts
-├── crlocsp.spec.ts
-├── hsm.spec.ts
-├── rbac.spec.ts
-├── operations.spec.ts
-├── audit.spec.ts
-├── tools.spec.ts
-├── account.spec.ts
-├── core.spec.ts       # Users, Settings, Navigation
-└── pro/               # SSO & advanced features
-    ├── groups.spec.ts
-    ├── rbac.spec.ts
-    ├── sso.spec.ts
-    ├── hsm.spec.ts
-    └── ldap.spec.ts
-```
-
-### Configuration
-
-E2E tests are configured in `playwright.config.ts`:
-
-```typescript
-export default defineConfig({
-  testDir: './e2e',
-  baseURL: 'https://localhost:8443',
-  use: {
-    ignoreHTTPSErrors: true,
-    storageState: 'e2e/.auth/user.json',
-  },
-  projects: [
-    { name: 'setup', testMatch: /auth\.setup\.ts/ },
-    { name: 'chromium', dependencies: ['setup'] },
-    { name: 'pro-features', dependencies: ['setup'] },
-  ],
-})
-```
-
-### Writing E2E Tests
-
-```typescript
-import { test, expect } from '@playwright/test'
-
-test.describe('Dashboard', () => {
-  test('displays stats widgets', async ({ page }) => {
-    await page.goto('/dashboard')
-    await expect(page.locator('text=Certificates')).toBeVisible()
-    await expect(page.locator('text=Active CAs')).toBeVisible()
-  })
-})
-```
-
-## Advanced Features Test Infrastructure
-
-For testing advanced features (SSO, LDAP, HSM), a Docker Compose stack is available:
-
-```bash
-# Start test infrastructure
-cd docker
-docker-compose -f docker-compose.test.yml up -d
-```
-
-### Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| Keycloak | 8180 | SSO (OIDC/SAML) |
-| OpenLDAP | 389 | Directory |
-| phpLDAPadmin | 8181 | LDAP admin UI |
-| SoftHSM | - | HSM simulation |
-
-### Test Credentials
-
-**Keycloak:**
-- Admin: `admin` / `admin123`
-- Realm: `ucm`
-- Client: `ucm-app`
-
-**LDAP:**
-- Admin: `cn=admin,dc=ucm,dc=test` / `admin123`
-- Users: `alice`, `bob`, `charlie`, `david`, `eve` (password: `{username}123`)
-
-**SoftHSM:**
-- Token: `UCM-Test`
-- PIN: `87654321`
-- Keys: `ucm-ca-key` (RSA 2048), `ucm-root-key` (RSA 4096)
+Without `UCM_E2E_MANAGED=1`, which only `scripts/ci/e2e.sh` sets, and always with `UCM_LAB=1`, the global setup changes no setting and the backup restore test does not run. The other tests still create objects and save settings: on a shared instance, name the lab files to run, as above.
 
 ## CI/CD Integration
 
-### GitHub Actions (recommended)
-
-```yaml
-name: Tests
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      
-      - name: Install dependencies
-        run: cd frontend && npm ci
-      
-      - name: Run unit tests
-        run: cd frontend && npm test
-      
-      - name: Install Playwright
-        run: cd frontend && npx playwright install --with-deps
-      
-      - name: Run E2E tests
-        run: cd frontend && npm run test:e2e
-```
-
-## Coverage Goals
-
-| Metric | Target | Current |
-|--------|--------|---------|
-| Backend Route Coverage | 80% | ~95% (347 routes) |
-| E2E Pass Rate | 95% | Active |
-| Critical Paths | 100% | Covered |
+The "End-to-end (browser)" job of `tests.yml` runs on pull requests, on each push of the 3.0 integration branch and on a manual run. It installs the backend and frontend dependencies and the browser libraries, then calls `scripts/ci/e2e.sh`; on failure the Playwright report and the traces are kept as the `e2e-report` artifact. `backend/tests/test_workflow_e2e.py` pins when the job runs and what it runs.
 
 ## Troubleshooting
 
-### Auth Setup Fails
+### The instance does not start
 
-UCM has a complex login flow (username → auth method detection → password). If auth fails:
+`scripts/ci/e2e.sh` prints the last lines of the server console, application log and access log when the instance is not healthy within 180 seconds or when a test fails.
 
-1. Check if WebAuthn is registered for admin user
-2. The test waits for "Use password instead" link
-3. Increase timeout if WebAuthn detection is slow
+### A test fails in the CI only
 
-### E2E Tests Timeout
-
-```typescript
-// Increase timeout for slow operations
-test.setTimeout(60000)
-
-// Or per-assertion
-await expect(locator).toBeVisible({ timeout: 10000 })
-```
-
-### SSL Certificate Errors
-
-Tests ignore HTTPS errors by default. If issues persist:
-
-```typescript
-use: {
-  ignoreHTTPSErrors: true,
-}
-```
+Download the `e2e-report` artifact and open a trace with `npx playwright show-trace <trace.zip>`; the console log of the job also holds the accessibility tree of the page at the failure.

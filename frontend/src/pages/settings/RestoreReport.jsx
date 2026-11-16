@@ -4,18 +4,21 @@ import { Link } from 'react-router-dom'
 import { Modal, Button } from '../../components'
 
 // What a restore did and what it left to do. With nothing to do it is the old short
-// success and a reload; with warnings it stays until closed, then reloads.
+// success and a reload; with warnings, or a restart to make by hand, it stays until closed.
 export default function RestoreReport({ data, onClose }) {
   const { t } = useTranslation()
   const todo = Array.isArray(data?.todo) ? data.todo : []
   // An archive with no section changed nothing: no restart was asked.
   const restored = !!data && (data.restart_requested !== undefined || (data.sections_carried || []).length > 0)
 
+  // A restart not obtained is an instruction the operator must read: no reload under it
+  const restartByHand = data?.restart_requested === false
+
   useEffect(() => {
-    if (!data || todo.length) return undefined
+    if (!data || todo.length || restartByHand) return undefined
     const timer = setTimeout(() => window.location.reload(), 2000)
     return () => clearTimeout(timer)
-  }, [data, todo.length])
+  }, [data, todo.length, restartByHand])
 
   const close = () => { onClose(); window.location.reload() }
 

@@ -253,10 +253,11 @@ _RESUME_STEPS = (_step_sequences, _step_high_water)
 def _empty_auth_tables(target_engine) -> None:
     """One transaction, children first: a copy never verified is replaced, never reused, since
     a row count cannot see a password, role or key changed on the source since."""
-    order = [t for t in _topo_sort_tables(inspect(target_engine)) if t in set(BOOTSTRAP_AUTH_TABLES)]
-    # A listing that failed still empties every table: the list is parents first, and the
-    # only references of users that point later are ON DELETE SET NULL
-    order += [t for t in BOOTSTRAP_AUTH_TABLES if t not in order]
+    listed = _topo_sort_tables(inspect(target_engine))
+    # Only the tables present (the copy builds a missing one again). A listing that failed
+    # still empties every table: the list is parents first, and the only references of users
+    # that point later are ON DELETE SET NULL
+    order = [t for t in listed if t in set(BOOTSTRAP_AUTH_TABLES)] if listed else list(BOOTSTRAP_AUTH_TABLES)
     with target_engine.begin() as tx:
         for name in reversed(order):
             tx.execute(text(f'DELETE FROM "{_safe_ident(name)}"'))
@@ -282,10 +283,11 @@ def _bootstrap_plan(source_engine, target_engine) -> List[TablePlan]:
     source_tables = set(source_insp.get_table_names())
     target_tables = set(target_insp.get_table_names())
 
-    # Parents first, decided by the target's constraints: those are the ones
-    # that will be enforced when the rows arrive.
+    # Parents first, from the models the target was built from: the same constraints, and an
+    # order that holds when the target's cannot be read (its sort falls back to alphabetical)
+    from models import db as _db
     wanted = set(BOOTSTRAP_AUTH_TABLES)
-    ordered = [t for t in _topo_sort_tables(target_insp) if t in wanted]
+    ordered = [t.name for t in _db.metadata.sorted_tables if t.name in wanted]
     ordered += [t for t in BOOTSTRAP_AUTH_TABLES if t not in set(ordered)]
 
     plan: List[TablePlan] = []

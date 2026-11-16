@@ -34,11 +34,11 @@ describe('FloatingHelpPanel help languages', () => {
     h.load.mockResolvedValue({ default: { helpContent: { title: 'TRADUIT' } } })
   })
 
-  it('lists exactly fr and zh', () => {
-    expect([...HELP_TRANSLATED_LANGUAGES].sort()).toEqual(['fr', 'zh'])
+  it('lists exactly fr, ru and zh', () => {
+    expect([...HELP_TRANSLATED_LANGUAGES].sort()).toEqual(['fr', 'ru', 'zh'])
   })
 
-  it.each(['fr', 'zh-CN'])('merges the translation for %s', async (lang) => {
+  it.each(['fr', 'ru', 'zh-CN'])('merges the translation for %s', async (lang) => {
     h.lang = lang
     open()
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('TRADUIT'))
@@ -46,7 +46,7 @@ describe('FloatingHelpPanel help languages', () => {
     expect(screen.queryByText('NOTICE')).toBeNull()
   })
 
-  it.each(['de', 'ja', 'uk'])('shows English with no import for %s, with the notice', async (lang) => {
+  it.each(['de', 'es', 'it', 'ja', 'pt', 'uk'])('shows English with no import for %s, with the notice', async (lang) => {
     h.lang = lang
     open()
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(en)
