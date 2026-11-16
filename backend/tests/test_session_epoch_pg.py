@@ -5,7 +5,7 @@ import threading
 import uuid
 
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, text
 
 from auth.session_epoch import EPOCH_KEY, advance_epoch, current_epoch
 from models import SystemConfig, db
@@ -32,9 +32,8 @@ def test_an_advance_returns_the_epoch_it_stored_not_a_later_one(app):
 
         def another_node_advances(_session):
             with db.engine.connect() as conn:
-                conn.exec_driver_sql("UPDATE system_config SET value = '9999' WHERE key = ?"
-                                     if conn.dialect.name == 'sqlite' else
-                                     "UPDATE system_config SET value = '9999' WHERE key = %s", (EPOCH_KEY,))
+                conn.execute(text("UPDATE system_config SET value = '9999' WHERE key = :key"),
+                             {'key': EPOCH_KEY})
                 conn.commit()
 
         event.listen(session, 'after_commit', another_node_advances, once=True)
