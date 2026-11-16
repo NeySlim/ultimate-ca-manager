@@ -760,6 +760,19 @@ def test_the_step_follows_the_trust_store_step_in_the_upgrade():
         STEPS.index('166_trust_store_certificates_only') + 1
 
 
+@pytest.mark.parametrize('dialect', BACKENDS)
+def test_the_full_upgrade_runs_the_trust_store_step_then_this_one(dialect, tmp_path, monkeypatch,
+                                                                   capfd):
+    for base in make_base(dialect, tmp_path, monkeypatch, 's167order'):
+        capfd.readouterr()
+        assert base.upgrade()
+        journal = capfd.readouterr().out.splitlines()
+        marks = [line.strip().split(':')[0] for line in journal if line.strip().startswith('step 16')]
+        assert marks.index('step 166_trust_store_certificates_only') < \
+            marks.index('step 167_user_sso_identities'), journal
+        assert 'user_sso_identities' in base.tables()
+
+
 @pytest.fixture(params=BACKENDS)
 def upgraded_2254(request, tmp_path, monkeypatch):
     for base in make_base(request.param, tmp_path, monkeypatch, 's167'):
