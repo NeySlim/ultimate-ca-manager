@@ -1397,7 +1397,7 @@
     "activate": "Aktivieren",
     "activated": "Vorlage aktiviert",
     "deactivated": "Vorlage deaktiviert",
-    "deactivateTooltip": "Eine deaktivierte Vorlage wird weder im Formular „Zertifikat ausstellen“ noch für die Windows-Autoregistrierung angeboten. Systemvorlagen können deaktiviert, aber nicht bearbeitet werden: Duplizieren Sie sie für eine eigene Kopie."
+    "deactivateTooltip": "Eine deaktivierte Vorlage wird weder im Formular „Zertifikat ausstellen“ noch für die Windows-Autoregistrierung angeboten. Systemvorlagen können deaktiviert, aber nicht bearbeitet werden: Kopieren Sie sie für eine eigene Kopie."
   },
   "users": {
     "securityKeys": {

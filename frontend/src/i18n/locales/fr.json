@@ -4041,7 +4041,7 @@
     "activate": "Activer",
     "activated": "Modèle activé",
     "deactivated": "Modèle désactivé",
-    "deactivateTooltip": "Un modèle désactivé n'est proposé ni par le formulaire Émettre un certificat ni à l'auto-inscription Windows. Les modèles système peuvent être désactivés mais pas modifiés : dupliquez-en un pour le changer."
+    "deactivateTooltip": "Un modèle désactivé n'est proposé ni par le formulaire Émettre un certificat ni à l'auto-inscription Windows. Les modèles système peuvent être désactivés mais pas modifiés : copiez-en un pour le changer."
   },
   "time": {
     "today": "Aujourd'hui",

@@ -1397,7 +1397,7 @@
     "activate": "Attiva",
     "activated": "Modello attivato",
     "deactivated": "Modello disattivato",
-    "deactivateTooltip": "Un modello disattivato non viene offerto dal modulo Emetti certificato né all'autoenrollment di Windows. I modelli di sistema possono essere disattivati, non modificati: duplicane uno per cambiarlo."
+    "deactivateTooltip": "Un modello disattivato non viene offerto dal modulo Emetti certificato né all'autoenrollment di Windows. I modelli di sistema possono essere disattivati, non modificati: copiane uno per cambiarlo."
   },
   "users": {
     "securityKeys": {

@@ -1397,7 +1397,7 @@
     "activate": "Activar",
     "activated": "Plantilla activada",
     "deactivated": "Plantilla desactivada",
-    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: duplique una para modificarla."
+    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: copie una para modificarla."
   },
   "users": {
     "securityKeys": {

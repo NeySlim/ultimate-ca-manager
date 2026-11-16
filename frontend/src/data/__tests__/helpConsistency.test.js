@@ -178,3 +178,29 @@ describe('screen labels quoted by every help language', () => {
     expect(help(lang, 'policies').guide).toContain('`allowed_signature_schemes`')
   })
 })
+
+describe('system template advice', () => {
+  const locales = import.meta.glob('../../i18n/locales/*.json', { eager: true })
+  // The Templates page offers a Copy button, never "duplicate"; per language: the former verb and the stem of the button label.
+  const verbs = {
+    en: [/duplicate/i, /copy/i], fr: [/dupliqu/i, /copi/i], ru: [/дублиру|продублиру/i, /копир/i], zh: [/复制/, /复制/],
+    de: [/duplizier/i, /kopier/i], es: [/dupliqu/i, /copi/i], it: [/duplic/i, /copi/i], pt: [/dupliqu/i, /copi/i],
+    uk: [/дублікат/i, /копі/i], ja: [/複製/, /コピー/],
+  }
+  const tip = (lang) => locales[`../../i18n/locales/${lang}.json`].default.templates.deactivateTooltip
+  const help = (lang) => {
+    const page = lang === 'en' ? helpContent.templates : pages[`../help/${lang}/templates.js`].default.helpContent
+    return page.sections.flatMap((sec) => sec.items || []).filter((i) => /^(Deactivate|Désactiver|Деактивировать|停用)$/.test(i.label)).map((i) => i.text)
+  }
+  it.each(Object.keys(verbs))('%s tooltip advises the Copy button', (lang) => {
+    const [old, copy] = verbs[lang]
+    if (lang !== 'zh') expect(tip(lang)).not.toMatch(old)
+    expect(tip(lang)).toMatch(copy)
+  })
+  it.each(['en', 'fr', 'ru', 'zh'])('%s help advises the Copy button', (lang) => {
+    const [old, copy] = verbs[lang]
+    const text = help(lang).join('\n')
+    if (lang !== 'zh') expect(text).not.toMatch(old)
+    expect(text).toMatch(copy)
+  })
+})

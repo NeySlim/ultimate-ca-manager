@@ -1397,7 +1397,7 @@
     "activate": "Activate",
     "activated": "Template activated",
     "deactivated": "Template deactivated",
-    "deactivateTooltip": "A deactivated template is not offered by the Issue Certificate form nor to Windows autoenrollment. System templates can be deactivated, not edited: duplicate one to change it."
+    "deactivateTooltip": "A deactivated template is not offered by the Issue Certificate form nor to Windows autoenrollment. System templates can be deactivated, not edited: copy one to change it."
   },
   "users": {
     "securityKeys": {
