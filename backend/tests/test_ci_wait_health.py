@@ -87,6 +87,26 @@ def test_no_answer_fails_within_the_bound():
     assert 2 <= elapsed < 2 + 7
 
 
+def test_the_bound_does_not_depend_on_where_in_the_second_the_wait_starts(tmp_path):
+    """A first probe that straddles the clock's next second does not shorten the wait."""
+    with socket.socket() as s:
+        s.bind(('127.0.0.1', 0))
+        port = s.getsockname()[1]
+    slow = tmp_path / 'bin' / 'curl'
+    slow.parent.mkdir()
+    slow.write_text(f'#!/bin/sh\n[ -e {tmp_path}/seen ] || {{ : > {tmp_path}/seen; sleep 0.6; }}\n'
+                    f'exec {shutil.which("curl")} "$@"\n')
+    slow.chmod(0o755)
+    while not 0.5 <= time.time() % 1 < 0.8:
+        time.sleep(0.005)
+    t0 = time.monotonic()
+    proc = subprocess.run(['bash', str(SCRIPT), f'http://127.0.0.1:{port}/api/v2/health', '2'],
+                          capture_output=True, text=True, timeout=60,
+                          env={'PATH': f'{slow.parent}:{os.environ["PATH"]}'})
+    elapsed = time.monotonic() - t0
+    assert proc.returncode == 1 and 2 <= elapsed < 2 + 7, elapsed
+
+
 @pytest.mark.parametrize('timeout', ['', 'abc', '-1'])
 def test_a_bad_timeout_is_refused(timeout):
     proc, _ = _run('http://127.0.0.1:1/', timeout)
