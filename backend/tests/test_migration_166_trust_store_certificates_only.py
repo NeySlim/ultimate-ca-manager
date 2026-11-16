@@ -43,8 +43,10 @@ def _rows():
         first, _, _ = _issue('chain-first')
         second, _, _ = _issue('chain-second')
         _, only_key, _ = _issue('key-only')
-        old, old_key, _ = _issue('legacy-label')
-        old = old.replace('BEGIN CERTIFICATE', 'BEGIN X509 CERTIFICATE').replace('END CERTIFICATE', 'END X509 CERTIFICATE')
+        new, old_key, _ = _issue('legacy-label')
+        old = new.replace('BEGIN CERTIFICATE', 'BEGIN X509 CERTIFICATE').replace('END CERTIFICATE', 'END X509 CERTIFICATE')
+        bare, _, _ = _issue('legacy-label-no-key')
+        bare_old = bare.replace('BEGIN CERTIFICATE', 'BEGIN X509 CERTIFICATE').replace('END CERTIFICATE', 'END X509 CERTIFICATE')
         _MADE['rows'] = [
             (1, 'sane', sane, sane, False),
             (2, 'server.pem', kc_key + kc, kc, True),
@@ -52,7 +54,8 @@ def _rows():
             (4, 'after text', 'subject=CN=after-text\nissuer=CN=after-text\n' + text, text, False),
             (5, 'chain', first + second, first + second, False),
             (6, 'key only', only_key, '', True),
-            (7, 'legacy label', old_key + old, old, True),
+            (7, 'legacy label', old_key + old, new, True),
+            (8, 'legacy label, no key', bare_old, bare, False),
         ]
         _MADE['keys'] = (kc_key, ck_key, only_key, old_key)
     return _MADE['rows']

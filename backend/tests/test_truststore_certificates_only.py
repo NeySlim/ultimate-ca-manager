@@ -202,9 +202,41 @@ def test_the_legacy_x509_certificate_label_is_read_as_a_certificate():
     legacy = pem.replace('BEGIN CERTIFICATE', 'BEGIN X509 CERTIFICATE').replace('END CERTIFICATE', 'END X509 CERTIFICATE')
     key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
                                 serialization.NoEncryption()).decode()
-    assert certificate_blocks(key_pem + legacy).decode() == legacy
+    assert certificate_blocks(key_pem + legacy).decode() == pem  # RFC 7468 5.1: never generated
     assert first_fingerprint(legacy) == cert.fingerprint(hashes.SHA256()).hex()
     pems, skipped = readable_pems([(1, key_pem + legacy)], load=x509.load_pem_x509_certificate)
-    assert skipped == [] and len(pems) == 1 and b'PRIVATE KEY' not in pems[0]
+    assert skipped == [] and pems == [pem.encode()]
     # A block opened under one label and closed under the other is not one
     assert certificate_blocks(legacy.replace('END X509 CERTIFICATE', 'END CERTIFICATE')) == b''
+
+
+def _legacy(pem):
+    return pem.replace(b'BEGIN CERTIFICATE', b'BEGIN X509 CERTIFICATE').replace(b'END CERTIFICATE', b'END X509 CERTIFICATE')
+
+
+@pytest.mark.parametrize('write', sorted(WRITES))
+def test_a_legacy_label_is_accepted_and_stored_as_a_certificate(app, auth_client, drop, write):
+    _, cert = _issue(f'legacy-{write}')
+    drop(cert)
+    r = WRITES[write](auth_client, _legacy(_pem(cert)))
+    assert r.status_code == 201, r.get_data(as_text=True)
+    with app.app_context():
+        row = TrustedCertificate.query.filter_by(fingerprint_sha256=cert.fingerprint(hashes.SHA256()).hex()).one()
+        assert row.certificate_pem.encode() == _pem(cert)
+
+
+def test_a_row_stored_under_the_legacy_label_never_leaves_under_it(app, auth_client, drop):
+    """RFC 7468 5.1: a generator MUST NOT generate the `X509 CERTIFICATE` label."""
+    _, cert = _issue('legacy-stored')
+    drop(cert)
+    with app.app_context():
+        row = TrustedCertificate(name='legacy stored', certificate_pem=_legacy(_pem(cert)).decode(),
+                                 fingerprint_sha256=cert.fingerprint(hashes.SHA256()).hex(), purpose='custom')
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    detail = auth_client.get(f'{TS}/{row_id}').get_json()['data']
+    assert detail['certificate_pem'].encode() == _pem(cert)
+    bundle = auth_client.get(f'{TS}/export?format=pem')
+    assert bundle.status_code == 200 and _pem(cert).strip() in bundle.data and b'X509 CERTIFICATE' not in bundle.data
+    assert str(row_id) not in bundle.headers.get('X-Skipped-Certificates', '').split(',')
