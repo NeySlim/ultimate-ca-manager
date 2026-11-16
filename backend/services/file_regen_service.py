@@ -17,7 +17,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from config.settings import Config
+from config.settings import BACKEND_DIR, Config
 from utils.file_naming import (
     ca_cert_path,
     ca_key_path,
@@ -611,7 +611,8 @@ class _Pass:
         self.full = full
         self.encrypting = encrypting
         self.stats = {'ca_certs': 0, 'ca_keys': 0, 'certs': 0, 'cert_keys': 0, 'csrs': 0,
-                      'removed': 0, 'failed': 0, 'refused': 0}
+                      'removed': 0, 'failed': 0, 'refused': 0,
+                      'legacy_moved': 0, 'legacy_removed': 0, 'legacy_kept': 0}
 
     def directory_of(self, path):
         return self.dirs.get(os.path.realpath(os.path.dirname(str(path))))
@@ -746,6 +747,109 @@ class _Pass:
             self.stats['failed'] += 1
             logger.error("Files: %s could not be removed (%s); retried at the next pass",
                          path, exc)
+
+
+# --- Files an earlier OPNsense import wrote under the code tree ------------------------
+
+# That import wrote ca/<refid>.crt, certs/<refid>.crt and private/<refid>.key here, where
+# nothing else looks; a start moves or removes them, under the reconciliation's lock.
+LEGACY_DATA_DIR = BACKEND_DIR / 'data'
+_LEGACY_SUBDIRS = (('ca', '.crt', ('ca',)), ('certs', '.crt', ('cert',)),
+                   ('private', '.key', ('ca', 'cert')))
+_LEGACY_WARNED = set()
+
+
+def _legacy_note(path, level, message, *args):
+    """Each left-over file is reported once per process, by its path, never its content."""
+    if str(path) not in _LEGACY_WARNED:
+        _LEGACY_WARNED.add(str(path))
+        logger.log(level, message, path, *args)
+
+
+def _legacy_copy_of(kind, refid, is_key, data):
+    """``(path, mode)`` under DATA_DIR of the row whose content ``data`` is, or None."""
+    from models import CA, Certificate, db
+    model = CA if kind == 'ca' else Certificate
+    rows = db.session.query(model.id, *_row_columns(kind, model)).filter(model.refid == refid)
+    for row in rows.all():
+        named = _paths_of(kind, _CaRow(row) if kind == 'ca' else row)
+        wanted = named[-1] if is_key else named[0]
+        for path, content, mode in _wanted_of(kind, row, encrypting=False):
+            if path == wanted and content == data:
+                return path, mode
+    return None
+
+
+def _repair_legacy_files(run) -> None:
+    """A copy of a row's file goes to the row's own path, or is removed when that path holds it
+    or the key is encrypted in the database; anything else stays and is reported."""
+    from models import db
+    try:
+        for sub, suffix, kinds in _LEGACY_SUBDIRS:
+            legacy = Path(LEGACY_DATA_DIR) / sub
+            if os.path.realpath(legacy) in run.dirs:
+                continue  # DATA_DIR is the code tree's data/ (a checkout): nothing left over
+            try:
+                dfd = os.open(str(legacy), os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+            except (FileNotFoundError, NotADirectoryError):
+                continue
+            try:
+                for name in sorted(os.listdir(dfd)):
+                    if name != '.gitkeep':
+                        _repair_legacy_file(run, dfd, legacy / name, suffix, kinds)
+            finally:
+                os.close(dfd)
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Files: the files left under %s could not be examined (%s)",
+                     LEGACY_DATA_DIR, exc)
+
+
+def _repair_legacy_file(run, dfd, path, suffix, kinds):
+    name = path.name
+    found = _lstat(dfd, name)
+    match = None
+    if found is not None and stat.S_ISREG(found.st_mode) and name.endswith(suffix):
+        data = _read_regular(dfd, name)
+        for kind in kinds:
+            match = _legacy_copy_of(kind, name[:-len(suffix)], suffix == '.key', data)
+            if match:
+                break
+    if match is None:
+        run.stats['legacy_kept'] += 1
+        _legacy_note(path, logging.WARNING,
+                     "Files: %s, outside DATA_DIR, is no copy of a stored CA or certificate;"
+                     " left in place, to check and remove by hand")
+        return
+    dest, mode = match
+    if suffix == '.key' and run.encrypting:
+        outcome = 'legacy_removed'  # the key is encrypted in the database: no mirror
+    else:
+        directory = run.directory_of(dest)
+        if directory is None or directory.fd is None:
+            return  # its directory could not be opened: the next pass retries
+        present = _lstat(directory.fd, dest.name)
+        if present is None:
+            if not run.put(kind, dest, data, mode):
+                return
+            outcome = 'legacy_moved'
+        elif stat.S_ISREG(present.st_mode) and _read_regular(directory.fd, dest.name) == data:
+            outcome = 'legacy_removed'
+        else:
+            run.stats['legacy_kept'] += 1
+            _legacy_note(path, logging.WARNING,
+                         "Files: %s, outside DATA_DIR, differs from %s; left in place", dest)
+            return
+    try:
+        os.unlink(name, dir_fd=dfd)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        _legacy_note(path, logging.ERROR, "Files: %s could not be removed (%s)", exc)
+        return
+    run.stats[outcome] += 1
+    logger.info("Files: %s %s", path, 'moved to ' + str(dest) if outcome == 'legacy_moved'
+                else 'removed, a copy of what DATA_DIR or the database holds')
 
 
 def _write_marker(directory: _Dir, generation: str) -> None:
@@ -889,6 +993,7 @@ def reconcile_files(*, full=None, wait=0.0) -> dict:
                     logger.info("Files: a restore or another node holds rows of the removal list; retried later")
                     return {'status': 'busy'}
             run = _Pass(opened, full, encrypting)
+            _repair_legacy_files(run)
             run.write_rows('ca', CA)
             run.write_rows('cert', Certificate)
             complete = len(opened) == len(dirs)
