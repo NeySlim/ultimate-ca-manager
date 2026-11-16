@@ -1,4 +1,4 @@
-"""A start moves or removes the files the OPNsense import left under the code tree."""
+"""A start moves or removes the files UCM 1.x left under the code tree."""
 import logging
 import uuid
 from contextlib import contextmanager
@@ -191,3 +191,66 @@ def test_a_copy_is_kept_when_its_destination_holds_other_content(app, legacy, pl
     assert planted['ca'].read_bytes() == rows['ca'][1]
     assert stats['legacy_kept'] == 1 and stats['legacy_removed'] == 3
     assert any(str(planted['ca']) in r.getMessage() for r in caplog.records)
+
+
+# UCM 1.x kept its whole DATA_DIR under backend/data, with its own key and CSR names
+def _plant_1x(root, rows, which):
+    refid, _crt, prv = rows['ca' if which == 'ca_key' else 'cert']
+    path = root / 'private' / f"{'ca' if which == 'ca_key' else 'cert'}_{refid}.key"
+    path.write_bytes(prv)
+    return path
+
+
+@pytest.mark.parametrize('which', ['ca_key', 'cert_key'])
+def test_1x_key_names_are_removed_while_keys_are_encrypted(
+        app, legacy, encryption_enabled, caplog, which):
+    rows = _rows(app, uuid.uuid4().hex[:8])
+    planted = _plant_1x(legacy, rows, which)
+
+    with caplog.at_level(logging.WARNING, logger='services.file_regen_service'):
+        stats = _reconcile(app)
+
+    assert not planted.exists()
+    assert stats['legacy_removed'] == 1 and stats['legacy_kept'] == 0
+    assert not _canonical(app, rows)[which].exists()
+    assert not any(str(planted) in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.parametrize('which', ['ca_key', 'cert_key'])
+def test_1x_key_names_are_moved_to_the_row_key_path(app, legacy, plaintext_mirrors, which):
+    rows = _rows(app, uuid.uuid4().hex[:8])
+    planted = _plant_1x(legacy, rows, which)
+    expected = planted.read_bytes()
+    canonical = _canonical(app, rows)[which]
+    canonical.unlink(missing_ok=True)
+
+    stats = _reconcile(app)
+
+    assert not planted.exists() and stats['legacy_moved'] == 1
+    assert canonical.read_bytes() == expected
+    assert canonical.stat().st_mode & 0o777 == 0o600
+
+
+def test_1x_csr_is_moved_to_the_certificate_csr_path(app, legacy, plaintext_mirrors):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from utils.file_naming import cert_csr_path
+    rows = _rows(app, uuid.uuid4().hex[:8])
+    key = ec.generate_private_key(ec.SECP256R1())
+    csr = x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'legacy csr')])).sign(
+        key, hashes.SHA256()).public_bytes(serialization.Encoding.PEM)
+    with app.app_context():
+        cert = Certificate.query.filter_by(refid=rows['cert'][0]).one()
+        cert.csr = csr.decode()
+        db.session.commit()
+        canonical = cert_csr_path(cert)
+    canonical.unlink(missing_ok=True)
+    planted = legacy / 'certs' / f"{rows['cert'][0]}.csr"
+    planted.write_bytes(csr)
+
+    stats = _reconcile(app)
+
+    assert not planted.exists() and stats['legacy_moved'] == 1 and stats['legacy_kept'] == 0
+    assert canonical.read_bytes() == csr

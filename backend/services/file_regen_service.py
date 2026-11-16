@@ -749,13 +749,30 @@ class _Pass:
                          path, exc)
 
 
-# --- Files an earlier OPNsense import wrote under the code tree ------------------------
+# --- Files UCM 1.x left under the code tree ------------------------------------------
 
-# That import wrote ca/<refid>.crt, certs/<refid>.crt and private/<refid>.key here, where
-# nothing else looks; a start moves or removes them, under the reconciliation's lock.
+# 1.x kept its DATA_DIR there (ca/<refid>.crt, certs/<refid>.crt|.csr, private/ca_<refid>.key,
+# private/cert_<refid>.key, and <refid>.key from its OPNsense import), where nothing else looks;
+# a start moves or removes them, under the reconciliation's lock.
 LEGACY_DATA_DIR = BACKEND_DIR / 'data'
-_LEGACY_SUBDIRS = (('ca', '.crt', ('ca',)), ('certs', '.crt', ('cert',)),
-                   ('private', '.key', ('ca', 'cert')))
+_LEGACY_SUBDIRS = ('ca', 'certs', 'private')
+_SLOTS = {'crt': 0, 'csr': 1, 'key': -1}
+
+
+def _legacy_candidates(sub, name):
+    """``[(kind, refid, slot)]`` a file of ``sub`` named ``name`` may be a copy of."""
+    stem, dot, ext = name.rpartition('.')
+    if not dot or not stem:
+        return []
+    if sub == 'ca':
+        return [('ca', stem, 'crt')] if ext == 'crt' else []
+    if sub == 'certs':
+        return [('cert', stem, ext)] if ext in ('crt', 'csr') else []
+    if ext != 'key':
+        return []
+    found = [(kind, stem[len(kind) + 1:], 'key') for kind in ('ca', 'cert')
+             if stem.startswith(kind + '_') and len(stem) > len(kind) + 1]
+    return found + [('ca', stem, 'key'), ('cert', stem, 'key')]
 _LEGACY_WARNED = set()
 
 
@@ -766,14 +783,14 @@ def _legacy_note(path, level, message, *args):
         logger.log(level, message, path, *args)
 
 
-def _legacy_copy_of(kind, refid, is_key, data):
+def _legacy_copy_of(kind, refid, slot, data):
     """``(path, mode)`` under DATA_DIR of the row whose content ``data`` is, or None."""
     from models import CA, Certificate, db
     model = CA if kind == 'ca' else Certificate
     rows = db.session.query(model.id, *_row_columns(kind, model)).filter(model.refid == refid)
     for row in rows.all():
         named = _paths_of(kind, _CaRow(row) if kind == 'ca' else row)
-        wanted = named[-1] if is_key else named[0]
+        wanted = named[_SLOTS[slot]]
         for path, content, mode in _wanted_of(kind, row, encrypting=False):
             if path == wanted and content == data:
                 return path, mode
@@ -785,7 +802,7 @@ def _repair_legacy_files(run) -> None:
     or the key is encrypted in the database; anything else stays and is reported."""
     from models import db
     try:
-        for sub, suffix, kinds in _LEGACY_SUBDIRS:
+        for sub in _LEGACY_SUBDIRS:
             legacy = Path(LEGACY_DATA_DIR) / sub
             if os.path.realpath(legacy) in run.dirs:
                 continue  # DATA_DIR is the code tree's data/ (a checkout): nothing left over
@@ -796,7 +813,7 @@ def _repair_legacy_files(run) -> None:
             try:
                 for name in sorted(os.listdir(dfd)):
                     if name != '.gitkeep':
-                        _repair_legacy_file(run, dfd, legacy / name, suffix, kinds)
+                        _repair_legacy_file(run, dfd, legacy / name, sub)
             finally:
                 os.close(dfd)
     except Exception as exc:
@@ -805,14 +822,15 @@ def _repair_legacy_files(run) -> None:
                      LEGACY_DATA_DIR, exc)
 
 
-def _repair_legacy_file(run, dfd, path, suffix, kinds):
+def _repair_legacy_file(run, dfd, path, sub):
     name = path.name
     found = _lstat(dfd, name)
     match = None
-    if found is not None and stat.S_ISREG(found.st_mode) and name.endswith(suffix):
+    candidates = _legacy_candidates(sub, name)
+    if found is not None and stat.S_ISREG(found.st_mode) and candidates:
         data = _read_regular(dfd, name)
-        for kind in kinds:
-            match = _legacy_copy_of(kind, name[:-len(suffix)], suffix == '.key', data)
+        for kind, refid, slot in candidates:
+            match = _legacy_copy_of(kind, refid, slot, data)
             if match:
                 break
     if match is None:
@@ -822,7 +840,7 @@ def _repair_legacy_file(run, dfd, path, suffix, kinds):
                      " left in place, to check and remove by hand")
         return
     dest, mode = match
-    if suffix == '.key' and run.encrypting:
+    if slot == 'key' and run.encrypting:
         outcome = 'legacy_removed'  # the key is encrypted in the database: no mirror
     else:
         directory = run.directory_of(dest)
