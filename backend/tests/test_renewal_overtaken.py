@@ -502,6 +502,34 @@ def _chain_pair(app):
     return a_id, b_id
 
 
+def _names_none(row):
+    import base64
+    from utils import related_cert
+    return related_cert.read_related_certificate(
+        x509.load_pem_x509_certificate(base64.b64decode(row.crt))) is None
+
+
+def test_a_b_unlinked_since_read_renews_alone_naming_none(app, tmp_path):
+    """Old B read naming A; elsewhere the newest B goes on hold and A renews alone, which unlinks
+    old B. Renewed from the caller's copy, old B names nothing and stays out of the pair."""
+    from services.cert.renewal import renew_certificate_in_place
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'unlinked.db'}"):
+        a_id, (old_b, new_b) = _linked_rows(app, n_b=2)
+        with app.app_context():
+            held = db.session.get(Certificate, old_b)  # kept by the session, linked to A
+            assert held.related_certificate_id == a_id
+            _revoke_elsewhere(app, new_b, 'row')
+            _renew_elsewhere(app, a_id)
+            outcome = renew_certificate_in_place(held, username='admin', regenerate_crl=False)
+            assert outcome['related'] == [], outcome
+            db.session.expire_all()
+            b = db.session.get(Certificate, old_b)
+            assert b.renewed_times == 1
+            assert b.related_certificate_id is None and _names_none(b)
+            db.session.remove()
+
+
 def _a_member_archived_since_read(app):
     """Judging A's own link re-reads B: the caller's view of B is taken before that."""
     from services.cert.renewal import RenewalError, renew_certificate_in_place

@@ -70,6 +70,9 @@ _ISSUER_OWNED_EXTENSION_OIDS = frozenset({
 _SUPERSEDED_FALLBACK = timedelta(days=365)
 
 
+# ``related_to`` of a member naming the A its row links to, as re-read under its lock
+CURRENT_RELATED = object()
+
 # ``known_serial`` default: the caller passes nothing, the instance's own
 # serial is the reference (None is a real value: a row that gained a serial
 # meanwhile was renewed)
@@ -253,8 +256,8 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         staged_all, renewed_a = [], None
         for index, member in enumerate(members):
             is_cert = member is cert
-            # B names A as renewed a moment ago; a lone certificate names its A as it is
-            related_to = renewed_a if pair and index == 1 else _current_related(member)
+            # B names A as renewed a moment ago; any other member the A its locked row links to
+            related_to = renewed_a if pair and index == 1 else CURRENT_RELATED
             try:
                 staged_member = _stage_renewal(
                     member, ca if is_cert else None, rekey=rekey, trigger=trigger,
@@ -273,7 +276,7 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             if pair and index == 0:
                 renewed_a = x509.load_pem_x509_certificate(staged_member['cert_pem'])
             staged_all.append(staged_member)
-        if not pair and related_to is None:
+        if not pair and staged_all[0]['related_to'] is None:
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
             leave_pair(staged_all[0]['cert'])
@@ -408,9 +411,11 @@ def _current_related(row):
 def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,
                    precheck=None, was_archived=None, link=SERIAL_UNSET) -> dict:
     """Every check, the signature and the writes, left uncommitted; *related_to*
-    is the certificate A the renewed one names (RFC 9763), *link* the row the members
-    were chosen on."""
+    is the certificate A the renewed one names (RFC 9763), CURRENT_RELATED to read it
+    from the locked row, *link* the row the members were chosen on."""
     cert = _reread(cert, known_serial, trigger, was_archived, link)
+    if related_to is CURRENT_RELATED:
+        related_to = _current_related(cert)
     check_renewable(cert, trigger)
     ca, ca_cert, ca_key = _signing_ca(cert, ca, trigger)
 
@@ -459,7 +464,7 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     return {
         'cert': cert, 'cert_id': cert.id, 'ca': ca, 'old_serial': old_serial,
         'new_serial': new_serial, 'valid_from': cert.valid_from, 'valid_to': cert.valid_to,
-        'notices': notices, 'cert_pem': cert_pem, 'key_pem': key_pem,
+        'notices': notices, 'cert_pem': cert_pem, 'key_pem': key_pem, 'related_to': related_to,
     }
 
 
