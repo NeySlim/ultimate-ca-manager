@@ -149,8 +149,9 @@ class User(db.Model):
 
     def reserve_login_attempt(self, max_attempts: int, lockout_seconds: int):
         """Count one login attempt before its secret is checked: ``(rank, armed)``, rank
-        None when the attempt is refused unchecked, armed True for the one attempt whose
-        count armed the lock. The caller commits before checking the secret.
+        None when the attempt is refused unchecked, armed the stored ``locked_until`` for
+        the one attempt whose count armed the lock, else None. The caller commits before
+        checking the secret.
 
         One UPDATE decides on every node: at most ``max_attempts`` attempts get a rank,
         the one reaching it (or, past a lowered threshold, the next one) arms the lock,
@@ -177,24 +178,26 @@ class User(db.Model):
             if db.session.execute(stmt.execution_options(preserve_rowcount=True)).rowcount:
                 row = db.session.execute(select(*columns).where(User.id == self.id)).one()
         if row is None:
-            return None, False
+            return None, None
         set_committed_value(self, 'failed_logins', row[0])
         set_committed_value(self, 'locked_until', row[1])
         # Only an unlocked row is updated, so an attempt whose count reaches max armed it.
-        return (row[0] if row[0] <= max_attempts else None), row[0] >= max_attempts
+        return (row[0] if row[0] <= max_attempts else None), \
+            (row[1] if row[0] >= max_attempts else None)
 
-    def release_login_attempt(self, armed: bool):
-        """Give back a reserved attempt whose secret was proved but opened no session, and
-        lift the lock only if this attempt armed it: one armed by another attempt stays,
-        so the attempts checked before it expires stay within the threshold. The caller
-        commits."""
-        values = {'failed_logins': func.coalesce(User.failed_logins, 0) - 1}
+    def release_login_attempt(self, armed):
+        """Give back a reserved attempt whose secret was proved but opened no session.
+
+        Only the attempt that armed the lock can show its window is still open: the stored
+        lock is the one it wrote (``armed``). It then lifts that lock and gives its unit
+        back. Any other stays counted, so no window gets back a unit taken in another and
+        each window checks at most ``max_attempts`` wrong secrets. The caller commits."""
         if armed:
-            values['locked_until'] = None
-        db.session.execute(
-            update(User).where(User.id == self.id, User.failed_logins > 0)
-            .values(**values)
-            .execution_options(synchronize_session=False))
+            db.session.execute(
+                update(User).where(User.id == self.id, User.locked_until == armed)
+                .values(failed_logins=func.coalesce(User.failed_logins, 0) - 1,
+                        locked_until=None)
+                .execution_options(synchronize_session=False))
         self._reload_lockout()
 
     def clear_failed_logins(self) -> bool:

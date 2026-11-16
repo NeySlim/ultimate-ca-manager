@@ -366,6 +366,60 @@ def test_a_reset_that_cannot_be_stored_answers_500_without_a_session(app, client
     assert not me.get('authenticated')
 
 
+# --- Giving back a proved attempt -------------------------------------------------
+# Only the attempt that armed the lock can show its window is still open: the lock it
+# wrote is still the stored one. It then lifts that lock and gives its unit back.
+
+def _reserved(name, before):
+    _another_node_writes(name, failed_logins=before)
+    user = User.query.filter_by(username=name).one()
+    rank, armed = user.reserve_login_attempt(MAX_ATTEMPTS, 900)
+    db.session.commit()
+    return user, rank, armed
+
+
+def test_a_release_lifts_the_lock_its_attempt_armed(app, username):
+    with app.app_context():
+        user, rank, armed = _reserved(username, MAX_ATTEMPTS - 1)
+        assert rank == MAX_ATTEMPTS and armed
+        user.release_login_attempt(armed)
+        db.session.commit()
+        assert tuple(_stored(username)) == (MAX_ATTEMPTS - 1, None)
+
+
+def test_a_release_leaves_a_lock_armed_after_its_own(app, username):
+    """Cleared by a right password, then locked again by a burst, while it was checked."""
+    relock = utc_now() + timedelta(minutes=15)
+    with app.app_context():
+        user, _rank, armed = _reserved(username, MAX_ATTEMPTS - 1)
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS, locked_until=relock)
+        user.release_login_attempt(armed)
+        db.session.commit()
+        assert tuple(_stored(username)) == (MAX_ATTEMPTS, relock)
+
+
+def test_a_release_after_its_lock_expired_and_the_count_restarted_gives_nothing(app, username):
+    """A bind slower than lockout_duration: the count it took belongs to an ended window."""
+    with app.app_context():
+        user, _rank, armed = _reserved(username, MAX_ATTEMPTS - 1)
+        _another_node_writes(username, failed_logins=1, locked_until=None)
+        user.release_login_attempt(armed)
+        db.session.commit()
+        assert tuple(_stored(username)) == (1, None)
+
+
+def test_a_release_of_an_attempt_that_armed_nothing_gives_nothing(app, username):
+    """Cleared, then counted three times, while it was checked: its unit is not the new
+    window's to give back."""
+    with app.app_context():
+        user, rank, armed = _reserved(username, 0)
+        assert rank == 1 and not armed
+        _another_node_writes(username, failed_logins=3)
+        user.release_login_attempt(armed)
+        db.session.commit()
+        assert tuple(_stored(username)) == (3, None)
+
+
 # --- LDAP door -------------------------------------------------------------------
 
 def test_an_ldap_burst_binds_at_most_max_attempts_times(app, client, username, ldap_provider,
@@ -429,15 +483,51 @@ def test_an_ldap_lock_armed_past_a_lowered_threshold_is_alerted_once(
 
 
 @pytest.mark.parametrize('reason', ['account_disabled', 'group_denied'])
-def test_a_proved_ldap_password_refused_for_another_reason_does_not_count(
+def test_a_proved_ldap_password_refused_for_another_reason_never_locks(
         app, client, username, ldap_provider, monkeypatch, reason):
+    """The attempt that armed the lock gives it back with its unit."""
     import api.v2.sso.ldap_routes as ldap_routes
     with app.app_context():
         _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda p, n, pw, before_bind=None: (_found(n, before_bind), (None, reason))[1])
-    assert client.post(LDAP_DOOR, json=_ldap_body(username, ldap_provider)).status_code == 403
+    for _ in range(3):
+        assert client.post(LDAP_DOOR, json=_ldap_body(username, ldap_provider)).status_code == 403
     with app.app_context():
         assert tuple(_stored(username)) == (MAX_ATTEMPTS - 1, None)
+
+
+@pytest.mark.parametrize('reason', ['account_disabled', 'group_denied'])
+def test_a_proved_ldap_password_that_armed_nothing_stays_counted(
+        app, client, username, ldap_provider, monkeypatch, reason):
+    """Nothing stored tells its window from a later one, so its unit is not given back."""
+    import api.v2.sso.ldap_routes as ldap_routes
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda p, n, pw, before_bind=None: (_found(n, before_bind), (None, reason))[1])
+    assert client.post(LDAP_DOOR, json=_ldap_body(username, ldap_provider)).status_code == 403
+    with app.app_context():
+        assert tuple(_stored(username)) == (1, None)
+
+
+def test_a_proved_ldap_password_leaves_a_lock_armed_after_its_own(
+        app, client, username, ldap_provider, monkeypatch):
+    """It armed the lock; meanwhile a success cleared it and a burst armed another: that
+    one stays, with its count, so the burst's binds stay within the threshold."""
+    import api.v2.sso.ldap_routes as ldap_routes
+    relock = utc_now() + timedelta(minutes=15)
+
+    def cleared_and_locked_again_while_it_binds(provider, name, password, before_bind=None):
+        assert _found(name, before_bind)
+        assert _stored(name)[1] is not None
+        _another_node_writes(name, failed_logins=MAX_ATTEMPTS, locked_until=relock)
+        return None, 'group_denied'
+
+    with app.app_context():
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
+                        cleared_and_locked_again_while_it_binds)
+    assert client.post(LDAP_DOOR, json=_ldap_body(username, ldap_provider, PASSWORD)
+                       ).status_code == 403
+    with app.app_context():
+        assert tuple(_stored(username)) == (MAX_ATTEMPTS, relock)
 
 
 def test_a_proved_ldap_password_leaves_the_lock_another_attempt_armed(
@@ -468,17 +558,19 @@ def test_a_proved_ldap_password_leaves_the_lock_another_attempt_armed(
         assert _stored(username)[1] is not None
 
 
-def test_a_locally_disabled_ldap_account_does_not_count(app, client, ldap_user, ldap_provider,
-                                                        monkeypatch):
+@pytest.mark.parametrize('before, after', [(2, 3), (MAX_ATTEMPTS - 1, MAX_ATTEMPTS - 1)],
+                         ids=['armed-nothing', 'armed-the-lock'])
+def test_a_locally_disabled_ldap_account_is_counted_but_never_locked_by_it(
+        app, client, ldap_user, ldap_provider, monkeypatch, before, after):
     import api.v2.sso.ldap_routes as ldap_routes
     with app.app_context():
-        _another_node_writes(ldap_user, active=False, failed_logins=2)
+        _another_node_writes(ldap_user, active=False, failed_logins=before)
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
                         lambda p, n, pw, before_bind=None:
                         (_found(n, before_bind), (_bind_result(n), None))[1])
     assert client.post(LDAP_DOOR, json=_ldap_body(ldap_user, ldap_provider)).status_code == 403
     with app.app_context():
-        assert tuple(_stored(ldap_user)) == (2, None)
+        assert tuple(_stored(ldap_user)) == (after, None)
 
 
 def _case_blind_directory(binds, stored_name):

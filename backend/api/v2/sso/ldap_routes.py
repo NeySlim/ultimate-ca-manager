@@ -88,7 +88,7 @@ def ldap_login():
         return attempt['local'] is None or attempt['rank'] is not None
 
     user_info, error = _ldap_authenticate_user(provider, username, password, before_bind=reserve)
-    local, armed = attempt.get('local'), attempt.get('armed', False)
+    local, armed = attempt.get('local'), attempt.get('armed')
 
     if attempt.get('failed'):
         return error_response("Failed to record login attempt", 500)
@@ -105,8 +105,7 @@ def ldap_login():
 
     if error:
         if error == 'account_disabled':
-            # Account exists but is disabled in LDAP — don't count as
-            # failed login attempt (not a wrong password).
+            # Disabled in LDAP, the password proved: never locks the account by itself.
             _release_ldap_attempt(local, armed)
             AuditService.log_action(
                 action='login_failure',
@@ -118,8 +117,7 @@ def ldap_login():
             return error_response("This account has been disabled in Active Directory / LDAP", 403)
 
         if error == 'group_denied':
-            # Authenticated but not in required groups — don't count as
-            # failed login attempt.
+            # Proved but not in the required groups: never locks the account by itself.
             _release_ldap_attempt(local, armed)
             AuditService.log_action(
                 action='login_failure',

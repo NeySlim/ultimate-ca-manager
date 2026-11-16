@@ -737,7 +737,7 @@ class TestLDAPRateLimiting:
         """An entry with no local account counts nothing and is not locked"""
         with app.app_context():
             from api.v2.sso import _reserve_ldap_attempt
-            assert _reserve_ldap_attempt(None) == (None, None, False)
+            assert _reserve_ldap_attempt(None) == (None, None, None)
 
     def test_record_failed_attempts_and_lockout(self, app):
         """After 5 reserved attempts, user should be locked"""
@@ -753,14 +753,17 @@ class TestLDAPRateLimiting:
 
             # Default max attempts is 5
             max_attempts = 5
-            for rank in range(1, max_attempts + 1):
-                assert _reserve_ldap_attempt(user) == (user, rank, rank == max_attempts)
+            for rank in range(1, max_attempts):
+                assert _reserve_ldap_attempt(user) == (user, rank, None)
+            # The last one armed the lock: it is handed the lock it wrote
+            assert _reserve_ldap_attempt(user) == (user, max_attempts, user.locked_until)
+            assert user.locked_until is not None
 
             # Locked now: no further attempt is counted
-            assert _reserve_ldap_attempt(user) == (user, None, False)
+            assert _reserve_ldap_attempt(user) == (user, None, None)
 
             _clear_ldap_failed_attempts(user)
-            assert _reserve_ldap_attempt(user) == (user, 1, False)
+            assert _reserve_ldap_attempt(user) == (user, 1, None)
 
             _clear_ldap_failed_attempts(user)
             db.session.refresh(user)

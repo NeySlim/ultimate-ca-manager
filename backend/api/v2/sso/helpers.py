@@ -215,7 +215,7 @@ def _reserve_ldap_attempt(user):
     Returns (account, rank, armed) as ``User.reserve_login_attempt``: account None when
     there is none (nothing is counted). Raises, rolled back, when the count fails."""
     if not user:
-        return None, None, False
+        return None, None, None
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()
     try:
         rank, armed = user.reserve_login_attempt(max_attempts, lockout_seconds)
@@ -234,7 +234,8 @@ def _ldap_attempt_failed(user, armed):
 
 
 def _release_ldap_attempt(user, armed):
-    """The bind proved the password but no session opens: the attempt does not count."""
+    """The bind proved the password but no session opens: the attempt that armed the lock
+    lifts it and is not counted; any other stays counted (``User.release_login_attempt``)."""
     if user is None:
         return
     try:
