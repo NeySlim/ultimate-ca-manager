@@ -166,6 +166,18 @@ def test_a_locked_account_refuses_the_right_password_unchecked(app, client, user
     assert checked == []
 
 
+def test_a_count_past_a_lowered_threshold_locks_unchecked(app, client, username, monkeypatch):
+    """Counted under a higher max_login_attempts and never locked: the next attempt locks."""
+    with app.app_context():
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS + 2)
+    checked = []
+    monkeypatch.setattr(User, 'check_password', lambda self, pw: checked.append(pw) or True)
+    response = client.post(PASSWORD_DOOR, json={'username': username, 'password': PASSWORD})
+    assert response.status_code == 401 and checked == []
+    with app.app_context():
+        assert _stored(username)[1] is not None
+
+
 def test_an_expired_lock_restarts_the_count(app, client, username):
     with app.app_context():
         _another_node_writes(username, failed_logins=MAX_ATTEMPTS,
