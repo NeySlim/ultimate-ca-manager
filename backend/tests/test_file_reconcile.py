@@ -346,7 +346,7 @@ def test_a_full_pass_with_nothing_listed_reads_no_row_to_strike(app, issued, reg
     from models import FileRemoval, db
     struck = []
     real = regen.keep_named_paths
-    monkeypatch.setattr(regen, 'keep_named_paths', lambda: struck.append(1) or real())
+    monkeypatch.setattr(regen, 'keep_named_paths', lambda **kw: struck.append(1) or real(**kw))
     with app.app_context():
         FileRemoval.query.delete()
         db.session.commit()

@@ -112,7 +112,75 @@ def test_in_ha_a_pass_asked_to_wait_takes_the_lock_once_released(target, monkeyp
         # One key only: the pass holds the others while it waits for this one
         other_node.execute(text('SELECT pg_advisory_lock(:k)'), {'k': keys[-1]})
         assert regen.reconcile_files(full=True, wait=0.2) == {'status': 'busy'}
-        threading.Timer(0.3, other_node.close).start()
+        # Released by the other node 0.3 s into a pass that waits for it
+        threading.Timer(0.3, lambda: other_node.execute(
+            text('SELECT pg_advisory_unlock(:k)'), {'k': keys[-1]})).start()
         assert regen.reconcile_files(full=True, wait=5)['status'] == 'done'
     finally:
         other_node.close()
+
+
+def test_a_pass_striking_with_a_restore_never_deadlocks_the_restore(target, app, monkeypatch):
+    """A restore strikes listed rows and holds them to its commit; a pass striking the same
+    rows takes each without waiting, in id order, and commits each batch: no lock cycle."""
+    if target != 'postgresql':
+        pytest.skip('row locks and their deadlocks are PostgreSQL\'s')
+    import threading
+    from sqlalchemy import event, text
+    from services import file_regen_service as regen
+    first = _authority_row(f'strike-a-{uuid.uuid4().hex[:8]}')[0]
+    second = _authority_row(f'strike-b-{uuid.uuid4().hex[:8]}')[0]
+    paths = [str(ca_cert_path(first)), str(ca_cert_path(second))]
+    db.session.add_all([FileRemoval(generation=1, path=p) for p in paths])
+    db.session.commit()
+    monkeypatch.setattr(regen, 'PAGE_SIZE', 1)   # one path per batch
+
+    restore = db.engine.connect()
+    restore_txn = restore.begin()
+    restore.execute(text('DELETE FROM file_removals WHERE path = :p'), {'p': paths[1]})
+
+    first_batch, go_on, outcome = threading.Event(), threading.Event(), {}
+
+    def after(conn, cursor, statement, *args):
+        if statement.lstrip().upper().startswith('DELETE FROM FILE_REMOVALS') \
+                and not first_batch.is_set():
+            first_batch.set()
+            go_on.wait(10)
+
+    def node_pass():
+        with app.app_context():
+            event.listen(db.engine, 'after_cursor_execute', after)
+            try:
+                outcome['pass'] = regen.reconcile_files(full=True)['status']
+            except Exception as exc:  # noqa: BLE001 (the outcome is asserted below)
+                outcome['pass'] = exc
+            finally:
+                event.remove(db.engine, 'after_cursor_execute', after)
+                db.session.remove()
+
+    def restore_strikes_the_first():
+        try:
+            restore.execute(text('DELETE FROM file_removals WHERE path = :p'), {'p': paths[0]})
+            restore_txn.commit()
+            outcome['restore'] = 'committed'
+        except Exception as exc:  # noqa: BLE001
+            restore_txn.rollback()
+            outcome['restore'] = exc
+
+    passing = threading.Thread(target=node_pass)
+    passing.start()
+    try:
+        assert first_batch.wait(10)
+        # The restore now waits on the pass's first batch, as a restore's strike would
+        striking = threading.Thread(target=restore_strikes_the_first)
+        striking.start()
+        import time
+        time.sleep(0.5)
+        go_on.set()
+        striking.join(30)
+        passing.join(30)
+    finally:
+        go_on.set()
+        restore.close()
+    assert outcome['restore'] == 'committed', outcome
+    assert outcome['pass'] in ('busy', 'done'), outcome

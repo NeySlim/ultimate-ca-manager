@@ -336,9 +336,14 @@ def record_removal_candidates(generation: int) -> None:
     flush()
 
 
-def keep_named_paths() -> None:
+def keep_named_paths(nowait=False) -> None:
     """Strike from the list, whatever its generation, every path a row names now
-    (a key path too when the row holds no key: such a copy is never removed)."""
+    (a key path too when the row holds no key: such a copy is never removed).
+
+    ``nowait`` (a reconciliation): each batch locks its rows in id order without waiting,
+    then commits, so it never waits on a restore striking the same rows; a row held
+    raises (lock not available) and the pass is retried.
+    """
     from models import CA, Certificate, FileRemoval, db
     db.session.flush()
     table = FileRemoval.__table__
@@ -347,10 +352,35 @@ def keep_named_paths() -> None:
         for row in _pages(model, (model.refid, model.subject, model.descr)):
             paths.extend(str(p) for p in _named_paths(kind, row))
             if len(paths) >= PAGE_SIZE:
-                db.session.execute(table.delete().where(table.c.path.in_(paths)))
+                _strike(table, table.c.path.in_(paths), nowait=nowait)
                 paths = []
         if paths:
-            db.session.execute(table.delete().where(table.c.path.in_(paths)))
+            _strike(table, table.c.path.in_(paths), nowait=nowait)
+
+
+def _strike(table, condition, *, nowait=False, skip_locked=False):
+    """Delete the list rows matching ``condition``; locked first, by id, unless plain."""
+    from sqlalchemy import select
+    from models import db
+    if not (nowait or skip_locked):
+        db.session.execute(table.delete().where(condition))
+        return
+    last = 0
+    while True:
+        ids = db.session.execute(
+            select(table.c.id).where(condition, table.c.id > last).order_by(table.c.id)
+            .limit(PAGE_SIZE).with_for_update(nowait=nowait, skip_locked=skip_locked)
+        ).scalars().all()
+        if ids:
+            db.session.execute(table.delete().where(table.c.id.in_(ids)))
+        db.session.commit()
+        if len(ids) < PAGE_SIZE:
+            return
+        last = ids[-1]
+
+
+def _lock_not_available(exc) -> bool:
+    return getattr(getattr(exc, 'orig', None), 'sqlstate', None) == '55P03'
 
 
 def removals_listed(generation: int) -> int:
@@ -812,8 +842,15 @@ def reconcile_files(*, full=None, wait=0.0) -> dict:
             purged = purge_private_key_files() if encrypting else None
             if full and db.session.query(FileRemoval.id).first() is not None:
                 # A row created since the restore may name a listed path again: strike it first
-                keep_named_paths()
-                db.session.commit()
+                from sqlalchemy.exc import OperationalError
+                try:
+                    keep_named_paths(nowait=True)
+                except OperationalError as exc:
+                    if not _lock_not_available(exc):
+                        raise
+                    db.session.rollback()
+                    logger.info("Files: a restore holds the removal list; retried later")
+                    return {'status': 'busy'}
             run = _Pass(opened, full, encrypting)
             run.write_rows('ca', CA)
             run.write_rows('cert', Certificate)
@@ -835,10 +872,10 @@ def reconcile_files(*, full=None, wait=0.0) -> dict:
                         logger.error("Files: the marker of %s could not be written (%s)",
                                      directory.path, exc)
                 if complete and not ha_enabled():
-                    # One node consumes the list; in HA every node may still need it
-                    db.session.query(FileRemoval).filter(
-                        FileRemoval.generation <= generation_number(generation)
-                    ).delete(synchronize_session=False)
+                    # One node consumes the list; in HA every node may still need it.
+                    # Rows a restore holds are skipped: it strikes them or leaves them listed
+                    _strike(FileRemoval.__table__, FileRemoval.__table__.c.generation
+                            <= generation_number(generation), skip_locked=True)
             db.session.commit()
             stats = dict(run.stats, generation=generation, full=full,
                          keys_purged=purged['removed'] if purged else 0)
