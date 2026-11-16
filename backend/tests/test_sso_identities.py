@@ -361,6 +361,30 @@ def test_an_import_beaten_to_an_email_by_another_creation_gets_409(app, auth_cli
     auth_client.delete(f"/api/v2/users/{first.get_json()['data']['id']}")
 
 
+def test_an_import_beaten_to_a_username_by_another_creation_gets_409(app, auth_client, monkeypatch):
+    """Another request commits the name after the import checked it: the 409 names the name."""
+    import io
+    import api.v2.users.management as management
+    name = _name()
+    holder = management.local_email_holder
+
+    def another_request_takes_the_name(*args, **kwargs):
+        with db.engine.begin() as conn:
+            conn.execute(User.__table__.insert().values(
+                username=name, email=f'{name}-other@corp.example', password_hash='x', role='viewer'))
+        return holder(*args, **kwargs)
+
+    monkeypatch.setattr(management, 'local_email_holder', another_request_takes_the_name)
+    csv_text = f'username,email,full_name,role,password\n{name},{name}@corp.example,N,viewer,Race-Condition-42!\n'
+    r = auth_client.post('/api/v2/users/import', data={'file': (io.BytesIO(csv_text.encode()), 'u.csv')},
+                         content_type='multipart/form-data')
+    assert r.status_code == 409, r.get_json()
+    assert repr(name) in r.get_json()['message'] and 'Username' in r.get_json()['message'], r.get_json()
+    with app.app_context():
+        assert [u.email for u in User.query.filter_by(username=name)] == [f'{name}-other@corp.example']
+        _cleanup()
+
+
 def test_an_import_gives_an_sso_accounts_email_to_a_local_account(app, providers, auth_client):
     """E-mail is unique among local accounts only, as the creation of one account says."""
     import io

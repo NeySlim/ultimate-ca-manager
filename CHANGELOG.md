@@ -223,7 +223,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SSO: Link to SSO refused every account already linked or left without provider, the remedy sign-in refusals named, and Unlink then Link made an account without password set one at its next SSO session. Attaching a provider now works on any account, keeps a password it has, asks none of an account without, closes the account's sessions, can remove its local password, and its audit entry names the providers the account had.
 - SSO: a sign-in whose email belonged to an account of another provider or left without provider by another or an unknown IdP (after a restore, for instance), or to an account an administrator linked while the OIDC IdP marked that email unverified, received a second account with the default role. It is now refused (`sso_email_conflict`) with an audit entry naming the account.
 - SSO: a sign-in refused over a name gave the same reason for every account; the log and audit entry now say whether the account is local, linked to another provider, bound to another identity or without provider, and what repairs it. A provider with no rule and no default role now says so on the login page (`sso_no_default_role`).
-- Users: a CSV import refused a local account whose e-mail an SSO account used, which a single creation accepts, and answered `500` when another request took one of its e-mails first; it now accepts that e-mail and answers `409` naming the e-mail taken.
+- Users: a CSV import refused a local account whose e-mail an SSO account used, which a single creation accepts, and answered `500` when another request took one of its e-mails or usernames first; it now accepts that e-mail and answers `409` naming the e-mail or username taken.
 
 ### Security
 
