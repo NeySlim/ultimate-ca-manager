@@ -14,8 +14,8 @@ REMOVED_ACTION = 'truststore_private_key_removed'
 
 # Any armour label ending in PRIVATE KEY: PKCS#8, encrypted PKCS#8, RSA, EC, DSA, OpenSSH
 _PRIVATE_KEY = re.compile(rb'-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----')
-# A block body is base64 and whitespace only, so no other armour can hide inside one; 2.x also
-# stored the `X509 CERTIFICATE` label, which cryptography loads
+# A block body is base64 and whitespace only, so no other armour can hide inside one. 2.x also stored
+# the `X509 CERTIFICATE` label: read here, never handed out (RFC 7468 5.1, generators MUST NOT)
 _CERTIFICATE_BLOCK = re.compile(rb'-----BEGIN (?P<label>(?:X509 )?CERTIFICATE)-----[A-Za-z0-9+/=\s]*?'
                                 rb'-----END (?P=label)-----(?:\r?\n)?')
 
@@ -36,8 +36,10 @@ def holds_private_key(data) -> bool:
 
 
 def certificate_blocks(data) -> bytes:
-    """The CERTIFICATE blocks of *data*, as stored and in order; empty when there is none."""
-    return b''.join(m.group(0) for m in _CERTIFICATE_BLOCK.finditer(_bytes(data)))
+    """The certificate blocks of *data*, in order and under the `CERTIFICATE` label; empty when there is none."""
+    return b''.join(m.group(0) if m.group('label') == b'CERTIFICATE'
+                    else m.group(0).replace(b'X509 CERTIFICATE', b'CERTIFICATE')
+                    for m in _CERTIFICATE_BLOCK.finditer(_bytes(data)))
 
 
 def canonical_certificates(data):

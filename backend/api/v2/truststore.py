@@ -155,8 +155,8 @@ def import_trusted_certificate():
     try:
         if holds_private_key(file_content):
             raise PrivateKeyInEntry()
-        # Try PEM first
-        if b'-----BEGIN CERTIFICATE-----' in file_content:
+        # PEM when it holds a certificate block (the legacy label included), DER otherwise
+        if certificate_blocks(file_content):
             pem_data, cert_details = parse_entry(file_content.decode('utf-8'))
         else:
             # Try DER
