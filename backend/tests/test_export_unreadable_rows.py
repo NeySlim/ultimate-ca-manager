@@ -148,14 +148,18 @@ def test_an_unreadable_row_is_skipped_logged_and_named(auth_client, rows, route,
 
 @EVERY
 def test_no_readable_row_answers_the_same_in_both_formats(auth_client, rows, route):
-    made = rows.made
-    rows.corrupt_all(route)
-    answers = [route.call(auth_client, made[route.kind], fmt) for fmt in ('pem', 'p7b')]
+    made = rows.made[route.kind]
+    corrupted = rows.corrupt_all(route)
+    # a bulk route reads the selection, the others the whole table, neighbours' rows included
+    n = len(made) if 'bulk' in route.name else corrupted
+    answers = [route.call(auth_client, made, fmt) for fmt in ('pem', 'p7b')]
     assert answers[0].status_code == answers[1].status_code == 404
     for r in answers:
         details = r.get_json()['details']
-        assert set(str(i) for i in made[route.kind]) <= set(details['skipped'])
-        assert details['skipped_count'] >= 2
+        assert details['skipped_count'] == n
+        assert len(details['skipped']) == min(n, SKIPPED_LIST_LIMIT)
+        if n <= SKIPPED_LIST_LIMIT:
+            assert set(str(i) for i in made) <= set(details['skipped'])
         assert 'No readable' in r.get_json()['detail']
     assert answers[0].get_json() == answers[1].get_json()
 
