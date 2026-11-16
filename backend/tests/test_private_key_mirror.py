@@ -440,6 +440,6 @@ def test_purge_keeps_the_mirror_of_a_row_whose_key_is_empty(
             assert stats == {'removed': 0, 'kept_no_db_key': 1, 'errors': 0}
             assert path.exists()
         finally:
-            path.unlink()
+            path.unlink(missing_ok=True)
             db.session.delete(keyless)
             db.session.commit()
