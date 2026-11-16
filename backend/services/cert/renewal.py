@@ -496,7 +496,7 @@ def _reread(cert, known_serial, trigger, was_archived=None, link=SERIAL_UNSET):
     if fresh.serial_number != expected or bool(fresh.archived) != was_archived:
         raise _renewed_meanwhile(trigger)
     if link is not SERIAL_UNSET and fresh.related_certificate_id != link:
-        raise _overtaken('Related certificate was changed by another request', trigger)
+        raise _overtaken('The related pair was changed by another request', trigger)
     return fresh
 
 

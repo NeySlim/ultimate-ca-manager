@@ -442,9 +442,10 @@ def test_a_certificate_given_a_newer_partner_is_renewed_with_it_alone(app, tmp_p
             db.session.remove()
 
 
+@pytest.mark.parametrize('trigger', ['manual', 'auto'])
 @pytest.mark.parametrize('read_with', ['the previous B', 'no B'])
 def test_a_partner_taken_while_the_members_were_chosen_refuses_the_renewal(
-        app, tmp_path, monkeypatch, read_with):
+        app, tmp_path, monkeypatch, read_with, trigger):
     """The link is judged again on the row as the renewal locks it: nothing is renewed on a
     choice made before a newer B took the certificate, and a retry renews with that B."""
     from services.cert import renewal
@@ -465,9 +466,12 @@ def test_a_partner_taken_while_the_members_were_chosen_refuses_the_renewal(
 
             monkeypatch.setattr(renewal, '_linked_members', then_taken)
             with pytest.raises(renewal.RenewalError) as e:
-                renewal.renew_certificate_in_place(a, username='admin', regenerate_crl=False)
+                renewal.renew_certificate_in_place(a, username='admin', regenerate_crl=False,
+                                                   trigger=trigger)
             monkeypatch.undo()
-            assert e.value.status == 409 and 'related' in e.value.message.lower() and e.value.overtaken
+            said = 'The related pair was changed by another request'
+            assert (e.value.status, e.value.message, e.value.overtaken) == (
+                409, said if trigger == 'auto' else f'{said}; reload it and retry', True)
             db.session.expire_all()
             for row_id, serial in serials.items():
                 assert db.session.get(Certificate, row_id).serial_number == serial
@@ -506,8 +510,9 @@ def test_a_partner_that_left_while_the_members_were_chosen_refuses_the_renewal(
             with pytest.raises(renewal.RenewalError) as e:
                 renewal.renew_certificate_in_place(a, username='admin', regenerate_crl=False)
             monkeypatch.undo()
-            assert e.value.status == 409 and e.value.message.startswith(f'Related certificate {b_id}: ')
-            assert e.value.overtaken
+            assert (e.value.status, e.value.message, e.value.overtaken) == (409, (
+                f'Related certificate {b_id}: The related pair was changed by another request; '
+                'reload it and retry'), True)
             db.session.expire_all()
             assert db.session.get(Certificate, a_id).serial_number == serial
             db.session.remove()
