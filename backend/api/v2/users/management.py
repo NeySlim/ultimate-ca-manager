@@ -240,6 +240,15 @@ def link_user_sso(user_id):
     if not provider:
         return error_response('SSO provider not found', 404)
 
+    # A new owner (another provider, or a reset identity): the former holder's sessions end
+    moved = user.sso_provider_id != provider.id or user.sso_external_id is not None
+    owner = None
+    if moved:
+        owner = end_sessions_on_commit(user.id)
+        if owner is None:
+            db.session.rollback()
+            return error_response('User not found', 404)
+        user = owner
     origin = describe_origin(user, provider)
     user.auth_source = provider.provider_type
     user.sso_provider_id = provider.id
@@ -253,17 +262,20 @@ def link_user_sso(user_id):
     ok, err = safe_commit(logger, f"Failed to link user {user_id} to SSO")
     if not ok:
         return err
+    closed = sessions_closed_by(owner) if owner is not None else 0
+    note = f', {closed_sessions_note(closed)}' if owner is not None else ''
     AuditService.log_action(
         action='user_link_sso',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Linked account {user.username!r} to SSO provider {provider.name!r} ({origin})',
+        details=f'Linked account {user.username!r} to SSO provider {provider.name!r} ({origin}{note})',
         success=True,
     )
     return success_response(
         data=user.to_dict(),
-        message=f'Account linked to {provider.name}')
+        message=f'Account linked to {provider.name}',
+        meta={'other_sessions_closed': closed})
 
 
 @bp.route('/api/v2/users/<int:user_id>/unlink-sso', methods=['POST'])

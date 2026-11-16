@@ -171,6 +171,44 @@ def test_relinked_account_without_password_is_not_asked_for_one(app, providers, 
     assert not (r.get_json() or {}).get('must_change_password'), (r.status_code, r.get_json())
 
 
+def _open_session(app, uid, name):
+    """A client holding a session of the account, opened now."""
+    from utils.datetime_utils import utc_now
+    with app.app_context():
+        u = db.session.get(User, uid)
+        role, version = u.role, u.session_version or 0
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s.update(user_id=uid, username=name, role=role, auth_method='sso', session_version=version,
+                 login_time=utc_now().isoformat(), last_activity=utc_now().isoformat())
+    return c
+
+
+@pytest.mark.parametrize('state', ['local_password', 'other_provider', 'same_provider_other_identity'])
+def test_link_that_changes_the_owner_closes_the_account_sessions(app, providers, auth_client, state):
+    """Whoever held the former identity keeps no session once the account is moved or reset."""
+    name = _name()
+    uid = _state(app, providers, state, name)
+    held = _open_session(app, uid, name)
+    assert held.get('/api/v2/certificates').status_code == 200
+    r = auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': providers.b})
+    assert r.status_code == 200, r.get_json()
+    assert held.get('/api/v2/certificates').status_code == 401
+    assert auth_client.get('/api/v2/certificates').status_code == 200
+    assert r.get_json()['meta']['other_sessions_closed'] in (1, None)
+    assert 'other session' in _last_audit(app, 'user_link_sso', name)
+
+
+def test_link_that_changes_nothing_keeps_the_account_sessions(app, providers, auth_client):
+    name = _name()
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.b,
+               sso_external_id=None, password_hash=NOPASS)
+    held = _open_session(app, uid, name)
+    r = auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': providers.b})
+    assert r.status_code == 200 and r.get_json()['meta']['other_sessions_closed'] == 0
+    assert held.get('/api/v2/certificates').status_code == 200
+
+
 def test_link_keeps_a_password_change_an_account_with_a_password_owes(app, providers, auth_client):
     name = _name()
     uid = _add(app, username=name, auth_source='local', password_hash='hash-y',
