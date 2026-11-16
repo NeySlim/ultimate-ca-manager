@@ -532,27 +532,22 @@ class SSHCAService:
     def get_next_serial(ca_id):
         """Commit the next serial number of a CA and return it; a failed signature leaves a gap."""
         from sqlalchemy import select, update
-        from sqlalchemy.orm.attributes import set_committed_value
         table = SSHCertificateAuthority.__table__
         # One UPDATE adds one to the stored value under the row (PostgreSQL) or write (SQLite)
         # lock, never to a copy loaded earlier; the value returned is this call's, not a re-read
         bump = (update(table).where(table.c.id == ca_id)
                 .values(serial_counter=table.c.serial_counter + 1))
         try:
-            with db.session.no_autoflush:
-                if db.session.get_bind().dialect.update_returning:
-                    serial = db.session.execute(
-                        bump.returning(table.c.serial_counter)).scalar_one_or_none()
-                elif db.session.execute(bump).rowcount:
-                    serial = db.session.execute(select(table.c.serial_counter)
-                                                .where(table.c.id == ca_id)).scalar_one()
-                else:
-                    serial = None
+            if db.session.get_bind().dialect.update_returning:
+                serial = db.session.execute(
+                    bump.returning(table.c.serial_counter)).scalar_one_or_none()
+            elif db.session.execute(bump).rowcount:
+                serial = db.session.execute(select(table.c.serial_counter)
+                                            .where(table.c.id == ca_id)).scalar_one()
+            else:
+                serial = None
             if serial is None:
                 raise ValueError(f"SSH CA not found: {ca_id}")
-            loaded = db.session.identity_map.get(db.session.identity_key(SSHCertificateAuthority, ca_id))
-            if loaded is not None:
-                set_committed_value(loaded, 'serial_counter', serial)
             db.session.commit()
         except Exception:
             db.session.rollback()
