@@ -24,6 +24,28 @@ def test_the_first_advance_creates_the_row_and_the_next_one_counts(app):
         assert SystemConfig.query.filter_by(key=EPOCH_KEY).count() == 1
 
 
+def test_an_advance_returns_the_epoch_it_stored_not_a_later_one(app):
+    """Another node advancing right after this commit does not change what this call returns."""
+    with app.app_context():
+        before = advance_epoch()
+        session = db.session()
+
+        def another_node_advances(_session):
+            with db.engine.connect() as conn:
+                conn.exec_driver_sql("UPDATE system_config SET value = '9999' WHERE key = ?"
+                                     if conn.dialect.name == 'sqlite' else
+                                     "UPDATE system_config SET value = '9999' WHERE key = %s", (EPOCH_KEY,))
+                conn.commit()
+
+        event.listen(session, 'after_commit', another_node_advances, once=True)
+        try:
+            assert advance_epoch() == before + 1
+        finally:
+            db.session.remove()
+            SystemConfig.query.filter_by(key=EPOCH_KEY).update({'value': str(before + 1)})
+            db.session.commit()
+
+
 def _race(app, url):
     """Every worker reaches its INSERT before any of them commits it."""
     from sqlalchemy import create_engine
