@@ -58,6 +58,8 @@ describe('LoginPage SSO errors', () => {
   it.each([
     ['sso_username_conflict', 'auth.ssoUsernameConflict'],
     ['sso_unmapped', 'auth.ssoUnmapped'],
+    ['sso_no_default_role', 'auth.ssoNoDefaultRole'],
+    ['sso_email_conflict', 'auth.ssoEmailConflict'],
     ['saml_logout_rejected', 'auth.samlLogoutRejected'],
   ])('explains the %s refusal', async (code, key) => {
     render(<MemoryRouter initialEntries={[`/login?error=${code}`]}><LoginPage /></MemoryRouter>)

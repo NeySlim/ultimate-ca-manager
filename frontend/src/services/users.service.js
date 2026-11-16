@@ -63,8 +63,8 @@ export const usersService = {
     return apiClient.post(`/users/${id}/toggle-active`)
   },
 
-  async linkSso(id, { provider_id, sso_username } = {}) {
-    return apiClient.post(`/users/${id}/link-sso`, { provider_id, sso_username })
+  async linkSso(id, { provider_id, sso_username, remove_password } = {}) {
+    return apiClient.post(`/users/${id}/link-sso`, { provider_id, sso_username, remove_password })
   },
 
   async unlinkSso(id) {
