@@ -278,6 +278,17 @@ def _validate_claims(claims, issuer, client_id, expected_nonce):
         raise OIDCValidationError('ID token is missing subject')
 
 
+def _configured_issuer_and_client_id(provider):
+    """Both non-empty strings, else nothing to match iss and aud against (step 2-3)."""
+    issuer = getattr(provider, 'oauth2_issuer', None)
+    client_id = getattr(provider, 'oauth2_client_id', None)
+    if not isinstance(issuer, str) or not issuer:
+        raise OIDCValidationError('OIDC issuer is not configured')
+    if not isinstance(client_id, str) or not client_id:
+        raise OIDCValidationError('OIDC client ID is not configured')
+    return issuer, client_id
+
+
 def unverified_claims_are_valid(claims, provider, expected_nonce):
     """True when an unsigned (compatibility) token passes every check but the signature.
 
@@ -285,8 +296,8 @@ def unverified_claims_are_valid(claims, provider, expected_nonce):
     azp, exp, iat and nonce (steps 2-5, 9-11) still apply.
     """
     try:
-        _validate_claims(claims or {}, getattr(provider, 'oauth2_issuer', None),
-                         getattr(provider, 'oauth2_client_id', None), expected_nonce)
+        issuer, client_id = _configured_issuer_and_client_id(provider)
+        _validate_claims(claims or {}, issuer, client_id, expected_nonce)
     except OIDCValidationError:
         return False
     return True
@@ -307,12 +318,7 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
             raise OIDCValidationError('ID token nonce mismatch')
         return claims
 
-    issuer = getattr(provider, 'oauth2_issuer', None)
-    client_id = getattr(provider, 'oauth2_client_id', None)
-    if not isinstance(issuer, str) or not issuer:
-        raise OIDCValidationError('OIDC issuer is not configured')
-    if not isinstance(client_id, str) or not client_id:
-        raise OIDCValidationError('OIDC client ID is not configured')
+    issuer, client_id = _configured_issuer_and_client_id(provider)
     try:
         validate_url_not_cloud_metadata(issuer)
     except ValueError as exc:

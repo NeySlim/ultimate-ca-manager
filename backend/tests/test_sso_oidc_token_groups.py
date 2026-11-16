@@ -190,6 +190,39 @@ def test_unverified_token_with_invalid_claims_gives_no_groups(entra, bad):
     assert entra.role_of(name) is None
 
 
+@pytest.mark.parametrize('config, iss', [
+    ({'oauth2_issuer': ''}, ''),
+    ({'oauth2_issuer': None}, None),
+    ({'oauth2_client_id': ''}, 'https://idp.example'),
+    ({}, None),
+], ids=['issuer-empty', 'issuer-none', 'client-id-empty', 'token-without-iss'])
+def test_unverified_token_needs_issuer_and_client_id(entra, config, iss):
+    # OIDC Core §3.1.3.7 step 2: the configured issuer MUST exactly match iss.
+    entra.configure(id_token_verify=False, **config)
+    name = f'zi-{uuid.uuid4().hex[:6]}'
+    claims = _valid_claims('zi', groups=['grp-oid-admins'], iss=iss)
+    if iss is None:
+        claims.pop('iss')
+    loc = entra({'sub': 'zi', 'preferred_username': name}, claims)
+    assert loc.endswith(UNMAPPED)
+    assert entra.role_of(name) is None
+
+
+def test_unverified_claims_need_a_configured_issuer_and_client_id():
+    from types import SimpleNamespace
+    from services.oidc_id_token import unverified_claims_are_valid
+
+    def check(issuer, client_id, **claims):
+        provider = SimpleNamespace(oauth2_issuer=issuer, oauth2_client_id=client_id)
+        return unverified_claims_are_valid(_valid_claims('u', nonce='n', **claims), provider, 'n')
+
+    assert check('https://idp.example', 'ucm-client')
+    assert not check(None, 'ucm-client', iss=None)
+    assert not check('', 'ucm-client', iss='')
+    assert not check('https://idp.example', '', aud='')
+    assert not check('https://idp.example', None, aud=None)
+
+
 def test_unverified_token_without_tls_verification_gives_no_groups(entra):
     entra.configure(id_token_verify=False, oauth2_verify_ssl=False)
     loc = entra({'sub': 's13', 'preferred_username': 'entra13'},
