@@ -399,7 +399,7 @@ def test_an_empty_default_role_is_stored_and_admits_nobody(app, auth_client, oid
     assert r.get_json()['data']['default_role'] is None
     try:
         location, _ = oidc({'sub': 'none-sub', 'preferred_username': 'tknone'})
-        assert location.endswith('/login?error=sso_unmapped')
+        assert location.endswith('/login?error=sso_no_default_role')
         with app.app_context():
             assert User.query.filter_by(username='tknone').count() == 0
     finally:
