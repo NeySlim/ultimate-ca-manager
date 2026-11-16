@@ -108,6 +108,24 @@ def test_a_waiting_write_is_not_reported_as_another_connections_system_error(con
     assert isinstance(err, TimeoutError), f'a healthy connection was reported as {err!r}'
 
 
+def test_a_tls_call_resumed_after_a_wait_finds_the_queue_empty(contexts):
+    # Other greenlets run while a connection waits: what they leave is gone before its retry
+    def scenario():
+        listener = gevent.socket.socket()
+        listener.bind(('127.0.0.1', 0))
+        listener.listen(8)
+        server, client = _pair(listener, contexts)
+        crypto = ctypes.CDLL(_ssl.__file__)
+        crypto.ERR_peek_error.restype = ctypes.c_ulong
+        waiter = gevent.spawn(server._wait, server._write_event)
+        gevent.spawn(_push_system_error, errno.ECONNRESET).join()
+        waiter.get(timeout=5)
+        return crypto.ERR_peek_error(), client
+
+    left, _client = _in_own_hub(scenario)
+    assert left == 0
+
+
 def test_a_connection_the_browser_dropped_does_not_break_the_next_download(contexts):
     def scenario():
         listener = gevent.socket.socket()
