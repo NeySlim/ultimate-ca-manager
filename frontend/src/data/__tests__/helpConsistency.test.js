@@ -65,10 +65,11 @@ describe('SSO setup steps', () => {
   const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
   const guide = (lang) => (lang === 'en' ? helpGuides.sso : pages[`../help/${lang}/sso.js`].default.helpGuides).content
   // Settings > SSO shows one card per type with a Configure button; there is no "Add SSO Provider" button.
+  const oldLabel = { en: 'Add SSO Provider', fr: 'Ajouter un fournisseur SSO', ru: 'Добавить провайдера SSO', zh: '添加 SSO 提供者' }
   it.each(['en', 'fr', 'ru', 'zh'])('%s names the Configure button of each provider card', (lang) => {
     const { sso } = locales[`../../i18n/locales/${lang}.json`].default
     const text = guide(lang)
-    expect(text).not.toContain('Add SSO Provider')
+    expect(text).not.toContain(oldLabel[lang])
     expect(text).toContain(`**${sso.configure}**`)
     for (const type of ['saml', 'oauth2', 'ldap']) expect(text).toContain(`**${sso[type]}**`)
   })
