@@ -15,6 +15,8 @@ def sso_only(user) -> bool:
     if user.password_hash != SSO_NO_PASSWORD:
         return False
     return (user.auth_source or 'local') != 'local' or not user.force_password_change
+
+
 ID_BOUND = 64
 
 

@@ -162,7 +162,7 @@ Database migrations run automatically at startup.
 
 ### SSO role mapping reads more groups
 
-OIDC role mapping rules now also match the `groups` and `roles` of the ID token validated for the login, and a `roles` claim no longer hides `groups`; SAML and LDAP are unchanged. A user no rule matched before may now be admitted, or, with *Sync role on each login*, get a higher role at the next sign-in: review the mapping rules of OIDC providers before upgrading.
+OIDC role mapping rules now also match the `groups` and `roles` of the ID token validated for the login, and a `roles` claim no longer hides `groups`; SAML matching is unchanged, except that an assertion repeating an attribute name is now accepted with all its values, and the LDAP changes are in the next note. A user no rule matched before may now be admitted, or, with *Sync role on each login*, get a higher role at the next sign-in: review the mapping rules of OIDC providers before upgrading.
 
 ### LDAP role mapping compares group names as the directory does
 
