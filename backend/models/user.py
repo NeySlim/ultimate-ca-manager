@@ -39,13 +39,17 @@ class User(db.Model):
     """User model for authentication"""
     __tablename__ = "users"
     __table_args__ = (
+        # E-mail is unique among local accounts (#136); an SSO account may share it
+        db.Index('ix_users_email_local', 'email', unique=True,
+                 sqlite_where=db.text('NOT has_sso_identity'),
+                 postgresql_where=db.text('NOT has_sso_identity')),
         # A deleted account's id is never handed out again (migration 150 on upgrades)
         {'sqlite_autoincrement': True},
     )
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    # Not globally UNIQUE — see __table_args__ (unique per local account only).
+    # Unique among local accounts only: see ix_users_email_local.
     email = db.Column(db.String(120), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(255))  # Full name for WebAuthn/certificates
@@ -85,6 +89,9 @@ class User(db.Model):
     # User preferences (JSON-encoded; language, theme, density, etc.)
     # Persisted server-side so they follow the user across browsers/devices.
     preferences = db.Column(db.Text, nullable=True)
+    # Whether the account has a row in user_sso_identities, for ix_users_email_local only:
+    # written by sync_sso_flags alone, in the transaction that changes the rows.
+    has_sso_identity = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
 
     # Relationships
     custom_role = db.relationship('CustomRole', foreign_keys=[custom_role_id], lazy='select')
@@ -281,6 +288,104 @@ def local_email_holder(email, other_than=None):
     return query.order_by(User.id).first()
 
 
+def local_email_taken(email, other_than=None, message='Email already in use'):
+    """A 409 when a local account holds ``email``: the ``on_conflict`` of a commit the local
+    e-mail index refused, whichever request won the race."""
+    from utils.response import error_response
+    if email and local_email_holder(email, other_than=other_than) is not None:
+        return error_response(message, 409)
+    return None
+
+
+def sync_sso_flags(connection, user_ids=None):
+    """Set ``users.has_sso_identity`` from the identity rows, for ``user_ids`` or every account.
+
+    The one writer of the flag: the flush hooks below call it for the accounts whose rows an
+    ORM flush changed, and a path writing the rows in SQL calls it itself before committing.
+    The local e-mail index checks the accounts it turns local; returns the ids it changed."""
+    from sqlalchemy import exists
+    users, rows = User.__table__, UserSSOIdentity.__table__
+    held = exists().where(rows.c.user_id == users.c.id)
+    stmt = select(users.c.id).where(users.c.has_sso_identity != held)
+    ids = sorted(user_ids) if user_ids is not None else None
+    if ids is None:
+        changed = [uid for (uid,) in connection.execute(stmt)]
+    else:
+        changed = [uid for start in range(0, len(ids), 500) for (uid,) in connection.execute(
+            stmt.where(users.c.id.in_(ids[start:start + 500])))]
+    for start in range(0, len(changed), 500):
+        connection.execute(update(users).where(users.c.id.in_(changed[start:start + 500]))
+                           .values(has_sso_identity=held))
+    return changed
+
+
+_TOUCHED = '_sso_flag_accounts'
+
+
+def _accounts_touched(session, _context, _instances):
+    """Before a flush: the accounts whose identity rows it changes. One gaining a row is flagged
+    in its own row, so its INSERT or UPDATE never meets the local e-mail index."""
+    from sqlalchemy.orm.attributes import get_history
+    touched = []
+    with session.no_autoflush:
+        for obj in list(session.new) + list(session.dirty) + list(session.deleted):
+            if isinstance(obj, UserSSOIdentity):
+                touched.append(obj)
+                touched.extend(get_history(obj, 'user_id').deleted or ())
+                if obj not in session.deleted and obj.user is not None:
+                    obj.user.has_sso_identity = True
+            elif isinstance(obj, User) and obj not in session.deleted:
+                history = get_history(obj, 'sso_identities')
+                if history.has_changes():
+                    touched.append(obj)
+                if history.added or (obj in session.new and obj.sso_identities):
+                    obj.has_sso_identity = True
+    session.info[_TOUCHED] = touched
+
+
+def _flags_synced(session, _context):
+    """After a flush, in its transaction: the flag of each account touched, from the rows."""
+    touched = session.info.pop(_TOUCHED, None)
+    if not touched:
+        return
+    ids = set()
+    for item in touched:
+        if isinstance(item, User):
+            ids.add(item.id)
+        elif isinstance(item, UserSSOIdentity):
+            ids.add(item.user_id)
+        else:
+            ids.add(item)
+    ids.discard(None)
+    if not ids:
+        return
+    changed = sync_sso_flags(session.connection(), ids)
+    if changed:
+        _reload_flags(session, changed)
+
+
+def _reload_flags(session, ids):
+    """The flag of the accounts this session holds, as the database has it now."""
+    wanted = set(ids)
+    # By identity key: an account a statement deleted is expired, and reading its id raises
+    held = {key[1][0]: obj for key, obj in session.identity_map.items()
+            if key[0] is User and key[1][0] in wanted}
+    if not held:
+        return
+    users = User.__table__
+    for uid, flag in session.connection().execute(
+            select(users.c.id, users.c.has_sso_identity).where(users.c.id.in_(list(held)))):
+        set_committed_value(held[uid], 'has_sso_identity', bool(flag))
+
+
+def sync_sso_flags_in_session(session, user_ids=None):
+    """``sync_sso_flags`` on the session's connection, the accounts it holds reloaded."""
+    changed = sync_sso_flags(session.connection(), user_ids)
+    if changed:
+        _reload_flags(session, changed)
+    return changed
+
+
 class UserSSOIdentity(db.Model):
     """One provider that opens an account, and the stable identity it does so with.
 
@@ -344,3 +449,14 @@ class UserSSOIdentity(db.Model):
             'bound_at': utc_isoformat(self.bound_at),
             'created_by': self.created_by,
         }
+
+
+def _listen():
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+    if not event.contains(Session, 'before_flush', _accounts_touched):
+        event.listen(Session, 'before_flush', _accounts_touched)
+        event.listen(Session, 'after_flush', _flags_synced)
+
+
+_listen()

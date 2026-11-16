@@ -262,9 +262,11 @@ def test_the_runner_applies_it_to_a_database_file(tmp_path):
     assert migration_runner._run_pending_sqlite(['300_upgrade_from_2_254'], False, db_path=str(path))
     conn = sqlite3.connect(path)
     assert 'AUTOINCREMENT' in _table_sql(conn).upper()
-    # Step 166, later in the same upgrade, takes auth_source out of users
+    # Step 166, later in the same upgrade, takes auth_source out of users and adds, last,
+    # has_sso_identity: this schema has no provider columns, so no account gets a row
+    assert conn.execute("SELECT COUNT(*) FROM user_sso_identities").fetchone() == (0,)
     assert conn.execute(f"SELECT * FROM {TABLE} ORDER BY id").fetchall() == \
-        [row[:3] + row[4:] for row in _USERS]
+        [row[:3] + row[4:] + (0,) for row in _USERS]
     assert conn.execute("SELECT name FROM _migrations").fetchall() == [('300_upgrade_from_2_254',)]
 
 

@@ -479,6 +479,7 @@ class RestoreCoreMixin:
                     results.update(remove_after_writes(replacement).report())
                 # On the final rows: an authority a replacement removes after the writes holds nothing
                 db.session.flush()
+                self._settle_local_emails(backup_data)
                 for key_id, held in key_binding.shared_keys().items():
                     if key_id not in shared_before:
                         raise BackupSchemaError(
@@ -728,8 +729,6 @@ class RestoreCoreMixin:
                 continue
             results[name] = apply_section(name, rows, plan)
 
-        db.session.flush()
-        self._refuse_shared_local_emails(backup_data)
 
         # Rows of another installation can name user ids this one has not handed out yet
         from services.backup import user_id_counter
@@ -775,6 +774,8 @@ class RestoreCoreMixin:
 
             if not carried_hash:
                 existing.password_hash = previous_hash
+            # Out of the local e-mail index until its identity rows are back (_settle_local_emails)
+            existing.has_sso_identity = True
             if legacy and 'auth_source' in user_data:
                 self._legacy_sso_identities.append((existing, user_data))
             results['users'] += 1
@@ -784,10 +785,18 @@ class RestoreCoreMixin:
         if nested:
             results['webauthn_credentials'] = nested
 
+    def _settle_local_emails(self, backup_data: Dict) -> None:
+        """On the final rows: the refusal of two local accounts on one e-mail, then the flag of
+        every account set from its identity rows, which the local e-mail index checks."""
+        from models.user import sync_sso_flags_in_session
+        self._refuse_shared_local_emails(backup_data)
+        sync_sso_flags_in_session(db.session)
+        db.session.flush()
+
     @staticmethod
     def _refuse_shared_local_emails(backup_data: Dict) -> None:
-        """E-mail is unique among local accounts (#136), which no index holds: a restored
-        local account may not share one with another local account here."""
+        """E-mail is unique among local accounts (#136): a restored local account may not share
+        one with another local account here. Said before ix_users_email_local refuses it."""
         from models import User
         from models.user import local_email_holder
         from .restore.conflict import RestoreConflictError

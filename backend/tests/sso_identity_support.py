@@ -2,6 +2,7 @@
 ``sso_orphan_of``), built with the identity rows the upgrade (step 166) gives them, and the reads
 the tests make of those rows."""
 from models import db, User, UserSSOIdentity
+from models.user import sync_sso_flags
 from utils.sso_identity_upgrade import identity_rows
 
 LEGACY = ('auth_source', 'sso_provider_id', 'sso_external_id', 'sso_orphan_of')
@@ -66,6 +67,7 @@ def attach_from_another_node(username, provider_id, external_id=None):
         user_id = conn.execute(select(users.c.id).where(users.c.username == username)).scalar_one()
         conn.execute(table.insert().values(user_id=user_id, provider_id=provider_id,
                                            external_id=external_id))
+        sync_sso_flags(conn, [user_id])
 
 
 def only(user):

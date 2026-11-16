@@ -2,7 +2,8 @@
 
 ``users.sso_provider_id``, ``sso_external_id`` and ``sso_orphan_of`` become rows of
 ``user_sso_identities``, and ``users.auth_source`` goes: an account is local when it has
-no row. Each account keeps the access it had. An account 2.254 treated as SSO (a source other
+no row, which ``users.has_sso_identity`` records for the index holding the e-mail of local
+accounts unique (``ix_users_email_local``, now on that flag). Each account keeps the access it had. An account 2.254 treated as SSO (a source other
 than local) gets one row; one older than migration 024 (local, no password, owing no change)
 gets one only where 024 or a provider deletion recorded its provider, and otherwise stays the
 legacy account the first provider to open it by name records itself on.
@@ -39,6 +40,12 @@ _COLUMNS = """
 )"""
 SQLITE_DDL = f"CREATE TABLE {TABLE} (\n    id INTEGER NOT NULL," + _COLUMNS.format(ts='DATETIME')
 PG_DDL = f"CREATE TABLE {TABLE} (\n    id SERIAL NOT NULL," + _COLUMNS.format(ts='TIMESTAMP WITHOUT TIME ZONE')
+FLAG = 'has_sso_identity'
+_HELD = f"EXISTS (SELECT 1 FROM {TABLE} i WHERE i.user_id = {USERS}.id)"
+SYNC_FLAGS = f"UPDATE {USERS} SET {FLAG} = {_HELD} WHERE {FLAG} <> {_HELD}"
+# The accounts local in 3.0 were local in 2.254, whose index held their e-mails unique
+LOCAL_EMAIL_INDEX = (f"CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_local ON {USERS} (email) "
+                     f"WHERE NOT {FLAG}")
 INDEXES = (
     f"CREATE INDEX IF NOT EXISTS ix_user_sso_identities_orphan ON {TABLE} (orphan_of, external_id)",
     f"CREATE INDEX IF NOT EXISTS ix_user_sso_identities_user_id ON {TABLE} (user_id)",
@@ -96,6 +103,10 @@ def _upgrade_sqlite(conn):
                 _copy_sqlite(conn, tables)
             if columns & set(DROPPED):
                 _drop_sqlite(conn)
+            if FLAG not in _columns_sqlite(conn, USERS):
+                conn.execute(f"ALTER TABLE {USERS} ADD COLUMN {FLAG} BOOLEAN DEFAULT 0 NOT NULL")
+            conn.execute(SYNC_FLAGS)
+            conn.execute(LOCAL_EMAIL_INDEX)
             conn.commit()
         except BaseException:
             conn.rollback()
@@ -161,6 +172,8 @@ def _upgrade_pg(conn):
     for statement in INDEXES:
         conn.execute(text(statement))
     columns = {c['name'] for c in inspector.get_columns(USERS)}
+    if FLAG not in columns:
+        conn.execute(text(f"ALTER TABLE {USERS} ADD COLUMN {FLAG} BOOLEAN DEFAULT false NOT NULL"))
     if set(DROPPED) <= columns:
         provider_ids = ({row[0] for row in conn.execute(text(f"SELECT id FROM {PROVIDERS}"))}
                         if PROVIDERS in tables else set())
@@ -174,11 +187,15 @@ def _upgrade_pg(conn):
                 "VALUES (:u, :p, :o, :e, timezone('utc', now()), "
                 "CASE WHEN CAST(:e AS VARCHAR) IS NULL THEN NULL ELSE timezone('utc', now()) END)"),
                 {'u': uid, 'p': pid, 'o': orphan, 'e': ext})
-    for index in LEGACY_INDEXES:
-        conn.execute(text(f"DROP INDEX IF EXISTS {index}"))
+    if columns & set(DROPPED):
+        # The 2.254 index of the same name read auth_source
+        for index in LEGACY_INDEXES:
+            conn.execute(text(f"DROP INDEX IF EXISTS {index}"))
     for column in DROPPED:
         if column in columns:
             conn.execute(text(f"ALTER TABLE {USERS} DROP COLUMN {column}"))
+    conn.execute(text(SYNC_FLAGS))
+    conn.execute(text(LOCAL_EMAIL_INDEX))
     logger.info("[166] SSO identities per account (PostgreSQL)")
 
 

@@ -374,7 +374,7 @@ def detach_user_sso_provider(user_id, identity_id):
 
     DELETE /api/v2/users/{user_id}/sso-identities/{identity_id}
     """
-    from models.user import local_email_holder
+    from models import user as user_model
     from api.v2.sso.account_state import SSO_NO_PASSWORD, identity_text
 
     user, refused = _sso_admin_target(user_id)
@@ -389,17 +389,20 @@ def detach_user_sso_provider(user_id, identity_id):
         return error_response('SSO attachment not found', 404)
     last = len(user.sso_identities) == 1
     # E-mail is unique among local accounts (#136): the last row going makes it one.
-    if last and local_email_holder(user.email, other_than=user.id) is not None:
+    taken = ('Another local account uses this e-mail address: change one of them before '
+             'detaching the last provider')
+    if last and user_model.local_email_holder(user.email, other_than=user.id) is not None:
         db.session.rollback()
-        return error_response('Another local account uses this e-mail address: change one of '
-                              'them before detaching the last provider', 409)
+        return error_response(taken, 409)
+    uid, email = user.id, user.email
     what = identity_text(row)
     user.sso_identities.remove(row)
     needs_password = last and user.password_hash == SSO_NO_PASSWORD
     if needs_password:
         user.force_password_change = True
 
-    ok, err = safe_commit(logger, f"Failed to detach user {user_id} from SSO")
+    ok, err = safe_commit(logger, f"Failed to detach user {user_id} from SSO",
+                          on_conflict=lambda: user_model.local_email_taken(email, uid, taken))
     if not ok:
         return err
     closed = sessions_closed_by(user)

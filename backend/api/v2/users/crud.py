@@ -13,8 +13,10 @@ from auth.twofa_enforcement import lock_user
 from utils.response import success_response, error_response, created_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
+from sqlalchemy.exc import IntegrityError
+
 from models import db, User
-from models.user import local_email_holder
+from models.user import local_email_holder, local_email_taken
 from services.audit_service import AuditService
 from services.deletion_blockers import parse_bulk_ids
 
@@ -339,7 +341,9 @@ def create_user():
     user.set_password(data['password'])
 
     db.session.add(user)
-    ok, err = safe_commit(logger, "Failed to create user")
+    email = data['email']
+    ok, err = safe_commit(logger, "Failed to create user", on_conflict=lambda: local_email_taken(
+        email, message='Email already exists'))
     if not ok:
         return err
 
@@ -511,6 +515,11 @@ def update_user(user_id):
         )
     except Exception as e:
         db.session.rollback()
+        # The local e-mail index refused a change a concurrent request beat this one to
+        if isinstance(e, IntegrityError) and 'email' in data:
+            taken = local_email_taken(data['email'], other_than=user_id)
+            if taken is not None:
+                return taken
         logger.error(f"Failed to update user: {e}", exc_info=True)
         return error_response('Failed to update user', 500)
 

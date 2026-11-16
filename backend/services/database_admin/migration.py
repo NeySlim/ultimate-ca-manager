@@ -118,6 +118,8 @@ BOOTSTRAP_AUTH_TABLES = (
     "pro_custom_roles",
     "pro_role_permissions",
     "pro_sso_providers",
+    # The providers that open each account, and the flag users.has_sso_identity reads them by
+    "user_sso_identities",
     "pro_sso_sessions",
     "webauthn_credentials",
     "webauthn_challenges",

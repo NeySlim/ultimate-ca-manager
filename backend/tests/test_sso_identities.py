@@ -53,11 +53,30 @@ def providers(app):
     make.saml = make(provider_type='saml', saml_entity_id=f'https://saml-{uuid.uuid4().hex[:6]}.example')
     yield make
     with app.app_context():
+        assert _untrue_flags() == []
         _cleanup()
         UserSSOIdentity.query.filter(UserSSOIdentity.provider_id.in_(made)).delete(
             synchronize_session=False)
         SSOProvider.query.filter(SSOProvider.id.in_(made)).delete(synchronize_session=False)
         db.session.commit()
+
+
+def _untrue_flags():
+    """Accounts whose has_sso_identity says otherwise than their identity rows."""
+    from sqlalchemy import exists, select
+    users, rows = User.__table__, UserSSOIdentity.__table__
+    held = exists().where(rows.c.user_id == users.c.id)
+    return db.session.execute(select(users.c.username, users.c.has_sso_identity)
+                              .where(users.c.has_sso_identity != held)).all()
+
+
+@pytest.fixture(autouse=True)
+def _the_local_flag_tells_the_truth(request):
+    """After every scenario, the flag the local e-mail index reads agrees with the rows."""
+    yield
+    if 'app' in request.fixturenames:
+        with request.getfixturevalue('app').app_context():
+            assert _untrue_flags() == []
 
 
 def _ext(provider_id, stable):
@@ -259,6 +278,86 @@ def test_rows_not_bound_yet_may_share_a_provider_across_accounts(app, providers)
     uids = [_add(app, username=_name(), auth_source='oauth2', sso_provider_id=providers.oidc,
                  password_hash=NOPASS) for _ in range(2)]
     assert [_rows(app, uid) for uid in uids] == [[(providers.oidc, None, None)]] * 2
+
+
+# ── The database holds the e-mail of local accounts unique (#136) ─────────
+
+def _insert_user(name, email, sso):
+    db.session.execute(User.__table__.insert().values(
+        username=name, email=email, password_hash='hash', role='viewer', has_sso_identity=sso))
+
+
+def test_the_database_refuses_a_second_local_account_on_one_email(app, providers):
+    first, second, third = _name(), _name(), _name()
+    email = f'{first}@corp.example'
+    with app.app_context():
+        _insert_user(first, email, False)
+        # An account a provider opens may share it
+        _insert_user(second, email, True)
+        db.session.commit()
+        with pytest.raises(IntegrityError):
+            _insert_user(third, email, False)
+            db.session.flush()
+        db.session.rollback()
+        db.session.execute(User.__table__.delete().where(User.username.in_([first, second])))
+        db.session.commit()
+
+
+def test_two_creations_at_once_one_passes_the_other_gets_409(app, auth_client, monkeypatch):
+    """Both pass the check before either commits: the index refuses the second."""
+    import api.v2.users.crud as crud
+    email = f'{_name()}@corp.example'
+    body = dict(password='Race-Condition-42!', email=email, role='viewer')
+    first = auth_client.post('/api/v2/users', json=dict(body, username=_name()))
+    assert first.status_code == 201, first.get_json()
+    monkeypatch.setattr(crud, 'local_email_holder', lambda *a, **k: None)
+    name = _name()
+    second = auth_client.post('/api/v2/users', json=dict(body, username=name))
+    assert second.status_code == 409, second.get_json()
+    with app.app_context():
+        assert User.query.filter_by(username=name).count() == 0
+    auth_client.delete(f"/api/v2/users/{first.get_json()['data']['id']}")
+
+
+def test_detaching_the_last_provider_at_once_with_a_new_local_account_gets_409(
+        app, providers, auth_client, monkeypatch):
+    import models.user as user_model
+    local, name = _name(), _name()
+    email = f'{local}@corp.example'
+    _add(app, username=local, email=email, password_hash='hash')
+    uid = _add(app, username=name, email=email, auth_source='oauth2',
+               sso_provider_id=providers.oidc, password_hash=NOPASS)
+    real, calls = user_model.local_email_holder, []
+
+    def not_yet(*args, **kwargs):
+        # The check runs before the local account commits; the answer to the refusal after
+        calls.append(args)
+        return None if len(calls) == 1 else real(*args, **kwargs)
+
+    monkeypatch.setattr(user_model, 'local_email_holder', not_yet)
+    r = _detach(app, auth_client, uid, providers.oidc)
+    assert r.status_code == 409, r.get_json()
+    assert _rows(app, uid) == [(providers.oidc, None, None)]
+
+
+def test_the_flag_follows_every_change_of_the_rows(app, providers, auth_client):
+    name = _name()
+    uid = _add(app, username=name, password_hash='hash')
+
+    def flag():
+        with app.app_context():
+            return db.session.execute(db.select(User.has_sso_identity).where(User.id == uid)).scalar()
+
+    assert flag() is False
+    assert _attach(auth_client, uid, providers.oidc).status_code == 201
+    assert flag() is True
+    assert _detach(app, auth_client, uid, providers.oidc).status_code == 200
+    assert flag() is False
+    # A row written outside the session, as another node would, goes through the same writer
+    from tests.sso_identity_support import attach_from_another_node
+    with app.app_context():
+        attach_from_another_node(name, providers.saml)
+    assert flag() is True
 
 
 # ── Detaching ───────────────────────────────────────────────────────────────
@@ -518,6 +617,10 @@ def test_each_2254_account_gets_the_rows_that_keep_its_access(upgraded_2254):
     assert len(states) >= len(STATES_2254) - len(_ONLY_SQLITE)
     assert {state[0]: got.get(state[0], []) for state in states} == \
         {state[0]: state[-1] for state in states}
+    # The flag the local e-mail index reads says which accounts got rows
+    flags = {name: bool(flag) for name, flag in
+             upgraded_2254.run("SELECT username, has_sso_identity FROM users")}
+    assert flags == {state[0]: bool(state[-1]) for state in states}
     columns = upgraded_2254.run("SELECT * FROM users WHERE id = 1")
     assert len(columns) == 1
     bound_at = upgraded_2254.run(
@@ -527,12 +630,25 @@ def test_each_2254_account_gets_the_rows_that_keep_its_access(upgraded_2254):
 
 def test_the_upgrade_step_runs_again_without_changing_anything(upgraded_2254):
     from migrations._from_2_254 import step
-    before = upgraded_2254.run("SELECT user_id, provider_id, external_id, orphan_of FROM "
-                               "user_sso_identities ORDER BY id")
+    def state():
+        return (upgraded_2254.run("SELECT user_id, provider_id, external_id, orphan_of FROM "
+                                  "user_sso_identities ORDER BY id"),
+                upgraded_2254.run("SELECT id, has_sso_identity FROM users ORDER BY id"))
+    before = state()
     with upgraded_2254.connection() as conn:
         step('166_user_sso_identities').upgrade(conn)
-    assert upgraded_2254.run("SELECT user_id, provider_id, external_id, orphan_of FROM "
-                             "user_sso_identities ORDER BY id") == before
+    assert state() == before
+
+
+def test_the_upgraded_index_refuses_a_second_local_account_on_one_email(upgraded_2254):
+    from sqlalchemy.exc import IntegrityError as Refused
+    insert = ("INSERT INTO users (username, email, password_hash, role, has_sso_identity) "
+              "VALUES (:n, :e, 'h', 'viewer', :s)")
+    # 'bound' is opened by a provider: a local account may take its e-mail, and an SSO one 'local's
+    upgraded_2254.run(insert, {'n': 'new-local', 'e': 'bound@x.test', 's': False})
+    upgraded_2254.run(insert, {'n': 'new-sso', 'e': 'local@x.test', 's': True})
+    with pytest.raises(Refused):
+        upgraded_2254.run(insert, {'n': 'second-local', 'e': 'local@x.test', 's': False})
 
 
 def test_the_upgraded_constraints_refuse_a_second_owner(upgraded_2254):

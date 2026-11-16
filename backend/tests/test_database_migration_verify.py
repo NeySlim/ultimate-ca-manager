@@ -17,6 +17,7 @@ from sqlalchemy import create_engine, inspect as sa_inspect, text
 from services.database_admin import verify as verify_mod
 from services.database_admin.verify import (
     VerificationError,
+    check_local_email_flags,
     check_foreign_keys,
     check_row_counts,
     check_schema,
@@ -51,20 +52,21 @@ def target(app):
         os.unlink(path)
 
 
-def _add_user(engine, user_id, username, *, email=None,
+def _add_user(engine, user_id, username, *, email=None, sso=False,
               totp_secret=None):
     """Insert one user row directly, the way the bulk loader does."""
     with engine.begin() as conn:
         conn.execute(
             text('INSERT INTO users (id, username, email, password_hash, role, '
-                 'totp_secret) VALUES (:id, :username, :email, '
-                 ':password_hash, :role, :totp_secret)'),
+                 'has_sso_identity, totp_secret) VALUES (:id, :username, :email, '
+                 ':password_hash, :role, :sso, :totp_secret)'),
             {
                 'id': user_id,
                 'username': username,
                 'email': email or f'{username}@example.test',
                 'password_hash': 'not-a-real-hash',
                 'role': 'viewer',
+                'sso': sso,
                 'totp_secret': totp_secret,
             },
         )
@@ -150,7 +152,7 @@ class TestVerifyMigration:
         assert report['target_backend'] == 'sqlite'
         assert set(report['checks']) == {
             'schema', 'row_counts', 'foreign_keys', 'unique_constraints',
-            'sequences', 'secrets',
+            'local_email_flags', 'sequences', 'secrets',
         }
         assert report['checks']['row_counts']['rows'] == 4
         assert report['checks']['foreign_keys']['constraints_checked'] > 0
@@ -325,7 +327,7 @@ class TestUniqueConstraints:
 
     def test_duplicate_on_a_unique_constraint_is_detected(self, target, monkeypatch):
         _add_user(target, 1, 'local_user', email='shared@example.test')
-        _add_user(target, 2, 'sso_user', email='shared@example.test')
+        _add_user(target, 2, 'sso_user', email='shared@example.test', sso=True)
 
         monkeypatch.setattr(verify_mod, 'inspect', lambda engine: _InspectorWithExtras(
             sa_inspect(engine), 'users',
@@ -340,7 +342,7 @@ class TestUniqueConstraints:
 
     def test_duplicate_on_a_unique_index_is_detected(self, target, monkeypatch):
         _add_user(target, 1, 'local_user', email='shared@example.test')
-        _add_user(target, 2, 'sso_user', email='shared@example.test')
+        _add_user(target, 2, 'sso_user', email='shared@example.test', sso=True)
 
         monkeypatch.setattr(verify_mod, 'inspect', lambda engine: _InspectorWithExtras(
             sa_inspect(engine), 'users',
@@ -363,6 +365,33 @@ class TestUniqueConstraints:
                       'unique': 1, 'dialect_options': {}}]))
 
         assert check_unique_constraints(target)['duplicate_groups'] == 0
+
+
+class TestLocalEmailFlags:
+    """has_sso_identity, which the local e-mail index reads, agrees with the identity rows."""
+
+    def test_agreeing_flags_pass(self, target):
+        _add_user(target, 1, 'local_user', email='shared@example.test')
+        _add_user(target, 2, 'sso_user', email='shared@example.test', sso=True)
+        with target.begin() as conn:
+            conn.execute(text("INSERT INTO user_sso_identities (user_id, orphan_of) "
+                              "VALUES (2, 'oauth2:https://idp.example')"))
+        assert check_local_email_flags(target)['accounts_checked'] == 2
+
+    def test_a_flag_without_its_row_is_refused(self, target):
+        # Out of the index, this account could share the e-mail of a local one unnoticed
+        _add_user(target, 1, 'flagged', sso=True)
+        with pytest.raises(VerificationError) as excinfo:
+            check_local_email_flags(target)
+        assert 'has_sso_identity' in str(excinfo.value)
+
+    def test_a_row_without_its_flag_is_refused(self, target):
+        _add_user(target, 1, 'unflagged')
+        with target.begin() as conn:
+            conn.execute(text("INSERT INTO user_sso_identities (user_id, orphan_of) "
+                              "VALUES (1, 'oauth2:https://idp.example')"))
+        with pytest.raises(VerificationError):
+            check_local_email_flags(target)
 
 
 # ---------------------------------------------------------------------------
