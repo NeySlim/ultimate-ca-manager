@@ -75,3 +75,33 @@ def removal_warning(entry_id, name, fingerprint):
     return (f'Trust store entry {entry_id} "{name}" (SHA-256 {fingerprint or "unknown"}) held a private key, '
             'removed: it was readable by every account allowed to read the trust store and by every '
             'backup; replace that key')
+
+
+def report_removed_keys(app) -> int:
+    """At start: one audit entry and one WARNING per entry the upgrade removed a private key from, once.
+
+    The list is deleted in the transaction of the first entry: a node that finds it gone reports nothing."""
+    import json
+    import logging
+    from models import db, SystemConfig
+    from services.audit_service import AuditService
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=REMOVED_KEY).first()
+        if row is None:
+            return 0
+        try:
+            entries = [e for e in json.loads(row.value or '[]') if isinstance(e, dict)]
+        except ValueError:
+            entries = []
+        if not db.session.execute(db.delete(SystemConfig).where(SystemConfig.key == REMOVED_KEY)).rowcount:
+            db.session.rollback()
+            return 0
+        if not entries:
+            db.session.commit()
+            return 0
+        for entry in entries:
+            text = removal_warning(entry.get('id'), entry.get('name'), entry.get('fingerprint_sha256'))
+            logging.getLogger(__name__).warning("%s", text)
+            AuditService.log_action(action=REMOVED_ACTION, resource_type='truststore', resource_id=entry.get('id'),
+                                    resource_name=entry.get('name'), details=text, success=True, username='system')
+        return len(entries)
