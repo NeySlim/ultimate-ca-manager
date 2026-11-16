@@ -263,16 +263,20 @@ def test_a_service_account_bounded_to_a_subtree_never_searches_the_root(
 
 
 @pytest.mark.parametrize('raised', [False, True], ids=['no_such_object', 'raised'])
-def test_a_refused_parent_is_searched_again_under_the_base_dn(env, monkeypatch, raised):
+def test_a_refused_parent_is_searched_again_under_the_base_dn(env, monkeypatch, raised, caplog):
     user = env.user()
     d = _corp(monkeypatch, user)
     if raised:
         d.denied.clear()
         d.raising_groups.add('dc=example,dc=com')
     pid = _member_provider(env, ldap_base_dn='ou=corp,dc=example,dc=com')
-    assert env.login(pid, user)[0] == 200
+    with caplog.at_level(logging.INFO):
+        assert env.login(pid, user)[0] == 200
     assert env.role(user) == 'admin'
     assert _group_bases(d) == ['dc=example,dc=com', 'ou=corp,dc=example,dc=com']
+    # The extra search each login pays is visible to the operator
+    assert [r.getMessage() for r in caplog.records if 'after a refused search' in r.getMessage()
+            and 'ou=corp,dc=example,dc=com' in r.getMessage()]
 
 
 def test_a_parent_and_a_base_dn_both_refused_are_unreadable(env, monkeypatch, auth_client):

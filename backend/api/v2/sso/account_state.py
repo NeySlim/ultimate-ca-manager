@@ -10,9 +10,11 @@ SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
 
 
 def sso_only(user) -> bool:
-    """An account bound to a provider and without a local password: the provider alone
-    opens it, so no password door may hand it a password."""
-    return (user.auth_source or 'local') != 'local' and user.password_hash == SSO_NO_PASSWORD
+    """An account without a local password that its SSO provider alone opens: no self-service
+    door may hand it one. An account unlinked to set a password (a change owed) is not one."""
+    if user.password_hash != SSO_NO_PASSWORD:
+        return False
+    return (user.auth_source or 'local') != 'local' or not user.force_password_change
 ID_BOUND = 64
 
 

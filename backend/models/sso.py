@@ -125,22 +125,6 @@ class SSOProvider(db.Model):
             val = ''
         return f"{self.provider_type}:{val}" if val else None
 
-    def idp_keys(self):
-        """Every key under which a deleted provider for this same IdP may have been
-        recorded: an OIDC provider kept without an issuer was keyed by its UserInfo URL."""
-        keys = [self.idp_key()]
-        if self.provider_type == 'oauth2':
-            userinfo = (self.oauth2_userinfo_url or '').strip().rstrip('/')
-            if userinfo:
-                keys.append(f"oauth2:{userinfo}")
-        return [k for k in dict.fromkeys(keys) if k]
-
-    def directory_base_dn(self):
-        """The lower-cased base DN an LDAP ``idp_key`` ends with, else None."""
-        if self.provider_type != 'ldap':
-            return None
-        return (self.ldap_base_dn or '').strip().lower()
-
     # Encrypted property accessors for secrets
     @property
     def oauth2_client_secret(self):
