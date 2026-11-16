@@ -207,8 +207,11 @@ def _reserve_ldap_attempt(username):
     """Count one LDAP attempt before the bind, on the local account of this name.
 
     Returns (account, rank): account None when no local account has the name (nothing
-    is counted), rank None when it is locked. Raises, rolled back, when the count fails."""
-    user = User.query.filter_by(username=username).first()
+    is counted), rank None when it is locked. Raises, rolled back, when the count fails.
+    The name is matched without case, as the directory does; an exact match comes first."""
+    candidates = User.query.filter(db.func.lower(User.username) == username.lower()).all()
+    user = next((u for u in candidates if u.username == username),
+                min(candidates, key=lambda u: u.id, default=None))
     if not user:
         return None, None
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()

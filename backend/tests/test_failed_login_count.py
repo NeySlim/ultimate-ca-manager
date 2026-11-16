@@ -333,6 +333,47 @@ def test_a_locally_disabled_ldap_account_does_not_count(app, client, ldap_user, 
         assert tuple(_stored(ldap_user)) == (2, None)
 
 
+def _case_blind_directory(binds, stored_name):
+    """A directory whose name match ignores case (uid, sAMAccountName) and returns its own."""
+    def bind(provider, name, password):
+        binds.append(name)
+        if name.lower() != stored_name.lower() or password != PASSWORD:
+            return None, 'Invalid credentials'
+        return _bind_result(stored_name), None
+    return bind
+
+
+def test_an_ldap_name_in_another_case_is_counted_on_the_same_account(
+        app, client, ldap_user, ldap_provider, monkeypatch):
+    import api.v2.sso.ldap_routes as ldap_routes
+    binds = []
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
+                        _case_blind_directory(binds, ldap_user))
+    for _ in range(BURST * 2):
+        assert client.post(LDAP_DOOR, json=_ldap_body(ldap_user.upper(), ldap_provider)
+                           ).status_code == 401
+    assert len(binds) == MAX_ATTEMPTS
+    response = client.post(LDAP_DOOR, json=_ldap_body(ldap_user.upper(), ldap_provider, PASSWORD))
+    assert response.status_code == 401
+    assert len(binds) == MAX_ATTEMPTS
+    with app.app_context():
+        failures, locked_until = _stored(ldap_user)
+    assert failures == MAX_ATTEMPTS and locked_until is not None
+
+
+def test_an_ldap_success_in_another_case_clears_the_account(
+        app, client, ldap_user, ldap_provider, monkeypatch):
+    import api.v2.sso.ldap_routes as ldap_routes
+    with app.app_context():
+        _another_node_writes(ldap_user, failed_logins=MAX_ATTEMPTS - 2)
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
+                        _case_blind_directory([], ldap_user))
+    response = client.post(LDAP_DOOR, json=_ldap_body(ldap_user.upper(), ldap_provider, PASSWORD))
+    assert response.status_code == 200
+    with app.app_context():
+        assert tuple(_stored(ldap_user)) == (0, None)
+
+
 def test_an_ldap_count_that_cannot_be_stored_answers_500_unbound(app, client, username,
                                                                 ldap_provider, monkeypatch):
     import api.v2.sso.ldap_routes as ldap_routes
