@@ -360,6 +360,34 @@ def test_a_proved_ldap_password_refused_for_another_reason_does_not_count(
         assert tuple(_stored(username)) == (MAX_ATTEMPTS - 1, None)
 
 
+def test_a_proved_ldap_password_leaves_the_lock_another_attempt_armed(
+        app, client, username, ldap_provider, alerts, monkeypatch):
+    """Released while wrong passwords locked the account: the lock stays, so no more
+    than max_login_attempts binds are made in all."""
+    import api.v2.sso.ldap_routes as ldap_routes
+    binds = []
+
+    def group_denied_while_a_burst_locks(provider, name, password, before_bind=None):
+        if not _found(name, before_bind):
+            return None, 'attempt_refused'
+        binds.append(password)
+        if password != PASSWORD:
+            return None, 'Invalid credentials'
+        with app.app_context():
+            for _ in range(MAX_ATTEMPTS - 1):
+                assert client.post(LDAP_DOOR, json=_ldap_body(name, ldap_provider)
+                                   ).status_code == 401
+        return None, 'group_denied'
+
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', group_denied_while_a_burst_locks)
+    assert client.post(LDAP_DOOR, json=_ldap_body(username, ldap_provider, PASSWORD)
+                       ).status_code == 403
+    assert client.post(LDAP_DOOR, json=_ldap_body(username, ldap_provider)).status_code == 401
+    assert len(binds) == MAX_ATTEMPTS and alerts == [username]
+    with app.app_context():
+        assert _stored(username)[1] is not None
+
+
 def test_a_locally_disabled_ldap_account_does_not_count(app, client, ldap_user, ldap_provider,
                                                         monkeypatch):
     import api.v2.sso.ldap_routes as ldap_routes

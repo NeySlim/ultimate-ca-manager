@@ -233,12 +233,12 @@ def _ldap_attempt_failed(user, armed):
                                 _get_ldap_lockout_settings()[0])
 
 
-def _release_ldap_attempt(user):
+def _release_ldap_attempt(user, armed):
     """The bind proved the password but no session opens: the attempt does not count."""
     if user is None:
         return
     try:
-        user.release_login_attempt(_get_ldap_lockout_settings()[0])
+        user.release_login_attempt(armed)
         db.session.commit()
     except Exception as e:
         db.session.rollback()

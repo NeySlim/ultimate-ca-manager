@@ -183,15 +183,17 @@ class User(db.Model):
         # Only an unlocked row is updated, so an attempt whose count reaches max armed it.
         return (row[0] if row[0] <= max_attempts else None), row[0] >= max_attempts
 
-    def release_login_attempt(self, max_attempts: int):
-        """Give back a reserved attempt whose secret was proved but opened no session,
-        and the lock it armed; the caller commits."""
-        from sqlalchemy import case
-        left = func.coalesce(User.failed_logins, 0) - 1
+    def release_login_attempt(self, armed: bool):
+        """Give back a reserved attempt whose secret was proved but opened no session, and
+        lift the lock only if this attempt armed it: one armed by another attempt stays,
+        so the attempts checked before it expires stay within the threshold. The caller
+        commits."""
+        values = {'failed_logins': func.coalesce(User.failed_logins, 0) - 1}
+        if armed:
+            values['locked_until'] = None
         db.session.execute(
             update(User).where(User.id == self.id, User.failed_logins > 0)
-            .values(failed_logins=left,
-                    locked_until=case((left < max_attempts, None), else_=User.locked_until))
+            .values(**values)
             .execution_options(synchronize_session=False))
         self._reload_lockout()
 
