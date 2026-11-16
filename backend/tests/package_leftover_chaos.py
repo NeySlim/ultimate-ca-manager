@@ -171,6 +171,15 @@ class Lab:
         return box, data, config, before, runs
 
 
+def lab_of(request, root, *args, **kwargs):
+    """A Lab whose boxes go once its class has passed: tens of thousands of files each,
+    kept only when a test failed since, as tmp_path is."""
+    failed = request.session.testsfailed
+    yield Lab(root, *args, **kwargs)
+    if request.session.testsfailed == failed:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def while_failing(box, out, before, data, config, why):
     """Whatever a faulty run left: every original at exactly one path; exit 1 puts all back;
     exit 2 names real paths only."""
@@ -205,12 +214,12 @@ class ChaosSuite:
     env = 'full'
 
     @pytest.fixture(scope='class')
-    def lab(self, tmp_path_factory):
-        return Lab(tmp_path_factory.mktemp('lab'), self.layout, self.env)
+    def lab(self, request, tmp_path_factory):
+        yield from lab_of(request, tmp_path_factory.mktemp('lab'), self.layout, self.env)
 
     @pytest.fixture(scope='class')
-    def outside_lab(self, tmp_path_factory):
-        return Lab(tmp_path_factory.mktemp('outside'), self.layout, self.env, outside=True)
+    def outside_lab(self, request, tmp_path_factory):
+        yield from lab_of(request, tmp_path_factory.mktemp('outside'), self.layout, self.env, outside=True)
 
     def _scenario(self, lab, first, second=None):
         """`first` = (call, mode) of the archiving run; `second` = (call, mode) of the same
@@ -430,8 +439,8 @@ class NothingRenamesSuite:
     layout = None
 
     @pytest.fixture(scope='class')
-    def lab(self, tmp_path_factory):
-        return Lab(tmp_path_factory.mktemp('lab'), self.layout, refused=True)
+    def lab(self, request, tmp_path_factory):
+        yield from lab_of(request, tmp_path_factory.mktemp('lab'), self.layout, refused=True)
 
     def test_every_fault_still_puts_everything_back(self, lab):
         """Failed or killed at any call, the next attempt puts everything back (exit 1); once

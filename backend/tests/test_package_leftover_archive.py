@@ -2050,3 +2050,16 @@ def test_a_completed_put_back_says_what_is_back_without_a_contradiction(tmp_path
             'what it had left in its archive is back in place now.\n') in out.stdout, out.stdout
     assert 'could not put back' not in out.stdout
     archived(box, out, data, config)
+
+
+@pytest.mark.parametrize('failures, kept', [(0, False), (1, True)])
+def test_a_chaos_lab_goes_when_its_class_passed_and_stays_after_a_failure(tmp_path, failures, kept):
+    import types
+    from tests.package_leftover_chaos import lab_of
+    session = types.SimpleNamespace(testsfailed=0)
+    labs = lab_of(types.SimpleNamespace(session=session), tmp_path / 'lab', 'plain')
+    lab = next(labs)
+    (lab.root / 'b1').mkdir(parents=True)
+    session.testsfailed += failures
+    assert next(labs, None) is None
+    assert lab.root.exists() is kept
