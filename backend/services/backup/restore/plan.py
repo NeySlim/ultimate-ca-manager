@@ -267,8 +267,8 @@ class RestorePlan:
 
     def _sso_identity_here(self, row: Dict[str, Any]) -> Optional[Any]:
         """The attachment here an archived one is: the account's row for the same provider,
-        else, for one whose provider is not here, its orphan of the same IdP; an orphan of an
-        unknown IdP is told apart by its identity, an account may hold several.
+        else, for one whose provider is not here, its orphan of the same IdP key (or of none)
+        with the same identity: an account may hold several orphans of one IdP.
         An orphan's identity holds NULLs, which the generic index matches with nothing."""
         from models import UserSSOIdentity
         user_id = self.resolve(_SSO_IDENTITIES, row, 'user_id')
@@ -419,8 +419,9 @@ def sso_identity_key(user_id, provider_id, orphan_of, external_id) -> Tuple:
 
 
 def _sso_identity_fields(key: Tuple) -> Tuple[str, ...]:
-    """The fields an identity key holds, for a message: an empty part of it names nothing."""
-    return tuple(field for field, part in zip(_SSO_IDENTITY_FIELDS, key) if part is not None)
+    """The fields that tell an identity key apart, for a message: the provider for a live
+    row, else the IdP key and the identity, either of which may be empty."""
+    return _SSO_IDENTITY_FIELDS[:2] if key[1] is not None else ('user_id',) + _SSO_IDENTITY_FIELDS[2:]
 
 
 def _identity_key(values: Dict[str, Any], fields: Tuple[str, ...],
@@ -587,8 +588,11 @@ def _identities_here(model, primary: str, fields: Tuple[str, ...]):
 def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate: str,
                             others: Optional[List[Any]] = None) -> str:
     others = ids[1:] if others is None else others
-    spelt = '/'.join('' if part is None else str(part) for part in key)
-    fields = _sso_identity_fields(key) if section_name == _SSO_IDENTITIES else SECTIONS[section_name].identity
+    fields, parts = SECTIONS[section_name].identity, key
+    if section_name == _SSO_IDENTITIES:
+        fields = _sso_identity_fields(key)
+        parts = [key[_SSO_IDENTITY_FIELDS.index(field)] for field in fields]
+    spelt = '/'.join('' if part is None else str(part) for part in parts)
     message = (f"{section_name} {spelt}: {len(ids)} rows here share this "
                f"{'/'.join(fields)} (id {', '.join(map(str, ids))}); "
                "the archive's rows of it go to them oldest first")

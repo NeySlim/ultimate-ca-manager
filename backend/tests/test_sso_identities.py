@@ -835,7 +835,7 @@ def test_two_identical_unknown_orphans_here_are_named_not_a_crash(app, providers
         results = _backup().restore_backup(blob, password, mode='merge')
     shared = [w for w in results['warnings'] if 'user_sso_identities' in w]
     assert len(shared) == 1 and 'orphan-twice' in shared[0], results['warnings']
-    assert 'share this user_id/external_id' in shared[0]
+    assert f'user_sso_identities {uid}//orphan-twice: 2 rows here share this user_id/orphan_of/external_id' in shared[0]
 
 
 def test_an_archived_orphan_of_a_known_idp_finds_its_own_row_not_the_oldest(app, providers):
@@ -865,13 +865,49 @@ def test_an_archived_orphan_of_a_known_idp_finds_its_own_row_not_the_oldest(app,
         assert not [w for w in results['warnings'] if 'user_sso_identities' in w], results['warnings']
 
 
-def test_the_shared_identity_warning_names_the_fields_its_key_holds():
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_orphans_of_one_idp_each_find_their_own_row_however_often_restored(app, providers, mode):
+    """The rows here are not in the archive's order: none is rewritten, none is added, twice over."""
+    from services.backup import manifest
+    password, idp = 'Correct-Horse-Battery-9', 'oauth2:https://known-idp.example/'
+    uid = _add(app, username=_name(), password_hash=NOPASS)
+
+    def orphans(*pairs):
+        for orphan_of, external_id in pairs:
+            row = UserSSOIdentity(user_id=uid, orphan_of=orphan_of)
+            row.bind(external_id)
+            db.session.add(row)
+            db.session.commit()
+
+    def held():
+        db.session.expire_all()
+        rows = UserSSOIdentity.query.filter_by(user_id=uid).order_by(UserSSOIdentity.id)
+        return [(r.id, r.orphan_of, r.external_id) for r in rows]
+
+    with app.app_context():
+        orphans((idp, 'e2'), (None, 'e1'), (idp, 'e1'), (idp, 'e3'))
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        UserSSOIdentity.query.filter_by(user_id=uid).delete()
+        db.session.commit()
+        orphans((idp, 'e1'), (idp, 'e2'), (idp, 'e3'), (None, 'e1'))
+        before = held()
+        for _ in range(2):
+            results = _backup().restore_backup(blob, password, mode=mode)
+            assert held() == before
+            assert not [w for w in results['warnings'] if 'user_sso_identities' in w], results['warnings']
+            assert results.get('removed', {}).get('user_sso_identities', 0) == 0
+
+
+def test_the_shared_identity_warning_names_the_fields_that_tell_its_key_apart():
     from services.backup.restore.plan import shared_identity_warning, sso_identity_key
-    for key, fields in ((sso_identity_key(2, 5, None, 'x'), 'user_id/provider_id'),
-                        (sso_identity_key(2, None, 'oauth2:k', 'x'), 'user_id/orphan_of/external_id'),
-                        (sso_identity_key(2, None, None, 'x'), 'user_id/external_id')):
+    for key, spelt, fields in (
+            (sso_identity_key(2, 5, None, 'x'), '2/5', 'user_id/provider_id'),
+            (sso_identity_key(2, None, 'oauth2:k', 'x'), '2/oauth2:k/x', 'user_id/orphan_of/external_id'),
+            (sso_identity_key(2, None, 'oauth2:k', None), '2/oauth2:k/', 'user_id/orphan_of/external_id'),
+            (sso_identity_key(2, None, None, 'x'), '2//x', 'user_id/orphan_of/external_id')):
         text = shared_identity_warning('user_sso_identities', key, [1, 2], 'left alone')
-        assert f'share this {fields} (id 1, 2)' in text, text
+        assert text.startswith(f'user_sso_identities {spelt}: 2 rows here share this {fields} (id 1, 2)'), text
 
 
 def test_an_orphan_archived_twice_comes_back_twice_beside_the_one_here(app, providers):
