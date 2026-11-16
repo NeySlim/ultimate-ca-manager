@@ -14,7 +14,7 @@ export default {
       {
         title: 'Champs du certificat',
         items: [
-          { label: 'Key ID', text: 'Identifiant que sshd journalise pour le titulaire. L\'AC le définit à principals@AC name, sauf si elle laisse les demandeurs le choisir.' },
+          { label: 'Key ID', text: 'Identifiant que sshd journalise pour le titulaire. L\'AC le définit à principals@nom de l\'AC, sauf si elle laisse les demandeurs le choisir.' },
           { label: 'Principals', text: 'Noms d\'utilisateur (certificat utilisateur) ou noms d\'hôte (certificat hôte) pour lesquels ce certificat est valide. Séparés par des virgules.' },
           { label: 'Validité', text: 'Durée de vie du certificat. Choisissez un préréglage (1h, 8h, 24h, 7j, 30j, 90j, 365j) ou définissez une durée personnalisée en secondes. Valide dès 5 minutes avant l\'émission, pour les serveurs dont l\'horloge retarde (v2.252).' },
           { label: 'Extensions', text: 'Extensions SSH telles que permit-pty, permit-agent-forwarding. Applicables uniquement aux certificats utilisateur.' },
@@ -96,7 +96,7 @@ UCM génère à la fois la paire de clés et le certificat. Utilisez ce mode lor
 ### Key ID
 Un identifiant intégré dans le certificat. Le serveur SSH le journalise lorsque le certificat est utilisé, comme identité du titulaire.
 
-L'AC le définit à \`principals@AC name\` (ex. \`deploy@Production User AC\`). Un demandeur ne peut en choisir un autre que sur une AC où **Laisser les demandeurs définir l'identifiant de clé** est coché ; ailleurs, une telle demande est refusée.
+L'AC le définit à \`principals@nom de l'AC\` (ex. \`deploy@AC utilisateur de production\`). Un demandeur ne peut en choisir un autre que sur une AC où **Laisser les demandeurs définir l'identifiant de clé** est coché ; ailleurs, une telle demande est refusée.
 
 **Bons exemples de Key ID, là où c'est autorisé :** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
 
@@ -169,7 +169,7 @@ echo "HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub" | sudo tee -a /etc
 sudo systemctl restart sshd
 \`\`\`
 
-Sur les clients, ajoutez la Host AC à known_hosts :
+Sur les clients, ajoutez l'AC hôte à known_hosts :
 \`\`\`
 @cert-authority *.example.com ssh-ed25519 AAAA...
 \`\`\`
@@ -193,7 +193,7 @@ Un certificat révoqué reste dans la KRL, et dans la liste, jusqu'à son expira
 | Certificat non utilisé | Assurez-vous que le fichier certificat est nommé \`<key>-cert.pub\` à côté de la clé privée |
 | Non-correspondance de principal | Le nom d'utilisateur SSH doit figurer dans les principals du certificat |
 | Certificat expiré | Émettez un nouveau certificat avec une validité appropriée |
-| Échec de vérification de l'hôte | Ajoutez la Host AC à known_hosts avec @cert-authority |
+| Échec de vérification de l'hôte | Ajoutez l'AC hôte à known_hosts avec @cert-authority |
 `
   }
 }

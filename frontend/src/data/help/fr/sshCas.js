@@ -7,8 +7,8 @@ export default {
       {
         title: 'Types d\'AC',
         items: [
-          { label: 'User AC', text: 'Signe des certificats utilisateur pour la connexion SSH. Les serveurs font confiance à cette AC et acceptent tout certificat signé par elle.' },
-          { label: 'Host AC', text: 'Signe des certificats d\'hôte pour prouver l\'identité du serveur. Les clients font confiance à cette AC pour vérifier qu\'ils se connectent au bon serveur.' },
+          { label: 'AC utilisateur', text: 'Signe des certificats utilisateur pour la connexion SSH. Les serveurs font confiance à cette AC et acceptent tout certificat signé par elle.' },
+          { label: 'AC hôte', text: 'Signe des certificats d\'hôte pour prouver l\'identité du serveur. Les clients font confiance à cette AC pour vérifier qu\'ils se connectent au bon serveur.' },
         ]
       },
       {
@@ -37,7 +37,7 @@ export default {
           { label: 'Script de configuration Windows', text: 'Téléchargez un script PowerShell (.ps1) qui configure Windows OpenSSH Server (écrit la clé publique de l\'AC dans %ProgramData%\\ssh, verrouille les ACL, ajoute TrustedUserCAKeys / HostCertificate dans sshd_config, valide avec sshd -T, redémarre sshd). Installation rapide : iwr <url> | iex' },
           { label: 'Bloc de diagnostic', text: 'En cas d\'échec d\'Add-WindowsCapability (WSUS / machine jointe au domaine), le script affiche un bloc étiqueté expliquant l\'état de la politique et trois pistes de remédiation, il ne modifie jamais la politique WSUS / WU lui-même' },
           { label: 'Dry-run', text: 'Les deux scripts prennent en charge un drapeau -DryRun / --dry-run pour prévisualiser les modifications sans les appliquer' },
-          { label: 'Configuration manuelle', text: 'Copiez la clé publique de l\'AC et ajoutez TrustedUserCAKeys (User AC) ou HostCertificate (Host AC) dans sshd_config' },
+          { label: 'Configuration manuelle', text: 'Copiez la clé publique de l\'AC et ajoutez TrustedUserCAKeys (AC utilisateur) ou HostCertificate (AC hôte) dans sshd_config' },
         ]
       },
       {
@@ -66,7 +66,7 @@ export default {
       {
         title: 'Key ID',
         items: [
-          { label: 'Défini par l\'AC', text: 'sshd journalise le key ID comme identité du titulaire. Par défaut, l\'AC nomme chaque certificat principals@AC name, et une demande qui définit un autre key ID est refusée.' },
+          { label: 'Défini par l\'AC', text: 'sshd journalise le key ID comme identité du titulaire. Par défaut, l\'AC nomme chaque certificat principals@nom de l\'AC, et une demande qui définit un autre key ID est refusée.' },
           { label: 'Laisser les demandeurs définir l\'identifiant de clé', text: 'Cochez cette option pour laisser les demandeurs choisir le leur, par ex. un numéro de ticket ou d\'employé.' },
           { label: 'Mise à niveau', text: 'À partir de 2.249, les AC existantes démarrent aussi avec l\'option décochée.' },
         ]
@@ -93,8 +93,8 @@ UCM prend en charge le format de certificat OpenSSH (RFC 4253 + extensions OpenS
 
 ## Types d'AC
 
-### User AC
-Une User AC signe des certificats qui authentifient les **utilisateurs auprès des serveurs**. Lorsqu'un serveur fait confiance à une User AC, tout utilisateur présentant un certificat valide signé par cette AC est autorisé à se connecter (sous réserve de correspondance des principals).
+### AC utilisateur
+Une AC utilisateur signe des certificats qui authentifient les **utilisateurs auprès des serveurs**. Lorsqu'un serveur fait confiance à une AC utilisateur, tout utilisateur présentant un certificat valide signé par cette AC est autorisé à se connecter (sous réserve de correspondance des principals).
 
 **Configuration du serveur :**
 \`\`\`
@@ -102,8 +102,8 @@ Une User AC signe des certificats qui authentifient les **utilisateurs auprès d
 TrustedUserCAKeys /etc/ssh/user_ca.pub
 \`\`\`
 
-### Host AC
-Une Host AC signe des certificats qui authentifient les **serveurs auprès des clients**. Lorsqu'un client fait confiance à une Host AC, il peut vérifier que le serveur auquel il se connecte est légitime : éliminant les avertissements TOFU (Trust On First Use).
+### AC hôte
+Une AC hôte signe des certificats qui authentifient les **serveurs auprès des clients**. Lorsqu'un client fait confiance à une AC hôte, il peut vérifier que le serveur auquel il se connecte est légitime : éliminant les avertissements TOFU (Trust On First Use).
 
 **Configuration du client :**
 \`\`\`
@@ -146,7 +146,7 @@ Une AC dont la liste est vide ne signe rien, sauf si **Autoriser tout principal*
 
 ### Key ID
 
-sshd journalise le key ID d'un certificat comme identité du titulaire. L'AC le définit à \`principals@AC name\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les AC, y compris les existantes depuis 2.249.
+sshd journalise le key ID d'un certificat comme identité du titulaire. L'AC le définit à \`principals@nom de l'AC\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les AC, y compris les existantes depuis 2.249.
 
 ### Formats de TTL
 
@@ -179,14 +179,14 @@ Le script :
 - Détecte votre système d'exploitation et votre système d'init
 - Sauvegarde sshd_config avant toute modification
 - Installe la clé publique de l'AC
-- Ajoute TrustedUserCAKeys (User AC) ou HostCertificate (Host AC)
+- Ajoute TrustedUserCAKeys (AC utilisateur) ou HostCertificate (AC hôte)
 - Valide la configuration avec \`sshd -t\`
 - Redémarre sshd uniquement si la validation réussit
 - Supporte \`--dry-run\` pour prévisualiser les modifications
 
 ### Configuration manuelle
 
-#### User AC
+#### AC utilisateur
 \`\`\`bash
 # Copiez la clé publique de l'AC sur le serveur
 echo "ssh-ed25519 AAAA... user-ca" | sudo tee /etc/ssh/user_ca.pub
@@ -198,7 +198,7 @@ echo "TrustedUserCAKeys /etc/ssh/user_ca.pub" | sudo tee -a /etc/ssh/sshd_config
 sudo systemctl restart sshd
 \`\`\`
 
-#### Host AC
+#### AC hôte
 \`\`\`bash
 # Signez la clé d'hôte du serveur
 # Puis ajoutez à sshd_config :

@@ -54,6 +54,11 @@ describe('French wording of the certification authority', () => {
     const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])CAs?(?![\p{L}\p{N}_]).{0,20}/gu) || [])
     expect(found).toEqual([])
   })
+  // The key ID template and the SSH CA types are written as the French screens show them.
+  it('has no English fragments around the AC in the SSH help', () => {
+    const found = frStrings.flatMap((s) => s.match(/AC name|User AC|Host AC|Production User/g) || [])
+    expect(found).toEqual([])
+  })
   // "AC" is feminine and starts with a vowel: "l'AC", "d'AC", "cette AC", "toute AC", never "la AC", "tout AC", "l'CA".
   it('elides and agrees the article before AC', () => {
     const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])(?:la|le|de|du|ce|cet|au|un|sa|ma|ta|que|si|tout|nouveau|quel)\s+AC(?![\p{L}\p{N}_]).{0,20}|[\p{L}\p{N}_]+\\?['’]CA(?![\p{L}\p{N}_]).{0,20}/giu) || [])
