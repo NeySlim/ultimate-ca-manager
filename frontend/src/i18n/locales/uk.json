@@ -5156,6 +5156,7 @@
   },
   "export": {
     "title": "Експортувати",
+    "skippedUnreadable": "{{count}} unreadable certificate(s) were not exported",
     "format": "Формат",
     "options": "Параметри",
     "password": "Пароль",

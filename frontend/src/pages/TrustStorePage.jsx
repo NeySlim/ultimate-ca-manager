@@ -20,7 +20,7 @@ import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
-import { formatDate, cn, downloadBlob } from '../lib/utils'
+import { formatDate, cn, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
@@ -32,7 +32,7 @@ export default function TrustStorePage() {
   const navigate = useNavigate()
   const { isMobile } = useMobile()
   const openEntity = useOpenEntity()
-  const { showSuccess, showError, showConfirm } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { modals, open: openModal, close: closeModal } = useModals(['add', 'sync'])
   
@@ -288,6 +288,7 @@ export default function TrustStorePage() {
       const blob = response instanceof Blob ? response : response?.data instanceof Blob ? response.data : new Blob([response?.data || response], { type: 'application/x-pem-file' })
       downloadBlob(blob, `truststore-bundle.${format}`)
       showSuccess(t('trustStore.bundleExported'))
+      warnSkippedExport(response, t, showWarning)
     } catch (error) {
       showError(error.message || t('trustStore.exportFailed'))
     }

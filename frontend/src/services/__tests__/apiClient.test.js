@@ -311,6 +311,24 @@ describe('API Client', () => {
 
       expect(result).toEqual(mockBlob)
     })
+
+    it.each([
+      ['x-skipped-certificates-count', '3', 3],
+      ['x-skipped-cas-count', '2', 2],
+      ['x-other', '5', undefined],
+    ])('carries the count of an export\'s skipped rows on the blob (%s)', async (name, value, expected) => {
+      const mockBlob = new Blob(['pem'])
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/x-pem-file', [name]: value }),
+        blob: () => Promise.resolve(mockBlob),
+      })
+
+      const { apiClient } = await import('../apiClient')
+      const result = await apiClient.get('/certificates/export', { responseType: 'blob' })
+
+      expect(result.skippedCount).toBe(expected)
+    })
   })
 
   describe('401 Handling', () => {

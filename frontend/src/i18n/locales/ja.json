@@ -5095,6 +5095,7 @@
   },
   "export": {
     "title": "エクスポート",
+    "skippedUnreadable": "{{count}} unreadable certificate(s) were not exported",
     "format": "フォーマット",
     "options": "オプション",
     "password": "パスワード",
