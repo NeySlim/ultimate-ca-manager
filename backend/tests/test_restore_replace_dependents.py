@@ -136,6 +136,11 @@ def _orphans():
                 ~exists().where(target == column))
             for row in db.session.execute(query).all():
                 found.append(f'{dependent.name}.{column.name}={row[0]}')
+    # An authorization naming neither an order nor an account belongs to nobody
+    from models.acme_models import AcmeAuthorization
+    found.extend(f'acme_authorizations.authorization_id={row.authorization_id} (no owner)'
+                 for row in AcmeAuthorization.query.filter(AcmeAuthorization.order_id.is_(None),
+                                                           AcmeAuthorization.account_id.is_(None)))
     return found
 
 

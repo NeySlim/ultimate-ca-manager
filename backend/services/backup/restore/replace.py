@@ -202,7 +202,7 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'pro_sso_sessions': 'live SSO sessions',
     'webauthn_challenges': 'single-use challenges',
     'acme_orders': 'in-flight protocol state of the ACME server',
-    'acme_authorizations': 'in-flight protocol state, tied to orders',
+    'acme_authorizations': 'in-flight protocol state, tied to orders and accounts',
     'acme_challenges': 'in-flight protocol state, tied to authorizations',
     'acme_proxy_dns_challenges': 'expected TXT values of in-flight proxy orders',
     'acme_proxy_challenge_links': 'which in-flight proxy order a challenge belongs to',
@@ -265,8 +265,10 @@ def link_scope(dependent, column, named):
 CLOSED_WITH_TARGET = {('key_recovery_requests', 'cert_id')}
 
 # Links whose row goes with the row it names although the column allows none:
-# an approval of a certificate that is gone, as deleting the certificate does.
-REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id')}
+# an approval of a certificate that is gone, as deleting the certificate does, and
+# an ACME authorization of an order or account that is gone, as deleting the account does.
+REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id'),
+                       ('acme_authorizations', 'order_id'), ('acme_authorizations', 'account_id')}
 
 # An identity row whose provider goes keeps that provider's IdP key, as deleting the provider
 # does: only a provider for the exact same IdP takes it back (OIDC Core §5.7).
