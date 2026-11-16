@@ -278,6 +278,20 @@ def _validate_claims(claims, issuer, client_id, expected_nonce):
         raise OIDCValidationError('ID token is missing subject')
 
 
+def unverified_claims_are_valid(claims, provider, expected_nonce):
+    """True when an unsigned (compatibility) token passes every check but the signature.
+
+    OIDC Core §3.1.3.7 step 6 lets TLS stand in for the signature only; iss, aud,
+    azp, exp, iat and nonce (steps 2-5, 9-11) still apply.
+    """
+    try:
+        _validate_claims(claims or {}, getattr(provider, 'oauth2_issuer', None),
+                         getattr(provider, 'oauth2_client_id', None), expected_nonce)
+    except OIDCValidationError:
+        return False
+    return True
+
+
 def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=True):
     """Verify an OIDC ID token and return its trusted claims.
 

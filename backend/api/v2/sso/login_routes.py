@@ -13,7 +13,8 @@ from utils.db_transaction import safe_commit
 from models import db, User
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
-from services.oidc_id_token import OIDCValidationError, verify_id_token
+from services.oidc_id_token import (OIDCValidationError, unverified_claims_are_valid,
+                                    verify_id_token)
 from utils.datetime_utils import utc_now
 from utils.ssrf_protection import (
     safe_request_get,
@@ -408,12 +409,16 @@ def sso_callback(provider_type):
                 return redirect(_login_error('no_username', oauth2_next))
 
             # Token groups count only from the token of this login: nonce checked and
-            # same subject as UserInfo. Unsigned (compatibility) tokens came from the
-            # token endpoint over the UserInfo channel (OIDC Core 3.1.3.7, step 6).
+            # same subject as UserInfo. An unsigned (compatibility) token counts only over
+            # verified TLS with every other claim valid (OIDC Core 3.1.3.7, steps 2-6, 9).
             token_sub = (trusted_id_claims or {}).get('sub')
             bound_claims = trusted_id_claims if (
                 expected_nonce and isinstance(token_sub, str) and token_sub
                 and userinfo.get('sub') == token_sub) else None
+            if bound_claims is not None and not verification_enabled and (
+                    verify is False
+                    or not unverified_claims_are_valid(bound_claims, provider, expected_nonce)):
+                bound_claims = None
             external_data = dict(userinfo, groups=oidc_external_groups(userinfo, bound_claims))
 
             # Create or update user

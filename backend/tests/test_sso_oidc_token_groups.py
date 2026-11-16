@@ -7,6 +7,7 @@ token (same ``sub``, same nonce) and of its UserInfo response, nothing else.
 import base64
 import json
 import logging
+import time
 import uuid
 
 import pytest
@@ -159,19 +160,56 @@ def test_subject_mismatch_is_refused_before_anything_is_read(entra):
     assert entra.role_of('entra6') is None
 
 
-def test_unverified_token_groups_are_read_when_bound_to_the_login(entra):
-    # OIDC Core §3.1.3.7 (6): a token taken from the token endpoint may rely on TLS.
+def _valid_claims(sub, **extra):
+    now = int(time.time())
+    return dict({'sub': sub, 'iss': 'https://idp.example', 'aud': 'ucm-client',
+                 'iat': now, 'exp': now + 300}, **extra)
+
+
+def test_unverified_token_groups_are_read_when_its_claims_are_valid(entra):
+    # OIDC Core §3.1.3.7 (6): only the signature may give way to TLS; steps 2, 3, 9 hold.
     entra.configure(id_token_verify=False)
     loc = entra({'sub': 's7', 'preferred_username': 'entra7'},
-                {'sub': 's7', 'groups': ['grp-oid-admins']})
+                _valid_claims('s7', groups=['grp-oid-admins']))
     assert loc.endswith(OK)
     assert entra.role_of('entra7') == 'admin'
+
+
+@pytest.mark.parametrize('bad', [
+    {'aud': 'another-client'},
+    {'iss': 'https://evil.example'},
+    {'exp': 1},
+    {'aud': ['ucm-client', 'other'], 'azp': 'other'},
+], ids=['aud', 'iss', 'exp', 'azp'])
+def test_unverified_token_with_invalid_claims_gives_no_groups(entra, bad):
+    entra.configure(id_token_verify=False)
+    name = f"zz-{'-'.join(bad)}"
+    loc = entra({'sub': 'z1', 'preferred_username': name},
+                _valid_claims('z1', groups=['grp-oid-admins'], **bad))
+    assert loc.endswith(UNMAPPED)
+    assert entra.role_of(name) is None
+
+
+def test_unverified_token_without_tls_verification_gives_no_groups(entra):
+    entra.configure(id_token_verify=False, oauth2_verify_ssl=False)
+    loc = entra({'sub': 's13', 'preferred_username': 'entra13'},
+                _valid_claims('s13', groups=['grp-oid-admins']))
+    assert loc.endswith(UNMAPPED)
+    assert entra.role_of('entra13') is None
+
+
+def test_unverified_token_still_feeds_groups_from_userinfo(entra):
+    entra.configure(id_token_verify=False, oauth2_verify_ssl=False)
+    loc = entra({'sub': 's14', 'preferred_username': 'entra14', 'groups': ['UCM.Operator']},
+                {'sub': 's14', 'aud': 'another-client', 'groups': ['grp-oid-admins']})
+    assert loc.endswith(OK)
+    assert entra.role_of('entra14') == 'operator'
 
 
 def test_unverified_token_of_another_subject_gives_no_groups(entra):
     entra.configure(id_token_verify=False)
     loc = entra({'sub': 's8', 'preferred_username': 'entra8'},
-                {'sub': 'someone-else', 'groups': ['grp-oid-admins']})
+                _valid_claims('someone-else', groups=['grp-oid-admins']))
     assert loc.endswith(UNMAPPED)
     assert entra.role_of('entra8') is None
 
@@ -179,7 +217,7 @@ def test_unverified_token_of_another_subject_gives_no_groups(entra):
 def test_unverified_token_without_a_session_nonce_gives_no_groups(entra):
     entra.configure(id_token_verify=False)
     loc = entra({'sub': 's12', 'preferred_username': 'entra12'},
-                {'sub': 's12', 'groups': ['grp-oid-admins']}, nonce=None)
+                _valid_claims('s12', groups=['grp-oid-admins']), nonce=None)
     assert loc.endswith(UNMAPPED)
     assert entra.role_of('entra12') is None
 
