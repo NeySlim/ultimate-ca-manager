@@ -815,6 +815,38 @@ def test_a_row_deleted_while_a_newer_b_takes_its_a_leaves_that_link_on_postgresq
             db.session.remove()
 
 
+def test_a_link_a_newer_b_took_meanwhile_is_not_handed_over(app, tmp_path, monkeypatch):
+    """Newest B revoked alone while a B issued since takes A: same certificate A, another
+    link. The hand-over to the older B must not write over it."""
+    from services.cert import related_pair
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'handover-newer.db'}"):
+        a_id, (old_b, revoked_b, newer_b) = _linked_rows(app, n_b=3)
+        with app.app_context():
+            db.session.get(Certificate, newer_b).related_certificate_id = None  # not issued yet
+            db.session.get(Certificate, a_id).related_certificate_id = revoked_b
+            db.session.commit()
+            db.session.remove()
+        found, fired = related_pair._live_rows_linked_to, []
+
+        def then_taken(*args):
+            rows = found(*args)
+            if not fired:
+                fired.append([r.id for r in rows])
+                _linked_elsewhere(app, a_id, newer_b)
+            return rows
+
+        monkeypatch.setattr(related_pair, '_live_rows_linked_to', then_taken)
+        with app.app_context():
+            CertificateService.revoke_certificate(revoked_b, reason='keyCompromise', revoke_related=False)
+            monkeypatch.undo()
+            db.session.expire_all()
+            assert fired == [[old_b]]
+            assert db.session.get(Certificate, a_id).related_certificate_id == newer_b
+            db.session.remove()
+
+
 def test_a_link_is_handed_over_to_the_older_b(app, tmp_path):
     from services.cert_service import CertificateService
     from tests.test_backup_cross_installation import _bound_to

@@ -465,8 +465,10 @@ def _relink_or_leave(row, gone_id):
 
 def unlink_rows_naming(row_id):
     """Rows linked to *row_id*, whose certificate is gone or replaced, relink or leave their pair.
-    Each is locked and re-read first, A before B as a renewal locks them: one a newer B took
-    meanwhile (link_issued, under that lock) keeps its new link."""
+    Each is locked and re-read first, the A of *row_id* before it and its Bs after, as a
+    pair renewal locks them: one a newer B took meanwhile (link_issued, under that lock)
+    keeps its new link. A B renewed alone locks itself before its A: against a deletion of
+    that A, PostgreSQL may abort one of the two, and nothing is left half written."""
     linked = Certificate.query.filter(Certificate.related_certificate_id == row_id,
                                       Certificate.id != row_id).order_by(Certificate.id).all()
     if not linked:
