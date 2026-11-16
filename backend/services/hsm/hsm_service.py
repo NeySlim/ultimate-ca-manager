@@ -705,6 +705,9 @@ class HsmService:
         listing; an UNKNOWN reading never overwrites what the row holds."""
         if key_info.algorithm in HsmKey.VALID_ALGORITHMS and key_info.algorithm != known.algorithm:
             known.algorithm = key_info.algorithm
+            # A different algorithm at the same slot id means the slot was re-keyed:
+            # the cached public key belongs to the key that no longer exists.
+            known.public_key_pem = key_info.public_key_pem if _parses_as_spki(key_info.public_key_pem) else None
             cls.forget_signing_hash(known.id)
         if key_info.public_key_pem and not _parses_as_spki(known.public_key_pem) \
                 and _parses_as_spki(key_info.public_key_pem):

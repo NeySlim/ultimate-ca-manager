@@ -43,6 +43,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Updates: a later major version published as a final release is offered apart as a recommended upgrade with its release notes, installed only on an explicit, confirmed request (`major_upgrade: true` and its `version` on `POST /api/v2/system/updates/install`); `system.update_available` announces it once per major version, with `major_upgrade` set.
 - Updates: the Updates page states that this version line is in security maintenance: security fixes will keep coming, new features will not.
 
+### Fixed
+
+- A token slot that was re-keyed (for example an EC key replacing an RSA key in the same PIV slot) left the provider's stored algorithm and cached public key pointing at the key that no longer exists, and nothing in the UI could re-read the token. `sync_keys` now drops the cached public key when the algorithm reported at a key id changes, and the HSM page gained a "Sync keys" action that applies what the token reports.
+
 ## [2.254.1] - 2026-11-14
 
 ### Security
