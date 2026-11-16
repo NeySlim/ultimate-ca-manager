@@ -603,6 +603,8 @@
     "samlLoginExpired": "此次登录已过期，或是在其他标签页或浏览器中发起的。请从此页面重新开始。",
     "ssoUsernameConflict": "此次登录与一个已有账户匹配，该账户为本地账户或已关联到其他身份。请联系管理员关联这些账户。",
     "ssoUnmapped": "访问被拒绝：此登录提供方的角色映射规则均不匹配您的账户。请联系管理员。",
+    "ssoNoDefaultRole": "Access denied: this sign-in provider has no default role and no role mapping rule. Contact your administrator.",
+    "ssoEmailConflict": "Sign-in refused: another account already uses the email address of this sign-in. Contact your administrator.",
     "samlLogoutRejected": "无法验证身份提供方的注销请求；您仍处于登录状态。"
   },
   "dashboard": {
@@ -1388,6 +1390,12 @@
       "ssoUsernameHelp": "身份提供商发送的用户名。默认为当前用户名；如果 SSO 登录不同，请修改。",
       "linkSuccess": "{{name}} 已关联到单点登录",
       "linkFailed": "无法将账户关联到 SSO",
+      "relink": "Change provider or reset SSO identity",
+      "relinkTitle": "Change the provider of {{name}} or reset its SSO identity",
+      "relinkHelp": "Choose the provider this account signs in through: another one moves it there, the same one resets its SSO identity. The next sign-in through that provider with this username or email binds the new identity. A password the account has is kept.",
+      "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
+      "confirmRelink": "Attach {{name}} to {{provider}}? Its current SSO identity is cleared, and the next sign-in through this provider binds a new one.",
+      "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "解除 {{name}} 的单点登录关联并转换回本地账户？",
       "unlinkSuccess": "{{name}} 已转换为本地账户",
       "unlinkFailed": "无法解除账户关联"
