@@ -493,7 +493,7 @@ def _group_match_key_of(provider_type):
 
 
 def group_match_key(provider):
-    """How a rule key and a group name compare. LDAP: as cn does, caseIgnoreMatch
+    """How a rule key and a group name compare. LDAP: close to what cn does, caseIgnoreMatch
     (RFC 4519 §2.3; RFC 4517 §4.2.11 with RFC 4518 §2.6.1): case, edge spaces and the
     length of inner space runs ignored. OIDC and SAML groups are opaque identifiers: exact."""
     return _group_match_key_of(getattr(provider, 'provider_type', None))

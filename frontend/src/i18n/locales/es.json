@@ -3935,7 +3935,7 @@
     "groupFilter": "Filtro de grupo",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
     "groupBaseDn": "Group Search Base",
-    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, else the base DN.",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, then the base DN if that search is refused; else the base DN.",
     "isDefault": "Proveedor de inicio de sesión predeterminado",
     "lastUsed": "Último uso",
     "redirectUri": "URI de redirección",

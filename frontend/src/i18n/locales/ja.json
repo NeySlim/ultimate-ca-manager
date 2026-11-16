@@ -3938,7 +3938,7 @@
     "groupFilter": "グループフィルター",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
     "groupBaseDn": "Group Search Base",
-    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, else the base DN.",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, then the base DN if that search is refused; else the base DN.",
     "isDefault": "デフォルトログインプロバイダー",
     "lastUsed": "最終使用日時",
     "redirectUri": "リダイレクトURI",
