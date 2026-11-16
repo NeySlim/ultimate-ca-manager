@@ -9,17 +9,19 @@ timeout=${2-90}
 
 body=$(mktemp)
 trap 'rm -f "$body"' EXIT
-start=$SECONDS
-deadline=$((SECONDS + timeout))
+# Milliseconds, not $SECONDS: that one ticks with the clock's seconds and ends a wait up to 1 s early
+now_ms() { local t=${EPOCHREALTIME/[.,]/}; printf '%s' "$((t / 1000))"; }
+start=$(now_ms)
+deadline=$((start + timeout * 1000))
 code=000
 while :; do
     code=$(curl -sk --max-time 5 -o "$body" -w '%{http_code}' "$url" 2>/dev/null) || code=000
     if [ "$code" = 200 ] && jq -e '.status == "ok" and .service == "ucm" and (.safe_mode // false) == false' \
             "$body" >/dev/null 2>&1; then
-        echo "healthy after $((SECONDS - start))s: $(head -c 300 "$body")"
+        echo "healthy after $((($(now_ms) - start) / 1000))s: $(head -c 300 "$body")"
         exit 0
     fi
-    [ "$SECONDS" -lt "$deadline" ] || break
+    [ "$(now_ms)" -lt "$deadline" ] || break
     sleep 1
 done
 echo "FAIL: $url not healthy within ${timeout}s (last HTTP $code): $(head -c 300 "$body")" >&2
