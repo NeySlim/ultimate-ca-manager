@@ -899,6 +899,75 @@ def test_orphans_of_one_idp_each_find_their_own_row_however_often_restored(app, 
             assert results.get('removed', {}).get('user_sso_identities', 0) == 0
 
 
+def _orphan_restore(app, archived, here, mode, password='Correct-Horse-Battery-9'):
+    """An account holding the `archived` orphans is archived, holds `here` instead, then is
+    restored twice: what it holds after each pass, oldest first, and the ids `here` had."""
+    from services.backup import manifest
+    uid = _add(app, username=_name(), password_hash=NOPASS)
+
+    def orphans(pairs):
+        for orphan_of, external_id in pairs:
+            row = UserSSOIdentity(user_id=uid, orphan_of=orphan_of, external_id=external_id)
+            db.session.add(row)
+            db.session.commit()
+
+    def held():
+        db.session.expire_all()
+        rows = UserSSOIdentity.query.filter_by(user_id=uid).order_by(UserSSOIdentity.id)
+        return [(r.id, r.orphan_of, r.external_id) for r in rows]
+
+    with app.app_context():
+        orphans(archived)
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        UserSSOIdentity.query.filter_by(user_id=uid).delete()
+        db.session.commit()
+        orphans(here)
+        before, passes = held(), []
+        for _ in range(2):
+            _backup().restore_backup(blob, password, mode=mode)
+            passes.append(held())
+    return before, passes
+
+
+_IDP = 'oauth2:https://known-idp.example/'
+
+
+def test_a_merged_bound_orphan_binds_the_unbound_orphan_of_its_idp(app, providers):
+    """Left unbound beside the restored row, the account could still be claimed by name."""
+    before, passes = _orphan_restore(app, [(_IDP, 'e1')], [(_IDP, None)], 'merge')
+    assert passes == [[(before[0][0], _IDP, 'e1')]] * 2
+
+
+def test_one_unbound_orphan_is_bound_once_by_the_first_of_two_archived(app, providers):
+    before, passes = _orphan_restore(app, [(_IDP, 'e1'), (_IDP, 'e2')], [(_IDP, None)], 'merge')
+    assert [(r[1], r[2]) for r in passes[0]] == [(_IDP, 'e1'), (_IDP, 'e2')]
+    assert passes[0][0][0] == before[0][0] and passes[1] == passes[0]
+
+
+def test_a_bound_orphan_here_is_not_taken_for_another_identity(app, providers):
+    before, passes = _orphan_restore(app, [(_IDP, 'e1')], [(_IDP, 'other'), (_IDP, None)], 'merge')
+    assert passes == [[before[0], (before[1][0], _IDP, 'e1')]] * 2
+
+
+def test_an_orphan_of_an_unknown_idp_is_never_bound_by_an_archived_one(app, providers):
+    """No sign-in claims an orphan without an IdP key: it guards the account."""
+    before, passes = _orphan_restore(app, [(None, 'e1')], [(None, None)], 'merge')
+    assert [(r[1], r[2]) for r in passes[0]] == [(None, None), (None, 'e1')]
+    assert passes[0][0] == before[0] and passes[1] == passes[0]
+
+
+def test_another_idp_s_unbound_orphan_is_left_alone(app, providers):
+    before, passes = _orphan_restore(app, [(_IDP, 'e1')], [('oauth2:https://other.example/', None)], 'merge')
+    assert [(r[1], r[2]) for r in passes[0]] == [('oauth2:https://other.example/', None), (_IDP, 'e1')]
+    assert passes[1] == passes[0]
+
+
+def test_a_replace_leaves_only_the_archived_orphan(app, providers):
+    _, passes = _orphan_restore(app, [(_IDP, 'e1')], [(_IDP, None)], 'replace')
+    assert [[(r[1], r[2]) for r in held] for held in passes] == [[(_IDP, 'e1')]] * 2
+
+
 def test_the_shared_identity_warning_names_the_fields_that_tell_its_key_apart():
     from services.backup.restore.plan import shared_identity_warning, sso_identity_key
     for key, spelt, fields in (

@@ -269,18 +269,28 @@ class RestorePlan:
         """The attachment here an archived one is: the account's row for the same provider,
         else, for one whose provider is not here, its orphan of the same IdP key (or of none)
         with the same identity: an account may hold several orphans of one IdP.
+        A bound orphan that finds none binds an unbound orphan of its IdP still here, as its
+        sign-in would: left unbound beside it, the account could still be claimed by name.
         An orphan's identity holds NULLs, which the generic index matches with nothing."""
         from models import UserSSOIdentity
         user_id = self.resolve(_SSO_IDENTITIES, row, 'user_id')
         if user_id is None:
             return None
         provider_id = self.resolve(_SSO_IDENTITIES, row, 'provider_id')
-        query = UserSSOIdentity.query.filter_by(user_id=user_id, provider_id=provider_id)
-        if provider_id is None:
-            query = query.filter_by(orphan_of=row.get('orphan_of'), external_id=row.get('external_id'))
-        ids = [found.id for found in query.order_by(UserSSOIdentity.id)]
-        key = sso_identity_key(user_id, provider_id, row.get('orphan_of'), row.get('external_id'))
-        return self.rank(_SSO_IDENTITIES, key, row, ids)
+        orphan_of, external_id = row.get('orphan_of'), row.get('external_id')
+
+        def here(identity):
+            query = UserSSOIdentity.query.filter_by(user_id=user_id, provider_id=provider_id)
+            if provider_id is None:
+                query = query.filter_by(orphan_of=orphan_of, external_id=identity)
+            ids = [found.id for found in query.order_by(UserSSOIdentity.id)]
+            key = sso_identity_key(user_id, provider_id, orphan_of, identity)
+            return self.rank(_SSO_IDENTITIES, key, row, ids)
+
+        found = here(external_id)
+        if found is None and provider_id is None and orphan_of is not None:
+            found = here(None)
+        return found
 
     def _claimed(self, section_name: str, key: Tuple, row: Dict[str, Any]) -> Optional[Any]:
         """The row here for that identity, by rank: the n-th archived row of it takes the n-th oldest."""
