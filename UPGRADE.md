@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### SSO: Link to SSO moves accounts, a shared email is refused
+
+`POST /api/v2/users/{id}/link-sso` now accepts an account already linked to a provider or left without one (it answered `400` before): it moves the account, or clears its SSO identity when the provider is the same, and closes the account's sessions. A sign-in whose email belongs to an account of another provider, or to an account an administrator linked to this provider while the OIDC IdP marks that email unverified, is now refused (`sso_email_conflict`) instead of receiving a second account with the default role: use Link to SSO on that account if it is the same person, or create an account under the name the provider sends and link it with its local password removed. An email shared with a local account still gives the SSO identity an account of its own. A provider with no role mapping rule and no default role now refuses with `sso_no_default_role` (it was `sso_unmapped`).
+
 ### A restore signs out every session, the restoring one included
 
 After a successful restore, every session opened before it is refused, whatever the session store, including the session of the operator who ran the restore: sign in again once the restore has completed. A script that restores through the API with a session cookie needs a new sign-in before its next call; an API key is not a session and is kept or replaced as the archive says. A failed restore, or an archive that carried no data, signs nobody out.
