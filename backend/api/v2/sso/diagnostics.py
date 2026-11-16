@@ -22,7 +22,8 @@ _CLAIM_DEPTH = 3
 @dataclass
 class GroupSource:
     """Where the groups of a sign-in were looked for, and the names the IdP sent
-    that may carry them (``None``: not known for this protocol)."""
+    that may carry them; ``candidates`` is ``None`` for LDAP and for OIDC or SAML
+    once group values were read."""
     label: str
     candidates: list = field(default=None)
     kind: str = 'attributes'
