@@ -2,13 +2,9 @@
 ``sso_orphan_of``), built with the identity rows the upgrade (step 166) gives them, and the reads
 the tests make of those rows."""
 from models import db, User, UserSSOIdentity
+from utils.sso_identity_upgrade import identity_rows
 
 LEGACY = ('auth_source', 'sso_provider_id', 'sso_external_id', 'sso_orphan_of')
-
-
-def _step():
-    from migrations._from_2_254 import step
-    return step('166_user_sso_identities')
 
 
 def legacy_user(**columns):
@@ -18,7 +14,7 @@ def legacy_user(**columns):
     user = User(**columns)
     # The id given is a provider the account has, even a test double's
     providers = {pid for (pid,) in db.session.query(SSOProvider.id)} | {legacy['sso_provider_id']}
-    for _uid, provider_id, orphan_of, external_id in _step().identity_rows(
+    for _uid, provider_id, orphan_of, external_id in identity_rows(
             [(0, legacy['auth_source'] or 'local', legacy['sso_provider_id'], legacy['sso_external_id'],
               legacy['sso_orphan_of'], columns.get('password_hash'),
               columns.get('force_password_change'))], providers):

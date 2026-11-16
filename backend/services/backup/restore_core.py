@@ -785,9 +785,9 @@ class RestoreCoreMixin:
         """The identity rows of an archive's account rows that carry their provider (2.254, or
         3.0 before user_sso_identities), once the providers are back: the same rows an upgrade
         gives them. A provider this installation does not hold leaves an orphan of an unknown IdP."""
-        from migrations._from_2_254 import step
         from models import UserSSOIdentity
         from models.sso import SSOProvider
+        from utils.sso_identity_upgrade import identity_rows
 
         pending = getattr(self, '_legacy_sso_identities', [])
         if not pending:
@@ -803,7 +803,7 @@ class RestoreCoreMixin:
             accounts.append((user.id, row.get('auth_source'), here.id if here else None,
                              row.get('sso_external_id'), row.get('sso_orphan_of'),
                              user.password_hash, user.force_password_change))
-        made = step('166_user_sso_identities').identity_rows(sorted(accounts), provider_ids)
+        made = identity_rows(sorted(accounts), provider_ids)
         for user_id, provider_id, orphan_of, external_id in made:
             identity = UserSSOIdentity(user_id=user_id, provider_id=provider_id, orphan_of=orphan_of)
             identity.bind(external_id)

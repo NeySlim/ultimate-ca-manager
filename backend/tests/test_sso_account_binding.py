@@ -260,7 +260,7 @@ def test_link_audit_says_where_the_account_comes_from(app, providers, auth_clien
 
 def test_link_audit_bounds_the_former_identity(app, providers, auth_client):
     name = _name()
-    long_id = 'x' * 500
+    long_id = 'x' * 255  # the widest identity the column holds
     uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.a,
                sso_external_id=long_id, password_hash=NOPASS)
     _ok(_link(app, auth_client, uid, providers.b))

@@ -484,6 +484,10 @@ STATES_2254 = [
 ]
 
 
+# PostgreSQL enforced the foreign key in 2.254: no account names a provider that is gone
+_ONLY_SQLITE = {'dangling'}
+
+
 @pytest.fixture(params=BACKENDS)
 def upgraded_2254(request, tmp_path, monkeypatch):
     for base in make_base(request.param, tmp_path, monkeypatch, 's166'):
@@ -491,6 +495,8 @@ def upgraded_2254(request, tmp_path, monkeypatch):
                  "sync_role_on_login, enforce_2fa) VALUES (1, 'p-oidc', 'oauth2', TRUE, FALSE, FALSE), "
                  "(2, 'p-saml', 'saml', TRUE, FALSE, FALSE)")
         for i, (name, source, pid, ext, orphan, pw, force, _rows_after) in enumerate(STATES_2254, start=1):
+            if name in _ONLY_SQLITE and request.param != 'sqlite':
+                continue
             base.run("INSERT INTO users (id, username, email, password_hash, role, auth_source, "
                      "sso_provider_id, sso_external_id, sso_orphan_of, force_password_change) "
                      "VALUES (:i, :n, :e, :pw, 'viewer', :s, :p, :x, :o, :f)",
@@ -507,8 +513,11 @@ def test_each_2254_account_gets_the_rows_that_keep_its_access(upgraded_2254):
     got = {}
     for name, pid, ext, orphan in rows:
         got.setdefault(name, []).append((pid, ext, orphan))
-    assert {state[0]: got.get(state[0], []) for state in STATES_2254} == \
-        {state[0]: state[-1] for state in STATES_2254}
+    names = {name for (name,) in upgraded_2254.run("SELECT username FROM users")}
+    states = [state for state in STATES_2254 if state[0] in names]
+    assert len(states) >= len(STATES_2254) - len(_ONLY_SQLITE)
+    assert {state[0]: got.get(state[0], []) for state in states} == \
+        {state[0]: state[-1] for state in states}
     columns = upgraded_2254.run("SELECT * FROM users WHERE id = 1")
     assert len(columns) == 1
     bound_at = upgraded_2254.run(
