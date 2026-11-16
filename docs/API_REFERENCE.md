@@ -705,7 +705,7 @@ POST /api/v2/cas/export
 `chain_variant` adds cross-certificates after each CA certificate: `primary` (default) adds none,
 `auto` the served ones, `all` every attached one, `cross:<id>` that one.
 
-An unreadable CA certificate (or cross-certificate, named `cross:<id>`) is skipped, logged, and named in `X-Skipped-CAs` (the first 100) with the total in `X-Skipped-CAs-Count`; the others are exported. When none is readable the answer is `404` in both PEM and P7B, with `details.skipped` and `details.skipped_count`.
+An unreadable CA certificate (or cross-certificate, named `cross:<id>`) is skipped, logged, and named in `X-Skipped-CAs` (the first 100) with the total in `X-Skipped-CAs-Count`; the others are exported. When none is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ### Bulk Delete CAs
 ```http
@@ -739,7 +739,7 @@ Content-Type: application/json
 
 Returns the selected CA certificates as `format` `pem` (default) or `p7b`.
 
-An unreadable CA certificate (or cross-certificate, named `cross:<id>`) is skipped, logged, and named in `X-Skipped-CAs` (the first 100) with the total in `X-Skipped-CAs-Count`; the others are exported. When none is readable the answer is `404` in both PEM and P7B, with `details.skipped` and `details.skipped_count`.
+An unreadable CA certificate (or cross-certificate, named `cross:<id>`) is skipped, logged, and named in `X-Skipped-CAs` (the first 100) with the total in `X-Skipped-CAs-Count`; the others are exported. When none is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ### Cross-certificates
 
@@ -1104,7 +1104,7 @@ GET /api/v2/certificates/export
 POST /api/v2/certificates/export
 ```
 
-An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificates` (its first 100 ids) with the total in `X-Skipped-Certificates-Count`; the others are exported. When no certificate is readable the answer is `404` in both PEM and P7B, with `details.skipped` and `details.skipped_count`.
+An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificates` (its first 100 ids) with the total in `X-Skipped-Certificates-Count`; the others are exported. When no certificate is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ### Bulk Revoke Certificates
 ```http
@@ -1166,7 +1166,7 @@ Content-Type: application/json
 
 Returns the selected certificates as `format` `pem` (default) or `p7b`.
 
-An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificates` (its first 100 ids) with the total in `X-Skipped-Certificates-Count`; the others are exported. When no certificate is readable the answer is `404` in both PEM and P7B, with `details.skipped` and `details.skipped_count`.
+An unreadable certificate is skipped, logged, and named in `X-Skipped-Certificates` (its first 100 ids) with the total in `X-Skipped-Certificates-Count`; the others are exported. When no certificate is readable the answer is `404` in both PEM and P7B, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ### Certificate Metadata, Linting and Transparency
 ```http
@@ -1722,7 +1722,7 @@ GET /api/v2/truststore/export?format=pem&purpose=all
 - `add-from-ca` (`write:truststore`) adds a managed CA's certificate. Optional body `purpose` (default `root_ca` for a root, else `intermediate_ca`) and `notes`. `201`; `409` when it is already there, `400` when the CA awaits its certificate or the purpose is invalid, `404` for an unknown CA.
 - `bulk/delete` (`delete:truststore`) takes `{"ids": [1, 2]}` (a non-empty list of at most 100) and returns `success` (the removed ids) and `failed` (`{id, error}`).
 - `expiring` (`read:truststore`) lists trusted certificates expiring within `days` (default 90).
-- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable.
+- `export` (`read:truststore`) downloads a bundle: `format` `pem` (default) or `p7b`, `purpose` filters (default `all`). `404` when nothing matches. Unreadable entries are skipped and named in `X-Skipped-Certificates` and `X-Skipped-Certificates-Count` (first 100 ids and the total); `404` also when none is readable, with `details.skipped` (the first 100) and `details.skipped_count` (the total).
 
 ---
 
