@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
 
 from models import CA, Certificate, db
 from models.ca_cross_certificate import CACrossCertificate
+from models.revoked_serial import RevokedSerial
 from tests.fixtures.cross_pki import openssl_verify, pem
 from tests.fixtures.cross_world import build_world, set_served
 from tests.test_cross_chain_paths import _der
@@ -25,6 +26,8 @@ def world(app, auth_client):
     before = _ids(app)
     yield build_world(app, auth_client)
     with app.app_context():
+        refids = [ca.refid for ca in CA.query.filter(CA.id.notin_(before[CA]))]
+        RevokedSerial.query.filter(RevokedSerial.caref.in_(refids)).delete(synchronize_session=False)
         for model, ids in before.items():
             model.query.filter(model.id.notin_(ids)).delete(synchronize_session=False)
         db.session.commit()
