@@ -96,7 +96,7 @@ Une CSR dont la clé a été révoquée comme compromise est refusée avec 400, 
 Tous les points de terminaison sont sous \`/.well-known/est/\` :
 
 ### GET /cacerts
-Récupérer la chaîne de certificats CA. **Aucune authentification requise.**
+Récupérer la chaîne de certificats AC. **Aucune authentification requise.**
 
 Utilisez ceci pour établir la confiance : les clients récupèrent le certificat AC avant l'inscription.
 

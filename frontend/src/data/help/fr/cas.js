@@ -170,11 +170,11 @@ Le formulaire signale une AC RSA-2048 qui dépasserait 2030 : l'ANSSI accepte RS
 - Une AC ML-DSA s'exporte en PEM ou DER, pas en PKCS#12 ni en JKS. Les clients sans prise en charge de ML-DSA (OpenSSL avant 3.5, la plupart des navigateurs aujourd'hui) ne peuvent pas vérifier ce qu'elle signe.
 
 ### AC EdDSA (Ed25519, Ed448)
-Des clés **Ed25519** et **Ed448** peuvent être générées pour une AC racine, intermédiaire ou externe, ou importées avec ou après le certificat de la CA. La clé est une clé logicielle (aucun fournisseur HSM ne signe en EdDSA), et en mode FIPS l'algorithme n'est proposé que si le module FIPS l'approuve (l'image Docker \`-fips\` le fait, RHEL 9 et Ubuntu 24.04 non).
+Des clés **Ed25519** et **Ed448** peuvent être générées pour une AC racine, intermédiaire ou externe, ou importées avec ou après le certificat de l'AC. La clé est une clé logicielle (aucun fournisseur HSM ne signe en EdDSA), et en mode FIPS l'algorithme n'est proposé que si le module FIPS l'approuve (l'image Docker \`-fips\` le fait, RHEL 9 et Ubuntu 24.04 non).
 
 - Une clé EdDSA signe sans digest, comme ML-DSA : le champ digest disparaît, et les CRL et les réponses OCSP suivent la même règle.
 - Les hiérarchies peuvent se mélanger : une AC EdDSA peut signer des intermédiaires et des certificats RSA, EC ou ML-DSA, et inversement.
-- Les navigateurs, Windows (CryptoAPI/CNG) et les clients SCEP n'acceptent pas les certificats signés par une AC EdDSA, quelle que soit la clé du certificat final. SCEP et XCEP/WSTEP refusent une telle CA. Utilisez-la là où les consommateurs sont OpenSSL, Go ou Java 15+.
+- Les navigateurs, Windows (CryptoAPI/CNG) et les clients SCEP n'acceptent pas les certificats signés par une AC EdDSA, quelle que soit la clé du certificat final. SCEP et XCEP/WSTEP refusent une telle AC. Utilisez-la là où les consommateurs sont OpenSSL, Go ou Java 15+.
 
 ### Créer une AC signée en externe (mode CSR, v2.214)
 Pour le schéma de racine hors ligne : la clé de l'AC émettrice vit dans UCM, son certificat est signé ailleurs :
@@ -197,7 +197,7 @@ Importez des certificats d'AC existants via :
 
 Lors de l'importation sans clé privée, l'AC peut vérifier les certificats mais ne peut pas en signer de nouveaux.
 
-Un certificat qui porte le sujet et la clé d'une AC déjà présente dans UCM, sous un autre émetteur, est un certificat croisé et ne remplace jamais le certificat propre de la CA. Sur une racine auto-signée, il est rattaché comme certificat croisé. Sur une intermédiaire, et lors du téléversement après **Renouveler via CSR**, l'import est refusé (409) et propose **Rattacher comme certificat croisé** ou **Remplacer** ; un roulement de racine (même nom d'émetteur, nouvelle clé) remplace le certificat comme un renouvellement. L'import intelligent rattache celui trouvé à côté d'une racine détenue et le liste dans le résultat ; celui qu'il ne peut pas rattacher est écarté et signalé.
+Un certificat qui porte le sujet et la clé d'une AC déjà présente dans UCM, sous un autre émetteur, est un certificat croisé et ne remplace jamais le certificat propre de l'AC. Sur une racine auto-signée, il est rattaché comme certificat croisé. Sur une intermédiaire, et lors du téléversement après **Renouveler via CSR**, l'import est refusé (409) et propose **Rattacher comme certificat croisé** ou **Remplacer** ; un roulement de racine (même nom d'émetteur, nouvelle clé) remplace le certificat comme un renouvellement. L'import intelligent rattache celui trouvé à côté d'une racine détenue et le liste dans le résultat ; celui qu'il ne peut pas rattacher est écarté et signalé.
 
 ## Exporter une AC
 
@@ -212,7 +212,7 @@ Lorsqu'un certificat croisé offre un autre chemin, la fenêtre d'exportation af
 
 ## Certificats croisés
 
-Un certificat croisé porte le sujet et la clé d'une AC sous la signature d'une autre CA. Les clients qui ne font confiance qu'à l'autre racine construisent par lui un chemin vers votre AC, ce qui permet de renouveler ou migrer une racine sans les casser. Il se place à côté du certificat propre de l'AC, qui n'est jamais remplacé. Une AC qui en porte un affiche un badge **Signée en croisé**.
+Un certificat croisé porte le sujet et la clé d'une AC sous la signature d'une autre AC. Les clients qui ne font confiance qu'à l'autre racine construisent par lui un chemin vers votre AC, ce qui permet de renouveler ou migrer une racine sans les casser. Il se place à côté du certificat propre de l'AC, qui n'est jamais remplacé. Une AC qui en porte un affiche un badge **Signée en croisé**.
 
 Dans les détails de l'AC, **Certificats croisés** les liste :
 - **Rattacher** : collez ou choisissez un certificat émis par une autre AC pour la clé de cette AC (PEM ou DER). Les contraintes de noms ou de politique qu'il porte sont signalées.
@@ -292,7 +292,7 @@ UCM peut stocker la clé de signature d'une AC sur un module matériel de sécur
 
 ## Mode hors ligne
 
-Sortez la clé de signature d'une AC de l'usage runtime sans supprimer la CA. Le certificat, la chaîne et la dernière CRL restent servis ; les opérations de signature (signer un CSR, émettre un certificat, renouveler, nouvelles CRL) sont bloquées. L'OCSP répond via un répondeur délégué, sinon uniquement depuis les réponses déjà en cache, jusqu'à leur nextUpdate.
+Sortez la clé de signature d'une AC de l'usage runtime sans supprimer l'AC. Le certificat, la chaîne et la dernière CRL restent servis ; les opérations de signature (signer un CSR, émettre un certificat, renouveler, nouvelles CRL) sont bloquées. L'OCSP répond via un répondeur délégué, sinon uniquement depuis les réponses déjà en cache, jusqu'à leur nextUpdate.
 
 C'est la façon standard de protéger une AC racine entre des cérémonies rares, tout en gardant son ancre de confiance et son infrastructure de révocation en ligne.
 

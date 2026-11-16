@@ -53,7 +53,7 @@ Liste complète de tous les certificats gérés par UCM. Inclut le sujet, l'éme
 Certificats expirant dans une fenêtre temporelle spécifiée (par défaut : 30 jours). Critique pour éviter les pannes, consultez ce rapport régulièrement ou programmez-le pour une livraison quotidienne.
 
 ### Hiérarchie des AC
-Structure de l'autorité de certification montrant les relations parent-enfant, les comptages de certificats par CA. Utile pour comprendre votre topologie PKI.
+Structure de l'autorité de certification montrant les relations parent-enfant, les comptages de certificats par AC. Utile pour comprendre votre topologie PKI.
 
 ### Résumé d'audit
 Les dix actions les plus fréquentes et les dix utilisateurs les plus actifs sur la période.

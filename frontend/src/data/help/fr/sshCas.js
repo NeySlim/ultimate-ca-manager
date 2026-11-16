@@ -33,7 +33,7 @@ export default {
       {
         title: 'Configuration du serveur',
         items: [
-          { label: 'Script de configuration Linux/macOS', text: 'Téléchargez un script shell POSIX (.sh) qui configure automatiquement sshd pour faire confiance à cette CA. Installation rapide : curl -sSL <url> | sudo bash' },
+          { label: 'Script de configuration Linux/macOS', text: 'Téléchargez un script shell POSIX (.sh) qui configure automatiquement sshd pour faire confiance à cette AC. Installation rapide : curl -sSL <url> | sudo bash' },
           { label: 'Script de configuration Windows', text: 'Téléchargez un script PowerShell (.ps1) qui configure Windows OpenSSH Server (écrit la clé publique de l\'AC dans %ProgramData%\\ssh, verrouille les ACL, ajoute TrustedUserCAKeys / HostCertificate dans sshd_config, valide avec sshd -T, redémarre sshd). Installation rapide : iwr <url> | iex' },
           { label: 'Bloc de diagnostic', text: 'En cas d\'échec d\'Add-WindowsCapability (WSUS / machine jointe au domaine), le script affiche un bloc étiqueté expliquant l\'état de la politique et trois pistes de remédiation, il ne modifie jamais la politique WSUS / WU lui-même' },
           { label: 'Dry-run', text: 'Les deux scripts prennent en charge un drapeau -DryRun / --dry-run pour prévisualiser les modifications sans les appliquer' },
@@ -44,7 +44,7 @@ export default {
         title: 'Révocation de clés',
         items: [
           { label: 'KRL (Key Revocation List)', text: 'Format binaire compact pour révoquer des certificats individuels. Configuré via RevokedKeys dans sshd_config.' },
-          { label: 'Télécharger la KRL', text: 'Téléchargez le fichier KRL actuel depuis le panneau de détail de la CA.' },
+          { label: 'Télécharger la KRL', text: 'Téléchargez le fichier KRL actuel depuis le panneau de détail de l\'AC.' },
         ]
       },
       {
@@ -146,7 +146,7 @@ Une AC dont la liste est vide ne signe rien, sauf si **Autoriser tout principal*
 
 ### Key ID
 
-sshd journalise le key ID d'un certificat comme identité du titulaire. L'AC le définit à \`principals@CA name\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les AC, y compris les existantes depuis 2.249.
+sshd journalise le key ID d'un certificat comme identité du titulaire. L'AC le définit à \`principals@AC name\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les AC, y compris les existantes depuis 2.249.
 
 ### Formats de TTL
 

@@ -281,7 +281,7 @@
     "dnsPropagationTimeout": "Délai de propagation DNS (s)",
     "dnsPropagationTimeoutHelper": "Secondes d'attente du TXT DNS-01 avant validation AC (DNS auto). 0 = ignorer l'attente de propagation (auto et vérification manuelle soumettent à l'AC sans polling). Valeur positive : l'auto-poll en arrière-plan attend jusqu'à cette limite ; la vérification manuelle sonde 30 s max puis signale « pas prêt » pour réessayer. Procède dès que chaque serveur de noms autoritaire sert l'enregistrement (ou que le résolveur configuré le confirme) ; les lignes 9.9.9.9 / 8.8.8.8 / 1.1.1.1 sont informatives uniquement.",
     "dnsPropagationDelay": "Délai de propagation DNS (s)",
-    "dnsPropagationDelayHelper": "Secondes d'attente supplémentaires une fois le TXT visible, avant la validation CA. Les fournisseurs DNS avec des serveurs de noms anycast peuvent mettre quelques secondes à mettre à jour chaque nœud. 0 = aucune attente ; la vérification manuelle attend 30 s max.",
+    "dnsPropagationDelayHelper": "Secondes d'attente supplémentaires une fois le TXT visible, avant la validation AC. Les fournisseurs DNS avec des serveurs de noms anycast peuvent mettre quelques secondes à mettre à jour chaque nœud. 0 = aucune attente ; la vérification manuelle attend 30 s max.",
     "debugLogging": "Logs ACME/DNS détaillés",
     "debugLoggingDesc": "Émet les diagnostics de polling DNS en INFO dans les logs UCM. Désactiver après diagnostic.",
     "allowLoopbackUpstream": "Autoriser une AC ACME sur loopback",
@@ -346,7 +346,7 @@
     "localDomainHelper": "Entrez le domaine pour lequel cette AC émettra des certificats. Les sous-domaines seront automatiquement rattachés.",
     "noLocalDomains": "Aucun domaine local configuré",
     "noLocalDomainsDesc": "Ajoutez un mapping domaine → AC pour que le serveur ACME local sache quelle AC signe les certificats de chaque domaine.",
-    "localDomainsHelp": "Associez des domaines à des CAs spécifiques. Le serveur ACME local utilise ces mappings pour signer les certificats avec la bonne CA.",
+    "localDomainsHelp": "Associez des domaines à des AC spécifiques. Le serveur ACME local utilise ces mappings pour signer les certificats avec la bonne AC.",
     "wildcard": "Générique",
     "autoApprove": "Auto-approbation",
     "allowWildcard": "Autoriser les certificats wildcard",
@@ -461,8 +461,8 @@
     "clientSettings": "Paramètres du client ACME",
     "customDirectoryOverride": "Répertoire ACME personnalisé",
     "customDirectoryOverrideHelper": "Remplacer le répertoire Let's Encrypt par défaut pour utiliser une autre AC ACME (ex: ZeroSSL, Google Trust). Laisser vide pour Let's Encrypt.",
-    "accountMismatch": "Incohérence compte/CA",
-    "accountMismatchHelper": "Le compte enregistré ne correspond pas à l'AC amont sélectionnée. Réinitialisez le compte pour vous réinscrire auprès de la bonne CA.",
+    "accountMismatch": "Incohérence compte/AC",
+    "accountMismatchHelper": "Le compte enregistré ne correspond pas à l'AC amont sélectionnée. Réinitialisez le compte pour vous réinscrire auprès de la bonne AC.",
     "noUpstreamUrl": "Aucune URL amont configurée",
     "autoApproveWarning": "Risque de sécurité : à n'activer que pour les domaines dont vous avez le contrôle total.",
     "proxy": "Proxy",
@@ -556,7 +556,7 @@
     "caHttpTimeout": "Timeout HTTP (secondes)",
     "caHttpTimeoutHelper": "Timeout des appels API ACME dont la finalisation (10–120).",
     "preferredChain": "Chaîne préférée (CN ancrage)",
-    "preferredChainHelper": "Optionnel. Sélectionne une chaîne alternate RFC 8555 lorsque le CN sujet ou émetteur du dernier certificat correspond (ex. ISRG Root X1 pour Let's Encrypt). Laisser vide pour la chaîne par défaut de la CA.",
+    "preferredChainHelper": "Optionnel. Sélectionne une chaîne alternate RFC 8555 lorsque le CN sujet ou émetteur du dernier certificat correspond (ex. ISRG Root X1 pour Let's Encrypt). Laisser vide pour la chaîne par défaut de l'AC.",
     "preferredChainSummary": "Chaîne préférée : {{chain}}",
     "caTimingSummary": "Poll {{timeout}}s / {{interval}}s · HTTP {{http}}s",
     "caAccountCreated": "Compte AC ACME créé",
@@ -833,7 +833,7 @@
     "chainRevoked": "Révoquée en amont",
     "chainRevokedBanner": "Une AC au-dessus de celle-ci est révoquée : cette AC ne peut plus signer de certificats ni de CRL, ni les AC en dessous d'elle.",
     "revokeWarnings": {
-      "parent_crl_not_regenerated": "La CRL de l'AC parente n'a pas pu être régénérée : la CRL servie actuellement ne liste pas encore cette CA. Vérifiez l'AC parente et régénérez sa CRL.",
+      "parent_crl_not_regenerated": "La CRL de l'AC parente n'a pas pu être régénérée : la CRL servie actuellement ne liste pas encore cette AC. Vérifiez l'AC parente et régénérez sa CRL.",
       "parent_cdp_disabled": "Le CDP est désactivé sur l'AC parente : aucune CRL ne publie cette révocation, les clients ne l'apprennent que par OCSP."
     },
     "certificateOnly": "Certificat seul",
@@ -916,7 +916,7 @@
       "checkFailed": "La vérification par rapport au profil a échoué",
       "ready": "Rien ne bloque ce profil sur cette AC",
       "notReady": "Des constats bloquent ce profil sur cette AC",
-      "nothingFound": "Rien que ce profil refuserait sur cette CA.",
+      "nothingFound": "Rien que ce profil refuserait sur cette AC.",
       "confirmAttach": "Désormais, les règles de {{profile}} s'appliquent à ce que cette AC émet. Les certificats déjà émis ne sont ni re-signés ni revérifiés.",
       "confirmButton": "Appliquer {{profile}}",
       "removeConfirm": "Cette AC ne sera plus encadrée par un profil de conformité. Les certificats déjà émis ne sont pas modifiés.",
@@ -1016,11 +1016,11 @@
       "certificateProfile": "Profil certificat (RFC 5280)",
       "certificateProfileHelp": "Les AC racines utilisent keyCertSign + cRLSign par défaut. Les AC émettrices ajoutent digitalSignature et peuvent inclure l'authentification de serveur web TLS (serverAuth).",
       "ekuServerAuth": "Utilisation étendue de la clé : authentification de serveur web TLS (serverAuth)",
-      "noKeyTypeAllowedByPolicy": "Aucun type de clé n'est autorisé par les politiques qui s'appliquent à cette CA.",
+      "noKeyTypeAllowedByPolicy": "Aucun type de clé n'est autorisé par les politiques qui s'appliquent à cette AC.",
       "noSchemeAllowedByProfile": "Aucun schéma de signature RSA n'est autorisé par le profil de conformité pour cette clé.",
       "profileRequiresHsm": "Ce profil exige que la clé de l'AC soit stockée sur un HSM.",
       "profileHorizon": "Le profil de conformité accepte {{key}} jusqu'au {{date}}, et cette AC lui survivrait.",
-      "noDigestAllowedByPolicy": "Aucun hachage de signature n'est autorisé par les politiques qui s'appliquent à cette CA.",
+      "noDigestAllowedByPolicy": "Aucun hachage de signature n'est autorisé par les politiques qui s'appliquent à cette AC.",
       "hsmNeedsRead": "Créer une AC sur une clé HSM exige la permission read:hsm."
     },
     "detail": {
@@ -2046,7 +2046,7 @@
     "rekeyAsCSR": "Nouveau CSR",
     "rekeyAsCert": "Nouveau certificat",
     "rekeyAsCSRDescription": "Générer un nouveau CSR avec les mêmes champs DN et SANs mais une nouvelle paire de clés.",
-    "rekeyAsCertDescription": "Émettre directement un nouveau certificat avec le même sujet, signé par une CA.",
+    "rekeyAsCertDescription": "Émettre directement un nouveau certificat avec le même sujet, signé par une AC.",
     "keyRsa2048": "RSA 2048",
     "keyRsa3072": "RSA 3072",
     "keyRsa4096": "RSA 4096",
@@ -2364,7 +2364,7 @@
       "useDefaultCredentials": "Retirer la clé enregistrée et utiliser les identifiants par défaut du serveur"
     },
     "helpSecurity": "Les clés HSM sont dans un matériel inviolable. La destruction d'une clé est irréversible.",
-    "helpBestPractice": "Utilisez HSM pour toutes les clés de signature CA. Testez les connexions régulièrement.",
+    "helpBestPractice": "Utilisez HSM pour toutes les clés de signature AC. Testez les connexions régulièrement.",
     "stats": {
       "providers": "Fournisseurs",
       "keys": "Clés",
@@ -2383,7 +2383,7 @@
     },
     "certification": {
       "label": "Certification déclarée",
-      "hint": "La certification que l'opérateur déclare pour ce HSM. UCM ne vérifie pas le matériel. Les profils alignés sur eIDAS l'utilisent pour contrôler la protection de la clé de la CA.",
+      "hint": "La certification que l'opérateur déclare pour ce HSM. UCM ne vérifie pas le matériel. Les profils alignés sur eIDAS l'utilisent pour contrôler la protection de la clé de l'AC.",
       "notDeclared": "Non déclarée",
       "values": {
         "cc-eal4+": "Common Criteria EAL 4+",
@@ -3331,7 +3331,7 @@
       "title": "Authentification mTLS",
       "enable": "Activer l'authentification par certificat client",
       "trustedCA": "Autorité de certification de confiance",
-      "selectCA": "Sélectionner une CA...",
+      "selectCA": "Sélectionner une AC...",
       "required": "Exiger un certificat client (pas de repli sur mot de passe)",
       "requiredWarning": "En mode requis, les utilisateurs sans certificat client valide ne peuvent pas se connecter. Assurez-vous qu'au moins un admin a un certificat enrôlé.",
       "restartNote": "Un redémarrage du service est nécessaire pour appliquer les changements mTLS.",
@@ -3584,7 +3584,7 @@
         },
         "ocsp_responder_unapproved_key": {
           "title": "Répondeurs OCSP délégués avec une clé Ed25519/Ed448, ML-DSA ou faible : l'AC signe à leur place",
-          "remedy": "Émettez un nouveau certificat de répondeur RSA ou ECDSA et sélectionnez-le dans les paramètres de la CA."
+          "remedy": "Émettez un nouveau certificat de répondeur RSA ou ECDSA et sélectionnez-le dans les paramètres de l'AC."
         },
         "tsa_signer_unapproved_key": {
           "title": "Le certificat d'horodatage a une clé Ed25519/Ed448, ML-DSA ou faible : les horodatages échouent en mode FIPS",
@@ -4036,7 +4036,7 @@
       "pdsLanguage": "Langue",
       "addPds": "Ajouter une déclaration de divulgation",
       "policyOids": "OID de politique de certificat",
-      "policyOidsHint": "OID en notation pointée, un par ligne, ajoutés après la politique propre à la CA. Les boutons ajoutent les politiques ETSI QCP."
+      "policyOidsHint": "OID en notation pointée, un par ligne, ajoutés après la politique propre à l'AC. Les boutons ajoutent les politiques ETSI QCP."
     },
     "activate": "Activer",
     "activated": "Modèle activé",
@@ -4209,7 +4209,7 @@
     "adding": "Ajout...",
     "syncDescription": "Importe les certificats AC de confiance depuis le bundle AC du système.",
     "syncLimitLabel": "Nombre maximum de certificats à importer",
-    "syncLimitHelp": "La plupart des systèmes contiennent ~150 CA. Maximum 1000.",
+    "syncLimitHelp": "La plupart des systèmes contiennent ~150 AC. Maximum 1000.",
     "syncTitle": "Synchroniser depuis le système",
     "confirmRemove": "Supprimer le certificat",
     "deleteSelected": "Supprimer la sélection",
@@ -5421,7 +5421,7 @@
     "title": "Microsoft AD CS",
     "subtitle": "Gérer les connexions Microsoft Active Directory Certificate Services",
     "helpTitle": "Intégration AC Microsoft",
-    "helpDescription": "Connectez-vous à Microsoft AD CS pour signer des certificats via votre autorité de certification Windows. Trois méthodes d'authentification disponibles :\n\n- **Certificat client (recommandé)** : Le plus sécurisé et autonome. Pas besoin de joindre le domaine. Générez un certificat client sur votre AC Microsoft, exportez en PFX, puis importez le certificat et la clé ici.\n- **Auth basique** : Simple identifiant/mot de passe en HTTPS. Fonctionne sans jonction au domaine. Assurez-vous que le certsrv accepte l'authentification basique dans IIS.\n- **Kerberos (optionnel)** : Nécessite le paquet pip requests-kerberos et que la machine soit jointe au domaine AD (ou un keytab configuré). Seulement si les autres méthodes sont désactivées sur le CA.",
+    "helpDescription": "Connectez-vous à Microsoft AD CS pour signer des certificats via votre autorité de certification Windows. Trois méthodes d'authentification disponibles :\n\n- **Certificat client (recommandé)** : Le plus sécurisé et autonome. Pas besoin de joindre le domaine. Générez un certificat client sur votre AC Microsoft, exportez en PFX, puis importez le certificat et la clé ici.\n- **Auth basique** : Simple identifiant/mot de passe en HTTPS. Fonctionne sans jonction au domaine. Assurez-vous que le certsrv accepte l'authentification basique dans IIS.\n- **Kerberos (optionnel)** : Nécessite le paquet pip requests-kerberos et que la machine soit jointe au domaine AD (ou un keytab configuré). Seulement si les autres méthodes sont désactivées sur l'AC.",
     "addConnection": "Ajouter une connexion",
     "editConnection": "Modifier la connexion",
     "connectionName": "Nom de la connexion",
@@ -5506,7 +5506,7 @@
     "testFailed": "Échec du test de connexion",
     "templatesFetchHint": "Testez la connexion pour charger automatiquement les modèles disponibles",
     "warnings": {
-      "authenticated_but_no_templates": "Authentification OK mais aucun modèle disponible. Vérifiez les permissions du compte sur la CA.",
+      "authenticated_but_no_templates": "Authentification OK mais aucun modèle disponible. Vérifiez les permissions du compte sur l'AC.",
       "authenticated_but_template_access_denied": "Authentification OK mais accès refusé lors du listage des modèles. Le compte manque peut-être de permissions d'inscription."
     },
     "noConnections": "Aucune connexion AC Microsoft configurée",
@@ -5541,7 +5541,7 @@
       "enrolleeUpn": "UPN du bénéficiaire",
       "enrolleeUpnPlaceholder": "jean.dupont@corp.local",
       "upnRequired": "Le UPN est requis lorsque l'inscription au nom de est activée",
-      "hint": "Nécessite un certificat d'agent d'inscription configuré sur la CA. Le modèle doit autoriser l'inscription pour le compte d'autres utilisateurs."
+      "hint": "Nécessite un certificat d'agent d'inscription configuré sur l'AC. Le modèle doit autoriser l'inscription pour le compte d'autres utilisateurs."
     }
   },
   "xcepWstep": {
@@ -5879,7 +5879,7 @@
       "allowAnyPrincipal": "Autoriser tout principal",
       "allowAnyPrincipalHelp": "Si aucun principal n'est listé, signer pour n'importe quel nom, root compris. Sans cette option, une AC à liste vide ne signe rien.",
       "allowCustomKeyId": "Laisser les demandeurs définir l'identifiant de clé",
-      "allowCustomKeyIdHelp": "sshd journalise l'identifiant de clé comme identité du titulaire. Sans cette option, l'AC nomme chaque certificat principals@nom de la CA.",
+      "allowCustomKeyIdHelp": "sshd journalise l'identifiant de clé comme identité du titulaire. Sans cette option, l'AC nomme chaque certificat principals@nom de l'AC.",
       "keyStorageLockedHelp": "La clé de l'AC et le type d'AC ne peuvent pas être modifiés après la création de l'AC.",
       "hsmKeyHelper": "Une AC SSH sur HSM utilise une clé de signature RSA ou ECDSA P-256/P-384/P-521 qu'aucune autre autorité ne détient. Ajoutez ou synchronisez les clés dans la gestion HSM.",
       "hsmNoUsableKeys": "Ce fournisseur n'a aucune clé de signature RSA ou ECDSA libre. Une clé HSM sert une seule autorité, X.509 ou SSH.",
@@ -6153,7 +6153,7 @@
   },
   "chainUsage": {
     "title": "Chaîne encore liée à cette AC",
-    "empty": "Plus aucun certificat, aucune sous-AC, aucune chaîne par défaut ni aucun déploiement d'UCM ne passe par cette CA. Les réglages qui la nomment (AC émettrice ACME, SCEP ou EST, politiques) ne sont pas vérifiés ici.",
+    "empty": "Plus aucun certificat, aucune sous-AC, aucune chaîne par défaut ni aucun déploiement d'UCM ne passe par cette AC. Les réglages qui la nomment (AC émettrice ACME, SCEP ou EST, politiques) ne sont pas vérifiés ici.",
     "issued": "Certificats émis par cette AC ou en dessous",
     "viaCross": "Chaîne par défaut via un certificat croisé de cette AC",
     "deployments": "Liaisons de déploiement qui poussent une telle chaîne",
@@ -6185,12 +6185,12 @@
     "updateFailed": "Impossible de mettre à jour le certificat croisé",
     "attach": "Rattacher",
     "attachTitle": "Rattacher un certificat croisé",
-    "attachHint": "Collez ou choisissez un certificat qui porte le sujet et la clé de cette AC et qui est émis par une autre CA. Le certificat propre de l'AC est conservé.",
+    "attachHint": "Collez ou choisissez un certificat qui porte le sujet et la clé de cette AC et qui est émis par une autre AC. Le certificat propre de l'AC est conservé.",
     "serveNow": "Le servir dans la chaîne par défaut",
     "attached": "Certificat croisé rattaché",
     "attachFailed": "Impossible de rattacher le certificat croisé",
     "attachAsCross": "Rattacher comme certificat croisé",
-    "offerHint": "Ce certificat est un autre certificat de la clé de cette CA. Rattachez-le à côté du certificat propre de l'AC au lieu de le remplacer.",
+    "offerHint": "Ce certificat est un autre certificat de la clé de cette AC. Rattachez-le à côté du certificat propre de l'AC au lieu de le remplacer.",
     "replaceCurrent": "Remplacer",
     "replaceHint": "Remplacer installe ce certificat à la place de celui de l'AC : cette AC n'utilisera plus le certificat actuel.",
     "sign": "Signer en croisé",
@@ -6216,7 +6216,7 @@
     "convertFailed": "Impossible de convertir le doublon",
     "restorePrimary": "Restaurer comme principal",
     "restorePrimaryOn": "Restaurer sur {{name}}",
-    "restoreHint": "Fournissez le certificat auto-signé de la clé de cette CA. Le certificat que l'enregistrement détient actuellement est conservé comme certificat croisé.",
+    "restoreHint": "Fournissez le certificat auto-signé de la clé de cette AC. Le certificat que l'enregistrement détient actuellement est conservé comme certificat croisé.",
     "restored": "Certificat auto-signé restauré",
     "restoreFailed": "Impossible de restaurer le certificat auto-signé"
   },
@@ -6227,7 +6227,7 @@
     "cross": "Certificat croisé de {{name}} par {{issuer}}",
     "served": "servi",
     "notServable": "révoqué, expiré ou pas encore valide",
-    "exportHint": "Un certificat croisé permet aux clients qui font confiance à une autre racine de construire un chemin vers cette CA.",
+    "exportHint": "Un certificat croisé permet aux clients qui font confiance à une autre racine de construire un chemin vers cette AC.",
     "deployHint": "La chaîne écrite dans le fichier de chaîne complète. Un certificat croisé révoqué, expiré ou pas encore valide n'est jamais poussé."
   },
   "customExtensions": {

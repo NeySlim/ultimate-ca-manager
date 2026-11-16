@@ -72,7 +72,7 @@ Importez les AC de confiance du magasin de confiance du système d'exploitation 
 ### Chaînes
 La vue de chaîne d'un certificat, et ses exports avec la chaîne, prennent un certificat du magasin de confiance dont le sujet correspond au nom de l'émetteur pour compléter la chaîne. Aucune signature n'est vérifiée contre le magasin de confiance.
 
-Le magasin de confiance ne joue aucun rôle dans l'authentification client mTLS (qui utilise l'AC de confiance choisie sous Paramètres › Sécurité) ni dans la connexion du client ACME à sa CA.
+Le magasin de confiance ne joue aucun rôle dans l'authentification client mTLS (qui utilise l'AC de confiance choisie sous Paramètres › Sécurité) ni dans la connexion du client ACME à son AC.
 `
   }
 }

@@ -49,7 +49,7 @@ Les listes de révocation de certificats (CRL) et le protocole OCSP (Online Cert
 ## Gestion des CRL
 
 ### Qu'est-ce qu'une CRL ?
-Une CRL est une liste signée de numéros de série de certificats révoqués, publiée par une CA. Les clients téléchargent la CRL et vérifient si le numéro de série d'un certificat y figure.
+Une CRL est une liste signée de numéros de série de certificats révoqués, publiée par une AC. Les clients téléchargent la CRL et vérifient si le numéro de série d'un certificat y figure.
 
 ### CRL par AC
 Chaque AC a sa propre CRL. La liste des CRL affiche toutes vos AC avec :
@@ -58,10 +58,10 @@ Chaque AC a sa propre CRL. La liste des CRL affiche toutes vos AC avec :
 - **Auto-régénération** : Si les mises à jour automatiques de la CRL sont activées
 
 ### Régénérer une CRL
-Cliquez sur **Régénérer** pour reconstruire immédiatement la CRL d'une CA. C'est utile après avoir révoqué des certificats.
+Cliquez sur **Régénérer** pour reconstruire immédiatement la CRL d'une AC. C'est utile après avoir révoqué des certificats.
 
 ### Auto-régénération
-Activez l'auto-régénération pour reconstruire automatiquement la CRL chaque fois qu'un certificat est révoqué. Basculez cette option par CA.
+Activez l'auto-régénération pour reconstruire automatiquement la CRL chaque fois qu'un certificat est révoqué. Basculez cette option par AC.
 
 ### Validité de la CRL
 La planification de la CRL (par AC) définit la durée de validité de chaque CRL publiée. Les options vont de **1 jour à 5 ans** : 1j, 2j, 3j, 7j, 14j, 30j, 90j, 180j, 1a, 3a, 5a.

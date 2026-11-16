@@ -31,7 +31,7 @@ export default {
       {
         title: 'Gestion',
         items: [
-          { label: 'Révoquer', text: 'Ajoute un certificat à la liste de révocation de clés (KRL) de la CA. Les serveurs doivent être configurés pour vérifier la KRL. Un certificat révoqué reste dans la KRL et ne peut pas être supprimé avant son expiration (v2.252).' },
+          { label: 'Révoquer', text: 'Ajoute un certificat à la liste de révocation de clés (KRL) de l\'AC. Les serveurs doivent être configurés pour vérifier la KRL. Un certificat révoqué reste dans la KRL et ne peut pas être supprimé avant son expiration (v2.252).' },
           { label: 'Télécharger', text: 'Téléchargez le certificat, la clé publique ou la clé privée (mode génération uniquement).' },
         ]
       },
@@ -44,7 +44,7 @@ export default {
     ],
     warnings: [
       'En mode génération, téléchargez la clé privée immédiatement : elle n\'est pas stockée et ne peut pas être récupérée.',
-      'La révocation d\'un certificat ne fonctionne que si les serveurs sont configurés pour vérifier le fichier KRL de la CA.',
+      'La révocation d\'un certificat ne fonctionne que si les serveurs sont configurés pour vérifier le fichier KRL de l\'AC.',
     ],
   },
   helpGuides: {
@@ -96,7 +96,7 @@ UCM génère à la fois la paire de clés et le certificat. Utilisez ce mode lor
 ### Key ID
 Un identifiant intégré dans le certificat. Le serveur SSH le journalise lorsque le certificat est utilisé, comme identité du titulaire.
 
-L'AC le définit à \`principals@CA name\` (ex. \`deploy@Production User CA\`). Un demandeur ne peut en choisir un autre que sur une AC où **Laisser les demandeurs définir l'identifiant de clé** est coché ; ailleurs, une telle demande est refusée.
+L'AC le définit à \`principals@AC name\` (ex. \`deploy@Production User AC\`). Un demandeur ne peut en choisir un autre que sur une AC où **Laisser les demandeurs définir l'identifiant de clé** est coché ; ailleurs, une telle demande est refusée.
 
 **Bons exemples de Key ID, là où c'est autorisé :** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
 

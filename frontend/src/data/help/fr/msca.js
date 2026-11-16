@@ -18,7 +18,7 @@ export default {
           { label: 'Sélection du modèle', text: 'Choisir parmi les modèles de certificats disponibles sur l\'AC Microsoft' },
           { label: 'Auto-approuvé', text: 'Les modèles avec autoenroll retournent le certificat immédiatement' },
           { label: 'Approbation du gestionnaire', text: 'Certains modèles exigent l\'approbation du gestionnaire, UCM suit la requête en attente' },
-          { label: 'Requêtes en attente', text: 'Une requête que l\'AC retient pour son gestionnaire reste En attente dans UCM : utilisez Vérifier le statut dans les détails de la CSR, ou approuvez-la depuis le panneau de contrôle CA. La synchronisation de l\'inventaire termine aussi une requête en attente que l\'AC montre émise, et marque refusée celle qu\'elle montre refusée. Une requête dont la CSR est signée ailleurs (AC locale, import) est close ; si ses détails sont encore ouverts, Vérifier le statut affiche « Cette CSR a été signée ailleurs : sa demande auprès d\'AC Microsoft est close ». Un certificat que l\'AC émet malgré tout entre comme un certificat distinct quand la requête est approuvée depuis le panneau de contrôle AC, ou par une synchronisation complète de l\'inventaire (full: true sur POST /api/v2/microsoft-cas/{id}/inventory-sync) : Importer depuis l\'AC maintenant et la synchronisation planifiée sont incrémentales et peuvent le manquer' },
+          { label: 'Requêtes en attente', text: 'Une requête que l\'AC retient pour son gestionnaire reste En attente dans UCM : utilisez Vérifier le statut dans les détails de la CSR, ou approuvez-la depuis le panneau de contrôle AC. La synchronisation de l\'inventaire termine aussi une requête en attente que l\'AC montre émise, et marque refusée celle qu\'elle montre refusée. Une requête dont la CSR est signée ailleurs (AC locale, import) est close ; si ses détails sont encore ouverts, Vérifier le statut affiche « Cette CSR a été signée ailleurs : sa demande auprès d\'AC Microsoft est close ». Un certificat que l\'AC émet malgré tout entre comme un certificat distinct quand la requête est approuvée depuis le panneau de contrôle AC, ou par une synchronisation complète de l\'inventaire (full: true sur POST /api/v2/microsoft-cas/{id}/inventory-sync) : Importer depuis l\'AC maintenant et la synchronisation planifiée sont incrémentales et peuvent le manquer' },
         ]
       },
       {
@@ -50,7 +50,7 @@ export default {
       {
         title: 'Synchronisation CRL des révocations',
         items: [
-          { label: 'Sens unique', text: 'Récupère périodiquement la CRL de l\'AC et marque comme révoqués dans UCM les certificats révoqués sur la CA. Ne dé-révoque jamais.' },
+          { label: 'Sens unique', text: 'Récupère périodiquement la CRL de l\'AC et marque comme révoqués dans UCM les certificats révoqués sur l\'AC. Ne dé-révoque jamais.' },
           { label: 'Source CRL', text: 'Une URL de CRL explicite, ou auto-détectée depuis le point de distribution CRL des certificats émis.' },
           { label: 'Vérifiée', text: 'La signature de la CRL est vérifiée avec le certificat de l\'AC avant toute application.' },
         ]
@@ -59,7 +59,7 @@ export default {
         title: 'Inventaire AC & panneau de contrôle',
         items: [
           { label: 'Sync d\'inventaire', text: 'Importe les certificats émis directement sur l\'AC et encore inconnus d\'UCM (incrémental par id de requête) ; la réconciliation est disponible via l\'API.' },
-          { label: 'Requêtes en attente', text: 'Lister, approuver (resoumission + import auto) ou refuser les requêtes en attente d\'approbation du gestionnaire de la CA.' },
+          { label: 'Requêtes en attente', text: 'Lister, approuver (resoumission + import auto) ou refuser les requêtes en attente d\'approbation du gestionnaire de l\'AC.' },
           { label: 'Santé de l\'AC', text: 'État du service AC, expiration du certificat AC, prochaine mise à jour de la CRL et nombre de requêtes en attente, d\'un coup d\'œil.' },
         ]
       },
@@ -124,7 +124,7 @@ UCM s'intègre avec Microsoft Active Directory Certificate Services (AD CS) pour
 Le certificat est retourné immédiatement et importé dans UCM.
 
 ### Modèles avec approbation du gestionnaire
-UCM enregistre la requête comme **En attente** et suit l'ID de requête MS CA. Ouvrez la CSR dans **CSR → En attente** et cliquez sur **Vérifier le statut** : si l'AC a émis le certificat (approuvé sur la console de l'AC Windows, par exemple), UCM l'importe dans la requête ; si l'AC l'a refusée, la requête passe à Refusée ; sinon elle reste En attente. L'approbation depuis le **panneau de contrôle AC** importe aussi le certificat. La **synchronisation de l'inventaire** termine de la même façon les requêtes en attente et les signale comme terminées, à part des certificats importés. Une requête dont la CSR est signée ailleurs (AC locale, import) est close ; si ses détails sont encore ouverts, **Vérifier le statut** affiche *Cette CSR a été signée ailleurs : sa demande auprès d'AC Microsoft est close*. Un certificat que l'AC émet malgré tout entre comme un certificat distinct quand la requête est approuvée depuis le **panneau de contrôle AC**, ou par une synchronisation complète de l'inventaire (\`full: true\` sur \`POST /api/v2/microsoft-cas/{id}/inventory-sync\`) : **Importer depuis l'AC maintenant** et la synchronisation planifiée sont incrémentales et peuvent le manquer.
+UCM enregistre la requête comme **En attente** et suit l'ID de requête MS AC. Ouvrez la CSR dans **CSR → En attente** et cliquez sur **Vérifier le statut** : si l'AC a émis le certificat (approuvé sur la console de l'AC Windows, par exemple), UCM l'importe dans la requête ; si l'AC l'a refusée, la requête passe à Refusée ; sinon elle reste En attente. L'approbation depuis le **panneau de contrôle AC** importe aussi le certificat. La **synchronisation de l'inventaire** termine de la même façon les requêtes en attente et les signale comme terminées, à part des certificats importés. Une requête dont la CSR est signée ailleurs (AC locale, import) est close ; si ses détails sont encore ouverts, **Vérifier le statut** affiche *Cette CSR a été signée ailleurs : sa demande auprès d'AC Microsoft est close*. Un certificat que l'AC émet malgré tout entre comme un certificat distinct quand la requête est approuvée depuis le **panneau de contrôle AC**, ou par une synchronisation complète de l'inventaire (\`full: true\` sur \`POST /api/v2/microsoft-cas/{id}/inventory-sync\`) : **Importer depuis l'AC maintenant** et la synchronisation planifiée sont incrémentales et peuvent le manquer.
 
 ## Inscription pour le compte d'autrui (EOBO)
 
@@ -166,7 +166,7 @@ Le renouvellement ne re-signe **pas** localement (la clé émettrice réside sur
 
 ### Révoquer un certificat AD CS
 L'inscription Web AD CS n'a pas de point de terminaison de révocation. Révoquer un certificat émis par AD CS :
-- **Sans le canal admin WinRM** : le marque révoqué dans UCM uniquement ; l'AC Windows n'est pas notifiée. Révoquez-le aussi sur la CA.
+- **Sans le canal admin WinRM** : le marque révoqué dans UCM uniquement ; l'AC Windows n'est pas notifiée. Révoquez-le aussi sur l'AC.
 - **Avec le canal admin WinRM** : UCM propage la révocation à l'AC Windows (certutil -revoke + publication de la CRL). La levée d'un certificateHold propage aussi la dé-révocation.
 
 ## Canal admin WinRM (optionnel)
@@ -193,7 +193,7 @@ Le canal admin permet à UCM d'exécuter sur l'AC Windows des opérations de ges
 
 ## Synchronisation CRL des révocations
 
-Activez **Synchroniser les révocations depuis la CRL de l'AC** sur la connexion pour qu'UCM récupère périodiquement la CRL de l'AC et marque comme révoqués dans UCM les certificats révoqués sur la CA. C'est strictement à sens unique (AC vers UCM) et un certificat révoqué dans UCM n'est jamais dé-révoqué. L'URL de la CRL vient de la connexion ou est auto-détectée depuis le point de distribution CRL des certificats émis, et sa signature est vérifiée avec le certificat de l'AC avant toute application. S'exécute toutes les heures, plus une action **Synchroniser la CRL maintenant**.
+Activez **Synchroniser les révocations depuis la CRL de l'AC** sur la connexion pour qu'UCM récupère périodiquement la CRL de l'AC et marque comme révoqués dans UCM les certificats révoqués sur l'AC. C'est strictement à sens unique (AC vers UCM) et un certificat révoqué dans UCM n'est jamais dé-révoqué. L'URL de la CRL vient de la connexion ou est auto-détectée depuis le point de distribution CRL des certificats émis, et sa signature est vérifiée avec le certificat de l'AC avant toute application. S'exécute toutes les heures, plus une action **Synchroniser la CRL maintenant**.
 
 ## Synchronisation d'inventaire AC
 

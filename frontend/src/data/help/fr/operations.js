@@ -47,7 +47,7 @@ Identique à la page Importation & Exportation : l'assistant d'importation intel
 
 ## Onglet Exportation
 
-Exportation en masse des certificats et des CA.
+Exportation en masse des certificats et des AC.
 
 ## Actions en masse
 

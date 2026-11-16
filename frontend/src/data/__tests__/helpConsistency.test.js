@@ -50,7 +50,7 @@ describe('French wording of the certification authority', () => {
   const prose = (block) => block.split('\n').map((l) => (l.match(/#.*$|\s{2,}\(.*\)$/) || [''])[0]).join('\n')
   const uncoded = (s) => s.replace(/```[\s\S]*?```/g, prose).replace(/`[^`]*`/g, ' ').replace(ENGLISH_TERMS, ' ')
   it('has no isolated "CA" in the interface and the help', () => {
-    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\w/:.-])CA(?![\w:/.-]).{0,20}/g) || [])
+    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_-])CA(?![\p{L}\p{N}_]).{0,20}/gu) || [])
     expect(found).toEqual([])
   })
   // "AC" starts with a vowel: "l'AC", "d'AC", "cette AC", "une AC", never "la AC", "de AC", "l'CA".

@@ -75,7 +75,7 @@ Importez les certificats et AC d'un pare-feu OPNsense, à la demande (UCM ne les
 1. Sélectionnez les éléments que vous souhaitez importer
 2. Cliquez sur **Importer N sélectionnés** (N compte les éléments sélectionnés)
 
-UCM importe les certificats avec leurs clés privées (si disponibles) et préserve la hiérarchie des CA.
+UCM importe les certificats avec leurs clés privées (si disponibles) et préserve la hiérarchie des AC.
 
 ## Exporter les certificats
 
