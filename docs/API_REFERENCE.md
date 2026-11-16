@@ -4004,7 +4004,7 @@ Content-Type: application/json
 }
 ```
 
-Fields left out or blank keep their saved values. Saved credentials this node's database key cannot decrypt are never merged: `credentials` must then hold every required field, and a secret when the provider has one, in one request (400 naming the missing fields otherwise), and the entry replaces them whole, so an optional secret not sent again (INWX `shared_secret`, Cloudflare `api_key`) is no longer saved.
+Fields left out or blank keep their saved values. Saved credentials this node's database key cannot decrypt are never merged: `credentials` must then hold every required field, and a secret when the provider has one, in one request (400 naming the missing fields otherwise), and the entry replaces them whole, so an optional secret not sent again (INWX `shared_secret`, Cloudflare `api_key`) is no longer saved. A type without credential fields (`manual`, or one this release no longer knows) refuses any such entry, and a `manual` provider never reads its saved credentials.
 
 ### Delete DNS Provider
 ```http
