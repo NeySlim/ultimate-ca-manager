@@ -225,6 +225,63 @@ def test_the_right_password_admitted_before_another_node_locked_clears_it(
         assert tuple(_stored(username)) == (0, None)
 
 
+def _signed_in(client):
+    return bool(client.get('/api/v2/auth/verify').get_json()['data'].get('authenticated'))
+
+
+def test_the_right_password_checked_while_a_burst_locks_opens_one_session_unlocked(
+        app, client, username, alerts, monkeypatch):
+    """Counted first, the right password is checked; the burst sent meanwhile on another
+    connection checks the rest of the threshold and locks: the success clears that lock."""
+    real, checked = User.check_password, []
+
+    def a_burst_locks_meanwhile(self, password):
+        checked.append(password)
+        if password == PASSWORD:
+            with app.app_context():
+                other = app.test_client()
+                for _ in range(BURST):
+                    assert other.post(PASSWORD_DOOR, json={'username': username,
+                                                           'password': 'wrong'}
+                                      ).status_code == 401
+                assert _stored(username)[1] is not None
+        return real(self, password)
+
+    monkeypatch.setattr(User, 'check_password', a_burst_locks_meanwhile)
+    response = client.post(PASSWORD_DOOR, json={'username': username, 'password': PASSWORD})
+    assert response.status_code == 200 and _signed_in(client)
+    assert len(checked) == MAX_ATTEMPTS
+    with app.app_context():
+        assert tuple(_stored(username)) == (0, None)
+
+
+def test_the_right_password_sent_once_a_burst_locked_opens_no_session(
+        app, client, username, alerts, monkeypatch):
+    real, checked, right = User.check_password, [], []
+
+    def the_right_password_arrives_meanwhile(self, password):
+        checked.append(password)
+        if len(checked) < BURST:
+            with app.app_context():
+                other = app.test_client()
+                if len(checked) == MAX_ATTEMPTS:
+                    right.append(other.post(PASSWORD_DOOR, json={'username': username,
+                                                                  'password': PASSWORD}))
+                    right.append(_signed_in(other))
+                else:
+                    other.post(PASSWORD_DOOR, json={'username': username, 'password': 'wrong'})
+        return real(self, password)
+
+    monkeypatch.setattr(User, 'check_password', the_right_password_arrives_meanwhile)
+    assert client.post(PASSWORD_DOOR, json={'username': username, 'password': 'wrong'}
+                       ).status_code == 401
+    assert right[0].status_code == 401 and right[1] is False
+    assert len(checked) == MAX_ATTEMPTS and PASSWORD not in checked
+    with app.app_context():
+        failures, locked_until = _stored(username)
+    assert failures == MAX_ATTEMPTS and locked_until is not None and alerts == [username]
+
+
 def test_a_success_resets_the_stored_count_not_its_copy(app, client, username, monkeypatch):
     real = User.check_password
 
