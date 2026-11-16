@@ -1870,6 +1870,21 @@ def test_a_run_killed_while_the_readme_is_written_again_leaves_the_first_one_who
     assert sorted(p.name for p in box.archive.iterdir()) == ['README.txt', 'config', 'data']
 
 
+def test_a_run_killed_while_the_readme_is_first_written_is_put_back_then_archived(tmp_path):
+    """Killed with the journal still there: the retry takes the cut README away with the rest."""
+    box = Box(tmp_path, python='stub')
+    data, config = originals(box)
+    box.wrap()
+    (box.bin / 'cat').write_text(f'#!/bin/sh\ncase "$*" in */VERSION) kill -9 0 ;; esac\nexec {REAL_CAT} "$@"\n')
+    (box.bin / 'cat').chmod(0o755)
+    assert box.run().returncode == -9
+    assert (box.archive / '.journal').exists() and not (box.archive / 'README.txt').exists()
+    (box.bin / 'cat').unlink()
+    out = box.run()
+    archived(box, out, data, config)
+    assert sorted(p.name for p in box.archive.iterdir()) == ['README.txt', 'config', 'data']
+
+
 # -- dnf5 cuts a scriptlet's lines at 80 columns ---------------------------------------
 
 @pytest.mark.parametrize('case', ['archived', 'failed', 'nothing to say'])
