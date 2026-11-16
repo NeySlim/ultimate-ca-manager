@@ -196,6 +196,7 @@ def _archived_sso_identities(row: Dict[str, Any], plan: RestorePlan) -> Set[Tupl
 # and goes with the row otherwise (see REMOVED_WITH_TARGET).
 DEPENDENT_TABLES: Dict[str, str] = {
     'crl_metadata': 'regenerated from the authorities',
+    'crls': 'legacy CRL rows, named by the refid of their authority',
     'ocsp_responses': 'a response cache',
     'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',
     'user_sessions': 'live sessions, revoked after every restore anyway',
@@ -226,9 +227,10 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'user_sso_identities': 'not in a 2.254 archive; removed with its account, orphaned with its provider',
 }
 
-# Integer links the schema holds without a foreign key, handled as if it had one:
-# SQLite hands a removed row's id to the next row inserted.
+# Links the schema holds without a foreign key, handled as if it had one: SQLite
+# hands a removed row's id to the next row inserted, and a refid outlives its row.
 SOFT_LINKS = (
+    ('crls', 'caref', 'certificate_authorities', 'refid'),
     ('certificates', 'related_certificate_id', 'certificates', 'id'),
     ('certificates', 'windows_profile_id', 'windows_enrollment_profiles', 'id'),
     ('deploy_bindings', 'attention_successor_id', 'certificates', 'id'),

@@ -14,7 +14,7 @@ from services.backup.export_generic import load_model
 from services.backup.manifest import SECTIONS
 from tests.test_backup_cross_installation import Keys, PASSWORD, _installation, _service
 from tests.test_restore_replace_dependents import (
-    ENGINES, _orphans, _restore, _snapshot, _target, _user,
+    ENGINES, _authority_row, _orphans, _restore, _snapshot, _target, _user,
 )
 
 from tests.fresh_app import fresh_app_fixtures
@@ -326,4 +326,24 @@ def test_no_acme_server_state_outlives_its_account(target, app, tmp_path, archiv
     else:
         assert after == {name: set() for name in after}
         assert cleared == {name: len(ids) for name, ids in made.items()}
+    assert _orphans() == []
+
+
+# -- legacy CRL rows ----------------------------------------------------------
+
+def test_a_legacy_crl_row_goes_with_its_removed_authority(target):
+    from models.crl_list import CRL
+
+    _user('replace-admin')
+    kept, _key, _cert = _authority_row('replace-crl-kept')
+    db.session.add(CRL(caref=kept.refid, descr='kept', text='x'))
+    blob = _snapshot()
+    gone, _key, _cert = _authority_row('replace-crl-gone')
+    db.session.add(CRL(caref=gone.refid, descr='gone', text='x'))
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert [(row.caref, row.descr) for row in CRL.query.all()] == [('replace-crl-kept', 'kept')]
+    assert results['cleared_dependents'].get('crls') == 1
     assert _orphans() == []
