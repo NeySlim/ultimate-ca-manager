@@ -465,11 +465,12 @@ def test_the_standard_install_is_unchanged(tmp_path):
 def _systemd(tmp_path, bin_dir, record, state='active', hold_stop=None):
     """A booted systemd whose systemctl logs each call, with the venv's content at that moment.
 
-    With hold_stop, `stop` stops ucm, creates that file and waits to be killed."""
+    With hold_stop, `stop` stops ucm, creates that file and waits to be killed: one process (exec),
+    since a shell loop outlives a SIGINT that misses its child of the moment."""
     (tmp_path / 'run-systemd').mkdir()
     (tmp_path / 'ucm-state').write_text(state)
     venv = tmp_path / 'opt' / 'venv'
-    hold = f'touch {hold_stop}; while :; do {shutil.which("sleep")} 0.05; done' if hold_stop else ':'
+    hold = f'touch {hold_stop}; exec {shutil.which("sleep")} 600' if hold_stop else ':'
     _stub(bin_dir / 'systemctl', f"""echo "SYSTEMCTL $* [$({shutil.which('ls')} {venv} 2>/dev/null | tr '\\n' ' ')]" >> {record}
 state=$(cat {tmp_path}/ucm-state)
 case "$1" in
@@ -478,6 +479,27 @@ case "$1" in
   start|restart) echo active > {tmp_path}/ucm-state ;;
 esac""")
     return {'PATH': str(bin_dir), 'UCM_SETUP_SYSTEMD_RUN': str(tmp_path / 'run-systemd')}
+
+
+def test_a_held_stop_dies_of_a_sigint_its_shell_alone_receives(tmp_path):
+    """A shell loop survives SIGINT when its current child does not get it (bash waits for the
+    child to die of it first); a group signal lands so whenever the child is between fork and exec."""
+    bin_dir = tmp_path / 'bin'
+    held = tmp_path / 'held'
+    _systemd(tmp_path, bin_dir, tmp_path / 'record', hold_stop=held)
+    proc = subprocess.Popen([str(bin_dir / 'systemctl'), 'stop', 'ucm'], start_new_session=True,
+                            preexec_fn=_default_signals)
+    try:
+        _wait_for(held, proc)
+        time.sleep(0.2)
+        os.kill(proc.pid, signal.SIGINT)
+        assert proc.wait(timeout=5) == -signal.SIGINT
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
 
 
 def _calls(record):
