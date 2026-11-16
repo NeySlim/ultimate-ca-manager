@@ -122,6 +122,14 @@ def _bind_result(name):
             'email': f'{name}@example.test', 'fullname': name, 'groups': []}
 
 
+def _found(name, before_bind):
+    """The directory found ``name``: the door's hook runs before the user's bind, as the
+    real search does; False when it refused the attempt."""
+    if before_bind is None:
+        return True
+    return before_bind({k: v for k, v in _bind_result(name).items() if k != 'groups'})
+
+
 def _lock_lines(caplog, name):
     return [r for r in caplog.records if 'locked after' in r.getMessage() and name in r.getMessage()]
 
@@ -273,7 +281,9 @@ def test_an_ldap_burst_binds_at_most_max_attempts_times(app, client, username, l
     import api.v2.sso.ldap_routes as ldap_routes
     binds = []
 
-    def the_next_request_arrives_meanwhile(provider, name, password):
+    def the_next_request_arrives_meanwhile(provider, name, password, before_bind=None):
+        if not _found(name, before_bind):
+            return None, 'attempt_refused'
         binds.append(password)
         if len(binds) < BURST:
             with app.app_context():
@@ -297,7 +307,8 @@ def test_an_ldap_bind_admitted_before_another_node_locked_clears_it(
         app, client, ldap_user, ldap_provider, monkeypatch):
     import api.v2.sso.ldap_routes as ldap_routes
 
-    def another_node_locks_meanwhile(provider, name, password):
+    def another_node_locks_meanwhile(provider, name, password, before_bind=None):
+        assert _found(name, before_bind)
         _another_node_writes(name, failed_logins=MAX_ATTEMPTS,
                              locked_until=utc_now() + timedelta(minutes=15))
         return _bind_result(name), None
@@ -315,7 +326,7 @@ def test_a_proved_ldap_password_refused_for_another_reason_does_not_count(
     import api.v2.sso.ldap_routes as ldap_routes
     with app.app_context():
         _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
-    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda p, n, pw: (None, reason))
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda p, n, pw, before_bind=None: (_found(n, before_bind), (None, reason))[1])
     assert client.post(LDAP_DOOR, json=_ldap_body(username, ldap_provider)).status_code == 403
     with app.app_context():
         assert tuple(_stored(username)) == (MAX_ATTEMPTS - 1, None)
@@ -327,7 +338,8 @@ def test_a_locally_disabled_ldap_account_does_not_count(app, client, ldap_user, 
     with app.app_context():
         _another_node_writes(ldap_user, active=False, failed_logins=2)
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda p, n, pw: (_bind_result(n), None))
+                        lambda p, n, pw, before_bind=None:
+                        (_found(n, before_bind), (_bind_result(n), None))[1])
     assert client.post(LDAP_DOOR, json=_ldap_body(ldap_user, ldap_provider)).status_code == 403
     with app.app_context():
         assert tuple(_stored(ldap_user)) == (2, None)
@@ -335,7 +347,9 @@ def test_a_locally_disabled_ldap_account_does_not_count(app, client, ldap_user, 
 
 def _case_blind_directory(binds, stored_name):
     """A directory whose name match ignores case (uid, sAMAccountName) and returns its own."""
-    def bind(provider, name, password):
+    def bind(provider, name, password, before_bind=None):
+        if name.lower() == stored_name.lower() and not _found(stored_name, before_bind):
+            return None, 'attempt_refused'
         binds.append(name)
         if name.lower() != stored_name.lower() or password != PASSWORD:
             return None, 'Invalid credentials'
@@ -379,7 +393,7 @@ def test_an_ldap_count_that_cannot_be_stored_answers_500_unbound(app, client, us
     import api.v2.sso.ldap_routes as ldap_routes
     binds = []
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda p, n, pw: binds.append(pw) or (None, 'Invalid credentials'))
+                        lambda p, n, pw, before_bind=None: (_found(n, before_bind) and binds.append(pw)) or (None, 'Invalid credentials'))
     with app.app_context():
         restore = _refuse_the_count(db.engine)
     try:
@@ -467,3 +481,107 @@ def test_wrong_passwords_sent_together_lock_once_on_postgresql(app, monkeypatch,
             _pin_threshold()
             db.session.remove()
         _wrong_passwords_together(app, monkeypatch, alerts)
+
+
+# --- The directory decides whose account a name opens ----------------------------
+
+class _AnySpellingDirectory:
+    """A directory whose user filter accepts the uid or the mail of an entry and returns
+    the stored uid: the attempt must be counted on that entry's account, whatever was typed."""
+
+    def __init__(self, uid, mail, entry_uuid=None):
+        self.uid, self.mail, self.entry_uuid, self.binds = uid, mail, entry_uuid, []
+
+    def connection(self, server, user=None, password=None, **kwargs):
+        directory = self
+
+        class _Conn:
+            def __init__(self):
+                self.user, self.password, self.entries = user, password, []
+
+            def search(self, base, query, attributes=None):
+                if f'={directory.uid})' not in query and f'={directory.mail})' not in query:
+                    return
+                entry = type('Entry', (), {})()
+                entry.entry_dn = f'uid={directory.uid},dc=example,dc=test'
+                entry.uid, entry.mail, entry.cn = directory.uid, directory.mail, directory.uid
+                entry.entryUUID = type('V', (), {'value': directory.entry_uuid})()
+                self.entries = [entry]
+
+            def unbind(self):
+                return None
+        return _Conn()
+
+    def bind(self, conn, provider):
+        if conn.user.startswith('cn=svc'):
+            return True
+        self.binds.append(conn.user)
+        return conn.password == PASSWORD
+
+
+@pytest.fixture
+def any_spelling(app, ldap_provider, monkeypatch):
+    """The real search and bind of the LDAP door, against _AnySpellingDirectory."""
+    import ldap3
+    import api.v2.sso.connection_tests as connection_tests
+    with app.app_context():
+        provider = db.session.get(SSOProvider, ldap_provider)
+        provider.ldap_user_filter = '(|(uid={username})(mail={username}))'
+        provider.ldap_bind_dn = 'cn=svc,dc=example,dc=test'
+        provider.ldap_email_attr, provider.ldap_fullname_attr = 'mail', 'cn'
+        db.session.commit()
+
+    def install(directory):
+        monkeypatch.setattr(ldap3, 'Server', lambda *a, **k: object())
+        monkeypatch.setattr(ldap3, 'Connection', directory.connection)
+        monkeypatch.setattr(connection_tests, 'ldap_bind', directory.bind)
+        monkeypatch.setattr(connection_tests, '_build_ldap_tls', lambda provider: None)
+        monkeypatch.setattr(connection_tests, '_decrypt_ldap_password', lambda provider: 'svc')
+        monkeypatch.setattr(connection_tests, '_check_account_disabled', lambda *a: False)
+        return directory
+    return install
+
+
+def test_an_ldap_name_the_filter_maps_to_an_entry_is_counted_on_its_account(
+        app, client, ldap_user, ldap_provider, any_spelling, alerts):
+    directory = any_spelling(_AnySpellingDirectory(ldap_user, f'{ldap_user}@example.test'))
+    mail = directory.mail
+    for _ in range(BURST * 2):
+        assert client.post(LDAP_DOOR, json=_ldap_body(mail, ldap_provider)).status_code == 401
+    assert len(directory.binds) == MAX_ATTEMPTS
+    assert client.post(LDAP_DOOR, json=_ldap_body(mail, ldap_provider, PASSWORD)
+                       ).status_code == 401
+    assert len(directory.binds) == MAX_ATTEMPTS
+    with app.app_context():
+        failures, locked_until = _stored(ldap_user)
+    assert failures == MAX_ATTEMPTS and locked_until is not None
+    assert alerts == [ldap_user]
+
+
+def test_an_ldap_success_under_another_spelling_clears_the_entry_account(
+        app, client, ldap_user, ldap_provider, any_spelling):
+    directory = any_spelling(_AnySpellingDirectory(ldap_user, f'{ldap_user}@example.test'))
+    with app.app_context():
+        _another_node_writes(ldap_user, failed_logins=MAX_ATTEMPTS - 1)
+    response = client.post(LDAP_DOOR, json=_ldap_body(directory.mail, ldap_provider, PASSWORD))
+    assert response.status_code == 200
+    with app.app_context():
+        assert tuple(_stored(ldap_user)) == (0, None)
+
+
+def test_an_ldap_attempt_is_counted_on_the_account_bound_to_the_entry_id(
+        app, client, username, ldap_provider, any_spelling):
+    """Bound by its stable id, the account opens whatever its name now is."""
+    entry_uid = f'dir{uuid.uuid4().hex[:8]}'
+    directory = any_spelling(_AnySpellingDirectory(entry_uid, f'{entry_uid}@example.test',
+                                                   entry_uuid=f'uuid-{entry_uid}'))
+    with app.app_context():
+        _another_node_writes(username, auth_source='ldap', sso_provider_id=ldap_provider,
+                             sso_external_id=f'uuid-{entry_uid}')
+    for _ in range(BURST):
+        assert client.post(LDAP_DOOR, json=_ldap_body(entry_uid, ldap_provider)
+                           ).status_code == 401
+    assert len(directory.binds) == MAX_ATTEMPTS
+    with app.app_context():
+        failures, locked_until = _stored(username)
+    assert failures == MAX_ATTEMPTS and locked_until is not None

@@ -129,7 +129,7 @@ def test_a_passkey_login_a_restore_overtakes_opens_no_valid_session(app, user, m
 def test_an_ldap_login_a_restore_overtakes_opens_no_valid_session(app, ldap, monkeypatch):
     from api.v2.sso import ldap_routes
     name = f'ldap-{uuid.uuid4().hex[:8]}'
-    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda _p, username, _pw: (
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda _p, username, _pw, before_bind=None: (
         {'username': username, 'dn': f'uid={username},dc=example', 'uid': f'uuid-{username}'}, None))
     done = _restore_meanwhile(monkeypatch, ldap_routes, '_ldap_authenticate_user')
     c = app.test_client()

@@ -122,7 +122,7 @@ class TestSessionFieldParity:
             secret, provider_id = totp.totp_secret, provider.id
 
         ldap_name = f'parityldap{tag}'
-        monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda p, u, pw: ({
+        monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', lambda p, u, pw, before_bind=None: ({
             'dn': f'uid={ldap_name}', 'uid': ldap_name, 'username': ldap_name,
             'email': f'{ldap_name}@example.test', 'fullname': ldap_name, 'groups': []}, None))
         try:

@@ -734,10 +734,10 @@ class TestLDAPRateLimiting:
     """Test LDAP brute-force protection"""
 
     def test_lockout_check_nonexistent_user(self, app):
-        """A name with no local account counts nothing and is not locked"""
+        """An entry with no local account counts nothing and is not locked"""
         with app.app_context():
             from api.v2.sso import _reserve_ldap_attempt
-            assert _reserve_ldap_attempt('nonexistent_user_xyz') == (None, None)
+            assert _reserve_ldap_attempt(None) == (None, None)
 
     def test_record_failed_attempts_and_lockout(self, app):
         """After 5 reserved attempts, user should be locked"""
@@ -754,13 +754,13 @@ class TestLDAPRateLimiting:
             # Default max attempts is 5
             max_attempts = 5
             for rank in range(1, max_attempts + 1):
-                assert _reserve_ldap_attempt('admin') == (user, rank)
+                assert _reserve_ldap_attempt(user) == (user, rank)
 
             # Locked now: no further attempt is counted
-            assert _reserve_ldap_attempt('admin') == (user, None)
+            assert _reserve_ldap_attempt(user) == (user, None)
 
             _clear_ldap_failed_attempts(user)
-            assert _reserve_ldap_attempt('admin') == (user, 1)
+            assert _reserve_ldap_attempt(user) == (user, 1)
 
             _clear_ldap_failed_attempts(user)
             db.session.refresh(user)
