@@ -199,10 +199,21 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - Group-to-role mapping (map AD groups to UCM roles)
 - Test connection before saving
 
+*Where groups are read.* With `memberOf`, from the user's own entry (a base search on its DN); the group filter is not used. With `member` or `uniqueMember`, by a search for the entries whose membership attribute holds the user's DN and that match the group filter (`(objectClass=*)` when empty), under the parent of the base DN when that parent lies in a naming context the server publishes (the root DSE's `namingContexts`, or when it publishes none), else under the base DN; a search under the parent that does not succeed (for example a service account allowed to search one subtree only) is tried once more under the base DN. Groups in a branch beside the users (`ou=people` and `ou=groups`) are therefore found; on a large directory, index the membership attribute for equality (OpenLDAP `index member eq`; Active Directory indexes `member`). The groups are read whenever the provider has role mapping rules or required groups.
+
+*Direct membership only.* A group counts when it names the user itself: nested groups are not followed, and the Active Directory primary group (`primaryGroupID`, usually Domain Users) never appears in `memberOf`. Map the groups users are direct members of.
+
+*Matching.* LDAP group names compare with rule keys and required groups as `cn` does (caseIgnoreMatch, RFC 4519 and RFC 4518): case and edge spaces are ignored and a run of inner spaces counts as one space; OIDC and SAML groups are compared exactly. A rule key is saved without its edge spaces, and two LDAP rule keys that compare equal are refused at save; a provider saved earlier with two such keys keeps working, both rules apply and the highest-privilege role wins.
+
+*A failed read.* When the directory does not answer the group read with success (service account rights, timeout, referral, missing base) and the admission depends on the groups, the login is refused with "your groups could not be read from the directory", and the log and the audit say the same.
+
+*Test Mapping* (Groups and role mapping section of a saved provider) finds the user, reads the groups and decides as the login does, without a password: it shows the access verdict with its reason, and a role only for an admitted user. It does not check the password nor the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic creation turned off, an email that belongs to an account of another provider or left without one).
+
 **OAuth2 (Azure AD, Google, GitHub):**
 - Client ID, Client Secret, Authorization/Token/UserInfo URLs
 - Callback URL: `https://your-server:8443/api/v2/auth/sso/oauth2/callback`
 - Role claim mapping from token attributes
+- Role mapping rules compare their keys with the `roles` and `groups` claims, read from the ID token of the login (same `sub` as UserInfo) and from the UserInfo response together. Microsoft Entra ID sends them only in the ID token: add the groups claim under *Token configuration* of the application registration (values are group object IDs, so the mapping keys are these IDs), or define app roles and map their values. Above about 200 groups Entra ID leaves the groups claim out: UCM logs a warning and only app roles can match, so emit only the groups assigned to the application, or app roles. With *Verify ID token signature* off, the groups of the ID token count only when the Token URL is HTTPS with TLS verification on, and the issuer and client ID are set and match the token.
 
 **SAML 2.0:**
 - IdP Metadata URL or manual XML upload
@@ -213,7 +224,13 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - *Sign authentication requests* signs each AuthnRequest with the key of the SP certificate (the HTTPS certificate or one held by UCM, RSA only); register that certificate at the IdP from the SP metadata first.
 - *NameID format* is asked of the IdP in each request and published in the metadata; *persistent* gives UCM a stable identifier, a transient NameID is never used to recognise the account.
 
-**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. Users with no matching entry get the provider's default role at account creation; on later logins their stored role is kept unless *Sync role on each login* is enabled.
+**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. With at least one entry, a user no entry matches is refused at sign-in; without entries, new accounts get the provider's default role. On later logins the stored role is kept unless *Sync role on each login* is enabled.
+
+**Which account a sign-in opens:** an account belongs to one provider and to one stable identity of its IdP (OIDC `sub`, SAML persistent NameID, LDAP `entryUUID` or `objectGUID`, else the DN). A sign-in opens the account bound to its identity; a name or email matches only an account of the same provider that is not bound yet. A sign-in is refused, with an audit entry naming the account, its state and the remedy, when its name belongs to an account it may not open (local, linked to another provider, bound to another identity, or without provider), and when no account matches but its email belongs to an account of another provider or left without provider by another or an unknown IdP (after a restore, for instance) or, with `email_verified` false, to one linked to this provider and not bound yet. An email shared with a local account still gives the SSO identity an account of its own.
+
+**Moving an account:** **Users → Link to SSO** (on a linked account, **Change provider or reset SSO identity**) attaches any account to the chosen provider after a confirmation: a local account, one of another provider (moved, after which its former provider no longer opens it), one without provider, or one of the same provider whose identity changed at the IdP (reset). Its identity is cleared and the next sign-in through that provider with its username or email binds one. An account with a password keeps it unless **Also remove its local password** is ticked, which leaves it signing in through the provider only (**Forgot password** then sends it no link, and an administrator cannot tick it for their own account); an account without one is not asked to set one. For a second person who shares an email with an existing account, create an account under the name their provider sends and link it with that box ticked, so the password chosen at creation does not stay outside the IdP. Linking closes the account's sessions whenever its provider or identity changes or its password is removed; its password (unless removed), API keys, security keys and mTLS certificates stay, so revoke them yourself when the account now belongs to another person.
+
+**Deleted providers:** the users of a deleted provider keep their identity and are taken back at sign-in by a provider created again for the same IdP: same OIDC issuer (or, when neither provider has one, the same UserInfo URL), same SAML entity ID, or same LDAP server and base DN. Otherwise, use Link to SSO on each account.
 
 **Important:** After configuring SSO, test with a non-admin account first. Keep at least one local admin account as fallback.
 
@@ -751,6 +768,8 @@ Once installed, `gssapi`/`spnego` are importable and the warning clears without 
 3. Click **Reset Password**
 4. Set temporary password
 5. User must change on next login
+
+**Forgot password** on the login page sends no reset link to an account linked to an SSO provider that has no local password: its provider alone opens it, and a link sent before the account was linked no longer works. An SSO account that kept a local password keeps the reset.
 
 ### Role Management
 

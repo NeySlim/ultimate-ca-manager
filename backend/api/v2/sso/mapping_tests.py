@@ -3,17 +3,24 @@ from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models.sso import SSOProvider
-from .helpers import _parse_json_field, _parse_group_list, _resolve_mapped_roles, _resolve_role, sso_admission, _check_ldap_lockout, _clear_ldap_failed_attempts, _decrypt_ldap_password, _build_ldap_tls, ldap_auto_bind
+from .helpers import _parse_json_field, _parse_group_list, _resolve_mapped_roles, _resolve_role, sso_admission, _mapping_rules, _build_ldap_tls
+from . import connection_tests
 import logging
 from models import db
 
 logger = logging.getLogger(__name__)
 
+# What the dry run cannot decide: the login may still refuse on these.
+NOT_CHECKED = ("Not checked by this test: the password, and the UCM account the sign-in would "
+               "open (an account of the same name that this identity may not open, "
+               "an account disabled in UCM, automatic account creation turned off, an e-mail that "
+               "belongs to an account of another provider or left without one).")
+
 
 @bp.route('/api/v2/sso/providers/<int:provider_id>/test-mapping', methods=['POST'])
 @require_auth(['write:sso'])
 def test_mapping(provider_id):
-    """Dry-run LDAP group lookup: fetches groups for a username without creating a session"""
+    """Dry run of an LDAP login past the password: the same entry, groups and verdict."""
     provider = db.get_or_404(SSOProvider, provider_id)
 
     if provider.provider_type != 'ldap':
@@ -26,99 +33,36 @@ def test_mapping(provider_id):
 
     try:
         import ldap3
-        from ldap3 import Server, Connection, ALL, Tls
         from ldap3.utils.conv import escape_filter_chars
 
-        tls_config = _build_ldap_tls(provider)
-        server = Server(
+        server = ldap3.Server(
             provider.ldap_server,
             port=provider.ldap_port,
             use_ssl=provider.ldap_use_ssl,
-            tls=tls_config,
-            get_info=ALL
+            tls=_build_ldap_tls(provider),
+            get_info=ldap3.ALL
         )
-
-        conn = Connection(
-            server,
-            user=provider.ldap_bind_dn,
-            password=_decrypt_ldap_password(provider),
-            auto_bind=ldap_auto_bind(provider)
-        )
-
-        safe_username = escape_filter_chars(test_username)
-        user_filter = provider.ldap_user_filter.replace('{username}', safe_username)
-
-        attrs = [
-            provider.ldap_username_attr,
-            provider.ldap_email_attr,
-            provider.ldap_fullname_attr
-        ]
-        member_attr = (provider.ldap_group_member_attr or 'member').strip().lower()
-        if member_attr == 'memberof':
-            attrs.append('memberOf')
-
-        conn.search(provider.ldap_base_dn, user_filter, attributes=attrs)
-
-        if not conn.entries:
-            conn.unbind()
+        user_entry = connection_tests._ldap_find_user(provider, server, test_username)
+        if user_entry is None:
             return success_response(data={
                 'found': False,
                 'message': f'User "{test_username}" not found in LDAP'
             })
-
-        user_entry = conn.entries[0]
         user_dn = user_entry.entry_dn
+        groups, groups_error = connection_tests._ldap_entry_groups(
+            provider, server, user_dn, test_username)
+        refusal = connection_tests._ldap_entry_refusal(
+            provider, user_entry, user_dn, escape_filter_chars(test_username), groups, groups_error)
+        external = {'groups': groups}
+        if refusal is None and not sso_admission(provider, external):
+            refusal = 'unmapped' if _mapping_rules(provider) else 'no_default_role'
 
-        # Fetch groups
-        groups = []
-        if provider.ldap_group_filter:
-            if member_attr == 'memberof':
-                if hasattr(user_entry, 'memberOf'):
-                    group_dns = user_entry.memberOf.values if hasattr(user_entry.memberOf, 'values') else [str(user_entry.memberOf)]
-                    for gdn in group_dns:
-                        gdn_str = str(gdn)
-                        for part in gdn_str.split(','):
-                            part = part.strip()
-                            if part.upper().startswith('CN='):
-                                groups.append(part[3:])
-                                break
-                else:
-                    # Fallback: re-search with memberOf attribute
-                    safe_dn = escape_filter_chars(user_dn)
-                    conn.search(provider.ldap_base_dn, f'(distinguishedName={safe_dn})', attributes=['memberOf'])
-                    if conn.entries and hasattr(conn.entries[0], 'memberOf'):
-                        group_dns = conn.entries[0].memberOf.values if hasattr(conn.entries[0].memberOf, 'values') else [str(conn.entries[0].memberOf)]
-                        for gdn in group_dns:
-                            gdn_str = str(gdn)
-                            for part in gdn_str.split(','):
-                                part = part.strip()
-                                if part.upper().startswith('CN='):
-                                    groups.append(part[3:])
-                                    break
-            else:
-                group_base = ','.join(provider.ldap_base_dn.split(',')[1:]) or provider.ldap_base_dn
-                gf = provider.ldap_group_filter.strip()
-                if not gf.startswith('('):
-                    gf = f'({gf})'
-                safe_dn = escape_filter_chars(user_dn)
-                group_filter = f'(&{gf}({member_attr}={safe_dn}))'
-                conn.search(group_base, group_filter, attributes=['cn'])
-                groups = [str(entry.cn) for entry in conn.entries if hasattr(entry, 'cn')]
-
-        conn.unbind()
-
-        # Resolve role using same logic as real login
-        mapped_role, mapped_custom = _resolve_mapped_roles(provider, {'groups': groups})
-        resolved_role = _resolve_role(provider, {'groups': groups}, mapped=mapped_role)
-
-        # Evaluate required groups (default-deny) like real login
-        required_groups = _parse_group_list(provider.ldap_required_groups)
-        access_allowed = True
-        if required_groups:
-            user_groups_lower = {g.lower() for g in groups}
-            access_allowed = any(g.lower() in user_groups_lower for g in required_groups)
-        # The login refuses a user no mapping rule matches, too.
-        access_allowed = access_allowed and sso_admission(provider, {'groups': groups})
+        # A user the login would refuse has no role.
+        resolved_role = resolved_custom = None
+        if refusal is None:
+            mapped_role, mapped_custom = _resolve_mapped_roles(provider, external)
+            resolved_role = _resolve_role(provider, external, mapped=mapped_role)
+            resolved_custom = mapped_custom.name if mapped_custom else None
 
         return success_response(data={
             'found': True,
@@ -126,19 +70,23 @@ def test_mapping(provider_id):
             'username': str(getattr(user_entry, provider.ldap_username_attr, test_username)),
             'email': str(getattr(user_entry, provider.ldap_email_attr, '')),
             'groups': groups,
+            'groups_readable': groups_error is None,
+            'refusal': refusal,
+            'access_allowed': refusal is None,
             'resolved_role': resolved_role,
-            'resolved_custom_role': mapped_custom.name if mapped_custom else None,
+            'resolved_custom_role': resolved_custom,
             'role_mapping': _parse_json_field(provider.role_mapping) or {},
             'default_role': provider.default_role,
-            'required_groups': required_groups,
-            'access_allowed': access_allowed
+            'required_groups': _parse_group_list(provider.ldap_required_groups),
+            'account_checked': False,
+            'note': NOT_CHECKED,
         })
 
     except ImportError:
         return error_response("LDAP library not installed", 500)
     except Exception as e:
         logger.error(f"LDAP test mapping failed: {e}")
-        return error_response(f"Test mapping failed: check LDAP configuration", 400)
+        return error_response("Test mapping failed: check LDAP configuration", 400)
 
 
 # ============ SSO Sessions ============

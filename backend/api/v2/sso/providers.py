@@ -207,7 +207,7 @@ def create_provider():
             val = json.loads(val)
         provider.attribute_mapping = json.dumps(val)
     if data.get('role_mapping'):
-        val, role_error = validate_role_mapping(data['role_mapping'])
+        val, role_error = validate_role_mapping(data['role_mapping'], provider.provider_type)
         if role_error:
             db.session.rollback()
             return error_response(role_error, 400)
@@ -389,7 +389,7 @@ def update_provider(provider_id=None, provider_type_name=None):
             val = json.loads(val)
         provider.attribute_mapping = json.dumps(val)
     if 'role_mapping' in data:
-        val, role_error = validate_role_mapping(data['role_mapping'])
+        val, role_error = validate_role_mapping(data['role_mapping'], provider.provider_type)
         if role_error:
             db.session.rollback()
             return error_response(role_error, 400)

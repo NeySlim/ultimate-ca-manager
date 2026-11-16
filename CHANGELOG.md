@@ -7,6 +7,27 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- SSO: the password reset by e-mail set a local password on an account created by an SSO provider, which then opened without the provider. Such an account gets no reset link any more, and a reset token sets no password on it.
+
+### Fixed
+
+- SSO: an OIDC provider with role mapping rules, such as Microsoft Entra ID whose UserInfo response has no groups, refused every user; the rules now read the `groups` and `roles` of the ID token validated for the login together with those of the UserInfo response, and a `roles` claim no longer hides `groups`.
+- SSO: a SAML assertion that repeats an attribute name, as Keycloak's role list does with one attribute per role, was refused as invalid; its values are now merged in assertion order, role mapping reads them all and a repeated username or email attribute gives its first value.
+- SSO: LDAP groups read through `member` or `uniqueMember` were searched only under the parent of the base DN, so a base DN at the domain root found none and the user was refused. They are searched under that parent when the directory holds it, else under the base DN, and a refused search is tried once more under the base DN.
+- SSO: an LDAP provider with role mapping rules or required groups and no group filter read no group and refused everyone; the groups are now read without one.
+- SSO: an LDAP `memberOf` value that is not a DN ended the group read and lost the groups listed after it; only that value is skipped now, with a warning in the log.
+- SSO: an LDAP role mapping rule `pki-admins` did not match the directory group `PKI-Admins`. LDAP rules and groups now compare ignoring case, edge spaces and inner space runs (OIDC and SAML stay exact), and two rule keys a provider compares equal are refused at save.
+- SSO: an LDAP login whose groups could not be read was refused as "no role mapping rule matches". It is now refused with "your groups could not be read from the directory", in the response, the log and the audit, and does not count as a failed attempt.
+- SSO: the LDAP mapping test read the groups by its own code and showed a resolved role for a user the login refuses. It now gives the login's verdict and the reason of a refusal.
+- SSO: the Active Directory `userAccountControl` check never read the attribute's value, so the mapping test reported a disabled account as allowed. It now reports it disabled, and a login the directory binds despite that flag is refused.
+- SSO: Link to SSO refused every account already linked or left without provider, the remedy sign-in refusals named, and Unlink then Link made an account without password set one. It now attaches any account to the chosen provider (moving it, or resetting its SSO identity), keeps a password it has, asks none of an account without, can remove its local password, closes the account's sessions whenever its provider, identity or password changes, and its audit entry says where the account came from.
+- SSO: a sign-in whose email belonged to an account of another provider or left without provider by another or an unknown IdP (after a restore, for instance), or to an account an administrator linked while the OIDC IdP marked that email unverified, received a second account with the default role; it is now refused (`sso_email_conflict`) with an audit entry naming the account.
+- SSO: a sign-in refused over a name gave the same reason for every account; the log and audit entry now say whether the account is local, linked to another provider, bound to another identity or without provider, and what repairs it. A provider with no rule and no default role now says so on the login page (`sso_no_default_role`).
+
 ## [2.254.3] - 2026-11-16
 
 ### Security

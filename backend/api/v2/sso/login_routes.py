@@ -1,6 +1,7 @@
 from . import bp, VALID_ROLES
 from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
-                      _extract_saml_groups, oidc_identity, saml_identity)
+                      _extract_saml_groups, oidc_external_groups, oidc_identity,
+                      saml_identity)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import saml_sp
 from onelogin.saml2.constants import OneLogin_Saml2_Constants
@@ -12,7 +13,8 @@ from utils.db_transaction import safe_commit
 from models import db, User
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
-from services.oidc_id_token import OIDCValidationError, verify_id_token
+from services.oidc_id_token import (OIDCValidationError, unverified_claims_error,
+                                    verify_id_token)
 from utils.datetime_utils import utc_now
 from utils.ssrf_protection import (
     safe_request_get,
@@ -373,8 +375,33 @@ def sso_callback(provider_type):
             if not username:
                 return redirect('/login?error=no_username')
 
+            # Token groups count only from the token of this login (nonce checked, same subject as
+            # UserInfo). Unverified (compatibility mode), only over an HTTPS token endpoint with
+            # its certificate checked: OIDC Core §3.1.3.7 step 6; steps 2-5 and 9-11 still apply.
+            token_sub = (trusted_id_claims or {}).get('sub')
+            token_unused = None
+            if trusted_id_claims is None:
+                token_unused = 'no ID token'
+            elif not (isinstance(token_sub, str) and token_sub
+                      and userinfo.get('sub') == token_sub):
+                token_unused = 'subject does not match UserInfo'
+            elif not verification_enabled:
+                if verify is False:
+                    token_unused = 'unverified and TLS verification is off'
+                elif urllib.parse.urlsplit(provider.oauth2_token_url or '').scheme.lower() != 'https':
+                    token_unused = 'unverified and the token endpoint is not HTTPS'
+                else:
+                    claims_error = unverified_claims_error(trusted_id_claims, provider,
+                                                           expected_nonce)
+                    if claims_error:
+                        token_unused = f'unverified token rejected ({claims_error})'
+            bound_claims = trusted_id_claims if token_unused is None else None
+            external_data = dict(userinfo, groups=oidc_external_groups(
+                userinfo, bound_claims, token_unused))
+
             # Create or update user
-            user, error_code = _get_or_create_sso_user(provider, username, email, fullname, userinfo)
+            user, error_code = _get_or_create_sso_user(provider, username, email, fullname,
+                                                       external_data)
 
             if not user:
                 return redirect(f'/login?error={error_code or "user_creation_failed"}')

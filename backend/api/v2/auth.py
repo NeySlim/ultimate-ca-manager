@@ -203,10 +203,13 @@ def forgot_password():
     if not email:
         return error_response('Email is required', 400)
     
-    # Always return success to prevent email enumeration
-    user = User.query.filter(db.func.lower(User.email) == email).first()
-    
-    if user and user.active:
+    # Always return success to prevent email enumeration. An account its SSO provider
+    # alone opens gets no link: another account sharing the address may still get one.
+    from api.v2.sso.account_state import sso_only
+    holders = User.query.filter(db.func.lower(User.email) == email).order_by(User.id).all()
+    user = next((u for u in holders if u.active and not sso_only(u)), None)
+
+    if user:
         # Generate secure token
         token = secrets.token_urlsafe(48)
         user.password_reset_token = hashlib.sha256(token.encode()).hexdigest()
@@ -269,8 +272,9 @@ def reset_password():
     if not user:
         return error_response('Invalid or expired reset token', 400)
     
-    # Check if user is active
-    if not user.active:
+    # An inactive account, or one its SSO provider alone opens, takes no password this way
+    from api.v2.sso.account_state import sso_only
+    if not user.active or sso_only(user):
         return error_response('Invalid or expired reset token', 400)
     
     if user.password_reset_expires < utc_now():
