@@ -568,6 +568,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
                      'carried as the https_server files instead'),
     'backup_archives': 'the HA archive store: earlier archives, never carried inside a new one',
     'backup_archive_chunks': 'the bytes of the HA archive store, never carried inside a new archive',
+    'file_removals': 'paths a restore removed, deleted by each node from its own disk: never restored',
     'second_factor_failures': 'second-factor and WebAuthn lockout counters: runtime state, never restored',
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',

@@ -246,7 +246,6 @@ def test_renew_import_csr_and_restore_do_not_recreate_encrypted_key_mirrors(
 ):
     import base64
 
-    from services.backup_service import BackupService
     from services.cert_service import CertificateService
     from utils.file_naming import cert_csr_path
     from utils.key_codec import load_pem_bytes
@@ -297,14 +296,12 @@ def test_renew_import_csr_and_restore_do_not_recreate_encrypted_key_mirrors(
 
             for item in (cert, imported, csr):
                 cert_key_path(item).write_bytes(b'stale plaintext')
-            # The certificate files are staged and published with the rest of
-            # the restore now; the key mirrors are still a direct write, and
-            # removing a stale one is what this checks.
-            from services.backup.restore.files import StagedFiles
-            with StagedFiles(base_dir=tmp_path / 'staging') as staged:
-                BackupService()._regenerate_files(staged)
-                staged.publish()
-                staged.discard()
+            # After a restore the reconciliation writes the files: never a key mirror
+            # while values are encrypted, and a stale one is removed
+            from services.file_regen_service import advance_generation, reconcile_files
+            advance_generation()
+            db.session.commit()
+            reconcile_files()
             assert all(not cert_key_path(item).exists() for item in (cert, imported, csr))
     finally:
         _cleanup_models(app, cert_ids, ca_data['id'])
@@ -423,4 +420,26 @@ def test_mirrors_follow_the_values_while_a_disable_keeps_its_deks(
                 helpers.save_ca_key_file(ca, KEY_PEM)
         finally:
             EncryptionKey.query.delete()
+            db.session.commit()
+
+
+def test_purge_keeps_the_mirror_of_a_row_whose_key_is_empty(
+    app, encryption_enabled, monkeypatch, tmp_path
+):
+    from config.settings import Config
+
+    monkeypatch.setattr(Config, 'PRIVATE_DIR', tmp_path)
+    keyless = Certificate(refid=str(uuid.uuid4()), descr='Empty key purge row', prv='')
+    with app.app_context():
+        db.session.add(keyless)
+        db.session.commit()
+        path = cert_key_path(keyless)
+        path.write_bytes(b'plaintext')
+        try:
+            stats = purge_private_key_files()
+            assert stats == {'removed': 0, 'kept_no_db_key': 1, 'errors': 0}
+            assert path.exists()
+        finally:
+            path.unlink(missing_ok=True)
+            db.session.delete(keyless)
             db.session.commit()

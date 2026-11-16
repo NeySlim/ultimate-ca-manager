@@ -49,6 +49,8 @@ class LockBusyError(RuntimeError):
     started rather than queueing work nobody asked for. The message names no
     path and no host, and is safe to return to the caller.
     """
+    # True when nothing holds the lock: it could not be taken at all (fail closed)
+    unavailable = False
 
 
 def _depths() -> dict:
@@ -65,14 +67,24 @@ def _depths() -> dict:
     """
     state = getattr(_local, 'state', None)
     if state is None or state['pid'] != os.getpid():
-        state = {'pid': os.getpid(), 'depth': {}}
+        state = {'pid': os.getpid(), 'depth': {}, 'held': set()}
         _local.state = state
     return state['depth']
+
+
+def _held() -> set:
+    _depths()
+    return _local.state.setdefault('held', set())
 
 
 def lock_depth(path) -> int:
     """How many nested blocks of this thread currently hold ``path``."""
     return _depths().get(str(path), 0)
+
+
+def lock_held(path) -> bool:
+    """Whether this thread holds ``path`` by flock, not merely runs fail-open."""
+    return str(path) in _held()
 
 
 def _open_lock_file(path: Path) -> int:
@@ -117,7 +129,7 @@ def _acquire(fd: int, timeout: float, message: str, busy_error) -> None:
 @contextmanager
 def process_lock(path, *, timeout: float = 0, purpose: str = 'the operation',
                  subject: str = 'operation', busy_error=LockBusyError,
-                 fail_open: bool = True):
+                 fail_open: bool = True, where: str = 'the data directory'):
     """Hold the lock at ``path`` for the duration of the block.
 
     ``timeout=0`` (the default) does not wait: if another process holds the
@@ -132,7 +144,8 @@ def process_lock(path, *, timeout: float = 0, purpose: str = 'the operation',
     again must not deadlock against itself.
 
     ``fail_open`` decides what happens when the lock cannot be taken for a
-    *system* reason — no permission on the file, or a filesystem without
+    *system* reason (closed: ``busy_error`` with ``unavailable`` set; ``where`` names
+    the directory of the lock file in its message) — no permission on the file, or a filesystem without
     flock (NFS without lockd, some SMB mounts). Open, the operation is logged
     as unprotected and allowed through, which is the right trade-off for a
     backup: an installation that can never take one again is a worse failure
@@ -173,9 +186,11 @@ def process_lock(path, *, timeout: float = 0, purpose: str = 'the operation',
             logger.error(
                 "The %s lock could not be taken (%s); %s was refused",
                 subject, exc, purpose)
-            raise busy_error(
+            refused = busy_error(
                 f"The {subject} lock could not be taken, so {purpose} was not "
-                "started. Check the permissions on the data directory.")
+                f"started. Check that {where} is writable and supports file locks.")
+            refused.unavailable = True
+            raise refused
         logger.error(
             "The %s lock could not be taken (%s); %s runs without protection "
             "against a concurrent operation", subject, exc, purpose)
@@ -183,10 +198,13 @@ def process_lock(path, *, timeout: float = 0, purpose: str = 'the operation',
     # Counted even when nothing was locked: the nesting has to unwind the
     # same way either way, and a nested block must not try to lock again.
     depths[key] = 1
+    if held:
+        _held().add(key)
     try:
         yield
     finally:
         depths[key] = 0
+        _held().discard(key)
         if fd is not None:
             if held:
                 try:

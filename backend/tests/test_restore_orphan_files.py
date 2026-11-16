@@ -1,9 +1,11 @@
-"""The files of a restore follow its rows: published with the commit, never before.
+"""The files of a restore follow its rows: never written by the restore, reconciled after.
 
 A failed restore left the certificate and key files of authorities that were
 never committed, written at insert time; a replacement left the files of the
-rows it removed. Both now go through the staged publication.
+rows it removed. A restore now writes no file and lists what it removed; the
+reconciliation then follows the committed rows, on SQLite and on PostgreSQL.
 """
+import base64
 import uuid
 
 import pytest
@@ -12,15 +14,15 @@ from models import CA, db
 from services.backup.errors import BackupSchemaError
 from tests.test_backup_restore_failfast import UNREADABLE_KEY, SSH_PUBLIC_KEY, _reseal
 from tests.test_restore_replace_dependents import (
-    PASSWORD, _authority_row, _only, _service, _target,
+    ENGINES, PASSWORD, _authority_row, _only, _service, _target,
 )
 from utils.file_naming import ca_cert_path, ca_key_path
 
 
-@pytest.fixture
-def target(app, tmp_path):
-    with _target(app, 'sqlite', tmp_path, f'orphans_{uuid.uuid4().hex[:8]}'):
-        yield
+@pytest.fixture(params=ENGINES)
+def target(request, app, tmp_path):
+    with _target(app, request.param, tmp_path, f'orphans_{uuid.uuid4().hex[:8]}'):
+        yield request.param
 
 
 def _files(row):
@@ -56,7 +58,10 @@ def test_a_replacement_removes_the_files_of_the_rows_it_removes(target):
     cert, key = _with_a_mirror(removed)
 
     _service().restore_backup(blob, PASSWORD, mode='replace')
+    assert cert.exists() and key.exists(), 'the restore itself wrote to the disk'
 
+    from services.file_regen_service import reconcile_files
+    assert reconcile_files()['status'] == 'done'
     assert not cert.exists() and not key.exists()
     assert ca_cert_path(kept).exists()
 
@@ -99,24 +104,23 @@ def test_a_failed_restore_writes_no_file_for_the_rows_it_did_not_keep(target):
 
 # (DEKs loaded, new values encrypted): (False, False) off, (True, False) a disable's grace
 @pytest.mark.parametrize('enabled,encrypted', [(False, False), (True, False), (True, True)])
-def test_a_key_mirror_waits_for_the_publication(tmp_path, monkeypatch, enabled, encrypted):
-    """Written at once, a mirror outlived the rollback; removed at once, it was lost by one."""
+def test_a_key_mirror_follows_the_values(target, monkeypatch, enabled, encrypted):
+    """Mirrored while values are stored in the clear, removed while they are encrypted."""
     from security.encryption import key_encryption
-    from services.backup.restore.files import StagedFiles
-    from services.backup.restore_core import _stage_key_mirror
+    from services import file_regen_service as regen
+    from utils.key_codec import load_pem_bytes
 
+    row = _authority_row(f'mirror-{uuid.uuid4().hex[:8]}')[0]
+    db.session.commit()
+    key_pem = load_pem_bytes(row.prv)
+    if not encrypted:    # values stored in the clear, as a disable leaves them
+        row.prv = base64.b64encode(key_pem).decode('ascii')
+    mirror = ca_key_path(row)
+    mirror.parent.mkdir(parents=True, exist_ok=True)
+    mirror.write_bytes(b'before')
+    regen.advance_generation()
+    db.session.commit()
     monkeypatch.setattr(type(key_encryption), 'is_enabled', property(lambda self: enabled))
     monkeypatch.setattr(type(key_encryption), 'is_encrypting', property(lambda self: encrypted))
-    mirror = tmp_path / 'private' / 'ca_x.key'
-    mirror.parent.mkdir()
-    mirror.write_bytes(b'before')
-    staged = StagedFiles(base_dir=tmp_path / 'staging')
-    try:
-        _stage_key_mirror(staged, mirror, b'restored')
-        assert mirror.read_bytes() == b'before'
-        staged.publish()
-        assert (not mirror.exists()) if encrypted else mirror.read_bytes() == b'restored'
-        staged.unpublish()
-        assert mirror.read_bytes() == b'before'
-    finally:
-        staged.discard()
+    regen.reconcile_files()
+    assert (not mirror.exists()) if encrypted else mirror.read_bytes() == key_pem

@@ -151,13 +151,15 @@ def _census():
     from models import CA, Certificate, SystemConfig, User
     from models.deploy import DeployTarget
     from models.group import Group
+    from services.file_regen_service import GENERATION_KEY
 
     return {
         'users': User.query.count(),
         'cas': CA.query.count(),
         'certificates': Certificate.query.count(),
         'groups': Group.query.count(),
-        'settings': SystemConfig.query.count(),
+        # The files generation a restore advances is this installation's bookkeeping
+        'settings': SystemConfig.query.filter(SystemConfig.key != GENERATION_KEY).count(),
         'deploy_targets': DeployTarget.query.count(),
     }
 

@@ -509,17 +509,32 @@ def _index_of(section_name: str, section: Section):
     temporal = _temporal_identity(section_name)
     singleton = section.identity == ('id',)
     rows, incomplete = {}, []
-    for row in model.query.order_by(getattr(model, primary[0])).all():
-        values = [getattr(row, field, None) for field in section.identity]
+    for key_value, values in _identities_here(model, primary[0], section.identity):
         if not singleton and any(missing_identity_value(section_name, field, value)
                                  for field, value in zip(section.identity, values)):
-            incomplete.append(getattr(row, primary[0]))
+            incomplete.append(key_value)
             continue
         key = tuple(_normalise(value, field in temporal) for field, value in zip(section.identity, values))
-        rows.setdefault(key, []).append(getattr(row, primary[0]))
+        rows.setdefault(key, []).append(key_value)
     index = {key: ids[0] for key, ids in rows.items()}
     shared = {key: ids for key, ids in rows.items() if len(ids) > 1 and not singleton}
     return index, shared, incomplete
+
+
+def _identities_here(model, primary: str, fields: Tuple[str, ...]):
+    """(primary key, identity values) of each row here, oldest first: the identity columns
+    alone when they are columns, never the whole row."""
+    from sqlalchemy.orm import ColumnProperty
+    from models import db
+
+    order = getattr(model, primary)
+    attributes = [getattr(model, field, None) for field in fields]
+    if all(isinstance(getattr(attr, 'property', None), ColumnProperty) for attr in attributes):
+        for row in db.session.query(order, *attributes).order_by(order):
+            yield row[0], list(row[1:])
+        return
+    for row in model.query.order_by(order).all():
+        yield getattr(row, primary), [getattr(row, field, None) for field in fields]
 
 
 def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate: str,

@@ -189,6 +189,11 @@ HTTPS_BOUND_KEY = 'https_bound_certificate_refid'
 HTTPS_CHAIN_KEY = 'https_bound_certificate_chain'
 # services/shared_files.HTTPS_GENERATED: the self-signed pair regenerated in HA
 HTTPS_GENERATED_FILE = 'https.generated'
+# services/shared_files.HTTPS_RESTORED: the pair of the last restored archive
+HTTPS_RESTORED_FILE = 'https.restored'
+RESTORED_LABEL = "restored HTTPS certificate"
+# What this node's master did with the restored pair, read by the scheduler process
+HTTPS_RESTORED_ATTEMPT = '.ucm-https-restored'
 
 
 class HttpsMaterialError(Exception):
@@ -263,8 +268,9 @@ def _key_text(stored, context):
 def https_material(database):
     """``(cert_pem, key_pem, label, chain_known)`` the database says this node serves, or None.
 
-    The bound certificate comes with the chain last written for it when that chain starts
-    with it (``chain_known``), else alone. Raises HttpsMaterialError when unreadable.
+    The bound certificate first, then a restored pair, then a regenerated one. The bound
+    certificate comes with the chain last written for it when that chain starts with it
+    (``chain_known``), else alone. Raises HttpsMaterialError when unreadable.
     """
     config = _settings(database, (HTTPS_BOUND_KEY, HTTPS_CHAIN_KEY))
     refid = (config.get(HTTPS_BOUND_KEY) or '').strip()
@@ -282,19 +288,20 @@ def https_material(database):
         if chain and _first_certificate(chain) == _first_certificate(leaf):
             return chain, key, label, True
         return leaf, key, label, False
-    try:
-        row = database.one("SELECT content FROM shared_files WHERE name = ?", (HTTPS_GENERATED_FILE,))
-    except Exception as e:
-        if _missing_table(e):
-            return None
-        raise
-    if not row or not row[0]:
-        return None
     import json
-    label = "regenerated self-signed certificate"
-    _load_deks(database)
-    pair = json.loads(_stored_bytes(row[0], label))
-    return pair['crt'], pair['key'], label, True
+    for name, label in ((HTTPS_RESTORED_FILE, RESTORED_LABEL),
+                        (HTTPS_GENERATED_FILE, "regenerated self-signed certificate")):
+        try:
+            row = database.one("SELECT content FROM shared_files WHERE name = ?", (name,))
+        except Exception as e:
+            if _missing_table(e):
+                return None
+            raise
+        if row and row[0]:
+            _load_deks(database)
+            pair = json.loads(_stored_bytes(row[0], label))
+            return pair['crt'], pair['key'], label, True
+    return None
 
 
 def _same_file(path, text):
@@ -420,6 +427,28 @@ def materialize_https(data_path, cert_path, key_path):
         return f"{label} already in place"  # the chain on disk was written by the application
     from datetime import datetime, timezone
     suffix = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-    if write_https_pair(cert_path, key_path, cert_pem, key_pem, backup_suffix=suffix):
-        return f"{label} written from the database"
-    return f"{label} already in place"
+    try:
+        written = write_https_pair(cert_path, key_path, cert_pem, key_pem, backup_suffix=suffix)
+    except Exception as e:
+        if label == RESTORED_LABEL:
+            _record_restored_attempt(data_path, cert_pem, key_pem, f"{type(e).__name__}: {e}")
+        raise
+    if label == RESTORED_LABEL:
+        _record_restored_attempt(data_path, cert_pem, key_pem, None)
+    return f"{label} {'written from the database' if written else 'already in place'}"
+
+
+def restored_pair_digest(cert_pem, key_pem):
+    import hashlib
+    return hashlib.sha256(cert_pem.encode('utf-8') + b'\0' + key_pem.encode('utf-8')).hexdigest()
+
+
+def _record_restored_attempt(data_path, cert_pem, key_pem, error):
+    """One line for the scheduler process: outside HA it then drops the stored pair."""
+    import json
+    try:
+        with open(os.path.join(data_path, HTTPS_RESTORED_ATTEMPT), 'w', encoding='utf-8') as out:
+            json.dump({'digest': restored_pair_digest(cert_pem, key_pem), 'error': error}, out)
+    except OSError as e:
+        print(f"HTTPS: the restored certificate attempt could not be recorded: {e}",
+              file=sys.stderr)
