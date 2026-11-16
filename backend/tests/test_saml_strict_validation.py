@@ -1055,3 +1055,20 @@ def test_the_oid_name_mapped_to_groups_is_read(app, mapped_provider, idp_signer)
     role, _ = _login_role(app, idp_signer, attributes={IS_MEMBER_OF: ['pki-admins']},
                           friendly={IS_MEMBER_OF: 'isMemberOf'})
     assert role == 'admin'
+
+
+def test_saved_screen_payload_keeps_both_group_sources_read(app, auth_client, provider):
+    """The payload the screen sends (legacy row rewritten, new row added) reads both attributes."""
+    from api.v2.sso.helpers import saml_groups
+    payload = {'attribute_mapping': {'memberOf': 'groups', 'Role': 'groups'}}
+    r = auth_client.put(f'/api/v2/sso/providers/{provider}', json=payload)
+    assert r.status_code == 200, r.get_data(as_text=True)
+    with app.app_context():
+        saved = json.loads(db.session.get(SSOProvider, provider).attribute_mapping)
+        try:
+            attrs = {'memberOf': ['cn=a'], 'Role': ['r1']}
+            assert set(saml_groups(attrs, saved)[0]) == {'cn=a', 'r1'}
+        finally:
+            row = db.session.get(SSOProvider, provider)
+            row.attribute_mapping = None
+            db.session.commit()

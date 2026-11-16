@@ -172,8 +172,8 @@ def test_ldap_group_info_line_is_bounded(monkeypatch, caplog):
     assert '(+180 more)' in line
 
 
-def test_a_form_row_hides_a_legacy_groups_row_until_it_is_rewritten():
+def test_mapped_attributes_reads_only_form_rows_once_one_targets_groups():
     from api.v2.sso.helpers import mapped_attributes
-    # A form row hides a legacy one: the screen rewrites the legacy row so both are read.
+    # Contract: a form row to groups hides a legacy `groups -> attribute` row, which the screen rewrites.
     assert mapped_attributes({'groups': 'memberOf', 'Role': 'groups'}, 'groups') == ('Role',)
     assert set(mapped_attributes({'memberOf': 'groups', 'Role': 'groups'}, 'groups')) == {'memberOf', 'Role'}
