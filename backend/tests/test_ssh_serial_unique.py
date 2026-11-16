@@ -205,3 +205,56 @@ def test_signatures_together_behind_a_trailing_counter_on_postgresql(app):
     with _a_schema_of_our_own(f'ssh_unique_race_{uuid.uuid4().hex[:6]}') as url, \
             _bound_to(app, url, is_postgresql=True):
         _together_behind_a_trailing_counter(app)
+
+
+# --- a pair the upgrade marked: shown, and revoked together ---------------------------------
+
+def _pair(label):
+    """A CA holding serial 7 twice, as an upgraded 2.254 database may: the newer one marked."""
+    ca_id = _ca(label)
+    first, second = _row(ca_id, 7), _row(ca_id, 7, marked=True)
+    alone = _row(ca_id, 8)
+    db.session.add_all([first, second, alone])
+    db.session.commit()
+    return ca_id, first.id, second.id, alone.id
+
+
+def test_each_certificate_of_a_pair_names_the_other(app, auth_client):
+    with app.app_context():
+        ca_id, first, second, alone = _pair('shown')
+    try:
+        listed = {c['id']: c for c in auth_client.get(
+            f'/api/v2/ssh/certificates?ca_id={ca_id}&per_page=100').get_json()['data']}
+        assert listed[first]['serial_shared_with'] == [second]
+        assert listed[second]['serial_shared_with'] == [first]
+        assert listed[alone]['serial_shared_with'] == []
+        one = auth_client.get(f'/api/v2/ssh/certificates/{second}').get_json()['data']
+        assert one['serial_shared_with'] == [first]
+    finally:
+        with app.app_context():
+            _drop(ca_id)
+
+
+def test_revoking_one_of_a_pair_revokes_both_and_says_so(app, auth_client):
+    from models import AuditLog
+    with app.app_context():
+        ca_id, first, second, alone = _pair('revoked')
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+    try:
+        response = auth_client.post(f'/api/v2/ssh/certificates/{first}/revoke', json={'reason': 'keyCompromise'})
+        assert response.status_code == 200, response.get_json()
+        body = response.get_json()
+        assert body['data']['revoked_with'] == [second]
+        assert 'serial 7' in body['message'] and 'KRL' in body['message']
+        with app.app_context():
+            assert db.session.get(SSHCertificate, second).revoked is True
+            assert db.session.get(SSHCertificate, alone).revoked is False
+            details = [e.details for e in AuditLog.query.filter(
+                AuditLog.id > floor, AuditLog.action == 'ssh_cert_revoked')]
+            assert any(f'#{second}' in d for d in details), details
+        lone = auth_client.post(f'/api/v2/ssh/certificates/{alone}/revoke', json={})
+        assert lone.get_json()['data']['revoked_with'] == []
+        assert lone.get_json()['message'] == 'SSH certificate revoked'
+    finally:
+        with app.app_context():
+            _drop(ca_id)

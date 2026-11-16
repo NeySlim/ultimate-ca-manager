@@ -300,7 +300,22 @@ class SSHCertificate(db.Model if db else object):
             return 'expired'
         return 'valid'
 
-    def to_dict(self):
+    @staticmethod
+    def shared_serials():
+        """{(ssh_ca_id, serial): ids} of every serial two certificates of one CA hold; one query."""
+        marked = (db.session.query(SSHCertificate.ssh_ca_id, SSHCertificate.serial)
+                  .filter(SSHCertificate.serial_duplicate.is_(True)).distinct().subquery())
+        rows = (db.session.query(SSHCertificate.id, SSHCertificate.ssh_ca_id, SSHCertificate.serial)
+                .join(marked, db.and_(SSHCertificate.ssh_ca_id == marked.c.ssh_ca_id,
+                                      SSHCertificate.serial == marked.c.serial))
+                .order_by(SSHCertificate.id))
+        shared = {}
+        for row_id, ca_id, serial in rows:
+            shared.setdefault((ca_id, serial), []).append(row_id)
+        return shared
+
+    def to_dict(self, shared=None):
+        """*shared*: ``shared_serials()`` read once for a page of certificates."""
         """Convert to dict for API response"""
         return {
             'id': self.id,
@@ -314,7 +329,9 @@ class SSHCertificate(db.Model if db else object):
             'certificate': self.certificate,
             'principals': self.get_principals(),
             'serial': self.serial,
-            'serial_duplicate': bool(self.serial_duplicate),
+            # Ids of the other certificates of this CA holding this serial: a KRL revokes them all
+            'serial_shared_with': [i for i in (SSHCertificate.shared_serials() if shared is None else shared)
+                                   .get((self.ssh_ca_id, self.serial), []) if i != self.id] if self.serial else [],
             'valid_from': utc_isoformat(self.valid_from),
             'valid_to': utc_isoformat(self.valid_to),
             'key_type': self.key_type,

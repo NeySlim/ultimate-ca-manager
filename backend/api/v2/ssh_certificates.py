@@ -190,9 +190,10 @@ def list_ssh_certificates():
 
     query = query.order_by(SSHCertificate.created_at.desc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    shared = SSHCertificate.shared_serials()
 
     return success_response(
-        data=[cert.to_dict() for cert in pagination.items],
+        data=[cert.to_dict(shared) for cert in pagination.items],
         meta={
             'total': pagination.total,
             'page': page,
@@ -421,26 +422,34 @@ def revoke_ssh_certificate(cert_id):
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
         cert = SSHCertificateService.revoke_certificate(cert_id, reason, username)
+        others = list(getattr(cert, 'revoked_with', []))
+        message = 'SSH certificate revoked'
+        if others:
+            message = (f'SSH certificate revoked with {len(others)} other certificate(s) holding serial '
+                       f'{cert.serial} under this CA: the KRL revokes by serial')
 
         AuditService.log_action(
             action='ssh_cert_revoked',
             resource_type='ssh_certificate',
             resource_id=str(cert.id),
             resource_name=cert.key_id,
-            details=f'SSH certificate revoked: {reason}',
+            details=f'SSH certificate revoked: {reason}' + (
+                f'; serial {cert.serial} also revokes ' + ', '.join(f"#{o.id} '{o.key_id}'" for o in others)
+                if others else ''),
             success=True,
             username=username,
         )
 
         try:
             from websocket.emitters import on_ssh_certificate_revoked
-            on_ssh_certificate_revoked(cert.id, cert.key_id, reason, username)
+            for revoked in [cert] + others:
+                on_ssh_certificate_revoked(revoked.id, revoked.key_id, reason, username)
         except Exception:
             pass
 
         return success_response(
-            data=cert.to_dict(),
-            message='SSH certificate revoked'
+            data={**cert.to_dict(), 'revoked_with': [o.id for o in others]},
+            message=message
         )
 
     except ValueError as e:
