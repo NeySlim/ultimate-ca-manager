@@ -835,7 +835,43 @@ def test_two_identical_unknown_orphans_here_are_named_not_a_crash(app, providers
         results = _backup().restore_backup(blob, password, mode='merge')
     shared = [w for w in results['warnings'] if 'user_sso_identities' in w]
     assert len(shared) == 1 and 'orphan-twice' in shared[0], results['warnings']
-    assert 'share this user_id/provider_id/orphan_of/external_id' in shared[0]
+    assert 'share this user_id/external_id' in shared[0]
+
+
+def test_an_archived_orphan_of_a_known_idp_finds_its_own_row_not_the_oldest(app, providers):
+    """Two providers of one IdP may leave an account two orphans: each is told apart by its identity."""
+    from services.backup import manifest
+    password, idp = 'Correct-Horse-Battery-9', 'oauth2:https://known-idp.example/'
+    uid = _add(app, username=_name(), password_hash=NOPASS)
+
+    def orphan(external_id):
+        row = UserSSOIdentity(user_id=uid, orphan_of=idp)
+        row.bind(external_id)
+        db.session.add(row)
+        db.session.commit()
+        return row
+
+    with app.app_context():
+        archived = orphan('e2')
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        db.session.delete(archived)
+        db.session.commit()
+        orphan('e1')
+        orphan('e2')
+        results = _backup().restore_backup(blob, password, mode='merge')
+        rows = UserSSOIdentity.query.filter_by(user_id=uid).order_by(UserSSOIdentity.id)
+        assert [(r.orphan_of, r.external_id) for r in rows] == [(idp, 'e1'), (idp, 'e2')]
+        assert not [w for w in results['warnings'] if 'user_sso_identities' in w], results['warnings']
+
+
+def test_the_shared_identity_warning_names_the_fields_its_key_holds():
+    from services.backup.restore.plan import shared_identity_warning, sso_identity_key
+    for key, fields in ((sso_identity_key(2, 5, None, 'x'), 'user_id/provider_id'),
+                        (sso_identity_key(2, None, 'oauth2:k', 'x'), 'user_id/orphan_of/external_id'),
+                        (sso_identity_key(2, None, None, 'x'), 'user_id/external_id')):
+        text = shared_identity_warning('user_sso_identities', key, [1, 2], 'left alone')
+        assert f'share this {fields} (id 1, 2)' in text, text
 
 
 def test_an_orphan_archived_twice_comes_back_twice_beside_the_one_here(app, providers):
