@@ -471,13 +471,13 @@ def _external_groups(external_data):
 
 def _group_match_key_of(provider_type):
     if provider_type == 'ldap':
-        # str.split() takes every separator RFC 4518 2.2 maps to SPACE
+        # str.split() takes the separators RFC 4518 2.2 maps to SPACE (and a few control characters)
         return lambda name: ' '.join(str(name).split()).casefold()
     return lambda name: name
 
 
 def group_match_key(provider):
-    """How a rule key and a group name compare. LDAP: as cn does, caseIgnoreMatch
+    """How a rule key and a group name compare. LDAP: close to what cn does, caseIgnoreMatch
     (RFC 4519 2.3; RFC 4517 4.2.11 with RFC 4518 2.6.1): case, edge spaces and the
     length of inner space runs ignored. OIDC and SAML groups are opaque identifiers: exact."""
     return _group_match_key_of(getattr(provider, 'provider_type', None))

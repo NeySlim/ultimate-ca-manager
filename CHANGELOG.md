@@ -17,7 +17,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **LDAP role mapping ignores case.** A rule `pki-admins` did not match the Active Directory group `PKI-Admins`, which the required groups accepted; LDAP rules and groups now compare as caseIgnoreMatch does (case, edge spaces and inner space runs ignored), OIDC and SAML stay exact, and a rule key is saved without edge spaces (two keys the provider compares equal are refused).
 - **A failed LDAP group read says so.** When the groups could not be read (service account rights, timeout, referral, missing base) the login was refused as "no role mapping rule matches", or as not a member of the required groups; it is now refused with "your groups could not be read from the directory", in the response, the log and the audit, and it never counts as a failed attempt.
 - **The LDAP mapping test gives the login's verdict.** It read the groups by its own code and showed "Resolved role: viewer" for a user the login refuses; it now reads them as the login does, shows the access line and the reason of a refusal with no role, and says what it does not check (`refusal`, `groups_readable`, `note` in its response).
-- **Active Directory disabled accounts.** The `userAccountControl` check never read the attribute's value, so an account disabled in Active Directory was refused only by the directory's own bind and reported allowed by the mapping test; both now report it disabled.
+- **Active Directory disabled accounts.** The `userAccountControl` check never read the attribute's value, so an account disabled in Active Directory was refused only by the directory's own bind and reported allowed by the mapping test, which now reports it disabled.
 
 ## [2.254.3] - 2026-11-16
 

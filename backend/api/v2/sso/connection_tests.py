@@ -10,7 +10,8 @@ import ssl
 import logging
 import requests as http_requests
 from utils.datetime_utils import utc_isoformat
-from utils.dn_parse import get_dn_attribute, get_parent_dn, parse_dn, _unescape_value
+from utils.dn_parse import (get_dn_attribute, get_parent_dn, parse_dn, stored_dn_attribute,
+                            _unescape_value)
 from utils.ssrf_protection import (
     safe_request_head, validate_url_not_cloud_metadata)
 
@@ -212,12 +213,14 @@ def _ldap_read_groups(provider, server, user_dn):
                     else [str(entry.memberOf)]
                 groups = []
                 for group_dn in values:
-                    # One value that is no DN costs that group only, not the others.
+                    # A value the strict parser refuses (an unescaped '=', RFC 4514 section 3) is
+                    # read leniently; one that names no group costs that group only, not the others.
                     try:
                         name = get_dn_attribute(str(group_dn), 'CN')
                     except ValueError:
-                        logger.warning(f"LDAP memberOf value skipped, not a DN: {str(group_dn)[:200]!r}")
-                        continue
+                        name = stored_dn_attribute(str(group_dn), ('cn', '2.5.4.3'))
+                        if name is None:
+                            logger.warning(f"LDAP memberOf value skipped, not a DN: {str(group_dn)[:200]!r}")
                     if name is not None:
                         groups.append(name)
                 return groups
