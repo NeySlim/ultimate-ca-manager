@@ -5,8 +5,9 @@
 no row, which ``users.has_sso_identity`` records for the index holding the e-mail of local
 accounts unique (``ix_users_email_local``, now on that flag). Each account keeps the access it had. An account 2.254 treated as SSO (a source other
 than local) gets one row; one older than migration 024 (local, no password, owing no change)
-gets one only where 024 or a provider deletion recorded its provider, and otherwise stays the
-legacy account the first provider to open it by name records itself on.
+gets one only where 024, a provider deletion or a sign-in recorded its provider, its IdP or its
+stable identity, and otherwise stays the legacy account the first provider to open it by name
+records itself on.
 """
 import logging
 import re

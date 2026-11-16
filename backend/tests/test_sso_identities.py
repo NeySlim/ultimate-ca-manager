@@ -857,6 +857,8 @@ STATES_2254 = [
      [(None, None, 'oauth2:https://gone.example')]),
     ('detached', 'local', None, None, None, NOPASS, True, []),
     ('detached_with_provider', 'local', 2, None, None, NOPASS, True, []),
+    # 2.254 opened none by its name: the identity it carries makes it an orphan, never claimable
+    ('legacy_bound_alone', 'local', None, 'sub-l', None, NOPASS, False, [(None, 'sub-l', None)]),
 ]
 
 

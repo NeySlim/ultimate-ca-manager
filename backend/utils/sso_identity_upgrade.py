@@ -19,7 +19,8 @@ def identity_rows(users, here):
     for uid, source, stored, external_id, orphan_of, password_hash, force_change in users:
         if (source or 'local') == 'local':
             legacy = password_hash == NO_PASSWORD and not force_change
-            if not legacy or (stored is None and orphan_of is None):
+            # 2.254 opened by its name only a legacy account carrying no provider, key or identity
+            if not legacy or (stored is None and orphan_of is None and not external_id):
                 continue
         provider_id = here.get(stored) if stored is not None else None
         if provider_id is not None:
