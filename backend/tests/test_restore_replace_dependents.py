@@ -894,6 +894,8 @@ def test_every_integer_link_without_a_foreign_key_is_declared(app):
         ('microsoft_cas', 'last_synced_request_id'): 'a request number of the AD CS server',
         ('msca_requests', 'request_id'): 'a request number of the AD CS server',
         ('pro_role_permissions', 'resource_id'): 'scoped by resource_type, set by no code path',
+        ('background_jobs', 'requested_by_id'): ('the requester as a plain value: the table is '
+                                                 'never exported nor restored, the account may be gone'),
     }
     declared = {(table, column) for table, column, _target, _key in SOFT_LINKS}
     with app.app_context():
