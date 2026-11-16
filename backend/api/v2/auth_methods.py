@@ -304,9 +304,7 @@ def login_password():
 
     # Verify password
     if not user.check_password(password):
-        # Increment failed login counter
-        user.failed_logins = (user.failed_logins or 0) + 1
-        locked = user.failed_logins >= max_attempts
+        locked = user.count_failed_login() >= max_attempts
         if locked:
             user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
             logger.warning(f"Account {username} locked after {max_attempts} failed attempts")

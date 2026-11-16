@@ -107,6 +107,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- SSH certificates: two workers or nodes signing under one SSH CA at the same time could issue the same serial number, so revoking one certificate in the KRL revoked the other too. Each signature now takes its own serial from the database.
 - Policies: editing a policy in the form dropped the rules the form does not show, such as `allowed_signature_schemes` set through the API. They are now sent back unchanged.
 - HSM: syncing the keys of a provider whose secret this node cannot decrypt answered 500 without naming it. It now answers 400 and names the field.
 - CA deduplication: merging duplicate records of one CA dropped the HSM key of a removed duplicate when the record kept had no key. The kept record now takes over that HSM key.
@@ -186,6 +187,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Account: wrong passwords tried at the same time on the password or LDAP login, on one node or several, could be counted once, leaving more guesses than `max_login_attempts` before the lockout. Each failure now counts.
 - Integrations: a stored secret the database key cannot decrypt (saved under another key) now stops its integration with an error naming it: a webhook was sent unsigned or without its auth token, a mail without SMTP login, an SSO token request, a Microsoft CA or an HSM provider connection without its secret (a Google Cloud KMS provider fell back to the node's default credentials).
 - Integrations: a saved secret this node cannot decrypt, sent back masked or blank, now holds its target like a readable one, so moving an HSM provider, AD connector, SSO provider, Microsoft CA or SMTP server without typing it again is refused, and a DNS provider's credentials change only when entered again in full, every required field, and a secret when the provider has one, in one request (an optional secret left out is then dropped). The AD connector's test, health probe and domain SID read, the Intune app tests, the approval of an Intune SCEP request and a DNS provider's challenges, cleanups and tests (except a manual provider, which reads none) name such a secret instead of reporting it missing or a generic failure; an enabled AD connector holding one saves only with its bind password typed again or switched off.
 - FIPS image: in FIPS mode the container refuses to start when its FIPS module differs from the one the image was built with, when the image's integrity value for it is missing or malformed, or when `OPENSSL_MODULES` is not the absolute path of that module's directory; 2.x before 2.254.3 ran `openssl fipsinstall` on whatever module it found and so accepted a replaced one (see UPGRADE.md). The checked directory then holds for the whole process: an `OPENSSL_MODULES` in `ucm.env` does not move it.

@@ -227,12 +227,11 @@ def _record_ldap_failed_attempt(username):
     if not user:
         return
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()
-    user.failed_logins = (user.failed_logins or 0) + 1
-    locked = user.failed_logins >= max_attempts
-    if locked:
-        user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
-        logger.warning(f"LDAP account locked for {username} after {max_attempts} failed attempts")
     try:
+        locked = user.count_failed_login() >= max_attempts
+        if locked:
+            user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
+            logger.warning(f"LDAP account locked for {username} after {max_attempts} failed attempts")
         db.session.commit()
     except Exception as e:
         db.session.rollback()
