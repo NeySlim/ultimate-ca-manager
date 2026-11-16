@@ -4079,6 +4079,12 @@
     "provisioningRulesNotice": "已设置角色映射规则：没有任何规则匹配的用户在登录时会被拒绝。",
     "provisioningNoRulesNotice": "没有角色映射规则：此提供方认证的所有用户都可以登录，新账户获得 {{role}} 角色。",
     "provisioningNobodyNotice": "没有角色映射规则，也没有默认角色：任何人都无法通过此提供方登录。",
+    "provisioningRefusalAudited": "因没有匹配规则而被拒绝的登录会作为登录失败记录在审计日志中，并附带提供方发送的组值及其读取位置。",
+    "samlGroupShortcuts": "添加一行，从常用属性读取组：",
+    "samlGroupShortcutKeycloakRoles": "Keycloak，角色",
+    "samlGroupShortcutKeycloakGroups": "Keycloak，组",
+    "samlGroupShortcutMemberOf": "基于 LDAP 目录的 IdP",
+    "samlGroupShortcutIsMemberOf": "isMemberOf，Shibboleth",
     "ldapStartTls": "使用 StartTLS",
     "ldapStartTlsHelp": "在任何绑定之前将明文 LDAP 连接升级为 TLS",
     "ldapPlainWarning": "明文 LDAP：绑定密码和用户密码以未加密方式在网络上传输。请启用 SSL/TLS 或 StartTLS。"

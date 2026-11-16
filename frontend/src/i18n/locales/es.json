@@ -4079,6 +4079,12 @@
     "provisioningRulesNotice": "Hay reglas de asignación de roles: un usuario que ninguna regla reconoce es rechazado al iniciar sesión.",
     "provisioningNoRulesNotice": "Ninguna regla de asignación de roles: cualquier usuario autenticado por este proveedor puede iniciar sesión, y las cuentas nuevas reciben el rol {{role}}.",
     "provisioningNobodyNotice": "Ninguna regla de asignación de roles ni rol por defecto: nadie puede iniciar sesión con este proveedor.",
+    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values the provider sent and where they were read.",
+    "samlGroupShortcuts": "Add a row that reads groups from a common attribute:",
+    "samlGroupShortcutKeycloakRoles": "Keycloak, roles",
+    "samlGroupShortcutKeycloakGroups": "Keycloak, groups",
+    "samlGroupShortcutMemberOf": "LDAP-backed IdPs",
+    "samlGroupShortcutIsMemberOf": "isMemberOf, Shibboleth",
     "ldapStartTls": "Usar StartTLS",
     "ldapStartTlsHelp": "Cambiar la conexión LDAP sin cifrar a TLS antes de cualquier bind",
     "ldapPlainWarning": "LDAP sin cifrar: las contraseñas de bind y de los usuarios viajan sin cifrar. Active SSL/TLS o StartTLS."

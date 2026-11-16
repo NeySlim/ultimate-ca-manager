@@ -25,7 +25,8 @@ from . import saml_sp
 from .account_state import (
     SSO_NO_PASSWORD, bounded, describe_conflict, legacy_sso_account, orphan_text, own_identity,
 )
-from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
+from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules, _external_groups
+from .diagnostics import GroupSource, refusal_diagnosis
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
 @limiter.limit("5/minute")
@@ -158,12 +159,14 @@ def ldap_login():
         return error_response("Invalid credentials", 401)
 
     # Create or update user
+    group_label = user_info.pop('group_source', None)
     user, error_code = _get_or_create_sso_user(
         provider,
         user_info['username'],
         user_info.get('email', ''),
         user_info.get('fullname', ''),
-        user_info
+        user_info,
+        group_source=GroupSource(group_label) if group_label else None,
     )
 
     if not user:
@@ -313,14 +316,12 @@ def ldap_login():
 
 def _get_saml_auth(flask_request, provider, relay_state=None, sign_request=False):
     """Build a OneLogin_Saml2_Auth from Flask request and SSO provider config."""
-    from onelogin.saml2.auth import OneLogin_Saml2_Auth
-
     base = saml_sp.sp_base_url(flask_request)
     sp_cert = sp_key = None
     if sign_request and provider.saml_sign_requests:
         sp_cert, sp_key = saml_sp.load_sp_credentials(provider, with_key=True)
-    return OneLogin_Saml2_Auth(saml_sp.request_data(flask_request, base),
-                               saml_sp.build_settings(provider, base, sp_cert, sp_key))
+    return saml_sp.Saml2Auth(saml_sp.request_data(flask_request, base),
+                             saml_sp.build_settings(provider, base, sp_cert, sp_key))
 
 
 def _extract_external_id(provider, external_data):
@@ -474,12 +475,20 @@ def _refuse_email_conflict(provider, username, email, account, unverified):
                    EMAIL_CONFLICT)
 
 
-def _refuse_unmapped(provider, username):
+_GENERIC_SOURCES = {'oauth2': "the IdP's claims", 'saml': 'the assertion', 'ldap': 'the directory'}
+
+
+def _refuse_unmapped(provider, username, external_data=None, group_source=None):
+    """The refusal for want of a role, with the groups read, their source and the remedy."""
     if _mapping_rules(provider):
         reason, code = 'no role mapping rule matches it', UNMAPPED
     else:
         reason, code = 'the provider has no role mapping rule and no default role', NO_DEFAULT_ROLE
-    return _refuse(username, f"SSO login via {provider.name!r} refused for {username!r}: {reason}", code)
+    if group_source is None:
+        group_source = GroupSource(_GENERIC_SOURCES.get(provider.provider_type, 'the IdP'))
+    diagnosis = refusal_diagnosis(_external_groups(external_data), group_source)
+    return _refuse(username, f"SSO login via {provider.name!r} refused for {username!r}: "
+                             f"{reason}; {diagnosis}", code)
 
 
 def _email_owner(provider, account, unverified):
@@ -550,8 +559,9 @@ def _ldap_local_account(provider, identity):
     return user or conflict
 
 
-def _get_or_create_sso_user(provider, username, email, fullname, external_data):
-    """Create or update a user from SSO authentication
+def _get_or_create_sso_user(provider, username, email, fullname, external_data, group_source=None):
+    """Create or update a user from SSO authentication; ``group_source`` says where the
+    groups were read, for a refusal for want of a role.
 
     Returns:
         tuple: (user, error_code) - user object or None, and error code if failed
@@ -572,7 +582,7 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         return user, None
 
     if not sso_admission(provider, external_data):
-        return _refuse_unmapped(provider, username)
+        return _refuse_unmapped(provider, username, external_data, group_source)
 
     if user:
         if row is None:

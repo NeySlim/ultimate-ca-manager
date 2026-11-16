@@ -4082,6 +4082,12 @@
     "provisioningRulesNotice": "ロールマッピングルールが設定されています。どのルールにも一致しないユーザーはサインイン時に拒否されます。",
     "provisioningNoRulesNotice": "ロールマッピングルールがありません。このプロバイダーで認証されたすべてのユーザーがサインインでき、新しいアカウントには {{role}} ロールが付与されます。",
     "provisioningNobodyNotice": "ロールマッピングルールもデフォルトロールもありません。このプロバイダーでは誰もサインインできません。",
+    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values the provider sent and where they were read.",
+    "samlGroupShortcuts": "Add a row that reads groups from a common attribute:",
+    "samlGroupShortcutKeycloakRoles": "Keycloak, roles",
+    "samlGroupShortcutKeycloakGroups": "Keycloak, groups",
+    "samlGroupShortcutMemberOf": "LDAP-backed IdPs",
+    "samlGroupShortcutIsMemberOf": "isMemberOf, Shibboleth",
     "ldapStartTls": "StartTLS を使用",
     "ldapStartTlsHelp": "バインドの前に平文の LDAP 接続を TLS に切り替えます",
     "ldapPlainWarning": "平文の LDAP: バインドとユーザーのパスワードが暗号化されずにネットワークを流れます。SSL/TLS または StartTLS を有効にしてください。"

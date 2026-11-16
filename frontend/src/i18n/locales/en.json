@@ -4082,6 +4082,12 @@
     "provisioningRulesNotice": "Role mapping rules are set: a user no rule matches is refused at sign-in.",
     "provisioningNoRulesNotice": "No role mapping rule: every user this provider authenticates can sign in, and new accounts get the {{role}} role.",
     "provisioningNobodyNotice": "No role mapping rule and no default role: nobody can sign in through this provider.",
+    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values the provider sent and where they were read.",
+    "samlGroupShortcuts": "Add a row that reads groups from a common attribute:",
+    "samlGroupShortcutKeycloakRoles": "Keycloak, roles",
+    "samlGroupShortcutKeycloakGroups": "Keycloak, groups",
+    "samlGroupShortcutMemberOf": "LDAP-backed IdPs",
+    "samlGroupShortcutIsMemberOf": "isMemberOf, Shibboleth",
     "ldapStartTls": "Use StartTLS",
     "ldapStartTlsHelp": "Upgrade the plain LDAP connection to TLS before any bind",
     "ldapPlainWarning": "Plain LDAP: the bind and user passwords cross the network unencrypted. Turn on SSL/TLS or StartTLS."

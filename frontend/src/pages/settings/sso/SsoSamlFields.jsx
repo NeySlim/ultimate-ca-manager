@@ -16,6 +16,15 @@ const NAME_ID_FORMATS = [
   { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient', labelKey: 'sso.nameIdTransient' },
 ]
 
+// Common SAML attribute Names that carry groups, by origin. None is read by default:
+// a click adds a visible "→ groups" row the operator saves (or removes) himself.
+const SAML_GROUP_SHORTCUTS = [
+  { name: 'Role', originKey: 'sso.samlGroupShortcutKeycloakRoles' },
+  { name: 'member', originKey: 'sso.samlGroupShortcutKeycloakGroups' },
+  { name: 'memberOf', originKey: 'sso.samlGroupShortcutMemberOf' },
+  { name: 'urn:oid:1.3.6.1.4.1.5923.1.5.1.1', originKey: 'sso.samlGroupShortcutIsMemberOf' },
+]
+
 export default function SsoSamlFields({
   formData,
   handleChange,
@@ -161,6 +170,25 @@ export default function SsoSamlFields({
               keyPlaceholder="e.g., preferred_username"
               valuePlaceholder="e.g., username"
             />
+            <div className="mt-2">
+              <p className="text-xs text-text-tertiary mb-1">{t('sso.samlGroupShortcuts')}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {SAML_GROUP_SHORTCUTS.map(({ name, originKey }) => (
+                  <Button
+                    key={name}
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={Object.prototype.hasOwnProperty.call(formData.attribute_mapping || {}, name)}
+                    onClick={() => handleChange('attribute_mapping', { ...(formData.attribute_mapping || {}), [name]: 'groups' })}
+                    className="gap-1"
+                  >
+                    <span className="font-mono">{name}</span>
+                    <span className="text-text-tertiary">{t(originKey)}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="pt-2 border-t border-border">
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>

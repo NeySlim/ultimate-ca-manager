@@ -6,6 +6,9 @@ import tempfile
 import os
 import json
 import logging
+from .diagnostics import (
+    MAX_NAMES, NAME_LENGTH, GroupSource, claim_candidates, saml_candidates, shown_list,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -347,19 +350,26 @@ def saml_identity(attrs, name_id, attr_mapping):
 
 
 def _extract_saml_groups(attrs, attr_mapping=None):
-    """Group / role values from a validated SAML assertion, for role mapping.
+    """Group / role values from a validated SAML assertion, for role mapping."""
+    return saml_groups(attrs, attr_mapping)[0]
+
+
+def saml_groups(attrs, attr_mapping=None, friendly_names=None):
+    """``(values, GroupSource)`` of a validated SAML assertion, for role mapping.
 
     ``attrs`` is the ``{name: [values]}`` dict from the SAML library. When the
     attribute mapping assigns attributes to ``groups``, only those are read and
-    the defaults in ``_SAML_GROUP_ATTRIBUTES`` are not. Returns the non-empty
-    values, de-duplicated in assertion order, for the top-level ``groups`` key
-    that ``_resolve_role_from_mapping`` reads.
+    the defaults in ``_SAML_GROUP_ATTRIBUTES`` are not. Attributes are read by Name
+    only, never by FriendlyName (SAML Core 2.0 §2.7.3.1), which ``friendly_names``
+    gives for the refusal diagnosis alone. Values are the non-empty ones,
+    de-duplicated in assertion order, for the top-level ``groups`` key.
     """
     attrs = attrs if isinstance(attrs, dict) else {}
     configured = _saml_group_attribute_names(attr_mapping, attrs)
+    looked_for = configured or _SAML_GROUP_ATTRIBUTES
     groups = {}  # insertion-ordered set
     sources = []
-    for name in configured or _SAML_GROUP_ATTRIBUTES:
+    for name in looked_for:
         values = attrs.get(name)
         if values is None:
             continue
@@ -382,7 +392,11 @@ def _extract_saml_groups(attrs, attr_mapping=None):
             "SAML assertion has no groups: Entra ID sent groups.link because the user "
             "has too many groups. Emit only the groups assigned to the application, "
             "or app roles, so role mapping can match.")
-    return list(groups)
+    names = sources or looked_for
+    label = (f"SAML attribute{'s' if len(names) > 1 else ''} "
+             f"{shown_list(names, MAX_NAMES, NAME_LENGTH)}")
+    candidates = None if groups else saml_candidates(attrs, friendly_names, exclude=looked_for)
+    return list(groups), GroupSource(label, candidates, 'attributes')
 
 
 # Highest privilege first — multi-match resolution picks the greatest (#221).
@@ -498,26 +512,76 @@ def _entra_oidc_groups_overage(id_claims):
     return (isinstance(names, dict) and 'groups' in names) or id_claims.get('hasgroups') is True
 
 
-def oidc_external_groups(userinfo, id_claims, token_unused=None):
-    """Groups and roles of an OIDC login: those of its UserInfo response and of
-    the ID token bound to it (``None`` when none is, ``token_unused`` saying why)."""
+def _claim_lookup(data, name):
+    """The value of claim ``name``: the claim of that exact name, else a dotted path
+    through nested objects (a key may itself hold dots); ``_MISSING`` when neither."""
+    if not isinstance(data, dict):
+        return _MISSING
+    if name in data:
+        return data[name]
+    dots = [i for i, ch in enumerate(name) if ch == '.']
+    for i in reversed(dots):  # the longest key first
+        inner = data.get(name[:i])
+        if isinstance(inner, dict):
+            found = _claim_lookup(inner, name[i + 1:])
+            if found is not _MISSING:
+                return found
+    return _MISSING
+
+
+_MISSING = object()
+
+
+def claim_groups(data, name):
+    """Groups of the claim an attribute mapping row assigns to ``groups``: a string
+    or a list of strings; any other value gives none."""
+    value = _claim_lookup(data, name)
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return list(value)
+    return []
+
+
+def oidc_groups(userinfo, id_claims, token_unused=None, attr_mapping=None):
+    """``(values, GroupSource)`` of an OIDC login: those of its UserInfo response and of
+    the ID token bound to it (``None`` when none is, ``token_unused`` saying why).
+    Claims the attribute mapping assigns to ``groups`` replace ``roles`` and ``groups``."""
     id_claims = id_claims if isinstance(id_claims, dict) else {}
+    userinfo = userinfo if isinstance(userinfo, dict) else {}
+    configured = mapped_attributes(attr_mapping, 'groups', set(userinfo) | set(id_claims))
     sources = [('UserInfo', userinfo)]
     if token_unused is None:
         sources.insert(0, ('ID token', id_claims))
     merged, counts = {}, []
     for label, data in sources:
-        values = _external_groups(data)
+        if configured:
+            values = [v for name in configured for v in claim_groups(data, name)]
+        else:
+            values = _external_groups(data)
         counts.append(f"{label} ({len(values)} value(s))")
         merged.update((v, None) for v in values)
     unused = f"; ID token not used: {token_unused}" if token_unused is not None else ''
-    logger.info(f"OIDC groups read from {', '.join(counts)}{unused}")
+    claims = f" claim {', '.join(configured)}" if configured else ''
+    logger.info(f"OIDC groups read from {', '.join(counts)}{claims}{unused}")
     if _entra_oidc_groups_overage(id_claims):
         logger.warning(
             "OIDC ID token has no groups claim: Entra ID left it out because the user "
             "has too many groups. Emit only the groups assigned to the application, "
             "or app roles, so role mapping can match.")
-    return list(merged)
+    names = configured or ('roles', 'groups')
+    where = ' and '.join(('the ID token' if label == 'ID token' else label) for label, _ in sources)
+    label = (f"{where}, claim{'s' if len(names) > 1 else ''} "
+             f"{shown_list(names, MAX_NAMES, NAME_LENGTH)}")
+    if token_unused is not None:
+        label += f" (ID token not used: {token_unused})"
+    candidates = None if merged else claim_candidates(*(data for _, data in sources), exclude=names)
+    return list(merged), GroupSource(label, candidates, 'claims')
+
+
+def oidc_external_groups(userinfo, id_claims, token_unused=None, attr_mapping=None):
+    """Group values of an OIDC login (see :func:`oidc_groups`)."""
+    return oidc_groups(userinfo, id_claims, token_unused, attr_mapping)[0]
 
 
 def _group_match_key_of(provider_type):
@@ -563,7 +627,8 @@ def _resolve_mapped_roles(provider, external_data):
     if not role_mapping:
         return None, None
     external_roles = _external_groups(external_data)
-    logger.info(f"Role resolution: mapping={role_mapping}, external_groups={external_roles}")
+    logger.info(f"Role resolution: {len(role_mapping)} rule(s), external groups "
+                f"({len(external_roles)}): {shown_list(external_roles)}")
     key = group_match_key(provider)
     external_keys = _external_group_keys(provider, external_data)
     bases, customs = [], []

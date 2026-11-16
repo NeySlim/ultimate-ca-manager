@@ -4132,6 +4132,12 @@
     "provisioningRulesNotice": "Правила сопоставления ролей заданы: пользователю, не подходящему ни под одно правило, при входе отказывается.",
     "provisioningNoRulesNotice": "Правил сопоставления ролей нет: любой пользователь, аутентифицированный этим провайдером, может войти, а новые учётные записи получают роль {{role}}.",
     "provisioningNobodyNotice": "Нет ни правил сопоставления ролей, ни роли по умолчанию: через этого провайдера не может войти никто.",
+    "provisioningRefusalAudited": "Вход, отклонённый из-за отсутствия подходящего правила, записывается в журнал аудита как неудачный вход вместе со значениями групп, отправленными поставщиком, и указанием, откуда они были прочитаны.",
+    "samlGroupShortcuts": "Добавить строку, читающую группы из распространённого атрибута:",
+    "samlGroupShortcutKeycloakRoles": "Keycloak, роли",
+    "samlGroupShortcutKeycloakGroups": "Keycloak, группы",
+    "samlGroupShortcutMemberOf": "IdP на основе каталога LDAP",
+    "samlGroupShortcutIsMemberOf": "isMemberOf из Shibboleth",
     "ldapStartTls": "Использовать StartTLS",
     "ldapStartTlsHelp": "Перевести обычное соединение LDAP на TLS до любой привязки",
     "ldapPlainWarning": "Обычный LDAP: пароли привязки и пользователей передаются по сети в открытом виде. Включите SSL/TLS или StartTLS."
