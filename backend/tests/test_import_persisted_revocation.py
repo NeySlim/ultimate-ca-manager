@@ -147,7 +147,6 @@ class TestAnImportAppliesThePersistedRevocation:
 
     def test_the_legacy_opnsense_service(self, app, issuer, monkeypatch, tmp_path):
         from services.opnsense import importer
-        monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
         _, refid, ca_cert, ca_key = issuer
         real, _ = _leaf('reimported-legacy.example.test', ca_cert, ca_key)
         _record(app, refid, real)

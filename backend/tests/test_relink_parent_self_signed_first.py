@@ -174,7 +174,6 @@ def test_an_export_completes_a_chain_with_the_root_not_another_record_of_its_key
 def test_the_opnsense_file_importer_chains_a_ca_listed_before_its_parent(app, rows, monkeypatch, tmp_path):
     """Roots are stored first; an intermediate listed before the intermediate that signed it is not."""
     from services.opnsense import importer
-    monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
     pki = build_cross_pki()
     deep = make_cert(f'Deep CA {pki.tag}', new_key(), f'Cross Int B {pki.tag}', pki.key_int)
 

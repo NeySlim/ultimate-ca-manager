@@ -308,14 +308,12 @@ def test_renew_import_csr_and_restore_do_not_recreate_encrypted_key_mirrors(
 
 
 def test_legacy_opnsense_import_skips_key_mirrors_when_encrypted(
-    app, encryption_enabled, monkeypatch, tmp_path
+    app, encryption_enabled
 ):
     import base64
 
     from services.opnsense import importer
 
-    fake_module = tmp_path / 'services' / 'opnsense' / 'importer.py'
-    monkeypatch.setattr(importer, '__file__', str(fake_module))
     encoded_key = base64.b64encode(KEY_PEM).decode()
     encoded_cert = base64.b64encode(b'public certificate').decode()
     # A CA key is read before it is admitted: this one has to be a real key
@@ -343,12 +341,13 @@ def test_legacy_opnsense_import_skips_key_mirrors_when_encrypted(
 
         assert ca_result['imported'] == 1
         assert cert_result['imported'] == 1
-        data_dir = tmp_path / 'data'
-        assert (data_dir / 'ca' / f'{ca_refid}.crt').exists()
-        assert (data_dir / 'certs' / f'{cert_refid}.crt').exists()
-        assert not (data_dir / 'private' / f'{ca_refid}.key').exists()
-        assert not (data_dir / 'private' / f'{cert_refid}.key').exists()
+        ca = CA.query.filter_by(refid=ca_refid).one()
+        cert = Certificate.query.filter_by(refid=cert_refid).one()
+        assert ca_cert_path(ca).exists() and cert_cert_path(cert).exists()
+        assert not ca_key_path(ca).exists() and not cert_key_path(cert).exists()
 
+        ca_cert_path(ca).unlink()
+        cert_cert_path(cert).unlink()
         CA.query.filter_by(refid=ca_refid).delete()
         Certificate.query.filter_by(refid=cert_refid).delete()
         db.session.commit()

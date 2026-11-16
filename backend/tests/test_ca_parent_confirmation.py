@@ -191,7 +191,6 @@ def test_opnsense_api_import_names_the_candidate(app, auth_client, monkeypatch, 
 
 def test_opnsense_file_importer_names_the_candidate(app, monkeypatch, tmp_path, made):
     from services.opnsense import importer
-    monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
     tag, ski = _tag(), uuid.uuid4().bytes
     rows = [{'refid': uuid.uuid4().hex[:13], 'descr': f'Gost FC {tag}', 'is_root': False,
              'crt': base64.b64encode(_gost_pem(f'Gost FC {tag}', f'Gost FR {tag}', serial=_serial(),

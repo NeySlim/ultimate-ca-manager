@@ -170,7 +170,6 @@ def test_opnsense_service_fires_imported_per_created_certificate(app, monkeypatc
     import uuid
     from services.opnsense import importer
     from tests.test_import_ca_serial_unique import _cleanup
-    monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
     ca_refid, ca_pem, leaf_pem = _opnsense_rows()
     rows = [{'refid': uuid.uuid4().hex[:13], 'caref': ca_refid, 'descr': f'copy {i}',
              'crt': base64.b64encode(leaf_pem).decode(), 'serial_number': '4242'} for i in range(2)]
