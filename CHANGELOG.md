@@ -109,6 +109,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - SSH certificates: two workers or nodes signing under one SSH CA at the same time could issue the same serial number, so revoking one certificate in the KRL revoked the other too. Each signature now takes its own serial from the database.
 - Renewal: a renewal overtaken by another renewal of the same certificate, manual, bulk or scheduled, was refused as if the certificate were revoked. It is now refused as renewed by another request.
+- Related certificates (RFC 9763): a member of a pair whose partner had just been renewed by another request was renewed alone and lost its link to that partner. The partner is now judged as the database holds it, so the pair renews together, and a partner revoked meanwhile still leaves the member to renew alone.
 - Policies: editing a policy in the form dropped the rules the form does not show, such as `allowed_signature_schemes` set through the API. They are now sent back unchanged.
 - HSM: syncing the keys of a provider whose secret this node cannot decrypt answered 500 without naming it. It now answers 400 and names the field.
 - CA deduplication: merging duplicate records of one CA dropped the HSM key of a removed duplicate when the record kept had no key. The kept record now takes over that HSM key.
