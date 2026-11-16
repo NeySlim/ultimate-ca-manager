@@ -1306,7 +1306,7 @@
     "customTemplates": "Personalizadas",
     "systemDescription": "Incluida, no se puede editar ni eliminar",
     "customDescription": "Creada aquí, se puede editar y eliminar",
-    "systemNotEditable": "Las plantillas del sistema no se pueden editar. Duplíquela para crear una copia personalizada.",
+    "systemNotEditable": "Las plantillas del sistema no se pueden editar. Cópiela para crear una versión personalizada.",
     "systemNotDeletable": "Las plantillas del sistema no se pueden eliminar.",
     "defaultValidity": "Validez predeterminada (días)",
     "maxValidityHint": "Para limitar la validez de los certificados emitidos con esta plantilla, use una política de emisión (Políticas, validez máxima).",
@@ -1397,7 +1397,7 @@
     "activate": "Activar",
     "activated": "Plantilla activada",
     "deactivated": "Plantilla desactivada",
-    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: duplique una para modificarla."
+    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: copie una para modificarla."
   },
   "users": {
     "securityKeys": {
@@ -3922,7 +3922,6 @@
     "configuredProviders": "Proveedores configurados",
     "acsUrl": "URL del servicio de consumidor de aserciones (ACS)",
     "acsUrlDesc": "Donde el IdP envía las aserciones SAML después de la autenticación",
-    "addProvider": "Agregar proveedor SSO",
     "attributeMapping": "Mapeo de atributos",
     "attributeMappingHelp": "Izquierda: el nombre del atributo enviado por el proveedor. Derecha: el campo de UCM que rellena (username, email, fullname o groups). Ejemplo: user.userprincipalname → username.",
     "callbackUrls": "URLs de callback",

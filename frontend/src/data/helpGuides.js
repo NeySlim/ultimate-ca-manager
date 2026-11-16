@@ -297,7 +297,7 @@ Central management for all X.509 certificates. Issue new certificates, import ex
 5. Choose key type and size
 6. Set validity period
 7. Optionally apply a **Template** to pre-fill settings
-8. Click **Issue**
+8. Click **Issue Certificate**
 
 ### Using Templates
 Templates pre-fill Key Usage, Extended Key Usage, subject defaults, and validity. Select a template before filling the form to save time.
@@ -620,7 +620,7 @@ Templates define reusable certificate profiles. Instead of manually configuring 
 Every template is one or the other, shown in the **Source** column.
 
 ### System
-The templates seeded at install: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication and Smartcard Logon. Edit and Delete are refused for them, in the interface and by the API. **Duplicate** gives you an editable copy to build on.
+The templates seeded at install: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication and Smartcard Logon. Edit and Delete are refused for them, in the interface and by the API. **Copy** gives you an editable copy to build on.
 
 ### Custom
 Everything created or imported here. These can be edited and deleted freely.
@@ -694,9 +694,9 @@ A template can add extensions UCM has no setting for. Each one is an **OID**, a 
 
 The inspector lists such extensions for certificates and CAs under **Other extensions** on the Extensions tab, with their OID, name when known, criticality and value.
 
-## Duplicating Templates
+## Copying Templates
 
-Click **Duplicate** to create a copy of an existing template. Modify the copy without affecting the original.
+Click **Copy** to create a copy of an existing template. Modify the copy without affecting the original.
 
 ## Import & Export
 
@@ -2694,7 +2694,7 @@ Each provider shows a connection status indicator:
 
 ### Generating Keys
 1. Select a connected provider
-2. Click **Generate Key**
+2. Click **Generate**
 3. Choose the algorithm (RSA 2048/4096, ECDSA P-256/P-384)
 4. Enter a key label/alias
 5. Click **Generate**

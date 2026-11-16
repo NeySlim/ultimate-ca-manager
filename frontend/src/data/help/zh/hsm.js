@@ -19,7 +19,7 @@ export default {
         items: [
           { label: '新提供商', text: '配置 HSM 连接（库路径、凭据、插槽）' },
           { label: '测试连接', text: '验证 HSM 可达且凭据有效；对于 PKCS#11 模块，还会记录其上报的信息（库、制造商、库版本和固件版本），显示在提供商页面上' },
-          { label: '生成密钥', text: '直接在 HSM 上创建新的密钥对' },
+          { label: '生成', text: '直接在 HSM 上创建新的密钥对' },
           { label: '同步密钥', text: '从令牌重新读取提供商的密钥：新密钥会被添加，已从令牌消失的密钥会被移除，但 CA 正在使用的密钥会被保留。令牌列表读取失败时不会移除任何密钥。提示信息会给出各项数量、保留的密钥和无法读取的密钥；同步进行期间按钮保持禁用' },
           { label: '状态', text: '监控提供商连接健康状况' },
           { label: '认证', text: '声明 HSM 的认证：Common Criteria EAL 4+、EUCC high、FIPS 140-3 级别 3、FIPS 140-2 级别 3 或其他。留空表示未声明。对于由 HSM 支持的 CA，eu-acm 合规配置仅接受 Common Criteria EAL 4+、EUCC high 以及 FIPS 140-3 级别 3（至 2030 年 12 月 31 日）' },
@@ -151,7 +151,7 @@ OpenBao 或 HashiCorp Vault Transit Secrets Engine。密钥通过 Transit API �
 
 ### 生成密钥
 1. 选择一个已连接的提供商
-2. 点击**生成密钥**
+2. 点击**生成**
 3. 选择算法（RSA 2048/4096、ECDSA P-256/P-384）
 4. 输入密钥标签/别名
 5. 点击**生成**

@@ -1306,7 +1306,7 @@
     "customTemplates": "Personalizzati",
     "systemDescription": "Inclusa, non modificabile né eliminabile",
     "customDescription": "Creata qui, modificabile ed eliminabile",
-    "systemNotEditable": "I modelli di sistema non possono essere modificati. Duplicalo per crearne una copia personalizzata.",
+    "systemNotEditable": "I modelli di sistema non possono essere modificati. Copialo per crearne una versione personalizzata.",
     "systemNotDeletable": "I modelli di sistema non possono essere eliminati.",
     "defaultValidity": "Validità Predefinita (giorni)",
     "maxValidityHint": "Per limitare la validità dei certificati emessi con questo modello, usa una policy di emissione (Policy, validità massima).",
@@ -1397,7 +1397,7 @@
     "activate": "Attiva",
     "activated": "Modello attivato",
     "deactivated": "Modello disattivato",
-    "deactivateTooltip": "Un modello disattivato non viene offerto dal modulo Emetti certificato né all'autoenrollment di Windows. I modelli di sistema possono essere disattivati, non modificati: duplicane uno per cambiarlo."
+    "deactivateTooltip": "Un modello disattivato non viene offerto dal modulo Emetti certificato né all'autoenrollment di Windows. I modelli di sistema possono essere disattivati, non modificati: copiane uno per cambiarlo."
   },
   "users": {
     "securityKeys": {
@@ -3922,7 +3922,6 @@
     "configuredProviders": "Provider configurati",
     "acsUrl": "URL Assertion Consumer Service (ACS)",
     "acsUrlDesc": "Dove l'IdP invia le asserzioni SAML dopo l'autenticazione",
-    "addProvider": "Aggiungi provider SSO",
     "attributeMapping": "Mappatura attributi",
     "attributeMappingHelp": "A sinistra: il nome dell'attributo inviato dal provider. A destra: il campo UCM che compila (username, email, fullname o groups). Esempio: user.userprincipalname → username.",
     "callbackUrls": "URL di callback",

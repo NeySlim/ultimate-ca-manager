@@ -1306,7 +1306,7 @@
     "customTemplates": "Custom",
     "systemDescription": "Built in, cannot be edited or deleted",
     "customDescription": "Created here, can be edited and deleted",
-    "systemNotEditable": "System templates cannot be edited. Duplicate it to make a custom copy.",
+    "systemNotEditable": "System templates cannot be edited. Copy it to make a custom version.",
     "systemNotDeletable": "System templates cannot be deleted.",
     "defaultValidity": "Default Validity (days)",
     "maxValidityHint": "To cap the validity of certificates issued from this template, use an issuance policy (Policies, maximum validity).",
@@ -1397,7 +1397,7 @@
     "activate": "Activate",
     "activated": "Template activated",
     "deactivated": "Template deactivated",
-    "deactivateTooltip": "A deactivated template is not offered by the Issue Certificate form nor to Windows autoenrollment. System templates can be deactivated, not edited: duplicate one to change it."
+    "deactivateTooltip": "A deactivated template is not offered by the Issue Certificate form nor to Windows autoenrollment. System templates can be deactivated, not edited: copy one to change it."
   },
   "users": {
     "securityKeys": {
@@ -3925,7 +3925,6 @@
     "keepExisting": "••••••• (leave empty to keep)",
     "roles": {},
     "configuredProviders": "Configured Providers",
-    "addProvider": "Add SSO Provider",
     "default": "Default",
     "isDefault": "Default login provider",
     "lastUsed": "Last used",
