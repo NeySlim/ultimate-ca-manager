@@ -109,6 +109,8 @@ Mappez les attributs SAML de l'IDP aux champs utilisateur UCM :
 - \`email\` → E-mail UCM (requis)
 - \`groups\` → lu par les règles de mappage de rôles (optionnel) ; il ne rend pas l'utilisateur membre de groupes UCM
 
+Les groupes sont lus dans les attributs mappés vers \`groups\`, sinon dans \`groups\` et les URI de claims de Microsoft. Keycloak envoie les rôles dans \`Role\` et les groupes dans \`member\`, Shibboleth envoie \`urn:oid:1.3.6.1.4.1.5923.1.5.1.1\` (isMemberOf), d'autres IdP \`memberOf\` : ils ne sont lus qu'une fois mappés vers \`groups\`. Les boutons sous le mappage d'attributs ajoutent une telle ligne, qui prend effet une fois enregistrée. Un attribut est reconnu par son Name, jamais par son FriendlyName (SAML Core 2.0 §2.7.3.1) : mappez \`urn:oid:1.3.6.1.4.1.5923.1.5.1.1\`, pas \`isMemberOf\`.
+
 ### Déconnexion unique
 Quand l'IdP termine une session, il envoie une **LogoutRequest** signée via le navigateur à l'URL SLO. UCM vérifie la signature de l'IdP, l'émetteur, la Destination (obligatoire), l'IssueInstant (dans la fenêtre d'horloge) et que la requête n'a pas déjà servi, ferme la session UCM de ce NameID dans ce navigateur (quand la requête porte des SessionIndex, seulement une session qu'ils désignent), puis envoie une **LogoutResponse** à l'URL SLO de l'IdP, signée avec la clé SP ; un certificat SP qui n'est pas RSA l'envoie non signée, ce qu'un IdP strict comme AD FS refuse. Sans URL SLO de l'IdP, le navigateur retourne à la page de connexion UCM. Une LogoutRequest non signée ou falsifiée est refusée et la session reste ouverte.
 
@@ -135,6 +137,8 @@ Lorsqu'elle est activée, un nouveau compte utilisateur UCM est automatiquement 
 ### Groupes pour le mappage de rôles
 Les règles de mappage de rôles comparent leurs clés aux valeurs des claims **roles** et **groups**, lues ensemble dans le jeton d'identité de la connexion et dans la réponse UserInfo. Microsoft Entra ID n'envoie les groupes et les rôles d'application que dans le jeton d'identité : dans l'inscription de l'application, ajoutez le claim de groupes sous **Configuration de jeton** (les valeurs sont les identifiants d'objet des groupes, les clés de mappage sont donc ces identifiants), ou définissez des rôles d'application et mappez leurs valeurs. Un utilisateur membre de plus de 200 groupes environ ne reçoit pas de claim de groupes d'Entra ID : UCM journalise un avertissement et seuls les rôles d'application peuvent correspondre. N'émettez que les groupes attribués à l'application, ou des rôles d'application. Avec **Vérifier la signature de l'ID token** désactivé, les groupes du jeton d'identité ne comptent que si l'URL de jeton est en HTTPS avec la vérification TLS active, et que l'émetteur et l'identifiant client sont renseignés et correspondent au jeton.
 
+Une ligne \`claim → groups\` du mappage d'attributs fait de ce claim la source des groupes, dans le jeton d'identité et dans UserInfo aux mêmes conditions, à la place de **roles** et **groups**. Le nom est d'abord cherché tel quel (\`https://example.com/groups\`), puis comme un chemin par points à travers des objets imbriqués : pour Keycloak, \`realm_access.roles\` pour les rôles du realm et \`resource_access.<client id>.roles\` pour les rôles d'un client. Une valeur qui n'est ni une chaîne ni une liste de chaînes ne donne aucun groupe.
+
 ## Qui peut se connecter
 
 ### Correspondance d'identité
@@ -149,6 +153,9 @@ Quand un fournisseur est supprimé, ses rattachements sont conservés comme orph
 - **Rôle par défaut : Aucun** sans règle : personne ne peut se connecter via le fournisseur
 
 La section **Provisionnement des utilisateurs** s'ouvre d'elle-même et affiche un avertissement quand le fournisseur n'a aucune règle.
+
+### Diagnostiquer une connexion refusée
+Une connexion refusée parce qu'aucune règle ne correspond, ou parce que le fournisseur n'a ni règle ni rôle par défaut, est consignée dans les **Journaux d'audit** comme connexion échouée (filtre rapide **Connexions échouées**). L'entrée donne les valeurs de groupes lues par UCM (20 au plus, chacune coupée à 64 caractères) et l'endroit où elles ont été lues : le jeton d'identité, UserInfo ou les deux pour OIDC, avec la raison pour laquelle le jeton d'identité n'a pas servi ; les attributs lus pour SAML ; la base de recherche des groupes ou \`memberOf\` pour LDAP. Quand rien n'a été lu par OIDC ou SAML, elle nomme les claims ou attributs reçus qui ressemblent à des listes de groupes, jamais leurs valeurs : mappez l'un d'eux vers \`groups\`. Ajoutez ensuite une règle de mappage de rôles pour l'une des valeurs, ou définissez un rôle par défaut. L'utilisateur refusé voit seulement qu'aucune règle ne correspond.
 
 ## LDAP
 

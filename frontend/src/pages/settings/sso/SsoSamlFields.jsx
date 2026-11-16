@@ -18,7 +18,7 @@ const NAME_ID_FORMATS = [
 
 // Common SAML attribute Names that carry groups, by origin. None is read by default:
 // a click adds a visible "→ groups" row the operator saves (or removes) himself.
-export const SAML_GROUP_SHORTCUTS = [
+const SAML_GROUP_SHORTCUTS = [
   { name: 'Role', originKey: 'sso.samlGroupShortcutKeycloakRoles' },
   { name: 'member', originKey: 'sso.samlGroupShortcutKeycloakGroups' },
   { name: 'memberOf', originKey: 'sso.samlGroupShortcutMemberOf' },

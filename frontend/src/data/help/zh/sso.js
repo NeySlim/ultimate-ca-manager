@@ -109,6 +109,8 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 - \`email\` → UCM 邮箱（必需）
 - \`groups\` → 由角色映射规则读取（可选）；不会使用户成为 UCM 组的成员
 
+组从映射到 \`groups\` 的属性中读取，否则从 \`groups\` 和 Microsoft 声明 URI 中读取。Keycloak 在 \`Role\` 中发送角色、在 \`member\` 中发送组，Shibboleth 发送 \`urn:oid:1.3.6.1.4.1.5923.1.5.1.1\`（isMemberOf），其他 IdP 发送 \`memberOf\`：只有映射到 \`groups\` 后才会读取它们。属性映射下方的按钮会添加这样一行，保存后生效。属性只按其 Name 识别，绝不按 FriendlyName 识别（SAML Core 2.0 §2.7.3.1）：请映射 \`urn:oid:1.3.6.1.4.1.5923.1.5.1.1\`，而不是 \`isMemberOf\`。
+
 ### 单点注销
 IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutRequest**。UCM 检查 IdP 签名、签发者、Destination（必需）、IssueInstant（在时钟窗口内）以及该请求未被使用过，关闭此浏览器中该 NameID 的 UCM 会话（请求携带 SessionIndex 时，仅关闭其指定的会话），然后向 IdP 的 SLO URL 发送使用 SP 密钥签名的 **LogoutResponse**；SP 证书不是 RSA 时不签名，AD FS 等严格的 IdP 会拒绝。没有 IdP SLO URL 时，浏览器返回 UCM 登录页面。未签名或伪造的 LogoutRequest 会被拒绝，会话保持打开。
 
@@ -135,6 +137,8 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 ### 用于角色映射的组
 角色映射规则将其键与 **roles** 和 **groups** 声明的值进行比较，这些值从本次登录的 ID 令牌和 UserInfo 响应中一并读取。Microsoft Entra ID 只在 ID 令牌中发送组和应用角色：在应用注册中，于 **Token configuration** 下添加组声明（其值为组的对象 ID，因此映射键就是这些 ID），或定义应用角色并映射其值。属于大约 200 个以上组的用户不会从 Entra ID 获得组声明：UCM 会记录一条警告，只有应用角色可以匹配。请只发出分配给该应用程序的组，或应用角色。关闭**验证 ID 令牌签名**后，只有在令牌 URL 使用 HTTPS 并启用 TLS 验证，且已设置颁发者（issuer）和客户端 ID 并与令牌一致时，ID 令牌中的组才会被计入。
 
+属性映射中的一行 \`声明 → groups\` 会使该声明成为组的来源，在相同条件下从 ID 令牌和 UserInfo 中读取，取代 **roles** 和 **groups**。名称先按原样查找（\`https://example.com/groups\`），再作为穿过嵌套对象的点分路径查找：对于 Keycloak，realm 角色为 \`realm_access.roles\`，客户端角色为 \`resource_access.<client id>.roles\`。既不是字符串也不是字符串列表的值不提供任何组。
+
 ## 谁可以登录
 
 ### 身份匹配
@@ -149,6 +153,9 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 - **默认角色：无**且没有规则: 没有人能通过该提供商登录
 
 提供商没有规则时，**用户配置**部分会自动展开并显示警告。
+
+### 诊断被拒绝的登录
+因没有匹配规则，或因提供方既没有规则也没有默认角色而被拒绝的登录，会作为登录失败记录在**审计日志**中（快速筛选**登录失败**）。该条目给出 UCM 读取到的组值（最多 20 个，每个截断为 64 个字符）及其读取位置：OIDC 为 ID 令牌、UserInfo 或两者，并附带未使用 ID 令牌的原因；SAML 为读取的属性；LDAP 为组搜索基准或 \`memberOf\`。当通过 OIDC 或 SAML 未读取到任何值时，条目会列出收到的看起来像组列表的声明或属性的名称，绝不列出其值：请将其中之一映射到 \`groups\`。然后为其中一个值添加角色映射规则，或设置默认角色。被拒绝的用户只会看到没有规则匹配。
 
 ## LDAP
 
