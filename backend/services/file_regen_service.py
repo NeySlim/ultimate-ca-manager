@@ -294,10 +294,44 @@ def advance_generation() -> int:
     return number
 
 
-def _named_paths(kind, row):
+_LISTED_DIRS = ('CA_DIR', 'CERT_DIR', 'PRIVATE_DIR')
+
+
+def _listed(setting, path) -> str:
+    """A removal as listed: the directory's setting and the file name, the same on every
+    node whatever its directories' location."""
+    return f'{setting}/{Path(path).name}'
+
+
+def listed_path(path) -> str:
+    """The listed form of a path in a managed directory (its absolute form otherwise)."""
+    path = Path(path)
+    for setting in _LISTED_DIRS:
+        if path.parent == Path(getattr(Config, setting)):
+            return _listed(setting, path)
+    return str(path)
+
+
+def local_path(listed) -> Path:
+    """This node's path for a listed removal; an unknown form stays as written."""
+    setting, sep, name = str(listed).partition('/')
+    if sep and setting in _LISTED_DIRS and name and '/' not in name and name not in ('.', '..'):
+        return Path(getattr(Config, setting)) / name
+    return Path(listed)
+
+
+def _paths_of(kind, row):
+    """This node's paths of every file a row names (certificate, CSR, key last)."""
     if kind == 'ca':
         return (ca_cert_path(row), ca_key_path(row))
     return (cert_cert_path(row), cert_csr_path(row), cert_key_path(row))
+
+
+def _named_paths(kind, row):
+    """The listed forms of every file a row names, in the order of `_paths_of`."""
+    settings = ('CA_DIR', 'PRIVATE_DIR') if kind == 'ca' else ('CERT_DIR', 'CERT_DIR', 'PRIVATE_DIR')
+    return tuple(_listed(setting, path)
+                 for setting, path in zip(settings, _paths_of(kind, row), strict=True))
 
 
 def record_removal_candidates(generation: int) -> None:
@@ -316,10 +350,11 @@ def record_removal_candidates(generation: int) -> None:
 
     for row in _pages(CA, (CA.refid, CA.subject, CA.descr, _holds(CA.crt).label('has_crt'),
                            _holds(CA.prv).label('has_prv'))):
+        crt, key = _named_paths('ca', row)
         if row.has_crt:
-            batch.append({'generation': generation, 'path': str(ca_cert_path(row))})
+            batch.append({'generation': generation, 'path': crt})
         if row.has_prv:
-            batch.append({'generation': generation, 'path': str(ca_key_path(row))})
+            batch.append({'generation': generation, 'path': key})
         if len(batch) >= PAGE_SIZE:
             flush()
     for row in _pages(Certificate, (
@@ -327,10 +362,10 @@ def record_removal_candidates(generation: int) -> None:
             _holds(Certificate.crt).label('has_crt'),
             _holds(Certificate.csr).label('has_csr'),
             _holds(Certificate.prv).label('has_prv'))):
-        for present, path in ((row.has_crt, cert_cert_path), (row.has_csr, cert_csr_path),
-                              (row.has_prv, cert_key_path)):
+        for present, path in zip((row.has_crt, row.has_csr, row.has_prv),
+                                 _named_paths('cert', row), strict=True):
             if present:
-                batch.append({'generation': generation, 'path': str(path(row))})
+                batch.append({'generation': generation, 'path': path})
         if len(batch) >= PAGE_SIZE:
             flush()
     flush()
@@ -350,7 +385,7 @@ def keep_named_paths(nowait=False) -> None:
     for kind, model in (('ca', CA), ('cert', Certificate)):
         paths = []
         for row in _pages(model, (model.refid, model.subject, model.descr)):
-            paths.extend(str(p) for p in _named_paths(kind, row))
+            paths.extend(_named_paths(kind, row))
             if len(paths) >= PAGE_SIZE:
                 _strike(table, table.c.path.in_(paths), nowait=nowait)
                 paths = []
@@ -525,7 +560,7 @@ def _wanted(kind, row, encrypting):
     from utils.key_codec import load_pem_bytes
     files = []
     label = f"{'CA' if kind == 'ca' else 'certificate'} {row.id}"
-    paths = _named_paths(kind, row)
+    paths = _paths_of(kind, row)
     try:
         if row.crt:
             files.append((paths[0], base64.b64decode(row.crt), 0o644))
@@ -689,7 +724,7 @@ class _Pass:
                 return False
             db.session.commit()
             for entry in page:
-                self._remove(entry.path)
+                self._remove(local_path(entry.path))
             last = page[-1].id
 
     def _remove(self, path):

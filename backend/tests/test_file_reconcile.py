@@ -138,7 +138,7 @@ def test_only_listed_regular_files_inside_the_directories_are_removed(app, issue
         lookalike.write_bytes(b'an operator file named like ours')
         generation = regen.advance_generation()
         for path in (outside, link, listed, Config.CERT_DIR / 'never-there.crt'):
-            db.session.add(FileRemoval(generation=generation, path=str(path)))
+            db.session.add(FileRemoval(generation=generation, path=regen.listed_path(path)))
         db.session.commit()
         stats = regen.reconcile_files()
         assert stats['status'] == 'done' and stats['removed'] == 1
@@ -270,7 +270,7 @@ def test_a_listed_path_a_row_names_again_is_kept_by_a_full_pass(app, issued, reg
     from models import FileRemoval, db
     with app.app_context():
         generation = regen.advance_generation()
-        db.session.add(FileRemoval(generation=generation, path=str(issued['crt'])))
+        db.session.add(FileRemoval(generation=generation, path=regen.listed_path(issued['crt'])))
         db.session.commit()
         stats = regen.reconcile_files()
         assert stats['full'] and stats['removed'] == 0
@@ -352,7 +352,30 @@ def test_a_full_pass_with_nothing_listed_reads_no_row_to_strike(app, issued, reg
         db.session.commit()
         assert regen.reconcile_files(full=True)['status'] == 'done'
         assert struck == []
-        db.session.add(FileRemoval(generation=1, path=str(issued['crt'])))
+        db.session.add(FileRemoval(generation=1, path=regen.listed_path(issued['crt'])))
         db.session.commit()
         assert regen.reconcile_files(full=True)['status'] == 'done'
         assert struck == [1] and issued['crt'].exists()
+
+
+def test_a_node_with_directories_elsewhere_removes_what_the_restore_listed(
+        app, issued, regen, monkeypatch, tmp_path):
+    """The list names each file by its directory setting and name, not by the path on
+    the node that restored: nodes need not share their data directory's location."""
+    from config.settings import Config
+    from models import Certificate, db
+    with app.app_context():
+        generation = regen.advance_generation()
+        regen.record_removal_candidates(generation)
+        db.session.delete(db.session.get(Certificate, issued['id']))
+        regen.keep_named_paths()
+        db.session.commit()
+        elsewhere = {}
+        for name in ('CA_DIR', 'CERT_DIR', 'PRIVATE_DIR'):
+            elsewhere[name] = tmp_path / 'other-node' / name.lower()
+            elsewhere[name].mkdir(parents=True)
+            monkeypatch.setattr(Config, name, elsewhere[name])
+        copy = elsewhere['CERT_DIR'] / issued['crt'].name
+        copy.write_bytes(issued['pem'])
+        assert regen.reconcile_files()['removed'] >= 1
+        assert not copy.exists()

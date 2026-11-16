@@ -31,7 +31,8 @@ def test_a_replacement_commits_its_generation_and_the_paths_it_removed(target):
     blob = _service().create_backup(PASSWORD, include=_only('certificate_authorities'))
     removed = _authority_row(f'gone-{uuid.uuid4().hex[:8]}')[0]
     db.session.commit()
-    gone = str(ca_cert_path(removed))
+    from services.file_regen_service import listed_path
+    gone = listed_path(ca_cert_path(removed))
     before = _generation()
 
     results = _service().restore_backup(blob, PASSWORD, mode='replace')
@@ -41,7 +42,7 @@ def test_a_replacement_commits_its_generation_and_the_paths_it_removed(target):
     assert generation_number(after) == generation_number(before) + 1
     listed = {row.path for row in FileRemoval.query.filter_by(
         generation=generation_number(after))}
-    assert gone in listed and str(ca_cert_path(kept)) not in listed
+    assert gone in listed and listed_path(ca_cert_path(kept)) not in listed
     assert results['files']['removals'] == len(listed)
 
 
@@ -130,7 +131,7 @@ def test_a_pass_striking_with_a_restore_never_deadlocks_the_restore(target, app,
     from services import file_regen_service as regen
     first = _authority_row(f'strike-a-{uuid.uuid4().hex[:8]}')[0]
     second = _authority_row(f'strike-b-{uuid.uuid4().hex[:8]}')[0]
-    paths = [str(ca_cert_path(first)), str(ca_cert_path(second))]
+    paths = [regen.listed_path(ca_cert_path(first)), regen.listed_path(ca_cert_path(second))]
     db.session.add_all([FileRemoval(generation=1, path=p) for p in paths])
     db.session.commit()
     monkeypatch.setattr(regen, 'PAGE_SIZE', 1)   # one path per batch

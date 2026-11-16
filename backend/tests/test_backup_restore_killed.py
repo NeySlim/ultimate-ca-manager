@@ -311,16 +311,17 @@ def test_a_file_that_cannot_be_written_after_the_commit_is_retried(app, diverged
 
 def test_a_restore_leaves_its_generation_and_its_list_and_nothing_on_disk(app, diverged):
     from models import FileRemoval
-    from services.file_regen_service import current_generation, generation_number, reconcile_files
+    from services.file_regen_service import (
+        current_generation, generation_number, listed_path, reconcile_files)
     with app.app_context():
         tree = _tree(app.config['DATA_DIR'])
         results = _restore(diverged['archive'])
         assert _tree(app.config['DATA_DIR']) == tree
         generation = generation_number(current_generation())
         listed = {row.path for row in FileRemoval.query.filter_by(generation=generation)}
-        assert str(diverged['added']) in listed
-        assert str(diverged['operator_key']) not in listed, 'a key the row does not hold'
-        assert str(diverged['lookalike']) not in listed
+        assert listed_path(diverged['added']) in listed
+        assert listed_path(diverged['operator_key']) not in listed, 'a key the row does not hold'
+        assert listed_path(diverged['lookalike']) not in listed
         assert results['files'] == {'generation': generation, 'removals': len(listed)}
         reconcile_files()
         assert FileRemoval.query.count() == 0, 'a single node consumes the list'
