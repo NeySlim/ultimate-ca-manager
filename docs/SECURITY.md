@@ -275,6 +275,7 @@ WebAuthn authentication includes rate limiting:
 - A code checked in an open session (disabling 2FA, regenerating recovery codes) counts against the same per-account budget as the login's second step
 - A password checked in an open session counts on a per-account counter of its own, with the same threshold and duration, and never locks the login
 - Account lockout after repeated failures; at the password and LDAP login each attempt is counted before its password is checked (at LDAP on the local account the directory entry opens, not the name typed), so attempts sent together on any node check at most `max_login_attempts` passwords
+- The lockout is the password's and the LDAP bind's: a client certificate or a passkey is not refused by it, and its success neither resets the password's count nor lifts its lock
 - Separate rate limit from password login
 
 ### 9. SSO Audit Logging (v2.52+)

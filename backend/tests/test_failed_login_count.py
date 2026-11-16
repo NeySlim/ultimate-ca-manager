@@ -562,9 +562,9 @@ def test_an_ldap_reset_that_cannot_be_stored_answers_500_without_a_session(
         assert _stored(ldap_user)[0] == 1
 
 
-# --- Other authenticators: behaviour as it stands, pending a decision ------------
-# A client certificate or a passkey neither reads the password lock nor resets the count
-# in SQL: these tests record what happens today, they do not say it is wanted.
+# --- Other authenticators ---------------------------------------------------------
+# The count and the lock are the password's (NIST SP 800-63B rev. 4 §3.2.2): a client
+# certificate or a passkey neither reads them nor resets them.
 
 MTLS_DOOR = '/api/v2/auth/login/mtls'
 PASSKEY_DOOR = '/api/v2/auth/login/webauthn/verify'
@@ -603,46 +603,69 @@ _OTHER_DOORS = pytest.mark.parametrize('door', [_signs_in_by_certificate, _signs
 
 
 @_OTHER_DOORS
-def test_today_a_password_lock_does_not_stop_another_authenticator(
+def test_a_password_lock_does_not_stop_a_certificate_or_a_passkey(
         app, client, username, monkeypatch, door):
-    """The session opens; the count is zeroed on its copy, the lock stays."""
+    """The session opens; the password's count and lock stay as they were."""
+    until = utc_now() + timedelta(minutes=15)
     with app.app_context():
-        _another_node_writes(username, failed_logins=MAX_ATTEMPTS,
-                             locked_until=utc_now() + timedelta(minutes=15))
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS, locked_until=until)
     assert door(monkeypatch, username)(client).status_code == 200
     with app.app_context():
-        failures, locked_until = _stored(username)
-    assert failures == 0 and locked_until is not None
+        assert tuple(_stored(username)) == (MAX_ATTEMPTS, until)
     assert client.post(PASSWORD_DOOR, json={'username': username, 'password': PASSWORD}
                        ).status_code == 401
 
 
 @_OTHER_DOORS
-def test_today_another_authenticator_resets_the_password_count(
+def test_a_certificate_or_a_passkey_gives_no_password_guess_back(
         app, client, username, monkeypatch, door):
+    checked = []
+    real = User.check_password
     with app.app_context():
         _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
     assert door(monkeypatch, username)(client).status_code == 200
     with app.app_context():
-        assert tuple(_stored(username)) == (0, None)
+        assert tuple(_stored(username)) == (MAX_ATTEMPTS - 1, None)
+    monkeypatch.setattr(User, 'check_password',
+                        lambda self, pw: checked.append(pw) or real(self, pw))
+    for _ in range(3):
+        assert client.post(PASSWORD_DOOR, json={'username': username, 'password': 'wrong'}
+                           ).status_code == 401
+    assert len(checked) == 1
 
 
-def test_today_a_certificate_keeps_a_count_written_while_it_checks(
-        app, client, username, monkeypatch):
-    """Its copy already held 0: the ORM writes nothing, the other node's count stays."""
+@_OTHER_DOORS
+def test_a_certificate_or_a_passkey_keeps_a_count_written_while_it_checks(
+        app, client, username, monkeypatch, door):
     meanwhile = lambda: _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
-    assert _signs_in_by_certificate(monkeypatch, username, meanwhile)(client).status_code == 200
+    assert door(monkeypatch, username, meanwhile)(client).status_code == 200
     with app.app_context():
         assert tuple(_stored(username)) == (MAX_ATTEMPTS - 1, None)
 
 
-def test_today_a_passkey_resets_a_count_written_while_it_checks(
-        app, client, username, monkeypatch):
-    """The passkey's own count is committed first, so its copy is read again and zeroed."""
-    meanwhile = lambda: _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
-    assert _signs_in_by_passkey(monkeypatch, username, meanwhile)(client).status_code == 200
+def test_a_passkey_success_clears_its_own_count(app, client, username, monkeypatch):
+    """The passkey's counter, apart from the password's, is the one its success resets."""
+    from models.second_factor_failure import SecondFactorFailure
+    assert _signs_in_by_passkey(monkeypatch, username)(client).status_code == 200
     with app.app_context():
-        assert tuple(_stored(username)) == (0, None)
+        assert SecondFactorFailure.query.filter_by(kind='webauthn', target=username).count() == 0
+
+
+def test_a_certificate_auto_login_leaves_the_password_count(app, username, monkeypatch):
+    """The mTLS middleware opens a session on any call: the count and the lock stay."""
+    import middleware.mtls_middleware as mtls_middleware
+    from services.mtls_auth_service import MTLSAuthService
+    from tests.test_session_lifecycle import _cert_login
+    until = utc_now() + timedelta(minutes=15)
+    with app.app_context():
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS, locked_until=until)
+        uid = User.query.filter_by(username=username).one().id
+    monkeypatch.setattr(MTLSAuthService, 'is_mtls_enabled', staticmethod(lambda: True))
+    monkeypatch.setattr(mtls_middleware, '_extract_certificate', lambda: {'serial': '0a'})
+    _cert_login(monkeypatch, app, uid)
+    assert app.test_client().get('/api/v2/account/profile').status_code == 200
+    with app.app_context():
+        assert tuple(_stored(username)) == (MAX_ATTEMPTS, until)
 
 
 # --- Threads on one database -----------------------------------------------------

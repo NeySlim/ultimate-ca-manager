@@ -681,10 +681,9 @@ def login_mtls():
     if not user or not user.active:
         return error_response('Certificate authentication failed', 401)
 
-    # Update login stats
+    # The password's count and lock are left as they are (NIST SP 800-63B §3.2.2)
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
-    user.failed_logins = 0  # Reset failed logins on successful login
     ok, _err = safe_commit(logger, "Failed to update login stats")
     if not ok:
         return _err
@@ -853,11 +852,10 @@ def webauthn_verify():
             )
             return error_response('WebAuthn verification failed', 401)
 
-        # Update login stats
+        # Only the passkey's own count is reset: the password's stays (NIST SP 800-63B §3.2.2)
         _clear_2fa_failures(WEBAUTHN, username)
         user.last_login = utc_now()
         user.login_count = (user.login_count or 0) + 1
-        user.failed_logins = 0  # Reset failed logins on successful login
         ok, _err = safe_commit(logger, "Failed to update login stats")
         if not ok:
             return _err
