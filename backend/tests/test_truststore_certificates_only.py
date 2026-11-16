@@ -174,3 +174,10 @@ def test_the_system_bundle_is_stored_reserialized(app, auth_client, drop, tmp_pa
     assert r.status_code == 200, r.data
     (row,) = _rows_for(app, cert)
     assert row.certificate_pem == _pem(cert).decode()
+
+
+def test_a_key_after_a_truncated_certificate_block_is_never_taken_for_its_body():
+    from utils.trust_pem import certificate_blocks
+    key, cert = _issue('truncated')
+    held = b'-----BEGIN CERTIFICATE-----\nMIIB\n' + _key_pem(key) + _pem(cert)
+    assert certificate_blocks(held) == _pem(cert)
