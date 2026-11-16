@@ -3785,6 +3785,7 @@
     "ldapAttributes": "Attributs LDAP",
     "directoryType": "Type d'annuaire",
     "attributeMappingHelp": "Gauche : le nom de l'attribut envoyé par le fournisseur. Droite : le champ UCM qu'il renseigne (username, email, fullname ou groups). Exemple : user.userprincipalname → username.",
+    "legacyGroupsHidden": "Non lue tant qu'une autre ligne cible groups : la ligne « groups → attribut » pour {{attributes}}. Pour continuer à la lire, remplacez-la par une ligne « attribut → groups ».",
     "roleMapping": "Mappage des rôles",
     "roleMappingHelp": "Mappez les groupes ou rôles externes vers les rôles UCM. Les utilisateurs dans les groupes correspondants se verront attribuer le rôle UCM associé. Si plusieurs groupes correspondent, le rôle au privilège le plus élevé l'emporte (admin > operator > auditor > viewer). Un rôle personnalisé peut être ajouté à un groupe seul ou à côté d'un rôle de base ; si plusieurs groupes donnent un rôle personnalisé, le premier de la liste l'emporte.",
     "baseRole": "Rôle de base",

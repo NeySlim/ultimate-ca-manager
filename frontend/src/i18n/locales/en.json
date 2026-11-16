@@ -3974,6 +3974,7 @@
     "ldapAttributes": "LDAP Attributes",
     "directoryType": "Directory Type",
     "attributeMappingHelp": "Left: the attribute name sent by the provider. Right: the UCM field it fills (username, email, fullname or groups). Example: user.userprincipalname → username.",
+    "legacyGroupsHidden": "Not read while another row maps to groups: the \"groups → attribute\" row for {{attributes}}. To keep reading it, replace it with a row \"attribute → groups\".",
     "roleMapping": "Role Mapping",
     "roleMappingHelp": "Map external groups or roles to UCM roles. Users in matched groups will be assigned the corresponding UCM role. If several groups match, the highest-privilege role wins (admin > operator > auditor > viewer). A custom role can be added to a group on its own or next to a base role; if several groups give a custom role, the first one in the list wins.",
     "baseRole": "Base role",

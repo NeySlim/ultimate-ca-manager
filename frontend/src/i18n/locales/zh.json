@@ -3942,6 +3942,7 @@
     "acsUrlDesc": "IdP 在认证后发送 SAML 断言的地址",
     "attributeMapping": "属性映射",
     "attributeMappingHelp": "左侧：提供商发送的属性名称。右侧：对应填充的 UCM 字段（username、email、fullname 或 groups）。示例：user.userprincipalname → username。",
+    "legacyGroupsHidden": "由于另一行已映射到 groups，不再读取“groups → 属性”行：{{attributes}}。若要继续读取，请将其替换为“属性 → groups”行。",
     "callbackUrls": "回调 URL",
     "callbackUrlsHelp": "将此重定向 URI 复制到您的 OAuth2/OIDC 应用配置中。",
     "default": "默认",

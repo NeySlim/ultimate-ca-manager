@@ -3992,6 +3992,7 @@
     "acsUrlDesc": "Куди IdP надсилає SAML-твердження після автентифікації",
     "attributeMapping": "Зіставлення атрибутів",
     "attributeMappingHelp": "Ліворуч: назва атрибута, який надсилає провайдер. Праворуч: поле UCM, яке він заповнює (username, email, fullname або groups). Приклад: user.userprincipalname → username.",
+    "legacyGroupsHidden": "Not read while another row maps to groups: the \"groups → attribute\" row for {{attributes}}. To keep reading it, replace it with a row \"attribute → groups\".",
     "callbackUrls": "URL-адреси зворотного виклику",
     "callbackUrlsHelp": "Скопіюйте цей URI перенаправлення в конфігурацію вашого OAuth2/OIDC-додатку.",
     "default": "За замовчуванням",

@@ -3942,6 +3942,7 @@
     "acsUrlDesc": "Dove l'IdP invia le asserzioni SAML dopo l'autenticazione",
     "attributeMapping": "Mappatura attributi",
     "attributeMappingHelp": "A sinistra: il nome dell'attributo inviato dal provider. A destra: il campo UCM che compila (username, email, fullname o groups). Esempio: user.userprincipalname → username.",
+    "legacyGroupsHidden": "Not read while another row maps to groups: the \"groups → attribute\" row for {{attributes}}. To keep reading it, replace it with a row \"attribute → groups\".",
     "callbackUrls": "URL di callback",
     "callbackUrlsHelp": "Copiare questo URI di reindirizzamento nella configurazione dell'applicazione OAuth2/OIDC.",
     "default": "Predefinito",
