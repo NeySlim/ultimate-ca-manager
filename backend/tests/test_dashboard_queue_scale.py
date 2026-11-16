@@ -15,6 +15,7 @@ from models.acme_models import AcmeClientOrder
 from models.policy import ApprovalRequest
 from services import dashboard_aggregates as da
 from tests.dashboard_pem import self_signed
+from tests.planner_stats import STATES, planner_statistics
 from utils.cert_status import EXPIRY_WINDOW_DAYS, holds_certificate
 from utils.datetime_utils import utc_now
 
@@ -180,6 +181,21 @@ def rows(app):
         for key, value in saved.items():
             _set(key, value)
         db.session.commit()
+
+
+# The tables the queue reads
+STAT_TABLES = ('certificates', 'acme_client_orders', 'approval_requests', 'system_config',
+               'certificate_authorities')
+
+
+@pytest.fixture(params=STATES)
+def planner_stats(request, app):
+    if request.param != 'no_stats':
+        with app.app_context():
+            if db.engine.dialect.name != 'sqlite':
+                pytest.skip("sqlite_stat1 is SQLite's; PostgreSQL analyzes on its own")
+    with planner_statistics(app, request.param, STAT_TABLES):
+        yield request.param
 
 
 def _ca(rows, name, **kw):
@@ -409,7 +425,7 @@ def _pg_violations(statement, parameters):
 
 
 @pytest.mark.parametrize('scenario', ['auto_off', 'auto_wide'])
-def test_no_correlated_subquery_walks_a_table_for_each_certificate(app, auth_client, rows, scenario):
+def test_no_correlated_subquery_walks_a_table_for_each_certificate(app, auth_client, rows, scenario, planner_stats):
     with app.app_context():
         for key, value in SCENARIOS[scenario].items():
             _set(key, value)
@@ -473,7 +489,7 @@ def _steps(app):
     return counter[0]
 
 
-def test_the_queue_cost_grows_linearly_with_the_certificates(app, rows):
+def test_the_queue_cost_grows_linearly_with_the_certificates(app, rows, planner_stats):
     with app.app_context():
         if db.engine.dialect.name != 'sqlite':
             pytest.skip('instruction counts are a SQLite measure; the plan test covers PostgreSQL')
