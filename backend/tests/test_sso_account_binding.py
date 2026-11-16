@@ -590,7 +590,7 @@ def _forgot(app, email):
 @pytest.mark.parametrize('fields, sent', [
     ({'auth_source': 'oauth2', 'password_hash': NOPASS}, False),
     ({'auth_source': 'oauth2', 'password_hash': 'kept-hash'}, True),
-    ({'auth_source': 'local', 'password_hash': NOPASS}, True),
+    ({'auth_source': 'local', 'password_hash': NOPASS, 'force_password_change': True}, True),
     ({'auth_source': 'local', 'password_hash': 'local-hash'}, True),
 ], ids=['sso-no-password', 'sso-kept-password', 'unlinked-no-password', 'local'])
 def test_forgot_password_sends_no_link_to_an_sso_account_without_password(
@@ -670,3 +670,52 @@ def test_an_administrator_cannot_remove_the_password_of_their_own_account(app, p
             me.password_hash, me.auth_source, me.sso_provider_id = before
             me.sso_external_id = None
             db.session.commit()
+
+
+@pytest.mark.parametrize('orphan_of', ['oauth2:https://okta-gone.example', None])
+@pytest.mark.parametrize('verified', [True, False])
+def test_email_of_an_orphan_of_another_or_unknown_idp_is_refused_not_duplicated(
+        app, providers, orphan_of, verified):
+    """A provider deleted, another created, another name sent: no second account."""
+    name, idp_name = _name(), _name()
+    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+         sso_provider_id=None, sso_orphan_of=orphan_of, sso_external_id='sub-old',
+         password_hash=NOPASS)
+    got = _login(app, providers.b, idp_name, {'sub': 'sub-new', 'email_verified': verified},
+                 email=f'{name}@corp.example')
+    assert got == (None, 'sso_email_conflict')
+    assert _count(app, username=idp_name) == 0
+    assert _count(app, email=f'{name}@corp.example') == 1
+    details = _last_audit(app, 'login_failure', name)
+    assert 'no provider' in details and 'Link to SSO attaches it' in details, details
+
+
+def test_email_of_an_unbound_orphan_of_this_idp_is_still_taken_back(app, providers):
+    """The orphan check leaves this IdP's own orphans to the adoption that precedes it."""
+    name, idp_name = _name(), _name()
+    uid = _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+               sso_provider_id=None, sso_orphan_of='oauth2:https://b.example',
+               sso_external_id=None, password_hash=NOPASS)
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-o'},
+                  email=f'{name}@corp.example') == (name, None)
+    with app.app_context():
+        assert db.session.get(User, uid).sso_provider_id == providers.b
+
+
+def test_forgot_password_sends_no_link_to_an_sso_account_older_than_its_auth_source(
+        app, providers, reset_mail):
+    """Local by its column, without password and owing no change: its provider alone opens it."""
+    name = _name()
+    _add(app, username=name, auth_source='local', password_hash=NOPASS, force_password_change=False)
+    _forgot(app, f'{name}@corp.example')
+    assert reset_mail == []
+
+
+def test_forgot_password_reaches_the_active_account_behind_an_inactive_one(app, providers, reset_mail):
+    gone, name = _name(), _name()
+    email = f'{name}@corp.example'
+    _add(app, username=gone, email=email, auth_source='oauth2', sso_provider_id=providers.b,
+         password_hash='old-hash', active=False)
+    _add(app, username=name, email=email, auth_source='local', password_hash='hash-l')
+    _forgot(app, email)
+    assert reset_mail == [name]
