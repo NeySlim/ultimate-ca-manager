@@ -410,13 +410,16 @@ class ChaosSuite:
                 converged(box, Run(box, *_chaos_run(box)).out, data, config, why)
 
     def test_only_the_journal_is_ever_moved_and_nothing_copied(self, lab):
-        """cp never runs; mv only renames the journal into place (the guard of Box fails any
-        other call that names an item, whatever the run)."""
+        """cp never runs; mv only renames the journal or the README into place (the guard of
+        Box fails any other call that names an item, whatever the run)."""
         runs = [lab.first_run()] + [lab.chain([(at, 'fail')], ())[4][-1]
                                     for at in range(1, self._calls(lab) + 1, 3)]
         assert all(r.out.returncode in (0, 1, 2) for r in runs)
         assert not any(name == 'cp' for r in runs for _n, name, _a in r.calls)
-        assert all(args[-1].endswith('/.journal') for r in runs for _n, name, args in r.calls if name == 'mv')
+        moves = [args[-2:] for r in runs for _n, name, args in r.calls if name == 'mv']
+        assert all(dst.endswith('/.journal') and src == f'{dst}.new'
+                   or dst.endswith('/README.txt') and src == f'{dst[:-len("README.txt")]}.README.txt.new'
+                   for src, dst in moves), moves
 
 
 class NothingRenamesSuite:
