@@ -565,9 +565,11 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 def upgrade_refusal(engine):
     """What migration 300 refuses in the 2.254 data, read before the copy and its marker are
     written, so a refused database is left exactly as 2.254 left it."""
-    module = _load_module(MIGRATIONS_DIR / f"{UPGRADE_MIGRATION}.py")
+    check = getattr(_load_module(MIGRATIONS_DIR / f"{UPGRADE_MIGRATION}.py"), "refusal", None)
+    if check is None:
+        return None
     with engine.connect() as conn:
-        return module.refusal(conn)
+        return check(conn)
 
 
 def _sqlite_file(sqlite_path):
