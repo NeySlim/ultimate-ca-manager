@@ -795,6 +795,24 @@ def test_an_account_holding_two_unknown_orphans_is_restored_as_it_is(app, provid
                       for r in UserSSOIdentity.query.filter_by(user_id=uid)) == before
 
 
+def test_two_identical_unknown_orphans_here_are_named_not_a_crash(app, providers):
+    """Two deleted providers without an IdP key may leave one account the same orphan twice."""
+    from services.backup import manifest
+    password = 'Correct-Horse-Battery-9'
+    uid = _add(app, username=_name(), password_hash=NOPASS)
+    with app.app_context():
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        for _ in range(2):
+            row = UserSSOIdentity(user_id=uid)
+            row.bind('orphan-twice')
+            db.session.add(row)
+        db.session.commit()
+        results = _backup().restore_backup(blob, password, mode='merge')
+    shared = [w for w in results['warnings'] if 'user_sso_identities' in w]
+    assert len(shared) == 1 and 'orphan-twice' in shared[0], results['warnings']
+
+
 @pytest.mark.parametrize('merging', [True, False], ids=['merge', 'replace'])
 def test_an_archive_from_before_the_rows_keeps_a_skipped_identity_as_an_orphan(app, providers, merging):
     with app.app_context():
