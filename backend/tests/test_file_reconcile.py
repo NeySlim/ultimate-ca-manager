@@ -292,3 +292,49 @@ def test_a_key_mirror_whose_row_holds_an_empty_key_is_never_removed(app, issued,
         db.session.commit()
         regen.reconcile_files()
         assert issued['key'].read_bytes() == b'an operator copy of the key'
+
+
+@pytest.fixture
+def empty_authority(app):
+    """A CA row whose certificate and key are '' (no content), with operator files at its
+    paths; the row and the files are removed after the test."""
+    from models import CA, db
+    from utils.file_naming import ca_cert_path, ca_key_path
+    with app.app_context():
+        ca = CA(refid=str(uuid.uuid4()), descr=f'empty-{uuid.uuid4().hex[:8]}',
+                subject='CN=empty authority', crt='', prv='')
+        db.session.add(ca)
+        db.session.commit()
+        paths = {'id': ca.id, 'crt': ca_cert_path(ca), 'key': ca_key_path(ca)}
+    for name in ('crt', 'key'):
+        paths[name].parent.mkdir(parents=True, exist_ok=True)
+        paths[name].write_bytes(f'operator {name}'.encode())
+    yield paths
+    for name in ('crt', 'key'):
+        paths[name].unlink(missing_ok=True)
+    with app.app_context():
+        CA.query.filter_by(id=paths['id']).delete()
+        db.session.commit()
+
+
+def test_an_authority_restored_away_without_content_leaves_its_paths_alone(
+        app, empty_authority, regen):
+    """'' is no content: its paths are not listed, so the files there are not the restore's."""
+    from models import CA, db
+    with app.app_context():
+        generation = regen.advance_generation()
+        regen.record_removal_candidates(generation)
+        db.session.delete(db.session.get(CA, empty_authority['id']))
+        regen.keep_named_paths()
+        db.session.commit()
+        regen.reconcile_files()
+    assert empty_authority['crt'].read_bytes() == b'operator crt'
+    assert empty_authority['key'].read_bytes() == b'operator key'
+
+
+def test_the_purge_keeps_the_key_copy_of_an_authority_whose_key_is_empty(
+        app, empty_authority, regen, encryption_enabled):
+    with app.app_context():
+        stats = regen.purge_private_key_files()
+    assert empty_authority['key'].read_bytes() == b'operator key'
+    assert stats['kept_no_db_key'] >= 1
