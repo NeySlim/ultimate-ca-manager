@@ -151,7 +151,7 @@ jobs:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant'))
-    timeout-minutes: 120
+    timeout-minutes: 150
     # On the 3.0 integration branch one run at a time: the running one finishes, the
     # newest push waits and replaces any older waiting one; elsewhere one group per commit
     concurrency:
@@ -191,7 +191,8 @@ jobs:
           UCM_DEV_MODE: 'true'
         run: |
           cd backend
-          pytest -v --tb=short --durations=30
+          # The tests marked slow (an hour of fault scenarios) stay with the shards: this job has a time limit
+          pytest -v --tb=short --durations=30 -m "not ha and not slow"
 
       # The same suite in random order on the nightly run and on pushes of the 3.0
       # integration branch: a report, not a gate. The job summary gives the seed that replays the order.
@@ -213,14 +214,14 @@ jobs:
           seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
           set +e
           # Inside the step timeout, so a slow run still writes its summary (exit 124).
-          timeout 40m pytest -p randomly --randomly-seed="$seed" -q --tb=line -rfE > random-order.log 2>&1
+          timeout 40m pytest -p randomly --randomly-seed="$seed" -m "not ha and not slow" -q --tb=line -rfE > random-order.log 2>&1
           status=$?
           set -e
           tail -n 60 random-order.log
           {
             echo "### Random order: seed $seed, commit $sha, pytest exit $status"
             echo
-            echo "Replay: \`git checkout $sha && pip install pytest-randomly==5.0.0 && cd backend && pytest -p randomly --randomly-seed=$seed\`"
+            echo "Replay: \`git checkout $sha && pip install pytest-randomly==5.0.0 && cd backend && pytest -p randomly --randomly-seed=$seed -m 'not ha and not slow'\`"
             echo
             echo "Files with failures or errors:"
             echo

@@ -115,12 +115,19 @@ fips_build_ok() {
     fi
 }
 
+# A restart asked for is not counted by the unit's start limit, meant for crashes alone:
+# reset-failed flushes that counter first
+restart_ucm() {
+    systemctl reset-failed ucm >> "$LOG_FILE" 2>&1 || true
+    systemctl restart ucm >> "$LOG_FILE" 2>&1
+}
+
 finish_update() {
     # Always restart UCM so the backend consumes the result and emits the
     # truthful installed/failed event
     rm -f "$RESTART_FILE"
     log "Update handling done (status recorded), restarting UCM..."
-    systemctl restart ucm >> "$LOG_FILE" 2>&1
+    restart_ucm
     exit 0
 }
 
@@ -218,7 +225,7 @@ fi
 if [ -f "$RESTART_FILE" ]; then
     rm -f "$RESTART_FILE"
     log "Restart requested, restarting UCM..."
-    systemctl restart ucm >> "$LOG_FILE" 2>&1
+    restart_ucm
     log "Restart complete"
     exit 0
 fi

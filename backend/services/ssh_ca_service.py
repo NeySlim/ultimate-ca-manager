@@ -530,7 +530,9 @@ class SSHCAService:
 
     @staticmethod
     def get_next_serial(ca_id):
-        """Commit the next serial number of a CA and return it; a failed signature leaves a gap."""
+        """Commit the next serial number of a CA and return it; a failed signature leaves a gap.
+
+        An unknown CA raises ValueError with the caller's session as it was: nothing to undo."""
         from sqlalchemy import select, update
         table = SSHCertificateAuthority.__table__
         # One UPDATE adds one to the stored value under the row (PostgreSQL) or write (SQLite)
@@ -546,12 +548,13 @@ class SSHCAService:
                                             .where(table.c.id == ca_id)).scalar_one()
             else:
                 serial = None
-            if serial is None:
-                raise ValueError(f"SSH CA not found: {ca_id}")
-            db.session.commit()
+            if serial is not None:
+                db.session.commit()
         except Exception:
             db.session.rollback()
             raise
+        if serial is None:
+            raise ValueError(f"SSH CA not found: {ca_id}")
         return serial
 
     @staticmethod

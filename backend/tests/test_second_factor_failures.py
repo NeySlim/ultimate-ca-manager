@@ -337,6 +337,7 @@ def test_the_three_routes_count_alike_without_insert_returning(nodes, monkeypatc
         db.session.remove()
     if not returning:
         monkeypatch.setattr(engine.dialect, 'insert_returning', False)
+        monkeypatch.setattr(engine.dialect, 'update_returning', False)  # the login's count
         event.listen(engine, 'before_cursor_execute', _refuse_returning)
     seen = []
     try:

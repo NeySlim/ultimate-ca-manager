@@ -343,8 +343,7 @@ class TestTheSchedulerMarksARecordedRevocation:
 
 class TestAPairPartnerRevokedOnlyByItsRecord:
 
-    def test_it_is_left_out_like_a_revoked_partner(self, app, issuer, monkeypatch):
-        from services.cert import related_pair
+    def test_it_is_left_out_like_a_revoked_partner(self, app, issuer):
         from services.cert.renewal import _renewal_members
         _, refid, ca_cert, ca_key = issuer
         first, key_a = _leaf('pair-a.example.test', ca_cert, ca_key)
@@ -353,7 +352,8 @@ class TestAPairPartnerRevokedOnlyByItsRecord:
         _record(app, refid, second)
         with app.app_context():
             a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, b_id)
-            monkeypatch.setattr(related_pair, 'mutual_partner', lambda cert: b if cert is a else a)
+            a.related_certificate_id, b.related_certificate_id = b_id, a_id
+            db.session.commit()
             assert _renewal_members(a) == [a]
 
 

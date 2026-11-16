@@ -115,6 +115,8 @@ Content-Type: application/json
 }
 ```
 
+**Lockout.** Each attempt is counted before its password is checked, on every node: here on a known, active account; at `POST /api/v2/sso/ldap/login` on the local account the directory entry opens, active or not, whatever name the user filter matched, and an entry with no local account yet is not counted. After `max_login_attempts` attempts without a success, the next ones answer 401 `Invalid credentials` without checking the password, the right one included, until `lockout_duration` has passed. An account whose count already reached a lowered `max_login_attempts` is locked by its next attempt, refused unchecked. A bind that proves the password but opens no session (account disabled here or in the directory, not in the required groups, no role mapped) stays counted, except the attempt that armed the lock, while that lock still runs: it lifts it and is not counted, so such binds never lock the account by themselves. Each lock is logged and sends the `account_locked` alert once. A success resets the count, and so does a new password: reset by link, set by an administrator (`POST /api/v2/users/{id}/reset-password`) or changed in a session (`POST /api/v2/account/password`). The count and the lock are those of the password and the LDAP bind: a client certificate or a passkey is not refused by them, and its success neither resets the count nor lifts the lock. When the count cannot be stored, the login answers 500 `Failed to record login attempt`; when a success cannot reset it, 500 `Failed to update login stats`, with no session opened and a lock armed by that attempt left in place.
+
 **Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account when its password was generated, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
 
 ### Login with WebAuthn
@@ -991,7 +993,9 @@ Content-Type: application/json
 
 Renewing a member of a hybrid pair renews both, and the new B names the new A; the response
 lists the other member in `related_renewed`. When the two members require approval under
-different policies, the renewal answers `409` and only an administrator can perform it.
+different policies, the renewal answers `409` and only an administrator can perform it. A
+certificate or a pair link changed by another request while the renewal runs also answers
+`409`: reload the certificate and retry.
 
 ### Revoke Certificate
 ```http
