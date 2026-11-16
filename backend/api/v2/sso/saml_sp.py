@@ -176,6 +176,9 @@ def build_settings(provider, base, sp_cert=None, sp_key=None, want_messages_sign
             'wantAssertionsEncrypted': False,
             # The username falls back to the NameID when no attribute is sent.
             'wantAttributeStatement': False,
+            # Keycloak's role list sends one Attribute per role under the same Name;
+            # the library then merges their values instead of refusing the assertion.
+            'allowRepeatAttributeName': True,
             'requestedAuthnContext': False,
             'allowSingleLabelDomains': True,
             # SHA-256 for anything the SP signs; IdP signatures or digests in SHA-1 are refused.
