@@ -462,15 +462,15 @@ def test_the_standard_install_is_unchanged(tmp_path):
 
 # ------------------------------------------------------- running service
 
-def _systemd(tmp_path, bin_dir, record, state='active', hold_stop=None):
+def _systemd(tmp_path, bin_dir, record, state='active', hold_stop=None, gap=''):
     """A booted systemd whose systemctl logs each call, with the venv's content at that moment.
 
-    With hold_stop, `stop` stops ucm, creates that file and waits to be killed: one process (exec),
-    since a shell loop outlives a SIGINT that misses its child of the moment."""
+    With hold_stop, `stop` stops ucm, writes its pid to that file and execs a sleep waiting to be
+    killed: one process, since a shell outlives a SIGINT that misses its child of the moment."""
     (tmp_path / 'run-systemd').mkdir()
     (tmp_path / 'ucm-state').write_text(state)
     venv = tmp_path / 'opt' / 'venv'
-    hold = f'touch {hold_stop}; exec {shutil.which("sleep")} 600' if hold_stop else ':'
+    hold = f'echo $$ > {hold_stop}; {gap}exec {shutil.which("sleep")} 600' if hold_stop else ':'
     _stub(bin_dir / 'systemctl', f"""echo "SYSTEMCTL $* [$({shutil.which('ls')} {venv} 2>/dev/null | tr '\\n' ' ')]" >> {record}
 state=$(cat {tmp_path}/ucm-state)
 case "$1" in
@@ -490,8 +490,7 @@ def test_a_held_stop_dies_of_a_sigint_its_shell_alone_receives(tmp_path):
     proc = subprocess.Popen([str(bin_dir / 'systemctl'), 'stop', 'ucm'], start_new_session=True,
                             preexec_fn=_default_signals)
     try:
-        _wait_for(held, proc)
-        time.sleep(0.2)
+        _wait_for_held_stop(held, proc)
         os.kill(proc.pid, signal.SIGINT)
         assert proc.wait(timeout=5) == -signal.SIGINT
     finally:
@@ -643,6 +642,17 @@ def _held_gunicorn(started, exit_code=None):
 def test_an_interruption_after_the_stop_restarts_the_service_on_the_previous_venv(tmp_path, sig, point):
     """Cut once ucm is stopped: before the switch (systemctl stop still running), or after it,
     while the new venv is being checked."""
+    _cut_after_the_stop(tmp_path, sig, point)
+
+
+def test_a_sigint_between_the_witness_and_the_held_stop_still_lands(tmp_path):
+    """The window a slow machine opens: the fake's shell, waiting for a child that exits normally,
+    outlives the SIGINT and then execs the sleep, which never gets it."""
+    _cut_after_the_stop(tmp_path, signal.SIGINT, 'stopped',
+                        gap=f"{shutil.which('sh')} -c 'trap \"\" INT; {shutil.which('sleep')} 1'; ")
+
+
+def _cut_after_the_stop(tmp_path, sig, point, gap=''):
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
     held = tmp_path / 'held'
     python, record = _fake_python(tmp_path, _held_gunicorn(held) if point == 'switched' else 'exit 0')
@@ -650,9 +660,9 @@ def test_an_interruption_after_the_stop_restarts_the_service_on_the_previous_ven
     envfile.write_text('SECRET_KEY=a\n')
     shutil.rmtree(home / 'venv')
     _venv_dir(home / 'venv')
-    extra = _systemd(tmp_path, bin_dir, record, hold_stop=held if point == 'stopped' else None)
+    extra = _systemd(tmp_path, bin_dir, record, hold_stop=held if point == 'stopped' else None, gap=gap)
     proc = _spawn(tmp_path, home, python, envfile, extra)
-    _wait_for(held, proc)
+    (_wait_for_held_stop if point == 'stopped' else _wait_for)(held, proc)
     os.killpg(proc.pid, sig)
     _out, err = _reap(proc)
     assert proc.returncode != 0, err
@@ -791,6 +801,20 @@ def _wait_for(path, proc):
     while not path.exists() and proc.poll() is None and time.monotonic() < deadline:
         time.sleep(0.05)
     assert path.exists(), proc.communicate(timeout=5)
+
+
+def _wait_for_held_stop(witness, proc):
+    """Until the held `systemctl stop` runs the sleep: before its exec, a SIGINT can reach its shell
+    while that waits for a child exiting normally, and the shell then goes on to the sleep."""
+    deadline = time.monotonic() + 15
+    while proc.poll() is None and time.monotonic() < deadline:
+        try:
+            if pathlib.Path(f'/proc/{int(witness.read_text())}/comm').read_text().strip() == 'sleep':
+                return
+        except (OSError, ValueError):  # not written yet, or written halfway
+            pass
+        time.sleep(0.05)
+    pytest.fail(f'the held stop never reached its sleep: {proc.communicate(timeout=5)}')
 
 
 def _systemctl_lines(record):
