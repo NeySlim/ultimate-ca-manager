@@ -237,6 +237,12 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
     the caller decided on (default: the one ``cert`` carries). The other member
     of a related pair is renewed with it, A first, in the same commit."""
     try:
+        # The caller's view, taken before judging a partner's link re-reads this very row
+        try:
+            known_serial = cert.serial_number if known_serial is SERIAL_UNSET else known_serial
+            was_archived = bool(cert.archived)
+        except InvalidRequestError as e:  # deleted since the caller read it
+            raise RenewalError('Certificate no longer exists', 404) from e
         members = _renewal_members(cert)
         # Read before a row takes its new certificate: the replaced ones prove the entity
         previous = [(m, _stored(m)) for m in members]
@@ -250,6 +256,7 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                 staged_member = _stage_renewal(
                     member, ca if is_cert else None, rekey=rekey, trigger=trigger,
                     known_serial=known_serial if is_cert else SERIAL_UNSET,
+                    was_archived=was_archived if is_cert else None,
                     validity_days=validity_days, related_to=related_to,
                     precheck=lambda signer, issued: _refuse_taken(
                         signer, issued, members, trigger, username, locked=False,
@@ -337,15 +344,23 @@ def _renewal_members(cert):
     from services.cert.related_pair import anchor_first, mutual_partner
     try:
         partner = mutual_partner(cert)
+        if partner is not None:
+            partner = _as_stored(partner.id)
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
         return [cert]
-    if (partner is None or partner.archived or not cert.crt
-            or not partner.crt or not partner.prv):
+    if (partner is None or partner.related_certificate_id != cert.id or partner.archived
+            or not cert.crt or not partner.crt or not partner.prv):
         return [cert]
     from services.cert.issued_lookup import row_revoked
     if row_revoked(partner):  # by its row or by the record of its serial
         return [cert]
     return list(anchor_first(cert, partner))
+
+
+def _as_stored(row_id):
+    """The row as the database holds it now, None once deleted: one the session kept may have
+    been renewed or revoked since, and its revocation is judged on the serial it carries now."""
+    return db.session.get(Certificate, row_id, populate_existing=True)
 
 
 def renewal_partner(cert):
@@ -367,7 +382,7 @@ def _current_related(row):
         original.extensions.get_extension_for_oid(RELATED_CERT_EXTENSION_OID)
     except x509.ExtensionNotFound:
         return None
-    a_row = db.session.get(Certificate, row.related_certificate_id)
+    a_row = _as_stored(row.related_certificate_id)
     if a_row is None or a_row.archived or not a_row.crt:
         return None
     from services.cert.issued_lookup import row_revoked
@@ -380,10 +395,10 @@ def _current_related(row):
 
 
 def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,
-                   precheck=None) -> dict:
+                   precheck=None, was_archived=None) -> dict:
     """Every check, the signature and the writes, left uncommitted; *related_to*
     is the certificate A the renewed one names (RFC 9763)."""
-    cert = _reread(cert, known_serial, trigger)
+    cert = _reread(cert, known_serial, trigger, was_archived)
     check_renewable(cert, trigger)
     ca, ca_cert, ca_key = _signing_ca(cert, ca, trigger)
 
@@ -436,13 +451,13 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     }
 
 
-def _reread(cert, known_serial, trigger):
+def _reread(cert, known_serial, trigger, was_archived=None):
     """The row as stored now, locked until the commit on PostgreSQL. A row renewed or
     archived since the caller read it is refused: an archived row is renewed only by a
     caller that read it archived, never revived behind another renewal's back."""
     try:
         expected = cert.serial_number if known_serial is SERIAL_UNSET else known_serial
-        was_archived = bool(cert.archived)
+        was_archived = bool(cert.archived) if was_archived is None else was_archived
         fresh = db.session.get(Certificate, cert.id, populate_existing=True, with_for_update=True)
     except InvalidRequestError:  # deleted since the caller read it
         fresh = None
