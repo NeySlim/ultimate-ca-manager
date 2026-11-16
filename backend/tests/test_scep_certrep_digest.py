@@ -11,6 +11,8 @@ from cryptography.x509.oid import NameOID
 from services.scep import response_builder
 from services.scep.message_parser import verify_cms_signature
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 KEYS = {
     'rsa': lambda: rsa.generate_private_key(65537, 2048),
     'p384': lambda: ec.generate_private_key(ec.SECP384R1()),

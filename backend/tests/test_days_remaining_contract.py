@@ -20,6 +20,8 @@ import pytest
 from utils.datetime_utils import utc_now
 from utils.days_remaining import days_remaining, has_expired
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONTRACT = os.path.join(_REPO, 'contracts', 'days_remaining_contract.json')
 

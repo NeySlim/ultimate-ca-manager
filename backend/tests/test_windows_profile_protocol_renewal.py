@@ -19,6 +19,8 @@ from tests.test_scep_rfc8894_operations import (
     FAIL_INFO_OID, PKI_STATUS_OID, _decrypt_response, _response_attributes,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 STATES = ['enabled', 'disabled', 'deleted']
 
 

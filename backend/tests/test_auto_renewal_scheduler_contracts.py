@@ -7,6 +7,8 @@ from sqlalchemy import text
 
 from models import db, AuditLog, CA, Certificate, SystemConfig
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 FAILED = 'certificate.auto_renewal_failed'
 SETTING_KEYS = ('auto_renewal_enabled', 'auto_renewal_days', 'auto_renewal_sources',
                 'auto_renewal_notify_on_renewal', 'auto_renewal_notify_on_failure',

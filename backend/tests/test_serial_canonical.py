@@ -15,6 +15,8 @@ from cryptography.x509.oid import NameOID
 from models import CA, Certificate, RevokedSerial, db
 from utils.serial_format import canonical_serial, canonical_stored_serial
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _digit_hex_serial():
     """A serial whose hexadecimal spelling has no letter: the one ambiguous case."""

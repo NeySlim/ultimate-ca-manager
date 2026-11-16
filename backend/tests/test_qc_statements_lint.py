@@ -15,6 +15,8 @@ from services import cert_linting_service as L
 from tests.test_acme_profile_template import _drop_template
 from tests.test_csr_sign_extra_names import _upload
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 needs_pkilint = pytest.mark.skipif(not L.linters_status()['pkilint'], reason='pkilint not installed')
 _SEQ = itertools.count(1)
 

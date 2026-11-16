@@ -18,6 +18,8 @@ import pytest
 from tests.conftest import get_json
 from tests.test_msca_admin_channel import _make_msca_cert
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CERTS = '/api/v2/certificates'
 
 

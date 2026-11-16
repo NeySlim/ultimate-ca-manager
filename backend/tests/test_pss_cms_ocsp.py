@@ -21,6 +21,8 @@ from cryptography.x509 import ocsp
 from models import CA, Certificate, SystemConfig, db
 from utils.signing_hash import pss_algorithm_identifier
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 OPENSSL = shutil.which('openssl')
 PSS_SHA256 = pss_algorithm_identifier(hashes.SHA256()).dump()
 

@@ -12,6 +12,8 @@ import pytest
 import fips_mode
 from tests.test_hsm_sync_and_listing import SOFTHSM_MODULE, needs_softhsm, softhsm_token  # noqa: F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_config_rows')
+
 PROVIDERS = '/api/v2/hsm/providers'
 SOFTHSM_PATH = '/usr/lib/softhsm/libsofthsm2.so'
 VENDOR_PATH = '/opt/vendor/lib/libcs_pkcs11_R3.so'

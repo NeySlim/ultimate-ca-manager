@@ -18,6 +18,10 @@ from models import CA, HsmKey, HsmProvider, db
 from services import compliance_signer
 from services.policy_service import PolicyEvaluationService, SystemPolicy
 from tests.conftest import get_json
+from tests.leak_marks import with_fixtures
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 JSON = 'application/json'

@@ -12,8 +12,10 @@ from models import Certificate, db
 from tests.test_csr_sign_extra_names import _upload
 from tests.test_csr_windows_basic_constraints import _windows_shaped_csr
 import pytest
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 
 def _csr(cn):

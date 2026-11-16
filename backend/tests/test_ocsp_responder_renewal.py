@@ -14,6 +14,9 @@ from cryptography.x509.oid import ExtensionOID
 
 from tests.conftest import get_json
 from utils.datetime_utils import utc_now
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 CONTENT_JSON = 'application/json'
 OCSP_SIGNING_OID = '1.3.6.1.5.5.7.3.9'

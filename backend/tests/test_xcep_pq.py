@@ -13,9 +13,12 @@ from tests.test_xcep_policy import (
     XCEP_NS, XCEP_PASSWORD, XCEP_URL, XCEP_USER, _basic_auth, _set_config,
 )
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 XSI_NIL = '{http://www.w3.org/2001/XMLSchema-instance}nil'
 MLDSA_LABELS = key_algorithms.labels('ML-DSA')

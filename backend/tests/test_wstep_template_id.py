@@ -7,6 +7,8 @@ from models.certificate_template import CertificateTemplate
 from tests import test_wstep_renew_tls as renew_tls
 from tests.test_wstep_renew_tls import USER_AND_CODESIGN, _eku_csr, _issue, _renew, _template_oid, _wstep_issued
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 templated_ca = renew_tls.templated_ca
 
 

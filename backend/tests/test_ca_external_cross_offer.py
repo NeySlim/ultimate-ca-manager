@@ -8,6 +8,9 @@ from models import db, CA
 from tests.test_ca_external_csr import (
     _create_external, _make_external_root, _sign_csr_as_external_root, _next_cn, post_json,
 )
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 BASE = '/api/v2/cas'
 

@@ -16,6 +16,8 @@ import pytest
 from models import CA, Certificate, db
 from models.policy import ApprovalRequest, CertificatePolicy
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+
 
 def _json(client, method, url, payload):
     return getattr(client, method)(url, data=json.dumps(payload), content_type='application/json')

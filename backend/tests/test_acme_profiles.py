@@ -17,6 +17,8 @@ from tests.test_acme_security_paths import (  # reuse the JWS/account harness
     _build_jws, _csr_b64, _nonce, _post_jws, acme_account,  # noqa: F401
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 PROFILES = {
     'default': {
         'description': '90-day server certificate',

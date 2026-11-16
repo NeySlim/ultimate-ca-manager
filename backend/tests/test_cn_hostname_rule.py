@@ -20,6 +20,8 @@ import pytest
 
 from utils.san_parse import auto_san_buckets_from_cn, cn_looks_like_hostname
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.mark.parametrize('cn,is_hostname', [
     # Display names: a dot does not make a hostname.

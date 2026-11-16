@@ -17,6 +17,8 @@ from scripts import compliance_preflight as cli
 from tests.test_fips_preflight_api import instance_db  # noqa: F401  (fixture)
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 ROUTE = '/api/v2/system/compliance-preflight'
 _READ_ONLY_APP = cli.read_only_app
 _RSA_2048 = rsa.generate_private_key(public_exponent=65537, key_size=2048)

@@ -21,6 +21,8 @@ from tests.test_scep_rfc8894_operations import (
     TRANSACTION_ID_OID, _client_identity, _load_ca_material, _response_attributes,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 FAIL_INFO_TEXT_OID = '1.3.6.1.5.5.7.24.1'
 
 
