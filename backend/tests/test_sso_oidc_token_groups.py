@@ -84,14 +84,15 @@ def entra(app, monkeypatch):
                 setattr(row, key, val)
             db.session.commit()
 
-    def login(userinfo, claims):
+    def login(userinfo, claims, nonce='n'):
         state['userinfo'] = dict(userinfo)
         state['claims'] = dict(claims, nonce='n')
         client = app.test_client()
         with client.session_transaction() as s:
             s['sso_state'] = 'st'
             s['sso_pkce_verifier'] = 'v'
-            s['sso_nonce'] = 'n'
+            if nonce:
+                s['sso_nonce'] = nonce
         r = client.get('/api/v2/sso/callback/oauth2?state=st&code=c')
         assert r.status_code == 302
         return r.headers['Location']
@@ -173,6 +174,14 @@ def test_unverified_token_of_another_subject_gives_no_groups(entra):
                 {'sub': 'someone-else', 'groups': ['grp-oid-admins']})
     assert loc.endswith(UNMAPPED)
     assert entra.role_of('entra8') is None
+
+
+def test_unverified_token_without_a_session_nonce_gives_no_groups(entra):
+    entra.configure(id_token_verify=False)
+    loc = entra({'sub': 's12', 'preferred_username': 'entra12'},
+                {'sub': 's12', 'groups': ['grp-oid-admins']}, nonce=None)
+    assert loc.endswith(UNMAPPED)
+    assert entra.role_of('entra12') is None
 
 
 def test_entra_groups_overage_is_reported_and_refused(entra, caplog):
