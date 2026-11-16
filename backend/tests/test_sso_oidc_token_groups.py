@@ -341,9 +341,12 @@ def _groups_line(caplog):
 def test_log_says_why_the_id_token_was_not_used(entra, caplog, config, userinfo, claims,
                                                 nonce, reason):
     entra.configure(id_token_verify=False, **config)
+    if claims is not None:
+        # The cases are built at collection: their times are set when the test runs
+        now = int(time.time())
+        claims = dict(claims, groups=['grp-secret-x'], iat=now, exp=now + 300)
     with caplog.at_level(logging.INFO, logger='api.v2.sso.helpers'):
         entra(dict(userinfo, preferred_username=f'log-{uuid.uuid4().hex[:6]}',
-                   groups=['UCM.Operator']),
-              None if claims is None else dict(claims, groups=['grp-secret-x']), nonce=nonce)
+                   groups=['UCM.Operator']), claims, nonce=nonce)
     line = _groups_line(caplog)
     assert line == f'OIDC groups read from UserInfo (1 value(s)); ID token not used: {reason}'
