@@ -366,6 +366,24 @@ def test_a_reset_that_cannot_be_stored_answers_500_without_a_session(app, client
     assert not me.get('authenticated')
 
 
+def test_a_lock_armed_by_a_right_password_whose_reset_fails_is_alerted_once(
+        app, client, username, alerts, caplog):
+    """The lock stays, as the database left it: the alert says so."""
+    with app.app_context():
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
+        restore = _refuse_the_reset(db.engine)
+    try:
+        with caplog.at_level(logging.WARNING):
+            response = client.post(PASSWORD_DOOR, json={'username': username,
+                                                        'password': PASSWORD})
+    finally:
+        restore()
+    assert response.status_code == 500
+    assert alerts == [username] and len(_lock_lines(caplog, username)) == 1
+    with app.app_context():
+        assert _stored(username)[1] is not None
+
+
 # --- Giving back a proved attempt -------------------------------------------------
 # Only the attempt that armed the lock can show its window is still open: the lock it
 # wrote is still the stored one. It then lifts that lock and gives its unit back.
@@ -652,6 +670,25 @@ def test_an_ldap_reset_that_cannot_be_stored_answers_500_without_a_session(
     with app.app_context():
         assert SSOSession.query.filter_by(provider_id=ldap_provider).count() == 0
         assert _stored(ldap_user)[0] == 1
+
+
+def test_an_ldap_lock_armed_by_a_right_password_whose_reset_fails_is_alerted_once(
+        app, client, ldap_user, ldap_provider, alerts, monkeypatch, caplog):
+    import api.v2.sso.ldap_routes as ldap_routes
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
+                        _case_blind_directory([], ldap_user))
+    with app.app_context():
+        _another_node_writes(ldap_user, failed_logins=MAX_ATTEMPTS - 1)
+        restore = _refuse_the_reset(db.engine)
+    try:
+        with caplog.at_level(logging.WARNING):
+            response = client.post(LDAP_DOOR, json=_ldap_body(ldap_user, ldap_provider, PASSWORD))
+    finally:
+        restore()
+    assert response.status_code == 500
+    assert alerts == [ldap_user] and len(_lock_lines(caplog, ldap_user)) == 1
+    with app.app_context():
+        assert _stored(ldap_user)[1] is not None
 
 
 # --- Other authenticators ---------------------------------------------------------

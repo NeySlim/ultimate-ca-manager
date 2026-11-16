@@ -188,6 +188,8 @@ def ldap_login():
     # Both come from one resolution; they differ only if the accounts changed in between.
     if local is not None and local.id == user.id:
         if not _clear_ldap_failed_attempts(local):
+            # A lock this attempt armed stays as stored, the safe side: it is announced
+            _ldap_attempt_failed(local, armed)
             return error_response("Failed to update login stats", 500)
     else:
         _release_ldap_attempt(local, armed)

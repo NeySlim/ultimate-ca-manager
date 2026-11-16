@@ -329,6 +329,10 @@ def login_password():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to update login stats for {username}: {e}", exc_info=True)
+        if armed:
+            # The lock this attempt armed stays as stored, the safe side: it is announced
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
         return error_response('Failed to update login stats', 500)
 
     # Second factor: TOTP (with recovery codes) and/or a security key, the key
