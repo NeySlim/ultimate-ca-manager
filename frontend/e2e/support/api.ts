@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import type { APIRequestContext } from '@playwright/test'
+import { strongPassword } from './password'
 
 export const ADMIN_USER = 'admin'
 export const ADMIN_PASSWORD = process.env.UCM_E2E_ADMIN_PASSWORD || ''
@@ -71,9 +72,7 @@ export async function issueCert(api: Api, caId: number, extra: Record<string, un
   return api.post('/certificates', { cn: `${uid('cert')}.example.com`, ca_id: caId, validity_days: 90, ...extra })
 }
 
-export function strongPassword() {
-  return `E2e!${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}Qz9`
-}
+export { strongPassword }
 
 /** A local user created by the administrator; returns its name and password. */
 export async function createUser(api: Api, role: string) {
