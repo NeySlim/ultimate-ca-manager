@@ -585,3 +585,16 @@ def test_an_ldap_attempt_is_counted_on_the_account_bound_to_the_entry_id(
     with app.app_context():
         failures, locked_until = _stored(username)
     assert failures == MAX_ATTEMPTS and locked_until is not None
+
+
+def test_an_ldap_entry_named_like_a_local_account_is_counted_on_it(
+        app, client, username, ldap_provider, any_spelling):
+    """The bind of such an entry is refused 403 once proved: its guesses are bounded too."""
+    directory = any_spelling(_AnySpellingDirectory(username, f'{username}@example.test'))
+    for _ in range(BURST):
+        assert client.post(LDAP_DOOR, json=_ldap_body(directory.mail, ldap_provider)
+                           ).status_code == 401
+    assert len(directory.binds) == MAX_ATTEMPTS
+    assert client.post(LDAP_DOOR, json=_ldap_body(directory.mail, ldap_provider, PASSWORD)
+                       ).status_code == 401
+    assert len(directory.binds) == MAX_ATTEMPTS
