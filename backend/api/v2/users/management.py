@@ -216,7 +216,7 @@ def link_user_sso(user_id):
     The username is kept (renaming it locked admins out of their account, #138).
 
     POST /api/v2/users/{user_id}/link-sso
-    Body: {"provider_id": int}
+    Body: {"provider_id": int, "remove_password": bool (optional, default false)}
     """
     refused = refuse_api_key_on_own_account(user_id)
     if refused:
@@ -236,14 +236,19 @@ def link_user_sso(user_id):
     provider_id = data.get('provider_id')
     if not provider_id:
         return error_response('provider_id is required', 400)
+    remove_password = data.get('remove_password', False)
+    if not isinstance(remove_password, bool):
+        return error_response('remove_password must be true or false', 400)
     provider = db.session.get(SSOProvider, provider_id)
     if not provider:
         return error_response('SSO provider not found', 404)
 
-    # A new owner (another provider, or a reset identity): the former holder's sessions end
+    # The account's sessions end when its owner may change (another provider, a local
+    # account, a reset identity) or its local password goes: they were opened before.
     moved = user.sso_provider_id != provider.id or user.sso_external_id is not None
+    drop_password = remove_password and user.password_hash != SSO_NO_PASSWORD
     owner = None
-    if moved:
+    if moved or drop_password:
         owner = end_sessions_on_commit(user.id)
         if owner is None:
             db.session.rollback()
@@ -256,6 +261,11 @@ def link_user_sso(user_id):
     user.sso_orphan_of = None
     # An account without a password signs in through the provider only: the change
     # Unlink SSO asked of it would confine its SSO session. One with a password keeps both.
+    if drop_password:
+        # Same state as an account the provider created: no password door opens it.
+        user.password_hash = SSO_NO_PASSWORD
+        user.password_reset_token = None
+        user.password_reset_expires = None
     if user.password_hash == SSO_NO_PASSWORD:
         user.force_password_change = False
 
@@ -263,7 +273,8 @@ def link_user_sso(user_id):
     if not ok:
         return err
     closed = sessions_closed_by(owner) if owner is not None else 0
-    note = f', {closed_sessions_note(closed)}' if owner is not None else ''
+    note = ', local password removed' if drop_password else ''
+    note += f', {closed_sessions_note(closed)}' if owner is not None else ''
     AuditService.log_action(
         action='user_link_sso',
         resource_type='user',

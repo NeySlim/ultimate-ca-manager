@@ -131,7 +131,7 @@ describe('UsersGroupsPage Link to SSO on a linked account', () => {
     fireEvent.click(screen.getByRole('button', { name: /users\.sso\.relink$/ }))
     await waitFor(() => expect(mocks.showConfirm).toHaveBeenCalledWith(
       'users.sso.confirmRelink:IdP B', expect.anything()))
-    await waitFor(() => expect(mocks.linkSso).toHaveBeenCalledWith(7, { provider_id: 2 }))
+    await waitFor(() => expect(mocks.linkSso).toHaveBeenCalledWith(7, { provider_id: 2, remove_password: false }))
   })
 
   it('changes nothing when the confirmation is declined', async () => {
@@ -151,7 +151,19 @@ describe('UsersGroupsPage Link to SSO on a linked account', () => {
     fireEvent.click(await screen.findByRole('button', { name: /users\.sso\.link/ }))
     await choose(1)
     fireEvent.click(screen.getAllByRole('button', { name: /users\.sso\.link$/ }).pop())
-    await waitFor(() => expect(mocks.linkSso).toHaveBeenCalledWith(8, { provider_id: 1 }))
+    await waitFor(() => expect(mocks.linkSso).toHaveBeenCalledWith(8, { provider_id: 1, remove_password: false }))
     expect(mocks.showConfirm).not.toHaveBeenCalled()
+  })
+
+  it('removes the local password only when the administrator ticks the box', async () => {
+    await open({ id: 9, username: 'dan', email: 'd@example.com', role: 'viewer', active: true,
+      auth_source: 'local', sso_provider_id: null })
+    fireEvent.click(await screen.findByRole('button', { name: /users\.sso\.link/ }))
+    await choose(1)
+    const box = screen.getByRole('checkbox', { name: 'users.sso.removePassword' })
+    expect(box.checked).toBe(false)
+    fireEvent.click(box)
+    fireEvent.click(screen.getAllByRole('button', { name: /users\.sso\.link$/ }).pop())
+    await waitFor(() => expect(mocks.linkSso).toHaveBeenCalledWith(9, { provider_id: 1, remove_password: true }))
   })
 })

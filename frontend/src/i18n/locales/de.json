@@ -1455,6 +1455,7 @@
       "relink": "Change provider or reset SSO identity",
       "relinkTitle": "Change the provider of {{name}} or reset its SSO identity",
       "relinkHelp": "Choose the provider this account signs in through: another one moves it there, the same one resets its SSO identity. The next sign-in through that provider with this username or email binds the new identity. A password the account has is kept.",
+      "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
       "confirmRelink": "Attach {{name}} to {{provider}}? Its current SSO identity is cleared, and the next sign-in through this provider binds a new one.",
       "confirmUnlink": "Verknüpfung von {{name}} mit Single Sign-On lösen und wieder in ein lokales Konto umwandeln?",
       "unlinkSuccess": "{{name}} in ein lokales Konto umgewandelt",

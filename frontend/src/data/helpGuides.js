@@ -1755,7 +1755,7 @@ The **Source** column shows where each user comes from:
 
 Since v2.133, roles changed manually in UCM for SSO users are **preserved** between logins, unless **"Sync role on every login"** is enabled on the provider (see **Settings → SSO**).
 
-**Link to SSO** attaches an account to a provider; on an account already linked, **Change provider or reset SSO identity** moves it to another provider or clears its SSO identity, after a confirmation. The next sign-in through that provider with the account's username or email binds the new identity; a password the account has is kept, and an account without one is not asked to set one. **Unlink SSO** turns the account back into a local one.
+**Link to SSO** attaches an account to a provider; on an account already linked, **Change provider or reset SSO identity** moves it to another provider or clears its SSO identity, after a confirmation. The next sign-in through that provider with the account's username or email binds the new identity; a password the account has is kept unless the box that removes it is ticked, after which no password login opens the account, and an account without one is not asked to set one. **Unlink SSO** turns the account back into a local one.
 `
   },
 

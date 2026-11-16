@@ -105,6 +105,7 @@ export default function UsersGroupsPage() {
   const [linkProviders, setLinkProviders] = useState([])
   const [linkProviderId, setLinkProviderId] = useState('')
   const [linkSaving, setLinkSaving] = useState(false)
+  const [linkRemovePassword, setLinkRemovePassword] = useState(false)
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -252,6 +253,7 @@ export default function UsersGroupsPage() {
   const handleOpenLinkModal = async (user) => {
     setLinkTarget(user)
     setLinkProviderId('')
+    setLinkRemovePassword(false)
     setShowLinkModal(true)
     try {
       const res = await ssoService.getProviders()
@@ -276,6 +278,7 @@ export default function UsersGroupsPage() {
     try {
       await usersService.linkSso(linkTarget.id, {
         provider_id: Number(linkProviderId),
+        remove_password: linkRemovePassword,
       })
       showSuccess(t('users.sso.linkSuccess', { name: linkTarget.username }))
       setShowLinkModal(false)
@@ -1225,6 +1228,15 @@ export default function UsersGroupsPage() {
               label: `${p.display_name || p.name} (${(p.provider_type || '').toUpperCase()})`,
             }))}
           />
+          <label className="flex items-start gap-2 text-sm text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={linkRemovePassword}
+              onChange={(e) => setLinkRemovePassword(e.target.checked)}
+              className="mt-0.5 rounded border-border"
+            />
+            <span>{t('users.sso.removePassword')}</span>
+          </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => { setShowLinkModal(false); setLinkTarget(null) }}>
               {t('common.cancel')}

@@ -327,6 +327,7 @@ def test_another_person_sharing_the_email_signs_in_once_an_account_is_created_an
          sso_provider_id=providers.a, sso_external_id='sub-a', password_hash=NOPASS)
     assert _login(app, providers.b, idp_name, {'sub': 'sub-b'},
                   email=f'{name}@corp.example') == (None, 'sso_email_conflict')
+    assert 'link it, removing its local password' in _last_audit(app, 'login_failure', name)
     r = auth_client.post('/api/v2/users', json={'username': idp_name, 'email': f'{name}@corp.example',
                                                  'password': 'Shared-Mailbox-9x!', 'role': 'viewer'})
     assert r.status_code in (200, 201), r.get_json()
@@ -376,6 +377,61 @@ def test_a_provider_without_auto_create_answers_as_before_on_a_taken_email(
     r = app.test_client().post('/api/v2/sso/ldap/login',
                                json={'username': idp_name, 'password': 'pw', 'provider_id': lid})
     assert (r.status_code, r.get_json()['message']) == (401, 'Invalid credentials')
+
+
+def test_link_can_remove_the_local_password_the_account_was_created_with(app, providers, auth_client):
+    """The shared-mailbox remedy leaves no administrator-chosen password outside the IdP."""
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now
+    name, idp_name, pw = _name(), _name(), 'Shared-Mailbox-9x!'
+    r = auth_client.post('/api/v2/users', json={'username': idp_name, 'email': f'{name}@corp.example',
+                                                 'password': pw, 'role': 'viewer'})
+    assert r.status_code in (200, 201), r.get_json()
+    uid = r.get_json()['data']['id']
+    with app.app_context():
+        u = db.session.get(User, uid)
+        u.force_password_change = True
+        u.password_reset_token, u.password_reset_expires = 'pending', utc_now() + timedelta(hours=1)
+        db.session.commit()
+    login = {'username': idp_name, 'password': pw}
+    assert app.test_client().post('/api/v2/auth/login', json=login).status_code == 200
+    r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                         json={'provider_id': providers.b, 'remove_password': True})
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        u = db.session.get(User, uid)
+        assert (u.password_hash, u.force_password_change, u.password_reset_token) == \
+            (NOPASS, False, None)
+    assert 'local password removed' in _last_audit(app, 'user_link_sso', idp_name)
+    assert app.test_client().post('/api/v2/auth/login', json=login).status_code == 401
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-s'},
+                  email=f'{name}@corp.example') == (idp_name, None)
+    held = _open_session(app, uid, idp_name).get('/api/v2/certificates')
+    assert held.status_code == 200 and not held.get_json().get('must_change_password')
+
+
+def test_removing_the_password_closes_sessions_of_an_account_that_does_not_move(
+        app, providers, auth_client):
+    name = _name()
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.b,
+               sso_external_id=None, password_hash='hash-z')
+    held = _open_session(app, uid, name)
+    r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                         json={'provider_id': providers.b, 'remove_password': True})
+    assert r.status_code == 200 and r.get_json()['meta']['other_sessions_closed'] in (1, None)
+    assert held.get('/api/v2/certificates').status_code == 401
+
+
+@pytest.mark.parametrize('value', ['yes', 1, None])
+def test_remove_password_must_be_a_boolean(app, providers, auth_client, value):
+    name = _name()
+    uid = _add(app, username=name, auth_source='local', password_hash='hash-q')
+    r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                         json={'provider_id': providers.b, 'remove_password': value})
+    assert r.status_code == 400
+    with app.app_context():
+        u = db.session.get(User, uid)
+        assert (u.password_hash, u.sso_provider_id) == ('hash-q', None)
 
 
 def test_email_of_a_local_account_still_gives_a_distinct_sso_account(app, providers):

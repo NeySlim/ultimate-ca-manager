@@ -108,7 +108,7 @@ La colonne **Source** indique d'où provient chaque utilisateur :
 
 Depuis la v2.133, les rôles modifiés manuellement dans UCM sur des utilisateurs SSO sont **conservés** entre deux connexions, sauf si **« Synchroniser le rôle à chaque connexion »** est activé sur le fournisseur (voir page **Paramètres → SSO**).
 
-**Lier au SSO** rattache un compte à un fournisseur ; sur un compte déjà lié, **Changer de fournisseur ou réinitialiser l'identité SSO** le déplace vers un autre fournisseur ou efface son identité SSO, après confirmation. La prochaine connexion via ce fournisseur avec le nom d'utilisateur ou l'e-mail du compte lie la nouvelle identité ; le mot de passe du compte, s'il en a un, est conservé, et aucun n'est demandé à un compte qui n'en a pas. **Délier du SSO** rend au compte son statut local.
+**Lier au SSO** rattache un compte à un fournisseur ; sur un compte déjà lié, **Changer de fournisseur ou réinitialiser l'identité SSO** le déplace vers un autre fournisseur ou efface son identité SSO, après confirmation. La prochaine connexion via ce fournisseur avec le nom d'utilisateur ou l'e-mail du compte lie la nouvelle identité ; le mot de passe du compte, s'il en a un, est conservé, sauf si la case qui le retire est cochée, après quoi aucune connexion par mot de passe n'ouvre le compte, et aucun n'est demandé à un compte qui n'en a pas. **Délier du SSO** rend au compte son statut local.
 `
   }
 }

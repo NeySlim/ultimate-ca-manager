@@ -475,8 +475,8 @@ def _refuse_email_conflict(provider, username, email, account, unverified):
         state, remedy = describe_conflict(account, provider)
     return _refuse(username, (f"SSO login via {provider.name!r} refused for {username!r}: the e-mail "
                               f"{bounded(email)!r} belongs to the account {account.username!r}, which "
-                              f"{state}; no second account is created ({remedy}; for another person, "
-                              f"create and link an account named {username!r} first)"),
+                              f"{state}; no second account is created ({remedy}; for another person, create "
+                              f"an account named {username!r} and link it, removing its local password)"),
                    EMAIL_CONFLICT)
 
 
