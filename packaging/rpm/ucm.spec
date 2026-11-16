@@ -192,9 +192,8 @@ for d in ca certs private crl scep backups sessions; do
 done
 # The modes %%files declares for them, so rpm -V agrees before the first start;
 # a link an operator put there is left as it is
-for d in private sessions; do
-    [ -L "$UCM_DATA/$d" ] || chmod 700 "$UCM_DATA/$d"
-done
+[ -L "$UCM_DATA/private" ] || chmod 700 "$UCM_DATA/private"
+[ -L "$UCM_DATA/sessions" ] || chmod 700 "$UCM_DATA/sessions"
 mkdir -p $UCM_CONFIG
 
 # SoftHSM setup: add ucm user to softhsm/ods group and prepare token directory

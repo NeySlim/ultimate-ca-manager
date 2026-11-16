@@ -77,9 +77,8 @@ POST_DIRECTORIES = [
     'for d in ca certs private crl scep backups sessions; do',
     '    mkdir -p $UCM_DATA/$d',
     'done',
-    'for d in private sessions; do',
-    '    [ -L "$UCM_DATA/$d" ] || chmod 700 "$UCM_DATA/$d"',
-    'done',
+    '[ -L "$UCM_DATA/private" ] || chmod 700 "$UCM_DATA/private"',
+    '[ -L "$UCM_DATA/sessions" ] || chmod 700 "$UCM_DATA/sessions"',
 ]
 
 
