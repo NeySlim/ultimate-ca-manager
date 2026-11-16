@@ -335,11 +335,8 @@ def _accounts_touched(session, _context, _instances):
                 if obj not in session.deleted and obj.user is not None:
                     obj.user.has_sso_identity = True
             elif isinstance(obj, User) and obj not in session.deleted:
-                history = get_history(obj, 'sso_identities')
-                if history.has_changes():
+                if get_history(obj, 'sso_identities').has_changes():
                     touched.append(obj)
-                if history.added or (obj in session.new and obj.sso_identities):
-                    obj.has_sso_identity = True
     session.info[_TOUCHED] = touched
 
 
