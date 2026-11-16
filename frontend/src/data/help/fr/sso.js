@@ -90,7 +90,7 @@ Cette URL retourne un document XML conforme SAML 2.0 contenant :
 
 Copiez cette URL dans la configuration « Ajouter un fournisseur de services » ou « Application SAML » de votre IDP.
 
-> ⚠️ **Important :** Le certificat HTTPS d'UCM doit être **approuvé par l'IDP**. Si l'IDP ne peut pas valider le certificat (par ex. auto-signé ou émis par une CA privée), il rejettera les métadonnées comme invalides. Importez le certificat CA d'UCM dans le magasin de confiance de l'IDP, ou utilisez un certificat signé par une CA publiquement approuvée.
+> ⚠️ **Important :** Le certificat HTTPS d'UCM doit être **approuvé par l'IDP**. Si l'IDP ne peut pas valider le certificat (par ex. auto-signé ou émis par une AC privée), il rejettera les métadonnées comme invalides. Importez le certificat AC d'UCM dans le magasin de confiance de l'IDP, ou utilisez un certificat signé par une AC publiquement approuvée.
 
 ### Configuration
 1. Obtenez l'URL de métadonnées IDP ou le fichier XML de votre fournisseur d'identité

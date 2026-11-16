@@ -48,7 +48,7 @@ export default {
       'Les clés API peuvent expirer après un nombre de jours défini pour les intégrations de courte durée',
       'Les clés API peuvent aussi être créées sans expiration pour l\'automatisation à long terme',
       'Scannez le code QR avec n\'importe quelle application TOTP : Google Authenticator, Authy, 1Password, etc.',
-      'Les sélections de filtres sur les principales pages liste (Certificats, CA, Modèles, Audit, Politiques, Magasin de confiance et autres) sont persistées au rechargement ; CSR, Approbations, Récupération de clés, Découverte et Journaux système démarrent sans filtre',
+      'Les sélections de filtres sur les principales pages liste (Certificats, AC, Modèles, Audit, Politiques, Magasin de confiance et autres) sont persistées au rechargement ; CSR, Approbations, Récupération de clés, Découverte et Journaux système démarrent sans filtre',
     ],
   },
   helpGuides: {
@@ -125,7 +125,7 @@ X-API-Key: <your-api-key>
 Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. **Certificats uniquement** émet des certificats X.509 et SSH et lit les CA, les CA SSH et les CRL, mais ne peut ni créer ni modifier une CA. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions, et cette clé expire au plus tard avec celle qui la demande. Régénérer une clé, ce que seule l'API propose (\`POST /api/v2/account/apikeys/<id>/regenerate\`), conserve ses permissions et sa durée ; une clé révoquée ou expirée ne peut pas être régénérée.
+Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. **Certificats uniquement** émet des certificats X.509 et SSH et lit les AC, les AC SSH et les CRL, mais ne peut ni créer ni modifier une CA. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions, et cette clé expire au plus tard avec celle qui la demande. Régénérer une clé, ce que seule l'API propose (\`POST /api/v2/account/apikeys/<id>/regenerate\`), conserve ses permissions et sa durée ; une clé révoquée ou expirée ne peut pas être régénérée.
 
 Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d'administration des utilisateurs : celles-ci exigent une session interactive.
 

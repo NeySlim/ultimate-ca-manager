@@ -15,9 +15,9 @@ export default {
       {
         title: 'Actions en masse',
         items: [
-          { label: 'Certificats', text: 'Révoquer, renouveler, supprimer ou exporter, filtrer par statut et CA émettrice' },
-          { label: 'CA', text: 'Supprimer ou exporter des autorités de certification' },
-          { label: 'CSR', text: 'Signer avec une CA ou supprimer les requêtes en attente' },
+          { label: 'Certificats', text: 'Révoquer, renouveler, supprimer ou exporter, filtrer par statut et AC émettrice' },
+          { label: 'AC', text: 'Supprimer ou exporter des autorités de certification' },
+          { label: 'CSR', text: 'Signer avec une AC ou supprimer les requêtes en attente' },
           { label: 'Modèles', text: 'Supprimer des modèles de certificats' },
           { label: 'Utilisateurs', text: 'Supprimer des comptes utilisateurs' },
         ]
@@ -25,13 +25,13 @@ export default {
     ],
     tips: [
       'Utilisez les puces de ressources pour basculer rapidement entre les types de ressources',
-      'La recherche et les filtres intégrés (Statut, CA) permettent d\'affiner les éléments sans quitter la barre d\'outils',
+      'La recherche et les filtres intégrés (Statut, AC) permettent d\'affiner les éléments sans quitter la barre d\'outils',
       'Basculez entre les modes d\'affichage Tableau et Panier (panneau de transfert) sur ordinateur',
       'La révocation, le renouvellement, la signature et la suppression demandent une confirmation avant de s\'exécuter ; un export démarre aussitôt',
     ],
     warnings: [
       'La suppression en masse est irréversible : créez toujours une sauvegarde d\'abord',
-      'La révocation en masse publiera des CRL mises à jour pour toutes les CA concernées',
+      'La révocation en masse publiera des CRL mises à jour pour toutes les AC concernées',
     ],
   },
   helpGuides: {
@@ -54,7 +54,7 @@ Exportation en masse des certificats et des CA.
 Effectuez des opérations par lots sur plusieurs ressources à la fois.
 
 ### Comment ça fonctionne
-1. Sélectionnez le **type de ressource** (Certificats, CA, CSR, Modèles, Utilisateurs)
+1. Sélectionnez le **type de ressource** (Certificats, AC, CSR, Modèles, Utilisateurs)
 2. Cochez les éléments dans le tableau (la vue Panier, facultative, les déplace entre deux panneaux à la place)
 3. Choisissez l'**action** à effectuer
 4. Confirmez et exécutez
@@ -67,12 +67,12 @@ Effectuez des opérations par lots sur plusieurs ressources à la fois.
 - **Exportation en masse** : Télécharger les certificats sélectionnés en bundle
 - **Suppression en masse** : Supprimer définitivement les certificats sélectionnés
 
-#### CA
-- **Exportation en masse** : Télécharger les CA sélectionnées
-- **Suppression en masse** : Supprimer les CA sélectionnées (ne doivent pas avoir d'enfants)
+#### AC
+- **Exportation en masse** : Télécharger les AC sélectionnées
+- **Suppression en masse** : Supprimer les AC sélectionnées (ne doivent pas avoir d'enfants)
 
 #### CSR
-- **Signature en masse** : Signer plusieurs CSR avec une CA sélectionnée
+- **Signature en masse** : Signer plusieurs CSR avec une AC sélectionnée
 - **Suppression en masse** : Supprimer les CSR sélectionnées
 
 #### Modèles

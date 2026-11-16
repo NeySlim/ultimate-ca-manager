@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Certificats SSH',
     subtitle: 'Émettre et gérer des certificats OpenSSH',
-    overview: 'Émettez des certificats SSH signés par vos CA SSH. Les certificats remplacent la gestion manuelle d\'authorized_keys en offrant un accès limité dans le temps, restreint par principal, avec expiration automatique. Les certificats utilisateur et hôte sont pris en charge.',
+    overview: 'Émettez des certificats SSH signés par vos AC SSH. Les certificats remplacent la gestion manuelle d\'authorized_keys en offrant un accès limité dans le temps, restreint par principal, avec expiration automatique. Les certificats utilisateur et hôte sont pris en charge.',
     sections: [
       {
         title: 'Modes d\'émission',
@@ -14,7 +14,7 @@ export default {
       {
         title: 'Champs du certificat',
         items: [
-          { label: 'Key ID', text: 'Identifiant que sshd journalise pour le titulaire. La CA le définit à principals@CA name, sauf si elle laisse les demandeurs le choisir.' },
+          { label: 'Key ID', text: 'Identifiant que sshd journalise pour le titulaire. L\'AC le définit à principals@AC name, sauf si elle laisse les demandeurs le choisir.' },
           { label: 'Principals', text: 'Noms d\'utilisateur (certificat utilisateur) ou noms d\'hôte (certificat hôte) pour lesquels ce certificat est valide. Séparés par des virgules.' },
           { label: 'Validité', text: 'Durée de vie du certificat. Choisissez un préréglage (1h, 8h, 24h, 7j, 30j, 90j, 365j) ou définissez une durée personnalisée en secondes. Valide dès 5 minutes avant l\'émission, pour les serveurs dont l\'horloge retarde (v2.252).' },
           { label: 'Extensions', text: 'Extensions SSH telles que permit-pty, permit-agent-forwarding. Applicables uniquement aux certificats utilisateur.' },
@@ -24,8 +24,8 @@ export default {
       {
         title: 'Types de certificats',
         items: [
-          { label: 'Certificat utilisateur', text: 'Authentifie un utilisateur auprès d\'un serveur. Le serveur doit faire confiance à la CA signataire via TrustedUserCAKeys.' },
-          { label: 'Certificat d\'hôte', text: 'Authentifie un serveur auprès des clients. Les clients font confiance à la CA via @cert-authority dans known_hosts.' },
+          { label: 'Certificat utilisateur', text: 'Authentifie un utilisateur auprès d\'un serveur. Le serveur doit faire confiance à l\'AC signataire via TrustedUserCAKeys.' },
+          { label: 'Certificat d\'hôte', text: 'Authentifie un serveur auprès des clients. Les clients font confiance à l\'AC via @cert-authority dans known_hosts.' },
         ]
       },
       {
@@ -39,7 +39,7 @@ export default {
     tips: [
       'Utilisez des certificats éphémères (8h-24h) pour l\'accès utilisateur afin de minimiser l\'impact d\'une compromission de clé.',
       'Le mode signature est préférable : la clé privée de l\'utilisateur ne quitte jamais sa machine.',
-      'Lorsqu\'une CA laisse les demandeurs définir le key ID, gardez-le descriptif (ex. : « jdoe-prod-2025 ») pour faciliter l\'audit des journaux.',
+      'Lorsqu\'une AC laisse les demandeurs définir le key ID, gardez-le descriptif (ex. : « jdoe-prod-2025 ») pour faciliter l\'audit des journaux.',
       'Pour les certificats d\'hôte, le principal doit correspondre au nom d\'hôte utilisé par les clients pour se connecter.',
     ],
     warnings: [
@@ -83,7 +83,7 @@ UCM génère à la fois la paire de clés et le certificat. Utilisez ce mode lor
 > ⚠ **Téléchargez la clé privée immédiatement** : elle n'est pas stockée dans UCM et ne peut pas être récupérée.
 
 **Procédure :**
-1. Sélectionnez une CA et remplissez les détails du certificat
+1. Sélectionnez une AC et remplissez les détails du certificat
 2. Choisissez le mode « Générer »
 3. Cliquez sur **Émettre un certificat**
 4. Téléchargez les trois fichiers :
@@ -96,7 +96,7 @@ UCM génère à la fois la paire de clés et le certificat. Utilisez ce mode lor
 ### Key ID
 Un identifiant intégré dans le certificat. Le serveur SSH le journalise lorsque le certificat est utilisé, comme identité du titulaire.
 
-La CA le définit à \`principals@CA name\` (ex. \`deploy@Production User CA\`). Un demandeur ne peut en choisir un autre que sur une CA où **Laisser les demandeurs définir l'identifiant de clé** est coché ; ailleurs, une telle demande est refusée.
+L'AC le définit à \`principals@CA name\` (ex. \`deploy@Production User CA\`). Un demandeur ne peut en choisir un autre que sur une AC où **Laisser les demandeurs définir l'identifiant de clé** est coché ; ailleurs, une telle demande est refusée.
 
 **Bons exemples de Key ID, là où c'est autorisé :** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
 
@@ -169,7 +169,7 @@ echo "HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub" | sudo tee -a /etc
 sudo systemctl restart sshd
 \`\`\`
 
-Sur les clients, ajoutez la Host CA à known_hosts :
+Sur les clients, ajoutez la Host AC à known_hosts :
 \`\`\`
 @cert-authority *.example.com ssh-ed25519 AAAA...
 \`\`\`
@@ -178,8 +178,8 @@ Sur les clients, ajoutez la Host CA à known_hosts :
 
 1. Sélectionnez un certificat dans le tableau
 2. Cliquez sur **Révoquer** dans le panneau de détail
-3. Le certificat est ajouté à la liste de révocation de clés (KRL) de la CA
-4. Téléchargez et déployez la KRL mise à jour sur les serveurs (depuis la page CA SSH)
+3. Le certificat est ajouté à la liste de révocation de clés (KRL) de l'AC
+4. Téléchargez et déployez la KRL mise à jour sur les serveurs (depuis la page AC SSH)
 
 Un certificat révoqué reste dans la KRL, et dans la liste, jusqu'à son expiration : le supprimer plus tôt est refusé, puisque la KRL est construite à partir de ces enregistrements et que le certificat serait de nouveau accepté. Chaque téléchargement de la KRL porte un numéro de version plus élevé (v2.252).
 
@@ -189,11 +189,11 @@ Un certificat révoqué reste dans la KRL, et dans la liste, jusqu'à son expira
 
 | Problème | Solution |
 |----------|----------|
-| Permission denied (publickey) | Vérifiez que la CA est approuvée sur le serveur (TrustedUserCAKeys) |
+| Permission denied (publickey) | Vérifiez que l'AC est approuvée sur le serveur (TrustedUserCAKeys) |
 | Certificat non utilisé | Assurez-vous que le fichier certificat est nommé \`<key>-cert.pub\` à côté de la clé privée |
 | Non-correspondance de principal | Le nom d'utilisateur SSH doit figurer dans les principals du certificat |
 | Certificat expiré | Émettez un nouveau certificat avec une validité appropriée |
-| Échec de vérification de l'hôte | Ajoutez la Host CA à known_hosts avec @cert-authority |
+| Échec de vérification de l'hôte | Ajoutez la Host AC à known_hosts avec @cert-authority |
 `
   }
 }

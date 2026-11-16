@@ -1,14 +1,14 @@
 export default {
   helpContent: {
     title: 'Autorités de certification SSH',
-    subtitle: 'Gérer les CA SSH pour l\'authentification des utilisateurs et des hôtes',
-    overview: 'Créez et gérez des autorités de certification SSH conformes aux standards OpenSSH. Les CA SSH éliminent la nécessité de distribuer les clés publiques individuellement, les serveurs et les utilisateurs font confiance à la CA, et la CA signe des certificats qui accordent l\'accès.',
+    subtitle: 'Gérer les AC SSH pour l\'authentification des utilisateurs et des hôtes',
+    overview: 'Créez et gérez des autorités de certification SSH conformes aux standards OpenSSH. Les AC SSH éliminent la nécessité de distribuer les clés publiques individuellement, les serveurs et les utilisateurs font confiance à l\'AC, et l\'AC signe des certificats qui accordent l\'accès.',
     sections: [
       {
-        title: 'Types de CA',
+        title: 'Types d\'AC',
         items: [
-          { label: 'User CA', text: 'Signe des certificats utilisateur pour la connexion SSH. Les serveurs font confiance à cette CA et acceptent tout certificat signé par elle.' },
-          { label: 'Host CA', text: 'Signe des certificats d\'hôte pour prouver l\'identité du serveur. Les clients font confiance à cette CA pour vérifier qu\'ils se connectent au bon serveur.' },
+          { label: 'User AC', text: 'Signe des certificats utilisateur pour la connexion SSH. Les serveurs font confiance à cette AC et acceptent tout certificat signé par elle.' },
+          { label: 'Host AC', text: 'Signe des certificats d\'hôte pour prouver l\'identité du serveur. Les clients font confiance à cette AC pour vérifier qu\'ils se connectent au bon serveur.' },
         ]
       },
       {
@@ -34,10 +34,10 @@ export default {
         title: 'Configuration du serveur',
         items: [
           { label: 'Script de configuration Linux/macOS', text: 'Téléchargez un script shell POSIX (.sh) qui configure automatiquement sshd pour faire confiance à cette CA. Installation rapide : curl -sSL <url> | sudo bash' },
-          { label: 'Script de configuration Windows', text: 'Téléchargez un script PowerShell (.ps1) qui configure Windows OpenSSH Server (écrit la clé publique de la CA dans %ProgramData%\\ssh, verrouille les ACL, ajoute TrustedUserCAKeys / HostCertificate dans sshd_config, valide avec sshd -T, redémarre sshd). Installation rapide : iwr <url> | iex' },
+          { label: 'Script de configuration Windows', text: 'Téléchargez un script PowerShell (.ps1) qui configure Windows OpenSSH Server (écrit la clé publique de l\'AC dans %ProgramData%\\ssh, verrouille les ACL, ajoute TrustedUserCAKeys / HostCertificate dans sshd_config, valide avec sshd -T, redémarre sshd). Installation rapide : iwr <url> | iex' },
           { label: 'Bloc de diagnostic', text: 'En cas d\'échec d\'Add-WindowsCapability (WSUS / machine jointe au domaine), le script affiche un bloc étiqueté expliquant l\'état de la politique et trois pistes de remédiation, il ne modifie jamais la politique WSUS / WU lui-même' },
           { label: 'Dry-run', text: 'Les deux scripts prennent en charge un drapeau -DryRun / --dry-run pour prévisualiser les modifications sans les appliquer' },
-          { label: 'Configuration manuelle', text: 'Copiez la clé publique de la CA et ajoutez TrustedUserCAKeys (User CA) ou HostCertificate (Host CA) dans sshd_config' },
+          { label: 'Configuration manuelle', text: 'Copiez la clé publique de l\'AC et ajoutez TrustedUserCAKeys (User AC) ou HostCertificate (Host AC) dans sshd_config' },
         ]
       },
       {
@@ -59,27 +59,27 @@ export default {
         title: 'Principals autorisés',
         items: [
           { label: 'Principals autorisés', text: 'Motifs séparés par des virgules (par ex. deploy, team-*). Chaque principal d\'une demande doit correspondre à l\'un d\'eux.' },
-          { label: 'Autoriser tout principal', text: 'Une CA dont la liste est vide signe pour n\'importe quel nom, root compris, uniquement si cette option est cochée. Sinon elle ne signe rien.' },
-          { label: 'Mise à niveau', text: 'Les CA créées avant 2.245 sans liste continuent de signer pour tout principal : la mise à niveau coche l\'option pour elles.' },
+          { label: 'Autoriser tout principal', text: 'Une AC dont la liste est vide signe pour n\'importe quel nom, root compris, uniquement si cette option est cochée. Sinon elle ne signe rien.' },
+          { label: 'Mise à niveau', text: 'Les AC créées avant 2.245 sans liste continuent de signer pour tout principal : la mise à niveau coche l\'option pour elles.' },
         ]
       },
       {
         title: 'Key ID',
         items: [
-          { label: 'Défini par la CA', text: 'sshd journalise le key ID comme identité du titulaire. Par défaut, la CA nomme chaque certificat principals@CA name, et une demande qui définit un autre key ID est refusée.' },
+          { label: 'Défini par l\'AC', text: 'sshd journalise le key ID comme identité du titulaire. Par défaut, l\'AC nomme chaque certificat principals@AC name, et une demande qui définit un autre key ID est refusée.' },
           { label: 'Laisser les demandeurs définir l\'identifiant de clé', text: 'Cochez cette option pour laisser les demandeurs choisir le leur, par ex. un numéro de ticket ou d\'employé.' },
-          { label: 'Mise à niveau', text: 'À partir de 2.249, les CA existantes démarrent aussi avec l\'option décochée.' },
+          { label: 'Mise à niveau', text: 'À partir de 2.249, les AC existantes démarrent aussi avec l\'option décochée.' },
         ]
       },
     ],
     tips: [
-      'Utilisez des CA distinctes pour les certificats utilisateur et hôte : ne les mélangez jamais.',
+      'Utilisez des AC distinctes pour les certificats utilisateur et hôte : ne les mélangez jamais.',
       'Ed25519 est recommandé pour les nouveaux déploiements grâce à sa rapidité et sa sécurité.',
       'Téléchargez le script de configuration pour une mise en place facile du serveur : il gère automatiquement la sauvegarde et la validation.',
     ],
     warnings: [
-      'Une CA ne peut pas être supprimée tant que des certificats qu\'elle a signés subsistent : supprimez-les d\'abord, et mettez à jour la confiance des serveurs.',
-      'Si la clé privée de la CA est compromise, tous les certificats signés par celle-ci doivent être considérés comme non fiables.',
+      'Une AC ne peut pas être supprimée tant que des certificats qu\'elle a signés subsistent : supprimez-les d\'abord, et mettez à jour la confiance des serveurs.',
+      'Si la clé privée de l\'AC est compromise, tous les certificats signés par celle-ci doivent être considérés comme non fiables.',
     ],
   },
   helpGuides: {
@@ -87,14 +87,14 @@ export default {
     content: `
 ## Vue d'ensemble
 
-Les autorités de certification SSH (CA) constituent le fondement de l'authentification par certificats SSH. Au lieu de distribuer des clés publiques individuelles à chaque serveur, vous créez une CA et configurez les serveurs pour lui faire confiance. Tout certificat signé par la CA est alors automatiquement accepté.
+Les autorités de certification SSH (AC) constituent le fondement de l'authentification par certificats SSH. Au lieu de distribuer des clés publiques individuelles à chaque serveur, vous créez une AC et configurez les serveurs pour lui faire confiance. Tout certificat signé par l'AC est alors automatiquement accepté.
 
 UCM prend en charge le format de certificat OpenSSH (RFC 4253 + extensions OpenSSH), nativement reconnu par OpenSSH 5.4+ : aucun logiciel supplémentaire n'est nécessaire sur les serveurs ou les clients.
 
-## Types de CA
+## Types d'AC
 
-### User CA
-Une User CA signe des certificats qui authentifient les **utilisateurs auprès des serveurs**. Lorsqu'un serveur fait confiance à une User CA, tout utilisateur présentant un certificat valide signé par cette CA est autorisé à se connecter (sous réserve de correspondance des principals).
+### User AC
+Une User AC signe des certificats qui authentifient les **utilisateurs auprès des serveurs**. Lorsqu'un serveur fait confiance à une User AC, tout utilisateur présentant un certificat valide signé par cette AC est autorisé à se connecter (sous réserve de correspondance des principals).
 
 **Configuration du serveur :**
 \`\`\`
@@ -102,8 +102,8 @@ Une User CA signe des certificats qui authentifient les **utilisateurs auprès d
 TrustedUserCAKeys /etc/ssh/user_ca.pub
 \`\`\`
 
-### Host CA
-Une Host CA signe des certificats qui authentifient les **serveurs auprès des clients**. Lorsqu'un client fait confiance à une Host CA, il peut vérifier que le serveur auquel il se connecte est légitime : éliminant les avertissements TOFU (Trust On First Use).
+### Host AC
+Une Host AC signe des certificats qui authentifient les **serveurs auprès des clients**. Lorsqu'un client fait confiance à une Host AC, il peut vérifier que le serveur auquel il se connecte est légitime : éliminant les avertissements TOFU (Trust On First Use).
 
 **Configuration du client :**
 \`\`\`
@@ -111,11 +111,11 @@ Une Host CA signe des certificats qui authentifient les **serveurs auprès des c
 @cert-authority *.example.com ssh-ed25519 AAAA...
 \`\`\`
 
-## Créer une CA
+## Créer une AC
 
-1. Cliquez sur **Créer une CA SSH**
-2. Saisissez un nom descriptif (ex. : « CA utilisateur Production »)
-3. Sélectionnez le type de CA : **User** ou **Host**
+1. Cliquez sur **Créer une AC SSH**
+2. Saisissez un nom descriptif (ex. : « AC utilisateur Production »)
+3. Sélectionnez le type d'AC : **User** ou **Host**
 4. Choisissez l'algorithme de clé :
    - **Ed25519** : Recommandé. Rapide, petites clés, sécurité moderne.
    - **ECDSA P-256/P-384/P-521** : Bonne compatibilité et sécurité.
@@ -128,7 +128,7 @@ Une Host CA signe des certificats qui authentifient les **serveurs auprès des c
 
 Une AC SSH peut garder sa clé privée sur un fournisseur HSM.
 
-1. Dans **Créer une CA SSH**, réglez **Stockage de la clé** sur **HSM**
+1. Dans **Créer une AC SSH**, réglez **Stockage de la clé** sur **HSM**
 2. Choisissez le **Fournisseur HSM**, puis la **Clé HSM existante** : seules les clés de signature RSA et ECDSA P-256/P-384/P-521 inutilisées sont listées
 3. Cliquez sur **Créer**. L'AC reprend son type de clé de la clé elle-même, et la clé privée ne quitte jamais le jeton
 
@@ -140,13 +140,13 @@ Bon à savoir :
 - Si le fournisseur est injoignable à la création de l'AC, rien n'est créé.
 ### Principals autorisés
 
-Le champ **Principals autorisés** restreint les noms pour lesquels une CA signe, sous forme de motifs séparés par des virgules (\`deploy\`, \`team-*\`, \`web??.example.com\`). Chaque principal d'une demande doit correspondre à l'un d'eux.
+Le champ **Principals autorisés** restreint les noms pour lesquels une AC signe, sous forme de motifs séparés par des virgules (\`deploy\`, \`team-*\`, \`web??.example.com\`). Chaque principal d'une demande doit correspondre à l'un d'eux.
 
-Une CA dont la liste est vide ne signe rien, sauf si **Autoriser tout principal** est coché : elle signe alors pour n'importe quel nom, \`root\` compris. Les CA créées avant 2.245 sans liste se comportaient ainsi implicitement ; la mise à niveau coche l'option pour elles, elles continuent donc de fonctionner.
+Une AC dont la liste est vide ne signe rien, sauf si **Autoriser tout principal** est coché : elle signe alors pour n'importe quel nom, \`root\` compris. Les AC créées avant 2.245 sans liste se comportaient ainsi implicitement ; la mise à niveau coche l'option pour elles, elles continuent donc de fonctionner.
 
 ### Key ID
 
-sshd journalise le key ID d'un certificat comme identité du titulaire. La CA le définit à \`principals@CA name\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les CA, y compris les existantes depuis 2.249.
+sshd journalise le key ID d'un certificat comme identité du titulaire. L'AC le définit à \`principals@CA name\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les AC, y compris les existantes depuis 2.249.
 
 ### Formats de TTL
 
@@ -157,7 +157,7 @@ Les champs **TTL par défaut** et **TTL max** acceptent des durées lisibles :
 
 Les valeurs mal formées sont rejetées avec une erreur indiquant les formats acceptés.
 
-> 💡 Utilisez des CA distinctes pour les certificats utilisateur et hôte. N'utilisez jamais une même CA pour les deux.
+> 💡 Utilisez des AC distinctes pour les certificats utilisateur et hôte. N'utilisez jamais une même AC pour les deux.
 
 ## Configuration du serveur
 
@@ -165,7 +165,7 @@ Les valeurs mal formées sont rejetées avec une erreur indiquant les formats ac
 
 UCM génère un script shell POSIX qui configure automatiquement votre serveur :
 
-1. Ouvrez le panneau de détail de la CA
+1. Ouvrez le panneau de détail de l'AC
 2. Cliquez sur **Télécharger le script de configuration**
 3. Transférez le script sur votre serveur
 4. Exécutez-le :
@@ -178,17 +178,17 @@ sudo ./setup-ssh-ca.sh
 Le script :
 - Détecte votre système d'exploitation et votre système d'init
 - Sauvegarde sshd_config avant toute modification
-- Installe la clé publique de la CA
-- Ajoute TrustedUserCAKeys (User CA) ou HostCertificate (Host CA)
+- Installe la clé publique de l'AC
+- Ajoute TrustedUserCAKeys (User AC) ou HostCertificate (Host AC)
 - Valide la configuration avec \`sshd -t\`
 - Redémarre sshd uniquement si la validation réussit
 - Supporte \`--dry-run\` pour prévisualiser les modifications
 
 ### Configuration manuelle
 
-#### User CA
+#### User AC
 \`\`\`bash
-# Copiez la clé publique de la CA sur le serveur
+# Copiez la clé publique de l'AC sur le serveur
 echo "ssh-ed25519 AAAA... user-ca" | sudo tee /etc/ssh/user_ca.pub
 
 # Ajoutez à sshd_config
@@ -198,7 +198,7 @@ echo "TrustedUserCAKeys /etc/ssh/user_ca.pub" | sudo tee -a /etc/ssh/sshd_config
 sudo systemctl restart sshd
 \`\`\`
 
-#### Host CA
+#### Host AC
 \`\`\`bash
 # Signez la clé d'hôte du serveur
 # Puis ajoutez à sshd_config :
@@ -208,10 +208,10 @@ sudo systemctl restart sshd
 
 ## Listes de révocation de clés (KRL)
 
-Les CA SSH prennent en charge les listes de révocation de clés pour invalider les certificats compromis :
+Les AC SSH prennent en charge les listes de révocation de clés pour invalider les certificats compromis :
 
 1. Révoquez les certificats depuis la page Certificats SSH
-2. Téléchargez la KRL mise à jour depuis le panneau de détail de la CA
+2. Téléchargez la KRL mise à jour depuis le panneau de détail de l'AC
 3. Déployez le fichier KRL sur les serveurs :
 
 \`\`\`bash
@@ -225,10 +225,10 @@ RevokedKeys /etc/ssh/revoked_keys
 
 | Pratique | Recommandation |
 |----------|---------------|
-| CA distinctes | Utilisez des CA séparées pour les certificats utilisateur et hôte |
+| AC distinctes | Utilisez des AC séparées pour les certificats utilisateur et hôte |
 | Algorithme de clé | Ed25519 pour les nouveaux déploiements, RSA 4096 pour la compatibilité avec les anciens systèmes |
-| Durée de vie de la CA | Gardez les CA à longue durée de vie ; utilisez des certificats éphémères |
-| Sauvegarde | Conservez les sauvegardes UCM : la clé privée de la CA ne peut pas être exportée seule |
+| Durée de vie de l'AC | Gardez les AC à longue durée de vie ; utilisez des certificats éphémères |
+| Sauvegarde | Conservez les sauvegardes UCM : la clé privée de l'AC ne peut pas être exportée seule |
 | Correspondance des principals | Associez les principals à des noms d'utilisateur spécifiques, pas à des jokers |
 `
   }

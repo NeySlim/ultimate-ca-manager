@@ -55,7 +55,7 @@ Les certificats présents ici sont entièrement gérés par UCM : ils sont stock
 
 1. Allez dans **Mon compte → Sécurité**, section **Certificats clients (mTLS)**
 2. Cliquez sur **Ajouter un certificat**, gardez **Générer** et cliquez sur **Générer le certificat**
-3. Le système génère une paire de clés et émet un certificat client signé par votre CA mTLS
+3. Le système génère une paire de clés et émet un certificat client signé par votre AC mTLS
 4. Le certificat apparaît sur cette page et peut être utilisé pour la connexion mTLS
 
 ## Statut du certificat
@@ -69,7 +69,7 @@ Les certificats présents ici sont entièrement gérés par UCM : ils sont stock
 
 1. Sélectionnez un certificat → **Exporter**
 2. Choisissez le format :
-   - **PEM** : Certificat + clé privée + chaîne de CA au format texte
+   - **PEM** : Certificat + clé privée + chaîne d'AC au format texte
    - **PKCS#12** : Archive binaire, protégée par mot de passe (8 caractères minimum)
 3. Cliquez sur **Télécharger**
 

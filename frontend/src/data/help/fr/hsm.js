@@ -22,7 +22,7 @@ export default {
           { label: 'Générer', text: 'Créer une nouvelle paire de clés directement sur le HSM' },
           { label: 'Synchroniser les clés', text: 'Relit les clés du fournisseur depuis le jeton : les nouvelles sont ajoutées, celles qui ont disparu du jeton sont retirées, sauf celles qu\'une AC utilise, qui sont conservées. Si la lecture du jeton échoue, rien n\'est retiré. Le message donne les décomptes, les clés conservées et les clés illisibles ; le bouton reste désactivé pendant la synchronisation' },
           { label: 'Statut', text: 'Surveiller la santé de la connexion du fournisseur' },
-          { label: 'Certification', text: 'Déclarer la certification du HSM : Common Criteria EAL 4+, EUCC élevé, FIPS 140-3 niveau 3, FIPS 140-2 niveau 3 ou autre. Laissée vide, elle n\'est pas déclarée. Le profil de conformité eu-acm n\'accepte que Common Criteria EAL 4+, EUCC élevé et FIPS 140-3 niveau 3 (jusqu\'au 31 décembre 2030) pour une CA adossée à un HSM' },
+          { label: 'Certification', text: 'Déclarer la certification du HSM : Common Criteria EAL 4+, EUCC élevé, FIPS 140-3 niveau 3, FIPS 140-2 niveau 3 ou autre. Laissée vide, elle n\'est pas déclarée. Le profil de conformité eu-acm n\'accepte que Common Criteria EAL 4+, EUCC élevé et FIPS 140-3 niveau 3 (jusqu\'au 31 décembre 2030) pour une AC adossée à un HSM' },
           { label: "Nom déjà utilisé (v2.249)", text: "Générer une clé sous un nom qu'OpenBao ou Azure Key Vault détient déjà est refusé (409) : importez une clé existante par une synchronisation de clés (POST /api/v2/hsm/providers/<id>/sync)" },
           { label: "Une génération à la fois (v2.249)", text: "Les générations de clé passent à tour de rôle sur chaque fournisseur, et celle qui attend encore après 60 secondes reçoit un 409. Une clé dont l'enregistrement n'a pas pu être stocké est supprimée du HSM" },
           { label: "PIN dans les sauvegardes (v2.249)", text: "Une sauvegarde contient en clair, dans l'archive protégée par son mot de passe, le PIN ou le jeton du fournisseur, afin de se restaurer sur une autre installation. Une valeur que seule la clé d'une autre installation ouvre est abandonnée à la restauration, avec une entrée de journal demandant de la saisir de nouveau" },
@@ -30,14 +30,14 @@ export default {
         ]
       },
       {
-        title: 'CA adossées à HSM (v2.130+)',
-        content: 'Une fois un fournisseur HSM configuré, vous pouvez épingler la clé privée d\'une CA à ce HSM dès sa création :',
+        title: 'AC adossées à HSM (v2.130+)',
+        content: 'Une fois un fournisseur HSM configuré, vous pouvez épingler la clé privée d\'une AC à ce HSM dès sa création :',
         items: [
-          { label: 'Bascule Stockage de clé', text: 'Sur le formulaire de création de CA, choisir Local (chiffré en DB) ou HSM. Sélectionner le fournisseur + label de clé' },
-          { label: 'Chemin de signature', text: 'Chaque émission, signature de CRL et signature OCSP de cette CA passe par le HSM, la clé ne sort jamais' },
-          { label: 'Restrictions d\'export', text: 'L\'export PKCS#12, JKS et clé seule est désactivé pour les CA HSM (seul le certificat public / la chaîne peut être exporté)' },
-          { label: 'CRL & OCSP', text: 'Les deux fonctionnent de manière transparente avec les CA HSM (signés via HSM)' },
-          { label: 'Migration', text: 'Les CA locales existantes ne peuvent pas être déplacées vers un HSM après création, choisir à la création' },
+          { label: 'Bascule Stockage de clé', text: 'Sur le formulaire de création d\'AC, choisir Local (chiffré en DB) ou HSM. Sélectionner le fournisseur + label de clé' },
+          { label: 'Chemin de signature', text: 'Chaque émission, signature de CRL et signature OCSP de cette AC passe par le HSM, la clé ne sort jamais' },
+          { label: 'Restrictions d\'export', text: 'L\'export PKCS#12, JKS et clé seule est désactivé pour les AC HSM (seul le certificat public / la chaîne peut être exporté)' },
+          { label: 'CRL & OCSP', text: 'Les deux fonctionnent de manière transparente avec les AC HSM (signés via HSM)' },
+          { label: 'Migration', text: 'Les AC locales existantes ne peuvent pas être déplacées vers un HSM après création, choisir à la création' },
           { label: 'Une autorité par clé', text: 'Une clé HSM sert une seule autorité, X.509 ou SSH. Les listes de clés existantes ne proposent que des clés inutilisées, une seconde AC sur une clé est refusée (409) avec le nom de l\'AC qui la tient, et une clé ou son fournisseur ne peut pas être supprimé tant qu\'une AC le tient' },
           { label: 'Droits', text: 'Créer une AC sur une clé HSM, X.509 ou SSH, exige read:hsm en plus de write:cas ou write:ssh_cas ; sans lui, le choix HSM est indisponible' },
           { label: 'AC SSH', text: 'Une AC SSH, utilisateur ou hôte, peut utiliser une clé de signature RSA ou ECDSA P-256/P-384/P-521 (voir AC SSH). En mode HA, une clé sur SoftHSM ou sur un lecteur de carte à puce local est refusée, car elle n\'existe que sur un nœud' },
@@ -57,11 +57,11 @@ export default {
     tips: [
       'Utilisez SoftHSM pour les tests avant de déployer avec un HSM physique',
       'Les clés générées sur un HSM ne quittent jamais le matériel : elles ne peuvent pas être exportées',
-      'Testez la connexion avant d\'utiliser un fournisseur HSM pour la signature de CA',
-      'Pour les CA racines à longue durée de vie en production, préférez le stockage de clé adossé à HSM',
+      'Testez la connexion avant d\'utiliser un fournisseur HSM pour la signature d\'AC',
+      'Pour les AC racines à longue durée de vie en production, préférez le stockage de clé adossé à HSM',
     ],
     warnings: [
-      'La certification déclarée est l\'affirmation de l\'opérateur sur le HSM : UCM ne vérifie pas le matériel. Les profils alignés sur eIDAS la lisent pour contrôler la protection de la clé de la CA',
+      'La certification déclarée est l\'affirmation de l\'opérateur sur le HSM : UCM ne vérifie pas le matériel. Les profils alignés sur eIDAS la lisent pour contrôler la protection de la clé de l\'AC',
       'Une mauvaise configuration du fournisseur HSM peut empêcher la signature de certificats',
       'Perdre l\'accès au HSM signifie perdre l\'accès aux clés qui y sont stockées',
     ],
@@ -174,7 +174,7 @@ Cliquez sur **Synchroniser les clés** dans les détails du fournisseur pour rel
 
 Le message donne les décomptes, le nombre de clés conservées parce qu'une AC les utilise, le nombre de clés illisibles et le nombre de clés utilisées par une AC dont le matériel a changé sur le jeton. Le bouton est désactivé pendant la synchronisation.
 ### Utiliser les clés HSM
-Lors de la création d'une CA, sélectionnez un fournisseur HSM et une clé au lieu de générer une clé logicielle. Les opérations de signature de la CA sont effectuées sur le HSM.
+Lors de la création d'une AC, sélectionnez un fournisseur HSM et une clé au lieu de générer une clé logicielle. Les opérations de signature de l'AC sont effectuées sur le HSM.
 
 Une clé HSM sert une seule autorité, X.509 ou SSH. Créer une AC sur une clé HSM exige la permission \`read:hsm\` en plus de \`write:cas\` (\`write:ssh_cas\` pour une AC SSH), et une clé qu'une AC tient ne peut pas être supprimée.
 

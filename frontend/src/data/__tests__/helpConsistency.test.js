@@ -38,11 +38,24 @@ describe('code blocks of the translated guides', () => {
   })
 })
 
-describe('French help wording', () => {
-  // "CA" is read "cé-a" and never elided: "la CA", "de la CA", not "l'CA" or "d'CA".
-  it('never elides an article before CA', () => {
-    const found = strings(entries.filter((e) => e.lang === 'fr').map((e) => e.page))
-      .flatMap((s) => s.match(/\b\w+\\?['’]CA\b.{0,20}/g) || [])
+describe('French wording of the certification authority', () => {
+  const fr = import.meta.glob('../../i18n/locales/fr.json', { eager: true })['../../i18n/locales/fr.json'].default
+  const frStrings = [
+    ...strings(fr),
+    ...strings(entries.filter((e) => e.lang === 'fr').map((e) => e.page)),
+  ]
+  // The French acronym is "AC"; "CA" stays only in these English technical terms and in code.
+  const ENGLISH_TERMS = /CA\/Browser Forum|CA:(?:TRUE|FALSE)|CA Issuers|Global Root CA/g
+  // In a fenced block only the translated comments and the "(note)" after an address are French.
+  const prose = (block) => block.split('\n').map((l) => (l.match(/#.*$|\s{2,}\(.*\)$/) || [''])[0]).join('\n')
+  const uncoded = (s) => s.replace(/```[\s\S]*?```/g, prose).replace(/`[^`]*`/g, ' ').replace(ENGLISH_TERMS, ' ')
+  it('has no isolated "CA" in the interface and the help', () => {
+    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\w/:.-])CA(?![\w:/.-]).{0,20}/g) || [])
+    expect(found).toEqual([])
+  })
+  // "AC" starts with a vowel: "l'AC", "d'AC", "cette AC", "une AC", never "la AC", "de AC", "l'CA".
+  it('elides and agrees the article before AC', () => {
+    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])(?:la|le|de|du|ce|un|sa|ma|ta|que|si)\s+AC(?![\p{L}\p{N}_]).{0,20}|[\p{L}\p{N}_]+\\?['’]CA(?![\p{L}\p{N}_]).{0,20}/giu) || [])
     expect(found).toEqual([])
   })
 })
