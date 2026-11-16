@@ -10,7 +10,9 @@ STATES = ('no_stats', 'stale_stats')
 
 
 def _reload():
-    db.session.execute(text('ANALYZE sqlite_schema'))  # also creates sqlite_stat1 when missing
+    # Reloads the statistics of THIS connection only (and creates sqlite_stat1 when missing):
+    # the test and the request it measures must share the session's connection
+    db.session.execute(text('ANALYZE sqlite_schema'))
 
 
 @contextmanager

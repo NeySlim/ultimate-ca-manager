@@ -3,10 +3,11 @@ from sqlalchemy.dialects.sqlite.base import SQLiteCompiler
 
 
 def _from_hint_text(self, table, text):
-    return text
+    # A hint written for every dialect ('*', the default of with_hint) reaches this method too:
+    # only INDEXED BY is SQLite syntax, anything else stays out of the statement as before
+    return text if text.startswith('INDEXED BY ') else None
 
 
-# Only hints given for the 'sqlite' dialect reach this method, so nothing else changes
 SQLiteCompiler.get_from_hint_text = _from_hint_text
 
 
