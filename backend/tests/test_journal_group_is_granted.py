@@ -19,7 +19,7 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-UNITS = ('packaging/debian/ucm.service', 'packaging/rpm/ucm.service')
+UNITS = ('packaging/systemd/ucm.service',)
 RECIPES = ('packaging/debian/postinst', 'packaging/rpm/ucm.spec')
 
 

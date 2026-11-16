@@ -108,6 +108,14 @@ sudo systemctl status ucm
 
 ---
 
+### Upgrading a DEB or RPM installation
+
+The 3.0 packages install over UCM 2.254 or later only. Over an older version, the pre-installation script refuses before writing anything and leaves that version installed and running: install 2.254, start it once, then install 3.0. See the [Upgrade Guide](../../UPGRADE.md#upgrading-to-v30).
+
+Where an older UCM was removed but left its data (an RPM removal, a DEB removed or purged), the 3.0 package installs as new. If 3.0 cannot start on the SQLite database left there, the package moves that installation's files, unchanged, into `/opt/ucm-archive/<UTC date and time>/` (root only, with a `README.txt` that gives the way back through 2.254; a file that cannot be renamed out of its filesystem goes into a root-only `.ucm-archive-<UTC date and time>/` directory beside it, which that README lists), then starts a new, empty UCM. Data that 3.0 starts on is kept. The Docker image never archives: it refuses an older volume at startup.
+
+---
+
 ### FIPS hosts: DEB and RPM built against the system OpenSSL
 
 The packages install pre-built Python wheels, and the `cryptography` and `psycopg-binary` wheels carry their own OpenSSL, which ignores the FIPS mode of the host. On RHEL 9 (or AlmaLinux and Rocky Linux 9) and on Ubuntu 24.04 (Ubuntu Pro for the FIPS module), `UCM_FIPS_BUILD=1` makes the package compile `cryptography`, `psycopg`, `lxml` and `xmlsec` against the system OpenSSL instead. Other distributions refuse the option.
@@ -288,6 +296,7 @@ With a generated password, UCM asks for a new one right after login. Until it is
 - **Config:** `/etc/ucm/ucm.env`
 - **Logs:** `/var/log/ucm/`
 - **Service:** `/etc/systemd/system/ucm.service`
+- **Archive of a removed older installation:** `/opt/ucm-archive/` (only after one was archived; see above)
 
 ### Source Installation
 - **Data:** `./backend/data` (relative to repository root)

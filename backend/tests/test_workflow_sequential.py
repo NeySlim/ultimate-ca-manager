@@ -109,3 +109,48 @@ def test_the_job_leaves_the_first_pass_its_time_whatever_the_random_one_takes():
     """The first pass ran 66 minutes when this was written: the job's limit, less the whole
     limit of the random-order pass, must still cover it with room to grow."""
     assert _job()['timeout-minutes'] - _random_step()['timeout-minutes'] >= 100
+
+
+def _pytest_commands(job):
+    lines = [line.strip() for step in job['steps'] for line in str(step.get('run', '')).splitlines()]
+    return [line for line in lines if line.startswith(('pytest ', 'timeout 40m pytest '))]
+
+
+def _marker(command):
+    import shlex
+    words = shlex.split(command)
+    return words[words.index('-m') + 1] if '-m' in words else None
+
+
+def test_the_one_process_runs_leave_the_slow_tests_to_the_shards():
+    """An hour of fault scenarios in one process would pass the job's time limit; the shards run them."""
+    commands = _pytest_commands(_job())
+    assert len(commands) == 2, commands
+    markers = {_marker(c) for c in commands}
+    assert len(markers) == 1 and None not in markers, commands
+    # A command-line -m replaces the one of addopts: the HA bench must stay out by name
+    chosen = _collected(['-m', markers.pop(), SLOW_FILE, HA_FILE, PLAIN_TEST])
+    assert chosen == [PLAIN_TEST], chosen
+
+
+SLOW_FILE = 'tests/test_package_leftover_retry_data_link.py'
+HA_FILE = 'tests/ha/test_startup.py'
+PLAIN_TEST = 'tests/test_workflow_sequential.py::test_only_the_sequential_job_has_its_own_group'
+
+
+def _collected(arguments):
+    import os
+    import subprocess
+    import sys
+    backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = subprocess.run(
+        [sys.executable, '-m', 'pytest', '--collect-only', '-q', '-p', 'no:cacheprovider', *arguments],
+        cwd=backend, capture_output=True, text=True, timeout=120)
+    return [line for line in out.stdout.splitlines() if '::' in line]
+
+
+def test_the_shards_still_run_the_slow_tests():
+    """No -m on their command, and none from the configuration either: collected as they run."""
+    shard = _pytest_commands(load('tests.yml')['jobs']['test-backend'])
+    assert shard and all(_marker(c) is None for c in shard), shard
+    assert any(line.startswith(SLOW_FILE) for line in _collected([SLOW_FILE]))

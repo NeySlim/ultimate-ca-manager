@@ -604,7 +604,7 @@ def test_a_3_0_database_naming_an_unknown_migration_is_refused_untouched(fresh, 
 
 def test_a_2254_database_still_naming_2_0_migrations_upgrades(dialect, tmp_path, monkeypatch):
     """2.52 folded 001 to 042 of the 2.0 series into its baseline, which kept their names, and
-    migrate_v1_to_v2 records its own: a 2.254 database started that long ago still holds them."""
+    the 2.x upgrade from 1.8 recorded its own: a 2.254 database started that long ago still holds them."""
     old = ''.join(f"INSERT INTO _migrations (name) VALUES ('{n}');\n"
                   for n in ('001_add_api_keys', '042_add_discovery_san_sni', 'v1_to_v2_migration'))
     for db in make_base(dialect, tmp_path, monkeypatch, 'go', sql=schema_2254(dialect) + old):
