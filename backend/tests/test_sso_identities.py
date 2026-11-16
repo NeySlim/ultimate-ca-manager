@@ -6,6 +6,7 @@ sent: an administrator does (OIDC Core 1.0 §5.7). The database holds one accoun
 and one row per (account, P) on both backends; a 2.254 database keeps every account's access.
 """
 import uuid
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -199,15 +200,36 @@ def test_the_role_follows_the_provider_of_the_last_sign_in(app, providers, auth_
     assert role() == 'admin'
 
 
-def test_attaching_replaces_the_orphan_the_same_idp_left(app, providers, auth_client):
+def test_attaching_takes_back_the_orphan_the_same_idp_left_with_its_identity(app, providers, auth_client):
+    """An explicit attachment never weakens a binding: no other sign-in may bind that row."""
     with app.app_context():
         key = db.session.get(SSOProvider, providers.oidc).idp_key()
     name = _name()
     uid = _add(app, username=name, auth_source='oauth2', sso_orphan_of=key, sso_external_id='old',
                password_hash=NOPASS)
+    with app.app_context():
+        orphan_id = identity_for(db.session.get(User, uid), None).id
     assert _attach(auth_client, uid, providers.oidc).status_code == 201
-    assert _rows(app, uid) == [(providers.oidc, None, None)]
-    assert 'replacing its orphan of the same IdP' in _audit(app, 'user_sso_attach', name)
+    assert _rows(app, uid) == [(providers.oidc, 'old', None)]
+    assert _row_id(app, uid, providers.oidc) == orphan_id
+    assert 'taking back its orphan of the same IdP' in _audit(app, 'user_sso_attach', name)
+    # Only that identity opens it; the account's name sent with another one does not
+    assert _login(app, providers.oidc, name, 'someone-else') == (None, 'sso_username_conflict')
+    assert _login(app, providers.oidc, 'renamed', 'old') == (name, None)
+
+
+def test_taking_back_an_orphan_whose_identity_opens_another_account_gets_409(app, providers, auth_client):
+    with app.app_context():
+        key = db.session.get(SSOProvider, providers.oidc).idp_key()
+    name = _name()
+    uid = _add(app, username=name, auth_source='oauth2', sso_orphan_of=key, sso_external_id='twice',
+               password_hash=NOPASS)
+    other = _add(app, username=_name(), auth_source='oauth2', sso_provider_id=providers.oidc,
+                 sso_external_id='twice', password_hash=NOPASS)
+    r = _attach(auth_client, uid, providers.oidc)
+    assert r.status_code == 409, r.get_json()
+    assert _rows(app, uid) == [(None, 'twice', key)]
+    assert _rows(app, other) == [(providers.oidc, 'twice', None)]
 
 
 def test_an_orphan_of_the_same_idp_beside_an_attachment_lets_the_name_bind_it(app, providers):
@@ -529,6 +551,78 @@ def test_a_restore_brings_the_rows_back_and_orphans_a_provider_it_cannot_place(a
         assert len(User.query.filter_by(username=name).one().sso_identities) == 2
 
 
+def test_a_replace_by_an_archive_that_matches_keeps_the_rows_and_warns_nothing(app, providers, auth_client):
+    """A live row has no orphan_of, an orphan no provider: the rows are matched by account and
+    provider, or account and IdP key, never judged incomplete, removed and made again."""
+    from services.backup import manifest
+    password = 'Correct-Horse-Battery-9'
+    name = _name()
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.oidc,
+               sso_external_id='sub-rp', password_hash=NOPASS)
+    with app.app_context():
+        db.session.add(UserSSOIdentity(user_id=uid, orphan_of='saml:https://gone.example',
+                                       external_id='nameid-rp'))
+        db.session.commit()
+        before = [(row.id, row.provider_id, row.external_id, row.orphan_of)
+                  for row in UserSSOIdentity.query.order_by(UserSSOIdentity.id)]
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        results = _backup().restore_backup(blob, password, mode='replace')
+        db.session.expire_all()
+        assert [w for w in results['warnings'] if 'user_sso_identities' in w] == []
+        assert [(row.id, row.provider_id, row.external_id, row.orphan_of)
+                for row in UserSSOIdentity.query.order_by(UserSSOIdentity.id)] == before
+
+
+def test_a_merge_skips_an_identity_another_account_holds_here(app, providers, auth_client):
+    """One identity opens one account: the archive's row is left out, named, the rest restored."""
+    from services.backup import manifest
+    password = 'Correct-Horse-Battery-9'
+    name, holder = _name(), _name()
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.oidc,
+               sso_external_id='sub-m', password_hash=NOPASS)
+    assert _attach(auth_client, uid, providers.saml).status_code == 201
+    with app.app_context():
+        provider_name = db.session.get(SSOProvider, providers.oidc).name
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        db.session.delete(db.session.get(User, uid))
+        db.session.commit()
+    holder_id = _add(app, username=holder, auth_source='oauth2', sso_provider_id=providers.oidc,
+                     sso_external_id='sub-m', password_hash=NOPASS)
+    with app.app_context():
+        results = _backup().restore_backup(blob, password, mode='merge')
+        db.session.expire_all()
+        restored = User.query.filter_by(username=name).one()
+        assert identities(restored) == [(providers.saml, None, None)]
+        assert identities(db.session.get(User, holder_id)) == [(providers.oidc, 'sub-m', None)]
+    skipped = [w for w in results['warnings'] if 'user_sso_identities' in w]
+    assert len(skipped) == 1 and repr(holder) in skipped[0] and repr(provider_name) in skipped[0] \
+        and repr(name) in skipped[0], results['warnings']
+
+
+def test_an_archive_from_before_the_rows_skips_an_identity_another_account_holds(app, providers):
+    with app.app_context():
+        provider_name = db.session.get(SSOProvider, providers.oidc).name
+    holder = _name()
+    holder_id = _add(app, username=holder, auth_source='oauth2', sso_provider_id=providers.oidc,
+                     sso_external_id='sub-t', password_hash=NOPASS)
+    service, plan = _backup(), SimpleNamespace(warnings=[])
+    with app.app_context():
+        user = User(username=_name(), email='taken@corp.example', role='viewer', password_hash=NOPASS)
+        db.session.add(user)
+        service._legacy_sso_identities = [(user, {
+            'auth_source': 'oauth2', 'sso_provider_id': 7, 'sso_provider_id_ref': {'name': provider_name},
+            'sso_external_id': 'sub-t'})]
+        results = {}
+        service._restore_legacy_sso_identities(results, plan)
+        db.session.commit()
+        assert identities(user) == []
+        assert identities(db.session.get(User, holder_id)) == [(providers.oidc, 'sub-t', None)]
+        assert len(plan.warnings) == 1 and repr(holder) in plan.warnings[0] \
+            and repr(provider_name) in plan.warnings[0], plan.warnings
+
+
 def test_an_archive_from_before_the_rows_gets_the_rows_an_upgrade_gives(app, providers):
     """2.254 archives carry the provider on the account row."""
     with app.app_context():
@@ -553,7 +647,7 @@ def test_an_archive_from_before_the_rows_gets_the_rows_an_upgrade_gives(app, pro
             service._legacy_sso_identities.append((user, row))
             made[label] = user
         results = {}
-        service._restore_legacy_sso_identities(results)
+        service._restore_legacy_sso_identities(results, SimpleNamespace(warnings=[]))
         db.session.commit()
         for label, (_row, _hash, rows_after) in accounts.items():
             assert identities(made[label]) == rows_after, label

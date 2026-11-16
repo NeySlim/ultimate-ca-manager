@@ -694,7 +694,7 @@ class RestoreCoreMixin:
 
         # Auth restores
         self._restore_sso_providers(backup_data, results)
-        self._restore_legacy_sso_identities(results)
+        self._restore_legacy_sso_identities(results, plan)
         self._restore_hsm_providers(backup_data, results, plan)
         self._restore_api_keys(backup_data, results, plan)
         self._restore_auth_certificates(backup_data, results, plan)
@@ -727,6 +727,8 @@ class RestoreCoreMixin:
             rows = backup_data.get(name)
             if not rows:
                 continue
+            if name == 'user_sso_identities':
+                rows = self._identities_free_here(rows, plan)
             results[name] = apply_section(name, rows, plan)
 
 
@@ -814,7 +816,45 @@ class RestoreCoreMixin:
                         f"{holder.username!r} would share the e-mail {user.email!r}. "
                         "Nothing has been changed.")
 
-    def _restore_legacy_sso_identities(self, results: Dict) -> None:
+    @staticmethod
+    def _identity_holder(user_id, provider_id, external_id):
+        """The other account here a provider's stable identity opens, if any."""
+        from models import User, UserSSOIdentity
+        if provider_id is None or not external_id:
+            return None
+        return (User.query.join(UserSSOIdentity, UserSSOIdentity.user_id == User.id)
+                .filter(UserSSOIdentity.provider_id == provider_id,
+                        UserSSOIdentity.external_id == external_id, User.id != user_id).first())
+
+    @staticmethod
+    def _skipped_identity(plan, account, provider_id, holder) -> str:
+        from models.sso import SSOProvider
+        provider = db.session.get(SSOProvider, provider_id)
+        warning = (f"user_sso_identities: the identity of account {account!r} at provider "
+                   f"{(provider.name if provider else provider_id)!r} is left out: it opens the "
+                   f"account {holder.username!r} here, and an identity opens one account only")
+        plan.warnings.append(warning)
+        logger.warning("Restore: %s", warning)
+        return warning
+
+    def _identities_free_here(self, rows, plan):
+        """The archive's identity rows but those whose identity opens another account here."""
+        from models import User
+        db.session.flush()
+        plan.refresh(['users', 'sso_providers'])
+        kept = []
+        for row in rows:
+            user_id = plan.resolve('user_sso_identities', row, 'user_id')
+            provider_id = plan.resolve('user_sso_identities', row, 'provider_id')
+            holder = self._identity_holder(user_id, provider_id, row.get('external_id'))
+            if holder is None:
+                kept.append(row)
+                continue
+            account = db.session.get(User, user_id) if user_id is not None else None
+            self._skipped_identity(plan, account.username if account else None, provider_id, holder)
+        return kept
+
+    def _restore_legacy_sso_identities(self, results: Dict, plan) -> None:
         """The identity rows of an archive's account rows that carry their provider (2.254, or
         3.0 before user_sso_identities), once the providers are back: the same rows an upgrade
         gives them. A provider this installation does not hold leaves an orphan of an unknown IdP."""
@@ -841,7 +881,14 @@ class RestoreCoreMixin:
             accounts.append((user.id, row.get('auth_source'), here.id if here else None,
                              row.get('sso_external_id'), row.get('sso_orphan_of'),
                              user.password_hash, user.force_password_change))
-        made = identity_rows(sorted(accounts), provider_ids)
+        made = []
+        names = {user.id: user.username for user, _row in pending}
+        for user_id, provider_id, orphan_of, external_id in identity_rows(sorted(accounts), provider_ids):
+            holder = self._identity_holder(user_id, provider_id, external_id)
+            if holder is not None:
+                self._skipped_identity(plan, names.get(user_id), provider_id, holder)
+                continue
+            made.append((user_id, provider_id, orphan_of, external_id))
         for user_id, provider_id, orphan_of, external_id in made:
             identity = UserSSOIdentity(user_id=user_id, provider_id=provider_id, orphan_of=orphan_of)
             identity.bind(external_id)

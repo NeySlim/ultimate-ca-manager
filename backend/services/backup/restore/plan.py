@@ -130,7 +130,9 @@ class RestorePlan:
         """
         if section.identity == ('id',):
             return  # singleton configuration rows
-        missing = [field for field in section.identity
+        # An attachment is its account's, by provider or by IdP key (sso_identity_key)
+        fields = ('user_id',) if name == _SSO_IDENTITIES else section.identity
+        missing = [field for field in fields
                    if missing_identity_value(name, field, row.get(field))]
         if not missing:
             return
@@ -402,6 +404,13 @@ class RestorePlan:
 _SSO_IDENTITIES = 'user_sso_identities'
 
 
+def sso_identity_key(user_id, provider_id, orphan_of) -> Tuple:
+    """What an identity row is: its account's row for a provider, or, without a provider, its
+    orphan of an IdP key (None: unknown). The manifest's identity is never complete on its own:
+    a live row has no orphan_of, an orphan no provider."""
+    return (user_id, provider_id, orphan_of if provider_id is None else None)
+
+
 def _identity_key(values: Dict[str, Any], fields: Tuple[str, ...],
                   temporal: frozenset = frozenset()) -> Tuple:
     return tuple(_normalise(values.get(field), field in temporal)
@@ -530,6 +539,11 @@ def _index_of(section_name: str, section: Section):
     temporal = _temporal_identity(section_name)
     singleton = section.identity == ('id',)
     rows, incomplete = {}, []
+    if section_name == _SSO_IDENTITIES:
+        for key_value, values in _identities_here(model, primary[0], section.identity):
+            rows.setdefault(sso_identity_key(*values), []).append(key_value)
+        return ({key: ids[0] for key, ids in rows.items()},
+                {key: ids for key, ids in rows.items() if len(ids) > 1}, [])
     for key_value, values in _identities_here(model, primary[0], section.identity):
         if not singleton and any(missing_identity_value(section_name, field, value)
                                  for field, value in zip(section.identity, values)):

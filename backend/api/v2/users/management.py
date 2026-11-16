@@ -247,7 +247,7 @@ def attach_user_sso_provider(user_id):
     """Attach a provider to any account (admin only); the providers it has keep opening it.
     The attachment is not bound yet: the next sign-in through this provider with the
     account's name, or its verified e-mail (#136), binds its stable identity. An orphan
-    the same IdP left on the account is replaced. The username is kept (#138).
+    the same IdP left on the account is taken back with its identity. The username is kept (#138).
 
     POST /api/v2/users/{user_id}/sso-identities
     Body: {"provider_id": int, "remove_password": bool (optional, default false)}
@@ -282,11 +282,16 @@ def attach_user_sso_provider(user_id):
                               'identity instead', 409)
     before = attachments_text(user)
     key = provider.idp_key()
-    replaced = [row for row in user.sso_identities
-                if key and row.provider_id is None and row.orphan_of == key]
-    for row in replaced:
-        user.sso_identities.remove(row)
-    user.sso_identities.append(UserSSOIdentity(provider=provider, created_by=g.current_user.username))
+    orphans = [row for row in user.sso_identities
+               if key and row.provider_id is None and row.orphan_of == key]
+    # An explicit attachment never weakens a binding: the orphan comes back with its identity
+    taken_back = next((row for row in orphans if row.external_id), orphans[0] if orphans else None)
+    if taken_back is not None:
+        taken_back.provider, taken_back.orphan_of = provider, None
+    else:
+        user.sso_identities.append(UserSSOIdentity(provider=provider,
+                                                   created_by=g.current_user.username))
+    identity = taken_back.external_id if taken_back is not None else None
     drop_password = remove_password and user.password_hash != SSO_NO_PASSWORD
     if drop_password:
         # Same state as an account the provider created: no password door opens it.
@@ -300,11 +305,22 @@ def attach_user_sso_provider(user_id):
     if user.password_hash == SSO_NO_PASSWORD:
         user.force_password_change = False
 
-    ok, err = safe_commit(logger, f"Failed to attach user {user_id} to SSO")
+    def held_elsewhere():
+        # The orphan's identity already opens another account through this provider
+        holder = UserSSOIdentity.query.filter(UserSSOIdentity.provider_id == provider_id,
+                                              UserSSOIdentity.external_id == identity,
+                                              UserSSOIdentity.user_id != user_id).first()
+        if identity and holder is not None:
+            return error_response('The identity this account keeps from the same IdP already '
+                                  'opens another account through this provider', 409)
+        return None
+
+    ok, err = safe_commit(logger, f"Failed to attach user {user_id} to SSO",
+                          on_conflict=held_elsewhere)
     if not ok:
         return err
     closed = sessions_closed_by(user)
-    note = ', replacing its orphan of the same IdP' if replaced else ''
+    note = ', taking back its orphan of the same IdP' if taken_back is not None else ''
     note += ', local password removed' if drop_password else ''
     AuditService.log_action(
         action='user_sso_attach',
@@ -326,7 +342,8 @@ def attach_user_sso_provider(user_id):
 @require_auth(['write:users'])
 def reset_user_sso_identity(user_id, identity_id):
     """Clear the stable identity of one attachment (admin only): the IdP changed it, and
-    the next sign-in through that provider with the account's name binds the new one.
+    the next sign-in through that provider with the account's name or its verified e-mail
+    binds the new one.
 
     POST /api/v2/users/{user_id}/sso-identities/{identity_id}/reset
     """

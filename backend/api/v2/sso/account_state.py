@@ -18,7 +18,7 @@ def own_identity(user, provider):
 
 def legacy_sso_account(user) -> bool:
     """An SSO account from before migration 024: no row, no password, owing no change.
-    Unlink leaves a password change owed, so an account an administrator detached is not one."""
+    Detaching the last provider leaves a password change owed, so such an account is not one."""
     return user.is_local and user.password_hash == SSO_NO_PASSWORD and not user.force_password_change
 
 

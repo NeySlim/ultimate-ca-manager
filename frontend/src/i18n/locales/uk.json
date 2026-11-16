@@ -1492,7 +1492,7 @@
       "detachSuccess": "Provider detached from {{name}}",
       "detachFailed": "Failed to detach the provider",
       "resetIdentity": "Reset identity",
-      "confirmReset": "Reset the identity of {{name}} at {{provider}}? The next sign-in through this provider with the account's username binds a new one, and every session of the account is closed.",
+      "confirmReset": "Reset the identity of {{name}} at {{provider}}? The next sign-in through this provider with the account's username or verified e-mail binds a new one, and every session of the account is closed.",
       "resetSuccess": "Identity of {{name}} reset",
       "resetFailed": "Failed to reset the identity"
     },
