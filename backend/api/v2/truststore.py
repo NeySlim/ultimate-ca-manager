@@ -27,7 +27,8 @@ import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.days_remaining import days_remaining as compute_days_remaining
 from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
-from utils.trust_pem import PrivateKeyInEntry, canonical_certificates, certificate_blocks, holds_private_key
+from utils.trust_pem import (PrivateKeyInEntry, canonical_certificates, certificate_blocks, holds_private_key,
+                             is_der_certificate, opens_a_pem_certificate)
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +79,8 @@ def parse_certificate(pem_data):
 def parse_entry(pem_data):
     """``(PEM to store, details)``: the entry's certificates re-serialized, never the text received.
 
-    Raises PrivateKeyInEntry for an entry carrying a private key, ValueError for any other block that
-    is not a certificate."""
+    Raises PrivateKeyInEntry for an entry carrying a private key, ValueError for a certificate block
+    that cannot be read or is left open."""
     try:
         pem, _ = canonical_certificates(pem_data)
     except PrivateKeyInEntry:
@@ -153,13 +154,15 @@ def import_trusted_certificate():
         return error_response(err, 400)
     
     try:
-        if holds_private_key(file_content):
+        # A DER certificate first: a field of it may name any armour line. Then PEM when a
+        # certificate block opens in the file (the legacy label included), else the DER refusal.
+        if is_der_certificate(file_content):
+            pem_data, cert_details = parse_der_certificate(file_content)
+        elif holds_private_key(file_content):
             raise PrivateKeyInEntry()
-        # PEM when it holds a certificate block (the legacy label included), DER otherwise
-        if certificate_blocks(file_content):
+        elif opens_a_pem_certificate(file_content):
             pem_data, cert_details = parse_entry(file_content.decode('utf-8'))
         else:
-            # Try DER
             pem_data, cert_details = parse_der_certificate(file_content)
         
         # Check if already exists

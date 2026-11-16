@@ -20,6 +20,10 @@ _CERTIFICATE_BLOCK = re.compile(rb'-----BEGIN (?P<label>(?:X509 )?CERTIFICATE)--
                                 rb'-----END (?P=label)-----(?:\r?\n)?')
 
 
+# The opening line alone: a block cryptography loads may carry RFC 1421 headers the pattern above refuses
+_CERTIFICATE_OPENING = re.compile(rb'-----BEGIN (?:X509 )?CERTIFICATE-----')
+
+
 class PrivateKeyInEntry(ValueError):
     """The entry offered to the trust store carries a private key."""
 
@@ -35,6 +39,20 @@ def holds_private_key(data) -> bool:
     return _PRIVATE_KEY.search(_bytes(data)) is not None
 
 
+def is_der_certificate(data) -> bool:
+    """Whether *data* is one DER certificate: whatever armour line one of its fields names, it holds no key."""
+    try:
+        x509.load_der_x509_certificate(_bytes(data))
+    except Exception:
+        return False
+    return True
+
+
+def opens_a_pem_certificate(data) -> bool:
+    """Whether *data* is offered as PEM certificates, readable or not: what an upload must not read as DER."""
+    return _CERTIFICATE_OPENING.search(_bytes(data)) is not None
+
+
 def certificate_blocks(data) -> bytes:
     """The certificate blocks of *data*, in order and under the `CERTIFICATE` label; empty when there is none."""
     return b''.join(m.group(0) if m.group('label') == b'CERTIFICATE'
@@ -45,11 +63,14 @@ def certificate_blocks(data) -> bytes:
 def canonical_certificates(data):
     """``(PEM text, certificates)`` for an entry offered to the store, re-serialized from the parsed objects.
 
-    Raises PrivateKeyInEntry when it carries a private key, ValueError when a block is not a certificate.
+    Raises PrivateKeyInEntry when it carries a private key, ValueError when a block is not a certificate
+    or is left open: a chain cut short is refused whole.
     """
     if holds_private_key(data):
         raise PrivateKeyInEntry()
     certs = x509.load_pem_x509_certificates(_bytes(data))
+    if len(_CERTIFICATE_OPENING.findall(_bytes(data))) > len(certs):
+        raise ValueError('a certificate block is left open')
     pem = b''.join(c.public_bytes(serialization.Encoding.PEM) for c in certs)
     return pem.decode('ascii'), certs
 
