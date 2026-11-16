@@ -823,6 +823,8 @@
     "samlLoginExpired": "Cette connexion a expiré ou a été lancée dans un autre onglet ou navigateur. Recommencez depuis cette page.",
     "ssoUsernameConflict": "Cette connexion correspond à un compte existant, local ou lié à une autre identité. Demandez à un administrateur de lier les comptes.",
     "ssoUnmapped": "Accès refusé : aucune règle de correspondance des rôles de ce fournisseur ne reconnaît votre compte. Contactez votre administrateur.",
+    "ssoNoDefaultRole": "Access denied: this sign-in provider has no default role and no role mapping rule. Contact your administrator.",
+    "ssoEmailConflict": "Sign-in refused: another account already uses the email address of this sign-in. Contact your administrator.",
     "samlLogoutRejected": "La demande de déconnexion du fournisseur d'identité n'a pas pu être vérifiée ; vous êtes toujours connecté."
   },
   "cas": {
@@ -4137,6 +4139,13 @@
       "ssoUsernameHelp": "Le nom d'utilisateur envoyé par le fournisseur d'identité. Par défaut l'actuel ; modifiez-le si la connexion SSO diffère.",
       "linkSuccess": "{{name}} lié à l'authentification unique",
       "linkFailed": "Échec de la liaison du compte au SSO",
+      "relink": "Change provider or reset SSO identity",
+      "relinkTitle": "Change the provider of {{name}} or reset its SSO identity",
+      "relinkHelp": "Choose the provider this account signs in through: another one moves it there, the same one resets its SSO identity. The next sign-in through that provider with this username or email binds the new identity. A password the account has is kept unless you tick the box below.",
+      "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
+      "confirmRelink": "Attach {{name}} to {{provider}}? Its current SSO identity is cleared, and the next sign-in through this provider binds a new one.",
+      "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
+      "relinkKeepsNoPassword": "Its API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "Délier {{name}} de l'authentification unique et le reconvertir en compte local ?",
       "unlinkSuccess": "{{name}} reconverti en compte local",
       "unlinkFailed": "Échec de la déliaison du compte"

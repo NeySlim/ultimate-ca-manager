@@ -217,6 +217,8 @@ Content-Type: application/json
 }
 ```
 
+`forgot-password` answers the same `200` whether or not a link was sent. No link is sent to an account linked to an SSO provider that has no local password, and `reset-password` answers `400` (`Invalid or expired reset token`) for a link such an account holds.
+
 ### Check Email Configuration
 ```http
 GET /api/v2/auth/email-configured
@@ -1820,6 +1822,21 @@ Content-Type: application/json
   "send_invites": true
 }
 ```
+
+### Link or Unlink SSO
+```http
+POST /api/v2/users/{user_id}/link-sso
+Content-Type: application/json
+
+{
+  "provider_id": 1,
+  "remove_password": false
+}
+
+POST /api/v2/users/{user_id}/unlink-sso
+```
+
+`link-sso` (admin, `write:users`) attaches any account to that SSO provider: a local account, one of another provider (moved), one without provider, or one already linked to it (its stable identity is reset). The stored identity is cleared, so the next sign-in through the provider with the account's username or email binds one. A password the account has is kept unless `remove_password` is `true` (a boolean, `400` otherwise), which removes it and any pending reset link so no password login opens the account (`400` on the caller's own account); an account without password is not asked to set one. When the account's provider or identity changes, or its password is removed, its sessions are closed (the caller's own session stays); API keys, security keys and mTLS certificates are kept. The `user_link_sso` audit entry says where the account came from. `400` without `provider_id`, `404` for an unknown user or provider. `unlink-sso` turns an SSO-linked account back into a local one (`400` when it is not linked).
 
 ### Delete User
 ```http

@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Security
+
+- SSO: the password reset by e-mail set a local password on an account created by an SSO provider, which then opened without the provider. Such an account gets no reset link any more, and a reset token sets no password on it.
+
 ### Fixed
 
 - SSO: an OIDC provider with role mapping rules, such as Microsoft Entra ID whose UserInfo response has no groups, refused every user; the rules now read the `groups` and `roles` of the ID token validated for the login together with those of the UserInfo response, and a `roles` claim no longer hides `groups`.
@@ -20,6 +24,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SSO: an LDAP login whose groups could not be read was refused as "no role mapping rule matches". It is now refused with "your groups could not be read from the directory", in the response, the log and the audit, and does not count as a failed attempt.
 - SSO: the LDAP mapping test read the groups by its own code and showed a resolved role for a user the login refuses. It now gives the login's verdict and the reason of a refusal.
 - SSO: the Active Directory `userAccountControl` check never read the attribute's value, so the mapping test reported a disabled account as allowed; it now reports it disabled.
+- SSO: Link to SSO refused every account already linked or left without provider, the remedy sign-in refusals named, and Unlink then Link made an account without password set one. It now attaches any account to the chosen provider (moving it, or resetting its SSO identity), keeps a password it has, asks none of an account without, can remove its local password, closes the account's sessions whenever its provider, identity or password changes, and its audit entry says where the account came from.
+- SSO: a sign-in whose email belonged to an account of another provider or left without provider by another IdP, or to an account an administrator linked while the OIDC IdP marked that email unverified, received a second account with the default role; it is now refused (`sso_email_conflict`) with an audit entry naming the account.
+- SSO: a sign-in refused over a name gave the same reason for every account; the log and audit entry now say whether the account is local, linked to another provider, bound to another identity or without provider, and what repairs it. A provider with no rule and no default role now says so on the login page (`sso_no_default_role`).
+- SSO: a provider created again for the same IdP did not take back its users when the deleted OIDC provider had no issuer and the new one has one, or when an LDAP provider reaches the same base DN through another host for accounts bound by entryUUID or objectGUID; both now take them back.
 
 ## [2.254.3] - 2026-11-16
 

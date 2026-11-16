@@ -261,6 +261,8 @@ export default function LoginPage() {
         'saml_login_expired': t('auth.samlLoginExpired'),
         'sso_username_conflict': t('auth.ssoUsernameConflict'),
         'sso_unmapped': t('auth.ssoUnmapped'),
+        'sso_no_default_role': t('auth.ssoNoDefaultRole'),
+        'sso_email_conflict': t('auth.ssoEmailConflict'),
         'saml_logout_rejected': t('auth.samlLogoutRejected'),
       }
       showError(errorMessages[error] || t('auth.ssoError'))

@@ -1717,7 +1717,7 @@ Manage user accounts, groups, and role assignments. Users authenticate to UCM vi
 Toggle a user's status without deleting their account.
 
 ### Password Reset
-Admins can reset any user's password. The user is not asked to change it at the next login: give them the new password and ask them to change it under My Account.
+Admins can reset any user's password. The user is not asked to change it at the next login: give them the new password and ask them to change it under My Account. **Forgot password** on the login page sends no link to an account linked to an SSO provider that has no local password: its provider alone opens it.
 
 ### Security Keys
 In a user's details, administrators see that user's security keys and can disable or remove one, typically a lost key, which otherwise still signs in without a password. Removing the last second factor of an account that requires one asks for a second confirmation; the user then enrols a factor again at the next login.
@@ -1764,6 +1764,8 @@ The **Source** column shows where each user comes from:
 - **LDAP / OAuth2 / SAML**: auto-provisioned on first SSO login. The originating provider name is shown on the badge (e.g. \`LDAP · Corporate AD\`).
 
 Since v2.133, roles changed manually in UCM for SSO users are **preserved** between logins, unless **"Sync role on every login"** is enabled on the provider (see **Settings → SSO**).
+
+**Link to SSO** attaches an account to a provider; on an account already linked, **Change provider or reset SSO identity** moves it to another provider or clears its SSO identity, after a confirmation. The next sign-in through that provider with the account's username or email binds the new identity; a password the account has is kept unless the box that removes it is ticked, after which no password login opens the account, and an account without one is not asked to set one. **Unlink SSO** turns the account back into a local one.
 `
   },
 
@@ -2786,9 +2788,9 @@ Role mapping rules compare their keys with the values of the **roles** and **gro
 ## Who can sign in
 
 ### Identity matching
-A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first; its next sign-in through that provider binds the IdP identifier.
+A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. When no account matches, a sign-in whose email belongs to an account of another provider or left without provider by another IdP, or, while the email is unverified, to one linked to this provider and not bound yet, is refused rather than given a second account. To attach an account to a provider, use **Link to SSO** on that user (**Change provider or reset SSO identity** on a linked one): it accepts a local account, one of another provider, which it moves, and one whose identity changed at the IdP, which it resets. Its next sign-in through that provider binds the IdP identifier, and an account without a local password is not asked for one.
 
-When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink** then **Link to SSO** on each account.
+When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, or the UserInfo URL of a provider deleted without one; same entity ID; same LDAP server and base DN, or the same base DN alone for accounts bound by \`entryUUID\` or \`objectGUID\`) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Link to SSO** on each account.
 
 ### Role mapping rules
 - **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
@@ -2808,7 +2810,7 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)
 6. Enter the **Base DN** (search base for user lookups)
 7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
-8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink** then **Link to SSO**
+8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Link to SSO** on each account
 9. Click **Test Connection** to verify, then **Save** and **Enable**
 
 ### Groups
