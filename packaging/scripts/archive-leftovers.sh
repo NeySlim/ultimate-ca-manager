@@ -31,6 +31,8 @@ NL='
 FIPS_LINE=UCM_FIPS_BUILD=1
 # An item rename(2) cannot take out of its filesystem goes into <its directory>/$LOCAL_PREFIX<archive>
 LOCAL_PREFIX=.ucm-archive-
+# README.txt is written here first, then renamed over it: never read half written
+README_NEW=.README.txt.new
 # LOCALS: the local archives this run made, one per line between newlines
 DEST="" JOURNAL="" MADE_PARENT="" LOCALS=$NL EARLIER="" LAST_ERR="" LAST_DIR=""
 
@@ -347,7 +349,7 @@ EOF
     done <<EOF
 $undo
 EOF
-    for f in "$DEST/README.txt" "$JOURNAL.new"; do
+    for f in "$DEST/README.txt" "$DEST/$README_NEW" "$JOURNAL.new"; do
         if present "$f"; then rm -f -- "$f" || unsettled "$f" "could not be removed"; fi
     done
     [ -z "$left" ] || return 1
@@ -446,7 +448,7 @@ end), and any setting written there by hand. Private keys encrypted with a
 master.key or a KEY_ENCRYPTION_KEY that was not kept cannot be decrypted.
 "
     fi
-    cat > "$DEST/README.txt" <<EOF
+    cat > "$DEST/$README_NEW" <<EOF || return 1
 UCM: what an earlier installation left on this machine
 
 Archived on $STAMP (UTC) by the UCM $(cat "$UCM_HOME/VERSION" 2>/dev/null || echo 3.0) package,
@@ -484,6 +486,7 @@ To put that installation back in service
      records the 2.254 migrations in the database.
   6. Install this release again: it upgrades that database.
 EOF
+    mv -f -- "$DEST/$README_NEW" "$DEST/README.txt"
 }
 
 # dnf 4 (EL9) ends a failed scriptlet with "Complete!" and exit 0: the line says how to tell
@@ -512,6 +515,8 @@ RENAME=""
 
 # -- 0. An earlier run that could not put everything back is finished first --------
 for d in "$PARENT"/*/; do
+    # A README cut while written again, once the journal was gone
+    [ -e "$d.journal" ] || rm -f -- "$d$README_NEW" 2>/dev/null || true
     # Killed before its journal was written, or after it was removed: nothing to keep
     [ -e "$d.journal" ] || [ -e "${d}README.txt" ] || { rm -f -- "$d.journal.new"; rmdir -- "$d"; } \
         2>/dev/null || true

@@ -24,6 +24,7 @@ SECRET = 'f00dfeedf00dfeedf00dfeedf00dfeed'
 # Where an item rename(2) cannot take out of its filesystem goes, beside it
 LOCAL = f'.ucm-archive-{STAMP}'
 FIPS = 'UCM_FIPS_BUILD=1\n'
+REAL_CAT = shutil.which('cat')
 REAL = {name: shutil.which(name) for name in ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'tee')}
 KEPT = ['backups', 'ca', 'certs', 'crl', 'private', 'scep', 'sessions']
 COMMANDS = ('mkdir', 'rmdir', 'mv', 'rm', 'chmod', 'rename', 'tee')
@@ -161,12 +162,13 @@ class Box:
             f'! grep -qxF -- "$src" {self.state}/refused || refuse\n'
             f'exec {sys.executable} "$@"\n')
         journal = (f'"{self.parent}"/*/.journal', f'"{self.parent}"/*/.journal.new')
+        readme = (f'"{self.parent}"/*/.README.txt.new', f'"{self.parent}"/*/README.txt')
         # The ucm.env the script wrote (UCM_FIPS_BUILD=1, or the start of it), absent or whole
         fips = (f'        "{self.config}/ucm.env") case {FIPS.strip()} in "$(cat -- "$a" 2>/dev/null)"*) continue ;; esac\n'
                 f'            no "$@" ;;\n')
-        (self.inner / 'mv').write_text(self._guard('mv', journal))
+        (self.inner / 'mv').write_text(self._guard('mv', (*journal, *readme)))
         (self.inner / 'cp').write_text(self._guard('cp'))
-        (self.inner / 'rm').write_text(self._guard('rm', (*journal, f'"{self.parent}"/*/README.txt'), fips))
+        (self.inner / 'rm').write_text(self._guard('rm', (*journal, *readme), fips))
         for f in self.inner.iterdir():
             f.chmod(0o755)
         for name in ('mv', 'cp', 'rm', 'mkdir', 'rmdir', 'chmod', 'rename', 'tee'):
@@ -1097,10 +1099,11 @@ def test_the_guard_lets_the_journal_the_readme_and_the_written_ucm_env_go(tmp_pa
     box = Box(tmp_path, python='stub')
     box.wrap()
     box.archive.mkdir(parents=True)
-    for name in ('.journal', '.journal.new', 'README.txt'):
+    for name in ('.journal', '.journal.new', 'README.txt', '.README.txt.new'):
         (box.archive / name).write_text('x')
     (box.config / 'ucm.env').write_text(FIPS)
     for call in (['mv', '--', f'{box.archive}/.journal.new', f'{box.archive}/.journal'],
+                 ['mv', '-f', '--', f'{box.archive}/.README.txt.new', f'{box.archive}/README.txt'],
                  ['rm', '-f', '--', f'{box.archive}/.journal', f'{box.archive}/README.txt'],
                  ['rm', '-f', '--', f'{box.config}/ucm.env']):
         assert subprocess.run([str(box.bin / call[0]), *call[1:]]).returncode == 0, call
@@ -1843,6 +1846,28 @@ def test_the_readme_and_the_last_lines_say_whether_what_is_kept_beside_became_ro
     assert ('Moved, unchanged but for the owner of what is kept beside, everything it left in'
             in out.stdout) is given, out.stdout
     assert ('could not all be given to root' in out.stdout) is not given, out.stdout
+
+
+@pytest.mark.skipif(os.getuid() != 0, reason='gives files to another owner')
+def test_a_run_killed_while_the_readme_is_written_again_leaves_the_first_one_whole(tmp_path):
+    """The README is written again once what is kept beside is root's: killed then, the one
+    written before stays whole, and the next run clears what the kill left."""
+    box = Box(tmp_path, python='stub')
+    box.wrap(other_fs=(box.data,))
+    count = box.state / 'cat'
+    count.write_text('0')
+    (box.bin / 'cat').write_text(
+        f'#!/bin/sh\ncase "$*" in */VERSION) n=$(( $({REAL_CAT} {count}) + 1 )); echo $n > {count}\n'
+        f'    [ "$n" != 2 ] || kill -9 0 ;; esac\nexec {REAL_CAT} "$@"\n')
+    (box.bin / 'cat').chmod(0o755)
+    assert box.run().returncode == -9
+    readme = (box.archive / 'README.txt').read_text()
+    assert readme.startswith('UCM: what an earlier installation left on this machine\n'), readme
+    assert readme.endswith('  6. Install this release again: it upgrades that database.\n'), readme
+    assert 'given to root (owner and group) as the archiving ends' in ' '.join(readme.split())
+    (box.bin / 'cat').unlink()
+    assert box.run().returncode == 0
+    assert sorted(p.name for p in box.archive.iterdir()) == ['README.txt', 'config', 'data']
 
 
 # -- dnf5 cuts a scriptlet's lines at 80 columns ---------------------------------------
