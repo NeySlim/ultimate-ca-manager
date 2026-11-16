@@ -104,7 +104,8 @@ def only_these(secrets, encryption_enabled, monkeypatch):
     mine = set(secrets.values())
     monkeypatch.setattr(
         encryption_enabled, 'master_key_values',
-        lambda: (v for v in every() if (type(v[1]), v[1].id) in mine))
+        # SharedFile rows are keyed by name, with no id: never one of this test's rows
+        lambda: (v for v in every() if (type(v[1]), getattr(v[1], 'id', None)) in mine))
     return encryption_enabled
 
 
@@ -192,6 +193,32 @@ def test_decrypting_is_all_or_nothing(app, secrets, only_these):
         db.session.expire_all()
         # The key is kept when anything fails, so nothing may be left decrypted
         assert key_encryption.is_encrypted(db.session.get(*secrets['target']).private_key)
+
+
+@pytest.fixture
+def foreign_shared_file(app):
+    """A shared_files row left by another test: keyed by its name, it has no id."""
+    from models import SharedFile
+    from services.shared_files import store_file
+    name = f'coverage.{uuid.uuid4().hex[:8]}'
+    with app.app_context():
+        store_file(name, PEM.encode())
+        db.session.commit()
+    yield name
+    with app.app_context():
+        row = db.session.get(SharedFile, name)
+        if row is not None:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def test_the_filter_skips_rows_of_other_tests_without_an_id(
+        app, secrets, foreign_shared_file, only_these):
+    from security.encryption import encrypt_all_keys
+
+    with app.app_context():
+        encrypted, _, errors = encrypt_all_keys(dry_run=True)
+        assert not errors and encrypted == len(PLAINTEXT)
 
 
 def _drop_disabled_marker(app):
