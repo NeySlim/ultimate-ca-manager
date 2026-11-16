@@ -20,6 +20,10 @@ _CERTIFICATE_BLOCK = re.compile(rb'-----BEGIN (?P<label>(?:X509 )?CERTIFICATE)--
                                 rb'-----END (?P=label)-----(?:\r?\n)?')
 
 
+# The opening line alone: a block cryptography loads may carry RFC 1421 headers the pattern above refuses
+_CERTIFICATE_OPENING = re.compile(rb'-----BEGIN (?:X509 )?CERTIFICATE-----')
+
+
 class PrivateKeyInEntry(ValueError):
     """The entry offered to the trust store carries a private key."""
 
@@ -33,6 +37,11 @@ def _bytes(data):
 
 def holds_private_key(data) -> bool:
     return _PRIVATE_KEY.search(_bytes(data)) is not None
+
+
+def opens_a_pem_certificate(data) -> bool:
+    """Whether *data* is offered as PEM certificates, readable or not: what an upload must not read as DER."""
+    return _CERTIFICATE_OPENING.search(_bytes(data)) is not None
 
 
 def certificate_blocks(data) -> bytes:

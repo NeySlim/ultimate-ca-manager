@@ -27,7 +27,8 @@ import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.days_remaining import days_remaining as compute_days_remaining
 from utils.certificate_readability import UnreadableCertificate, require_readable_extensions
-from utils.trust_pem import PrivateKeyInEntry, canonical_certificates, certificate_blocks, holds_private_key
+from utils.trust_pem import (PrivateKeyInEntry, canonical_certificates, certificate_blocks, holds_private_key,
+                             opens_a_pem_certificate)
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +156,8 @@ def import_trusted_certificate():
     try:
         if holds_private_key(file_content):
             raise PrivateKeyInEntry()
-        # PEM when it holds a certificate block (the legacy label included), DER otherwise
-        if certificate_blocks(file_content):
+        # PEM when a certificate block opens in it (the legacy label included), DER otherwise
+        if opens_a_pem_certificate(file_content):
             pem_data, cert_details = parse_entry(file_content.decode('utf-8'))
         else:
             # Try DER

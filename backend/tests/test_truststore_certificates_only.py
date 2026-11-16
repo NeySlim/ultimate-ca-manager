@@ -240,3 +240,18 @@ def test_a_row_stored_under_the_legacy_label_never_leaves_under_it(app, auth_cli
     bundle = auth_client.get(f'{TS}/export?format=pem')
     assert bundle.status_code == 200 and _pem(cert).strip() in bundle.data and b'X509 CERTIFICATE' not in bundle.data
     assert str(row_id) not in bundle.headers.get('X-Skipped-Certificates', '').split(',')
+
+
+@pytest.mark.parametrize('label', ['CERTIFICATE', 'X509 CERTIFICATE'])
+@pytest.mark.parametrize('write', sorted(WRITES))
+def test_a_block_with_rfc1421_headers_is_read_the_same_by_both_writes(app, auth_client, drop, write, label):
+    """cryptography loads such a block: the upload must not send it to the DER reader."""
+    _, cert = _issue(f'headers-{write}-{label[:4]}')
+    drop(cert)
+    pem = _pem(cert).replace(b'-----BEGIN CERTIFICATE-----\n', b'-----BEGIN CERTIFICATE-----\nComment: x\n\n')
+    pem = pem.replace(b'CERTIFICATE-----', label.encode() + b'-----')
+    r = WRITES[write](auth_client, pem)
+    assert r.status_code == 201, r.get_data(as_text=True)
+    with app.app_context():
+        row = TrustedCertificate.query.filter_by(fingerprint_sha256=cert.fingerprint(hashes.SHA256()).hex()).one()
+        assert row.certificate_pem.encode() == _pem(cert)
