@@ -49,6 +49,7 @@ from models.websocket_relay import WebsocketRelayEvent
 from models.shared_file import SharedFile
 from models.backup_archive import BackupArchive, BackupArchiveChunk
 from models.second_factor_failure import SecondFactorFailure
+from models.file_removal import FileRemoval
 
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -74,5 +75,5 @@ __all__ = [
     "RevokedSerial", "CompromisedKeyRecord", "EstSignerCert",
     "DeployTarget", "DeployBinding", "CRLDeployBinding", "DeployDelivery",
     "ClusterCommand", "ClusterMaintenance", "ClusterNode", "SchedulerRequest", "EncryptionKey", "WebsocketRelayEvent",
-    "SharedFile", "BackupArchive", "BackupArchiveChunk", "SecondFactorFailure",
+    "SharedFile", "BackupArchive", "BackupArchiveChunk", "SecondFactorFailure", "FileRemoval",
 ]

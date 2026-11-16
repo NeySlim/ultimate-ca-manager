@@ -115,7 +115,7 @@ Content-Type: application/json
 }
 ```
 
-**Lockout.** Each attempt is counted before its password is checked, on every node: here on a known, active account; at `POST /api/v2/sso/ldap/login` on the local account the directory entry opens, active or not, whatever name the user filter matched, and an entry with no local account yet is not counted. After `max_login_attempts` attempts without a success, the next ones answer 401 `Invalid credentials` without checking the password, the right one included, until `lockout_duration` has passed. An account whose count already reached a lowered `max_login_attempts` is locked by its next attempt, refused unchecked. A bind that proves the password but opens no session (account disabled here or in the directory, not in the required groups, no role mapped) stays counted, except the attempt that armed the lock: it lifts that lock and is not counted, so such binds never lock the account by themselves. Each lock is logged and sends the `account_locked` alert once. A success resets the count, and so does a new password: reset by link, set by an administrator (`POST /api/v2/users/{id}/reset-password`) or changed in a session (`POST /api/v2/account/password`). The count and the lock are those of the password and the LDAP bind: a client certificate or a passkey is not refused by them, and its success neither resets the count nor lifts the lock. When the count cannot be stored, the login answers 500 `Failed to record login attempt`; when a success cannot reset it, 500 `Failed to update login stats`, with no session opened and a lock armed by that attempt left in place.
+**Lockout.** Each attempt is counted before its password is checked, on every node: here on a known, active account; at `POST /api/v2/sso/ldap/login` on the local account the directory entry opens, active or not, whatever name the user filter matched, and an entry with no local account yet is not counted. After `max_login_attempts` attempts without a success, the next ones answer 401 `Invalid credentials` without checking the password, the right one included, until `lockout_duration` has passed. An account whose count already reached a lowered `max_login_attempts` is locked by its next attempt, refused unchecked. A bind that proves the password but opens no session (account disabled here or in the directory, not in the required groups, no role mapped) stays counted, except the attempt that armed the lock, while that lock still runs: it lifts it and is not counted, so such binds never lock the account by themselves. Each lock is logged and sends the `account_locked` alert once. A success resets the count, and so does a new password: reset by link, set by an administrator (`POST /api/v2/users/{id}/reset-password`) or changed in a session (`POST /api/v2/account/password`). The count and the lock are those of the password and the LDAP bind: a client certificate or a passkey is not refused by them, and its success neither resets the count nor lifts the lock. When the count cannot be stored, the login answers 500 `Failed to record login attempt`; when a success cannot reset it, 500 `Failed to update login stats`, with no session opened and a lock armed by that attempt left in place.
 
 **Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account when its password was generated, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
 
@@ -3140,7 +3140,11 @@ In HA mode a restore holds the cluster maintenance (see [HA](HA.md#restoring-a-b
 code `maintenance_in_progress` while another maintenance holds, `maintenance_not_acknowledged` when a node with a
 fresh heartbeat did not acknowledge it within 30 s (`nodes` maps each one to the processes missing, `web` or
 `scheduler`), and `maintenance_lost` when the maintenance ended or was lifted before the commit; in each case
-nothing is restored. A successful restore answers `restart_detail` "Rolling restart requested: the nodes
+nothing is restored. Both restore routes answer `409` "The restore was refused: this server cannot write to
+<directories>. Nothing has been changed." when the CA, certificate or key directory is not writable, and `409`
+when the backup lock cannot be taken. A restore writes no file: `data.files` gives the files `generation` it
+committed and the number of `removals` listed, and each node then reconciles its files (see the
+[Administration Guide](ADMIN_GUIDE.md#files-after-a-restore)). A successful restore answers `restart_detail` "Rolling restart requested: the nodes
 restart one at a time". Both restore routes also answer `data.todo`, a list of strings with one line per warning
 (sections not restored, a CA whose CRL could not be signed, a secret to enter again); it is empty when there is
 nothing to do. The backup listing's `meta.restore_limits` gives `upload_bytes` (archives before v4) and
@@ -3244,6 +3248,8 @@ Content-Type: application/json
   "master_password": "secure-master-password"
 }
 ```
+
+`data.key_files` says what became of the plaintext key files the disable writes: `written`, `incomplete` (a file could not be written), or `pending` when the file directories were busy (another reconciliation, a restore, another node) or could not be locked; they are then written at the next start of the service, and `key_files_written` is `0`.
 
 ### Security - Generate Encryption Key
 ```http

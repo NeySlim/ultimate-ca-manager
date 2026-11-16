@@ -68,7 +68,7 @@ docker run -d \
 # Download new version (replace VERSION, e.g. 2.48)
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_VERSION_all.deb
 
-# Install (automatically backs up database)
+# Install
 sudo dpkg -i ucm_VERSION_all.deb
 
 # Fix dependencies if needed
@@ -76,7 +76,7 @@ sudo apt-get install -f
 ```
 
 **What happens during upgrade:**
-1. Pre-upgrade backup created automatically
+1. No backup is taken by the package: make one first (below). From 2.254 to 3.0, UCM copies a SQLite database itself at its first start (see Upgrading to v3.0)
 2. Service stopped gracefully
 3. Files updated
 4. Database migrated (if schema changed)
@@ -97,8 +97,8 @@ sudo systemctl start ucm
 ```bash
 sudo systemctl stop ucm
 
-# Restore database
-sudo cp /opt/ucm/data/backups/ucm-pre-upgrade-*.db /opt/ucm/data/ucm.db
+# Restore the database from the manual backup taken above
+sudo cp ~/ucm-backup-YYYYMMDD.db /opt/ucm/data/ucm.db
 
 # Reinstall previous version
 sudo dpkg -i ucm_<previous-version>_all.deb
@@ -164,6 +164,7 @@ Database migrations run automatically at startup.
 
 - **Start from 2.254.** 3.0 upgrades a database last started by UCM 2.254, nothing older. From an earlier 2.x, install 2.254 first (package or image), start it once so it completes its own migrations, then install 3.0. The same applies to every node of a shared PostgreSQL database and to a database copied from SQLite to PostgreSQL: it is the database that must have been started by 2.254. 3.0 reads the backup archives of every 2.x version; what a restore refuses is under *Backup archives* below.
 - **What a refused start looks like.** On a database that 2.254 has not started, 3.0 stops before writing anything: `This database was last started by a release older than 2.254 (N migration(s) of 2.254 are missing from its registry, first ...). Install 2.254, start it once, then upgrade. Nothing was changed: 2.254 still starts on this database.` A database without a migration registry gives the same message with `it has no migration registry`. A package installation shows it in the service journal (`journalctl -u ucm`) and the service does not come up; a container shows it in its log (`docker logs <container>`) and exits. Since nothing was written, put 2.254 back (the 2.254 package, or the 2.254 image on the same volume), start it once, then upgrade to 3.0 again. The 2.254.x security updates add no migration, so a database they started upgrades like a 2.254 one; a database whose registry names a migration that neither 2.254 nor this release knows (started by a later release, or edited by hand) is refused the same way, without writing, by `This database names N migration(s) this release does not know, first ...`.
+- **A refused start or a failed upgrade is not restarted.** The DEB and RPM packages now install the same systemd unit. When 3.0 refuses the database (one 2.254 has not started, on SQLite or PostgreSQL, a PostgreSQL database not in UTF8, or a copy before the upgrade it could not take), or when a step of the upgrade fails, the server exits with code 78 and the unit stays `failed`, without restarting, until you act (`systemctl status ucm` shows the code). Once the cause is fixed, start it again: `sudo systemctl start ucm`. A failure while the service runs restarts it after 10 seconds, at most 5 times in 5 minutes; past that, run `sudo systemctl reset-failed ucm` before starting it. A restart asked from the interface, an update or a package install is not counted.
 - **Two X.509 CAs on one HSM key.** 3.0 binds an HSM key to one X.509 CA at most, on every database (2.x had the unique index only where its migration 035 ran). A 2.254 database where two X.509 CAs share a key, left by a race or a restore, stops the upgrade before anything is written: `Upgrade refused: HSM key '<label>' (#<id>) backs 2 X.509 CAs: '<CA>' (#<id>), '<CA>' (#<id>). ... Nothing was changed: 2.254 still starts on this database.` Start 2.254 again, keep one CA on each key and delete the others, then upgrade. A backup archive that gives one HSM key to two authorities is refused by a restore the same way, naming them.
 - **A longer first start on a large database.** The first start of 3.0 reads every stored certificate once, in batches (subject index, key size, serial spelling): on 255,000 certificates and a million audit lines it was measured at about 31 seconds on SQLite and 50 on PostgreSQL until the service answers, growing in proportion to the number of certificates and of audit lines (step 150 reads the audit log: under a second of the 27 seconds of upgrade measured on SQLite, 44 on PostgreSQL), longer on a slow disk or a busy host. The service answers nothing until it ends. The log shows each step of the upgrade with its start, its end and its duration, and a progress line at most every 30 seconds while a step reads certificates. Let it finish: stopped, the upgrade starts over at the next start.
 - **Start limits during that first start.** The DEB and RPM services and the Docker image never stop a start that takes long: its container is only reported unhealthy after one to two minutes (its health check), and `docker-compose.prod.yml` then leaves nginx unstarted until `docker compose up -d` is run again once UCM answers. On Kubernetes the chart's startup probe allows 360 seconds before the liveness probe begins, with or without HA (before 3.0 the chart had none without HA, and the liveness probe restarted the pod after about 100 seconds): for a database several times larger than the one above, raise `startupProbe.failureThreshold` for the upgrade.
@@ -174,6 +175,20 @@ Database migrations run automatically at startup.
 - **FIPS image: the module is checked against the build.** In FIPS mode the `-fips` image refuses to start when the module-mac that `openssl fipsinstall` computes for its FIPS module differs from the one recorded at build time in `/usr/share/ucm/fips-module.mac`, or when that file is missing or malformed. An image derived from it that replaces the module must record the new value in that file in its own build, or it no longer starts in FIPS mode. FIPS mode also refuses to start when `OPENSSL_MODULES` is set to anything but the absolute path of the directory of the checked module, and an `OPENSSL_MODULES` in `ucm.env` is ignored.
 - **FIPS mode: RSA sizes.** In FIPS mode a request whose RSA key has an even length other than 2048, 3072 and 4096 bits, up to 16384 (RSA-8192 among them), refused by 2.254, is now signed; an odd length or one over 16384 bits stays refused at issuance and is now also refused for an OCSP responder or a TSA signer key.
 - **FIPS mode: HMAC secrets of 14 bytes or more.** Saving a webhook secret or an RFC 2136 TSIG key shorter than 14 bytes (112 bits) is refused in FIPS mode, on every module. A TSIG key already saved keeps working; a webhook secret, Constellix, DNS Made Easy, INWX or Tencent Cloud secret or external EAB key already saved that short now fails when used in FIPS mode, with the FIPS reason, and a `SECRET_KEY` that short makes every sign-in fail. The FIPS readiness check lists them under `hmac.short_secret`, and the `SECRET_KEY` as the blocker `session.short_secret_key`: replace them before the switch.
+- **The DEB and RPM packages check the installed version first.** Installing 3.0 over an installed UCM package older than 2.254 (1.x included) stops in the pre-installation script, before any file is written: `UCM 2.253 is installed, and this package upgrades UCM 2.254 or later only: its database must have been started by 2.254 first. Install 2.254, start it once, then install this package. Nothing was changed: UCM 2.253 is still installed.` The installed version stays installed, and the 3.0 package stops nothing. Release candidates of 2.254 (`2.254~rc1`) and the 2.254.x security updates are accepted. The 3.0 packages no longer carry the 1.x to 2.0 upgrade: a 1.x installation goes through 2.254 too.
+- **An older UCM removed with its data left in place is archived, not upgraded.** After an RPM removal, or a DEB removed or purged, no UCM package is installed and the 3.0 package installs as new. Before it writes its configuration, it asks the 3.0 migration runner whether it starts on the SQLite database left there. When it does not, the package moves everything that installation left, unchanged, into `/opt/ucm-archive/<UTC date and time>/` (readable by root only, outside every path UCM serves, writes or backs up): the contents of `/opt/ucm/data` and `/etc/ucm`, and the database file with its `-wal` when `DATABASE_PATH` placed it elsewhere. It then sets up a new, empty UCM and starts it; `UCM_FIPS_BUILD=1`, when the archived `ucm.env` set it, is written into the new one, and the output says so; when a retry had built the Python environment while that `ucm.env` was still in the archive, the environment is built again against the system OpenSSL. The installation output and `/var/log/ucm/leftover-archive.log` say what was found and where it went. Every item is renamed, never copied or removed: one that cannot be renamed out of its filesystem (another filesystem, a bind mount, overlayfs) goes into a `.ucm-archive-<UTC date and time>/` directory beside it, readable by root only, and a directory that cannot be renamed at all stays where it is while its contents move the same way. The output lists each such directory, and the archive's `README.txt` lists each one with what it holds; UCM never uses or removes them, and `apt purge ucm` leaves them in place: it removes the rest of `/etc/ucm`, `/var/lib/ucm` and `/var/log/ucm` and names what it kept. `README.txt` in the archive gives the way back: install 2.254 in place of 3.0, stop it, put the archived data and configuration back, start it once, then install 3.0 again. Data that 3.0 starts on (left by 2.254 or later) is kept and used as before. A database whose registry names migrations 3.0 does not know (written by a later release) is not archived either: that is a downgrade, the service refuses to start, and the output says to reinstall the release that wrote it. A database it cannot read, or a PostgreSQL database it refuses, is left where it is, the output says so (the SQLite file, or `postgresql` without its address), and the service then refuses to start as described above. In these cases where nothing is archived, the installation does not end on its `UCM INSTALLED` banner. If a move fails, the installation stops there: what was moved is put back (the output says whether all of it could be), nothing else is written, and the service is not started. Once the cause is fixed, `dpkg --configure -a` or `dnf reinstall ucm` retries, first putting back whatever could not be. On EL9, dnf reports that failure as a warning (`%post(...) scriptlet failed`) and still ends with `Complete!` and exit code 0: `systemctl is-active ucm` then answers `inactive`, and `/var/log/ucm/leftover-archive.log` holds the reason.
+- **Docker has no package step.** The 3.0 image starts and refuses a database older than 2.254 as described above; it never archives a volume, since starting a newer image on it is an upgrade. A container that still mounts its volume at a path used by images before 2.70 (`/opt/ucm/backend/data` or `/app/backend/data`) has those files copied into `/opt/ucm/data` at startup, as before; a database carried over that way is checked the same way.
+- **A copy of the SQLite database before the upgrade.** At its first start on a 2.254 SQLite database, before changing anything, 3.0 copies it next to itself as `ucm.db.2.254-before-3.0` (`/opt/ucm/data/` for the packages and the image, so the Docker data volume keeps it), mode 0600 and with the owner of the database. The copy goes through SQLite's online backup, so it includes what the WAL holds, and is checked (integrity, the 2.254 migration registry, the row count of every table). It takes about the size of the database: the start checks that this size plus 8 MB is free. When the copy cannot be taken or checked, the start stops, the database is left as it was and the log says why, how much space is needed and where. UCM never deletes the copy and it is not listed among the backup archives: remove it yourself once 3.0 suits you.
+- **When an upgrade stops partway.** Once the copy is checked, and before the first upgrade step, 3.0 records in the database that the upgrade has started (a table named `_upgrade_from_2_254_started`, which the copy does not hold and which a completed upgrade removes). A start that finds this record does not copy the database again, since it is no longer the 2.254 one: it keeps the existing copy and says `kept the copy taken by an earlier start` in the log, or, when that copy is missing or fails its check, says that no copy of the 2.254 database exists, makes none, and resumes the upgrade. A start on a database without the record (the copy put back, or a 2.254 database that was never upgraded) takes a fresh copy that replaces the previous one. The `dry-run` and `status` commands of `migration_runner.py` say which of these applies, and where the copy is, without writing anything.
+- **Going back to 2.254 with that copy.** Stop UCM, put the copy back in place of the database, remove the `-wal` and `-shm` files left by 3.0, then reinstall the 2.254 package or start the 2.254 image on the same volume. Everything written by 3.0 since the upgrade is lost. Do the same after an upgrade that failed: put the copy back before starting 2.254, never start 2.254 on the half-upgraded database, because the steps already applied have changed tables that 2.254 reads and writes. If 2.254 was started on it anyway, the next 3.0 start keeps the original copy, and what 2.254 wrote in between is not in that copy. On a package installation:
+
+  ```bash
+  sudo systemctl stop ucm
+  sudo cp -p /opt/ucm/data/ucm.db.2.254-before-3.0 /opt/ucm/data/ucm.db
+  sudo rm -f /opt/ucm/data/ucm.db-wal /opt/ucm/data/ucm.db-shm
+  ```
+- **PostgreSQL: UTF8 only.** A database whose `server_encoding` is not `UTF8` (`SQL_ASCII`, the default of a cluster created under the C locale) is refused at startup and by the package's check, with its encoding named; 2.254 failed on it too, without naming it. Create a UTF8 database as the Admin Guide shows (PostgreSQL Backend) and point `DATABASE_URL` at it.
+- **PostgreSQL: back the database up yourself.** No copy is taken on PostgreSQL, single node or HA; the upgrade log says so. Run `pg_dump` on the database before installing 3.0, and stop every node first in a cluster.
 - **FIPS mode: HSM keys.** 2.x checked an HSM key against FIPS mode only when it was generated, so a CA bound to a key that FIPS mode refuses (RSA under 2048 bits, of an odd length or over 16384 bits, an elliptic curve other than P-256, P-384 and P-521, or Ed25519, Ed448 and ML-DSA, which not every FIPS module approves) kept signing. In FIPS mode 3.0 refuses to sign with such a key, whatever the module: its CA issues no certificate and no CRL, and its OCSP answers `unauthorized`, unless a valid delegated responder answers for it (until that responder expires). The FIPS readiness check lists these keys under `hsm.unapproved_keys`: replace them before the switch, or keep their CAs on an instance without FIPS mode.
 - In-app help is available in English, French, Russian and Chinese only; with the interface in German, Spanish, Italian, Japanese, Portuguese or Ukrainian the help panel shows the English text. The interface has ten languages, Russian added.
 - Private-key encryption becomes an envelope: the key in `master.key` or `KEY_ENCRYPTION_KEY` (the KEK) wraps a data key stored in the database. Nothing is re-encrypted at the upgrade and the KEK stays the only secret to back up. A KEK is now changed by hand with the previous one in `master.key.previous` or `KEY_ENCRYPTION_KEY_PREVIOUS` (see the Admin Guide); swapping the key without it puts UCM in safe mode while encryption is enabled, and in HA also once it was disabled. Disabling encryption with `KEY_ENCRYPTION_KEY` set no longer answers 409: the variable stays configured and unused.
@@ -369,19 +384,9 @@ No manual action required: updates are triggered from Settings > Updates.
 
 No action required: all migration happens automatically.
 
-### Upgrading from v1.8.x to v2.0.x
+### Upgrading from v1.8.x
 
-**Major version upgrade** -- data is automatically migrated.
-
-- Database path moved from `/var/lib/ucm/` to `/opt/ucm/data/`
-- Frontend replaced: HTMX -> React 18
-- Authentication: JWT -> session cookies
-- A backup is created automatically during upgrade
-
-Steps:
-1. Standard upgrade procedure (install new package)
-2. No configuration changes required
-3. Check logs: `journalctl -u ucm -n 50`
+Bring the installation to 2.254 first: 3.0 starts only on a database 2.254 has started, and its packages no longer handle a 1.x installation. Then follow [Upgrading to v3.0](#upgrading-to-v30).
 
 ---
 
@@ -396,7 +401,8 @@ sudo journalctl -u ucm -n 100 --no-pager
 # Common fixes:
 
 # 1. Permission issues
-sudo chown -R ucm:ucm /opt/ucm/data
+# A local archive (.ucm-archive-*) holds an earlier installation's keys: it stays root's
+sudo find /opt/ucm/data/ -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
 sudo chown -R ucm:ucm /var/log/ucm
 
 # 2. Missing dependencies

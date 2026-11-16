@@ -74,15 +74,21 @@ def _rate_limit_lan_exempt():
 
 
 def run_startup_housekeeping(app):
-    """Files missing on disk rewritten from the database, interrupted ACME orders reset."""
+    """Files reconciled with the database, a restored HTTPS pair settled, ACME orders reset."""
     try:
         with app.app_context():
-            from services.file_regen_service import regenerate_all_files
-            stats = regenerate_all_files()
-            if sum(stats.values()) > 0:
-                app.logger.info(f"✓ File regeneration completed: {stats}")
+            from services.file_regen_service import reconcile_files
+            stats = reconcile_files()
+            app.logger.info(f"File reconciliation at start: {stats}")
     except Exception as e:
-        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
+        app.logger.error(f"File reconciliation failed, retried by its task: {e}")
+
+    try:
+        with app.app_context():
+            from services.https_binding import settle_restored_https
+            settle_restored_https()
+    except Exception as e:
+        app.logger.warning(f"Restored HTTPS certificate not settled (non-fatal): {e}")
 
     # No auto-poll thread survives a restart: its orders go back to pending
     try:
@@ -234,24 +240,15 @@ def create_app(config_name=None):
     # Failure here MUST stop startup: continuing with a broken schema causes
     # silent data corruption or 500s on every request. Operators should see
     # the failure immediately and fix it before the service comes back up.
-    from migration_runner import run_at_startup, _get_db_url
+    from migration_runner import _get_db_url
     from services.scheduler_leader import boot_lock
+    from startup_refusal import migrate_or_refuse
     db_path = config.DATABASE_PATH
     if db_path:
         os.environ.setdefault('DATABASE_PATH', str(db_path))
-    from utils.ha import ha_enabled as _ha_on
-    if _ha_on():
-        # A restore that has not committed holds the cluster: no migration or write before it ends
-        from services.cluster_maintenance import wait_while_restoring
-        wait_while_restoring(_get_db_url())
-    # HA: one node at a time migrates; the next one finds nothing left to apply
-    migrated = run_at_startup(boot_lock)
-    if not migrated:
-        raise RuntimeError(
-            "Schema migration failed or the database was refused at startup. "
-            "Refusing to start with an inconsistent database. Check the migration "
-            "log above and fix the issue before restarting the service."
-        )
+    # HA: once no restore holds the cluster, one node at a time migrates; the next one finds
+    # nothing left to apply
+    migrate_or_refuse(boot_lock)
     
     # A backend switch that asked for this restart has now been applied: the
     # configuration read above is the new one. Clearing the marker is what
@@ -381,6 +378,8 @@ def create_app(config_name=None):
     app.request_class = SpoolingRequest
     from services.backup.section_store import sweep_stale_stores
     sweep_stale_stores(spool=app.config['UPLOAD_SPOOL_DIR'])
+    from services.backup.storage import sweep_orphan_spools
+    sweep_orphan_spools()
 
     # Initialize cache
     cache.init_app(app, config={
@@ -860,6 +859,16 @@ def create_app(config_name=None):
             app.logger.info("Registered update check task (hourly)")
         except ImportError:
             pass
+
+        # Every node: its certificate and key files follow the rows, after a restore anywhere
+        from services.file_regen_service import reconcile_if_behind
+        scheduler.register_task(
+            name="files_reconcile",
+            func=reconcile_if_behind,
+            interval=60,
+            description="Write and remove this node's certificate and key files after a restore",
+            per_node=True
+        )
         
         # Register discovery scheduler task (checks every 60s for due profiles)
         try:

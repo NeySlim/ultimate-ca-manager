@@ -46,13 +46,14 @@ if __name__ == '__main__':
 
 
 class TestPerNodeTasks:
-    def test_the_update_result_alone_runs_on_every_node(self, auth_client):
+    def test_the_update_result_and_the_files_run_on_every_node(self, auth_client):
         r = auth_client.get('/api/v2/system/scheduler')
         tasks = {t['name']: t for t in json.loads(r.data)['data']['tasks']}
         assert 'backup_retention' in tasks and 'update_result' in tasks, sorted(tasks)
         per_node = {name for name, t in tasks.items() if t['per_node']}
         # Retention runs on the leader, over the archives every node shares
-        assert per_node == {'update_result'}
+        assert per_node == {'update_result', 'files_reconcile'}
+        assert tasks['files_reconcile']['label'] == 'Certificate and key files'
         assert tasks['update_result']['label'] == 'Update result'
 
     def test_the_update_check_leaves_the_result_to_its_node_task(self, app, monkeypatch, tmp_path):

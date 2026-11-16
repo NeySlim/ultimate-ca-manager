@@ -185,7 +185,9 @@ def key_matches_certificate(pem_key: str, certificate_der_or_pem, *, label: str)
             data = data.encode()
         certificate = (x509.load_pem_x509_certificate(data)
                        if b'-----BEGIN' in data else x509.load_der_x509_certificate(data))
-        key = serialization.load_pem_private_key(pem_key.encode(), password=None)
+        # Only the public key is compared: OpenSSL's RSA consistency check cost most of a backup
+        key = serialization.load_pem_private_key(pem_key.encode(), password=None,
+                                                 unsafe_skip_rsa_key_validation=True)
     except Exception:
         return True
 

@@ -2,6 +2,9 @@
 Description=Ultimate Certificate Manager (UCM)
 Documentation=https://github.com/NeySlim/ultimate-ca-manager
 After=network.target
+# Any failure but a refused database restarts the service, at most 5 times in 5 minutes
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=exec
@@ -14,6 +17,7 @@ EnvironmentFile=-/etc/ucm/ucm.env
 
 # Start gunicorn directly using config file
 ExecStart=/opt/ucm/venv/bin/gunicorn -c gunicorn_config.py wsgi:app
+ExecReload=/bin/kill -HUP $MAINPID
 
 # Journal access. The diagnostic bundle and the log viewer read this unit's own
 # journal with `journalctl -u ucm`, which needs membership of systemd-journal.
@@ -23,8 +27,7 @@ ExecStart=/opt/ucm/venv/bin/gunicorn -c gunicorn_config.py wsgi:app
 SupplementaryGroups=systemd-journal
 
 # Standard output. Both are systemd's default, but stated here so the journal
-# destination the diagnostic bundle collects is not an implicit one, and so
-# entries carry the same identifier the DEB unit gives them.
+# destination the diagnostic bundle collects is not an implicit one.
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=ucm
@@ -35,9 +38,12 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/opt/ucm/data /var/log/ucm /etc/ucm
+# Older layouts; "-" keeps the unit starting where a package did not create them
+ReadWritePaths=-/opt/ucm/backend/data -/var/lib/ucm
 # SoftHSM writes its tokens here; "-" keeps the unit starting where SoftHSM is absent.
 ReadWritePaths=-/var/lib/softhsm/tokens
 ProtectKernelTunables=true
+ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictRealtime=true
 RestrictNamespaces=true
@@ -49,9 +55,13 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 LimitNOFILE=65536
 LimitNPROC=512
 
-# Restart policy
-Restart=always
+# Restart policy. A database the release refuses exits 78 (EX_CONFIG): restarting
+# cannot change it, so the unit stays failed until the cause is fixed. Restarts
+# asked from the interface go through ucm-watcher, which resets the start limit
+# first: StartLimitBurst counts crashes, not restarts asked for.
+Restart=on-failure
 RestartSec=10s
+RestartPreventExitStatus=78
 
 # Graceful shutdown
 KillMode=mixed
