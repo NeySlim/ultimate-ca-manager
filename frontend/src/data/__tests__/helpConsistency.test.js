@@ -44,13 +44,14 @@ describe('French wording of the certification authority', () => {
     ...strings(fr),
     ...strings(entries.filter((e) => e.lang === 'fr').map((e) => e.page)),
   ]
-  // The French acronym is "AC"; "CA" stays only in these English technical terms and in code.
-  const ENGLISH_TERMS = /CA\/Browser Forum|CA:(?:TRUE|FALSE)|CA Issuers|Global Root CA/g
+  // The French acronym is "AC"; "CA" stays only in these English technical terms, in code
+  // and in the example CA name of the import placeholder, kept as the English one.
+  const ENGLISH_TERMS = /CA\/Browser Forum|CA:(?:TRUE|FALSE)|CA Issuers|Global Root CA|Corp-Root-CA/g
   // In a fenced block only the translated comments and the "(note)" after an address are French.
   const prose = (block) => block.split('\n').map((l) => (l.match(/#.*$|\s{2,}\(.*\)$/) || [''])[0]).join('\n')
   const uncoded = (s) => s.replace(/```[\s\S]*?```/g, prose).replace(/`[^`]*`/g, ' ').replace(ENGLISH_TERMS, ' ')
   it('has no isolated "CA" in the interface and the help', () => {
-    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_-])CA(?![\p{L}\p{N}_]).{0,20}/gu) || [])
+    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])CAs?(?![\p{L}\p{N}_]).{0,20}/gu) || [])
     expect(found).toEqual([])
   })
   // "AC" starts with a vowel: "l'AC", "d'AC", "cette AC", "une AC", never "la AC", "de AC", "l'CA".

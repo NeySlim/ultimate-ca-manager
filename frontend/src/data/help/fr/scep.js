@@ -80,7 +80,7 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 \`\`\`
 
 Chaque profil est lié à :
-- **Sa propre AC** : différentes flottes d'appareils peuvent s'enrôler auprès de CAs différentes
+- **Sa propre AC** : différentes flottes d'appareils peuvent s'enrôler auprès d'AC différentes
 - **Un template de certificat optionnel** : quand un template est lié, ses usages de clé (KU/EKU) et sa validité gouvernent chaque certificat émis via le profil
 - **Usages interdits aux enrôlés** : un template lié à un profil ne peut pas porter la signature OCSP, l'horodatage, « any purpose » ou Smartcard Logon, et un renouvellement SCEP ne les reporte jamais ; Smartcard Logon est autorisé quand le profil se valide face à Intune, qui se porte garant de l'identité
 - **Un mot de passe de défi par profil** : stocké chiffré, avec la même fenêtre d'expiration que le challenge global (ou la validation Microsoft Intune, voir ci-dessous)
