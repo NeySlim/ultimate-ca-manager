@@ -15,7 +15,6 @@ from config.paths import env_file as _config_env_file
 from utils.db_url import is_postgres_url, postgres_engine_options, sqlalchemy_url
 
 
-
 def load_env_files():
     """ucm.env, then a local .env; a variable already in the environment wins, so the
     OPENSSL_MODULES the -fips entrypoint pinned after its module check stays."""

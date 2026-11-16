@@ -164,6 +164,17 @@ def test_openssl_modules_elsewhere_is_refused_neg(bench, modules):
     assert list((bench / 'run').iterdir()) == []
 
 
+def test_openssl_modules_is_refused_when_it_cannot_be_resolved_neg(bench):
+    # no realpath on the PATH: the comparison has nothing to compare, so it refuses
+    for tool in ('bash', 'dirname', 'mktemp', 'rm', 'tr', 'grep', 'awk', 'mv', 'cat'):
+        (bench / 'bin' / tool).symlink_to(shutil.which(tool))
+    (bench / 'other').mkdir()
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), PATH=str(bench / 'bin'),
+                   OPENSSL_MODULES=str(bench / 'other'))
+    assert rc == 1 and 'continued' not in out and 'OPENSSL_MODULES' in out
+    assert list((bench / 'run').iterdir()) == []
+
+
 def test_a_relative_openssl_modules_is_refused_neg(bench):
     # relative to the entrypoint's directory here, to another one in the process that loads fips.so
     rc, out = _run(bench, _reference(bench, BUILD_MAC), OPENSSL_MODULES=os.path.relpath(bench))
