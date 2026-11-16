@@ -255,6 +255,24 @@ def test_email_of_an_account_of_another_provider_is_refused_not_duplicated(app, 
     assert repr(a_name) in details and 'Link to SSO' in details, details
 
 
+def test_another_person_sharing_the_email_signs_in_once_an_account_is_created_and_linked(
+        app, providers, auth_client):
+    """The remedy the refusal names for a shared mailbox: no setting, an explicit account."""
+    name, idp_name = _name(), _name()
+    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+         sso_provider_id=providers.a, sso_external_id='sub-a', password_hash=NOPASS)
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-b'},
+                  email=f'{name}@corp.example') == (None, 'sso_email_conflict')
+    r = auth_client.post('/api/v2/users', json={'username': idp_name, 'email': f'{name}@corp.example',
+                                                 'password': 'Shared-Mailbox-9x!', 'role': 'viewer'})
+    assert r.status_code in (200, 201), r.get_json()
+    uid = r.get_json()['data']['id']
+    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                            json={'provider_id': providers.b}).status_code == 200
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-b'},
+                  email=f'{name}@corp.example') == (idp_name, None)
+
+
 def test_email_of_a_local_account_still_gives_a_distinct_sso_account(app, providers):
     """E-mail is unique among local accounts only (#136): an SSO account may share it."""
     name, idp_name = _name(), _name()
