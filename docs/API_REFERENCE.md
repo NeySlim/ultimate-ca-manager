@@ -1666,7 +1666,7 @@ Content-Type: application/json
   "description": "Third-party CA for partner integration"
 }
 ```
-The trust store holds certificates only: an entry that contains a private key (any `... PRIVATE KEY` block, encrypted or not) is refused with `400` and `A trust store holds certificates only; remove the private key`, and so is an entry with a block that is not a readable certificate. The entry is judged and fingerprinted by its first certificate and stored as its certificates re-encoded in PEM; other text is dropped. `certificate_pem` in the list and the detail holds only certificates. The same rules apply to the file upload below.
+The trust store holds certificates only: an entry that contains a private key (any `... PRIVATE KEY` block, encrypted or not) is refused with `400` and `A trust store holds certificates only; remove the private key`, and so is an entry with a `CERTIFICATE` block that cannot be read; other blocks and the text around are left out. The entry is judged and fingerprinted by its first certificate and stored as its certificates re-encoded in PEM; other text is dropped. `certificate_pem` in the list and the detail holds only certificates. The same rules apply to the file upload below.
 
 ### Get Trusted Certificate
 ```http
