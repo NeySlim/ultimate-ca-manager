@@ -21,7 +21,7 @@ def _provider_name(provider_id):
     return row.name if row else f'#{provider_id}'
 
 
-def _orphan_text(user):
+def orphan_text(user):
     if user.sso_orphan_of:
         return f"no provider (orphan of {bounded(user.sso_orphan_of)!r})"
     return "no provider (its IdP is unknown)"
@@ -43,7 +43,7 @@ def describe_conflict(user, provider):
     if (user.auth_source or 'local') == 'local' and not user.sso_orphan_of:
         return ("is a local account",
                 f"if it is the same person, Link to SSO attaches it to {target}")
-    state = "has " + _orphan_text(user)
+    state = "has " + orphan_text(user)
     if user.sso_external_id:
         state += f", bound to identity {bounded(user.sso_external_id)!r}"
     return state, f"if it is the same person, Link to SSO attaches it to {target}"
@@ -59,4 +59,4 @@ def describe_origin(user, provider):
         return f"was linked to provider {_provider_name(user.sso_provider_id)!r}{ident}"
     if (user.auth_source or 'local') == 'local' and not user.sso_orphan_of:
         return "was a local account" + ident
-    return "had " + _orphan_text(user) + ident
+    return "had " + orphan_text(user) + ident

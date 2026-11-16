@@ -22,7 +22,7 @@ from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
 from . import saml_sp
-from .account_state import SSO_NO_PASSWORD, bounded, describe_conflict
+from .account_state import SSO_NO_PASSWORD, bounded, describe_conflict, orphan_text
 from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
@@ -464,8 +464,11 @@ def _refuse_username_conflict(provider, username, account):
 
 def _refuse_email_conflict(provider, username, email, account, unverified):
     """No second account for an e-mail an account this identity may not open owns."""
-    if unverified and account.sso_provider_id == provider.id:
-        state = (f"is linked to {provider.name!r} but the IdP marks the e-mail unverified "
+    # This provider may adopt it: only a verified e-mail matches it, Link to SSO would not.
+    if unverified and _adoptable(account, provider):
+        held = (f"is linked to {provider.name!r}" if account.sso_provider_id == provider.id
+                else f"has {orphan_text(account)}, left by this same IdP")
+        state = (f"{held} but the IdP marks the e-mail unverified "
                  f"(email_verified false), so it is not matched by it")
         remedy = "have the IdP verify the e-mail address"
     else:

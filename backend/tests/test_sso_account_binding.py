@@ -279,6 +279,37 @@ def test_unverified_email_of_an_admin_linked_account_is_refused_not_duplicated(
     assert 'unverified' in details and repr(idp_name) in details, details
 
 
+def test_unverified_email_of_an_orphan_of_this_idp_names_the_real_cause(app, providers, auth_client):
+    """The orphan is this provider's to adopt: only a verified e-mail matches it, linking does not."""
+    name, idp_name = _name(), _name()
+    uid = _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+               sso_provider_id=None, sso_orphan_of='oauth2:https://b.example',
+               sso_external_id=None, password_hash=NOPASS)
+    ext = {'sub': 'sub-o', 'email_verified': False}
+    assert _login(app, providers.b, idp_name, ext, email=f'{name}@corp.example') == \
+        (None, 'sso_email_conflict')
+    details = _last_audit(app, 'login_failure', name)
+    assert 'have the IdP verify' in details and 'Link to SSO' not in details, details
+    # The text is true: linking it changes nothing, the refusal stands.
+    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                            json={'provider_id': providers.b}).status_code == 200
+    assert _login(app, providers.b, idp_name, ext, email=f'{name}@corp.example') == \
+        (None, 'sso_email_conflict')
+
+
+def test_unverified_email_of_an_account_of_another_provider_says_link_moves_it(app, providers):
+    with app.app_context():
+        a_name = db.session.get(SSOProvider, providers.a).name
+    name, idp_name = _name(), _name()
+    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+         sso_provider_id=providers.a, sso_external_id='sub-a', password_hash=NOPASS)
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-b', 'email_verified': False},
+                  email=f'{name}@corp.example') == (None, 'sso_email_conflict')
+    details = _last_audit(app, 'login_failure', name)
+    assert repr(a_name) in details and 'Link to SSO moves it' in details, details
+    assert 'have the IdP verify' not in details, details
+
+
 def test_email_of_an_account_of_another_provider_is_refused_not_duplicated(app, providers):
     """(b) The e-mail belongs to an account of another provider; this one sends another name."""
     with app.app_context():
