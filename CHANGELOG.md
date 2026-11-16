@@ -107,6 +107,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Web interface: a request the browser cancelled could cut another download served at the same time, so the main script arrived truncated and the page stayed blank until reloaded. The server now empties the TLS error state before each read and write, so one dropped connection no longer breaks the others.
 - Policies: editing a policy in the form dropped the rules the form does not show, such as `allowed_signature_schemes` set through the API. They are now sent back unchanged.
 - HSM: syncing the keys of a provider whose secret this node cannot decrypt answered 500 without naming it. It now answers 400 and names the field.
 - CA deduplication: merging duplicate records of one CA dropped the HSM key of a removed duplicate when the record kept had no key. The kept record now takes over that HSM key.
