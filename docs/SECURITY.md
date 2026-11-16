@@ -264,7 +264,7 @@ WebAuthn authentication includes rate limiting:
 
 - Failed attempts tracked per user
 - A TOTP or recovery code checked in an open session (disabling 2FA, regenerating recovery codes) counts against the same per-account budget as the second step of a login
-- Account lockout after repeated failures
+- Account lockout after repeated failures; at the password and LDAP login each attempt is counted before its password is checked (at LDAP on the local account the directory entry opens, not the name typed), so attempts sent together check at most `max_login_attempts` passwords
 - Separate rate limit from password login
 
 ### 9. SSO Audit Logging (v2.52+)
