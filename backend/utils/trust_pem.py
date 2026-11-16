@@ -40,8 +40,17 @@ def holds_private_key(data) -> bool:
 
 
 def opens_a_pem_certificate(data) -> bool:
-    """Whether *data* is offered as PEM certificates, readable or not: what an upload must not read as DER."""
-    return _CERTIFICATE_OPENING.search(_bytes(data)) is not None
+    """Whether *data* is offered as PEM certificates, readable or not: what an upload must not read as DER.
+
+    A DER certificate that merely names the opening line in one of its fields is not."""
+    data = _bytes(data)
+    if _CERTIFICATE_OPENING.search(data) is None:
+        return False
+    try:
+        x509.load_der_x509_certificate(data)
+    except Exception:
+        return True
+    return False
 
 
 def certificate_blocks(data) -> bytes:
@@ -54,11 +63,14 @@ def certificate_blocks(data) -> bytes:
 def canonical_certificates(data):
     """``(PEM text, certificates)`` for an entry offered to the store, re-serialized from the parsed objects.
 
-    Raises PrivateKeyInEntry when it carries a private key, ValueError when a block is not a certificate.
+    Raises PrivateKeyInEntry when it carries a private key, ValueError when a block is not a certificate
+    or is left open: a chain cut short is refused whole.
     """
     if holds_private_key(data):
         raise PrivateKeyInEntry()
     certs = x509.load_pem_x509_certificates(_bytes(data))
+    if len(_CERTIFICATE_OPENING.findall(_bytes(data))) > len(certs):
+        raise ValueError('a certificate block is left open')
     pem = b''.join(c.public_bytes(serialization.Encoding.PEM) for c in certs)
     return pem.decode('ascii'), certs
 
