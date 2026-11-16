@@ -1,14 +1,18 @@
-"""What a replacing restore leaves behind: no ACME state without its account.
+"""What a replacing restore leaves behind: names the archive gives, no ACME state without its account.
 
 Each case runs on its own installation, on SQLite and on PostgreSQL (which enforces the keys).
 """
 import json
 import uuid
+from dataclasses import dataclass
+from typing import Callable, Optional
 
 import pytest
 
 from models import db
-from tests.test_backup_cross_installation import Keys, _installation
+from services.backup.export_generic import load_model
+from services.backup.manifest import SECTIONS
+from tests.test_backup_cross_installation import Keys, PASSWORD, _installation, _service
 from tests.test_restore_replace_dependents import (
     ENGINES, _orphans, _restore, _snapshot, _target, _user,
 )
@@ -23,6 +27,205 @@ def target(request, app, tmp_path):
     schema = f'replace_matrix_{uuid.uuid4().hex[:12]}'
     with _target(app, request.param, tmp_path, schema):
         yield request.param
+
+
+# -- names --------------------------------------------------------------------
+
+T1, T2 = 'one', 'two'
+
+
+def _webhook(name, thing):
+    from services.webhook_service import WebhookEndpoint
+    return WebhookEndpoint(name=name, url=f'https://hook-{thing}.example.test/', events='["*"]')
+
+
+def _provider(name, thing):
+    from models.acme_models import DnsProvider
+    return DnsProvider(name=name, provider_type={T1: 'cloudflare', T2: 'route53'}[thing])
+
+
+def _account(name, thing):
+    from models.acme_client_account import AcmeClientAccount
+    return AcmeClientAccount(label=name, email='ops@example.test',
+                             directory_url=f'https://ca-{thing}.example.test/directory',
+                             account_url=f'https://ca-{thing}.example.test/acct/1')
+
+
+def _domain_on(provider):
+    from models.acme_models import AcmeDomain
+    row = AcmeDomain(domain='matrix.example.test', dns_provider_id=provider.id)
+    db.session.add(row)
+    return row
+
+
+def _update_key_on(account):
+    from models.acme_dns_update import AcmeDnsUpdateKey
+    row = AcmeDnsUpdateKey(acme_client_account_id=account.id, name='matrix-key.example.test.')
+    row.secret = 'c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0'
+    db.session.add(row)
+    return row
+
+
+@dataclass(frozen=True)
+class _Table:
+    section: str
+    column: str
+    make: Callable
+    thing: Callable              # the row's identity, names aside, as T1 or T2
+    archived_as: Callable        # edits an archived row into the other thing
+    # A row of another section that cannot exist without one of these: (make, holder of)
+    dependent: Optional[tuple] = None
+    # Whether a row is found again under another name (names.py RULES key)
+    keyed: bool = True
+
+    def model(self):
+        return load_model(SECTIONS[self.section])
+
+
+def _hook_thing(row):
+    return T1 if 'hook-one' in row.url else T2
+
+
+def _provider_thing(row):
+    return T1 if row.provider_type == 'cloudflare' else T2
+
+
+def _account_thing(row):
+    return T1 if 'ca-one' in row.directory_url else T2
+
+
+def _as_second_hook(row):
+    row['url'] = 'https://hook-two.example.test/'
+
+
+def _as_second_provider(row):
+    row['provider_type'] = 'route53'
+
+
+def _as_second_account(row):
+    row['directory_url'] = 'https://ca-two.example.test/directory'
+    row['account_url'] = 'https://ca-two.example.test/acct/1'
+
+
+def _provider_of(domain):
+    from models.acme_models import DnsProvider
+    return db.session.get(DnsProvider, domain.dns_provider_id)
+
+
+def _account_of(key):
+    from models.acme_client_account import AcmeClientAccount
+    return db.session.get(AcmeClientAccount, key.acme_client_account_id)
+
+
+TABLES = {
+    'webhook_endpoints': _Table('webhook_endpoints', 'name', _webhook, _hook_thing,
+                                _as_second_hook),
+    'dns_providers': _Table('dns_providers', 'name', _provider, _provider_thing,
+                            _as_second_provider, (_domain_on, _provider_of), keyed=False),
+    'acme_client_accounts': _Table('acme_client_accounts', 'label', _account, _account_thing,
+                                   _as_second_account, (_update_key_on, _account_of)),
+}
+
+N, M = 'matrix', 'matrix-renamed'
+SUFFIXED = f'{N} (2)'
+HELD_HERE = 'name held here by a different row'
+HELD_IN_ARCHIVE = 'name held by another row of the archive'
+
+
+def _expected(mode, table, collision, kept):
+    """(rows after the restore as (name, thing), renamed as (from, to, reason))."""
+    if collision == 'same_thing_other_name':
+        if mode == 'replace':
+            return [(N, T1)], []
+        if table.keyed:
+            return [(M, T1)], [(N, M, 'same row here under this name')]
+        return sorted([(M, T1), (N, T1)]), []
+    if collision == 'same_name_other_thing':
+        if mode == 'replace' and kept != 'yes':
+            return [(N, T1)], []
+        both = [(N, T2), (SUFFIXED, T1)] if mode == 'merge' else [(SUFFIXED, T1)]
+        return sorted(both), [(N, SUFFIXED, HELD_HERE)]
+    if collision == 'archive_duplicate':
+        return sorted([(N, T1), (SUFFIXED, T2)]), [(N, SUFFIXED, HELD_IN_ARCHIVE)]
+    return [(N, T1)], []     # same name same thing, or no collision at all
+
+
+def _cases():
+    for mode in ('merge', 'replace'):
+        for name, table in TABLES.items():
+            for collision in ('same_name_same_thing', 'same_thing_other_name',
+                              'same_name_other_thing', 'archive_duplicate', 'none'):
+                # A kept row can need only the row holding the name, and only where one can
+                if collision == 'same_name_other_thing' and table.dependent:
+                    kepts = ('yes', 'no')
+                else:
+                    kepts = ('n/a',)
+                for kept in kepts:
+                    yield pytest.param(mode, name, collision, kept,
+                                       id=f'{mode}-{name}-{collision}-kept_{kept}')
+
+
+def _duplicated(blob, table):
+    """The archive with a second row of the same name, another thing: an archive older than 124."""
+    from tests.test_backup_hostile_corpus import _reseal
+    _key, data = _service()._decrypt_framed(blob, PASSWORD)
+    rows = data[table.section]
+    twin = dict(next(r for r in rows if r[table.column] == N))
+    table.archived_as(twin)
+    rows.append(twin)
+    return _reseal(blob, data)
+
+
+@pytest.mark.parametrize('mode,table_name,collision,kept', list(_cases()))
+def test_every_restored_row_bears_the_name_the_archive_gives(target, mode, table_name,
+                                                             collision, kept):
+    table = TABLES[table_name]
+    model = table.model()
+    _user('replace-admin')
+    archived = table.make(N, T1)
+    db.session.add(archived)
+    db.session.flush()
+    archived_id = archived.id
+    dependent = None
+    if kept == 'yes':
+        dependent = table.dependent[0](archived)
+        db.session.flush()
+    blob = _snapshot()
+
+    if collision == 'same_thing_other_name':
+        setattr(archived, table.column, M)
+    elif collision == 'same_name_other_thing':
+        holder = table.make(f'{N}-here', T2)
+        db.session.add(holder)
+        db.session.flush()
+        if dependent is not None:
+            setattr(dependent, 'dns_provider_id' if table_name == 'dns_providers'
+                    else 'acme_client_account_id', holder.id)
+            db.session.flush()
+        db.session.delete(archived)
+        db.session.flush()
+        setattr(holder, table.column, N)
+    elif collision in ('archive_duplicate', 'none'):
+        db.session.delete(archived)
+        if collision == 'archive_duplicate':
+            blob = _duplicated(blob, table)
+    db.session.commit()
+
+    results = _restore(blob, mode=mode)
+
+    rows = model.query.all()
+    names = [getattr(row, table.column) for row in rows]
+    assert len(names) == len(set(names)), names
+    expected_rows, expected_renamed = _expected(mode, table, collision, kept)
+    assert sorted((getattr(row, table.column), table.thing(row)) for row in rows) == expected_rows
+    assert sorted((entry['from'], entry['to'], entry['reason'])
+                  for entry in results['renamed']) == sorted(expected_renamed)
+    if collision == 'same_name_same_thing':
+        assert [row.id for row in rows] == [archived_id]    # updated in place
+    if kept == 'yes':
+        restored = type(dependent).query.one()
+        assert table.thing(table.dependent[1](restored)) == T1
+    assert _orphans() == []
 
 
 # -- ACME server state --------------------------------------------------------

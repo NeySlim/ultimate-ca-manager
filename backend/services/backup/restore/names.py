@@ -114,8 +114,9 @@ def _place(section_name, rule, rows, pruned=frozenset(), backup_data=None):
         if claim(row, row[rule.column]) is not None:
             final[index] = row[rule.column]
 
-    # Same thing under another name: updated, and keeps its name here.
-    if rule.key is not None:
+    # Same thing under another name: updated, and keeps its name here. A replacing
+    # restore gives it the archive's name: that row here is not carried, so it goes.
+    if rule.key is not None and section_name not in pruned:
         by_key: Dict[tuple, list] = {}
         for target in here:
             key = rule.key_here(target)
