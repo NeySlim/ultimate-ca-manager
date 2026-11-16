@@ -34,9 +34,9 @@ def test_a_short_list_has_no_count():
 
 
 def test_values_are_one_line_without_control_or_format_characters():
-    nasty = ['a\nINJECTED: forged line', 'b\r\x1b[31m', 'c d', 'e‮f', 'g\x00']
+    nasty = ['a\nINJECTED: forged line', 'b\r\x1b[31m', 'c\u2028d', 'e\u202ef', 'g\x00']
     text = shown_list(nasty)
-    for ch in ('\n', '\r', '\x1b', ' ', '‮', '\x00'):
+    for ch in ('\n', '\r', '\x1b', '\u2028', '\u202e', '\x00'):
         assert ch not in text
     assert '\\n' in text  # escaped, so the administrator still sees the exact value
 
