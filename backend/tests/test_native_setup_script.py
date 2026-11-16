@@ -832,10 +832,9 @@ def test_a_stop_that_never_holds_fails_the_wait_and_leaves_no_process(tmp_path):
         assert proc.poll() is not None
     finally:
         # A failing assertion must not leave the sleep behind either
-        try:
+        if proc.poll() is None:
             os.killpg(proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+            proc.wait(timeout=5)
         proc.communicate(timeout=5)
 
 
