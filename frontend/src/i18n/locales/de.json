@@ -3859,7 +3859,7 @@
     "testMappingRefusalGroupDenied": "kein Mitglied der erforderlichen Gruppen",
     "testMappingRefusalUnmapped": "keine Rollenzuordnungsregel passt",
     "testMappingRefusalNoDefaultRole": "keine Rollenzuordnungsregel und keine Standardrolle",
-    "testMappingNotChecked": "Hier nicht geprüft: das Passwort und das UCM-Konto, das die Anmeldung öffnen würde (ein gleichnamiges Konto, das diese Identität nicht öffnen darf, ein in UCM deaktiviertes Konto, deaktivierte automatische Kontoerstellung, eine E-Mail-Adresse, die zu einem Konto eines anderen Anbieters gehört).",
+    "testMappingNotChecked": "Hier nicht geprüft: das Passwort und das UCM-Konto, das die Anmeldung öffnen würde (ein gleichnamiges Konto, das diese Identität nicht öffnen darf, ein in UCM deaktiviertes Konto, deaktivierte automatische Kontoerstellung, eine E-Mail-Adresse, die zu einem Konto eines anderen Anbieters oder zu einem Konto ohne Anbieter gehört).",
     "testMappingNotFound": "Benutzer nicht in LDAP gefunden",
     "testMappingResolvedRole": "Aufgelöste Rolle",
     "testMappingAccess": "Anmeldezugriff",

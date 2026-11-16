@@ -3859,7 +3859,7 @@
     "testMappingRefusalGroupDenied": "不是所需组的成员",
     "testMappingRefusalUnmapped": "没有匹配的角色映射规则",
     "testMappingRefusalNoDefaultRole": "没有角色映射规则，也没有默认角色",
-    "testMappingNotChecked": "此处未检查：密码，以及此次登录将打开的 UCM 账户（同名但此身份不得打开的账户、在 UCM 中已禁用的账户、已关闭的自动创建账户、属于其他提供商账户的电子邮件）。",
+    "testMappingNotChecked": "此处未检查：密码，以及此次登录将打开的 UCM 账户（同名但此身份不得打开的账户、在 UCM 中已禁用的账户、已关闭的自动创建账户、属于其他提供商账户或无提供商账户的电子邮件）。",
     "testMappingNotFound": "在LDAP中未找到用户",
     "testMappingResolvedRole": "解析的角色",
     "testMappingAccess": "登录访问",

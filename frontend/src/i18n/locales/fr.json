@@ -3668,7 +3668,7 @@
     "testMappingRefusalGroupDenied": "n'est membre d'aucun des groupes requis",
     "testMappingRefusalUnmapped": "aucune règle de correspondance des rôles ne s'applique",
     "testMappingRefusalNoDefaultRole": "ni règle de correspondance des rôles ni rôle par défaut",
-    "testMappingNotChecked": "Non vérifié ici : le mot de passe, et le compte UCM que la connexion ouvrirait (un compte de même nom que cette identité ne peut pas ouvrir, un compte désactivé dans UCM, la création automatique de comptes désactivée, un e-mail qui appartient à un compte d'un autre fournisseur).",
+    "testMappingNotChecked": "Non vérifié ici : le mot de passe, et le compte UCM que la connexion ouvrirait (un compte de même nom que cette identité ne peut pas ouvrir, un compte désactivé dans UCM, la création automatique de comptes désactivée, un e-mail qui appartient à un compte d'un autre fournisseur ou resté sans fournisseur).",
     "testConnectionSuccess": "Connexion réussie",
     "testConnectionFailed": "Échec de la connexion",
     "testMappingFailed": "Échec du test de mapping",

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 NOT_CHECKED = ("Not checked by this test: the password, and the UCM account the sign-in would "
                "open (an account of the same name that this identity may not open, "
                "an account disabled in UCM, automatic account creation turned off, an e-mail that "
-               "belongs to an account of another provider).")
+               "belongs to an account of another provider or left without one).")
 
 
 @bp.route('/api/v2/sso/providers/<int:provider_id>/test-mapping', methods=['POST'])

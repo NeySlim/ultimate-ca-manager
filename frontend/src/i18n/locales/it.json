@@ -3859,7 +3859,7 @@
     "testMappingRefusalGroupDenied": "non è membro dei gruppi richiesti",
     "testMappingRefusalUnmapped": "nessuna regola di mappatura dei ruoli corrisponde",
     "testMappingRefusalNoDefaultRole": "nessuna regola di mappatura dei ruoli e nessun ruolo predefinito",
-    "testMappingNotChecked": "Non verificato qui: la password e l'account UCM che l'accesso aprirebbe (un account con lo stesso nome che questa identità non può aprire, un account disabilitato in UCM, la creazione automatica degli account disattivata, un'email che appartiene a un account di un altro provider).",
+    "testMappingNotChecked": "Non verificato qui: la password e l'account UCM che l'accesso aprirebbe (un account con lo stesso nome che questa identità non può aprire, un account disabilitato in UCM, la creazione automatica degli account disattivata, un'email che appartiene a un account di un altro provider o rimasto senza provider).",
     "testMappingNotFound": "Utente non trovato in LDAP",
     "testMappingResolvedRole": "Ruolo risolto",
     "testMappingAccess": "Accesso al login",

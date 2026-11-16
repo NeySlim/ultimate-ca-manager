@@ -3859,7 +3859,7 @@
     "testMappingRefusalGroupDenied": "não é membro dos grupos exigidos",
     "testMappingRefusalUnmapped": "nenhuma regra de mapeamento de funções corresponde",
     "testMappingRefusalNoDefaultRole": "nenhuma regra de mapeamento de funções e nenhuma função padrão",
-    "testMappingNotChecked": "Não verificado aqui: a senha e a conta UCM que o login abriria (uma conta com o mesmo nome que esta identidade não pode abrir, uma conta desativada no UCM, a criação automática de contas desligada, um e-mail que pertence a uma conta de outro provedor).",
+    "testMappingNotChecked": "Não verificado aqui: a senha e a conta UCM que o login abriria (uma conta com o mesmo nome que esta identidade não pode abrir, uma conta desativada no UCM, a criação automática de contas desligada, um e-mail que pertence a uma conta de outro provedor ou deixada sem provedor).",
     "testMappingNotFound": "Usuário não encontrado no LDAP",
     "testMappingResolvedRole": "Função resolvida",
     "testMappingAccess": "Acesso de login",

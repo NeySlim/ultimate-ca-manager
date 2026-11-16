@@ -3862,7 +3862,7 @@
     "testMappingRefusalGroupDenied": "必須グループのメンバーではありません",
     "testMappingRefusalUnmapped": "一致するロールマッピングルールがありません",
     "testMappingRefusalNoDefaultRole": "ロールマッピングルールもデフォルトロールもありません",
-    "testMappingNotChecked": "ここでは確認されません：パスワード、およびサインインで開かれる UCM アカウント（この ID では開けない同名のアカウント、UCM で無効化されたアカウント、アカウントの自動作成がオフの場合、別のプロバイダーのアカウントに属するメール）。",
+    "testMappingNotChecked": "ここでは確認されません：パスワード、およびサインインで開かれる UCM アカウント（この ID では開けない同名のアカウント、UCM で無効化されたアカウント、アカウントの自動作成がオフの場合、別のプロバイダーのアカウント、またはプロバイダーなしになったアカウントに属するメール）。",
     "testMappingNotFound": "LDAPでユーザーが見つかりません",
     "testMappingResolvedRole": "解決されたロール",
     "testMappingAccess": "ログインアクセス",

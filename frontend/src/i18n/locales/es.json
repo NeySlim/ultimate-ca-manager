@@ -3859,7 +3859,7 @@
     "testMappingRefusalGroupDenied": "no es miembro de los grupos requeridos",
     "testMappingRefusalUnmapped": "ninguna regla de asignación de roles lo reconoce",
     "testMappingRefusalNoDefaultRole": "sin regla de asignación de roles ni rol predeterminado",
-    "testMappingNotChecked": "No se comprueba aquí: la contraseña y la cuenta UCM que abriría el inicio de sesión (una cuenta del mismo nombre que esta identidad no puede abrir, una cuenta desactivada en UCM, la creación automática de cuentas desactivada, un correo que pertenece a una cuenta de otro proveedor).",
+    "testMappingNotChecked": "No se comprueba aquí: la contraseña y la cuenta UCM que abriría el inicio de sesión (una cuenta del mismo nombre que esta identidad no puede abrir, una cuenta desactivada en UCM, la creación automática de cuentas desactivada, un correo que pertenece a una cuenta de otro proveedor o que quedó sin proveedor).",
     "testMappingNotFound": "Usuario no encontrado en LDAP",
     "testMappingResolvedRole": "Rol resuelto",
     "testMappingAccess": "Acceso de inicio de sesión",
