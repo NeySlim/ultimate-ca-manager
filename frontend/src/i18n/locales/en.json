@@ -1306,7 +1306,7 @@
     "customTemplates": "Custom",
     "systemDescription": "Built in, cannot be edited or deleted",
     "customDescription": "Created here, can be edited and deleted",
-    "systemNotEditable": "System templates cannot be edited. Duplicate it to make a custom copy.",
+    "systemNotEditable": "System templates cannot be edited. Copy it to make a custom version.",
     "systemNotDeletable": "System templates cannot be deleted.",
     "defaultValidity": "Default Validity (days)",
     "maxValidityHint": "To cap the validity of certificates issued from this template, use an issuance policy (Policies, maximum validity).",

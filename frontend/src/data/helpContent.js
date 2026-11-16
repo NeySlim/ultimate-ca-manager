@@ -440,7 +440,7 @@ export const helpContent = {
         title: 'Source',
         icon: FileText,
         definitions: [
-          { term: 'System', description: 'Seeded at install. Copy one for an editable copy: it cannot be edited or deleted itself' },
+          { term: 'System', description: 'Seeded at install. Copy one to get an editable version: it cannot be edited or deleted itself' },
           { term: 'Custom', description: 'Created or imported here, and the only kind that can be edited or deleted' },
         ]
       },

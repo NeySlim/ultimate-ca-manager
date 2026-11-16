@@ -1306,7 +1306,7 @@
     "customTemplates": "Personalizzati",
     "systemDescription": "Inclusa, non modificabile né eliminabile",
     "customDescription": "Creata qui, modificabile ed eliminabile",
-    "systemNotEditable": "I modelli di sistema non possono essere modificati. Duplicalo per crearne una copia personalizzata.",
+    "systemNotEditable": "I modelli di sistema non possono essere modificati. Copialo per crearne una versione personalizzata.",
     "systemNotDeletable": "I modelli di sistema non possono essere eliminati.",
     "defaultValidity": "Validità Predefinita (giorni)",
     "maxValidityHint": "Per limitare la validità dei certificati emessi con questo modello, usa una policy di emissione (Policy, validità massima).",

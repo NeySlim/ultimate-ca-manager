@@ -3950,7 +3950,7 @@
     "customTemplates": "Personnalisé",
     "systemDescription": "Fourni, ne peut être ni modifié ni supprimé",
     "customDescription": "Créé ici, modifiable et supprimable",
-    "systemNotEditable": "Les modèles système ne peuvent pas être modifiés. Dupliquez-le pour en faire une copie personnalisée.",
+    "systemNotEditable": "Les modèles système ne peuvent pas être modifiés. Copiez-le pour en faire une version personnalisée.",
     "systemNotDeletable": "Les modèles système ne peuvent pas être supprimés.",
     "defaultValidity": "Validité par défaut (jours)",
     "maxValidityHint": "Pour plafonner la validité des certificats émis avec ce modèle, utilisez une politique d'émission (Politiques, validité maximale).",

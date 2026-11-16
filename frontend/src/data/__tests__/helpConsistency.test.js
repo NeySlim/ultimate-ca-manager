@@ -179,15 +179,30 @@ describe('screen labels quoted by every help language', () => {
   })
 })
 
+describe('French CA creation button', () => {
+  const fr = import.meta.glob('../../i18n/locales/fr.json', { eager: true })['../../i18n/locales/fr.json'].default
+  it('the CA help quotes the button as the screen shows it', () => {
+    const text = JSON.stringify(pages['../help/fr/cas.js'].default)
+    expect(text).toContain(`**${fr.common.createCA}**`)
+    expect(text).not.toMatch(/Créer AC\b/)
+  })
+  it('the SSH CA help quotes the type labels of the form', () => {
+    const text = JSON.stringify(pages['../help/fr/sshCas.js'].default)
+    expect(text).toContain(`**${fr.sshCas.typeUser}** ou **${fr.sshCas.typeHost}**`)
+  })
+})
+
 describe('system template advice', () => {
   const locales = import.meta.glob('../../i18n/locales/*.json', { eager: true })
   // The Templates page offers a Copy button, never "duplicate"; per language: the former verb and the stem of the button label.
   const verbs = {
     en: [/duplicate/i, /copy/i], fr: [/dupliqu/i, /copi/i], ru: [/дублиру|продублиру/i, /копир/i], zh: [/复制/, /复制/],
-    de: [/duplizier/i, /kopier/i], es: [/dupliqu/i, /copi/i], it: [/duplic/i, /copi/i], pt: [/dupliqu/i, /copi/i],
+    de: [/duplizier/i, /kopier/i], es: [/dupl[ií]qu/i, /c[oó]pi/i], it: [/duplic/i, /copi/i], pt: [/dupliqu/i, /copi/i],
     uk: [/дублікат/i, /копі/i], ja: [/複製/, /コピー/],
   }
-  const tip = (lang) => locales[`../../i18n/locales/${lang}.json`].default.templates.deactivateTooltip
+  // both tooltips of a system template row: the Deactivate switch and the disabled Edit button
+  const tip = (lang) => ['deactivateTooltip', 'systemNotEditable']
+    .map((key) => locales[`../../i18n/locales/${lang}.json`].default.templates[key]).join('\n')
   const help = (lang) => {
     const page = lang === 'en' ? helpContent.templates : pages[`../help/${lang}/templates.js`].default.helpContent
     return page.sections.flatMap((sec) => sec.items || []).filter((i) => /^(Deactivate|Désactiver|Деактивировать|停用)$/.test(i.label)).map((i) => i.text)

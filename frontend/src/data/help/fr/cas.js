@@ -15,7 +15,7 @@ export default {
       {
         title: 'Actions',
         items: [
-          { label: 'Créer AC', text: 'Un seul bouton ; la boîte de dialogue propose une racine auto-signée, une intermédiaire signée par une AC parente, ou une AC signée par une AC externe (CSR)' },
+          { label: 'Créer une AC', text: 'Un seul bouton ; la boîte de dialogue propose une racine auto-signée, une intermédiaire signée par une AC parente, ou une AC signée par une AC externe (CSR)' },
           { label: 'Importer une AC', text: 'Importer un certificat d\'AC existant (avec ou sans clé privée)' },
           { label: 'Exporter', text: 'PEM, DER ou PKCS#12 (P12/PFX) avec protection par mot de passe' },
           { label: 'Révoquer', text: 'Révoquer une AC intermédiaire auprès de son AC parente : publiée dans la CRL et l\'OCSP du parent, et l\'AC ne peut plus signer (définitif)' },
@@ -145,14 +145,14 @@ Tableau plat avec colonnes triables.
 ## Créer une AC
 
 ### Créer une AC racine
-1. Cliquez sur **Créer AC** et choisissez le type racine dans la boîte de dialogue
+1. Cliquez sur **Créer une AC** et choisissez le type racine dans la boîte de dialogue
 2. Remplissez les champs du sujet (CN, O, OU, C, ST, L)
 3. Sélectionnez l'algorithme de clé (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87, EdDSA Ed25519/Ed448) : RSA-3072 par défaut
 4. Définissez la période de validité : 1, 2, 3, 5, 10, 15 ou 20 ans, ou **Personnalisée (jours)** jusqu'à 50 ans (typiquement 10-20 ans pour les AC racines)
 5. Cliquez sur **Créer**
 
 ### Créer une AC intermédiaire
-1. Cliquez sur **Créer AC** et choisissez le type intermédiaire dans la boîte de dialogue
+1. Cliquez sur **Créer une AC** et choisissez le type intermédiaire dans la boîte de dialogue
 2. Sélectionnez la **AC parente** (doit posséder une clé privée)
 3. Remplissez les champs du sujet
 4. Définissez la période de validité (typiquement 5-10 ans)
@@ -178,7 +178,7 @@ Des clés **Ed25519** et **Ed448** peuvent être générées pour une AC racine,
 
 ### Créer une AC signée en externe (mode CSR, v2.214)
 Pour le schéma de racine hors ligne : la clé de l'AC émettrice vit dans UCM, son certificat est signé ailleurs :
-1. Cliquez sur **Créer AC** et choisissez le type **Signée par une AC externe (CSR)**
+1. Cliquez sur **Créer une AC** et choisissez le type **Signée par une AC externe (CSR)**
 2. Renseignez le sujet et les paramètres de clé (locale ou HSM) : la validité est décidée par le signataire externe
 3. Validez : UCM génère la paire de clés et un CSR de type AC (téléchargé automatiquement)
 4. Faites signer le CSR par votre AC racine externe/hors ligne

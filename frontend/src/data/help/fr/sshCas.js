@@ -114,8 +114,8 @@ Une AC hôte signe des certificats qui authentifient les **serveurs auprès des 
 ## Créer une AC
 
 1. Cliquez sur **Créer une AC SSH**
-2. Saisissez un nom descriptif (ex. : « AC utilisateur Production »)
-3. Sélectionnez le type d'AC : **User** ou **Host**
+2. Saisissez un nom descriptif (ex. : « AC utilisateur de production »)
+3. Sélectionnez le type d'AC : **Utilisateur** ou **Hôte**
 4. Choisissez l'algorithme de clé :
    - **Ed25519** : Recommandé. Rapide, petites clés, sécurité moderne.
    - **ECDSA P-256/P-384/P-521** : Bonne compatibilité et sécurité.
