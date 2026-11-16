@@ -95,16 +95,16 @@ def get_ca_certs_p7c(ca_ref):
     if not ca or not ca.crt:
         abort(404)
     # an unreadable certificate is skipped and logged; a public answer names nothing
-    entries = [(ca.id, ca.crt)] + [(f'cross:{row.id}', row.crt) for row in cross_certs.list_for(ca) if row.servable]
-    pems, _ = readable_pems(entries, 'CA', load=x509.load_pem_x509_certificate)
-    if not pems:
-        abort(404)
     try:
+        entries = [(ca.id, ca.crt)] + [(f'cross:{row.id}', row.crt) for row in cross_certs.list_for(ca) if row.servable]
+        pems, _ = readable_pems(entries, 'CA', load=x509.load_pem_x509_certificate, operation='AIA bundle')
         certs = [x509.load_pem_x509_certificate(p) for p in pems]
-        bundle = pkcs7.serialize_certificates(certs, Encoding.DER)
+        bundle = pkcs7.serialize_certificates(certs, Encoding.DER) if certs else None
     except Exception as e:
         logger.error(f"AIA: failed to build the bundle of CA {ca_ref}: {e}")
         abort(500)
+    if bundle is None:
+        abort(404)
     return _aia_response(bundle, 'application/pkcs7-mime', f'{ca.refid}.p7c')
 
 

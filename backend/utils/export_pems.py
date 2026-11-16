@@ -14,11 +14,11 @@ logger = logging.getLogger(__name__)
 SKIPPED_LIST_LIMIT = 100
 
 
-def readable_pems(rows, what='certificate', load=x509.load_pem_x509_certificates):
+def readable_pems(rows, what='certificate', load=x509.load_pem_x509_certificates, operation='Bulk export'):
     """``(pems, skipped)`` for *rows*, an iterable of ``(identifier, PEM text or its base64, or None)``.
 
     PEM text may follow other text (``openssl pkcs12`` attributes); base64 never holds a dash.
-    A row is readable when *load* accepts its PEM bytes."""
+    A row is readable when *load* accepts its PEM bytes; *operation* names the caller in the log."""
     pems, skipped = [], []
     for ident, raw in rows:
         try:
@@ -27,7 +27,7 @@ def readable_pems(rows, what='certificate', load=x509.load_pem_x509_certificates
             pem = raw.encode() if isinstance(raw, str) and '-----BEGIN' in raw else base64.b64decode(raw)
             load(pem)
         except Exception as exc:
-            logger.warning('Bulk export skips %s %s: unreadable (%s)', what, ident, type(exc).__name__)
+            logger.warning('%s skips %s %s: unreadable (%s)', operation, what, ident, type(exc).__name__)
             skipped.append(str(ident))
             continue
         pems.append(pem)

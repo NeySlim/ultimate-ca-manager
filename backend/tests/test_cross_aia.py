@@ -107,9 +107,21 @@ def test_p7c_skips_an_unreadable_certificate_and_logs_it(app, client, world, cap
             r = client.get(f'/ca/{_ref(app, world.b_id)}.p7c')
         assert r.status_code == 200 and _bundle(r) == [_der(world.pki.root_b)]
         assert not any(h.startswith('X-Skipped') for h in r.headers.keys())
-        assert any('skips' in m and f'cross:{world.xid}' in m for m in caplog.messages)
+        assert any(m.startswith(f'AIA bundle skips CA cross:{world.xid}') for m in caplog.messages)
     finally:
         _store_crt(app, CACrossCertificate, world.xid, saved)
+
+
+def test_p7c_logs_a_bundle_whose_cross_certificates_cannot_be_listed(app, client, world, monkeypatch, caplog):
+    from services.ca import cross_certs
+
+    def broken(_ca):
+        raise RuntimeError('database gone')
+    monkeypatch.setattr(cross_certs, 'list_for', broken)
+    with caplog.at_level('ERROR'):
+        r = client.get(f'/ca/{_ref(app, world.b_id)}.p7c')
+    assert r.status_code == 500
+    assert any(m.startswith('AIA: failed to build the bundle') for m in caplog.messages)
 
 
 def test_p7c_with_no_readable_certificate_is_not_found(app, client, world):
