@@ -18,9 +18,9 @@ def _migration():
     return importlib.import_module('migrations._from_2_254.165_sso_ldap_group_base_dn')
 
 
-def test_the_step_is_the_last_of_the_upgrade():
+def test_the_step_follows_164_in_the_upgrade():
     from migrations._from_2_254 import STEPS
-    assert STEPS[-1] == '165_sso_ldap_group_base_dn'
+    assert STEPS.index('165_sso_ldap_group_base_dn') == STEPS.index('164_file_removals') + 1
 
 
 def test_sqlite_adds_the_column_once_and_keeps_the_rows():

@@ -70,7 +70,7 @@ def _listed(db):
 
 def test_the_step_is_part_of_the_upgrade():
     from migrations._from_2_254 import STEPS
-    assert STEPS[-1] == STEP
+    assert STEPS.index(STEP) == STEPS.index('165_sso_ldap_group_base_dn') + 1
 
 
 @pytest.mark.parametrize('dialect', BACKENDS)
