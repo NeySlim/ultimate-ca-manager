@@ -414,9 +414,7 @@ def sso_callback(provider_type):
             bound_claims = trusted_id_claims if (
                 expected_nonce and isinstance(token_sub, str) and token_sub
                 and userinfo.get('sub') == token_sub) else None
-            external_data = dict(userinfo)
-            external_data.pop('roles', None)
-            external_data['groups'] = oidc_external_groups(userinfo, bound_claims)
+            external_data = dict(userinfo, groups=oidc_external_groups(userinfo, bound_claims))
 
             # Create or update user
             user, error_code = _get_or_create_sso_user(provider, username, email, fullname,
