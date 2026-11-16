@@ -4793,6 +4793,8 @@ Content-Type: application/json
 { ... }
 ```
 
+A field left out of the body keeps its value. `rules`, when sent, replaces the policy's rules as a whole: a rule key left out of it is removed.
+
 ### Delete Policy
 ```http
 DELETE /api/v2/policies/{policy_id}
