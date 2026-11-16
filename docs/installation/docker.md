@@ -149,6 +149,7 @@ volumes:
 | `UCM_LOG_LEVEL` | `INFO` | Log level (DEBUG/INFO/WARNING/ERROR) |
 | `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `/opt/ucm/data/ucm.log` is rotated (10 MB) |
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
+| `UCM_WORKER_TIMEOUT` | `120` | Seconds a web request may run before the worker is restarted, 30 to 3600; out of bounds the container refuses to start |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
 | `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`. Changing it does not change the Docker mounts: mount a persistent directory at the configured path as well as the data directory |
 | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
