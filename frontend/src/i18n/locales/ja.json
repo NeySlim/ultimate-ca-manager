@@ -4019,7 +4019,7 @@
     "testMappingRefusalGroupDenied": "not a member of the required groups",
     "testMappingRefusalUnmapped": "no role mapping rule matches",
     "testMappingRefusalNoDefaultRole": "no role mapping rule and no default role",
-    "testMappingNotChecked": "Not checked here: the password, and the UCM account the sign-in would open (a local account or one bound to another identity with the same name, an account disabled in UCM, automatic account creation turned off, an e-mail that belongs to an account of another provider).",
+    "testMappingNotChecked": "Not checked here: the password, and the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic account creation turned off, an e-mail that belongs to an account of another provider).",
     "testMappingNotFound": "LDAPでユーザーが見つかりません",
     "testMappingResolvedRole": "解決されたロール",
     "testMappingAccess": "ログインアクセス",

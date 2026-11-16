@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # What the dry run cannot decide: the login may still refuse on these.
 NOT_CHECKED = ("Not checked by this test: the password, and the UCM account the sign-in would "
-               "open (a local account or one bound to another identity with the same name, "
+               "open (an account of the same name that this identity may not open, "
                "an account disabled in UCM, automatic account creation turned off, an e-mail that "
                "belongs to an account of another provider).")
 

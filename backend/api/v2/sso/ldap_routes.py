@@ -397,44 +397,17 @@ def _same_provider_or_idp(user, provider, legacy=False):
     return user.sso_orphan_of == provider.idp_key()
 
 
-DIRECTORY_UNIQUE_ATTRS = {'', 'objectguid', 'entryuuid'}
-
-
-def _directory_unique_id(provider, external_id):
-    """An LDAP id that names the entry in every directory (RFC 4530 entryUUID, AD
-    objectGUID), not a DN or another attribute two directories of one base DN may share."""
-    import uuid
-    if (provider.ldap_uid_attr or '').strip().lower() not in DIRECTORY_UNIQUE_ATTRS:
-        return False
-    try:
-        uuid.UUID(str(external_id))
-    except ValueError:
-        return False
-    return True
-
-
-def _same_idp_orphan_key(provider, key, external_id):
-    """Whether an orphan recorded under ``key`` and bound to ``external_id`` is this IdP's.
-    LDAP: a directory-unique id needs only the same base DN, whichever host serves it."""
-    if key in provider.idp_keys():
-        return True
-    if provider.provider_type != 'ldap' or not key.startswith('ldap:') or '|' not in key:
-        return False
-    return (key.partition('|')[2] == provider.directory_base_dn()
-            and _directory_unique_id(provider, external_id))
-
-
 def _orphan_with_id(provider, external_id):
     """The one account bound to ``external_id`` whose deleted provider served this
     same IdP; None when there is none, or several (a stable id is per IdP)."""
-    if not provider.idp_keys():
+    key = provider.idp_key()
+    if not key:
         return None
-    candidates = User.query.filter(
+    orphans = User.query.filter(
         User.sso_external_id == external_id,
         User.auth_source == provider.provider_type,
         User.sso_provider_id.is_(None),
-        User.sso_orphan_of.isnot(None)).all()
-    orphans = [u for u in candidates if _same_idp_orphan_key(provider, u.sso_orphan_of, external_id)]
+        User.sso_orphan_of == key).limit(2).all()
     return orphans[0] if len(orphans) == 1 else None
 
 

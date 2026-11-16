@@ -504,15 +504,22 @@ def test_no_rule_and_no_default_role_is_its_own_code(app, providers):
 
 # ── 4. Same IdP ─────────────────────────────────────────────────────────────
 
-def test_oidc_orphan_keyed_by_userinfo_is_taken_back_once_the_issuer_is_set(app, providers):
-    """Deleted without an issuer (key = UserInfo URL), recreated with one."""
+def test_oidc_orphan_is_taken_back_under_its_exact_idp_key_only(app, providers, auth_client):
+    """OIDC Core §5.7: iss and sub together identify the user. An orphan recorded under a
+    UserInfo URL is not the issuer's: Link to SSO attaches it, a sign-in does not."""
     name = _name()
-    _add(app, username=name, auth_source='oauth2', sso_orphan_of='oauth2:https://c.example/userinfo',
-         sso_external_id='sub-c', password_hash=NOPASS)
-    other = providers(oauth2_issuer='https://c2.example', oauth2_userinfo_url='https://c2.example/userinfo')
-    assert _login(app, other, name, {'sub': 'sub-c'}) == (None, 'sso_username_conflict')
-    same = providers(oauth2_issuer='https://c.example', oauth2_userinfo_url='https://c.example/userinfo/')
-    assert _login(app, same, name, {'sub': 'sub-c'}) == (name, None)
+    uid = _add(app, username=name, auth_source='oauth2', sso_orphan_of='oauth2:https://c.example/userinfo',
+               sso_external_id='sub-c', password_hash=NOPASS)
+    with_issuer = providers(oauth2_issuer='https://c.example', oauth2_userinfo_url='https://c.example/userinfo')
+    assert _login(app, with_issuer, name, {'sub': 'sub-c'}) == (None, 'sso_username_conflict')
+    assert auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': with_issuer}).status_code == 200
+    assert _login(app, with_issuer, name, {'sub': 'sub-c'}) == (name, None)
+    # Control: the provider recorded under that same key takes its orphan back by itself
+    other = _name()
+    _add(app, username=other, auth_source='oauth2', sso_orphan_of='oauth2:https://d.example/userinfo',
+         sso_external_id='sub-d', password_hash=NOPASS)
+    same_key = providers(oauth2_issuer=None, oauth2_userinfo_url='https://d.example/userinfo')
+    assert _login(app, same_key, other, {'sub': 'sub-d'}) == (other, None)
 
 
 def test_unbound_orphan_keyed_by_a_shared_userinfo_is_not_taken_by_name(app, providers):
@@ -535,7 +542,7 @@ def _ldap_orphan(app, name, external_id, base='ou=people,dc=example,dc=com'):
 
 
 @pytest.mark.parametrize('uid_attr', [None, 'entryUUID', 'objectGUID'])
-def test_ldap_orphan_with_a_directory_unique_id_is_taken_back_through_another_host(
+def test_ldap_orphan_is_not_taken_back_through_another_host_even_with_a_unique_id(
         app, providers, uid_attr):
     name = _name()
     guid = uuid.uuid4()
@@ -544,7 +551,7 @@ def test_ldap_orphan_with_a_directory_unique_id_is_taken_back_through_another_ho
     pid = providers(provider_type='ldap', ldap_server='10.0.0.7', ldap_uid_attr=uid_attr,
                     ldap_base_dn='OU=People,DC=example,DC=com')
     assert _login(app, pid, name, {'uid': ext, 'dn': f'uid={name},ou=people,dc=example,dc=com'}) \
-        == (name, None)
+        == (None, 'sso_username_conflict')
 
 
 @pytest.mark.parametrize('case', ['dn_fallback', 'other_base_dn', 'custom_uid_attr'])
