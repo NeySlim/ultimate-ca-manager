@@ -423,9 +423,23 @@ def hand_over_link(revoked_row):
         return None
     for b_row in _live_rows_linked_to(a_row.id, revoked_row.id):
         if related_cert.references(row_certificate(b_row), cert_a):
+            if not _still_linked(a_row, revoked_row.id, cert_a):
+                return None
             a_row.related_certificate_id = b_row.id
             return b_row
     return None
+
+
+def _still_linked(a_row, b_id, cert_a):
+    """*a_row* locked and re-read: True while it still holds *cert_a*, unrevoked and linked to
+    *b_id*. A renewal of A writes its links under this lock, so none is written back over it."""
+    from sqlalchemy.exc import InvalidRequestError
+    try:
+        fresh = db.session.get(Certificate, a_row.id, populate_existing=True, with_for_update=True)
+    except InvalidRequestError:  # deleted since it was read
+        return False
+    return (fresh is not None and not fresh.revoked and fresh.related_certificate_id == b_id
+            and bool(fresh.crt) and row_certificate(fresh) == cert_a)
 
 
 def _readable(row):
@@ -450,10 +464,31 @@ def _relink_or_leave(row, gone_id):
 
 
 def unlink_rows_naming(row_id):
-    """Rows linked to *row_id*, whose certificate is gone or replaced, relink or leave their pair."""
-    for other in Certificate.query.filter(Certificate.related_certificate_id == row_id,
-                                          Certificate.id != row_id).all():
-        _relink_or_leave(other, row_id)
+    """Rows linked to *row_id*, whose certificate is gone or replaced, relink or leave their pair.
+    Each is locked and re-read first, A before B as a renewal locks them: one a newer B took
+    meanwhile (link_issued, under that lock) keeps its new link."""
+    linked = Certificate.query.filter(Certificate.related_certificate_id == row_id,
+                                      Certificate.id != row_id).order_by(Certificate.id).all()
+    if not linked:
+        return
+    gone = _readable(db.session.get(Certificate, row_id))
+    bs = [r for r in linked if _is_b_of(r, gone)]
+    for r in [r for r in linked if r not in bs]:  # the A of *row_id* (or a row renewed since)
+        _relink_if_linked(r, row_id)
+    db.session.get(Certificate, row_id, with_for_update=True)
+    for r in bs:
+        _relink_if_linked(r, row_id)
+
+
+def _is_b_of(row, cert):
+    mine = _readable(row)
+    return cert is not None and mine is not None and related_cert.references(mine, cert)
+
+
+def _relink_if_linked(row, gone_id):
+    fresh = db.session.get(Certificate, row.id, populate_existing=True, with_for_update=True)
+    if fresh is not None and fresh.related_certificate_id == gone_id:
+        _relink_or_leave(fresh, gone_id)
 
 
 def leave_pair(row):

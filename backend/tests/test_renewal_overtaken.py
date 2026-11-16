@@ -563,6 +563,146 @@ def test_a_chain_pair_renews_a_naming_nothing_its_original_did_not(app, tmp_path
             db.session.remove()
 
 
+def test_a_link_handed_over_after_a_renewed_alone_is_not_written_back(app, tmp_path, monkeypatch):
+    """Newest B revoked alone: A's link goes back to the older B, unless A was renewed alone
+    since the older B was found, which unlinked both."""
+    from services.cert import related_pair
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'handover.db'}"):
+        a_id, (old_b, new_b) = _linked_rows(app, n_b=2)
+        found, fired = related_pair._live_rows_linked_to, []
+
+        def then_renewed(*args):
+            rows = found(*args)
+            if not fired:
+                fired.append(True)
+                _renew_elsewhere(app, a_id)
+            return rows
+
+        monkeypatch.setattr(related_pair, '_live_rows_linked_to', then_renewed)
+        with app.app_context():
+            CertificateService.revoke_certificate(new_b, reason='keyCompromise', revoke_related=False)
+            monkeypatch.undo()
+            db.session.expire_all()
+            a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, old_b)
+            assert fired and a.renewed_times == 1
+            assert (a.related_certificate_id, b.related_certificate_id) == (None, None)
+            db.session.remove()
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_a_link_handed_over_while_a_renews_alone_waits_and_writes_nothing_on_postgresql(
+        app, monkeypatch):
+    from models import CA
+    from services.cert.related_pair import hand_over_link
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_renewal_lock_order_pg import _race_with_an_in_place_renewal
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+    with _a_schema_of_our_own(f'renew_handover_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        a_id, (old_b, new_b) = _linked_rows(app, n_b=2)
+        _revoke_elsewhere(app, new_b, 'row')
+        with app.app_context():
+            ca_id = CA.query.filter_by(refid=db.session.get(Certificate, a_id).caref).one().id
+            db.session.remove()
+
+        def hand_over():
+            if hand_over_link(db.session.get(Certificate, new_b)) is not None:
+                db.session.commit()
+
+        blocked, errors = _race_with_an_in_place_renewal(app, url, monkeypatch, a_id, ca_id, hand_over)
+        assert blocked and not errors, errors
+        with app.app_context():
+            a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, old_b)
+            assert a.renewed_times == 1
+            assert (a.related_certificate_id, b.related_certificate_id) == (None, None)
+            db.session.remove()
+
+
+def _while_a_is_taken(app, url, a_id, b_id, work):
+    """Run *work* while another session holds A locked, moving its link to *b_id* as
+    link_issued does; returns whether *work* waited on that lock."""
+    from tests.test_renewal_lock_order_pg import _own_session, _pid_of, _waits_on_a_lock
+    holds, release, pids, errors = threading.Event(), threading.Event(), {}, []
+
+    def take_a():
+        with app.app_context():
+            engine, pids['linker'] = _own_session(url)
+            try:
+                db.session.get(Certificate, a_id, with_for_update=True).related_certificate_id = b_id
+                db.session.get(Certificate, b_id).related_certificate_id = a_id
+                db.session.flush()
+                holds.set()
+                release.wait(30)
+                db.session.commit()
+            finally:
+                holds.set()
+                db.session.remove()
+                engine.dispose()
+
+    def run():
+        with app.app_context():
+            engine, pids['work'] = _own_session(url)
+            try:
+                work()
+            except Exception as exc:  # noqa: BLE001
+                errors.append(repr(exc))
+            finally:
+                db.session.remove()
+                engine.dispose()
+
+    linker = threading.Thread(target=take_a)
+    linker.start()
+    assert holds.wait(30)
+    worker = threading.Thread(target=run)
+    worker.start()
+    blocked = _waits_on_a_lock(url, _pid_of(pids, 'work'))
+    release.set()
+    worker.join(60)
+    linker.join(60)
+    assert not errors, errors
+    return blocked
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_a_row_deleted_while_a_newer_b_takes_its_a_leaves_that_link_on_postgresql(app):
+    """Deleting A's B relinks A to an older B, unless a newer B took A meanwhile."""
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+    with _a_schema_of_our_own(f'renew_unlink_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        a_id, (older, gone, newer) = _linked_rows(app, n_b=3)
+        with app.app_context():
+            db.session.get(Certificate, a_id).related_certificate_id = gone
+            db.session.get(Certificate, newer).related_certificate_id = None
+            db.session.commit()
+            db.session.remove()
+        blocked = _while_a_is_taken(app, url, a_id, newer,
+                                    lambda: CertificateService.delete_certificate(gone))
+        with app.app_context():
+            assert db.session.get(Certificate, gone) is None
+            a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, newer)
+            assert blocked and (a.related_certificate_id, b.related_certificate_id) == (newer, a_id)
+            assert db.session.get(Certificate, older).related_certificate_id == a_id
+            db.session.remove()
+
+
+def test_a_link_is_handed_over_to_the_older_b(app, tmp_path):
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'handover-ok.db'}"):
+        a_id, (old_b, new_b) = _linked_rows(app, n_b=2)
+        with app.app_context():
+            CertificateService.revoke_certificate(new_b, reason='keyCompromise', revoke_related=False)
+            db.session.expire_all()
+            assert db.session.get(Certificate, a_id).related_certificate_id == old_b
+            db.session.remove()
+
+
 def _a_member_archived_since_read(app):
     """Judging A's own link re-reads B: the caller's view of B is taken before that."""
     from services.cert.renewal import RenewalError, renew_certificate_in_place
