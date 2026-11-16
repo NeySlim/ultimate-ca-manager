@@ -306,7 +306,6 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         db.session.rollback()
         raise
     staged = staged_all[members.index(cert)]
-    cert, ca = staged['cert'], staged['ca']
     cert_id = staged['cert_id']
     if not commit_or_rollback(logger, f'Failed to renew certificate {cert_id}'):
         raise RenewalError('Failed to renew certificate', 500)
@@ -318,20 +317,37 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         'new_serial': staged['new_serial'],
         'valid_from': utc_isoformat(staged['valid_from']),
         'valid_to': utc_isoformat(staged['valid_to']),
-        'ca_id': ca.id,
-        'ca_refid': ca.refid,
+        'ca_id': staged['ca_id'],
+        'ca_refid': staged['ca_refid'],
         'rekeyed': bool(rekey),
         'notices': staged['notices'],
-        'related': [{'cert_id': s['cert_id'], 'ca_id': s['ca'].id, 'new_serial': s['new_serial']}
+        'related': [{'cert_id': s['cert_id'], 'ca_id': s['ca_id'], 'new_serial': s['new_serial']}
                     for s in others],
     }
     crl_done = set()
     for s in [staged] + others:
-        _after_commit(s['cert'], s['ca'], s, username=username, actor_user_id=actor_user_id,
-                      rekey=rekey, regenerate_crl=regenerate_crl and s['ca'].id not in crl_done,
-                      trigger=trigger)
-        crl_done.add(s['ca'].id)
+        issuer = current_issuer(s['cert_id'])
+        _after_commit(s['cert'], issuer, s, username=username, actor_user_id=actor_user_id,
+                      rekey=rekey, regenerate_crl=regenerate_crl and issuer is not None
+                      and issuer[0] not in crl_done, trigger=trigger)
+        if issuer is not None:
+            crl_done.add(issuer[0])
     return outcome
+
+
+def current_issuer(cert_id):
+    """``(id, refid, cdp_enabled)`` of the CA the certificate row names now, read as plain
+    values: once committed, the record it was signed under may have been merged away."""
+    try:
+        row = db.session.execute(
+            select(CA.id, CA.refid, CA.cdp_enabled)
+            .join(Certificate, Certificate.caref == CA.refid)
+            .where(Certificate.id == cert_id)).first()
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.warning(f"Issuer of renewed certificate {cert_id} not read: {e}")
+        return None
+    return tuple(row) if row is not None else None
 
 
 def _refuse_taken(ca, issued, rows, trigger, username, locked=True, previous=()):
@@ -473,7 +489,9 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     _record_superseded(cert.id, ca, old_serial, old_valid_to, now, old_digest)
     _record_scts(cert.id, scts)
     return {
-        'cert': cert, 'cert_id': cert.id, 'ca': ca, 'old_serial': old_serial,
+        # Plain values: the outcome is built after the commit, when these rows may be gone
+        'cert': cert, 'cert_id': cert.id, 'ca': ca, 'ca_id': ca.id, 'ca_refid': ca.refid,
+        'old_serial': old_serial,
         'new_serial': new_serial, 'valid_from': cert.valid_from, 'valid_to': cert.valid_to,
         'notices': notices, 'cert_pem': cert_pem, 'key_pem': key_pem, 'related_to': related_to,
     }
@@ -816,8 +834,10 @@ def _record_scts(cert_id, scts) -> None:
         db.session.delete(row)
 
 
-def _after_commit(cert, ca, staged, *, username, actor_user_id, rekey, regenerate_crl, trigger) -> None:
-    """Each effect is tried on its own: a failure is logged, never raised."""
+def _after_commit(cert, issuer, staged, *, username, actor_user_id, rekey, regenerate_crl,
+                  trigger) -> None:
+    """Each effect is tried on its own: a failure is logged, never raised. *issuer* is the
+    ``current_issuer`` of the row, None when it names no CA any more."""
     cert_id = staged['cert_id']
     old_serial = staged['old_serial']
 
@@ -845,16 +865,16 @@ def _after_commit(cert, ca, staged, *, username, actor_user_id, rekey, regenerat
     try:
         if old_serial:
             from services.ocsp_service import OCSPService
-            OCSPService.invalidate_cached_responses(old_serial, ca_id=ca.id)
+            OCSPService.invalidate_cached_responses(old_serial, ca_id=staged['ca_id'])
     except Exception as e:
         logger.warning(f"OCSP cache of superseded serial {old_serial} not cleared: {e}")
 
     try:
-        if regenerate_crl and ca.cdp_enabled:
+        if regenerate_crl and issuer[2]:
             from services.crl import CRLService
-            CRLService.generate_crl(ca.id, username=username)
+            CRLService.generate_crl(issuer[0], username=username)
     except Exception as e:
-        logger.warning(f"CRL of CA {ca.id} not regenerated after renewing certificate {cert_id}: {e}")
+        logger.warning(f"CRL of CA {issuer[0]} not regenerated after renewing certificate {cert_id}: {e}")
 
     try:
         from services.audit_service import AuditService
@@ -876,7 +896,8 @@ def _after_commit(cert, ca, staged, *, username, actor_user_id, rekey, regenerat
 
     try:
         from services.webhook_service import emit_cert_renewed
-        emit_cert_renewed(cert.to_dict(), ca_refid=ca.refid, actor=username)
+        emit_cert_renewed(cert.to_dict(), ca_refid=issuer[1] if issuer else staged['ca_refid'],
+                          actor=username)
     except Exception as e:
         logger.warning(f"Renewal webhook of certificate {cert_id} not emitted: {e}")
 
