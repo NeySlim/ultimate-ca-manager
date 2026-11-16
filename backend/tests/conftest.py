@@ -163,7 +163,8 @@ if _pg_app.ENABLED:
 
 def pytest_addoption(parser):
     parser.addoption('--order-seed', type=int, default=None,
-                     help='shuffle the order of the test files with this seed (one process; xdist assigns files itself)')
+                     help='shuffle the order of the test FILES with this seed, never the tests inside a file; the seed is '
+                          'printed at the top of the report (one process; xdist assigns files itself)')
 
 
 def pytest_report_header(config):
