@@ -255,3 +255,30 @@ def test_a_block_with_rfc1421_headers_is_read_the_same_by_both_writes(app, auth_
     with app.app_context():
         row = TrustedCertificate.query.filter_by(fingerprint_sha256=cert.fingerprint(hashes.SHA256()).hex()).one()
         assert row.certificate_pem.encode() == _pem(cert)
+
+
+@pytest.mark.parametrize('label', ['CERTIFICATE', 'X509 CERTIFICATE'])
+def test_a_der_file_naming_the_pem_opening_is_still_read_as_der(app, auth_client, drop, label):
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'-----BEGIN {label}-----')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(x509.random_serial_number()).not_valid_before(now)
+            .not_valid_after(now + datetime.timedelta(days=30)).sign(key, hashes.SHA256()))
+    drop(cert)
+    r = _upload(auth_client, cert.public_bytes(serialization.Encoding.DER), 'odd.der')
+    assert r.status_code == 201, r.get_data(as_text=True)
+
+
+@pytest.mark.parametrize('write', sorted(WRITES))
+def test_a_block_left_open_after_a_certificate_refuses_the_entry(app, auth_client, drop, write):
+    """A chain cut short is refused whole: half of it is never stored in silence."""
+    _, first = _issue(f'cut-first-{write}')
+    _, second = _issue(f'cut-second-{write}')
+    drop(first)
+    cut = _pem(second).split(b'-----END')[0]
+    r = WRITES[write](auth_client, _pem(first) + cut)
+    assert r.status_code == 400, r.get_data(as_text=True)
+    with app.app_context():
+        assert TrustedCertificate.query.filter_by(
+            fingerprint_sha256=first.fingerprint(hashes.SHA256()).hex()).count() == 0
