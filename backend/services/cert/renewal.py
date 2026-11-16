@@ -306,7 +306,6 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         db.session.rollback()
         raise
     staged = staged_all[members.index(cert)]
-    cert, ca = staged['cert'], staged['ca']
     cert_id = staged['cert_id']
     if not commit_or_rollback(logger, f'Failed to renew certificate {cert_id}'):
         raise RenewalError('Failed to renew certificate', 500)
@@ -327,7 +326,7 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
     }
     crl_done = set()
     for s in [staged] + others:
-        issuer = _current_issuer(s['cert_id'])
+        issuer = current_issuer(s['cert_id'])
         _after_commit(s['cert'], issuer, s, username=username, actor_user_id=actor_user_id,
                       rekey=rekey, regenerate_crl=regenerate_crl and issuer is not None
                       and issuer[0] not in crl_done, trigger=trigger)
@@ -336,7 +335,7 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
     return outcome
 
 
-def _current_issuer(cert_id):
+def current_issuer(cert_id):
     """``(id, refid, cdp_enabled)`` of the CA the certificate row names now, read as plain
     values: once committed, the record it was signed under may have been merged away."""
     try:
@@ -838,7 +837,7 @@ def _record_scts(cert_id, scts) -> None:
 def _after_commit(cert, issuer, staged, *, username, actor_user_id, rekey, regenerate_crl,
                   trigger) -> None:
     """Each effect is tried on its own: a failure is logged, never raised. *issuer* is the
-    ``_current_issuer`` of the row, None when it names no CA any more."""
+    ``current_issuer`` of the row, None when it names no CA any more."""
     cert_id = staged['cert_id']
     old_serial = staged['old_serial']
 
