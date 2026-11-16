@@ -5,7 +5,7 @@ from auth.unified import require_auth
 from auth.session_start import begin_session
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from models import db, User
+from models import db, User, UserSSOIdentity
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
 from utils.datetime_utils import utc_now
@@ -22,7 +22,9 @@ from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
 from . import saml_sp
-from .account_state import SSO_NO_PASSWORD, bounded, describe_conflict, orphan_text
+from .account_state import (
+    SSO_NO_PASSWORD, bounded, describe_conflict, legacy_sso_account, orphan_text, own_identity,
+)
 from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
@@ -343,26 +345,26 @@ def _extract_external_id(provider, external_data):
     return val or None
 
 
-def _bind_external_id(user, provider, external_id):
-    """Bind the stable id to the account (TOFU). Never replaces an id already
-    bound, nor takes one another account of this provider owns. True if bound."""
-    if not external_id or user.sso_external_id == external_id:
+def _bind_external_id(row, provider, external_id):
+    """Bind the stable id to the row (TOFU). Never replaces an id already bound,
+    nor takes one another account of this provider owns. True if bound."""
+    if not external_id or row.external_id == external_id:
         return True
-    if user.sso_external_id:
+    username = row.user.username if row.user is not None else '?'
+    if row.external_id:
         logger.warning(
-            f"SSO external id of '{user.username}' is already bound; not replacing it")
+            f"SSO external id of '{username}' is already bound; not replacing it")
         return False
-    taken = User.query.filter(
-        User.sso_provider_id == provider.id,
-        User.sso_external_id == external_id,
-        User.id != user.id,
+    taken = UserSSOIdentity.query.filter(
+        UserSSOIdentity.provider_id == provider.id,
+        UserSSOIdentity.external_id == external_id,
     ).first()
-    if taken:
+    if taken is not None and taken is not row:
         logger.warning(
-            f"SSO external id {external_id!r} already bound to '{taken.username}'; "
-            f"not rebinding to '{user.username}'")
+            f"SSO external id {external_id!r} already bound to '{taken.user.username}'; "
+            f"not rebinding to '{username}'")
         return False
-    user.sso_external_id = external_id
+    row.bind(external_id)
     return True
 
 
@@ -372,54 +374,56 @@ UNMAPPED = 'sso_unmapped'
 NO_DEFAULT_ROLE = 'sso_no_default_role'
 
 
+def _same_idp_orphans(user, provider):
+    """Rows of ``user`` a deleted provider for this exact IdP left. Exact key only: a
+    UserInfo URL may serve several issuers (one Entra ID endpoint)."""
+    key = provider.idp_key()
+    return [row for row in user.sso_identities
+            if key and row.provider_id is None and row.orphan_of == key]
+
+
+def _claimable(user, provider):
+    """The row of ``user`` an identity whose stable id matches nobody may take: its own
+    attachment to this provider not bound yet, else an unbound orphan of this same IdP.
+    A row bound to another identity is never taken (OIDC Core §5.7)."""
+    own = own_identity(user, provider)
+    if own is not None:
+        return own if own.external_id is None else None
+    return next((row for row in _same_idp_orphans(user, provider) if row.external_id is None), None)
+
+
 def _adoptable(user, provider):
-    """Whether an identity whose stable id matches nobody may claim ``user``:
-    an account of this provider (provisioned, or linked by an admin) not bound yet.
-    A local account, or one bound to another identity, is never claimed (OIDC Core §5.7)."""
-    if user.sso_external_id:
-        return False
-    if (user.auth_source or 'local') == 'local':
-        # SSO account from before migration 024 (which may have set its provider),
-        # never converted back by an admin (unlink forces a password change).
-        return (user.password_hash == SSO_NO_PASSWORD and not user.force_password_change
-                and _same_provider_or_idp(user, provider, legacy=True))
-    return user.auth_source == provider.provider_type and _same_provider_or_idp(user, provider)
-
-
-def _same_provider_or_idp(user, provider, legacy=False):
-    """Linked to this provider, or orphaned by a deleted provider for this same IdP.
-    An account with no recorded IdP is claimable only if it predates migration 024.
-    Exact key only: a UserInfo URL may serve several issuers (one Entra ID endpoint)."""
-    if user.sso_provider_id is not None:
-        return user.sso_provider_id == provider.id
-    if user.sso_orphan_of is None:
-        return legacy
-    return user.sso_orphan_of == provider.idp_key()
+    """Whether an identity whose stable id matches nobody may claim ``user`` by name.
+    An account attached to other providers only is never claimed: an administrator
+    attaches this one to it."""
+    return _claimable(user, provider) is not None or legacy_sso_account(user)
 
 
 def _orphan_with_id(provider, external_id):
-    """The one account bound to ``external_id`` whose deleted provider served this
-    same IdP; None when there is none, or several (a stable id is per IdP)."""
+    """The one row bound to ``external_id`` whose deleted provider served this same IdP,
+    on an account not attached to this provider already; None when there is none, or
+    several (a stable id is per IdP)."""
     key = provider.idp_key()
     if not key:
         return None
-    orphans = User.query.filter(
-        User.sso_external_id == external_id,
-        User.auth_source == provider.provider_type,
-        User.sso_provider_id.is_(None),
-        User.sso_orphan_of == key).limit(2).all()
-    return orphans[0] if len(orphans) == 1 else None
+    rows = UserSSOIdentity.query.filter(
+        UserSSOIdentity.external_id == external_id,
+        UserSSOIdentity.provider_id.is_(None),
+        UserSSOIdentity.orphan_of == key).limit(2).all()
+    if len(rows) != 1 or own_identity(rows[0].user, provider) is not None:
+        return None
+    return rows[0]
 
 
 def _bound_by_dn(provider, external_data, external_id):
-    """An LDAP account of this provider bound by its DN fallback, now that the
+    """The row of this LDAP provider bound by its DN fallback, now that the
     directory returns a stable uid for the DN the user bind just proved."""
     from sqlalchemy import func
     dn = str((external_data or {}).get('dn') or '').strip()
     if provider.provider_type != 'ldap' or not dn or dn == external_id:
         return None
-    return User.query.filter(User.sso_provider_id == provider.id,
-                             func.lower(User.sso_external_id) == dn.lower()).first()
+    return UserSSOIdentity.query.filter(UserSSOIdentity.provider_id == provider.id,
+                                        func.lower(UserSSOIdentity.external_id) == dn.lower()).first()
 
 
 def _email_unverified(provider, external_data):
@@ -452,10 +456,11 @@ def _refuse_username_conflict(provider, username, account):
 
 def _refuse_email_conflict(provider, username, email, account, unverified):
     """No second account for an e-mail an account this identity may not open owns."""
-    # This provider may adopt it: only a verified e-mail matches it, Link to SSO would not.
-    if unverified and _adoptable(account, provider):
-        held = (f"is linked to {provider.name!r}" if account.sso_provider_id == provider.id
-                else f"has {orphan_text(account)}, left by this same IdP")
+    # This provider may adopt it: only a verified e-mail matches it, attaching would not.
+    row = _claimable(account, provider) if unverified else None
+    if row is not None:
+        held = (f"is attached to {provider.name!r}, not bound yet" if row.provider_id is not None
+                else f"has {orphan_text(row)}, left by this same IdP")
         state = (f"{held} but the IdP marks the e-mail unverified "
                  f"(email_verified false), so it is not matched by it")
         remedy = "have the IdP verify the e-mail address"
@@ -464,7 +469,8 @@ def _refuse_email_conflict(provider, username, email, account, unverified):
     return _refuse(username, (f"SSO login via {provider.name!r} refused for {username!r}: the e-mail "
                               f"{bounded(email)!r} belongs to the account {account.username!r}, which "
                               f"{state}; no second account is created ({remedy}; for another person, create "
-                              f"an account named {username!r} and link it, removing its local password)"),
+                              f"an account named {username!r} and attach this provider to it, removing "
+                              f"its local password)"),
                    EMAIL_CONFLICT)
 
 
@@ -478,65 +484,68 @@ def _refuse_unmapped(provider, username):
 
 def _email_owner(provider, account, unverified):
     """An account owning the presented e-mail that this identity may not open and whose
-    existence a new account would duplicate: one linked to another provider, one left
-    without provider by another or unknown IdP, or one this provider may adopt that an
-    unverified e-mail cannot match."""
-    if (account.auth_source or 'local') == 'local':
+    existence a new account would duplicate: one attached to other providers or left by
+    another or unknown IdP only, or one this provider may adopt that an unverified e-mail
+    cannot match. One bound to another identity of this IdP is another person's."""
+    if account.is_local:
         return False  # e-mail is unique among local accounts only (#136)
-    if account.sso_provider_id is not None and account.sso_provider_id != provider.id:
+    if own_identity(account, provider) is None and not _same_idp_orphans(account, provider):
         return True
-    if account.sso_provider_id is None and not _same_provider_or_idp(account, provider):
-        return True
-    return unverified and _adoptable(account, provider)
+    return unverified and _claimable(account, provider) is not None
 
 
 def _resolve_sso_account(provider, username, email, external_data):
-    """(account, rebind, conflict, email_owner): the local account this identity opens,
-    whether it is the DN-bound one moving to the stable uid, the account of the same
-    name it may not claim, and the one owning its e-mail it may not claim either.
+    """(account, row, rebind, conflict, email_owner): the local account this identity opens
+    and the identity row it opens it with (None: a legacy account gets one), whether that
+    row is the DN-bound one moving to the stable uid, the account of the same name it may
+    not claim, and the one owning its e-mail it may not claim either.
     Reads only: the LDAP door counts its attempt on what this finds."""
     from sqlalchemy import func
     external_id = _extract_external_id(provider, external_data)
 
-    # 1. Stable-identifier match — robust to username/email changes (primary).
-    user = None
+    # 1. Stable-identifier match: robust to username/email changes (primary).
+    row = None
     rebind = False
     if external_id:
-        user = User.query.filter_by(
-            sso_provider_id=provider.id, sso_external_id=external_id).first()
-        if not user:
-            user = _bound_by_dn(provider, external_data, external_id)
-            rebind = user is not None
-        if not user:
-            user = _orphan_with_id(provider, external_id)
+        row = UserSSOIdentity.query.filter_by(
+            provider_id=provider.id, external_id=external_id).first()
+        if row is None:
+            row = _bound_by_dn(provider, external_data, external_id)
+            rebind = row is not None
+        if row is None:
+            row = _orphan_with_id(provider, external_id)
+    if row is not None:
+        return row.user, row, rebind, None, None
 
-    # 2. Not bound yet (legacy, or linked by an admin): match by username, but
+    # 2. Not bound yet (legacy, or attached by an admin): match by username, but
     #    only an account this identity may claim.
     conflict = None
-    if not user:
-        user = User.query.filter_by(username=username).first()
-        if user and not _adoptable(user, provider):
-            conflict, user = user, None
+    user = User.query.filter_by(username=username).first()
+    if user is not None:
+        if _adoptable(user, provider):
+            return user, _claimable(user, provider), False, None, None
+        conflict = user
 
-    # 3. An account an admin linked to this provider that owns this email but
+    # 3. An account an admin attached to this provider that owns this email but
     #    whose username differs (#138). Never a local or already bound account,
     #    nor by an e-mail the OIDC IdP says is unverified.
     email_owner = None
-    if not user and email:
+    if email:
         unverified = _email_unverified(provider, external_data)
         norm = email.strip().lower()
-        candidates = User.query.filter(func.lower(User.email) == norm).all()
+        candidates = User.query.filter(func.lower(User.email) == norm).order_by(User.id).all()
         if not unverified:
-            user = next((u for u in candidates
-                         if (u.auth_source or 'local') != 'local' and _adoptable(u, provider)), None)
-        if not user:
-            email_owner = next((u for u in candidates if _email_owner(provider, u, unverified)), None)
-    return user, rebind, conflict, email_owner
+            for candidate in candidates:
+                found = _claimable(candidate, provider)
+                if found is not None:
+                    return candidate, found, False, None, None
+        email_owner = next((u for u in candidates if _email_owner(provider, u, unverified)), None)
+    return None, None, False, conflict, email_owner
 
 
 def _ldap_local_account(provider, identity):
     """The local account a bind of this directory entry would open or be refused on."""
-    user, _rebind, conflict, _owner = _resolve_sso_account(
+    user, _row, _rebind, conflict, _owner = _resolve_sso_account(
         provider, identity['username'], identity.get('email', ''), identity)
     return user or conflict
 
@@ -548,14 +557,15 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         tuple: (user, error_code) - user object or None, and error code if failed
     """
     external_id = _extract_external_id(provider, external_data)
-    user, rebind, conflict, email_owner = _resolve_sso_account(provider, username, email, external_data)
+    user, row, rebind, conflict, email_owner = _resolve_sso_account(
+        provider, username, email, external_data)
 
     if not user and conflict:
         return _refuse_username_conflict(provider, username, conflict)
 
     if user and not user.active:
         # A disabled account is a refused login: every caller checks it a
-        # few lines on. Synchronising first bound `sso_external_id`, which
+        # few lines on. Synchronising first bound the stable identity, which
         # decides whose account this is, for good.
         logger.warning(
             f"SSO sync skipped for '{username}': the local account is disabled")
@@ -565,22 +575,19 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         return _refuse_unmapped(provider, username)
 
     if user:
-        # Backfill auth_source/sso_provider_id for users created before
-        # migration 024 — useful when several providers share a directory
-        # and the migration could not infer the right one.
-        if (user.auth_source or 'local') == 'local' and user.password_hash == SSO_NO_PASSWORD:
-            user.auth_source = provider.provider_type
-            user.sso_provider_id = provider.id
-        elif user.sso_provider_id != provider.id:
-            user.sso_provider_id = provider.id  # unlinked, or its provider was deleted
-        user.sso_orphan_of = None
+        if row is None:
+            # An SSO account from before migration 024: the first provider to open it records itself.
+            row = UserSSOIdentity(provider_id=provider.id)
+            user.sso_identities.append(row)
+        elif row.provider_id is None:
+            row.provider_id, row.orphan_of = provider.id, None  # taken back by the same IdP
 
         # Bind the stable id (trust-on-first-use) for future stable matching.
         if rebind:
             logger.info(f"SSO external id of '{user.username}' moves from its DN to the LDAP uid")
-            user.sso_external_id = external_id
+            row.bind(external_id)
         else:
-            _bind_external_id(user, provider, external_id)
+            _bind_external_id(row, provider, external_id)
 
         # ── Userinfo sync (email, full name) ─────────────────────────────
         # Controlled by `auto_update_users`. Does NOT touch the role.
@@ -677,8 +684,8 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     # Auto-create a distinct SSO account. The email may already belong to a LOCAL
     # account — that's fine: SSO identity is the stable external id, never the
     # email, so the two accounts coexist (email is unique only among local
-    # accounts). An admin who wants a single merged account links them instead
-    # (POST /api/v2/users/<id>/link-sso). See #136/#138.
+    # accounts). An admin who wants a single account attaches the provider to the
+    # existing one instead (POST /api/v2/users/<id>/sso-identities). See #136/#138.
     effective_email = email or f'{username}@sso.local'
 
     # Creation path keeps the historical fallback to default_role.
@@ -692,10 +699,9 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         role=role,
         active=True,
         last_login=utc_now(),
-        auth_source=provider.provider_type,
-        sso_provider_id=provider.id,
-        sso_external_id=external_id,
     )
+    user.sso_identities.append(UserSSOIdentity(provider_id=provider.id))
+    user.sso_identities[0].bind(external_id)
     if mapped_custom is not None:
         user.custom_role_id = mapped_custom.id
         user.custom_role_source = 'sso'

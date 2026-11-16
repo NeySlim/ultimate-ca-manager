@@ -4,7 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 # Core models
-from models.user import User, UserSession
+from models.user import User, UserSession, UserSSOIdentity
 from models.system_config import SystemConfig
 from models.ca import CA
 from models.certificate import Certificate

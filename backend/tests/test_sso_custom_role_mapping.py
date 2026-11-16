@@ -1,4 +1,5 @@
 """Custom roles in the SSO role mapping (migration 109, resolution, sync, guards)."""
+from tests.sso_identity_support import delete_users_of
 import importlib
 import json
 import os
@@ -63,7 +64,8 @@ def provider(app):
 
     yield _make
     with app.app_context():
-        User.query.filter(User.sso_provider_id.in_(made)).delete(synchronize_session=False)
+        for pid in made:
+            delete_users_of(pid)
         SSOProvider.query.filter(SSOProvider.id.in_(made)).delete(synchronize_session=False)
         db.session.commit()
 

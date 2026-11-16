@@ -4,6 +4,7 @@ Microsoft Entra ID's UserInfo endpoint never returns ``groups`` nor ``roles``:
 they only exist in the ID token. The groups of a login are those of its ID
 token (same ``sub``, same nonce) and of its UserInfo response, nothing else.
 """
+from tests.sso_identity_support import users_of
 import base64
 import json
 import logging
@@ -109,7 +110,7 @@ def entra(app, monkeypatch):
     yield login
     with app.app_context():
         SSOSession.query.filter_by(provider_id=pid).delete()
-        _cleanup([u.username for u in User.query.filter_by(sso_provider_id=pid).all()])
+        _cleanup([u.username for u in users_of(pid).all()])
         db.session.delete(db.session.get(SSOProvider, pid))
         for opid, enabled in others:
             db.session.get(SSOProvider, opid).enabled = enabled

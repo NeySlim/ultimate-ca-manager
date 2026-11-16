@@ -386,8 +386,8 @@ def test_steps_146_and_148_leave_a_2254_order_without_replaced_certificates(upgr
 
 def test_step_150_never_hands_out_an_id_a_row_still_names(upgraded):
     db, _ = upgraded
-    db.run("INSERT INTO users (username, email, password_hash, role, auth_source) "
-           "VALUES ('new', 'new@example.test', 'x', 'viewer', 'local')")
+    db.run("INSERT INTO users (username, email, password_hash, role) "
+           "VALUES ('new', 'new@example.test', 'x', 'viewer')")
     assert db.run("SELECT id FROM users WHERE username = 'new'") == [(8,)]
 
 

@@ -105,6 +105,7 @@ GENERIC_SECTIONS = (
     'compromised_keys',
     'role_permissions',
     'group_members',
+    'user_sso_identities',
     'webauthn_credentials',
     'ad_connector',
     'webhook_endpoints',
@@ -692,6 +693,7 @@ class RestoreCoreMixin:
 
         # Auth restores
         self._restore_sso_providers(backup_data, results)
+        self._restore_legacy_sso_identities(results)
         self._restore_hsm_providers(backup_data, results, plan)
         self._restore_api_keys(backup_data, results, plan)
         self._restore_auth_certificates(backup_data, results, plan)
@@ -750,6 +752,9 @@ class RestoreCoreMixin:
         """
         from models import User
 
+        # An archive older than user_sso_identities carries the provider on the account row
+        legacy = not _carries(backup_data, 'user_sso_identities')
+        self._legacy_sso_identities = []
         for user_data in backup_data.get('users', []):
             existing = User.query.filter_by(
                 username=user_data['username']).first()
@@ -767,12 +772,46 @@ class RestoreCoreMixin:
 
             if not carried_hash:
                 existing.password_hash = previous_hash
+            if legacy and 'auth_source' in user_data:
+                self._legacy_sso_identities.append((existing, user_data))
             results['users'] += 1
 
         db.session.flush()
         nested = restore_nested_webauthn(backup_data, plan)
         if nested:
             results['webauthn_credentials'] = nested
+
+    def _restore_legacy_sso_identities(self, results: Dict) -> None:
+        """The identity rows of an archive's account rows that carry their provider (2.254, or
+        3.0 before user_sso_identities), once the providers are back: the same rows an upgrade
+        gives them. A provider this installation does not hold leaves an orphan of an unknown IdP."""
+        from migrations._from_2_254 import step
+        from models import UserSSOIdentity
+        from models.sso import SSOProvider
+
+        pending = getattr(self, '_legacy_sso_identities', [])
+        if not pending:
+            return
+        db.session.flush()
+        provider_ids = {pid for (pid,) in db.session.query(SSOProvider.id)}
+        accounts = []
+        for user, row in pending:
+            if user.sso_identities:
+                continue  # the account here has its own rows: a merge keeps them
+            ref = row.get('sso_provider_id_ref') or {}
+            here = SSOProvider.query.filter_by(name=ref['name']).first() if ref.get('name') else None
+            accounts.append((user.id, row.get('auth_source'), here.id if here else None,
+                             row.get('sso_external_id'), row.get('sso_orphan_of'),
+                             user.password_hash, user.force_password_change))
+        made = step('166_user_sso_identities').identity_rows(sorted(accounts), provider_ids)
+        for user_id, provider_id, orphan_of, external_id in made:
+            identity = UserSSOIdentity(user_id=user_id, provider_id=provider_id, orphan_of=orphan_of)
+            identity.bind(external_id)
+            db.session.add(identity)
+        db.session.flush()
+        self._legacy_sso_identities = []
+        if made:
+            results['user_sso_identities'] = results.get('user_sso_identities', 0) + len(made)
 
     @staticmethod
     def _apply_ca_revocation(ca, ca_data: Dict, here_revocation=None) -> None:

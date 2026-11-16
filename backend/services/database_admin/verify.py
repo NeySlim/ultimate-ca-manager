@@ -478,11 +478,11 @@ def _partial_index_reason(index: dict) -> Optional[str]:
     """Why this index cannot be checked by a global GROUP BY, if it cannot.
 
     A partial index (``CREATE UNIQUE INDEX ... WHERE ...``) constrains a subset
-    of the rows — UCM has one, ``ix_users_email_local``, which makes an email
-    unique among LOCAL accounts only. A GROUP BY over the whole table would
-    report the SSO account sharing that email as a duplicate and block a
-    migration that is perfectly correct, so the index is declared unverifiable
-    instead of being answered wrongly.
+    of the rows, e.g. ``uq_windows_enrollment_profiles_default``, which allows
+    one default profile. A GROUP BY over the whole table would report the
+    profiles that are not the default as duplicates and block a migration that
+    is perfectly correct, so the index is declared unverifiable instead of being
+    answered wrongly.
     """
     options = index.get('dialect_options') or {}
     if any(key.endswith('_where') for key in options):

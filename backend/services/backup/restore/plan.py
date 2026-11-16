@@ -250,6 +250,9 @@ class RestorePlan:
             # with two configurations and used whichever the query returned.
             return next(iter(index.values()), None)
 
+        if section_name == _SSO_IDENTITIES:
+            return self._sso_identity_here(row)
+
         if not _identified_by_a_reference(section):
             return self._claimed(section_name, _identity_key(
                 row, section.identity, _temporal_identity(section_name)), row)
@@ -259,6 +262,21 @@ class RestorePlan:
         if key not in index and self.source_numbers_hold(section_name, row):
             key = _identity_key(row, section.identity, _temporal_identity(section_name))
         return self._claimed(section_name, key, row)
+
+    def _sso_identity_here(self, row: Dict[str, Any]) -> Optional[Any]:
+        """The attachment here an archived one is: the account's row for the same provider,
+        else, for one whose provider is not here, its orphan of the same IdP.
+        An orphan's identity holds NULLs, which the generic index matches with nothing."""
+        from models import UserSSOIdentity
+        user_id = self.resolve(_SSO_IDENTITIES, row, 'user_id')
+        if user_id is None:
+            return None
+        provider_id = self.resolve(_SSO_IDENTITIES, row, 'provider_id')
+        query = UserSSOIdentity.query.filter_by(user_id=user_id, provider_id=provider_id)
+        if provider_id is None:
+            query = query.filter_by(orphan_of=row.get('orphan_of'))
+        found = query.order_by(UserSSOIdentity.id).first()
+        return found.id if found is not None else None
 
     def _claimed(self, section_name: str, key: Tuple, row: Dict[str, Any]) -> Optional[Any]:
         """The row here for that identity, by rank: the n-th archived row of it takes the n-th oldest."""
@@ -379,6 +397,9 @@ class RestorePlan:
             self._archived_by_identity[section_name] = index
         return index.get(_identity_key(identity, fields,
                                        _temporal_identity(section_name)))
+
+
+_SSO_IDENTITIES = 'user_sso_identities'
 
 
 def _identity_key(values: Dict[str, Any], fields: Tuple[str, ...],

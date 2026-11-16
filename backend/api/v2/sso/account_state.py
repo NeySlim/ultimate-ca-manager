@@ -1,21 +1,33 @@
 """Where an account stands with respect to a provider, in words an administrator acts on.
 
-An account belongs to one provider and one stable identity; these texts go to the
-server log and the audit log only, never to the person signing in.
+An account is opened by the providers it has a row for in ``user_sso_identities``, each with
+one stable identity; these texts go to the server log and the audit log only, never to the
+person signing in.
 """
 from models import db
 from models.sso import SSOProvider
 
 SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
+ID_BOUND = 64
+
+
+def own_identity(user, provider):
+    """The row attaching ``user`` to ``provider``, or None."""
+    return next((row for row in user.sso_identities if row.provider_id == provider.id), None)
+
+
+def legacy_sso_account(user) -> bool:
+    """An SSO account from before migration 024: no row, no password, owing no change.
+    Unlink leaves a password change owed, so an account an administrator detached is not one."""
+    return user.is_local and user.password_hash == SSO_NO_PASSWORD and not user.force_password_change
 
 
 def sso_only(user) -> bool:
-    """An account without a local password that its SSO provider alone opens: no self-service
-    door may hand it one. An account unlinked to set a password (a change owed) is not one."""
+    """An account without a local password that its providers alone open: no self-service
+    door may hand it one. An account detached to set a password (a change owed) is not one."""
     if user.password_hash != SSO_NO_PASSWORD:
         return False
-    return (user.auth_source or 'local') != 'local' or not user.force_password_change
-ID_BOUND = 64
+    return not user.is_local or not user.force_password_change
 
 
 def bounded(value, limit=ID_BOUND):
@@ -29,44 +41,48 @@ def _provider_name(provider_id):
     return row.name if row else f'#{provider_id}'
 
 
-def orphan_text(user):
-    if user.sso_orphan_of:
-        return f"no provider (orphan of {bounded(user.sso_orphan_of)!r})"
+def orphan_text(row):
+    if row.orphan_of:
+        return f"no provider (orphan of {bounded(row.orphan_of)!r})"
     return "no provider (its IdP is unknown)"
+
+
+def identity_text(row):
+    """One row, as the audit names it."""
+    ident = f", identity {bounded(row.external_id)!r}" if row.external_id else ''
+    if row.provider_id is not None:
+        return f"provider {_provider_name(row.provider_id)!r}{ident}"
+    return orphan_text(row) + ident
+
+
+def attachments_text(user):
+    """Every row of ``user``, or that it has none."""
+    if user.is_local:
+        return "a local account"
+    return '; '.join(identity_text(row) for row in user.sso_identities)
 
 
 def describe_conflict(user, provider):
     """(state, remedy) of an account of that name ``provider`` may not open."""
     target = repr(provider.name)
-    if user.sso_provider_id is not None and user.sso_provider_id != provider.id:
-        former = _provider_name(user.sso_provider_id)
-        return (f"is linked to provider {former!r}",
-                f"if it is the same person, Link to SSO moves it to {target}, "
-                f"after which {former!r} no longer opens it")
-    if user.sso_provider_id == provider.id:
-        if user.sso_external_id:
-            return (f"is bound to another identity of {target} ({bounded(user.sso_external_id)!r})",
-                    "if the identity changed at the IdP, Link to SSO resets its identity "
-                    "and the next sign-in through this provider binds the new one")
-        return (f"is of type {user.auth_source!r}, not {provider.provider_type!r}",
-                f"Link to SSO attaches it to {target}")
-    if (user.auth_source or 'local') == 'local' and not user.sso_orphan_of:
-        return ("is a local account",
-                f"if it is the same person, Link to SSO attaches it to {target}")
-    state = "has " + orphan_text(user)
-    if user.sso_external_id:
-        state += f", bound to identity {bounded(user.sso_external_id)!r}"
-    return state, f"if it is the same person, Link to SSO attaches it to {target}"
-
-
-def describe_origin(user, provider):
-    """Where an account Link to SSO attaches to ``provider`` comes from."""
-    ident = f", identity {bounded(user.sso_external_id)!r}" if user.sso_external_id else ''
-    if user.sso_provider_id == provider.id:
-        return (f"identity {bounded(user.sso_external_id)!r} reset" if user.sso_external_id
-                else "already linked to it, not bound yet")
-    if user.sso_provider_id is not None:
-        return f"was linked to provider {_provider_name(user.sso_provider_id)!r}{ident}"
-    if (user.auth_source or 'local') == 'local' and not user.sso_orphan_of:
-        return "was a local account" + ident
-    return "had " + orphan_text(user) + ident
+    attach = f"if it is the same person, attach provider {target} to the account"
+    own = own_identity(user, provider)
+    if own is not None and own.external_id:
+        return (f"is bound to another identity of {target} ({bounded(own.external_id)!r})",
+                f"if the identity changed at the IdP, reset the identity of its {target} "
+                "attachment and the next sign-in through this provider binds the new one")
+    if user.is_local:
+        return "is a local account", attach
+    live = [row for row in user.sso_identities if row.provider_id is not None]
+    gone = [row for row in user.sso_identities if row.provider_id is None]
+    parts = []
+    if live:
+        parts.append("is attached to " + ', '.join(
+            f"provider {_provider_name(row.provider_id)!r}" for row in live))
+    for row in gone:
+        text = "has " + orphan_text(row)
+        if row.external_id:
+            text += f", bound to identity {bounded(row.external_id)!r}"
+        parts.append(text)
+    keep = "; the providers it is attached to keep opening it" if live else ''
+    return '; it '.join(parts), attach + keep

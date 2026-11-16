@@ -10,7 +10,7 @@ from auth.unified import require_auth
 from auth.session_start import begin_session
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from models import db, User
+from models import db, User, UserSSOIdentity
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
 from services.oidc_id_token import (OIDCValidationError, unverified_claims_error,
@@ -144,8 +144,8 @@ def _saml_logout_request(provider):
 
     users = {u for (u,) in db.session.query(SSOSession.user_id).filter_by(
         provider_id=provider.id, sso_name_id=name_id)}
-    users |= {u for (u,) in db.session.query(User.id).filter_by(
-        sso_provider_id=provider.id, sso_external_id=name_id)}
+    users |= {u for (u,) in db.session.query(UserSSOIdentity.user_id).filter_by(
+        provider_id=provider.id, external_id=name_id)}
     SSOSession.query.filter_by(provider_id=provider.id, sso_name_id=name_id).delete()
     db.session.commit()
     # With SessionIndex values only the sessions they name end (SAML Core §3.7.3.2);

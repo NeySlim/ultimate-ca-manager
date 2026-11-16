@@ -51,24 +51,37 @@ def target(app):
         os.unlink(path)
 
 
-def _add_user(engine, user_id, username, *, email=None, auth_source='local',
+def _add_user(engine, user_id, username, *, email=None,
               totp_secret=None):
     """Insert one user row directly, the way the bulk loader does."""
     with engine.begin() as conn:
         conn.execute(
             text('INSERT INTO users (id, username, email, password_hash, role, '
-                 'auth_source, totp_secret) VALUES (:id, :username, :email, '
-                 ':password_hash, :role, :auth_source, :totp_secret)'),
+                 'totp_secret) VALUES (:id, :username, :email, '
+                 ':password_hash, :role, :totp_secret)'),
             {
                 'id': user_id,
                 'username': username,
                 'email': email or f'{username}@example.test',
                 'password_hash': 'not-a-real-hash',
                 'role': 'viewer',
-                'auth_source': auth_source,
                 'totp_secret': totp_secret,
             },
         )
+
+
+PARTIAL = 'uq_windows_enrollment_profiles_default'
+
+
+def _add_profile(engine, profile_id, *, is_default=False):
+    """One Windows enrolment profile: at most one is the default (a partial unique index)."""
+    with engine.begin() as conn:
+        conn.execute(
+            text('INSERT INTO windows_enrollment_profiles (id, name, is_default, enabled, '
+                 'policy_id, policy_oid_root, validity_days) VALUES (:id, :name, :is_default, 1, '
+                 ':policy, :oid, 365)'),
+            {'id': profile_id, 'name': f'profile-{profile_id}', 'is_default': is_default,
+             'policy': f'policy-{profile_id}', 'oid': f'1.2.3.{profile_id}'})
 
 
 def _populate(engine):
@@ -291,32 +304,28 @@ class TestUniqueConstraints:
         assert result['constraints_checked'] > 0
         assert result['unique_indexes_checked'] > 0
         skipped = {entry['constraint'] for entry in result['skipped']}
-        assert 'ix_users_email_local' in skipped
+        assert PARTIAL in skipped
         assert result['skipped_count'] == len(result['skipped'])
         assert all(entry['reason'] for entry in result['skipped'])
 
     def test_partial_unique_index_is_not_a_false_positive(self, target):
-        # Email is unique among LOCAL accounts only (ix_users_email_local is a
-        # partial index): an SSO account sharing the address is legitimate and
-        # a global GROUP BY would wrongly condemn the migration.
-        _add_user(target, 1, 'local_user', email='shared@example.test',
-                  auth_source='local')
-        _add_user(target, 2, 'sso_user', email='shared@example.test',
-                  auth_source='sso')
+        # One default profile at most (a partial index): two profiles that are not
+        # the default are legitimate and a global GROUP BY would wrongly condemn
+        # the migration.
+        _add_profile(target, 1)
+        _add_profile(target, 2)
 
         result = check_unique_constraints(target)
 
         assert result['duplicate_groups'] == 0
         partial = [entry for entry in result['skipped']
-                   if entry['constraint'] == 'ix_users_email_local']
+                   if entry['constraint'] == PARTIAL]
         assert len(partial) == 1
         assert 'partial index' in partial[0]['reason']
 
     def test_duplicate_on_a_unique_constraint_is_detected(self, target, monkeypatch):
-        _add_user(target, 1, 'local_user', email='shared@example.test',
-                  auth_source='local')
-        _add_user(target, 2, 'sso_user', email='shared@example.test',
-                  auth_source='sso')
+        _add_user(target, 1, 'local_user', email='shared@example.test')
+        _add_user(target, 2, 'sso_user', email='shared@example.test')
 
         monkeypatch.setattr(verify_mod, 'inspect', lambda engine: _InspectorWithExtras(
             sa_inspect(engine), 'users',
@@ -330,10 +339,8 @@ class TestUniqueConstraints:
         assert 'users' in message
 
     def test_duplicate_on_a_unique_index_is_detected(self, target, monkeypatch):
-        _add_user(target, 1, 'local_user', email='shared@example.test',
-                  auth_source='local')
-        _add_user(target, 2, 'sso_user', email='shared@example.test',
-                  auth_source='sso')
+        _add_user(target, 1, 'local_user', email='shared@example.test')
+        _add_user(target, 2, 'sso_user', email='shared@example.test')
 
         monkeypatch.setattr(verify_mod, 'inspect', lambda engine: _InspectorWithExtras(
             sa_inspect(engine), 'users',

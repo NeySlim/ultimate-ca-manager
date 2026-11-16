@@ -39,13 +39,6 @@ class User(db.Model):
     """User model for authentication"""
     __tablename__ = "users"
     __table_args__ = (
-        # Email is unique only among LOCAL accounts (partial index). SSO users are
-        # identified by sso_external_id, never by email, so an SSO account may
-        # share an email with a local one (see #136/#138). Matches migration 045.
-        db.Index('ix_users_email_local', 'email', unique=True,
-                 sqlite_where=db.text("auth_source = 'local'"),
-                 postgresql_where=db.text("auth_source = 'local'")),
-        db.Index('ix_users_sso_identity', 'sso_provider_id', 'sso_external_id'),
         # A deleted account's id is never handed out again (migration 150 on upgrades)
         {'sqlite_autoincrement': True},
     )
@@ -93,26 +86,23 @@ class User(db.Model):
     # Persisted server-side so they follow the user across browsers/devices.
     preferences = db.Column(db.Text, nullable=True)
 
-    # Authentication source — distinguishes locally-managed users from those
-    # provisioned by an SSO provider. Values: 'local', 'ldap', 'oauth2', 'saml'.
-    # `sso_provider_id` links to the originating provider when applicable.
-    auth_source = db.Column(db.String(20), nullable=False, default='local')
-    sso_provider_id = db.Column(
-        db.Integer,
-        db.ForeignKey('pro_sso_providers.id', ondelete='SET NULL'),
-        nullable=True,
-    )
-    # Immutable identifier from the IdP (OIDC `sub` / SAML persistent NameID /
-    # LDAP entryUUID·objectGUID). Bound on first SSO login; the primary key used
-    # to recognise the directory account across username/email changes.
-    sso_external_id = db.Column(db.String(255), nullable=True)
-    # IdP of the deleted provider that last owned this account (SSOProvider.idp_key):
-    # only a provider for that same IdP may take it back by its stable id. Migration 137.
-    sso_orphan_of = db.Column(db.String(600), nullable=True)
-
     # Relationships
     custom_role = db.relationship('CustomRole', foreign_keys=[custom_role_id], lazy='select')
-    sso_provider = db.relationship('SSOProvider', foreign_keys=[sso_provider_id], lazy='select')
+    # The providers that open this account, one row each (UserSSOIdentity)
+    sso_identities = db.relationship('UserSSOIdentity', back_populates='user', lazy='selectin',
+                                     cascade='all, delete-orphan', passive_deletes=True,
+                                     order_by='UserSSOIdentity.id')
+
+    @property
+    def is_local(self):
+        """No provider opens this account, nor did a deleted one: its e-mail is unique
+        among local accounts (#136)."""
+        return not self.sso_identities
+
+    @property
+    def auth_source(self):
+        """'local', or 'sso' for an account with at least one identity row."""
+        return 'local' if self.is_local else 'sso'
     
     @property
     def groups(self):
@@ -271,19 +261,86 @@ class User(db.Model):
             "last_login": utc_isoformat(self.last_login),
             "login_count": self.login_count or 0,
             "failed_logins": self.failed_logins or 0,
-            "auth_source": self.auth_source or 'local',
-            "sso_provider_id": self.sso_provider_id,
-            "sso_external_id": self.sso_external_id,
+            "auth_source": self.auth_source,
+            "sso_identities": [row.to_dict() for row in self.sso_identities],
         }
         try:
             if self.custom_role_id and self.custom_role:
                 result["custom_role_name"] = self.custom_role.name
         except Exception:
             pass
-        try:
-            if self.sso_provider_id and self.sso_provider:
-                result["sso_provider_name"] = self.sso_provider.name
-                result["sso_provider_type"] = self.sso_provider.provider_type
-        except Exception:
-            pass
         return result
+
+
+def local_email_holder(email, other_than=None):
+    """A local account (no identity row) holding ``email``: e-mail is unique among local
+    accounts only (#136), which every path making an account local checks here."""
+    query = User.query.filter(User.email == email, ~User.sso_identities.any())
+    if other_than is not None:
+        query = query.filter(User.id != other_than)
+    return query.order_by(User.id).first()
+
+
+class UserSSOIdentity(db.Model):
+    """One provider that opens an account, and the stable identity it does so with.
+
+    ``external_id`` NULL: attached, not bound yet (the first sign-in binds it). ``provider_id``
+    NULL: its provider was deleted; ``orphan_of`` keeps that provider's IdP key, and only a
+    provider for that exact key takes it back (OIDC Core §5.7: iss and sub together identify).
+    """
+    __tablename__ = 'user_sso_identities'
+    __table_args__ = (
+        # One account per stable identity of a provider; one attachment per provider per account
+        db.UniqueConstraint('provider_id', 'external_id', name='uq_user_sso_identities_provider_identity'),
+        db.UniqueConstraint('user_id', 'provider_id', name='uq_user_sso_identities_user_provider'),
+        db.Index('ix_user_sso_identities_orphan', 'orphan_of', 'external_id'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    provider_id = db.Column(db.Integer, db.ForeignKey('pro_sso_providers.id', ondelete='SET NULL'),
+                            nullable=True)
+    orphan_of = db.Column(db.String(600), nullable=True)
+    # OIDC `sub`, SAML persistent NameID, LDAP entryUUID/objectGUID (or the DN fallback)
+    external_id = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    bound_at = db.Column(db.DateTime, nullable=True)
+    # The administrator who attached the provider; NULL when a sign-in or an upgrade made the row
+    created_by = db.Column(db.String(80), nullable=True)
+
+    user = db.relationship('User', back_populates='sso_identities')
+    # A provider deleted through the session leaves its rows orphans of an unknown IdP (SQLite
+    # applies no ON DELETE SET NULL); the provider routes record the IdP key first.
+    provider = db.relationship('SSOProvider', foreign_keys=[provider_id], lazy='joined',
+                               backref=db.backref('identities', lazy='select'))
+
+    @property
+    def provider_type(self):
+        if self.provider is not None:
+            return self.provider.provider_type
+        return self.orphan_of.split(':', 1)[0] if self.orphan_of else None
+
+    @property
+    def state(self):
+        if self.provider_id is None:
+            return 'orphan'
+        return 'bound' if self.external_id else 'pending'
+
+    def bind(self, external_id):
+        self.external_id = external_id
+        self.bound_at = utc_now() if external_id else None
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'provider_id': self.provider_id,
+            'provider_name': self.provider.name if self.provider is not None else None,
+            'provider_type': self.provider_type,
+            'orphan_of': self.orphan_of,
+            'external_id': self.external_id,
+            'state': self.state,
+            'created_at': utc_isoformat(self.created_at),
+            'bound_at': utc_isoformat(self.bound_at),
+            'created_by': self.created_by,
+        }

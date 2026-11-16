@@ -14,6 +14,7 @@ from utils.response import success_response, error_response, created_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
 from models import db, User
+from models.user import local_email_holder
 from services.audit_service import AuditService
 from services.deletion_blockers import parse_bulk_ids
 
@@ -167,6 +168,10 @@ def _purge_user_dependencies(user_id):
     except Exception as e:
         logger.debug(f"AuthCertificate cleanup skipped for user {user_id}: {e}")
 
+    # Provider attachments (SQLite applies no ON DELETE CASCADE)
+    from models import UserSSOIdentity
+    UserSSOIdentity.query.filter_by(user_id=user_id).delete()
+
     # SSO sessions
     try:
         from models import SSOSession
@@ -298,7 +303,7 @@ def create_user():
         return error_response('Username already exists', 409)
 
     # Email is unique only among local accounts (an SSO account may share it).
-    if User.query.filter_by(email=data['email'], auth_source='local').first():
+    if local_email_holder(data['email']) is not None:
         return error_response('Email already exists', 409)
 
     # Validate role — only admins can assign non-viewer roles
@@ -420,12 +425,8 @@ def update_user(user_id):
         # Email is unique only among local accounts. Only block when this change
         # would put two local accounts on the same email (an SSO account may
         # share an email with a local one).
-        if (user.auth_source or 'local') == 'local':
-            existing = User.query.filter(
-                User.email == data['email'], User.id != user_id,
-                User.auth_source == 'local').first()
-            if existing:
-                return error_response('Email already in use', 409)
+        if user.is_local and local_email_holder(data['email'], other_than=user_id) is not None:
+            return error_response('Email already in use', 409)
         user.email = data['email']
 
     if 'full_name' in data:

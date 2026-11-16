@@ -21,6 +21,7 @@ from sqlalchemy import create_engine, text
 
 import fips_mode
 from config.settings import Config
+from models import UserSSOIdentity
 from models import (CA, AcmeClientOrder, Certificate, CertificatePolicy, CertificateTemplate,
                     DeployTarget, DnsProvider, HsmKey, HsmProvider, MicrosoftCA, SSHCertificate,
                     SSHCertificateAuthority, SystemConfig, User, db)
@@ -176,8 +177,9 @@ def test_users_password_scrypt(session):
     session.add(User(username='scrypt-user', email='s@example.com', password_hash=SCRYPT_HASH))
     session.add(User(username='pbkdf2-user', email='p@example.com',
                      password_hash=hash_password('a long password')))
-    session.add(User(username='sso-user', email='o@example.com', password_hash=SCRYPT_HASH,
-                     auth_source='sso'))
+    sso = User(username='sso-user', email='o@example.com', password_hash=SCRYPT_HASH)
+    sso.sso_identities.append(UserSSOIdentity(orphan_of='oauth2:https://idp.example'))
+    session.add(sso)
     session.flush()
     _assert_found('users.password_scrypt', 1, 'scrypt-user')
 

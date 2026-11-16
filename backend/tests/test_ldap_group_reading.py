@@ -3,6 +3,7 @@
 The directory is ldap3's MOCK_SYNC strategy behind the real ``_ldap_authenticate_user``,
 the real ``/api/v2/sso/ldap/login`` door and the real mapping test route.
 """
+from models import UserSSOIdentity
 import json
 import logging
 import uuid
@@ -146,7 +147,7 @@ def env(app, monkeypatch):
         _cleanup(created_u)
         for pid in created_p:
             SSOSession.query.filter_by(provider_id=pid).delete()
-            User.query.filter_by(sso_provider_id=pid).update({User.sso_provider_id: None})
+            UserSSOIdentity.query.filter_by(provider_id=pid).update({UserSSOIdentity.provider_id: None})
             p = db.session.get(SSOProvider, pid)
             if p:
                 db.session.delete(p)

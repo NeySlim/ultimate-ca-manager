@@ -10,6 +10,7 @@ had not happened yet.
 Two things are pinned here: the entry names the change that was actually
 made, and it is not written at all when the change is rolled back.
 """
+from tests.sso_identity_support import delete_users_of, legacy_user
 import pytest
 
 from models import db, AuditLog, User
@@ -48,8 +49,7 @@ def make_provider(app):
 
     with app.app_context():
         for provider_id in made:
-            User.query.filter_by(sso_provider_id=provider_id).delete(
-                synchronize_session=False)
+            delete_users_of(provider_id)
             SSOProvider.query.filter_by(id=provider_id).delete(
                 synchronize_session=False)
         db.session.commit()
@@ -67,11 +67,11 @@ class TestTheRoleChangeIsRecordedAfterItIsMade:
             sync_role_on_login=True)
 
         with app.app_context():
-            existing = User(username='role-order-probe-user',
+            existing = legacy_user(username='role-order-probe-user',
                             email='probe@example.test', role='viewer',
-                            active=True, auth_source='ldap')
+                            active=True, auth_source='ldap',
+                sso_provider_id=provider_id)
             existing.set_password('unused-by-sso-logins')
-            existing.sso_provider_id = provider_id
             db.session.add(existing)
             db.session.commit()
 
@@ -113,11 +113,11 @@ class TestTheRoleChangeIsRecordedAfterItIsMade:
             role_mapping='{"pki-admins": "admin"}', sync_role_on_login=True)
 
         with app.app_context():
-            existing = User(username='role-order-refused',
+            existing = legacy_user(username='role-order-refused',
                             email='refused@example.test', role='viewer',
-                            active=True, auth_source='ldap')
+                            active=True, auth_source='ldap',
+                sso_provider_id=provider_id)
             existing.set_password('unused-by-sso-logins')
-            existing.sso_provider_id = provider_id
             db.session.add(existing)
             db.session.commit()
 
@@ -160,7 +160,7 @@ class TestADisabledAccountIsNotSynchronised:
     name and role were written to the record, a `last_login` was stamped for
     a login that did not happen, and an audit line said the role changed.
 
-    The one that outlives the attempt is `sso_external_id`. It is bound once,
+    The one that outlives the attempt is the stable identity. It is bound once,
     on first use, and it is what decides whose account this is. Bound while
     the account was disabled, it hands that account to whoever held the
     identifier at the directory the day it is switched back on.
@@ -176,12 +176,12 @@ class TestADisabledAccountIsNotSynchronised:
             sync_role_on_login=True, auto_update_users=True)
 
         with app.app_context():
-            disabled = User(username='disabled-sso-user',
+            disabled = legacy_user(username='disabled-sso-user',
                             email='old@example.test', role='viewer',
                             full_name='Old Name', active=False,
-                            auth_source='ldap')
+                            auth_source='ldap',
+                sso_provider_id=provider_id)
             disabled.set_password('unused-by-sso-logins')
-            disabled.sso_provider_id = provider_id
             db.session.add(disabled)
             db.session.commit()
 
@@ -205,7 +205,7 @@ class TestADisabledAccountIsNotSynchronised:
                 f'a refused login rewrote the name: {again.full_name}')
             assert again.last_login is None, (
                 'a refused login was stamped as a login')
-            assert again.sso_external_id is None, (
+            assert [r.external_id for r in again.sso_identities] == [None], (
                 'a refused login bound an external identifier to a disabled '
                 'account, which is who the account belongs to once it is '
                 'switched back on')
