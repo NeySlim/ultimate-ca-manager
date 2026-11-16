@@ -2384,7 +2384,7 @@ GET /ca/{ca_refid}.p7c
 ```
 
 **Response**: `application/pkcs7-mime`: certs-only CMS (RFC 5280 section 4.2.2.1) holding the CA certificate
-and its servable cross-certificates.
+and its servable cross-certificates. An unreadable certificate is left out and logged; `404` when none is readable.
 
 ### Download a Cross-certificate
 ```http
