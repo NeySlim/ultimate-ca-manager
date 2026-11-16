@@ -768,6 +768,25 @@ def test_an_archive_from_before_the_rows_keeps_a_skipped_identity_as_an_orphan(a
     assert len(plan.warnings) == 1 and 'orphan' in plan.warnings[0], plan.warnings
 
 
+@pytest.mark.parametrize('ref', [None, {'name': 'not-here'}], ids=['no-ref', 'gone'])
+@pytest.mark.parametrize('merging', [True, False], ids=['merge', 'replace'])
+def test_a_pre_024_account_whose_provider_is_not_here_stays_an_orphan(app, providers, ref, merging):
+    """The upgrade keeps such an account as an orphan of an unknown IdP: so does a restore."""
+    service, name = _backup(), _name()
+    with app.app_context():
+        user = User(username=name, email=f'{name}@corp.example', role='admin', password_hash=NOPASS)
+        db.session.add(user)
+        service._merging = merging
+        service._legacy_sso_identities = [(user, {
+            'auth_source': 'local', 'sso_provider_id': 7, 'sso_provider_id_ref': ref,
+            'sso_external_id': None})]
+        service._restore_legacy_sso_identities({}, SimpleNamespace(warnings=[]))
+        db.session.commit()
+        uid = user.id
+    assert _rows(app, uid) == [(None, None, None)]
+    assert _claimable_by_name(app, providers, uid, name) == (False, (None, 'sso_username_conflict'))
+
+
 def test_an_archive_from_before_the_rows_gets_the_rows_an_upgrade_gives(app, providers):
     """2.254 archives carry the provider on the account row."""
     with app.app_context():

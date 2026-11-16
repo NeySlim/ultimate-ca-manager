@@ -7,21 +7,21 @@ logger = logging.getLogger(__name__)
 NO_PASSWORD = '!SSO_NO_PASSWORD!'
 
 
-def identity_rows(users, provider_ids):
+def identity_rows(users, here):
     """The rows the accounts of a 2.254 database get, as (user_id, provider_id, orphan_of,
-    external_id). ``users``: (id, auth_source, sso_provider_id, sso_external_id, sso_orphan_of,
-    password_hash, force_password_change), ascending ids. A provider id no provider holds any more
-    (SQLite applied no ON DELETE SET NULL) leaves an orphan of an unknown IdP, as 2.254 read it;
-    a stable identity a lower id already holds for the same provider does too (2.254 matched the
-    first account only), so that no account becomes claimable by name."""
+    external_id). ``users``: (id, auth_source, provider, sso_external_id, sso_orphan_of,
+    password_hash, force_password_change), ascending ids, ``provider`` the stored reference to
+    the account's provider (None: none) and ``here`` the provider id each reference has here.
+    A reference ``here`` does not place leaves an orphan of an unknown IdP, as 2.254 read a
+    deleted provider; so does a stable identity a lower id already holds for the same provider
+    (2.254 matched the first account only), so that no account becomes claimable by name."""
     rows, taken = [], set()
-    for uid, source, provider_id, external_id, orphan_of, password_hash, force_change in users:
+    for uid, source, stored, external_id, orphan_of, password_hash, force_change in users:
         if (source or 'local') == 'local':
             legacy = password_hash == NO_PASSWORD and not force_change
-            if not legacy or (provider_id is None and orphan_of is None):
+            if not legacy or (stored is None and orphan_of is None):
                 continue
-        if provider_id not in provider_ids:
-            provider_id = None
+        provider_id = here.get(stored) if stored is not None else None
         if provider_id is not None:
             orphan_of = None
             if external_id and (provider_id, external_id) in taken:
@@ -32,3 +32,8 @@ def identity_rows(users, provider_ids):
                 taken.add((provider_id, external_id))
         rows.append((uid, provider_id, orphan_of, external_id or None))
     return rows
+
+
+def ids_here(provider_ids):
+    """``here`` for a database whose references are its own provider ids."""
+    return {pid: pid for pid in provider_ids}

@@ -3,7 +3,7 @@
 the tests make of those rows."""
 from models import db, User, UserSSOIdentity
 from models.user import sync_sso_flags
-from utils.sso_identity_upgrade import identity_rows
+from utils.sso_identity_upgrade import identity_rows, ids_here
 
 LEGACY = ('auth_source', 'sso_provider_id', 'sso_external_id', 'sso_orphan_of')
 
@@ -18,7 +18,7 @@ def legacy_user(**columns):
     for _uid, provider_id, orphan_of, external_id in identity_rows(
             [(0, legacy['auth_source'] or 'local', legacy['sso_provider_id'], legacy['sso_external_id'],
               legacy['sso_orphan_of'], columns.get('password_hash'),
-              columns.get('force_password_change'))], providers):
+              columns.get('force_password_change'))], ids_here(providers)):
         row = UserSSOIdentity(provider_id=provider_id, orphan_of=orphan_of)
         row.bind(external_id)
         user.sso_identities.append(row)

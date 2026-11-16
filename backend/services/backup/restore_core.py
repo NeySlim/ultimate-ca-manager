@@ -888,7 +888,9 @@ class RestoreCoreMixin:
         if not pending:
             return
         db.session.flush()
-        provider_ids = {pid for (pid,) in db.session.query(SSOProvider.id)}
+        # The archive's reference to a provider, as identity_rows reads it: its number and its
+        # name, placed here by name; None only when the row names no provider at all
+        here = {}
         accounts = []
         merging = getattr(self, '_merging', False)
         for user, row in pending:
@@ -900,14 +902,19 @@ class RestoreCoreMixin:
                 held.delete(synchronize_session=False)
                 # The loaded collection still lists the rows the statement deleted
                 db.session.expire(user, ['sso_identities'])
-            ref = row.get('sso_provider_id_ref') or {}
-            here = SSOProvider.query.filter_by(name=ref['name']).first() if ref.get('name') else None
-            accounts.append((user.id, row.get('auth_source'), here.id if here else None,
+            name = (row.get('sso_provider_id_ref') or {}).get('name')
+            stored = None
+            if row.get('sso_provider_id') is not None or name:
+                stored = (row.get('sso_provider_id'), name)
+                if stored not in here:
+                    found = SSOProvider.query.filter_by(name=name).first() if name else None
+                    here[stored] = found.id if found else None
+            accounts.append((user.id, row.get('auth_source'), stored,
                              row.get('sso_external_id'), row.get('sso_orphan_of'),
                              user.password_hash, user.force_password_change))
         made = []
         names = {user.id: user.username for user, _row in pending}
-        for user_id, provider_id, orphan_of, external_id in identity_rows(sorted(accounts), provider_ids):
+        for user_id, provider_id, orphan_of, external_id in identity_rows(sorted(accounts), here):
             holder = self._identity_holder(user_id, provider_id, external_id)
             if holder is not None:
                 # Kept as an orphan of an unknown IdP, as the upgrade keeps a shared identity

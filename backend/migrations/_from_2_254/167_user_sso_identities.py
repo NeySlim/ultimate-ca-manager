@@ -12,7 +12,7 @@ import logging
 import re
 import sqlite3
 
-from utils.sso_identity_upgrade import identity_rows
+from utils.sso_identity_upgrade import identity_rows, ids_here
 
 logger = logging.getLogger(__name__)
 pg_compatible = True
@@ -126,7 +126,8 @@ def _copy_sqlite(conn, tables):
     conn.executemany(
         f"INSERT INTO {TABLE} (user_id, provider_id, orphan_of, external_id, created_at, bound_at) "
         "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END)",
-        [(uid, pid, orphan, ext, ext) for uid, pid, orphan, ext in identity_rows(users, provider_ids)])
+        [(uid, pid, orphan, ext, ext)
+         for uid, pid, orphan, ext in identity_rows(users, ids_here(provider_ids))])
 
 
 def _drop_sqlite(conn):
@@ -181,7 +182,7 @@ def _upgrade_pg(conn):
             f"SELECT id, auth_source, sso_provider_id, sso_external_id, sso_orphan_of, password_hash, "
             f"force_password_change FROM {USERS} u WHERE NOT EXISTS "
             f"(SELECT 1 FROM {TABLE} i WHERE i.user_id = u.id) ORDER BY id")).fetchall()
-        for uid, pid, orphan, ext in identity_rows(users, provider_ids):
+        for uid, pid, orphan, ext in identity_rows(users, ids_here(provider_ids)):
             conn.execute(text(
                 f"INSERT INTO {TABLE} (user_id, provider_id, orphan_of, external_id, created_at, bound_at) "
                 "VALUES (:u, :p, :o, :e, timezone('utc', now()), "
