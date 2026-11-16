@@ -221,6 +221,17 @@ def test_repeated_group_attributes_are_merged(app, mapped_provider, idp_signer):
     assert role == 'admin'
 
 
+def test_repeated_identity_attributes_keep_the_first_value(app, mapped_provider, idp_signer):
+    """Repeated Name: the library merges values in assertion order; identity reads the first."""
+    first, second = f'u1-{uuid.uuid4().hex[:8]}', f'u2-{uuid.uuid4().hex[:8]}'
+    _role, name_id = _login_role(app, idp_signer, attributes=[
+        ('username', [first]), ('email', [f'{first}@example.org']),
+        ('username', [second]), ('email', [f'{second}@example.org'])])
+    with app.app_context():
+        user = User.query.filter_by(sso_external_id=name_id).one()
+        assert (user.username, user.email) == (first, f'{first}@example.org')
+
+
 def test_unmatched_groups_are_refused_when_rules_exist(app, mapped_provider, idp_signer):
     mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}))
     client = app.test_client()
