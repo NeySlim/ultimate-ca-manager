@@ -271,11 +271,43 @@ def _validate_claims(claims, issuer, client_id, expected_nonce):
         raise OIDCValidationError('ID token is not yet valid')
 
     nonce = claims.get('nonce')
-    if not expected_nonce or not isinstance(nonce, str) or not hmac.compare_digest(
+    if not expected_nonce:
+        raise OIDCValidationError('no session nonce')
+    if not isinstance(nonce, str) or not hmac.compare_digest(
             nonce, expected_nonce):
         raise OIDCValidationError('ID token nonce mismatch')
     if not isinstance(claims.get('sub'), str) or not claims['sub']:
         raise OIDCValidationError('ID token is missing subject')
+
+
+def _configured_issuer_and_client_id(provider):
+    """Both non-empty strings, else nothing to match iss and aud against (step 2-3)."""
+    issuer = getattr(provider, 'oauth2_issuer', None)
+    client_id = getattr(provider, 'oauth2_client_id', None)
+    if not isinstance(issuer, str) or not issuer:
+        raise OIDCValidationError('OIDC issuer is not configured')
+    if not isinstance(client_id, str) or not client_id:
+        raise OIDCValidationError('OIDC client ID is not configured')
+    return issuer, client_id
+
+
+def unverified_claims_error(claims, provider, expected_nonce):
+    """Why an unsigned (compatibility) token fails a check other than the signature, or None.
+
+    OIDC Core §3.1.3.7 steps 2-5 and 9-11 (iss, aud, azp, exp, iat, nonce) still
+    apply; step 6 lets TLS stand in for the signature only.
+    """
+    try:
+        issuer, client_id = _configured_issuer_and_client_id(provider)
+        _validate_claims(claims or {}, issuer, client_id, expected_nonce)
+    except OIDCValidationError as exc:
+        return str(exc)
+    return None
+
+
+def unverified_claims_are_valid(claims, provider, expected_nonce):
+    """True when an unsigned (compatibility) token passes every check but the signature."""
+    return unverified_claims_error(claims, provider, expected_nonce) is None
 
 
 def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=True):
@@ -293,12 +325,7 @@ def verify_id_token(id_token, provider, expected_nonce, verify=True, ssl_verify=
             raise OIDCValidationError('ID token nonce mismatch')
         return claims
 
-    issuer = getattr(provider, 'oauth2_issuer', None)
-    client_id = getattr(provider, 'oauth2_client_id', None)
-    if not isinstance(issuer, str) or not issuer:
-        raise OIDCValidationError('OIDC issuer is not configured')
-    if not isinstance(client_id, str) or not client_id:
-        raise OIDCValidationError('OIDC client ID is not configured')
+    issuer, client_id = _configured_issuer_and_client_id(provider)
     try:
         validate_url_not_cloud_metadata(issuer)
     except ValueError as exc:

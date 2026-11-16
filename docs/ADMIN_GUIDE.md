@@ -253,6 +253,7 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - Client ID, Client Secret, Authorization/Token/UserInfo URLs
 - Callback URL: `https://your-server:8443/api/v2/auth/sso/oauth2/callback`
 - Role claim mapping from token attributes
+- Role mapping rules compare their keys with the `roles` and `groups` claims, read from the ID token of the login (same `sub` as UserInfo) and from the UserInfo response together. Microsoft Entra ID sends them only in the ID token: add the groups claim under *Token configuration* of the application registration (values are group object IDs, so the mapping keys are these IDs), or define app roles and map their values. Above about 200 groups Entra ID leaves the groups claim out: UCM logs a warning and only app roles can match, so emit only the groups assigned to the application, or app roles. With *Verify ID token signature* off, the groups of the ID token count only when the Token URL is HTTPS with TLS verification on, and the issuer and client ID are set and match the token.
 
 **SAML 2.0:**
 - IdP Metadata URL or manual XML upload

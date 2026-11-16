@@ -1581,6 +1581,7 @@ export const helpContent = {
           { label: 'Client ID/Secret', text: 'OAuth2 client credentials from your IDP' },
           { label: 'Scopes', text: 'OAuth2 scopes to request (openid, profile, email)' },
           { label: 'Auto-Create Users', text: 'Automatically create UCM accounts on first SSO login' },
+          { label: 'Groups for role mapping', text: 'The values of the roles and groups claims, from the ID token of the login and from the UserInfo response together. Microsoft Entra ID sends them only in the ID token: add the groups claim in the token configuration of the application (its values are group object IDs, so the mapping keys are these IDs), or use app roles. A user in more than about 200 groups gets no groups claim from Entra ID: a warning is logged and only the app roles can match. Emit only the groups assigned to the application, or app roles.' },
         ]
       },
       {
