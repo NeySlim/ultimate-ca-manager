@@ -2471,19 +2471,17 @@ Content-Type: application/json
 ### Import Users
 ```http
 POST /api/v2/users/import
-Content-Type: application/json
+Content-Type: multipart/form-data
 
-{
-  "users": [
-    {
-      "username": "user1",
-      "email": "user1@example.com",
-      "role": "viewer"
-    }
-  ],
-  "send_invites": true
-}
+file=@users.csv
 ```
+```csv
+username,email,full_name,role,password
+john.doe,john@example.com,John Doe,operator,SecurePass123!
+```
+- The `file` field holds a UTF-8 CSV file whose name ends in `.csv` (`400` otherwise), of 5 MB at most (`413`); the import stops after 10 000 rows and says so in `errors`. `username`, `email` and `password` are required on each row, `role` is one of the built-in roles (`viewer` when empty) and `full_name` is optional. Each account is local and created active with that password.
+- A row is skipped, and named in `errors`, when a field is missing, the password fails the password policy, the role is unknown, the username exists or a local account already uses the e-mail (an SSO account's e-mail may be taken). The answer gives `imported`, `skipped` and `errors`; `409` names the e-mail or username another request took first, and nothing is imported then.
+- It needs `write:users` and an admin caller (`403` otherwise). Audit action `user_import`.
 
 ### Delete User
 ```http
