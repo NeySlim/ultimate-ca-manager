@@ -2,8 +2,9 @@
 
 A KRL names the certificates of a CA by serial, so ``uq_ssh_certificates_ca_serial`` holds every
 non-zero serial once per CA (0 means "no number"). Rows issued twice before 3.0 keep their number,
-which their signature carries: ``serial_duplicate`` takes them out of the index, the upgrade lists
-them and the next start reports them once. ``ssh_cas.serial_counter`` never trails the serials
+which their signature carries: the oldest stays in the index, so no new row can take the number,
+``serial_duplicate`` takes the others out of it; the upgrade lists them and the next start reports
+them once. ``ssh_cas.serial_counter`` never trails the serials
 its CA holds; every path that writes certificates or counters calls ``raise_counters``.
 """
 import json
@@ -28,9 +29,10 @@ _HIGHEST = 'SELECT COALESCE(MAX(c.serial), 0) FROM ssh_certificates c WHERE c.ss
 # The SET re-reads serial_counter: a value another writer stored meanwhile is never lowered
 _RAISE = (f'UPDATE ssh_cas SET serial_counter = CASE WHEN serial_counter < ({_HIGHEST}) '
           f'THEN ({_HIGHEST}) ELSE serial_counter END WHERE serial_counter < ({_HIGHEST})')
-_SIBLING = ('EXISTS (SELECT 1 FROM ssh_certificates o WHERE o.ssh_ca_id = ssh_certificates.ssh_ca_id '
-            'AND o.serial = ssh_certificates.serial AND o.id <> ssh_certificates.id)')
-_TO_MARK = f'SELECT id FROM ssh_certificates WHERE serial <> 0 AND NOT {FLAG} AND {_SIBLING} ORDER BY id'
+# An older certificate of the same CA holds the same serial
+_OLDER = ('EXISTS (SELECT 1 FROM ssh_certificates o WHERE o.ssh_ca_id = ssh_certificates.ssh_ca_id '
+          'AND o.serial = ssh_certificates.serial AND o.id < ssh_certificates.id)')
+_TO_MARK = f'SELECT id FROM ssh_certificates WHERE serial <> 0 AND NOT {FLAG} AND {_OLDER} ORDER BY id'
 _LAGGING = (f'SELECT id, descr, serial_counter, ({_HIGHEST}) FROM ssh_cas '
             f'WHERE serial_counter < ({_HIGHEST}) ORDER BY id')
 _GROUPS = ('SELECT c.id, c.ssh_ca_id, a.descr, c.serial, c.key_id FROM ssh_certificates c '
@@ -55,7 +57,7 @@ def lagging_counters(run: Run) -> List[tuple]:
 
 
 def unmarked_duplicates(run: Run) -> List[int]:
-    """Ids of the certificates sharing a non-zero serial under their CA and not marked so."""
+    """Ids of the certificates under the index that an older certificate of their CA shares a serial with."""
     return [r[0] for r in run(_TO_MARK, {}).fetchall()]
 
 
@@ -72,7 +74,7 @@ def duplicate_groups(run: Run, ids=None) -> List[Dict]:
 
 
 def mark_duplicates(run: Run) -> List[Dict]:
-    """Mark the unmarked certificates that share their serial; the groups they belong to."""
+    """Mark every certificate but the oldest of a shared serial; the groups newly marked."""
     ids = unmarked_duplicates(run)
     if not ids:
         return []
@@ -80,6 +82,13 @@ def mark_duplicates(run: Run) -> List[Dict]:
     for row_id in ids:
         run(f'UPDATE ssh_certificates SET {FLAG} = TRUE WHERE id = :i', {'i': row_id})
     return groups
+
+
+def settle_marks(run: Run) -> None:
+    """The oldest holder of each serial under the index, every other one marked; marks first, so
+    no statement ever puts two holders under the index."""
+    mark_duplicates(run)
+    run(f'UPDATE ssh_certificates SET {FLAG} = FALSE WHERE {FLAG} AND NOT {_OLDER}', {})
 
 
 def describe(entry: Dict) -> str:

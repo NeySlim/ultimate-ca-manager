@@ -323,6 +323,9 @@ class SSHCAService:
 
         try:
             db.session.add(ca)
+            db.session.flush()
+            # An imported CA counts past any certificate this database already holds under its id
+            SSHCAService.raise_serial_counter(ca.id)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -456,6 +459,9 @@ class SSHCAService:
 
         try:
             db.session.add(ca)
+            db.session.flush()
+            # An imported CA counts past any certificate this database already holds under its id
+            SSHCAService.raise_serial_counter(ca.id)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -527,6 +533,13 @@ class SSHCAService:
 
         logger.info(f"Deleted SSH CA '{ca_name}'")
         return ca_name
+
+    @staticmethod
+    def raise_serial_counter(ca_id=None):
+        """In the caller's transaction: the counter of *ca_id* (every CA when None) moves past
+        the serials its certificates hold, never down."""
+        from utils.ssh_serials import raise_counters, session_run
+        raise_counters(session_run, ca_id)
 
     @staticmethod
     def get_next_serial(ca_id):

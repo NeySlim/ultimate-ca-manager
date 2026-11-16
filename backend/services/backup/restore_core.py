@@ -34,6 +34,7 @@ from .restore.orders import keep_newer_orders
 from .restore.repairs import replay_repairs
 from .restore.conflict import conflict_from_integrity_error, is_value_too_long
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
+from utils import ssh_serials as SSHSerials
 from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
@@ -446,6 +447,8 @@ class RestoreCoreMixin:
                 # A key two authorities held before the restore is not the restore's doing
                 shared_before = set(key_binding.shared_keys())
                 token_shared_before = set(key_binding.shared_token_keys())
+                # Before a replacement removes certificates issued here: their serials stay given out
+                SSHSerials.raise_counters(SSHSerials.session_run)
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
@@ -480,6 +483,8 @@ class RestoreCoreMixin:
                     results.update(remove_after_writes(replacement).report())
                 # On the final rows: an authority a replacement removes after the writes holds nothing
                 db.session.flush()
+                SSHSerials.settle_marks(SSHSerials.session_run)
+                SSHSerials.raise_counters(SSHSerials.session_run)
                 self._settle_local_emails(backup_data)
                 for key_id, held in key_binding.shared_keys().items():
                     if key_id not in shared_before:

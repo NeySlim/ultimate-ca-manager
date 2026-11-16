@@ -43,6 +43,7 @@ from .helpers import (
     _force_register_all_models,
     _reset_pg_sequences,
     carry_id_high_water,
+    raise_ssh_serial_counters,
     read_id_high_water,
     _short_err,
     _topo_sort_tables,
@@ -676,6 +677,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
             _reset_pg_sequences(target_engine)
         # A deleted account's id stays unused on the target too
         carry_id_high_water(target_engine, high_water, target_is_pg)
+        raise_ssh_serial_counters(target_engine)
 
         # 6. What landed is checked before the caller is told it can switch.
         stats["validation"] = verify_migration(

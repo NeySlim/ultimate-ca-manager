@@ -84,7 +84,8 @@ def test_a_2254_database_keeps_its_serials_and_marks_the_pairs(dialect, tmp_path
         with caplog.at_level('WARNING'):
             assert db.upgrade()
         flags = _flags(db)
-        assert flags == {11: False, 12: True, 13: True, 14: False, 21: False, 22: False, 23: False}
+        # The oldest holder stays under the index: no later row can take its serial
+        assert flags == {11: False, 12: False, 13: True, 14: False, 21: False, 22: False, 23: False}
         # Nothing is renumbered: the signature carries the serial
         assert dict(db.run(f"SELECT id, serial FROM {CERTS} ORDER BY id")) == {
             11: 1, 12: 3, 13: 3, 14: 2, 21: 0, 22: 0, 23: 3}
@@ -96,6 +97,8 @@ def test_a_2254_database_keeps_its_serials_and_marks_the_pairs(dialect, tmp_path
         # The index holds from now on, serial 0 aside
         with pytest.raises(IntegrityError):
             _cert(db, 15, 1, 2)
+        with pytest.raises(IntegrityError):
+            _cert(db, 16, 1, 3)
         _cert(db, 24, 2, 0)
 
         _run_step_again(db, dialect)

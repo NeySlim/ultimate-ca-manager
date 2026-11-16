@@ -268,6 +268,24 @@ def refuse_archived_shared_keys(backup_data, plan):
             "An HSM key backs one authority only; nothing has been changed.")
 
 
+def _mark_shared_serials(written) -> None:
+    """Before the flush: every holder of a non-zero serial a restored certificate shares with another
+    of its CA (a 2.254 archive may hold such pairs) leaves the unique index; the restore puts the
+    oldest back once every row is written (utils/ssh_serials.settle_marks)."""
+    from models.ssh import SSHCertificate
+    groups: Dict[tuple, Dict[int, Any]] = {}
+    for sc in written:
+        if sc.serial:
+            groups.setdefault((sc.ssh_ca_id, sc.serial), {})[id(sc)] = sc
+    with db.session.no_autoflush:
+        for (ca_id, serial), held in groups.items():
+            for row in SSHCertificate.query.filter_by(ssh_ca_id=ca_id, serial=serial):
+                held.setdefault(id(row), row)
+            if len(held) > 1:
+                for row in held.values():
+                    row.serial_duplicate = True
+
+
 class RestoreExtendedMixin:
     def _restore_ssh_cas(self, backup_data: Dict, results: Dict, master_key: bytes,
                          plan: Optional[RestorePlan] = None) -> None:
@@ -311,6 +329,8 @@ class RestoreExtendedMixin:
         for sca_data in rows:
             refid = sca_data.get('refid')
             sca = _existing_row('ssh_cas', {'refid': refid})
+            # A serial this CA gave out here stays given out, whatever an older archive says
+            counter_here = sca.serial_counter if sca is not None else 0
             if sca is None:
                 # refid, descr, ca_type, public_key, private_key, key_type,
                 # fingerprint and serial_counter are NOT NULL; all but the
@@ -328,6 +348,7 @@ class RestoreExtendedMixin:
                 db.session.add(sca)
 
             apply_columns(sca, 'ssh_cas', sca_data, plan)
+            sca.serial_counter = max(counter_here or 0, sca.serial_counter or 0)
             if 'allow_any_principal' not in sca_data:
                 # An older archive: an empty list meant any principal then
                 sca.allow_any_principal = not sca.get_allowed_principals()
@@ -384,6 +405,7 @@ class RestoreExtendedMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('ssh_certificates', plan)
 
+        written = []
         for position, sc_data in enumerate(rows):
             where = f"SSH certificate {sc_data.get('refid') or position}"
             _required(where, sc_data, 'ssh_ca_id')
@@ -429,7 +451,9 @@ class RestoreExtendedMixin:
 
             if apply_columns(sc, 'ssh_certificates', sc_data, plan):
                 results['ssh_certificates'] += 1
+            written.append(sc)
 
+        _mark_shared_serials(written)
         db.session.flush()
 
     def _restore_microsoft_cas(self, backup_data: Dict, results: Dict,

@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.serialization import ssh as ssh_serializatio
 
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
+from services.ssh_ca_service import SSHCAService
 from utils.key_codec import refuse_eddsa_key
 from .utils import SSHCertificateUtilsMixin
 
@@ -136,6 +137,9 @@ class SSHCertificateDecodeMixin:
 
         try:
             db.session.add(ssh_cert)
+            db.session.flush()
+            # The CA chose this serial outside UCM: the next one UCM gives out comes after it
+            SSHCAService.raise_serial_counter(matched_ca.id)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
