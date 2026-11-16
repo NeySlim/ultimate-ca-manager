@@ -325,3 +325,80 @@ def test_a_partner_that_left_the_pair_since_read_is_not_renewed_with_it(app, tmp
             thread.join(60)
             assert renewal_partner(a) is None and held.related_certificate_id is None
             db.session.remove()
+
+
+def _chain_pair(app):
+    """``(a_id, b_id)``: A names X in its certificate, B names A, A and B link each other."""
+    import base64
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from services.cert.related_pair import pq_builder_from
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    from models import CA
+    from utils.key_codec import store_pem_bytes
+    from utils.serial_format import canonical_serial
+
+    _x_id, (a_id,) = _linked_rows(app)
+    with app.app_context():
+        a = db.session.get(Certificate, a_id)
+        ca = CA.query.filter_by(refid=a.caref).one()
+        cert_a = x509.load_pem_x509_certificate(base64.b64decode(a.crt))
+        key = ec.generate_private_key(ec.SECP256R1())
+        cert_b = pq_builder_from(cert_a, key.public_key()).sign(get_ca_signing_key(ca), hashes.SHA256())
+        b = Certificate(
+            refid=uuid.uuid4().hex, descr='b', caref=a.caref, cert_type=a.cert_type,
+            crt=base64.b64encode(cert_b.public_bytes(serialization.Encoding.PEM)).decode(),
+            prv=store_pem_bytes(key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption())),
+            subject=a.subject, issuer=a.issuer, serial_number=canonical_serial(cert_b.serial_number),
+            valid_from=cert_b.not_valid_before_utc.replace(tzinfo=None),
+            valid_to=cert_b.not_valid_after_utc.replace(tzinfo=None), source=a.source,
+            related_certificate_id=a_id)
+        db.session.add(b)
+        db.session.flush()
+        a.related_certificate_id = b_id = b.id
+        db.session.commit()
+        db.session.remove()
+    return a_id, b_id
+
+
+def _a_member_archived_since_read(app):
+    """Judging A's own link re-reads B: the caller's view of B is taken before that."""
+    from services.cert.renewal import RenewalError, renew_certificate_in_place
+
+    def archive(row_id):
+        with app.app_context():
+            db.session.get(Certificate, row_id).archived = True
+            db.session.commit()
+            db.session.remove()
+
+    _a_id, b_id = _chain_pair(app)
+    with app.app_context():
+        held = db.session.get(Certificate, b_id)  # read unarchived
+        thread = threading.Thread(target=archive, args=(b_id,))
+        thread.start()
+        thread.join(60)
+        with pytest.raises(RenewalError) as e:
+            renew_certificate_in_place(held, username='admin', regenerate_crl=False)
+        assert e.value.status == 409 and 'renewed by another request' in e.value.message
+        db.session.expire_all()
+        b = db.session.get(Certificate, b_id)
+        assert b.archived and not b.renewed_times
+        db.session.remove()
+
+
+def test_a_member_archived_since_read_is_refused_on_sqlite(app, tmp_path):
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'archived.db'}"):
+        _a_member_archived_since_read(app)
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_a_member_archived_since_read_is_refused_on_postgresql(app):
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+    with _a_schema_of_our_own(f'renew_arch_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        _a_member_archived_since_read(app)

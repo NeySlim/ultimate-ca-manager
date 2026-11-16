@@ -237,6 +237,12 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
     the caller decided on (default: the one ``cert`` carries). The other member
     of a related pair is renewed with it, A first, in the same commit."""
     try:
+        # The caller's view, taken before judging a partner's link re-reads this very row
+        try:
+            known_serial = cert.serial_number if known_serial is SERIAL_UNSET else known_serial
+            was_archived = bool(cert.archived)
+        except InvalidRequestError as e:  # deleted since the caller read it
+            raise RenewalError('Certificate no longer exists', 404) from e
         members = _renewal_members(cert)
         # Read before a row takes its new certificate: the replaced ones prove the entity
         previous = [(m, _stored(m)) for m in members]
@@ -250,6 +256,7 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                 staged_member = _stage_renewal(
                     member, ca if is_cert else None, rekey=rekey, trigger=trigger,
                     known_serial=known_serial if is_cert else SERIAL_UNSET,
+                    was_archived=was_archived if is_cert else None,
                     validity_days=validity_days, related_to=related_to,
                     precheck=lambda signer, issued: _refuse_taken(
                         signer, issued, members, trigger, username, locked=False,
@@ -388,10 +395,10 @@ def _current_related(row):
 
 
 def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,
-                   precheck=None) -> dict:
+                   precheck=None, was_archived=None) -> dict:
     """Every check, the signature and the writes, left uncommitted; *related_to*
     is the certificate A the renewed one names (RFC 9763)."""
-    cert = _reread(cert, known_serial, trigger)
+    cert = _reread(cert, known_serial, trigger, was_archived)
     check_renewable(cert, trigger)
     ca, ca_cert, ca_key = _signing_ca(cert, ca, trigger)
 
@@ -444,13 +451,13 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     }
 
 
-def _reread(cert, known_serial, trigger):
+def _reread(cert, known_serial, trigger, was_archived=None):
     """The row as stored now, locked until the commit on PostgreSQL. A row renewed or
     archived since the caller read it is refused: an archived row is renewed only by a
     caller that read it archived, never revived behind another renewal's back."""
     try:
         expected = cert.serial_number if known_serial is SERIAL_UNSET else known_serial
-        was_archived = bool(cert.archived)
+        was_archived = bool(cert.archived) if was_archived is None else was_archived
         fresh = db.session.get(Certificate, cert.id, populate_existing=True, with_for_update=True)
     except InvalidRequestError:  # deleted since the caller read it
         fresh = None
