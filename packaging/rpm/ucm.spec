@@ -307,15 +307,16 @@ fi
 %{ucm_home}/frontend/
 %{ucm_home}/scripts/
 # The owner and mode %%post and the service give them, so that laying the package down
-# over an installation changes none of them before %%post decides anything
+# over an installation changes none of them before %%post decides anything; %%ghost: the
+# payload never creates one, %%post does once the leftovers of a removed UCM are archived
 %dir %attr(0750,%{name},%{name}) %{ucm_data}
-%dir %attr(0755,%{name},%{name}) %{ucm_data}/ca
-%dir %attr(0755,%{name},%{name}) %{ucm_data}/certs
-%dir %attr(0700,%{name},%{name}) %{ucm_data}/private
-%dir %attr(0755,%{name},%{name}) %{ucm_data}/crl
-%dir %attr(0755,%{name},%{name}) %{ucm_data}/scep
-%dir %attr(0755,%{name},%{name}) %{ucm_data}/backups
-%dir %attr(0700,%{name},%{name}) %{ucm_data}/sessions
+%ghost %dir %attr(0755,%{name},%{name}) %{ucm_data}/ca
+%ghost %dir %attr(0755,%{name},%{name}) %{ucm_data}/certs
+%ghost %dir %attr(0700,%{name},%{name}) %{ucm_data}/private
+%ghost %dir %attr(0755,%{name},%{name}) %{ucm_data}/crl
+%ghost %dir %attr(0755,%{name},%{name}) %{ucm_data}/scep
+%ghost %dir %attr(0755,%{name},%{name}) %{ucm_data}/backups
+%ghost %dir %attr(0700,%{name},%{name}) %{ucm_data}/sessions
 %dir %attr(0750,%{name},%{name}) %{_sysconfdir}/%{name}/
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %dir %{_localstatedir}/log/%{name}/

@@ -45,15 +45,23 @@ def payload(tmp_path_factory):
     assert built.returncode == 0, built.stderr[-3000:]
     rpm = next((top / 'RPMS' / 'noarch').glob('ucm-0.0.0-1*.rpm'))
     dump = subprocess.run(['rpm', '-qp', '--qf', '[%{FILENAMES}\t%{FILEMODES:octal}\t%{FILEUSERNAME}\t'
-                           '%{FILEGROUPNAME}\n]', str(rpm)], capture_output=True, text=True, timeout=60, env=env)
+                           '%{FILEGROUPNAME}\t%{FILEFLAGS}\n]', str(rpm)],
+                          capture_output=True, text=True, timeout=60, env=env)
     assert dump.returncode == 0, dump.stderr
-    return {path: (int(mode, 8), user, group) for path, mode, user, group
+    return {path: (int(mode, 8), user, group, int(flags)) for path, mode, user, group, flags
             in (line.split('\t') for line in dump.stdout.splitlines())}
 
 
 def test_each_data_directory_is_laid_down_as_the_installation_leaves_it(payload):
-    got = {p: v for p, v in payload.items() if p == DATA or p.startswith(DATA + '/')}
+    got = {p: v[:3] for p, v in payload.items() if p == DATA or p.startswith(DATA + '/')}
     assert got == {p: (0o40000 | mode, 'ucm', 'ucm') for p, mode in EXPECTED.items()}
+
+
+def test_the_payload_creates_no_directory_inside_the_data(payload):
+    """%ghost (RPMFILE_GHOST): a failed archiving leaves what a removed UCM left without the
+    empty directories the payload would have added; %post creates them afterwards."""
+    ghost = {p for p, v in payload.items() if v[3] & 64}
+    assert ghost == {p for p in EXPECTED if p != DATA}
 
 
 def test_the_package_still_carries_the_application_and_its_scripts(payload):
