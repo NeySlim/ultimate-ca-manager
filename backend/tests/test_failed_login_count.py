@@ -426,6 +426,21 @@ def test_a_release_after_its_lock_expired_and_the_count_restarted_gives_nothing(
         assert tuple(_stored(username)) == (1, None)
 
 
+def test_a_release_after_its_own_lock_expired_gives_nothing(app, username):
+    """A bind slower than lockout_duration, nothing counted since: the window has ended,
+    and the next attempt restarts the count at 1 instead of arming a lock at once."""
+    with app.app_context():
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
+        user = User.query.filter_by(username=username).one()
+        _rank, armed = user.reserve_login_attempt(MAX_ATTEMPTS, 0)
+        db.session.commit()
+        user.release_login_attempt(armed)
+        db.session.commit()
+        assert tuple(_stored(username)) == (MAX_ATTEMPTS, armed)
+        assert user.reserve_login_attempt(MAX_ATTEMPTS, 900) == (1, None)
+        db.session.rollback()
+
+
 def test_a_release_of_an_attempt_that_armed_nothing_gives_nothing(app, username):
     """Cleared, then counted three times, while it was checked: its unit is not the new
     window's to give back."""
@@ -844,6 +859,36 @@ def test_an_unlock_lifts_a_lock_written_after_the_account_was_read(
     monkeypatch.undo()
     assert response.status_code == 200
     assert response.get_json()['message'] == f'User {username} unlocked successfully'
+    with app.app_context():
+        assert tuple(_stored(username)) == (0, None)
+
+
+NEW_PASSWORD = 'Another-Passw0rd-7!'
+
+
+def _locked_elsewhere(name):
+    _another_node_writes(name, failed_logins=MAX_ATTEMPTS,
+                         locked_until=utc_now() + timedelta(minutes=15))
+
+
+def test_a_password_set_by_an_administrator_ends_the_lock_of_the_old_one(app, username, auth_client):
+    """The count was of guesses at a password that no longer exists."""
+    with app.app_context():
+        uid = User.query.filter_by(username=username).one().id
+        _locked_elsewhere(username)
+    response = auth_client.post(f'/api/v2/users/{uid}/reset-password', json={'new_password': NEW_PASSWORD})
+    assert response.status_code == 200, response.get_json()
+    with app.app_context():
+        assert tuple(_stored(username)) == (0, None)
+
+
+def test_a_password_changed_in_a_session_ends_the_lock_of_the_old_one(app, client, username):
+    assert client.post(PASSWORD_DOOR, json={'username': username, 'password': PASSWORD}).status_code == 200
+    with app.app_context():
+        _locked_elsewhere(username)
+    response = client.post('/api/v2/account/password',
+                           json={'current_password': PASSWORD, 'new_password': NEW_PASSWORD})
+    assert response.status_code == 200, response.get_json()
     with app.app_context():
         assert tuple(_stored(username)) == (0, None)
 

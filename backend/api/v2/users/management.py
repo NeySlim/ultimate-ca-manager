@@ -77,8 +77,10 @@ def reset_user_password(user_id):
     if not is_valid:
         return error_response(error_msg, 400)
 
-    # Update password; the user's sessions end with the old one
+    # Update password; the user's sessions end with the old one, and so does the count of
+    # guesses at it
     user.set_password(data['new_password'])
+    user.clear_failed_logins()
 
     try:
         db.session.commit()

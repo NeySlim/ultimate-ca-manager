@@ -189,12 +189,13 @@ class User(db.Model):
         """Give back a reserved attempt whose secret was proved but opened no session.
 
         Only the attempt that armed the lock can show its window is still open: the stored
-        lock is the one it wrote (``armed``). It then lifts that lock and gives its unit
-        back. Any other stays counted, so no window gets back a unit taken in another and
-        each window checks at most ``max_attempts`` wrong secrets. The caller commits."""
+        lock is the one it wrote (``armed``) and still runs. It then lifts that lock and
+        gives its unit back. Any other stays counted, so no window gets back a unit taken in
+        another and each window checks at most ``max_attempts`` wrong secrets. The caller commits."""
         if armed:
             db.session.execute(
-                update(User).where(User.id == self.id, User.locked_until == armed)
+                update(User).where(User.id == self.id, User.locked_until == armed,
+                                   User.locked_until > utc_now())
                 .values(failed_logins=func.coalesce(User.failed_logins, 0) - 1,
                         locked_until=None)
                 .execution_options(synchronize_session=False))
