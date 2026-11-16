@@ -1020,3 +1020,41 @@ def test_a_merge_bringing_back_an_email_another_local_account_holds_is_refused(t
     assert 'replace-email-a@example.test' in str(refused.value)
     assert 'Nothing has been changed' in str(refused.value)
     assert User.query.filter_by(username='replace-email-a').first() is None
+
+
+def test_a_full_replace_of_an_sso_account_sharing_a_local_email_passes(target):
+    """An SSO account may share its e-mail with a local one (#136): restoring that is no conflict."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    _identity(_user('replace-shared-sso'), _sso_provider('replace-shared-idp'), 'sub-shared')
+    _user('replace-shared-local').email = 'replace-shared-sso@example.test'
+    blob = _snapshot()
+
+    _restore(blob)
+
+    sso = User.query.filter_by(username='replace-shared-sso').one()
+    assert [row.external_id for row in UserSSOIdentity.query.filter_by(user_id=sso.id)] == ['sub-shared']
+    assert User.query.filter_by(username='replace-shared-local').one().email == sso.email
+
+
+def test_a_merge_making_a_local_account_sso_again_may_share_its_email(target):
+    """The archive's identity rows count, not the rows the account had before the restore."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    sso = _user('replace-merge-sso')
+    _identity(sso, _sso_provider('replace-merge-idp'), 'sub-merge')
+    blob = _snapshot()
+    UserSSOIdentity.query.filter_by(user_id=sso.id).delete()
+    sso.email = 'elsewhere@example.test'
+    db.session.flush()
+    _user('replace-merge-local').email = 'replace-merge-sso@example.test'
+    db.session.commit()
+
+    _restore(blob, mode='merge')
+
+    sso = User.query.filter_by(username='replace-merge-sso').one()
+    assert sso.email == 'replace-merge-sso@example.test'
+    assert [row.external_id for row in UserSSOIdentity.query.filter_by(user_id=sso.id)] == ['sub-merge']
+

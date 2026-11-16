@@ -794,9 +794,10 @@ class RestoreCoreMixin:
 
         names = [row['username'] for row in backup_data.get('users') or []]
         for start in range(0, len(names), 500):
-            for user in User.query.filter(User.username.in_(names[start:start + 500])):
-                if not user.email or not user.is_local:
-                    continue
+            # Local in SQL: the cached sso_identities predate the identity rows just restored
+            for user in User.query.filter(User.username.in_(names[start:start + 500]),
+                                          User.email.isnot(None), User.email != '',
+                                          ~User.sso_identities.any()):
                 holder = local_email_holder(user.email, other_than=user.id)
                 if holder is not None:
                     raise RestoreConflictError(
