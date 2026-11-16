@@ -11,8 +11,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- SSO: an OIDC provider with role mapping rules, such as Microsoft Entra ID whose UserInfo response has no groups, refused every user; the rules now read the `groups` and `roles` of the ID token validated for the login together with those of the UserInfo response, and an empty `roles` claim no longer hides `groups`.
+- SSO: an OIDC provider with role mapping rules, such as Microsoft Entra ID whose UserInfo response has no groups, refused every user; the rules now read the `groups` and `roles` of the ID token validated for the login together with those of the UserInfo response, and a `roles` claim no longer hides `groups`.
 - SSO: a SAML assertion that repeats an attribute name, as Keycloak's role list does with one attribute per role, was refused as invalid; its values are now merged in assertion order, role mapping reads them all and a repeated username or email attribute gives its first value.
+- SSO: LDAP groups read through `member` or `uniqueMember` were searched only under the parent of the base DN, so a base DN at the domain root found none and the user was refused. They are searched under that parent when the directory holds it, else under the base DN, and a refused search is tried once more under the base DN.
+- SSO: an LDAP provider with role mapping rules or required groups and no group filter read no group and refused everyone; the groups are now read without one.
+- SSO: an LDAP `memberOf` value that is not a DN ended the group read and lost the groups listed after it; only that value is skipped now, with a warning in the log.
+- SSO: an LDAP role mapping rule `pki-admins` did not match the directory group `PKI-Admins`. LDAP rules and groups now compare ignoring case, edge spaces and inner space runs (OIDC and SAML stay exact), and two rule keys a provider compares equal are refused at save.
+- SSO: an LDAP login whose groups could not be read was refused as "no role mapping rule matches". It is now refused with "your groups could not be read from the directory", in the response, the log and the audit, and does not count as a failed attempt.
+- SSO: the LDAP mapping test read the groups by its own code and showed a resolved role for a user the login refuses. It now gives the login's verdict and the reason of a refusal.
+- SSO: the Active Directory `userAccountControl` check never read the attribute's value, so the mapping test reported a disabled account as allowed; it now reports it disabled.
 
 ## [2.254.3] - 2026-11-16
 

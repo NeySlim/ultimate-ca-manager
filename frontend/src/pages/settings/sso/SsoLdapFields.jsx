@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import { Plugs, MagnifyingGlass, UsersThree, UserPlus, Play, ShieldWarning } from '@phosphor-icons/react'
-import { Button, Input, Select, Badge, LoadingSpinner, CompactSection } from '../../../components'
+import { Button, Input, Select, LoadingSpinner, CompactSection } from '../../../components'
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import RoleMappingEditor from '../RoleMappingEditor'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import MappingTestResult from './MappingTestResult'
 
 export default function SsoLdapFields({
   formData,
@@ -258,34 +259,7 @@ export default function SsoLdapFields({
               </div>
               {testMappingResult && (
                 <div className="mt-2 p-2.5 rounded-lg border border-border bg-bg-secondary text-xs space-y-1">
-                  {testMappingResult.found === false ? (
-                    <p className="text-status-error">{t('sso.testMappingNotFound')}</p>
-                  ) : (
-                    <>
-                      <p><span className="text-text-secondary font-medium">DN:</span> <span className="text-text-tertiary font-mono">{testMappingResult.user_dn}</span></p>
-                      <p>
-                        <span className="text-text-secondary font-medium">{t('sso.testMappingGroups')}:</span>{' '}
-                        {testMappingResult.groups?.length > 0
-                          ? testMappingResult.groups.map(g => <Badge key={g} variant="secondary" size="sm" className="mr-1">{g}</Badge>)
-                          : <span className="text-text-tertiary italic">{t('sso.testMappingNoGroups')}</span>
-                        }
-                      </p>
-                      <p>
-                        <span className="text-text-secondary font-medium">{t('sso.testMappingResolvedRole')}:</span>{' '}
-                        <Badge variant={testMappingResult.resolved_role === 'admin' ? 'danger' : testMappingResult.resolved_role === 'operator' ? 'warning' : 'info'} size="sm">
-                          {testMappingResult.resolved_role}
-                        </Badge>
-                      </p>
-                      {testMappingResult.required_groups?.length > 0 && (
-                        <p>
-                          <span className="text-text-secondary font-medium">{t('sso.testMappingAccess')}:</span>{' '}
-                          <Badge variant={testMappingResult.access_allowed ? 'success' : 'danger'} size="sm">
-                            {testMappingResult.access_allowed ? t('sso.testMappingAccessAllowed') : t('sso.testMappingAccessDenied')}
-                          </Badge>
-                        </p>
-                      )}
-                    </>
-                  )}
+                  <MappingTestResult result={testMappingResult} />
                 </div>
               )}
             </div>

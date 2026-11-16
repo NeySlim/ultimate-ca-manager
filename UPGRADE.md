@@ -164,6 +164,10 @@ Database migrations run automatically at startup.
 
 OIDC role mapping rules now also match the `groups` and `roles` of the ID token validated for the login, and a `roles` claim no longer hides `groups`; SAML and LDAP are unchanged. A user no rule matched before may now be admitted, or, with *Sync role on each login*, get a higher role at the next sign-in: review the mapping rules of OIDC providers before upgrading.
 
+### LDAP role mapping compares group names as the directory does
+
+Rule keys and required groups now compare with the directory's group names ignoring case, edge spaces and the length of inner space runs, and groups are read whenever a provider has rules or required groups, even without a group filter: a rule can match a group it missed before, so review the rules of an LDAP provider and check a few users with *Test Mapping*. A provider saved with two keys equal in that sense keeps signing in (both rules apply, the highest-privilege role wins), and saving it with that mapping is refused until one key is removed.
+
 ### A restore signs out every session, the restoring one included
 
 After a successful restore, every session opened before it is refused, whatever the session store, including the session of the operator who ran the restore: sign in again once the restore has completed. A script that restores through the API with a session cookie needs a new sign-in before its next call; an API key is not a session and is kept or replaced as the archive says. A failed restore, or an archive that carried no data, signs nobody out.
