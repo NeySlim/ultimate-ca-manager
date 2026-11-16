@@ -77,8 +77,10 @@ def reset_user_password(user_id):
     if not is_valid:
         return error_response(error_msg, 400)
 
-    # Update password; the user's sessions end with the old one
+    # Update password; the user's sessions end with the old one, and so does the count of
+    # guesses at it
     user.set_password(data['new_password'])
+    user.clear_failed_logins()
 
     try:
         db.session.commit()
@@ -326,12 +328,11 @@ def unlock_user(user_id):
     if not user:
         return error_response('User not found', 404)
 
-    if not user.locked_until and not user.failed_logins:
-        return success_response(data=user.to_dict(), message='Account is not locked')
-
     try:
-        user.failed_logins = 0
-        user.locked_until = None
+        # Decided on the stored row: a lock another node wrote after this read is lifted
+        if not user.clear_failed_logins():
+            db.session.rollback()
+            return success_response(data=user.to_dict(), message='Account is not locked')
         db.session.commit()
         AuditService.log_action(
             action='user_unlock',

@@ -62,6 +62,7 @@ def change_password():
     # Update password: set_password() closes every session of the account,
     # then this one is kept under a new identifier.
     user.set_password(new_password)
+    user.clear_failed_logins()  # guesses at the old password count for nothing now
     user.force_password_change = False
     ok, _err = safe_commit(logger, "Failed to update password")
     if not ok:

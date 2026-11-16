@@ -189,24 +189,6 @@ def _get_ldap_lockout_settings():
     return _get_lockout_settings()
 
 
-def _check_ldap_lockout(username):
-    """Check if account is locked due to failed LDAP attempts."""
-    user = User.query.filter_by(username=username).first()
-    if not user:
-        return False
-    if user.locked_until:
-        if utc_now() < user.locked_until:
-            return True
-        user.locked_until = None
-        user.failed_logins = 0
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to clear LDAP lockout: {e}")
-    return False
-
-
 def notify_account_locked(username):
     """Send the account_locked security alert; never fails the login."""
     try:
@@ -221,37 +203,62 @@ def notify_account_locked(username):
         logger.warning(f"Failed to send account_locked alert for {username}: {e}")
 
 
-def _record_ldap_failed_attempt(username):
-    """Record a failed LDAP login attempt."""
-    user = User.query.filter_by(username=username).first()
+def announce_account_locked(subject, username, max_attempts):
+    """Log and alert a lock; called by the one attempt that armed it."""
+    logger.warning(f"{subject} locked after {max_attempts} failed attempts")
+    notify_account_locked(username)
+
+
+def _reserve_ldap_attempt(user):
+    """Count one LDAP attempt before the bind, on the local account the entry resolves to.
+
+    Returns (account, rank, armed) as ``User.reserve_login_attempt``: account None when
+    there is none (nothing is counted). Raises, rolled back, when the count fails."""
     if not user:
-        return
+        return None, None, None
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()
     try:
-        locked = user.count_failed_login() >= max_attempts
-        if locked:
-            user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
-            logger.warning(f"LDAP account locked for {username} after {max_attempts} failed attempts")
+        rank, armed = user.reserve_login_attempt(max_attempts, lockout_seconds)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return user, rank, armed
+
+
+def _ldap_attempt_failed(user, armed):
+    """A refused or failed bind: the one attempt that armed the lock reports it."""
+    if user is not None and armed:
+        announce_account_locked(f'LDAP account {user.username}', user.username,
+                                _get_ldap_lockout_settings()[0])
+
+
+def _release_ldap_attempt(user, armed):
+    """The bind proved the password but no session opens: the attempt that armed the lock
+    lifts it and is not counted; any other stays counted (``User.release_login_attempt``)."""
+    if user is None:
+        return
+    try:
+        user.release_login_attempt(armed)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to record LDAP failed attempt for {username}: {e}")
-        return
-    if locked:
-        notify_account_locked(username)
+        logger.error(f"Failed to release LDAP attempt for {user.username}: {e}")
 
 
-def _clear_ldap_failed_attempts(username):
-    """Clear failed attempt counters on successful login."""
-    user = User.query.filter_by(username=username).first()
-    if user and (user.failed_logins or user.locked_until):
-        user.failed_logins = 0
-        user.locked_until = None
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to clear LDAP failed attempts for {username}: {e}")
+def _clear_ldap_failed_attempts(user):
+    """Clear the stored count and lock of the account a successful bind opens; False,
+    rolled back, when that fails: no session opens, as at the password door."""
+    if user is None:
+        return True
+    try:
+        user.clear_failed_logins()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to update login stats for {user.username}: {e}", exc_info=True)
+        return False
+    return True
 
 
 # SAML attributes read for group membership when the provider's attribute
