@@ -8,10 +8,65 @@ reverse proxy.
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket.gunicorn.workers import GeventWebSocketWorker
 from gunicorn.workers.ggevent import PyWSGIHandler
+import ctypes
+import functools
 import ssl
 import logging
 
+import gevent.ssl
+
 logger = logging.getLogger(__name__)
+
+
+def _openssl_clear_error():
+    """ERR_clear_error of the libcrypto the ssl module is linked to, or None."""
+    try:
+        import _ssl
+        clear = ctypes.CDLL(_ssl.__file__).ERR_clear_error
+    except (ImportError, OSError, AttributeError):
+        return None
+    clear.argtypes, clear.restype = [], None
+    return clear
+
+
+def clear_tls_errors_before_io(cls=gevent.ssl.SSLSocket):
+    """Empties the thread's OpenSSL error queue before each TLS call of ``cls``, as SSL_get_error
+    requires: CPython leaves there the system errors it raises as OSError, and every greenlet of
+    the worker shares the thread, so one dropped connection made another's wait look like a failure."""
+    if cls.__dict__.get('_ucm_clears_tls_errors'):
+        return True
+    calls = ('read', 'write', 'send', 'do_handshake', 'unwrap')
+    clear = _openssl_clear_error()
+    # All or nothing: a class missing one of them (another gevent) is left as it is
+    if clear is None or not all(hasattr(cls, name) for name in calls + ('_wait',)):
+        logger.warning("OpenSSL error queue not reachable: TLS errors may spread between connections")
+        return False
+
+    def before(method):
+        @functools.wraps(method)
+        def call(self, *args, **kwargs):
+            clear()
+            return method(self, *args, **kwargs)
+        return call
+
+    def after(method):
+        @functools.wraps(method)
+        def call(self, *args, **kwargs):
+            try:
+                return method(self, *args, **kwargs)
+            finally:
+                clear()  # other greenlets ran during the wait; the TLS call is retried next
+        return call
+
+    for name in calls:
+        setattr(cls, name, before(getattr(cls, name)))
+    cls._wait = after(cls._wait)
+    cls._ucm_clears_tls_errors = True
+    return True
+
+
+# Gunicorn imports the worker class in the master before forking: every worker is covered
+clear_tls_errors_before_io()
 
 
 class MTLSWebSocketHandler(WebSocketHandler, PyWSGIHandler):
