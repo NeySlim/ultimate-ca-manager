@@ -18,6 +18,7 @@ from services.database_admin import verify as verify_mod
 from services.database_admin.verify import (
     VerificationError,
     check_local_email_flags,
+    check_ssh_serials,
     check_foreign_keys,
     check_row_counts,
     check_schema,
@@ -152,7 +153,7 @@ class TestVerifyMigration:
         assert report['target_backend'] == 'sqlite'
         assert set(report['checks']) == {
             'schema', 'row_counts', 'foreign_keys', 'unique_constraints',
-            'local_email_flags', 'sequences', 'secrets',
+            'local_email_flags', 'ssh_serials', 'sequences', 'secrets',
         }
         assert report['checks']['row_counts']['rows'] == 4
         assert report['checks']['foreign_keys']['constraints_checked'] > 0
@@ -392,6 +393,53 @@ class TestLocalEmailFlags:
                               "VALUES (1, 'oauth2:https://idp.example')"))
         with pytest.raises(VerificationError):
             check_local_email_flags(target)
+
+
+def _ssh_ca(engine, ca_id, counter):
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO ssh_cas (id, refid, descr, ca_type, public_key, private_key, key_type, fingerprint, "
+            "serial_counter, allow_any_principal, allow_custom_key_id) VALUES (:i, :r, 'CA', 'user', 'pub', "
+            "'prv', 'ed25519', :f, :c, 1, 0)"), {'i': ca_id, 'r': f'ca-{ca_id}', 'f': f'f{ca_id}', 'c': counter})
+
+
+def _ssh_cert(engine, cert_id, ca_id, serial, marked=False):
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO ssh_certificates (id, refid, ssh_ca_id, cert_type, key_id, public_key, certificate, "
+            "principals, serial, serial_duplicate, valid_from, valid_to, key_type, fingerprint) VALUES "
+            "(:i, :r, :c, 'user', 'k', 'pub', 'cert', '[]', :s, :m, '2026-01-01', '2027-01-01', 'ed25519', :f)"),
+            {'i': cert_id, 'r': f'c-{cert_id}', 'c': ca_id, 's': serial, 'm': marked, 'f': f'f{cert_id}'})
+
+
+class TestSSHSerials:
+    """Every SSH CA counts past its certificates, and no serial is held twice unmarked."""
+
+    def test_a_counter_past_its_certificates_and_a_marked_pair_pass(self, target):
+        _ssh_ca(target, 1, 3)
+        _ssh_cert(target, 1, 1, 3)
+        _ssh_cert(target, 2, 1, 3, marked=True)
+        _ssh_cert(target, 3, 1, 0)
+        _ssh_cert(target, 4, 1, 0)
+        assert check_ssh_serials(target) == {'cas_checked': 1, 'lagging': 0, 'unmarked_duplicates': 0}
+
+    def test_a_counter_behind_its_certificates_is_refused(self, target):
+        _ssh_ca(target, 1, 2)
+        _ssh_cert(target, 1, 1, 3)
+        with pytest.raises(VerificationError) as excinfo:
+            check_ssh_serials(target)
+        assert 'serial_counter' in str(excinfo.value) and 'CA #1' in str(excinfo.value)
+
+    def test_an_unmarked_pair_is_refused(self, target):
+        # Only a target that lost the index can hold one
+        with target.begin() as conn:
+            conn.execute(text('DROP INDEX uq_ssh_certificates_ca_serial'))
+        _ssh_ca(target, 1, 3)
+        _ssh_cert(target, 1, 1, 3)
+        _ssh_cert(target, 2, 1, 3)
+        with pytest.raises(VerificationError) as excinfo:
+            check_ssh_serials(target)
+        assert 'serial' in str(excinfo.value) and '#2' in str(excinfo.value)
 
 
 # ---------------------------------------------------------------------------
