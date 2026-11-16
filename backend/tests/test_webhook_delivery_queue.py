@@ -9,20 +9,6 @@ from services.webhook_service import WebhookService, WebhookEndpoint
 from utils.datetime_utils import utc_now
 
 
-@pytest.fixture(autouse=True, scope='module')
-def _endpoints_leave_with_the_module(app):
-    """Enabled sinks left behind would receive, and queue deliveries for, the events of every later file."""
-    yield
-    with app.app_context():
-        db.session.rollback()
-        ids = [row.id for row in WebhookEndpoint.query.filter(
-            db.or_(WebhookEndpoint.name.like('sink-%'), WebhookEndpoint.name.like('ca-scoped-%')))]
-        if ids:
-            WebhookDelivery.query.filter(WebhookDelivery.endpoint_id.in_(ids)).delete(synchronize_session=False)
-            WebhookEndpoint.query.filter(WebhookEndpoint.id.in_(ids)).delete(synchronize_session=False)
-        db.session.commit()
-
-
 @pytest.fixture
 def endpoint(app):
     with app.app_context():

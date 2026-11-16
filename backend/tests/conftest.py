@@ -554,6 +554,59 @@ def _planner_statistics_stay_in_their_module():
     _drop_planner_statistics()
 
 
+def _sweep_deliveries(webhook_endpoints_before=None):
+    """Delivery rows must not outlive what they were queued for: SQLite hands a deleted endpoint's or
+    binding's id to the next one, which then inherits the old rows. Endpoints a file created go too."""
+    if not _SESSION_APP:
+        return
+    from sqlalchemy import text as _text
+    from models import db
+    with _SESSION_APP[0].app_context():
+        try:
+            present = set(db.inspect(db.engine).get_table_names())
+            if 'webhook_endpoints' in present and 'webhook_deliveries' in present:
+                if webhook_endpoints_before is not None:
+                    for (row_id,) in db.session.execute(_text('SELECT id FROM webhook_endpoints')).all():
+                        if row_id not in webhook_endpoints_before:
+                            db.session.execute(_text('DELETE FROM webhook_deliveries WHERE endpoint_id = :i'), {'i': row_id})
+                            db.session.execute(_text('DELETE FROM webhook_endpoints WHERE id = :i'), {'i': row_id})
+                db.session.execute(_text('DELETE FROM webhook_deliveries WHERE endpoint_id NOT IN (SELECT id FROM webhook_endpoints)'))
+            for kind, table in (('certificate', 'deploy_bindings'), ('crl', 'crl_deploy_bindings')):
+                if {'deploy_deliveries', table} <= present:
+                    db.session.execute(_text(
+                        f"DELETE FROM deploy_deliveries WHERE binding_type = '{kind}' "
+                        f'AND binding_id NOT IN (SELECT id FROM {table})'))
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            import warnings
+            warnings.warn(f'deliveries not swept: {type(exc).__name__}', stacklevel=1)
+        finally:
+            db.session.remove()
+
+
+def _webhook_endpoint_ids():
+    if not _SESSION_APP:
+        return None
+    from sqlalchemy import text as _text
+    from models import db
+    with _SESSION_APP[0].app_context():
+        try:
+            if 'webhook_endpoints' not in db.inspect(db.engine).get_table_names():
+                return None
+            return {row[0] for row in db.session.execute(_text('SELECT id FROM webhook_endpoints')).all()}
+        finally:
+            db.session.rollback()
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _deliveries_stay_with_their_endpoints():
+    """No webhook endpoint a file created, and no delivery without its endpoint or binding, reaches the next file."""
+    before = _webhook_endpoint_ids()
+    yield
+    _sweep_deliveries(before)
+
+
 def _epoch_row():
     """The stored session epoch: its value, None when absent (a fresh database)."""
     if not _SESSION_APP:
