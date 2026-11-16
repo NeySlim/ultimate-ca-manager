@@ -3559,7 +3559,7 @@
           "remedy": "Créez une AC RSA ou ECDSA (P-256/P-384/P-521) et déplacez-y l'émission avant la bascule ; la clé d'une AC ne peut pas être convertie."
         },
         "ca_weak_key": {
-          "title": "Autorités de certification avec une clé DSA, une clé RSA de longueur impaire ou hors de 2048 à 16384 bits, ou une courbe autre que P-256/384/521",
+          "title": "Autorités de certification avec une clé DSA, une clé RSA de longueur impaire ou hors de l'intervalle de 2048 à 16384 bits, ou une courbe autre que P-256/384/521",
           "remedy": "Créez une AC en RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission."
         },
         "ca_unapproved_algorithm": {
