@@ -1,5 +1,5 @@
 from . import bp, VALID_ROLES, logger
-from .connection_tests import _ldap_authenticate_user
+from .connection_tests import ATTEMPT_REFUSED, _ldap_authenticate_user
 from flask import request, session
 from auth.unified import require_auth
 from auth.session_start import begin_session
@@ -22,7 +22,7 @@ from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
 from . import saml_sp
-from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
+from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
 @limiter.limit("5/minute")
@@ -72,8 +72,28 @@ def ldap_login():
     if not provider.enabled:
         return error_response("LDAP provider is disabled", 400)
 
-    # Checked before the bind, so a locked account answers like a wrong password
-    if _check_ldap_lockout(username):
+    # Counted after the search and before the bind, on the account the entry resolves to
+    # (whatever spelling the filter accepted), so a burst in any worker binds at most
+    # max_login_attempts times. An entry with no local account yet has no count.
+    attempt = {}
+
+    def reserve(identity):
+        try:
+            attempt['local'], attempt['rank'], attempt['armed'] = _reserve_ldap_attempt(
+                _ldap_local_account(provider, identity))
+        except Exception as e:
+            logger.error(f"Failed to record LDAP login attempt for {username}: {e}", exc_info=True)
+            attempt['failed'] = True
+            return False
+        return attempt['local'] is None or attempt['rank'] is not None
+
+    user_info, error = _ldap_authenticate_user(provider, username, password, before_bind=reserve)
+    local, armed = attempt.get('local'), attempt.get('armed')
+
+    if attempt.get('failed'):
+        return error_response("Failed to record login attempt", 500)
+    if error == ATTEMPT_REFUSED:
+        _ldap_attempt_failed(local, armed)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -83,13 +103,10 @@ def ldap_login():
         )
         return error_response("Invalid credentials", 401)
 
-    # Authenticate via LDAP
-    user_info, error = _ldap_authenticate_user(provider, username, password)
-
     if error:
         if error == 'account_disabled':
-            # Account exists but is disabled in LDAP — don't count as
-            # failed login attempt (not a wrong password).
+            # Disabled in LDAP, the password proved: never locks the account by itself.
+            _release_ldap_attempt(local, armed)
             AuditService.log_action(
                 action='login_failure',
                 resource_type='user',
@@ -100,8 +117,8 @@ def ldap_login():
             return error_response("This account has been disabled in Active Directory / LDAP", 403)
 
         if error == 'group_denied':
-            # Authenticated but not in required groups — don't count as
-            # failed login attempt.
+            # Proved but not in the required groups: never locks the account by itself.
+            _release_ldap_attempt(local, armed)
             AuditService.log_action(
                 action='login_failure',
                 resource_type='user',
@@ -111,8 +128,8 @@ def ldap_login():
             )
             return error_response("Access denied: you are not a member of the required group(s)", 403)
 
-        # Generic auth failure (wrong password, etc.)
-        _record_ldap_failed_attempt(username)
+        # Generic auth failure (wrong password, etc.): the reserved attempt stays counted
+        _ldap_attempt_failed(local, armed)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -132,6 +149,7 @@ def ldap_login():
     )
 
     if not user:
+        _release_ldap_attempt(local, armed)
         # The password is proved by now, so the refusal may say why.
         if error_code == USERNAME_CONFLICT:
             return error_response(
@@ -153,6 +171,7 @@ def ldap_login():
 
     # SECURITY: Block disabled accounts (admin can disable LDAP users locally)
     if not user.active:
+        _release_ldap_attempt(local, armed)
         logger.warning(f"LDAP login blocked: user {username} is disabled")
         AuditService.log_action(
             action='login_failure',
@@ -165,8 +184,15 @@ def ldap_login():
         )
         return error_response("This account has been disabled", 403)
 
-    # Clear failed attempts on successful login
-    _clear_ldap_failed_attempts(username)
+    # The bind opened the account it was counted on: its count and lock are cleared.
+    # Both come from one resolution; they differ only if the accounts changed in between.
+    if local is not None and local.id == user.id:
+        if not _clear_ldap_failed_attempts(local):
+            # A lock this attempt armed stays as stored, the safe side: it is announced
+            _ldap_attempt_failed(local, armed)
+            return error_response("Failed to update login stats", 500)
+    else:
+        _release_ldap_attempt(local, armed)
 
     # Create or update session (deduplicate like OAuth2/SAML)
     session_id = user_info['dn']
@@ -412,12 +438,10 @@ def _refuse_unmapped(provider, username):
     return None, UNMAPPED
 
 
-def _get_or_create_sso_user(provider, username, email, fullname, external_data):
-    """Create or update a user from SSO authentication
-
-    Returns:
-        tuple: (user, error_code) - user object or None, and error code if failed
-    """
+def _resolve_sso_account(provider, username, email, external_data):
+    """(account, rebind, conflict): the local account this identity opens, whether it is
+    the DN-bound one moving to the stable uid, and the account of the same name it may
+    not claim. Reads only: the LDAP door counts its attempt on what this finds."""
     from sqlalchemy import func
     external_id = _extract_external_id(provider, external_data)
 
@@ -435,11 +459,11 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
 
     # 2. Not bound yet (legacy, or linked by an admin): match by username, but
     #    only an account this identity may claim.
-    conflict = False
+    conflict = None
     if not user:
         user = User.query.filter_by(username=username).first()
         if user and not _adoptable(user, provider):
-            conflict, user = True, None
+            conflict, user = user, None
 
     # 3. An account an admin linked to this provider that owns this email but
     #    whose username differs (#138). Never a local or already bound account,
@@ -449,6 +473,24 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         candidates = User.query.filter(func.lower(User.email) == norm).all()
         user = next((u for u in candidates
                      if (u.auth_source or 'local') != 'local' and _adoptable(u, provider)), None)
+    return user, rebind, conflict
+
+
+def _ldap_local_account(provider, identity):
+    """The local account a bind of this directory entry would open or be refused on."""
+    user, _rebind, conflict = _resolve_sso_account(
+        provider, identity['username'], identity.get('email', ''), identity)
+    return user or conflict
+
+
+def _get_or_create_sso_user(provider, username, email, fullname, external_data):
+    """Create or update a user from SSO authentication
+
+    Returns:
+        tuple: (user, error_code) - user object or None, and error code if failed
+    """
+    external_id = _extract_external_id(provider, external_data)
+    user, rebind, conflict = _resolve_sso_account(provider, username, email, external_data)
 
     if not user and conflict:
         return _refuse_username_conflict(provider, username)

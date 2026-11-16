@@ -726,46 +726,38 @@ class TestLDAPRateLimiting:
     """Test LDAP brute-force protection"""
 
     def test_lockout_check_nonexistent_user(self, app):
-        """Non-existent user should not be locked"""
+        """An entry with no local account counts nothing and is not locked"""
         with app.app_context():
-            from api.v2.sso import _check_ldap_lockout
-            assert _check_ldap_lockout('nonexistent_user_xyz') is False
+            from api.v2.sso import _reserve_ldap_attempt
+            assert _reserve_ldap_attempt(None) == (None, None, None)
 
     def test_record_failed_attempts_and_lockout(self, app):
-        """After 5 failed attempts, user should be locked"""
+        """After 5 reserved attempts, user should be locked"""
         with app.app_context():
-            from api.v2.sso import (
-                _record_ldap_failed_attempt,
-                _check_ldap_lockout,
-                _clear_ldap_failed_attempts,
-            )
+            from api.v2.sso import _reserve_ldap_attempt, _clear_ldap_failed_attempts
             from models import db, User
 
-            # Use the admin user for testing
             user = User.query.filter_by(username='admin').first()
             assert user is not None
-
-            # Clear any existing lockout
             user.failed_logins = 0
             user.locked_until = None
             db.session.commit()
 
             # Default max attempts is 5
             max_attempts = 5
+            for rank in range(1, max_attempts):
+                assert _reserve_ldap_attempt(user) == (user, rank, None)
+            # The last one armed the lock: it is handed the lock it wrote
+            assert _reserve_ldap_attempt(user) == (user, max_attempts, user.locked_until)
+            assert user.locked_until is not None
 
-            # Record failures up to threshold
-            for i in range(max_attempts):
-                assert _check_ldap_lockout('admin') is False
-                _record_ldap_failed_attempt('admin')
+            # Locked now: no further attempt is counted
+            assert _reserve_ldap_attempt(user) == (user, None, None)
 
-            # Should now be locked
-            assert _check_ldap_lockout('admin') is True
+            _clear_ldap_failed_attempts(user)
+            assert _reserve_ldap_attempt(user) == (user, 1, None)
 
-            # Clear and verify unlocked
-            _clear_ldap_failed_attempts('admin')
-            assert _check_ldap_lockout('admin') is False
-
-            # Verify user state is clean
+            _clear_ldap_failed_attempts(user)
             db.session.refresh(user)
             assert user.failed_logins == 0
             assert user.locked_until is None

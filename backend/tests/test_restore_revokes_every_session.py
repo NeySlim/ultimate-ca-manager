@@ -226,7 +226,7 @@ def ldap_login(app, monkeypatch):
         names.append(name)
         found = {'dn': f'uid={name}', 'uid': name, 'username': name,
                  'email': f'{name}@example.test', 'fullname': name, 'groups': []}
-        bind = _advance_while((found, None)) if restore_lands else (lambda *_a: (found, None))
+        bind = _advance_while((found, None)) if restore_lands else (lambda *_a, **_k: (found, None))
         monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', bind)
         client = app.test_client()
         answer = client.post('/api/v2/sso/ldap/login', json={
