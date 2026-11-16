@@ -17,7 +17,8 @@ from utils.response import success_response, error_response, created_response, n
 from services import compliance_signer
 from services.hsm import HsmService, key_binding
 from utils.process_lock import LockBusyError
-from services.hsm.base_provider import HsmError, HsmKeyExistsError, HsmConnectionError, HsmOperationError, HsmConfigError
+from services.hsm.base_provider import (
+    HsmError, HsmKeyExistsError, HsmConnectionError, HsmOperationError, HsmConfigError, HsmSecretUnreadable)
 from models import db
 from models.hsm import HsmProvider, HsmKey
 from services.audit_service import AuditService
@@ -402,6 +403,8 @@ def sync_provider_keys(provider_id):
         
     except HaRestricted:
         raise
+    except HsmSecretUnreadable as e:
+        return error_response(str(e), 400)  # names the field, never its value
     except HsmError as e:
         logger.error(f"HSM sync error: {e}")
         return error_response('HSM synchronization error', 500)

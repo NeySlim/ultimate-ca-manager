@@ -176,6 +176,29 @@ def test_hsm_connection_test_with_an_unreadable_secret_names_the_field(app, monk
             db.session.commit()
 
 
+def test_hsm_key_sync_with_an_unreadable_secret_answers_400_naming_the_field(
+        app, auth_client, monkeypatch):
+    from models import db
+    from services.hsm import gcp_provider
+    monkeypatch.setattr(gcp_provider.kms_v1, 'KeyManagementServiceClient', lambda *a, **k: MagicMock())
+    token = _foreign_token('{"type": "service_account"}')
+    with app.app_context():
+        row = _gcp_row(None, token)
+        row.name = f'kms-{uuid.uuid4().hex[:6]}'
+        db.session.add(row)
+        db.session.commit()
+        pid = row.id
+    try:
+        r = auth_client.post(f'/api/v2/hsm/providers/{pid}/sync')
+        assert r.status_code == 400, r.get_data(as_text=True)
+        assert f'HSM provider {pid} service_account_json cannot be decrypted' in r.get_json()['message']
+        assert token not in r.get_data(as_text=True)
+    finally:
+        with app.app_context():
+            db.session.delete(db.session.get(type(row), pid))
+            db.session.commit()
+
+
 def test_hsm_provider_with_a_readable_secret_still_gets_it(app):
     from services.hsm import HsmService
     from utils.encryption import encrypt_value
