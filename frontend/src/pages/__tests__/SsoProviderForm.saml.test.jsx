@@ -114,24 +114,4 @@ describe('SsoProviderForm SAML strict options', () => {
       onSave={onSave} onCancel={vi.fn()} />)
     expect((await submit(onSave)).attribute_mapping).toEqual({ email: 'email' })
   })
-
-  it('keeps a legacy groups row read when a shortcut adds one of the new form', async () => {
-    const onSave = vi.fn()
-    render(<SsoProviderForm provider={{ ...PROVIDER, attribute_mapping: { email: 'email', groups: 'memberOf' } }}
-      onSave={onSave} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByText('sso.attributeRoleMappingSection'))
-    fireEvent.click(screen.getByRole('button', { name: /^Role/ }))
-    const payload = await submit(onSave)
-    expect(payload.attribute_mapping).toEqual({ email: 'email', memberOf: 'groups', Role: 'groups' })
-  })
-
-  it('keeps a legacy groups row read when the operator types a row to groups', async () => {
-    const onSave = vi.fn()
-    render(<SsoProviderForm provider={{ ...PROVIDER, attribute_mapping: { groups: 'memberOf', Role: 'x' } }}
-      onSave={onSave} onCancel={vi.fn()} />)
-    fireEvent.click(screen.getByText('sso.attributeRoleMappingSection'))
-    fireEvent.change(screen.getByDisplayValue('x'), { target: { value: 'groups' } })
-    const payload = await submit(onSave)
-    expect(payload.attribute_mapping).toEqual({ memberOf: 'groups', Role: 'groups' })
-  })
 })

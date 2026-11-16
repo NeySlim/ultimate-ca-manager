@@ -16,7 +16,6 @@ const SECRET_TARGETS = {
 }
 import SsoLdapFields from './sso/SsoLdapFields'
 import SsoOAuth2Fields from './sso/SsoOAuth2Fields'
-import { keepLegacyGroupsRead, legacyGroupsConflict } from './sso/groupMapping'
 import SsoSamlFields, { NAMEID_UNSPECIFIED } from './sso/SsoSamlFields'
 
 // Stored as JSON array string in DB — display as comma-separated text
@@ -203,14 +202,6 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
       return
     }
     const data = { ...formData }
-    if (data.provider_type === 'saml' || data.provider_type === 'oauth2') {
-      const clash = legacyGroupsConflict(data.attribute_mapping)
-      if (clash) {
-        showError(t('sso.legacyGroupsConflict', { attribute: clash }))
-        return
-      }
-      data.attribute_mapping = keepLegacyGroupsRead(data.attribute_mapping)
-    }
     delete data._directoryType
     if (!data.oauth2_ca_bundle) delete data.oauth2_ca_bundle
     if (!data.saml_ca_bundle) delete data.saml_ca_bundle

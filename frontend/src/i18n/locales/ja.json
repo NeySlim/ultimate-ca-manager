@@ -3945,7 +3945,6 @@
     "acsUrlDesc": "認証後にIdPがSAMLアサーションを送信する先",
     "attributeMapping": "属性マッピング",
     "attributeMappingHelp": "左列はプロバイダーが送信する属性名、右列はそれが設定されるUCMのフィールド（username、email、fullname、groups）です。例: user.userprincipalname → username。",
-    "legacyGroupsConflict": "Save refused: the legacy \"groups → {{attribute}}\" row cannot be rewritten because \"{{attribute}}\" already has another target. Remove the \"groups\" row, or the row that gives \"{{attribute}}\" another target.",
     "callbackUrls": "コールバックURL",
     "callbackUrlsHelp": "このリダイレクトURIをOAuth2/OIDCアプリケーション設定にコピーしてください。",
     "default": "デフォルト",
