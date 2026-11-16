@@ -240,9 +240,17 @@ def test_a_ca_certificate_that_cannot_be_read_is_a_503(app, client, create_ca, t
     with app.app_context():
         import base64
         ca = CA.query.filter_by(refid=refid).first()
+        readable = ca.crt
         ca.crt = base64.b64encode(b'not a certificate').decode()
         db.session.commit()
-    tsa(tsa_ca_refid=refid, **{KEY: 'false'})
-    resp = _post(client, b'unreadable')
-    assert resp.status_code == 503
-    assert resp.data == b'TSA configuration invalid'
+    try:
+        tsa(tsa_ca_refid=refid, **{KEY: 'false'})
+        resp = _post(client, b'unreadable')
+        assert resp.status_code == 503
+        assert resp.data == b'TSA configuration invalid'
+    finally:
+        # Left unreadable, the CA would be skipped by later bulk CA exports and named in X-Skipped-CAs
+        with app.app_context():
+            db.session.rollback()
+            CA.query.filter_by(refid=refid).first().crt = readable
+            db.session.commit()

@@ -12,6 +12,7 @@ from sqlalchemy import or_
 from models import db, Certificate
 from utils.cert_status import issued_certificates
 from utils.p7b import p7b_from_pems
+from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 from services.cert_service import CertificateService
 from services.cert.renewal import (
     RenewalError, check_renewable, renew_certificate_in_place, renewal_partner,
@@ -313,21 +314,19 @@ def bulk_export_certificates():
     if not certs:
         return error_response('No certificates found', 404)
 
+    if export_format not in ('pem', 'pkcs7', 'p7b'):
+        return error_response('Supported formats: pem, p7b', 400)
     try:
+        pems, skipped = readable_pems((c.id, c.crt) for c in certs)
+        if not pems:
+            return nothing_readable(skipped)
+        headers = skipped_headers(skipped)
         if export_format == 'pem':
-            pem_data = b''
-            for cert in certs:
-                pem_data += base64.b64decode(cert.crt)
-                if not pem_data.endswith(b'\n'):
-                    pem_data += b'\n'
-            return Response(pem_data, mimetype='application/x-pem-file',
-                headers={'Content-Disposition': 'attachment; filename="certificates.pem"'})
-        elif export_format in ('pkcs7', 'p7b'):
-            p7b_output = p7b_from_pems(base64.b64decode(cert.crt) for cert in certs)
-            return Response(p7b_output, mimetype='application/x-pkcs7-certificates',
-                headers={'Content-Disposition': 'attachment; filename="certificates.p7b"'})
-        else:
-            return error_response('Supported formats: pem, p7b', 400)
+            headers['Content-Disposition'] = 'attachment; filename="certificates.pem"'
+            return Response(b''.join(p if p.endswith(b'\n') else p + b'\n' for p in pems),
+                            mimetype='application/x-pem-file', headers=headers)
+        headers['Content-Disposition'] = 'attachment; filename="certificates.p7b"'
+        return Response(p7b_from_pems(pems), mimetype='application/x-pkcs7-certificates', headers=headers)
     except Exception as e:
         logger.error(f"Bulk export failed: {e}")
         return error_response('Export failed', 500)

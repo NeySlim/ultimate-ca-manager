@@ -5,17 +5,32 @@ import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
 
-from models import CA, db
+from models import CA, Certificate, db
 from models.ca_cross_certificate import CACrossCertificate
+from models.revoked_serial import RevokedSerial
 from tests.fixtures.cross_pki import openssl_verify, pem
 from tests.fixtures.cross_world import build_world, set_served
 from tests.test_cross_chain_paths import _der
 from utils.datetime_utils import utc_now
 
 
+def _ids(app):
+    with app.app_context():
+        return {model: {row.id for row in db.session.query(model.id)}
+                for model in (CACrossCertificate, Certificate, CA)}
+
+
 @pytest.fixture
 def world(app, auth_client):
-    return build_world(app, auth_client)
+    """The world of the test, removed after it: the tables are shared with the other files."""
+    before = _ids(app)
+    yield build_world(app, auth_client)
+    with app.app_context():
+        refids = [ca.refid for ca in CA.query.filter(CA.id.notin_(before[CA]))]
+        RevokedSerial.query.filter(RevokedSerial.caref.in_(refids)).delete(synchronize_session=False)
+        for model, ids in before.items():
+            model.query.filter(model.id.notin_(ids)).delete(synchronize_session=False)
+        db.session.commit()
 
 
 def _ref(app, ca_id):
@@ -87,3 +102,50 @@ def test_a_cross_certificate_url_is_refused_for_another_ca_unknown_ids_and_unser
 def test_every_aia_answer_is_cacheable_for_a_day(app, client, world, suffix):
     r = client.get(f'/ca/{_ref(app, world.b_id)}{suffix}')
     assert r.headers['Cache-Control'] == 'public, max-age=86400, must-revalidate'
+
+
+GARBAGE_CRT = 'bm90IGEgY2VydGlmaWNhdGU='  # base64 of "not a certificate"
+
+
+def _store_crt(app, model, row_id, value):
+    with app.app_context():
+        row = db.session.get(model, row_id)
+        before, row.crt = row.crt, value
+        db.session.commit()
+    return before
+
+
+def test_p7c_skips_an_unreadable_certificate_and_logs_it(app, client, world, caplog):
+    saved = _store_crt(app, CACrossCertificate, world.xid, GARBAGE_CRT)
+    try:
+        with caplog.at_level('WARNING'):
+            r = client.get(f'/ca/{_ref(app, world.b_id)}.p7c')
+        assert r.status_code == 200 and _bundle(r) == [_der(world.pki.root_b)]
+        assert not any(h.startswith('X-Skipped') for h in r.headers.keys())
+        assert any(m.startswith(f'AIA bundle skips CA cross:{world.xid}') for m in caplog.messages)
+    finally:
+        _store_crt(app, CACrossCertificate, world.xid, saved)
+
+
+def test_p7c_logs_a_bundle_whose_cross_certificates_cannot_be_listed(app, client, world, monkeypatch, caplog):
+    from services.ca import cross_certs
+
+    def broken(_ca):
+        raise RuntimeError('database gone')
+    monkeypatch.setattr(cross_certs, 'list_for', broken)
+    with caplog.at_level('ERROR'):
+        r = client.get(f'/ca/{_ref(app, world.b_id)}.p7c')
+    assert r.status_code == 500
+    assert any(m.startswith('AIA: failed to build the bundle') for m in caplog.messages)
+
+
+def test_p7c_with_no_readable_certificate_is_not_found(app, client, world):
+    saved_cross = _store_crt(app, CACrossCertificate, world.xid, GARBAGE_CRT)
+    saved_ca = _store_crt(app, CA, world.b_id, GARBAGE_CRT)
+    try:
+        r = client.get(f'/ca/{_ref(app, world.b_id)}.p7c')
+        assert r.status_code == 404
+        assert not any(h.startswith('X-Skipped') for h in r.headers.keys())
+    finally:
+        _store_crt(app, CA, world.b_id, saved_ca)
+        _store_crt(app, CACrossCertificate, world.xid, saved_cross)

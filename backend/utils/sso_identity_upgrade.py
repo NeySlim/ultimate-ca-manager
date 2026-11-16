@@ -1,4 +1,4 @@
-"""The identity rows a 2.254 account gets, shared by upgrade step 166 and the restore of an
+"""The identity rows a 2.254 account gets, shared by upgrade step 167 and the restore of an
 archive whose account rows still carry their provider, which must run without the migrations."""
 import logging
 
@@ -25,7 +25,7 @@ def identity_rows(users, provider_ids):
         if provider_id is not None:
             orphan_of = None
             if external_id and (provider_id, external_id) in taken:
-                logger.warning("[166] account %s shares a stable identity of provider %s with an "
+                logger.warning("[167] account %s shares a stable identity of provider %s with an "
                                "older account: left as an orphan of an unknown IdP", uid, provider_id)
                 provider_id = None
             elif external_id:

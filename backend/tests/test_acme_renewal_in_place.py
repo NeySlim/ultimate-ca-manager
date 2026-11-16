@@ -196,7 +196,7 @@ def test_a_deployment_bound_to_the_certificate_is_queued_by_the_renewal(bench):
     db.session.commit()
     binding_id = binding.id
     bench.renew()
-    queued = DeployDelivery.query.filter_by(binding_id=binding_id).all()
+    queued = DeployDelivery.query.filter_by(binding_id=binding_id, binding_type='certificate').all()
     assert [d.event_type for d in queued] == ['certificate.renewed']
 
 

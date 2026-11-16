@@ -754,9 +754,15 @@ STATES_2254 = [
 _ONLY_SQLITE = {'dangling'}
 
 
+def test_the_step_follows_the_trust_store_step_in_the_upgrade():
+    from migrations._from_2_254 import STEPS
+    assert STEPS.index('167_user_sso_identities') == \
+        STEPS.index('166_trust_store_certificates_only') + 1
+
+
 @pytest.fixture(params=BACKENDS)
 def upgraded_2254(request, tmp_path, monkeypatch):
-    for base in make_base(request.param, tmp_path, monkeypatch, 's166'):
+    for base in make_base(request.param, tmp_path, monkeypatch, 's167'):
         base.run("INSERT INTO pro_sso_providers (id, name, provider_type, id_token_verify, "
                  "sync_role_on_login, enforce_2fa) VALUES (1, 'p-oidc', 'oauth2', TRUE, FALSE, FALSE), "
                  "(2, 'p-saml', 'saml', TRUE, FALSE, FALSE)")
@@ -803,7 +809,7 @@ def test_the_upgrade_step_runs_again_without_changing_anything(upgraded_2254):
                 upgraded_2254.run("SELECT id, has_sso_identity FROM users ORDER BY id"))
     before = state()
     with upgraded_2254.connection() as conn:
-        step('166_user_sso_identities').upgrade(conn)
+        step('167_user_sso_identities').upgrade(conn)
     assert state() == before
 
 

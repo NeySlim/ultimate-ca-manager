@@ -4025,7 +4025,7 @@
     "testMappingRefusalGroupDenied": "not a member of the required groups",
     "testMappingRefusalUnmapped": "no role mapping rule matches",
     "testMappingRefusalNoDefaultRole": "no role mapping rule and no default role",
-    "testMappingNotChecked": "Not checked here: the password, and the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic account creation turned off, an e-mail that belongs to an account of another provider).",
+    "testMappingNotChecked": "Not checked here: the password, and the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic account creation turned off, an e-mail that belongs to an account of another provider or left without one).",
     "testMappingNotFound": "Benutzer nicht in LDAP gefunden",
     "testMappingResolvedRole": "Aufgelöste Rolle",
     "testMappingAccess": "Anmeldezugriff",
@@ -5101,6 +5101,7 @@
   },
   "export": {
     "title": "Exportieren",
+    "skippedUnreadable": "{{count}} unreadable certificate(s) were not exported",
     "format": "Format",
     "options": "Optionen",
     "password": "Passwort",

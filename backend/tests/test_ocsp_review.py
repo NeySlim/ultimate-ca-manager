@@ -20,6 +20,17 @@ from tests.test_ocsp_service import (  # noqa: E402
 from tests.test_ca_service_hsm import _patch_hsm, hsm_provider_and_key  # noqa: E402,F401
 
 
+
+@pytest.fixture(autouse=True, scope='module')
+def _stored_leaves_leave_with_the_module(app):
+    """The leaves _store_leaf writes (serials 10 and 16 among them) are gone for the files after this one."""
+    yield
+    from services.cert_service import CertificateService
+    with app.app_context():
+        for row_id in [r.id for r in Certificate.query.filter(Certificate.refid.like('ocsp-review-%'))]:
+            CertificateService.delete_certificate(row_id)
+
+
 def _gen():
     return rsa.generate_private_key(public_exponent=65537, key_size=2048)
 

@@ -717,6 +717,17 @@ def test_email_of_an_orphan_of_another_or_unknown_idp_is_refused_not_duplicated(
     assert 'no provider' in details and 'attach provider' in details, details
 
 
+def test_email_of_a_bound_orphan_of_this_idp_does_not_block_another_identity(app, providers):
+    """Two identities of one IdP sharing an e-mail keep an account each, orphaned or not."""
+    name, idp_name = _name(), _name()
+    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+         sso_provider_id=None, sso_orphan_of='oauth2:https://b.example', sso_external_id='sub-old',
+         password_hash=NOPASS)
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-new'},
+                  email=f'{name}@corp.example') == (idp_name, None)
+    assert _count(app, email=f'{name}@corp.example') == 2
+
+
 def test_email_of_an_unbound_orphan_of_this_idp_is_still_taken_back(app, providers):
     """The orphan check leaves this IdP's own orphans to the adoption that precedes it."""
     name, idp_name = _name(), _name()

@@ -1,5 +1,5 @@
 """Accounts described as 2.254 held them (``auth_source``, ``sso_provider_id``, ``sso_external_id``,
-``sso_orphan_of``), built with the identity rows the upgrade (step 166) gives them, and the reads
+``sso_orphan_of``), built with the identity rows the upgrade (step 167) gives them, and the reads
 the tests make of those rows."""
 from models import db, User, UserSSOIdentity
 from models.user import sync_sso_flags

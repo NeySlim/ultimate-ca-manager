@@ -140,11 +140,11 @@ LEGACY_COLUMNS: Dict[str, Dict[str, str]] = {
                           "migration 030 added the approvals JSON empty",
     },
     "users": {
-        "auth_source": "upgrade step 166 replaced it by the rows of user_sso_identities: "
+        "auth_source": "upgrade step 167 replaced it by the rows of user_sso_identities: "
                        "an account is local when it has none",
-        "sso_provider_id": "copied to user_sso_identities.provider_id by upgrade step 166",
-        "sso_external_id": "copied to user_sso_identities.external_id by upgrade step 166",
-        "sso_orphan_of": "copied to user_sso_identities.orphan_of by upgrade step 166",
+        "sso_provider_id": "copied to user_sso_identities.provider_id by upgrade step 167",
+        "sso_external_id": "copied to user_sso_identities.external_id by upgrade step 167",
+        "sso_orphan_of": "copied to user_sso_identities.orphan_of by upgrade step 167",
     },
 }
 

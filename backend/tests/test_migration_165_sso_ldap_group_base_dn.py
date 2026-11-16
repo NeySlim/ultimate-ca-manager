@@ -18,7 +18,7 @@ def _migration():
     return importlib.import_module('migrations._from_2_254.165_sso_ldap_group_base_dn')
 
 
-def test_the_step_follows_the_file_removals():
+def test_the_step_follows_164_in_the_upgrade():
     from migrations._from_2_254 import STEPS
     assert STEPS.index('165_sso_ldap_group_base_dn') == STEPS.index('164_file_removals') + 1
 

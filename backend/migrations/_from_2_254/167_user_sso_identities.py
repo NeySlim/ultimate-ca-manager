@@ -1,4 +1,4 @@
-"""Upgrade step 166: an account may be opened by several providers, one row each.
+"""Upgrade step 167: an account may be opened by several providers, one row each.
 
 ``users.sso_provider_id``, ``sso_external_id`` and ``sso_orphan_of`` become rows of
 ``user_sso_identities``, and ``users.auth_source`` goes: an account is local when it has
@@ -20,7 +20,7 @@ pg_compatible = True
 TABLE = 'user_sso_identities'
 USERS = 'users'
 PROVIDERS = 'pro_sso_providers'
-SCRATCH = '_users_s166'
+SCRATCH = '_users_s167'
 DROPPED = ('auth_source', 'sso_provider_id', 'sso_external_id', 'sso_orphan_of')
 LEGACY_INDEXES = ('ix_users_email_local', 'ix_users_sso_identity')
 
@@ -113,7 +113,7 @@ def _upgrade_sqlite(conn):
             raise
     finally:
         conn.execute(f'PRAGMA foreign_keys = {"ON" if enforced else "OFF"}')
-    logger.info("[166] SSO identities per account (SQLite)")
+    logger.info("[167] SSO identities per account (SQLite)")
 
 
 def _copy_sqlite(conn, tables):
@@ -140,7 +140,7 @@ def _drop_sqlite(conn):
     conn.execute(users_ddl_without(sql, SCRATCH))
     kept = [c for c in _columns_sqlite(conn, USERS) if c not in dropped]
     if _columns_sqlite(conn, SCRATCH) != kept:
-        raise RuntimeError(f'[166] the rebuilt {USERS} table would not have the expected columns')
+        raise RuntimeError(f'[167] the rebuilt {USERS} table would not have the expected columns')
     columns = ', '.join(f'"{c}"' for c in kept)
     conn.execute(f'INSERT INTO {SCRATCH} ({columns}) SELECT {columns} FROM {USERS}')
     sequence = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = ?", (USERS,)).fetchone() \
@@ -196,7 +196,7 @@ def _upgrade_pg(conn):
             conn.execute(text(f"ALTER TABLE {USERS} DROP COLUMN {column}"))
     conn.execute(text(SYNC_FLAGS))
     conn.execute(text(LOCAL_EMAIL_INDEX))
-    logger.info("[166] SSO identities per account (PostgreSQL)")
+    logger.info("[167] SSO identities per account (PostgreSQL)")
 
 
 def upgrade(conn):

@@ -52,7 +52,7 @@ export default {
 **添加**会列出 UCM 管理的 CA：选择要信任的 CA。
 
 ### 外部证书
-页面没有用于上传 UCM 之外证书的表单。请通过 API 添加：\`POST /api/v2/truststore\` 携带其 PEM，或 \`POST /api/v2/truststore/import\` 携带 PEM 或 DER 文件。
+页面没有用于上传 UCM 之外证书的表单。请通过 API 添加：\`POST /api/v2/truststore\` 携带其 PEM，或 \`POST /api/v2/truststore/import\` 携带 PEM 或 DER 文件。包含私钥的条目会被拒绝：信任存储只保存证书，文件中只保留证书。
 
 ### 从系统同步
 导入操作系统信任库中的受信任 CA（例如 Linux 上的 Mozilla CA 捆绑包），数量不超过所选值：默认 500，最多 1000。

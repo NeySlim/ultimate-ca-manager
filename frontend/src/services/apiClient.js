@@ -209,6 +209,8 @@ class APIClient {
         data = await response.json()
       } else if (options.responseType === 'blob') {
         data = await response.blob()
+        const skipped = skippedCount(response.headers)
+        if (skipped) data.skippedCount = skipped
       } else {
         data = await response.text()
       }
@@ -365,6 +367,13 @@ class APIClient {
 }
 
 export const apiClient = new APIClient()
+
+/** The rows a bulk export left out as unreadable (X-Skipped-*-Count), 0 when none. */
+export function skippedCount(headers) {
+  const raw = headers?.get?.('x-skipped-certificates-count') || headers?.get?.('x-skipped-cas-count')
+  const n = Number(raw)
+  return Number.isInteger(n) && n > 0 ? n : 0
+}
 
 /**
  * Build a URL query string from an object of params.
