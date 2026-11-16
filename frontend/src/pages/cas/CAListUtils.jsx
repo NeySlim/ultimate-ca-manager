@@ -111,7 +111,8 @@ export function TypeBadge({ type, isMobile, t }) {
 
 /** HSM badge — shown when CA's signing key is on an HSM */
 export function HsmBadge({ ca, t }) {
-  if (!ca?.uses_hsm) return null
+  // An SSH CA records the same fact as key_source rather than uses_hsm
+  if (!ca?.uses_hsm && ca?.key_source !== 'hsm') return null
   const tip = [ca.hsm_provider_name, ca.hsm_key_label].filter(Boolean).join(' / ')
   return (
     <span

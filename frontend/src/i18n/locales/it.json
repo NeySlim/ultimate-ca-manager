@@ -5603,7 +5603,13 @@
       "allowAnyPrincipal": "Consenti qualsiasi principal",
       "allowAnyPrincipalHelp": "Se non è elencato alcun principal, firma per qualsiasi nome, root compreso. Senza questa opzione, una CA con elenco vuoto non firma nulla.",
       "allowCustomKeyId": "Consenti ai richiedenti di impostare l'ID chiave",
-      "allowCustomKeyIdHelp": "sshd registra l'ID chiave come identità del titolare. Senza questa opzione, la CA assegna a ogni certificato il nome principals@nome CA."
+      "allowCustomKeyIdHelp": "sshd registra l'ID chiave come identità del titolare. Senza questa opzione, la CA assegna a ogni certificato il nome principals@nome CA.",
+      "keyStorageLockedHelp": "La chiave CA e il tipo CA non possono essere modificati dopo la creazione della CA.",
+      "hsmKeyHelper": "Solo una chiave di firma RSA o ECDSA P-256/P-384/P-521 custodita nell'HSM può firmare certificati SSH. Aggiungi o sincronizza le chiavi in Gestione HSM.",
+      "hsmNoUsableKeys": "Questo provider non ha una chiave di firma RSA o ECDSA utilizzabile da una CA SSH.",
+      "hsmKeyUsedBy": "già usata dalla CA {{caType}}",
+      "hsmKeyInUse": "Una CA SSH {{caType}} usa già questa chiave: {{name}}",
+      "hsmDerivedKey": "Tipo di chiave dall'HSM: {{keyType}}"
     },
     "searchPlaceholder": "Cerca CA SSH...",
     "downloadSetupScript": "Scarica script di configurazione",

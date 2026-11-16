@@ -19,6 +19,7 @@ from utils.process_lock import LockBusyError
 from services.hsm.base_provider import HsmError, HsmKeyExistsError, HsmConnectionError, HsmOperationError, HsmConfigError
 from models import db, CA
 from models.hsm import HsmProvider, HsmKey
+from models.ssh import SSHCertificateAuthority
 from services.audit_service import AuditService
 import logging
 
@@ -568,11 +569,16 @@ def delete_key(key_id):
 
     # Block deletion if any CA still references this key.
     bound = CA.query.filter_by(hsm_key_id=key_id).all()
-    if bound:
-        names = ', '.join(f"#{c.id} {c.descr or ''}".strip() for c in bound[:5])
-        more = '' if len(bound) <= 5 else f' (+{len(bound) - 5} more)'
+    ssh_bound = SSHCertificateAuthority.query.filter_by(hsm_key_id=key_id).all()
+    if bound or ssh_bound:
+        names = ', '.join(
+            f"#{c.id} {c.descr or ''}".strip()
+            for c in (bound + ssh_bound)[:5]
+        )
+        total = len(bound) + len(ssh_bound)
+        more = '' if total <= 5 else f' (+{total - 5} more)'
         return error_response(
-            f"Cannot delete key: {len(bound)} CA(s) depend on it: {names}{more}",
+            f"Cannot delete key: {total} CA(s) depend on it: {names}{more}",
             409,
         )
 

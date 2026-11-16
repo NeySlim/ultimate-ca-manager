@@ -327,7 +327,7 @@ SECTIONS: Dict[str, Section] = {
         model='models.ssh:SSHCertificateAuthority',
         identity=('refid',),
         exclude={**_SURROGATE},
-        references={'owner_group_id': 'groups'},
+        references={'owner_group_id': 'groups', 'hsm_key_id': 'hsm_keys'},
         custom=True,
         handled={'private_key': 'private_key_pem_encrypted'},
     ),

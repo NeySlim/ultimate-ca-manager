@@ -5603,7 +5603,13 @@
       "allowAnyPrincipal": "允许任意主体",
       "allowAnyPrincipalHelp": "未列出任何主体时，为任意名称签名，包括 root。未启用此选项时，列表为空的 CA 不会签署任何证书。",
       "allowCustomKeyId": "允许请求者设置密钥 ID",
-      "allowCustomKeyIdHelp": "sshd 会将密钥 ID 记录为持有者的身份。未启用此选项时，CA 会将每个证书命名为 principals@CA 名称。"
+      "allowCustomKeyIdHelp": "sshd 会将密钥 ID 记录为持有者的身份。未启用此选项时，CA 会将每个证书命名为 principals@CA 名称。",
+      "keyStorageLockedHelp": "创建 CA 后无法更改 CA 密钥和 CA 类型。",
+      "hsmKeyHelper": "只有 HSM 中的 RSA 或 ECDSA P-256/P-384/P-521 签名密钥才能签发 SSH 证书。请在 HSM 管理中添加或同步密钥。",
+      "hsmNoUsableKeys": "此提供商没有可供 SSH CA 使用的 RSA 或 ECDSA 签名密钥。",
+      "hsmKeyUsedBy": "已被 {{caType}} CA 使用",
+      "hsmKeyInUse": "SSH {{caType}} CA 已使用此密钥：{{name}}",
+      "hsmDerivedKey": "来自 HSM 的密钥类型：{{keyType}}"
     },
     "searchPlaceholder": "搜索 SSH CA...",
     "downloadSetupScript": "下载配置脚本",

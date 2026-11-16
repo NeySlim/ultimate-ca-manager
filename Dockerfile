@@ -125,6 +125,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     openssh-client \
     softhsm2 \
+    opensc \
+    libpcsclite1 \
     libkrb5-3 \
     libgssapi-krb5-2 \
     postgresql-client \
