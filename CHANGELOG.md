@@ -114,7 +114,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- **Bulk exports survive an unreadable row.** The PEM and P7B exports of certificates, CAs and the trust store answered 500 (P7B) or carried the damaged data (PEM); they now skip the row, log it and list its id in `X-Skipped-Certificates` or `X-Skipped-CAs` (first 100, with `-Count`), and answer 404 in both formats when none is readable.
+- **Bulk exports survive an unreadable row.** The certificate and CA exports answered 500 in P7B and carried the damaged data in PEM, as the trust store did in PEM while its P7B dropped the entry silently and answered 400 when none was left; each now skips the row, logs it, lists its id in `X-Skipped-Certificates` or `X-Skipped-CAs` (first 100, with `-Count`) and answers 404 in both formats when none is readable.
 - **Renewal during a CA record merge.** An in-place renewal already stored answered with an error when the SKI/AKI repair merged the record of its CA right after; it now reports the renewal and regenerates the CRL of the record that remains.
 - **OIDC role mapping with Microsoft Entra ID.** Role mapping rules now compare their keys with the `groups` and `roles` read together from the ID token validated for the login and the UserInfo response, which Entra ID never fills, so a provider with rules no longer refuses every user; a `roles` claim no longer hides `groups`.
 - **SAML logins from Keycloak.** An assertion that repeats an attribute name, as Keycloak's role list does with one attribute per role, was refused as invalid; their values are now merged in assertion order, role mapping reads them all and a repeated username or email attribute gives its first value.
