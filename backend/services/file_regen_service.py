@@ -169,6 +169,12 @@ def write_ca_files(ca) -> None:
 
 
 
+def _holds(column):
+    """An empty value is no content, as everywhere else in the code (a '' key is no key)."""
+    from sqlalchemy import and_
+    return and_(column.isnot(None), column != '')
+
+
 def purge_private_key_files() -> dict:
     """Remove plaintext key mirrors while new values are encrypted (not during a disable's grace).
 
@@ -185,7 +191,7 @@ def purge_private_key_files() -> dict:
     for model, path_of, legacy in ((CA, ca_key_path, 'ca_{}.key'),
                                    (Certificate, cert_key_path, 'cert_{}.key')):
         for row in _pages(model, (model.refid, model.subject, model.descr),
-                          where=model.prv.is_(None)):
+                          where=~_holds(model.prv)):
             keyless.add(path_of(row).name)
             keyless.add(legacy.format(row.refid))
 
@@ -308,8 +314,8 @@ def record_removal_candidates(generation: int) -> None:
             db.session.execute(FileRemoval.__table__.insert(), batch)
             batch.clear()
 
-    for row in _pages(CA, (CA.refid, CA.subject, CA.descr, CA.crt.isnot(None).label('has_crt'),
-                           CA.prv.isnot(None).label('has_prv'))):
+    for row in _pages(CA, (CA.refid, CA.subject, CA.descr, _holds(CA.crt).label('has_crt'),
+                           _holds(CA.prv).label('has_prv'))):
         if row.has_crt:
             batch.append({'generation': generation, 'path': str(ca_cert_path(row))})
         if row.has_prv:
@@ -318,9 +324,9 @@ def record_removal_candidates(generation: int) -> None:
             flush()
     for row in _pages(Certificate, (
             Certificate.refid, Certificate.subject, Certificate.descr,
-            Certificate.crt.isnot(None).label('has_crt'),
-            Certificate.csr.isnot(None).label('has_csr'),
-            Certificate.prv.isnot(None).label('has_prv'))):
+            _holds(Certificate.crt).label('has_crt'),
+            _holds(Certificate.csr).label('has_csr'),
+            _holds(Certificate.prv).label('has_prv'))):
         for present, path in ((row.has_crt, cert_cert_path), (row.has_csr, cert_csr_path),
                               (row.has_prv, cert_key_path)):
             if present:

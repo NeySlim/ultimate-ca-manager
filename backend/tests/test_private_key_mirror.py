@@ -421,3 +421,25 @@ def test_mirrors_follow_the_values_while_a_disable_keeps_its_deks(
         finally:
             EncryptionKey.query.delete()
             db.session.commit()
+
+
+def test_purge_keeps_the_mirror_of_a_row_whose_key_is_empty(
+    app, encryption_enabled, monkeypatch, tmp_path
+):
+    from config.settings import Config
+
+    monkeypatch.setattr(Config, 'PRIVATE_DIR', tmp_path)
+    keyless = Certificate(refid=str(uuid.uuid4()), descr='Empty key purge row', prv='')
+    with app.app_context():
+        db.session.add(keyless)
+        db.session.commit()
+        path = cert_key_path(keyless)
+        path.write_bytes(b'plaintext')
+        try:
+            stats = purge_private_key_files()
+            assert stats == {'removed': 0, 'kept_no_db_key': 1, 'errors': 0}
+            assert path.exists()
+        finally:
+            path.unlink()
+            db.session.delete(keyless)
+            db.session.commit()

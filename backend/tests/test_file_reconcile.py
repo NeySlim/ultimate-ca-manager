@@ -277,3 +277,18 @@ def test_a_listed_path_a_row_names_again_is_kept_by_a_full_pass(app, issued, reg
         assert issued['crt'].read_bytes() == issued['pem']
         assert FileRemoval.query.filter_by(path=str(issued['crt'])).count() == 0
 
+
+def test_a_key_mirror_whose_row_holds_an_empty_key_is_never_removed(app, issued, regen):
+    from models import Certificate, db
+    with app.app_context():
+        row = db.session.get(Certificate, issued['id'])
+        row.prv = ''
+        db.session.commit()
+        issued['key'].write_bytes(b'an operator copy of the key')
+        generation = regen.advance_generation()
+        regen.record_removal_candidates(generation)
+        db.session.delete(row)
+        regen.keep_named_paths()
+        db.session.commit()
+        regen.reconcile_files()
+        assert issued['key'].read_bytes() == b'an operator copy of the key'
