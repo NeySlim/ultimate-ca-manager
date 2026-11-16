@@ -70,14 +70,22 @@ _ISSUER_OWNED_EXTENSION_OIDS = frozenset({
 _SUPERSEDED_FALLBACK = timedelta(days=365)
 
 
+# ``related_to`` of a member naming the A its row links to, as re-read under its lock
+CURRENT_RELATED = object()
+
 # ``known_serial`` default: the caller passes nothing, the instance's own
 # serial is the reference (None is a real value: a row that gained a serial
 # meanwhile was renewed)
 SERIAL_UNSET = object()
 
 
-def _renewed_meanwhile_message(trigger: str) -> str:
-    return _retry_message('Certificate was renewed by another request', trigger)
+def _overtaken(what: str, trigger: str) -> 'RenewalError':
+    """The 409 of a renewal another request overtook: the next attempt reads the new state."""
+    return RenewalError(_retry_message(what, trigger), 409, overtaken=True)
+
+
+def _renewed_meanwhile(trigger: str) -> 'RenewalError':
+    return _overtaken('Certificate was renewed by another request', trigger)
 
 
 def _retry_message(what: str, trigger: str) -> str:
@@ -87,13 +95,15 @@ def _retry_message(what: str, trigger: str) -> str:
 
 class RenewalError(Exception):
     """A renewal refused or failed: ``status`` is the HTTP code to answer,
-    ``problem_type`` the FIPS problem type when FIPS mode refused it."""
+    ``problem_type`` the FIPS problem type when FIPS mode refused it, ``overtaken``
+    True when another request changed the row or its pair meanwhile (a retry may pass)."""
 
-    def __init__(self, message: str, status: int = 400, problem_type=None):
+    def __init__(self, message: str, status: int = 400, problem_type=None, overtaken=False):
         super().__init__(message)
         self.message = str(message)
         self.status = int(status)
         self.problem_type = problem_type
+        self.overtaken = bool(overtaken)
 
     def __str__(self) -> str:
         return self.message
@@ -220,7 +230,7 @@ def _refuse_recorded_revocation(cert: Certificate, ca, trigger: str) -> None:
     if stored is None:
         raise RenewalError('Certificate no longer exists', 404)
     if stored[0] != cert.serial_number:
-        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+        raise _renewed_meanwhile(trigger)
     raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
 
 
@@ -253,8 +263,8 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         staged_all, renewed_a = [], None
         for index, member in enumerate(members):
             is_cert = member is cert
-            # B names A as renewed a moment ago; a lone certificate names its A as it is
-            related_to = renewed_a if pair and index == 1 else _current_related(member)
+            # B names A as renewed a moment ago; any other member the A its locked row links to
+            related_to = renewed_a if pair and index == 1 else CURRENT_RELATED
             try:
                 staged_member = _stage_renewal(
                     member, ca if is_cert else None, rekey=rekey, trigger=trigger,
@@ -269,11 +279,11 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                 if is_cert:
                     raise
                 raise RenewalError(f'Related certificate {member.id}: {e.message}', e.status,
-                                   e.problem_type) from e
+                                   e.problem_type, e.overtaken) from e
             if pair and index == 0:
                 renewed_a = x509.load_pem_x509_certificate(staged_member['cert_pem'])
             staged_all.append(staged_member)
-        if not pair and related_to is None:
+        if not pair and staged_all[0]['related_to'] is None:
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
             leave_pair(staged_all[0]['cert'])
@@ -400,6 +410,10 @@ def _current_related(row):
     if row_revoked(a_row):  # by its row or by the record of its serial
         return None
     cert_a = row_certificate(a_row)
+    # A row linked to its own B (whose certificate names this one) names nothing B holds
+    from utils.related_cert import references
+    if references(cert_a, original):
+        return None
     if cert_a.not_valid_after_utc.replace(tzinfo=None) < utc_now():
         return None
     return cert_a
@@ -408,9 +422,11 @@ def _current_related(row):
 def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,
                    precheck=None, was_archived=None, link=SERIAL_UNSET) -> dict:
     """Every check, the signature and the writes, left uncommitted; *related_to*
-    is the certificate A the renewed one names (RFC 9763), *link* the row the members
-    were chosen on."""
+    is the certificate A the renewed one names (RFC 9763), CURRENT_RELATED to read it
+    from the locked row, *link* the row the members were chosen on."""
     cert = _reread(cert, known_serial, trigger, was_archived, link)
+    if related_to is CURRENT_RELATED:
+        related_to = _current_related(cert)
     check_renewable(cert, trigger)
     ca, ca_cert, ca_key = _signing_ca(cert, ca, trigger)
 
@@ -459,7 +475,7 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     return {
         'cert': cert, 'cert_id': cert.id, 'ca': ca, 'old_serial': old_serial,
         'new_serial': new_serial, 'valid_from': cert.valid_from, 'valid_to': cert.valid_to,
-        'notices': notices, 'cert_pem': cert_pem, 'key_pem': key_pem,
+        'notices': notices, 'cert_pem': cert_pem, 'key_pem': key_pem, 'related_to': related_to,
     }
 
 
@@ -478,10 +494,9 @@ def _reread(cert, known_serial, trigger, was_archived=None, link=SERIAL_UNSET):
     if fresh is None:
         raise RenewalError('Certificate no longer exists', 404)
     if fresh.serial_number != expected or bool(fresh.archived) != was_archived:
-        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+        raise _renewed_meanwhile(trigger)
     if link is not SERIAL_UNSET and fresh.related_certificate_id != link:
-        raise RenewalError(_retry_message('Related certificate was changed by another request',
-                                          trigger), 409)
+        raise _overtaken('The related pair was changed by another request', trigger)
     return fresh
 
 
@@ -735,7 +750,7 @@ def _take_serial(cert_id, old_serial, new_serial, trigger) -> None:
     taken = db.session.query(Certificate).filter(Certificate.id == cert_id, holds_old).update(
         {Certificate.serial_number: new_serial}, synchronize_session=False)
     if taken != 1:
-        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+        raise _renewed_meanwhile(trigger)
 
 
 def _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now) -> None:

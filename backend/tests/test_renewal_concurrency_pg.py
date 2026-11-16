@@ -72,7 +72,7 @@ def _check(app, cert_id, caref, old_serial, outcome):
     auto_won = outcome['auto'] == (True, cert_id)
     assert manual_won != auto_won, outcome
     if manual_won:
-        assert outcome['auto'][0] is False and 'renewed' in outcome['auto'][1].lower(), outcome
+        assert outcome['auto'][0] is None and 'renewed' in outcome['auto'][1].lower(), outcome
     else:
         assert outcome['manual'] == 409, outcome
     with app.app_context():
