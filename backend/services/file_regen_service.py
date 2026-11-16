@@ -796,6 +796,10 @@ def reconcile_files(*, full=None) -> dict:
                 full = any(d.marker != generation for d in dirs)
             encrypting = key_encryption.is_encrypting
             purged = purge_private_key_files() if encrypting else None
+            if full:
+                # A row created since the restore may name a listed path again: strike it first
+                keep_named_paths()
+                db.session.commit()
             run = _Pass(opened, full, encrypting)
             run.write_rows('ca', CA)
             run.write_rows('cert', Certificate)

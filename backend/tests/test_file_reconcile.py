@@ -263,3 +263,17 @@ def test_an_unreadable_marker_means_a_full_pass(app, issued, writes, regen):
         (issued['crt'].parent / regen.MARKER_NAME).write_bytes(b'\xff\xfe truncated')
         assert regen.reconcile_if_behind()['status'] == 'done'
         assert issued['crt'].read_bytes() == issued['pem']
+
+
+def test_a_listed_path_a_row_names_again_is_kept_by_a_full_pass(app, issued, regen):
+    """A row recreated on a path a restore listed (same refid): no later pass removes it."""
+    from models import FileRemoval, db
+    with app.app_context():
+        generation = regen.advance_generation()
+        db.session.add(FileRemoval(generation=generation, path=str(issued['crt'])))
+        db.session.commit()
+        stats = regen.reconcile_files()
+        assert stats['full'] and stats['removed'] == 0
+        assert issued['crt'].read_bytes() == issued['pem']
+        assert FileRemoval.query.filter_by(path=str(issued['crt'])).count() == 0
+
