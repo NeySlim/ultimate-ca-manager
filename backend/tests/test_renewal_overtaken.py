@@ -327,6 +327,42 @@ def test_a_partner_that_left_the_pair_since_read_is_not_renewed_with_it(app, tmp
             db.session.remove()
 
 
+def _linked_elsewhere(app, a_id, b_id):
+    """What link_issued stores when a newer B takes A: both name each other."""
+    def link():
+        with app.app_context():
+            db.session.get(Certificate, a_id).related_certificate_id = b_id
+            db.session.get(Certificate, b_id).related_certificate_id = a_id
+            db.session.commit()
+            db.session.remove()
+
+    thread = threading.Thread(target=link)
+    thread.start()
+    thread.join(60)
+
+
+@pytest.mark.parametrize('read_with', ['the previous B', 'no B'])
+def test_a_certificate_given_a_newer_partner_since_read_renews_with_it(app, tmp_path, read_with):
+    """The link of the renewed certificate itself is the stored one, not the caller's copy:
+    the previous B, which still names A, is not renewed in the newer one's place."""
+    from services.cert.renewal import renewal_partner
+    from tests.test_backup_cross_installation import _bound_to
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'newer.db'}"):
+        a_id, (first, newer) = _linked_rows(app, n_b=2)
+        with app.app_context():
+            a = db.session.get(Certificate, a_id)
+            a.related_certificate_id = first if read_with == 'the previous B' else None
+            db.session.commit()
+            serial = db.session.get(Certificate, a_id).serial_number  # A as the caller read it
+            assert getattr(renewal_partner(a), 'id', None) == (
+                first if read_with == 'the previous B' else None)
+            _linked_elsewhere(app, a_id, newer)
+            assert renewal_partner(a).id == newer
+            assert a.serial_number == serial
+            db.session.remove()
+
+
 def _chain_pair(app):
     """``(a_id, b_id)``: A names X in its certificate, B names A, A and B link each other."""
     import base64
