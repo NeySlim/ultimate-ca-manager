@@ -11,7 +11,8 @@ FILES = ['tests/test_2fa_enforcement.py', 'tests/test_access_log_redaction.py',
 
 def _collect(*args):
     env = {k: v for k, v in os.environ.items() if not k.startswith('UCM_TEST_REQUIRE_')}
-    proc = subprocess.run([sys.executable, '-m', 'pytest', '--collect-only', *(['-q'] if '-q' not in args and not any(a == '-v' for a in args) else []), '-p', 'no:cacheprovider',
+    verbosity = [] if '-q' in args or '-v' in args else ['-q']
+    proc = subprocess.run([sys.executable, '-m', 'pytest', '--collect-only', *verbosity, '-p', 'no:cacheprovider',
                            '-p', 'no:randomly', *args, *FILES[:3]],
                           cwd=BACKEND_DIR, capture_output=True, text=True, timeout=300, env=env)
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -29,9 +30,9 @@ def _files(ids):
 
 
 def test_without_the_option_the_order_is_unchanged():
-    plain, out = _collect()
+    plain, _ = _collect()
     assert _files(plain) == sorted(set(_files(plain)))
-    assert 'order-seed' not in out
+    assert 'order-seed' not in _collect('-v')[1]
 
 
 def test_the_same_seed_gives_the_same_order_and_keeps_tests_inside_a_file():
