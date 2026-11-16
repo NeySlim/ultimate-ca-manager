@@ -648,7 +648,8 @@ def test_a_merge_skips_an_identity_another_account_holds_here(app, providers, au
         results = _backup().restore_backup(blob, password, mode='merge')
         db.session.expire_all()
         restored = User.query.filter_by(username=name).one()
-        assert identities(restored) == [(providers.saml, None, None)]
+        # The skipped row stays as an orphan of an unknown IdP, which opens nothing
+        assert set(identities(restored)) == {(providers.saml, None, None), (None, 'sub-m', None)}
         assert identities(db.session.get(User, holder_id)) == [(providers.oidc, 'sub-m', None)]
     skipped = [w for w in results['warnings'] if 'user_sso_identities' in w]
     assert len(skipped) == 1 and repr(holder) in skipped[0] and repr(provider_name) in skipped[0] \
@@ -671,10 +672,66 @@ def test_an_archive_from_before_the_rows_skips_an_identity_another_account_holds
         results = {}
         service._restore_legacy_sso_identities(results, plan)
         db.session.commit()
-        assert identities(user) == []
+        assert identities(user) == [(None, 'sub-t', None)]
         assert identities(db.session.get(User, holder_id)) == [(providers.oidc, 'sub-t', None)]
         assert len(plan.warnings) == 1 and repr(holder) in plan.warnings[0] \
             and repr(provider_name) in plan.warnings[0], plan.warnings
+
+
+def _claimable_by_name(app, providers, uid, name):
+    """Whether an identity of another provider opens the account by its name alone."""
+    from api.v2.sso.account_state import legacy_sso_account
+    other = providers()
+    with app.app_context():
+        legacy = legacy_sso_account(db.session.get(User, uid))
+    return legacy, _login(app, other, name, 'attacker')
+
+
+def test_a_merge_keeps_a_skipped_identity_as_an_orphan_so_the_name_opens_nothing(app, providers):
+    """An account whose only row is skipped keeps it as an orphan of an unknown IdP: without a
+    row and a password, any provider would open it by its name."""
+    from services.backup import manifest
+    password = 'Correct-Horse-Battery-9'
+    name = _name()
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.oidc,
+               sso_external_id='sub-skip', password_hash=NOPASS, role='admin')
+    with app.app_context():
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        db.session.delete(db.session.get(User, uid))
+        db.session.commit()
+    _add(app, username=_name(), auth_source='oauth2', sso_provider_id=providers.oidc,
+         sso_external_id='sub-skip', password_hash=NOPASS)
+    with app.app_context():
+        results = _backup().restore_backup(blob, password, mode='merge')
+        db.session.expire_all()
+        uid = User.query.filter_by(username=name).one().id
+    assert _rows(app, uid) == [(None, 'sub-skip', None)]
+    assert _claimable_by_name(app, providers, uid, name) == (False, (None, 'sso_username_conflict'))
+    skipped = [w for w in results['warnings'] if 'user_sso_identities' in w]
+    assert len(skipped) == 1 and 'orphan' in skipped[0], results['warnings']
+
+
+@pytest.mark.parametrize('merging', [True, False], ids=['merge', 'replace'])
+def test_an_archive_from_before_the_rows_keeps_a_skipped_identity_as_an_orphan(app, providers, merging):
+    with app.app_context():
+        provider_name = db.session.get(SSOProvider, providers.oidc).name
+    _add(app, username=_name(), auth_source='oauth2', sso_provider_id=providers.oidc,
+         sso_external_id='sub-ts', password_hash=NOPASS)
+    service, plan, name = _backup(), SimpleNamespace(warnings=[]), _name()
+    with app.app_context():
+        user = User(username=name, email=f'{name}@corp.example', role='admin', password_hash=NOPASS)
+        db.session.add(user)
+        service._merging = merging
+        service._legacy_sso_identities = [(user, {
+            'auth_source': 'oauth2', 'sso_provider_id': 7, 'sso_provider_id_ref': {'name': provider_name},
+            'sso_external_id': 'sub-ts'})]
+        service._restore_legacy_sso_identities({}, plan)
+        db.session.commit()
+        uid = user.id
+    assert _rows(app, uid) == [(None, 'sub-ts', None)]
+    assert _claimable_by_name(app, providers, uid, name) == (False, (None, 'sso_username_conflict'))
+    assert len(plan.warnings) == 1 and 'orphan' in plan.warnings[0], plan.warnings
 
 
 def test_an_archive_from_before_the_rows_gets_the_rows_an_upgrade_gives(app, providers):

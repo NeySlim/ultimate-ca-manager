@@ -24,6 +24,7 @@ from services.file_regen_service import (
 
 from . import container, installation
 from .errors import BackupSchemaError, RestoreFilesUnwritable
+from .export_generic import REFERENCE_SUFFIX
 from .restore import RestorePlan, single_transaction
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
@@ -847,14 +848,17 @@ class RestoreCoreMixin:
         from models.sso import SSOProvider
         provider = db.session.get(SSOProvider, provider_id)
         warning = (f"user_sso_identities: the identity of account {account!r} at provider "
-                   f"{(provider.name if provider else provider_id)!r} is left out: it opens the "
-                   f"account {holder.username!r} here, and an identity opens one account only")
+                   f"{(provider.name if provider else provider_id)!r} opens the account "
+                   f"{holder.username!r} here, and an identity opens one account only: it is kept "
+                   f"as an orphan of an unknown IdP, which no sign-in takes back; attach a provider "
+                   f"to the account to let it sign in")
         plan.warnings.append(warning)
         logger.warning("Restore: %s", warning)
         return warning
 
     def _identities_free_here(self, rows, plan):
-        """The archive's identity rows but those whose identity opens another account here."""
+        """The archive's identity rows, those whose identity opens another account here made
+        orphans of an unknown IdP: an account without a row nor a password is claimable by name."""
         from models import User
         db.session.flush()
         plan.refresh(['users', 'sso_providers'])
@@ -868,6 +872,8 @@ class RestoreCoreMixin:
                 continue
             account = db.session.get(User, user_id) if user_id is not None else None
             self._skipped_identity(plan, account.username if account else None, provider_id, holder)
+            kept.append({**row, 'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
+                         'orphan_of': None})
         return kept
 
     def _restore_legacy_sso_identities(self, results: Dict, plan) -> None:
@@ -904,8 +910,9 @@ class RestoreCoreMixin:
         for user_id, provider_id, orphan_of, external_id in identity_rows(sorted(accounts), provider_ids):
             holder = self._identity_holder(user_id, provider_id, external_id)
             if holder is not None:
+                # Kept as an orphan of an unknown IdP, as the upgrade keeps a shared identity
                 self._skipped_identity(plan, names.get(user_id), provider_id, holder)
-                continue
+                provider_id, orphan_of = None, None
             made.append((user_id, provider_id, orphan_of, external_id))
         for user_id, provider_id, orphan_of, external_id in made:
             identity = UserSSOIdentity(user_id=user_id, provider_id=provider_id, orphan_of=orphan_of)
