@@ -26,6 +26,7 @@ from services.ocsp_responder_renewal import renewed_by_responder_task
 from utils.cert_status import EXPIRY_WINDOW_DAYS, holds_certificate, orphan_condition
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
 from utils.days_remaining import days_remaining
+from utils.sqlite_hints import indexed_by
 
 logger = logging.getLogger(__name__)
 
@@ -292,9 +293,9 @@ def _renewed_by_acme_client():
     switch_off = select(SystemConfig.id).where(
         SystemConfig.key == 'acme.client.renewal_enabled',
         or_(SystemConfig.value.is_(None), func.lower(SystemConfig.value) != 'true')).exists()
-    order = select(AcmeClientOrder.id).where(
+    order = indexed_by(select(AcmeClientOrder.id).where(
         AcmeClientOrder.certificate_id == Certificate.id, AcmeClientOrder.renewal_enabled.is_(True),
-        AcmeClientOrder.status == 'issued').exists()
+        AcmeClientOrder.status == 'issued'), AcmeClientOrder, 'ix_acme_client_orders_certificate_id').exists()
     return and_(Certificate.source == 'acme_client', order, ~switch_off)
 
 
@@ -306,13 +307,14 @@ def _superseded(now):
     """Same non-empty CN, full subject and SANs from the same CA, by a live
     certificate that itself lies beyond the expiry window."""
     newer = aliased(Certificate)
-    exists = (select(newer.id).where(
+    exists = indexed_by(select(newer.id).where(
         newer.subject_cn == Certificate.subject_cn, newer.caref == Certificate.caref,
         newer.subject.is_not_distinct_from(Certificate.subject),
         newer.san_dns.is_not_distinct_from(Certificate.san_dns),
         newer.san_ip.is_not_distinct_from(Certificate.san_ip),
         newer.id != Certificate.id, newer.valid_to > now + timedelta(days=EXPIRY_WINDOW_DAYS),
-        holds_certificate(newer), newer.revoked.is_(False), _not_archived(newer)).exists())
+        holds_certificate(newer), newer.revoked.is_(False), _not_archived(newer)),
+        newer, 'ix_certificates_caref_subject_cn').exists()
     return and_(Certificate.subject_cn.isnot(None), Certificate.subject_cn != '', exists)
 
 
@@ -371,7 +373,8 @@ def _renewal_declined(config, auto_only=False):
         or_(Certificate.valid_from.is_(None), ApprovalRequest.created_at >= Certificate.valid_from)]
     if auto_only:
         conditions.append(ApprovalRequest.request_data.like('%"trigger": "auto"%'))
-    exists = select(ApprovalRequest.id).where(*conditions).exists()
+    exists = indexed_by(select(ApprovalRequest.id).where(*conditions), ApprovalRequest,
+                        'ix_approval_requests_status_type').exists()
     ids = config.get('declined_ids')
     if ids is None:
         return exists

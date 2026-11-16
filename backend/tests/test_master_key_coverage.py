@@ -10,6 +10,8 @@ from cryptography.fernet import Fernet
 from models import db, SystemConfig
 
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 SSH_KEY = base64.b64encode(
     b'-----BEGIN OPENSSH PRIVATE KEY-----\nssh\n-----END OPENSSH PRIVATE KEY-----\n'
 ).decode()
