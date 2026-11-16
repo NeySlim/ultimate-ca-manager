@@ -810,7 +810,7 @@ def reconcile_files(*, full=None, wait=0.0) -> dict:
                 full = any(d.marker != generation for d in dirs)
             encrypting = key_encryption.is_encrypting
             purged = purge_private_key_files() if encrypting else None
-            if full:
+            if full and db.session.query(FileRemoval.id).first() is not None:
                 # A row created since the restore may name a listed path again: strike it first
                 keep_named_paths()
                 db.session.commit()

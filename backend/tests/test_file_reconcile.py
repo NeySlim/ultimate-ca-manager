@@ -338,3 +338,21 @@ def test_the_purge_keeps_the_key_copy_of_an_authority_whose_key_is_empty(
         stats = regen.purge_private_key_files()
     assert empty_authority['key'].read_bytes() == b'operator key'
     assert stats['kept_no_db_key'] >= 1
+
+
+def test_a_full_pass_with_nothing_listed_reads_no_row_to_strike(app, issued, regen,
+                                                                 monkeypatch):
+    """Striking reads every row's paths: only worth it when the list holds something."""
+    from models import FileRemoval, db
+    struck = []
+    real = regen.keep_named_paths
+    monkeypatch.setattr(regen, 'keep_named_paths', lambda: struck.append(1) or real())
+    with app.app_context():
+        FileRemoval.query.delete()
+        db.session.commit()
+        assert regen.reconcile_files(full=True)['status'] == 'done'
+        assert struck == []
+        db.session.add(FileRemoval(generation=1, path=str(issued['crt'])))
+        db.session.commit()
+        assert regen.reconcile_files(full=True)['status'] == 'done'
+        assert struck == [1] and issued['crt'].exists()
