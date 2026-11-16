@@ -203,29 +203,34 @@ def notify_account_locked(username):
         logger.warning(f"Failed to send account_locked alert for {username}: {e}")
 
 
+def announce_account_locked(subject, username, max_attempts):
+    """Log and alert a lock; called by the one attempt that armed it."""
+    logger.warning(f"{subject} locked after {max_attempts} failed attempts")
+    notify_account_locked(username)
+
+
 def _reserve_ldap_attempt(user):
     """Count one LDAP attempt before the bind, on the local account the entry resolves to.
 
-    Returns (account, rank): account None when there is none (nothing is counted), rank
-    None when it is locked. Raises, rolled back, when the count fails."""
+    Returns (account, rank, armed) as ``User.reserve_login_attempt``: account None when
+    there is none (nothing is counted). Raises, rolled back, when the count fails."""
     if not user:
-        return None, None
+        return None, None, False
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()
     try:
-        rank = user.reserve_login_attempt(max_attempts, lockout_seconds)
+        rank, armed = user.reserve_login_attempt(max_attempts, lockout_seconds)
         db.session.commit()
     except Exception:
         db.session.rollback()
         raise
-    return user, rank
+    return user, rank, armed
 
 
-def _ldap_attempt_failed(user, rank):
-    """A refused bind: the one attempt whose rank armed the lock reports it."""
-    max_attempts, _seconds = _get_ldap_lockout_settings()
-    if user is not None and rank == max_attempts:
-        logger.warning(f"LDAP account {user.username} locked after {max_attempts} failed attempts")
-        notify_account_locked(user.username)
+def _ldap_attempt_failed(user, armed):
+    """A refused or failed bind: the one attempt that armed the lock reports it."""
+    if user is not None and armed:
+        announce_account_locked(f'LDAP account {user.username}', user.username,
+                                _get_ldap_lockout_settings()[0])
 
 
 def _release_ldap_attempt(user):

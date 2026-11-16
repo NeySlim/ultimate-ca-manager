@@ -148,11 +148,13 @@ class User(db.Model):
         self._sessions_bump = (new - 1, new)
 
     def reserve_login_attempt(self, max_attempts: int, lockout_seconds: int):
-        """Count one login attempt before its secret is checked: its rank, or None when
-        the account is locked. The caller commits before checking the secret.
+        """Count one login attempt before its secret is checked: ``(rank, armed)``, rank
+        None when the attempt is refused unchecked, armed True for the one attempt whose
+        count armed the lock. The caller commits before checking the secret.
 
         One UPDATE decides on every node: at most ``max_attempts`` attempts get a rank,
-        the one reaching it arms the lock, and an expired lock restarts the count at 1."""
+        the one reaching it (or, past a lowered threshold, the next one) arms the lock,
+        and an expired lock restarts the count at 1."""
         from datetime import timedelta
         from sqlalchemy import and_, case, or_
         now = utc_now()
@@ -175,10 +177,11 @@ class User(db.Model):
             if db.session.execute(stmt.execution_options(preserve_rowcount=True)).rowcount:
                 row = db.session.execute(select(*columns).where(User.id == self.id)).one()
         if row is None:
-            return None
+            return None, False
         set_committed_value(self, 'failed_logins', row[0])
         set_committed_value(self, 'locked_until', row[1])
-        return row[0] if row[0] <= max_attempts else None
+        # Only an unlocked row is updated, so an attempt whose count reaches max armed it.
+        return (row[0] if row[0] <= max_attempts else None), row[0] >= max_attempts
 
     def release_login_attempt(self, max_attempts: int):
         """Give back a reserved attempt whose secret was proved but opened no session,

@@ -79,7 +79,7 @@ def ldap_login():
 
     def reserve(identity):
         try:
-            attempt['local'], attempt['rank'] = _reserve_ldap_attempt(
+            attempt['local'], attempt['rank'], attempt['armed'] = _reserve_ldap_attempt(
                 _ldap_local_account(provider, identity))
         except Exception as e:
             logger.error(f"Failed to record LDAP login attempt for {username}: {e}", exc_info=True)
@@ -88,11 +88,12 @@ def ldap_login():
         return attempt['local'] is None or attempt['rank'] is not None
 
     user_info, error = _ldap_authenticate_user(provider, username, password, before_bind=reserve)
-    local, rank = attempt.get('local'), attempt.get('rank')
+    local, armed = attempt.get('local'), attempt.get('armed', False)
 
     if attempt.get('failed'):
         return error_response("Failed to record login attempt", 500)
     if error == ATTEMPT_REFUSED:
+        _ldap_attempt_failed(local, armed)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -130,7 +131,7 @@ def ldap_login():
             return error_response("Access denied: you are not a member of the required group(s)", 403)
 
         # Generic auth failure (wrong password, etc.): the reserved attempt stays counted
-        _ldap_attempt_failed(local, rank)
+        _ldap_attempt_failed(local, armed)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',

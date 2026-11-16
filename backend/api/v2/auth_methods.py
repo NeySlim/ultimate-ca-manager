@@ -285,13 +285,16 @@ def login_password():
     # any node, the attempt is refused unchecked, like an unknown name.
     max_attempts, lockout_seconds = _get_2fa_lockout_settings()
     try:
-        rank = user.reserve_login_attempt(max_attempts, lockout_seconds)
+        rank, armed = user.reserve_login_attempt(max_attempts, lockout_seconds)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to record login attempt for {username}: {e}", exc_info=True)
         return error_response('Failed to record login attempt', 500)
     if rank is None:
+        if armed:
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -303,11 +306,9 @@ def login_password():
         return error_response('Invalid credentials', 401)
 
     if not user.check_password(password):
-        if rank == max_attempts:
-            # One request gets this rank: the one whose attempt armed the lock
-            logger.warning(f"Account {username} locked after {max_attempts} failed attempts")
-            from api.v2.sso.helpers import notify_account_locked
-            notify_account_locked(username)
+        if armed:
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',

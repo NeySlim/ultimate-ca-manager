@@ -186,6 +186,18 @@ def test_a_count_past_a_lowered_threshold_locks_unchecked(app, client, username,
         assert _stored(username)[1] is not None
 
 
+def test_a_lock_armed_past_a_lowered_threshold_is_alerted_once(app, client, username,
+                                                                alerts, caplog):
+    with app.app_context():
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS + 2)
+    with caplog.at_level(logging.WARNING):
+        for _ in range(3):
+            assert client.post(PASSWORD_DOOR, json={'username': username, 'password': 'wrong'}
+                               ).status_code == 401
+    assert alerts == [username]
+    assert len(_lock_lines(caplog, username)) == 1
+
+
 def test_an_expired_lock_restarts_the_count(app, client, username):
     with app.app_context():
         _another_node_writes(username, failed_logins=MAX_ATTEMPTS,
@@ -318,6 +330,22 @@ def test_an_ldap_bind_admitted_before_another_node_locked_clears_it(
     assert response.status_code == 200
     with app.app_context():
         assert tuple(_stored(ldap_user)) == (0, None)
+
+
+def test_an_ldap_lock_armed_past_a_lowered_threshold_is_alerted_once(
+        app, client, ldap_user, ldap_provider, alerts, monkeypatch, caplog):
+    import api.v2.sso.ldap_routes as ldap_routes
+    binds = []
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
+                        _case_blind_directory(binds, ldap_user))
+    with app.app_context():
+        _another_node_writes(ldap_user, failed_logins=MAX_ATTEMPTS + 2)
+    with caplog.at_level(logging.WARNING):
+        for _ in range(3):
+            assert client.post(LDAP_DOOR, json=_ldap_body(ldap_user, ldap_provider)
+                               ).status_code == 401
+    assert binds == [] and alerts == [ldap_user]
+    assert len(_lock_lines(caplog, ldap_user)) == 1
 
 
 @pytest.mark.parametrize('reason', ['account_disabled', 'group_denied'])
