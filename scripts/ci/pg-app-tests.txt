@@ -61,6 +61,7 @@ tests/test_migration_162*.py
 tests/test_migration_163*.py
 tests/test_migration_165*.py
 tests/test_migration_166*.py
+tests/test_migration_168*.py
 tests/test_restore_tsa_ca_signer.py
 tests/test_upgrade_from_2_254.py
 tests/test_fresh_install_interrupted.py
