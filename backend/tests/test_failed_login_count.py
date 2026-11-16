@@ -505,6 +505,89 @@ def test_an_ldap_reset_that_cannot_be_stored_answers_500_without_a_session(
         assert _stored(ldap_user)[0] == 1
 
 
+# --- Other authenticators: behaviour as it stands, pending a decision ------------
+# A client certificate or a passkey neither reads the password lock nor resets the count
+# in SQL: these tests record what happens today, they do not say it is wanted.
+
+MTLS_DOOR = '/api/v2/auth/login/mtls'
+PASSKEY_DOOR = '/api/v2/auth/login/webauthn/verify'
+
+
+def _signs_in_by_certificate(monkeypatch, name, meanwhile=None):
+    from types import SimpleNamespace
+    from services.certificate_parser import CertificateParser
+    from services.mtls_auth_service import MTLSAuthService
+
+    def authenticate(cert_info):
+        user = User.query.filter_by(username=name).one()
+        if meanwhile:
+            meanwhile()
+        return user, SimpleNamespace(id=1, cert_serial='0a', name='client'), None
+    monkeypatch.setattr(CertificateParser, 'extract_from_flask_native',
+                        staticmethod(lambda peercert: {'serial': '0a'}))
+    monkeypatch.setattr(MTLSAuthService, 'authenticate_certificate', staticmethod(authenticate))
+    return lambda client: client.post(MTLS_DOOR, environ_base={'peercert': {'subject': ()}})
+
+
+def _signs_in_by_passkey(monkeypatch, name, meanwhile=None):
+    from services.webauthn_service import WebAuthnService
+
+    def verify(user_id, response, host, **_kwargs):
+        if meanwhile:
+            meanwhile()
+        return True, '', db.session.get(User, user_id)
+    monkeypatch.setattr(WebAuthnService, 'verify_authentication', staticmethod(verify))
+    return lambda client: client.post(PASSKEY_DOOR, json={'username': name,
+                                                          'response': {'id': 'x'}})
+
+
+_OTHER_DOORS = pytest.mark.parametrize('door', [_signs_in_by_certificate, _signs_in_by_passkey],
+                                       ids=['certificate', 'passkey'])
+
+
+@_OTHER_DOORS
+def test_today_a_password_lock_does_not_stop_another_authenticator(
+        app, client, username, monkeypatch, door):
+    """The session opens; the count is zeroed on its copy, the lock stays."""
+    with app.app_context():
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS,
+                             locked_until=utc_now() + timedelta(minutes=15))
+    assert door(monkeypatch, username)(client).status_code == 200
+    with app.app_context():
+        failures, locked_until = _stored(username)
+    assert failures == 0 and locked_until is not None
+    assert client.post(PASSWORD_DOOR, json={'username': username, 'password': PASSWORD}
+                       ).status_code == 401
+
+
+@_OTHER_DOORS
+def test_today_another_authenticator_resets_the_password_count(
+        app, client, username, monkeypatch, door):
+    with app.app_context():
+        _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
+    assert door(monkeypatch, username)(client).status_code == 200
+    with app.app_context():
+        assert tuple(_stored(username)) == (0, None)
+
+
+def test_today_a_certificate_keeps_a_count_written_while_it_checks(
+        app, client, username, monkeypatch):
+    """Its copy already held 0: the ORM writes nothing, the other node's count stays."""
+    meanwhile = lambda: _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
+    assert _signs_in_by_certificate(monkeypatch, username, meanwhile)(client).status_code == 200
+    with app.app_context():
+        assert tuple(_stored(username)) == (MAX_ATTEMPTS - 1, None)
+
+
+def test_today_a_passkey_resets_a_count_written_while_it_checks(
+        app, client, username, monkeypatch):
+    """The passkey's own count is committed first, so its copy is read again and zeroed."""
+    meanwhile = lambda: _another_node_writes(username, failed_logins=MAX_ATTEMPTS - 1)
+    assert _signs_in_by_passkey(monkeypatch, username, meanwhile)(client).status_code == 200
+    with app.app_context():
+        assert tuple(_stored(username)) == (0, None)
+
+
 # --- Threads on one database -----------------------------------------------------
 
 WORKERS = 8
