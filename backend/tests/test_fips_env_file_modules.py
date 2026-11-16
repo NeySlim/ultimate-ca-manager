@@ -13,9 +13,12 @@ def test_env_file_sets_openssl_modules_when_the_environment_has_none_pos(tmp_pat
     # what the entrypoint's pin guards against: an unset variable is taken from ucm.env
     monkeypatch.delenv('OPENSSL_MODULES', raising=False)
     _env_file(tmp_path, monkeypatch, 'OPENSSL_MODULES=/elsewhere')
-    settings.load_env_files()
-    assert os.environ.get('OPENSSL_MODULES') == '/elsewhere'
-    monkeypatch.delenv('OPENSSL_MODULES')
+    try:
+        settings.load_env_files()
+        assert os.environ.get('OPENSSL_MODULES') == '/elsewhere'
+    finally:
+        # not monkeypatch.delenv: its undo would put the value back for every later test
+        os.environ.pop('OPENSSL_MODULES', None)
 
 
 def test_env_file_does_not_move_a_pinned_openssl_modules_neg(tmp_path, monkeypatch):
