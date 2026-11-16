@@ -238,7 +238,8 @@ def login_password():
     if rank is None:
         if armed:
             from api.v2.sso.helpers import announce_account_locked
-            announce_account_locked(f'Account {username}', username, max_attempts)
+            announce_account_locked(
+                f"Account {username} locked after {max_attempts} failed attempts", username)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -252,7 +253,8 @@ def login_password():
     if not user.check_password(password):
         if armed:
             from api.v2.sso.helpers import announce_account_locked
-            announce_account_locked(f'Account {username}', username, max_attempts)
+            announce_account_locked(
+                f"Account {username} locked after {max_attempts} failed attempts", username)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -276,7 +278,8 @@ def login_password():
         if armed:
             # The lock this attempt armed stays as stored, the safe side: it is announced
             from api.v2.sso.helpers import announce_account_locked
-            announce_account_locked(f'Account {username}', username, max_attempts)
+            announce_account_locked(
+                f"Account {username} locked after {max_attempts} failed attempts", username)
         return error_response('Failed to update login stats', 500)
 
     # Second factor: TOTP (with recovery codes) and/or a security key, the key

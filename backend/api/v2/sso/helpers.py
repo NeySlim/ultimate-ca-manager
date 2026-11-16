@@ -1,7 +1,5 @@
 from . import bp, VALID_ROLES
-from models import db, User
-from utils.datetime_utils import utc_now
-from datetime import timedelta
+from models import db
 import tempfile
 import os
 import json
@@ -29,7 +27,8 @@ def _get_lockout_settings():
     except Exception:
         max_attempts = 5
         lockout_seconds = 900
-    return max_attempts, lockout_seconds
+    # Below 1 no attempt would ever be checked, the right password included
+    return max(max_attempts, 1), lockout_seconds
 
 def _get_ssl_verify(provider, protocol):
     """Get SSL verification parameter for requests library.
@@ -193,9 +192,9 @@ def notify_account_locked(username):
         logger.warning(f"Failed to send account_locked alert for {username}: {e}")
 
 
-def announce_account_locked(subject, username, max_attempts):
+def announce_account_locked(line, username):
     """Log and alert a lock; called by the one attempt that armed it."""
-    logger.warning(f"{subject} locked after {max_attempts} failed attempts")
+    logger.warning(line)
     notify_account_locked(username)
 
 
@@ -219,8 +218,9 @@ def _reserve_ldap_attempt(user):
 def _ldap_attempt_failed(user, armed):
     """A refused or failed bind: the one attempt that armed the lock reports it."""
     if user is not None and armed:
-        announce_account_locked(f'LDAP account {user.username}', user.username,
-                                _get_ldap_lockout_settings()[0])
+        announce_account_locked(
+            f"LDAP account locked for {user.username} after "
+            f"{_get_ldap_lockout_settings()[0]} failed attempts", user.username)
 
 
 def _release_ldap_attempt(user, armed):

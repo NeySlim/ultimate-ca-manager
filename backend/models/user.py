@@ -1,7 +1,7 @@
 """
 User and UserSession Models
 """
-from sqlalchemy import func, select, update
+from sqlalchemy import case, func, select, update
 from sqlalchemy.orm.attributes import set_committed_value
 
 from utils.password_hash import hash_password, needs_rehash, verify_password
@@ -190,7 +190,9 @@ class User(db.Model):
             db.session.execute(
                 update(User).where(User.id == self.id, User.locked_until == armed,
                                    User.locked_until > utc_now())
-                .values(failed_logins=func.coalesce(User.failed_logins, 0) - 1,
+                # Never below zero: another door may have reset the count meanwhile
+                .values(failed_logins=case((func.coalesce(User.failed_logins, 0) > 0,
+                                            User.failed_logins - 1), else_=0),
                         locked_until=None)
                 .execution_options(synchronize_session=False))
         self._reload_lockout()

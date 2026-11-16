@@ -131,7 +131,9 @@ def _found(name, before_bind):
 
 
 def _lock_lines(caplog, name):
-    return [r for r in caplog.records if 'locked after' in r.getMessage() and name in r.getMessage()]
+    return [r for r in caplog.records
+            if 'locked' in r.getMessage() and f'{name} ' in r.getMessage()
+            and r.getMessage().endswith('failed attempts')]
 
 
 # --- Password door ---------------------------------------------------------------
@@ -439,6 +441,32 @@ def test_a_release_after_its_own_lock_expired_gives_nothing(app, username):
         assert tuple(_stored(username)) == (MAX_ATTEMPTS, armed)
         assert user.reserve_login_attempt(MAX_ATTEMPTS, 900) == (1, None)
         db.session.rollback()
+
+
+def test_a_release_never_takes_the_count_below_zero(app, username):
+    """A certificate or passkey success zeroed the count, not the lock, while it was checked."""
+    with app.app_context():
+        user, _rank, armed = _reserved(username, MAX_ATTEMPTS - 1)
+        _another_worker_writes(username, failed_logins=0)
+        user.release_login_attempt(armed)
+        db.session.commit()
+        assert tuple(_stored(username)) == (0, None)
+
+
+@pytest.mark.parametrize('threshold', ['0', '-3'])
+def test_a_threshold_below_one_still_lets_the_right_password_in(app, client, username, threshold):
+    """Such a setting locked at the first failure before; it never refused the right password."""
+    from models import SystemConfig
+    with app.app_context():
+        SystemConfig.query.filter_by(key='max_login_attempts').update({'value': threshold})
+        db.session.commit()
+    response = client.post(PASSWORD_DOOR, json={'username': username, 'password': PASSWORD})
+    assert response.status_code == 200, response.get_json()
+    with app.app_context():
+        assert tuple(_stored(username)) == (0, None)
+    assert client.post(PASSWORD_DOOR, json={'username': username, 'password': 'wrong'}).status_code == 401
+    with app.app_context():
+        assert _stored(username)[1] is not None
 
 
 def test_a_release_of_an_attempt_that_armed_nothing_gives_nothing(app, username):
@@ -886,6 +914,42 @@ def test_an_ldap_attempt_is_counted_on_the_account_bound_to_the_entry_id(
     with app.app_context():
         failures, locked_until = _stored(username)
     assert failures == MAX_ATTEMPTS and locked_until is not None
+
+
+def test_an_ldap_attempt_is_counted_on_the_account_linked_by_its_address(
+        app, client, ldap_user, ldap_provider, any_spelling):
+    """Linked by an administrator, never bound: another name, found by the entry's mail."""
+    entry_uid = f'dir{uuid.uuid4().hex[:8]}'
+    directory = any_spelling(_AnySpellingDirectory(entry_uid, f'{ldap_user}@example.test'))
+    for _ in range(BURST):
+        assert client.post(LDAP_DOOR, json=_ldap_body(entry_uid, ldap_provider)
+                           ).status_code == 401
+    assert len(directory.binds) == MAX_ATTEMPTS
+    with app.app_context():
+        failures, locked_until = _stored(ldap_user)
+    assert failures == MAX_ATTEMPTS and locked_until is not None
+
+
+def test_an_ldap_attempt_is_stored_before_its_bind(app, client, ldap_user, ldap_provider,
+                                                   any_spelling):
+    """Committed, not only written: nothing the bind does to the session takes it back,
+    and no row lock is held while the directory answers."""
+    directory = any_spelling(_AnySpellingDirectory(ldap_user, f'{ldap_user}@example.test'))
+    real = directory.bind
+
+    def bind_then_roll_back(conn, provider):
+        proved = real(conn, provider)
+        if not conn.user.startswith('cn=svc'):
+            db.session.rollback()
+        return proved
+
+    import api.v2.sso.connection_tests as connection_tests
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(connection_tests, 'ldap_bind', bind_then_roll_back)
+        assert client.post(LDAP_DOOR, json=_ldap_body(ldap_user, ldap_provider)
+                           ).status_code == 401
+    with app.app_context():
+        assert tuple(_stored(ldap_user)) == (1, None)
 
 
 def test_an_ldap_entry_named_like_a_local_account_is_counted_on_it(

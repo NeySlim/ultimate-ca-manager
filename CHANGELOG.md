@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- Account: wrong passwords sent at the same time to the password or LDAP login were all checked before the lockout took effect, and at LDAP a name typed in another case or spelling escaped the count, so `max_login_attempts` did not bound a parallel guess. Each attempt is now counted before its password is checked, at LDAP on the local account the directory entry opens, so at most `max_login_attempts` passwords are checked before the account locks, and a success clears the stored count and lock.
+- Account: wrong passwords sent at the same time to the password or LDAP login could all be checked before the lockout took effect, and at LDAP a name typed in another case or spelling escaped the count, so `max_login_attempts` did not bound a parallel guess. Each attempt is now counted before its password is checked, at LDAP on the local account the directory entry opens, so at most `max_login_attempts` passwords are checked before the account locks, and a success clears the stored count and lock.
 
 ## [2.254.3] - 2026-11-16
 
