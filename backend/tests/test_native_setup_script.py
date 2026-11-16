@@ -482,8 +482,8 @@ esac""")
 
 
 def test_a_held_stop_dies_of_a_sigint_its_shell_alone_receives(tmp_path):
-    """A shell loop survives SIGINT when its current child does not get it (bash waits for the
-    child to die of it first); a group signal lands so whenever the child is between fork and exec."""
+    """The held stop execs its sleep in the shell's own pid: once the sleep runs, a SIGINT ends it,
+    with no child left for the shell to wait for."""
     bin_dir = tmp_path / 'bin'
     held = tmp_path / 'held'
     _systemd(tmp_path, bin_dir, tmp_path / 'record', hold_stop=held)
@@ -803,10 +803,10 @@ def _wait_for(path, proc):
     assert path.exists(), proc.communicate(timeout=5)
 
 
-def _wait_for_held_stop(witness, proc):
+def _wait_for_held_stop(witness, proc, timeout=15):
     """Until the held `systemctl stop` runs the sleep: before its exec, a SIGINT can reach its shell
     while that waits for a child exiting normally, and the shell then goes on to the sleep."""
-    deadline = time.monotonic() + 15
+    deadline = time.monotonic() + timeout
     while proc.poll() is None and time.monotonic() < deadline:
         try:
             if pathlib.Path(f'/proc/{int(witness.read_text())}/comm').read_text().strip() == 'sleep':
@@ -814,7 +814,21 @@ def _wait_for_held_stop(witness, proc):
         except (OSError, ValueError):  # not written yet, or written halfway
             pass
         time.sleep(0.05)
-    pytest.fail(f'the held stop never reached its sleep: {proc.communicate(timeout=5)}')
+    if proc.poll() is None:  # the script and its held stop would otherwise outlive the test
+        os.killpg(proc.pid, signal.SIGKILL)
+    try:
+        said = proc.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        said = '(pipes still held open)'
+    pytest.fail(f'the held stop never reached its sleep: {said}')
+
+
+def test_a_stop_that_never_holds_fails_the_wait_and_leaves_no_process(tmp_path):
+    proc = subprocess.Popen([shutil.which('sleep'), '600'], start_new_session=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True)
+    with pytest.raises(pytest.fail.Exception, match='never reached its sleep'):
+        _wait_for_held_stop(tmp_path / 'held', proc, timeout=0.3)
+    assert proc.poll() is not None
 
 
 def _systemctl_lines(record):
