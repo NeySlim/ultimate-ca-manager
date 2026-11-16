@@ -216,8 +216,10 @@ def _a_partner_renewed_since_read(app):
 
 def _an_a_renewed_since_read(app):
     """A read by this session, then renewed elsewhere with its newest B: an older B renewed
-    alone still names A's current certificate."""
+    alone renews (A is not judged revoked) but names nothing, as A's current certificate is
+    not the one its extension hashed (RFC 9763 §4.1), and leaves the pair."""
     from services.cert.renewal import renew_certificate_in_place
+    from utils.related_cert import read_related_certificate
     a_id, (old_b, new_b) = _linked_rows(app, n_b=2)
     with app.app_context():
         held = db.session.get(Certificate, a_id)  # kept by the session as it was read
@@ -226,8 +228,10 @@ def _an_a_renewed_since_read(app):
         outcome = renew_certificate_in_place(b, username='admin', regenerate_crl=False)
         assert outcome['related'] == [], outcome
         db.session.expire_all()
-        b = db.session.get(Certificate, old_b)
-        assert b.related_certificate_id == a_id and _names(b) and held is not b
+        b, a = db.session.get(Certificate, old_b), db.session.get(Certificate, a_id)
+        assert b.renewed_times == 1 and held is not b
+        assert read_related_certificate(_cert(b)) is None and b.related_certificate_id is None
+        assert a.related_certificate_id == new_b
         db.session.remove()
 
 
@@ -402,3 +406,112 @@ def test_a_member_archived_since_read_is_refused_on_postgresql(app):
     with _a_schema_of_our_own(f'renew_arch_{uuid.uuid4().hex[:6]}') as url, \
             _bound_to(app, url, is_postgresql=True):
         _a_member_archived_since_read(app)
+
+
+# ---- RFC 9763 §4.1: the renewed certificate names what the original's extension hashed ----
+
+def _cert(row):
+    from services.cert.related_pair import row_certificate
+    return row_certificate(row)
+
+
+def test_an_a_renewed_in_a_chain_names_its_own_a_not_its_b(app, tmp_path):
+    """X <- A <- B with A and B linked to each other: A renewed names X, never the old B."""
+    from services.cert.renewal import renew_certificate_in_place
+    from tests.test_backup_cross_installation import _bound_to
+    from utils.related_cert import references
+    with _bound_to(app, f"sqlite:///{tmp_path / 'chain.db'}"):
+        a_id, b_id = _chain_pair(app)
+        with app.app_context():
+            x_id = Certificate.query.filter(Certificate.related_certificate_id == a_id,
+                                            Certificate.id != b_id).one().id
+            cert_x, old_b = _cert(db.session.get(Certificate, x_id)), _cert(db.session.get(Certificate, b_id))
+            outcome = renew_certificate_in_place(db.session.get(Certificate, a_id), username='admin',
+                                                 regenerate_crl=False)
+            assert [r['cert_id'] for r in outcome['related']] == [b_id], outcome
+            db.session.expire_all()
+            a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, b_id)
+            assert references(_cert(a), cert_x) and not references(_cert(a), old_b)
+            assert references(_cert(b), _cert(a))
+            assert (a.related_certificate_id, b.related_certificate_id) == (b_id, a_id)
+            db.session.remove()
+
+
+def test_an_a_renewed_alone_in_a_chain_names_its_own_a(app, tmp_path):
+    """B's key not held: A renews alone and still names X, keeping its link to B."""
+    from services.cert.renewal import renew_certificate_in_place
+    from tests.test_backup_cross_installation import _bound_to
+    from utils.related_cert import references
+    with _bound_to(app, f"sqlite:///{tmp_path / 'chain_alone.db'}"):
+        a_id, b_id = _chain_pair(app)
+        with app.app_context():
+            db.session.get(Certificate, b_id).prv = None
+            db.session.commit()
+            x_id = Certificate.query.filter(Certificate.related_certificate_id == a_id,
+                                            Certificate.id != b_id).one().id
+            cert_x, old_b = _cert(db.session.get(Certificate, x_id)), _cert(db.session.get(Certificate, b_id))
+            outcome = renew_certificate_in_place(db.session.get(Certificate, a_id), username='admin',
+                                                 regenerate_crl=False)
+            assert outcome['related'] == [], outcome
+            db.session.expire_all()
+            a = db.session.get(Certificate, a_id)
+            assert references(_cert(a), cert_x) and not references(_cert(a), old_b)
+            assert a.related_certificate_id == b_id
+            db.session.remove()
+
+
+def test_the_named_a_is_found_without_reading_every_certificate(app, tmp_path):
+    """Two indexed reads find X (the linked row, then the rows linked to A); no unfiltered scan."""
+    from sqlalchemy import event
+    from services.cert.renewal import _current_related
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'chain_cost.db'}"):
+        a_id, _b_id = _chain_pair(app)
+        with app.app_context():
+            a = db.session.get(Certificate, a_id)
+            a.crt  # loaded before counting
+            statements = []
+
+            def seen(conn, cursor, statement, *args):
+                statements.append(statement)
+
+            engine = db.session.get_bind()
+            event.listen(engine, 'before_cursor_execute', seen)
+            try:
+                assert _current_related(a) is not None
+            finally:
+                event.remove(engine, 'before_cursor_execute', seen)
+            on_certificates = [s for s in statements if 'FROM certificates' in s]
+            assert on_certificates and all('WHERE' in s for s in on_certificates), statements
+            assert len(on_certificates) == 2, on_certificates
+            db.session.remove()
+
+
+def test_a_malformed_extension_names_nothing(app, tmp_path):
+    """An extension that cannot be read hashes no certificate: the linked row is not named."""
+    import base64
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.x509 import UnrecognizedExtension
+    from models import CA
+    from services.cert.renewal import _current_related
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    from tests.test_backup_cross_installation import _bound_to
+    from utils.related_cert import RELATED_CERT_EXTENSION_OID
+    with _bound_to(app, f"sqlite:///{tmp_path / 'malformed.db'}"):
+        _a_id, (b_id,) = _linked_rows(app)
+        with app.app_context():
+            b = db.session.get(Certificate, b_id)
+            assert _current_related(b) is not None
+            cert_b = _cert(b)
+            builder = (x509.CertificateBuilder().subject_name(cert_b.subject).issuer_name(cert_b.issuer)
+                       .public_key(cert_b.public_key()).serial_number(cert_b.serial_number)
+                       .not_valid_before(cert_b.not_valid_before_utc)
+                       .not_valid_after(cert_b.not_valid_after_utc)
+                       .add_extension(UnrecognizedExtension(RELATED_CERT_EXTENSION_OID, b'\x30\x00'),
+                                      critical=False))
+            ca = CA.query.filter_by(refid=b.caref).one()
+            broken = builder.sign(get_ca_signing_key(ca), hashes.SHA256())
+            b.crt = base64.b64encode(broken.public_bytes(serialization.Encoding.PEM)).decode()
+            db.session.commit()
+            assert _current_related(db.session.get(Certificate, b_id)) is None
+            db.session.remove()
