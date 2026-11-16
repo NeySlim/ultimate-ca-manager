@@ -1,6 +1,12 @@
 {{- if .Values.persistence.enabled }}
 {{- $dataPvc := include "ucm.dataPvcName" . }}
-{{- if and (not .Values.persistence.data.existingClaim) (or (not .Values.ha.enabled) (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $dataPvc)) }}
+{{- $renderData := not .Values.persistence.data.existingClaim }}
+{{- /* The lookup sits under an if, never in an and/or argument: before Go 1.18 (Helm 3.10)
+       and/or evaluate every argument, so the claim would be read outside HA too */}}
+{{- if and $renderData .Values.ha.enabled }}
+{{- $renderData = (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $dataPvc) }}
+{{- end }}
+{{- if $renderData }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
