@@ -246,15 +246,18 @@ def _release_ldap_attempt(user, armed):
 
 
 def _clear_ldap_failed_attempts(user):
-    """Clear the stored count and lock of the account a successful bind opens."""
+    """Clear the stored count and lock of the account a successful bind opens; False,
+    rolled back, when that fails: no session opens, as at the password door."""
     if user is None:
-        return
+        return True
     try:
         user.clear_failed_logins()
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to clear LDAP failed attempts for {user.username}: {e}")
+        logger.error(f"Failed to update login stats for {user.username}: {e}", exc_info=True)
+        return False
+    return True
 
 
 # SAML attributes read for group membership when the provider's attribute

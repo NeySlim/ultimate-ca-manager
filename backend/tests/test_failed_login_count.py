@@ -286,6 +286,29 @@ def test_the_count_holds_on_a_database_without_update_returning(app, client, use
     assert right.status_code == 401 and alerts == [username]
 
 
+def _refuse_the_reset(engine):
+    """Refuse the success's reset of the count, and only it."""
+    def refuse(conn, cursor, statement, parameters, *args):
+        if statement.lstrip().upper().startswith('UPDATE USERS SET FAILED_LOGINS') \
+                and 'LOCKED_UNTIL' in statement.upper() and 'CASE' not in statement.upper():
+            raise RuntimeError('database unavailable')
+    event.listen(engine, 'before_cursor_execute', refuse)
+    return lambda: event.remove(engine, 'before_cursor_execute', refuse)
+
+
+def test_a_reset_that_cannot_be_stored_answers_500_without_a_session(app, client, username):
+    with app.app_context():
+        restore = _refuse_the_reset(db.engine)
+    try:
+        response = client.post(PASSWORD_DOOR, json={'username': username, 'password': PASSWORD})
+        me = client.get('/api/v2/auth/verify').get_json()['data']
+    finally:
+        restore()
+    assert (response.status_code, response.get_json()['message']) == \
+        (500, 'Failed to update login stats')
+    assert not me.get('authenticated')
+
+
 # --- LDAP door -------------------------------------------------------------------
 
 def test_an_ldap_burst_binds_at_most_max_attempts_times(app, client, username, ldap_provider,
@@ -459,6 +482,27 @@ def test_an_ldap_count_that_cannot_be_stored_answers_500_unbound(app, client, us
     assert (response.status_code, response.get_json()['message']) == \
         (500, 'Failed to record login attempt')
     assert binds == []
+
+
+def test_an_ldap_reset_that_cannot_be_stored_answers_500_without_a_session(
+        app, client, ldap_user, ldap_provider, monkeypatch):
+    import api.v2.sso.ldap_routes as ldap_routes
+    from models.sso import SSOSession
+    monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
+                        _case_blind_directory([], ldap_user))
+    with app.app_context():
+        restore = _refuse_the_reset(db.engine)
+    try:
+        response = client.post(LDAP_DOOR, json=_ldap_body(ldap_user, ldap_provider, PASSWORD))
+        me = client.get('/api/v2/auth/verify').get_json()['data']
+    finally:
+        restore()
+    assert (response.status_code, response.get_json()['message']) == \
+        (500, 'Failed to update login stats')
+    assert not me.get('authenticated')
+    with app.app_context():
+        assert SSOSession.query.filter_by(provider_id=ldap_provider).count() == 0
+        assert _stored(ldap_user)[0] == 1
 
 
 # --- Threads on one database -----------------------------------------------------

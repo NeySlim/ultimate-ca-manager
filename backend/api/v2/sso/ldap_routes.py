@@ -189,7 +189,8 @@ def ldap_login():
     # The bind opened the account it was counted on: its count and lock are cleared.
     # Both come from one resolution; they differ only if the accounts changed in between.
     if local is not None and local.id == user.id:
-        _clear_ldap_failed_attempts(local)
+        if not _clear_ldap_failed_attempts(local):
+            return error_response("Failed to update login stats", 500)
     else:
         _release_ldap_attempt(local, armed)
 
