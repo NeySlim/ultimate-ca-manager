@@ -39,18 +39,18 @@ def holds_private_key(data) -> bool:
     return _PRIVATE_KEY.search(_bytes(data)) is not None
 
 
-def opens_a_pem_certificate(data) -> bool:
-    """Whether *data* is offered as PEM certificates, readable or not: what an upload must not read as DER.
-
-    A DER certificate that merely names the opening line in one of its fields is not."""
-    data = _bytes(data)
-    if _CERTIFICATE_OPENING.search(data) is None:
-        return False
+def is_der_certificate(data) -> bool:
+    """Whether *data* is one DER certificate: whatever armour line one of its fields names, it holds no key."""
     try:
-        x509.load_der_x509_certificate(data)
+        x509.load_der_x509_certificate(_bytes(data))
     except Exception:
-        return True
-    return False
+        return False
+    return True
+
+
+def opens_a_pem_certificate(data) -> bool:
+    """Whether *data* is offered as PEM certificates, readable or not: what an upload must not read as DER."""
+    return _CERTIFICATE_OPENING.search(_bytes(data)) is not None
 
 
 def certificate_blocks(data) -> bytes:
