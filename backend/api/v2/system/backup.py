@@ -536,11 +536,18 @@ def restore_backup():
                     results = BackupService().restore_backup_from_stream(
                         file.stream, password, mode=mode)
             except MigrationBusyError as busy:
+                if busy.unavailable:
+                    record_request_refusal(audited_name, 'the migration lock could not be taken')
+                    return error_response(str(busy), 409)
                 record_request_refusal(audited_name, 'a backend migration or another restore is running')
                 return error_response(
                     f'{busy} A backend migration or another restore is still '
                     'running.', 409)
             except BackupBusyError as busy:
+                # Nothing runs: the lock file cannot be locked at all
+                if busy.unavailable:
+                    record_request_refusal(audited_name, 'the backup lock could not be taken')
+                    return error_response(str(busy), 409)
                 record_request_refusal(audited_name, 'a backup or another restore is running')
                 return error_response(f'{busy} Retry once it has finished.', 409)
             except RestoreFilesUnwritable as unwritable:

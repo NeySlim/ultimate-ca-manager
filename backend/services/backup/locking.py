@@ -81,5 +81,5 @@ def backup_operation_lock(*, timeout: float = 0, purpose: str = 'backup',
     """
     with process_lock(operation_lock_path(), timeout=timeout, purpose=purpose,
                       subject=_SUBJECT, busy_error=BackupBusyError,
-                      fail_open=fail_open):
+                      fail_open=fail_open, where='the backup directory'):
         yield

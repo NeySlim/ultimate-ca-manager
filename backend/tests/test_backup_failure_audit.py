@@ -318,4 +318,34 @@ def test_a_restore_never_runs_without_the_backup_lock(auth_client, audit, monkey
     monkeypatch.setattr(fcntl, 'flock', no_flock)
     response = _upload(auth_client, route)
     assert response.status_code == 409 and ran == []
-    assert 'lock could not be taken' in response.get_json()['message']
+    # The lock is in the backup directory, and nothing is running that would finish
+    assert response.get_json()['message'] == (
+        'The backup operation lock could not be taken, so the restore was not started. '
+        'Check that the backup directory is writable and supports file locks.')
+    _assert_failure(audit, 'system_restore')
+    assert audit[0]['details'] == 'Restore request refused: the backup lock could not be taken'
+
+
+@pytest.mark.parametrize('route', RESTORE)
+def test_a_restore_without_the_migration_lock_names_the_data_directory(
+        auth_client, audit, monkeypatch, route):
+    import errno
+    import fcntl
+    from services.backup_service import BackupService
+    ran = []
+    monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
+                        lambda self, *a, **k: ran.append(True))
+    real_flock = fcntl.flock
+
+    def no_flock(fd, op):
+        if os.readlink(f'/proc/self/fd/{fd}').endswith('.ucm_db_migration.lock'):
+            raise OSError(errno.ENOLCK, 'No locks available')
+        return real_flock(fd, op)
+    monkeypatch.setattr(fcntl, 'flock', no_flock)
+    response = _upload(auth_client, route)
+    assert response.status_code == 409 and ran == []
+    assert response.get_json()['message'] == (
+        'The database migration lock could not be taken, so the restore was not started. '
+        'Check that the data directory is writable and supports file locks.')
+    _assert_failure(audit, 'system_restore')
+    assert audit[0]['details'] == 'Restore request refused: the migration lock could not be taken'
