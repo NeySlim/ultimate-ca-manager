@@ -589,7 +589,7 @@ def export_trust_bundle():
         if not pems:
             return nothing_readable(skipped)
         headers = skipped_headers(skipped)
-        by_pem = {c.certificate_pem.encode(): c for c in certs}
+        by_pem = {certificate_blocks(c.certificate_pem): c for c in certs if c.certificate_pem}
         if fmt == 'pem':
             bundle_lines = []
             for pem in pems:
