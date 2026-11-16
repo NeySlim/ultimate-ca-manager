@@ -18,6 +18,8 @@ from tests.test_saml_strict_validation import (  # noqa: F401 (fixtures)
     ACS, SP_BASE, _module_provider, _response, idp_signer, provider,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 DONE = '/login/sso-complete'
 REFUSED_FORMS = [
     '//evil.example', '/\\evil.example', 'https://evil.example', '/%2f%2fevil.example',
