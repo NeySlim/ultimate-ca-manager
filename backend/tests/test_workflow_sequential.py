@@ -118,24 +118,33 @@ def _marker(command):
 
 def test_the_one_process_runs_leave_the_slow_tests_to_the_shards():
     """An hour of fault scenarios in one process would pass the job's time limit; the shards run them."""
-    import os
-    import subprocess
-    import sys
     commands = _pytest_commands(_job())
     assert len(commands) == 2, commands
     markers = {_marker(c) for c in commands}
     assert len(markers) == 1 and None not in markers, commands
+    # A command-line -m replaces the one of addopts: the HA bench must stay out by name
+    chosen = _collected(['-m', markers.pop(), SLOW_FILE, HA_FILE, PLAIN_TEST])
+    assert chosen == [PLAIN_TEST], chosen
+
+
+SLOW_FILE = 'tests/test_package_leftover_retry_data_link.py'
+HA_FILE = 'tests/ha/test_startup.py'
+PLAIN_TEST = 'tests/test_workflow_sequential.py::test_only_the_sequential_job_has_its_own_group'
+
+
+def _collected(arguments):
+    import os
+    import subprocess
+    import sys
     backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    kept = subprocess.run(
-        [sys.executable, '-m', 'pytest', '--collect-only', '-q', '-p', 'no:cacheprovider',
-         '-m', markers.pop(), 'tests/test_package_leftover_retry_data_link.py',
-         'tests/test_workflow_sequential.py::test_only_the_sequential_job_has_its_own_group'],
+    out = subprocess.run(
+        [sys.executable, '-m', 'pytest', '--collect-only', '-q', '-p', 'no:cacheprovider', *arguments],
         cwd=backend, capture_output=True, text=True, timeout=120)
-    chosen = [line for line in kept.stdout.splitlines() if '::' in line]
-    assert chosen == ['tests/test_workflow_sequential.py::test_only_the_sequential_job_has_its_own_group'], \
-        kept.stdout[-600:]
+    return [line for line in out.stdout.splitlines() if '::' in line]
 
 
 def test_the_shards_still_run_the_slow_tests():
+    """No -m on their command, and none from the configuration either: collected as they run."""
     shard = _pytest_commands(load('tests.yml')['jobs']['test-backend'])
     assert shard and all(_marker(c) is None for c in shard), shard
+    assert any(line.startswith(SLOW_FILE) for line in _collected([SLOW_FILE]))

@@ -2063,3 +2063,29 @@ def test_a_chaos_lab_goes_when_its_class_passed_and_stays_after_a_failure(tmp_pa
     session.testsfailed += failures
     assert next(labs, None) is None
     assert lab.root.exists() is kept
+
+
+def _suite_labs():
+    from tests import package_leftover_chaos as chaos
+    suites = [cls for cls in vars(chaos).values() if isinstance(cls, type) and 'lab' in vars(cls)]
+    return [(cls, name) for cls in suites for name in ('lab', 'outside_lab') if name in vars(cls)]
+
+
+@pytest.mark.parametrize('suite, name', _suite_labs(), ids=lambda v: getattr(v, '__name__', v))
+def test_every_suite_lab_goes_with_its_class(tmp_path, suite, name):
+    """The fixtures themselves, not only lab_of: one that returned its Lab would keep it."""
+    import types
+    session = types.SimpleNamespace(testsfailed=0)
+    factory = types.SimpleNamespace(mktemp=lambda kind: tmp_path / kind)
+    labs = vars(suite)[name].__wrapped__(
+        types.SimpleNamespace(layout='plain', env='full'),
+        types.SimpleNamespace(session=session), factory)
+    lab = next(labs)
+    (lab.root / 'b1').mkdir(parents=True)
+    assert next(labs, None) is None
+    assert not lab.root.exists()
+
+
+def test_the_suite_labs_are_found():
+    assert len(_suite_labs()) == 3, _suite_labs()
+
