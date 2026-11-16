@@ -403,6 +403,10 @@ def _current_related(row):
     if row_revoked(a_row):  # by its row or by the record of its serial
         return None
     cert_a = row_certificate(a_row)
+    # A row linked to its own B (whose certificate names this one) names nothing B holds
+    from utils.related_cert import references
+    if references(cert_a, original):
+        return None
     if cert_a.not_valid_after_utc.replace(tzinfo=None) < utc_now():
         return None
     return cert_a

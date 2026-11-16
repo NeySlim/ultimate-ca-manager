@@ -530,6 +530,39 @@ def test_a_b_unlinked_since_read_renews_alone_naming_none(app, tmp_path):
             db.session.remove()
 
 
+@pytest.mark.parametrize('x', ['held', 'deleted'])
+def test_a_chain_pair_renews_a_naming_nothing_its_original_did_not(app, tmp_path, x):
+    """A names X and links to its own B: the link is B's way back, not A's A. Renewed with B,
+    A' never names B's replaced certificate; B' names A'."""
+    import base64
+    from services.cert.related_pair import row_certificate
+    from services.cert.renewal import renew_certificate_in_place
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from utils import related_cert
+    with _bound_to(app, f"sqlite:///{tmp_path / 'chain.db'}"):
+        a_id, b_id = _chain_pair(app)
+        with app.app_context():
+            x_id = Certificate.query.filter(Certificate.related_certificate_id == a_id,
+                                            Certificate.id != b_id).one().id
+            if x == 'deleted':
+                assert CertificateService.delete_certificate(x_id)
+                db.session.expire_all()
+                assert db.session.get(Certificate, a_id).related_certificate_id == b_id
+            old_b = row_certificate(db.session.get(Certificate, b_id))
+            outcome = renew_certificate_in_place(db.session.get(Certificate, a_id), username='admin',
+                                                 regenerate_crl=False)
+            assert [r['cert_id'] for r in outcome['related']] == [b_id]
+            db.session.expire_all()
+            a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, b_id)
+            cert_a = x509.load_pem_x509_certificate(base64.b64decode(a.crt))
+            assert not related_cert.references(cert_a, old_b)
+            assert _names_none(a)
+            assert related_cert.references(row_certificate(b), cert_a)
+            assert (a.related_certificate_id, b.related_certificate_id) == (b_id, a_id)
+            db.session.remove()
+
+
 def _a_member_archived_since_read(app):
     """Judging A's own link re-reads B: the caller's view of B is taken before that."""
     from services.cert.renewal import RenewalError, renew_certificate_in_place
