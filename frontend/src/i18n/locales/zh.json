@@ -275,6 +275,7 @@
     "source": "来源",
     "addDnsProvider": "添加提供商",
     "test": "测试",
+    "syncKeys": "同步密钥",
     "dnsProviderTestFailed": "连接测试失败",
     "providerName": "提供商名称",
     "providerType": "提供商类型",
@@ -622,6 +623,8 @@
     "samlLoginExpired": "此次登录已过期，或是在其他标签页或浏览器中发起的。请从此页面重新开始。",
     "ssoUsernameConflict": "此次登录与一个已有账户匹配，该账户为本地账户或已关联到其他身份。请联系管理员关联这些账户。",
     "ssoUnmapped": "访问被拒绝：此登录提供方的角色映射规则均不匹配您的账户。请联系管理员。",
+    "ssoNoDefaultRole": "访问被拒绝：此登录提供商既没有默认角色，也没有角色映射规则。请联系管理员。",
+    "ssoEmailConflict": "登录被拒绝：另一个账户已在使用此次登录的邮箱地址。请联系管理员。",
     "samlLogoutRejected": "无法验证身份提供方的注销请求；您仍处于登录状态。",
     "tooManyAttempts": "失败尝试次数过多",
     "retryAfterSeconds": "请在 {{seconds}} 秒后重试。",
@@ -1083,7 +1086,8 @@
       "noSchemeAllowedByProfile": "合规配置文件不允许此密钥使用任何 RSA 签名方案。",
       "profileRequiresHsm": "此配置文件要求 CA 密钥存储在 HSM 上。",
       "profileHorizon": "合规配置文件接受 {{key}} 至 {{date}}，而此 CA 的有效期将超过该日期。",
-      "noDigestAllowedByPolicy": "适用于此 CA 的策略不允许任何签名摘要。"
+      "noDigestAllowedByPolicy": "适用于此 CA 的策略不允许任何签名摘要。",
+      "hsmNeedsRead": "在 HSM 密钥上创建 CA 需要 read:hsm 权限。"
     },
     "detail": {
       "hsmBacked": "HSM 支持",
@@ -1448,6 +1452,13 @@
       "ssoUsernameHelp": "身份提供商发送的用户名。默认为当前用户名；如果 SSO 登录不同，请修改。",
       "linkSuccess": "{{name}} 已关联到单点登录",
       "linkFailed": "无法将账户关联到 SSO",
+      "relink": "更换提供商或重置 SSO 身份",
+      "relinkTitle": "更换 {{name}} 的提供商或重置其 SSO 身份",
+      "relinkHelp": "选择此账户登录所用的提供商：选择其他提供商会将账户迁移过去，选择同一提供商会重置其 SSO 身份。下一次使用此用户名或邮箱通过该提供商登录时会绑定新身份。账户已有的密码会保留，除非您勾选下方的复选框。",
+      "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
+      "confirmRelink": "将 {{name}} 关联到 {{provider}}？其当前 SSO 身份将被清除，下一次通过该提供商登录时会绑定新身份。",
+      "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
+      "relinkKeepsNoPassword": "Its API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "解除 {{name}} 的单点登录关联并转换回本地账户？",
       "unlinkSuccess": "{{name}} 已转换为本地账户",
       "unlinkFailed": "无法解除账户关联"
@@ -3857,7 +3868,8 @@
       "firmwareVersion": "固件版本",
       "notRead": "测试连接以读取模块报告的信息。",
       "softhsmFips": "SoftHSM 不是经过验证的模块：在 FIPS 模式下，其上的密钥不受 FIPS 保护。"
-    }
+    },
+    "syncingKeys": "正在同步..."
   },
   "sso": {
     "subtitle": "配置LDAP、OAuth2或SAML提供商进行集中认证",
@@ -3919,7 +3931,6 @@
     "configuredProviders": "已配置的提供商",
     "acsUrl": "断言消费服务 (ACS) URL",
     "acsUrlDesc": "IdP 在认证后发送 SAML 断言的地址",
-    "addProvider": "添加 SSO 提供者",
     "attributeMapping": "属性映射",
     "attributeMappingHelp": "左侧：提供商发送的属性名称。右侧：对应填充的 UCM 字段（username、email、fullname 或 groups）。示例：user.userprincipalname → username。",
     "callbackUrls": "回调 URL",
@@ -3932,6 +3943,8 @@
     "uidAttrHelp": "用于在用户名/邮箱变更后识别账户的不可变目录 ID（entryUUID / objectGUID）。留空则自动检测。",
     "groupFilter": "组过滤器",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, then the base DN if that search is refused; else the base DN.",
     "isDefault": "默认登录提供者",
     "lastUsed": "最近使用",
     "redirectUri": "重定向 URI",
@@ -3996,11 +4009,18 @@
     "testMappingResult": "测试结果",
     "testMappingGroups": "找到的组",
     "testMappingNoGroups": "未找到组",
+    "testMappingAccessRefused": "Refused",
+    "testMappingGroupsUnreadable": "could not be read from the directory",
+    "testMappingRefusalAccountDisabled": "the account is disabled in the directory",
+    "testMappingRefusalGroupsUnreadable": "the groups could not be read",
+    "testMappingRefusalGroupDenied": "not a member of the required groups",
+    "testMappingRefusalUnmapped": "no role mapping rule matches",
+    "testMappingRefusalNoDefaultRole": "no role mapping rule and no default role",
+    "testMappingNotChecked": "Not checked here: the password, and the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic account creation turned off, an e-mail that belongs to an account of another provider).",
     "testMappingNotFound": "在LDAP中未找到用户",
     "testMappingResolvedRole": "解析的角色",
     "testMappingAccess": "登录访问",
     "testMappingAccessAllowed": "允许",
-    "testMappingAccessDenied": "拒绝（不在必需的组中）",
     "testMappingFailed": "映射测试失败",
     "oauth2Preset": "提供者预设",
     "oauth2PresetHelp": "选择预设以自动填充常见提供者的OAuth2/OIDC端点。",
@@ -4693,7 +4713,8 @@
         "template": "导出模板失败"
       },
       "hsm": {
-        "testFailed": "连接测试失败"
+        "testFailed": "连接测试失败",
+        "syncFailed": "密钥同步失败"
       },
       "https": {
         "applyFailed": "应用证书失败",
@@ -4822,7 +4843,12 @@
         "template": "模板导出成功"
       },
       "hsm": {
-        "connectionOk": "连接成功"
+        "connectionOk": "连接成功",
+        "keysSynced": "密钥已同步：新增 {{added}}，删除 {{removed}}，未变 {{unchanged}}",
+        "keysSyncedKept": "令牌上已不存在但因认证机构在使用而保留的密钥：{{count}}。",
+        "keysSyncedUnreadable": "令牌上无法读取的密钥：{{count}}。未删除任何密钥。",
+        "keysSyncedMissingKept": "列表中缺失但已保留的密钥：{{count}}。",
+        "keysSyncedChanged": "认证机构所用且其内容在令牌上已变化的密钥：{{count}}。"
       },
       "https": {
         "applied": "HTTPS 证书已应用，服务器将重启。",
@@ -5868,7 +5894,12 @@
       "allowAnyPrincipal": "允许任意主体",
       "allowAnyPrincipalHelp": "未列出任何主体时，为任意名称签名，包括 root。未启用此选项时，列表为空的 CA 不会签署任何证书。",
       "allowCustomKeyId": "允许请求者设置密钥 ID",
-      "allowCustomKeyIdHelp": "sshd 会将密钥 ID 记录为持有者的身份。未启用此选项时，CA 会将每个证书命名为 principals@CA 名称。"
+      "allowCustomKeyIdHelp": "sshd 会将密钥 ID 记录为持有者的身份。未启用此选项时，CA 会将每个证书命名为 principals@CA 名称。",
+      "keyStorageLockedHelp": "创建 CA 后无法更改 CA 密钥和 CA 类型。",
+      "hsmKeyHelper": "HSM 上的 SSH CA 使用未被其他认证机构占用的 RSA 或 ECDSA P-256/P-384/P-521 签名密钥。请在 HSM 管理中添加或同步密钥。",
+      "hsmNoUsableKeys": "此提供商没有空闲的 RSA 或 ECDSA 签名密钥。一个 HSM 密钥只能用于一个认证机构，X.509 或 SSH。",
+      "hsmDerivedKey": "来自 HSM 的密钥类型：{{keyType}}",
+      "hsmNeedsRead": "在 HSM 密钥上创建 SSH CA 需要 read:hsm 权限。"
     },
     "searchPlaceholder": "搜索 SSH CA...",
     "downloadSetupScript": "下载配置脚本",

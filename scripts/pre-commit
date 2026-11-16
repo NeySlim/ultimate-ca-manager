@@ -107,10 +107,11 @@ if [ "$VERSION_ONLY" = 0 ] && [ -n "$BACKEND_PY" ]; then
         esac
     done
     # Empty means empty: a bare pytest here would run the whole suite.
+    # Tests marked slow are left to the suites: a commit must not wait minutes for them.
     TARGETS=$(printf '%s\n' $TARGETS | grep . | sort -u | tr '\n' ' ')
     if [ "$(echo $TARGETS | wc -w)" -gt 0 ]; then
         echo -n "  Backend targeted tests ($(echo $TARGETS | wc -w) files)... "
-        BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest $TARGETS -q -x --tb=short -rfE -p no:cacheprovider 2>&1) || true
+        BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest $TARGETS -m "not slow and not ha" -q -x --tb=short -rfE -p no:cacheprovider 2>&1) || true
         BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
         # A file skipped as a whole (PG-only) ends on "N skipped": that is a pass.
         if echo "$BACK_RESULT" | grep -qE "[0-9]+ (passed|skipped|deselected|xfailed)" && ! echo "$BACK_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then

@@ -765,12 +765,13 @@ def test_an_in_place_renewal_and_the_merge_of_its_ca_record_do_not_deadlock(app,
 
 def _renewal_meets_the_repair(app, url, monkeypatch, cert_id, ca_id):
     """An in-place renewal of *cert_id* under *ca_id* paused holding its certificate row, then the
-    SKI/AKI repair run until it waits on a lock, then the renewal let go: (met, errors, stats)."""
+    SKI/AKI repair run until it waits on a lock, then the renewal let go and held after its
+    commit until the repair is over (the merge lands before it reads on): (met, errors, stats)."""
     from services.cert import renewal
     from services.ski_aki_backfill import backfill_ski_aki
-    holds, release = threading.Event(), threading.Event()
+    holds, release, repaired = threading.Event(), threading.Event(), threading.Event()
     errors, pids, stats = [], {}, []
-    reread = renewal._reread
+    reread, committed = renewal._reread, renewal.commit_or_rollback
 
     def pause_holding_the_row(*args):
         fresh = reread(*args)
@@ -779,6 +780,13 @@ def _renewal_meets_the_repair(app, url, monkeypatch, cert_id, ca_id):
             release.wait(30)
         return fresh
     monkeypatch.setattr(renewal, '_reread', pause_holding_the_row)
+
+    def commit_then_wait_for_the_repair(*args, **kwargs):
+        done = committed(*args, **kwargs)
+        if threading.current_thread().name == 'in-place':
+            repaired.wait(30)
+        return done
+    monkeypatch.setattr(renewal, 'commit_or_rollback', commit_then_wait_for_the_repair)
 
     def in_place():
         with app.app_context():
@@ -801,6 +809,7 @@ def _renewal_meets_the_repair(app, url, monkeypatch, cert_id, ca_id):
             except Exception as exc:  # noqa: BLE001
                 errors.append(('repair', repr(exc)))
             finally:
+                repaired.set()
                 db.session.remove()
                 engine.dispose()
 

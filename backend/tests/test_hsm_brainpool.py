@@ -52,7 +52,7 @@ def test_raw_signature_becomes_der_at_each_size(label):
     from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
     r, s = decode_dss_signature(der)
     raw = r.to_bytes(size, 'big') + s.to_bytes(size, 'big')
-    assert ecdsa_to_der(raw, coordinate_bytes(label)) == der
+    assert ecdsa_to_der(raw, coordinate_bytes(label), 'raw') == der
 
 
 def _provider_for(type_name):
@@ -212,7 +212,7 @@ def test_softhsm_generates_reads_and_signs_brainpool(softhsm, label):
                                     ('sha512', hashes.SHA512)):
             raw = provider.sign(info.key_identifier, b'tbs', label, hash_algorithm=hash_name)
             assert len(raw) == 2 * size
-            public_key.verify(ecdsa_to_der(raw, size), b'tbs', ec.ECDSA(hash_cls()))
+            public_key.verify(ecdsa_to_der(raw, size, 'raw'), b'tbs', ec.ECDSA(hash_cls()))
 
 
 @needs_softhsm

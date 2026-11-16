@@ -45,6 +45,75 @@ ucm_initial_admin_notice() {
     fi
 }
 
+# 78 (EX_CONFIG): a SQLite database the runner refuses (older than 2.254, or written by a
+# later release) stops the start before anything is written to the volume; any other
+# answer leaves the decision to the application. The database a path from before 2.70 still
+# holds is asked about too, before ucm_carry_old_data_paths copies it into the data.
+ucm_refuse_unstartable_database() {
+    local db out rc
+    ucm_ha_active && return 0
+    [ -n "${DATABASE_URL:-}" ] && return 0
+    for db in "$UCM_DATABASE_PATH" "$(ucm_old_database)"; do
+        [ -f "$db" ] || continue
+        rc=0
+        out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 DATABASE_URL= \
+            DATABASE_PATH="$db" python3 migration_runner.py check 2>&1) || rc=$?
+        case $rc in
+            4|6) ;;
+            *) continue ;;
+        esac
+        echo -e "${RED:-}❌ This release cannot start on $db:${NC:-}"
+        printf '%s\n' "$out" | sed -n '2,4p' | sed 's/^/   /'
+        echo "   Nothing was written to the volume. See UPGRADE.md, Upgrading to v3.0."
+        return 78
+    done
+}
+
+# The data directories of the images before 2.70, which some volumes are still mounted at
+ucm_old_data_paths() {
+    # shellcheck disable=SC2086  # a list of paths without spaces
+    printf '%s\n' ${UCM_OLD_DATA_PATHS:-/opt/ucm/backend/data /app/backend/data}
+}
+
+# The database ucm_carry_old_data_paths would copy into the data, if any, and only when the
+# application opens it there: with UCM_DATABASE_PATH elsewhere, that copy is never read
+ucm_old_database() {
+    local old data=${DATA_PATH:-/opt/ucm/data}
+    [ "$(realpath -m -- "${UCM_DATABASE_PATH:-$data/ucm.db}")" = "$(realpath -m -- "$data/ucm.db")" ] \
+        || return 0
+    [ ! -e "$data/ucm.db" ] || return 0
+    for old in $(ucm_old_data_paths); do
+        [ ! -f "$old/ucm.db" ] || { printf '%s\n' "$old/ucm.db"; return 0; }
+    done
+}
+
+# Copies into the data what a path from before 2.70 holds and the data lacks ('cas' is 'ca')
+ucm_carry_old_data_paths() {
+    local data=${DATA_PATH:-/opt/ucm/data} old item name sub
+    for old in $(ucm_old_data_paths); do
+        [ -d "$old" ] && [ -n "$(ls -A "$old" 2>/dev/null)" ] || continue
+        echo -e "${YELLOW:-}   Checking for data migration from $old...${NC:-}"
+        for item in "$old"/*; do
+            [ -e "$item" ] || continue
+            name=$(basename "$item")
+            [ "$name" != cas ] || name=ca
+            if [ ! -e "$data/$name" ]; then
+                echo -e "${YELLOW:-}   Migrating $(basename "$item") → $name...${NC:-}"
+                cp -a "$item" "$data/$name" 2>/dev/null || true
+            elif [ -d "$item" ] && [ -d "$data/$name" ]; then
+                for sub in "$item"/*; do
+                    [ -e "$sub" ] || continue
+                    if [ ! -e "$data/$name/$(basename "$sub")" ]; then
+                        echo -e "${YELLOW:-}   Migrating $name/$(basename "$sub")...${NC:-}"
+                        cp -a "$sub" "$data/$name/" 2>/dev/null || true
+                    fi
+                done
+            fi
+        done
+        echo -e "${GREEN:-}✅ Data migration complete${NC:-}"
+    done
+}
+
 # The database itself says whether this start upgrades it: a migration of the image missing from
 # its registry, or the serial step left to run again. Read-only; any doubt counts as an upgrade.
 # A WAL database is not opened: a read-only open would create its -wal and -shm files.

@@ -47,7 +47,7 @@ def _keeper(cas_with_ski):
     """The record the others merge into: parent link and key, then parent link, then key."""
     keeper = None
     for c in cas_with_ski:
-        if c.caref and c.prv:
+        if c.caref and c.has_private_key:
             keeper = c
             break
     if not keeper:
@@ -57,7 +57,7 @@ def _keeper(cas_with_ski):
                 break
     if not keeper:
         for c in cas_with_ski:
-            if c.prv:
+            if c.has_private_key:
                 keeper = c
                 break
     if not keeper:
@@ -88,10 +88,16 @@ def _merge_ca_group(db, cas_with_ski, stats):
             if c.caref:
                 keeper.caref = c.caref
                 break
-    if not keeper.prv:
+    if not keeper.has_private_key:
         for c in cas_with_ski:
             if c.prv:
                 keeper.prv = c.prv
+                break
+            if c.hsm_key_id:
+                # One HSM key, one CA (uq_ca_hsm_key_id): the duplicate lets go first
+                key_id, c.hsm_key_id = c.hsm_key_id, None
+                db.session.flush()
+                keeper.hsm_key_id = key_id
                 break
 
     for c in cas_with_ski:

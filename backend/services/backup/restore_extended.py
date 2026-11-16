@@ -27,7 +27,6 @@ from typing import Any, Dict, Optional
 from sqlalchemy import inspect as sa_inspect
 
 from models import db
-from config.settings import Config
 from utils.datetime_utils import to_naive_utc
 
 from .errors import BackupSchemaError
@@ -213,6 +212,62 @@ def _existing_row(section_name: str, identity: Dict[str, Any], plan: Optional[Re
     return next((row for row in rows if sa_inspect(row).identity[0] == taken), None)
 
 
+def _authority_name(authority):
+    from models import CA
+    if isinstance(authority, CA):
+        return f"X.509 CA '{authority.descr or ''}'"
+    return f"SSH {authority.ca_type} CA '{authority.descr or ''}'"
+
+
+def _refuse_a_taken_key(authority, taken):
+    """BackupSchemaError before the flush when another authority holds the X.509 or SSH CA's HSM key:
+    the unique index would refuse it with a database message naming neither authority."""
+    from models import CA
+    from models.ssh import SSHCertificateAuthority
+    from services.hsm import key_binding
+    if authority.hsm_key_id is None:
+        return
+    name = _authority_name(authority)
+    with db.session.no_autoflush:
+        x509 = CA.query.filter(CA.hsm_key_id == authority.hsm_key_id)
+        ssh = SSHCertificateAuthority.query.filter(SSHCertificateAuthority.hsm_key_id == authority.hsm_key_id)
+        if authority.id is not None:
+            if isinstance(authority, CA):
+                x509 = x509.filter(CA.id != authority.id)
+            else:
+                ssh = ssh.filter(SSHCertificateAuthority.id != authority.id)
+        held = [_authority_name(c) for c in x509] + [_authority_name(c) for c in ssh] \
+            + taken.get(authority.hsm_key_id, [])
+        if held:
+            raise BackupSchemaError(
+                f"Cannot restore the {name}: HSM key '{key_binding.label_of(authority.hsm_key_id)}' "
+                f"already backs the {held[0]}. An HSM key backs one authority only; nothing has been changed.")
+    taken.setdefault(authority.hsm_key_id, []).append(name)
+
+
+def refuse_archived_shared_keys(backup_data, plan):
+    """BackupSchemaError, before any write, when the archive itself gives one HSM key to two authorities."""
+    import json
+    by_key = {}
+    for section, describe in (('certificate_authorities', lambda r: f"X.509 CA '{r.get('descr') or ''}'"),
+                              ('ssh_cas', lambda r: f"SSH {r.get('ca_type') or 'user'} CA '{r.get('descr') or ''}'")):
+        for row in backup_data.get(section) or []:
+            if not isinstance(row, dict) or row.get('hsm_key_id') is None:
+                continue
+            ref = row.get(f'hsm_key_id{REFERENCE_SUFFIX}')
+            key = json.dumps(ref, sort_keys=True, default=str) if ref else f"#{row.get('hsm_key_id')}"
+            by_key.setdefault(key, (ref, row.get('hsm_key_id'), []))[2].append(describe(row))
+    for key, (ref, row_id, names) in by_key.items():
+        if len(names) < 2:
+            continue
+        label = f'#{row_id}'
+        if isinstance(ref, dict):
+            label = (plan._archived_row('hsm_keys', ref) or {}).get('label') or ref.get('key_identifier') or label
+        raise BackupSchemaError(
+            f"Cannot restore: the archive gives HSM key '{label}' to both the {names[0]} and the {names[1]}. "
+            "An HSM key backs one authority only; nothing has been changed.")
+
+
 class RestoreExtendedMixin:
     def _restore_ssh_cas(self, backup_data: Dict, results: Dict, master_key: bytes,
                          plan: Optional[RestorePlan] = None) -> None:
@@ -252,6 +307,7 @@ class RestoreExtendedMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('ssh_cas', plan)
 
+        taken = {}
         for sca_data in rows:
             refid = sca_data.get('refid')
             sca = _existing_row('ssh_cas', {'refid': refid})
@@ -291,6 +347,7 @@ class RestoreExtendedMixin:
                     ) from exc
             if prv:
                 sca.private_key = encrypt_private_key(prv)
+            _refuse_a_taken_key(sca, taken)
             results['ssh_cas'] += 1
 
         # One flush for the section, not a commit per row: the restore is one
@@ -672,31 +729,32 @@ class RestoreExtendedMixin:
 
         db.session.flush()
 
-    def _restore_https_files(self, backup_data: Dict, results: Dict,
-                             staged=None) -> None:
-        """Stage the HTTPS server certificate and key.
+    def _restore_https_files(self, backup_data: Dict, results: Dict, plan=None) -> None:
+        """The archive's HTTPS pair, stored in the restore's transaction for the next start.
 
-        Nothing is written where the server reads it until the database
-        transaction has committed: the pair used to be written in the middle
-        of the restore, so a failure afterwards left the server presenting a
-        certificate from an archive that was never applied. Failures are no
-        longer swallowed either — a restore that cannot place the key it was
-        asked to restore has not restored it.
+        Every node's gunicorn master writes it (boot_config.materialize_https): the
+        restore itself writes no file. Half a pair (the export skips a file it cannot
+        read) is left out with a warning: the HTTPS certificate in place is kept.
         """
         https_data = backup_data.get('https_server', {})
         if not https_data:
             return
-        if staged is None:
-            raise RuntimeError("HTTPS files must be staged, not written directly")
-
-        if https_data.get('cert_pem'):
-            staged.stage(Config.HTTPS_CERT_PATH,
-                         https_data['cert_pem'].encode(), mode=0o644)
-            results['https_server'] += 1
-        if https_data.get('key_pem'):
-            staged.stage(Config.HTTPS_KEY_PATH,
-                         https_data['key_pem'].encode(), mode=0o600)
-            results['https_server'] += 1
-        # A regenerated pair stored on the target would replace the restored one at start
+        cert_pem, key_pem = https_data.get('cert_pem'), https_data.get('key_pem')
+        if not cert_pem or not key_pem:
+            carried = ("neither its certificate nor its key" if not cert_pem and not key_pem
+                       else f"its {'certificate' if cert_pem else 'key'} without its "
+                            f"{'key' if cert_pem else 'certificate'}")
+            warning = ("the HTTPS certificate of the archive was not restored: the archive "
+                       f"carries {carried}; the HTTPS certificate in place is kept")
+            if plan is not None:
+                plan.warnings.append(warning)
+            else:
+                logger.warning("Restore: %s", warning)
+            return
+        import json
         from services import shared_files
+        shared_files.store_file(shared_files.HTTPS_RESTORED, json.dumps(
+            {'crt': cert_pem, 'key': key_pem}).encode('utf-8'), actor='restore')
+        results['https_server'] += 2
+        # A regenerated pair stored on the target would replace the restored one at start
         shared_files.drop_file(shared_files.HTTPS_GENERATED)

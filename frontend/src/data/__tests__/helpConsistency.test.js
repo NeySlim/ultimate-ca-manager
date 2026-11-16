@@ -38,11 +38,48 @@ describe('code blocks of the translated guides', () => {
   })
 })
 
-describe('French help wording', () => {
-  // "CA" is read "cé-a" and never elided: "la CA", "de la CA", not "l'CA" or "d'CA".
-  it('never elides an article before CA', () => {
-    const found = strings(entries.filter((e) => e.lang === 'fr').map((e) => e.page))
-      .flatMap((s) => s.match(/\b\w+\\?['’]CA\b.{0,20}/g) || [])
+describe('French wording of the certification authority', () => {
+  const fr = import.meta.glob('../../i18n/locales/fr.json', { eager: true })['../../i18n/locales/fr.json'].default
+  const frStrings = [
+    ...strings(fr),
+    ...strings(entries.filter((e) => e.lang === 'fr').map((e) => e.page)),
+  ]
+  // The French acronym is "AC"; "CA" stays only in these English technical terms, in code
+  // and in the example CA name of the import placeholder, kept as the English one.
+  const ENGLISH_TERMS = /CA\/Browser Forum|CA:(?:TRUE|FALSE)|CA Issuers|Global Root CA|Corp-Root-CA/g
+  // In a fenced block only the translated comments and the "(note)" after an address are French.
+  const prose = (block) => block.split('\n').map((l) => (l.match(/#.*$|\s{2,}\(.*\)$/) || [''])[0]).join('\n')
+  const uncoded = (s) => s.replace(/```[\s\S]*?```/g, prose).replace(/`[^`]*`/g, ' ').replace(ENGLISH_TERMS, ' ')
+  it('has no isolated "CA" in the interface and the help', () => {
+    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])CAs?(?![\p{L}\p{N}_]).{0,20}/gu) || [])
+    expect(found).toEqual([])
+  })
+  // Where English spells out "Certificate Authority", the French label spells out "autorité de certification".
+  it('spells out the long form wherever English does', () => {
+    const en = import.meta.glob('../../i18n/locales/en.json', { eager: true })['../../i18n/locales/en.json'].default
+    const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' ? flat(v, `${p}${k}.`) : [[p + k, v]]))
+    const frFlat = Object.fromEntries(flat(fr))
+    const found = flat(en)
+      .filter(([k, v]) => /certificate authorit/i.test(v) && !/autorité/i.test(frFlat[k] || ''))
+      .map(([k]) => k)
+    expect(found).toEqual([])
+  })
+  // The key ID template and the SSH CA types are written as the French screens show them.
+  it('has no English fragments around the AC in the SSH help', () => {
+    const found = frStrings.flatMap((s) => s.match(/AC name|User AC|Host AC|Production User/g) || [])
+    expect(found).toEqual([])
+  })
+  // "AC" is feminine and starts with a vowel: "l'AC", "d'AC", "cette AC", "toute AC", never "la AC", "tout AC", "l'CA".
+  it('elides and agrees the article before AC', () => {
+    const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])(?:la|le|de|du|ce|cet|au|un|sa|ma|ta|que|si|tout|nouveau|quel)\s+AC(?![\p{L}\p{N}_]).{0,20}|[\p{L}\p{N}_]+\\?['’]CA(?![\p{L}\p{N}_]).{0,20}/giu) || [])
+    expect(found).toEqual([])
+  })
+  // What the two guards above cannot see: a masculine adjective, a bare "AC" after a preposition, "CA" glued to a word.
+  it('agrees the adjective after AC and leaves no CA glued to a word', () => {
+    const masculine = /(?<![\p{L}])(?:une|cette|toute|l['’])\s?AC\s+(?:public|privé|émetteur|parent|subordonné|local|distant|compromis|révoqué|expiré|configuré|créé|importé|signé|supprimé|géré|lié|existant|actif|désactivé|sélectionné|utilisé|connu|inconnu|approuvé)s?(?![\p{L}]).{0,10}/giu
+    const bare = /(?<![\p{L}])(?:sur|vers|chez)\s+AC(?![\p{L}\p{N}_]).{0,20}|auprès d['’]AC Microsoft/giu
+    const glued = /\p{Ll}CA(?![\p{L}\p{N}_]).{0,20}|(?<![\p{L}])MS AC(?![\p{L}])/gu
+    const found = frStrings.flatMap((s) => [masculine, bare, glued].flatMap((re) => uncoded(s).match(re) || []))
     expect(found).toEqual([])
   })
 })
@@ -51,12 +88,21 @@ describe('SSO setup steps', () => {
   const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
   const guide = (lang) => (lang === 'en' ? helpGuides.sso : pages[`../help/${lang}/sso.js`].default.helpGuides).content
   // Settings > SSO shows one card per type with a Configure button; there is no "Add SSO Provider" button.
+  const oldLabel = { en: 'Add SSO Provider', fr: 'Ajouter un fournisseur SSO', ru: 'Добавить провайдера SSO', zh: '添加 SSO 提供者' }
   it.each(['en', 'fr', 'ru', 'zh'])('%s names the Configure button of each provider card', (lang) => {
     const { sso } = locales[`../../i18n/locales/${lang}.json`].default
     const text = guide(lang)
-    expect(text).not.toContain(sso.addProvider)
+    expect(text).not.toContain(oldLabel[lang])
     expect(text).toContain(`**${sso.configure}**`)
     for (const type of ['saml', 'oauth2', 'ldap']) expect(text).toContain(`**${sso[type]}**`)
+  })
+})
+
+describe('dead locale keys', () => {
+  const all = import.meta.glob('../../i18n/locales/*.json', { eager: true })
+  // The SSO page has one Configure button per provider card; no screen renders sso.addProvider.
+  it.each(Object.keys(all))('%s has no sso.addProvider', (path) => {
+    expect(all[path].default.sso).not.toHaveProperty('addProvider')
   })
 })
 
@@ -68,6 +114,17 @@ describe('values and buttons quoted by the translated pages', () => {
       .filter((s) => s.includes('name (2)') && !s.includes('name (3)') && /\(3\)/.test(s))
     expect(found).toEqual([])
   })
+  // The provider details have a Sync keys button; the SSH CA guide names the key storage and provider fields.
+  it.each(['en', 'fr', 'ru', 'zh'])('%s names the HSM Sync keys button and the SSH CA key fields', (lang) => {
+    const t = locales[`../../i18n/locales/${lang}.json`].default
+    const guide = (key) => (lang === 'en' ? helpGuides[key].content : pages[`../help/${lang}/${key}.js`].default.helpGuides.content)
+    expect(guide('hsm')).toContain(`**${t.common.syncKeys}**`)
+    for (const label of [t.cas.create.keyStorage, t.cas.create.hsmProvider, t.cas.create.hsmExistingKey, t.sshCas.createCA]) {
+      expect(guide('sshCas')).toContain(`**${label}**`)
+    }
+    const items = strings(page(lang, 'hsm').sections.flatMap((sec) => sec.items || []))
+    expect(items.join('\n')).toContain(t.common.syncKeys)
+  })
   // The HSM page creates a provider with its "New Provider" button.
   it.each(['en', 'fr', 'ru', 'zh'])('%s names the HSM New Provider button', (lang) => {
     const { hsm } = locales[`../../i18n/locales/${lang}.json`].default
@@ -77,15 +134,38 @@ describe('values and buttons quoted by the translated pages', () => {
 })
 
 describe('buttons named by the English help', () => {
-  // Labels not yet checked against their screen; every other "Click **X**" must be a label en.json holds.
-  const UNCHECKED = ['Issue', 'Duplicate', 'Generate Key']
+  // Every "Click **X**" must be a label en.json holds.
   const norm = (s) => s.replace(/\{\{\w+\}\}/g, 'N').replace(/^▶\s*/, '').trim().toLowerCase()
   it('cites only labels the interface shows', async () => {
     const en = (await import('../../i18n/locales/en.json')).default
     const labels = new Set(strings(en).map(norm))
     const cited = strings([helpContent, helpGuides])
       .flatMap((s) => [...s.matchAll(/\b[Cc]lick(?: on)? \*\*([^*]+)\*\*/g)].map((m) => m[1]))
-    expect([...new Set(cited)].filter((c) => !UNCHECKED.includes(c) && !labels.has(norm(c)))).toEqual([])
+    expect([...new Set(cited)].filter((c) => !labels.has(norm(c)))).toEqual([])
+  })
+})
+
+describe('buttons of the HSM, certificate and template guides in every language', () => {
+  const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
+  const guide = (lang, key) => (lang === 'en' ? helpGuides[key].content : pages[`../help/${lang}/${key}.js`].default.helpGuides.content)
+  it.each(['en', 'fr', 'ru', 'zh'])('%s quotes the Generate, Issue Certificate and Copy buttons as the screen shows them', (lang) => {
+    const t = locales[`../../i18n/locales/${lang}.json`].default
+    expect(guide(lang, 'hsm')).toContain(`**${t.common.generate}**`)
+    expect(guide(lang, 'certificates')).toContain(`**${t.certificates.issueCertificate}**`)
+    expect(guide(lang, 'templates')).toContain(`**${t.common.copy}**`)
+    const oldCopy = { en: 'Duplicate', fr: 'Dupliquer', ru: 'Дублировать' }[lang]
+    if (oldCopy) expect(guide(lang, 'templates')).not.toContain(`**${oldCopy}**`)
+    // The key generation modal opens with Generate; the former labels are gone from the steps.
+    const oldLabel = { en: 'Generate Key', fr: 'Générer une clé', ru: 'Сформировать ключ HSM', zh: '生成密钥' }[lang]
+    expect(guide(lang, 'hsm')).not.toContain(`**${oldLabel}**`)
+    if (lang === 'en') expect(guide(lang, 'certificates')).not.toMatch(/Click \*\*Issue\*\*/)
+  })
+  it.each(['en', 'fr', 'ru', 'zh'])('%s says the forced password prompt has Logout as its only other button', (lang) => {
+    const t = locales[`../../i18n/locales/${lang}.json`].default
+    const text = (lang === 'en' ? helpContent.account : pages[`../help/${lang}/account.js`].default.helpContent)
+    const forced = strings(text.sections).find((s) => s.includes('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE'))
+    expect(forced).toContain(t.common.logout)
+    expect(forced).toMatch({ en: /only other button is Logout/, fr: /seul autre bouton est Déconnexion/, ru: /только одна другая кнопка/, zh: /唯一的另一个按钮/ }[lang])
   })
 })
 
@@ -106,5 +186,46 @@ describe('screen labels quoted by every help language', () => {
     // Key regeneration and signature schemes have no control on screen: the help names the API.
     expect(help(lang, 'account').guide).toContain('/api/v2/account/apikeys/<id>/regenerate')
     expect(help(lang, 'policies').guide).toContain('`allowed_signature_schemes`')
+  })
+})
+
+describe('French CA creation button', () => {
+  const fr = import.meta.glob('../../i18n/locales/fr.json', { eager: true })['../../i18n/locales/fr.json'].default
+  it('the CA help quotes the button as the screen shows it', () => {
+    const text = JSON.stringify(pages['../help/fr/cas.js'].default)
+    expect(text).toContain(`**${fr.common.createCA}**`)
+    expect(text).not.toMatch(/Créer AC\b/)
+  })
+  it('the SSH CA help quotes the type labels of the form', () => {
+    const text = JSON.stringify(pages['../help/fr/sshCas.js'].default)
+    expect(text).toContain(`**${fr.sshCas.typeUser}** ou **${fr.sshCas.typeHost}**`)
+  })
+})
+
+describe('system template advice', () => {
+  const locales = import.meta.glob('../../i18n/locales/*.json', { eager: true })
+  // The Templates page offers a Copy button, never "duplicate"; per language: the former verb and the stem of the button label.
+  const verbs = {
+    en: [/duplicate/i, /copy/i], fr: [/dupliqu/i, /copi/i], ru: [/дублиру|продублиру/i, /копир/i], zh: [/复制/, /复制/],
+    de: [/duplizier/i, /kopier/i], es: [/dupl[ií]qu/i, /c[oó]pi/i], it: [/duplic/i, /copi/i], pt: [/dupliqu/i, /copi/i],
+    uk: [/дублікат/i, /копі/i], ja: [/複製/, /コピー/],
+  }
+  // both tooltips of a system template row: the Deactivate switch and the disabled Edit button
+  const tip = (lang) => ['deactivateTooltip', 'systemNotEditable']
+    .map((key) => locales[`../../i18n/locales/${lang}.json`].default.templates[key]).join('\n')
+  const help = (lang) => {
+    const page = lang === 'en' ? helpContent.templates : pages[`../help/${lang}/templates.js`].default.helpContent
+    return page.sections.flatMap((sec) => sec.items || []).filter((i) => /^(Deactivate|Désactiver|Деактивировать|停用)$/.test(i.label)).map((i) => i.text)
+  }
+  it.each(Object.keys(verbs))('%s tooltip advises the Copy button', (lang) => {
+    const [old, copy] = verbs[lang]
+    if (lang !== 'zh') expect(tip(lang)).not.toMatch(old)
+    expect(tip(lang)).toMatch(copy)
+  })
+  it.each(['en', 'fr', 'ru', 'zh'])('%s help advises the Copy button', (lang) => {
+    const [old, copy] = verbs[lang]
+    const text = help(lang).join('\n')
+    if (lang !== 'zh') expect(text).not.toMatch(old)
+    expect(text).toMatch(copy)
   })
 })

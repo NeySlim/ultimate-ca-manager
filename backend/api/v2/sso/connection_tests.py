@@ -3,7 +3,7 @@ from . import bp
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from .helpers import ldap_auto_bind, ldap_bind, _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password, _parse_json_field, _parse_group_list
+from .helpers import ldap_auto_bind, ldap_bind, _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password, _parse_json_field, _parse_group_list, _mapping_rules, group_match_key
 import ldap3
 from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
@@ -11,7 +11,8 @@ import ssl
 import logging
 import requests as http_requests
 from utils.datetime_utils import utc_isoformat
-from utils.dn_parse import get_dn_attribute, get_parent_dn
+from utils.dn_parse import (get_dn_attribute, get_parent_dn, parse_dn, stored_dn_attribute,
+                            _unescape_value)
 from utils.ssrf_protection import (
     safe_request_head, validate_url_not_cloud_metadata)
 
@@ -38,7 +39,9 @@ def _check_account_disabled(conn, user_entry, user_dn, provider, safe_username):
                     return True
 
         # 2. AD: check userAccountControl bit 2 (ACCOUNTDISABLE)
+        # An ldap3 Attribute: int() and comparisons need its value.
         uac = getattr(user_entry, 'userAccountControl', None)
+        uac = getattr(uac, 'value', uac)
         if uac is not None:
             try:
                 uac_val = int(uac)
@@ -59,7 +62,7 @@ def _check_account_disabled(conn, user_entry, user_dn, provider, safe_username):
                 return True
 
         # 4. Check for 'userAccountControl' string attribute (some LDAP servers)
-        uac_str = getattr(user_entry, 'userAccountControl', None)
+        uac_str = uac
         if uac_str is not None and not isinstance(uac_str, int):
             val = str(uac_str).lower()
             if val in ('disabled', 'inactive', 'negative'):
@@ -120,8 +123,211 @@ def _test_ldap_connection(provider):
         return error_response("LDAP connection failed. Check server address, port, and credentials.", 400)
 
 
-def _ldap_authenticate_user(provider, username, password):
-    """Authenticate user via LDAP with proper filter escaping"""
+# Returned when ``before_bind`` refused the entry: the user's password was not tried.
+ATTEMPT_REFUSED = 'attempt_refused'
+# Returned when the admission depends on groups the directory did not give.
+GROUPS_UNREADABLE = 'groups_unreadable'
+# Without a group filter, the membership clause alone selects the groups: an objectClass
+# guess would drop the kinds it does not name (groupOfNames, groupOfUniqueNames, AD group).
+DEFAULT_GROUP_FILTER = '(objectClass=*)'
+
+
+class LdapGroupsUnreadable(Exception):
+    """The directory did not answer a group read with success."""
+
+
+def _admission_needs_groups(provider):
+    return bool(_mapping_rules(provider)) or bool(_parse_group_list(provider.ldap_required_groups))
+
+
+def _service_connection(provider, server):
+    # check_names=False: attributes asked for may be missing from this server's schema
+    # (objectGUID on OpenLDAP, entryUUID on AD); the server returns the ones it has.
+    return ldap3.Connection(
+        server,
+        user=provider.ldap_bind_dn,
+        password=_decrypt_ldap_password(provider),
+        auto_bind=ldap_auto_bind(provider),
+        check_names=False,
+    )
+
+
+def _dn_key(dn):
+    return [sorted((t.casefold(), _unescape_value(v).strip().casefold()) for t, v in rdn)
+            for rdn in parse_dn(dn)]
+
+
+def _in_a_naming_context(server, dn):
+    """Whether ``dn`` lies in a naming context the server publishes (RFC 4512 §5.1);
+    a server that publishes none is given the benefit of the doubt."""
+    contexts = getattr(getattr(server, 'info', None), 'naming_contexts', None) or []
+    if isinstance(contexts, str):
+        contexts = [contexts]
+    keys = []
+    for context in contexts:
+        try:
+            keys.append(_dn_key(str(context)))
+        except ValueError:
+            continue
+    if not keys:
+        return True
+    target = _dn_key(dn)
+    return any(key and len(key) <= len(target) and target[len(target) - len(key):] == key
+               for key in keys)
+
+
+def _ldap_group_search_bases(provider, server):
+    """Bases tried in order: the explicit group base alone; else the parent of the base DN
+    (where 2.x searched) when this server holds it, then the base DN itself."""
+    explicit = (getattr(provider, 'ldap_group_base_dn', None) or '').strip()
+    if explicit:
+        return [explicit]
+    base_dn = provider.ldap_base_dn
+    try:
+        parent = get_parent_dn(base_dn)
+        if parent and _in_a_naming_context(server, parent):
+            return [parent, base_dn]
+    except ValueError:
+        pass
+    return [base_dn]
+
+
+def _search_succeeded(conn, what):
+    """Only a success result is an answer: noSuchObject, a referral or a limit is not."""
+    result = conn.result or {}
+    if result.get('result') != 0:
+        raise LdapGroupsUnreadable(
+            f"{what}: {result.get('description') or result.get('result')} "
+            f"{result.get('message') or ''}".strip())
+
+
+def _ldap_read_groups(provider, server, user_dn):
+    """Names of the groups ``user_dn`` is a direct member of, the same for the login and
+    the mapping test. Raises LdapGroupsUnreadable rather than answer an empty list."""
+    member_attr = (provider.ldap_group_member_attr or 'member').strip().lower()
+    try:
+        conn = _service_connection(provider, server)
+        try:
+            if member_attr == 'memberof':
+                # memberOf of the entry itself: any directory, no AD-only distinguishedName.
+                conn.search(user_dn, '(objectClass=*)', search_scope=ldap3.BASE,
+                            attributes=['memberOf'])
+                _search_succeeded(conn, 'memberOf read')
+                if not conn.entries:
+                    raise LdapGroupsUnreadable('memberOf read: the user entry was not returned')
+                entry = conn.entries[0]
+                if not hasattr(entry, 'memberOf'):
+                    return []
+                values = entry.memberOf.values if hasattr(entry.memberOf, 'values') \
+                    else [str(entry.memberOf)]
+                groups = []
+                for group_dn in values:
+                    # A value the strict parser refuses (an unescaped '=', RFC 4514 §3) is read
+                    # leniently; one that names no group costs that group only, not the others.
+                    try:
+                        name = get_dn_attribute(str(group_dn), 'CN')
+                    except ValueError:
+                        name = stored_dn_attribute(str(group_dn), ('cn', '2.5.4.3'))
+                        if name is None:
+                            logger.warning(f"LDAP memberOf value skipped, not a DN: {str(group_dn)[:200]!r}")
+                    if name is not None:
+                        groups.append(name)
+                return groups
+            gf = (provider.ldap_group_filter or '').strip() or DEFAULT_GROUP_FILTER
+            if not gf.startswith('('):
+                gf = f'({gf})'
+            group_filter = f'(&{gf}({member_attr}={escape_filter_chars(user_dn)}))'
+            failures = []
+            for base in _ldap_group_search_bases(provider, server):
+                try:
+                    conn.search(base, group_filter, search_scope=ldap3.SUBTREE, attributes=['cn'])
+                    _search_succeeded(conn, f'group search under {base}')
+                except (LdapGroupsUnreadable, ldap3.core.exceptions.LDAPOperationResult) as e:
+                    failures.append(str(e) or type(e).__name__)
+                    continue
+                if failures:
+                    logger.info(f"LDAP groups read under {base} after a refused search: {failures[0][:200]}")
+                return [str(entry.cn) for entry in conn.entries if hasattr(entry, 'cn')]
+            raise LdapGroupsUnreadable('; '.join(failures))
+        finally:
+            conn.unbind()
+    except LdapGroupsUnreadable:
+        raise
+    except Exception as e:
+        raise LdapGroupsUnreadable(str(e) or type(e).__name__) from e
+
+
+def _ldap_entry_groups(provider, server, user_dn, username):
+    """``(groups, error)``: read whenever the admission or the group filter asks for them."""
+    if not (_admission_needs_groups(provider) or (provider.ldap_group_filter or '').strip()):
+        return [], None
+    try:
+        groups = _ldap_read_groups(provider, server, user_dn)
+    except LdapGroupsUnreadable as e:
+        logger.warning(f"LDAP groups of {username} could not be read: {e}")
+        return [], str(e)
+    logger.info(f"LDAP groups for {username}: {groups}")
+    return groups, None
+
+
+def _ldap_entry_refusal(provider, user_entry, user_dn, safe_username, groups, groups_error):
+    """The directory's reason to refuse this entry, or None; the mapping rules come after."""
+    if _check_account_disabled(None, user_entry, user_dn, provider, safe_username):
+        return 'account_disabled'
+    if groups_error is not None and _admission_needs_groups(provider):
+        return GROUPS_UNREADABLE
+    group_list = _parse_group_list(provider.ldap_required_groups)
+    if group_list:
+        key = group_match_key(provider)
+        user_groups = {key(g) for g in groups}
+        if not any(key(g) in user_groups for g in group_list):
+            logger.info(
+                f"LDAP login denied for {safe_username}: not in required groups {group_list}, "
+                f"user groups: {groups}"
+            )
+            return 'group_denied'
+    return None
+
+
+def _ldap_find_user(provider, server, username):
+    """The directory entry the user filter finds for ``username``, or None."""
+    conn = _service_connection(provider, server)
+    try:
+        user_filter = provider.ldap_user_filter.replace('{username}', escape_filter_chars(username))
+        # All normal (*) and operational (+) attributes: the immutable id wherever it lives
+        # (entryUUID on OpenLDAP, objectGUID on AD) and the disabled-check attributes.
+        conn.search(provider.ldap_base_dn, user_filter, attributes=['*', '+'])
+        return conn.entries[0] if conn.entries else None
+    finally:
+        conn.unbind()
+
+
+def _ldap_entry_identity(provider, user_entry, username):
+    """dn, stable uid, username, email and full name the directory entry carries."""
+    stable_uid = None
+    for attr in ([provider.ldap_uid_attr] if getattr(provider, 'ldap_uid_attr', None)
+                 else ['objectGUID', 'entryUUID']):
+        try:
+            raw = getattr(user_entry, attr).value
+        except Exception:
+            raw = None
+        if raw:
+            stable_uid = raw.hex() if isinstance(raw, (bytes, bytearray)) else str(raw).strip()
+            break
+    return {
+        'dn': user_entry.entry_dn,
+        'uid': stable_uid,  # immutable id (None → matching falls back to dn/username)
+        'username': str(getattr(user_entry, provider.ldap_username_attr, username)),
+        'email': str(getattr(user_entry, provider.ldap_email_attr, '')),
+        'fullname': str(getattr(user_entry, provider.ldap_fullname_attr, '')),
+    }
+
+
+def _ldap_authenticate_user(provider, username, password, before_bind=None):
+    """Authenticate user via LDAP with proper filter escaping.
+
+    ``before_bind(identity)`` runs once the entry is found and before the user's bind;
+    a falsy answer returns (None, ATTEMPT_REFUSED) without trying the password."""
     try:
         import ldap3
         from ldap3 import Server, Connection, ALL, Tls
@@ -136,47 +342,16 @@ def _ldap_authenticate_user(provider, username, password):
             get_info=ALL
         )
 
-        # First bind as service account.
-        # check_names=False: we may request immutable-id attributes that don't
-        # exist in this server's schema (objectGUID on AD vs entryUUID on
-        # OpenLDAP) — the server simply returns the ones it has instead of
-        # ldap3 raising "invalid attribute type".
-        conn = Connection(
-            server,
-            user=provider.ldap_bind_dn,
-            password=_decrypt_ldap_password(provider),
-            auto_bind=ldap_auto_bind(provider),
-            check_names=False,
-        )
-
         # SECURITY: Escape username to prevent LDAP injection
         safe_username = escape_filter_chars(username)
-
-        # Search for user with escaped filter
-        user_filter = provider.ldap_user_filter.replace('{username}', safe_username)
-        # Fetch disabled-check attributes so _check_account_disabled works
-        extra_attrs = []
-        if provider.account_status_attr:
-            extra_attrs.append(provider.account_status_attr)
-        # Request all normal (*) and operational (+) attributes. This returns the
-        # immutable id wherever it lives — entryUUID (operational, OpenLDAP) or
-        # objectGUID (normal, AD) — without naming an attribute that may not exist
-        # in this schema (which makes ldap3 raise "invalid attribute type").
-        conn.search(
-            provider.ldap_base_dn,
-            user_filter,
-            attributes=['*', '+'],
-        )
-
-        if not conn.entries:
-            conn.unbind()
+        user_entry = _ldap_find_user(provider, server, username)
+        if user_entry is None:
             return None, "Invalid credentials"
-
-        user_entry = conn.entries[0]
         user_dn = user_entry.entry_dn
+        identity = _ldap_entry_identity(provider, user_entry, username)
 
-        # Close service account connection
-        conn.unbind()
+        if before_bind is not None and not before_bind(dict(identity)):
+            return None, ATTEMPT_REFUSED
 
         # Attempt to bind as the user to verify password
         user_conn = Connection(
@@ -190,117 +365,13 @@ def _ldap_authenticate_user(provider, username, password):
 
         user_conn.unbind()
 
-        # Fetch user's groups for role mapping
-        groups = []
-        if provider.ldap_group_filter:
-            member_attr = (provider.ldap_group_member_attr or 'member').strip().lower()
-            try:
-                if member_attr == 'memberof':
-                    # Method: read memberOf attribute from user entry (AD style)
-                    memberof_conn = Connection(
-                        server,
-                        user=provider.ldap_bind_dn,
-                        password=_decrypt_ldap_password(provider),
-                        auto_bind=ldap_auto_bind(provider)
-                    )
-                    safe_dn = escape_filter_chars(user_dn)
-                    memberof_conn.search(
-                        provider.ldap_base_dn,
-                        f'(distinguishedName={safe_dn})',
-                        attributes=['memberOf']
-                    )
-                    if not memberof_conn.entries:
-                        # Fallback: search by user filter
-                        safe_un = escape_filter_chars(username)
-                        uf = provider.ldap_user_filter.replace('{username}', safe_un)
-                        memberof_conn.search(provider.ldap_base_dn, uf, attributes=['memberOf'])
+        groups, groups_error = _ldap_entry_groups(provider, server, user_dn, username)
+        refusal = _ldap_entry_refusal(provider, user_entry, user_dn, safe_username,
+                                      groups, groups_error)
+        if refusal:
+            return None, refusal
 
-                    if memberof_conn.entries:
-                        entry = memberof_conn.entries[0]
-                        if hasattr(entry, 'memberOf'):
-                            group_dns = entry.memberOf.values if hasattr(entry.memberOf, 'values') else [str(entry.memberOf)]
-                            # Extract CN from each group DN without breaking
-                            # escaped separators or multivalued RDNs.
-                            for group_dn in group_dns:
-                                common_name = get_dn_attribute(str(group_dn), 'CN')
-                                if common_name is not None:
-                                    groups.append(common_name)
-                    memberof_conn.unbind()
-                    logger.info(f"LDAP memberOf groups for {username}: {groups}")
-                else:
-                    # Method: search groups where member/uniqueMember = user_dn (OpenLDAP style)
-                    group_conn = Connection(
-                        server,
-                        user=provider.ldap_bind_dn,
-                        password=_decrypt_ldap_password(provider),
-                        auto_bind=ldap_auto_bind(provider)
-                    )
-                    group_base = get_parent_dn(provider.ldap_base_dn) or provider.ldap_base_dn
-                    # Ensure group_filter has parentheses
-                    gf = provider.ldap_group_filter.strip()
-                    if not gf.startswith('('):
-                        gf = f'({gf})'
-                    safe_dn = escape_filter_chars(user_dn)
-                    group_filter = f'(&{gf}({member_attr}={safe_dn}))'
-                    group_conn.search(group_base, group_filter, attributes=['cn'])
-                    groups = [str(entry.cn) for entry in group_conn.entries if hasattr(entry, 'cn')]
-                    group_conn.unbind()
-                    logger.info(f"LDAP {member_attr} groups for {username}: {groups}")
-            except Exception as e:
-                logger.warning(f"Failed to fetch LDAP groups for {username}: {e}")
-
-        # ── Check for disabled account ─────────────────────────────────────
-        disabled = _check_account_disabled(
-            conn, user_entry, user_dn, provider, safe_username
-        )
-        if disabled:
-            conn.unbind()
-            return None, 'account_disabled'
-
-        # ── Check required groups (default-deny) ───────────────────────────
-        group_list = _parse_group_list(provider.ldap_required_groups)
-        if group_list:
-            if groups:
-                # Check if user belongs to ANY of the required groups
-                # (case-insensitive: AD group names are not case-sensitive)
-                user_groups_lower = {g.lower() for g in groups}
-                allowed = any(g.lower() in user_groups_lower for g in group_list)
-                if not allowed:
-                    logger.info(
-                        f"LDAP login denied for {username}: not in required groups {group_list}, "
-                        f"user groups: {groups}"
-                    )
-                    conn.unbind()
-                    return None, 'group_denied'
-            else:
-                logger.info(
-                    f"LDAP login denied for {username}: no groups fetched, "
-                    f"required groups: {group_list}"
-                )
-                conn.unbind()
-                return None, 'group_denied'
-
-        # Immutable id for stable account matching (entryUUID/objectGUID).
-        stable_uid = None
-        for attr in ([provider.ldap_uid_attr] if getattr(provider, 'ldap_uid_attr', None)
-                     else ['objectGUID', 'entryUUID']):
-            try:
-                raw = getattr(user_entry, attr).value
-            except Exception:
-                raw = None
-            if raw:
-                stable_uid = raw.hex() if isinstance(raw, (bytes, bytearray)) else str(raw).strip()
-                break
-
-        # Return user info
-        return {
-            'dn': user_dn,
-            'uid': stable_uid,  # immutable id (None → matching falls back to dn/username)
-            'username': str(getattr(user_entry, provider.ldap_username_attr, username)),
-            'email': str(getattr(user_entry, provider.ldap_email_attr, '')),
-            'fullname': str(getattr(user_entry, provider.ldap_fullname_attr, '')),
-            'groups': groups
-        }, None
+        return dict(identity, groups=groups), None
 
     except ImportError:
         return None, "LDAP library not installed"

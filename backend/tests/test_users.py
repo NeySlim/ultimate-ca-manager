@@ -799,11 +799,11 @@ class TestLinkSSO:
         assert data['auth_source'] == 'ldap'
         assert data['sso_provider_id'] == pid
 
-        # Linking again is rejected
+        # Linking again resets the stable identity (SSO-03): it is the remedy
         r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
                              data=json.dumps({'provider_id': pid}),
                              content_type='application/json')
-        assert_error(r, 400)
+        assert assert_success(r)['sso_external_id'] is None
 
         # Unlink → back to local
         r = auth_client.post(f'/api/v2/users/{uid}/unlink-sso')

@@ -22,6 +22,7 @@ from utils.process_lock import (  # noqa: F401  (_local: the test suite resets i
     LockBusyError,
     _local,
     lock_depth,
+    lock_held,
     process_lock,
 )
 
@@ -58,6 +59,11 @@ def operation_lock_path() -> Path:
     return Path(Config.BACKUP_DIR) / LOCK_NAME
 
 
+def operation_lock_held() -> bool:
+    """Whether this thread holds the backup lock for real, not fail-open."""
+    return lock_held(operation_lock_path())
+
+
 def operation_lock_depth() -> int:
     """How many nested backup blocks this thread currently holds."""
     return lock_depth(operation_lock_path())
@@ -75,5 +81,5 @@ def backup_operation_lock(*, timeout: float = 0, purpose: str = 'backup',
     """
     with process_lock(operation_lock_path(), timeout=timeout, purpose=purpose,
                       subject=_SUBJECT, busy_error=BackupBusyError,
-                      fail_open=fail_open):
+                      fail_open=fail_open, where='the backup directory'):
         yield

@@ -83,6 +83,9 @@ def _drop_pg_schema(admin, engine, name):
 def make_base(dialect, tmp_path, monkeypatch, label, sql=None):
     """Context generator: a database of *dialect* holding *sql* (default: the 2.254 fixture)."""
     sql = schema_2254(dialect) if sql is None else sql
+    # The node being upgraded has a data directory of its own, never created: no keytab an
+    # earlier test left on disk, and nothing added to what the test lists in tmp_path
+    monkeypatch.setattr('config.settings.DATA_DIR', tmp_path / f'{label}-data')
     if dialect == 'sqlite':
         path = tmp_path / f'{label}.db'
         conn = sqlite3.connect(path)

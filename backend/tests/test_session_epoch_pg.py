@@ -5,7 +5,7 @@ import threading
 import uuid
 
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, text
 
 from auth.session_epoch import EPOCH_KEY, advance_epoch, current_epoch
 from models import SystemConfig, db
@@ -22,6 +22,27 @@ def test_the_first_advance_creates_the_row_and_the_next_one_counts(app):
         assert advance_epoch() == 1
         assert advance_epoch() == 2
         assert SystemConfig.query.filter_by(key=EPOCH_KEY).count() == 1
+
+
+def test_an_advance_returns_the_epoch_it_stored_not_a_later_one(app):
+    """Another node advancing right after this commit does not change what this call returns."""
+    with app.app_context():
+        before = advance_epoch()
+        session = db.session()
+
+        def another_node_advances(_session):
+            with db.engine.connect() as conn:
+                conn.execute(text("UPDATE system_config SET value = '9999' WHERE key = :key"),
+                             {'key': EPOCH_KEY})
+                conn.commit()
+
+        event.listen(session, 'after_commit', another_node_advances, once=True)
+        try:
+            assert advance_epoch() == before + 1
+        finally:
+            db.session.remove()
+            SystemConfig.query.filter_by(key=EPOCH_KEY).update({'value': str(before + 1)})
+            db.session.commit()
 
 
 def _race(app, url):

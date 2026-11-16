@@ -275,6 +275,7 @@
     "source": "ソース",
     "addDnsProvider": "プロバイダーを追加",
     "test": "テスト",
+    "syncKeys": "鍵を同期",
     "dnsProviderTestFailed": "接続テストに失敗しました",
     "providerName": "プロバイダー名",
     "providerType": "プロバイダータイプ",
@@ -622,6 +623,8 @@
     "samlLoginExpired": "このサインインは期限切れか、別のタブまたはブラウザーで開始されました。このページからやり直してください。",
     "ssoUsernameConflict": "このサインインは、ローカルまたは別の ID にリンクされた既存のアカウントと一致します。管理者にアカウントのリンクを依頼してください。",
     "ssoUnmapped": "アクセスが拒否されました。このサインインプロバイダーのロールマッピングルールのいずれもあなたのアカウントに一致しません。管理者に連絡してください。",
+    "ssoNoDefaultRole": "Access denied: this sign-in provider has no default role and no role mapping rule. Contact your administrator.",
+    "ssoEmailConflict": "Sign-in refused: another account already uses the email address of this sign-in. Contact your administrator.",
     "samlLogoutRejected": "ID プロバイダーからのサインアウト要求を検証できませんでした。サインインしたままです。",
     "tooManyAttempts": "失敗した試行が多すぎます",
     "retryAfterSeconds": "{{seconds}}秒後にもう一度お試しください。",
@@ -1083,7 +1086,8 @@
       "noSchemeAllowedByProfile": "この鍵では、コンプライアンスプロファイルで許可されている RSA 署名方式がありません。",
       "profileRequiresHsm": "このプロファイルでは、CA 鍵を HSM に保管する必要があります。",
       "profileHorizon": "コンプライアンスプロファイルは {{key}} を {{date}} まで認めており、この CA はそれより長く存続します。",
-      "noDigestAllowedByPolicy": "この CA に適用されるポリシーで許可されている署名ハッシュはありません。"
+      "noDigestAllowedByPolicy": "この CA に適用されるポリシーで許可されている署名ハッシュはありません。",
+      "hsmNeedsRead": "HSMキー上にCAを作成するには、read:hsm権限が必要です。"
     },
     "detail": {
       "hsmBacked": "HSM バック",
@@ -1304,7 +1308,7 @@
     "customTemplates": "カスタム",
     "systemDescription": "組み込み。編集と削除はできません",
     "customDescription": "ここで作成。編集と削除ができます",
-    "systemNotEditable": "システムテンプレートは編集できません。複製してカスタムのコピーを作成してください。",
+    "systemNotEditable": "システムテンプレートは編集できません。コピーしてカスタム版を作成してください。",
     "systemNotDeletable": "システムテンプレートは削除できません。",
     "defaultValidity": "デフォルト有効期間（日数）",
     "maxValidityHint": "このテンプレートで発行する証明書の有効期間に上限を設けるには、発行ポリシー（ポリシー、最大有効期間）を使用してください。",
@@ -1395,7 +1399,7 @@
     "activate": "有効化",
     "activated": "テンプレートを有効化しました",
     "deactivated": "テンプレートを無効化しました",
-    "deactivateTooltip": "無効化したテンプレートは、証明書の発行フォームにも Windows 自動登録にも提供されません。システムテンプレートは無効化はできますが編集はできません。変更するには複製してください。"
+    "deactivateTooltip": "無効化したテンプレートは、証明書の発行フォームにも Windows 自動登録にも提供されません。システムテンプレートは無効化はできますが編集はできません。変更するにはコピーしてください。"
   },
   "users": {
     "securityKeys": {
@@ -1448,6 +1452,13 @@
       "ssoUsernameHelp": "ID プロバイダーが送信するユーザー名。既定は現在の値です。SSO ログインが異なる場合は変更してください。",
       "linkSuccess": "{{name}} をシングルサインオンにリンクしました",
       "linkFailed": "アカウントを SSO にリンクできませんでした",
+      "relink": "Change provider or reset SSO identity",
+      "relinkTitle": "Change the provider of {{name}} or reset its SSO identity",
+      "relinkHelp": "Choose the provider this account signs in through: another one moves it there, the same one resets its SSO identity. The next sign-in through that provider with this username or email binds the new identity. A password the account has is kept unless you tick the box below.",
+      "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
+      "confirmRelink": "Attach {{name}} to {{provider}}? Its current SSO identity is cleared, and the next sign-in through this provider binds a new one.",
+      "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
+      "relinkKeepsNoPassword": "Its API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "{{name}} のシングルサインオンのリンクを解除し、ローカルアカウントに戻しますか？",
       "unlinkSuccess": "{{name}} をローカルアカウントに変換しました",
       "unlinkFailed": "アカウントのリンクを解除できませんでした"
@@ -3859,7 +3870,8 @@
       "firmwareVersion": "ファームウェアのバージョン",
       "notRead": "接続をテストして、モジュールが報告する情報を読み取ります。",
       "softhsmFips": "SoftHSM は検証済みモジュールではありません。FIPS モードでは、その上の鍵は FIPS で保護されません。"
-    }
+    },
+    "syncingKeys": "同期中..."
   },
   "sso": {
     "subtitle": "LDAP、OAuth2、SAMLプロバイダーを設定して一元認証",
@@ -3922,7 +3934,6 @@
     "configuredProviders": "設定済みプロバイダー",
     "acsUrl": "アサーションコンシューマーサービス（ACS）URL",
     "acsUrlDesc": "認証後にIdPがSAMLアサーションを送信する先",
-    "addProvider": "SSOプロバイダーを追加",
     "attributeMapping": "属性マッピング",
     "attributeMappingHelp": "左列はプロバイダーが送信する属性名、右列はそれが設定されるUCMのフィールド（username、email、fullname、groups）です。例: user.userprincipalname → username。",
     "callbackUrls": "コールバックURL",
@@ -3935,6 +3946,8 @@
     "uidAttrHelp": "ユーザー名／メール変更後もアカウントを識別するための不変のディレクトリ ID（entryUUID / objectGUID）。空欄で自動検出。",
     "groupFilter": "グループフィルター",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, then the base DN if that search is refused; else the base DN.",
     "isDefault": "デフォルトログインプロバイダー",
     "lastUsed": "最終使用日時",
     "redirectUri": "リダイレクトURI",
@@ -3999,11 +4012,18 @@
     "testMappingResult": "テスト結果",
     "testMappingGroups": "見つかったグループ",
     "testMappingNoGroups": "グループが見つかりません",
+    "testMappingAccessRefused": "Refused",
+    "testMappingGroupsUnreadable": "could not be read from the directory",
+    "testMappingRefusalAccountDisabled": "the account is disabled in the directory",
+    "testMappingRefusalGroupsUnreadable": "the groups could not be read",
+    "testMappingRefusalGroupDenied": "not a member of the required groups",
+    "testMappingRefusalUnmapped": "no role mapping rule matches",
+    "testMappingRefusalNoDefaultRole": "no role mapping rule and no default role",
+    "testMappingNotChecked": "Not checked here: the password, and the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic account creation turned off, an e-mail that belongs to an account of another provider).",
     "testMappingNotFound": "LDAPでユーザーが見つかりません",
     "testMappingResolvedRole": "解決されたロール",
     "testMappingAccess": "ログインアクセス",
     "testMappingAccessAllowed": "許可",
-    "testMappingAccessDenied": "拒否（必須グループに属していません）",
     "testMappingFailed": "マッピングテスト失敗",
     "oauth2Preset": "プロバイダープリセット",
     "oauth2PresetHelp": "プリセットを選択して、一般的なプロバイダーのOAuth2/OIDCエンドポイントを自動入力します。",
@@ -4696,7 +4716,8 @@
         "template": "テンプレートのエクスポートに失敗しました"
       },
       "hsm": {
-        "testFailed": "接続テストに失敗しました"
+        "testFailed": "接続テストに失敗しました",
+        "syncFailed": "鍵の同期に失敗しました"
       },
       "https": {
         "applyFailed": "証明書の適用に失敗しました",
@@ -4825,7 +4846,12 @@
         "template": "テンプレートがエクスポートされました"
       },
       "hsm": {
-        "connectionOk": "接続に成功しました"
+        "connectionOk": "接続に成功しました",
+        "keysSynced": "鍵を同期しました: 新規 {{added}}、削除 {{removed}}、変更なし {{unchanged}}",
+        "keysSyncedKept": "トークンに存在しませんが、認証局が使用しているため保持されたキー: {{count}}。",
+        "keysSyncedUnreadable": "トークン上で読み取れなかったキー: {{count}}。キーは削除されていません。",
+        "keysSyncedMissingKept": "一覧になく保持されたキー: {{count}}。",
+        "keysSyncedChanged": "認証局が使用しているキーのうち、トークン上で内容が変わったもの: {{count}}。"
       },
       "https": {
         "applied": "HTTPS証明書が適用されました。サーバーが再起動します。",
@@ -5871,7 +5897,12 @@
       "allowAnyPrincipal": "任意のプリンシパルを許可",
       "allowAnyPrincipalHelp": "プリンシパルが一つも指定されていない場合、root を含む任意の名前に署名します。このオプションがなければ、リストが空の CA は何も署名しません。",
       "allowCustomKeyId": "リクエスタによる鍵IDの指定を許可",
-      "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。"
+      "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。",
+      "keyStorageLockedHelp": "CAキーとCAタイプはCA作成後に変更できません。",
+      "hsmKeyHelper": "HSM上のSSH CAは、他の認証局が使用していないRSAまたはECDSA P-256/P-384/P-521の署名キーを使います。HSM管理でキーを追加または同期してください。",
+      "hsmNoUsableKeys": "このプロバイダーには空いているRSAまたはECDSA署名キーがありません。HSMキーは、X.509またはSSHのいずれか1つの認証局にのみ使われます。",
+      "hsmDerivedKey": "HSMからのキータイプ: {{keyType}}",
+      "hsmNeedsRead": "HSMキー上にSSH CAを作成するには、read:hsm権限が必要です。"
     },
     "searchPlaceholder": "SSH CAを検索...",
     "downloadSetupScript": "セットアップスクリプトをダウンロード",

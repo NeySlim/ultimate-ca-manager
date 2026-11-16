@@ -465,11 +465,12 @@ def test_the_standard_install_is_unchanged(tmp_path):
 def _systemd(tmp_path, bin_dir, record, state='active', hold_stop=None):
     """A booted systemd whose systemctl logs each call, with the venv's content at that moment.
 
-    With hold_stop, `stop` stops ucm, creates that file and waits to be killed."""
+    With hold_stop, `stop` stops ucm, creates that file and waits to be killed: one process (exec),
+    since a shell loop outlives a SIGINT that misses its child of the moment."""
     (tmp_path / 'run-systemd').mkdir()
     (tmp_path / 'ucm-state').write_text(state)
     venv = tmp_path / 'opt' / 'venv'
-    hold = f'touch {hold_stop}; while :; do {shutil.which("sleep")} 0.05; done' if hold_stop else ':'
+    hold = f'touch {hold_stop}; exec {shutil.which("sleep")} 600' if hold_stop else ':'
     _stub(bin_dir / 'systemctl', f"""echo "SYSTEMCTL $* [$({shutil.which('ls')} {venv} 2>/dev/null | tr '\\n' ' ')]" >> {record}
 state=$(cat {tmp_path}/ucm-state)
 case "$1" in
@@ -478,6 +479,27 @@ case "$1" in
   start|restart) echo active > {tmp_path}/ucm-state ;;
 esac""")
     return {'PATH': str(bin_dir), 'UCM_SETUP_SYSTEMD_RUN': str(tmp_path / 'run-systemd')}
+
+
+def test_a_held_stop_dies_of_a_sigint_its_shell_alone_receives(tmp_path):
+    """A shell loop survives SIGINT when its current child does not get it (bash waits for the
+    child to die of it first); a group signal lands so whenever the child is between fork and exec."""
+    bin_dir = tmp_path / 'bin'
+    held = tmp_path / 'held'
+    _systemd(tmp_path, bin_dir, tmp_path / 'record', hold_stop=held)
+    proc = subprocess.Popen([str(bin_dir / 'systemctl'), 'stop', 'ucm'], start_new_session=True,
+                            preexec_fn=_default_signals)
+    try:
+        _wait_for(held, proc)
+        time.sleep(0.2)
+        os.kill(proc.pid, signal.SIGINT)
+        assert proc.wait(timeout=5) == -signal.SIGINT
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait()
 
 
 def _calls(record):
@@ -776,7 +798,7 @@ def _systemctl_lines(record):
 
 
 RESTARTED = ['SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]',
-             'SYSTEMCTL start ucm [bin good ]']
+             'SYSTEMCTL reset-failed ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
 
 
 @pytest.mark.parametrize('trigger', ['pip fails', 'SIGHUP', 'SIGHUP after the switch', 'new venv fails'])
@@ -1250,3 +1272,38 @@ def test_the_banner_names_the_configured_administrator(tmp_path):
     result = _sourced_banner(tmp_path, 'INITIAL_ADMIN_USERNAME=operator\n')
     assert result.returncode == 0, result.stderr
     assert ' Admin:    operator' in result.stdout
+
+
+# ----------------------------------------------------------------- without hostname
+
+def _path_without_hostname(tmp_path):
+    """Every command of the host but hostname, as on a Fedora 43 image without it."""
+    bin_dir = tmp_path / 'nohostname'
+    bin_dir.mkdir()
+    for d in ('/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'):
+        if not os.path.isdir(d):
+            continue
+        for name in os.listdir(d):
+            target = bin_dir / name
+            if name != 'hostname' and not target.exists() and not target.is_symlink():
+                os.symlink(os.path.join(d, name), target)
+    return str(bin_dir)
+
+
+def test_without_hostname_the_banner_and_the_name_come_from_uname(tmp_path):
+    path = _path_without_hostname(tmp_path)
+    name = os.uname().nodename
+    result = _run(['host-name'], _env(tmp_path, extra={'PATH': path}))
+    assert (result.returncode, result.stdout, result.stderr) == (0, f'{name}\n', '')
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('HTTPS_PORT=9443\n')
+    result = _run(['banner', str(envfile), 'rpm'], _env(tmp_path, extra={'PATH': path}))
+    assert result.returncode == 0 and 'command not found' not in result.stderr, result.stderr
+    assert f' Access:   https://{name}:9443' in result.stdout, result.stdout
+
+
+def test_with_hostname_its_fully_qualified_name_comes_first(tmp_path):
+    bin_dir = tmp_path / 'bin'
+    _stub(bin_dir / 'hostname', '[ "$1" = -f ] && echo ucm.example.test || echo ucm')
+    result = _run(['host-name'], _env(tmp_path, extra={'PATH': f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"}))
+    assert result.stdout == 'ucm.example.test\n'

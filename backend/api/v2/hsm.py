@@ -15,10 +15,11 @@ from auth.unified import require_auth
 from utils.secret_target import MASKS, changed_targets, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from services import compliance_signer
-from services.hsm import HsmService
+from services.hsm import HsmService, key_binding
 from utils.process_lock import LockBusyError
-from services.hsm.base_provider import HsmError, HsmKeyExistsError, HsmConnectionError, HsmOperationError, HsmConfigError
-from models import db, CA
+from services.hsm.base_provider import (
+    HsmError, HsmKeyExistsError, HsmConnectionError, HsmOperationError, HsmConfigError, HsmSecretUnreadable)
+from models import db
 from models.hsm import HsmProvider, HsmKey
 from services.audit_service import AuditService
 import logging
@@ -297,20 +298,12 @@ def delete_provider(provider_id):
     
     name = provider.name
 
-    # Block deletion if any CA still references a key from this provider.
-    # Without this check the cascade-delete on hsm_keys would orphan the CA's
-    # hsm_key_id FK and break signing on the next request.
-    bound_cas = (
-        db.session.query(CA.id, CA.descr)
-        .join(HsmKey, CA.hsm_key_id == HsmKey.id)
-        .filter(HsmKey.provider_id == provider_id)
-        .all()
-    )
-    if bound_cas:
-        names = ', '.join(f"#{cid} {cdesc or ''}".strip() for cid, cdesc in bound_cas[:5])
-        more = '' if len(bound_cas) <= 5 else f' (+{len(bound_cas) - 5} more)'
+    # The cascade on hsm_keys would leave an X.509 or SSH CA without its signing key
+    held = key_binding.holders(provider_id=provider_id)
+    if held:
         return error_response(
-            f"Cannot delete provider: {len(bound_cas)} CA(s) still use its keys: {names}{more}",
+            f"Cannot delete provider: its keys back {len(held)} authorit{'y' if len(held) == 1 else 'ies'}: "
+            f"{key_binding.summary(held)}",
             409,
         )
 
@@ -398,7 +391,9 @@ def sync_provider_keys(provider_id):
             resource_type='hsm_provider',
             resource_id=provider_id,
             resource_name=provider.name,
-            details=f"Synced keys: +{result['added']} -{result['removed']} ={result['unchanged']}",
+            details=(f"Synced keys: +{result['added']} -{result['removed']} ={result['unchanged']}; "
+                     f"Changed key material referenced by authorities: "
+                     f"{result['changed_referenced_key_ids']}"),
             success=True,
             user_id=_audit_user()[0],
             username=_audit_user()[1],
@@ -408,6 +403,8 @@ def sync_provider_keys(provider_id):
         
     except HaRestricted:
         raise
+    except HsmSecretUnreadable as e:
+        return error_response(str(e), 400)  # names the field, never its value
     except HsmError as e:
         logger.error(f"HSM sync error: {e}")
         return error_response('HSM synchronization error', 500)
@@ -441,9 +438,8 @@ def list_keys():
     keys = HsmService.list_keys(provider_id=provider_id)
 
     if unused:
-        # Filter to signing-capable asymmetric keys not yet bound to any CA
-        from models import CA
-        bound_ids = {row[0] for row in db.session.query(CA.hsm_key_id).filter(CA.hsm_key_id.isnot(None)).all()}
+        # Signing-capable asymmetric keys no X.509 or SSH CA holds yet, through this row or another
+        bound_ids = key_binding.taken_key_ids()
         keys = [
             k for k in keys
             if k.get('id') not in bound_ids
@@ -570,15 +566,9 @@ def delete_key(key_id):
     label = key.label
     provider_name = key.provider.name
 
-    # Block deletion if any CA still references this key.
-    bound = CA.query.filter_by(hsm_key_id=key_id).all()
-    if bound:
-        names = ', '.join(f"#{c.id} {c.descr or ''}".strip() for c in bound[:5])
-        more = '' if len(bound) <= 5 else f' (+{len(bound) - 5} more)'
-        return error_response(
-            f"Cannot delete key: {len(bound)} CA(s) depend on it: {names}{more}",
-            409,
-        )
+    held = key_binding.holders(key_id=key_id)
+    if held:
+        return error_response(f"Cannot delete key: it backs the {key_binding.summary(held)}", 409)
 
     try:
         HsmService.delete_key(key_id)

@@ -37,9 +37,22 @@ NODE_NAMES = ('node-a', 'node-b', 'node-c')
 
 
 def free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
+    return free_ports(1)[0]
+
+
+def free_ports(count) -> list:
+    """`count` distinct free ports: every probe socket stays bound until all are drawn,
+    since a port released is free to be handed out again."""
+    socks = []
+    try:
+        for _ in range(count):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            socks.append(sock)
+            sock.bind(('127.0.0.1', 0))
+        return [sock.getsockname()[1] for sock in socks]
+    finally:
+        for sock in socks:
+            sock.close()
 
 
 def wait_until(predicate, timeout, what):
@@ -85,10 +98,10 @@ def group_pids(pgid) -> set:
 
 
 class Node:
-    def __init__(self, name, root: Path, shared_env: dict):
+    def __init__(self, name, root: Path, shared_env: dict, port=None):
         self.name = name
         self.root = root
-        self.port = free_port()
+        self.port = port or free_port()
         self.data_dir = root / 'data'
         self.config_dir = root / 'config'
         self.console = root / 'console.log'
@@ -156,12 +169,21 @@ class Node:
             r = self.http.get(self.url('/health/ready'), timeout=5)
         except requests.ConnectionError:
             return None
-        return r.json() if r.status_code == 200 else None
+        if r.status_code != 200:
+            return None
+        report = r.json()
+        if report.get('node_id', self.name) != self.name:
+            raise AssertionError(f'{self.name} at {self.base} answered by {report["node_id"]}: {report}')
+        return report
 
     def health(self) -> dict:
         r = self.http.get(self.url('/health'), timeout=10)
         r.raise_for_status()
-        return r.json()
+        report = r.json()
+        # Another node's process listening on this node's address must not pass for this node
+        if report.get('node_id') != self.name:
+            raise AssertionError(f'{self.name} at {self.base} answered by {report.get("node_id")}: {report}')
+        return report
 
     def pids(self) -> set:
         return group_pids(self.proc.pid) if self.proc is not None else set()
@@ -234,8 +256,8 @@ class Cluster:
             'INITIAL_ADMIN_PASSWORD': self.password,
             'FQDN': 'ucm-ha.test',
         }
-        self.nodes = [Node(name, root / name, {**shared, 'DATABASE_URL': self.database_url(name)})
-                      for name in names]
+        self.nodes = [Node(name, root / name, {**shared, 'DATABASE_URL': self.database_url(name)}, port)
+                      for name, port in zip(names, free_ports(len(names)))]
 
     def app_name(self, node_name):
         """A node's application_name: it names the node in pg_stat_activity whatever client

@@ -277,6 +277,7 @@
     "source": "Source",
     "addDnsProvider": "Add Provider",
     "test": "Test",
+    "syncKeys": "Sync keys",
     "dnsProviderTestFailed": "Connection test failed",
     "providerName": "Provider Name",
     "providerType": "Provider Type",
@@ -622,6 +623,8 @@
     "samlLoginExpired": "This sign-in expired or was started in another tab or browser. Start it again from this page.",
     "ssoUsernameConflict": "This sign-in matches an existing account that is local or linked to another identity. Ask an administrator to link the accounts.",
     "ssoUnmapped": "Access denied: no role mapping rule of this sign-in provider matches your account. Contact your administrator.",
+    "ssoNoDefaultRole": "Access denied: this sign-in provider has no default role and no role mapping rule. Contact your administrator.",
+    "ssoEmailConflict": "Sign-in refused: another account already uses the email address of this sign-in. Contact your administrator.",
     "samlLogoutRejected": "The sign-out request of the identity provider could not be verified; you are still signed in.",
     "tooManyAttempts": "Too many failed attempts",
     "retryAfterSeconds": "Try again in {{seconds}} seconds.",
@@ -1083,7 +1086,8 @@
       "noSchemeAllowedByProfile": "No RSA signature scheme is allowed by the compliance profile for this key.",
       "profileRequiresHsm": "This profile requires the CA key to be stored on an HSM.",
       "profileHorizon": "The compliance profile accepts {{key}} until {{date}}, and this CA would outlive it.",
-      "noDigestAllowedByPolicy": "No signature hash is allowed by the policies that apply to this CA."
+      "noDigestAllowedByPolicy": "No signature hash is allowed by the policies that apply to this CA.",
+      "hsmNeedsRead": "Creating a CA on an HSM key requires the read:hsm permission."
     },
     "detail": {
       "hsmBacked": "HSM-backed",
@@ -1304,7 +1308,7 @@
     "customTemplates": "Custom",
     "systemDescription": "Built in, cannot be edited or deleted",
     "customDescription": "Created here, can be edited and deleted",
-    "systemNotEditable": "System templates cannot be edited. Duplicate it to make a custom copy.",
+    "systemNotEditable": "System templates cannot be edited. Copy it to make a custom version.",
     "systemNotDeletable": "System templates cannot be deleted.",
     "defaultValidity": "Default Validity (days)",
     "maxValidityHint": "To cap the validity of certificates issued from this template, use an issuance policy (Policies, maximum validity).",
@@ -1395,7 +1399,7 @@
     "activate": "Activate",
     "activated": "Template activated",
     "deactivated": "Template deactivated",
-    "deactivateTooltip": "A deactivated template is not offered by the Issue Certificate form nor to Windows autoenrollment. System templates can be deactivated, not edited: duplicate one to change it."
+    "deactivateTooltip": "A deactivated template is not offered by the Issue Certificate form nor to Windows autoenrollment. System templates can be deactivated, not edited: copy one to change it."
   },
   "users": {
     "securityKeys": {
@@ -1448,6 +1452,13 @@
       "ssoUsernameHelp": "The username the identity provider sends. Defaults to the current one; change it if the SSO login differs.",
       "linkSuccess": "{{name}} linked to single sign-on",
       "linkFailed": "Failed to link account to SSO",
+      "relink": "Change provider or reset SSO identity",
+      "relinkTitle": "Change the provider of {{name}} or reset its SSO identity",
+      "relinkHelp": "Choose the provider this account signs in through: another one moves it there, the same one resets its SSO identity. The next sign-in through that provider with this username or email binds the new identity. A password the account has is kept unless you tick the box below.",
+      "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
+      "confirmRelink": "Attach {{name}} to {{provider}}? Its current SSO identity is cleared, and the next sign-in through this provider binds a new one.",
+      "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
+      "relinkKeepsNoPassword": "Its API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "Unlink {{name}} from single sign-on and convert it back to a local account?",
       "unlinkSuccess": "{{name}} converted to a local account",
       "unlinkFailed": "Failed to unlink account"
@@ -3859,7 +3870,8 @@
       "firmwareVersion": "Firmware version",
       "notRead": "Test the connection to read what the module reports.",
       "softhsmFips": "SoftHSM is not a validated module: in FIPS mode, keys on it are not FIPS protected."
-    }
+    },
+    "syncingKeys": "Syncing..."
   },
   "sso": {
     "subtitle": "Configure LDAP, OAuth2, or SAML providers for centralized authentication",
@@ -3922,7 +3934,6 @@
     "keepExisting": "••••••• (leave empty to keep)",
     "roles": {},
     "configuredProviders": "Configured Providers",
-    "addProvider": "Add SSO Provider",
     "default": "Default",
     "isDefault": "Default login provider",
     "lastUsed": "Last used",
@@ -3942,6 +3953,8 @@
     "httpsDefault": "HTTPS Certificate (default)",
     "groupFilter": "Group Filter",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, then the base DN if that search is refused; else the base DN.",
     "groupMemberAttr": "Group Membership Attribute",
     "usernameAttr": "Username Attribute",
     "emailAttr": "Email Attribute",
@@ -3989,8 +4002,15 @@
     "testMappingResolvedRole": "Resolved role",
     "testMappingAccess": "Login access",
     "testMappingAccessAllowed": "Allowed",
-    "testMappingAccessDenied": "Denied (not in required groups)",
     "testMappingNoGroups": "No groups found",
+    "testMappingAccessRefused": "Refused",
+    "testMappingGroupsUnreadable": "could not be read from the directory",
+    "testMappingRefusalAccountDisabled": "the account is disabled in the directory",
+    "testMappingRefusalGroupsUnreadable": "the groups could not be read",
+    "testMappingRefusalGroupDenied": "not a member of the required groups",
+    "testMappingRefusalUnmapped": "no role mapping rule matches",
+    "testMappingRefusalNoDefaultRole": "no role mapping rule and no default role",
+    "testMappingNotChecked": "Not checked here: the password, and the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic account creation turned off, an e-mail that belongs to an account of another provider).",
     "testConnectionSuccess": "Connection successful",
     "testConnectionFailed": "Connection failed",
     "testMappingFailed": "Test mapping failed",
@@ -4921,7 +4941,8 @@
         "testFailed": "Failed to send test email"
       },
       "hsm": {
-        "testFailed": "Connection test failed"
+        "testFailed": "Connection test failed",
+        "syncFailed": "Key synchronization failed"
       },
       "sso": {
         "toggleFailed": "Failed to toggle provider",
@@ -5030,7 +5051,12 @@
         "generated": "CRL regenerated successfully"
       },
       "hsm": {
-        "connectionOk": "Connection successful"
+        "connectionOk": "Connection successful",
+        "keysSynced": "Keys synced: {{added}} new, {{removed}} removed, {{unchanged}} unchanged",
+        "keysSyncedKept": "Missing from the token but kept because an authority uses them: {{count}}.",
+        "keysSyncedUnreadable": "Keys that could not be read on the token: {{count}}. No key was removed.",
+        "keysSyncedMissingKept": "Keys missing from the listing and kept: {{count}}.",
+        "keysSyncedChanged": "Keys used by an authority whose material changed on the token: {{count}}."
       },
       "sso": {
         "connectionOk": "Connection successful"
@@ -5873,7 +5899,12 @@
       "allowAnyPrincipal": "Allow any principal",
       "allowAnyPrincipalHelp": "When no principal is listed, sign for any name, root included. Without it, a CA with an empty list signs nothing.",
       "allowCustomKeyId": "Let requesters set the key ID",
-      "allowCustomKeyIdHelp": "sshd logs the key ID as the holder's identity. Without this, the CA names every certificate principals@CA name."
+      "allowCustomKeyIdHelp": "sshd logs the key ID as the holder's identity. Without this, the CA names every certificate principals@CA name.",
+      "keyStorageLockedHelp": "The CA key and CA type cannot be changed after the CA is created.",
+      "hsmKeyHelper": "An SSH CA on an HSM uses an RSA or ECDSA P-256/P-384/P-521 signing key that no other authority holds. Add or sync keys in HSM Management.",
+      "hsmNoUsableKeys": "This provider has no free RSA or ECDSA signing key. An HSM key backs one authority, X.509 or SSH.",
+      "hsmDerivedKey": "Key type from the HSM: {{keyType}}",
+      "hsmNeedsRead": "Creating an SSH CA on an HSM key requires the read:hsm permission."
     },
     "searchPlaceholder": "Search SSH CAs...",
     "quickInstall": "Quick Install",

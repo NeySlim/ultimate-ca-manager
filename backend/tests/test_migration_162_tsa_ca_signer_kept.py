@@ -47,7 +47,7 @@ def _migration():
 
 def test_the_step_is_part_of_the_upgrade():
     from migrations._from_2_254 import STEPS
-    assert STEPS[-1] == '162_tsa_ca_signer_kept'
+    assert '162_tsa_ca_signer_kept' in STEPS
 
 
 @pytest.mark.parametrize('case,before,after', CASES, ids=[c[0] for c in CASES])

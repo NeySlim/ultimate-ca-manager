@@ -16,7 +16,8 @@ STEPS = (
     '152_shared_files', '153_encryption_keys', '155_windows_enrollment_profiles',
     '156_template_cn_pattern', '157_certificate_subject_key', '158_ca_parent_confirmation',
     '159_second_factor_failures', '160_backup_archives', '161_cluster_maintenance',
-    '162_tsa_ca_signer_kept',
+    '162_tsa_ca_signer_kept', '163_ssh_ca_hsm_key', '164_file_removals',
+    '165_sso_ldap_group_base_dn',
 )
 
 # Every name a 2.254 start leaves in `_migrations` (the migration files of tag v2.254-rc1,
@@ -73,7 +74,7 @@ PIVOT_NAMES = frozenset((
 ))
 
 # What else a 2.254 registry may hold: 001 to 042 of the 2.0 series, which the 2.52 baseline
-# (000) folded and kept recorded, and the name migrate_v1_to_v2 writes
+# (000) folded and kept recorded, and the name the 2.x upgrade from 1.8 wrote
 RECORDED_BEFORE_2_52 = frozenset((
     '001_add_api_keys', '002_upgrade_users_table', '003_create_v2_tables',
     '004_create_webauthn_table', '005_create_webauthn_challenges', '006_add_locked_until',

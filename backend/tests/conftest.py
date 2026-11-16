@@ -641,6 +641,36 @@ def _session_epoch_stays_in_its_module():
         db.session.remove()
 
 
+def _restored_https_row():
+    """The stored restored HTTPS pair (shared_files), None when absent."""
+    if not _SESSION_APP:
+        return None
+    from models import SharedFile, db
+    from services.shared_files import HTTPS_RESTORED
+    with _SESSION_APP[0].app_context():
+        content = db.session.query(SharedFile.content).filter_by(name=HTTPS_RESTORED).scalar()
+        db.session.rollback()
+        return content
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _restored_https_pair_stays_in_its_module():
+    """A restore of an archive with an HTTPS pair stores it for a next start no test makes;
+    put back what was found before the file, as the epoch above."""
+    before = _restored_https_row()
+    yield
+    if not _SESSION_APP or _restored_https_row() == before:
+        return
+    from models import SharedFile, db
+    from services.shared_files import HTTPS_RESTORED
+    with _SESSION_APP[0].app_context():
+        db.session.query(SharedFile).filter_by(name=HTTPS_RESTORED).delete()
+        if before is not None:
+            db.session.add(SharedFile(name=HTTPS_RESTORED, content=before))
+        db.session.commit()
+        db.session.remove()
+
+
 def _secret_state():
     """A token under the current database key, and the encrypted values it cannot read."""
     if not _SESSION_APP:

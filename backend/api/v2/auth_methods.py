@@ -281,11 +281,20 @@ def login_password():
         )
         return error_response('Invalid credentials', 401)
 
-    # Check account lockout (using centralized settings)
+    # Counted before the password is checked: past max_attempts in flight or failed on
+    # any node, the attempt is refused unchecked, like an unknown name.
     max_attempts, lockout_seconds = _get_2fa_lockout_settings()
-    if user.locked_until and utc_now() < user.locked_until:
-        # Same answer as an unknown name: the password is not checked yet, so a
-        # distinct status would tell anyone the account exists.
+    try:
+        rank, armed = user.reserve_login_attempt(max_attempts, lockout_seconds)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to record login attempt for {username}: {e}", exc_info=True)
+        return error_response('Failed to record login attempt', 500)
+    if rank is None:
+        if armed:
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -295,27 +304,11 @@ def login_password():
             username=username
         )
         return error_response('Invalid credentials', 401)
-    if user.locked_until and utc_now() >= user.locked_until:
-        user.locked_until = None
-        user.failed_logins = 0
-        ok, _err = safe_commit(logger, "Failed to clear account lockout")
-        if not ok:
-            return _err
 
-    # Verify password
     if not user.check_password(password):
-        # Increment failed login counter
-        user.failed_logins = (user.failed_logins or 0) + 1
-        locked = user.failed_logins >= max_attempts
-        if locked:
-            user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
-            logger.warning(f"Account {username} locked after {max_attempts} failed attempts")
-        ok, _err = safe_commit(logger, "Failed to record failed login")
-        if not ok:
-            return _err
-        if locked:
-            from api.v2.sso.helpers import notify_account_locked
-            notify_account_locked(username)
+        if armed:
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -326,13 +319,21 @@ def login_password():
         )
         return error_response('Invalid credentials', 401)
 
-    # Update login stats
+    # Admitted within the threshold: the success clears the stored count and any lock
+    # armed since by attempts counted after this one.
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
-    user.failed_logins = 0  # Reset failed logins on successful login
-    ok, _err = safe_commit(logger, "Failed to update login stats")
-    if not ok:
-        return _err
+    try:
+        user.clear_failed_logins()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to update login stats for {username}: {e}", exc_info=True)
+        if armed:
+            # The lock this attempt armed stays as stored, the safe side: it is announced
+            from api.v2.sso.helpers import announce_account_locked
+            announce_account_locked(f'Account {username}', username, max_attempts)
+        return error_response('Failed to update login stats', 500)
 
     # Second factor: TOTP (with recovery codes) and/or a security key, the key
     # when 2FA is enforced or the user turned it on as second factor.
@@ -684,10 +685,9 @@ def login_mtls():
     if not user or not user.active:
         return error_response('Certificate authentication failed', 401)
 
-    # Update login stats
+    # The password's count and lock are left as they are (NIST SP 800-63B §3.2.2)
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
-    user.failed_logins = 0  # Reset failed logins on successful login
     ok, _err = safe_commit(logger, "Failed to update login stats")
     if not ok:
         return _err
@@ -856,11 +856,10 @@ def webauthn_verify():
             )
             return error_response('WebAuthn verification failed', 401)
 
-        # Update login stats
+        # Only the passkey's own count is reset: the password's stays (NIST SP 800-63B §3.2.2)
         _clear_2fa_failures(WEBAUTHN, username)
         user.last_login = utc_now()
         user.login_count = (user.login_count or 0) + 1
-        user.failed_logins = 0  # Reset failed logins on successful login
         ok, _err = safe_commit(logger, "Failed to update login stats")
         if not ok:
             return _err

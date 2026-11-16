@@ -1,7 +1,7 @@
 """A fault at every point a backup or a restore can fail, and what stays true.
 
-The other backup tests each pin one mechanism: the transaction, the staged
-files, the retention rules, the scheduler's retry guard. This file breaks the
+The other backup tests each pin one mechanism: the transaction, the file
+reconciliation, the retention rules, the scheduler's retry guard. This file breaks the
 seams *between* them and asks the only question an administrator cares about
 afterwards -- what is on this machine now, and does what it is told match it.
 
@@ -14,9 +14,8 @@ what the route or the task reported.
 Three properties are the reason the file exists:
 
 - The database is either entirely as it was or entirely the archive's, and
-  no file on disk describes a restore that did not happen. The window is the
-  commit, and the files are published just before it, so a commit that fails
-  has to take the files back with it.
+  no file on disk describes a restore that did not happen: a restore writes
+  no file, the reconciliation writes them from the committed rows.
 - A failure in what *reports* the work -- the audit trail, the outcome row --
   never changes the verdict on the work itself, in either direction.
 - A failure in what *finishes* the work -- retention, the restart signal --
@@ -55,9 +54,7 @@ ARCHIVE_KEY = b'-----BEGIN PRIVATE KEY-----\nthe key the archive carries\n'
 LIVE_CERT = b'-----BEGIN CERTIFICATE-----\nthe pair the server is using\n'
 LIVE_KEY = b'-----BEGIN PRIVATE KEY-----\nthe key the server is using\n'
 
-# A mode the restore would not produce on its own (it stages the certificate
-# at 0o644), so a compensated file proves the mode came back and was not just
-# re-created with the staged one.
+# A mode the master would not produce on its own, so an untouched file shows it
 LIVE_CERT_MODE = 0o640
 
 _SETTINGS_KEYS = (
@@ -145,13 +142,10 @@ def sandboxed_write_targets(app):
 
 @pytest.fixture
 def private_staging_root(tmp_path, monkeypatch):
-    """Give the restore's staging a temporary root of this test's own.
+    """A temporary root of this test's own: a restore leaves nothing in it.
 
-    `StagedFiles` creates its directory in the system temporary directory,
-    which every xdist worker shares: what is in there at any moment is partly
-    another worker's, so counting it would be asserting on somebody else's
-    work. Redirected here, the directory is this test's alone and "the
-    staging did not survive" means exactly that.
+    The system temporary directory is shared by every xdist worker; redirected
+    here, "nothing was left there" means exactly that.
     """
     root = tmp_path / 'temporary-root'
     root.mkdir()
@@ -355,18 +349,13 @@ class TestAFailureMidwayTakesBackWhatWasApplied:
         the middle of `_apply_all`, and a failure there must not leave the
         instance holding the first half of an archive.
 
-        What is claimed here is the rows and the destinations the restore
-        publishes, not the whole data directory: `_regenerate_files` has
-        already run by this point, and it rewrites the authority and
-        certificate files of *every* row in the database, not only the
-        archive's. Those writes are not staged and not undone -- for rows the
-        restore did not change they put back the bytes the database already
-        held, which is why the failure is still invisible from outside.
+        The whole data directory is compared: a restore writes no file.
         """
         from services.acme import profiles as acme_profiles
         blob, before = groups_archive
 
         with app.app_context():
+            tree_before = _tree(Config.DATA_DIR)
             monkeypatch.setattr(
                 acme_profiles, 'remap_template_bindings',
                 lambda: (_ for _ in ()).throw(
@@ -378,38 +367,27 @@ class TestAFailureMidwayTakesBackWhatWasApplied:
             db.session.rollback()
             assert _group_names() == before, \
                 'the section applied before the failure survived it'
-            assert not Path(Config.HTTPS_CERT_PATH).exists()
-            assert not Path(Config.HTTPS_KEY_PATH).exists()
-            assert list(private_staging_root.iterdir()) == [], \
-                'the staging of a restore that failed was kept'
+            assert _tree(Config.DATA_DIR) == tree_before
+            assert list(private_staging_root.iterdir()) == []
 
 
 class TestTheFilesAndTheDatabaseAgreeAboutTheCommit:
-    """The one window the transaction cannot cover on its own.
+    """The HTTPS pair of the archive is a row of the restore: it commits with the
+    others or not at all, and the files are the next start's to write."""
 
-    The files are published *before* the commit, not after it: they are part
-    of the restore, and a file that cannot be placed has to be able to take
-    the database back with it. That leaves the commit itself as the last
-    thing that can fail, with the files already in place -- which is what
-    `unpublish()` exists for.
-    """
-
-    def test_the_pair_is_published_before_the_commit_and_taken_back_with_it(
+    def test_a_commit_that_fails_stores_no_pair_and_moves_no_file(
             self, app, archive_with_the_https_pair, private_staging_root,
             monkeypatch):
-        """Both halves in one test, because they are one property: the commit
-        reads the destinations and finds the archive's pair there (so the
-        publication really did precede it), and once it has failed the
-        destinations hold what the server was using, byte for byte and with
-        their own mode."""
         from sqlalchemy.orm.session import Session
+        from models import SharedFile
+        from services import shared_files
         blob, before = archive_with_the_https_pair
-        at_commit = {}
 
         with app.app_context():
+            tree_before = _tree(Config.DATA_DIR)
+            https_before = _tree(Path(Config.HTTPS_CERT_PATH).parent)
+
             def failing_commit(self, *args, **kwargs):
-                at_commit['cert'] = Path(Config.HTTPS_CERT_PATH).read_bytes()
-                at_commit['key'] = Path(Config.HTTPS_KEY_PATH).read_bytes()
                 raise RuntimeError('the transaction could not be committed')
 
             with monkeypatch.context() as injected:
@@ -418,22 +396,26 @@ class TestTheFilesAndTheDatabaseAgreeAboutTheCommit:
                     _service().restore_backup(blob, PASSWORD)
             db.session.rollback()
 
-            assert at_commit == {'cert': ARCHIVE_CERT, 'key': ARCHIVE_KEY}, \
-                'the files were not published before the commit was attempted'
-
-            assert Path(Config.HTTPS_CERT_PATH).read_bytes() == LIVE_CERT
-            assert Path(Config.HTTPS_KEY_PATH).read_bytes() == LIVE_KEY
-            assert _mode(Config.HTTPS_CERT_PATH) == LIVE_CERT_MODE, \
-                'the certificate came back with the mode the restore stages, ' \
-                'not the one it found'
-            assert _mode(Config.HTTPS_KEY_PATH) == 0o600
-
+            assert db.session.get(SharedFile, shared_files.HTTPS_RESTORED) is None
             assert _group_names() == before, \
                 'the database kept a restore whose commit failed'
-            assert sorted(p.name for p in Path(Config.HTTPS_CERT_PATH).parent
-                          .iterdir()) == ['https_cert.pem', 'https_key.pem'], \
-                'a temporary file of the publication was left behind'
+            assert _tree(Config.DATA_DIR) == tree_before
+            assert _tree(Path(Config.HTTPS_CERT_PATH).parent) == https_before
+            assert _mode(Config.HTTPS_CERT_PATH) == LIVE_CERT_MODE
             assert list(private_staging_root.iterdir()) == []
+
+    def test_a_committed_pair_waits_for_the_next_start(
+            self, app, archive_with_the_https_pair):
+        from services import shared_files
+        blob, _before = archive_with_the_https_pair
+
+        with app.app_context():
+            _service().restore_backup(blob, PASSWORD)
+            assert Path(Config.HTTPS_CERT_PATH).read_bytes() == LIVE_CERT
+            assert json.loads(shared_files.read_file(shared_files.HTTPS_RESTORED)) == {
+                'crt': ARCHIVE_CERT.decode(), 'key': ARCHIVE_KEY.decode()}
+            shared_files.drop_file(shared_files.HTTPS_RESTORED)
+            db.session.commit()
 
     def test_a_committed_restore_is_not_undone_because_the_sessions_survived(
             self, app, auth_client, groups_archive, monkeypatch, tmp_path):
@@ -471,119 +453,26 @@ class TestTheFilesAndTheDatabaseAgreeAboutTheCommit:
 
 
 class TestFilesThatCannotBeWritten:
-    """A full disk and a refused permission, at the two moments a restore
-    writes: while it stages, and while it publishes. What was there before
-    has to come back exactly, and nothing of the attempt may survive."""
+    """A restore cannot fail on a file after its commit, so a directory this server
+    cannot write refuses it first; nothing is changed."""
 
-    def test_a_full_disk_while_staging_publishes_nothing_at_all(
-            self, app, archive_with_the_https_pair, private_staging_root,
-            monkeypatch):
-        """Staging happens while the transaction can still roll back, so the
-        destinations must not even have been opened."""
-        from services.backup.restore.files import _STAGING_PREFIX
-        blob, before = archive_with_the_https_pair
-
-        with app.app_context():
-            real_open = os.open
-
-            def out_of_space(path, flags, *args, **kwargs):
-                # Only the staged content itself: the directory operations
-                # (creating it, and removing it afterwards) go through the
-                # same call and must keep working, or the leftover would be
-                # the injection's rather than the code's.
-                if _STAGING_PREFIX in str(path) and flags & os.O_CREAT:
-                    raise OSError(errno.ENOSPC, 'No space left on device')
-                return real_open(path, flags, *args, **kwargs)
-
-            with monkeypatch.context() as injected:
-                injected.setattr(os, 'open', out_of_space)
-                with pytest.raises(OSError) as failure:
-                    _service().restore_backup(blob, PASSWORD)
-            db.session.rollback()
-
-            assert failure.value.errno == errno.ENOSPC
-            assert Path(Config.HTTPS_CERT_PATH).read_bytes() == LIVE_CERT
-            assert Path(Config.HTTPS_KEY_PATH).read_bytes() == LIVE_KEY
-            assert _mode(Config.HTTPS_CERT_PATH) == LIVE_CERT_MODE
-            assert _group_names() == before
-            assert list(private_staging_root.iterdir()) == [], \
-                'the staging of a restore that ran out of space was kept'
-
-    def test_a_refused_publication_puts_back_the_file_it_had_replaced(
-            self, app, archive_with_the_https_pair, monkeypatch):
-        """The pair is two files and one state: publishing the certificate and
-        failing on the key would leave the server with a certificate from the
-        archive and the key it was already using -- a pair that matches
-        nothing. The first file goes back."""
-        blob, before = archive_with_the_https_pair
-
-        with app.app_context():
-            key_path = Path(Config.HTTPS_KEY_PATH)
-            real_replace = os.replace
-
-            def refused(src, dst, *args, **kwargs):
-                if Path(dst) == key_path:
-                    raise PermissionError(errno.EACCES, 'Permission denied')
-                return real_replace(src, dst, *args, **kwargs)
-
-            with monkeypatch.context() as injected:
-                injected.setattr(os, 'replace', refused)
-                with pytest.raises(PermissionError):
-                    _service().restore_backup(blob, PASSWORD)
-            db.session.rollback()
-
-            assert Path(Config.HTTPS_CERT_PATH).read_bytes() == LIVE_CERT, \
-                'the certificate published before the failure was kept'
-            assert _mode(Config.HTTPS_CERT_PATH) == LIVE_CERT_MODE
-            assert key_path.read_bytes() == LIVE_KEY
-            assert _group_names() == before
-            assert sorted(p.name for p in key_path.parent.iterdir()) == \
-                ['https_cert.pem', 'https_key.pem'], \
-                'the temporary file of the refused replace survived'
-
-    def test_a_refused_authority_file_stops_the_restore(
-            self, app, auth_client, create_ca, groups_archive, monkeypatch):
-        """The authority files are staged with the rest and published once
-        the transaction has committed, so a publication that is refused puts
-        back what it replaced and the restore raises: the rows go back with
-        it and the file on disk is the one that was there.
-
-        Written in place, as they were, a restore that failed afterwards left
-        every authority file holding the archive's content while the rows had
-        gone back. And before that, every failure here was `pass`: a restore
-        that could not write a single file still reported success.
-        """
-        from models import CA
-        from utils.file_naming import ca_cert_path
+    def test_an_unwritable_directory_refuses_the_restore_before_anything(
+            self, app, auth_client, groups_archive, monkeypatch):
         blob, before = groups_archive
-        created = create_ca(cn='Fault Injection File CA')
+        real_access = os.access
+        _no_real_restart(monkeypatch)
+        with app.app_context():
+            tree_before = _tree(Config.DATA_DIR)
+        monkeypatch.setattr(os, 'access', lambda path, mode: False if Path(path) == Path(
+            Config.CERT_DIR) else real_access(path, mode))
 
-        try:
-            with app.app_context():
-                target = ca_cert_path(db.session.get(CA, created['id']))
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(b'the authority file already on disk')
-                real_replace = os.replace
+        response = _restore_through_the_route(auth_client, blob)
 
-                def refused(src, dst, *args, **kwargs):
-                    if Path(dst) == target:
-                        raise PermissionError(errno.EACCES, 'Permission denied')
-                    return real_replace(src, dst, *args, **kwargs)
-
-                with monkeypatch.context() as injected:
-                    injected.setattr(os, 'replace', refused)
-                    with pytest.raises(PermissionError):
-                        _service().restore_backup(blob, PASSWORD)
-                db.session.rollback()
-
-                assert target.read_bytes() == b'the authority file already on disk'
-                assert _group_names() == before, \
-                    'a file that could not be written left the rows applied'
-                assert not [p for p in target.parent.iterdir()
-                            if p.name.startswith('.ucm_restore_')], \
-                    'the temporary file of the refused replace survived'
-        finally:
-            auth_client.delete(f"/api/v2/cas/{created['id']}")
+        assert response.status_code == 409
+        assert str(Config.CERT_DIR) in json.loads(response.data)['message']
+        with app.app_context():
+            assert _group_names() == before
+            assert _tree(Config.DATA_DIR) == tree_before
 
 
 class TestAnAuditFailureChangesNoVerdict:

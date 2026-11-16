@@ -494,6 +494,55 @@ def test_a_start_cut_after_the_profiles_table_ends_with_the_2254_identity(dialec
         assert db.run(query) == served
 
 
+# 2.x migration 035 created this index on the databases it upgraded, never on a fresh install
+_INDEX_OF_2X = ("CREATE UNIQUE INDEX uq_ca_hsm_key_id ON certificate_authorities(hsm_key_id) "
+                "WHERE hsm_key_id IS NOT NULL;\n")
+
+
+def test_the_2254_fixture_has_no_x509_hsm_key_index(dialect):
+    assert 'uq_ca_hsm_key_id' not in schema_2254(dialect)
+
+
+def test_a_2254_database_with_the_index_of_2x_has_the_schema_of_a_fresh_install(dialect, tmp_path,
+                                                                                  monkeypatch):
+    for db in make_base(dialect, tmp_path, monkeypatch, 'i35', sql=schema_2254(dialect) + _INDEX_OF_2X):
+        assert db.upgrade()
+        upgraded = snapshot(db.engine)
+    (tmp_path / 'fresh').mkdir()
+    for db in make_base(dialect, tmp_path / 'fresh', monkeypatch, 'i35f', sql=''):
+        fresh_metadata().create_all(db.engine)
+        db.mark_all_applied()
+        expected = snapshot(db.engine)
+    index = [d for d in differences(upgraded, expected) if d[0] == 'index' and d[1] == 'certificate_authorities']
+    assert index == []
+    assert ('index', 'certificate_authorities', 'uq_ca_hsm_key_id') in upgraded
+
+
+def _two_cas_on_one_key(db):
+    db.run("INSERT INTO hsm_providers (id, name, type, config) VALUES (7, 'token', 'pkcs11', '{}')")
+    db.run("INSERT INTO hsm_keys (id, provider_id, key_identifier, label, algorithm, key_type, purpose) "
+           "VALUES (9, 7, 'k9', 'shared-key', 'EC-P256', 'asymmetric', 'signing')")
+    for ca_id, descr in ((3, 'Root A'), (4, 'Root B')):
+        db.run("INSERT INTO certificate_authorities (id, refid, descr, crt, signature_scheme, issuance_hidden, "
+               "hsm_key_id) VALUES (:i, :r, :d, :c, 'pkcs1v15', FALSE, 9)",
+               {'i': ca_id, 'r': f'ca-{ca_id}', 'd': descr, 'c': _material()['ca'][1]})
+
+
+def test_two_x509_cas_on_one_hsm_key_stop_the_upgrade_untouched(dialect, tmp_path, monkeypatch, capsys):
+    for db in make_base(dialect, tmp_path, monkeypatch, 'dup'):
+        _two_cas_on_one_key(db)
+        before = _untouched(db)
+        assert db.upgrade() is False
+        assert _untouched(db) == before
+        out = capsys.readouterr().out
+        assert ("HSM key 'shared-key' (#9) backs 2 X.509 CAs: 'Root A' (#3), 'Root B' (#4)" in out), out
+        assert 'Nothing was changed: 2.254 still starts on this database' in out, out
+        assert 'IntegrityError' not in out and 'UNIQUE constraint' not in out, out
+        # Once one CA leaves the key, the same database upgrades
+        db.run("UPDATE certificate_authorities SET hsm_key_id = NULL WHERE id = 4")
+        assert db.upgrade() is True, capsys.readouterr().out
+
+
 # --- Pivot guard ------------------------------------------------------------------------------
 
 def _untouched(db):
@@ -555,7 +604,7 @@ def test_a_3_0_database_naming_an_unknown_migration_is_refused_untouched(fresh, 
 
 def test_a_2254_database_still_naming_2_0_migrations_upgrades(dialect, tmp_path, monkeypatch):
     """2.52 folded 001 to 042 of the 2.0 series into its baseline, which kept their names, and
-    migrate_v1_to_v2 records its own: a 2.254 database started that long ago still holds them."""
+    the 2.x upgrade from 1.8 recorded its own: a 2.254 database started that long ago still holds them."""
     old = ''.join(f"INSERT INTO _migrations (name) VALUES ('{n}');\n"
                   for n in ('001_add_api_keys', '042_add_discovery_san_sni', 'v1_to_v2_migration'))
     for db in make_base(dialect, tmp_path, monkeypatch, 'go', sql=schema_2254(dialect) + old):

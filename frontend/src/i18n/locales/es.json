@@ -275,6 +275,7 @@
     "source": "Fuente",
     "addDnsProvider": "Añadir proveedor",
     "test": "Probar",
+    "syncKeys": "Sincronizar claves",
     "dnsProviderTestFailed": "Prueba de conexión fallida",
     "providerName": "Nombre del proveedor",
     "providerType": "Tipo de proveedor",
@@ -622,6 +623,8 @@
     "samlLoginExpired": "Este inicio de sesión ha caducado o se inició en otra pestaña o navegador. Vuelva a empezar desde esta página.",
     "ssoUsernameConflict": "Este inicio de sesión corresponde a una cuenta existente, local o vinculada a otra identidad. Pida a un administrador que vincule las cuentas.",
     "ssoUnmapped": "Acceso denegado: ninguna regla de asignación de roles de este proveedor reconoce su cuenta. Contacte a su administrador.",
+    "ssoNoDefaultRole": "Access denied: this sign-in provider has no default role and no role mapping rule. Contact your administrator.",
+    "ssoEmailConflict": "Sign-in refused: another account already uses the email address of this sign-in. Contact your administrator.",
     "samlLogoutRejected": "No se pudo verificar la solicitud de cierre de sesión del proveedor de identidad; su sesión sigue abierta.",
     "tooManyAttempts": "Demasiados intentos fallidos",
     "retryAfterSeconds": "Vuelva a intentarlo en {{seconds}} segundos.",
@@ -1083,7 +1086,8 @@
       "noSchemeAllowedByProfile": "Ningún esquema de firma RSA está permitido por el perfil de cumplimiento para esta clave.",
       "profileRequiresHsm": "Este perfil exige que la clave de la CA se almacene en un HSM.",
       "profileHorizon": "El perfil de cumplimiento acepta {{key}} hasta {{date}}, y esta CA lo superaría.",
-      "noDigestAllowedByPolicy": "Ningún hash de firma está permitido por las políticas que se aplican a esta CA."
+      "noDigestAllowedByPolicy": "Ningún hash de firma está permitido por las políticas que se aplican a esta CA.",
+      "hsmNeedsRead": "Crear una AC en una clave HSM requiere el permiso read:hsm."
     },
     "detail": {
       "hsmBacked": "Respaldada por HSM",
@@ -1304,7 +1308,7 @@
     "customTemplates": "Personalizadas",
     "systemDescription": "Incluida, no se puede editar ni eliminar",
     "customDescription": "Creada aquí, se puede editar y eliminar",
-    "systemNotEditable": "Las plantillas del sistema no se pueden editar. Duplíquela para crear una copia personalizada.",
+    "systemNotEditable": "Las plantillas del sistema no se pueden editar. Cópiela para crear una versión personalizada.",
     "systemNotDeletable": "Las plantillas del sistema no se pueden eliminar.",
     "defaultValidity": "Validez predeterminada (días)",
     "maxValidityHint": "Para limitar la validez de los certificados emitidos con esta plantilla, use una política de emisión (Políticas, validez máxima).",
@@ -1395,7 +1399,7 @@
     "activate": "Activar",
     "activated": "Plantilla activada",
     "deactivated": "Plantilla desactivada",
-    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: duplique una para modificarla."
+    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: copie una para modificarla."
   },
   "users": {
     "securityKeys": {
@@ -1448,6 +1452,13 @@
       "ssoUsernameHelp": "El nombre de usuario que envía el proveedor de identidad. Por defecto el actual; cámbielo si el inicio de sesión SSO difiere.",
       "linkSuccess": "{{name}} vinculado al inicio de sesión único",
       "linkFailed": "No se pudo vincular la cuenta a SSO",
+      "relink": "Change provider or reset SSO identity",
+      "relinkTitle": "Change the provider of {{name}} or reset its SSO identity",
+      "relinkHelp": "Choose the provider this account signs in through: another one moves it there, the same one resets its SSO identity. The next sign-in through that provider with this username or email binds the new identity. A password the account has is kept unless you tick the box below.",
+      "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
+      "confirmRelink": "Attach {{name}} to {{provider}}? Its current SSO identity is cleared, and the next sign-in through this provider binds a new one.",
+      "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
+      "relinkKeepsNoPassword": "Its API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "¿Desvincular {{name}} del inicio de sesión único y reconvertirla en cuenta local?",
       "unlinkSuccess": "{{name}} reconvertida en cuenta local",
       "unlinkFailed": "No se pudo desvincular la cuenta"
@@ -3857,7 +3868,8 @@
       "firmwareVersion": "Versión del firmware",
       "notRead": "Pruebe la conexión para leer lo que informa el módulo.",
       "softhsmFips": "SoftHSM no es un módulo validado: en modo FIPS, las claves almacenadas en él no están protegidas por FIPS."
-    }
+    },
+    "syncingKeys": "Sincronizando..."
   },
   "sso": {
     "subtitle": "Configure proveedores LDAP, OAuth2 o SAML para autenticación centralizada",
@@ -3919,7 +3931,6 @@
     "configuredProviders": "Proveedores configurados",
     "acsUrl": "URL del servicio de consumidor de aserciones (ACS)",
     "acsUrlDesc": "Donde el IdP envía las aserciones SAML después de la autenticación",
-    "addProvider": "Agregar proveedor SSO",
     "attributeMapping": "Mapeo de atributos",
     "attributeMappingHelp": "Izquierda: el nombre del atributo enviado por el proveedor. Derecha: el campo de UCM que rellena (username, email, fullname o groups). Ejemplo: user.userprincipalname → username.",
     "callbackUrls": "URLs de callback",
@@ -3932,6 +3943,8 @@
     "uidAttrHelp": "Identificador inmutable del directorio para reconocer la cuenta pese a cambios de usuario/correo (entryUUID / objectGUID). Vacío = autodetección.",
     "groupFilter": "Filtro de grupo",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, then the base DN if that search is refused; else the base DN.",
     "isDefault": "Proveedor de inicio de sesión predeterminado",
     "lastUsed": "Último uso",
     "redirectUri": "URI de redirección",
@@ -3996,11 +4009,18 @@
     "testMappingResult": "Resultado de la prueba",
     "testMappingGroups": "Grupos encontrados",
     "testMappingNoGroups": "No se encontraron grupos",
+    "testMappingAccessRefused": "Refused",
+    "testMappingGroupsUnreadable": "could not be read from the directory",
+    "testMappingRefusalAccountDisabled": "the account is disabled in the directory",
+    "testMappingRefusalGroupsUnreadable": "the groups could not be read",
+    "testMappingRefusalGroupDenied": "not a member of the required groups",
+    "testMappingRefusalUnmapped": "no role mapping rule matches",
+    "testMappingRefusalNoDefaultRole": "no role mapping rule and no default role",
+    "testMappingNotChecked": "Not checked here: the password, and the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic account creation turned off, an e-mail that belongs to an account of another provider).",
     "testMappingNotFound": "Usuario no encontrado en LDAP",
     "testMappingResolvedRole": "Rol resuelto",
     "testMappingAccess": "Acceso de inicio de sesión",
     "testMappingAccessAllowed": "Permitido",
-    "testMappingAccessDenied": "Denegado (no está en los grupos requeridos)",
     "testMappingFailed": "Prueba de mapeo fallida",
     "oauth2Preset": "Preset de proveedor",
     "oauth2PresetHelp": "Seleccione un preset para completar automáticamente los endpoints OAuth2/OIDC para proveedores comunes.",
@@ -4693,7 +4713,8 @@
         "template": "Error al exportar la plantilla"
       },
       "hsm": {
-        "testFailed": "Error en la prueba de conexión"
+        "testFailed": "Error en la prueba de conexión",
+        "syncFailed": "Error al sincronizar claves"
       },
       "https": {
         "applyFailed": "Error al aplicar el certificado",
@@ -4822,7 +4843,12 @@
         "template": "Plantilla exportada exitosamente"
       },
       "hsm": {
-        "connectionOk": "Conexión exitosa"
+        "connectionOk": "Conexión exitosa",
+        "keysSynced": "Claves sincronizadas: {{added}} nuevas, {{removed}} eliminadas, {{unchanged}} sin cambios",
+        "keysSyncedKept": "Ausentes del token pero conservadas porque una autoridad las usa: {{count}}.",
+        "keysSyncedUnreadable": "Claves ilegibles en el token: {{count}}. No se eliminó ninguna clave.",
+        "keysSyncedMissingKept": "Claves ausentes de la lista y conservadas: {{count}}.",
+        "keysSyncedChanged": "Claves usadas por una autoridad cuyo material cambió en el token: {{count}}."
       },
       "https": {
         "applied": "Certificado HTTPS aplicado. El servidor se reiniciará.",
@@ -5868,7 +5894,12 @@
       "allowAnyPrincipal": "Permitir cualquier principal",
       "allowAnyPrincipalHelp": "Si no hay ningún principal en la lista, firmar para cualquier nombre, incluido root. Sin esta opción, una CA con la lista vacía no firma nada.",
       "allowCustomKeyId": "Permitir que los solicitantes definan el ID de clave",
-      "allowCustomKeyIdHelp": "sshd registra el ID de clave como identidad del titular. Sin esta opción, la CA nombra cada certificado principals@nombre de la CA."
+      "allowCustomKeyIdHelp": "sshd registra el ID de clave como identidad del titular. Sin esta opción, la CA nombra cada certificado principals@nombre de la CA.",
+      "keyStorageLockedHelp": "La clave de la AC y el tipo de AC no pueden cambiarse después de crear la AC.",
+      "hsmKeyHelper": "Una AC SSH en un HSM usa una clave de firma RSA o ECDSA P-256/P-384/P-521 que ninguna otra autoridad posee. Añada o sincronice claves en la gestión HSM.",
+      "hsmNoUsableKeys": "Este proveedor no tiene ninguna clave de firma RSA o ECDSA libre. Una clave HSM sirve a una sola autoridad, X.509 o SSH.",
+      "hsmDerivedKey": "Tipo de clave del HSM: {{keyType}}",
+      "hsmNeedsRead": "Crear una AC SSH en una clave HSM requiere el permiso read:hsm."
     },
     "searchPlaceholder": "Buscar CAs SSH...",
     "downloadSetupScript": "Descargar script de configuración",

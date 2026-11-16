@@ -33,22 +33,22 @@ def coordinate_bytes(key_algorithm: Optional[str], public_key_pem: Optional[str]
     return _COORDINATE_BYTES.get(key_algorithm)
 
 
-def _is_der(signature: bytes) -> bool:
-    try:
-        r, s = decode_dss_signature(signature)
-    except (ValueError, TypeError):
-        return False
-    return encode_dss_signature(r, s) == signature
-
-
-def ecdsa_to_der(signature: bytes, coordinate_size: Optional[int]) -> bytes:
-    """Raw ``r || s`` of exactly two coordinates -> DER; anything else is returned as is.
-
-    A DER signature is never exactly two coordinates long in practice, and one
-    that is gets recognised by round-tripping through the DER codec.
-    """
-    if not coordinate_size or len(signature) != 2 * coordinate_size or _is_der(signature):
+def ecdsa_to_der(signature: bytes, coordinate_size: Optional[int],
+                 signature_format: str) -> bytes:
+    """Decode the provider's declared format, never guess from ambiguous signature bytes."""
+    if not coordinate_size:
         return signature
+    if signature_format == 'der':
+        # The parser's own text never reaches the user: it describes ASN.1 internals
+        try:
+            r, s = decode_dss_signature(signature)
+        except ValueError:
+            raise ValueError('Invalid DER HSM ECDSA signature') from None
+        return encode_dss_signature(r, s)
+    if signature_format != 'raw':
+        raise ValueError('Unknown HSM ECDSA signature format')
+    if len(signature) != 2 * coordinate_size:
+        raise ValueError('Invalid raw HSM ECDSA signature length')
     r = int.from_bytes(signature[:coordinate_size], 'big')
     s = int.from_bytes(signature[coordinate_size:], 'big')
     return encode_dss_signature(r, s)

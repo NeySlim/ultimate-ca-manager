@@ -189,24 +189,6 @@ def _get_ldap_lockout_settings():
     return _get_lockout_settings()
 
 
-def _check_ldap_lockout(username):
-    """Check if account is locked due to failed LDAP attempts."""
-    user = User.query.filter_by(username=username).first()
-    if not user:
-        return False
-    if user.locked_until:
-        if utc_now() < user.locked_until:
-            return True
-        user.locked_until = None
-        user.failed_logins = 0
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to clear LDAP lockout: {e}")
-    return False
-
-
 def notify_account_locked(username):
     """Send the account_locked security alert; never fails the login."""
     try:
@@ -221,38 +203,62 @@ def notify_account_locked(username):
         logger.warning(f"Failed to send account_locked alert for {username}: {e}")
 
 
-def _record_ldap_failed_attempt(username):
-    """Record a failed LDAP login attempt."""
-    user = User.query.filter_by(username=username).first()
+def announce_account_locked(subject, username, max_attempts):
+    """Log and alert a lock; called by the one attempt that armed it."""
+    logger.warning(f"{subject} locked after {max_attempts} failed attempts")
+    notify_account_locked(username)
+
+
+def _reserve_ldap_attempt(user):
+    """Count one LDAP attempt before the bind, on the local account the entry resolves to.
+
+    Returns (account, rank, armed) as ``User.reserve_login_attempt``: account None when
+    there is none (nothing is counted). Raises, rolled back, when the count fails."""
     if not user:
-        return
+        return None, None, None
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()
-    user.failed_logins = (user.failed_logins or 0) + 1
-    locked = user.failed_logins >= max_attempts
-    if locked:
-        user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
-        logger.warning(f"LDAP account locked for {username} after {max_attempts} failed attempts")
     try:
+        rank, armed = user.reserve_login_attempt(max_attempts, lockout_seconds)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return user, rank, armed
+
+
+def _ldap_attempt_failed(user, armed):
+    """A refused or failed bind: the one attempt that armed the lock reports it."""
+    if user is not None and armed:
+        announce_account_locked(f'LDAP account {user.username}', user.username,
+                                _get_ldap_lockout_settings()[0])
+
+
+def _release_ldap_attempt(user, armed):
+    """The bind proved the password but no session opens: the attempt that armed the lock
+    lifts it and is not counted; any other stays counted (``User.release_login_attempt``)."""
+    if user is None:
+        return
+    try:
+        user.release_login_attempt(armed)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to record LDAP failed attempt for {username}: {e}")
-        return
-    if locked:
-        notify_account_locked(username)
+        logger.error(f"Failed to release LDAP attempt for {user.username}: {e}")
 
 
-def _clear_ldap_failed_attempts(username):
-    """Clear failed attempt counters on successful login."""
-    user = User.query.filter_by(username=username).first()
-    if user and (user.failed_logins or user.locked_until):
-        user.failed_logins = 0
-        user.locked_until = None
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to clear LDAP failed attempts for {username}: {e}")
+def _clear_ldap_failed_attempts(user):
+    """Clear the stored count and lock of the account a successful bind opens; False,
+    rolled back, when that fails: no session opens, as at the password door."""
+    if user is None:
+        return True
+    try:
+        user.clear_failed_logins()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to update login stats for {user.username}: {e}", exc_info=True)
+        return False
+    return True
 
 
 # SAML attributes read for group membership when the provider's attribute
@@ -409,10 +415,11 @@ def mapped_custom_role_names(role_mapping):
             if isinstance(name, str)}
 
 
-def validate_role_mapping(value):
+def validate_role_mapping(value, provider_type=None):
     """Check a role_mapping at save time. Returns ``(normalized_dict, error)``.
 
-    Rows with no key and no value (blank editor rows) are dropped.
+    Rows with no key and no value (blank editor rows) are dropped; a key is
+    saved without its edge spaces. Two keys the provider compares equal are refused.
     """
     if isinstance(value, str):
         try:
@@ -423,7 +430,8 @@ def validate_role_mapping(value):
         return {}, None
     if not isinstance(value, dict):
         return None, "role_mapping must be an object mapping external groups to roles"
-    cleaned = {}
+    cleaned, seen = {}, set()
+    match_key = _group_match_key_of(provider_type)
     for group, entry in value.items():
         blank = entry in (None, '', {}) or (isinstance(entry, dict) and not any(entry.values()))
         if not isinstance(group, str) or not group.strip():
@@ -444,7 +452,11 @@ def validate_role_mapping(value):
                 return None, f"role_mapping entry '{group}': custom role '{custom}' does not exist"
         if role is None and custom is None:
             return None, f"role_mapping entry '{group}' needs a role or a custom role"
-        cleaned[group] = entry
+        name = group.strip()
+        if match_key(name) in seen:
+            return None, f"role_mapping has two entries for the external group '{name}'"
+        seen.add(match_key(name))
+        cleaned[name] = entry
     return cleaned, None
 
 
@@ -467,10 +479,64 @@ def _mapping_rules(provider):
 
 
 def _external_groups(external_data):
-    groups = (external_data or {}).get('roles', (external_data or {}).get('groups', []))
-    if isinstance(groups, str):
-        groups = [groups]
-    return groups if isinstance(groups, (list, tuple, set)) else []
+    """Values of ``roles`` and ``groups`` together, de-duplicated: an IdP may
+    send app roles and groups side by side, and an empty one hides nothing."""
+    data = external_data if isinstance(external_data, dict) else {}
+    values = {}  # insertion-ordered set
+    for key in ('roles', 'groups'):
+        found = data.get(key)
+        if isinstance(found, str):
+            found = [found]
+        if isinstance(found, (list, tuple, set)):
+            values.update((v, None) for v in found if isinstance(v, str))
+    return list(values)
+
+
+def _entra_oidc_groups_overage(id_claims):
+    """Whether Entra ID left ``groups`` out of the ID token for too many groups."""
+    names = id_claims.get('_claim_names')
+    return (isinstance(names, dict) and 'groups' in names) or id_claims.get('hasgroups') is True
+
+
+def oidc_external_groups(userinfo, id_claims, token_unused=None):
+    """Groups and roles of an OIDC login: those of its UserInfo response and of
+    the ID token bound to it (``None`` when none is, ``token_unused`` saying why)."""
+    id_claims = id_claims if isinstance(id_claims, dict) else {}
+    sources = [('UserInfo', userinfo)]
+    if token_unused is None:
+        sources.insert(0, ('ID token', id_claims))
+    merged, counts = {}, []
+    for label, data in sources:
+        values = _external_groups(data)
+        counts.append(f"{label} ({len(values)} value(s))")
+        merged.update((v, None) for v in values)
+    unused = f"; ID token not used: {token_unused}" if token_unused is not None else ''
+    logger.info(f"OIDC groups read from {', '.join(counts)}{unused}")
+    if _entra_oidc_groups_overage(id_claims):
+        logger.warning(
+            "OIDC ID token has no groups claim: Entra ID left it out because the user "
+            "has too many groups. Emit only the groups assigned to the application, "
+            "or app roles, so role mapping can match.")
+    return list(merged)
+
+
+def _group_match_key_of(provider_type):
+    if provider_type == 'ldap':
+        # str.split() takes every separator RFC 4518 §2.2 maps to SPACE
+        return lambda name: ' '.join(str(name).split()).casefold()
+    return lambda name: name
+
+
+def group_match_key(provider):
+    """How a rule key and a group name compare. LDAP: close to what cn does, caseIgnoreMatch
+    (RFC 4519 §2.3; RFC 4517 §4.2.11 with RFC 4518 §2.6.1): case, edge spaces and the
+    length of inner space runs ignored. OIDC and SAML groups are opaque identifiers: exact."""
+    return _group_match_key_of(getattr(provider, 'provider_type', None))
+
+
+def _external_group_keys(provider, external_data):
+    key = group_match_key(provider)
+    return [key(g) for g in _external_groups(external_data)]
 
 
 def sso_admission(provider, external_data):
@@ -479,8 +545,9 @@ def sso_admission(provider, external_data):
     role admits nobody (no implicit role)."""
     rules = _mapping_rules(provider)
     if rules:
-        groups = _external_groups(external_data)
-        return any(key in groups for key in rules)
+        key = group_match_key(provider)
+        groups = _external_group_keys(provider, external_data)
+        return any(key(rule) in groups for rule in rules)
     return provider.default_role in VALID_ROLES
 
 
@@ -497,9 +564,11 @@ def _resolve_mapped_roles(provider, external_data):
         return None, None
     external_roles = _external_groups(external_data)
     logger.info(f"Role resolution: mapping={role_mapping}, external_groups={external_roles}")
+    key = group_match_key(provider)
+    external_keys = _external_group_keys(provider, external_data)
     bases, customs = [], []
     for ext_role, value in role_mapping.items():
-        if ext_role not in external_roles:
+        if key(ext_role) not in external_keys:
             continue
         base, custom_name = _split_mapping_value(value)
         if base is not None:

@@ -268,7 +268,9 @@ Open **Modules** > **Administration** > **Access Control** (administrators). Cus
 
 ### HSM Management
 
-Open **Modules** > **Administration** > **HSM Management**. Providers hold CA private keys in hardware or a key service: PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS and OpenBao/Vault Transit. **New Provider** configures one, **Test** checks it and a key can be generated directly on the module. In a Docker deployment see [HSM in Docker](HSM_DOCKER.md).
+Open **Modules** > **Administration** > **HSM Management**. Providers hold CA private keys in hardware or a key service: PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS and OpenBao/Vault Transit. **New Provider** configures one, **Test** checks it and a key can be generated directly on the module. **Sync keys** in the provider details reads the keys of the token again: it adds the new ones and removes those gone from the token, except keys a CA uses, which are kept; if the token listing fails, nothing is removed. The message gives the counts of each case. In a Docker deployment see [HSM in Docker](HSM_DOCKER.md).
+
+Creating a CA on an HSM key, an existing one or one generated for it, needs the `read:hsm` permission besides `write:cas` (`write:ssh_cas` for an SSH CA).
 
 ### Audit Logs
 
@@ -280,7 +282,9 @@ Open **Modules** > **Administration** > **System Logs** (administrators). It rea
 
 ### SSH CAs and SSH Certificates
 
-Open **Modules** > **Administration** > **SSH CAs** to create user and host CAs (Ed25519, ECDSA or RSA 4096) and to download a setup script that makes sshd trust the CA and a key revocation list. Open **Modules** > **Administration** > **SSH Certificates** to issue certificates by signing a public key you paste, or by generating a key pair, with principals, a validity and extensions.
+Open **Modules** > **Administration** > **SSH CAs** to create user and host CAs (Ed25519, ECDSA or RSA 4096, or on an RSA or NIST ECDSA key of an HSM provider) and to download a setup script that makes sshd trust the CA and a key revocation list. Open **Modules** > **Administration** > **SSH Certificates** to issue certificates by signing a public key you paste, or by generating a key pair, with principals, a validity and extensions.
+
+An SSH CA on an HSM key keeps its private key on the token and needs the `read:hsm` permission besides `write:ssh_cas`. An HSM key backs one authority, X.509 or SSH, user or host: the key list offers only unused keys, and a key already held is refused with the name of the CA that holds it, and neither the key nor its provider can be deleted while the CA exists.
 
 ### Settings
 

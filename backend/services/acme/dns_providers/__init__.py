@@ -173,6 +173,8 @@ def saved_credentials(model) -> Dict[str, Any]:
     does not open raises SecretUnreadable naming it, never reads back as no credentials."""
     import json
     from utils.encryption import decrypt_required
+    if model.provider_type == 'manual':
+        return {}  # it reads no credentials: whatever is stored cannot stop it
     stored = decrypt_required(model._credentials, f'DNS provider {model.id} credentials')
     return json.loads(stored) if stored else {}
 

@@ -249,10 +249,21 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - Group-to-role mapping (map AD groups to UCM roles)
 - Test connection before saving
 
+*Where groups are read.* With `memberOf`, from the user's own entry (a base search on its DN); the group filter is not used. With `member` or `uniqueMember`, by a search for the entries whose membership attribute holds the user's DN and that match the group filter (`(objectClass=*)` when empty), under the *Group Search Base* when it is set and under that base only. Without it, the search runs under the parent of the base DN when that parent lies in a naming context the server publishes (the root DSE's `namingContexts`, or when it publishes none), else under the base DN; a search under the parent that does not succeed (for example a service account allowed to search one subtree only) is tried once more under the base DN. Groups in a branch beside the users (`ou=people` and `ou=groups`) are therefore found; on a large directory, index the membership attribute for equality (OpenLDAP `index member eq`; Active Directory indexes `member`). The groups are read whenever the provider has role mapping rules or required groups.
+
+*Direct membership only.* A group counts when it names the user itself: nested groups are not followed, and the Active Directory primary group (`primaryGroupID`, usually Domain Users) never appears in `memberOf`. Map the groups users are direct members of.
+
+*Matching.* LDAP group names compare with rule keys and required groups as `cn` does (caseIgnoreMatch, RFC 4519 and RFC 4518): case and edge spaces are ignored and a run of inner spaces counts as one space; OIDC and SAML groups are compared exactly. A rule key is saved without its edge spaces, and two LDAP rule keys that compare equal are refused at save; a provider saved earlier with two such keys keeps working, both rules apply and the highest-privilege role wins.
+
+*A failed read.* When the directory does not answer the group read with success (service account rights, timeout, referral, missing base) and the admission depends on the groups, the login is refused with "your groups could not be read from the directory", and the log and the audit say the same.
+
+*Test Mapping* (Groups and role mapping section of a saved provider) finds the user, reads the groups and decides as the login does, without a password: it shows the access verdict with its reason, and a role only for an admitted user. It does not check the password nor the UCM account the sign-in would open (an account of the same name that this identity may not open, an account disabled in UCM, automatic creation turned off, an email that belongs to an account of another provider).
+
 **OAuth2 (Azure AD, Google, GitHub):**
 - Client ID, Client Secret, Authorization/Token/UserInfo URLs
 - Callback URL: `https://your-server:8443/api/v2/auth/sso/oauth2/callback`
 - Role claim mapping from token attributes
+- Role mapping rules compare their keys with the `roles` and `groups` claims, read from the ID token of the login (same `sub` as UserInfo) and from the UserInfo response together. Microsoft Entra ID sends them only in the ID token: add the groups claim under *Token configuration* of the application registration (values are group object IDs, so the mapping keys are these IDs), or define app roles and map their values. Above about 200 groups Entra ID leaves the groups claim out: UCM logs a warning and only app roles can match, so emit only the groups assigned to the application, or app roles. With *Verify ID token signature* off, the groups of the ID token count only when the Token URL is HTTPS with TLS verification on, and the issuer and client ID are set and match the token.
 
 **SAML 2.0:**
 - IdP Metadata URL or manual XML upload
@@ -263,7 +274,13 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - *Sign authentication requests* signs each AuthnRequest with the key of the SP certificate (the HTTPS certificate or one held by UCM, RSA only); register that certificate at the IdP from the SP metadata first.
 - *NameID format* is asked of the IdP in each request and published in the metadata; *persistent* gives UCM a stable identifier, a transient NameID is never used to recognise the account.
 
-**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. Users with no matching entry get the provider's default role at account creation; on later logins their stored role is kept unless *Sync role on each login* is enabled.
+**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. With at least one entry, a user no entry matches is refused at sign-in; without entries, new accounts get the provider's default role. On later logins the stored role is kept unless *Sync role on each login* is enabled.
+
+**Which account a sign-in opens:** an account belongs to one provider and to one stable identity of its IdP (OIDC `sub`, SAML persistent NameID, LDAP `entryUUID` or `objectGUID`, else the DN). A sign-in opens the account bound to its identity; a name or email matches only an account of the same provider that is not bound yet. A sign-in is refused, with an audit entry naming the account, its state and the remedy, when its name belongs to an account it may not open (local, linked to another provider, bound to another identity, or without provider), and when no account matches but its email belongs to an account of another provider or left without provider by another IdP or, with `email_verified` false, to one linked to this provider and not bound yet. An email shared with a local account still gives the SSO identity an account of its own.
+
+**Moving an account:** **Users → Link to SSO** (on a linked account, **Change provider or reset SSO identity**) attaches any account to the chosen provider (an account already linked is moved or reset only after a confirmation): a local account, one of another provider (moved, after which its former provider no longer opens it), one without provider, or one of the same provider whose identity changed at the IdP (reset). Its identity is cleared and the next sign-in through that provider with its username or email binds one. An account with a password keeps it unless **Also remove its local password** is ticked, which leaves it signing in through the provider only (the password reset by e-mail sends such an account no link, and an administrator cannot tick it for their own account); an account without one is not asked to set one. For a second person who shares an email with an existing account, create an account under the name their provider sends and link it with that box ticked, so the password chosen at creation does not stay outside the IdP. Linking closes the account's sessions whenever its provider or identity changes or its password is removed; its password (unless removed), API keys, security keys and mTLS certificates stay, so revoke them yourself when the account now belongs to another person.
+
+**Deleted providers:** the users of a deleted provider keep their identity and are taken back at sign-in by a provider created again for the same IdP: same OIDC issuer (the UserInfo URL for a provider without issuer), same SAML entity ID, or same LDAP server and base DN. Otherwise, use Link to SSO on each account.
 
 **Important:** After configuring SSO, test with a non-admin account first. Keep at least one local admin account as fallback.
 
@@ -341,7 +358,7 @@ The file picker accepts the sizes the server accepts (`BACKUP_MAX_UPLOAD_MB` for
 
 A restore **replaces** the instance with the archive: for every section the archive carries, the rows it does not hold are removed. Sections the archive left out are not touched, and an archive whose user list is empty is refused. `POST /api/v2/system/restore` also takes `mode=merge`, which adds and updates the archived rows and removes nothing.
 
-- The restore is one transaction: on any error nothing is changed, the answer names the row the database refused, and no file on disk is touched. The certificate, CSR and key files are published once the rows are in, and those of the removed rows are deleted with them.
+- The restore is one transaction: on any error nothing is changed, the answer names the row the database refused, and no file on disk is touched. The restore itself writes no file: the certificate, CSR and key files follow the committed rows afterwards (see [Files after a restore](#files-after-a-restore)). It is refused with 409, before anything changes, when the server cannot write to `CA_DIR`, `CERT_DIR` or `PRIVATE_DIR`.
 - A row of a table the archive does not carry that points at a removed row loses the link where it is optional, and goes with it in a regenerable table (CRL metadata, OCSP cache, sessions, in-flight ACME server orders); any other refuses the restore, named.
 - Rows are matched by identity (name, refid, fingerprint), never by number. Each archive carries the identifier of the database it was taken from, and row numbers are trusted only when restoring onto that same database.
 - An archive written by an older version is repaired as the migrations repaired the source: legacy EAB keys, dead and `ldap_*` settings, SAML providers, group permissions, duplicated ACME renewal orders.
@@ -349,6 +366,14 @@ A restore **replaces** the instance with the archive: for every section the arch
 - Revocations: a merge never lowers a revocation made here, final or a suspension, of a certificate or a CA, with or without its revocation record; an archive that revokes it for good replaces a suspension, and between two revocations of the same weight the earlier date stays.
 - Every session is revoked and a restart is requested: no session begun before the restore is accepted after it, the restoring operator's included, on every node and whatever the session store (files, database or Redis). A restore is refused (409) while a backend migration, another restore or a backup is running.
 - In HA mode the other nodes refuse writes for the whole restore and restart in turn after it: see [HA.md](HA.md#restoring-a-backup).
+
+### Files after a restore
+
+The files under `CA_DIR`, `CERT_DIR` and `PRIVATE_DIR` are copies of the database for external tools; UCM never reads them back. A restore commits, with its rows, a new files generation and the list of the files of the rows it removed. Each node then reconciles its own directories with the database: at the start of its scheduler process, and every minute by the `files_reconcile` task, which only compares a marker file (`.ucm-files-generation`) in each directory with the generation in the database. When they differ, the node rewrites every file that is missing or differs from its row (keeping the file's mode and owner), deletes the regular files the list names (never a symbolic link, never a file outside these directories, never a key copy whose row holds no key), syncs the disk once, then writes the marker. An ordinary start only writes the files that are missing.
+
+What the log shows: `Files: generation N, X written, Y removed` after a pass that changed something; `Files: <path> could not be written (...); retried at the next pass` for a file that failed, the pass then ends with `Files: generation N not reached on this node (... failed); next try in Ns` and is tried again after one minute, doubling up to one hour; `Files: <path> is not a regular file (a link?); left as it is` for a link at the path of a row. A pass never runs while another one holds the directories (a lock in `DATA_DIR`, a PostgreSQL advisory lock in HA): it is then tried again later, and nothing is written.
+
+The HTTPS certificate and key of the archive are stored in the database and written by the next start, before the TLS socket opens, after a certificate bound to HTTPS and before a regenerated self-signed one. On a single node they are written once: the stored copy is dropped by that start, and a certificate replaced by hand afterwards stays. When the files cannot be written (read-only mount), that start logs `HTTPS: the restored certificate could not be written to ...` once and keeps the files on disk. With `UCM_HTTPS_CERT` and `UCM_HTTPS_KEY` in the Docker image, the entrypoint writes the variables' pair at every start and the restored pair replaces it at the start after the restore only.
 
 Archives are written as format v4: a sequence of chunks of at most 8 MB, each authenticated on its own, so a backup is created and read section by section without ever being held whole. The upload is spooled to `DATA_DIR/tmp` and each section is kept there, encrypted under a key held only in memory, until the restore needs it. When `DATA_DIR/tmp` is missing and cannot be created, or is not writable, the upload is spooled to the system temporary directory and the sections to a directory of the instance's own under it, named after a hash of `DATA_DIR`. At startup each worker removes stale stores from the directory its restores use, and only after taking the backup lock: when the lock cannot be taken, nothing is removed. Decryption and the checks made before the restore plan hold about one section at a time; the plan and the writes hold every section the archive carries. A v4 archive has no size limit unless `BACKUP_MAX_ARCHIVE_MB` sets one. Archives written before 3.0 (v1 to v3) are still restored, up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it. A reverse proxy in front of UCM applies its own body limit.
 
@@ -431,10 +456,10 @@ sqlite3 /opt/ucm/data/ucm.db ".dump" > ucm_dump.sql
 
 UCM supports PostgreSQL 13+ as a drop-in replacement for SQLite. The schema is created automatically on first start.
 
-**Recommended PostgreSQL setup:**
+**Recommended PostgreSQL setup.** The database must use the UTF8 encoding: UCM refuses to start on any other (`SHOW server_encoding;` tells it). A cluster created under the C or POSIX locale makes its databases `SQL_ASCII` by default, hence `ENCODING 'UTF8'` and `TEMPLATE template0` here:
 ```sql
 CREATE USER ucm WITH PASSWORD 'strong-password';
-CREATE DATABASE ucm OWNER ucm;
+CREATE DATABASE ucm OWNER ucm ENCODING 'UTF8' TEMPLATE template0;
 GRANT ALL PRIVILEGES ON DATABASE ucm TO ucm;
 ```
 
@@ -1114,7 +1139,8 @@ sudo journalctl -u ucm -n 100
 
 # Check permissions
 ls -la /opt/ucm/data/
-sudo chown -R ucm:ucm /opt/ucm/data/
+# A local archive (.ucm-archive-*) holds an earlier installation's keys: it stays root's
+sudo find /opt/ucm/data/ -name '.ucm-archive-*' -prune -o -exec chown -h ucm:ucm {} +
 
 # Check port
 sudo netstat -tlpn | grep 8443

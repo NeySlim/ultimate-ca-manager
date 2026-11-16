@@ -181,7 +181,8 @@ def _unrecorded_message(refid=None):
         bound = get_bound_refid()
         if refid and bound == refid:
             return f"{base}, and its next start serves this certificate"
-        named = bool(bound) or shared_files.read_file(shared_files.HTTPS_GENERATED) is not None
+        named = bool(bound) or any(shared_files.read_file(name) is not None for name in (
+            shared_files.HTTPS_RESTORED, shared_files.HTTPS_GENERATED))
     except Exception:
         db.session.rollback()
         return base
@@ -247,6 +248,7 @@ def regenerate_https_cert():
                                  actor=_actor())
             else:
                 shared_files.drop_file(shared_files.HTTPS_GENERATED)
+            shared_files.drop_file(shared_files.HTTPS_RESTORED)
             set_bound_refid('')
         except Exception as e:
             db.session.rollback()

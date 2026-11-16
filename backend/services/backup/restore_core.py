@@ -17,13 +17,14 @@ from compliance_profiles import is_valid as is_valid_profile
 from utils.port_zero import strip_port_zero_from_stored
 from utils.signing_hash import SIGNATURE_SCHEMES
 from models.acme_models import AcmeAccount
-from config.settings import Config
-from services.file_regen_service import insert_file_writes_suspended
+from services.file_regen_service import (
+    advance_generation, insert_file_writes_suspended, keep_named_paths, record_removal_candidates,
+    removals_listed, unwritable_dirs,
+)
 
 from . import container, installation
-from .errors import BackupSchemaError
+from .errors import BackupSchemaError, RestoreFilesUnwritable
 from .restore import RestorePlan, single_transaction
-from .restore.files import StagedFiles
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import apply_columns, apply_section, relink_references
@@ -84,32 +85,6 @@ def _archived_datetime(where: str, column: str, value: Any):
             f"Invalid backup: {where} holds {value!r} as its {column}, which "
             "is not a date. Nothing has been changed."
         ) from exc
-
-
-def _row_file_paths() -> set:
-    """The certificate, CSR and key files the authority and certificate rows name."""
-    from types import SimpleNamespace
-    from utils.file_naming import ca_cert_path, ca_key_path, cert_cert_path, cert_csr_path, cert_key_path
-
-    paths = set()
-    with db.session.no_autoflush:
-        for refid, subject, descr in db.session.query(CA.refid, CA.subject, CA.descr):
-            row = SimpleNamespace(refid=refid, subject=subject, descr=descr)
-            paths.update((ca_cert_path(row), ca_key_path(row)))
-        for refid, subject, descr in db.session.query(
-                Certificate.refid, Certificate.subject, Certificate.descr):
-            row = SimpleNamespace(refid=refid, subject=subject, descr=descr)
-            paths.update((cert_cert_path(row), cert_csr_path(row), cert_key_path(row)))
-    return paths
-
-
-def _stage_key_mirror(staged, path, key_pem: bytes) -> None:
-    """A plaintext key mirror, only while values are stored in the clear (as mirror_private_key)."""
-    from security.encryption import key_encryption
-    if key_encryption.is_encrypting:
-        staged.stage_removal(path)
-    else:
-        staged.stage(path, key_pem, mode=0o600)
 
 
 def _archived_timestamps(row, where: str, data: Dict[str, Any]) -> None:
@@ -345,6 +320,13 @@ class RestoreCoreMixin:
 
     def _restore_payload(self, backup_data, master_key: bytes, mode: str) -> Dict[str, Any]:
         """Everything after decryption: a payload dict, or a v4 `SectionStore`."""
+        # Nothing reaches the disk before the commit; after it, a file that cannot be written
+        # is only retried, so a directory this process cannot write refuses the restore here
+        refused = unwritable_dirs()
+        if refused:
+            raise RestoreFilesUnwritable(
+                "The restore was refused: this server cannot write to "
+                f"{', '.join(refused)}. Nothing has been changed.")
         # Everything the payload claims about itself is checked here, before
         # the first write: a schema this version cannot read, or a section
         # holding fewer rows than the archive says it holds, must not be
@@ -441,20 +423,27 @@ class RestoreCoreMixin:
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
+        from .restore_extended import refuse_archived_shared_keys
+        refuse_archived_shared_keys(backup_data, plan)
 
-        # Files are staged during the transaction and published just before the
-        # commit; a commit that fails puts them back (`unpublish()`).
+        # No file is written here: the rows commit with a new files generation and the
+        # list of paths they no longer name; each node's reconciliation then follows them.
         results['mode'] = mode
         # A merge never lowers a revocation made here, of a certificate or a CA (_kept_revocation)
         self._merging = mode == 'merge'
         self._kept_revocations = []
 
-        staged = StagedFiles()
-        # What the rows had on disk before: a file no row names afterwards goes with the commit
-        files_before = _row_file_paths()
         aligned = []
         try:
             with single_transaction(), insert_file_writes_suspended():
+                # Every file the rows have now; what they still name afterwards is struck out
+                generation = advance_generation() if carried else None
+                if generation is not None:
+                    record_removal_candidates(generation)
+                from services.hsm import key_binding
+                # A key two authorities held before the restore is not the restore's doing
+                shared_before = set(key_binding.shared_keys())
+                token_shared_before = set(key_binding.shared_token_keys())
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
@@ -465,7 +454,7 @@ class RestoreCoreMixin:
                     replacement = remove_before_writes(replacement)
                     plan.refresh()
 
-                self._apply_all(backup_data, results, master_key, plan, staged)
+                self._apply_all(backup_data, results, master_key, plan)
 
                 # Sections are applied in an order that cannot satisfy every
                 # reference at once, so they are resolved again now that every
@@ -474,6 +463,7 @@ class RestoreCoreMixin:
                 results['relinked'] = relink_references(backup_data, plan)
                 link_restored_connectors(backup_data)
                 results['repairs'] = replay_repairs(backup_data, plan)
+                db.session.flush()
                 # The rows written take the revocation their CA records, as the hourly pass does
                 aligned = self._align_restored_revocations(plan) + self._align_kept_revocations()
                 results['revoked_from_records'] = len(aligned)
@@ -486,6 +476,22 @@ class RestoreCoreMixin:
 
                 if replacement is not None:
                     results.update(remove_after_writes(replacement).report())
+                # On the final rows: an authority a replacement removes after the writes holds nothing
+                db.session.flush()
+                for key_id, held in key_binding.shared_keys().items():
+                    if key_id not in shared_before:
+                        raise BackupSchemaError(
+                            f"Cannot restore: HSM key '{key_binding.label_of(key_id)}' would back both the "
+                            f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
+                            "nothing has been changed.")
+                # Two key rows naming one token key are one key (refuse_same_token_key)
+                for (first, second), held in key_binding.shared_token_keys().items():
+                    if (first, second) not in token_shared_before:
+                        raise BackupSchemaError(
+                            f"Cannot restore: HSM keys '{key_binding.label_of(first)}' and "
+                            f"'{key_binding.label_of(second)}' are one token key and would back both the "
+                            f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
+                            "nothing has been changed.")
                 # Lockouts are keyed by user id and name, which either mode may hand to
                 # another account; the sessions they guard are revoked after any restore
                 from models.second_factor_failure import SecondFactorFailure
@@ -499,29 +505,16 @@ class RestoreCoreMixin:
                 results['warnings'] = list(dict.fromkeys(plan.warnings))
                 results['dropped_secrets'] = list(plan.dropped_fields)
 
-                for path in sorted(files_before - _row_file_paths()):
-                    staged.stage_removal(path)
-                # Published inside the transaction, so a file that cannot be
-                # placed rolls the database back with it. The window that
-                # remains is the commit itself, and it is compensated below.
-                staged.publish()
+                if generation is not None:
+                    keep_named_paths()
+                    results['files'] = {'generation': generation,
+                                        'removals': removals_listed(generation)}
         except (IntegrityError, DataError) as exc:
-            staged.unpublish()
-            staged.discard()
             if isinstance(exc, DataError) and not is_value_too_long(exc):
                 raise
             conflict = conflict_from_integrity_error(exc)
             logger.warning("Restore refused by the database: %s", conflict)
             raise conflict from exc
-        except Exception:
-            # The commit is the last thing the block does: if it is what
-            # failed, the files are already in place and describe a restore
-            # that did not happen.
-            staged.unpublish()
-            staged.discard()
-            raise
-        finally:
-            staged.discard()
 
         if keytab_published:
             self._write_keytab_here()
@@ -669,7 +662,7 @@ class RestoreCoreMixin:
 
         return sections
 
-    def _apply_all(self, backup_data, results, master_key, plan, staged):
+    def _apply_all(self, backup_data, results, master_key, plan):
         """Every write of a restore, inside the one transaction."""
         # Core restores
         self._restore_users(backup_data, results, plan)
@@ -684,9 +677,6 @@ class RestoreCoreMixin:
         # No commit here: the whole restore is one transaction, so a failure
         # in a later section cannot leave these entities applied on their own.
         db.session.flush()
-
-        # Regenerate CA/cert files on disk
-        self._regenerate_files(staged)
 
         # RBAC restores
         self._restore_groups(backup_data, results, plan)
@@ -725,7 +715,7 @@ class RestoreCoreMixin:
         self._restore_approval_requests(backup_data, results, plan)
         self._restore_acme_client_orders(backup_data, results, plan)
         self._restore_key_recovery_requests(backup_data, results, plan)
-        self._restore_https_files(backup_data, results, staged)
+        self._restore_https_files(backup_data, results, plan)
 
         # Sections the manifest carries and the hand-written restorers never
         # learned about: applied from the manifest, with every column and with
@@ -977,6 +967,8 @@ class RestoreCoreMixin:
         # build one, so references still land on the row the archive names
         # rather than on whatever holds that number here.
         plan = plan if plan is not None else RestorePlan.build(backup_data)
+        from .restore_extended import _refuse_a_taken_key
+        taken = {}
 
         for ca_data in backup_data.get('certificate_authorities', []):
             ca = CA.query.filter_by(refid=ca_data['refid']).first()
@@ -1019,6 +1011,7 @@ class RestoreCoreMixin:
             ca.ski = ca_data.get('ski') or ca.ski
             self._apply_ca_fields(ca, ca_data)
             self._apply_ca_revocation(ca, ca_data, here_revocation)
+            _refuse_a_taken_key(ca, taken)
             results['cas'] += 1
 
     def _restore_certificates(self, backup_data: Dict, results: Dict, master_key: bytes,
@@ -1225,92 +1218,3 @@ class RestoreCoreMixin:
         results['encrypted_settings'] = restore_encrypted_settings(
             configuration if isinstance(configuration, dict) else {},
             (configuration or {}).get('encrypted_settings') or [], skip=deferred)
-
-    def _regenerate_files(self, staged) -> None:
-        """Write the files that materialise the restored rows on disk.
-
-        Every failure here used to be `pass`: a restore that could not write
-        a single file still reported success. Two kinds are distinguished,
-        because they do not mean the same thing.
-
-        A write that fails — no space left, a read-only directory — stops the
-        restore. It runs inside the transaction, so the rows go back with it
-        and the instance stays as it was, which is the only outcome that
-        matches what the caller is told.
-
-        The certificate, CSR and key files are staged rather than written in
-        place, published with the rest just before the commit and put back by
-        `unpublish()` if the commit fails: written directly, a restore that failed afterwards left
-        every certificate file holding the archive's content while the rows
-        had gone back to what they were. With database encryption on, a key
-        mirror is staged as a removal.
-
-        Material that cannot be decoded is a warning naming the row, and the
-        restore goes on. This walks every authority and certificate in the
-        database, not only the ones the archive carried: a row whose stored
-        key predates this installation's KEY_ENCRYPTION_KEY was already
-        unreadable before the restore, so nothing is lost by not mirroring
-        it, and refusing would make an instance holding one such row
-        impossible to restore at all. What the archive itself brought cannot
-        land here: it was just encoded by this process, a few lines above.
-        """
-        from utils.file_naming import ca_cert_path, ca_key_path, cert_cert_path, cert_key_path, cert_csr_path
-        from utils.key_codec import load_pem_bytes
-
-        for ca in CA.query.all():
-            if ca.crt:
-                try:
-                    cert_pem = base64.b64decode(ca.crt)
-                except (ValueError, TypeError) as exc:
-                    logger.warning(
-                        "Restore: the stored certificate of CA %s could not be "
-                        "decoded (%s); its file was not written", ca.id, exc)
-                else:
-                    Config.CA_DIR.mkdir(parents=True, exist_ok=True)
-                    staged.stage(ca_cert_path(ca), cert_pem, mode=0o644)
-            if ca.prv:
-                try:
-                    prv_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
-                except ValueError as exc:
-                    logger.warning(
-                        "Restore: the stored key of CA %s could not be read "
-                        "(%s); it was not mirrored on disk", ca.id, exc)
-                else:
-                    _stage_key_mirror(staged, ca_key_path(ca), prv_pem)
-
-        for cert in Certificate.query.all():
-            if cert.crt:
-                try:
-                    cert_pem_bytes = base64.b64decode(cert.crt)
-                except (ValueError, TypeError) as exc:
-                    logger.warning(
-                        "Restore: the stored certificate %s could not be "
-                        "decoded (%s); its file was not written", cert.id, exc)
-                else:
-                    Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
-                    staged.stage(cert_cert_path(cert), cert_pem_bytes,
-                                 mode=0o644)
-            if cert.csr:
-                try:
-                    csr_data = cert.csr
-                    if csr_data.startswith('-----BEGIN'):
-                        csr_bytes = csr_data.encode('utf-8')
-                    else:
-                        csr_bytes = base64.b64decode(csr_data)
-                except (ValueError, TypeError, AttributeError) as exc:
-                    logger.warning(
-                        "Restore: the stored CSR of certificate %s could not "
-                        "be decoded (%s); its file was not written",
-                        cert.id, exc)
-                else:
-                    staged.stage(cert_csr_path(cert), csr_bytes, mode=0o644)
-            if cert.prv:
-                try:
-                    prv_pem_bytes = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
-                except ValueError as exc:
-                    logger.warning(
-                        "Restore: the stored key of certificate %s could not "
-                        "be read (%s); it was not mirrored on disk",
-                        cert.id, exc)
-                else:
-                    _stage_key_mirror(staged, cert_key_path(cert), prv_pem_bytes)

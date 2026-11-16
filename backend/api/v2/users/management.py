@@ -77,8 +77,10 @@ def reset_user_password(user_id):
     if not is_valid:
         return error_response(error_msg, 400)
 
-    # Update password; the user's sessions end with the old one
+    # Update password; the user's sessions end with the old one, and so does the count of
+    # guesses at it
     user.set_password(data['new_password'])
+    user.clear_failed_logins()
 
     try:
         db.session.commit()
@@ -204,22 +206,17 @@ def toggle_user_status(user_id):
         return error_response('Failed to toggle user status', 500)
 
 
-SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
-
-
 @bp.route('/api/v2/users/<int:user_id>/link-sso', methods=['POST'])
 @require_auth(['write:users'])
 def link_user_sso(user_id):
-    """Link an existing local account to an SSO provider (admin only).
-
-    The recommended way to resolve an email collision between a local user and
-    an SSO identity (#136): instead of creating a duplicate or silently merging
-    on email, an admin deliberately links the two. After linking, the matching
-    SSO login adopts this account **by email** — the local username is kept
-    unchanged (renaming it locked admins out of their account, see #138).
+    """Attach any account to an SSO provider (admin only): a local account, one of
+    another provider (moved), one with no provider, or one of this provider whose
+    stable identity changed (reset). Its stable identity is cleared: the next
+    sign-in through this provider with its name, or its e-mail (#136), binds one.
+    The username is kept (renaming it locked admins out of their account, #138).
 
     POST /api/v2/users/{user_id}/link-sso
-    Body: {"provider_id": int}
+    Body: {"provider_id": int, "remove_password": bool (optional, default false)}
     """
     refused = refuse_api_key_on_own_account(user_id)
     if refused:
@@ -229,41 +226,72 @@ def link_user_sso(user_id):
 
     from models.sso import SSOProvider
 
+    from api.v2.sso.account_state import SSO_NO_PASSWORD, describe_origin
+
     user = db.session.get(User, user_id)
     if not user:
         return error_response('User not found', 404)
-    if (user.auth_source or 'local') != 'local' or user.sso_provider_id:
-        return error_response('User is already linked to single sign-on', 400)
 
     data = request.get_json(silent=True) or {}
     provider_id = data.get('provider_id')
     if not provider_id:
         return error_response('provider_id is required', 400)
+    remove_password = data.get('remove_password', False)
+    if not isinstance(remove_password, bool):
+        return error_response('remove_password must be true or false', 400)
     provider = db.session.get(SSOProvider, provider_id)
     if not provider:
         return error_response('SSO provider not found', 404)
+    # Changing one's own password asks for the current one: removing it is another admin's act
+    if remove_password and g.current_user.id == user_id:
+        return error_response('You cannot remove the local password of your own account', 400)
 
-    # Keep the username; the SSO login is matched to this account by email.
-    # An external id left by older releases is dropped: the first sign-in binds it.
+    # The account's sessions end when its owner may change (another provider, a local
+    # account, a reset identity) or its local password goes: they were opened before.
+    moved = user.sso_provider_id != provider.id or user.sso_external_id is not None
+    drop_password = remove_password and user.password_hash != SSO_NO_PASSWORD
+    owner = None
+    if moved or drop_password:
+        owner = end_sessions_on_commit(user.id)
+        if owner is None:
+            db.session.rollback()
+            return error_response('User not found', 404)
+        user = owner
+    origin = describe_origin(user, provider)
     user.auth_source = provider.provider_type
     user.sso_provider_id = provider.id
     user.sso_external_id = None
     user.sso_orphan_of = None
+    # An account without a password signs in through the provider only: the change
+    # Unlink SSO asked of it would confine its SSO session. One with a password keeps both.
+    if drop_password:
+        # Same state as an account the provider created: no password door opens it.
+        from auth.initial_admin import forget_generated
+        forget_generated(user)
+        user.password_hash = SSO_NO_PASSWORD
+        user.password_reset_token = None
+        user.password_reset_expires = None
+    if user.password_hash == SSO_NO_PASSWORD:
+        user.force_password_change = False
 
     ok, err = safe_commit(logger, f"Failed to link user {user_id} to SSO")
     if not ok:
         return err
+    closed = sessions_closed_by(owner) if owner is not None else 0
+    note = ', local password removed' if drop_password else ''
+    note += f', {closed_sessions_note(closed)}' if owner is not None else ''
     AuditService.log_action(
         action='user_link_sso',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Linked account {user.username!r} to SSO provider {provider.name!r}',
+        details=f'Linked account {user.username!r} to SSO provider {provider.name!r} ({origin}{note})',
         success=True,
     )
     return success_response(
         data=user.to_dict(),
-        message=f'Account linked to {provider.name}')
+        message=f'Account linked to {provider.name}',
+        meta={'other_sessions_closed': closed})
 
 
 @bp.route('/api/v2/users/<int:user_id>/unlink-sso', methods=['POST'])
@@ -289,6 +317,7 @@ def unlink_user_sso(user_id):
     user.sso_provider_id = None
     user.sso_external_id = None
     user.sso_orphan_of = None
+    from api.v2.sso.account_state import SSO_NO_PASSWORD
     # An account that never had a local password must set one before it can log in.
     needs_password = user.password_hash == SSO_NO_PASSWORD
     if needs_password:
@@ -326,12 +355,11 @@ def unlock_user(user_id):
     if not user:
         return error_response('User not found', 404)
 
-    if not user.locked_until and not user.failed_logins:
-        return success_response(data=user.to_dict(), message='Account is not locked')
-
     try:
-        user.failed_logins = 0
-        user.locked_until = None
+        # Decided on the stored row: a lock another node wrote after this read is lifted
+        if not user.clear_failed_logins():
+            db.session.rollback()
+            return success_response(data=user.to_dict(), message='Account is not locked')
         db.session.commit()
         AuditService.log_action(
             action='user_unlock',

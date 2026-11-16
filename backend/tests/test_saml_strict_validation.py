@@ -108,11 +108,13 @@ def _response(idp_signer, *, in_response_to=None, sp_base=SP_BASE, audience=None
     scd_nooa = f' NotOnOrAfter="{_ts(expires)}"' if scd_expiry else ''
     attribute_statement = ''
     if attributes:
+        # A list of (name, values) pairs may repeat a name, as Keycloak's role list does.
+        pairs = attributes.items() if isinstance(attributes, dict) else attributes
         attribute_statement = '<saml:AttributeStatement>' + ''.join(
-            f'<saml:Attribute Name="{name}">'
+            f'<saml:Attribute Name="{name}" FriendlyName="{name}">'
             + ''.join(f'<saml:AttributeValue>{v}</saml:AttributeValue>' for v in values)
             + '</saml:Attribute>'
-            for name, values in attributes.items()) + '</saml:AttributeStatement>'
+            for name, values in pairs) + '</saml:AttributeStatement>'
     xml = f'''<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
  xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_r{uuid.uuid4().hex}" Version="2.0"
  IssueInstant="{_ts(issued)}" Destination="{destination}"{irt}>
@@ -208,6 +210,26 @@ def test_role_mapping_reads_the_attribute_mapped_to_groups(app, mapped_provider,
     role, _ = _login_role(app, idp_signer,
                           attributes={'memberships': ['pki-operators'], 'groups': ['pki-admins']})
     assert role == 'operator'
+
+
+def test_repeated_group_attributes_are_merged(app, mapped_provider, idp_signer):
+    """Keycloak's role list mapper sends one Attribute element per role."""
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}),
+                    attribute_mapping=json.dumps({'Role': 'groups'}))
+    role, _ = _login_role(app, idp_signer,
+                          attributes=[('Role', ['offline_access']), ('Role', ['pki-admins'])])
+    assert role == 'admin'
+
+
+def test_repeated_identity_attributes_keep_the_first_value(app, mapped_provider, idp_signer):
+    """Repeated Name: the library merges values in assertion order; identity reads the first."""
+    first, second = f'u1-{uuid.uuid4().hex[:8]}', f'u2-{uuid.uuid4().hex[:8]}'
+    _role, name_id = _login_role(app, idp_signer, attributes=[
+        ('username', [first]), ('email', [f'{first}@example.org']),
+        ('username', [second]), ('email', [f'{second}@example.org'])])
+    with app.app_context():
+        user = User.query.filter_by(sso_external_id=name_id).one()
+        assert (user.username, user.email) == (first, f'{first}@example.org')
 
 
 def test_unmatched_groups_are_refused_when_rules_exist(app, mapped_provider, idp_signer):

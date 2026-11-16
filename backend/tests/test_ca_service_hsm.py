@@ -164,7 +164,7 @@ class TestCreateInternalCaWithExistingHsmKey:
                     descr='First HSM CA', dn={'CN': 'First'},
                     hsm_key_id=hsm_provider_and_key['hsm_key_id'],
                 )
-                with pytest.raises(ValueError, match='already bound'):
+                with pytest.raises(ValueError, match="already backs the X.509 CA 'First HSM CA'"):
                     CAService.create_internal_ca(
                         descr='Second', dn={'CN': 'Second'},
                         hsm_key_id=hsm_provider_and_key['hsm_key_id'],

@@ -223,7 +223,8 @@ UCM can store a CA's signing key on an external Hardware Security Module instead
 ### Limitations
 - HSM-backed private keys **cannot be exported**. PKCS#12, JKS and key-only export options are hidden for HSM CAs. Only the certificate (PEM/DER/P7B) can be exported.
 - There is **no in-place migration** between Local and HSM. To "move" an existing local CA onto an HSM, create a new CA on the HSM and re-issue certificates.
-- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to another CA.
+- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to an authority, X.509 or SSH: an HSM key backs one authority only.
+- Creating a CA on an HSM key needs the \`read:hsm\` permission besides \`write:cas\`; without it the **HSM** choice is disabled.
 
 ## Offline Mode
 
@@ -296,7 +297,7 @@ Central management for all X.509 certificates. Issue new certificates, import ex
 5. Choose key type and size
 6. Set validity period
 7. Optionally apply a **Template** to pre-fill settings
-8. Click **Issue**
+8. Click **Issue Certificate**
 
 ### Using Templates
 Templates pre-fill Key Usage, Extended Key Usage, subject defaults, and validity. Select a template before filling the form to save time.
@@ -619,7 +620,7 @@ Templates define reusable certificate profiles. Instead of manually configuring 
 Every template is one or the other, shown in the **Source** column.
 
 ### System
-The templates seeded at install: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication and Smartcard Logon. Edit and Delete are refused for them, in the interface and by the API. **Duplicate** gives you an editable copy to build on.
+The templates seeded at install: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication and Smartcard Logon. Edit and Delete are refused for them, in the interface and by the API. **Copy** gives you an editable copy to build on.
 
 ### Custom
 Everything created or imported here. These can be edited and deleted freely.
@@ -693,9 +694,9 @@ A template can add extensions UCM has no setting for. Each one is an **OID**, a 
 
 The inspector lists such extensions for certificates and CAs under **Other extensions** on the Extensions tab, with their OID, name when known, criticality and value.
 
-## Duplicating Templates
+## Copying Templates
 
-Click **Duplicate** to create a copy of an existing template. Modify the copy without affecting the original.
+Click **Copy** to create a copy of an existing template. Modify the copy without affecting the original.
 
 ## Import & Export
 
@@ -1753,6 +1754,8 @@ The **Source** column shows where each user comes from:
 - **LDAP / OAuth2 / SAML**: auto-provisioned on first SSO login. The originating provider name is shown on the badge (e.g. \`LDAP · Corporate AD\`).
 
 Since v2.133, roles changed manually in UCM for SSO users are **preserved** between logins, unless **"Sync role on every login"** is enabled on the provider (see **Settings → SSO**).
+
+**Link to SSO** attaches an account to a provider; on an account already linked, **Change provider or reset SSO identity** moves it to another provider or clears its SSO identity, after a confirmation. The next sign-in through that provider with the account's username or email binds the new identity; a password the account has is kept unless the box that removes it is ticked, after which no password login opens the account, and an account without one is not asked to set one. **Unlink SSO** turns the account back into a local one.
 `
   },
 
@@ -2693,7 +2696,7 @@ Each provider shows a connection status indicator:
 
 ### Generating Keys
 1. Select a connected provider
-2. Click **Generate Key**
+2. Click **Generate**
 3. Choose the algorithm (RSA 2048/4096, ECDSA P-256/P-384)
 4. Enter a key label/alias
 5. Click **Generate**
@@ -2708,8 +2711,17 @@ ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are offered only on providers that
 
 Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider. An ML-DSA key signs the data itself, so no digest is chosen.
 
+### Synchronizing keys
+Click **Sync keys** in the provider details to read the keys of the token again.
+- New keys are added.
+- Keys gone from the token are removed, except keys a CA uses: they are kept.
+- If the token listing fails, nothing is removed.
+
+The message gives the counts, the number of keys kept because a CA uses them, the number of unreadable keys and the number of keys used by a CA whose material changed on the token. The button is disabled while the synchronization runs.
 ### Using HSM Keys
 When creating a CA, select an HSM provider and key instead of generating a software key. The CA's signing operations are performed on the HSM.
+
+An HSM key backs one authority, X.509 or SSH. Creating a CA on an HSM key needs the \`read:hsm\` permission besides \`write:cas\` (\`write:ssh_cas\` for an SSH CA), and a key a CA holds cannot be deleted.
 
 > ⚠ Keys generated on an HSM cannot be exported. If you lose access to the HSM, you lose the keys.
 
@@ -2784,12 +2796,15 @@ A login started from the IdP portal reaches UCM without a request from UCM. **Al
 ### Auto-Create Users
 When enabled, a new UCM user account is automatically created on first SSO login, using the IDP-provided attributes, with the role its mapping rule gives, else the default role.
 
+### Groups for role mapping
+Role mapping rules compare their keys with the values of the **roles** and **groups** claims, read from the ID token of the login and from the UserInfo response together. Microsoft Entra ID sends groups and app roles only in the ID token: in the application registration, add the groups claim under **Token configuration** (the values are group object IDs, so the mapping keys are these IDs), or define app roles and map their values. A user in more than about 200 groups gets no groups claim from Entra ID: UCM logs a warning and only the app roles can match. Emit only the groups assigned to the application, or app roles. With **Verify ID token signature** off, the groups of the ID token count only when the Token URL is HTTPS with TLS verification on, and the issuer and client ID are set and match the token.
+
 ## Who can sign in
 
 ### Identity matching
-A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first; its next sign-in through that provider binds the IdP identifier.
+A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. When no account matches, a sign-in whose email belongs to an account of another provider or left without provider by another IdP, or, while the email is unverified, to one linked to this provider and not bound yet, is refused rather than given a second account. To attach an account to a provider, use **Link to SSO** on that user (**Change provider or reset SSO identity** on a linked one): it accepts a local account, one of another provider, which it moves, and one whose identity changed at the IdP, which it resets. Its next sign-in through that provider binds the IdP identifier, and an account without a local password is not asked for one.
 
-When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink SSO** then **Link to SSO** on each account.
+When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Link to SSO** on each account.
 
 ### Role mapping rules
 - **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
@@ -2809,8 +2824,16 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)
 6. Enter the **Base DN** (search base for user lookups)
 7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
-8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink SSO** then **Link to SSO**
+8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Link to SSO** on each account
 9. Click **Test Connection** to verify, then **Save** and **Enable**
+
+### Groups
+- **memberOf**: read from the user's own entry (a base search on its DN); the group filter is not used
+- **member / uniqueMember**: searched under the Group Search Base alone when it is set; otherwise under the parent of the Base DN when the directory holds it, then under the Base DN if that search fails, with the group filter (\`(objectClass=*)\` when empty); groups beside the users (\`ou=groups\` next to \`ou=people\`) are found
+- **Direct membership only**: nested groups and the Active Directory primary group (Domain Users) are not seen
+- **Matching**: group names compare with rules and required groups ignoring case and edge spaces, a run of inner spaces counting as one
+- **Unreadable groups**: with rules or required groups, a sign-in whose groups cannot be read is refused with "your groups could not be read from the directory"
+- **Test Mapping** reads the groups and decides as the sign-in does, without the password; it shows a role only for an admitted user
 
 ### Active Directory
 For Microsoft Active Directory, use:
@@ -3504,6 +3527,20 @@ A Host CA signs certificates that authenticate **servers to clients**. When a cl
 6. List the allowed principals, or tick **Allow any principal**
 7. Click **Create**
 
+### On an HSM key
+
+An SSH CA can keep its private key on an HSM provider.
+
+1. In **Create SSH CA**, set **Key Storage** to **HSM**
+2. Pick the **HSM Provider**, then the **Existing HSM Key**: only unused RSA and ECDSA P-256/P-384/P-521 signing keys are listed
+3. Click **Create**. The CA takes its key type from the key, and the private key never leaves the token
+
+Good to know:
+- An SSH CA on an HSM takes an RSA or ECDSA P-256, P-384 or P-521 key. Ed25519 keys are not offered: UCM's HSM signing does not cover EdDSA, so an Ed25519 SSH CA is a software key. Brainpool and ML-DSA keys are not offered either: UCM signs with them on an HSM for X.509 CAs, but OpenSSH certificates have no key type for them.
+- An HSM key backs one authority, X.509 or SSH. A key a CA already holds is refused with the name of that CA, and neither the key nor its provider can be deleted while the CA exists.
+- It needs \`write:ssh_cas\` and \`read:hsm\`. Without \`read:hsm\` the **HSM** choice is disabled.
+- In FIPS mode a key that FIPS mode refuses is not offered. In HA mode a key on SoftHSM or on a local smart card reader is refused, as it exists on one node only.
+- If the provider cannot be reached when the CA is created, nothing is created.
 ### Allowed Principals
 
 The **Allowed Principals** field restricts the names a CA signs for, as comma-separated patterns (\`deploy\`, \`team-*\`, \`web??.example.com\`). Every principal in a request must match one of them.

@@ -99,6 +99,37 @@ def test_convert_attaches_the_duplicate_as_cross_certificate_and_keeps_its_child
     assert found == []
 
 
+def test_convert_moves_the_hsm_key_of_the_duplicate_to_the_root(app, auth_client):
+    """One CA per HSM key: the root takes the key the removed duplicate held, never both at once."""
+    import json
+    from models.hsm import HsmKey, HsmProvider
+    pki, ids = _world(app)
+    with app.app_context():
+        provider = HsmProvider(type='pkcs11', name=f'cross-{pki.tag}', config=json.dumps({'module_path': '/x.so'}))
+        db.session.add(provider)
+        db.session.flush()
+        key = HsmKey(provider_id=provider.id, key_identifier=f'k-{pki.tag}', label=f'k-{pki.tag}',
+                     algorithm='EC-P256', key_type='asymmetric', purpose='signing')
+        db.session.add(key)
+        db.session.flush()
+        key_id, provider_id = key.id, provider.id
+        record = db.session.get(CA, ids['x'])
+        record.prv, record.hsm_key_id = None, key_id
+        db.session.commit()
+    try:
+        r = auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert db.session.get(CA, ids['x']) is None
+            assert db.session.get(CA, ids['b']).hsm_key_id == key_id
+    finally:
+        with app.app_context():
+            CA.query.filter_by(hsm_key_id=key_id).update({'hsm_key_id': None})
+            HsmKey.query.filter_by(id=key_id).delete()
+            HsmProvider.query.filter_by(id=provider_id).delete()
+            db.session.commit()
+
+
 def test_convert_refuses_a_record_that_is_not_shadowing_a_root(app, auth_client):
     pki, ids = _world(app, with_root_b=False)
     r = auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={})

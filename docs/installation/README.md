@@ -108,6 +108,14 @@ sudo systemctl status ucm
 
 ---
 
+### Upgrading a DEB or RPM installation
+
+The 3.0 packages install over UCM 2.254 or later only. Over an older version, the pre-installation script refuses before writing anything and leaves that version installed and running: install 2.254, start it once, then install 3.0. See the [Upgrade Guide](../../UPGRADE.md#upgrading-to-v30).
+
+Where an older UCM was removed but left its data (an RPM removal, a DEB removed or purged), the 3.0 package installs as new. If 3.0 cannot start on the SQLite database left there, the package moves that installation's files, unchanged, into `/opt/ucm-archive/<UTC date and time>/` (root only, with a `README.txt` that gives the way back through 2.254; a file that cannot be renamed out of its filesystem goes into a root-only `.ucm-archive-<UTC date and time>/` directory beside it, which that README lists), then starts a new, empty UCM. Data that 3.0 starts on is kept. The Docker image never archives: it refuses an older volume at startup.
+
+---
+
 ### FIPS hosts: DEB and RPM built against the system OpenSSL
 
 The packages install pre-built Python wheels, and the `cryptography` and `psycopg-binary` wheels carry their own OpenSSL, which ignores the FIPS mode of the host. On RHEL 9 (or AlmaLinux and Rocky Linux 9) and on Ubuntu 24.04 (Ubuntu Pro for the FIPS module), `UCM_FIPS_BUILD=1` makes the package compile `cryptography`, `psycopg`, `lxml` and `xmlsec` against the system OpenSSL instead. Other distributions refuse the option.
@@ -156,7 +164,7 @@ In FIPS mode UCM asks the loaded module whether it approves ML-DSA, Ed25519 and 
 - The image is built on Debian 13, and also for arm64: neither is among the tested configurations of certificate #5586.
 - Still refused with the image: Ed25519 SSH keys of deployment targets and Ed25519 host keys (paramiko signs and verifies them with libsodium, outside the module), HSM and OpenBao keys other than RSA of an even length from 2048 to 16384 bits and ECDSA P-256, P-384 and P-521, ML-DSA and EdDSA among them (the provider signs, not the module), and SLH-DSA, which the module approves but the Python cryptography library does not provide.
 - The readiness check of the `-fips` image, run before the switch without `UCM_FIPS`, judges these keys by the image's module, asked when the image was built. Run it with that image, not the standard one: without a FIPS module the check lists EdDSA and ML-DSA keys as refused, and its report says so (`module_known: false`).
-- At each start in FIPS mode the `-fips` image runs the module's self-tests and compares the module's HMAC-SHA2-256 integrity value to the one recorded when the image was built; when they differ, or the record is missing, it refuses to start, and the published image has to be pulled again.
+- At each start in FIPS mode the `-fips` image runs the module's self-tests and compares the module's HMAC-SHA2-256 integrity value to the one recorded when the image was built; when they differ, or the record is missing or malformed, it refuses to start, and the published image has to be pulled again. It also refuses to start when `OPENSSL_MODULES` is set to anything but the absolute path of the checked module's directory, and keeps that directory for the whole process, whatever `ucm.env` sets.
 - SCEP in FIPS mode takes only RSA-OAEP key transport and AES content encryption: a request whose content key is wrapped with RSA PKCS#1 v1.5, encrypted with 3DES or signed with SHA-1 is refused (`badAlg`), so a client without RSA-OAEP, such as sscep, does not enroll.
 - In FIPS mode UCM runs the blocker checks of the readiness check at each start (about one database query per check, none that reads every certificate) and writes each blocker to the log as an error line with its remedy; `GET /api/v2/system/service/status` carries those of the start under `crypto.blockers`, with their time in `crypto.blockers_checked_at`, until the next start; the readiness check run on demand gives a fresh report. UCM starts anyway, since a native package sets `UCM_FIPS=1` by itself when the host switches, and refuses each affected operation when it is used. In HA mode every node logs its own.
 - With the image, TLS 1.2 without Extended Master Secret is refused in both directions, and TLS also offers the hybrid groups X25519MLKEM768, SecP256r1MLKEM768 and SecP384r1MLKEM1024; X25519 and X448 alone stay refused.
@@ -288,6 +296,7 @@ With a generated password, UCM asks for a new one right after login. Until it is
 - **Config:** `/etc/ucm/ucm.env`
 - **Logs:** `/var/log/ucm/`
 - **Service:** `/etc/systemd/system/ucm.service`
+- **Archive of a removed older installation:** `/opt/ucm-archive/` (only after one was archived; see above)
 
 ### Source Installation
 - **Data:** `./backend/data` (relative to repository root)

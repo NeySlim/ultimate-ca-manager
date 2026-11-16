@@ -115,6 +115,8 @@ Content-Type: application/json
 }
 ```
 
+**Lockout.** Each attempt is counted before its password is checked, on every node: here on a known, active account; at `POST /api/v2/sso/ldap/login` on the local account the directory entry opens, active or not, whatever name the user filter matched, and an entry with no local account yet is not counted. After `max_login_attempts` attempts without a success, the next ones answer 401 `Invalid credentials` without checking the password, the right one included, until `lockout_duration` has passed. An account whose count already reached a lowered `max_login_attempts` is locked by its next attempt, refused unchecked. A bind that proves the password but opens no session (account disabled here or in the directory, not in the required groups, no role mapped) stays counted, except the attempt that armed the lock, while that lock still runs: it lifts it and is not counted, so such binds never lock the account by themselves. Each lock is logged and sends the `account_locked` alert once. A success resets the count, and so does a new password: reset by link, set by an administrator (`POST /api/v2/users/{id}/reset-password`) or changed in a session (`POST /api/v2/account/password`). The count and the lock are those of the password and the LDAP bind: a client certificate or a passkey is not refused by them, and its success neither resets the count nor lifts the lock. When the count cannot be stored, the login answers 500 `Failed to record login attempt`; when a success cannot reset it, 500 `Failed to update login stats`, with no session opened and a lock armed by that attempt left in place.
+
 **Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account when its password was generated, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
 
 ### Login with WebAuthn
@@ -225,6 +227,8 @@ Content-Type: application/json
   "email": "user@example.com"
 }
 ```
+
+The answer is the same whether or not an account holds the address. No link is sent to an SSO account (linked to a provider or left without one) that has no local password: its provider alone opens it, and a token cannot set a password on it either. An administrator can still give it one.
 
 ### Reset Password
 ```http
@@ -550,8 +554,12 @@ An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored
 in `meta.notices`. An intermediate under an ML-DSA parent likewise takes no digest; an
 ML-DSA intermediate under an RSA or EC parent uses its parent's digest.
 
-In HA mode, a CA on a SoftHSM key (`hsm_key_id` of a key on a SoftHSM provider, or a new key
+In HA mode, a CA on a SoftHSM or local smart card reader (OpenSC, YubiKey PIV) key (`hsm_key_id` of a key on such a provider, or a new key
 through `hsm_provider_id`) answers `409` with code `ha_mode`, whatever the CA type.
+
+An HSM key backs one authority: `hsm_key_id` of a key an X.509 or SSH CA already holds answers `409`, naming that CA.
+
+A CA on an HSM key (`hsm_key_id`, or `hsm_provider_id` for a new key on the token), internal or `external`, requires `read:hsm` besides `write:cas`: `403` names the missing permission otherwise, before the key is looked up or generated.
 
 Optional `namedUrls: true` gives the CA an immutable unique slug derived from
 its name, used instead of the random id in CDP/AIA URL paths (both forms keep
@@ -987,7 +995,9 @@ Content-Type: application/json
 
 Renewing a member of a hybrid pair renews both, and the new B names the new A; the response
 lists the other member in `related_renewed`. When the two members require approval under
-different policies, the renewal answers `409` and only an administrator can perform it.
+different policies, the renewal answers `409` and only an administrator can perform it. A
+certificate or a pair link changed by another request while the renewal runs also answers
+`409`: reload the certificate and retry.
 
 ### Revoke Certificate
 ```http
@@ -2096,6 +2106,7 @@ GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&pla
 ```
 - `GET` list filters by `search` and by `type` (repeatable).
 - `POST` creates a CA (`201`): `descr` (or `name`, required), `ca_type` (`user` by default, or `host`), `key_type`, `default_ttl`, `max_ttl` (default `0`), `default_extensions`, `allowed_principals` (a list of non-empty strings), `allow_any_principal` and `allow_custom_key_id` (JSON booleans, default off), `comment`. `400` for an invalid value.
+- `POST` with `hsm_key_id` (a JSON integer above zero, `400` otherwise) creates a CA whose key stays on an HSM token: the key must be an RSA or NIST P-256, P-384 or P-521 signing key, `key_type` is read from it and the CA carries `key_source: "hsm"` and `hsm_key_id` (`"software"` and `null` for any other CA). It requires `read:hsm` besides `write:ssh_cas` (`403` naming the missing permission otherwise). An HSM key backs one authority: `409` names the X.509 or SSH CA that already holds it. A token that cannot be reached answers `503`, a key no longer on its token `409`, a misconfigured provider `400`, any other HSM failure `502`. In FIPS mode a key FIPS mode does not approve is refused before the CA is created; in HA mode a SoftHSM or local smart card reader (OpenSC, YubiKey PIV) key answers `409` with code `ha_mode`.
 - `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value.
 - `DELETE` answers `204`, or `409` when the service refuses (certificates still depend on the CA).
 - `POST /import` imports an existing CA from `private_key` (required) with `descr`, `ca_type` (`user` or `host`), `default_ttl`, `max_ttl` and `comment`; `201`, or `400` for an unusable key.
@@ -2483,7 +2494,7 @@ POST /api/v2/users/password-strength
 - `toggle-active` is the same route as `PATCH /api/v2/users/{user_id}/toggle`. `403` for your own account, `409` when it would deactivate the last active admin. These routes need `write:users` and an admin caller (`403` otherwise); `404` for an unknown user.
 - `unlock` clears a lockout and answers `Account is not locked` when there was none.
 - `reset-2fa` clears the user's second factor, the break-glass for a locked-out user.
-- `link-sso` takes `{"provider_id": 1}` (required) and links a local account to an SSO provider; `400` when the user is already linked, `404` for an unknown provider. `unlink-sso` turns an SSO-linked account back into a local one (`400` when it is not linked).
+- `link-sso` takes `{"provider_id": 1}` (required) and attaches any account to that SSO provider: a local account, one of another provider (moved), one without provider, or one already linked to it (its stable identity is reset). The stored identity is cleared, so the next sign-in through the provider with the account's username or email binds one; a password the account has is kept unless `"remove_password": true` is sent (a boolean, `400` otherwise), which removes it and any pending reset link so no password login opens the account (the password reset by e-mail sends it no link either; `400` on the caller's own account), and an account without password is not asked to set one. When the account's provider or identity changes, or its password is removed, its sessions are closed (the caller's own session stays) and `meta.other_sessions_closed` gives their count (`null` when the session store cannot count them, `0` when nothing changed); API keys, security keys and mTLS certificates are kept. The `user_link_sso` audit entry says where the account came from; `400` without `provider_id`, `404` for an unknown user or provider. `unlink-sso` turns an SSO-linked account back into a local one (`400` when it is not linked).
 - `bulk/delete` needs `delete:users` and an admin caller, and takes `{"ids": [...]}` (a non-empty list of at most 100). Each user is deleted with the mTLS certificates it enrolled. The result lists `success` ids, `failed` entries (`{id, error}`: own account, last active admin, pending approval requests, not found) and `unrevoked` certificates left valid.
 - `password-policy` and `password-strength` are public: the first returns the password requirements, the second takes `{"password": "..."}` and returns its strength.
 
@@ -3131,7 +3142,11 @@ In HA mode a restore holds the cluster maintenance (see [HA](HA.md#restoring-a-b
 code `maintenance_in_progress` while another maintenance holds, `maintenance_not_acknowledged` when a node with a
 fresh heartbeat did not acknowledge it within 30 s (`nodes` maps each one to the processes missing, `web` or
 `scheduler`), and `maintenance_lost` when the maintenance ended or was lifted before the commit; in each case
-nothing is restored. A successful restore answers `restart_detail` "Rolling restart requested: the nodes
+nothing is restored. Both restore routes answer `409` "The restore was refused: this server cannot write to
+<directories>. Nothing has been changed." when the CA, certificate or key directory is not writable, and `409`
+when the backup lock cannot be taken. A restore writes no file: `data.files` gives the files `generation` it
+committed and the number of `removals` listed, and each node then reconciles its files (see the
+[Administration Guide](ADMIN_GUIDE.md#files-after-a-restore)). A successful restore answers `restart_detail` "Rolling restart requested: the nodes
 restart one at a time". Both restore routes also answer `data.todo`, a list of strings with one line per warning
 (sections not restored, a CA whose CRL could not be signed, a secret to enter again); it is empty when there is
 nothing to do. The backup listing's `meta.restore_limits` gives `upload_bytes` (archives before v4) and
@@ -3235,6 +3250,8 @@ Content-Type: application/json
   "master_password": "secure-master-password"
 }
 ```
+
+`data.key_files` says what became of the plaintext key files the disable writes: `written`, `incomplete` (a file could not be written), or `pending` when the file directories were busy (another reconciliation, a restore, another node) or could not be locked; they are then written at the next start of the service, and `key_files_written` is `0`.
 
 ### Security - Generate Encryption Key
 ```http
@@ -3999,7 +4016,7 @@ Content-Type: application/json
 }
 ```
 
-Fields left out or blank keep their saved values. Saved credentials this node's database key cannot decrypt are never merged: `credentials` must then hold every required field, and a secret when the provider has one, in one request (400 naming the missing fields otherwise), and the entry replaces them whole, so an optional secret not sent again (INWX `shared_secret`, Cloudflare `api_key`) is no longer saved.
+Fields left out or blank keep their saved values. Saved credentials this node's database key cannot decrypt are never merged: `credentials` must then hold every required field, and a secret when the provider has one, in one request (400 naming the missing fields otherwise), and the entry replaces them whole, so an optional secret not sent again (INWX `shared_secret`, Cloudflare `api_key`) is no longer saved. A type without credential fields (`manual`, or one this release no longer knows) refuses any such entry, and a `manual` provider never reads its saved credentials.
 
 ### Delete DNS Provider
 ```http
@@ -4352,7 +4369,7 @@ Additional fields depend on `provider_type` (ldap, oauth2, saml).
 
 Custom roles are referenced by name. Among the groups a user belongs to, the base role is the most privileged one given; the custom role is the first one, in mapping order, that names one. A custom role never grants the permissions reserved to administrators.
 
-The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
+The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role, a malformed entry, or two keys the provider compares equal (an LDAP provider ignores case, edge spaces and the length of inner space runs) returns `400` and nothing is saved. A key is saved without its edge spaces. For an LDAP provider, `ldap_group_base_dn` sets where the groups are searched: an empty value clears it, a value that is not a DN returns `400`. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
 
 With `sync_role_on_login` on, each login also updates the custom role, and removes it when no matching group names one, but only if it came from the mapping (`custom_role_source` is `"sso"`). A custom role assigned by hand is never replaced nor removed. System roles cannot be used as the custom role of a mapping. Changes are recorded in the audit log as `role_change`.
 
@@ -4432,7 +4449,7 @@ POST /api/v2/sso/providers/{provider_id}/test-mapping
 - `certificates` (`read:sso`) lists the valid certificates usable for the SP metadata, the HTTPS certificate included.
 - `metadata` is public and returns the SAML 2.0 SP metadata XML to give the IdP.
 - `metadata/fetch` (`write:sso`) fetches and parses IdP metadata from `{"metadata_url": "https://..."}` (required; http or https with a hostname, not loopback or a cloud metadata address: `400`); optional `provider_id`, `verify_ssl` (default true) and `ca_bundle`.
-- `test-mapping` (`write:sso`) is a dry run of the LDAP group lookup for `{"username": "..."}` (required) without creating a session. `400` for a provider that is not LDAP or a failed lookup.
+- `test-mapping` (`write:sso`) is a dry run of an LDAP login past the password for `{"username": "..."}` (required), without creating a session: the same entry, groups and verdict as the login. `found: false` when the user filter finds no entry; otherwise `user_dn`, `username`, `email`, `groups`, `groups_readable`, `access_allowed`, `refusal` (`null`, `account_disabled`, `groups_unreadable`, `group_denied`, `unmapped` or `no_default_role`), `resolved_role` and `resolved_custom_role` (`null` when refused), `role_mapping`, `default_role`, `required_groups`, and `account_checked: false` with a `note`: the password and the UCM account the sign-in would open are not checked. `400` for a provider that is not LDAP, without `username` ("Username is required") or for a failed user lookup; `404` for an unknown provider.
 
 ---
 
@@ -4491,6 +4508,8 @@ On update, an absent or `null` `certification` keeps the declared one and `""` c
 DELETE /api/v2/hsm/providers/{provider_id}
 ```
 
+Deletes the provider and its keys. `409`, naming the authorities, while one of its keys backs an X.509 or SSH CA.
+
 ### Test HSM Provider
 ```http
 POST /api/v2/hsm/providers/{provider_id}/test
@@ -4503,11 +4522,16 @@ POST /api/v2/hsm/providers/{provider_id}/sync
 
 In HA mode, syncing a SoftHSM provider answers `409` with code `ha_mode`: its keys exist on one node only.
 
+A key the token no longer lists is removed, except a key an X.509 or SSH CA holds (counted in `missing_kept`) or any key when the listing reported errors (`listing_errors`); the CA keeps its key and its signing fails until the key is back on the token.
+
 ### List HSM Keys
 ```http
 GET /api/v2/hsm/keys
 GET /api/v2/hsm/keys?provider_id=1
+GET /api/v2/hsm/keys?unused=true
 ```
+
+`unused=true` keeps the asymmetric signing keys no X.509 or SSH CA holds, through that key row or another row with the same public key (the same token key under a second provider).
 
 ### Create HSM Key
 ```http
@@ -4542,6 +4566,8 @@ GET /api/v2/hsm/keys/{key_id}
 ```http
 DELETE /api/v2/hsm/keys/{key_id}
 ```
+
+`409`, naming the X.509 or SSH CA, while the key backs one.
 
 ### Get Public Key
 ```http
@@ -4778,6 +4804,8 @@ Content-Type: application/json
 
 { ... }
 ```
+
+A field left out of the body keeps its value. `rules`, when sent, replaces the policy's rules as a whole: a rule key left out of it is removed.
 
 ### Delete Policy
 ```http

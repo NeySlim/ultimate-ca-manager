@@ -9,6 +9,7 @@ from sqlalchemy import event, insert
 
 from models import AuditLog, db
 from services.audit import AuditService
+from tests.planner_stats import STATES, planner_statistics
 from utils.datetime_utils import utc_now
 
 MARK = 'stats-scale'
@@ -19,6 +20,16 @@ def frozen(monkeypatch):
     now = utc_now()
     monkeypatch.setattr('services.audit.query.utc_now', lambda: now)
     return now
+
+
+@pytest.fixture(params=STATES)
+def planner_stats(request, app):
+    if request.param != 'no_stats':
+        with app.app_context():
+            if db.engine.dialect.name != 'sqlite':
+                pytest.skip("sqlite_stat1 is SQLite's; PostgreSQL analyzes on its own")
+    with planner_statistics(app, request.param, ('audit_logs',)):
+        yield request.param
 
 
 @pytest.fixture
@@ -72,7 +83,7 @@ def _full_scans(statement, parameters):
     return bad
 
 
-def test_every_statement_reads_the_period_by_its_timestamp(app, journal, frozen):
+def test_every_statement_reads_the_period_by_its_timestamp(app, journal, frozen, planner_stats):
     with app.app_context():
         _add(frozen, 50, 2)
         found = {}
@@ -114,7 +125,7 @@ def _steps(app):
     return counter[0]
 
 
-def test_entries_older_than_the_period_cost_nothing(app, journal, frozen):
+def test_entries_older_than_the_period_cost_nothing(app, journal, frozen, planner_stats):
     with app.app_context():
         if db.engine.dialect.name != 'sqlite':
             pytest.skip('instruction counts are a SQLite measure; the plan test covers PostgreSQL')

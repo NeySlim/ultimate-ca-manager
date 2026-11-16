@@ -167,6 +167,21 @@ class TestHsmAndTsa:
         assert not compliance_signer.softhsm_provider(provider('openbao', '/usr/lib/softhsm/libsofthsm2.so'))
         assert not compliance_signer.softhsm_provider(None)
 
+    @pytest.mark.parametrize('module,local', [
+        ('/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so', True),
+        ('/usr/lib/x86_64-linux-gnu/onepin-opensc-pkcs11.so', True),
+        ('/usr/lib/x86_64-linux-gnu/libykcs11.so', True),
+        ('/usr/local/lib/libykcs11.so.2', True),
+        ('/opt/vendor/libcs_pkcs11_R3.so', False),
+        ('/usr/lib/softhsm/libsofthsm2.so', False),
+    ])
+    def test_a_local_reader_is_told_by_a_named_module(self, module, local):
+        provider = SimpleNamespace(type='pkcs11', name='HSM', get_config=lambda: {'module_path': module})
+        assert compliance_signer.local_reader_provider(provider) is local
+        assert not compliance_signer.local_reader_provider(
+            SimpleNamespace(type='openbao', name='HSM', get_config=lambda: {'module_path': module}))
+        assert not compliance_signer.local_reader_provider(None)
+
     def test_a_key_row_that_cannot_be_read_is_not_an_hsm(self):
         assert compliance_signer.storage_for_hsm_key(None) == 'software'
         assert compliance_signer.storage_for_hsm_key(SimpleNamespace(provider=None)) == 'software'

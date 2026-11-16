@@ -14,6 +14,7 @@ from services.backup import shared_store, storage
 from fips_mode import FipsRestricted
 from services.backup.decrypt_mixin import BackupDecryptionError
 from services.backup.locking import BackupBusyError, backup_operation_lock
+from services.backup.errors import RestoreFilesUnwritable
 from services.backup.restore.plan import RestoreValidationError
 from services.backup.restore_report import safe_restore_audit_details
 from services.backup.restore_completion import (
@@ -237,16 +238,27 @@ def restore_backup():
             service = BackupService()
             try:
                 with database_migration_lock(purpose='the restore'), \
-                        backup_operation_lock(purpose='the restore'):
+                        backup_operation_lock(purpose='the restore', fail_open=False):
                     results = service.restore_backup_from_stream(file.stream, password)
             except MigrationBusyError as busy:
+                if busy.unavailable:
+                    record_request_refusal(audited_name, 'the migration lock could not be taken')
+                    return error_response(str(busy), 409)
                 record_request_refusal(audited_name, 'a backend migration or another restore is running')
                 return error_response(
                     f"{busy} A backend migration or another restore is still "
                     "running.", 409)
             except BackupBusyError as busy:
+                # Nothing runs: the lock file cannot be locked at all
+                if busy.unavailable:
+                    record_request_refusal(audited_name, 'the backup lock could not be taken')
+                    return error_response(str(busy), 409)
                 record_request_refusal(audited_name, 'a backup or another restore is running')
                 return error_response(f"{busy} Retry once it has finished.", 409)
+            except RestoreFilesUnwritable as unwritable:
+                record_failure('system_restore', audited_name,
+                               'Restore refused: a file directory is not writable')
+                return error_response(str(unwritable), 409)
 
             # Recorded before the archive is judged empty or not, as the system
             # route does: a file that restored nothing was still uploaded and
