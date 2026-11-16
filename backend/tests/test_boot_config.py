@@ -175,3 +175,38 @@ class TestAnchor:
 
         pem, _name, _required = mtls_client_ca(str(tmp_path))
         assert pem == _pem('LEAF')
+
+
+def _three_boot_reads(data_path, capsys):
+    """What the gunicorn master reads before the schema exists, and what it printed."""
+    from boot_config import materialize_https
+    found = (wstep_enabled(data_path), mtls_client_ca(data_path),
+             materialize_https(data_path, os.path.join(data_path, 'c.pem'), os.path.join(data_path, 'k.pem')))
+    return found, capsys.readouterr().err
+
+
+def test_a_sqlite_database_without_its_tables_is_read_as_no_settings(tmp_path, monkeypatch, capsys):
+    """A first start cut before create_all: an empty file, read as a new installation."""
+    import sqlite3
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    monkeypatch.delenv('DATABASE_PATH', raising=False)
+    sqlite3.connect(str(tmp_path / 'ucm.db')).close()
+    assert _three_boot_reads(str(tmp_path), capsys) == ((False, None, None), '')
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_an_empty_postgres_database_is_read_as_no_settings(tmp_path, monkeypatch, capsys):
+    """A first start on an empty PostgreSQL database: no warning before the schema is built."""
+    import psycopg
+    schema = f'boot_empty_{os.getpid()}'
+    with psycopg.connect(PG_URL, autocommit=True) as connection:
+        connection.execute(f'DROP SCHEMA IF EXISTS {schema} CASCADE')
+        connection.execute(f'CREATE SCHEMA {schema}')
+    try:
+        sep = '&' if '?' in PG_URL else '?'
+        monkeypatch.setenv('DATABASE_URL', f'{PG_URL}{sep}options=-csearch_path%3D{schema}')
+        assert _three_boot_reads(str(tmp_path), capsys) == ((False, None, None), '')
+    finally:
+        with psycopg.connect(PG_URL, autocommit=True) as connection:
+            connection.execute(f'DROP SCHEMA IF EXISTS {schema} CASCADE')

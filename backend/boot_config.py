@@ -47,7 +47,12 @@ class BootDatabase:
 
     def rows(self, sql, params=()):
         cursor = self._connection.cursor()
-        cursor.execute(sql.replace('?', self._placeholder), params)
+        try:
+            cursor.execute(sql.replace('?', self._placeholder), params)
+        except Exception:
+            # A failed statement aborts a PostgreSQL transaction: the next read starts clean
+            self._connection.rollback()
+            raise
         return cursor.fetchall()
 
     def one(self, sql, params=()):
@@ -89,10 +94,16 @@ def open_boot_database(data_path: str):
 
 
 def _settings(database, keys):
+    """The stored values of *keys*; none before the schema exists (a first start)."""
     placeholders = ', '.join('?' for _ in keys)
-    rows = database.rows(
-        f"SELECT key, value FROM system_config WHERE key IN ({placeholders})",
-        tuple(keys))
+    try:
+        rows = database.rows(
+            f"SELECT key, value FROM system_config WHERE key IN ({placeholders})",
+            tuple(keys))
+    except Exception as e:
+        if _missing_table(e):
+            return {}
+        raise
     return {key: value for key, value in rows}
 
 
