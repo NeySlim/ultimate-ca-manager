@@ -19,7 +19,7 @@ export default {
         items: [
           { label: 'Nouveau fournisseur', text: 'Configurer la connexion à un HSM (chemin de bibliothèque, identifiants, slot)' },
           { label: 'Tester la connexion', text: 'Vérifier que le HSM est joignable et que les identifiants sont valides ; pour un module PKCS#11, enregistre aussi ce qu\'il déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur' },
-          { label: 'Générer une clé', text: 'Créer une nouvelle paire de clés directement sur le HSM' },
+          { label: 'Générer', text: 'Créer une nouvelle paire de clés directement sur le HSM' },
           { label: 'Synchroniser les clés', text: 'Relit les clés du fournisseur depuis le jeton : les nouvelles sont ajoutées, celles qui ont disparu du jeton sont retirées, sauf celles qu\'une AC utilise, qui sont conservées. Si la lecture du jeton échoue, rien n\'est retiré. Le message donne les décomptes, les clés conservées et les clés illisibles ; le bouton reste désactivé pendant la synchronisation' },
           { label: 'Statut', text: 'Surveiller la santé de la connexion du fournisseur' },
           { label: 'Certification', text: 'Déclarer la certification du HSM : Common Criteria EAL 4+, EUCC élevé, FIPS 140-3 niveau 3, FIPS 140-2 niveau 3 ou autre. Laissée vide, elle n\'est pas déclarée. Le profil de conformité eu-acm n\'accepte que Common Criteria EAL 4+, EUCC élevé et FIPS 140-3 niveau 3 (jusqu\'au 31 décembre 2030) pour une CA adossée à un HSM' },
@@ -151,7 +151,7 @@ Chaque fournisseur affiche un indicateur de statut de connexion :
 
 ### Générer des clés
 1. Sélectionnez un fournisseur connecté
-2. Cliquez sur **Générer une clé**
+2. Cliquez sur **Générer**
 3. Choisissez l'algorithme (RSA 2048/4096, ECDSA P-256/P-384)
 4. Entrez un label/alias pour la clé
 5. Cliquez sur **Générer**

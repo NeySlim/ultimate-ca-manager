@@ -54,7 +54,7 @@ describe('SSO setup steps', () => {
   it.each(['en', 'fr', 'ru', 'zh'])('%s names the Configure button of each provider card', (lang) => {
     const { sso } = locales[`../../i18n/locales/${lang}.json`].default
     const text = guide(lang)
-    expect(text).not.toContain(sso.addProvider)
+    expect(text).not.toContain('Add SSO Provider')
     expect(text).toContain(`**${sso.configure}**`)
     for (const type of ['saml', 'oauth2', 'ldap']) expect(text).toContain(`**${sso[type]}**`)
   })
@@ -88,15 +88,32 @@ describe('values and buttons quoted by the translated pages', () => {
 })
 
 describe('buttons named by the English help', () => {
-  // Labels not yet checked against their screen; every other "Click **X**" must be a label en.json holds.
-  const UNCHECKED = ['Issue', 'Duplicate', 'Generate Key']
+  // Every "Click **X**" must be a label en.json holds.
   const norm = (s) => s.replace(/\{\{\w+\}\}/g, 'N').replace(/^▶\s*/, '').trim().toLowerCase()
   it('cites only labels the interface shows', async () => {
     const en = (await import('../../i18n/locales/en.json')).default
     const labels = new Set(strings(en).map(norm))
     const cited = strings([helpContent, helpGuides])
       .flatMap((s) => [...s.matchAll(/\b[Cc]lick(?: on)? \*\*([^*]+)\*\*/g)].map((m) => m[1]))
-    expect([...new Set(cited)].filter((c) => !UNCHECKED.includes(c) && !labels.has(norm(c)))).toEqual([])
+    expect([...new Set(cited)].filter((c) => !labels.has(norm(c)))).toEqual([])
+  })
+})
+
+describe('buttons of the HSM, certificate and template guides in every language', () => {
+  const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
+  const guide = (lang, key) => (lang === 'en' ? helpGuides[key].content : pages[`../help/${lang}/${key}.js`].default.helpGuides.content)
+  it.each(['en', 'fr', 'ru', 'zh'])('%s quotes the Generate, Issue Certificate and Copy buttons as the screen shows them', (lang) => {
+    const t = locales[`../../i18n/locales/${lang}.json`].default
+    expect(guide(lang, 'hsm')).toContain(`**${t.common.generate}**`)
+    expect(guide(lang, 'certificates')).toContain(`**${t.certificates.issueCertificate}**`)
+    expect(guide(lang, 'templates')).toContain(`**${t.common.copy}**`)
+  })
+  it.each(['en', 'fr', 'ru', 'zh'])('%s says the forced password prompt has Logout as its only other button', (lang) => {
+    const t = locales[`../../i18n/locales/${lang}.json`].default
+    const text = (lang === 'en' ? helpContent.account : pages[`../help/${lang}/account.js`].default.helpContent)
+    const forced = strings(text.sections).find((s) => s.includes('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE'))
+    expect(forced).toContain(t.common.logout)
+    expect(forced).toMatch({ en: /only other button is Logout/, fr: /seul autre bouton est Déconnexion/, ru: /единственная другая кнопка/, zh: /唯一的另一个按钮/ }[lang])
   })
 })
 

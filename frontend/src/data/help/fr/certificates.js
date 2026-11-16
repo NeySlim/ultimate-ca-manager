@@ -131,7 +131,7 @@ Gestion centralisée de tous les certificats X.509. Émettez de nouveaux certifi
 5. Choisissez le type et la taille de la clé
 6. Définissez la période de validité
 7. Appliquez optionnellement un **modèle** pour préremplir les paramètres
-8. Cliquez sur **Émettre**
+8. Cliquez sur **Émettre un certificat**
 
 ### Utiliser les modèles
 Les modèles préremplissent l'utilisation de la clé, l'utilisation étendue de la clé, les valeurs par défaut du sujet et la validité. Sélectionnez un modèle avant de remplir le formulaire pour gagner du temps.

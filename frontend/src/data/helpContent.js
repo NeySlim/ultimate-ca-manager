@@ -440,7 +440,7 @@ export const helpContent = {
         title: 'Source',
         icon: FileText,
         definitions: [
-          { term: 'System', description: 'Seeded at install. Duplicate one for an editable copy: it cannot be edited or deleted itself' },
+          { term: 'System', description: 'Seeded at install. Copy one for an editable copy: it cannot be edited or deleted itself' },
           { term: 'Custom', description: 'Created or imported here, and the only kind that can be edited or deleted' },
         ]
       },
@@ -454,7 +454,7 @@ export const helpContent = {
           { label: 'Extended Key Usage', text: 'Any purpose the server knows: Server Auth, Client Auth, Code Signing, Email Protection, Smartcard Logon, Time Stamping, OCSP Signing, IPsec, Microsoft RDP and others' },
           { label: 'SAN types', text: 'The name types (DNS, IP, Email, URI, UPN) a request made with the template may carry. With "Enforce the allowed SAN types" on, the issue form, Sign CSR, the enrollment protocols, renewals and approvals refuse any other type, and a name only implied by the CN is left out. New templates have it on; older ones and the built-in ones have it off. None checked: every type is allowed' },
           { label: 'Validity', text: 'Default validity period in days' },
-          { label: 'Duplicate', text: 'Clone an existing template and modify it' },
+          { label: 'Copy', text: 'Clone an existing template and modify it' },
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
           { label: 'Deactivate', text: 'A deactivated template, built-in ones included, is no longer offered by the Issue Certificate form nor to Windows autoenrollment, and shows an Inactive badge. Activate brings it back. A built-in template can be deactivated, not edited: duplicate it to change it' },
           { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances: the page exports one template at a time, and an import file may hold one or several' },
@@ -480,7 +480,7 @@ export const helpContent = {
     ],
     tips: [
       'Create separate templates for TLS servers, clients, and code signing',
-      'Use the Duplicate action to quickly create variations of a template, including of a system one',
+      'Use the Copy action to quickly create variations of a template, including of a system one',
       'Templates with autoenrollment flags show AD / Auto / ACL / Pinned badges in the list',
     ],
     related: ['Certificates', 'CSRs', 'CAs']
@@ -1322,7 +1322,7 @@ export const helpContent = {
           { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
           { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
           { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
-          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt cannot be skipped and offers only Logout. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
+          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt cannot be skipped and its only other button is Logout. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
         ]
       },
       {
@@ -1499,7 +1499,7 @@ export const helpContent = {
         items: [
           { label: 'New Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
           { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid; for a PKCS#11 module, also record what it reports (library, manufacturer, library and firmware versions), shown on the provider page' },
-          { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
+          { label: 'Generate', text: 'Create a new key pair directly on the HSM' },
           { label: 'Sync keys', text: 'Reads the provider\'s keys again from the token: new keys are added, keys gone from the token are removed, except those a CA uses, which are kept. When the token listing fails, nothing is removed. The message gives the counts, the keys kept and the unreadable keys; the button stays disabled while the synchronization runs' },
           { label: 'Status', text: 'Monitor provider connection health' },
           { label: 'Certification', text: 'Declare the certification of the HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 level 3, FIPS 140-2 level 3 or other. Left empty, it is not declared. The eu-acm compliance profile accepts only Common Criteria EAL 4+, EUCC high, and FIPS 140-3 level 3 (until 31 December 2030) for an HSM-backed CA' },

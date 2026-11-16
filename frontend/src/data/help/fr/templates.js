@@ -7,7 +7,7 @@ export default {
       {
         title: 'Origine',
         definitions: [
-          { term: 'Système', description: 'Fournis à l\'installation. Dupliquez-en un pour obtenir une copie modifiable : lui-même ne peut être ni modifié ni supprimé' },
+          { term: 'Système', description: 'Fournis à l\'installation. Copiez-en un pour obtenir une copie modifiable : lui-même ne peut être ni modifié ni supprimé' },
           { term: 'Personnalisé', description: 'Créés ou importés ici, et les seuls qui peuvent être modifiés ou supprimés' },
         ]
       },
@@ -20,7 +20,7 @@ export default {
           { label: 'Utilisation étendue de la clé', text: 'Tout usage connu du serveur : authentification serveur, authentification client, signature de code, protection e-mail, Smartcard Logon, horodatage, signature OCSP, IPsec, Microsoft RDP et autres' },
           { label: 'Types de SAN', text: 'Les types de noms (DNS, IP, Email, URI, UPN) qu\'une demande faite avec le modèle peut porter. Avec « Appliquer les types de SAN autorisés » activé, le formulaire d\'émission, la signature de CSR, les protocoles d\'enrôlement, les renouvellements et les approbations refusent tout autre type, et un nom seulement déduit du CN est omis. Les nouveaux modèles l\'ont activé ; les anciens et les modèles intégrés l\'ont désactivé. Aucune case cochée : tous les types sont permis' },
           { label: 'Validité', text: 'Période de validité par défaut en jours' },
-          { label: 'Dupliquer', text: 'Cloner un modèle existant et le modifier' },
+          { label: 'Copier', text: 'Cloner un modèle existant et le modifier' },
           { label: 'Afficher système', text: 'Masquer les modèles intégrés pour ne travailler qu\'avec les vôtres. Mémorisé par navigateur' },
           { label: 'Désactiver', text: 'Un modèle désactivé, intégré ou non, n\'est plus proposé par le formulaire Émettre un certificat ni à l\'auto-inscription Windows, et affiche un badge Inactif. Activer le remet en service. Un modèle intégré peut être désactivé, pas modifié : dupliquez-le pour le changer' },
           { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM : la page exporte un modèle à la fois, et un fichier d\'import peut en contenir un ou plusieurs' },
@@ -45,7 +45,7 @@ export default {
     ],
     tips: [
       'Créez des modèles séparés pour les serveurs TLS, les clients et la signature de code',
-      'Utilisez l\'action Dupliquer pour créer rapidement des variantes d\'un modèle, y compris d\'un modèle système',
+      'Utilisez l\'action Copier pour créer rapidement des variantes d\'un modèle, y compris d\'un modèle système',
       'Les modèles avec indicateurs d\'autoenrollment affichent des badges AD / Auto / ACL / Épinglé dans la liste',
     ],
   },
@@ -61,7 +61,7 @@ Les modèles définissent des profils de certificat réutilisables. Au lieu de c
 Chaque modèle est l'un ou l'autre, comme l'indique la colonne **Origine**.
 
 ### Système
-Les modèles fournis à l'installation : Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication et Smartcard Logon. Modifier et Supprimer leur sont refusés, dans l'interface comme par l'API. **Dupliquer** vous donne une copie modifiable comme point de départ.
+Les modèles fournis à l'installation : Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication et Smartcard Logon. Modifier et Supprimer leur sont refusés, dans l'interface comme par l'API. **Copier** vous donne une copie modifiable comme point de départ.
 
 ### Personnalisé
 Tout ce qui est créé ou importé ici. Ces modèles peuvent être modifiés et supprimés librement.
@@ -135,9 +135,9 @@ Un modèle peut ajouter des extensions pour lesquelles UCM n'a aucun réglage. C
 
 L'inspecteur liste ces extensions pour les certificats et les CA sous **Autres extensions**, dans l'onglet Extensions, avec leur OID, leur nom s'il est connu, leur criticité et leur valeur.
 
-## Dupliquer des modèles
+## Copier des modèles
 
-Cliquez sur **Dupliquer** pour créer une copie d'un modèle existant. Modifiez la copie sans affecter l'original.
+Cliquez sur **Copier** pour créer une copie d'un modèle existant. Modifiez la copie sans affecter l'original.
 
 ## Importer et exporter
 
