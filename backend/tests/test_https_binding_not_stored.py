@@ -50,21 +50,22 @@ def test_regenerate_without_a_stored_binding_does_not_restart(auth_client, broke
 @pytest.fixture
 def prior(app):
     """Sets what the database served before the request: nothing, a binding, or a
-    regenerated pair; the rows found before are put back after."""
+    regenerated pair (never a restored one); the rows found before are put back after."""
     from models import SharedFile, SystemConfig, db
     from services import shared_files
     from services.https_binding import BOUND_REFID_KEY
     with app.app_context():
         row = SystemConfig.query.filter_by(key=BOUND_REFID_KEY).first()
         saved_bound = row.value if row else None
-        generated = db.session.get(SharedFile, shared_files.HTTPS_GENERATED)
-        saved_generated = generated.content if generated else None
+        saved = {name: getattr(db.session.get(SharedFile, name), 'content', None)
+                 for name in (shared_files.HTTPS_GENERATED, shared_files.HTTPS_RESTORED)}
 
     def _set(state):
         from services.https_binding import _set_config
         with app.app_context():
             _set_config(BOUND_REFID_KEY, 'earlier-https-refid' if state == 'bound' else '', 'test')
             shared_files.drop_file(shared_files.HTTPS_GENERATED)
+            shared_files.drop_file(shared_files.HTTPS_RESTORED)
             if state == 'generated':
                 shared_files.store_file(shared_files.HTTPS_GENERATED, b'{"crt": "", "key": ""}')
             db.session.commit()
@@ -72,10 +73,11 @@ def prior(app):
     with app.app_context():
         from services.https_binding import _set_config
         _set_config(BOUND_REFID_KEY, saved_bound or '', 'test')
-        shared_files.drop_file(shared_files.HTTPS_GENERATED)
-        db.session.flush()
-        if saved_generated is not None:
-            db.session.add(SharedFile(name=shared_files.HTTPS_GENERATED, content=saved_generated))
+        for name, content in saved.items():
+            shared_files.drop_file(name)
+            db.session.flush()
+            if content is not None:
+                db.session.add(SharedFile(name=name, content=content))
         db.session.commit()
 
 
