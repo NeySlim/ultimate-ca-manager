@@ -88,8 +88,9 @@ def _count(route, fmt, data):
 def rows(app, create_cert, create_ca):
     """Two readable rows per kind, plus a restore of every row touched."""
     saved = []
-    made = {'cert': [create_cert(cn=f'unreadable-{i}.example.com')['id'] for i in range(2)],
-            'ca': [create_ca(cn=f'Unreadable CA {i}')['id'] for i in range(2)]}
+    # the certificates are issued by a CA of this file, removed with it
+    made = {'ca': [create_ca(cn=f'Unreadable CA {i}')['id'] for i in range(2)]}
+    made['cert'] = [create_cert(cn=f'unreadable-{i}.example.com', ca_id=made['ca'][0])['id'] for i in range(2)]
     with app.app_context():
         trust = []
         for i in range(2):
