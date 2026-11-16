@@ -1957,6 +1957,8 @@ Purge old logs based on retention period:
 
 Click **Verify Integrity** to check the audit log chain. UCM uses hash chaining to detect an entry modified or removed inside the chain; removing the latest entries leaves no trace in the chain itself, which is why syslog forwarding keeps a copy elsewhere.
 
+On a large ledger the verification runs in the background: the button shows how many entries are checked so far, **Cancel verification** stops it, and leaving or reloading the page does not stop it (the page picks it up again). One verification runs at a time.
+
 ## Syslog Forwarding
 
 Configure remote syslog forwarding in **Settings → Audit** to send log events to an external SIEM or syslog server in real-time.

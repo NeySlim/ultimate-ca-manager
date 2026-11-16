@@ -1076,7 +1076,7 @@ export const helpContent = {
         items: [
           { label: 'Export', text: 'Download logs in JSON or CSV format' },
           { label: 'Cleanup Old Logs', text: 'Purge old logs with configurable retention (days)' },
-          { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering' },
+          { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering; on a large ledger it runs in the background, with its progress and a cancel button' },
         ]
       },
     ],
