@@ -4079,6 +4079,12 @@
     "provisioningRulesNotice": "Existem regras de mapeamento de funções: um utilizador que nenhuma regra reconhece é recusado ao iniciar sessão.",
     "provisioningNoRulesNotice": "Nenhuma regra de mapeamento de funções: qualquer utilizador autenticado por este fornecedor pode iniciar sessão, e as novas contas recebem a função {{role}}.",
     "provisioningNobodyNotice": "Nenhuma regra de mapeamento de funções nem função predefinida: ninguém pode iniciar sessão através deste fornecedor.",
+    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values the provider sent and where they were read.",
+    "samlGroupShortcuts": "Add a row that reads groups from a common attribute:",
+    "samlGroupShortcutKeycloakRoles": "Keycloak, roles",
+    "samlGroupShortcutKeycloakGroups": "Keycloak, groups",
+    "samlGroupShortcutMemberOf": "LDAP-backed IdPs",
+    "samlGroupShortcutIsMemberOf": "isMemberOf, Shibboleth",
     "ldapStartTls": "Usar StartTLS",
     "ldapStartTlsHelp": "Passar a ligação LDAP sem cifra para TLS antes de qualquer bind",
     "ldapPlainWarning": "LDAP sem cifra: as palavras-passe de bind e dos utilizadores circulam sem cifra. Ative SSL/TLS ou StartTLS."

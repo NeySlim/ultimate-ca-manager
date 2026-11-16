@@ -4129,6 +4129,12 @@
     "provisioningRulesNotice": "Правила зіставлення ролей задано: користувача, якого не розпізнає жодне правило, буде відхилено під час входу.",
     "provisioningNoRulesNotice": "Немає правил зіставлення ролей: кожен користувач, автентифікований цим постачальником, може увійти, а нові облікові записи отримують роль {{role}}.",
     "provisioningNobodyNotice": "Немає правил зіставлення ролей і ролі за замовчуванням: ніхто не може увійти через цього постачальника.",
+    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values the provider sent and where they were read.",
+    "samlGroupShortcuts": "Add a row that reads groups from a common attribute:",
+    "samlGroupShortcutKeycloakRoles": "Keycloak, roles",
+    "samlGroupShortcutKeycloakGroups": "Keycloak, groups",
+    "samlGroupShortcutMemberOf": "LDAP-backed IdPs",
+    "samlGroupShortcutIsMemberOf": "isMemberOf, Shibboleth",
     "ldapStartTls": "Використовувати StartTLS",
     "ldapStartTlsHelp": "Перевести незашифроване з'єднання LDAP на TLS перед будь-яким bind",
     "ldapPlainWarning": "Незашифрований LDAP: паролі bind і користувачів передаються мережею без шифрування. Увімкніть SSL/TLS або StartTLS."
