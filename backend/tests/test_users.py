@@ -756,19 +756,24 @@ class TestLinkSSO:
     at one provider per type, and the test DB is shared across the session.
     """
 
-    def _provider_id(self, app):
-        """Reuse an existing SSO provider, or create one directly."""
-        from models import db
+    @pytest.fixture
+    def provider_id(self, app):
+        """A provider of this test's own, removed after it: a provider left behind makes the
+        providers API of a later file refuse a second one of its type."""
+        import uuid
+        from models import db, User
         from models.sso import SSOProvider
         with app.app_context():
-            p = SSOProvider.query.filter_by(provider_type='ldap').first()
-            if not p:
-                p = SSOProvider(name='link-test-ldap', provider_type='ldap',
-                                display_name='Link Test', enabled=False,
-                                default_role='viewer')
-                db.session.add(p)
-                db.session.commit()
-            return p.id
+            p = SSOProvider(name=f'link-test-{uuid.uuid4().hex[:8]}', provider_type='ldap',
+                            display_name='Link Test', enabled=False, default_role='viewer')
+            db.session.add(p)
+            db.session.commit()
+            pid = p.id
+        yield pid
+        with app.app_context():
+            User.query.filter_by(sso_provider_id=pid).update({'sso_provider_id': None}, synchronize_session=False)
+            SSOProvider.query.filter_by(id=pid).delete(synchronize_session=False)
+            db.session.commit()
 
     def _make_local_user(self, app, username, email):
         from models import db, User
@@ -786,8 +791,8 @@ class TestLinkSSO:
                         content_type='application/json')
         assert r.status_code == 401, r.data
 
-    def test_link_and_unlink_roundtrip(self, app, auth_client):
-        pid = self._provider_id(app)
+    def test_link_and_unlink_roundtrip(self, app, auth_client, provider_id):
+        pid = provider_id
         uid = self._make_local_user(app, 'link_local1', 'link_local1@test.local')
 
         # Link — the username is preserved (no rename, see #138)
