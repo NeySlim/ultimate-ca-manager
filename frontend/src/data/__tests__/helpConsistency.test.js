@@ -54,6 +54,16 @@ describe('French wording of the certification authority', () => {
     const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])CAs?(?![\p{L}\p{N}_]).{0,20}/gu) || [])
     expect(found).toEqual([])
   })
+  // Where English spells out "Certificate Authority", the French label spells out "autorité de certification".
+  it('spells out the long form wherever English does', () => {
+    const en = import.meta.glob('../../i18n/locales/en.json', { eager: true })['../../i18n/locales/en.json'].default
+    const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' ? flat(v, `${p}${k}.`) : [[p + k, v]]))
+    const frFlat = Object.fromEntries(flat(fr))
+    const found = flat(en)
+      .filter(([k, v]) => /certificate authorit/i.test(v) && !/autorité/i.test(frFlat[k] || ''))
+      .map(([k]) => k)
+    expect(found).toEqual([])
+  })
   // The key ID template and the SSH CA types are written as the French screens show them.
   it('has no English fragments around the AC in the SSH help', () => {
     const found = frStrings.flatMap((s) => s.match(/AC name|User AC|Host AC|Production User/g) || [])

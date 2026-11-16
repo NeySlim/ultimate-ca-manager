@@ -540,8 +540,8 @@
     "registered": "Enregistré",
     "certificateAuthorities": "Autorités de certification (AC)",
     "certificateAuthoritiesDesc": "Gérez les autorités ACME externes auprès desquelles UCM peut demander des certificats (Let's Encrypt, Actalis, ZeroSSL...).",
-    "addCertificateAuthority": "Ajouter une autorité",
-    "editCertificateAuthority": "Modifier l'autorité",
+    "addCertificateAuthority": "Ajouter une autorité de certification",
+    "editCertificateAuthority": "Modifier l'autorité de certification",
     "noCaAccounts": "Aucun compte AC ACME configuré pour l'instant.",
     "setDefault": "Définir par défaut",
     "caLabel": "Nom",
@@ -2725,7 +2725,7 @@
     "scepDisabled": "SCEP est désactivé",
     "scepDisabledDesc": "Activez SCEP dans l'onglet Configuration.",
     "noCasAvailable": "Aucune AC disponible",
-    "noCasAvailableDesc": "Créez d'abord une AC pour configurer SCEP",
+    "noCasAvailableDesc": "Créez d'abord une autorité de certification pour configurer SCEP",
     "regenerate": "Régénérer",
     "challengeRegenerated": "Mot de passe de défi régénéré",
     "confirmRegenerateChallenge": "Régénérer le mot de passe de challenge SCEP de cette AC ? L'actuel cesse de fonctionner immédiatement et tous les appareils configurés avec doivent être mis à jour.",
@@ -3555,19 +3555,19 @@
           "remedy": "Saisissez à nouveau le mot de passe dans les paramètres du protocole : il est alors stocké en hash PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "AC avec une clé Ed25519 ou Ed448 : elles ne peuvent pas signer en mode FIPS sur un HSM, ou sur un module qui n'approuve pas EdDSA",
+          "title": "Autorités de certification avec une clé Ed25519 ou Ed448 : elles ne peuvent pas signer en mode FIPS sur un HSM, ou sur un module qui n'approuve pas EdDSA",
           "remedy": "Créez une AC RSA ou ECDSA (P-256/P-384/P-521) et déplacez-y l'émission avant la bascule ; la clé d'une AC ne peut pas être convertie."
         },
         "ca_weak_key": {
-          "title": "AC avec une clé DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
+          "title": "Autorités de certification avec une clé DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
           "remedy": "Créez une AC en RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission."
         },
         "ca_unapproved_algorithm": {
-          "title": "AC avec une clé ML-DSA : elles ne peuvent pas signer en mode FIPS sur un HSM, ou sur un module qui n'approuve pas ML-DSA",
+          "title": "Autorités de certification avec une clé ML-DSA : elles ne peuvent pas signer en mode FIPS sur un HSM, ou sur un module qui n'approuve pas ML-DSA",
           "remedy": "Créez une AC RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission avant la bascule, ou laissez le mode FIPS désactivé tant que l'émission ML-DSA est nécessaire."
         },
         "ssh_ca_eddsa_key": {
-          "title": "AC SSH avec une clé Ed25519 : elles ne peuvent pas signer en mode FIPS sur un module qui n'approuve pas EdDSA",
+          "title": "Autorités de certification SSH avec une clé Ed25519 : elles ne peuvent pas signer en mode FIPS sur un module qui n'approuve pas EdDSA",
           "remedy": "Créez une AC SSH ECDSA ou RSA et distribuez sa clé publique aux hôtes avant la bascule."
         },
         "ssh_certificates_eddsa_key": {
@@ -4949,8 +4949,8 @@
         "generic": "Créé avec succès",
         "sshCa": "AC SSH créée avec succès",
         "sshCertificate": "Certificat SSH émis avec succès",
-        "caOffline": "Autorité de certification hors ligne",
-        "caRestored": "Autorité de certification restaurée à l'état en ligne"
+        "caOffline": "AC mise hors ligne",
+        "caRestored": "AC restaurée à l'état en ligne"
       },
       "update": {
         "certificate": "Certificat mis à jour avec succès",
