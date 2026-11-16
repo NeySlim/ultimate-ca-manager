@@ -51,7 +51,7 @@ export default {
           { label: '用户筛选器', text: '匹配用户的 LDAP 筛选器（例如 (uid={username})）' },
           { label: '属性映射', text: '将 LDAP 属性映射到 UCM 字段：用户名、邮箱、全名。' },
           { label: '唯一 ID 属性', text: '用于识别账户的不可变 ID（entryUUID、objectGUID）。按 DN 绑定的账户会在下一次登录时迁移到此 ID；从一个 ID 属性改为另一个会拒绝所有已绑定的用户，直到对每个账户执行关联到 SSO。' },
-          { label: '组', text: '使用 memberOf 时，从用户自身的条目读取；使用 member 或 uniqueMember 时，若设置了组搜索基础则在其下搜索，否则在目录包含的基础 DN 的父级下搜索，然后在基础 DN 下搜索，组筛选器默认为 (objectClass=*)。仅计直接成员资格：嵌套组和 Active Directory 主要组（Domain Users）不可见。组名与规则和必需组比较时忽略大小写、首尾空格以及内部连续空格的长度。存在规则或必需组而组无法读取时，登录被拒绝并说明原因。测试映射读取组并按登录相同的方式判定。' },
+          { label: '组', text: '使用 memberOf 时，从用户自身的条目读取；使用 member 或 uniqueMember 时，若设置了组搜索基础则在其下搜索，否则在目录包含的基础 DN 的父级下搜索，该搜索失败时再在基础 DN 下搜索，目录不包含父级时直接在基础 DN 下搜索；组筛选器默认为 (objectClass=*)。仅计直接成员资格：嵌套组和 Active Directory 主要组（Domain Users）不可见。组名与规则和必需组比较时忽略大小写、首尾空格以及内部连续空格的长度。存在规则或必需组而组无法读取时，登录被拒绝并说明原因。测试映射读取组并按登录相同的方式判定。' },
         ]
       },
     ],

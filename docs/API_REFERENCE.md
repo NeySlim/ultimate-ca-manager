@@ -228,7 +228,7 @@ Content-Type: application/json
 }
 ```
 
-The answer is the same whether or not an account holds the address. No link is sent to an account linked to an SSO provider that has no local password: its provider alone opens it, and a token cannot set a password on it either.
+The answer is the same whether or not an account holds the address. No link is sent to an SSO account (linked to a provider or left without one) that has no local password: its provider alone opens it, and a token cannot set a password on it either. An administrator can still give it one.
 
 ### Reset Password
 ```http
