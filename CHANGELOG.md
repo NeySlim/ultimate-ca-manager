@@ -113,7 +113,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- **OIDC role mapping with Microsoft Entra ID.** Role mapping rules now compare the `groups` and `roles` of the ID token validated for the login with those of the UserInfo response, which Entra ID never fills, so a provider with rules no longer refuses every user; an empty `roles` claim no longer hides `groups`.
+- **OIDC role mapping with Microsoft Entra ID.** Role mapping rules now compare their keys with the `groups` and `roles` read together from the ID token validated for the login and the UserInfo response, which Entra ID never fills, so a provider with rules no longer refuses every user; an empty `roles` claim no longer hides `groups`.
 - **SAML logins from Keycloak.** An assertion that repeats an attribute name, as Keycloak's role list does with one attribute per role, was refused as invalid; the values of repeated attributes are now merged and read for role mapping.
 - **Files after a restore.** A restore no longer writes certificate, CSR or key files: once it has committed, the service rewrites from the database the files that are missing or differ and removes those of the rows the restore removed, and it refuses the restore with `409` when it cannot write to these directories.
 - **Backups of large installations.** A backup held each section of the archive whole in memory and ran an RSA consistency check on every private key, which took most of its time; it now reads each table a page at a time, so its memory no longer grows with the number of certificates, and compares each key with its certificate by their public keys alone.

@@ -410,7 +410,8 @@ def sso_callback(provider_type):
 
             # Token groups count only from the token of this login: nonce checked and
             # same subject as UserInfo. An unsigned (compatibility) token counts only over
-            # verified TLS with every other claim valid (OIDC Core 3.1.3.7, steps 2-6, 9).
+            # verified TLS: OIDC Core §3.1.3.7 steps 2-5 and 9-11 (iss, aud, azp, exp, iat,
+            # nonce) still apply; step 6 lets TLS stand in for the signature only.
             token_sub = (trusted_id_claims or {}).get('sub')
             token_unused = None
             if trusted_id_claims is None:

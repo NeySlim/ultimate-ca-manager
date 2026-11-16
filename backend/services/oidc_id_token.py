@@ -294,8 +294,8 @@ def _configured_issuer_and_client_id(provider):
 def unverified_claims_error(claims, provider, expected_nonce):
     """Why an unsigned (compatibility) token fails a check other than the signature, or None.
 
-    OIDC Core §3.1.3.7 step 6 lets TLS stand in for the signature only; iss, aud,
-    azp, exp, iat and nonce (steps 2-5, 9-11) still apply.
+    OIDC Core §3.1.3.7 steps 2-5 and 9-11 (iss, aud, azp, exp, iat, nonce) still
+    apply; step 6 lets TLS stand in for the signature only.
     """
     try:
         issuer, client_id = _configured_issuer_and_client_id(provider)
