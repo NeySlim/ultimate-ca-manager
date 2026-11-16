@@ -2824,9 +2824,9 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 
 ### Groups
 - **memberOf**: read from the user's own entry (a base search on its DN); the group filter is not used
-- **member / uniqueMember**: searched under the server's naming context that holds the Base DN, else under the Base DN, with the group filter (\`(objectClass=*)\` when empty); groups beside the users (\`ou=groups\` next to \`ou=people\`) are found
+- **member / uniqueMember**: searched under the Group Search Base alone when it is set; otherwise under the parent of the Base DN when the directory holds it, then under the Base DN if that search fails, with the group filter (\`(objectClass=*)\` when empty); groups beside the users (\`ou=groups\` next to \`ou=people\`) are found
 - **Direct membership only**: nested groups and the Active Directory primary group (Domain Users) are not seen
-- **Matching**: group names compare with rules and required groups ignoring case and edge spaces
+- **Matching**: group names compare with rules and required groups ignoring case and edge spaces, a run of inner spaces counting as one
 - **Unreadable groups**: with rules or required groups, a sign-in whose groups cannot be read is refused with "your groups could not be read from the directory"
 - **Test Mapping** reads the groups and decides as the sign-in does, without the password; it shows a role only for an admitted user
 

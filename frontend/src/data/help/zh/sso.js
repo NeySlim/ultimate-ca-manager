@@ -50,7 +50,7 @@ export default {
           { label: '用户筛选器', text: '匹配用户的 LDAP 筛选器（例如 (uid={username})）' },
           { label: '属性映射', text: '将 LDAP 属性映射到 UCM 字段：用户名、邮箱、全名。' },
           { label: '唯一 ID 属性', text: '用于识别账户的不可变 ID（entryUUID、objectGUID）。按 DN 绑定的账户会在下一次登录时迁移到此 ID；从一个 ID 属性改为另一个会拒绝所有已绑定的用户，直到执行解除 SSO 关联再关联到 SSO。' },
-          { label: '组', text: '使用 memberOf 时，从用户自身的条目读取；使用 member 或 uniqueMember 时，在服务器包含基础 DN 的命名上下文下搜索（否则在基础 DN 下），组筛选器默认为 (objectClass=*)。仅计直接成员资格：嵌套组和 Active Directory 主要组（Domain Users）不可见。组名与规则和必需组比较时忽略大小写和首尾空格。存在规则或必需组而组无法读取时，登录被拒绝并说明原因。测试映射读取组并按登录相同的方式判定。' },
+          { label: '组', text: '使用 memberOf 时，从用户自身的条目读取；使用 member 或 uniqueMember 时，若设置了组搜索基础则在其下搜索，否则在目录包含的基础 DN 的父级下搜索，然后在基础 DN 下搜索，组筛选器默认为 (objectClass=*)。仅计直接成员资格：嵌套组和 Active Directory 主要组（Domain Users）不可见。组名与规则和必需组比较时忽略大小写、首尾空格以及内部连续空格的长度。存在规则或必需组而组无法读取时，登录被拒绝并说明原因。测试映射读取组并按登录相同的方式判定。' },
         ]
       },
     ],
@@ -161,9 +161,9 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 
 ### 组
 - **memberOf**：从用户自身的条目读取（对其 DN 的 base 范围搜索）；不使用组筛选器
-- **member / uniqueMember**：在服务器包含基础 DN 的命名上下文下搜索，否则在基础 DN 下，使用组筛选器（为空时为 \`(objectClass=*)\`）；位于用户旁边的组（\`ou=people\` 旁的 \`ou=groups\`）也能找到
+- **member / uniqueMember**：设置了组搜索基础时仅在其下搜索；否则在目录包含的基础 DN 的父级下搜索，若该搜索失败再在基础 DN 下搜索，使用组筛选器（为空时为 \`(objectClass=*)\`）；位于用户旁边的组（\`ou=people\` 旁的 \`ou=groups\`）也能找到
 - **仅直接成员资格**：嵌套组和 Active Directory 主要组（Domain Users）不可见
-- **比较**：组名与规则和必需组比较时忽略大小写和首尾空格
+- **比较**：组名与规则和必需组比较时忽略大小写和首尾空格，内部连续空格视为一个空格
 - **无法读取组**：存在规则或必需组时，无法读取其组的登录被拒绝，消息为“your groups could not be read from the directory”
 - **测试映射**按登录相同的方式读取组并判定，无需密码；仅对允许登录的用户显示角色
 
