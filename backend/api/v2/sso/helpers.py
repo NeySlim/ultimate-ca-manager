@@ -457,10 +457,45 @@ def _mapping_rules(provider):
 
 
 def _external_groups(external_data):
-    groups = (external_data or {}).get('roles', (external_data or {}).get('groups', []))
-    if isinstance(groups, str):
-        groups = [groups]
-    return groups if isinstance(groups, (list, tuple, set)) else []
+    """Values of ``roles`` and ``groups`` together, de-duplicated: an IdP may
+    send app roles and groups side by side, and an empty one hides nothing."""
+    data = external_data if isinstance(external_data, dict) else {}
+    values = {}  # insertion-ordered set
+    for key in ('roles', 'groups'):
+        found = data.get(key)
+        if isinstance(found, str):
+            found = [found]
+        if isinstance(found, (list, tuple, set)):
+            values.update((v, None) for v in found if isinstance(v, str))
+    return list(values)
+
+
+def _entra_oidc_groups_overage(id_claims):
+    """Whether Entra ID left ``groups`` out of the ID token for too many groups."""
+    names = id_claims.get('_claim_names')
+    return (isinstance(names, dict) and 'groups' in names) or id_claims.get('hasgroups') is True
+
+
+def oidc_external_groups(userinfo, id_claims, token_unused=None):
+    """Groups and roles of an OIDC login: those of its UserInfo response and of
+    the ID token bound to it (``None`` when none is, ``token_unused`` saying why)."""
+    id_claims = id_claims if isinstance(id_claims, dict) else {}
+    sources = [('UserInfo', userinfo)]
+    if token_unused is None:
+        sources.insert(0, ('ID token', id_claims))
+    merged, counts = {}, []
+    for label, data in sources:
+        values = _external_groups(data)
+        counts.append(f"{label} ({len(values)} value(s))")
+        merged.update((v, None) for v in values)
+    unused = f"; ID token not used: {token_unused}" if token_unused is not None else ''
+    logger.info(f"OIDC groups read from {', '.join(counts)}{unused}")
+    if _entra_oidc_groups_overage(id_claims):
+        logger.warning(
+            "OIDC ID token has no groups claim: Entra ID left it out because the user "
+            "has too many groups. Emit only the groups assigned to the application, "
+            "or app roles, so role mapping can match.")
+    return list(merged)
 
 
 def sso_admission(provider, external_data):
