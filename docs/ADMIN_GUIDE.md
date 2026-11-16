@@ -207,7 +207,7 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 
 *A failed read.* When the directory does not answer the group read with success (service account rights, timeout, referral, missing base) and the admission depends on the groups, the login is refused with "your groups could not be read from the directory", and the log and the audit say the same.
 
-*Test Mapping* (Groups and role mapping section of a saved provider) finds the user, reads the groups and decides as the login does, without a password: it shows the access verdict with its reason, and a role only for an admitted user. It does not check the password nor the UCM account the sign-in would open (a local account of the same name, an account disabled in UCM, automatic creation turned off).
+*Test Mapping* (Groups and role mapping section of a saved provider) finds the user, reads the groups and decides as the login does, without a password: it shows the access verdict with its reason, and a role only for an admitted user. It does not check the password nor the UCM account the sign-in would open (a local account of the same name, an account disabled in UCM, automatic creation turned off, an email that belongs to an account of another provider).
 
 **OAuth2 (Azure AD, Google, GitHub):**
 - Client ID, Client Secret, Authorization/Token/UserInfo URLs

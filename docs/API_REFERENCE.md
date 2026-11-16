@@ -217,7 +217,7 @@ Content-Type: application/json
 }
 ```
 
-`forgot-password` answers the same `200` whether or not a link was sent. No link is sent to an account linked to an SSO provider that has no local password, and `reset-password` answers `400` (`Invalid or expired reset token`) for a link such an account holds.
+`forgot-password` answers the same `200` whether or not a link was sent. No link is sent to an SSO account (linked to a provider or left without one) that has no local password, and `reset-password` answers `400` (`Invalid or expired reset token`) for a link such an account holds.
 
 ### Check Email Configuration
 ```http

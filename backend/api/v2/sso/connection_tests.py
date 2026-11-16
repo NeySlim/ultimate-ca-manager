@@ -236,6 +236,8 @@ def _ldap_read_groups(provider, server, user_dn):
                 except (LdapGroupsUnreadable, ldap3.core.exceptions.LDAPOperationResult) as e:
                     failures.append(str(e) or type(e).__name__)
                     continue
+                if failures:
+                    logger.info(f"LDAP groups read under {base} after a refused search: {failures[0][:200]}")
                 return [str(entry.cn) for entry in conn.entries if hasattr(entry, 'cn')]
             raise LdapGroupsUnreadable('; '.join(failures))
         finally:
