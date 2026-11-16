@@ -5,7 +5,7 @@ import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
 
-from models import CA, db
+from models import CA, Certificate, db
 from models.ca_cross_certificate import CACrossCertificate
 from tests.fixtures.cross_pki import openssl_verify, pem
 from tests.fixtures.cross_world import build_world, set_served
@@ -13,9 +13,21 @@ from tests.test_cross_chain_paths import _der
 from utils.datetime_utils import utc_now
 
 
+def _ids(app):
+    with app.app_context():
+        return {model: {row.id for row in db.session.query(model.id)}
+                for model in (CACrossCertificate, Certificate, CA)}
+
+
 @pytest.fixture
 def world(app, auth_client):
-    return build_world(app, auth_client)
+    """The world of the test, removed after it: the tables are shared with the other files."""
+    before = _ids(app)
+    yield build_world(app, auth_client)
+    with app.app_context():
+        for model, ids in before.items():
+            model.query.filter(model.id.notin_(ids)).delete(synchronize_session=False)
+        db.session.commit()
 
 
 def _ref(app, ca_id):
