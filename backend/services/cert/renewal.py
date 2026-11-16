@@ -13,6 +13,7 @@ from datetime import timedelta
 import cryptography.x509 as x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import ExtensionOID, NameOID
+from sqlalchemy import select
 from sqlalchemy.exc import InvalidRequestError, SQLAlchemyError
 
 from models import db, CA, Certificate, RevokedSerial, SystemConfig
@@ -341,11 +342,12 @@ def _renewal_members(cert):
     """``[cert]``, or both members of its related pair with A first. A partner whose key
     the server does not hold (enrolled by a device) renews through its own protocol, never
     here; an archived one (superseded) is not renewed at all."""
-    from services.cert.related_pair import anchor_first, mutual_partner
+    from services.cert.related_pair import anchor_first
     try:
-        partner = mutual_partner(cert)
-        if partner is not None:
-            partner = _as_stored(partner.id)
+        # The stored link, not the caller's copy: a newer B may have taken this certificate
+        linked = db.session.scalar(
+            select(Certificate.related_certificate_id).where(Certificate.id == cert.id))
+        partner = _as_stored(linked) if linked else None
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
         return [cert]
     if (partner is None or partner.related_certificate_id != cert.id or partner.archived
