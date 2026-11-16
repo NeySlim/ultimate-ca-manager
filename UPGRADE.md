@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### SSO role mapping reads more groups
+
+OIDC role mapping rules now also match the `groups` and `roles` of the ID token validated for the login, and a `roles` claim no longer hides `groups`; SAML and LDAP are unchanged. A user no rule matched before may now be admitted, or, with *Sync role on each login*, get a higher role at the next sign-in: review the mapping rules of OIDC providers before upgrading.
+
 ### A restore signs out every session, the restoring one included
 
 After a successful restore, every session opened before it is refused, whatever the session store, including the session of the operator who ran the restore: sign in again once the restore has completed. A script that restores through the API with a session cookie needs a new sign-in before its next call; an API key is not a session and is kept or replaced as the archive says. A failed restore, or an archive that carried no data, signs nobody out.

@@ -7,6 +7,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- SSO: an OIDC provider with role mapping rules, such as Microsoft Entra ID whose UserInfo response has no groups, refused every user; the rules now read the `groups` and `roles` of the ID token validated for the login together with those of the UserInfo response, and an empty `roles` claim no longer hides `groups`.
+- SSO: a SAML assertion that repeats an attribute name, as Keycloak's role list does with one attribute per role, was refused as invalid; its values are now merged in assertion order, role mapping reads them all and a repeated username or email attribute gives its first value.
+
 ## [2.254.3] - 2026-11-16
 
 ### Security
