@@ -1697,6 +1697,36 @@ def test_a_database_outside_whose_mount_point_is_left_empty_waits_for_it(tmp_pat
     archived(box, out, data, config)
 
 
+def test_the_fips_line_waits_while_the_configuration_is_not_mounted(tmp_path):
+    """The configuration on a mount of its own and UCM_FIPS_BUILD=1; killed while the README
+    is written, then unmounted: each attempt keeps the fips line and writes nothing there;
+    mounted again, the next attempt archives everything."""
+    box = Box(tmp_path, python='stub')
+    env = box.config / 'ucm.env'
+    env.write_text(env.read_text() + FIPS)
+    data, config = originals(box)
+    box.wrap(other_fs=(box.config,))
+    (box.bin / 'cat').write_text(
+        f'#!/bin/sh\ncase "$*" in */VERSION) kill -9 0 ;; esac\nexec {shutil.which("cat")} "$@"\n')
+    (box.bin / 'cat').chmod(0o755)
+    assert box.run().returncode == -9
+    (box.bin / 'cat').unlink()
+    journal = box.archive / '.journal'
+    lines = set(journal.read_text().splitlines())
+    assert f'fips\t{env}\t{box.config}/{LOCAL}/ucm.env' in lines and f'mount\t{box.config}' in lines
+    aside = box.unmount(box.config)
+    for _ in range(2):
+        out = box.run()
+        assert out.returncode == 2, (out.stdout, out.stderr)
+        assert reported(out.stdout)[str(box.config)].startswith('not mounted: mount it again, then retry'), out.stdout
+        assert lines <= set(journal.read_text().splitlines())
+        assert list(box.config.iterdir()) == []
+    box.remount(box.config, aside)
+    out = box.run()
+    archived(box, out, data, config)
+    assert env.read_text() == FIPS
+
+
 def test_a_journal_without_mount_lines_keeps_reading_an_empty_kept_tree_as_not_mounted(tmp_path):
     """A journal an earlier release wrote names no mount point: it is still read, and data
     left as an empty mount point is still told by its kept directories, absent."""
