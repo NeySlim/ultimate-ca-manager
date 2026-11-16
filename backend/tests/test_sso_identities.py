@@ -191,6 +191,20 @@ def test_attaching_replaces_the_orphan_the_same_idp_left(app, providers, auth_cl
     assert 'replacing its orphan of the same IdP' in _audit(app, 'user_sso_attach', name)
 
 
+def test_an_orphan_of_the_same_idp_beside_an_attachment_lets_the_name_bind_it(app, providers):
+    """The account already has its own row for the provider: that row is bound, never a second."""
+    with app.app_context():
+        key = db.session.get(SSOProvider, providers.oidc).idp_key()
+    name = _name()
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.oidc,
+               password_hash=NOPASS)
+    with app.app_context():
+        db.session.add(UserSSOIdentity(user_id=uid, orphan_of=key, external_id='sub-o2'))
+        db.session.commit()
+    assert _login(app, providers.oidc, name, 'sub-o2') == (name, None)
+    assert _rows(app, uid) == [(providers.oidc, 'sub-o2', None), (None, 'sub-o2', key)]
+
+
 def test_a_second_attachment_to_the_same_provider_is_refused(app, providers, auth_client):
     name = _name()
     uid = _add(app, username=name, password_hash='hash')
@@ -351,11 +365,12 @@ def test_deleting_an_account_removes_its_rows(app, providers, auth_client):
     ({'auth_source': 'oauth2', 'sso_external_id': 's'}, True),        # attached, bound
     ({'auth_source': 'oauth2'}, True),                                 # attached, not bound yet
     ({'auth_source': 'oauth2', 'sso_orphan_of': 'oauth2:https://gone.example'}, True),  # orphan
+    ({'auth_source': 'oauth2', 'force_password_change': True}, True),  # attached, a change owed
     ({'auth_source': 'local', 'force_password_change': False}, True),  # older than auth_source
     ({'auth_source': 'local', 'force_password_change': True}, False),  # detached, owes a password
     ({'auth_source': 'oauth2', 'password_hash': 'kept'}, False),       # kept its password
     ({'auth_source': 'local', 'password_hash': 'local'}, False),       # local
-], ids=['bound', 'pending', 'orphan', 'legacy', 'detached', 'kept-password', 'local'])
+], ids=['bound', 'pending', 'orphan', 'owing', 'legacy', 'detached', 'kept-password', 'local'])
 def test_sso_only_reads_the_rows(app, providers, fields, only):
     from api.v2.sso.account_state import sso_only
     fields = dict({'password_hash': NOPASS}, **fields)
