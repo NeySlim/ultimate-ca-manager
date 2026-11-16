@@ -302,3 +302,26 @@ def test_an_a_revoked_since_read_is_not_named(app, tmp_path, how):
             _revoke_elsewhere(app, a_id, how)
             assert _current_related(b) is None and held.revoked == (how == 'row')
             db.session.remove()
+
+
+def test_a_partner_that_left_the_pair_since_read_is_not_renewed_with_it(app, tmp_path):
+    from services.cert.renewal import renewal_partner
+    from tests.test_backup_cross_installation import _bound_to
+
+    def leave(b_id):
+        with app.app_context():
+            db.session.get(Certificate, b_id).related_certificate_id = None
+            db.session.commit()
+            db.session.remove()
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'left.db'}"):
+        a_id, (b_id,) = _linked_rows(app)
+        with app.app_context():
+            a = db.session.get(Certificate, a_id)
+            held = renewal_partner(a)  # B kept by the session, still naming A
+            assert held.id == b_id
+            thread = threading.Thread(target=leave, args=(b_id,))
+            thread.start()
+            thread.join(60)
+            assert renewal_partner(a) is None and held.related_certificate_id is None
+            db.session.remove()
