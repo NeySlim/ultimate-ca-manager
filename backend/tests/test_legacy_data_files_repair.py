@@ -163,3 +163,31 @@ def test_repair_runs_only_under_the_reconciliation_lock(app, legacy, monkeypatch
     monkeypatch.setattr(file_regen_service, '_exclusive', held_elsewhere)
     assert _reconcile(app)['status'] == 'busy'
     assert all(path.exists() for path in planted.values())
+
+
+def test_a_namesake_with_other_content_is_not_moved_into_data_dir(app, legacy, plaintext_mirrors):
+    rows = _rows(app, uuid.uuid4().hex[:8])
+    canonical = _canonical(app, rows)
+    canonical['ca'].unlink()
+    namesake = legacy / 'ca' / f"{rows['ca'][0]}.crt"
+    namesake.write_bytes(b'not the stored certificate')
+
+    stats = _reconcile(app)
+
+    assert namesake.read_bytes() == b'not the stored certificate'
+    assert canonical['ca'].read_bytes() == rows['ca'][1]  # written from the row
+    assert stats['legacy_kept'] == 1 and stats['legacy_moved'] == 0
+
+
+def test_a_copy_is_kept_when_its_destination_holds_other_content(app, legacy, plaintext_mirrors, caplog):
+    rows = _rows(app, uuid.uuid4().hex[:8])
+    planted = _plant(legacy, rows)
+    canonical = _canonical(app, rows)
+    canonical['ca'].write_bytes(b'edited by an operator')
+
+    with caplog.at_level(logging.WARNING, logger='services.file_regen_service'):
+        stats = _reconcile(app)
+
+    assert planted['ca'].read_bytes() == rows['ca'][1]
+    assert stats['legacy_kept'] == 1 and stats['legacy_removed'] == 3
+    assert any(str(planted['ca']) in r.getMessage() for r in caplog.records)
