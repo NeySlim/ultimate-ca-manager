@@ -27,12 +27,13 @@ export default {
           { label: 'Client ID/Secret', text: 'Credenciais de cliente OAuth2 do seu IDP' },
           { label: 'Escopos', text: 'Escopos OAuth2 a solicitar (openid, profile, email)' },
           { label: 'Criação Automática de Usuários', text: 'Criar automaticamente contas UCM no primeiro login SSO' },
+          { label: 'Grupos para mapeamento de funções', text: 'Os valores das claims roles e groups, lidos do ID token do login e da resposta UserInfo em conjunto. O Microsoft Entra ID os envia apenas no ID token: adicione a claim groups na configuração de token do aplicativo (seus valores são IDs de objeto de grupo, portanto as chaves do mapeamento são esses IDs) ou use app roles. Um usuário em mais de cerca de 200 grupos não recebe a claim groups do Entra ID: um aviso é registrado e apenas as app roles podem corresponder. Emita apenas os grupos atribuídos ao aplicativo, ou app roles. Com Verificar assinatura do ID token desativado, os grupos do ID token só contam quando a URL de Token é HTTPS com verificação TLS ativada e o emissor e o client ID estão definidos e correspondem ao token.' },
         ]
       },
       {
         title: 'Provisionamento de Funções (#81)',
         items: [
-          { label: 'Correspondência de identidade', text: 'Um login abre a conta vinculada ao identificador do IdP (OIDC sub, NameID persistente SAML, entryUUID ou objectGUID LDAP). Um nome de usuário ou e-mail só corresponde a uma conta do mesmo provedor ainda não vinculada; uma conta local, ou vinculada a outra identidade, é recusada no login. Para unir uma conta local, use primeiro Vincular ao SSO em Usuários: o próximo login por esse provedor vincula o identificador.' },
+          { label: 'Correspondência de identidade', text: 'Um login abre a conta vinculada ao identificador do IdP (OIDC sub, NameID persistente SAML, entryUUID ou objectGUID LDAP). Um nome de usuário ou e-mail só corresponde a uma conta do mesmo provedor ainda não vinculada; uma conta local, ou vinculada a outra identidade, é recusada no login. Vincular ao SSO em Usuários associa qualquer conta a um provedor (uma local, uma de outro provedor ou uma cuja identidade mudou): o próximo login por esse provedor vincula o identificador.' },
           { label: 'Função Padrão', text: 'Atribuída às contas criadas no primeiro login SSO quando o provedor não tem regra de mapeamento de funções, e como função base de uma conta nova cuja regra correspondente dá apenas uma função personalizada (viewer quando Nenhuma). Nenhuma: ninguém entra sem uma regra. Alterações de função feitas depois no UCM são preservadas.' },
           { label: 'Mapeamento de Funções', text: 'Mapear grupos externos (Azure AD, Okta, LDAP) → funções UCM (admin / operator / auditor / viewer) ou funções personalizadas. Com pelo menos uma regra, um usuário que nenhuma regra reconhece é recusado em todo login SSO (OIDC, SAML, LDAP), conta nova ou existente; um login por passkey ou certificado não é verificado. Usado na criação do usuário e a cada login quando a sincronização de funções está ativada. Quando vários grupos correspondem, a função de maior privilégio vence (admin > operator > auditor > viewer): a ordem das entradas não importa (#221). Cada grupo também pode indicar uma função personalizada (escolhida entre as funções personalizadas existentes): ela é somada à função base ou usada sozinha. Se vários grupos correspondentes derem uma função personalizada, vence o primeiro da lista. Com a sincronização de funções ativada, uma função personalizada definida pelo SSO é removida quando nenhum grupo a dá; uma função personalizada atribuída à mão no UCM nunca é tocada. As funções do sistema não podem ser usadas como função personalizada.' },
           { label: 'Sincronizar função a cada login', text: 'DESATIVADO (padrão): o SSO nunca sobrescreve funções gerenciadas no UCM. ATIVADO: a função é ressincronizada a partir de role_mapping a cada login; usuários sem correspondência no mapeamento mantêm sua função armazenada (default_role nunca é reaplicada).' },
@@ -49,7 +50,8 @@ export default {
           { label: 'Base DN', text: 'Base de pesquisa para busca de usuários' },
           { label: 'Filtro de Usuário', text: 'Filtro LDAP para corresponder usuários (ex.: (uid={username}))' },
           { label: 'Mapeamento de Atributos', text: 'Mapear atributos LDAP para nome de usuário, e-mail, nome completo' },
-          { label: 'Atributo de ID único', text: 'ID imutável que reconhece a conta (entryUUID, objectGUID). Uma conta vinculada pelo seu DN passa a este id no próximo login; mudar de um atributo de id para outro recusa todos os usuários vinculados até Desvincular e depois Vincular ao SSO.' },
+          { label: 'Atributo de ID único', text: 'ID imutável que reconhece a conta (entryUUID, objectGUID). Uma conta vinculada pelo seu DN passa a este id no próximo login; mudar de um atributo de id para outro recusa todos os usuários vinculados até que Vincular ao SSO seja usado em cada conta.' },
+          { label: 'Grupos', text: 'Com memberOf, lidos da própria entrada do usuário; com member ou uniqueMember, pesquisados sob o pai do Base DN quando o diretório o contém, depois sob o Base DN se essa pesquisa for recusada, caso contrário sob o Base DN; o filtro de grupos é (objectClass=*) por padrão. Apenas a associação direta: grupos aninhados e o grupo primário do Active Directory (Domain Users) não são vistos. Os nomes são comparados com as regras e os grupos exigidos ignorando maiúsculas, espaços nas extremidades e o tamanho das sequências de espaços internos. Quando há regras ou grupos exigidos e os grupos não podem ser lidos, o login é recusado com essa indicação. Testar Mapeamento lê os grupos e decide como o login.' },
         ]
       },
     ],
@@ -130,12 +132,15 @@ Um login iniciado no portal do IdP chega ao UCM sem uma solicitação do UCM. **
 ### Criação Automática de Usuários
 Quando ativada, uma nova conta de usuário UCM é criada automaticamente no primeiro login SSO, usando os atributos fornecidos pelo IDP. A função padrão é atribuída.
 
+### Grupos para mapeamento de funções
+As regras de mapeamento de funções comparam suas chaves com os valores das claims **roles** e **groups**, lidos do ID token do login e da resposta UserInfo em conjunto. O Microsoft Entra ID envia grupos e app roles apenas no ID token: no registro do aplicativo, adicione a claim groups em **Configuração de token** (os valores são IDs de objeto de grupo, portanto as chaves do mapeamento são esses IDs) ou defina app roles e mapeie seus valores. Um usuário em mais de cerca de 200 grupos não recebe a claim groups do Entra ID: o UCM registra um aviso e apenas as app roles podem corresponder. Emita apenas os grupos atribuídos ao aplicativo, ou app roles. Com **Verificar assinatura do ID token** desativado, os grupos do ID token só contam quando a URL de Token é HTTPS com verificação TLS ativada e o emissor e o client ID estão definidos e correspondem ao token.
+
 ## Quem pode entrar
 
 ### Correspondência de identidade
-Um login abre a conta vinculada ao identificador do IdP: OIDC \`sub\`, NameID persistente SAML, LDAP \`entryUUID\` ou \`objectGUID\`. Um nome de usuário ou e-mail corresponde apenas a uma conta do mesmo provedor que ainda não está vinculada (criada antes dos identificadores estáveis, ou vinculada por um administrador); um e-mail que o IdP OIDC marca como não verificado (\`email_verified\` falso) não corresponde a nenhuma. Uma conta local, ou vinculada a outra identidade, nunca é aberta por um login SSO: o login é recusado e registrado no log de auditoria. Para unir uma conta local a uma identidade SSO, use primeiro **Vincular ao SSO** nesse usuário; o próximo login por esse provedor vincula o identificador do IdP.
+Um login abre a conta vinculada ao identificador do IdP: OIDC \`sub\`, NameID persistente SAML, LDAP \`entryUUID\` ou \`objectGUID\`. Um nome de usuário ou e-mail corresponde apenas a uma conta do mesmo provedor que ainda não está vinculada (criada antes dos identificadores estáveis, ou vinculada por um administrador); um e-mail que o IdP OIDC marca como não verificado (\`email_verified\` falso) não corresponde a nenhuma. Uma conta local, ou vinculada a outra identidade, nunca é aberta por um login SSO: o login é recusado e registrado no log de auditoria. Quando nenhuma conta corresponde, um login cujo e-mail pertence a uma conta de outro provedor, ou deixada sem provedor por outro IdP, ou, enquanto o e-mail não é verificado, a uma conta vinculada a este provedor e ainda não vinculada, é recusado em vez de receber uma segunda conta. Para associar uma conta a um provedor, use **Vincular ao SSO** nesse usuário (**Alterar provedor ou redefinir identidade SSO** em uma conta já vinculada): aceita uma conta local, uma de outro provedor, que ela move, e uma cuja identidade mudou no IdP, que ela redefine. O próximo login por esse provedor vincula o identificador do IdP, e uma conta sem senha local não é solicitada a definir uma.
 
-Quando um provedor é excluído, os seus usuários são mantidos: um provedor criado de novo para o mesmo IdP (mesmo emissor, entity ID, ou servidor LDAP e Base DN) os retoma no próximo login. Caso contrário, e para usuários que uma restauração deixou sem provedor, use **Desvincular** e depois **Vincular ao SSO** em cada conta.
+Quando um provedor é excluído, os seus usuários são mantidos: um provedor criado de novo para o mesmo IdP (mesmo emissor, entity ID, ou servidor LDAP e Base DN) os retoma no próximo login. Caso contrário, e para usuários que uma restauração deixou sem provedor, use **Vincular ao SSO** em cada conta.
 
 ### Regras de mapeamento de funções
 - **Pelo menos uma regra**: um usuário que nenhuma regra reconhece é recusado em todo login SSO (OIDC, SAML, LDAP), seja a conta nova ou já existente; um login por passkey ou certificado não é verificado
@@ -155,8 +160,16 @@ A seção **Provisionamento de Usuários** abre sozinha e mostra um aviso quando
 5. Insira o **Bind DN** e **Senha de Bind** (credenciais da conta de serviço)
 6. Insira o **Base DN** (base de pesquisa para busca de usuários)
 7. Configure o **Filtro de Usuário** (ex.: \`(uid={username})\` ou \`(sAMAccountName={username})\` para AD)
-8. Mapeie atributos LDAP: **nome de usuário**, **e-mail**, **nome completo** e o **atributo de ID único** (\`entryUUID\`, \`objectGUID\`). Uma conta vinculada pelo seu DN passa a este id no próximo login; mudar de um atributo de id para outro recusa todos os usuários vinculados até **Desvincular** e depois **Vincular ao SSO**
+8. Mapeie atributos LDAP: **nome de usuário**, **e-mail**, **nome completo** e o **atributo de ID único** (\`entryUUID\`, \`objectGUID\`). Uma conta vinculada pelo seu DN passa a este id no próximo login; mudar de um atributo de id para outro recusa todos os usuários vinculados até **Vincular ao SSO** em cada conta
 9. Clique em **Testar Conexão** para verificar, depois **Salvar** e **Ativar**
+
+### Grupos
+- **memberOf**: lido da própria entrada do usuário (pesquisa base em seu DN); o filtro de grupos não é usado
+- **member / uniqueMember**: pesquisados sob o pai do Base DN quando o diretório o contém, depois sob o Base DN se essa pesquisa falhar, com o filtro de grupos (\`(objectClass=*)\` quando vazio); grupos ao lado dos usuários (\`ou=groups\` junto a \`ou=people\`) são encontrados
+- **Apenas associação direta**: grupos aninhados e o grupo primário do Active Directory (Domain Users) não são vistos
+- **Correspondência**: os nomes de grupo são comparados com as regras e os grupos exigidos ignorando maiúsculas e espaços nas extremidades, uma sequência de espaços internos contando como um
+- **Grupos ilegíveis**: com regras ou grupos exigidos, um login cujos grupos não podem ser lidos é recusado com "your groups could not be read from the directory"
+- **Testar Mapeamento** lê os grupos e decide como o login, sem a senha; mostra uma função apenas para um usuário admitido
 
 ### Active Directory
 Para Microsoft Active Directory, use:

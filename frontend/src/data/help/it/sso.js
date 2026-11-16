@@ -27,12 +27,13 @@ export default {
           { label: 'Client ID/Secret', text: 'Credenziali client OAuth2 dal tuo IDP' },
           { label: 'Scope', text: 'Scope OAuth2 da richiedere (openid, profile, email)' },
           { label: 'Creazione automatica utenti', text: 'Crea automaticamente account UCM al primo accesso SSO' },
+          { label: 'Gruppi per la mappatura dei ruoli', text: 'I valori dei claim roles e groups, letti insieme dall\'ID token dell\'accesso e dalla risposta UserInfo. Microsoft Entra ID li invia solo nell\'ID token: aggiungi il claim groups nella configurazione del token dell\'applicazione (i suoi valori sono gli object ID dei gruppi, quindi le chiavi di mappatura sono questi ID), oppure usa i ruoli dell\'app. Un utente in più di circa 200 gruppi non riceve il claim groups da Entra ID: viene registrato un avviso e possono corrispondere solo i ruoli dell\'app. Emetti solo i gruppi assegnati all\'applicazione, oppure i ruoli dell\'app. Con Verifica firma ID token disattivata, i gruppi dell\'ID token contano solo quando l\'URL del token è HTTPS con verifica TLS attiva e l\'emittente e il client ID sono impostati e corrispondono al token.' },
         ]
       },
       {
         title: 'Provisioning dei ruoli (#81)',
         items: [
-          { label: 'Corrispondenza identità', text: 'Un accesso apre l\'account associato all\'identificatore dell\'IdP (sub OIDC, NameID persistente SAML, entryUUID o objectGUID LDAP). Un nome utente o un\'email corrisponde solo a un account dello stesso provider non ancora associato; un account locale, o uno associato a un\'altra identità, viene rifiutato all\'accesso. Per unire un account locale, usa prima Collega a SSO in Utenti: il suo prossimo accesso tramite quel provider associa l\'identificatore.' },
+          { label: 'Corrispondenza identità', text: 'Un accesso apre l\'account associato all\'identificatore dell\'IdP (sub OIDC, NameID persistente SAML, entryUUID o objectGUID LDAP). Un nome utente o un\'email corrisponde solo a un account dello stesso provider non ancora associato; un account locale, o uno associato a un\'altra identità, viene rifiutato all\'accesso. Collega a SSO in Utenti associa qualsiasi account a un provider (uno locale, uno di un altro provider o uno la cui identità è cambiata): il suo prossimo accesso tramite quel provider associa l\'identificatore.' },
           { label: 'Ruolo predefinito', text: 'Assegnato agli account creati al primo accesso SSO quando il provider non ha regole di mappatura dei ruoli, e come ruolo di base di un nuovo account la cui regola di corrispondenza assegna solo un ruolo personalizzato (viewer se Nessuno). Nessuno: nessuno accede senza una regola. Le modifiche di ruolo effettuate in seguito in UCM vengono preservate.' },
           { label: 'Mappatura ruoli', text: 'Mappa i gruppi esterni (Azure AD, Okta, LDAP) → ruoli UCM (admin / operator / auditor / viewer) o ruoli personalizzati. Con almeno una regola, un utente a cui nessuna regola corrisponde viene rifiutato a ogni accesso SSO (OIDC, SAML, LDAP), account nuovo o esistente; un accesso con passkey o certificato non è controllato. Usata alla creazione dell\'utente e a ogni accesso quando la sincronizzazione dei ruoli è abilitata. Quando più gruppi corrispondono, vince il ruolo con i privilegi più alti (admin > operator > auditor > viewer): l\'ordine delle voci non conta (#221). Ogni gruppo può anche indicare un ruolo personalizzato (scelto tra i ruoli personalizzati esistenti): viene aggiunto al ruolo di base, o usato da solo. Se più gruppi corrispondenti assegnano un ruolo personalizzato, vince il primo dell\'elenco. Con la sincronizzazione dei ruoli attiva, un ruolo personalizzato impostato da SSO viene rimosso quando nessun gruppo ne assegna uno; un ruolo personalizzato assegnato a mano in UCM non viene mai toccato. I ruoli di sistema non possono essere usati come ruolo personalizzato.' },
           { label: 'Sincronizza ruolo a ogni accesso', text: 'OFF (predefinito): SSO non sovrascrive mai i ruoli gestiti in UCM. ON: il ruolo viene risincronizzato da role_mapping a ogni accesso; una regola corrispondente che non assegna un ruolo di base mantiene quello memorizzato (default_role non viene mai riapplicato).' },
@@ -49,7 +50,8 @@ export default {
           { label: 'Base DN', text: 'Base di ricerca per le ricerche utente' },
           { label: 'Filtro utente', text: 'Filtro LDAP per trovare gli utenti (es. (uid={username}))' },
           { label: 'Mappatura attributi', text: 'Mappa gli attributi LDAP a nome utente, email, nome completo' },
-          { label: 'Attributo ID univoco', text: 'Id immutabile che riconosce l\'account (entryUUID, objectGUID). Un account associato tramite il suo DN passa a questo id al suo prossimo accesso; passare da un attributo id a un altro rifiuta tutti gli utenti associati finché non si usa Scollega e poi Collega a SSO.' },
+          { label: 'Attributo ID univoco', text: 'Id immutabile che riconosce l\'account (entryUUID, objectGUID). Un account associato tramite il suo DN passa a questo id al suo prossimo accesso; passare da un attributo id a un altro rifiuta tutti gli utenti associati finché non si usa Collega a SSO su ciascun account.' },
+          { label: 'Gruppi', text: 'Con memberOf, letti dalla voce dell\'utente stesso; con member o uniqueMember, cercati sotto il padre del Base DN quando la directory lo contiene, poi sotto il Base DN se quella ricerca viene rifiutata, altrimenti sotto il Base DN; il filtro dei gruppi è per impostazione predefinita (objectClass=*). Solo appartenenza diretta: i gruppi annidati e il gruppo primario di Active Directory (Domain Users) non vengono visti. I nomi vengono confrontati con regole e gruppi richiesti ignorando maiuscole e minuscole, gli spazi ai bordi e la lunghezza delle sequenze di spazi interni. Quando esistono regole o gruppi richiesti e i gruppi non possono essere letti, l\'accesso viene rifiutato con questo motivo. Testa mappatura legge i gruppi e decide come l\'accesso.' },
         ]
       },
     ],
@@ -128,14 +130,17 @@ Un accesso avviato dal portale dell'IdP arriva a UCM senza una richiesta di UCM.
 10. Clicca **Salva** e **Abilita**
 
 ### Creazione automatica utenti
-Quando abilitata, un nuovo account utente UCM viene creato automaticamente al primo accesso SSO, utilizzando gli attributi forniti dall'IDP. Viene assegnato il ruolo predefinito.
+Quando abilitata, un nuovo account utente UCM viene creato automaticamente al primo accesso SSO, utilizzando gli attributi forniti dall'IDP, con il ruolo assegnato dalla sua regola di mappatura, altrimenti con il ruolo predefinito.
+
+### Gruppi per la mappatura dei ruoli
+Le regole di mappatura dei ruoli confrontano le loro chiavi con i valori dei claim **roles** e **groups**, letti insieme dall'ID token dell'accesso e dalla risposta UserInfo. Microsoft Entra ID invia gruppi e ruoli dell'app solo nell'ID token: nella registrazione dell'applicazione aggiungi il claim groups in **Configurazione token** (i valori sono gli object ID dei gruppi, quindi le chiavi di mappatura sono questi ID), oppure definisci i ruoli dell'app e mappane i valori. Un utente in più di circa 200 gruppi non riceve il claim groups da Entra ID: UCM registra un avviso e possono corrispondere solo i ruoli dell'app. Emetti solo i gruppi assegnati all'applicazione, oppure i ruoli dell'app. Con **Verifica firma ID token** disattivata, i gruppi dell'ID token contano solo quando l'URL del token è HTTPS con verifica TLS attiva e l'emittente e il client ID sono impostati e corrispondono al token.
 
 ## Chi può accedere
 
 ### Corrispondenza identità
-Un accesso apre l'account associato all'identificatore dell'IdP: \`sub\` OIDC, NameID persistente SAML, \`entryUUID\` o \`objectGUID\` LDAP. Un nome utente o un'email corrisponde solo a un account dello stesso provider non ancora associato (creato prima degli identificatori stabili, o collegato da un amministratore); un'email che l'IdP OIDC segna come non verificata (\`email_verified\` false) non corrisponde a nessuno. Un account locale, o uno associato a un'altra identità, non viene mai aperto da un accesso SSO: l'accesso è rifiutato e registrato nel log di audit. Per unire un account locale a un'identità SSO, usa prima **Collega a SSO** su quell'utente; il suo prossimo accesso tramite quel provider associa l'identificatore dell'IdP.
+Un accesso apre l'account associato all'identificatore dell'IdP: \`sub\` OIDC, NameID persistente SAML, \`entryUUID\` o \`objectGUID\` LDAP. Un nome utente o un'email corrisponde solo a un account dello stesso provider non ancora associato (creato prima degli identificatori stabili, o collegato da un amministratore); un'email che l'IdP OIDC segna come non verificata (\`email_verified\` false) non corrisponde a nessuno. Un account locale, o uno associato a un'altra identità, non viene mai aperto da un accesso SSO: l'accesso è rifiutato e registrato nel log di audit. Quando nessun account corrisponde, un accesso la cui email appartiene a un account di un altro provider o rimasto senza provider per un altro IdP, oppure, finché l'email non è verificata, a uno collegato a questo provider e non ancora associato, viene rifiutato invece di ricevere un secondo account. Per associare un account a un provider, usa **Collega a SSO** su quell'utente (**Cambia provider o reimposta l'identità SSO** su uno già collegato): accetta un account locale, uno di un altro provider, che sposta, e uno la cui identità è cambiata presso l'IdP, che reimposta. Il suo prossimo accesso tramite quel provider associa l'identificatore dell'IdP, e a un account senza password locale non ne viene chiesta una.
 
-Quando un provider viene eliminato, i suoi utenti sono conservati: un provider creato di nuovo per lo stesso IdP (stesso emittente, entity ID, o server LDAP e base DN) li riprende al loro prossimo accesso. Altrimenti, e per gli utenti che un ripristino ha lasciato senza provider, usa **Scollega** poi **Collega a SSO** su ogni account.
+Quando un provider viene eliminato, i suoi utenti sono conservati: un provider creato di nuovo per lo stesso IdP (stesso emittente, entity ID, o server LDAP e base DN) li riprende al loro prossimo accesso. Altrimenti, e per gli utenti che un ripristino ha lasciato senza provider, usa **Collega a SSO** su ogni account.
 
 ### Regole di mappatura dei ruoli
 - **Almeno una regola**: un utente a cui nessuna regola corrisponde viene rifiutato a ogni accesso SSO (OIDC, SAML, LDAP), che l'account sia nuovo o già esistente; un accesso con passkey o certificato non è controllato
@@ -155,8 +160,16 @@ La sezione **Provisioning utenti** si apre da sola e mostra un avviso quando il 
 5. Inserisci il **Bind DN** e la **password di bind** (credenziali dell'account di servizio)
 6. Inserisci il **Base DN** (base di ricerca per le ricerche utente)
 7. Configura il **filtro utente** (es. \`(uid={username})\` o \`(sAMAccountName={username})\` per AD)
-8. Mappa gli attributi LDAP: **nome utente**, **email**, **nome completo**
+8. Mappa gli attributi LDAP: **nome utente**, **email**, **nome completo** e l'**attributo ID univoco** (\`entryUUID\`, \`objectGUID\`). Un account associato tramite il suo DN passa a questo id al suo prossimo accesso; passare da un attributo id a un altro rifiuta tutti gli utenti associati finché non si usa **Collega a SSO** su ciascun account
 9. Clicca **Testa connessione** per verificare, poi **Salva** e **Abilita**
+
+### Gruppi
+- **memberOf**: letto dalla voce dell'utente stesso (una ricerca di base sul suo DN); il filtro dei gruppi non viene usato
+- **member / uniqueMember**: cercati sotto il padre del Base DN quando la directory lo contiene, poi sotto il Base DN se quella ricerca fallisce, con il filtro dei gruppi (\`(objectClass=*)\` se vuoto); i gruppi accanto agli utenti (\`ou=groups\` accanto a \`ou=people\`) vengono trovati
+- **Solo appartenenza diretta**: i gruppi annidati e il gruppo primario di Active Directory (Domain Users) non vengono visti
+- **Confronto**: i nomi dei gruppi vengono confrontati con regole e gruppi richiesti ignorando maiuscole e minuscole e gli spazi ai bordi, una sequenza di spazi interni valendo come uno solo
+- **Gruppi non leggibili**: con regole o gruppi richiesti, un accesso i cui gruppi non possono essere letti viene rifiutato con «i tuoi gruppi non hanno potuto essere letti dalla directory»
+- **Testa mappatura** legge i gruppi e decide come l'accesso, senza la password; mostra un ruolo solo per un utente ammesso
 
 ### Active Directory
 Per Microsoft Active Directory, usa:
