@@ -68,7 +68,8 @@ def entra(app, monkeypatch):
             return self._body
 
     monkeypatch.setattr(login_routes, 'safe_request_post', lambda *_a, **_k: Resp(
-        {'access_token': 'at', 'id_token': _unsigned_token(state['claims'])}))
+        {'access_token': 'at', 'id_token': _unsigned_token(state['claims'])}
+        if state['claims'] is not None else {'access_token': 'at'}))
     monkeypatch.setattr(login_routes, 'safe_request_get', lambda *_a, **_k: Resp(state['userinfo']))
     real_verify = login_routes.verify_id_token
 
@@ -87,7 +88,7 @@ def entra(app, monkeypatch):
 
     def login(userinfo, claims, nonce='n'):
         state['userinfo'] = dict(userinfo)
-        state['claims'] = dict(claims, nonce='n')
+        state['claims'] = None if claims is None else dict(claims, nonce='n')
         client = app.test_client()
         with client.session_transaction() as s:
             s['sso_state'] = 'st'
@@ -305,3 +306,33 @@ def test_external_groups_join_roles_and_groups():
     assert _external_groups({'roles': ['r'], 'groups': ['a', 'r']}) == ['r', 'a']
     assert _external_groups({'groups': 'solo'}) == ['solo']
     assert _external_groups(None) == []
+
+
+def _groups_line(caplog):
+    return next(r.getMessage() for r in caplog.records
+                if r.getMessage().startswith('OIDC groups'))
+
+
+@pytest.mark.parametrize('config, userinfo, claims, nonce, reason', [
+    ({}, {'sub': 'r1'}, None, 'n', 'no ID token'),
+    ({}, {'sub': 'r2'}, _valid_claims('other'), 'n', 'subject does not match UserInfo'),
+    ({}, {}, {k: v for k, v in _valid_claims('x').items() if k != 'sub'}, 'n',
+     'subject does not match UserInfo'),
+    ({'oauth2_verify_ssl': False}, {'sub': 'r4'}, _valid_claims('r4'), 'n',
+     'unsigned and TLS verification is off'),
+    ({}, {'sub': 'r5'}, _valid_claims('r5', iss='https://evil.example'), 'n',
+     'unsigned token rejected (ID token issuer mismatch)'),
+    ({'oauth2_issuer': None}, {'sub': 'r6'}, _valid_claims('r6'), 'n',
+     'unsigned token rejected (OIDC issuer is not configured)'),
+    ({}, {'sub': 'r7'}, _valid_claims('r7'), None,
+     'unsigned token rejected (no session nonce)'),
+], ids=['no-token', 'other-sub', 'no-sub', 'tls-off', 'bad-iss', 'no-issuer', 'no-nonce'])
+def test_log_says_why_the_id_token_was_not_used(entra, caplog, config, userinfo, claims,
+                                                nonce, reason):
+    entra.configure(id_token_verify=False, **config)
+    with caplog.at_level(logging.INFO, logger='api.v2.sso.helpers'):
+        entra(dict(userinfo, preferred_username=f'log-{uuid.uuid4().hex[:6]}',
+                   groups=['UCM.Operator']),
+              None if claims is None else dict(claims, groups=['grp-secret-x']), nonce=nonce)
+    line = _groups_line(caplog)
+    assert line == f'OIDC groups read from UserInfo (1 value(s)); ID token not used: {reason}'

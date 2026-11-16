@@ -492,16 +492,20 @@ def _entra_oidc_groups_overage(id_claims):
     return (isinstance(names, dict) and 'groups' in names) or id_claims.get('hasgroups') is True
 
 
-def oidc_external_groups(userinfo, id_claims):
+def oidc_external_groups(userinfo, id_claims, token_unused=None):
     """Groups and roles of an OIDC login: those of its UserInfo response and of
-    the ID token bound to it (``None`` when none is), de-duplicated."""
+    the ID token bound to it (``None`` when none is, ``token_unused`` saying why)."""
     id_claims = id_claims if isinstance(id_claims, dict) else {}
+    sources = [('UserInfo', userinfo)]
+    if token_unused is None:
+        sources.insert(0, ('ID token', id_claims))
     merged, counts = {}, []
-    for label, data in (('ID token', id_claims), ('UserInfo', userinfo)):
+    for label, data in sources:
         values = _external_groups(data)
         counts.append(f"{label} ({len(values)} value(s))")
         merged.update((v, None) for v in values)
-    logger.info(f"OIDC groups read from {', '.join(counts)}")
+    unused = f"; ID token not used: {token_unused}" if token_unused is not None else ''
+    logger.info(f"OIDC groups read from {', '.join(counts)}{unused}")
     if _entra_oidc_groups_overage(id_claims):
         logger.warning(
             "OIDC ID token has no groups claim: Entra ID left it out because the user "

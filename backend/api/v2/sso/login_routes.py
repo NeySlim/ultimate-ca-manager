@@ -13,7 +13,7 @@ from utils.db_transaction import safe_commit
 from models import db, User
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
-from services.oidc_id_token import (OIDCValidationError, unverified_claims_are_valid,
+from services.oidc_id_token import (OIDCValidationError, unverified_claims_error,
                                     verify_id_token)
 from utils.datetime_utils import utc_now
 from utils.ssrf_protection import (
@@ -412,14 +412,23 @@ def sso_callback(provider_type):
             # same subject as UserInfo. An unsigned (compatibility) token counts only over
             # verified TLS with every other claim valid (OIDC Core 3.1.3.7, steps 2-6, 9).
             token_sub = (trusted_id_claims or {}).get('sub')
-            bound_claims = trusted_id_claims if (
-                isinstance(token_sub, str) and token_sub
-                and userinfo.get('sub') == token_sub) else None
-            if bound_claims is not None and not verification_enabled and (
-                    verify is False
-                    or not unverified_claims_are_valid(bound_claims, provider, expected_nonce)):
-                bound_claims = None
-            external_data = dict(userinfo, groups=oidc_external_groups(userinfo, bound_claims))
+            token_unused = None
+            if trusted_id_claims is None:
+                token_unused = 'no ID token'
+            elif not (isinstance(token_sub, str) and token_sub
+                      and userinfo.get('sub') == token_sub):
+                token_unused = 'subject does not match UserInfo'
+            elif not verification_enabled:
+                if verify is False:
+                    token_unused = 'unsigned and TLS verification is off'
+                else:
+                    claims_error = unverified_claims_error(trusted_id_claims, provider,
+                                                           expected_nonce)
+                    if claims_error:
+                        token_unused = f'unsigned token rejected ({claims_error})'
+            bound_claims = trusted_id_claims if token_unused is None else None
+            external_data = dict(userinfo, groups=oidc_external_groups(
+                userinfo, bound_claims, token_unused))
 
             # Create or update user
             user, error_code = _get_or_create_sso_user(provider, username, email, fullname,
