@@ -373,12 +373,13 @@ def _adoptable(user, provider):
 
 def _same_provider_or_idp(user, provider, legacy=False):
     """Linked to this provider, or orphaned by a deleted provider for this same IdP.
-    An account with no recorded IdP is claimable only if it predates migration 024."""
+    An account with no recorded IdP is claimable only if it predates migration 024.
+    Exact key only: a UserInfo URL may serve several issuers (one Entra ID endpoint)."""
     if user.sso_provider_id is not None:
         return user.sso_provider_id == provider.id
     if user.sso_orphan_of is None:
         return legacy
-    return user.sso_orphan_of in provider.idp_keys()
+    return user.sso_orphan_of == provider.idp_key()
 
 
 DIRECTORY_UNIQUE_ATTRS = {'', 'objectguid', 'entryuuid'}

@@ -353,6 +353,19 @@ def test_oidc_orphan_keyed_by_userinfo_is_taken_back_once_the_issuer_is_set(app,
     assert _login(app, same, name, {'sub': 'sub-c'}) == (name, None)
 
 
+def test_unbound_orphan_keyed_by_a_shared_userinfo_is_not_taken_by_name(app, providers):
+    """One UserInfo endpoint serves every tenant (Entra ID): only iss + sub may match."""
+    name = _name()
+    userinfo = 'https://graph.microsoft.com/oidc/userinfo'
+    _add(app, username=name, role='admin', auth_source='oauth2', sso_provider_id=None,
+         sso_orphan_of=f'oauth2:{userinfo}', sso_external_id=None, password_hash=NOPASS)
+    tenant_b = providers(oauth2_issuer='https://login.microsoftonline.com/tenant-b/v2.0',
+                         oauth2_userinfo_url=userinfo)
+    assert _login(app, tenant_b, name, {'sub': 'attacker-sub'}) == (None, 'sso_username_conflict')
+    assert _login(app, tenant_b, _name(), {'sub': 'attacker-sub-2'},
+                  email=f'{name}@corp.example')[0] != name
+
+
 def _ldap_orphan(app, name, external_id, base='ou=people,dc=example,dc=com'):
     return _add(app, username=name, auth_source='ldap', sso_provider_id=None,
                 sso_orphan_of=f'ldap:dc1.example.com|{base}', sso_external_id=external_id,
