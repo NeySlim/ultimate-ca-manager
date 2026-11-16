@@ -1505,6 +1505,7 @@ export const helpContent = {
           { label: 'Client ID/Secret', text: 'OAuth2 client credentials from your IDP' },
           { label: 'Scopes', text: 'OAuth2 scopes to request (openid, profile, email)' },
           { label: 'Auto-Create Users', text: 'Automatically create UCM accounts on first SSO login' },
+          { label: 'Groups for role mapping', text: 'Read from the attributes mapped to groups, else from groups and the Microsoft Entra ID / AD FS group and role claims. When Entra ID sends groups.link instead of the groups (users in more than 150 groups), a warning is logged and, when role mapping rules exist, the user is refused: emit only the groups assigned to the application, or app roles.' },
         ]
       },
       {
