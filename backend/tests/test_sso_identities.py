@@ -982,16 +982,18 @@ def test_unbound_orphans_sharing_a_key_are_said_to_be_bound_by_the_archive(app, 
     with app.app_context():
         include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
         blob = _backup().create_backup(password, include=include)
-        for orphan_of in (_IDP, _IDP, None, None):
-            db.session.add(UserSSOIdentity(user_id=uid, orphan_of=orphan_of))
+        rows = [UserSSOIdentity(user_id=uid, orphan_of=orphan_of) for orphan_of in (_IDP, _IDP, None, None)]
+        db.session.add_all(rows)
         db.session.commit()
+        first, second = rows[0].id, rows[1].id
         results = _backup().restore_backup(blob, password, mode='merge')
     shared = sorted(w for w in results['warnings'] if 'user_sso_identities' in w)
     assert len(shared) == 2, results['warnings']
     assert f'{uid}//:' in shared[0] and shared[0].endswith('are left as they are')
     assert "this IdP that have no row here" not in shared[0]
-    assert shared[1].endswith("are bound by the archive's identities of this IdP that have no row here, "
-                              "else left as they are")
+    assert shared[1].endswith(
+        f"(id {first}, {second}); the archive's unbound rows of it and its orphans of this IdP that have "
+        "no row here take them oldest first, in the archive's order, and the rest are left as they are")
 
 
 def test_a_bound_orphan_here_is_not_taken_for_another_identity(app, providers):

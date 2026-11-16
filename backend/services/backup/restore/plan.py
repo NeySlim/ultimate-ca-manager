@@ -66,7 +66,7 @@ class RestorePlan:
         # the row each archived row was written to, which a second pass reuses
         self._claims: Dict[Tuple, List[int]] = {}
         self._placed: Dict[Tuple[str, int], Any] = {}
-        # The identity rows here per key, as they stood at the last refresh
+        # The identity rows here per key, as first read since the last refresh
         self._sso_rows: Dict[Tuple, List[Any]] = {}
 
     # -- building ---------------------------------------------------------
@@ -181,10 +181,10 @@ class RestorePlan:
     def _warn_shared_identities(self, pruned) -> None:
         for name in sorted(set(self.shared) - set(pruned)):
             for key, ids in self.shared[name].items():
-                fate = 'left as they are'
                 if name == _SSO_IDENTITIES and key[1] is None and key[2] is not None and key[3] is None:
-                    fate = "bound by the archive's identities of this IdP that have no row here, else left as they are"
-                self.warnings.append(shared_identity_warning(name, key, ids, fate))
+                    self.warnings.append(shared_identity_warning(name, key, ids, '', others=[], taken=_UNBOUND_TAKEN))
+                    continue
+                self.warnings.append(shared_identity_warning(name, key, ids, 'left as they are'))
 
     def refresh(self, section_names=None) -> None:
         """Rebuild the identity indexes from the database as it is now.
@@ -603,8 +603,14 @@ def _identities_here(model, primary: str, fields: Tuple[str, ...]):
         yield getattr(row, primary), [getattr(row, field, None) for field in fields]
 
 
+# Unbound orphans of a known IdP are also what the archive's bound orphans without a row bind
+_UNBOUND_TAKEN = ("the archive's unbound rows of it and its orphans of this IdP that have no row "
+                  "here take them oldest first, in the archive's order, and the rest are left as they are")
+
+
 def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate: str,
-                            others: Optional[List[Any]] = None) -> str:
+                            others: Optional[List[Any]] = None,
+                            taken: str = "the archive's rows of it go to them oldest first") -> str:
     others = ids[1:] if others is None else others
     fields, parts = SECTIONS[section_name].identity, key
     if section_name == _SSO_IDENTITIES:
@@ -612,8 +618,7 @@ def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate:
         parts = [key[_SSO_IDENTITY_FIELDS.index(field)] for field in fields]
     spelt = '/'.join('' if part is None else str(part) for part in parts)
     message = (f"{section_name} {spelt}: {len(ids)} rows here share this "
-               f"{'/'.join(fields)} (id {', '.join(map(str, ids))}); "
-               "the archive's rows of it go to them oldest first")
+               f"{'/'.join(fields)} (id {', '.join(map(str, ids))}); {taken}")
     return f"{message}, and the others (id {', '.join(map(str, others))}) are {fate}" if others else message
 
 
