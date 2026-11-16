@@ -56,7 +56,7 @@ Gerencie contas de usuário, grupos e atribuições de funções. Os usuários s
 Alterne o status de um usuário sem excluir sua conta.
 
 ### Redefinir Senha
-Administradores podem redefinir a senha de qualquer usuário. O usuário não é solicitado a alterá-la no próximo login: forneça a nova senha e peça que a altere em Minha Conta. **Esqueceu a senha?**, na página de login, não envia link a uma conta vinculada a um provedor SSO que não tem senha local: só o seu provedor a abre.
+Administradores podem redefinir a senha de qualquer usuário. O usuário não é solicitado a alterá-la no próximo login: forneça a nova senha e peça que a altere em Minha Conta. **Esqueceu a palavra-passe?**, na página de login, não envia link a uma conta vinculada a um provedor SSO que não tem senha local: só o seu provedor a abre.
 
 ### Chaves de segurança
 Nos detalhes de um usuário, os administradores veem as chaves de segurança dele e podem desativar ou remover uma, normalmente uma chave perdida, que caso contrário ainda permite entrar sem senha. Remover o último segundo fator de uma conta que exige um pede uma segunda confirmação; o usuário registra então novamente um fator no próximo login.
