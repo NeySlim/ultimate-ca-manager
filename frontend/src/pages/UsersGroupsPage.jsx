@@ -264,6 +264,14 @@ export default function UsersGroupsPage() {
 
   const handleSubmitLink = async () => {
     if (!linkTarget || !linkProviderId) return
+    // An account already linked is moved, or its SSO identity reset: confirmed first.
+    if (isLinked(linkTarget)) {
+      const chosen = linkProviders.find(p => String(p.id) === String(linkProviderId))
+      const confirmed = await showConfirm(t('users.sso.confirmRelink', {
+        name: linkTarget.username, provider: chosen?.display_name || chosen?.name || '',
+      }), { title: t('users.sso.relink'), confirmText: t('users.sso.relink') })
+      if (!confirmed) return
+    }
     setLinkSaving(true)
     try {
       await usersService.linkSso(linkTarget.id, {
@@ -786,9 +794,12 @@ export default function UsersGroupsPage() {
     { label: row.active ? t('common.deactivate') : t('users.activate'), icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
     { label: t('users.resetPassword'), icon: Key, onClick: () => handleResetPassword(row) },
     ...(canWrite('users') ? [
-      isLinked(row)
-        ? { label: t('users.sso.unlink'), icon: LinkBreak, onClick: () => handleUnlinkSso(row) }
-        : { label: t('users.sso.link'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) }
+      ...(isLinked(row)
+        ? [
+          { label: t('users.sso.relink'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) },
+          { label: t('users.sso.unlink'), icon: LinkBreak, onClick: () => handleUnlinkSso(row) },
+        ]
+        : [{ label: t('users.sso.link'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) }])
     ] : []),
     ...(canDelete('users') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteUser(row) }
@@ -843,9 +854,14 @@ export default function UsersGroupsPage() {
               <ShieldCheck size={14} /> {selectedUser.totp_exempt ? t('users.require2fa') : t('users.exempt2fa')}
             </Button>
             {isLinked(selectedUser) ? (
-              <Button type="button" size="sm" variant="secondary" onClick={() => handleUnlinkSso(selectedUser)}>
-                <LinkBreak size={14} /> {t('users.sso.unlink')}
-              </Button>
+              <>
+                <Button type="button" size="sm" variant="secondary" onClick={() => handleOpenLinkModal(selectedUser)}>
+                  <LinkSimple size={14} /> {t('users.sso.relink')}
+                </Button>
+                <Button type="button" size="sm" variant="secondary" onClick={() => handleUnlinkSso(selectedUser)}>
+                  <LinkBreak size={14} /> {t('users.sso.unlink')}
+                </Button>
+              </>
             ) : (
               <Button type="button" size="sm" variant="secondary" onClick={() => handleOpenLinkModal(selectedUser)}>
                 <LinkSimple size={14} /> {t('users.sso.link')}
@@ -1194,11 +1210,11 @@ export default function UsersGroupsPage() {
       <Modal
         open={showLinkModal}
         onOpenChange={(open) => { setShowLinkModal(open); if (!open) setLinkTarget(null) }}
-        title={t('users.sso.linkTitle', { name: linkTarget?.username || '' })}
+        title={t(isLinked(linkTarget) ? 'users.sso.relinkTitle' : 'users.sso.linkTitle', { name: linkTarget?.username || '' })}
         size="md"
       >
         <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">{t('users.sso.linkHelp')}</p>
+          <p className="text-sm text-text-secondary">{t(isLinked(linkTarget) ? 'users.sso.relinkHelp' : 'users.sso.linkHelp')}</p>
           <Select
             label={t('users.sso.provider')}
             value={linkProviderId}
@@ -1214,7 +1230,7 @@ export default function UsersGroupsPage() {
               {t('common.cancel')}
             </Button>
             <Button type="button" onClick={handleSubmitLink} disabled={!linkProviderId || linkSaving} loading={linkSaving}>
-              <LinkSimple size={16} /> {t('users.sso.link')}
+              <LinkSimple size={16} /> {t(isLinked(linkTarget) ? 'users.sso.relink' : 'users.sso.link')}
             </Button>
           </div>
         </div>
