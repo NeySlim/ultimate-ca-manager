@@ -39,6 +39,7 @@ class Directory:
         self.fail_on = None  # substring of a search filter that raises
         self.denied = set()  # bases the service account may not search (an ACL)
         self.denied_groups = set()  # bases where a group search fails (a limit, a timeout)
+        self.raising_groups = set()  # bases where a group search raises a result error
         self.searches = []
         self.admin = real_conn(self.server, user=SVC_DN, password=SVC_PW,
                                client_strategy=ldap3.MOCK_SYNC)
@@ -67,7 +68,8 @@ class Directory:
 
             def search(self, base, flt, *a, **kw):
                 directory.searches.append((base, flt, kw.get('search_scope', ldap3.SUBTREE)))
-                if directory.fail_on and directory.fail_on in flt:
+                if directory.fail_on and directory.fail_on in flt or (
+                        '(member=' in flt and base.lower() in directory.raising_groups):
                     raise ldap3.core.exceptions.LDAPOperationsErrorResult('insufficientAccessRights')
                 if base.lower() not in {k.lower() for k in directory.server.dit} \
                         or base.lower() in directory.denied \
@@ -260,9 +262,13 @@ def test_a_service_account_bounded_to_a_subtree_never_searches_the_root(
     assert _group_bases(d) == ['ou=corp,dc=example,dc=com']
 
 
-def test_a_refused_parent_is_searched_again_under_the_base_dn(env, monkeypatch):
+@pytest.mark.parametrize('raised', [False, True], ids=['no_such_object', 'raised'])
+def test_a_refused_parent_is_searched_again_under_the_base_dn(env, monkeypatch, raised):
     user = env.user()
     d = _corp(monkeypatch, user)
+    if raised:
+        d.denied.clear()
+        d.raising_groups.add('dc=example,dc=com')
     pid = _member_provider(env, ldap_base_dn='ou=corp,dc=example,dc=com')
     assert env.login(pid, user)[0] == 200
     assert env.role(user) == 'admin'
