@@ -867,7 +867,8 @@ def reconcile_files(*, full=None, wait=0.0) -> dict:
             return {'status': 'incomplete', 'failed': len(dirs)}
         with _exclusive(opened, wait) as held:
             if not held:
-                logger.info("Files: another reconciliation holds the directories; retried later")
+                logger.info("Files: the directories are held by another reconciliation or "
+                            "could not be locked; retried later")
                 return {'status': 'busy'}
             generation = current_generation()
             for directory in opened:
