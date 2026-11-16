@@ -16,7 +16,7 @@ from datetime import timedelta
 
 import pytest
 
-from models import db, User
+from models import db, User, UserSSOIdentity
 from models.sso import SSOProvider
 from utils.datetime_utils import utc_now
 
@@ -37,6 +37,8 @@ def ldap_provider(app):
         provider_id = provider.id
     yield provider_id
     with app.app_context():
+        # SQLite applies no ON DELETE CASCADE: the attachments go first
+        UserSSOIdentity.query.filter_by(provider_id=provider_id).delete()
         row = db.session.get(SSOProvider, provider_id)
         if row is not None:
             db.session.delete(row)
@@ -63,6 +65,8 @@ def local_user(app):
 
     yield _make
     with app.app_context():
+        ids = [u.id for u in User.query.filter(User.username.in_(created))]
+        UserSSOIdentity.query.filter(UserSSOIdentity.user_id.in_(ids)).delete(synchronize_session=False)
         User.query.filter(User.username.in_(created)).delete(synchronize_session=False)
         db.session.commit()
 

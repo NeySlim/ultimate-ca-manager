@@ -18,6 +18,8 @@ from security.dek_rotation import GRACE_KEY
 from tests import pg_app_harness
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 @pytest.fixture(autouse=True)
 def _dek_refresh(dek_refresh_now, dek_retire_at_once):
     """No process here lags: rotations and disables wait for none, and the previous DEK

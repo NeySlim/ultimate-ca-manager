@@ -360,6 +360,7 @@ def test_the_certificate_middleware_issues_a_new_identifier(app, make_user, monk
 def test_oidc_login_issues_a_new_identifier(app, make_user, monkeypatch):
     from types import SimpleNamespace
     from api.v2.sso import login_routes
+    from models import UserSSOIdentity
     from models.sso import SSOProvider, SSOSession
 
     username = f'oidcsess{uuid.uuid4().hex[:6]}'
@@ -393,6 +394,8 @@ def test_oidc_login_issues_a_new_identifier(app, make_user, monkeypatch):
         assert _sid(victim) != planted and _authenticated(victim)
     finally:
         with app.app_context():
+            # SQLite applies no ON DELETE CASCADE: the attachments go first
+            UserSSOIdentity.query.filter_by(provider_id=provider_id).delete()
             SSOSession.query.filter_by(provider_id=provider_id).delete()
             User.query.filter_by(username=username).delete()
             db.session.delete(db.session.get(SSOProvider, provider_id))
