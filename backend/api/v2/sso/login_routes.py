@@ -410,7 +410,7 @@ def sso_callback(provider_type):
 
             # Token groups count only from the token of this login: nonce checked and
             # same subject as UserInfo. An unsigned (compatibility) token counts only over
-            # verified TLS: OIDC Core §3.1.3.7 steps 2-5 and 9-11 (iss, aud, azp, exp, iat,
+            # verified TLS (an HTTPS token endpoint, its certificate checked): OIDC Core §3.1.3.7 steps 2-5 and 9-11 (iss, aud, azp, exp, iat,
             # nonce) still apply; step 6 lets TLS stand in for the signature only.
             token_sub = (trusted_id_claims or {}).get('sub')
             token_unused = None
@@ -422,6 +422,8 @@ def sso_callback(provider_type):
             elif not verification_enabled:
                 if verify is False:
                     token_unused = 'unsigned and TLS verification is off'
+                elif urllib.parse.urlsplit(provider.oauth2_token_url or '').scheme.lower() != 'https':
+                    token_unused = 'unsigned and the token endpoint is not HTTPS'
                 else:
                     claims_error = unverified_claims_error(trusted_id_claims, provider,
                                                            expected_nonce)

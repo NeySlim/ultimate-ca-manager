@@ -234,6 +234,15 @@ def test_unverified_token_without_tls_verification_gives_no_groups(entra):
     assert entra.role_of('entra13') is None
 
 
+def test_unverified_token_from_a_plain_http_token_endpoint_gives_no_groups(entra):
+    """OIDC Core 3.1.3.7 step 6: only TLS server validation stands in for the signature."""
+    entra.configure(id_token_verify=False, oauth2_token_url='http://idp.example/token')
+    loc = entra({'sub': 's15', 'preferred_username': 'entra15'},
+                _valid_claims('s15', groups=['grp-oid-admins']))
+    assert loc.endswith(UNMAPPED)
+    assert entra.role_of('entra15') is None
+
+
 def test_unverified_token_still_feeds_groups_from_userinfo(entra):
     entra.configure(id_token_verify=False, oauth2_verify_ssl=False)
     loc = entra({'sub': 's14', 'preferred_username': 'entra14', 'groups': ['UCM.Operator']},
@@ -320,13 +329,15 @@ def _groups_line(caplog):
      'subject does not match UserInfo'),
     ({'oauth2_verify_ssl': False}, {'sub': 'r4'}, _valid_claims('r4'), 'n',
      'unsigned and TLS verification is off'),
+    ({'oauth2_token_url': 'http://idp.example/token'}, {'sub': 'r8'}, _valid_claims('r8'), 'n',
+     'unsigned and the token endpoint is not HTTPS'),
     ({}, {'sub': 'r5'}, _valid_claims('r5', iss='https://evil.example'), 'n',
      'unsigned token rejected (ID token issuer mismatch)'),
     ({'oauth2_issuer': None}, {'sub': 'r6'}, _valid_claims('r6'), 'n',
      'unsigned token rejected (OIDC issuer is not configured)'),
     ({}, {'sub': 'r7'}, _valid_claims('r7'), None,
      'unsigned token rejected (no session nonce)'),
-], ids=['no-token', 'other-sub', 'no-sub', 'tls-off', 'bad-iss', 'no-issuer', 'no-nonce'])
+], ids=['no-token', 'other-sub', 'no-sub', 'tls-off', 'http-token', 'bad-iss', 'no-issuer', 'no-nonce'])
 def test_log_says_why_the_id_token_was_not_used(entra, caplog, config, userinfo, claims,
                                                 nonce, reason):
     entra.configure(id_token_verify=False, **config)
