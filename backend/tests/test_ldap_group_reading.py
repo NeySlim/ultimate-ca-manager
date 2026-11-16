@@ -37,13 +37,16 @@ class Directory:
         self.server.info.naming_contexts = naming_contexts
         real_conn = ldap3.Connection
         self.fail_on = None  # substring of a search filter that raises
+        self.denied = set()  # bases the service account may not search (an ACL)
+        self.denied_groups = set()  # bases where a group search fails (a limit, a timeout)
         self.searches = []
         self.admin = real_conn(self.server, user=SVC_DN, password=SVC_PW,
                                client_strategy=ldap3.MOCK_SYNC)
         self.admin.strategy.add_entry(SVC_DN, {'objectClass': ['person'], 'cn': 'svc', 'sn': 'svc',
                                                'userPassword': SVC_PW})
         for dn in ('dc=example,dc=com', 'ou=people,dc=example,dc=com',
-                   'ou=groups,dc=example,dc=com',
+                   'ou=groups,dc=example,dc=com', 'ou=corp,dc=example,dc=com',
+                   'ou=people,ou=corp,dc=example,dc=com', 'ou=groups,ou=corp,dc=example,dc=com',
                    'OU=Staff,DC=example,DC=com', 'OU=Groups,DC=example,DC=com'):
             self.admin.strategy.add_entry(dn, {'objectClass': ['top']})
         directory = self
@@ -66,7 +69,9 @@ class Directory:
                 directory.searches.append((base, flt, kw.get('search_scope', ldap3.SUBTREE)))
                 if directory.fail_on and directory.fail_on in flt:
                     raise ldap3.core.exceptions.LDAPOperationsErrorResult('insufficientAccessRights')
-                if base.lower() not in {k.lower() for k in directory.server.dit}:
+                if base.lower() not in {k.lower() for k in directory.server.dit} \
+                        or base.lower() in directory.denied \
+                        or ('(member=' in flt and base.lower() in directory.denied_groups):
                     # A real server answers noSuchObject (RFC 4511 §4.5.1) for a base
                     # entry it does not hold; the mock matches by DN suffix instead.
                     base = 'cn=no-such-base'
@@ -201,50 +206,134 @@ def _audited(app, username, text):
             AuditLog.details.contains(text)).count()
 
 
-# ── 1. Group search base: the naming context, else the base DN ───────────────
+# ── 1. Group search base: the parent of the base DN as before, else the base DN ──
 
-def test_a_root_base_dn_reads_the_groups_of_its_naming_context(env, monkeypatch):
-    """Base DN at the domain root (the form's placeholder): searched under ``dc=com``
-    the groups were never found and a user the rule names was refused."""
+def _group_bases(d):
+    return [b for b, f, _ in d.searches if '(member=' in f]
+
+
+def test_a_root_base_dn_reads_the_groups_under_itself(env, monkeypatch):
+    """Base DN at the domain root (the form's placeholder): its parent ``dc=com`` is in no
+    naming context, so the base DN itself is searched."""
     user = env.user()
-    _openldap(monkeypatch, user)
+    d, _ = _openldap(monkeypatch, user)
     pid = _member_provider(env)
     assert env.login(pid, user)[0] == 200
     assert env.role(user) == 'admin'
+    assert _group_bases(d) == ['dc=example,dc=com']
 
 
-def test_groups_in_a_sibling_branch_of_the_users_are_read(env, monkeypatch):
-    """``ou=people`` as base DN, groups under ``ou=groups``: the naming context holds both."""
-    user = env.user()
-    _openldap(monkeypatch, user)
-    pid = _member_provider(env, ldap_base_dn='ou=people,dc=example,dc=com')
-    assert env.login(pid, user)[0] == 200
-    assert env.role(user) == 'admin'
-
-
-def test_without_a_published_naming_context_groups_are_searched_under_the_base_dn(
-        env, monkeypatch):
-    user = env.user()
-    d, _ = _openldap(monkeypatch, user, naming_contexts=None)
-    pid = _member_provider(env)
-    assert env.login(pid, user)[0] == 200
-    assert env.role(user) == 'admin'
-    group_bases = [b for b, f, _ in d.searches if '(member=' in f]
-    assert group_bases == ['dc=example,dc=com']
-
-
-def test_a_group_search_the_directory_refuses_is_never_read_as_no_group(
-        env, monkeypatch, auth_client):
-    """noSuchObject on the group search base (RFC 4511 §4.5.1) refuses as unreadable."""
+def test_groups_in_a_sibling_branch_are_read_under_the_parent_as_before(env, monkeypatch):
     user = env.user()
     d, _ = _openldap(monkeypatch, user)
     pid = _member_provider(env, ldap_base_dn='ou=people,dc=example,dc=com')
-    d.remove('dc=example,dc=com')
+    assert env.login(pid, user)[0] == 200
+    assert env.role(user) == 'admin'
+    assert _group_bases(d) == ['dc=example,dc=com']
+
+
+def _corp(monkeypatch, user, naming_contexts=('dc=example,dc=com',)):
+    """A service account bounded to ``ou=corp``: the root answers noSuchObject."""
+    d = Directory(monkeypatch, 'openldap', list(naming_contexts) if naming_contexts else None)
+    udn = f'uid={user},ou=people,ou=corp,dc=example,dc=com'
+    d.add(udn, {'objectClass': ['inetOrgPerson'], 'uid': user, 'cn': user, 'sn': user,
+                'mail': f'{user}@example.com', 'userPassword': PW})
+    d.add('cn=pki-admins,ou=groups,ou=corp,dc=example,dc=com',
+          {'objectClass': ['groupOfNames'], 'cn': 'pki-admins', 'member': [udn]})
+    d.denied.add('dc=example,dc=com')
+    return d
+
+
+@pytest.mark.parametrize('contexts', [
+    ('dc=example,dc=com',),
+    # OpenLDAP ``subordinate advertise``: the longest and the shortest context agree
+    ('dc=example,dc=com', 'ou=corp,dc=example,dc=com'),
+    ('ou=corp,dc=example,dc=com', 'dc=example,dc=com'),
+], ids=['one_context', 'subordinate_last', 'subordinate_first'])
+def test_a_service_account_bounded_to_a_subtree_never_searches_the_root(
+        env, monkeypatch, contexts):
+    user = env.user()
+    d = _corp(monkeypatch, user, contexts)
+    pid = _member_provider(env, ldap_base_dn='ou=people,ou=corp,dc=example,dc=com')
+    assert env.login(pid, user)[0] == 200
+    assert env.role(user) == 'admin'
+    assert _group_bases(d) == ['ou=corp,dc=example,dc=com']
+
+
+def test_a_refused_parent_is_searched_again_under_the_base_dn(env, monkeypatch):
+    user = env.user()
+    d = _corp(monkeypatch, user)
+    pid = _member_provider(env, ldap_base_dn='ou=corp,dc=example,dc=com')
+    assert env.login(pid, user)[0] == 200
+    assert env.role(user) == 'admin'
+    assert _group_bases(d) == ['dc=example,dc=com', 'ou=corp,dc=example,dc=com']
+
+
+def test_a_parent_and_a_base_dn_both_refused_are_unreadable(env, monkeypatch, auth_client):
+    """noSuchObject on both bases (RFC 4511 §4.5.1) is never read as "no group"."""
+    user = env.user()
+    d, _ = _openldap(monkeypatch, user)
+    pid = _member_provider(env, ldap_base_dn='ou=people,dc=example,dc=com')
+    d.denied_groups.update({'dc=example,dc=com', 'ou=people,dc=example,dc=com'})
     code, body = env.login(pid, user)
     assert (code, body.get('message')) == (403, UNREADABLE)
+    assert _group_bases(d) == ['dc=example,dc=com', 'ou=people,dc=example,dc=com']
     tool = _tool(auth_client, pid, user)
     assert tool['groups_readable'] is False and tool['access_allowed'] is False
     assert tool['refusal'] == 'groups_unreadable' and tool['resolved_role'] is None
+
+
+def test_an_explicit_group_base_is_the_only_base_searched(env, monkeypatch):
+    user = env.user()
+    d, _ = _openldap(monkeypatch, user)
+    pid = _member_provider(env, ldap_base_dn='ou=people,dc=example,dc=com',
+                           ldap_group_base_dn='ou=groups,dc=example,dc=com')
+    assert env.login(pid, user)[0] == 200
+    assert env.role(user) == 'admin'
+    assert _group_bases(d) == ['ou=groups,dc=example,dc=com']
+    d.searches.clear()
+    d.denied.add('ou=groups,dc=example,dc=com')  # no fallback past an explicit base
+    code, body = env.login(pid, user)
+    assert (code, body.get('message')) == (403, UNREADABLE)
+    assert _group_bases(d) == ['ou=groups,dc=example,dc=com']
+
+
+@pytest.mark.parametrize('base_dn,bases', [
+    ('ou=people,dc=example,dc=com', ['dc=example,dc=com']),
+    ('dc=example,dc=com', ['dc=com', 'dc=example,dc=com']),
+], ids=['parent_found', 'parent_absent'])
+def test_without_a_published_naming_context_the_parent_comes_first(
+        env, monkeypatch, base_dn, bases):
+    user = env.user()
+    d, _ = _openldap(monkeypatch, user, naming_contexts=None)
+    pid = _member_provider(env, ldap_base_dn=base_dn)
+    assert env.login(pid, user)[0] == 200
+    assert env.role(user) == 'admin'
+    assert _group_bases(d) == bases
+
+
+def test_the_group_base_is_saved_as_a_dn_or_empty(app, auth_client):
+    name = f'grp-base-{uuid.uuid4().hex[:6]}'
+    ldap = {'name': name, 'provider_type': 'ldap', 'ldap_server': 'ldap.example.com',
+            'ldap_base_dn': 'dc=example,dc=com'}
+    r = auth_client.post('/api/v2/sso/providers', json={**ldap, 'ldap_group_base_dn': 'groups'})
+    assert r.status_code == 400 and 'ldap_group_base_dn' in r.get_json()['message']
+    r = auth_client.post('/api/v2/sso/providers',
+                         json={**ldap, 'ldap_group_base_dn': ' ou=groups,dc=example,dc=com '})
+    assert r.status_code in (200, 201), r.data
+    pid = r.get_json()['data']['id']
+    try:
+        assert r.get_json()['data']['ldap_group_base_dn'] == 'ou=groups,dc=example,dc=com'
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}', json={'ldap_group_base_dn': 'ou=,x'})
+        assert r.status_code == 400, r.data
+        r = auth_client.put(f'/api/v2/sso/providers/{pid}', json={'ldap_group_base_dn': '  '})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert db.session.get(SSOProvider, pid).ldap_group_base_dn is None
+    finally:
+        with app.app_context():
+            SSOProvider.query.filter_by(id=pid).delete()
+            db.session.commit()
 
 
 # ── 2. No group filter ───────────────────────────────────────────────────────

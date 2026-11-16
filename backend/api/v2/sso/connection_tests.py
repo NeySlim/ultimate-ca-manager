@@ -11,7 +11,7 @@ import ssl
 import logging
 import requests as http_requests
 from utils.datetime_utils import utc_isoformat
-from utils.dn_parse import get_dn_attribute, parse_dn, _unescape_value
+from utils.dn_parse import get_dn_attribute, get_parent_dn, parse_dn, _unescape_value
 from utils.ssrf_protection import (
     safe_request_head, validate_url_not_cloud_metadata)
 
@@ -156,25 +156,39 @@ def _dn_key(dn):
             for rdn in parse_dn(dn)]
 
 
-def _ldap_group_search_base(server, base_dn):
-    """The server's naming context holding the base DN (RFC 4512 §5.1), else the base DN."""
+def _in_a_naming_context(server, dn):
+    """Whether ``dn`` lies in a naming context the server publishes (RFC 4512 §5.1);
+    a server that publishes none is given the benefit of the doubt."""
     contexts = getattr(getattr(server, 'info', None), 'naming_contexts', None) or []
     if isinstance(contexts, str):
         contexts = [contexts]
-    try:
-        base = _dn_key(base_dn)
-    except ValueError:
-        return base_dn
-    best, best_len = None, 0
+    keys = []
     for context in contexts:
         try:
-            key = _dn_key(str(context))
+            keys.append(_dn_key(str(context)))
         except ValueError:
             continue
-        if key and len(key) <= len(base) and base[len(base) - len(key):] == key \
-                and len(key) > best_len:
-            best, best_len = str(context), len(key)
-    return best or base_dn
+    if not keys:
+        return True
+    target = _dn_key(dn)
+    return any(key and len(key) <= len(target) and target[len(target) - len(key):] == key
+               for key in keys)
+
+
+def _ldap_group_search_bases(provider, server):
+    """Bases tried in order: the explicit group base alone; else the parent of the base DN
+    (where 2.x searched) when this server holds it, then the base DN itself."""
+    explicit = (getattr(provider, 'ldap_group_base_dn', None) or '').strip()
+    if explicit:
+        return [explicit]
+    base_dn = provider.ldap_base_dn
+    try:
+        parent = get_parent_dn(base_dn)
+        if parent and _in_a_naming_context(server, parent):
+            return [parent, base_dn]
+    except ValueError:
+        pass
+    return [base_dn]
 
 
 def _search_succeeded(conn, what):
@@ -215,10 +229,16 @@ def _ldap_read_groups(provider, server, user_dn):
             if not gf.startswith('('):
                 gf = f'({gf})'
             group_filter = f'(&{gf}({member_attr}={escape_filter_chars(user_dn)}))'
-            base = _ldap_group_search_base(server, provider.ldap_base_dn)
-            conn.search(base, group_filter, search_scope=ldap3.SUBTREE, attributes=['cn'])
-            _search_succeeded(conn, f'group search under {base}')
-            return [str(entry.cn) for entry in conn.entries if hasattr(entry, 'cn')]
+            failures = []
+            for base in _ldap_group_search_bases(provider, server):
+                try:
+                    conn.search(base, group_filter, search_scope=ldap3.SUBTREE, attributes=['cn'])
+                    _search_succeeded(conn, f'group search under {base}')
+                except (LdapGroupsUnreadable, ldap3.core.exceptions.LDAPOperationResult) as e:
+                    failures.append(str(e) or type(e).__name__)
+                    continue
+                return [str(entry.cn) for entry in conn.entries if hasattr(entry, 'cn')]
+            raise LdapGroupsUnreadable('; '.join(failures))
         finally:
             conn.unbind()
     except LdapGroupsUnreadable:

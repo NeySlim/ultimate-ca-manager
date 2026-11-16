@@ -3984,6 +3984,8 @@
     "uidAttrHelp": "Незмінний ідентифікатор каталогу для розпізнавання облікового запису попри зміни імені/email (entryUUID / objectGUID). Порожнє: автовизначення.",
     "groupFilter": "Фільтр груп",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, else the base DN.",
     "isDefault": "Провайдер входу за замовчуванням",
     "lastUsed": "Останнє використання",
     "redirectUri": "URI перенаправлення",

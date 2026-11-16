@@ -3994,6 +3994,8 @@
     "httpsDefault": "Сертификат HTTPS (по умолчанию)",
     "groupFilter": "Фильтр групп",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "База поиска групп",
+    "groupBaseDnHelp": "Где ищутся группы. Пусто: родитель базового DN, если он есть в каталоге, иначе сам базовый DN.",
     "groupMemberAttr": "Атрибут членства в группе",
     "usernameAttr": "Атрибут имени пользователя",
     "emailAttr": "Атрибут эл. почты",

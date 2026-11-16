@@ -3934,6 +3934,8 @@
     "uidAttrHelp": "Unveränderliche Verzeichnis-ID, um das Konto trotz geänderter Benutzername/E-Mail zu erkennen (entryUUID / objectGUID). Leer = automatische Erkennung.",
     "groupFilter": "Gruppenfilter",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, else the base DN.",
     "isDefault": "Standard-Login-Provider",
     "lastUsed": "Zuletzt verwendet",
     "redirectUri": "Redirect-URI",

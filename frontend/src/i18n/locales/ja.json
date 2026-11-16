@@ -3937,6 +3937,8 @@
     "uidAttrHelp": "ユーザー名／メール変更後もアカウントを識別するための不変のディレクトリ ID（entryUUID / objectGUID）。空欄で自動検出。",
     "groupFilter": "グループフィルター",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, else the base DN.",
     "isDefault": "デフォルトログインプロバイダー",
     "lastUsed": "最終使用日時",
     "redirectUri": "リダイレクトURI",

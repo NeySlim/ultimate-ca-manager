@@ -3934,6 +3934,8 @@
     "uidAttrHelp": "用于在用户名/邮箱变更后识别账户的不可变目录 ID（entryUUID / objectGUID）。留空则自动检测。",
     "groupFilter": "组过滤器",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, else the base DN.",
     "isDefault": "默认登录提供者",
     "lastUsed": "最近使用",
     "redirectUri": "重定向 URI",

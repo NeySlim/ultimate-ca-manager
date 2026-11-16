@@ -216,6 +216,15 @@ export default function SsoLdapFields({
               { value: 'uniqueMember', label: t('sso.ldapGroupAttrs.uniqueMember') },
             ]}
           />
+          {(formData.ldap_group_member_attr || 'member') !== 'memberOf' && (
+            <Input
+              label={t('sso.groupBaseDn')}
+              value={formData.ldap_group_base_dn || ''}
+              onChange={e => handleChange('ldap_group_base_dn', e.target.value)}
+              placeholder="ou=groups,dc=example,dc=com"
+              helperText={t('sso.groupBaseDnHelp')}
+            />
+          )}
           <Select
             label={t('sso.defaultRole')}
             value={formData.default_role}

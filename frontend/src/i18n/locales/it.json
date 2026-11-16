@@ -3934,6 +3934,8 @@
     "uidAttrHelp": "Identificatore immutabile della directory per riconoscere l'account nonostante i cambi di username/email (entryUUID / objectGUID). Vuoto = rilevamento automatico.",
     "groupFilter": "Filtro gruppo",
     "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "groupBaseDn": "Group Search Base",
+    "groupBaseDnHelp": "Where the groups are searched. Empty: the parent of the base DN when the directory holds it, else the base DN.",
     "isDefault": "Provider di accesso predefinito",
     "lastUsed": "Ultimo utilizzo",
     "redirectUri": "URI di reindirizzamento",
