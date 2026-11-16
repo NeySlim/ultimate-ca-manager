@@ -167,6 +167,7 @@ def test_no_readable_row_answers_the_same_in_both_formats(auth_client, rows, rou
 
 @EVERY
 def test_an_unsupported_format_is_refused_before_the_rows_are_read(auth_client, rows, route):
+    assert route.call(auth_client, rows.made[route.kind], 'der').status_code == 400
     rows.corrupt_all(route)
     assert route.call(auth_client, rows.made[route.kind], 'der').status_code == 400
 
