@@ -13,6 +13,7 @@ from fips_mode import FipsRestricted
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import parse_request_pagination
 from services.ssh_cert_service import SSHCertificateService
+from services.ssh_cert.signing import SSHSerialConflict
 from services.ssh_ca_service import normalize_key_type
 from services.audit_service import AuditService
 from sqlalchemy import or_, and_
@@ -329,6 +330,8 @@ def sign_ssh_certificate():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except SSHSerialConflict as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -399,6 +402,8 @@ def generate_ssh_certificate():
 
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except SSHSerialConflict as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:

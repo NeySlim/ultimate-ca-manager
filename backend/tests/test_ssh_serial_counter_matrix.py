@@ -333,3 +333,20 @@ def test_an_archive_holding_a_serial_twice_restores_both_marked(installation, mo
     # The oldest holder back under the index, the other one marked
     assert pair == [False, True], rows
     _next_is_new(restored, {1, 2})
+
+
+@pytest.mark.parametrize('mode', ('merge', 'replace'))
+def test_an_archive_whose_counter_trails_its_certificates_restores_past_them(installation, mode):
+    """A 2.254 archive taken where the counter had fallen behind: the restore counts past its rows."""
+    ca_id = _ca(f'archived lag {mode}')
+    refid = db.session.get(SSHCertificateAuthority, ca_id).refid
+    issued = {_sign(ca_id) for _ in range(3)}
+    master, store = _archive()
+    payload = {name: copy.deepcopy(list(store[name])) for name in ('ssh_cas', 'ssh_certificates')}
+    next(row for row in payload['ssh_cas'] if row['refid'] == refid)['serial_counter'] = 0
+    _forget(ca_id, sorted(issued))
+    db.session.execute(CAS.delete().where(CAS.c.id == ca_id))
+    db.session.commit()
+    _restore(master, payload, mode)
+    db.session.remove()
+    _next_is_new(_ca_by_refid(refid), issued)
