@@ -87,3 +87,38 @@ def test_a_cross_certificate_url_is_refused_for_another_ca_unknown_ids_and_unser
 def test_every_aia_answer_is_cacheable_for_a_day(app, client, world, suffix):
     r = client.get(f'/ca/{_ref(app, world.b_id)}{suffix}')
     assert r.headers['Cache-Control'] == 'public, max-age=86400, must-revalidate'
+
+
+GARBAGE_CRT = 'bm90IGEgY2VydGlmaWNhdGU='  # base64 of "not a certificate"
+
+
+def _store_crt(app, model, row_id, value):
+    with app.app_context():
+        row = db.session.get(model, row_id)
+        before, row.crt = row.crt, value
+        db.session.commit()
+    return before
+
+
+def test_p7c_skips_an_unreadable_certificate_and_logs_it(app, client, world, caplog):
+    saved = _store_crt(app, CACrossCertificate, world.xid, GARBAGE_CRT)
+    try:
+        with caplog.at_level('WARNING'):
+            r = client.get(f'/ca/{_ref(app, world.b_id)}.p7c')
+        assert r.status_code == 200 and _bundle(r) == [_der(world.pki.root_b)]
+        assert not any(h.startswith('X-Skipped') for h in r.headers.keys())
+        assert any('skips' in m and f'cross:{world.xid}' in m for m in caplog.messages)
+    finally:
+        _store_crt(app, CACrossCertificate, world.xid, saved)
+
+
+def test_p7c_with_no_readable_certificate_is_not_found(app, client, world):
+    saved_cross = _store_crt(app, CACrossCertificate, world.xid, GARBAGE_CRT)
+    saved_ca = _store_crt(app, CA, world.b_id, GARBAGE_CRT)
+    try:
+        r = client.get(f'/ca/{_ref(app, world.b_id)}.p7c')
+        assert r.status_code == 404
+        assert not any(h.startswith('X-Skipped') for h in r.headers.keys())
+    finally:
+        _store_crt(app, CA, world.b_id, saved_ca)
+        _store_crt(app, CACrossCertificate, world.xid, saved_cross)
