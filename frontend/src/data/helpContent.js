@@ -1505,7 +1505,7 @@ export const helpContent = {
           { label: 'Client ID/Secret', text: 'OAuth2 client credentials from your IDP' },
           { label: 'Scopes', text: 'OAuth2 scopes to request (openid, profile, email)' },
           { label: 'Auto-Create Users', text: 'Automatically create UCM accounts on first SSO login' },
-          { label: 'Groups for role mapping', text: 'Read from the attributes mapped to groups, else from groups and the Microsoft Entra ID / AD FS group and role claims. When Entra ID sends groups.link instead of the groups (users in more than 150 groups), a warning is logged and, when role mapping rules exist, the user is refused: emit only the groups assigned to the application, or app roles.' },
+          { label: 'Groups for role mapping', text: 'The values of the roles and groups claims, from the ID token of the login and from the UserInfo response together. Microsoft Entra ID sends them only in the ID token: add the groups claim in the token configuration of the application (its values are group object IDs, so the mapping keys are these IDs), or use app roles. A user in more than about 200 groups gets no groups claim from Entra ID: a warning is logged and only the app roles can match. Emit only the groups assigned to the application, or app roles. With Verify ID token signature off, the groups of the ID token count only when the Token URL is HTTPS with TLS verification on, and the issuer and client ID are set and match the token.' },
         ]
       },
       {
