@@ -746,6 +746,55 @@ def test_a_merge_keeps_a_skipped_identity_as_an_orphan_so_the_name_opens_nothing
     assert len(skipped) == 1 and 'orphan' in skipped[0], results['warnings']
 
 
+def test_two_skipped_identities_of_one_account_stay_two_orphans(app, providers):
+    """Orphans of an unknown IdP are told apart by their identity: neither overwrites the other."""
+    from services.backup import manifest
+    password = 'Correct-Horse-Battery-9'
+    name = _name()
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.oidc,
+               sso_external_id='sub-two', password_hash=NOPASS)
+    with app.app_context():
+        attach_row = UserSSOIdentity(user_id=uid, provider_id=providers.saml)
+        attach_row.bind('nameid-two')
+        db.session.add(attach_row)
+        db.session.commit()
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        db.session.delete(db.session.get(User, uid))
+        db.session.commit()
+    _add(app, username=_name(), auth_source='oauth2', sso_provider_id=providers.oidc,
+         sso_external_id='sub-two', password_hash=NOPASS)
+    _add(app, username=_name(), auth_source='saml', sso_provider_id=providers.saml,
+         sso_external_id='nameid-two', password_hash=NOPASS)
+    with app.app_context():
+        _backup().restore_backup(blob, password, mode='merge')
+        db.session.expire_all()
+        uid = User.query.filter_by(username=name).one().id
+    assert sorted(_rows(app, uid)) == [(None, 'nameid-two', None), (None, 'sub-two', None)]
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_an_account_holding_two_unknown_orphans_is_restored_as_it_is(app, providers, mode):
+    from services.backup import manifest
+    password = 'Correct-Horse-Battery-9'
+    uid = _add(app, username=_name(), password_hash=NOPASS)
+    with app.app_context():
+        for external_id in ('orphan-a', 'orphan-b'):
+            row = UserSSOIdentity(user_id=uid)
+            row.bind(external_id)
+            db.session.add(row)
+        db.session.commit()
+        before = sorted((r.id, r.external_id) for r in UserSSOIdentity.query.filter_by(user_id=uid))
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        results = _backup().restore_backup(blob, password, mode=mode)
+        db.session.expire_all()
+        assert [w for w in results['warnings'] if 'user_sso_identities' in w] == []
+        assert results.get('removed', {}).get('user_sso_identities', 0) == 0
+        assert sorted((r.id, r.external_id)
+                      for r in UserSSOIdentity.query.filter_by(user_id=uid)) == before
+
+
 @pytest.mark.parametrize('merging', [True, False], ids=['merge', 'replace'])
 def test_an_archive_from_before_the_rows_keeps_a_skipped_identity_as_an_orphan(app, providers, merging):
     with app.app_context():
