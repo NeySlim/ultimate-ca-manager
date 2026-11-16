@@ -144,6 +144,15 @@ def test_the_ldap_door_names_a_missing_group(
         403, 'Access denied: you are not a member of the required group(s)')
 
 
+def test_the_ldap_door_names_groups_it_could_not_read(
+    client, local_user, ldap_provider, monkeypatch
+):
+    username = local_user()
+    _bind_succeeds(monkeypatch, username, error='groups_unreadable')
+    assert _login(client, username, '/api/v2/sso/ldap/login', ldap_provider) == (
+        403, 'Access denied: your groups could not be read from the directory')
+
+
 def test_a_wrong_ldap_password_says_nothing_more(
     client, local_user, ldap_provider, monkeypatch
 ):
@@ -206,9 +215,10 @@ class _Directory:
 
         class _Conn:
             def __init__(self):
-                self.user, self.entries = user, []
+                self.user, self.entries, self.result = user, [], None
 
-            def search(self, base, query, attributes=None):
+            def search(self, base, query, attributes=None, **kwargs):
+                self.result = {'result': 0}
                 entry = type('Entry', (), {'entry_dn': directory.USER_DN})()
                 if 'memberOf' in (attributes or []):
                     entry.memberOf = type('V', (), {'values': [f'CN={g},dc=example,dc=test'
@@ -250,7 +260,7 @@ def test_the_named_reasons_are_decided_after_the_bind(monkeypatch, disabled, gro
         account_status_attr=None, ldap_group_filter='(objectClass=group)',
         ldap_group_member_attr='memberOf', ldap_required_groups='["Admins"]',
         ldap_uid_attr=None, ldap_username_attr='uid', ldap_email_attr='mail',
-        ldap_fullname_attr='cn')
+        ldap_fullname_attr='cn', provider_type='ldap', role_mapping=None)
     for password_ok, expected in ((False, 'Invalid credentials'), (True, reason)):
         directory = _Directory(password_ok, disabled, groups)
         monkeypatch.setattr(ldap3, 'Server', lambda *a, **k: object())

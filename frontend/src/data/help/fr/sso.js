@@ -51,6 +51,7 @@ export default {
           { label: 'Filtre utilisateur', text: 'Filtre LDAP pour la correspondance des utilisateurs (par ex. (uid={username}))' },
           { label: 'Mappage d\'attributs', text: 'Mapper les attributs LDAP au nom d\'utilisateur, e-mail et nom complet' },
           { label: 'Attribut d\'ID unique', text: 'Identifiant immuable qui reconnaît le compte (entryUUID, objectGUID). Un compte lié par son DN passe à cet identifiant à sa prochaine connexion ; passer d\'un attribut d\'identifiant à un autre refuse tous les utilisateurs liés jusqu\'à Délier du SSO puis Lier au SSO.' },
+          { label: 'Groupes', text: 'Avec memberOf, lus sur l\'entrée de l\'utilisateur ; avec member ou uniqueMember, cherchés sous la base de recherche des groupes si elle est renseignée, sinon sous le parent du DN de base quand l\'annuaire le contient, puis sous le DN de base, avec (objectClass=*) comme filtre de groupe par défaut. Appartenance directe seulement : les groupes imbriqués et le groupe principal d\'Active Directory (Utilisateurs du domaine) ne sont pas vus. Les noms se comparent aux règles et aux groupes requis sans tenir compte de la casse, des espaces de bord ni de la longueur des suites d\'espaces internes. Quand des règles ou des groupes requis existent et que les groupes ne peuvent pas être lus, la connexion est refusée en le disant. « Tester le mapping » lit les groupes et décide comme la connexion.' },
         ]
       },
     ],
@@ -161,6 +162,14 @@ La section **Provisionnement des utilisateurs** s'ouvre d'elle-même et affiche 
 7. Configurez le **filtre utilisateur** (par ex. \`(uid={username})\` ou \`(sAMAccountName={username})\` pour AD)
 8. Mappez les attributs LDAP : **nom d'utilisateur**, **e-mail**, **nom complet**, et l'**attribut d'ID unique** (\`entryUUID\`, \`objectGUID\`). Un compte lié par son DN passe à cet identifiant à sa prochaine connexion ; passer d'un attribut d'identifiant à un autre refuse tous les utilisateurs liés jusqu'à **Délier du SSO** puis **Lier au SSO**
 9. Cliquez sur **Tester la connexion** pour vérifier, puis **Enregistrer** et **Activer**
+
+### Groupes
+- **memberOf** : lus sur l'entrée de l'utilisateur (recherche de portée base sur son DN) ; le filtre de groupe ne sert pas
+- **member / uniqueMember** : cherchés sous la base de recherche des groupes seule quand elle est renseignée ; sinon sous le parent du DN de base quand l'annuaire le contient, puis sous le DN de base si cette recherche échoue, avec le filtre de groupe (\`(objectClass=*)\` s'il est vide) ; les groupes placés à côté des utilisateurs (\`ou=groups\` à côté de \`ou=people\`) sont trouvés
+- **Appartenance directe seulement** : les groupes imbriqués et le groupe principal d'Active Directory (Utilisateurs du domaine) ne sont pas vus
+- **Comparaison** : les noms de groupe se comparent aux règles et aux groupes requis sans tenir compte de la casse ni des espaces de bord, une suite d'espaces internes valant un espace
+- **Groupes illisibles** : avec des règles ou des groupes requis, une connexion dont les groupes ne peuvent pas être lus est refusée avec « your groups could not be read from the directory »
+- **Tester le mapping** lit les groupes et décide comme la connexion, sans le mot de passe ; il n'affiche un rôle que pour un utilisateur admis
 
 ### Active Directory
 Pour Microsoft Active Directory, utilisez :

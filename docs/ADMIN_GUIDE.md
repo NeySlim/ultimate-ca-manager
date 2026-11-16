@@ -249,6 +249,16 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - Group-to-role mapping (map AD groups to UCM roles)
 - Test connection before saving
 
+*Where groups are read.* With `memberOf`, from the user's own entry (a base search on its DN); the group filter is not used. With `member` or `uniqueMember`, by a search for the entries whose membership attribute holds the user's DN and that match the group filter (`(objectClass=*)` when empty), under the *Group Search Base* when it is set and under that base only. Without it, the search runs under the parent of the base DN when that parent lies in a naming context the server publishes (the root DSE's `namingContexts`, or when it publishes none), else under the base DN; a search under the parent that does not succeed (for example a service account allowed to search one subtree only) is tried once more under the base DN. Groups in a branch beside the users (`ou=people` and `ou=groups`) are therefore found; on a large directory, index the membership attribute for equality (OpenLDAP `index member eq`; Active Directory indexes `member`). The groups are read whenever the provider has role mapping rules or required groups.
+
+*Direct membership only.* A group counts when it names the user itself: nested groups are not followed, and the Active Directory primary group (`primaryGroupID`, usually Domain Users) never appears in `memberOf`. Map the groups users are direct members of.
+
+*Matching.* LDAP group names compare with rule keys and required groups as `cn` does (caseIgnoreMatch, RFC 4519 and RFC 4518): case and edge spaces are ignored and a run of inner spaces counts as one space; OIDC and SAML groups are compared exactly. A rule key is saved without its edge spaces, and two LDAP rule keys that compare equal are refused at save; a provider saved earlier with two such keys keeps working, both rules apply and the highest-privilege role wins.
+
+*A failed read.* When the directory does not answer the group read with success (service account rights, timeout, referral, missing base) and the admission depends on the groups, the login is refused with "your groups could not be read from the directory", and the log and the audit say the same.
+
+*Test Mapping* (Groups and role mapping section of a saved provider) finds the user, reads the groups and decides as the login does, without a password: it shows the access verdict with its reason, and a role only for an admitted user. It does not check the password nor the UCM account the sign-in would open (a local account of the same name, an account disabled in UCM, automatic creation turned off).
+
 **OAuth2 (Azure AD, Google, GitHub):**
 - Client ID, Client Secret, Authorization/Token/UserInfo URLs
 - Callback URL: `https://your-server:8443/api/v2/auth/sso/oauth2/callback`
@@ -264,7 +274,7 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - *Sign authentication requests* signs each AuthnRequest with the key of the SP certificate (the HTTPS certificate or one held by UCM, RSA only); register that certificate at the IdP from the SP metadata first.
 - *NameID format* is asked of the IdP in each request and published in the metadata; *persistent* gives UCM a stable identifier, a transient NameID is never used to recognise the account.
 
-**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. Users with no matching entry get the provider's default role at account creation; on later logins their stored role is kept unless *Sync role on each login* is enabled.
+**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. With at least one entry, a user no entry matches is refused at sign-in; without entries, new accounts get the provider's default role. On later logins the stored role is kept unless *Sync role on each login* is enabled.
 
 **Important:** After configuring SSO, test with a non-admin account first. Keep at least one local admin account as fallback.
 

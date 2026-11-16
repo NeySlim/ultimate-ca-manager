@@ -1,5 +1,5 @@
 from . import bp, VALID_ROLES, logger
-from .connection_tests import ATTEMPT_REFUSED, _ldap_authenticate_user
+from .connection_tests import ATTEMPT_REFUSED, GROUPS_UNREADABLE, _ldap_authenticate_user
 from flask import request, session
 from auth.unified import require_auth
 from auth.session_start import begin_session
@@ -33,10 +33,10 @@ def ldap_login():
 
     On refusals this door says more than the password door, on purpose. Every
     message below that names a reason — the account disabled in the directory,
-    the account disabled locally, membership of a required group — is returned
-    only after ``_ldap_authenticate_user`` has bound as the user with the
-    password supplied, so the caller has already proved it. Before that point
-    the answers match the password door's exactly: "Invalid credentials", 401,
+    the account disabled locally, membership of a required group, groups the
+    directory would not give — is returned only after ``_ldap_authenticate_user``
+    has bound as the user with the password supplied, so the caller has already
+    proved it. Before that point the answers match the password door's exactly: "Invalid credentials", 401,
     whether the name exists in the directory or not.
 
     Do not "align" these on the generic message: the operator is then left
@@ -127,6 +127,21 @@ def ldap_login():
                 username=username
             )
             return error_response("Access denied: you are not a member of the required group(s)", 403)
+
+        if error == GROUPS_UNREADABLE:
+            # The admission needs groups the directory did not give: never "no rule matches".
+            _release_ldap_attempt(local, armed)
+            logger.warning(f"LDAP login refused for '{username}' via {provider.name}: "
+                           f"its groups could not be read from the directory")
+            AuditService.log_action(
+                action='login_failure',
+                resource_type='user',
+                details=(f'LDAP login refused for {username} via {provider.name}: '
+                         f'its groups could not be read from the directory'),
+                success=False,
+                username=username
+            )
+            return error_response("Access denied: your groups could not be read from the directory", 403)
 
         # Generic auth failure (wrong password, etc.): the reserved attempt stays counted
         _ldap_attempt_failed(local, armed)

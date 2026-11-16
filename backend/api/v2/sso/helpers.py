@@ -415,10 +415,11 @@ def mapped_custom_role_names(role_mapping):
             if isinstance(name, str)}
 
 
-def validate_role_mapping(value):
+def validate_role_mapping(value, provider_type=None):
     """Check a role_mapping at save time. Returns ``(normalized_dict, error)``.
 
-    Rows with no key and no value (blank editor rows) are dropped.
+    Rows with no key and no value (blank editor rows) are dropped; a key is
+    saved without its edge spaces. Two keys the provider compares equal are refused.
     """
     if isinstance(value, str):
         try:
@@ -429,7 +430,8 @@ def validate_role_mapping(value):
         return {}, None
     if not isinstance(value, dict):
         return None, "role_mapping must be an object mapping external groups to roles"
-    cleaned = {}
+    cleaned, seen = {}, set()
+    match_key = _group_match_key_of(provider_type)
     for group, entry in value.items():
         blank = entry in (None, '', {}) or (isinstance(entry, dict) and not any(entry.values()))
         if not isinstance(group, str) or not group.strip():
@@ -450,7 +452,11 @@ def validate_role_mapping(value):
                 return None, f"role_mapping entry '{group}': custom role '{custom}' does not exist"
         if role is None and custom is None:
             return None, f"role_mapping entry '{group}' needs a role or a custom role"
-        cleaned[group] = entry
+        name = group.strip()
+        if match_key(name) in seen:
+            return None, f"role_mapping has two entries for the external group '{name}'"
+        seen.add(match_key(name))
+        cleaned[name] = entry
     return cleaned, None
 
 
@@ -514,14 +520,34 @@ def oidc_external_groups(userinfo, id_claims, token_unused=None):
     return list(merged)
 
 
+def _group_match_key_of(provider_type):
+    if provider_type == 'ldap':
+        # str.split() takes every separator RFC 4518 §2.2 maps to SPACE
+        return lambda name: ' '.join(str(name).split()).casefold()
+    return lambda name: name
+
+
+def group_match_key(provider):
+    """How a rule key and a group name compare. LDAP: close to what cn does, caseIgnoreMatch
+    (RFC 4519 §2.3; RFC 4517 §4.2.11 with RFC 4518 §2.6.1): case, edge spaces and the
+    length of inner space runs ignored. OIDC and SAML groups are opaque identifiers: exact."""
+    return _group_match_key_of(getattr(provider, 'provider_type', None))
+
+
+def _external_group_keys(provider, external_data):
+    key = group_match_key(provider)
+    return [key(g) for g in _external_groups(external_data)]
+
+
 def sso_admission(provider, external_data):
     """Whether a login may proceed. With mapping rules, only a user one of them
     matches; without rules, every user gets the default role, and no default
     role admits nobody (no implicit role)."""
     rules = _mapping_rules(provider)
     if rules:
-        groups = _external_groups(external_data)
-        return any(key in groups for key in rules)
+        key = group_match_key(provider)
+        groups = _external_group_keys(provider, external_data)
+        return any(key(rule) in groups for rule in rules)
     return provider.default_role in VALID_ROLES
 
 
@@ -538,9 +564,11 @@ def _resolve_mapped_roles(provider, external_data):
         return None, None
     external_roles = _external_groups(external_data)
     logger.info(f"Role resolution: mapping={role_mapping}, external_groups={external_roles}")
+    key = group_match_key(provider)
+    external_keys = _external_group_keys(provider, external_data)
     bases, customs = [], []
     for ext_role, value in role_mapping.items():
-        if ext_role not in external_roles:
+        if key(ext_role) not in external_keys:
             continue
         base, custom_name = _split_mapping_value(value)
         if base is not None:
