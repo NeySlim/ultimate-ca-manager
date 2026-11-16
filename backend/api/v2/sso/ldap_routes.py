@@ -22,6 +22,7 @@ from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
 from . import saml_sp
+from .account_state import SSO_NO_PASSWORD, bounded, describe_conflict
 from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
@@ -155,10 +156,14 @@ def ldap_login():
             return error_response(
                 "Sign-in refused: a local account, or one linked to another identity, "
                 "already uses this name. An administrator can link the accounts.", 403)
+        if error_code == EMAIL_CONFLICT:
+            return error_response(
+                "Sign-in refused: another account already uses this e-mail address. "
+                "Contact your administrator.", 403)
+        if error_code == NO_DEFAULT_ROLE:
+            return error_response(
+                "Access denied: this provider has no default role and no role mapping rule", 403)
         if error_code == UNMAPPED:
-            if not _mapping_rules(provider):
-                return error_response(
-                    "Access denied: this provider has no default role and no role mapping rule", 403)
             return error_response(
                 "Access denied: no role mapping rule of this provider matches your account", 403)
         # Generic message — don't disclose whether the LDAP user exists or whether
@@ -346,9 +351,10 @@ def _bind_external_id(user, provider, external_id):
     return True
 
 
-SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
 USERNAME_CONFLICT = 'sso_username_conflict'
+EMAIL_CONFLICT = 'sso_email_conflict'
 UNMAPPED = 'sso_unmapped'
+NO_DEFAULT_ROLE = 'sso_no_default_role'
 
 
 def _adoptable(user, provider):
@@ -372,20 +378,47 @@ def _same_provider_or_idp(user, provider, legacy=False):
         return user.sso_provider_id == provider.id
     if user.sso_orphan_of is None:
         return legacy
-    return user.sso_orphan_of == provider.idp_key()
+    return user.sso_orphan_of in provider.idp_keys()
+
+
+DIRECTORY_UNIQUE_ATTRS = {'', 'objectguid', 'entryuuid'}
+
+
+def _directory_unique_id(provider, external_id):
+    """An LDAP id that names the entry in every directory (RFC 4530 entryUUID, AD
+    objectGUID), not a DN or another attribute two directories of one base DN may share."""
+    import uuid
+    if (provider.ldap_uid_attr or '').strip().lower() not in DIRECTORY_UNIQUE_ATTRS:
+        return False
+    try:
+        uuid.UUID(str(external_id))
+    except ValueError:
+        return False
+    return True
+
+
+def _same_idp_orphan_key(provider, key, external_id):
+    """Whether an orphan recorded under ``key`` and bound to ``external_id`` is this IdP's.
+    LDAP: a directory-unique id needs only the same base DN, whichever host serves it."""
+    if key in provider.idp_keys():
+        return True
+    if provider.provider_type != 'ldap' or not key.startswith('ldap:') or '|' not in key:
+        return False
+    return (key.partition('|')[2] == provider.directory_base_dn()
+            and _directory_unique_id(provider, external_id))
 
 
 def _orphan_with_id(provider, external_id):
     """The one account bound to ``external_id`` whose deleted provider served this
     same IdP; None when there is none, or several (a stable id is per IdP)."""
-    key = provider.idp_key()
-    if not key:
+    if not provider.idp_keys():
         return None
-    orphans = User.query.filter(
+    candidates = User.query.filter(
         User.sso_external_id == external_id,
         User.auth_source == provider.provider_type,
         User.sso_provider_id.is_(None),
-        User.sso_orphan_of == key).limit(2).all()
+        User.sso_orphan_of.isnot(None)).all()
+    orphans = [u for u in candidates if _same_idp_orphan_key(provider, u.sso_orphan_of, external_id)]
     return orphans[0] if len(orphans) == 1 else None
 
 
@@ -408,40 +441,65 @@ def _email_unverified(provider, external_data):
     return flag is False or (isinstance(flag, str) and flag.strip().lower() == 'false')
 
 
-def _refuse_username_conflict(provider, username):
-    logger.warning(
-        f"SSO login refused for '{username}' via {provider.name}: the name belongs to a "
-        f"local account or to one bound to another identity")
+def _refuse(username, details, code):
+    logger.warning(details)
     AuditService.log_action(
         action='login_failure',
         resource_type='sso',
         resource_name=username,
-        details=(f"SSO login via {provider.name} refused: the name {username!r} belongs to a "
-                 f"local account or to one bound to another identity (link it with Link to SSO)"),
+        details=details,
         success=False,
         username=username,
     )
-    return None, USERNAME_CONFLICT
+    return None, code
+
+
+def _refuse_username_conflict(provider, username, account):
+    state, remedy = describe_conflict(account, provider)
+    return _refuse(username, (f"SSO login via {provider.name!r} refused: the name {username!r} "
+                              f"belongs to an account it may not open, which {state} ({remedy})"),
+                   USERNAME_CONFLICT)
+
+
+def _refuse_email_conflict(provider, username, email, account, unverified):
+    """No second account for an e-mail an account this identity may not open owns."""
+    if unverified and account.sso_provider_id == provider.id:
+        state = (f"is linked to {provider.name!r} but the IdP marks the e-mail unverified "
+                 f"(email_verified false), so it is not matched by it")
+        remedy = "have the IdP verify the e-mail address"
+    else:
+        state, remedy = describe_conflict(account, provider)
+    return _refuse(username, (f"SSO login via {provider.name!r} refused for {username!r}: the e-mail "
+                              f"{bounded(email)!r} belongs to the account {account.username!r}, which "
+                              f"{state}; no second account is created ({remedy}; for another person, "
+                              f"create and link an account named {username!r} first)"),
+                   EMAIL_CONFLICT)
 
 
 def _refuse_unmapped(provider, username):
-    reason = 'no role mapping rule matches it' if _mapping_rules(provider) else 'the provider has no default role'
-    logger.warning(f"SSO login refused for '{username}' via {provider.name}: {reason}")
-    AuditService.log_action(
-        action='login_failure',
-        resource_type='sso',
-        resource_name=username,
-        details=f"SSO login via {provider.name} refused for {username!r}: {reason}",
-        success=False,
-        username=username,
-    )
-    return None, UNMAPPED
+    if _mapping_rules(provider):
+        reason, code = 'no role mapping rule matches it', UNMAPPED
+    else:
+        reason, code = 'the provider has no role mapping rule and no default role', NO_DEFAULT_ROLE
+    return _refuse(username, f"SSO login via {provider.name!r} refused for {username!r}: {reason}", code)
+
+
+def _email_owner(provider, account, unverified):
+    """An account owning the presented e-mail that this identity may not open and whose
+    existence a new account would duplicate: one linked to another provider, or one
+    an administrator linked to this provider that an unverified e-mail cannot match."""
+    if (account.auth_source or 'local') == 'local':
+        return False  # e-mail is unique among local accounts only (#136)
+    if account.sso_provider_id is not None and account.sso_provider_id != provider.id:
+        return True
+    return unverified and _adoptable(account, provider)
 
 
 def _resolve_sso_account(provider, username, email, external_data):
-    """(account, rebind, conflict): the local account this identity opens, whether it is
-    the DN-bound one moving to the stable uid, and the account of the same name it may
-    not claim. Reads only: the LDAP door counts its attempt on what this finds."""
+    """(account, rebind, conflict, email_owner): the local account this identity opens,
+    whether it is the DN-bound one moving to the stable uid, the account of the same
+    name it may not claim, and the one owning its e-mail it may not claim either.
+    Reads only: the LDAP door counts its attempt on what this finds."""
     from sqlalchemy import func
     external_id = _extract_external_id(provider, external_data)
 
@@ -468,17 +526,22 @@ def _resolve_sso_account(provider, username, email, external_data):
     # 3. An account an admin linked to this provider that owns this email but
     #    whose username differs (#138). Never a local or already bound account,
     #    nor by an e-mail the OIDC IdP says is unverified.
-    if not user and email and not _email_unverified(provider, external_data):
+    email_owner = None
+    if not user and email:
+        unverified = _email_unverified(provider, external_data)
         norm = email.strip().lower()
         candidates = User.query.filter(func.lower(User.email) == norm).all()
-        user = next((u for u in candidates
-                     if (u.auth_source or 'local') != 'local' and _adoptable(u, provider)), None)
-    return user, rebind, conflict
+        if not unverified:
+            user = next((u for u in candidates
+                         if (u.auth_source or 'local') != 'local' and _adoptable(u, provider)), None)
+        if not user:
+            email_owner = next((u for u in candidates if _email_owner(provider, u, unverified)), None)
+    return user, rebind, conflict, email_owner
 
 
 def _ldap_local_account(provider, identity):
     """The local account a bind of this directory entry would open or be refused on."""
-    user, _rebind, conflict = _resolve_sso_account(
+    user, _rebind, conflict, _owner = _resolve_sso_account(
         provider, identity['username'], identity.get('email', ''), identity)
     return user or conflict
 
@@ -490,10 +553,13 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         tuple: (user, error_code) - user object or None, and error code if failed
     """
     external_id = _extract_external_id(provider, external_data)
-    user, rebind, conflict = _resolve_sso_account(provider, username, email, external_data)
+    user, rebind, conflict, email_owner = _resolve_sso_account(provider, username, email, external_data)
 
     if not user and conflict:
-        return _refuse_username_conflict(provider, username)
+        return _refuse_username_conflict(provider, username, conflict)
+    if not user and email_owner:
+        return _refuse_email_conflict(provider, username, email, email_owner,
+                                      _email_unverified(provider, external_data))
 
     if user and not user.active:
         # A disabled account is a refused login: every caller checks it a

@@ -206,19 +206,14 @@ def toggle_user_status(user_id):
         return error_response('Failed to toggle user status', 500)
 
 
-SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
-
-
 @bp.route('/api/v2/users/<int:user_id>/link-sso', methods=['POST'])
 @require_auth(['write:users'])
 def link_user_sso(user_id):
-    """Link an existing local account to an SSO provider (admin only).
-
-    The recommended way to resolve an email collision between a local user and
-    an SSO identity (#136): instead of creating a duplicate or silently merging
-    on email, an admin deliberately links the two. After linking, the matching
-    SSO login adopts this account **by email** — the local username is kept
-    unchanged (renaming it locked admins out of their account, see #138).
+    """Attach any account to an SSO provider (admin only): a local account, one of
+    another provider (moved), one with no provider, or one of this provider whose
+    stable identity changed (reset). Its stable identity is cleared: the next
+    sign-in through this provider with its name, or its e-mail (#136), binds one.
+    The username is kept (renaming it locked admins out of their account, #138).
 
     POST /api/v2/users/{user_id}/link-sso
     Body: {"provider_id": int}
@@ -231,11 +226,11 @@ def link_user_sso(user_id):
 
     from models.sso import SSOProvider
 
+    from api.v2.sso.account_state import SSO_NO_PASSWORD, describe_origin
+
     user = db.session.get(User, user_id)
     if not user:
         return error_response('User not found', 404)
-    if (user.auth_source or 'local') != 'local' or user.sso_provider_id:
-        return error_response('User is already linked to single sign-on', 400)
 
     data = request.get_json(silent=True) or {}
     provider_id = data.get('provider_id')
@@ -245,12 +240,15 @@ def link_user_sso(user_id):
     if not provider:
         return error_response('SSO provider not found', 404)
 
-    # Keep the username; the SSO login is matched to this account by email.
-    # An external id left by older releases is dropped: the first sign-in binds it.
+    origin = describe_origin(user, provider)
     user.auth_source = provider.provider_type
     user.sso_provider_id = provider.id
     user.sso_external_id = None
     user.sso_orphan_of = None
+    # An account without a password signs in through the provider only: the change
+    # Unlink SSO asked of it would confine its SSO session. One with a password keeps both.
+    if user.password_hash == SSO_NO_PASSWORD:
+        user.force_password_change = False
 
     ok, err = safe_commit(logger, f"Failed to link user {user_id} to SSO")
     if not ok:
@@ -260,7 +258,7 @@ def link_user_sso(user_id):
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Linked account {user.username!r} to SSO provider {provider.name!r}',
+        details=f'Linked account {user.username!r} to SSO provider {provider.name!r} ({origin})',
         success=True,
     )
     return success_response(
@@ -291,6 +289,7 @@ def unlink_user_sso(user_id):
     user.sso_provider_id = None
     user.sso_external_id = None
     user.sso_orphan_of = None
+    from api.v2.sso.account_state import SSO_NO_PASSWORD
     # An account that never had a local password must set one before it can log in.
     needs_password = user.password_hash == SSO_NO_PASSWORD
     if needs_password:
