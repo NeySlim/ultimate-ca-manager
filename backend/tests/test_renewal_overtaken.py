@@ -481,6 +481,78 @@ def test_a_partner_taken_while_the_members_were_chosen_refuses_the_renewal(
             db.session.remove()
 
 
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_a_partner_taken_under_the_lock_the_renewal_waits_on_refuses_it_on_postgresql(app, monkeypatch):
+    from services.cert import renewal
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_renewal_lock_order_pg import _own_session, _pid_of, _waits_on_a_lock
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+    with _a_schema_of_our_own(f'renew_taken_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        a_id, (first, newer) = _linked_rows(app, n_b=2)
+        with app.app_context():
+            db.session.get(Certificate, a_id).related_certificate_id = first
+            db.session.commit()
+            serials = {i: db.session.get(Certificate, i).serial_number for i in (a_id, first, newer)}
+            db.session.remove()
+        holds, release, pids, outcome = threading.Event(), threading.Event(), {}, {}
+
+        def take_a():  # link_issued: A locked, link moved, committed later
+            with app.app_context():
+                engine, pids['linker'] = _own_session(url)
+                try:
+                    row = db.session.get(Certificate, a_id, with_for_update=True)
+                    row.related_certificate_id = newer
+                    db.session.flush()
+                    holds.set()
+                    release.wait(30)
+                    db.session.commit()
+                finally:
+                    holds.set()
+                    db.session.remove()
+                    engine.dispose()
+
+        linker, chosen = threading.Thread(target=take_a), renewal._linked_members
+
+        def then_taken(cert):
+            members = chosen(cert)
+            linker.start()
+            assert holds.wait(30)
+            return members
+
+        def renew():
+            with app.app_context():
+                engine, pids['renewal'] = _own_session(url)
+                try:
+                    renewal.renew_certificate_in_place(db.session.get(Certificate, a_id),
+                                                       username='admin', regenerate_crl=False)
+                    outcome['renewed'] = True
+                except renewal.RenewalError as e:
+                    outcome['error'] = (e.status, e.message)
+                finally:
+                    db.session.remove()
+                    engine.dispose()
+
+        monkeypatch.setattr(renewal, '_linked_members', then_taken)
+        renewer = threading.Thread(target=renew)
+        renewer.start()
+        blocked = _waits_on_a_lock(url, _pid_of(pids, 'renewal'))
+        release.set()
+        renewer.join(60)
+        linker.join(60)
+        monkeypatch.undo()
+        assert blocked, outcome
+        assert outcome.get('error', (None, ''))[0] == 409, outcome
+        with app.app_context():
+            for row_id, serial in serials.items():
+                assert db.session.get(Certificate, row_id).serial_number == serial
+            done = renewal.renew_certificate_in_place(db.session.get(Certificate, a_id),
+                                                      username='admin', regenerate_crl=False)
+            assert [r['cert_id'] for r in done['related']] == [newer]
+            db.session.remove()
+
+
 def test_a_partner_that_left_while_the_members_were_chosen_refuses_the_renewal(
         app, tmp_path, monkeypatch):
     """Each member is judged on its own stored link, B as well as A."""
