@@ -622,6 +622,8 @@ def test_a_replace_by_an_archive_that_matches_keeps_the_rows_and_warns_nothing(a
         results = _backup().restore_backup(blob, password, mode='replace')
         db.session.expire_all()
         assert [w for w in results['warnings'] if 'user_sso_identities' in w] == []
+        # SQLite may hand a recreated row its old id: the replacement says what it removed
+        assert results['removed'].get('user_sso_identities', 0) == 0, results['removed']
         assert [(row.id, row.provider_id, row.external_id, row.orphan_of)
                 for row in UserSSOIdentity.query.order_by(UserSSOIdentity.id)] == before
 

@@ -408,7 +408,8 @@ def sso_identity_key(user_id, provider_id, orphan_of) -> Tuple:
     """What an identity row is: its account's row for a provider, or, without a provider, its
     orphan of an IdP key (None: unknown). The manifest's identity is never complete on its own:
     a live row has no orphan_of, an orphan no provider."""
-    return (user_id, provider_id, orphan_of if provider_id is None else None)
+    return tuple(_normalise(value) for value in
+                 (user_id, provider_id, orphan_of if provider_id is None else None))
 
 
 def _identity_key(values: Dict[str, Any], fields: Tuple[str, ...],
