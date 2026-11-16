@@ -408,6 +408,19 @@ def test_ad_memberof_keeps_working(env, monkeypatch):
     assert env.role(user) == 'operator'
 
 
+def test_a_memberof_value_that_is_no_dn_is_skipped_and_the_others_kept(
+        env, monkeypatch, caplog):
+    user = env.user()
+    bad = 'CN=a=b,DC=example,DC=com' + 'x' * 500
+    _ad(monkeypatch, user, [bad, 'CN=PKI-Admins,OU=Groups,DC=example,DC=com'])
+    pid = _ad_provider(env, role_mapping=json.dumps({'PKI-Admins': 'operator'}))
+    with caplog.at_level(logging.WARNING):
+        assert env.login(pid, user)[0] == 200
+    assert env.role(user) == 'operator'
+    skipped = [r.getMessage() for r in caplog.records if 'memberOf value' in r.getMessage()]
+    assert len(skipped) == 1 and 'CN=a=b' in skipped[0] and len(skipped[0]) < 400
+
+
 # ── 4. Comparison: cn is caseIgnoreMatch for LDAP, exact for OIDC and SAML ───
 
 def test_ldap_rule_and_group_compare_ignoring_case_and_edge_spaces(env, monkeypatch):

@@ -221,7 +221,12 @@ def _ldap_read_groups(provider, server, user_dn):
                     else [str(entry.memberOf)]
                 groups = []
                 for group_dn in values:
-                    name = get_dn_attribute(str(group_dn), 'CN')
+                    # One value that is no DN costs that group only, not the others.
+                    try:
+                        name = get_dn_attribute(str(group_dn), 'CN')
+                    except ValueError:
+                        logger.warning(f"LDAP memberOf value skipped, not a DN: {str(group_dn)[:200]!r}")
+                        continue
                     if name is not None:
                         groups.append(name)
                 return groups
