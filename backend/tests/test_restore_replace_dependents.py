@@ -943,3 +943,184 @@ def test_an_unenforced_optional_link_is_emptied_in_a_table_the_archive_omits(tar
 
     assert AcmeEabCredential.query.one().created_by_user_id is None
     assert results['unlinked_dependents'] == {'acme_eab_credentials.created_by_user_id': 1}
+
+
+# -- accounts and their providers ---------------------------------------------
+
+def _sso_provider(name):
+    from models.sso import SSOProvider
+    row = SSOProvider(name=name, provider_type='oauth2', oauth2_issuer=f'https://{name}.example.test')
+    db.session.add(row)
+    db.session.flush()
+    return row
+
+
+def _identity(user, provider, external_id):
+    from models import UserSSOIdentity
+    row = UserSSOIdentity(user_id=user.id, provider_id=provider.id)
+    row.bind(external_id)
+    db.session.add(row)
+    db.session.flush()
+    return row
+
+
+def test_an_archive_without_identity_rows_removes_a_newer_sso_account(target):
+    """A 2.254 archive carries no user_sso_identities: a newer account goes with its rows."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    provider = _sso_provider('replace-kept-idp')
+    blob = _snapshot('users')
+    _identity(_user('replace-newer-sso'), provider, 'sub-newer')
+    db.session.commit()
+
+    _restore(blob)
+
+    assert User.query.filter_by(username='replace-newer-sso').first() is None
+    assert UserSSOIdentity.query.count() == 0
+    assert _orphans() == []
+
+
+def test_an_archive_without_identity_rows_orphans_a_newer_provider_under_its_idp(target):
+    """The provider goes, the account it opened keeps its identity under the IdP's exact key."""
+    from models import User, UserSSOIdentity
+
+    admin = _user('replace-admin')
+    blob = _snapshot('users', 'sso_providers')
+    provider = _sso_provider('replace-newer-idp')
+    key = provider.idp_key()
+    _identity(admin, provider, 'sub-admin')
+    db.session.commit()
+
+    _restore(blob)
+
+    row = UserSSOIdentity.query.filter_by(
+        user_id=User.query.filter_by(username='replace-admin').one().id).one()
+    assert (row.provider_id, row.orphan_of, row.external_id) == (None, key, 'sub-admin')
+    assert _orphans() == []
+
+
+
+def test_a_merge_bringing_back_an_email_another_local_account_holds_is_refused(target):
+    """E-mail is unique among local accounts (#136): said by name before the index refuses it."""
+    from models import User
+
+    _user('replace-admin')
+    _user('replace-email-a')
+    blob = _snapshot('users')
+    db.session.delete(User.query.filter_by(username='replace-email-a').one())
+    db.session.flush()
+    other = _user('replace-email-b')
+    other.email = 'replace-email-a@example.test'
+    db.session.commit()
+
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore(blob, mode='merge')
+    db.session.rollback()
+    assert 'replace-email-a@example.test' in str(refused.value)
+    assert 'Nothing has been changed' in str(refused.value)
+    assert User.query.filter_by(username='replace-email-a').first() is None
+
+
+def test_the_shared_email_refusal_reads_the_accounts_in_one_query(target):
+    from sqlalchemy import event
+    from services.backup.restore.conflict import RestoreConflictError
+
+    names = [_user(f'replace-many-{i}').username for i in range(5)]
+    dup = _user('replace-many-dup')
+    # Out of the index as during a restore, before the flags are set from the rows
+    dup.has_sso_identity, dup.email = True, 'replace-many-3@example.test'
+    db.session.commit()
+    seen = []
+
+    def count(_conn, _cursor, statement, *_args):
+        if 'users' in statement:
+            seen.append(statement)
+    event.listen(db.engine, 'before_cursor_execute', count)
+    try:
+        with pytest.raises(RestoreConflictError) as refused:
+            _service()._refuse_shared_local_emails({'users': [{'username': n} for n in names]})
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', count)
+    assert len(seen) == 1, seen
+    assert "'replace-many-3'" in str(refused.value) and "'replace-many-dup'" in str(refused.value)
+
+
+def test_a_full_replace_of_an_sso_account_sharing_a_local_email_passes(target):
+    """An SSO account may share its e-mail with a local one (#136): restoring that is no conflict."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    _identity(_user('replace-shared-sso'), _sso_provider('replace-shared-idp'), 'sub-shared')
+    _user('replace-shared-local').email = 'replace-shared-sso@example.test'
+    blob = _snapshot()
+
+    _restore(blob)
+
+    sso = User.query.filter_by(username='replace-shared-sso').one()
+    assert [row.external_id for row in UserSSOIdentity.query.filter_by(user_id=sso.id)] == ['sub-shared']
+    assert User.query.filter_by(username='replace-shared-local').one().email == sso.email
+
+
+def test_a_merge_making_a_local_account_sso_again_may_share_its_email(target):
+    """The archive's identity rows count, not the rows the account had before the restore."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    sso = _user('replace-merge-sso')
+    _identity(sso, _sso_provider('replace-merge-idp'), 'sub-merge')
+    blob = _snapshot()
+    UserSSOIdentity.query.filter_by(user_id=sso.id).delete()
+    sso.email = 'elsewhere@example.test'
+    db.session.flush()
+    _user('replace-merge-local').email = 'replace-merge-sso@example.test'
+    db.session.commit()
+
+    _restore(blob, mode='merge')
+
+    sso = User.query.filter_by(username='replace-merge-sso').one()
+    assert sso.email == 'replace-merge-sso@example.test'
+    assert [row.external_id for row in UserSSOIdentity.query.filter_by(user_id=sso.id)] == ['sub-merge']
+
+
+def test_a_merge_from_a_254_archive_keeps_an_sso_account_sharing_a_local_email(target):
+    """The account is SSO here and in the archive: its e-mail is no local account's."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    provider = _sso_provider('replace-254-idp')
+    _identity(_user('replace-254-sso'), provider, 'sub-254')
+    _user('replace-254-local').email = 'replace-254-sso@example.test'
+    blob = _snapshot('users', 'sso_providers')
+
+    def as_254(row):
+        row['auth_source'] = 'local'
+        if row['username'] == 'replace-254-sso':
+            row.update(auth_source='oauth2', sso_provider_id=provider.id, sso_external_id='sub-254',
+                       sso_provider_id_ref={'name': 'replace-254-idp'})
+    _restore(_old_form(blob, drop_from='users', edit=as_254), mode='merge')
+
+    sso = User.query.filter_by(username='replace-254-sso').one()
+    local = User.query.filter_by(username='replace-254-local').one()
+    assert [row.external_id for row in UserSSOIdentity.query.filter_by(user_id=sso.id)] == ['sub-254']
+    assert (sso.has_sso_identity, local.has_sso_identity, local.email) == (True, False, sso.email)
+
+
+def test_a_replace_from_a_254_archive_drops_a_binding_made_after_it(target):
+    """The archive says local: a provider bound here since then no longer opens the account."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    account = _user('replace-later-bound')
+    provider = _sso_provider('replace-later-idp')
+    blob = _snapshot('users', 'sso_providers')
+    _identity(account, provider, 'sub-after')
+    db.session.commit()
+
+    def as_254(row):
+        row['auth_source'] = 'local'
+    _restore(_old_form(blob, drop_from='users', edit=as_254))
+
+    account = User.query.filter_by(username='replace-later-bound').one()
+    assert UserSSOIdentity.query.filter_by(user_id=account.id).count() == 0
+    assert _orphans() == []

@@ -251,8 +251,8 @@ def _next_user_id(url):
     try:
         with engine.begin() as conn:
             return conn.execute(text(
-                "INSERT INTO users (username, email, password_hash, role, auth_source) "
-                "VALUES ('after_switch', 'after@switch', 'x', 'viewer', 'local') RETURNING id")).scalar()
+                "INSERT INTO users (username, email, password_hash, role) "
+                "VALUES ('after_switch', 'after@switch', 'x', 'viewer') RETURNING id")).scalar()
     finally:
         engine.dispose()
 
@@ -945,8 +945,8 @@ def _provision(url, registry, with_user=True):
         if with_user:
             with engine.begin() as conn:
                 conn.execute(text(
-                    "INSERT INTO users (username, email, password_hash, role, auth_source) "
-                    "VALUES ('target_owner', 'owner@target', 'x', 'admin', 'local')"))
+                    "INSERT INTO users (username, email, password_hash, role) "
+                    "VALUES ('target_owner', 'owner@target', 'x', 'admin')"))
         if registry is not None:
             migration_runner._ensure_tracking_table(engine, is_pg)
             migration_runner._mark_applied(engine, sorted(registry), is_pg)
@@ -1301,8 +1301,8 @@ def _standalone_target(app, url):
             db.metadata.create_all(engine)
         with engine.begin() as conn:
             conn.execute(text(
-                "INSERT INTO users (username, email, password_hash, role, auth_source) "
-                "VALUES ('standalone', 'stand@alone', 'x', 'admin', 'local')"))
+                "INSERT INTO users (username, email, password_hash, role) "
+                "VALUES ('standalone', 'stand@alone', 'x', 'admin')"))
     finally:
         engine.dispose()
 
@@ -1360,8 +1360,8 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
             # A row the source never had: the retry must empty the copy, not top it up
             with engine.begin() as conn:
                 conn.execute(text(
-                    "INSERT INTO users (username, email, password_hash, role, auth_source) "
-                    "VALUES ('stray', 'stray@target', 'x', 'admin', 'local')"))
+                    "INSERT INTO users (username, email, password_hash, role) "
+                    "VALUES ('stray', 'stray@target', 'x', 'admin')"))
             before = env_file.read_text()
 
             second = self._post(auth_client, target)
@@ -1542,8 +1542,8 @@ class TestACopyThatWasNotVerifiedIsNotTakenNextTime:
                 db.session.execute(text(sql), params)
                 db.session.commit()
 
-        on_source("INSERT INTO users (username, email, password_hash, role, auth_source) "
-                  "VALUES ('resumed', 'resumed@test', 'OLD', 'admin', 'local')")
+        on_source("INSERT INTO users (username, email, password_hash, role) "
+                  "VALUES ('resumed', 'resumed@test', 'OLD', 'admin')")
         try:
             monkeypatch.setattr(migration, 'verify_migration', killed)
             with app.app_context():
@@ -1749,8 +1749,8 @@ class TestTheMarkerIsNeverTakenForAVerification:
                 assert inspected and TRANSFER_MARKER not in inspected
                 with engine.begin() as conn:
                     conn.execute(text(
-                        "INSERT INTO users (username, email, password_hash, role, auth_source) "
-                        "VALUES ('beside', 'beside@marker', 'x', 'admin', 'local')"))
+                        "INSERT INTO users (username, email, password_hash, role) "
+                        "VALUES ('beside', 'beside@marker', 'x', 'admin')"))
                 with pytest.raises(PreflightError, match="not empty.*users"):
                     check_target_is_empty(engine)
         finally:

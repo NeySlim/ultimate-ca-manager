@@ -3,6 +3,7 @@ import logging
 
 from flask import request, g
 from models import db, User
+from models.user import local_email_holder, local_email_taken
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
@@ -162,6 +163,9 @@ def update_profile():
         email = data['email']
         if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
             return error_response('Invalid email format', 400)
+        # E-mail is unique among local accounts (#136); ix_users_email_local refuses a race
+        if email and user.is_local and local_email_holder(email, other_than=user.id) is not None:
+            return error_response('Email already in use', 409)
         user.email = email
 
     if 'full_name' in data:
@@ -170,7 +174,9 @@ def update_profile():
     if 'timezone' in data:
         user.timezone = data.get('timezone', 'UTC')
 
-    ok, _err = safe_commit(logger, "Failed to update profile")
+    uid, email = user.id, data.get('email')
+    ok, _err = safe_commit(logger, "Failed to update profile",
+                           on_conflict=lambda: local_email_taken(email, other_than=uid))
     if not ok:
         return _err
 

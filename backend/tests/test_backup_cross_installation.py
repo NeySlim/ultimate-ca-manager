@@ -445,7 +445,6 @@ def _seed_source():
                  email=f'xinst-{suffix}@example.test', password_hash='x' * 32,
                  role='operator', active=True) for suffix in 'ab']
     users[1].custom_role_id = roles[1].id
-    users[1].sso_provider_id = providers[1].id
     # A role built on another role, and a provider recording who added it:
     # two numbers that named a different row on every other installation.
     roles[1].inherits_from = roles[0].id
@@ -494,6 +493,8 @@ def _seed_source():
     cross = add('ca_cross_certificates', ca_id=authorities[1].id, crt='xinst-cross-crt',
         fingerprint_sha256='xinst-cross-fingerprint', issuer_caref='xinst-ca-a')
     add('group_members', group_id=groups[1].id, user_id=users[1].id, role='member')
+    add('user_sso_identities', user_id=users[1].id, provider_id=providers[1].id,
+        external_id='xinst-sub')
     add('api_keys', user_id=users[1].id, key_hash='xinst-api-key-hash',
         name='xinst-api-key', permissions='[]')
     add('auth_certificates', user_id=users[1].id, cert_serial='xinst-auth-serial',
@@ -775,7 +776,7 @@ RESTORABLE_SECTIONS = tuple(
         # before the first write. `apply_section` now rebuilds the index of
         # the sections it points at, so they are ordinary sections of the
         # round trip like any other.
-        'role_permissions', 'group_members', 'webauthn_credentials',
+        'role_permissions', 'group_members', 'user_sso_identities', 'webauthn_credentials',
         'deploy_bindings', 'crl_deploy_bindings', 'ca_template_pins',
         'ca_cross_certificates',
         'key_recovery_requests',

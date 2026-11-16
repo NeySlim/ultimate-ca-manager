@@ -129,7 +129,7 @@ def _active_certificate_filter(model):
           'automatically; otherwise an administrator resets the password.')
 def _users_password_scrypt():
     rows = (User.query.with_entities(User.id, User.username, User.password_hash)
-            .filter(User.auth_source == 'local', User.password_hash.like('scrypt:%'))
+            .filter(~User.sso_identities.any(), User.password_hash.like('scrypt:%'))
             .order_by(User.id).all())
     return [_named(r.username, r.id) for r in rows if (r.password_hash or '').startswith('scrypt:')]
 

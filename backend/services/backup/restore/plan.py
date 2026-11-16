@@ -130,7 +130,9 @@ class RestorePlan:
         """
         if section.identity == ('id',):
             return  # singleton configuration rows
-        missing = [field for field in section.identity
+        # An attachment is its account's, by provider or by IdP key (sso_identity_key)
+        fields = ('user_id',) if name == _SSO_IDENTITIES else section.identity
+        missing = [field for field in fields
                    if missing_identity_value(name, field, row.get(field))]
         if not missing:
             return
@@ -250,6 +252,9 @@ class RestorePlan:
             # with two configurations and used whichever the query returned.
             return next(iter(index.values()), None)
 
+        if section_name == _SSO_IDENTITIES:
+            return self._sso_identity_here(row)
+
         if not _identified_by_a_reference(section):
             return self._claimed(section_name, _identity_key(
                 row, section.identity, _temporal_identity(section_name)), row)
@@ -259,6 +264,25 @@ class RestorePlan:
         if key not in index and self.source_numbers_hold(section_name, row):
             key = _identity_key(row, section.identity, _temporal_identity(section_name))
         return self._claimed(section_name, key, row)
+
+    def _sso_identity_here(self, row: Dict[str, Any]) -> Optional[Any]:
+        """The attachment here an archived one is: the account's row for the same provider,
+        else, for one whose provider is not here, its orphan of the same IdP; an orphan of an
+        unknown IdP is told apart by its identity, an account may hold several.
+        An orphan's identity holds NULLs, which the generic index matches with nothing."""
+        from models import UserSSOIdentity
+        user_id = self.resolve(_SSO_IDENTITIES, row, 'user_id')
+        if user_id is None:
+            return None
+        provider_id = self.resolve(_SSO_IDENTITIES, row, 'provider_id')
+        query = UserSSOIdentity.query.filter_by(user_id=user_id, provider_id=provider_id)
+        if provider_id is None:
+            query = query.filter_by(orphan_of=row.get('orphan_of'))
+            if row.get('orphan_of') is None:
+                query = query.filter_by(external_id=row.get('external_id'))
+        ids = [found.id for found in query.order_by(UserSSOIdentity.id)]
+        key = sso_identity_key(user_id, provider_id, row.get('orphan_of'), row.get('external_id'))
+        return self.rank(_SSO_IDENTITIES, key, row, ids)
 
     def _claimed(self, section_name: str, key: Tuple, row: Dict[str, Any]) -> Optional[Any]:
         """The row here for that identity, by rank: the n-th archived row of it takes the n-th oldest."""
@@ -379,6 +403,22 @@ class RestorePlan:
             self._archived_by_identity[section_name] = index
         return index.get(_identity_key(identity, fields,
                                        _temporal_identity(section_name)))
+
+
+_SSO_IDENTITIES = 'user_sso_identities'
+# What sso_identity_key is made of, in its order
+_SSO_IDENTITY_FIELDS = ('user_id', 'provider_id', 'orphan_of', 'external_id')
+
+
+def sso_identity_key(user_id, provider_id, orphan_of, external_id) -> Tuple:
+    """What an identity row is: its account's row for a provider, or, without a provider, its
+    orphan of an IdP key, or of an unknown IdP by its identity (an account may hold several).
+    The manifest's identity is never complete on its own: a live row has no orphan_of, an
+    orphan no provider."""
+    orphan_of = orphan_of if provider_id is None else None
+    unknown = provider_id is None and orphan_of is None
+    return tuple(_normalise(value) for value in
+                 (user_id, provider_id, orphan_of, external_id if unknown else None))
 
 
 def _identity_key(values: Dict[str, Any], fields: Tuple[str, ...],
@@ -509,6 +549,11 @@ def _index_of(section_name: str, section: Section):
     temporal = _temporal_identity(section_name)
     singleton = section.identity == ('id',)
     rows, incomplete = {}, []
+    if section_name == _SSO_IDENTITIES:
+        for key_value, values in _identities_here(model, primary[0], _SSO_IDENTITY_FIELDS):
+            rows.setdefault(sso_identity_key(*values), []).append(key_value)
+        return ({key: ids[0] for key, ids in rows.items()},
+                {key: ids for key, ids in rows.items() if len(ids) > 1}, [])
     for key_value, values in _identities_here(model, primary[0], section.identity):
         if not singleton and any(missing_identity_value(section_name, field, value)
                                  for field, value in zip(section.identity, values)):
@@ -540,8 +585,10 @@ def _identities_here(model, primary: str, fields: Tuple[str, ...]):
 def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate: str,
                             others: Optional[List[Any]] = None) -> str:
     others = ids[1:] if others is None else others
-    message = (f"{section_name} {'/'.join(key)}: {len(ids)} rows here share this "
-               f"{'/'.join(SECTIONS[section_name].identity)} (id {', '.join(map(str, ids))}); "
+    spelt = '/'.join('' if part is None else str(part) for part in key)
+    fields = _SSO_IDENTITY_FIELDS if section_name == _SSO_IDENTITIES else SECTIONS[section_name].identity
+    message = (f"{section_name} {spelt}: {len(ids)} rows here share this "
+               f"{'/'.join(fields)} (id {', '.join(map(str, ids))}); "
                "the archive's rows of it go to them oldest first")
     return f"{message}, and the others (id {', '.join(map(str, others))}) are {fate}" if others else message
 

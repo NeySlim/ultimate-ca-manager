@@ -92,9 +92,10 @@ SECTIONS: Dict[str, Section] = {
             'password_reset_expires': 'goes with the reset token',
             'totp_last_step': 'live replay guard of the TOTP codes',
             'session_version': 'live session state: an older value would reopen sessions closed since the backup',
+            'has_sso_identity': 'derived from user_sso_identities, set again once the restore wrote them',
         },
         secrets=('totp_secret', 'backup_codes'),
-        references={'custom_role_id': 'custom_roles', 'sso_provider_id': 'sso_providers'},
+        references={'custom_role_id': 'custom_roles'},
     ),
     'certificate_authorities': Section(
         model='models:CA',
@@ -522,6 +523,14 @@ SECTIONS: Dict[str, Section] = {
         identity=('group_id', 'user_id'),
         exclude={**_SURROGATE},
         references={'group_id': 'groups', 'user_id': 'users'},
+    ),
+    # The providers that open each account; one whose provider the restore cannot place is
+    # left as an orphan of an unknown IdP, which no sign-in takes back by itself.
+    'user_sso_identities': Section(
+        model='models.user:UserSSOIdentity',
+        identity=('user_id', 'provider_id', 'orphan_of'),
+        exclude={**_SURROGATE},
+        references={'user_id': 'users', 'provider_id': 'sso_providers'},
     ),
     'webauthn_credentials': Section(
         model='models.webauthn:WebAuthnCredential',

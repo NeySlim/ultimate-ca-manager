@@ -16,7 +16,8 @@ from auth.session_start import (
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
-from models import db, User
+from models import db, User, UserSSOIdentity
+from models.user import local_email_holder, local_email_taken
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -206,35 +207,60 @@ def toggle_user_status(user_id):
         return error_response('Failed to toggle user status', 500)
 
 
-@bp.route('/api/v2/users/<int:user_id>/link-sso', methods=['POST'])
-@require_auth(['write:users'])
-def link_user_sso(user_id):
-    """Attach any account to an SSO provider (admin only): a local account, one of
-    another provider (moved), one with no provider, or one of this provider whose
-    stable identity changed (reset). Its stable identity is cleared: the next
-    sign-in through this provider with its name, or its e-mail (#136), binds one.
-    The username is kept (renaming it locked admins out of their account, #138).
-
-    POST /api/v2/users/{user_id}/link-sso
-    Body: {"provider_id": int, "remove_password": bool (optional, default false)}
-    """
+def _sso_admin_target(user_id):
+    """(account, None) for an administrator's change of who opens it, else (None, answer).
+    write:users, which the routes require, is reserved to the administrator role."""
     refused = refuse_api_key_on_own_account(user_id)
     if refused:
-        return refused
-    if g.current_user.role != 'admin':
-        return error_response('Insufficient permissions', 403)
+        return None, refused
+    user = db.session.get(User, user_id)
+    if not user:
+        return None, error_response('User not found', 404)
+    return user, None
 
-    from models.sso import SSOProvider
 
-    from api.v2.sso.account_state import SSO_NO_PASSWORD, describe_origin
+def _identity_of(user, identity_id):
+    return next((row for row in user.sso_identities if row.id == identity_id), None)
 
+
+def _locked(user_id):
+    """The account locked, its sessions ending with the commit: what opens it changes."""
+    owner = end_sessions_on_commit(user_id)
+    if owner is None:
+        db.session.rollback()
+    return owner
+
+
+@bp.route('/api/v2/users/<int:user_id>/sso-identities', methods=['GET'])
+@require_auth(['read:users'])
+def list_user_sso_identities(user_id):
+    """The providers attached to an account, each bound, pending or orphaned."""
     user = db.session.get(User, user_id)
     if not user:
         return error_response('User not found', 404)
+    return success_response(data=[row.to_dict() for row in user.sso_identities])
 
+
+@bp.route('/api/v2/users/<int:user_id>/sso-identities', methods=['POST'])
+@require_auth(['write:users'])
+def attach_user_sso_provider(user_id):
+    """Attach a provider to any account (admin only); the providers it has keep opening it.
+    The attachment is not bound yet: the next sign-in through this provider with the
+    account's name, or its verified e-mail (#136), binds its stable identity. An orphan
+    the same IdP left on the account is taken back with its identity. The username is kept (#138).
+
+    POST /api/v2/users/{user_id}/sso-identities
+    Body: {"provider_id": int, "remove_password": bool (optional, default false)}
+    """
+    from models.sso import SSOProvider
+    from api.v2.sso.account_state import SSO_NO_PASSWORD, attachments_text, own_identity
+
+    user, refused = _sso_admin_target(user_id)
+    if refused:
+        return refused
     data = request.get_json(silent=True) or {}
     provider_id = data.get('provider_id')
-    if not provider_id:
+    if not isinstance(provider_id, int) or isinstance(provider_id, bool):
         return error_response('provider_id is required', 400)
     remove_password = data.get('remove_password', False)
     if not isinstance(remove_password, bool):
@@ -246,24 +272,27 @@ def link_user_sso(user_id):
     if remove_password and g.current_user.id == user_id:
         return error_response('You cannot remove the local password of your own account', 400)
 
-    # The account's sessions end when its owner may change (another provider, a local
-    # account, a reset identity) or its local password goes: they were opened before.
-    moved = user.sso_provider_id != provider.id or user.sso_external_id is not None
+    # A new provider opens the account: the sessions opened before it end.
+    user = _locked(user.id)
+    if user is None:
+        return error_response('User not found', 404)
+    if own_identity(user, provider) is not None:
+        db.session.rollback()
+        return error_response('This provider is already attached to the account: reset its '
+                              'identity instead', 409)
+    before = attachments_text(user)
+    key = provider.idp_key()
+    orphans = [row for row in user.sso_identities
+               if key and row.provider_id is None and row.orphan_of == key]
+    # An explicit attachment never weakens a binding: the orphan comes back with its identity
+    taken_back = next((row for row in orphans if row.external_id), orphans[0] if orphans else None)
+    if taken_back is not None:
+        taken_back.provider, taken_back.orphan_of = provider, None
+    else:
+        user.sso_identities.append(UserSSOIdentity(provider=provider,
+                                                   created_by=g.current_user.username))
+    identity = taken_back.external_id if taken_back is not None else None
     drop_password = remove_password and user.password_hash != SSO_NO_PASSWORD
-    owner = None
-    if moved or drop_password:
-        owner = end_sessions_on_commit(user.id)
-        if owner is None:
-            db.session.rollback()
-            return error_response('User not found', 404)
-        user = owner
-    origin = describe_origin(user, provider)
-    user.auth_source = provider.provider_type
-    user.sso_provider_id = provider.id
-    user.sso_external_id = None
-    user.sso_orphan_of = None
-    # An account without a password signs in through the provider only: the change
-    # Unlink SSO asked of it would confine its SSO session. One with a password keeps both.
     if drop_password:
         # Same state as an account the provider created: no password door opens it.
         from auth.initial_admin import forget_generated
@@ -271,73 +300,145 @@ def link_user_sso(user_id):
         user.password_hash = SSO_NO_PASSWORD
         user.password_reset_token = None
         user.password_reset_expires = None
+    # An account without a password signs in through its providers only: a change
+    # owed would confine its SSO session. One with a password keeps both.
     if user.password_hash == SSO_NO_PASSWORD:
         user.force_password_change = False
 
-    ok, err = safe_commit(logger, f"Failed to link user {user_id} to SSO")
+    def held_elsewhere():
+        # The orphan's identity already opens another account through this provider
+        holder = UserSSOIdentity.query.filter(UserSSOIdentity.provider_id == provider_id,
+                                              UserSSOIdentity.external_id == identity,
+                                              UserSSOIdentity.user_id != user_id).first()
+        if identity and holder is not None:
+            return error_response('The identity this account keeps from the same IdP already '
+                                  'opens another account through this provider', 409)
+        return None
+
+    ok, err = safe_commit(logger, f"Failed to attach user {user_id} to SSO",
+                          on_conflict=held_elsewhere)
     if not ok:
         return err
-    closed = sessions_closed_by(owner) if owner is not None else 0
-    note = ', local password removed' if drop_password else ''
-    note += f', {closed_sessions_note(closed)}' if owner is not None else ''
+    closed = sessions_closed_by(user)
+    note = ', taking back its orphan of the same IdP' if taken_back is not None else ''
+    note += ', local password removed' if drop_password else ''
     AuditService.log_action(
-        action='user_link_sso',
+        action='user_sso_attach',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Linked account {user.username!r} to SSO provider {provider.name!r} ({origin}{note})',
+        details=(f'Attached SSO provider {provider.name!r} to account {user.username!r} '
+                 f'(before: {before}{note}, {closed_sessions_note(closed)})'),
         success=True,
     )
     return success_response(
         data=user.to_dict(),
-        message=f'Account linked to {provider.name}',
-        meta={'other_sessions_closed': closed})
+        message=f'Provider {provider.name} attached to the account',
+        meta={'other_sessions_closed': closed},
+        status=201)
 
 
-@bp.route('/api/v2/users/<int:user_id>/unlink-sso', methods=['POST'])
+@bp.route('/api/v2/users/<int:user_id>/sso-identities/<int:identity_id>/reset', methods=['POST'])
 @require_auth(['write:users'])
-def unlink_user_sso(user_id):
-    """Convert an SSO-linked account back to a local account (admin only).
+def reset_user_sso_identity(user_id, identity_id):
+    """Clear the stable identity of one attachment (admin only): the IdP changed it, and
+    the next sign-in through that provider with the account's name or its verified e-mail
+    binds the new one.
 
-    POST /api/v2/users/{user_id}/unlink-sso
+    POST /api/v2/users/{user_id}/sso-identities/{identity_id}/reset
     """
-    refused = refuse_api_key_on_own_account(user_id)
+    from api.v2.sso.account_state import bounded, identity_text
+
+    user, refused = _sso_admin_target(user_id)
     if refused:
         return refused
-    if g.current_user.role != 'admin':
-        return error_response('Insufficient permissions', 403)
-
-    user = db.session.get(User, user_id)
-    if not user:
-        return error_response('User not found', 404)
-    if (user.auth_source or 'local') == 'local' and not user.sso_provider_id:
-        return error_response('User is not linked to single sign-on', 400)
-
-    user.auth_source = 'local'
-    user.sso_provider_id = None
-    user.sso_external_id = None
-    user.sso_orphan_of = None
-    from api.v2.sso.account_state import SSO_NO_PASSWORD
-    # An account that never had a local password must set one before it can log in.
-    needs_password = user.password_hash == SSO_NO_PASSWORD
-    if needs_password:
-        user.force_password_change = True
-
-    ok, err = safe_commit(logger, f"Failed to unlink user {user_id} from SSO")
+    if _identity_of(user, identity_id) is None:
+        return error_response('SSO attachment not found', 404)
+    user = _locked(user.id)
+    row = _identity_of(user, identity_id) if user is not None else None
+    if row is None:
+        db.session.rollback()
+        return error_response('SSO attachment not found', 404)
+    if row.external_id is None:
+        db.session.rollback()
+        return success_response(data=user.to_dict(), message='This attachment is not bound yet',
+                                meta={'other_sessions_closed': 0})
+    former = row.external_id
+    where = identity_text(row)
+    row.bind(None)
+    ok, err = safe_commit(logger, f"Failed to reset the SSO identity of user {user_id}")
     if not ok:
         return err
+    closed = sessions_closed_by(user)
     AuditService.log_action(
-        action='user_unlink_sso',
+        action='user_sso_reset',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Unlinked account {user.username!r} from single sign-on',
+        details=(f'Reset identity {bounded(former)!r} of account {user.username!r} '
+                 f'({where}, {closed_sessions_note(closed)})'),
         success=True,
     )
-    msg = f'Account {user.username} converted to local'
+    return success_response(data=user.to_dict(), message='SSO identity reset',
+                            meta={'other_sessions_closed': closed})
+
+
+@bp.route('/api/v2/users/<int:user_id>/sso-identities/<int:identity_id>', methods=['DELETE'])
+@require_auth(['write:users'])
+def detach_user_sso_provider(user_id, identity_id):
+    """Detach one provider from an account (admin only); the others keep opening it. An
+    account without a password whose last attachment goes must set one before it can log in.
+
+    DELETE /api/v2/users/{user_id}/sso-identities/{identity_id}
+    """
+    from models import user as user_model
+    from api.v2.sso.account_state import SSO_NO_PASSWORD, identity_text
+
+    user, refused = _sso_admin_target(user_id)
+    if refused:
+        return refused
+    if _identity_of(user, identity_id) is None:
+        return error_response('SSO attachment not found', 404)
+    user = _locked(user.id)
+    row = _identity_of(user, identity_id) if user is not None else None
+    if row is None:
+        db.session.rollback()
+        return error_response('SSO attachment not found', 404)
+    last = len(user.sso_identities) == 1
+    # E-mail is unique among local accounts (#136): the last row going makes it one.
+    taken = ('Another local account uses this e-mail address: change one of them before '
+             'detaching the last provider')
+    if last and user_model.local_email_holder(user.email, other_than=user.id) is not None:
+        db.session.rollback()
+        return error_response(taken, 409)
+    uid, email = user.id, user.email
+    what = identity_text(row)
+    user.sso_identities.remove(row)
+    needs_password = last and user.password_hash == SSO_NO_PASSWORD
+    if needs_password:
+        user.force_password_change = True
+
+    ok, err = safe_commit(logger, f"Failed to detach user {user_id} from SSO",
+                          on_conflict=lambda: user_model.local_email_taken(email, uid, taken))
+    if not ok:
+        return err
+    closed = sessions_closed_by(user)
+    note = ', now a local account' if last else ''
+    note += ' that must set a password' if needs_password else ''
+    AuditService.log_action(
+        action='user_sso_detach',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=(f'Detached {what} from account {user.username!r}'
+                 f'{note} ({closed_sessions_note(closed)})'),
+        success=True,
+    )
+    msg = 'Provider detached from the account'
     if needs_password:
         msg += ', set a password for this account'
-    return success_response(data=user.to_dict(), message=msg)
+    return success_response(data=user.to_dict(), message=msg,
+                            meta={'other_sessions_closed': closed})
 
 
 @bp.route('/api/v2/users/<int:user_id>/unlock', methods=['POST'])
@@ -374,6 +475,17 @@ def unlock_user(user_id):
         db.session.rollback()
         logger.error(f"Failed to unlock user {user_id}: {e}")
         return error_response('Failed to unlock user', 500)
+
+
+def _import_conflict(added):
+    """The 409 of an import a concurrent creation beat to a username or a local e-mail."""
+    for username, email in added:
+        if User.query.filter_by(username=username).first() is not None:
+            return error_response(f"Username '{username}' already exists", 409)
+        taken = local_email_taken(email, message=f"Email '{email}' already exists")
+        if taken is not None:
+            return taken
+    return None
 
 
 @bp.route('/api/v2/users/import', methods=['POST'])
@@ -436,6 +548,7 @@ def import_users():
         imported = 0
         skipped = 0
         errors = []
+        added = []
 
         for row in csv_reader:
             row_num = imported + skipped + 1
@@ -465,7 +578,8 @@ def import_users():
                 errors.append(f"Row {row_num}: Username '{row['username']}' already exists")
                 continue
 
-            if User.query.filter_by(email=row['email']).first():
+            # E-mail is unique among local accounts only (#136), as for a single creation
+            if local_email_holder(row['email']) is not None:
                 skipped += 1
                 errors.append(f"Row {row_num}: Email '{row['email']}' already exists")
                 continue
@@ -493,9 +607,11 @@ def import_users():
             user.set_password(row['password'])
 
             db.session.add(user)
+            added.append((row['username'], row['email']))
             imported += 1
 
-        ok, _err = safe_commit(logger, "Failed to import users")
+        ok, _err = safe_commit(logger, "Failed to import users",
+                               on_conflict=lambda: _import_conflict(added))
         if not ok:
             return _err
 

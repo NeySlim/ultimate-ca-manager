@@ -478,11 +478,11 @@ def _partial_index_reason(index: dict) -> Optional[str]:
     """Why this index cannot be checked by a global GROUP BY, if it cannot.
 
     A partial index (``CREATE UNIQUE INDEX ... WHERE ...``) constrains a subset
-    of the rows — UCM has one, ``ix_users_email_local``, which makes an email
-    unique among LOCAL accounts only. A GROUP BY over the whole table would
-    report the SSO account sharing that email as a duplicate and block a
-    migration that is perfectly correct, so the index is declared unverifiable
-    instead of being answered wrongly.
+    of the rows, e.g. ``uq_windows_enrollment_profiles_default``, which allows
+    one default profile. A GROUP BY over the whole table would report the
+    profiles that are not the default as duplicates and block a migration that
+    is perfectly correct, so the index is declared unverifiable instead of being
+    answered wrongly.
     """
     options = index.get('dialect_options') or {}
     if any(key.endswith('_where') for key in options):
@@ -588,6 +588,29 @@ def check_unique_constraints(engine) -> Dict[str, Any]:
         'skipped': skipped,
         'scan_limit': _DUPLICATE_SCAN_LIMIT,
     }
+
+
+def check_local_email_flags(engine) -> Dict[str, Any]:
+    """``users.has_sso_identity`` agrees with ``user_sso_identities`` on every account.
+
+    The flag is what ``ix_users_email_local`` reads to hold the e-mail of local accounts
+    unique: a wrong flag takes an account out of that index, or puts it in, unnoticed."""
+    insp, table_names = _reflect(engine)
+    if 'users' not in table_names or 'user_sso_identities' not in table_names:
+        return {'accounts_checked': 0, 'skipped_count': 1, 'skipped': [{
+            'table': 'users', 'constraint': 'has_sso_identity',
+            'reason': 'users or user_sso_identities is missing on the target'}]}
+    held = ('EXISTS (SELECT 1 FROM "user_sso_identities" i WHERE i."user_id" = u."id")')
+    with _connect(engine) as conn:
+        wrong = _scalar(conn, text(
+            f'SELECT COUNT(*) FROM "users" u WHERE u."has_sso_identity" <> {held}'),
+            what="the SSO flag of the accounts")
+        checked = _scalar(conn, text('SELECT COUNT(*) FROM "users"'), what="the accounts")
+    if wrong:
+        raise VerificationError(
+            f"users.has_sso_identity disagrees with user_sso_identities on {int(wrong)} "
+            "account(s): the e-mail of local accounts would not be held unique")
+    return {'accounts_checked': int(checked or 0), 'disagreeing': 0}
 
 
 # ---------------------------------------------------------------------------
@@ -1008,6 +1031,7 @@ def verify_migration(target_engine, expected_counts: Dict[str, int], *,
         ('row_counts', lambda: check_row_counts(target_engine, expected_counts)),
         ('foreign_keys', lambda: check_foreign_keys(target_engine)),
         ('unique_constraints', lambda: check_unique_constraints(target_engine)),
+        ('local_email_flags', lambda: check_local_email_flags(target_engine)),
         ('sequences', lambda: check_sequences(target_engine)),
         ('secrets', lambda: check_secret_decryption(target_engine)),
     )

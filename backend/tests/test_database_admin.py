@@ -89,6 +89,30 @@ def test_bootstrap_copies_users_to_empty_target(populated_app, sqlite_target):
     eng.dispose()
 
 
+def test_bootstrap_carries_the_providers_that_open_an_account(populated_app, sqlite_target):
+    """An SSO account lands with its identity rows: without them it would be a local account
+    its provider no longer opens, and the copy's check of has_sso_identity refuses that."""
+    from models import db, User, UserSSOIdentity
+    with populated_app.app_context():
+        user = User(username='boot-sso', email='boot-sso@x.test', role='viewer', password_hash='h')
+        user.sso_identities.append(UserSSOIdentity(orphan_of='oauth2:https://boot.example',
+                                                   external_id='sub-boot'))
+        db.session.add(user)
+        db.session.commit()
+        try:
+            ok, msg, _stats = svc.bootstrap_auth_to_target(sqlite_target)
+        finally:
+            db.session.delete(db.session.get(User, user.id))
+            db.session.commit()
+    assert ok, msg
+    eng = create_engine(sqlite_target)
+    with eng.connect() as c:
+        assert c.execute(text(
+            "SELECT u.has_sso_identity, i.external_id FROM users u JOIN user_sso_identities i "
+            "ON i.user_id = u.id WHERE u.username = 'boot-sso'")).fetchall() == [(1, 'sub-boot')]
+    eng.dispose()
+
+
 def test_bootstrap_skips_when_target_already_has_users(populated_app, sqlite_target):
     # First bootstrap to populate
     with populated_app.app_context():

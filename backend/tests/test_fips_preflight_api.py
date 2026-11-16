@@ -105,8 +105,8 @@ class TestCommandLine:
         engine, config = instance_db
         with engine.begin() as connection:
             connection.execute(text(
-                "INSERT INTO users (username, email, password_hash, role, auth_source) "
-                "VALUES ('cli-scrypt', 'c@example.com', :h, 'viewer', 'local')"), {'h': SCRYPT_HASH})
+                "INSERT INTO users (username, email, password_hash, role) "
+                "VALUES ('cli-scrypt', 'c@example.com', :h, 'viewer')"), {'h': SCRYPT_HASH})
         code, out = self._run(monkeypatch, capsys, config, '--json')
         assert code == 1
         report = json.loads(out)

@@ -17,7 +17,7 @@ STEPS = (
     '156_template_cn_pattern', '157_certificate_subject_key', '158_ca_parent_confirmation',
     '159_second_factor_failures', '160_backup_archives', '161_cluster_maintenance',
     '162_tsa_ca_signer_kept', '163_ssh_ca_hsm_key', '164_file_removals',
-    '165_sso_ldap_group_base_dn', '166_trust_store_certificates_only',
+    '165_sso_ldap_group_base_dn', '166_trust_store_certificates_only', '167_user_sso_identities',
 )
 
 # Every name a 2.254 start leaves in `_migrations` (the migration files of tag v2.254-rc1,

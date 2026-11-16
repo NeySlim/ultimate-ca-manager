@@ -118,8 +118,8 @@ def test_the_ldap_door_names_a_deactivated_account(
     username = local_user(active=False)
     with client.application.app_context():
         # An account of this directory, disabled in UCM: a local one is never opened.
-        User.query.filter_by(username=username).update(
-            {'auth_source': 'ldap', 'sso_provider_id': ldap_provider})
+        from tests.sso_identity_support import attach
+        attach(username, ldap_provider)
         db.session.commit()
     _bind_succeeds(monkeypatch, username)
     assert _login(client, username, '/api/v2/sso/ldap/login', ldap_provider) == (

@@ -12,6 +12,7 @@ import os
 import sys
 import json
 import tempfile
+from tests.sso_identity_support import legacy_user
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -402,17 +403,18 @@ class TestSSOUserProvisioning:
         return provider
 
     def _ensure_user(self, app, username='sso.alice', role='admin'):
-        from models import db, User
+        from models import db, User, UserSSOIdentity
+        from tests.sso_identity_support import legacy_user
         # Not bound yet, orphaned by a deleted provider for this IdP: a kind a name matches.
         u = User.query.filter_by(username=username).first()
         if u:
             u.role = role
             u.password_hash = '!SSO_NO_PASSWORD!'
-            u.auth_source, u.sso_provider_id, u.sso_external_id = 'oauth2', None, None
-            u.sso_orphan_of = IDP_KEY
+            u.sso_identities.clear()
+            u.sso_identities.append(UserSSOIdentity(orphan_of=IDP_KEY))
             db.session.commit()
             return u
-        u = User(
+        u = legacy_user(
             username=username,
             email=f'{username}@example.test',
             full_name='Alice',
@@ -534,7 +536,6 @@ class TestSSOUserProvisioning:
             local = User(
                 username='local.bob136', email=shared, full_name='Local Bob',
                 role='admin', active=True, password_hash='hashed-local-pw',
-                auth_source='local',
             )
             db.session.add(local)
             db.session.commit()
@@ -546,7 +547,7 @@ class TestSSOUserProvisioning:
 
             assert err is None
             assert user is not None and user.username == 'sso.bob136'
-            assert user.sso_external_id == 'sub-bob-136'
+            assert [r.external_id for r in user.sso_identities] == ['sub-bob-136']
             # Both accounts coexist with the same email.
             assert User.query.filter_by(email=shared).count() == 2
 
@@ -560,7 +561,7 @@ class TestSSOUserProvisioning:
             db.session.commit()
             provider = self._make_provider(provider_type='oauth2', default_role='viewer',
                                            auto_update_users=True)
-            u = User(username='stable.user', email='old@example.test', full_name='S',
+            u = legacy_user(username='stable.user', email='old@example.test', full_name='S',
                      role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
                      auth_source='oauth2', sso_provider_id=provider.id,
                      sso_external_id='sub-stable-1')
@@ -586,7 +587,7 @@ class TestSSOUserProvisioning:
             User.query.filter(User.email == 'tofu@example.test').delete()
             db.session.commit()
             provider = self._make_provider(provider_type='oauth2', default_role='viewer')
-            linked = User(username='tofu.local', email='tofu@example.test', full_name='T',
+            linked = legacy_user(username='tofu.local', email='tofu@example.test', full_name='T',
                           role='admin', active=True, password_hash='pw',
                           auth_source='oauth2', sso_provider_id=provider.id,
                           sso_external_id=None)
@@ -599,7 +600,7 @@ class TestSSOUserProvisioning:
                 provider, 'tofu.sso', 'tofu@example.test', 'T', {'sub': 'sub-tofu', 'groups': []}
             )
             assert err is None and user.id == uid
-            assert user.sso_external_id == 'sub-tofu'
+            assert [r.external_id for r in user.sso_identities] == ['sub-tofu']
 
     def test_sso_login_adopts_linked_account_by_email(self, app):
         """#138: a linked account is adopted by email even when the SSO username
@@ -614,7 +615,7 @@ class TestSSOUserProvisioning:
 
             provider = self._make_provider(provider_type='ldap', default_role='viewer')
             # Admin linked the LOCAL account, keeping its local username 'jdoe.local'.
-            linked = User(
+            linked = legacy_user(
                 username='jdoe.local', email=email, full_name='J Doe', role='admin',
                 active=True, password_hash='hashed-local-pw',
                 auth_source='ldap', sso_provider_id=provider.id,
@@ -641,7 +642,7 @@ class TestSSOUserProvisioning:
             User.query.filter(User.email == 'Case.User@example.test').delete()
             db.session.commit()
             provider = self._make_provider(provider_type='ldap', default_role='viewer')
-            linked = User(
+            linked = legacy_user(
                 username='case.local', email='Case.User@example.test', full_name='C',
                 role='viewer', active=True, password_hash='x',
                 auth_source='ldap', sso_provider_id=provider.id,
@@ -713,7 +714,7 @@ class TestSamlStableMatch:
             from models import db, User
             User.query.filter_by(username='saml.local').delete(); db.session.commit()
             provider = self._make_provider()
-            u = User(username='saml.local', email='s@example.test', full_name='S',
+            u = legacy_user(username='saml.local', email='s@example.test', full_name='S',
                      role='admin', active=True, password_hash='!SSO_NO_PASSWORD!',
                      auth_source='saml', sso_provider_id=provider.id,
                      sso_external_id='nameid-persistent-1')

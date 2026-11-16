@@ -53,10 +53,12 @@ def enforcement_active_for(user, *, provider=None):
         return False
     if getattr(user, 'totp_exempt', False):
         return False
-    if (getattr(user, 'auth_source', 'local') or 'local') == 'local':
+    if user.is_local:
         return global_enforce_2fa()
-    prov = provider if provider is not None else getattr(user, 'sso_provider', None)
-    return bool(prov is not None and getattr(prov, 'enforce_2fa', False))
+    if provider is not None:
+        return bool(getattr(provider, 'enforce_2fa', False))
+    # Outside a sign-in through one of them: any provider of the account that enforces it
+    return any(row.provider is not None and row.provider.enforce_2fa for row in user.sso_identities)
 
 
 def has_security_key(user, *, excluding=None):

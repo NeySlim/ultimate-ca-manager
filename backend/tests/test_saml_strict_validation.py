@@ -3,6 +3,8 @@
 Audience, Destination, validity window, InResponseTo against the AuthnRequest
 this browser started, IdP-initiated opt-in and the replay cache.
 """
+from models import UserSSOIdentity
+from tests.sso_identity_support import by_identity
 import base64
 import json
 import os
@@ -70,7 +72,7 @@ def _module_provider(app, idp_signer):
     yield provider_id
     with app.app_context():
         SSOSession.query.filter_by(provider_id=provider_id).delete()
-        User.query.filter_by(sso_provider_id=provider_id).update({'sso_provider_id': None})
+        UserSSOIdentity.query.filter_by(provider_id=provider_id).update({'provider_id': None})
         db.session.delete(db.session.get(SSOProvider, provider_id))
         for pid in other_ids:
             db.session.get(SSOProvider, pid).enabled = True
@@ -195,7 +197,7 @@ def _login_role(app, idp_signer, **response_args):
     resp = _response(idp_signer, in_response_to=request_id, name_id=name_id, **response_args)
     assert _post(client, resp) == OK
     with app.app_context():
-        return User.query.filter_by(sso_external_id=name_id).one().role, name_id
+        return by_identity(name_id).one().role, name_id
 
 
 def test_role_mapping_applies_the_groups_of_the_assertion(app, mapped_provider, idp_signer):
@@ -228,7 +230,7 @@ def test_repeated_identity_attributes_keep_the_first_value(app, mapped_provider,
         ('username', [first]), ('email', [f'{first}@example.org']),
         ('username', [second]), ('email', [f'{second}@example.org'])])
     with app.app_context():
-        user = User.query.filter_by(sso_external_id=name_id).one()
+        user = by_identity(name_id).one()
         assert (user.username, user.email) == (first, f'{first}@example.org')
 
 
@@ -241,7 +243,7 @@ def test_unmatched_groups_are_refused_when_rules_exist(app, mapped_provider, idp
                      attributes={'groups': ['someone-else']})
     assert _post(client, resp) == '/login?error=sso_unmapped'
     with app.app_context():
-        assert User.query.filter_by(sso_external_id=name_id).count() == 0
+        assert by_identity(name_id).count() == 0
 
 
 def test_without_rules_users_get_the_default_role(app, mapped_provider, idp_signer):
@@ -260,7 +262,7 @@ def test_role_sync_follows_the_groups_on_the_next_login(app, mapped_provider, id
                      attributes={'groups': ['pki-admins']})
     assert _post(client, resp) == OK
     with app.app_context():
-        assert User.query.filter_by(sso_external_id=name_id).one().role == 'admin'
+        assert by_identity(name_id).one().role == 'admin'
 
 
 def test_a_signed_name_id_does_not_open_the_local_account_of_that_name(app, provider, idp_signer):
@@ -268,7 +270,7 @@ def test_a_signed_name_id_does_not_open_the_local_account_of_that_name(app, prov
     with app.app_context():
         User.query.filter_by(username='samltkadmin').delete()
         db.session.add(User(username='samltkadmin', email='samltk@corp.test', full_name='A',
-                            role='admin', active=True, password_hash='hash', auth_source='local'))
+                            role='admin', active=True, password_hash='hash'))
         db.session.commit()
     try:
         client = app.test_client()
@@ -278,7 +280,7 @@ def test_a_signed_name_id_does_not_open_the_local_account_of_that_name(app, prov
         assert not _authenticated(client)
         with app.app_context():
             admin = User.query.filter_by(username='samltkadmin').one()
-            assert admin.sso_external_id is None and admin.auth_source == 'local'
+            assert admin.sso_identities == [] and admin.auth_source == 'local'
     finally:
         with app.app_context():
             User.query.filter_by(username='samltkadmin').delete()
@@ -754,7 +756,7 @@ def test_attribute_mapping_is_read_in_the_form_direction(app, mapped_provider, i
     _, name_id = _login_role(app, idp_signer, attributes={'upn': ['jdoe@corp.example'],
                                                           'mail': ['jdoe@corp.example']})
     with app.app_context():
-        user = User.query.filter_by(sso_external_id=name_id).one()
+        user = by_identity(name_id).one()
         assert (user.username, user.email) == ('jdoe@corp.example', 'jdoe@corp.example')
 
 
@@ -771,7 +773,7 @@ def test_custom_role_follows_the_mapping_through_the_callback(app, mapped_provid
         {'pki-ops': {'role': 'operator', 'custom_role': 'saml-e2e-role'}}))
     _, name_id = _login_role(app, idp_signer, attributes={'groups': ['pki-ops']})
     with app.app_context():
-        user = User.query.filter_by(sso_external_id=name_id).one()
+        user = by_identity(name_id).one()
         assert (user.role, user.custom_role_id, user.custom_role_source) == ('operator', role_id, 'sso')
 
 

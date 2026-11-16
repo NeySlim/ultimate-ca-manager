@@ -80,6 +80,8 @@ def ldap_provider(app):
     with app.app_context():
         from models.sso import SSOSession
         SSOSession.query.filter_by(provider_id=provider_id).delete()
+        from models import UserSSOIdentity
+        UserSSOIdentity.query.filter_by(provider_id=provider_id).delete()
         db.session.delete(db.session.get(SSOProvider, provider_id))
         db.session.commit()
 
@@ -88,8 +90,8 @@ def ldap_provider(app):
 def ldap_user(app, username, ldap_provider):
     """``username`` as an account of the LDAP provider, so a bind opens it."""
     with app.app_context():
-        User.query.filter_by(username=username).update(
-            {'auth_source': 'ldap', 'sso_provider_id': ldap_provider})
+        from tests.sso_identity_support import attach
+        attach(username, ldap_provider)
         db.session.commit()
     return username
 
@@ -1071,8 +1073,8 @@ def test_an_ldap_attempt_is_counted_on_the_account_bound_to_the_entry_id(
     directory = any_spelling(_AnySpellingDirectory(entry_uid, f'{entry_uid}@example.test',
                                                    entry_uuid=f'uuid-{entry_uid}'))
     with app.app_context():
-        _another_node_writes(username, auth_source='ldap', sso_provider_id=ldap_provider,
-                             sso_external_id=f'uuid-{entry_uid}')
+        from tests.sso_identity_support import attach_from_another_node
+        attach_from_another_node(username, ldap_provider, f'uuid-{entry_uid}')
     for _ in range(BURST):
         assert client.post(LDAP_DOOR, json=_ldap_body(entry_uid, ldap_provider)
                            ).status_code == 401

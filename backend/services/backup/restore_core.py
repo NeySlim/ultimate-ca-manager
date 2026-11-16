@@ -24,6 +24,7 @@ from services.file_regen_service import (
 
 from . import container, installation
 from .errors import BackupSchemaError, RestoreFilesUnwritable
+from .export_generic import REFERENCE_SUFFIX
 from .restore import RestorePlan, single_transaction
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
@@ -105,6 +106,7 @@ GENERIC_SECTIONS = (
     'compromised_keys',
     'role_permissions',
     'group_members',
+    'user_sso_identities',
     'webauthn_credentials',
     'ad_connector',
     'webhook_endpoints',
@@ -478,6 +480,7 @@ class RestoreCoreMixin:
                     results.update(remove_after_writes(replacement).report())
                 # On the final rows: an authority a replacement removes after the writes holds nothing
                 db.session.flush()
+                self._settle_local_emails(backup_data)
                 for key_id, held in key_binding.shared_keys().items():
                     if key_id not in shared_before:
                         raise BackupSchemaError(
@@ -701,6 +704,7 @@ class RestoreCoreMixin:
 
         # Auth restores
         self._restore_sso_providers(backup_data, results)
+        self._restore_legacy_sso_identities(results, plan)
         self._restore_hsm_providers(backup_data, results, plan)
         self._restore_api_keys(backup_data, results, plan)
         self._restore_auth_certificates(backup_data, results, plan)
@@ -733,7 +737,10 @@ class RestoreCoreMixin:
             rows = backup_data.get(name)
             if not rows:
                 continue
+            if name == 'user_sso_identities':
+                rows = self._identities_free_here(rows, plan)
             results[name] = apply_section(name, rows, plan)
+
 
         # Rows of another installation can name user ids this one has not handed out yet
         from services.backup import user_id_counter
@@ -759,6 +766,9 @@ class RestoreCoreMixin:
         """
         from models import User
 
+        # An archive older than user_sso_identities carries the provider on the account row
+        legacy = not _carries(backup_data, 'user_sso_identities')
+        self._legacy_sso_identities = []
         for user_data in backup_data.get('users', []):
             existing = User.query.filter_by(
                 username=user_data['username']).first()
@@ -776,12 +786,149 @@ class RestoreCoreMixin:
 
             if not carried_hash:
                 existing.password_hash = previous_hash
+            # Out of the local e-mail index until its identity rows are back (_settle_local_emails)
+            existing.has_sso_identity = True
+            if legacy and 'auth_source' in user_data:
+                self._legacy_sso_identities.append((existing, user_data))
             results['users'] += 1
 
         db.session.flush()
         nested = restore_nested_webauthn(backup_data, plan)
         if nested:
             results['webauthn_credentials'] = nested
+
+    def _settle_local_emails(self, backup_data: Dict) -> None:
+        """On the final rows: the refusal of two local accounts on one e-mail, then the flag of
+        every account set from its identity rows, which the local e-mail index checks."""
+        from models.user import sync_sso_flags_in_session
+        self._refuse_shared_local_emails(backup_data)
+        sync_sso_flags_in_session(db.session)
+        db.session.flush()
+
+    @staticmethod
+    def _refuse_shared_local_emails(backup_data: Dict) -> None:
+        """E-mail is unique among local accounts (#136): a restored local account may not share
+        one with another local account here. Said before ix_users_email_local refuses it."""
+        from sqlalchemy import and_, exists
+        from sqlalchemy.orm import aliased
+        from models import User, UserSSOIdentity
+        from .restore.conflict import RestoreConflictError
+
+        mine, other = aliased(User), aliased(User)
+
+        def local(account):
+            # Local in SQL: the cached sso_identities predate the identity rows just restored
+            return ~exists().where(UserSSOIdentity.user_id == account.id)
+
+        names = [row['username'] for row in backup_data.get('users') or []]
+        for start in range(0, len(names), 500):
+            shared = (db.session.query(mine.username, other.username, mine.email)
+                      .join(other, and_(other.email == mine.email, other.id != mine.id))
+                      .filter(mine.username.in_(names[start:start + 500]), mine.email.isnot(None),
+                              mine.email != '', local(mine), local(other))
+                      .order_by(mine.id, other.id).first())
+            if shared is not None:
+                raise RestoreConflictError(
+                    f"Refusing to restore: the local accounts {shared[0]!r} and "
+                    f"{shared[1]!r} would share the e-mail {shared[2]!r}. "
+                    "Nothing has been changed.")
+
+    @staticmethod
+    def _identity_holder(user_id, provider_id, external_id):
+        """The other account here a provider's stable identity opens, if any."""
+        from models import User, UserSSOIdentity
+        if provider_id is None or not external_id:
+            return None
+        return (User.query.join(UserSSOIdentity, UserSSOIdentity.user_id == User.id)
+                .filter(UserSSOIdentity.provider_id == provider_id,
+                        UserSSOIdentity.external_id == external_id, User.id != user_id).first())
+
+    @staticmethod
+    def _skipped_identity(plan, account, provider_id, holder) -> str:
+        from models.sso import SSOProvider
+        provider = db.session.get(SSOProvider, provider_id)
+        warning = (f"user_sso_identities: the identity of account {account!r} at provider "
+                   f"{(provider.name if provider else provider_id)!r} opens the account "
+                   f"{holder.username!r} here, and an identity opens one account only: it is kept "
+                   f"as an orphan of an unknown IdP, which no sign-in takes back; attach a provider "
+                   f"to the account to let it sign in")
+        plan.warnings.append(warning)
+        logger.warning("Restore: %s", warning)
+        return warning
+
+    def _identities_free_here(self, rows, plan):
+        """The archive's identity rows, those whose identity opens another account here made
+        orphans of an unknown IdP: an account without a row nor a password is claimable by name."""
+        from models import User
+        db.session.flush()
+        plan.refresh(['users', 'sso_providers'])
+        kept = []
+        for row in rows:
+            user_id = plan.resolve('user_sso_identities', row, 'user_id')
+            provider_id = plan.resolve('user_sso_identities', row, 'provider_id')
+            holder = self._identity_holder(user_id, provider_id, row.get('external_id'))
+            if holder is None:
+                kept.append(row)
+                continue
+            account = db.session.get(User, user_id) if user_id is not None else None
+            self._skipped_identity(plan, account.username if account else None, provider_id, holder)
+            kept.append({**row, 'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
+                         'orphan_of': None})
+        return kept
+
+    def _restore_legacy_sso_identities(self, results: Dict, plan) -> None:
+        """The identity rows of an archive's account rows that carry their provider (2.254, or
+        3.0 before user_sso_identities), once the providers are back: the same rows an upgrade
+        gives them. A provider this installation does not hold leaves an orphan of an unknown IdP."""
+        from models import UserSSOIdentity
+        from models.sso import SSOProvider
+        from utils.sso_identity_upgrade import identity_rows
+
+        pending = getattr(self, '_legacy_sso_identities', [])
+        if not pending:
+            return
+        db.session.flush()
+        # The archive's reference to a provider, as identity_rows reads it: its number and its
+        # name, placed here by name; None only when the row names no provider at all
+        here = {}
+        accounts = []
+        merging = getattr(self, '_merging', False)
+        for user, row in pending:
+            # A merge keeps the account's own rows; a replace rebuilds them from the archive
+            held = UserSSOIdentity.query.filter_by(user_id=user.id)
+            if merging and held.first() is not None:
+                continue
+            if not merging:
+                held.delete(synchronize_session=False)
+                # The loaded collection still lists the rows the statement deleted
+                db.session.expire(user, ['sso_identities'])
+            name = (row.get('sso_provider_id_ref') or {}).get('name')
+            stored = None
+            if row.get('sso_provider_id') is not None or name:
+                stored = (row.get('sso_provider_id'), name)
+                if stored not in here:
+                    found = SSOProvider.query.filter_by(name=name).first() if name else None
+                    here[stored] = found.id if found else None
+            accounts.append((user.id, row.get('auth_source'), stored,
+                             row.get('sso_external_id'), row.get('sso_orphan_of'),
+                             user.password_hash, user.force_password_change))
+        made = []
+        names = {user.id: user.username for user, _row in pending}
+        for user_id, provider_id, orphan_of, external_id in identity_rows(sorted(accounts), here):
+            holder = self._identity_holder(user_id, provider_id, external_id)
+            if holder is not None:
+                # Kept as an orphan of an unknown IdP, as the upgrade keeps a shared identity
+                self._skipped_identity(plan, names.get(user_id), provider_id, holder)
+                provider_id, orphan_of = None, None
+            made.append((user_id, provider_id, orphan_of, external_id))
+        for user_id, provider_id, orphan_of, external_id in made:
+            identity = UserSSOIdentity(user_id=user_id, provider_id=provider_id, orphan_of=orphan_of)
+            identity.bind(external_id)
+            db.session.add(identity)
+        db.session.flush()
+        self._legacy_sso_identities = []
+        if made:
+            results['user_sso_identities'] = results.get('user_sso_identities', 0) + len(made)
 
     @staticmethod
     def _apply_ca_revocation(ca, ca_data: Dict, here_revocation=None) -> None:

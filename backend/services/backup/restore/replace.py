@@ -28,7 +28,9 @@ from models import db
 from ..export_generic import load_model
 from ..manifest import SECTIONS
 from .conflict import RestoreConflictError, describe_row
-from .plan import RestorePlan, _normalise, _temporal_identity, shared_identity_warning
+from .plan import (
+    RestorePlan, _normalise, _temporal_identity, shared_identity_warning, sso_identity_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +155,8 @@ def _archived_identities(section_name: str, section, row: Dict[str, Any],
     they are a spelling here only when `plan.source_numbers_hold` says the
     archive is this database's and the numbers still name the same rows.
     """
+    if section_name == 'user_sso_identities':
+        return _archived_sso_identities(row, plan)
     resolved, raw = [], []
     for field_name in section.identity:
         raw.append(row.get(field_name))
@@ -170,6 +174,20 @@ def _archived_identities(section_name: str, section, row: Dict[str, Any],
     if any(value is not None for value in resolved):
         spellings.add(tuple(_normalise(value, name in temporal)
                             for name, value in zip(section.identity, resolved)))
+    return spellings
+
+
+def _archived_sso_identities(row: Dict[str, Any], plan: RestorePlan) -> Set[Tuple]:
+    """The spellings of an archived identity row, in the key its rows here are indexed by."""
+    section = 'user_sso_identities'
+    spellings = set()
+    candidates = [(plan.resolve(section, row, 'user_id'), plan.resolve(section, row, 'provider_id'))]
+    if plan.source_numbers_hold(section, row):
+        candidates.append((row.get('user_id'), row.get('provider_id')))
+    for user_id, provider_id in candidates:
+        if user_id is not None:
+            spellings.add(sso_identity_key(user_id, provider_id, row.get('orphan_of'),
+                                           row.get('external_id')))
     return spellings
 
 
@@ -204,6 +222,8 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'webhook_deliveries': 'delivery queue, removed with its endpoint as deleting it does',
     'deploy_deliveries': 'delivery queue, removed with its binding as deleting it does',
     'pro_sso_saml_message_ids': 'replay cache of SAML message ids',
+    # 3.0 only: a 2.254 archive carries the provider on the account row instead
+    'user_sso_identities': 'not in a 2.254 archive; removed with its account, orphaned with its provider',
 }
 
 # Integer links the schema holds without a foreign key, handled as if it had one:
@@ -247,6 +267,10 @@ CLOSED_WITH_TARGET = {('key_recovery_requests', 'cert_id')}
 # Links whose row goes with the row it names although the column allows none:
 # an approval of a certificate that is gone, as deleting the certificate does.
 REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id')}
+
+# An identity row whose provider goes keeps that provider's IdP key, as deleting the provider
+# does: only a provider for the exact same IdP takes it back (OIDC Core §5.7).
+ORPHANED_WITH_PROVIDER = ('user_sso_identities', 'provider_id')
 
 # Rows removed only after the writes, once their deletion blockers have nothing to say: the
 # rows they would leave dangling (SQLite enforces no key) are known only then.
@@ -525,6 +549,9 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         if (dependent.name, column.name) in CLOSED_WITH_TARGET:
             _close_requests(replacement, dependent, column, values)
             continue
+        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
+            _orphan_identities(replacement, dependent, values)
+            continue
         if column.nullable and (dependent.name, column.name) not in REMOVED_WITH_TARGET:
             for chunk in _chunks(values):
                 result = db.session.execute(update(dependent).where(column.in_(chunk), scope)
@@ -540,6 +567,16 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         for chunk in _chunks(values):
             result = db.session.execute(delete(dependent).where(column.in_(chunk), scope))
             _count(replacement.cleared, dependent.name, result.rowcount)
+
+
+def _orphan_identities(replacement: Replacement, table, provider_ids) -> None:
+    """The identity rows of removed providers become orphans of their IdP."""
+    from models.sso import SSOProvider
+
+    for provider in SSOProvider.query.filter(SSOProvider.id.in_(provider_ids)):
+        result = db.session.execute(update(table).where(table.c.provider_id == provider.id)
+                                    .values(provider_id=None, orphan_of=provider.idp_key()))
+        _count(replacement.unlinked, f'{table.name}.provider_id', result.rowcount)
 
 
 def _close_requests(replacement: Replacement, table, column, values) -> None:

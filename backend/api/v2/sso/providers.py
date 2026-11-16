@@ -3,7 +3,7 @@ from flask import g, request
 from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from models import db, User
+from models import db, UserSSOIdentity
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
 import json
@@ -452,10 +452,10 @@ def delete_provider(provider_id):
 
     # Delete associated sessions first
     SSOSession.query.filter_by(provider_id=provider_id).delete()
-    # Unlink its users on both backends (SQLite does not apply ON DELETE SET NULL),
-    # keeping its IdP so that only a provider recreated for that IdP takes them back.
-    User.query.filter_by(sso_provider_id=provider_id).update(
-        {User.sso_provider_id: None, User.sso_orphan_of: provider.idp_key()},
+    # Its attachments become orphans on both backends (SQLite does not apply ON DELETE
+    # SET NULL), keeping its IdP so that only a provider recreated for it takes them back.
+    UserSSOIdentity.query.filter_by(provider_id=provider_id).update(
+        {UserSSOIdentity.provider_id: None, UserSSOIdentity.orphan_of: provider.idp_key()},
         synchronize_session=False)
 
     db.session.delete(provider)
