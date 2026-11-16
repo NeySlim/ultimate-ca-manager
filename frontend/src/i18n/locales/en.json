@@ -3925,7 +3925,6 @@
     "keepExisting": "••••••• (leave empty to keep)",
     "roles": {},
     "configuredProviders": "Configured Providers",
-    "addProvider": "Add SSO Provider",
     "default": "Default",
     "isDefault": "Default login provider",
     "lastUsed": "Last used",

@@ -3752,7 +3752,6 @@
     "keepExisting": "••••••• (laisser vide pour conserver)",
     "roles": {},
     "configuredProviders": "Fournisseurs configurés",
-    "addProvider": "Ajouter un fournisseur SSO",
     "default": "Par défaut",
     "isDefault": "Fournisseur de connexion par défaut",
     "lastUsed": "Dernière utilisation",

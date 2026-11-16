@@ -3972,7 +3972,6 @@
     "configuredProviders": "Налаштовані провайдери",
     "acsUrl": "URL служби споживання тверджень (ACS)",
     "acsUrlDesc": "Куди IdP надсилає SAML-твердження після автентифікації",
-    "addProvider": "Додати SSO-провайдер",
     "attributeMapping": "Зіставлення атрибутів",
     "attributeMappingHelp": "Ліворуч: назва атрибута, який надсилає провайдер. Праворуч: поле UCM, яке він заповнює (username, email, fullname або groups). Приклад: user.userprincipalname → username.",
     "callbackUrls": "URL-адреси зворотного виклику",

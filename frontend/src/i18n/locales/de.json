@@ -3922,7 +3922,6 @@
     "configuredProviders": "Konfigurierte Anbieter",
     "acsUrl": "Assertion Consumer Service (ACS) URL",
     "acsUrlDesc": "Wohin der IdP SAML-Assertions nach der Authentifizierung sendet",
-    "addProvider": "SSO-Provider hinzufügen",
     "attributeMapping": "Attributzuordnung",
     "attributeMappingHelp": "Links: der vom Provider gesendete Attributname. Rechts: das UCM-Feld, das damit befüllt wird (username, email, fullname oder groups). Beispiel: user.userprincipalname → username.",
     "callbackUrls": "Callback-URLs",

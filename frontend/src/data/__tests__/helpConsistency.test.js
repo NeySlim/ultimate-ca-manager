@@ -60,6 +60,14 @@ describe('SSO setup steps', () => {
   })
 })
 
+describe('dead locale keys', () => {
+  const all = import.meta.glob('../../i18n/locales/*.json', { eager: true })
+  // The SSO page has one Configure button per provider card; no screen renders sso.addProvider.
+  it.each(Object.keys(all))('%s has no sso.addProvider', (path) => {
+    expect(all[path].default.sso).not.toHaveProperty('addProvider')
+  })
+})
+
 describe('values and buttons quoted by the translated pages', () => {
   const locales = import.meta.glob('../../i18n/locales/{en,fr,ru,zh}.json', { eager: true })
   const page = (lang, key) => (lang === 'en' ? helpContent[key] : pages[`../help/${lang}/${key}.js`].default.helpContent)

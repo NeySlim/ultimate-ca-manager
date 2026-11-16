@@ -3925,7 +3925,6 @@
     "configuredProviders": "設定済みプロバイダー",
     "acsUrl": "アサーションコンシューマーサービス（ACS）URL",
     "acsUrlDesc": "認証後にIdPがSAMLアサーションを送信する先",
-    "addProvider": "SSOプロバイダーを追加",
     "attributeMapping": "属性マッピング",
     "attributeMappingHelp": "左列はプロバイダーが送信する属性名、右列はそれが設定されるUCMのフィールド（username、email、fullname、groups）です。例: user.userprincipalname → username。",
     "callbackUrls": "コールバックURL",
