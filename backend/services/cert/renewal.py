@@ -415,9 +415,8 @@ def _row_named_by(original, row_id, linked_id):
         if linked is not None and hashed(linked):
             return linked
     linking = (Certificate.query.populate_existing()
-               .filter(Certificate.related_certificate_id == row_id, Certificate.id != row_id)
-               .order_by(Certificate.id).all())
-    return next((c for c in linking if c.id != linked_id and hashed(c)), None)
+               .filter(Certificate.related_certificate_id == row_id).order_by(Certificate.id).all())
+    return next((c for c in linking if hashed(c)), None)
 
 
 def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None,

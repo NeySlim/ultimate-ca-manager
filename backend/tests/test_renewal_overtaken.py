@@ -515,3 +515,27 @@ def test_a_malformed_extension_names_nothing(app, tmp_path):
             db.session.commit()
             assert _current_related(db.session.get(Certificate, b_id)) is None
             db.session.remove()
+
+
+@pytest.mark.parametrize('state', ['archived', 'expired', 'unreadable'])
+def test_an_a_no_longer_current_is_not_named(app, tmp_path, monkeypatch, state):
+    """The certificate the extension hashes is named only while its row holds it, unarchived
+    and unexpired; an unreadable linked row names nothing and raises nothing."""
+    from datetime import timedelta
+    from services.cert import renewal
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / f'{state}.db'}"):
+        a_id, (b_id,) = _linked_rows(app)
+        with app.app_context():
+            assert renewal._current_related(db.session.get(Certificate, b_id)) is not None
+            a = db.session.get(Certificate, a_id)
+            if state == 'archived':
+                a.archived = True
+            elif state == 'unreadable':
+                a.crt = 'bm90IGEgY2VydGlmaWNhdGU='
+            db.session.commit()
+            if state == 'expired':
+                later = a.valid_to + timedelta(days=1)
+                monkeypatch.setattr(renewal, 'utc_now', lambda: later)
+            assert renewal._current_related(db.session.get(Certificate, b_id)) is None
+            db.session.remove()
