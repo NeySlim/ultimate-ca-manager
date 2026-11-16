@@ -3942,6 +3942,7 @@
     "acsUrlDesc": "Donde el IdP envía las aserciones SAML después de la autenticación",
     "attributeMapping": "Mapeo de atributos",
     "attributeMappingHelp": "Izquierda: el nombre del atributo enviado por el proveedor. Derecha: el campo de UCM que rellena (username, email, fullname o groups). Ejemplo: user.userprincipalname → username.",
+    "legacyGroupsConflict": "Save refused: the legacy \"groups → {{attribute}}\" row cannot be rewritten because \"{{attribute}}\" already has another target. Remove the \"groups\" row, or the row that gives \"{{attribute}}\" another target.",
     "callbackUrls": "URLs de callback",
     "callbackUrlsHelp": "Copie esta URI de redirección en la configuración de su aplicación OAuth2/OIDC.",
     "default": "Predeterminado",
