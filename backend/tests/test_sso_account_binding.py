@@ -440,6 +440,65 @@ def test_link_can_remove_the_local_password_the_account_was_created_with(app, pr
     assert held.status_code == 200 and not held.get_json().get('must_change_password')
 
 
+@pytest.fixture
+def mailbox(app, monkeypatch):
+    from api.v2 import auth as auth_api
+    from services.notification_service import NotificationService
+    sent = []
+    monkeypatch.setattr(auth_api, '_is_email_configured', lambda: True)
+    monkeypatch.setattr(auth_api, 'get_admin_canonical_origin', lambda: 'https://pki.example.test')
+    monkeypatch.setattr(NotificationService, 'send_email',
+                        staticmethod(lambda **kw: sent.append(kw) or True))
+    return sent
+
+
+def _forgot(app, email):
+    return app.test_client().post('/api/v2/auth/forgot-password', json={'email': email})
+
+
+def test_the_password_reset_never_gives_a_password_to_an_sso_account(
+        app, providers, auth_client, mailbox):
+    """After Link to SSO removes the password, no password door opens the account."""
+    name = _name()
+    uid = _add(app, username=name, auth_source='local', password_hash='hash-r')
+    assert auth_client.post(f'/api/v2/users/{uid}/link-sso', json={
+        'provider_id': providers.b, 'remove_password': True}).status_code == 200
+    r = _forgot(app, f'{name}@corp.example')
+    assert r.status_code == 200 and 'If an account' in r.get_json()['message']
+    assert mailbox == []
+    with app.app_context():
+        assert db.session.get(User, uid).password_reset_token is None
+
+
+def test_a_reset_token_issued_before_the_link_no_longer_sets_a_password(
+        app, providers, auth_client, mailbox):
+    name, pw = _name(), 'Reset-After-Link-9x!'
+    # What Unlink SSO leaves: no password, a change owed; the reset is its way back.
+    uid = _add(app, username=name, auth_source='local', password_hash=NOPASS,
+               force_password_change=True)
+    assert _forgot(app, f'{name}@corp.example').status_code == 200
+    token = mailbox[0]['context']['reset_url'].split('token=')[1]
+    assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                            json={'provider_id': providers.b}).status_code == 200
+    r = app.test_client().post('/api/v2/auth/reset-password', json={'token': token, 'password': pw})
+    assert (r.status_code, r.get_json()['message']) == (400, 'Invalid or expired reset token')
+    with app.app_context():
+        assert db.session.get(User, uid).password_hash == NOPASS
+    assert app.test_client().post('/api/v2/auth/login',
+                                  json={'username': name, 'password': pw}).status_code == 401
+
+
+def test_the_reset_reaches_the_local_account_sharing_an_sso_account_email(
+        app, providers, mailbox):
+    name, other = _name(), _name()
+    email = f'{name}@corp.example'
+    _add(app, username=other, email=email, auth_source='oauth2', sso_provider_id=providers.b,
+         sso_external_id='sub-x', password_hash=NOPASS)
+    _add(app, username=name, email=email, auth_source='local', password_hash='hash-l')
+    assert _forgot(app, email).status_code == 200
+    assert [m['context']['username'] for m in mailbox] == [name]
+
+
 def test_removing_the_password_closes_sessions_of_an_account_that_does_not_move(
         app, providers, auth_client):
     name = _name()

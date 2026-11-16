@@ -758,6 +758,8 @@ Once installed, `gssapi`/`spnego` are importable and the warning clears without 
 4. Set temporary password
 5. User must change on next login
 
+**Forgot password** on the login page sends a reset link to local accounts only: an account linked to an SSO provider never gets a password this way, and a link sent before the account was linked no longer works.
+
 ### Role Management
 
 | Role | Certificates | CAs | Users | Settings |

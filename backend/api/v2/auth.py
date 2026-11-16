@@ -203,8 +203,11 @@ def forgot_password():
     if not email:
         return error_response('Email is required', 400)
     
-    # Always return success to prevent email enumeration
-    user = User.query.filter(db.func.lower(User.email) == email).first()
+    # Always return success to prevent email enumeration. Only a local account gets
+    # a password this way: an SSO one signs in through its provider (email is unique
+    # among local accounts only, so an SSO account may share it).
+    user = User.query.filter(db.func.lower(User.email) == email,
+                             db.or_(User.auth_source == 'local', User.auth_source.is_(None))).first()
     
     if user and user.active:
         # Generate secure token
@@ -269,8 +272,8 @@ def reset_password():
     if not user:
         return error_response('Invalid or expired reset token', 400)
     
-    # Check if user is active
-    if not user.active:
+    # Check if user is active; a token issued before Link to SSO sets no password.
+    if not user.active or (user.auth_source or 'local') != 'local':
         return error_response('Invalid or expired reset token', 400)
     
     if user.password_reset_expires < utc_now():

@@ -217,6 +217,8 @@ Content-Type: application/json
 }
 ```
 
+`forgot-password` sends a reset link to the local account with that email only, and answers the same `200` whether or not one was sent. `reset-password` answers `400` (`Invalid or expired reset token`) for a link whose account has been linked to an SSO provider since.
+
 ### Check Email Configuration
 ```http
 GET /api/v2/auth/email-configured

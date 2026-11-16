@@ -1717,7 +1717,7 @@ Manage user accounts, groups, and role assignments. Users authenticate to UCM vi
 Toggle a user's status without deleting their account.
 
 ### Password Reset
-Admins can reset any user's password. The user is not asked to change it at the next login: give them the new password and ask them to change it under My Account.
+Admins can reset any user's password. The user is not asked to change it at the next login: give them the new password and ask them to change it under My Account. **Forgot password** on the login page reaches local accounts only: an account linked to an SSO provider never gets a password that way.
 
 ### Security Keys
 In a user's details, administrators see that user's security keys and can disable or remove one, typically a lost key, which otherwise still signs in without a password. Removing the last second factor of an account that requires one asks for a second confirmation; the user then enrols a factor again at the next login.
