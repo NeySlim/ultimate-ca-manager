@@ -6,6 +6,7 @@ import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import { keepLegacyGroupsRead } from './groupMapping'
 
 export default function SsoOAuth2Fields({
   formData,
@@ -125,7 +126,7 @@ export default function SsoOAuth2Fields({
             <p className="text-xs text-text-tertiary mb-2">{t('sso.attributeMappingHelp')}</p>
             <MappingEditor
               value={formData.attribute_mapping}
-              onChange={val => handleChange('attribute_mapping', val)}
+              onChange={val => handleChange('attribute_mapping', keepLegacyGroupsRead(val))}
               keyLabel={t('sso.ssoAttribute')}
               valueLabel={t('sso.ucmField')}
               keyPlaceholder="e.g., preferred_username"

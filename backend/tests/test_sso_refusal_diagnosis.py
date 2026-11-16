@@ -170,3 +170,10 @@ def test_ldap_group_info_line_is_bounded(monkeypatch, caplog):
     line = next(r.getMessage() for r in caplog.records if 'LDAP groups for' in r.getMessage())
     assert 'group-019' in line and 'group-020' not in line
     assert '(+180 more)' in line
+
+
+def test_a_form_row_hides_a_legacy_groups_row_until_it_is_rewritten():
+    from api.v2.sso.helpers import mapped_attributes
+    # A form row hides a legacy one: the screen rewrites the legacy row so both are read.
+    assert mapped_attributes({'groups': 'memberOf', 'Role': 'groups'}, 'groups') == ('Role',)
+    assert set(mapped_attributes({'memberOf': 'groups', 'Role': 'groups'}, 'groups')) == {'memberOf', 'Role'}

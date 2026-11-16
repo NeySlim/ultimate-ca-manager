@@ -7,6 +7,7 @@ import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
 import { formatDate } from '../../../lib/utils'
+import { keepLegacyGroupsRead } from './groupMapping'
 
 export const NAMEID_UNSPECIFIED = 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
 const NAME_ID_FORMATS = [
@@ -164,7 +165,7 @@ export default function SsoSamlFields({
             <p className="text-xs text-text-tertiary mb-2">{t('sso.attributeMappingHelp')}</p>
             <MappingEditor
               value={formData.attribute_mapping}
-              onChange={val => handleChange('attribute_mapping', val)}
+              onChange={val => handleChange('attribute_mapping', keepLegacyGroupsRead(val))}
               keyLabel={t('sso.ssoAttribute')}
               valueLabel={t('sso.ucmField')}
               keyPlaceholder="e.g., preferred_username"
@@ -180,7 +181,7 @@ export default function SsoSamlFields({
                     size="sm"
                     variant="secondary"
                     disabled={Object.prototype.hasOwnProperty.call(formData.attribute_mapping || {}, name)}
-                    onClick={() => handleChange('attribute_mapping', { ...(formData.attribute_mapping || {}), [name]: 'groups' })}
+                    onClick={() => handleChange('attribute_mapping', keepLegacyGroupsRead({ ...(formData.attribute_mapping || {}), [name]: 'groups' }))}
                     className="gap-1"
                   >
                     <span className="font-mono">{name}</span>
