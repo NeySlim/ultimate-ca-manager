@@ -4306,6 +4306,7 @@
       "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
       "confirmRelink": "Rattacher {{name}} à {{provider}} ? Son identité SSO actuelle est effacée et la prochaine connexion via ce fournisseur en lie une nouvelle.",
       "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
+      "relinkKeepsNoPassword": "Its API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "Délier {{name}} de l'authentification unique et le reconvertir en compte local ?",
       "unlinkSuccess": "{{name}} reconverti en compte local",
       "unlinkFailed": "Échec de la déliaison du compte"

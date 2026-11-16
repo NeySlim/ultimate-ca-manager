@@ -242,6 +242,9 @@ def link_user_sso(user_id):
     provider = db.session.get(SSOProvider, provider_id)
     if not provider:
         return error_response('SSO provider not found', 404)
+    # Changing one's own password asks for the current one: removing it is another admin's act
+    if remove_password and g.current_user.id == user_id:
+        return error_response('You cannot remove the local password of your own account', 400)
 
     # The account's sessions end when its owner may change (another provider, a local
     # account, a reset identity) or its local password goes: they were opened before.
@@ -263,6 +266,8 @@ def link_user_sso(user_id):
     # Unlink SSO asked of it would confine its SSO session. One with a password keeps both.
     if drop_password:
         # Same state as an account the provider created: no password door opens it.
+        from auth.initial_admin import forget_generated
+        forget_generated(user)
         user.password_hash = SSO_NO_PASSWORD
         user.password_reset_token = None
         user.password_reset_expires = None

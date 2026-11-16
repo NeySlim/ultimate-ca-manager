@@ -1482,6 +1482,7 @@
       "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
       "confirmRelink": "Attach {{name}} to {{provider}}? Its current SSO identity is cleared, and the next sign-in through this provider binds a new one.",
       "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
+      "relinkKeepsNoPassword": "Its API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "Відв'язати {{name}} від єдиного входу та повернути до локального облікового запису?",
       "unlinkSuccess": "{{name}} перетворено на локальний обліковий запис",
       "unlinkFailed": "Не вдалося відв'язати обліковий запис"

@@ -213,6 +213,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Account: the password reset by e-mail set a local password on an account created by an SSO provider, which then opened without the provider. Such an account gets no reset link any more, and a reset token sets no password on it.
 - Account: passwords sent at the same time to the password or LDAP login, on one node or several, were all checked before the lockout, and a success could leave another node's lock in place. Each attempt is now counted before its password is checked, at LDAP on the account the directory entry opens whatever name was typed, so at most `max_login_attempts` are checked before the account locks, alerted once, and a success clears the stored count.
 - Account: a login by client certificate or passkey reset the password's failed attempt count, giving whoever guesses the password a fresh set of tries. The count and the lock now belong to the password and the LDAP bind alone.
 - Account: an LDAP sign-in whose password is right but which opens no session (account disabled, not in the required groups, no role mapped) now counts toward `max_login_attempts` alongside wrong passwords, though such sign-ins alone never lock the account. A password set by an administrator or changed in a session now clears the count and the lock, as a reset by link does.

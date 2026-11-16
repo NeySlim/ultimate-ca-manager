@@ -7,6 +7,12 @@ from models import db
 from models.sso import SSOProvider
 
 SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
+
+
+def sso_only(user) -> bool:
+    """An account bound to a provider and without a local password: the provider alone
+    opens it, so no password door may hand it a password."""
+    return (user.auth_source or 'local') != 'local' and user.password_hash == SSO_NO_PASSWORD
 ID_BOUND = 64
 
 

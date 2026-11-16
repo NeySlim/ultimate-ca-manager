@@ -134,6 +134,18 @@ describe('UsersGroupsPage Link to SSO on a linked account', () => {
     await waitFor(() => expect(mocks.linkSso).toHaveBeenCalledWith(7, { provider_id: 2, remove_password: false }))
   })
 
+  it('does not promise to keep a password the administrator asked to remove', async () => {
+    mocks.showConfirm.mockResolvedValue(true)
+    await open(LINKED)
+    fireEvent.click(await screen.findByRole('button', { name: /users\.sso\.relink/ }))
+    await choose(2)
+    fireEvent.click(screen.getByRole('checkbox', { name: 'users.sso.removePassword' }))
+    fireEvent.click(screen.getByRole('button', { name: /users\.sso\.relink$/ }))
+    await waitFor(() => expect(mocks.showConfirm).toHaveBeenCalledWith(
+      'users.sso.confirmRelink:IdP B users.sso.relinkKeepsNoPassword', expect.anything()))
+    await waitFor(() => expect(mocks.linkSso).toHaveBeenCalledWith(7, { provider_id: 2, remove_password: true }))
+  })
+
   it('changes nothing when the confirmation is declined', async () => {
     mocks.showConfirm.mockResolvedValue(false)
     await open(LINKED)

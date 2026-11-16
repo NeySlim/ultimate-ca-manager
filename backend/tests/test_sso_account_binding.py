@@ -567,3 +567,106 @@ def test_ldap_orphan_is_not_taken_back_through_another_host_without_a_unique_id(
                      else 'ou=people,dc=example,dc=com')
     if case != 'other_base_dn':
         assert _login(app, same, name, data) == (name, None)
+
+
+@pytest.fixture
+def reset_mail(monkeypatch):
+    """Password reset available; the fixture lists who was sent a link."""
+    import api.v2.auth as auth_api
+    from services.notification_service import NotificationService
+    sent = []
+    monkeypatch.setattr(auth_api, '_is_email_configured', lambda: True)
+    monkeypatch.setattr(auth_api, 'get_admin_canonical_origin', lambda: 'https://ucm.example.test')
+    monkeypatch.setattr(NotificationService, 'send_email',
+                        staticmethod(lambda **kw: sent.append(kw['context']['username'])))
+    return sent
+
+
+def _forgot(app, email):
+    r = app.test_client().post('/api/v2/auth/forgot-password', json={'email': email})
+    assert r.status_code == 200 and 'If an account' in r.get_json()['message']
+
+
+@pytest.mark.parametrize('fields, sent', [
+    ({'auth_source': 'oauth2', 'password_hash': NOPASS}, False),
+    ({'auth_source': 'oauth2', 'password_hash': 'kept-hash'}, True),
+    ({'auth_source': 'local', 'password_hash': NOPASS}, True),
+    ({'auth_source': 'local', 'password_hash': 'local-hash'}, True),
+], ids=['sso-no-password', 'sso-kept-password', 'unlinked-no-password', 'local'])
+def test_forgot_password_sends_no_link_to_an_sso_account_without_password(
+        app, providers, reset_mail, fields, sent):
+    """An account the provider alone opens gets no password by e-mail; the answer is the same."""
+    name = _name()
+    if fields['auth_source'] != 'local':
+        fields = dict(fields, sso_provider_id=providers.b)
+    uid = _add(app, username=name, **fields)
+    _forgot(app, f'{name}@corp.example')
+    assert reset_mail == ([name] if sent else [])
+    with app.app_context():
+        assert bool(db.session.get(User, uid).password_reset_token) is sent
+
+
+def test_forgot_password_reaches_the_local_account_that_shares_the_email(app, providers, reset_mail):
+    sso_name, local_name, email = _name(), _name(), f'{_name()}@corp.example'
+    _add(app, username=sso_name, email=email, auth_source='oauth2', sso_provider_id=providers.b,
+         password_hash=NOPASS)
+    _add(app, username=local_name, email=email, auth_source='local', password_hash='local-hash')
+    _forgot(app, email)
+    assert reset_mail == [local_name]
+
+
+def test_a_reset_token_sets_no_password_on_an_sso_account_without_one(app, providers):
+    import hashlib
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now
+    name, token = _name(), 'token-of-an-sso-only-account'
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.b,
+               password_hash=NOPASS, password_reset_token=hashlib.sha256(token.encode()).hexdigest(),
+               password_reset_expires=utc_now() + timedelta(hours=1))
+    r = app.test_client().post('/api/v2/auth/reset-password',
+                               json={'token': token, 'password': 'Brand-New-Passw0rd!x'})
+    assert r.status_code == 400 and r.get_json()['message'] == 'Invalid or expired reset token'
+    with app.app_context():
+        assert db.session.get(User, uid).password_hash == NOPASS
+
+
+def test_removing_the_password_forgets_a_generated_initial_password(app, providers, auth_client):
+    import json
+    from auth.initial_admin import MARKER_KEY
+    from models import SystemConfig
+    name = _name()
+    uid = _add(app, username=name, auth_source='local', password_hash='generated-hash', role='admin')
+    with app.app_context():
+        before = SystemConfig.query.filter_by(key=MARKER_KEY).first()
+        assert before is None, 'this test owns the marker'
+        db.session.add(SystemConfig(key=MARKER_KEY, value=json.dumps({'user_id': uid})))
+        db.session.commit()
+    try:
+        r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                             json={'provider_id': providers.b, 'remove_password': True})
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            assert SystemConfig.query.filter_by(key=MARKER_KEY).first() is None
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key=MARKER_KEY).delete()
+            db.session.commit()
+
+
+def test_an_administrator_cannot_remove_the_password_of_their_own_account(app, providers, auth_client):
+    with app.app_context():
+        me = User.query.filter_by(username='admin').one()
+        uid, before = me.id, (me.password_hash, me.auth_source, me.sso_provider_id)
+    try:
+        r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                             json={'provider_id': providers.b, 'remove_password': True})
+        assert r.status_code == 400 and 'your own account' in r.get_json()['message']
+        with app.app_context():
+            me = db.session.get(User, uid)
+            assert (me.password_hash, me.auth_source, me.sso_provider_id) == before
+    finally:  # the shared admin account stays usable whatever the answer was
+        with app.app_context():
+            me = db.session.get(User, uid)
+            me.password_hash, me.auth_source, me.sso_provider_id = before
+            me.sso_external_id = None
+            db.session.commit()

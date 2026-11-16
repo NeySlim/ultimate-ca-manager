@@ -1458,6 +1458,7 @@
       "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
       "confirmRelink": "Attach {{name}} to {{provider}}? Its current SSO identity is cleared, and the next sign-in through this provider binds a new one.",
       "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
+      "relinkKeepsNoPassword": "Its API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "{{name}} のシングルサインオンのリンクを解除し、ローカルアカウントに戻しますか？",
       "unlinkSuccess": "{{name}} をローカルアカウントに変換しました",
       "unlinkFailed": "アカウントのリンクを解除できませんでした"
