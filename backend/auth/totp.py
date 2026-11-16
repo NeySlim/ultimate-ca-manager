@@ -1,5 +1,6 @@
 """TOTP verification with one-time use (RFC 6238 §5.2)."""
 import hmac
+import logging
 import time
 import unicodedata
 
@@ -9,6 +10,8 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from models import User, db
 
+logger = logging.getLogger(__name__)
+
 # One time step of clock drift either way, as RFC 6238 §5.2 recommends at most.
 VALID_WINDOW = 1
 
@@ -17,12 +20,18 @@ def matched_step(secret, code, now=None):
     """Time step whose code equals ``code`` within the window, or None."""
     if not secret or not code:
         return None
-    totp = pyotp.TOTP(secret)
-    current = int((time.time() if now is None else now) // totp.interval)
     # NFKC like pyotp (fullwidth digits); compare_digest needs ASCII, so compare bytes.
     code = unicodedata.normalize('NFKC', str(code)).strip()
     if not (code.isascii() and code.isdigit()):
         return None
+    try:
+        totp = pyotp.TOTP(secret)
+        totp.byte_secret()
+    except ValueError:
+        # pyotp refuses secrets under 112 bits or not base32: their codes are wrong codes
+        logger.warning('TOTP secret unusable (not base32 or under 112 bits): code refused')
+        return None
+    current = int((time.time() if now is None else now) // totp.interval)
     for step in range(current - VALID_WINDOW, current + VALID_WINDOW + 1):
         if hmac.compare_digest(totp.generate_otp(step).encode(), code.encode()):
             return step

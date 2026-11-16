@@ -176,6 +176,29 @@ def test_hsm_connection_test_with_an_unreadable_secret_names_the_field(app, monk
             db.session.commit()
 
 
+def test_hsm_key_sync_with_an_unreadable_secret_answers_400_naming_the_field(
+        app, auth_client, monkeypatch):
+    from models import db
+    from services.hsm import gcp_provider
+    monkeypatch.setattr(gcp_provider.kms_v1, 'KeyManagementServiceClient', lambda *a, **k: MagicMock())
+    token = _foreign_token('{"type": "service_account"}')
+    with app.app_context():
+        row = _gcp_row(None, token)
+        row.name = f'kms-{uuid.uuid4().hex[:6]}'
+        db.session.add(row)
+        db.session.commit()
+        pid = row.id
+    try:
+        r = auth_client.post(f'/api/v2/hsm/providers/{pid}/sync')
+        assert r.status_code == 400, r.get_data(as_text=True)
+        assert f'HSM provider {pid} service_account_json cannot be decrypted' in r.get_json()['message']
+        assert token not in r.get_data(as_text=True)
+    finally:
+        with app.app_context():
+            db.session.delete(db.session.get(type(row), pid))
+            db.session.commit()
+
+
 def test_hsm_provider_with_a_readable_secret_still_gets_it(app):
     from services.hsm import HsmService
     from utils.encryption import encrypt_value
@@ -810,3 +833,47 @@ def test_dns_provider_tests_name_unreadable_credentials(auth_client, unreadable_
     r = auth_client.post('/api/v2/acme/domains/test',
                          json={'domain': 'example.com', 'dns_provider_id': unreadable_cloudflare})
     assert r.status_code == 400 and _named(r.get_json()['message'], unreadable_cloudflare)
+
+
+@pytest.mark.parametrize('provider_type', ['manual', 'retired-provider-type'])
+def test_unreadable_credentials_of_a_type_without_a_schema_are_kept(app, auth_client, provider_type):
+    """No schema says what a full entry is: any entry is refused, as before the repair path."""
+    pid, token = _unreadable_provider(app, provider_type)
+    try:
+        r = auth_client.patch(f'/api/v2/dns-providers/{pid}', json={'credentials': {'anything': 'x'}})
+        assert r.status_code == 400
+        message = r.get_json()['message']
+        assert _named(message, pid)
+        # no entry repairs this type: the message does not offer one
+        assert 'restore the key' in message and 'enter it again' not in message
+        assert _stored_credentials(app, pid) == token
+    finally:
+        _drop_provider(app, pid)
+
+
+@pytest.fixture
+def unreadable_manual(app):
+    pid, _token = _unreadable_provider(app, 'manual')
+    yield pid
+    _drop_provider(app, pid)
+
+
+def test_a_manual_provider_ignores_unreadable_credentials(app, monkeypatch, caplog, unreadable_manual):
+    """The manual provider reads no credentials, so an unreadable blob cannot stop it."""
+    from services.acme.acme_client_service import AcmeClientService
+    from services.acme.acme_proxy_service import AcmeProxyService
+    from services.acme.dns_providers import saved_credentials
+    from models import db, DnsProvider
+    with app.app_context():
+        assert saved_credentials(db.session.get(DnsProvider, unreadable_manual)) == {}
+        svc = AcmeClientService.__new__(AcmeClientService)
+        ok, message, _ = svc.setup_dns_challenge(_dns_order(unreadable_manual))
+        assert ok, message
+        ok, message = AcmeClientService.cleanup_dns_challenge(_dns_order(unreadable_manual))
+        assert ok, message
+    proxy = AcmeProxyService.__new__(AcmeProxyService)
+    monkeypatch.setattr(proxy, '_delete_dns_record', lambda *_a, **_k: None)
+    with caplog.at_level(logging.WARNING):
+        proxy._bg_cleanup_dns_records(app, [{'provider_id': unreadable_manual, 'domain': 'example.com',
+                                             'record_name': '_acme-challenge', 'value': 'v'}])
+    assert not _named(caplog.text, unreadable_manual), caplog.text

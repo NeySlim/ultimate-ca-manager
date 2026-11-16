@@ -171,14 +171,20 @@ def _secret_names(schema, names):
 
 def _saved_credentials(provider, credentials):
     """The saved credentials to merge *credentials* into. Saved ones this node cannot open
-    are replaced only by a full entry (every required field and a secret), never merged."""
+    are replaced only by a full entry (every required field, and a secret when the provider has one), never merged."""
     try:
         stored = decrypt_required(provider._credentials, f'DNS provider {provider.id} credentials')
     except SecretUnreadable as e:
         provider_class = get_provider_class(provider.provider_type)
-        given = {k for k, v in credentials.items() if _given(v)}
-        required = set(provider_class.REQUIRED_CREDENTIALS) if provider_class else set()
         schema = provider_class.get_credential_schema() if provider_class else []
+        # Without a schema (manual, a type no longer known) nothing makes an entry full
+        if not schema:
+            raise SecretUnreadable(
+                f'DNS provider {provider.id} credentials cannot be decrypted with this node\'s '
+                'database encryption key (UCM_DB_ENCRYPTION_KEY): restore the key they were saved '
+                'under; this provider type takes no credentials entry') from None
+        given = {k for k, v in credentials.items() if _given(v)}
+        required = set(provider_class.REQUIRED_CREDENTIALS)
         # A schema with no secret field (custom_command) is full with its required fields alone
         secrets = sorted(_secret_names(schema, {f['name'] for f in schema}))
         if required <= given and (_secret_names(schema, given) or not secrets):
