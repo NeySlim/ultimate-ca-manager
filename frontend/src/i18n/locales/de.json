@@ -4079,7 +4079,7 @@
     "provisioningRulesNotice": "Rollenzuordnungsregeln sind festgelegt: Ein Benutzer, den keine Regel erkennt, wird bei der Anmeldung abgelehnt.",
     "provisioningNoRulesNotice": "Keine Rollenzuordnungsregel: Jeder von diesem Anbieter authentifizierte Benutzer kann sich anmelden, und neue Konten erhalten die Rolle {{role}}.",
     "provisioningNobodyNotice": "Keine Rollenzuordnungsregel und keine Standardrolle: Niemand kann sich über diesen Anbieter anmelden.",
-    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values the provider sent and where they were read.",
+    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values read and where they were read from.",
     "samlGroupShortcuts": "Add a row that reads groups from a common attribute:",
     "samlGroupShortcutKeycloakRoles": "Keycloak, roles",
     "samlGroupShortcutKeycloakGroups": "Keycloak, groups",

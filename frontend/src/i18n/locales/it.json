@@ -4079,7 +4079,7 @@
     "provisioningRulesNotice": "Sono definite regole di mappatura dei ruoli: un utente che nessuna regola riconosce viene rifiutato all'accesso.",
     "provisioningNoRulesNotice": "Nessuna regola di mappatura dei ruoli: ogni utente autenticato da questo provider può accedere, e i nuovi account ricevono il ruolo {{role}}.",
     "provisioningNobodyNotice": "Nessuna regola di mappatura dei ruoli e nessun ruolo predefinito: nessuno può accedere tramite questo provider.",
-    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values the provider sent and where they were read.",
+    "provisioningRefusalAudited": "A sign-in refused because no rule matches is recorded in the audit log as a login failure, with the group values read and where they were read from.",
     "samlGroupShortcuts": "Add a row that reads groups from a common attribute:",
     "samlGroupShortcutKeycloakRoles": "Keycloak, roles",
     "samlGroupShortcutKeycloakGroups": "Keycloak, groups",
