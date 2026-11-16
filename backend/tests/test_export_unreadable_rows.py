@@ -208,6 +208,23 @@ def test_every_valid_stored_form_exports_as_before(auth_client, rows, route, fmt
         assert exported[at:at + len(wanted)] == wanted
 
 
+@BOTH
+def test_a_trust_entry_is_read_by_its_first_certificate(auth_client, rows, fmt):
+    """The store accepts an entry by its first certificate; a broken block after it does not hide it."""
+    route = next(r for r in ROUTES if r.kind == 'trust')
+    first = _pem('trust-first')
+    stored = first + b'-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----\n'
+    rows.store(route, rows.made['trust'][0], stored.decode())
+    r = route.call(auth_client, rows.made['trust'], fmt)
+    assert r.status_code == 200, r.data
+    assert 'X-Skipped-Certificates' not in r.headers
+    if fmt == 'pem':
+        assert stored.strip() in r.data
+    else:
+        der = x509.load_pem_x509_certificate(first).public_bytes(serialization.Encoding.DER)
+        assert der in [c.public_bytes(serialization.Encoding.DER) for c in pkcs7.load_der_pkcs7_certificates(r.data)]
+
+
 def test_readable_pems_skips_null_and_empty_rows():
     good = base64.b64encode(_pem('good')).decode()
     pems, skipped = readable_pems([(1, None), (2, ''), (3, GARBAGE), (4, good)])
