@@ -40,7 +40,8 @@ def holds_private_key(data) -> bool:
 
 
 def is_der_certificate(data) -> bool:
-    """Whether *data* is one DER certificate: whatever armour line one of its fields names, it holds no key."""
+    """Whether *data* is one DER certificate: an armour line named inside one of its fields is data
+    of the certificate, signed and public, not a key block of the entry."""
     try:
         x509.load_der_x509_certificate(_bytes(data))
     except Exception:
