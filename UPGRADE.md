@@ -241,6 +241,7 @@ Database migrations run automatically at startup.
 - CA import: a CA whose RSA key is under 2048 bits is refused when imported with its private key; import its certificate without the key to keep it for chain building. Existing CAs are not touched.
 - API clients of `GET /api/v2/dashboard/system-status`: 2.x returned `smtp` (its message naming the mail host), `webhooks` and `auto_renewal` to any authenticated caller. 3.0 returns them only to a caller holding `read:settings`; an API key that reads them must carry that scope, the other entries are unchanged.
 - SSO account linking: `POST /api/v2/users/{id}/link-sso` now accepts an account already linked to a provider or left without one (2.x answered `400`): it moves the account, or clears its SSO identity when the provider is the same, and an account without password no longer has to set one after Unlink SSO then Link to SSO. The login page receives two new refusal codes, `sso_email_conflict` and `sso_no_default_role` (the latter was `sso_unmapped`).
+- Trust store export: `GET /api/v2/truststore/export?format=p7b` answers `404`, with the unreadable entries in `details.skipped`, instead of `400` when no entry is readable.
 
 #### What changes without an error
 

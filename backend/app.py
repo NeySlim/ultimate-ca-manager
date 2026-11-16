@@ -426,6 +426,8 @@ def create_app(config_name=None):
             "origins": _cors_origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
+            "expose_headers": ["Content-Disposition", "X-Skipped-Certificates", "X-Skipped-Certificates-Count",
+                               "X-Skipped-CAs", "X-Skipped-CAs-Count"],
             "supports_credentials": True
         },
         r"/socket.io/*": {

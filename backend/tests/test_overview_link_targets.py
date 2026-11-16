@@ -13,6 +13,16 @@ def _body(r):
     return json.loads(r.data)['data']
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _scep_rows_leave_with_the_module(app):
+    """These requests name no CA: left behind they block a database migration in a later file."""
+    yield
+    with app.app_context():
+        db.session.rollback()
+        SCEPRequest.query.filter(SCEPRequest.transaction_id.like('link-%')).delete(synchronize_session=False)
+        db.session.commit()
+
+
 def test_scep_request_by_id_outside_the_listed_page(app, auth_client):
     with app.app_context():
         ids = []
