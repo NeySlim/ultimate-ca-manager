@@ -501,6 +501,15 @@ def test_two_rule_keys_ldap_compares_equal_are_refused_for_ldap(
             db.session.commit()
 
 
+def test_twin_rule_keys_already_saved_give_the_highest_role(env, monkeypatch):
+    """Saved before the check: both rules match and the highest-privilege role wins."""
+    user = env.user()
+    _ad(monkeypatch, user, ['CN=PKI-Admins,OU=Groups,DC=example,DC=com'])
+    pid = _ad_provider(env, role_mapping=json.dumps({'PKI-Admins': 'viewer', 'pki-admins': 'admin'}))
+    assert env.login(pid, user)[0] == 200
+    assert env.role(user) == 'admin'
+
+
 # ── 5. A failed group read says so ───────────────────────────────────────────
 
 def test_a_failed_group_read_says_the_groups_could_not_be_read(env, monkeypatch, caplog):
