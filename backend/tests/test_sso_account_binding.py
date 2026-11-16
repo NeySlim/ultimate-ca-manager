@@ -319,6 +319,36 @@ def test_email_of_an_account_of_another_provider_is_refused_not_duplicated(app, 
     assert repr(a_name) in details and 'Link to SSO' in details, details
 
 
+@pytest.mark.parametrize('orphan_of', ['oauth2:https://okta-gone.example', None])
+@pytest.mark.parametrize('verified', [True, False])
+def test_email_of_an_orphan_of_another_or_unknown_idp_is_refused_not_duplicated(
+        app, providers, orphan_of, verified):
+    """A provider deleted, another created, another name sent: no second account."""
+    name, idp_name = _name(), _name()
+    _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+         sso_provider_id=None, sso_orphan_of=orphan_of, sso_external_id='sub-old',
+         password_hash=NOPASS)
+    got = _login(app, providers.b, idp_name, {'sub': 'sub-new', 'email_verified': verified},
+                 email=f'{name}@corp.example')
+    assert got == (None, 'sso_email_conflict')
+    assert _count(app, username=idp_name) == 0
+    assert _count(app, email=f'{name}@corp.example') == 1
+    details = _last_audit(app, 'login_failure', name)
+    assert 'no provider' in details and 'Link to SSO attaches it' in details, details
+
+
+def test_email_of_an_unbound_orphan_of_this_idp_is_still_taken_back(app, providers):
+    """The orphan check leaves this IdP's own orphans to the adoption that precedes it."""
+    name, idp_name = _name(), _name()
+    uid = _add(app, username=name, email=f'{name}@corp.example', auth_source='oauth2',
+               sso_provider_id=None, sso_orphan_of='oauth2:https://b.example',
+               sso_external_id=None, password_hash=NOPASS)
+    assert _login(app, providers.b, idp_name, {'sub': 'sub-o'},
+                  email=f'{name}@corp.example') == (name, None)
+    with app.app_context():
+        assert db.session.get(User, uid).sso_provider_id == providers.b
+
+
 def test_another_person_sharing_the_email_signs_in_once_an_account_is_created_and_linked(
         app, providers, auth_client):
     """The remedy the refusal names for a shared mailbox: no setting, an explicit account."""

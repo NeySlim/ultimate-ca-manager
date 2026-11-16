@@ -464,11 +464,14 @@ def _refuse_unmapped(provider, username):
 
 def _email_owner(provider, account, unverified):
     """An account owning the presented e-mail that this identity may not open and whose
-    existence a new account would duplicate: one linked to another provider, or one
-    an administrator linked to this provider that an unverified e-mail cannot match."""
+    existence a new account would duplicate: one linked to another provider, one left
+    without provider by another or unknown IdP, or one this provider may adopt that an
+    unverified e-mail cannot match."""
     if (account.auth_source or 'local') == 'local':
         return False  # e-mail is unique among local accounts only (#136)
     if account.sso_provider_id is not None and account.sso_provider_id != provider.id:
+        return True
+    if account.sso_provider_id is None and not _same_provider_or_idp(account, provider):
         return True
     return unverified and _adoptable(account, provider)
 
