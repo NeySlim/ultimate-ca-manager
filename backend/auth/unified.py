@@ -453,6 +453,15 @@ def has_permission(required, user_permissions):
     return False
 
 
+def hsm_binding_refusal(authority):
+    """403 naming read:hsm when the caller may not put *authority* ('an SSH CA', 'an X.509 CA')
+    on an HSM key: binding a key takes the right to see the HSM inventory too. None otherwise."""
+    if has_permission('read:hsm', getattr(g, 'permissions', None) or []):
+        return None
+    from utils.response import error_response
+    return error_response(f'Creating {authority} on an HSM key requires the read:hsm permission', 403)
+
+
 def verify_request_auth(request_obj=None):
     """
     Manually verify authentication without aborting with 401.

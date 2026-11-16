@@ -135,6 +135,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [hsmProviders, setHsmProviders] = useState([])
   const [hsmKeys, setHsmKeys] = useState([])
   const [hsmLoading, setHsmLoading] = useState(false)
+  // The server refused the HSM list (no read:hsm) or the creation on the chosen key (403, 409)
+  const [hsmDenied, setHsmDenied] = useState(false)
+  const [hsmRefusal, setHsmRefusal] = useState('')
 
   // Load HSM providers when modal opens
   useEffect(() => {
@@ -146,11 +149,20 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         if (cancelled) return
         const list = extractData(res) || []
         setHsmProviders(list.filter(p => p.enabled))
+        setHsmDenied(false)
       })
-      .catch(() => { if (!cancelled) setHsmProviders([]) })
+      .catch((error) => {
+        if (cancelled) return
+        setHsmProviders([])
+        setHsmDenied(error?.status === 403)
+      })
       .finally(() => { if (!cancelled) setHsmLoading(false) })
     return () => { cancelled = true }
   }, [open])
+
+  // A refusal belongs to the key that was tried
+  useEffect(() => { setHsmRefusal('') },
+    [createFormHsmKeyId, createFormHsmProviderId, createFormHsmKeyMode, createFormKeyStorage])
 
   // Reset form when modal closes
   useEffect(() => {
@@ -405,6 +417,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         }
       }
 
+      setHsmRefusal('')
       muteToasts()
       const response = await casService.create(data)
       const created = extractData(response)
@@ -420,6 +433,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       onSuccess(created)
     } catch (error) {
       showError(error.message || t('cas.createFailed'))
+      if (keyStorage === 'hsm' && (error?.status === 403 || error?.status === 409)) {
+        setHsmRefusal(error.message || t('cas.createFailed'))
+      }
     } finally {
       creatingRef.current = false
       setCreating(false)
@@ -495,7 +511,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               {t('cas.create.keyStorageLocal')}
             </label>
             <label className={cn(
-              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
+              'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all',
+              hsmDenied ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
               keyStorage === 'hsm'
                 ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
                 : 'border-border hover:border-border-hover text-text-secondary'
@@ -506,11 +523,13 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                 value="hsm"
                 className="sr-only"
                 checked={keyStorage === 'hsm'}
+                disabled={hsmDenied}
                 onChange={() => setCreateFormKeyStorage('hsm')}
               />
               {t('cas.create.keyStorageHsm')}
             </label>
           </div>
+          {hsmDenied && <p className="mt-1 text-xs text-text-secondary">{t('cas.create.hsmNeedsRead')}</p>}
         </div>
 
         {keyStorage === 'local' && (
@@ -681,6 +700,11 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                 )
               )}
             </>
+          )}
+          {hsmRefusal && (
+            <div role="alert" className="px-3 py-2 rounded-lg border border-status-danger-op30 bg-status-danger-op10 text-xs text-status-danger">
+              {hsmRefusal}
+            </div>
           )}
         </div>
         )}

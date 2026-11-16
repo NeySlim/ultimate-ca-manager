@@ -138,6 +138,7 @@ class Pkcs11Provider(BaseHsmProvider):
         slot_index: Slot index (optional, default: auto-detect)
     """
 
+    ECDSA_SIGNATURE_FORMAT = 'raw'
     SIGNS_PSS = True
     SIGNS_BRAINPOOL = True
     SIGNS_ML_DSA = bool(ML_DSA_PARAMETER_SETS)
@@ -278,18 +279,18 @@ class Pkcs11Provider(BaseHsmProvider):
         self.list_errors = []
 
         try:
-            # Find all private keys (we use private keys as reference)
-            for obj in self._session.get_objects({
+            # Finish C_FindObjects before looking up public halves in the same session.
+            for obj in list(self._session.get_objects({
                 Attribute.CLASS: ObjectClass.PRIVATE_KEY
-            }):
+            })):
                 key_info = self._object_to_key_info(obj, 'asymmetric')
                 if key_info:
                     keys.append(key_info)
 
             # Find all secret keys
-            for obj in self._session.get_objects({
+            for obj in list(self._session.get_objects({
                 Attribute.CLASS: ObjectClass.SECRET_KEY
-            }):
+            })):
                 key_info = self._object_to_key_info(obj, 'symmetric')
                 if key_info:
                     keys.append(key_info)
@@ -391,6 +392,25 @@ class Pkcs11Provider(BaseHsmProvider):
                 purpose = 'all'
 
             is_extractable = bool(self._attr(obj, Attribute.EXTRACTABLE, False))
+            public_key_pem = None
+            if key_type == 'asymmetric':
+                try:
+                    pub = self._public_half(raw_id)
+                    if pub is not None:
+                        if pkcs11_key_type == KeyType.RSA:
+                            public_key_pem = self._export_rsa_public_key(pub)
+                        elif pkcs11_key_type == KeyType.EC:
+                            public_key_pem = self._export_ec_public_key(pub)
+                        elif _ML_DSA_KEY_TYPE is not None and pkcs11_key_type == _ML_DSA_KEY_TYPE:
+                            public_key_pem = self._export_mldsa_public_key(pub)
+                    if public_key_pem:
+                        from cryptography.hazmat.primitives.serialization import load_pem_public_key
+                        public = load_pem_public_key(public_key_pem.encode())
+                        algorithm = key_algorithms.label_for_public_key(public) or algorithm
+                except Exception as e:
+                    # Only a parsed SPKI is ever reported; the private key stays listed.
+                    public_key_pem = None
+                    logger.warning("Public half of PKCS#11 key %s could not be read: %s", key_id, e)
 
             return HsmKeyInfo(
                 key_identifier=key_id,
@@ -398,6 +418,7 @@ class Pkcs11Provider(BaseHsmProvider):
                 algorithm=algorithm,
                 key_type=key_type,
                 purpose=purpose,
+                public_key_pem=public_key_pem,
                 is_extractable=is_extractable
             )
 

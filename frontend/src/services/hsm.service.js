@@ -35,6 +35,10 @@ export const hsmService = {
     return apiClient.post(`/hsm/providers/${id}/test`)
   },
 
+  async syncKeys(id) {
+    return apiClient.post(`/hsm/providers/${id}/sync`)
+  },
+
   async createProvider(data) {
     return apiClient.post('/hsm/providers', data)
   },

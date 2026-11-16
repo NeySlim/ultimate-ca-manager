@@ -12,7 +12,7 @@ from services.mtls_auth_service import MTLSAuthService
 import logging
 from utils.datetime_utils import utc_now
 from utils.admin_allowlist import is_exempt_path
-from auth.session_epoch import holds_current_epoch
+from auth.session_epoch import holds_current_epoch, note_request_epoch
 from auth.session_start import ACCOUNT_KEY, account_proof, begin_session
 
 logger = logging.getLogger(__name__)
@@ -153,6 +153,8 @@ def process_client_certificate():
     # Store cert_info in g for /auth/methods to use without re-parsing
     g.mtls_cert_info = cert_info
 
+    # Before the certificate is checked: every path outside LOGIN_PATHS skipped the global read
+    note_request_epoch()
     user, auth_cert, error = MTLSAuthService.authenticate_certificate(cert_info)
 
     if user:

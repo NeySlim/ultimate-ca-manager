@@ -177,6 +177,8 @@ export const helpContent = {
           { label: 'Use existing key', text: 'Bind the CA to an unused signing key already on the HSM' },
           { label: 'No private key export', text: 'HSM-backed keys never leave the HSM, PKCS#12, JKS and key-only exports are disabled' },
           { label: 'Prerequisite', text: 'Configure and connect an HSM provider in HSM Management first' },
+          { label: 'One authority per key', text: 'The list of existing keys offers only unused keys: an HSM key backs one authority, X.509 or SSH. A key a CA already holds is refused (409) with the name of that CA' },
+          { label: 'Permission', text: 'Creating a CA on an HSM key needs read:hsm besides write:cas; the HSM choice is disabled without it' },
         ]
       },
       {
@@ -438,7 +440,7 @@ export const helpContent = {
         title: 'Source',
         icon: FileText,
         definitions: [
-          { term: 'System', description: 'Seeded at install. Duplicate one for an editable copy: it cannot be edited or deleted itself' },
+          { term: 'System', description: 'Seeded at install. Copy one to get an editable version: it cannot be edited or deleted itself' },
           { term: 'Custom', description: 'Created or imported here, and the only kind that can be edited or deleted' },
         ]
       },
@@ -452,9 +454,9 @@ export const helpContent = {
           { label: 'Extended Key Usage', text: 'Any purpose the server knows: Server Auth, Client Auth, Code Signing, Email Protection, Smartcard Logon, Time Stamping, OCSP Signing, IPsec, Microsoft RDP and others' },
           { label: 'SAN types', text: 'The name types (DNS, IP, Email, URI, UPN) a request made with the template may carry. With "Enforce the allowed SAN types" on, the issue form, Sign CSR, the enrollment protocols, renewals and approvals refuse any other type, and a name only implied by the CN is left out. New templates have it on; older ones and the built-in ones have it off. None checked: every type is allowed' },
           { label: 'Validity', text: 'Default validity period in days' },
-          { label: 'Duplicate', text: 'Clone an existing template and modify it' },
+          { label: 'Copy', text: 'Clone an existing template and modify it' },
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
-          { label: 'Deactivate', text: 'A deactivated template, built-in ones included, is no longer offered by the Issue Certificate form nor to Windows autoenrollment, and shows an Inactive badge. Activate brings it back. A built-in template can be deactivated, not edited: duplicate it to change it' },
+          { label: 'Deactivate', text: 'A deactivated template, built-in ones included, is no longer offered by the Issue Certificate form nor to Windows autoenrollment, and shows an Inactive badge. Activate brings it back. A built-in template can be deactivated, not edited: copy it to change it' },
           { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances: the page exports one template at a time, and an import file may hold one or several' },
           { label: 'qcStatements', text: 'Optional ETSI EN 319 412-5 statements added to every certificate issued from the template: QcCompliance, QcType (signature, seal or website), QcSSCD, QcPDS (HTTPS URL and two-letter language), QcRetentionPeriod, QcLimitValue, QcCClegislation (for a certificate qualified under a non-EU legal framework) and the semantics identifier. Not applied to EST, WSTEP or mTLS issuance, and a qcStatements extension in a CSR is ignored. QcIdentMethod, QcQSCDlegislation and PSD2 statements are not supported' },
           { label: 'Policy OIDs', text: 'Extra certificate policy OIDs (for example the ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd and QCP-w policies), added after the CA\'s own policy' },
@@ -478,7 +480,7 @@ export const helpContent = {
     ],
     tips: [
       'Create separate templates for TLS servers, clients, and code signing',
-      'Use the Duplicate action to quickly create variations of a template, including of a system one',
+      'Use the Copy action to quickly create variations of a template, including of a system one',
       'Templates with autoenrollment flags show AD / Auto / ACL / Pinned badges in the list',
     ],
     related: ['Certificates', 'CSRs', 'CAs']
@@ -1320,7 +1322,7 @@ export const helpContent = {
           { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
           { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
           { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
-          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt cannot be skipped and offers only Logout. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
+          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt cannot be skipped and its only other button is Logout. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
         ]
       },
       {
@@ -1497,7 +1499,8 @@ export const helpContent = {
         items: [
           { label: 'New Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
           { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid; for a PKCS#11 module, also record what it reports (library, manufacturer, library and firmware versions), shown on the provider page' },
-          { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
+          { label: 'Generate', text: 'Create a new key pair directly on the HSM' },
+          { label: 'Sync keys', text: 'Reads the provider\'s keys again from the token: new keys are added, keys gone from the token are removed, except those a CA uses, which are kept. When the token listing fails, nothing is removed. The message gives the counts, the keys kept and the unreadable keys; the button stays disabled while the synchronization runs' },
           { label: 'Status', text: 'Monitor provider connection health' },
           { label: 'Certification', text: 'Declare the certification of the HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 level 3, FIPS 140-2 level 3 or other. Left empty, it is not declared. The eu-acm compliance profile accepts only Common Criteria EAL 4+, EUCC high, and FIPS 140-3 level 3 (until 31 December 2030) for an HSM-backed CA' },
           { label: 'Name already held (v2.249)', text: 'Generating a key under a name OpenBao or Azure Key Vault already holds is refused (409): bring an existing key in with a key sync (POST /api/v2/hsm/providers/<id>/sync)' },
@@ -1516,6 +1519,9 @@ export const helpContent = {
           { label: 'Export restrictions', text: 'PKCS#12, JKS and key-only exports are disabled for HSM-backed CAs (only the public certificate / chain can be exported)' },
           { label: 'CRL & OCSP', text: 'Both work transparently with HSM-backed CAs (signed via HSM)' },
           { label: 'Migration', text: 'Existing local CAs cannot be moved to an HSM after creation, choose at creation time' },
+          { label: 'One authority per key', text: 'An HSM key backs one authority only, X.509 or SSH. The lists of existing keys offer unused keys, a second CA on a key is refused (409) with the name of the CA that holds it, and a key or its provider cannot be deleted while a CA holds it' },
+          { label: 'Permissions', text: 'Creating a CA on an HSM key, X.509 or SSH, needs read:hsm besides write:cas or write:ssh_cas; the HSM choice is unavailable without it' },
+          { label: 'SSH CAs', text: 'An SSH user or host CA can use an RSA or ECDSA P-256/P-384/P-521 signing key (see SSH CAs). In HA mode a key on SoftHSM or on a local smart card reader is refused, as it exists on one node only' },
         ]
       },
       {
@@ -2025,6 +2031,18 @@ export const helpContent = {
           { label: 'Ed25519', text: 'Modern, fast, small keys (256-bit). Recommended for new deployments.' },
           { label: 'ECDSA P-256 / P-384 / P-521', text: 'Elliptic curve keys, widely supported. Good balance of security and compatibility.' },
           { label: 'RSA 4096', text: 'Traditional algorithm, always 4096-bit. Broadest compatibility with older systems.' },
+        ]
+      },
+      {
+        title: 'HSM-backed SSH CAs',
+        icon: HardDrive,
+        items: [
+          { label: 'Key storage', text: 'At creation, choose Local or HSM, then the provider and an unused signing key. The CA takes its key type from the key and the private key never leaves the HSM' },
+          { label: 'Algorithms', text: 'RSA and ECDSA P-256, P-384 or P-521 keys. Ed25519 keys are not offered: UCM\'s HSM signing does not cover EdDSA, so an Ed25519 SSH CA is a software key. Brainpool and ML-DSA keys are not offered either: UCM signs with them on an HSM for X.509 CAs, but OpenSSH certificates have no key type for them' },
+          { label: 'One key, one authority', text: 'A key backs one authority, X.509 or SSH. A key already held is not offered, and a request naming it is refused (409) with the name of the CA that holds it. Neither the key nor its provider can be deleted while the CA exists' },
+          { label: 'Permissions', text: 'write:ssh_cas and read:hsm. Without read:hsm the HSM choice is disabled, and a refusal (403) names the missing permission' },
+          { label: 'FIPS and HA', text: 'In FIPS mode a key that FIPS mode refuses is not offered. In HA mode a key on SoftHSM or on a local smart card reader is refused (409), as it exists on one node only' },
+          { label: 'Unreachable token', text: 'If the provider cannot be reached when the CA is created (503), nothing is created: check the provider in HSM Management and try again' },
         ]
       },
       {

@@ -275,6 +275,7 @@
     "source": "Origem",
     "addDnsProvider": "Adicionar provedor",
     "test": "Testar",
+    "syncKeys": "Sincronizar chaves",
     "dnsProviderTestFailed": "Teste de conexão falhou",
     "providerName": "Nome do provedor",
     "providerType": "Tipo de provedor",
@@ -1083,7 +1084,8 @@
       "noSchemeAllowedByProfile": "Nenhum esquema de assinatura RSA é permitido pelo perfil de conformidade para esta chave.",
       "profileRequiresHsm": "Este perfil exige que a chave da CA seja guardada num HSM.",
       "profileHorizon": "O perfil de conformidade aceita {{key}} até {{date}}, e esta CA ultrapassaria essa data.",
-      "noDigestAllowedByPolicy": "Nenhum hash de assinatura é permitido pelas políticas aplicáveis a esta CA."
+      "noDigestAllowedByPolicy": "Nenhum hash de assinatura é permitido pelas políticas aplicáveis a esta CA.",
+      "hsmNeedsRead": "Criar uma AC em uma chave HSM exige a permissão read:hsm."
     },
     "detail": {
       "hsmBacked": "Apoiada por HSM",
@@ -1304,7 +1306,7 @@
     "customTemplates": "Personalizados",
     "systemDescription": "Incluído, não pode ser editado nem excluído",
     "customDescription": "Criado aqui, pode ser editado e excluído",
-    "systemNotEditable": "Modelos do sistema não podem ser editados. Duplique-o para criar uma cópia personalizada.",
+    "systemNotEditable": "Modelos do sistema não podem ser editados. Copie-o para criar uma versão personalizada.",
     "systemNotDeletable": "Modelos do sistema não podem ser excluídos.",
     "defaultValidity": "Validade predefinida (dias)",
     "maxValidityHint": "Para limitar a validade dos certificados emitidos com este modelo, use uma política de emissão (Políticas, validade máxima).",
@@ -1395,7 +1397,7 @@
     "activate": "Ativar",
     "activated": "Modelo ativado",
     "deactivated": "Modelo desativado",
-    "deactivateTooltip": "Um modelo desativado não é oferecido pelo formulário Emitir certificado nem pela autoinscrição do Windows. Os modelos do sistema podem ser desativados, mas não editados: duplique-o para o alterar."
+    "deactivateTooltip": "Um modelo desativado não é oferecido pelo formulário Emitir certificado nem pela autoinscrição do Windows. Os modelos do sistema podem ser desativados, mas não editados: copie um para o alterar."
   },
   "users": {
     "securityKeys": {
@@ -3857,7 +3859,8 @@
       "firmwareVersion": "Versão do firmware",
       "notRead": "Teste a ligação para ler o que o módulo reporta.",
       "softhsmFips": "O SoftHSM não é um módulo validado: no modo FIPS, as chaves nele armazenadas não são protegidas por FIPS."
-    }
+    },
+    "syncingKeys": "Sincronizando..."
   },
   "sso": {
     "subtitle": "Configure provedores LDAP, OAuth2 ou SAML para autenticação centralizada",
@@ -3919,7 +3922,6 @@
     "configuredProviders": "Provedores configurados",
     "acsUrl": "URL do Serviço de Consumo de Asserção (ACS)",
     "acsUrlDesc": "Para onde o IdP envia as asserções SAML após a autenticação",
-    "addProvider": "Adicionar Provedor SSO",
     "attributeMapping": "Mapeamento de Atributos",
     "attributeMappingHelp": "Esquerda: o nome do atributo enviado pelo provedor. Direita: o campo do UCM que ele preenche (username, email, fullname ou groups). Exemplo: user.userprincipalname → username.",
     "callbackUrls": "URLs de Callback",
@@ -4693,7 +4695,8 @@
         "template": "Falha ao exportar template"
       },
       "hsm": {
-        "testFailed": "Falha no teste de conexão"
+        "testFailed": "Falha no teste de conexão",
+        "syncFailed": "Falha ao sincronizar chaves"
       },
       "https": {
         "applyFailed": "Falha ao aplicar certificado",
@@ -4822,7 +4825,12 @@
         "template": "Template exportado com sucesso"
       },
       "hsm": {
-        "connectionOk": "Conexão bem-sucedida"
+        "connectionOk": "Conexão bem-sucedida",
+        "keysSynced": "Chaves sincronizadas: {{added}} novas, {{removed}} removidas, {{unchanged}} inalteradas",
+        "keysSyncedKept": "Ausentes do token, mas mantidas porque uma autoridade as usa: {{count}}.",
+        "keysSyncedUnreadable": "Chaves ilegíveis no token: {{count}}. Nenhuma chave foi removida.",
+        "keysSyncedMissingKept": "Chaves ausentes da lista e mantidas: {{count}}.",
+        "keysSyncedChanged": "Chaves usadas por uma autoridade cujo material mudou no token: {{count}}."
       },
       "https": {
         "applied": "Certificado HTTPS aplicado. O servidor será reiniciado.",
@@ -5868,7 +5876,12 @@
       "allowAnyPrincipal": "Permitir qualquer principal",
       "allowAnyPrincipalHelp": "Quando nenhum principal está listado, assinar para qualquer nome, incluindo root. Sem esta opção, uma CA com a lista vazia não assina nada.",
       "allowCustomKeyId": "Permitir que os solicitantes definam o ID da chave",
-      "allowCustomKeyIdHelp": "O sshd registra o ID da chave como a identidade do titular. Sem esta opção, a CA nomeia cada certificado principals@nome da CA."
+      "allowCustomKeyIdHelp": "O sshd registra o ID da chave como a identidade do titular. Sem esta opção, a CA nomeia cada certificado principals@nome da CA.",
+      "keyStorageLockedHelp": "A chave da AC e o tipo de AC não podem ser alterados após a criação da AC.",
+      "hsmKeyHelper": "Uma AC SSH em HSM usa uma chave de assinatura RSA ou ECDSA P-256/P-384/P-521 que nenhuma outra autoridade detém. Adicione ou sincronize chaves no Gerenciamento HSM.",
+      "hsmNoUsableKeys": "Este provedor não tem nenhuma chave de assinatura RSA ou ECDSA livre. Uma chave HSM serve a uma única autoridade, X.509 ou SSH.",
+      "hsmDerivedKey": "Tipo de chave do HSM: {{keyType}}",
+      "hsmNeedsRead": "Criar uma AC SSH em uma chave HSM exige a permissão read:hsm."
     },
     "searchPlaceholder": "Pesquisar CAs SSH...",
     "downloadSetupScript": "Baixar script de configuração",

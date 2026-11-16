@@ -423,6 +423,8 @@ class RestoreCoreMixin:
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
+        from .restore_extended import refuse_archived_shared_keys
+        refuse_archived_shared_keys(backup_data, plan)
 
         # No file is written here: the rows commit with a new files generation and the
         # list of paths they no longer name; each node's reconciliation then follows them.
@@ -438,6 +440,10 @@ class RestoreCoreMixin:
                 generation = advance_generation() if carried else None
                 if generation is not None:
                     record_removal_candidates(generation)
+                from services.hsm import key_binding
+                # A key two authorities held before the restore is not the restore's doing
+                shared_before = set(key_binding.shared_keys())
+                token_shared_before = set(key_binding.shared_token_keys())
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
@@ -457,6 +463,7 @@ class RestoreCoreMixin:
                 results['relinked'] = relink_references(backup_data, plan)
                 link_restored_connectors(backup_data)
                 results['repairs'] = replay_repairs(backup_data, plan)
+                db.session.flush()
                 # The rows written take the revocation their CA records, as the hourly pass does
                 aligned = self._align_restored_revocations(plan) + self._align_kept_revocations()
                 results['revoked_from_records'] = len(aligned)
@@ -469,6 +476,22 @@ class RestoreCoreMixin:
 
                 if replacement is not None:
                     results.update(remove_after_writes(replacement).report())
+                # On the final rows: an authority a replacement removes after the writes holds nothing
+                db.session.flush()
+                for key_id, held in key_binding.shared_keys().items():
+                    if key_id not in shared_before:
+                        raise BackupSchemaError(
+                            f"Cannot restore: HSM key '{key_binding.label_of(key_id)}' would back both the "
+                            f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
+                            "nothing has been changed.")
+                # Two key rows naming one token key are one key (refuse_same_token_key)
+                for (first, second), held in key_binding.shared_token_keys().items():
+                    if (first, second) not in token_shared_before:
+                        raise BackupSchemaError(
+                            f"Cannot restore: HSM keys '{key_binding.label_of(first)}' and "
+                            f"'{key_binding.label_of(second)}' are one token key and would back both the "
+                            f"{held[0]} and the {held[1]}. An HSM key backs one authority only; "
+                            "nothing has been changed.")
                 # Lockouts are keyed by user id and name, which either mode may hand to
                 # another account; the sessions they guard are revoked after any restore
                 from models.second_factor_failure import SecondFactorFailure
@@ -944,6 +967,8 @@ class RestoreCoreMixin:
         # build one, so references still land on the row the archive names
         # rather than on whatever holds that number here.
         plan = plan if plan is not None else RestorePlan.build(backup_data)
+        from .restore_extended import _refuse_a_taken_key
+        taken = {}
 
         for ca_data in backup_data.get('certificate_authorities', []):
             ca = CA.query.filter_by(refid=ca_data['refid']).first()
@@ -986,6 +1011,7 @@ class RestoreCoreMixin:
             ca.ski = ca_data.get('ski') or ca.ski
             self._apply_ca_fields(ca, ca_data)
             self._apply_ca_revocation(ca, ca_data, here_revocation)
+            _refuse_a_taken_key(ca, taken)
             results['cas'] += 1
 
     def _restore_certificates(self, backup_data: Dict, results: Dict, master_key: bytes,

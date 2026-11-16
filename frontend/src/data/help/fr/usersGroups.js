@@ -11,7 +11,7 @@ export default {
           { label: 'Rôles', text: 'Attribuer des rôles système ou personnalisés pour contrôler les permissions' },
           { label: 'Statut', text: 'Activer ou désactiver les comptes utilisateurs' },
           { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d\'un utilisateur (action administrateur). Les sessions ouvertes de l\'utilisateur sont fermées, comme par une réinitialisation de la 2FA' },
-          { label: 'Supprimer un utilisateur', text: "Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (cessationOfOperation), puis les supprime. Un certificat que la CA ne peut pas révoquer ne bloque pas la suppression : il reste valide, est nommé dans l'avertissement et le journal d'audit, et doit être révoqué sous Certificats. Un échec après certaines révocations conserve l'utilisateur et nomme les certificats déjà révoqués. Retirer un utilisateur ou l'un de ses certificats mTLS avertit quand la CA ACME qui a émis un certificat n'a pas été informée de sa révocation" },
+          { label: 'Supprimer un utilisateur', text: "Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (cessationOfOperation), puis les supprime. Un certificat que l'AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, est nommé dans l'avertissement et le journal d'audit, et doit être révoqué sous Certificats. Un échec après certaines révocations conserve l'utilisateur et nomme les certificats déjà révoqués. Retirer un utilisateur ou l'un de ses certificats mTLS avertit quand l'AC ACME qui a émis un certificat n'a pas été informée de sa révocation" },
           { label: 'Clés API', text: 'Dans le détail d\'un utilisateur, liste ses clés API et révoque une clé compromise ou inutilisée : elle cesse de fonctionner immédiatement, et une clé révoquée ou expirée peut ensuite être supprimée. Les propriétaires créent leurs clés depuis leur page Compte' },
           { label: 'Source', text: 'Indique l\'origine de chaque utilisateur : Local (géré dans UCM) ou LDAP / OAuth2 / SAML (provisionné par un fournisseur SSO). Le badge affiche le nom du fournisseur d\'origine.' },
         ]
@@ -63,7 +63,7 @@ Les administrateurs peuvent réinitialiser le mot de passe de tout utilisateur. 
 Dans la fiche d'un utilisateur, les administrateurs voient ses clés de sécurité et peuvent en désactiver ou en retirer une, typiquement une clé perdue, qui sinon permet toujours de se connecter sans mot de passe. Retirer le dernier second facteur d'un compte qui en exige un demande une seconde confirmation ; l'utilisateur enrôle alors à nouveau un facteur à la prochaine connexion.
 
 ### Supprimer un utilisateur
-Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (motif cessationOfOperation), puis les supprime. Un certificat que la CA ne peut pas révoquer ne bloque pas la suppression : il reste valide, l'avertissement et le journal d'audit le nomment, et vous le révoquez sous Certificats. Si la suppression échoue après certaines révocations, le message nomme les certificats déjà révoqués : ils restent révoqués.
+Supprimer un utilisateur révoque les certificats qu'il a inscrits pour mTLS (motif cessationOfOperation), puis les supprime. Un certificat que l'AC ne peut pas révoquer ne bloque pas la suppression : il reste valide, l'avertissement et le journal d'audit le nomment, et vous le révoquez sous Certificats. Si la suppression échoue après certaines révocations, le message nomme les certificats déjà révoqués : ils restent révoqués.
 
 ### Clés API
 Chaque utilisateur peut avoir plusieurs clés API pour l'accès programmatique. Les clés API héritent des permissions du rôle de l'utilisateur. Voir la page Compte pour gérer vos propres clés.
@@ -91,9 +91,9 @@ Les permissions effectives d'un utilisateur sont l'**union** de :
 
 ### Rôles système
 - **Admin** : Accès complet à toutes les fonctionnalités
-- **Opérateur** : Peut gérer les certificats, CA, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC
+- **Opérateur** : Peut gérer les certificats, AC, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC
 - **Auditeur** : Accès en lecture seule à toutes les données opérationnelles pour la conformité et l'audit
-- **Lecteur** : Accès en lecture seule aux certificats, CA et modèles
+- **Lecteur** : Accès en lecture seule aux certificats, AC et modèles
 
 ### Rôles personnalisés
 Créez des rôles avec des permissions granulaires sur la page **RBAC**.

@@ -14,10 +14,16 @@ from dotenv import load_dotenv
 from config.paths import env_file as _config_env_file
 from utils.db_url import is_postgres_url, postgres_engine_options, sqlalchemy_url
 
+
+def load_env_files():
+    """ucm.env, then a local .env; a variable already in the environment wins, so the
+    OPENSSL_MODULES the -fips entrypoint pinned after its module check stays."""
+    load_dotenv(_config_env_file())  # System config (DEB/RPM), moved by UCM_CONFIG_DIR
+    load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
+
+
 # Load environment variables FIRST (before using them)
-# Try multiple locations for .env files
-load_dotenv(_config_env_file())  # System config (DEB/RPM), moved by UCM_CONFIG_DIR
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
+load_env_files()
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent

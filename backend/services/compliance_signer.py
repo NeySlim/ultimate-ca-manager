@@ -39,6 +39,23 @@ def softhsm_provider(provider):
     return softhsm_config(provider.type, provider.get_config(), provider.name)
 
 
+# PKCS#11 modules of a smart card reader attached to one host, matched in the module file name, and
+# the name the HA refusal gives each (utils.ha); any other PKCS#11 module is assumed reachable from every node
+LOCAL_READER_MODULES = {
+    'opensc': 'OpenSC',
+    'ykcs11': 'YubiKey PIV',
+}
+
+
+def local_reader_provider(provider):
+    """Whether an HSM provider row opens a smart card reader attached to one host (LOCAL_READER_MODULES)."""
+    if provider is None or provider.type != 'pkcs11':
+        return False
+    module = str((provider.get_config() or {}).get('module_path') or '')
+    name = module.replace('\\', '/').rsplit('/', 1)[-1].lower()
+    return any(marker in name for marker in LOCAL_READER_MODULES)
+
+
 # Providers whose keys are all in hardware; a cloud key says so key by key
 _HARDWARE_PROVIDERS = ('pkcs11', 'aws-cloudhsm')
 _CLOUD_PROVIDERS = ('azure-keyvault', 'google-kms')

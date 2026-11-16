@@ -14,6 +14,7 @@ import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, mldsa, rsa
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from cryptography.x509.oid import NameOID
 
 import fips_mode
@@ -377,7 +378,7 @@ class TestSshAndHsm:
                 return False
 
             def sign(self, *args, **kwargs):
-                return b'signature'
+                return _SIGNATURE
 
         monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: _Stub()))
         pq = mldsa.MLDSA65PrivateKey.generate().public_key().public_bytes(
@@ -397,11 +398,15 @@ class TestSshAndHsm:
                 with pytest.raises(FipsRestricted, match='^ML-DSA-65 keys not available in FIPS mode$'):
                     HsmService.sign(key.id, b'tbs')
                 monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
-                assert HsmService.sign(key.id, b'tbs') == b'signature'
+                assert HsmService.sign(key.id, b'tbs') == _SIGNATURE
             finally:
                 db.session.delete(key)
                 db.session.delete(provider)
                 db.session.commit()
+
+
+# A well-formed DER ECDSA value: HsmService.sign decodes what an EC key's provider returns
+_SIGNATURE = encode_dss_signature(1, 1)
 
 
 def _pem(public_key):
@@ -426,7 +431,7 @@ class _SigningStub:
         return False
 
     def sign(self, *args, **kwargs):
-        return b'signature'
+        return _SIGNATURE
 
 
 @pytest.fixture
@@ -483,7 +488,7 @@ class TestHsmSigningInFipsMode:
         with pytest.raises(FipsRestricted, match=f'^{name} keys not available in FIPS mode$'):
             HsmService.sign(key.id, b'tbs', hash_algorithm='sha256')
         monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
-        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
+        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == _SIGNATURE
 
     @pytest.mark.parametrize('algorithm,bits', [
         ('RSA-2048', 2048), ('RSA-3072', 3072), ('RSA-4096', 4096), ('RSA-8192', 8192),
@@ -498,14 +503,14 @@ class TestHsmSigningInFipsMode:
         else:
             public = _ec_public({256: ec.SECP256R1, 384: ec.SECP384R1, 521: ec.SECP521R1}[bits]())
         key = hsm_signing_key(algorithm, _pem(public))
-        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
+        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == _SIGNATURE
 
     @pytest.mark.parametrize('label', ['RSA-8192', 'RSA 16384', 'RSA-2050'])
     def test_an_approved_rsa_label_signs_without_a_public_key(self, monkeypatch, hsm_signing_key,
                                                                fips_on, label):
         from services.hsm import HsmService
         key = hsm_signing_key(label, None)
-        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
+        assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == _SIGNATURE
 
     @pytest.mark.parametrize('label,bits,signs', [
         ('RSA-8192', 2048, True), ('UNKNOWN', 3072, True), ('RSA-2048', 1024, False),
@@ -523,7 +528,7 @@ class TestHsmSigningInFipsMode:
         monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: _Publishing()))
         key = hsm_signing_key(label, None)
         if signs:
-            assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == b'signature'
+            assert HsmService.sign(key.id, b'tbs', hash_algorithm='sha256') == _SIGNATURE
         else:
             with pytest.raises(FipsRestricted, match=f'^RSA {bits} keys not available in FIPS mode$'):
                 HsmService.sign(key.id, b'tbs', hash_algorithm='sha256')

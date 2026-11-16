@@ -38,7 +38,7 @@ def furnished_user(app, create_user):
     with app.app_context():
         user = User.query.filter_by(username='zzrestore-columns').first()
         user.full_name = 'Restore Columns'
-        user.totp_secret = 'ZZTOTPSECRET234567'
+        user.totp_secret = 'ZZRESTORECOLUMNSTOTPSECRET234567'
         user.mfa_enabled = True
         user.totp_confirmed = True
         user.backup_codes = '["code-one", "code-two"]'

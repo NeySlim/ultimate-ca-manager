@@ -369,3 +369,61 @@ def test_merge_with_crl_numbers_on_both_sides_keeps_the_highest(app):
         db.session.expire_all()
         assert db.session.get(CA, dupe_id) is None
         assert sorted(m.crl_number for m in CRLMetadata.query.filter_by(ca_id=keeper_id)) == [1, 2, 3]
+
+
+def _hsm_key(public_key):
+    import json
+    from models.hsm import HsmKey, HsmProvider
+    tag = uuid.uuid4().hex[:8]
+    provider = HsmProvider(type='pkcs11', name=f'dedup-{tag}',
+                           config=json.dumps({'module_path': '/opt/vendor/lib/libvendor.so'}))
+    db.session.add(provider)
+    db.session.flush()
+    row = HsmKey(provider_id=provider.id, key_identifier=f'k-{tag}', label=f'k-{tag}',
+                 algorithm='EC-P256', key_type='asymmetric', purpose='signing',
+                 public_key_pem=public_key.public_bytes(
+                     serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode())
+    db.session.add(row)
+    db.session.commit()
+    return row.id
+
+
+@pytest.mark.parametrize('hsm_on', ['backed-unlinked', 'both-linked'])
+def test_merge_carries_the_duplicates_hsm_key_to_the_keeper(app, hsm_on):
+    """The HSM key of a merged duplicate moves to the keeper, never left with the deleted row."""
+    key_a, key_b = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    signed = _cert(key_b, f'HSM Sub {hsm_on}', key_a, 'HSM Parent')
+    with app.app_context():
+        parent = db.session.get(CA, _row(_cert(key_a, 'HSM Parent'), key_a))
+        hsm_key_id = _hsm_key(key_b.public_key())
+        # The linked row wins the keeper's place; the HSM-backed one is merged into it
+        linked = _row(signed, caref=parent.refid)
+        backed = _row(signed, caref=parent.refid if hsm_on == 'both-linked' else None)
+        db.session.get(CA, backed).hsm_key_id = hsm_key_id
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        remaining = [i for i in (linked, backed) if db.session.get(CA, i) is not None]
+        assert len(remaining) == 1
+        assert db.session.get(CA, remaining[0]).hsm_key_id == hsm_key_id
+
+
+def test_an_hsm_backed_keeper_takes_no_software_key_from_a_duplicate(app):
+    key_a, key_b = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    signed = _cert(key_b, 'HSM Keeper Sub', key_a, 'HSM Keeper Parent')
+    with app.app_context():
+        parent = db.session.get(CA, _row(_cert(key_a, 'HSM Keeper Parent'), key_a))
+        hsm_key_id = _hsm_key(key_b.public_key())
+        software = _row(signed, key_b)  # the older row, met first by the merge
+        backed = _row(signed, caref=parent.refid)
+        db.session.get(CA, backed).hsm_key_id = hsm_key_id
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, software) is None
+        kept = db.session.get(CA, backed)
+        assert kept.hsm_key_id == hsm_key_id and not kept.prv

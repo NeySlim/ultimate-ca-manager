@@ -146,7 +146,20 @@ class User(db.Model):
         new = db.session.execute(select(User.session_version).where(User.id == self.id)).scalar_one()
         set_committed_value(self, 'session_version', new)
         self._sessions_bump = (new - 1, new)
-    
+
+    def count_failed_login(self) -> int:
+        """Count one failed login in SQL and return the stored count; the caller commits.
+
+        Concurrent failures on any node add up: the UPDATE holds the row (PostgreSQL)
+        or write (SQLite) lock until the commit, so the read sees this failure's count."""
+        db.session.execute(
+            update(User).where(User.id == self.id)
+            .values(failed_logins=func.coalesce(User.failed_logins, 0) + 1)
+            .execution_options(synchronize_session=False))
+        count = db.session.execute(select(User.failed_logins).where(User.id == self.id)).scalar_one()
+        set_committed_value(self, 'failed_logins', count)
+        return count
+
     def check_password(self, password: str) -> bool:
         """Verify password; a hash of an older method is replaced on success
         and saved by the caller's next commit."""

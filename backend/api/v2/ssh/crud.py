@@ -4,8 +4,12 @@ SSH CA CRUD routes — list, get, import, create, update, delete.
 
 from flask import request, g
 
-from auth.unified import require_auth
+from auth.unified import hsm_binding_refusal, require_auth
 from fips_mode import FipsRestricted
+from services.hsm.base_provider import (HsmConfigError, HsmConnectionError, HsmError,
+                                        HsmKeyNotFoundError)
+from services.hsm.key_binding import HsmKeyBound
+from utils.ha import HaRestricted
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import parse_request_pagination
 from services.ssh_ca_service import SSHCAService, normalize_key_type
@@ -24,6 +28,28 @@ def _allowed_principals(data):
     if not isinstance(value, list) or not all(isinstance(p, str) and p.strip() for p in value):
         raise ValueError('allowed_principals must be a list of non-empty strings')
     return [p.strip() for p in value]
+
+
+def _hsm_key_id(value):
+    """A JSON integer above zero, never a boolean, a float or a string."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError('hsm_key_id must be a positive integer')
+    return value
+
+
+# HsmError subclasses at creation: (status, message); the provider's own text goes to the log
+_HSM_ERRORS = (
+    (HsmConnectionError, 503, 'The HSM provider of this key cannot be reached'),
+    (HsmKeyNotFoundError, 409, 'The key is no longer on its HSM token: synchronize the provider'),
+    (HsmConfigError, 400, 'The HSM provider of this key is misconfigured'),
+)
+
+
+def _hsm_error_response(e):
+    for kind, status, message in _HSM_ERRORS:
+        if isinstance(e, kind):
+            return error_response(message, status)
+    return error_response('The HSM refused the operation', 502)
 
 
 def _opt_in(data, name):
@@ -171,30 +197,50 @@ def create_ssh_ca():
             return error_response('Description is required', 400)
 
         ca_type = (data.get('ca_type') or 'user').strip().lower()
-        key_type = normalize_key_type(data.get('key_type'))
 
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
-        ca = SSHCAService.create_ca(
-            descr=descr,
-            ca_type=ca_type,
-            key_type=key_type,
-            username=username,
-            default_ttl=data.get('default_ttl'),
-            max_ttl=data.get('max_ttl', 0),
-            default_extensions=data.get('default_extensions'),
-            allowed_principals=_allowed_principals(data),
-            allow_any_principal=_opt_in(data, 'allow_any_principal'),
-            allow_custom_key_id=_opt_in(data, 'allow_custom_key_id'),
-            comment=data.get('comment'),
-        )
+        hsm_key_id = data.get('hsm_key_id')
+        if hsm_key_id is not None:
+            refusal = hsm_binding_refusal('an SSH CA')
+            if refusal:
+                return refusal
+            hsm_key_id = _hsm_key_id(hsm_key_id)
+            ca = SSHCAService.import_hsm_ca(
+                descr=descr,
+                ca_type=ca_type,
+                hsm_key_id=hsm_key_id,
+                username=username,
+                default_ttl=data.get('default_ttl'),
+                max_ttl=data.get('max_ttl', 0),
+                default_extensions=data.get('default_extensions'),
+                allowed_principals=_allowed_principals(data),
+                allow_any_principal=_opt_in(data, 'allow_any_principal'),
+                allow_custom_key_id=_opt_in(data, 'allow_custom_key_id'),
+                comment=data.get('comment'),
+            )
+        else:
+            key_type = normalize_key_type(data.get('key_type'))
+            ca = SSHCAService.create_ca(
+                descr=descr,
+                ca_type=ca_type,
+                key_type=key_type,
+                username=username,
+                default_ttl=data.get('default_ttl'),
+                max_ttl=data.get('max_ttl', 0),
+                default_extensions=data.get('default_extensions'),
+                allowed_principals=_allowed_principals(data),
+                allow_any_principal=_opt_in(data, 'allow_any_principal'),
+                allow_custom_key_id=_opt_in(data, 'allow_custom_key_id'),
+                comment=data.get('comment'),
+            )
 
         AuditService.log_action(
             action='ssh_ca_created',
             resource_type='ssh_ca',
             resource_id=str(ca.id),
             resource_name=ca.descr,
-            details=f'SSH CA "{ca.descr}" created ({ca_type}, {key_type})',
+            details=f'SSH CA "{ca.descr}" created ({ca_type}, {ca.key_type}{_hsm_detail(ca)})',
             success=True,
             username=username,
         )
@@ -210,13 +256,30 @@ def create_ssh_ca():
             message='SSH CA created successfully'
         )
 
-    except FipsRestricted:
-        raise  # the app handler answers 400 with the FIPS problem type
+    except (FipsRestricted, HaRestricted):
+        raise  # the app handlers answer 400 (FIPS) and 409 (ha_mode)
+    except HsmKeyBound as e:
+        db.session.rollback()
+        return error_response(str(e), 409)
     except ValueError as e:
+        db.session.rollback()
         return error_response(str(e), 400)
+    except HsmError as e:
+        db.session.rollback()
+        logger.warning(f"SSH CA creation on an HSM key failed: {type(e).__name__}: {e}")
+        return _hsm_error_response(e)
     except Exception as e:
         logger.error(f"Failed to create SSH CA: {e}")
         return error_response('Failed to create SSH CA', 500)
+
+
+def _hsm_detail(ca):
+    """', HSM key #3 'label' on provider 'name', SHA256:...' for an HSM CA's audit line."""
+    if ca.key_source != 'hsm':
+        return ''
+    key = ca.hsm_key
+    provider = key.provider.name if key is not None and key.provider is not None else ''
+    return f", HSM key #{ca.hsm_key_id} '{key.label if key else ''}' on provider '{provider}', {ca.fingerprint}"
 
 
 @bp.route('/api/v2/ssh/cas/<int:ca_id>', methods=['PUT'])
