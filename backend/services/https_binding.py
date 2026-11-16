@@ -332,6 +332,11 @@ def settle_restored_https():
                 "HTTPS: the restored certificate could not be written to %s (%s); the "
                 "certificate on disk is kept and the restored one is not tried again",
                 cert_path, attempt.get('error') or 'the file on disk differs')
+    # Settled with the pair: a later restore of the same pair waits for its own attempt
+    try:
+        (Path(Config.DATA_DIR) / HTTPS_RESTORED_ATTEMPT).unlink(missing_ok=True)
+    except OSError as e:
+        logger.warning("HTTPS: the restored certificate attempt could not be removed (%s)", e)
     shared_files.drop_file(shared_files.HTTPS_RESTORED)
     db.session.commit()
     return outcome

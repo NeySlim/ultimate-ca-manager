@@ -237,3 +237,21 @@ def test_an_archive_written_without_the_https_key_restores_and_says_so(app, clea
             path.unlink(missing_ok=True)
         for path, content in saved.items():
             path.write_bytes(content)
+
+
+def test_a_second_restore_of_the_same_pair_waits_for_its_own_attempt(app, clean, tmp_path,
+                                                                     monkeypatch):
+    """The attempt is settled with the pair: restoring the same archive again after the
+    certificate was replaced by hand is not read as already tried."""
+    from boot_config import HTTPS_RESTORED_ATTEMPT
+    from services.https_binding import settle_restored_https
+    with app.app_context():
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+        _attempt(tmp_path, monkeypatch)
+        assert settle_restored_https() == 'applied'
+        assert not (tmp_path / HTTPS_RESTORED_ATTEMPT).exists()
+
+        (tmp_path / 'https_cert.pem').write_text('REPLACED BY HAND\n')
+        _store(shared_files.HTTPS_RESTORED, CERT, KEY)
+        assert settle_restored_https() == 'pending'
+        assert _stored(shared_files.HTTPS_RESTORED)
