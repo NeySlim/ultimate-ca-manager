@@ -36,9 +36,14 @@ def clear_tls_errors_before_io(cls=gevent.ssl.SSLSocket):
     if cls.__dict__.get('_ucm_clears_tls_errors'):
         return True
     calls = ('read', 'write', 'send', 'do_handshake', 'unwrap')
-    clear = _openssl_clear_error()
     # All or nothing: a class missing one of them (another gevent) is left as it is
-    if clear is None or not all(hasattr(cls, name) for name in calls + ('_wait',)):
+    missing = [name for name in calls + ('_wait',) if not hasattr(cls, name)]
+    if missing:
+        logger.warning("gevent TLS socket lacks %s: TLS errors may spread between connections",
+                       ', '.join(missing))
+        return False
+    clear = _openssl_clear_error()
+    if clear is None:
         logger.warning("OpenSSL error queue not reachable: TLS errors may spread between connections")
         return False
 
