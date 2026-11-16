@@ -22,7 +22,7 @@ from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
 from . import saml_sp
-from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
+from .helpers import _clear_ldap_failed_attempts, _ldap_attempt_failed, _release_ldap_attempt, _reserve_ldap_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
 @limiter.limit("5/minute")
@@ -72,8 +72,14 @@ def ldap_login():
     if not provider.enabled:
         return error_response("LDAP provider is disabled", 400)
 
-    # Checked before the bind, so a locked account answers like a wrong password
-    if _check_ldap_lockout(username):
+    # Counted before the bind, so a locked account answers like a wrong password and a
+    # burst on any node binds at most max_login_attempts times.
+    try:
+        local, rank = _reserve_ldap_attempt(username)
+    except Exception as e:
+        logger.error(f"Failed to record LDAP login attempt for {username}: {e}", exc_info=True)
+        return error_response("Failed to record login attempt", 500)
+    if local is not None and rank is None:
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -90,6 +96,7 @@ def ldap_login():
         if error == 'account_disabled':
             # Account exists but is disabled in LDAP — don't count as
             # failed login attempt (not a wrong password).
+            _release_ldap_attempt(local)
             AuditService.log_action(
                 action='login_failure',
                 resource_type='user',
@@ -102,6 +109,7 @@ def ldap_login():
         if error == 'group_denied':
             # Authenticated but not in required groups — don't count as
             # failed login attempt.
+            _release_ldap_attempt(local)
             AuditService.log_action(
                 action='login_failure',
                 resource_type='user',
@@ -111,8 +119,8 @@ def ldap_login():
             )
             return error_response("Access denied: you are not a member of the required group(s)", 403)
 
-        # Generic auth failure (wrong password, etc.)
-        _record_ldap_failed_attempt(username)
+        # Generic auth failure (wrong password, etc.): the reserved attempt stays counted
+        _ldap_attempt_failed(local, rank)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -132,6 +140,7 @@ def ldap_login():
     )
 
     if not user:
+        _release_ldap_attempt(local)
         # The password is proved by now, so the refusal may say why.
         if error_code == USERNAME_CONFLICT:
             return error_response(
@@ -153,6 +162,7 @@ def ldap_login():
 
     # SECURITY: Block disabled accounts (admin can disable LDAP users locally)
     if not user.active:
+        _release_ldap_attempt(local)
         logger.warning(f"LDAP login blocked: user {username} is disabled")
         AuditService.log_action(
             action='login_failure',
@@ -165,8 +175,12 @@ def ldap_login():
         )
         return error_response("This account has been disabled", 403)
 
-    # Clear failed attempts on successful login
-    _clear_ldap_failed_attempts(username)
+    # The bind opened the account it was counted on: its count and lock are cleared.
+    # Counted on another account of the same name, the attempt is only given back.
+    if local is not None and local.id == user.id:
+        _clear_ldap_failed_attempts(local)
+    else:
+        _release_ldap_attempt(local)
 
     # Create or update session (deduplicate like OAuth2/SAML)
     session_id = user_info['dn']

@@ -115,6 +115,8 @@ Content-Type: application/json
 }
 ```
 
+**Lockout.** Each attempt on a known, active account is counted before its password is checked, here and at `POST /api/v2/sso/ldap/login`, on every node: after `max_login_attempts` attempts without a success, the next ones answer 401 `Invalid credentials` without checking the password, the right one included, until `lockout_duration` has passed. A success resets the count. When the count cannot be stored, the login answers 500 `Failed to record login attempt`.
+
 **Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account when its password was generated, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
 
 ### Login with WebAuthn

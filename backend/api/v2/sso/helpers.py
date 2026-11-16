@@ -189,24 +189,6 @@ def _get_ldap_lockout_settings():
     return _get_lockout_settings()
 
 
-def _check_ldap_lockout(username):
-    """Check if account is locked due to failed LDAP attempts."""
-    user = User.query.filter_by(username=username).first()
-    if not user:
-        return False
-    if user.locked_until:
-        if utc_now() < user.locked_until:
-            return True
-        user.locked_until = None
-        user.failed_logins = 0
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to clear LDAP lockout: {e}")
-    return False
-
-
 def notify_account_locked(username):
     """Send the account_locked security alert; never fails the login."""
     try:
@@ -221,37 +203,54 @@ def notify_account_locked(username):
         logger.warning(f"Failed to send account_locked alert for {username}: {e}")
 
 
-def _record_ldap_failed_attempt(username):
-    """Record a failed LDAP login attempt."""
+def _reserve_ldap_attempt(username):
+    """Count one LDAP attempt before the bind, on the local account of this name.
+
+    Returns (account, rank): account None when no local account has the name (nothing
+    is counted), rank None when it is locked. Raises, rolled back, when the count fails."""
     user = User.query.filter_by(username=username).first()
     if not user:
-        return
+        return None, None
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()
     try:
-        locked = user.count_failed_login() >= max_attempts
-        if locked:
-            user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
-            logger.warning(f"LDAP account locked for {username} after {max_attempts} failed attempts")
+        rank = user.reserve_login_attempt(max_attempts, lockout_seconds)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return user, rank
+
+
+def _ldap_attempt_failed(user, rank):
+    """A refused bind: the one attempt whose rank armed the lock reports it."""
+    max_attempts, _seconds = _get_ldap_lockout_settings()
+    if user is not None and rank == max_attempts:
+        logger.warning(f"LDAP account {user.username} locked after {max_attempts} failed attempts")
+        notify_account_locked(user.username)
+
+
+def _release_ldap_attempt(user):
+    """The bind proved the password but no session opens: the attempt does not count."""
+    if user is None:
+        return
+    try:
+        user.release_login_attempt(_get_ldap_lockout_settings()[0])
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to record LDAP failed attempt for {username}: {e}")
+        logger.error(f"Failed to release LDAP attempt for {user.username}: {e}")
+
+
+def _clear_ldap_failed_attempts(user):
+    """Clear the stored count and lock of the account a successful bind opens."""
+    if user is None:
         return
-    if locked:
-        notify_account_locked(username)
-
-
-def _clear_ldap_failed_attempts(username):
-    """Clear failed attempt counters on successful login."""
-    user = User.query.filter_by(username=username).first()
-    if user and (user.failed_logins or user.locked_until):
-        user.failed_logins = 0
-        user.locked_until = None
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to clear LDAP failed attempts for {username}: {e}")
+    try:
+        user.clear_failed_logins()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to clear LDAP failed attempts for {user.username}: {e}")
 
 
 # SAML attributes read for group membership when the provider's attribute

@@ -147,18 +147,66 @@ class User(db.Model):
         set_committed_value(self, 'session_version', new)
         self._sessions_bump = (new - 1, new)
 
-    def count_failed_login(self) -> int:
-        """Count one failed login in SQL and return the stored count; the caller commits.
+    def reserve_login_attempt(self, max_attempts: int, lockout_seconds: int):
+        """Count one login attempt before its secret is checked: its rank, or None when
+        the account is locked. The caller commits before checking the secret.
 
-        Concurrent failures on any node add up: the UPDATE holds the row (PostgreSQL)
-        or write (SQLite) lock until the commit, so the read sees this failure's count."""
+        One UPDATE decides on every node: at most ``max_attempts`` attempts get a rank,
+        the one reaching it arms the lock, and an expired lock restarts the count at 1."""
+        from datetime import timedelta
+        from sqlalchemy import and_, case, or_
+        now = utc_now()
+        expired = and_(User.locked_until.is_not(None), User.locked_until <= now)
+        count = case((expired, 1), else_=func.coalesce(User.failed_logins, 0) + 1)
+        stmt = (update(User)
+                .where(User.id == self.id,
+                       or_(User.locked_until.is_(None), User.locked_until <= now))
+                .values(failed_logins=count,
+                        locked_until=case((count >= max_attempts,
+                                           now + timedelta(seconds=lockout_seconds)), else_=None))
+                .execution_options(synchronize_session=False))
+        columns = (User.failed_logins, User.locked_until)
+        if db.session.get_bind().dialect.update_returning:
+            row = db.session.execute(stmt.returning(*columns)).one_or_none()
+        else:
+            # No RETURNING: the UPDATE holds the write lock until the commit, so the read
+            # sees this attempt's count. No row changed = account locked.
+            row = None
+            if db.session.execute(stmt.execution_options(preserve_rowcount=True)).rowcount:
+                row = db.session.execute(select(*columns).where(User.id == self.id)).one()
+        if row is None:
+            return None
+        set_committed_value(self, 'failed_logins', row[0])
+        set_committed_value(self, 'locked_until', row[1])
+        return row[0] if row[0] <= max_attempts else None
+
+    def release_login_attempt(self, max_attempts: int):
+        """Give back a reserved attempt whose secret was proved but opened no session,
+        and the lock it armed; the caller commits."""
+        from sqlalchemy import case
+        left = func.coalesce(User.failed_logins, 0) - 1
+        db.session.execute(
+            update(User).where(User.id == self.id, User.failed_logins > 0)
+            .values(failed_logins=left,
+                    locked_until=case((left < max_attempts, None), else_=User.locked_until))
+            .execution_options(synchronize_session=False))
+        self._reload_lockout()
+
+    def clear_failed_logins(self):
+        """Reset the stored count and lock after a success, whatever this copy holds;
+        the caller commits."""
         db.session.execute(
             update(User).where(User.id == self.id)
-            .values(failed_logins=func.coalesce(User.failed_logins, 0) + 1)
+            .values(failed_logins=0, locked_until=None)
             .execution_options(synchronize_session=False))
-        count = db.session.execute(select(User.failed_logins).where(User.id == self.id)).scalar_one()
-        set_committed_value(self, 'failed_logins', count)
-        return count
+        set_committed_value(self, 'failed_logins', 0)
+        set_committed_value(self, 'locked_until', None)
+
+    def _reload_lockout(self):
+        row = db.session.execute(
+            select(User.failed_logins, User.locked_until).where(User.id == self.id)).one()
+        set_committed_value(self, 'failed_logins', row[0])
+        set_committed_value(self, 'locked_until', row[1])
 
     def check_password(self, password: str) -> bool:
         """Verify password; a hash of an older method is replaced on success
