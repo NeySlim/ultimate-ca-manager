@@ -128,6 +128,10 @@ describe('buttons of the HSM, certificate and template guides in every language'
     expect(guide(lang, 'hsm')).toContain(`**${t.common.generate}**`)
     expect(guide(lang, 'certificates')).toContain(`**${t.certificates.issueCertificate}**`)
     expect(guide(lang, 'templates')).toContain(`**${t.common.copy}**`)
+    // The key generation modal opens with Generate; the former labels are gone from the steps.
+    const oldLabel = { en: 'Generate Key', fr: 'Générer une clé', ru: 'Сформировать ключ HSM', zh: '生成密钥' }[lang]
+    expect(guide(lang, 'hsm')).not.toContain(`**${oldLabel}**`)
+    if (lang === 'en') expect(guide(lang, 'certificates')).not.toMatch(/Click \*\*Issue\*\*/)
   })
   it.each(['en', 'fr', 'ru', 'zh'])('%s says the forced password prompt has Logout as its only other button', (lang) => {
     const t = locales[`../../i18n/locales/${lang}.json`].default
