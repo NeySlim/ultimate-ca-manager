@@ -136,11 +136,57 @@ def test_a_renewal_overtaken_midway_says_renewed(app, tmp_path, monkeypatch, ste
                     outcome = (e.status, e.message)
             db.session.remove()
     assert fired
-    if trigger == 'auto':
-        assert outcome == (False, 'Certificate was renewed by another request'), outcome
+    if trigger == 'auto':  # a race the next pass retries: skipped, not failed
+        assert outcome == (None, 'Certificate was renewed by another request'), outcome
     else:
         assert outcome is not None and outcome[0] == 409, outcome
         assert 'renewed by another request' in outcome[1], outcome
+
+
+def _auto_pass(app, monkeypatch, cert_id):
+    """One scheduler pass over ``cert_id``: ``(stats, failure mails, failure audits)``."""
+    from models import AuditLog
+    from services.auto_renewal_service import AutoRenewalService as svc
+    sent = []
+    monkeypatch.setattr(svc, '_send_failure_notification', staticmethod(lambda stats: sent.append(stats)))
+    monkeypatch.setattr(svc, '_held_for_approval', staticmethod(lambda cert, already_queued: None))
+    monkeypatch.setattr(svc, '_publish_crls', staticmethod(lambda carefs: None))
+    with app.app_context():
+        svc.set_renewal_config({'enabled': True, 'notify_on_failure': True})
+        monkeypatch.setattr(svc, 'get_certificates_for_renewal',
+                            staticmethod(lambda: [db.session.get(Certificate, cert_id)]))
+        stats = svc.run_auto_renewal()
+        audits = AuditLog.query.filter_by(action='certificate.auto_renewal_failed').count()
+        db.session.remove()
+    return stats, sent, audits
+
+
+def test_a_scheduled_renewal_overtaken_is_skipped_without_a_failure(app, tmp_path, monkeypatch):
+    from tests.test_backup_cross_installation import _bound_to
+    with _bound_to(app, f"sqlite:///{tmp_path / 'auto-overtaken.db'}"):
+        cert_id, _, _ = _leaf(app)
+        fired = _overtaken_after(monkeypatch, app, cert_id, '_reread')
+        stats, sent, audits = _auto_pass(app, monkeypatch, cert_id)
+    assert fired
+    assert (stats['renewed'], stats['failed'], stats['skipped']) == (0, 0, 1), stats
+    assert (sent, audits) == ([], 0)
+
+
+def test_a_scheduled_renewal_refused_otherwise_still_fails(app, tmp_path, monkeypatch):
+    """Only the two races are skipped: any other 409 is a failure, mailed and audited."""
+    from services import auto_renewal_service
+    from services.cert.renewal import RenewalError
+    from tests.test_backup_cross_installation import _bound_to
+
+    def refused(*args, **kwargs):
+        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
+
+    with _bound_to(app, f"sqlite:///{tmp_path / 'auto-refused.db'}"):
+        cert_id, _, _ = _leaf(app)
+        monkeypatch.setattr(auto_renewal_service, 'renew_certificate_in_place', refused)
+        stats, sent, audits = _auto_pass(app, monkeypatch, cert_id)
+    assert (stats['failed'], stats['skipped']) == (1, 0), stats
+    assert len(sent) == 1 and audits == 1
 
 
 # ---- a related pair (RFC 9763): the partner is judged as stored now ---------------------
@@ -421,7 +467,7 @@ def test_a_partner_taken_while_the_members_were_chosen_refuses_the_renewal(
             with pytest.raises(renewal.RenewalError) as e:
                 renewal.renew_certificate_in_place(a, username='admin', regenerate_crl=False)
             monkeypatch.undo()
-            assert e.value.status == 409 and 'related certificate' in e.value.message.lower()
+            assert e.value.status == 409 and 'related' in e.value.message.lower() and e.value.overtaken
             db.session.expire_all()
             for row_id, serial in serials.items():
                 assert db.session.get(Certificate, row_id).serial_number == serial
@@ -461,6 +507,7 @@ def test_a_partner_that_left_while_the_members_were_chosen_refuses_the_renewal(
                 renewal.renew_certificate_in_place(a, username='admin', regenerate_crl=False)
             monkeypatch.undo()
             assert e.value.status == 409 and e.value.message.startswith(f'Related certificate {b_id}: ')
+            assert e.value.overtaken
             db.session.expire_all()
             assert db.session.get(Certificate, a_id).serial_number == serial
             db.session.remove()

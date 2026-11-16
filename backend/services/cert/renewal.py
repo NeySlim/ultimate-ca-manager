@@ -79,8 +79,13 @@ CURRENT_RELATED = object()
 SERIAL_UNSET = object()
 
 
-def _renewed_meanwhile_message(trigger: str) -> str:
-    return _retry_message('Certificate was renewed by another request', trigger)
+def _overtaken(what: str, trigger: str) -> 'RenewalError':
+    """The 409 of a renewal another request overtook: the next attempt reads the new state."""
+    return RenewalError(_retry_message(what, trigger), 409, overtaken=True)
+
+
+def _renewed_meanwhile(trigger: str) -> 'RenewalError':
+    return _overtaken('Certificate was renewed by another request', trigger)
 
 
 def _retry_message(what: str, trigger: str) -> str:
@@ -90,13 +95,15 @@ def _retry_message(what: str, trigger: str) -> str:
 
 class RenewalError(Exception):
     """A renewal refused or failed: ``status`` is the HTTP code to answer,
-    ``problem_type`` the FIPS problem type when FIPS mode refused it."""
+    ``problem_type`` the FIPS problem type when FIPS mode refused it, ``overtaken``
+    True when another request changed the row or its pair meanwhile (a retry may pass)."""
 
-    def __init__(self, message: str, status: int = 400, problem_type=None):
+    def __init__(self, message: str, status: int = 400, problem_type=None, overtaken=False):
         super().__init__(message)
         self.message = str(message)
         self.status = int(status)
         self.problem_type = problem_type
+        self.overtaken = bool(overtaken)
 
     def __str__(self) -> str:
         return self.message
@@ -223,7 +230,7 @@ def _refuse_recorded_revocation(cert: Certificate, ca, trigger: str) -> None:
     if stored is None:
         raise RenewalError('Certificate no longer exists', 404)
     if stored[0] != cert.serial_number:
-        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+        raise _renewed_meanwhile(trigger)
     raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
 
 
@@ -272,7 +279,7 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                 if is_cert:
                     raise
                 raise RenewalError(f'Related certificate {member.id}: {e.message}', e.status,
-                                   e.problem_type) from e
+                                   e.problem_type, e.overtaken) from e
             if pair and index == 0:
                 renewed_a = x509.load_pem_x509_certificate(staged_member['cert_pem'])
             staged_all.append(staged_member)
@@ -487,10 +494,9 @@ def _reread(cert, known_serial, trigger, was_archived=None, link=SERIAL_UNSET):
     if fresh is None:
         raise RenewalError('Certificate no longer exists', 404)
     if fresh.serial_number != expected or bool(fresh.archived) != was_archived:
-        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+        raise _renewed_meanwhile(trigger)
     if link is not SERIAL_UNSET and fresh.related_certificate_id != link:
-        raise RenewalError(_retry_message('Related certificate was changed by another request',
-                                          trigger), 409)
+        raise _overtaken('Related certificate was changed by another request', trigger)
     return fresh
 
 
@@ -744,7 +750,7 @@ def _take_serial(cert_id, old_serial, new_serial, trigger) -> None:
     taken = db.session.query(Certificate).filter(Certificate.id == cert_id, holds_old).update(
         {Certificate.serial_number: new_serial}, synchronize_session=False)
     if taken != 1:
-        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+        raise _renewed_meanwhile(trigger)
 
 
 def _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now) -> None:

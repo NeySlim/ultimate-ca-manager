@@ -198,7 +198,8 @@ class AutoRenewalService:
                 regenerate_crl=regenerate_crl, trigger='auto', known_serial=known_serial)
         except RenewalError as e:
             db.session.rollback()
-            if not AutoRenewalService._row_exists(cert_id):
+            # Gone, or overtaken by another request: the next pass reads the row anew
+            if e.overtaken or not AutoRenewalService._row_exists(cert_id):
                 logger.info(f"Auto-renewal skipped cert {cert_id}: {e.message}")
                 return None, e.message
             logger.warning(f"Auto-renewal of cert {cert_id} refused: {e.message}")
