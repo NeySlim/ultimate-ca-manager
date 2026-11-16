@@ -437,6 +437,23 @@ def test_ldap_rule_and_group_compare_ignoring_case_and_edge_spaces(env, monkeypa
     assert env.login(pid2, other)[0] == 403
 
 
+@pytest.mark.parametrize('rule,group', [('PKI  Admins', 'PKI Admins'), ('pki admins', 'PKI \t Admins'),
+                                        ('PKI\u00a0Admins', 'pki admins')])
+def test_ldap_compares_inner_space_runs_as_one_space(rule, group):
+    """caseIgnoreMatch: RFC 4517 §4.2.11 with RFC 4518 §2.2 and §2.6.1."""
+    from types import SimpleNamespace
+    from api.v2.sso.helpers import sso_admission, _resolve_mapped_roles, validate_role_mapping
+    p = SimpleNamespace(provider_type='ldap', role_mapping={rule: 'admin'}, default_role='viewer')
+    assert sso_admission(p, {'groups': [group]})
+    assert _resolve_mapped_roles(p, {'groups': [group]})[0] == 'admin'
+    assert not sso_admission(p, {'groups': ['PKIAdmins']})
+    assert validate_role_mapping({rule: 'admin', group: 'viewer'}, 'ldap')[1]
+    for other in ('oauth2', 'saml'):
+        q = SimpleNamespace(provider_type=other, role_mapping={rule: 'admin'}, default_role='viewer')
+        assert not sso_admission(q, {'groups': [group]})
+        assert validate_role_mapping({rule: 'admin', group: 'viewer'}, other)[1] is None
+
+
 @pytest.mark.parametrize('provider_type', ['oauth2', 'saml'])
 def test_oidc_and_saml_groups_stay_exact(provider_type):
     from types import SimpleNamespace
