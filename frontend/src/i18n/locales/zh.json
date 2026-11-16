@@ -1457,6 +1457,7 @@
       "relinkHelp": "选择此账户登录所用的提供商：选择其他提供商会将账户迁移过去，选择同一提供商会重置其 SSO 身份。下一次使用此用户名或邮箱通过该提供商登录时会绑定新身份。账户已有的密码会保留。",
       "removePassword": "Also remove its local password: the account then signs in through the provider only, and no password login opens it",
       "confirmRelink": "将 {{name}} 关联到 {{provider}}？其当前 SSO 身份将被清除，下一次通过该提供商登录时会绑定新身份。",
+      "relinkKeeps": "Its password, API keys, security keys and mTLS certificates stay: if the account now belongs to another person, revoke them yourself.",
       "confirmUnlink": "解除 {{name}} 的单点登录关联并转换回本地账户？",
       "unlinkSuccess": "{{name}} 已转换为本地账户",
       "unlinkFailed": "无法解除账户关联"

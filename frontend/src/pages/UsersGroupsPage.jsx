@@ -269,9 +269,9 @@ export default function UsersGroupsPage() {
     // An account already linked is moved, or its SSO identity reset: confirmed first.
     if (isLinked(linkTarget)) {
       const chosen = linkProviders.find(p => String(p.id) === String(linkProviderId))
-      const confirmed = await showConfirm(t('users.sso.confirmRelink', {
+      const confirmed = await showConfirm(`${t('users.sso.confirmRelink', {
         name: linkTarget.username, provider: chosen?.display_name || chosen?.name || '',
-      }), { title: t('users.sso.relink'), confirmText: t('users.sso.relink') })
+      })} ${t('users.sso.relinkKeeps')}`, { title: t('users.sso.relink'), confirmText: t('users.sso.relink') })
       if (!confirmed) return
     }
     setLinkSaving(true)

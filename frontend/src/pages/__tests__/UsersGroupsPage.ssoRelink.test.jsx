@@ -130,7 +130,7 @@ describe('UsersGroupsPage Link to SSO on a linked account', () => {
     await choose(2)
     fireEvent.click(screen.getByRole('button', { name: /users\.sso\.relink$/ }))
     await waitFor(() => expect(mocks.showConfirm).toHaveBeenCalledWith(
-      'users.sso.confirmRelink:IdP B', expect.anything()))
+      'users.sso.confirmRelink:IdP B users.sso.relinkKeeps', expect.anything()))
     await waitFor(() => expect(mocks.linkSso).toHaveBeenCalledWith(7, { provider_id: 2, remove_password: false }))
   })
 

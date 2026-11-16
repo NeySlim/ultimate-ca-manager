@@ -465,7 +465,8 @@ def test_the_ldap_door_says_the_email_conflict_without_naming_the_account(app, p
 
 @pytest.mark.parametrize('state, says', [
     ('local_password', ['is a local account', 'Link to SSO attaches it']),
-    ('other_provider', ["is linked to provider '{a}'", 'Link to SSO moves it']),
+    ('other_provider', ["is linked to provider '{a}'", 'Link to SSO moves it',
+                        "after which '{a}' no longer opens it"]),
     ('same_provider_other_identity', ["bound to another identity of '{b}' ('sub-before')",
                                       'Link to SSO resets its identity']),
     ('orphan_unknown_idp', ['has no provider (its IdP is unknown)', 'Link to SSO attaches it']),

@@ -31,8 +31,10 @@ def describe_conflict(user, provider):
     """(state, remedy) of an account of that name ``provider`` may not open."""
     target = repr(provider.name)
     if user.sso_provider_id is not None and user.sso_provider_id != provider.id:
-        return (f"is linked to provider {_provider_name(user.sso_provider_id)!r}",
-                f"if it is the same person, Link to SSO moves it to {target}")
+        former = _provider_name(user.sso_provider_id)
+        return (f"is linked to provider {former!r}",
+                f"if it is the same person, Link to SSO moves it to {target}, "
+                f"after which {former!r} no longer opens it")
     if user.sso_provider_id == provider.id:
         if user.sso_external_id:
             return (f"is bound to another identity of {target} ({bounded(user.sso_external_id)!r})",
