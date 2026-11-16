@@ -1077,6 +1077,11 @@ def create_app(config_name=None):
         check_pending_serial_index(app)
     except Exception as e:
         app.logger.debug(f"Serial index check skipped: {e}")
+    try:
+        from utils.trust_pem import report_removed_keys
+        report_removed_keys(app)
+    except Exception as e:
+        app.logger.warning(f"Trust store key report skipped: {e}")
 
     # Auto-register SoftHSM provider if Docker entrypoint initialized a token
     try:

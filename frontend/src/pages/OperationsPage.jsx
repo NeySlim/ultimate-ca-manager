@@ -22,7 +22,7 @@ import {
 import { REVOCATION_REASONS } from '../components/RevokeCertificateModal'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, extractCN, cn , downloadBlob} from '../lib/utils'
+import { formatDate, extractCN, cn, downloadBlob, warnSkippedExport } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
 import { bulkLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../lib/caSelection'
@@ -507,6 +507,7 @@ export default function OperationsPage() {
       const ext = { pem: 'pem', pkcs7: 'p7b', p7b: 'p7b' }[format] || format
       downloadBlob(blob, `${filename}.${ext}`)
       showSuccess(t('importExport.export.certificatesExported'))
+      warnSkippedExport(blob, t, showWarning)
     } catch (error) {
       showError(error.message || t('importExport.export.exportFailed'))
     }
@@ -707,6 +708,7 @@ export default function OperationsPage() {
                 downloadBlob(blob, `${bulkResourceType}_export.pem`)
               }
               showSuccess(t('operations.bulkSuccess', { action: 'export', count: ids.length, defaultValue: `Exported ${ids.length} items` }))
+              warnSkippedExport(blob, t, showWarning)
             } catch (e) { showError(e.message || 'Export failed') }
           }}>
             <DownloadSimple size={14} /> {t('export.title', 'Export')} PEM

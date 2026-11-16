@@ -5092,6 +5092,7 @@
   },
   "export": {
     "title": "Exportar",
+    "skippedUnreadable": "{{count}} unreadable certificate(s) were not exported",
     "format": "Formato",
     "options": "Opciones",
     "password": "Contraseña",

@@ -5095,6 +5095,7 @@
   },
   "export": {
     "title": "Export",
+    "skippedUnreadable": "{{count}} unreadable certificate(s) were not exported",
     "format": "Format",
     "options": "Options",
     "password": "Password",

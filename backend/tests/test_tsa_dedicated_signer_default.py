@@ -249,7 +249,7 @@ def test_a_ca_certificate_that_cannot_be_read_is_a_503(app, client, create_ca, t
         assert resp.status_code == 503
         assert resp.data == b'TSA configuration invalid'
     finally:
-        # An unreadable CA certificate would break every later bulk CA export
+        # Left unreadable, the CA would be skipped by later bulk CA exports and named in X-Skipped-CAs
         with app.app_context():
             db.session.rollback()
             CA.query.filter_by(refid=refid).first().crt = readable

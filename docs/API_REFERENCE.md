@@ -1661,11 +1661,12 @@ POST /api/v2/truststore
 Content-Type: application/json
 
 {
-  "certificate": "-----BEGIN CERTIFICATE-----\n...",
+  "certificate_pem": "-----BEGIN CERTIFICATE-----\n...",
   "name": "External Root CA",
   "description": "Third-party CA for partner integration"
 }
 ```
+The trust store holds certificates only: an entry that contains a private key (any `... PRIVATE KEY` block, encrypted or not) is refused with `400` and `A trust store holds certificates only; remove the private key`, and so is an entry with a `CERTIFICATE` block that cannot be read; other blocks and the text around are left out. The entry is judged and fingerprinted by its first certificate and stored as its certificates re-encoded in PEM; other text is dropped. `certificate_pem` in the list and the detail holds only certificates. The same rules apply to the file upload below.
 
 ### Get Trusted Certificate
 ```http
@@ -1711,6 +1712,7 @@ purpose: "trust_anchor"
 description: "Third-party CA"
 notes: "Optional notes"
 ```
+A PEM or DER file; a file that contains a private key is refused with `400` as above.
 
 ### Trust Store Bulk Operations
 ```http

@@ -1655,7 +1655,7 @@ The Trust Store keeps trusted CA certificates. Fill it from the CAs UCM manages 
 **Add** lists the CAs UCM manages: select those to trust.
 
 ### External certificates
-The page has no upload form for a certificate from outside UCM. Add it through the API: \`POST /api/v2/truststore\` with its PEM, or \`POST /api/v2/truststore/import\` with a PEM or DER file.
+The page has no upload form for a certificate from outside UCM. Add it through the API: \`POST /api/v2/truststore\` with its PEM, or \`POST /api/v2/truststore/import\` with a PEM or DER file. An entry that contains a private key is refused: the trust store holds certificates only, and only the certificates of a file are kept.
 
 ### Sync from System
 Import the trusted CAs of the operating system's trust store (e.g., Mozilla's CA bundle on Linux), up to the chosen count: 500 by default, 1000 at most.

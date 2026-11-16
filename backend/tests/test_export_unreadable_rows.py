@@ -194,8 +194,10 @@ FORMS = _forms()
 @BOTH
 @pytest.mark.parametrize('form', FORMS, ids=lambda f: f[0])
 def test_every_valid_stored_form_exports_as_before(auth_client, rows, route, fmt, form):
-    """What the base exported from a valid row it still exports, the same bytes in PEM."""
+    """What the base exported from a valid row it still exports, the same bytes in PEM, except
+    the text before the first certificate: an export holds certificate blocks only."""
     label, pem, certs = form
+    kept = pem[pem.index(b'-----BEGIN'):]
     row_id = rows.made[route.kind][0]
     stored = pem.decode() if route.kind == 'trust' else base64.b64encode(pem).decode()
     rows.store(route, row_id, stored)
@@ -205,10 +207,11 @@ def test_every_valid_stored_form_exports_as_before(auth_client, rows, route, fmt
     if fmt == 'pem':
         if route.kind == 'trust':
             # the bundle names each entry, found through the stored PEM itself
-            expected = f'# trust-0\n{pem.decode().strip()}\n'.encode()
+            expected = f'# trust-0\n{kept.decode().strip()}\n'.encode()
         else:
-            expected = pem if pem.endswith(b'\n') else pem + b'\n'
+            expected = kept if kept.endswith(b'\n') else kept + b'\n'
         assert expected in r.data
+        assert pem == kept or pem[:pem.index(b'-----BEGIN')] not in r.data
         return
     exported = [c.public_bytes(serialization.Encoding.DER) for c in pkcs7.load_der_pkcs7_certificates(r.data)]
     wanted = [x509.load_pem_x509_certificate(c).public_bytes(serialization.Encoding.DER) for c in certs]
@@ -259,3 +262,54 @@ def test_the_skipped_headers_are_exposed_to_a_cross_origin_screen(app, auth_clie
     exposed = r.headers.get('Access-Control-Expose-Headers', '')
     for name in ('X-Skipped-Certificates', 'X-Skipped-Certificates-Count', 'X-Skipped-CAs', 'X-Skipped-CAs-Count'):
         assert name in exposed
+
+
+def _key_pem():
+    return ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+
+
+@EVERY
+@BOTH
+@pytest.mark.parametrize('order', ['key-first', 'key-last'])
+def test_a_row_holding_a_private_key_exports_its_certificates_only(auth_client, rows, route, fmt, order):
+    """However a row came to hold a key (an old archive, a direct write), no export hands it out."""
+    cert, key = _pem('with-key'), _key_pem()
+    held = key + cert if order == 'key-first' else cert + key
+    row_id = rows.made[route.kind][0]
+    rows.store(route, row_id, held.decode() if route.kind == 'trust' else base64.b64encode(held).decode())
+    r = route.call(auth_client, rows.made[route.kind], fmt)
+    assert r.status_code == 200, r.data
+    assert b'PRIVATE KEY' not in r.data and key.splitlines()[1] not in r.data
+    if fmt == 'pem':
+        assert cert.strip() in r.data
+    else:
+        der = x509.load_pem_x509_certificate(cert).public_bytes(serialization.Encoding.DER)
+        assert der in [c.public_bytes(serialization.Encoding.DER) for c in pkcs7.load_der_pkcs7_certificates(r.data)]
+
+
+@pytest.mark.parametrize('encoded', [False, True], ids=['text', 'base64'])
+def test_readable_pems_hands_out_certificate_blocks_only(encoded):
+    cert, key = _pem('blocks'), _key_pem()
+    held = b'Bag Attributes\n' + key + cert + b'-----BEGIN CERTIFICATE REQUEST-----\nAAAA\n-----END CERTIFICATE REQUEST-----\n'
+    pems, skipped = readable_pems([(1, base64.b64encode(held).decode() if encoded else held.decode())])
+    assert pems == [cert] and skipped == []
+
+
+def test_a_row_holding_only_a_key_is_skipped():
+    pems, skipped = readable_pems([(9, _key_pem().decode())])
+    assert pems == [] and skipped == ['9']
+
+
+@pytest.mark.parametrize('order', ['key-first', 'key-last'])
+def test_an_entry_read_back_holds_its_certificates_only(auth_client, rows, order):
+    """The list and the detail of an entry never carry a key a row holds."""
+    route = next(r for r in ROUTES if r.kind == 'trust')
+    cert, key = _pem('read-back'), _key_pem()
+    row_id = rows.made['trust'][0]
+    rows.store(route, row_id, (key + cert if order == 'key-first' else cert + key).decode())
+    detail = auth_client.get(f'/api/v2/truststore/{row_id}').get_json()['data']
+    listed = next(e for e in auth_client.get('/api/v2/truststore').get_json()['data'] if e['id'] == row_id)
+    for entry in (detail, listed):
+        assert entry['certificate_pem'] == cert.decode()
+        assert entry['key_type'] != 'Unknown'

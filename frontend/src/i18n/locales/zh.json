@@ -5092,6 +5092,7 @@
   },
   "export": {
     "title": "导出",
+    "skippedUnreadable": "{{count}} unreadable certificate(s) were not exported",
     "format": "格式",
     "options": "选项",
     "password": "密码",
