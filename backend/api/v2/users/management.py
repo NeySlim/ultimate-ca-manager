@@ -17,6 +17,7 @@ from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
 from models import db, User, UserSSOIdentity
+from models.user import local_email_holder, local_email_taken
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -476,6 +477,17 @@ def unlock_user(user_id):
         return error_response('Failed to unlock user', 500)
 
 
+def _import_conflict(added):
+    """The 409 of an import a concurrent creation beat to a username or a local e-mail."""
+    for username, email in added:
+        if User.query.filter_by(username=username).first() is not None:
+            return error_response(f"Username '{username}' already exists", 409)
+        taken = local_email_taken(email, message=f"Email '{email}' already exists")
+        if taken is not None:
+            return taken
+    return None
+
+
 @bp.route('/api/v2/users/import', methods=['POST'])
 @require_auth(['write:users'])
 def import_users():
@@ -536,6 +548,7 @@ def import_users():
         imported = 0
         skipped = 0
         errors = []
+        added = []
 
         for row in csv_reader:
             row_num = imported + skipped + 1
@@ -565,7 +578,8 @@ def import_users():
                 errors.append(f"Row {row_num}: Username '{row['username']}' already exists")
                 continue
 
-            if User.query.filter_by(email=row['email']).first():
+            # E-mail is unique among local accounts only (#136), as for a single creation
+            if local_email_holder(row['email']) is not None:
                 skipped += 1
                 errors.append(f"Row {row_num}: Email '{row['email']}' already exists")
                 continue
@@ -593,9 +607,11 @@ def import_users():
             user.set_password(row['password'])
 
             db.session.add(user)
+            added.append((row['username'], row['email']))
             imported += 1
 
-        ok, _err = safe_commit(logger, "Failed to import users")
+        ok, _err = safe_commit(logger, "Failed to import users",
+                               on_conflict=lambda: _import_conflict(added))
         if not ok:
             return _err
 

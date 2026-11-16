@@ -341,6 +341,40 @@ def test_two_creations_at_once_one_passes_the_other_gets_409(app, auth_client, m
     auth_client.delete(f"/api/v2/users/{first.get_json()['data']['id']}")
 
 
+def test_an_import_beaten_to_an_email_by_another_creation_gets_409(app, auth_client, monkeypatch):
+    """The import checked the e-mail before the other account committed: the index refuses it."""
+    import io
+    import api.v2.users.management as management
+    email = f'{_name()}@corp.example'
+    first = auth_client.post('/api/v2/users', json=dict(
+        username=_name(), password='Race-Condition-42!', email=email, role='viewer'))
+    assert first.status_code == 201, first.get_json()
+    monkeypatch.setattr(management, 'local_email_holder', lambda *a, **k: None)
+    name = _name()
+    csv_text = f'username,email,full_name,role,password\n{name},{email},N,viewer,Race-Condition-42!\n'
+    r = auth_client.post('/api/v2/users/import', data={'file': (io.BytesIO(csv_text.encode()), 'u.csv')},
+                         content_type='multipart/form-data')
+    assert r.status_code == 409, r.get_json()
+    assert email in r.get_json()['message'], r.get_json()
+    with app.app_context():
+        assert User.query.filter_by(username=name).count() == 0
+    auth_client.delete(f"/api/v2/users/{first.get_json()['data']['id']}")
+
+
+def test_an_import_gives_an_sso_accounts_email_to_a_local_account(app, providers, auth_client):
+    """E-mail is unique among local accounts only, as the creation of one account says."""
+    import io
+    sso, name = _name(), _name()
+    email = f'{sso}@corp.example'
+    _add(app, username=sso, email=email, auth_source='oauth2', sso_provider_id=providers.oidc,
+         password_hash=NOPASS)
+    csv_text = f'username,email,full_name,role,password\n{name},{email},N,viewer,Race-Condition-42!\n'
+    r = auth_client.post('/api/v2/users/import', data={'file': (io.BytesIO(csv_text.encode()), 'u.csv')},
+                         content_type='multipart/form-data')
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()['data']['imported'] == 1, r.get_json()
+
+
 def test_detaching_the_last_provider_at_once_with_a_new_local_account_gets_409(
         app, providers, auth_client, monkeypatch):
     import models.user as user_model
