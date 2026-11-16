@@ -1,7 +1,8 @@
 """The one-process suite runs on the integration branch of the 3.0 line.
 
 A schedule only runs from the default branch's copy of the workflow, so this line gets the run
-on each push of its integration branch instead, superseded runs being cancelled.
+on each manual run of its integration branch instead: the suite is played in one process before
+every push already, and a push would only play it a second time.
 """
 import pytest
 
@@ -19,7 +20,8 @@ def _ctx(event, ref):
 
 
 @pytest.mark.parametrize('event, ref, runs', [
-    ('push', f'refs/heads/{LINE_BRANCH}', True),
+    ('workflow_dispatch', f'refs/heads/{LINE_BRANCH}', True),
+    ('push', f'refs/heads/{LINE_BRANCH}', False),
     ('push', 'refs/heads/test', True),
     ('push', 'refs/heads/main', True),
     ('schedule', 'refs/heads/main', True),
@@ -45,7 +47,8 @@ def _random_step():
 
 
 @pytest.mark.parametrize('event, ref, runs', [
-    ('push', f'refs/heads/{LINE_BRANCH}', True),
+    ('workflow_dispatch', f'refs/heads/{LINE_BRANCH}', True),
+    ('push', f'refs/heads/{LINE_BRANCH}', False),
     ('schedule', 'refs/heads/main', True),
     ('push', 'refs/heads/test', False),
     ('workflow_dispatch', 'refs/heads/dev', False),

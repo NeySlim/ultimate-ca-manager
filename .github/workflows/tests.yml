@@ -150,7 +150,7 @@ jobs:
   test-backend-sequential:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant'))
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
     timeout-minutes: 150
     # On the 3.0 integration branch one run at a time: the running one finishes, the
     # newest push waits and replaces any older waiting one; elsewhere one group per commit
@@ -194,10 +194,10 @@ jobs:
           # The tests marked slow (an hour of fault scenarios) stay with the shards: this job has a time limit
           pytest -v --tb=short --durations=30 -m "not ha and not slow"
 
-      # The same suite in random order on the nightly run and on pushes of the 3.0
+      # The same suite in random order on the nightly run and on manual runs of the 3.0
       # integration branch: a report, not a gate. The job summary gives the seed that replays the order.
       - name: Run tests in random order (report only)
-        if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'push' && github.ref_name == 'sextant')) && steps.deterministic.outcome != 'skipped' }}
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == 'sextant')) && steps.deterministic.outcome != 'skipped' }}
         continue-on-error: true
         timeout-minutes: 45
         env:
