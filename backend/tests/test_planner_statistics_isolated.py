@@ -1,4 +1,6 @@
 """ANALYZE leaves sqlite_stat1 in the database every later file shares; the suite drops it after each file."""
+import sqlite3
+
 import pytest
 from sqlalchemy import text
 
@@ -31,7 +33,8 @@ def test_a_stat4_table_is_dropped_with_stat1(app):
             db.session.execute(text('CREATE TABLE IF NOT EXISTS sqlite_stat4 (tbl, idx, neq, nlt, ndlt, sample)'))
         except Exception:
             db.session.rollback()
-            pytest.skip('this SQLite is built without STAT4 (the CI build is too), so sqlite_stat4 cannot be created: only a STAT4 build runs this case')
+            pytest.skip(f'SQLite {sqlite3.sqlite_version} here is built without STAT4 (as is the Debian 13 build), '
+                        'so sqlite_stat4 cannot be created: only a STAT4 build runs this case')
         db.session.commit()
         db.session.remove()
     conftest._drop_planner_statistics()

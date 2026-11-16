@@ -531,7 +531,7 @@ def _shared_tables_stay_in_their_module(request):
 
 def _drop_planner_statistics():
     """Remove the SQLite planner statistics (sqlite_stat1, and sqlite_stat4 where SQLite is built with
-    STAT4; the CI build is not) an ANALYZE left; a plan test reads them. The session never stays open."""
+    STAT4; Debian 13's SQLite 3.46 is not) an ANALYZE left; a plan test reads them. The session never stays open."""
     if not _SESSION_APP:
         return
     from sqlalchemy import text as _text
