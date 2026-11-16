@@ -29,6 +29,7 @@ conditional-errors = 1
 security-checks = 1
 module-mac = $FAKE_MAC
 EOF
+[ -n "${FAKE_FAIL_AFTER_WRITE:-}" ] && { echo "INSTALL FAILED"; exit 1; }
 echo "INSTALL PASSED"
 '''
 
@@ -76,7 +77,7 @@ def test_modified_module_is_refused_neg(bench):
 def test_missing_reference_is_refused_neg(bench):
     rc, out = _run(bench, bench / 'absent.mac')
     assert rc == 1 and 'continued' not in out
-    assert 'missing or unreadable' in out
+    assert 'missing, unreadable or malformed' in out
     # the refusal is the only text: no shell redirection error above it
     assert 'No such file' not in out and 'line ' not in out
 
@@ -86,7 +87,8 @@ def test_missing_reference_is_refused_neg(bench):
 def test_empty_or_malformed_reference_is_refused_neg(bench, content):
     rc, out = _run(bench, _reference(bench, content))
     assert rc == 1 and 'continued' not in out
-    assert 'missing or unreadable' in out and 'modified' not in out
+    assert 'missing, unreadable or malformed' in out and 'modified' not in out
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log']
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason='root reads a mode 000 file')
@@ -108,6 +110,67 @@ def test_failed_self_tests_are_refused_neg(bench):
     assert rc == 1 and 'self-tests' in out and 'INSTALL FAILED' in out
 
 
+def test_failed_self_tests_with_a_previous_good_config_are_refused_neg(bench):
+    # a config left by an earlier successful start must not stand in for a failed install
+    cnf = bench / 'run' / 'fipsmodule.cnf'
+    cnf.write_text(f'[fips_sect]\nmodule-mac = {BUILD_MAC}\n')
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), FAKE_FAIL='1')
+    assert rc == 1 and 'continued' not in out
+    assert 'self-tests' in out and 'modified' not in out
+
+
+def test_failed_self_tests_after_writing_a_good_config_are_refused_neg(bench):
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), FAKE_FAIL_AFTER_WRITE='1')
+    assert rc == 1 and 'continued' not in out and 'self-tests' in out
+    assert not (bench / 'run' / 'fipsmodule.cnf').exists()
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log']
+
+
+def test_refused_module_leaves_no_new_config_neg(bench):
+    rc, _ = _run(bench, _reference(bench, BUILD_MAC), mac=OTHER_MAC)
+    assert rc == 1
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log']
+
+
+def test_refused_module_keeps_the_previous_config_neg(bench):
+    cnf = bench / 'run' / 'fipsmodule.cnf'
+    cnf.write_text('previous\n')
+    rc, _ = _run(bench, _reference(bench, BUILD_MAC), mac=OTHER_MAC)
+    assert rc == 1 and cnf.read_text() == 'previous\n'
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log', 'fipsmodule.cnf']
+
+
+def test_accepted_module_leaves_only_the_config_pos(bench):
+    rc, _ = _run(bench, _reference(bench, BUILD_MAC))
+    assert rc == 0
+    assert sorted(p.name for p in (bench / 'run').iterdir()) == ['fipsinstall.log', 'fipsmodule.cnf']
+    assert f'module-mac = {BUILD_MAC}' in (bench / 'run' / 'fipsmodule.cnf').read_text()
+
+
+@pytest.mark.parametrize('modules', [None, '{bench}', '{bench}/', '{bench}/./'])
+def test_openssl_modules_on_the_checked_directory_is_accepted_pos(bench, modules):
+    extra = {} if modules is None else {'OPENSSL_MODULES': modules.format(bench=bench)}
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), **extra)
+    assert rc == 0 and 'continued' in out
+
+
+@pytest.mark.parametrize('modules', ['/nonexistent', '{bench}/other', ''])
+def test_openssl_modules_elsewhere_is_refused_neg(bench, modules):
+    (bench / 'other').mkdir()
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), OPENSSL_MODULES=modules.format(bench=bench))
+    assert rc == 1 and 'continued' not in out and 'OPENSSL_MODULES' in out
+    assert 'realpath' not in out
+    # refused before fipsinstall: nothing written in the run directory
+    assert list((bench / 'run').iterdir()) == []
+
+
+def test_a_relative_openssl_modules_is_refused_neg(bench):
+    # relative to the entrypoint's directory here, to another one in the process that loads fips.so
+    rc, out = _run(bench, _reference(bench, BUILD_MAC), OPENSSL_MODULES=os.path.relpath(bench))
+    assert rc == 1 and 'continued' not in out and 'OPENSSL_MODULES' in out
+    assert list((bench / 'run').iterdir()) == []
+
+
 def test_build_records_the_mac_the_runtime_compares_pos(bench):
     # the build writes the reference with fips_module_mac from the same helper
     cnf = bench / 'build.cnf'
@@ -119,14 +182,26 @@ def test_build_records_the_mac_the_runtime_compares_pos(bench):
     assert rc == 0 and 'continued' in out
 
 
-def test_the_build_shell_can_source_the_helper_pos(bench):
+@pytest.mark.parametrize('shell', ['bash', 'dash'])
+def test_the_build_shell_can_source_the_helper_pos(bench, shell):
     """The Dockerfile sources the helper under /bin/sh (dash) with set -eu: it must parse there."""
-    dash = shutil.which('dash')
-    if not dash:
-        pytest.skip('no dash on this host')
+    sh = shutil.which(shell)
+    if not sh:
+        pytest.skip(f'no {shell} on this host')
     cnf = bench / 'build.cnf'
     cnf.write_text(f'[fips_sect]\nmodule-mac = {BUILD_MAC}\n')
-    r = subprocess.run([dash, '-c', f'set -eu; . {HELPER}; fips_module_mac "{cnf}"'],
-                       capture_output=True, text=True)
+    r = subprocess.run([sh, '-c', f'set -eu; . {HELPER}; fips_module_mac "{cnf}"'],
+                       env={'PATH': '/usr/bin:/bin'}, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == BUILD_MAC
+
+
+def test_accepted_module_pins_openssl_modules_to_its_directory_pos(bench):
+    # ucm.env is read by the app after this check and must not move the module directory
+    script = (f'. {HELPER}; install_fips_module "{bench / "fips.so"}" "{bench / "run"}" '
+              f'"{_reference(bench, BUILD_MAC)}" && printf "%s" "$OPENSSL_MODULES" > "{bench / "seen"}" '
+              f'&& env | grep -q "^OPENSSL_MODULES=" && echo exported')
+    env = {'PATH': f'{bench / "bin"}:/usr/bin:/bin', 'FAKE_MAC': BUILD_MAC}
+    r = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True)
+    assert r.returncode == 0 and 'exported' in r.stdout
+    assert (bench / 'seen').read_text() == str(bench)
