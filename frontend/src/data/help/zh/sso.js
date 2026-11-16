@@ -27,6 +27,7 @@ export default {
           { label: '客户端 ID/密钥', text: '来自 IDP 的 OAuth2 客户端凭据' },
           { label: '范围', text: '请求的 OAuth2 范围（openid、profile、email）' },
           { label: '自动创建用户', text: '首次 SSO 登录时自动创建 UCM 账户' },
+          { label: '用于角色映射的组', text: 'roles 和 groups 声明的值，从本次登录的 ID 令牌和 UserInfo 响应中一并读取。Microsoft Entra ID 只在 ID 令牌中发送它们：请在应用程序的令牌配置中添加组声明（其值为组的对象 ID，因此映射键就是这些 ID），或使用应用角色。属于大约 200 个以上组的用户不会从 Entra ID 获得组声明：会记录一条警告，只有应用角色可以匹配。请只发出分配给该应用程序的组，或应用角色。' },
         ]
       },
       {
@@ -129,6 +130,9 @@ IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutR
 
 ### 自动创建用户
 启用后，首次 SSO 登录时会自动创建新的 UCM 用户账户，使用 IDP 提供的属性。分配默认角色。
+
+### 用于角色映射的组
+角色映射规则将其键与 **roles** 和 **groups** 声明的值进行比较，这些值从本次登录的 ID 令牌和 UserInfo 响应中一并读取。Microsoft Entra ID 只在 ID 令牌中发送组和应用角色：在应用注册中，于 **Token configuration** 下添加组声明（其值为组的对象 ID，因此映射键就是这些 ID），或定义应用角色并映射其值。属于大约 200 个以上组的用户不会从 Entra ID 获得组声明：UCM 会记录一条警告，只有应用角色可以匹配。请只发出分配给该应用程序的组，或应用角色。
 
 ## 谁可以登录
 
