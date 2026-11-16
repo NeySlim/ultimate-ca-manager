@@ -66,6 +66,8 @@ class RestorePlan:
         # the row each archived row was written to, which a second pass reuses
         self._claims: Dict[Tuple, List[int]] = {}
         self._placed: Dict[Tuple[str, int], Any] = {}
+        # The identity rows here per key, as they stood at the last refresh
+        self._sso_rows: Dict[Tuple, List[Any]] = {}
 
     # -- building ---------------------------------------------------------
 
@@ -179,7 +181,10 @@ class RestorePlan:
     def _warn_shared_identities(self, pruned) -> None:
         for name in sorted(set(self.shared) - set(pruned)):
             for key, ids in self.shared[name].items():
-                self.warnings.append(shared_identity_warning(name, key, ids, 'left as they are'))
+                fate = 'left as they are'
+                if name == _SSO_IDENTITIES and key[1] is None and key[2] is not None and key[3] is None:
+                    fate = "bound by the archive's identities of this IdP that have no row here, else left as they are"
+                self.warnings.append(shared_identity_warning(name, key, ids, fate))
 
     def refresh(self, section_names=None) -> None:
         """Rebuild the identity indexes from the database as it is now.
@@ -189,6 +194,7 @@ class RestorePlan:
         archive carries, a reference pointing at one of them can be resolved,
         which the first pass could not do.
         """
+        self._sso_rows.clear()
         for name in (section_names or list(self.target_ids)):
             section = SECTIONS.get(name)
             if section is None or name in _MAPPING_SECTIONS:
@@ -280,12 +286,14 @@ class RestorePlan:
         orphan_of, external_id = row.get('orphan_of'), row.get('external_id')
 
         def here(identity):
-            query = UserSSOIdentity.query.filter_by(user_id=user_id, provider_id=provider_id)
-            if provider_id is None:
-                query = query.filter_by(orphan_of=orphan_of, external_id=identity)
-            ids = [found.id for found in query.order_by(UserSSOIdentity.id)]
+            # Read once per key: a row bound for one archived row must keep its rank for the next
             key = sso_identity_key(user_id, provider_id, orphan_of, identity)
-            return self.rank(_SSO_IDENTITIES, key, row, ids)
+            if key not in self._sso_rows:
+                query = UserSSOIdentity.query.filter_by(user_id=user_id, provider_id=provider_id)
+                if provider_id is None:
+                    query = query.filter_by(orphan_of=orphan_of, external_id=identity)
+                self._sso_rows[key] = [found.id for found in query.order_by(UserSSOIdentity.id)]
+            return self.rank(_SSO_IDENTITIES, key, row, self._sso_rows[key])
 
         found = here(external_id)
         if found is None and provider_id is None and orphan_of is not None:

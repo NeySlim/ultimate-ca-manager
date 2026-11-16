@@ -945,6 +945,55 @@ def test_one_unbound_orphan_is_bound_once_by_the_first_of_two_archived(app, prov
     assert passes[0][0][0] == before[0][0] and passes[1] == passes[0]
 
 
+@pytest.mark.parametrize('archived, bound', [
+    ([(_IDP, 'e1'), (_IDP, 'e2')], ['e1', 'e2']),
+    ([(_IDP, 'e1'), (_IDP, 'e2'), (_IDP, 'e3')], ['e1', 'e2', 'e3']),
+    ([(_IDP, 'e1'), (_IDP, None)], ['e1', None]),
+    ([(_IDP, None), (_IDP, 'e1')], [None, 'e1']),
+])
+def test_two_unbound_orphans_are_each_taken_once_in_the_archive_s_order(app, providers, archived, bound):
+    """Binding the first must not hide the second from the next archived row."""
+    before, passes = _orphan_restore(app, archived, [(_IDP, None), (_IDP, None)], 'merge')
+    assert [r[2] for r in passes[0]] == bound
+    assert [r[0] for r in passes[0]][:2] == [r[0] for r in before]
+    assert passes[1] == passes[0]
+
+
+def test_the_plan_reads_identity_rows_once_per_key_until_its_next_refresh(app, providers, monkeypatch):
+    from services.backup.restore.plan import RestorePlan
+    uid = _add(app, username=_name(), password_hash=NOPASS)
+    with app.app_context():
+        plan = RestorePlan()
+        monkeypatch.setattr(plan, 'resolve', lambda section, row, column: uid if column == 'user_id' else None)
+        archived = {'orphan_of': _IDP, 'external_id': 'e1'}
+        assert plan._sso_identity_here(archived) is None
+        row = UserSSOIdentity(user_id=uid, orphan_of=_IDP, external_id='e1')
+        db.session.add(row)
+        db.session.commit()
+        assert plan._sso_identity_here(archived) is None
+        plan.refresh()
+        assert plan._sso_identity_here(archived) == row.id
+
+
+def test_unbound_orphans_sharing_a_key_are_said_to_be_bound_by_the_archive(app, providers):
+    from services.backup import manifest
+    password = 'Correct-Horse-Battery-9'
+    uid = _add(app, username=_name(), password_hash=NOPASS)
+    with app.app_context():
+        include = {n: n in ('users', 'user_sso_identities') for n in manifest.SECTIONS}
+        blob = _backup().create_backup(password, include=include)
+        for orphan_of in (_IDP, _IDP, None, None):
+            db.session.add(UserSSOIdentity(user_id=uid, orphan_of=orphan_of))
+        db.session.commit()
+        results = _backup().restore_backup(blob, password, mode='merge')
+    shared = sorted(w for w in results['warnings'] if 'user_sso_identities' in w)
+    assert len(shared) == 2, results['warnings']
+    assert f'{uid}//:' in shared[0] and shared[0].endswith('are left as they are')
+    assert "this IdP that have no row here" not in shared[0]
+    assert shared[1].endswith("are bound by the archive's identities of this IdP that have no row here, "
+                              "else left as they are")
+
+
 def test_a_bound_orphan_here_is_not_taken_for_another_identity(app, providers):
     before, passes = _orphan_restore(app, [(_IDP, 'e1')], [(_IDP, 'other'), (_IDP, None)], 'merge')
     assert passes == [[before[0], (before[1][0], _IDP, 'e1')]] * 2
