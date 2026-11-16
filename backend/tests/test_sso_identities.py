@@ -382,6 +382,19 @@ def test_the_flag_follows_every_change_of_the_rows(app, providers, auth_client):
     assert flag() is True
 
 
+def test_an_sso_account_may_take_the_email_of_a_local_account_in_its_profile(app, providers):
+    """Unique among local accounts only (#136): the profile and the index say the same."""
+    local, name = _name(), _name()
+    email = f'{local}@corp.example'
+    _add(app, username=local, email=email, password_hash='hash')
+    uid = _add(app, username=name, auth_source='oauth2', sso_provider_id=providers.oidc,
+               sso_external_id='sub-p', password_hash=NOPASS)
+    r = _session(app, uid).patch('/api/v2/account/profile', json={'email': email})
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        assert db.session.get(User, uid).email == email
+
+
 # ── Detaching ───────────────────────────────────────────────────────────────
 
 def test_detaching_one_of_two_keeps_the_other_and_closes_the_sessions(app, providers, auth_client):
@@ -652,6 +665,25 @@ def test_an_archive_from_before_the_rows_gets_the_rows_an_upgrade_gives(app, pro
         for label, (_row, _hash, rows_after) in accounts.items():
             assert identities(made[label]) == rows_after, label
         assert results['user_sso_identities'] == 3
+
+
+def test_a_replace_from_before_the_rows_leaves_no_stale_collection(app, providers):
+    """The rows a replace deletes in SQL are gone from the account read in the same session."""
+    with app.app_context():
+        provider_name = db.session.get(SSOProvider, providers.oidc).name
+    uid = _add(app, username=_name(), auth_source='oauth2', sso_provider_id=providers.oidc,
+               sso_external_id='sub-old', password_hash=NOPASS)
+    service = _backup()
+    with app.app_context():
+        user = db.session.get(User, uid)
+        assert identities(user) == [(providers.oidc, 'sub-old', None)]
+        service._merging = False
+        service._legacy_sso_identities = [(user, {
+            'auth_source': 'oauth2', 'sso_provider_id': 7, 'sso_provider_id_ref': {'name': provider_name},
+            'sso_external_id': 'sub-new'})]
+        service._restore_legacy_sso_identities({}, SimpleNamespace(warnings=[]))
+        assert identities(user) == [(providers.oidc, 'sub-new', None)]
+        db.session.commit()
 
 
 # ── The upgrade from 2.254 ──────────────────────────────────────────────────

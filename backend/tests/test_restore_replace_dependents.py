@@ -1002,7 +1002,7 @@ def test_an_archive_without_identity_rows_orphans_a_newer_provider_under_its_idp
 
 
 def test_a_merge_bringing_back_an_email_another_local_account_holds_is_refused(target):
-    """E-mail is unique among local accounts (#136), which no index holds any more."""
+    """E-mail is unique among local accounts (#136): said by name before the index refuses it."""
     from models import User
 
     _user('replace-admin')
@@ -1020,6 +1020,30 @@ def test_a_merge_bringing_back_an_email_another_local_account_holds_is_refused(t
     assert 'replace-email-a@example.test' in str(refused.value)
     assert 'Nothing has been changed' in str(refused.value)
     assert User.query.filter_by(username='replace-email-a').first() is None
+
+
+def test_the_shared_email_refusal_reads_the_accounts_in_one_query(target):
+    from sqlalchemy import event
+    from services.backup.restore.conflict import RestoreConflictError
+
+    names = [_user(f'replace-many-{i}').username for i in range(5)]
+    dup = _user('replace-many-dup')
+    # Out of the index as during a restore, before the flags are set from the rows
+    dup.has_sso_identity, dup.email = True, 'replace-many-3@example.test'
+    db.session.commit()
+    seen = []
+
+    def count(_conn, _cursor, statement, *_args):
+        if 'users' in statement:
+            seen.append(statement)
+    event.listen(db.engine, 'before_cursor_execute', count)
+    try:
+        with pytest.raises(RestoreConflictError) as refused:
+            _service()._refuse_shared_local_emails({'users': [{'username': n} for n in names]})
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', count)
+    assert len(seen) == 1, seen
+    assert "'replace-many-3'" in str(refused.value) and "'replace-many-dup'" in str(refused.value)
 
 
 def test_a_full_replace_of_an_sso_account_sharing_a_local_email_passes(target):
@@ -1057,6 +1081,29 @@ def test_a_merge_making_a_local_account_sso_again_may_share_its_email(target):
     sso = User.query.filter_by(username='replace-merge-sso').one()
     assert sso.email == 'replace-merge-sso@example.test'
     assert [row.external_id for row in UserSSOIdentity.query.filter_by(user_id=sso.id)] == ['sub-merge']
+
+
+def test_a_merge_from_a_254_archive_keeps_an_sso_account_sharing_a_local_email(target):
+    """The account is SSO here and in the archive: its e-mail is no local account's."""
+    from models import User, UserSSOIdentity
+
+    _user('replace-admin')
+    provider = _sso_provider('replace-254-idp')
+    _identity(_user('replace-254-sso'), provider, 'sub-254')
+    _user('replace-254-local').email = 'replace-254-sso@example.test'
+    blob = _snapshot('users', 'sso_providers')
+
+    def as_254(row):
+        row['auth_source'] = 'local'
+        if row['username'] == 'replace-254-sso':
+            row.update(auth_source='oauth2', sso_provider_id=provider.id, sso_external_id='sub-254',
+                       sso_provider_id_ref={'name': 'replace-254-idp'})
+    _restore(_old_form(blob, drop_from='users', edit=as_254), mode='merge')
+
+    sso = User.query.filter_by(username='replace-254-sso').one()
+    local = User.query.filter_by(username='replace-254-local').one()
+    assert [row.external_id for row in UserSSOIdentity.query.filter_by(user_id=sso.id)] == ['sub-254']
+    assert (sso.has_sso_identity, local.has_sso_identity, local.email) == (True, False, sso.email)
 
 
 def test_a_replace_from_a_254_archive_drops_a_binding_made_after_it(target):

@@ -799,22 +799,29 @@ class RestoreCoreMixin:
     def _refuse_shared_local_emails(backup_data: Dict) -> None:
         """E-mail is unique among local accounts (#136): a restored local account may not share
         one with another local account here. Said before ix_users_email_local refuses it."""
-        from models import User
-        from models.user import local_email_holder
+        from sqlalchemy import and_, exists
+        from sqlalchemy.orm import aliased
+        from models import User, UserSSOIdentity
         from .restore.conflict import RestoreConflictError
+
+        mine, other = aliased(User), aliased(User)
+
+        def local(account):
+            # Local in SQL: the cached sso_identities predate the identity rows just restored
+            return ~exists().where(UserSSOIdentity.user_id == account.id)
 
         names = [row['username'] for row in backup_data.get('users') or []]
         for start in range(0, len(names), 500):
-            # Local in SQL: the cached sso_identities predate the identity rows just restored
-            for user in User.query.filter(User.username.in_(names[start:start + 500]),
-                                          User.email.isnot(None), User.email != '',
-                                          ~User.sso_identities.any()):
-                holder = local_email_holder(user.email, other_than=user.id)
-                if holder is not None:
-                    raise RestoreConflictError(
-                        f"Refusing to restore: the local accounts {user.username!r} and "
-                        f"{holder.username!r} would share the e-mail {user.email!r}. "
-                        "Nothing has been changed.")
+            shared = (db.session.query(mine.username, other.username, mine.email)
+                      .join(other, and_(other.email == mine.email, other.id != mine.id))
+                      .filter(mine.username.in_(names[start:start + 500]), mine.email.isnot(None),
+                              mine.email != '', local(mine), local(other))
+                      .order_by(mine.id, other.id).first())
+            if shared is not None:
+                raise RestoreConflictError(
+                    f"Refusing to restore: the local accounts {shared[0]!r} and "
+                    f"{shared[1]!r} would share the e-mail {shared[2]!r}. "
+                    "Nothing has been changed.")
 
     @staticmethod
     def _identity_holder(user_id, provider_id, external_id):
@@ -876,6 +883,8 @@ class RestoreCoreMixin:
                 continue
             if not merging:
                 held.delete(synchronize_session=False)
+                # The loaded collection still lists the rows the statement deleted
+                db.session.expire(user, ['sso_identities'])
             ref = row.get('sso_provider_id_ref') or {}
             here = SSOProvider.query.filter_by(name=ref['name']).first() if ref.get('name') else None
             accounts.append((user.id, row.get('auth_source'), here.id if here else None,
