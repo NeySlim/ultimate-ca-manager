@@ -154,21 +154,16 @@ def test_link_to_sso_attaches_any_account_and_the_next_sign_in_opens_it(
 
 def test_relinked_account_without_password_is_not_asked_for_one(app, providers, auth_client):
     """Unlink SSO then Link to SSO: the SSO session is not confined to a password change."""
-    from utils.datetime_utils import utc_now
     name = _name()
     uid = _state(app, providers, 'other_provider', name)
     assert auth_client.post(f'/api/v2/users/{uid}/unlink-sso').status_code == 200
     assert auth_client.post(f'/api/v2/users/{uid}/link-sso',
                             json={'provider_id': providers.b}).status_code == 200
     assert _login(app, providers.b, name, {'sub': 'sub-b'}) == (name, None)
-    with app.app_context():
-        role = db.session.get(User, uid).role
-    c = app.test_client()
-    with c.session_transaction() as s:
-        s.update(user_id=uid, username=name, role=role, auth_method='sso',
-                 login_time=utc_now().isoformat(), last_activity=utc_now().isoformat())
-    r = c.get('/api/v2/certificates')
-    assert not (r.get_json() or {}).get('must_change_password'), (r.status_code, r.get_json())
+    # Opened after the link, which closes the sessions it finds.
+    r = _open_session(app, uid, name).get('/api/v2/certificates')
+    assert r.status_code == 200, r.get_json()
+    assert not (r.get_json() or {}).get('must_change_password'), r.get_json()
 
 
 def _open_session(app, uid, name):
