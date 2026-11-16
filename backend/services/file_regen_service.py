@@ -727,8 +727,8 @@ class FilesBusy(Exception):
 
 
 @contextmanager
-def _exclusive(dirs):
-    """Yields whether every directory is held; never fails open."""
+def _exclusive(dirs, wait=0.0):
+    """Yields whether every directory is held, trying for ``wait`` seconds; never fails open."""
     from models import db
     from utils.ha import ha_enabled
     if ha_enabled() and db.engine.dialect.name == 'postgresql':
@@ -736,11 +736,17 @@ def _exclusive(dirs):
         keys = advisory_keys(dirs)
         conn = db.engine.connect().execution_options(isolation_level='AUTOCOMMIT')
         held = []
+        deadline = time.monotonic() + wait
         try:
-            for key in keys:
-                if not conn.execute(text('SELECT pg_try_advisory_lock(:k)'), {'k': key}).scalar():
+            while True:
+                for key in keys[len(held):]:
+                    if not conn.execute(text('SELECT pg_try_advisory_lock(:k)'),
+                                        {'k': key}).scalar():
+                        break
+                    held.append(key)
+                if len(held) == len(keys) or time.monotonic() >= deadline:
                     break
-                held.append(key)
+                time.sleep(0.1)
             yield len(held) == len(keys)
         finally:
             for key in held:
@@ -752,8 +758,9 @@ def _exclusive(dirs):
         return
     from utils.process_lock import process_lock
     try:
-        lock = process_lock(Path(Config.DATA_DIR) / LOCK_NAME, purpose='the file reconciliation',
-                            subject='files', busy_error=FilesBusy, fail_open=False)
+        lock = process_lock(Path(Config.DATA_DIR) / LOCK_NAME, timeout=wait,
+                            purpose='the file reconciliation', subject='files',
+                            busy_error=FilesBusy, fail_open=False)
         lock.__enter__()
     except FilesBusy:
         yield False
@@ -768,11 +775,12 @@ _RETRY = {'after': 0.0, 'delay': 0.0}
 _RETRY_FIRST, _RETRY_MAX = 60.0, 3600.0
 
 
-def reconcile_files(*, full=None) -> dict:
+def reconcile_files(*, full=None, wait=0.0) -> dict:
     """Make this node's managed directories match the rows.
 
     ``full`` (default: when a directory's marker is not the database's generation) compares
     every file and applies the removal list; otherwise only absent files are written.
+    ``wait``: seconds to wait for another reconciliation to release the directories.
     Returns the counts and ``status``: 'done', 'busy' (nothing done) or 'incomplete'.
     """
     from models import CA, Certificate, FileRemoval, db
@@ -791,7 +799,7 @@ def reconcile_files(*, full=None) -> dict:
                              directory.path, exc)
         if not opened:
             return {'status': 'incomplete', 'failed': len(dirs)}
-        with _exclusive(opened) as held:
+        with _exclusive(opened, wait) as held:
             if not held:
                 logger.info("Files: another reconciliation holds the directories; retried later")
                 return {'status': 'busy'}
@@ -882,8 +890,10 @@ def reconcile_if_behind() -> dict:
     return reconcile_files(full=True)
 
 
-def regenerate_all_files():
-    """Absent files written from the rows (a full pass when this node is behind)."""
-    stats = reconcile_files()
-    return {key: stats.get(key, 0) for key in (
+def regenerate_all_files(wait=0.0):
+    """Absent files written from the rows (a full pass when this node is behind), with the
+    pass's ``status``: 'busy' when another reconciliation held the directories past ``wait``."""
+    stats = reconcile_files(wait=wait)
+    counts = {key: stats.get(key, 0) for key in (
         'ca_certs', 'ca_keys', 'certs', 'cert_keys', 'csrs', 'removed', 'keys_purged')}
+    return dict(counts, status=stats.get('status'))

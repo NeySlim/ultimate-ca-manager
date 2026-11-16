@@ -275,3 +275,72 @@ def test_disabling_a_key_file_does_not_fall_back_to_the_environment(
             assert db.session.get(*secrets['target']).private_key == PEM
     finally:
         _drop_disabled_marker(app)
+
+
+@pytest.fixture
+def files_lock_held(app):
+    """Another reconciliation's lock on the managed directories, released by ``release()``."""
+    import fcntl
+    import os
+    from pathlib import Path
+    from config.settings import Config
+    from services import file_regen_service as regen
+    holder = os.open(Path(Config.DATA_DIR) / regen.LOCK_NAME, os.O_RDWR | os.O_CREAT)
+    # A second descriptor of this process conflicts with it as another process's would
+    fcntl.flock(holder, fcntl.LOCK_EX)
+    closed = []
+
+    def release():
+        if not closed:
+            closed.append(1)
+            os.close(holder)
+    yield release
+    release()
+
+
+@pytest.mark.usefixtures('dek_retire_at_once')
+def test_disabling_waits_for_a_reconciliation_to_write_the_key_files(
+        app, auth_client, secrets, only_these, files_lock_held, monkeypatch):
+    import threading
+    from security.encryption import encrypt_text
+    from services import file_regen_service as regen
+    real = regen.reconcile_files
+
+    def released_meanwhile(**kwargs):
+        # The other reconciliation ends 0.3 s after this pass first asks for the lock
+        threading.Timer(0.3, files_lock_held).start()
+        return real(**kwargs)
+    monkeypatch.setattr(regen, 'reconcile_files', released_meanwhile)
+    with app.app_context():
+        db.session.get(*secrets['target']).private_key = encrypt_text(PEM)
+        db.session.commit()
+    try:
+        response = auth_client.post('/api/v2/system/security/disable-encryption')
+        assert response.status_code == 200, response.data
+        assert response.get_json()['data']['key_files'] == 'written'
+    finally:
+        _drop_disabled_marker(app)
+
+
+@pytest.mark.usefixtures('dek_retire_at_once')
+def test_disabling_says_the_key_files_wait_when_a_reconciliation_holds_on(
+        app, auth_client, secrets, only_these, files_lock_held, monkeypatch):
+    import api.v2.system.security as route
+    from security.encryption import encrypt_text
+    from services.audit_service import AuditService
+    monkeypatch.setattr(route, 'FILES_WAIT_SECONDS', 0.3)
+    audited = []
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(lambda **kw: audited.append(kw)))
+    with app.app_context():
+        db.session.get(*secrets['target']).private_key = encrypt_text(PEM)
+        db.session.commit()
+    try:
+        response = auth_client.post('/api/v2/system/security/disable-encryption')
+        assert response.status_code == 200, response.data
+        body = response.get_json()
+        assert body['data']['key_files'] == 'pending' and body['data']['key_files_written'] == 0
+        assert 'key files are written at the next start' in body['message']
+        disabled = [a for a in audited if a['action'] == 'encryption_disabled']
+        assert disabled and 'key files are written at the next start' in disabled[0]['details']
+    finally:
+        _drop_disabled_marker(app)

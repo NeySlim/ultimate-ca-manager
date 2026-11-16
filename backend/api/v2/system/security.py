@@ -357,6 +357,10 @@ def _env_kek_fingerprint():
         return None
 
 
+# How long a disable waits for a running file reconciliation before reporting it
+FILES_WAIT_SECONDS = 30
+
+
 @bp.route('/api/v2/system/security/disable-encryption', methods=['POST'])
 @require_auth(['admin:system'])
 def disable_encryption():
@@ -435,10 +439,14 @@ def disable_encryption():
         kept_until = max((r.retire_after for r in retained()), default=None)
 
         from services.file_regen_service import regenerate_all_files
-        regeneration_stats = regenerate_all_files()
+        regeneration_stats = regenerate_all_files(wait=FILES_WAIT_SECONDS)
         key_files_written = (
             regeneration_stats['ca_keys'] + regeneration_stats['cert_keys']
         )
+        # A reconciliation still holding the directories: nothing written, the next start does it
+        files_pending = regeneration_stats['status'] == 'busy'
+        files_note = (" The key files are written at the next start: another file "
+                      "reconciliation held the directories." if files_pending else '')
 
         AuditService.log_action(
             action='encryption_disabled',
@@ -446,18 +454,20 @@ def disable_encryption():
             resource_name='Private Key Encryption',
             details=(
                 f"Encryption disabled. Decrypted {decrypted} keys and wrote "
-                f"{key_files_written} key files."
+                f"{key_files_written} key files.{files_note}"
             ),
             success=True
         )
 
         return success_response(
-            message=f"Encryption disabled. {decrypted} keys decrypted.",
+            message=f"Encryption disabled. {decrypted} keys decrypted.{files_note}",
             data={
                 'enabled': False,
                 'decrypted': decrypted,
                 'skipped': skipped,
                 'key_files_written': key_files_written,
+                'key_files': {'busy': 'pending', 'done': 'written'}.get(
+                    regeneration_stats['status'], 'incomplete'),
                 'keys_kept_until': (None if dropped or not kept_until
                                     else kept_until.isoformat(timespec='seconds') + 'Z'),
                 'enable_available_after': (enable_after.isoformat(timespec='seconds') + 'Z'

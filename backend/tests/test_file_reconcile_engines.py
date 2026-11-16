@@ -91,3 +91,28 @@ def test_in_ha_nodes_sharing_a_directory_take_turns(target, monkeypatch, tmp_pat
     finally:
         other_node.close()
     assert regen.reconcile_files(full=True)['status'] == 'done'
+
+
+def test_in_ha_a_pass_asked_to_wait_takes_the_lock_once_released(target, monkeypatch):
+    if target != 'postgresql':
+        pytest.skip('the advisory lock is PostgreSQL\'s')
+    import threading
+    from sqlalchemy import text
+    from services import file_regen_service as regen
+    from utils import ha
+    monkeypatch.setattr(ha, 'ha_enabled', lambda: True)
+    dirs = [regen._Dir(path) for path in regen.managed_dirs()]
+    for directory in dirs:
+        directory.open()
+    keys = regen.advisory_keys(dirs)
+    for directory in dirs:
+        directory.close()
+    other_node = db.engine.connect().execution_options(isolation_level='AUTOCOMMIT')
+    try:
+        # One key only: the pass holds the others while it waits for this one
+        other_node.execute(text('SELECT pg_advisory_lock(:k)'), {'k': keys[-1]})
+        assert regen.reconcile_files(full=True, wait=0.2) == {'status': 'busy'}
+        threading.Timer(0.3, other_node.close).start()
+        assert regen.reconcile_files(full=True, wait=5)['status'] == 'done'
+    finally:
+        other_node.close()
