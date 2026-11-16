@@ -130,7 +130,7 @@ class TestSqliteInstall:
     def test_no_database_yet_is_not_an_error(self, tmp_path, monkeypatch):
         monkeypatch.delenv('DATABASE_URL', raising=False)
         monkeypatch.delenv('DATABASE_PATH', raising=False)
-        assert mtls_client_ca(str(tmp_path)) is None
+        assert mtls_client_ca(str(tmp_path)) is MTLS_UNDECIDED
         assert wstep_enabled(str(tmp_path)) is False
 
 
@@ -201,7 +201,7 @@ def _master_on(tmp_path, monkeypatch):
     monkeypatch.setattr(gevent.monkey, 'patch_all', lambda *a, **k: None)
     monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '')  # set by the config, undone after
     monkeypatch.setenv('DATA_DIR', str(tmp_path))
-    for name in ('DATABASE_URL', 'DATABASE_PATH', 'HTTPS_CERT_PATH', 'HTTPS_KEY_PATH'):
+    for name in ('DATABASE_URL', 'DATABASE_PATH', 'HTTPS_CERT_PATH', 'HTTPS_KEY_PATH', 'UCM_HA'):
         monkeypatch.delenv(name, raising=False)
     spec = importlib.util.spec_from_file_location(
         '_ucm_gunicorn_config_boot', os.path.join(os.path.dirname(os.path.dirname(__file__)),
@@ -223,9 +223,39 @@ def test_a_lost_settings_table_keeps_the_last_known_mtls_mode(tmp_path, monkeypa
     assert 'keeping the last known configuration (REQUIRED)' in capsys.readouterr().err
 
 
-def test_a_first_start_records_no_mtls_mode(tmp_path, monkeypatch, capsys):
+def test_a_lost_database_file_keeps_the_last_known_mtls_mode(tmp_path, monkeypatch, capsys):
+    (tmp_path / 'mtls_ca.pem').write_text(_pem('LEAF'))
+    (tmp_path / 'mtls_mode').write_text('required')
+    master = _master_on(tmp_path, monkeypatch)
+    assert (master.cert_reqs, master.ca_certs) == (2, str(tmp_path / 'mtls_ca.pem'))
+    assert (tmp_path / 'mtls_mode').read_text() == 'required'
+
+
+def test_mtls_turned_off_is_recorded_and_stays_off_when_the_table_is_lost(tmp_path, monkeypatch, capsys):
+    """Off is not optional: a CA file left by an earlier setting asks no client for a certificate."""
     import sqlite3
-    sqlite3.connect(str(tmp_path / 'ucm.db')).close()
+    connection = sqlite3.connect(str(tmp_path / 'ucm.db'))
+    for statement in SCHEMA:
+        connection.execute(statement)
+    connection.execute("INSERT INTO system_config VALUES ('mtls_enabled', 'false')")
+    connection.commit()
+    (tmp_path / 'mtls_ca.pem').write_text(_pem('LEAF'))
+    master = _master_on(tmp_path, monkeypatch)
+    assert (master.cert_reqs, (tmp_path / 'mtls_mode').read_text()) == (0, 'off')
+    connection.execute("DROP TABLE system_config")
+    connection.commit()
+    connection.close()
+    capsys.readouterr()
+    master = _master_on(tmp_path, monkeypatch)
+    assert (master.cert_reqs, master.ca_certs) == (0, None)
+    assert ((tmp_path / 'mtls_mode').read_text(), capsys.readouterr().err) == ('off', '')
+
+
+@pytest.mark.parametrize('database', ['empty file', 'no file'])
+def test_a_first_start_records_no_mtls_mode(tmp_path, monkeypatch, capsys, database):
+    import sqlite3
+    if database == 'empty file':
+        sqlite3.connect(str(tmp_path / 'ucm.db')).close()
     master = _master_on(tmp_path, monkeypatch)
     assert (master.cert_reqs, master.ca_certs) == (0, None)
     assert not (tmp_path / 'mtls_mode').exists()

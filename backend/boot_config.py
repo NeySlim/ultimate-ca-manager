@@ -93,7 +93,7 @@ def open_boot_database(data_path: str):
     return BootDatabase(sqlite3.connect(path), '?')
 
 
-# What mtls_client_ca answers when there is no settings table to read: nothing was decided
+# What mtls_client_ca answers when there are no settings to read: nothing was decided
 MTLS_UNDECIDED = object()
 
 
@@ -164,10 +164,10 @@ def anchor_client_verification(ctx):
 
 def mtls_client_ca(data_path: str):
     """``(ca_pem, ca_name, required)`` when mTLS is on, None when it is off, and
-    ``MTLS_UNDECIDED`` when the database has no settings table."""
+    ``MTLS_UNDECIDED`` when there is no database file or no settings table to read."""
     database = open_boot_database(data_path)
     if database is None:
-        return None
+        return MTLS_UNDECIDED
     with database:
         config = _settings(database, (
             'mtls_enabled', 'mtls_required', 'mtls_trusted_ca_id'), missing=MTLS_UNDECIDED)

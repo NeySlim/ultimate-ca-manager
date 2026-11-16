@@ -112,7 +112,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- **No settings warnings at the first start on an empty database.** Before the schema was built, the start logged `relation "system_config" does not exist` for WSTEP, HTTPS and mTLS (`no such table` on a SQLite file cut short); a database without that table now reads as one without settings.
+- **No settings warnings at the first start on an empty database.** Before the schema was built, the start logged `relation "system_config" does not exist` for WSTEP, HTTPS and mTLS (`no such table` on a SQLite file cut short); a database without that table now reads as one without settings, and mTLS keeps the mode of the previous start.
 - **Packages: no bytecode of the previous version after an upgrade.** The DEB and RPM post-installation remove the `__pycache__` the service wrote under `/opt/ucm`, and the RPM keeps the dates of its sources: on Fedora 43 and EL10 every version carried the same file dates, so a source of unchanged size could run the previous version's bytecode.
 - SSH certificates: two workers or nodes signing under one SSH CA at the same time could issue the same serial number, so revoking one certificate in the KRL revoked the other too. Each signature now takes its own serial from the database.
 - Renewal: a renewal overtaken by another renewal of the same certificate, manual, bulk or scheduled, was refused as if the certificate were revoked. It is now refused as renewed by another request.
