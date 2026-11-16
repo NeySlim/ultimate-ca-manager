@@ -151,7 +151,7 @@ jobs:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main' || github.ref_name == 'sextant'))
-    timeout-minutes: 120
+    timeout-minutes: 150
     # On the 3.0 integration branch one run at a time: the running one finishes, the
     # newest push waits and replaces any older waiting one; elsewhere one group per commit
     concurrency:

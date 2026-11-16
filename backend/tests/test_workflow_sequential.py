@@ -103,3 +103,9 @@ def test_every_release_commit_keeps_its_sequential_run(ref):
 def test_only_the_sequential_job_has_its_own_group():
     jobs = load('tests.yml')['jobs']
     assert [name for name, job in jobs.items() if 'concurrency' in job] == ['test-backend-sequential']
+
+
+def test_the_job_leaves_the_first_pass_its_time_whatever_the_random_one_takes():
+    """The first pass ran 66 minutes when this was written: the job's limit, less the whole
+    limit of the random-order pass, must still cover it with room to grow."""
+    assert _job()['timeout-minutes'] - _random_step()['timeout-minutes'] >= 100
