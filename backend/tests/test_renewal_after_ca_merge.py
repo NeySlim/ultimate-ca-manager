@@ -180,11 +180,41 @@ def test_a_bulk_renewal_publishes_the_crl_of_the_record_that_remains(app, monkey
             _forget(moved + [silent], [keeper_id, dupe_id, quiet_id])
 
 
+def _scheduler_run(monkeypatch, renew, ids):
+    """One pass of the scheduler over *ids* with *renew* in place of the renewal: its
+    statistics and the CA references handed to the CRL publication."""
+    from models import SystemConfig
+    from services import auto_renewal_service as svc
+
+    enabled = SystemConfig.query.filter_by(key='auto_renewal_enabled').first()
+    was = enabled.value if enabled is not None else None
+    published = []
+    service = svc.AutoRenewalService
+    monkeypatch.setattr(service, 'renew_certificate', staticmethod(renew))
+    monkeypatch.setattr(service, '_held_for_approval', staticmethod(lambda cert, already_queued: None))
+    monkeypatch.setattr(service, '_publish_crls',
+                        staticmethod(lambda carefs: published.append(set(carefs))))
+    monkeypatch.setattr(service, '_send_failure_notification', staticmethod(lambda stats: None))
+    monkeypatch.setattr(service, '_send_renewal_notification', staticmethod(lambda stats: None))
+    monkeypatch.setattr(service, 'get_certificates_for_renewal', staticmethod(
+        lambda: [db.session.get(Certificate, i) for i in ids]))
+    try:
+        service.set_renewal_config({'enabled': True})
+        return service.run_auto_renewal(), published
+    finally:
+        monkeypatch.undo()
+        db.session.rollback()
+        row = SystemConfig.query.filter_by(key='auto_renewal_enabled').first()
+        if was is None and row is not None:
+            db.session.delete(row)
+        elif row is not None:
+            row.value = was
+        db.session.commit()
+
+
 def test_the_scheduler_publishes_the_crl_of_the_record_that_remains(app, monkeypatch):
     """The scheduler publishes its CRLs after the batch: a record merged away while a later
     certificate was handled is not the one the first renewed certificate names by then."""
-    from models import SystemConfig
-    from services import auto_renewal_service as svc
     from services.ski_aki_backfill import _move_ca_dependents
 
     with app.app_context():
@@ -193,8 +223,6 @@ def test_the_scheduler_publishes_the_crl_of_the_record_that_remains(app, monkeyp
         keeper_id, keeper_refid, dupe_id = keeper.id, keeper.refid, dupe.id
         first = _leaf_under(dupe.refid, 'sched-merged.example.test')
         second = _leaf_under(keeper.refid, 'sched-failed.example.test')
-        enabled = SystemConfig.query.filter_by(key='auto_renewal_enabled').first()
-        was = enabled.value if enabled is not None else None
 
         def renew(cert, regenerate_crl=True, known_serial=None):
             if cert.id == first:
@@ -204,30 +232,30 @@ def test_the_scheduler_publishes_the_crl_of_the_record_that_remains(app, monkeyp
             db.session.commit()
             return False, 'not renewed'
 
-        published = []
-        monkeypatch.setattr(svc.AutoRenewalService, 'renew_certificate', staticmethod(renew))
-        monkeypatch.setattr(svc.AutoRenewalService, '_held_for_approval',
-                            staticmethod(lambda cert, already_queued: None))
-        monkeypatch.setattr(svc.AutoRenewalService, '_publish_crls',
-                            staticmethod(lambda carefs: published.append(set(carefs))))
-        monkeypatch.setattr(svc.AutoRenewalService, '_send_failure_notification',
-                            staticmethod(lambda stats: None))
-        monkeypatch.setattr(svc.AutoRenewalService, '_send_renewal_notification',
-                            staticmethod(lambda stats: None))
-        monkeypatch.setattr(svc.AutoRenewalService, 'get_certificates_for_renewal', staticmethod(
-            lambda: [db.session.get(Certificate, first), db.session.get(Certificate, second)]))
         try:
-            svc.AutoRenewalService.set_renewal_config({'enabled': True})
-            stats = svc.AutoRenewalService.run_auto_renewal()
+            stats, published = _scheduler_run(monkeypatch, renew, [first, second])
             assert (stats['renewed'], stats['failed']) == (1, 1), stats
             assert published == [{keeper_refid}]
         finally:
-            monkeypatch.undo()
-            db.session.rollback()
-            row = SystemConfig.query.filter_by(key='auto_renewal_enabled').first()
-            if was is None and row is not None:
-                db.session.delete(row)
-            elif row is not None:
-                row.value = was
-            db.session.commit()
             _forget([first, second], [keeper_id, dupe_id])
+
+
+def test_the_scheduler_publishes_the_crl_of_the_ca_of_each_member_of_a_pair(app, monkeypatch):
+    from services.cert import renewal
+
+    with app.app_context():
+        key, cert = _authority()
+        ca_a, ca_b = _ca_row(key, cert), _ca_row(key, cert)
+        ids, refids = [ca_a.id, ca_b.id], {ca_a.refid, ca_b.refid}
+        first = _leaf_under(ca_a.refid, 'sched-pair-a.example.test')
+        partner = _leaf_under(ca_b.refid, 'sched-pair-b.example.test')
+        monkeypatch.setattr(renewal, 'renewal_partner', lambda cert: (
+            db.session.get(Certificate, partner) if cert.id == first else None))
+        try:
+            stats, published = _scheduler_run(
+                monkeypatch, lambda cert, regenerate_crl=True, known_serial=None: (True, cert.id),
+                [first])
+            assert stats['renewed'] == 1, stats
+            assert published == [refids]
+        finally:
+            _forget([first, partner], ids)
