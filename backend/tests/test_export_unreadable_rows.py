@@ -3,6 +3,7 @@ answers the same in PEM and P7B when none is readable."""
 import base64
 import datetime
 import json
+from types import SimpleNamespace
 
 import pytest
 from cryptography import x509
@@ -101,23 +102,29 @@ def rows(app, create_cert, create_ca):
         db.session.commit()
         made['trust'] = trust
 
-    def corrupt(route, row_id):
+    def store(route, row_id, value):
         with app.app_context():
             row = db.session.get(_model(route), row_id)
             col = _column(route)
             saved.append((route, row_id, getattr(row, col)))
-            setattr(row, col, 'garbage' if route.kind == 'trust' else GARBAGE)
+            setattr(row, col, value)
             db.session.commit()
 
+    def corrupt(route, row_id):
+        store(route, row_id, 'garbage' if route.kind == 'trust' else GARBAGE)
+
     def corrupt_all(route):
+        """Corrupts every row the route selects and returns how many."""
         with app.app_context():
-            ids = [r.id for r in _model(route).query.all()]
+            ids = [r.id for r in _model(route).query.all()
+                   if route.kind == 'trust' or getattr(r, _column(route))]
         for i in ids:
             corrupt(route, i)
+        return len(ids)
 
-    yield made, corrupt, corrupt_all
+    yield SimpleNamespace(made=made, store=store, corrupt=corrupt, corrupt_all=corrupt_all)
     with app.app_context():
-        for route, row_id, value in saved:
+        for route, row_id, value in reversed(saved):
             setattr(db.session.get(_model(route), row_id), _column(route), value)
         for model, key in ((TrustedCertificate, 'trust'), (Certificate, 'cert'), (CA, 'ca')):
             model.query.filter(model.id.in_(made[key])).delete(synchronize_session=False)
@@ -127,9 +134,8 @@ def rows(app, create_cert, create_ca):
 @EVERY
 @BOTH
 def test_an_unreadable_row_is_skipped_logged_and_named(auth_client, rows, route, fmt, caplog):
-    made, corrupt, _ = rows
-    ids = made[route.kind]
-    corrupt(route, ids[0])
+    ids = rows.made[route.kind]
+    rows.corrupt(route, ids[0])
     with caplog.at_level('WARNING'):
         r = route.call(auth_client, ids, fmt)
     assert r.status_code == 200, r.data
@@ -142,8 +148,8 @@ def test_an_unreadable_row_is_skipped_logged_and_named(auth_client, rows, route,
 
 @EVERY
 def test_no_readable_row_answers_the_same_in_both_formats(auth_client, rows, route):
-    made, _, corrupt_all = rows
-    corrupt_all(route)
+    made = rows.made
+    rows.corrupt_all(route)
     answers = [route.call(auth_client, made[route.kind], fmt) for fmt in ('pem', 'p7b')]
     assert answers[0].status_code == answers[1].status_code == 404
     for r in answers:
@@ -152,6 +158,54 @@ def test_no_readable_row_answers_the_same_in_both_formats(auth_client, rows, rou
         assert details['skipped_count'] >= 2
         assert 'No readable' in r.get_json()['detail']
     assert answers[0].get_json() == answers[1].get_json()
+
+
+def _forms():
+    """Each shape of a valid stored certificate: (label, PEM bytes, certificates it holds)."""
+    bare, first, second, crlf = (_pem(f'form-{n}') for n in ('bare', 'first', 'second', 'crlf'))
+    pkcs12_text = b'Bag Attributes\n    localKeyID: 01 02\nsubject=CN=form-p12\nissuer=CN=form-p12\n'
+    x509_text = b'Certificate:\n    Data:\n        Version: 3 (0x2)\n'
+    p12, text = _pem('form-p12'), _pem('form-text')
+    return [
+        ('bare', bare, [bare]),
+        ('after-pkcs12-attributes', pkcs12_text + p12, [p12]),
+        ('after-x509-text', x509_text + text, [text]),
+        ('two-certificates', first + second, [first, second]),
+        ('crlf', crlf.replace(b'\n', b'\r\n'), [crlf]),
+    ]
+
+
+FORMS = _forms()
+
+
+@EVERY
+@BOTH
+@pytest.mark.parametrize('form', FORMS, ids=lambda f: f[0])
+def test_every_valid_stored_form_exports_as_before(auth_client, rows, route, fmt, form):
+    """What the base exported from a valid row it still exports, the same bytes in PEM."""
+    label, pem, certs = form
+    row_id = rows.made[route.kind][0]
+    stored = pem.decode() if route.kind == 'trust' else base64.b64encode(pem).decode()
+    rows.store(route, row_id, stored)
+    r = route.call(auth_client, rows.made[route.kind], fmt)
+    assert r.status_code == 200, r.data
+    assert str(row_id) not in r.headers.get(f'X-Skipped-{route.header}', '').split(',')
+    if fmt == 'pem':
+        if route.kind == 'trust':
+            # the bundle names each entry, found through the stored PEM itself
+            expected = f'# trust-0\n{pem.decode().strip()}\n'.encode()
+        else:
+            expected = pem if pem.endswith(b'\n') else pem + b'\n'
+        assert expected in r.data
+        return
+    exported = [c.public_bytes(serialization.Encoding.DER) for c in pkcs7.load_der_pkcs7_certificates(r.data)]
+    wanted = [x509.load_pem_x509_certificate(c).public_bytes(serialization.Encoding.DER) for c in certs]
+    if route.kind == 'trust':
+        # a trust store entry is the one certificate it was accepted for, its first
+        assert wanted[0] in exported and not any(w in exported for w in wanted[1:])
+    else:
+        at = exported.index(wanted[0])
+        assert exported[at:at + len(wanted)] == wanted
 
 
 def test_readable_pems_skips_null_and_empty_rows():

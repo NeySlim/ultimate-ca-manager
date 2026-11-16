@@ -8,7 +8,6 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
-from utils.p7b import p7b_from_pems
 from utils.export_pems import readable_pems, skipped_headers, nothing_readable
 from models import db
 from models.truststore import TrustedCertificate
@@ -16,6 +15,7 @@ from services.audit_service import AuditService
 from services.deletion_blockers import parse_bulk_ids
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.hazmat.backends import default_backend
 import hashlib
 from datetime import datetime
@@ -568,7 +568,9 @@ def export_trust_bundle():
         if not certs:
             return error_response('No certificates found matching criteria', 404)
         
-        pems, skipped = readable_pems(((c.id, c.certificate_pem) for c in certs))
+        # an entry is readable when its first certificate is, as when it was added
+        pems, skipped = readable_pems(((c.id, c.certificate_pem) for c in certs),
+                                      load=x509.load_pem_x509_certificate)
         if not pems:
             return nothing_readable(skipped)
         headers = skipped_headers(skipped)
@@ -586,7 +588,9 @@ def export_trust_bundle():
 
         filename = f'truststore-{sanitize_filename(purpose)}-bundle.p7b'
         headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-        return Response(p7b_from_pems(pems), mimetype='application/x-pkcs7-certificates', headers=headers)
+        p7b = pkcs7.serialize_certificates([x509.load_pem_x509_certificate(p) for p in pems],
+                                           serialization.Encoding.DER)
+        return Response(p7b, mimetype='application/x-pkcs7-certificates', headers=headers)
 
     except Exception as e:
         logger.error(f'Failed to export trust store bundle: {e}')
