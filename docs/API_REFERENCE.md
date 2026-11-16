@@ -993,7 +993,9 @@ Content-Type: application/json
 
 Renewing a member of a hybrid pair renews both, and the new B names the new A; the response
 lists the other member in `related_renewed`. When the two members require approval under
-different policies, the renewal answers `409` and only an administrator can perform it.
+different policies, the renewal answers `409` and only an administrator can perform it. A
+certificate or a pair link changed by another request while the renewal runs also answers
+`409`: reload the certificate and retry.
 
 ### Revoke Certificate
 ```http
