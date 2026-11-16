@@ -3346,7 +3346,7 @@ Additional fields depend on `provider_type` (ldap, oauth2, saml).
 
 Custom roles are referenced by name. Among the groups a user belongs to, the base role is the most privileged one given; the custom role is the first one, in mapping order, that names one. A custom role never grants the permissions reserved to administrators.
 
-The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
+The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. A key is saved without its edge spaces. For an LDAP provider, keys and group names compare ignoring case, edge spaces and the length of inner space runs (caseIgnoreMatch), and two keys equal in that sense return `400`; OIDC and SAML groups compare exactly. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
 
 With `sync_role_on_login` on, each login also updates the custom role, and removes it when no matching group names one, but only if it came from the mapping (`custom_role_source` is `"sso"`). A custom role assigned by hand is never replaced nor removed. System roles cannot be used as the custom role of a mapping. Changes are recorded in the audit log as `role_change`.
 
@@ -3372,6 +3372,16 @@ POST /api/v2/sso/providers/{provider_id}/toggle
 ```http
 POST /api/v2/sso/providers/{provider_id}/test
 ```
+
+### Test LDAP Role Mapping (admin)
+```http
+POST /api/v2/sso/providers/{provider_id}/test-mapping
+Content-Type: application/json
+
+{ "username": "alice" }
+```
+
+A dry run of an LDAP login past the password, without creating a session: the same entry, groups and verdict as the login. `found: false` when the user filter finds no entry; otherwise `user_dn`, `username`, `email`, `groups`, `groups_readable`, `access_allowed`, `refusal` (`null`, `account_disabled`, `groups_unreadable`, `group_denied`, `unmapped` or `no_default_role`), `resolved_role` and `resolved_custom_role` (`null` when refused), `role_mapping`, `default_role`, `required_groups`, and `account_checked: false` with a `note`: the password and the UCM account the sign-in would open are not checked. `400` for a provider that is not LDAP, without `username` ("Username is required") or for a failed user lookup; `404` for an unknown provider.
 
 ### List SSO Sessions (admin)
 ```http
