@@ -149,21 +149,20 @@ def resolve_issuing_ca(cert: Certificate) -> 'CA | None':
     return verified[0][0]
 
 
-def check_renewable(cert: Certificate) -> None:
+def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
     """Raise :class:`RenewalError` when ``cert`` cannot be renewed at all
     (no certificate, revoked, issued by a Microsoft CA, key not held by the
     server). Shared by the renewal itself and by the routes, which check it
     before queueing a renewal for approval: a request no renewal could honour
-    must not wait for an approver."""
+    must not wait for an approver. ``trigger`` words the refusal of a row renewed
+    since it was read."""
     if not cert.crt:
         raise RenewalError('Certificate data not available', 400)
     # Any revocation, a suspension included: renewing would hand back a good serial
     if cert.revoked:
         raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
     # The record outlives the row: a row left unrevoked beside it renews nothing
-    from services.cert.issued_lookup import row_persisted_revocation
-    if row_persisted_revocation(cert) is not None:
-        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
+    _refuse_recorded_revocation(cert, None, trigger)
     if cert.source == 'msca':
         raise RenewalError('Microsoft CA certificates must be renewed through the AD CS connector', 400)
 
@@ -205,6 +204,21 @@ def check_renewable(cert: Certificate) -> None:
             refusal = san_type_refusal(allowed, [san_type_of(n) for n in names], template.name)
             if refusal:
                 raise RenewalError(f'Policy violation: {refusal}', 400)
+
+
+def _refuse_recorded_revocation(cert: Certificate, ca, trigger: str) -> None:
+    """Refuse ``cert`` when a record revokes the serial it was read with. A renewal that
+    committed since records that serial as superseded: only the serial the row carries
+    now is revoked by its record, an older one was renewed meanwhile."""
+    from services.cert.issued_lookup import row_persisted_revocation
+    if row_persisted_revocation(cert, ca) is None:
+        return
+    stored = db.session.query(Certificate.serial_number).filter(Certificate.id == cert.id).first()
+    if stored is None:
+        raise RenewalError('Certificate no longer exists', 404)
+    if stored[0] != cert.serial_number:
+        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
+    raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
 
 
 def _stored_eddsa_name(cert: Certificate):
@@ -370,8 +384,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     """Every check, the signature and the writes, left uncommitted; *related_to*
     is the certificate A the renewed one names (RFC 9763)."""
     cert = _reread(cert, known_serial, trigger)
-    check_renewable(cert)
-    ca, ca_cert, ca_key = _signing_ca(cert, ca)
+    check_renewable(cert, trigger)
+    ca, ca_cert, ca_key = _signing_ca(cert, ca, trigger)
 
     original = x509.load_pem_x509_certificate(b64decode(cert.crt))
     public_key = original.public_key()
@@ -439,7 +453,7 @@ def _reread(cert, known_serial, trigger):
     return fresh
 
 
-def _signing_ca(cert, ca):
+def _signing_ca(cert, ca, trigger='manual'):
     """``(ca, ca certificate, signing key)`` of the CA that really signed ``cert``."""
     if ca is None:
         ca = resolve_issuing_ca(cert)
@@ -461,9 +475,7 @@ def _signing_ca(cert, ca):
             f'This certificate\'s signature does not verify with the current key of CA "{ca.descr}" '
             '(re-keyed or replaced): it cannot be renewed under it, issue a new certificate instead', 400)
     # Under the CA that really signed it, which a row without caref only now names
-    from services.cert.issued_lookup import row_persisted_revocation
-    if row_persisted_revocation(cert, ca) is not None:
-        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
+    _refuse_recorded_revocation(cert, ca, trigger)
 
     from services.hsm.ca_key_loader import get_ca_signing_key
     try:

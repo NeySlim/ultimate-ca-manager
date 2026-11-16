@@ -4,8 +4,8 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "--ignore=tests/e2e_test_suite.py -m 'not ha'"
-# A passed run leaves nothing in the temporary directory; a failed one keeps its own
-# until three later runs of the same user have ended
+# A passed test leaves nothing in the temporary directory; a failed one keeps its own,
+# and pytest keeps the three most recent runs of the user
 tmp_path_retention_policy = "failed"
 tmp_path_retention_count = 3
 markers = [
