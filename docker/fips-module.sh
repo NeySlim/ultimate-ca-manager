@@ -15,7 +15,12 @@ install_fips_module() {
     # absolute path (a relative one names another directory in the process that loads the module);
     # a directory that cannot be resolved is refused, not taken as equal
     checked=$(realpath -m -- "$(dirname -- "$module")" 2>/dev/null)
-    if [ -n "${OPENSSL_MODULES+set}" ] && { [ "${OPENSSL_MODULES#/}" = "$OPENSSL_MODULES" ] || [ -z "$checked" ] \
+    if [ -n "${OPENSSL_MODULES+set}" ] && [ -z "$checked" ]; then
+        echo -e "${RED:-}❌ The directory of the checked FIPS module ($(dirname -- "$module")) cannot be resolved, so OPENSSL_MODULES ($OPENSSL_MODULES) cannot be compared to it${NC:-}"
+        echo "   Remove OPENSSL_MODULES: UCM does not start FIPS mode on a module it has not checked."
+        return 1
+    fi
+    if [ -n "${OPENSSL_MODULES+set}" ] && { [ "${OPENSSL_MODULES#/}" = "$OPENSSL_MODULES" ] \
         || [ "$(realpath -m -- "$OPENSSL_MODULES" 2>/dev/null)" != "$checked" ]; }; then
         echo -e "${RED:-}❌ OPENSSL_MODULES ($OPENSSL_MODULES) is not the absolute path of the directory of the checked FIPS module ($(dirname -- "$module"))${NC:-}"
         echo "   Remove OPENSSL_MODULES: UCM does not start FIPS mode on a module it has not checked."

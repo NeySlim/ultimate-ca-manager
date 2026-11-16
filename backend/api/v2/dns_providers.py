@@ -239,7 +239,7 @@ def update_provider(provider_id):
         try:
             saved = _saved_credentials(provider, credentials)
         except SecretUnreadable as e:
-            return error_response(str(e), 400)  # kept as stored: it must be entered again
+            return error_response(str(e), 400)  # kept as stored
         if saved is not None:
             merged = saved
             for key, value in credentials.items():
