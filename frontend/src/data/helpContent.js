@@ -1530,6 +1530,7 @@ export const helpContent = {
           { label: 'User Filter', text: 'LDAP filter to match users (e.g., (uid={username}))' },
           { label: 'Attribute Mapping', text: 'Map LDAP attributes to username, email, full name' },
           { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink then Link to SSO.' },
+          { label: 'Groups', text: 'With memberOf, read from the user\'s own entry; with member or uniqueMember, searched under the parent of the Base DN when the directory holds it and then under the Base DN, the group filter defaulting to (objectClass=*). Direct membership only: nested groups and the Active Directory primary group (Domain Users) are not seen. Names compare with rules and required groups ignoring case, edge spaces and the length of inner space runs. When rules or required groups exist and the groups cannot be read, the sign-in is refused saying so. Test Mapping reads the groups and decides as the sign-in does.' },
         ]
       },
     ],
