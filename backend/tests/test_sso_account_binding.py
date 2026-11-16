@@ -656,3 +656,54 @@ def test_ldap_orphan_is_not_taken_back_through_another_host_without_a_unique_id(
                      else 'ou=people,dc=example,dc=com')
     if case != 'other_base_dn':
         assert _login(app, same, name, data) == (name, None)
+
+
+@pytest.mark.parametrize('fields, sent', [
+    ({'auth_source': 'oauth2', 'password_hash': NOPASS}, False),
+    ({'auth_source': 'local', 'password_hash': NOPASS, 'force_password_change': False}, False),
+    ({'auth_source': 'oauth2', 'password_hash': 'kept-hash'}, True),
+    ({'auth_source': 'local', 'password_hash': NOPASS, 'force_password_change': True}, True),
+    ({'auth_source': 'local', 'password_hash': 'local-hash'}, True),
+], ids=['sso-no-password', 'sso-before-auth-source', 'sso-kept-password', 'unlinked', 'local'])
+def test_the_reset_link_goes_to_every_account_but_one_its_provider_alone_opens(
+        app, providers, mailbox, fields, sent):
+    """No password is handed to an account that has none and signs in through its provider;
+    one that holds a password, or was unlinked to set one, keeps the reset."""
+    name = _name()
+    if fields['auth_source'] != 'local':
+        fields = dict(fields, sso_provider_id=providers.b)
+    uid = _add(app, username=name, **fields)
+    r = _forgot(app, f'{name}@corp.example')
+    assert r.status_code == 200 and 'If an account' in r.get_json()['message']
+    assert [m['context']['username'] for m in mailbox] == ([name] if sent else [])
+    with app.app_context():
+        assert bool(db.session.get(User, uid).password_reset_token) is sent
+
+
+def test_the_reset_reaches_the_active_account_behind_an_inactive_one(app, providers, mailbox):
+    gone, name = _name(), _name()
+    email = f'{name}@corp.example'
+    _add(app, username=gone, email=email, auth_source='oauth2', sso_provider_id=providers.b,
+         password_hash='old-hash', active=False)
+    _add(app, username=name, email=email, auth_source='local', password_hash='hash-l')
+    assert _forgot(app, email).status_code == 200
+    assert [m['context']['username'] for m in mailbox] == [name]
+
+
+def test_an_administrator_cannot_remove_the_password_of_their_own_account(app, providers, auth_client):
+    with app.app_context():
+        me = User.query.filter_by(username='admin').one()
+        uid, before = me.id, (me.password_hash, me.auth_source, me.sso_provider_id)
+    try:
+        r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                             json={'provider_id': providers.b, 'remove_password': True})
+        assert r.status_code == 400 and 'your own account' in r.get_json()['message']
+        with app.app_context():
+            me = db.session.get(User, uid)
+            assert (me.password_hash, me.auth_source, me.sso_provider_id) == before
+    finally:  # the shared admin account stays usable whatever the answer was
+        with app.app_context():
+            me = db.session.get(User, uid)
+            me.password_hash, me.auth_source, me.sso_provider_id = before
+            me.sso_external_id = None
+            db.session.commit()

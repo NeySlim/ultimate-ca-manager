@@ -232,6 +232,9 @@ def link_user_sso(user_id):
     provider = db.session.get(SSOProvider, provider_id)
     if not provider:
         return error_response('SSO provider not found', 404)
+    # Changing one's own password asks for the current one: removing it is another admin's act
+    if remove_password and g.current_user.id == user_id:
+        return error_response('You cannot remove the local password of your own account', 400)
 
     # The account's sessions end when its owner may change (another provider, a local
     # account, a reset identity) or its local password goes: they were opened before.
