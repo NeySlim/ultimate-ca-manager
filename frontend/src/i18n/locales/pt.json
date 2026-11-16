@@ -1397,7 +1397,7 @@
     "activate": "Ativar",
     "activated": "Modelo ativado",
     "deactivated": "Modelo desativado",
-    "deactivateTooltip": "Um modelo desativado não é oferecido pelo formulário Emitir certificado nem pela autoinscrição do Windows. Os modelos do sistema podem ser desativados, mas não editados: copie-o para o alterar."
+    "deactivateTooltip": "Um modelo desativado não é oferecido pelo formulário Emitir certificado nem pela autoinscrição do Windows. Os modelos do sistema podem ser desativados, mas não editados: copie um para o alterar."
   },
   "users": {
     "securityKeys": {

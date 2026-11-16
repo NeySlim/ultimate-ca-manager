@@ -318,7 +318,7 @@ Associez vos domaines aux fournisseurs DNS. Lors de la demande d'un certificat p
 
 ## Mode Proxy ACME
 
-Le proxy ACME permet aux clients internes de demander des certificats à une AC public (Let's Encrypt, ZeroSSL, etc.) via UCM, sans accès direct à Internet. UCM agit comme intermédiaire, gérant les défis DNS-01 et transférant les requêtes à l'AC en amont.
+Le proxy ACME permet aux clients internes de demander des certificats à une AC publique (Let's Encrypt, ZeroSSL, etc.) via UCM, sans accès direct à Internet. UCM agit comme intermédiaire, gérant les défis DNS-01 et transférant les requêtes à l'AC en amont.
 
 ### Quand utiliser le mode proxy
 - Serveurs internes sans accès direct à Internet

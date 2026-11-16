@@ -3559,7 +3559,7 @@
           "remedy": "Créez une AC RSA ou ECDSA (P-256/P-384/P-521) et déplacez-y l'émission avant la bascule ; la clé d'une AC ne peut pas être convertie."
         },
         "ca_weak_key": {
-          "title": "Autorités de certification avec une clé DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
+          "title": "Autorités de certification avec une clé DSA, une clé RSA de longueur impaire ou hors de 2048 à 16384 bits, ou une courbe autre que P-256/384/521",
           "remedy": "Créez une AC en RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission."
         },
         "ca_unapproved_algorithm": {
@@ -5471,7 +5471,7 @@
     "winrmUsernamePlaceholder": "DOMAINE\\svc_ucm_officer",
     "winrmPassword": "Mot de passe WinRM",
     "caConfig": "Config AC (optionnel)",
-    "caConfigPlaceholder": "HôteCA\\Nom commun AC : seulement si l'hôte WinRM n'est pas l'AC",
+    "caConfigPlaceholder": "HôteAC\\Nom commun de l'AC : seulement si l'hôte WinRM n'est pas l'AC",
     "testAdminChannel": "Tester le canal d'administration",
     "adminChannelTestSuccess": "Canal d'administration joignable (certsvc : {{status}})",
     "adminChannelTestFailed": "Échec du test du canal d'administration",
@@ -5518,14 +5518,14 @@
     "selectTemplate": "Sélectionner le modèle de certificat",
     "loadingTemplates": "Chargement des modèles...",
     "pending": "En attente d'approbation",
-    "pendingMessage": "La demande de certificat est en attente d'approbation sur AC Microsoft",
+    "pendingMessage": "La demande de certificat est en attente d'approbation sur l'AC Microsoft",
     "issued": "Émis",
     "denied": "Refusé",
     "checkStatus": "Vérifier le statut",
     "checkIssued": "Certificat émis et importé",
     "checkStillPending": "Toujours en attente d'approbation sur l'AC",
     "checkDenied": "L'AC a refusé cette demande",
-    "checkSuperseded": "Cette CSR a été signée ailleurs : sa demande auprès d'AC Microsoft est close",
+    "checkSuperseded": "Cette CSR a été signée ailleurs : sa demande auprès de l'AC Microsoft est close",
     "checkFailed": "Échec de la vérification du statut",
     "refreshStatus": "Actualiser le statut",
     "signMode": "Méthode de signature",

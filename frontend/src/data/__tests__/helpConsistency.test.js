@@ -74,6 +74,14 @@ describe('French wording of the certification authority', () => {
     const found = frStrings.flatMap((s) => uncoded(s).match(/(?<![\p{L}\p{N}_])(?:la|le|de|du|ce|cet|au|un|sa|ma|ta|que|si|tout|nouveau|quel)\s+AC(?![\p{L}\p{N}_]).{0,20}|[\p{L}\p{N}_]+\\?['’]CA(?![\p{L}\p{N}_]).{0,20}/giu) || [])
     expect(found).toEqual([])
   })
+  // What the two guards above cannot see: a masculine adjective, a bare "AC" after a preposition, "CA" glued to a word.
+  it('agrees the adjective after AC and leaves no CA glued to a word', () => {
+    const masculine = /(?<![\p{L}])(?:une|cette|toute|l['’])\s?AC\s+(?:public|privé|émetteur|parent|subordonné|local|distant|compromis|révoqué|expiré|configuré|créé|importé|signé|supprimé|géré|lié|existant|actif|désactivé|sélectionné|utilisé|connu|inconnu|approuvé)s?(?![\p{L}]).{0,10}/giu
+    const bare = /(?<![\p{L}])(?:sur|vers|chez)\s+AC(?![\p{L}\p{N}_]).{0,20}|auprès d['’]AC Microsoft/giu
+    const glued = /\p{Ll}CA(?![\p{L}\p{N}_]).{0,20}|(?<![\p{L}])MS AC(?![\p{L}])/gu
+    const found = frStrings.flatMap((s) => [masculine, bare, glued].flatMap((re) => uncoded(s).match(re) || []))
+    expect(found).toEqual([])
+  })
 })
 
 describe('SSO setup steps', () => {
@@ -145,6 +153,8 @@ describe('buttons of the HSM, certificate and template guides in every language'
     expect(guide(lang, 'hsm')).toContain(`**${t.common.generate}**`)
     expect(guide(lang, 'certificates')).toContain(`**${t.certificates.issueCertificate}**`)
     expect(guide(lang, 'templates')).toContain(`**${t.common.copy}**`)
+    const oldCopy = { en: 'Duplicate', fr: 'Dupliquer', ru: 'Дублировать' }[lang]
+    if (oldCopy) expect(guide(lang, 'templates')).not.toContain(`**${oldCopy}**`)
     // The key generation modal opens with Generate; the former labels are gone from the steps.
     const oldLabel = { en: 'Generate Key', fr: 'Générer une clé', ru: 'Сформировать ключ HSM', zh: '生成密钥' }[lang]
     expect(guide(lang, 'hsm')).not.toContain(`**${oldLabel}**`)
@@ -155,7 +165,7 @@ describe('buttons of the HSM, certificate and template guides in every language'
     const text = (lang === 'en' ? helpContent.account : pages[`../help/${lang}/account.js`].default.helpContent)
     const forced = strings(text.sections).find((s) => s.includes('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE'))
     expect(forced).toContain(t.common.logout)
-    expect(forced).toMatch({ en: /only other button is Logout/, fr: /seul autre bouton est Déconnexion/, ru: /единственная другая кнопка/, zh: /唯一的另一个按钮/ }[lang])
+    expect(forced).toMatch({ en: /only other button is Logout/, fr: /seul autre bouton est Déconnexion/, ru: /только одна другая кнопка/, zh: /唯一的另一个按钮/ }[lang])
   })
 })
 
