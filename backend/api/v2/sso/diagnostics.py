@@ -50,9 +50,10 @@ def _group_like(name):
     return any(word in lowered for word in _GROUP_WORDS)
 
 
-def claim_candidates(*claim_sets):
+def claim_candidates(*claim_sets, exclude=()):
     """Dotted names of the claims that hold a list or whose name speaks of groups,
-    roles or members, through nested objects; values are never returned."""
+    roles or members, through nested objects, but those in ``exclude`` (already read);
+    values are never returned."""
     names = {}
 
     def walk(data, prefix, depth):
@@ -69,16 +70,18 @@ def claim_candidates(*claim_sets):
     for claims in claim_sets:
         if isinstance(claims, dict):
             walk(claims, '', 1)
-    return list(names)
+    return [name for name in names if name not in exclude]
 
 
-def saml_candidates(attrs, friendly_names=None):
+def saml_candidates(attrs, friendly_names=None, exclude=()):
     """SAML attribute Names with several values or a group-like Name or FriendlyName,
     the FriendlyName shown in parentheses: it only helps find the Name (SAML Core
     §2.7.3.1 forbids identifying an attribute by it)."""
     friendly_names = friendly_names if isinstance(friendly_names, dict) else {}
     names = []
     for name, values in (attrs if isinstance(attrs, dict) else {}).items():
+        if name in exclude:
+            continue
         friendly = friendly_names.get(name)
         friendly = friendly if isinstance(friendly, str) and friendly and friendly != name else None
         several = isinstance(values, (list, tuple)) and len(values) > 1

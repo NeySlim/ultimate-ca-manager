@@ -148,3 +148,12 @@ def test_role_resolution_line_counts_rules_and_bounds_the_groups(app, caplog):
     assert '5 rule(s)' in line
     assert "'grp-19'" in line and "'grp-20'" not in line
     assert '(+180 more)' in line
+
+
+def test_names_already_read_are_not_suggested_again():
+    _values, source = oidc_groups({'groups': []}, {'roles': [], 'realm_access': {'roles': ['r']}},
+                                  None, None)
+    assert source.candidates == ['realm_access.roles']
+    from api.v2.sso.helpers import saml_groups
+    _values, source = saml_groups({'groups': [], 'Role': ['r']}, None)
+    assert source.candidates == ['Role']

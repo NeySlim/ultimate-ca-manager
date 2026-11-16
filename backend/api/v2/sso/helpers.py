@@ -395,7 +395,7 @@ def saml_groups(attrs, attr_mapping=None, friendly_names=None):
     names = sources or looked_for
     label = (f"SAML attribute{'s' if len(names) > 1 else ''} "
              f"{shown_list(names, MAX_NAMES, NAME_LENGTH)}")
-    candidates = None if groups else saml_candidates(attrs, friendly_names)
+    candidates = None if groups else saml_candidates(attrs, friendly_names, exclude=looked_for)
     return list(groups), GroupSource(label, candidates, 'attributes')
 
 
@@ -575,7 +575,7 @@ def oidc_groups(userinfo, id_claims, token_unused=None, attr_mapping=None):
              f"{shown_list(names, MAX_NAMES, NAME_LENGTH)}")
     if token_unused is not None:
         label += f" (ID token not used: {token_unused})"
-    candidates = None if merged else claim_candidates(*(data for _, data in sources))
+    candidates = None if merged else claim_candidates(*(data for _, data in sources), exclude=names)
     return list(merged), GroupSource(label, candidates, 'claims')
 
 
