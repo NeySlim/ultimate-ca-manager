@@ -14,8 +14,10 @@ REMOVED_ACTION = 'truststore_private_key_removed'
 
 # Any armour label ending in PRIVATE KEY: PKCS#8, encrypted PKCS#8, RSA, EC, DSA, OpenSSH
 _PRIVATE_KEY = re.compile(rb'-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----')
-# A block body is base64 and whitespace only, so no other armour can hide inside one
-_CERTIFICATE_BLOCK = re.compile(rb'-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\s]*?-----END CERTIFICATE-----(?:\r?\n)?')
+# A block body is base64 and whitespace only, so no other armour can hide inside one; 2.x also
+# stored the `X509 CERTIFICATE` label, which cryptography loads
+_CERTIFICATE_BLOCK = re.compile(rb'-----BEGIN (?P<label>(?:X509 )?CERTIFICATE)-----[A-Za-z0-9+/=\s]*?'
+                                rb'-----END (?P=label)-----(?:\r?\n)?')
 
 
 class PrivateKeyInEntry(ValueError):

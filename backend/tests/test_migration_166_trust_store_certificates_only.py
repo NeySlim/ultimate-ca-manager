@@ -42,14 +42,19 @@ def _rows():
         text, _, _ = _issue('after-text')
         first, _, _ = _issue('chain-first')
         second, _, _ = _issue('chain-second')
+        _, only_key, _ = _issue('key-only')
+        old, old_key, _ = _issue('legacy-label')
+        old = old.replace('BEGIN CERTIFICATE', 'BEGIN X509 CERTIFICATE').replace('END CERTIFICATE', 'END X509 CERTIFICATE')
         _MADE['rows'] = [
             (1, 'sane', sane, sane, False),
             (2, 'server.pem', kc_key + kc, kc, True),
             (3, 'cert and key', ck + ck_key, ck, True),
             (4, 'after text', 'subject=CN=after-text\nissuer=CN=after-text\n' + text, text, False),
             (5, 'chain', first + second, first + second, False),
+            (6, 'key only', only_key, '', True),
+            (7, 'legacy label', old_key + old, old, True),
         ]
-        _MADE['keys'] = (kc_key, ck_key)
+        _MADE['keys'] = (kc_key, ck_key, only_key, old_key)
     return _MADE['rows']
 
 
@@ -82,11 +87,14 @@ def test_a_2254_trust_store_keeps_its_certificates_only(dialect, tmp_path, monke
         after = _stored(db)
         assert after == {row_id: expected for row_id, _, _, expected, _ in _rows()}
         listed = _listed(db)
-        assert sorted(e['id'] for e in listed) == [2, 3]
-        assert {e['name'] for e in listed} == {'server.pem', 'cert and key'}
-        assert all(len(e['fingerprint_sha256']) == 64 for e in listed)
+        keyed = [row_id for row_id, _, _, _, removed in _rows() if removed]
+        assert sorted(e['id'] for e in listed) == keyed == [2, 3, 6, 7]
+        assert {e['name'] for e in listed} == {'server.pem', 'cert and key', 'key only', 'legacy label'}
+        # A row that held a key and no certificate has no fingerprint to give
+        assert {e['id']: e['fingerprint_sha256'] and len(e['fingerprint_sha256']) for e in listed} == {
+            2: 64, 3: 64, 6: None, 7: 64}
         warned = [m for m in caplog.messages if 'held a private key' in m]
-        assert len(warned) == 2 and all('replace that key' in m for m in warned)
+        assert len(warned) == len(keyed) and all('replace that key' in m for m in warned)
         for key in _MADE['keys']:
             body = key.splitlines()[1]
             assert not any(body in m for m in caplog.messages)

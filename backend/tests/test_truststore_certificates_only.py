@@ -181,3 +181,30 @@ def test_a_key_after_a_truncated_certificate_block_is_never_taken_for_its_body()
     key, cert = _issue('truncated')
     held = b'-----BEGIN CERTIFICATE-----\nMIIB\n' + _key_pem(key) + _pem(cert)
     assert certificate_blocks(held) == _pem(cert)
+
+
+def test_the_legacy_x509_certificate_label_is_read_as_a_certificate():
+    """2.x stored what cryptography loads, the `X509 CERTIFICATE` armour included."""
+    from cryptography import x509
+    from utils.export_pems import readable_pems
+    from utils.trust_pem import certificate_blocks, first_fingerprint
+    import datetime
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'legacy-label')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(x509.random_serial_number()).not_valid_before(now)
+            .not_valid_after(now + datetime.timedelta(days=1)).sign(key, hashes.SHA256()))
+    pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+    legacy = pem.replace('BEGIN CERTIFICATE', 'BEGIN X509 CERTIFICATE').replace('END CERTIFICATE', 'END X509 CERTIFICATE')
+    key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                serialization.NoEncryption()).decode()
+    assert certificate_blocks(key_pem + legacy).decode() == legacy
+    assert first_fingerprint(legacy) == cert.fingerprint(hashes.SHA256()).hex()
+    pems, skipped = readable_pems([(1, key_pem + legacy)], load=x509.load_pem_x509_certificate)
+    assert skipped == [] and len(pems) == 1 and b'PRIVATE KEY' not in pems[0]
+    # A block opened under one label and closed under the other is not one
+    assert certificate_blocks(legacy.replace('END X509 CERTIFICATE', 'END CERTIFICATE')) == b''
