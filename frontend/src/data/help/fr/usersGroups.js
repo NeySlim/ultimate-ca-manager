@@ -107,6 +107,8 @@ La colonne **Source** indique d'où provient chaque utilisateur :
 - **LDAP / OAuth2 / SAML** : provisionné automatiquement à la première connexion SSO ; le nom du fournisseur d'origine apparaît sur le badge (ex. \`LDAP · Corporate AD\`).
 
 Depuis la v2.133, les rôles modifiés manuellement dans UCM sur des utilisateurs SSO sont **conservés** entre deux connexions, sauf si **« Synchroniser le rôle à chaque connexion »** est activé sur le fournisseur (voir page **Paramètres → SSO**).
+
+**Lier au SSO** rattache un compte à un fournisseur ; sur un compte déjà lié, **Changer de fournisseur ou réinitialiser l'identité SSO** le déplace vers un autre fournisseur ou efface son identité SSO, après confirmation. La prochaine connexion via ce fournisseur avec le nom d'utilisateur ou l'e-mail du compte lie la nouvelle identité ; le mot de passe du compte, s'il en a un, est conservé, et aucun n'est demandé à un compte qui n'en a pas. **Délier du SSO** rend au compte son statut local.
 `
   }
 }
