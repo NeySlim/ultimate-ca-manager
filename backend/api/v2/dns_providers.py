@@ -176,12 +176,15 @@ def _saved_credentials(provider, credentials):
         stored = decrypt_required(provider._credentials, f'DNS provider {provider.id} credentials')
     except SecretUnreadable as e:
         provider_class = get_provider_class(provider.provider_type)
-        # Without a schema (manual, a type no longer known) nothing makes an entry full
-        if provider_class is None or not provider_class.get_credential_schema():
-            raise
-        given = {k for k, v in credentials.items() if _given(v)}
-        required = set(provider_class.REQUIRED_CREDENTIALS) if provider_class else set()
         schema = provider_class.get_credential_schema() if provider_class else []
+        # Without a schema (manual, a type no longer known) nothing makes an entry full
+        if not schema:
+            raise SecretUnreadable(
+                f'DNS provider {provider.id} credentials cannot be decrypted with this node\'s '
+                'database encryption key (UCM_DB_ENCRYPTION_KEY): restore the key they were saved '
+                'under; this provider type takes no credentials entry') from None
+        given = {k for k, v in credentials.items() if _given(v)}
+        required = set(provider_class.REQUIRED_CREDENTIALS)
         # A schema with no secret field (custom_command) is full with its required fields alone
         secrets = sorted(_secret_names(schema, {f['name'] for f in schema}))
         if required <= given and (_secret_names(schema, given) or not secrets):

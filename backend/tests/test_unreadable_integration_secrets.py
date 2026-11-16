@@ -842,7 +842,10 @@ def test_unreadable_credentials_of_a_type_without_a_schema_are_kept(app, auth_cl
     try:
         r = auth_client.patch(f'/api/v2/dns-providers/{pid}', json={'credentials': {'anything': 'x'}})
         assert r.status_code == 400
-        assert _named(r.get_json()['message'], pid)
+        message = r.get_json()['message']
+        assert _named(message, pid)
+        # no entry repairs this type: the message does not offer one
+        assert 'restore the key' in message and 'enter it again' not in message
         assert _stored_credentials(app, pid) == token
     finally:
         _drop_provider(app, pid)

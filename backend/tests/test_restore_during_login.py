@@ -342,9 +342,10 @@ def test_the_start_epoch_is_read_once_per_request(app, monkeypatch):
 
 
 @pytest.mark.parametrize('method,path', [('get', '/assets/index-abc123.js'), ('post', '/ocsp')])
-def test_a_file_or_an_ocsp_request_costs_at_most_four_statements(app, method, path):
-    """Measured: the three HSTS settings, plus the admin-network setting when its cache is cold;
-    nothing about sessions."""
+def test_a_file_path_or_a_malformed_ocsp_request_costs_at_most_four_statements(app, method, path):
+    """Neither reaches its handler's work here (no built frontend, an empty OCSP body): this counts
+    what runs before it. The three HSTS settings, plus the admin-network setting when its cache
+    is cold; nothing about sessions."""
     c = app.test_client()
     seen = _statements(app, lambda: getattr(c, method)(path))
     assert seen.epoch == 0 and seen.all <= 4, (path, seen.all)
