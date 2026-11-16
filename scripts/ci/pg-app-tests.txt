@@ -96,3 +96,4 @@ tests/test_msca_pending_completion.py
 tests/test_msca_signed_elsewhere.py
 tests/test_msca_status_import_deploys.py
 tests/test_ssh_serial_concurrency.py
+tests/test_failed_login_count.py
