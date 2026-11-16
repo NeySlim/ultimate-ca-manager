@@ -351,3 +351,148 @@ def test_log_says_why_the_id_token_was_not_used(entra, caplog, config, userinfo,
                    groups=['UCM.Operator']), claims, nonce=nonce)
     line = _groups_line(caplog)
     assert line == f'OIDC groups read from UserInfo (1 value(s)); ID token not used: {reason}'
+
+
+# ---- SSO-04: the refusal says what was read, a mapping row to groups is applied ------
+
+REMEDY = 'add a role mapping rule for one of these values, or set a default role'
+
+
+def _refusal(app, username):
+    from models import AuditLog
+    with app.app_context():
+        row = AuditLog.query.filter_by(action='login_failure', resource_name=username).one()
+        return row.details
+
+
+def _name():
+    return f'diag-{uuid.uuid4().hex[:8]}'
+
+
+def test_refusal_names_the_groups_read_and_their_source(app, entra, caplog):
+    name = _name()
+    with caplog.at_level(logging.WARNING, logger='api.v2.sso'):
+        loc = entra({'sub': 'd1', 'preferred_username': name, 'groups': ['ui-team']},
+                    {'sub': 'd1', 'groups': ['tk-team']})
+    assert loc.endswith(UNMAPPED)
+    details = _refusal(app, name)
+    assert "no role mapping rule matches it" in details
+    assert "groups read from the ID token and UserInfo, claims 'roles', 'groups': " \
+           "'tk-team', 'ui-team'" in details
+    assert details.endswith(REMEDY)
+    assert details in caplog.text  # the WARNING line says the same
+
+
+def test_refusal_says_why_the_token_was_not_used(app, entra):
+    entra.configure(id_token_verify=False)
+    name = _name()
+    loc = entra({'sub': 'd2', 'preferred_username': name}, None)
+    assert loc.endswith(UNMAPPED)
+    details = _refusal(app, name)
+    assert "no group value was read from UserInfo, claims 'roles', 'groups' " \
+           "(ID token not used: no ID token)" in details
+
+
+def test_refusal_with_nothing_read_lists_the_claim_names_never_their_values(app, entra, caplog):
+    """The 16/11/2026 case: groups where UCM does not look. Names only, bounded."""
+    name = _name()
+    with caplog.at_level(logging.DEBUG):
+        loc = entra({'sub': 'd3', 'preferred_username': name, 'email': 'SENTINEL-MAIL@x',
+                     'name': 'SENTINEL-NAME', 'phone_number': 'SENTINEL-PHONE'},
+                    {'sub': 'd3', 'realm_access': {'roles': ['SENTINEL-REALM-ROLE']},
+                     'entitlements': ['SENTINEL-LIST'], 'given_name': 'SENTINEL-GIVEN',
+                     'x_member_of': 'SENTINEL-MEMBER'})
+    assert loc.endswith(UNMAPPED)
+    details = _refusal(app, name)
+    assert ("received claims that may carry groups: 'realm_access.roles', 'entitlements', "
+            "'x_member_of': map one of them to groups in the attribute mapping") in details
+    assert 'SENTINEL' not in details
+    assert 'SENTINEL' not in caplog.text
+
+
+def test_refusal_without_rules_nor_default_role_carries_the_diagnosis(app, entra):
+    entra.configure(role_mapping=None, default_role=None)
+    name = _name()
+    loc = entra({'sub': 'd4', 'preferred_username': name}, {'sub': 'd4', 'groups': ['g1']})
+    assert loc.endswith('/login?error=sso_no_default_role')
+    details = _refusal(app, name)
+    assert 'no role mapping rule and no default role' in details
+    assert "'g1'" in details and details.endswith(REMEDY)
+
+
+def test_refusal_values_are_bounded_and_one_line(app, entra, caplog):
+    name = _name()
+    groups = [f'g{i:03d}\nforged' for i in range(200)]
+    with caplog.at_level(logging.INFO):
+        loc = entra({'sub': 'd5', 'preferred_username': name}, {'sub': 'd5', 'groups': groups})
+    assert loc.endswith(UNMAPPED)
+    details = _refusal(app, name)
+    assert '\n' not in details and '(+180 more)' in details
+    assert all('\nforged' not in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.parametrize('claim, claims', [
+    ('realm_access.roles', {'realm_access': {'roles': ['grp-oid-admins']}}),
+    ('resource_access.ucm-client.roles',
+     {'resource_access': {'ucm-client': {'roles': ['grp-oid-admins']}}}),
+    ('https://example.com/groups', {'https://example.com/groups': ['grp-oid-admins']}),
+], ids=['keycloak-realm', 'keycloak-client', 'uri'])
+def test_a_claim_mapped_to_groups_is_read(entra, claim, claims):
+    entra.configure(attribute_mapping=json.dumps({claim: 'groups'}))
+    name = _name()
+    assert entra({'sub': 'm1', 'preferred_username': name}, dict(claims, sub='m1')).endswith(OK)
+    assert entra.role_of(name) == 'admin'
+
+
+def test_a_claim_mapped_to_groups_is_read_from_userinfo(entra):
+    entra.configure(attribute_mapping=json.dumps({'realm_access.roles': 'groups'}),
+                    id_token_verify=False)
+    name = _name()
+    assert entra({'sub': 'm2', 'preferred_username': name,
+                  'realm_access': {'roles': ['UCM.Operator']}}, None).endswith(OK)
+    assert entra.role_of(name) == 'operator'
+
+
+def test_the_exact_claim_name_wins_over_the_dotted_path(entra):
+    entra.configure(attribute_mapping=json.dumps({'a.b': 'groups'}))
+    name = _name()
+    assert entra({'sub': 'm3', 'preferred_username': name},
+                 {'sub': 'm3', 'a.b': ['UCM.Operator'], 'a': {'b': ['grp-oid-admins']}}
+                 ).endswith(OK)
+    assert entra.role_of(name) == 'operator'
+
+
+def test_a_claim_mapped_to_groups_replaces_roles_and_groups(app, entra):
+    entra.configure(attribute_mapping=json.dumps({'team': 'groups'}))
+    name = _name()
+    loc = entra({'sub': 'm4', 'preferred_username': name, 'roles': ['UCM.Operator']},
+                {'sub': 'm4', 'groups': ['grp-oid-admins'], 'roles': ['UCM.Operator']})
+    assert loc.endswith(UNMAPPED)
+    assert "no group value was read from the ID token and UserInfo, claim 'team'" \
+        in _refusal(app, name)
+
+
+def test_a_mapped_claim_that_is_no_string_list_gives_no_group(entra):
+    entra.configure(attribute_mapping=json.dumps({'team': 'groups'}))
+    name = _name()
+    assert entra({'sub': 'm5', 'preferred_username': name},
+                 {'sub': 'm5', 'team': ['grp-oid-admins', 7]}).endswith(UNMAPPED)
+
+
+def test_a_mapped_claim_keeps_the_token_trust_rules(entra):
+    """Rien ne s'assouplit: a token of another subject gives no group, mapped or not."""
+    entra.configure(attribute_mapping=json.dumps({'realm_access.roles': 'groups'}),
+                    id_token_verify=False)
+    name = _name()
+    assert entra({'sub': 'm6', 'preferred_username': name},
+                 _valid_claims('other', realm_access={'roles': ['grp-oid-admins']})
+                 ).endswith(UNMAPPED)
+
+
+def test_without_a_row_to_groups_the_log_line_is_unchanged(entra, caplog):
+    entra.configure(attribute_mapping=json.dumps({'preferred_username': 'username'}))
+    with caplog.at_level(logging.INFO, logger='api.v2.sso.helpers'):
+        loc = entra({'sub': 'm7', 'preferred_username': _name(), 'groups': ['UCM.Operator']},
+                    {'sub': 'm7', 'roles': ['grp-oid-admins']})
+    assert loc.endswith(OK)
+    assert _groups_line(caplog) == 'OIDC groups read from ID token (1 value(s)), UserInfo (1 value(s))'

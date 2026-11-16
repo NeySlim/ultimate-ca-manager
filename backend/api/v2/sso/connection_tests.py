@@ -3,6 +3,7 @@ from . import bp
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from .diagnostics import NAME_LENGTH, shown
 from .helpers import ldap_auto_bind, ldap_bind, _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password, _parse_json_field, _parse_group_list, _mapping_rules, group_match_key
 import ldap3
 from ldap3 import Server, Connection, ALL, Tls
@@ -201,9 +202,11 @@ def _search_succeeded(conn, what):
             f"{result.get('message') or ''}".strip())
 
 
-def _ldap_read_groups(provider, server, user_dn):
+def _ldap_read_groups(provider, server, user_dn, report=None):
     """Names of the groups ``user_dn`` is a direct member of, the same for the login and
-    the mapping test. Raises LdapGroupsUnreadable rather than answer an empty list."""
+    the mapping test. Raises LdapGroupsUnreadable rather than answer an empty list.
+    ``report['source']`` is set to where they were read, for a refusal diagnosis."""
+    report = {} if report is None else report
     member_attr = (provider.ldap_group_member_attr or 'member').strip().lower()
     try:
         conn = _service_connection(provider, server)
@@ -213,6 +216,7 @@ def _ldap_read_groups(provider, server, user_dn):
                 conn.search(user_dn, '(objectClass=*)', search_scope=ldap3.BASE,
                             attributes=['memberOf'])
                 _search_succeeded(conn, 'memberOf read')
+                report['source'] = 'the memberOf attribute of the user entry'
                 if not conn.entries:
                     raise LdapGroupsUnreadable('memberOf read: the user entry was not returned')
                 entry = conn.entries[0]
@@ -247,6 +251,7 @@ def _ldap_read_groups(provider, server, user_dn):
                     continue
                 if failures:
                     logger.info(f"LDAP groups read under {base} after a refused search: {failures[0][:200]}")
+                report['source'] = f'the group search under {shown(base, NAME_LENGTH)}'
                 return [str(entry.cn) for entry in conn.entries if hasattr(entry, 'cn')]
             raise LdapGroupsUnreadable('; '.join(failures))
         finally:
@@ -257,12 +262,18 @@ def _ldap_read_groups(provider, server, user_dn):
         raise LdapGroupsUnreadable(str(e) or type(e).__name__) from e
 
 
-def _ldap_entry_groups(provider, server, user_dn, username):
+NOT_READ = ('the directory, not asked: groups are read only for role mapping rules, '
+            'required groups or a group filter')
+
+
+def _ldap_entry_groups(provider, server, user_dn, username, report=None):
     """``(groups, error)``: read whenever the admission or the group filter asks for them."""
+    report = {} if report is None else report
     if not (_admission_needs_groups(provider) or (provider.ldap_group_filter or '').strip()):
+        report['source'] = NOT_READ
         return [], None
     try:
-        groups = _ldap_read_groups(provider, server, user_dn)
+        groups = _ldap_read_groups(provider, server, user_dn, report)
     except LdapGroupsUnreadable as e:
         logger.warning(f"LDAP groups of {username} could not be read: {e}")
         return [], str(e)
@@ -365,13 +376,14 @@ def _ldap_authenticate_user(provider, username, password, before_bind=None):
 
         user_conn.unbind()
 
-        groups, groups_error = _ldap_entry_groups(provider, server, user_dn, username)
+        report = {}
+        groups, groups_error = _ldap_entry_groups(provider, server, user_dn, username, report)
         refusal = _ldap_entry_refusal(provider, user_entry, user_dn, safe_username,
                                       groups, groups_error)
         if refusal:
             return None, refusal
 
-        return dict(identity, groups=groups), None
+        return dict(identity, groups=groups, group_source=report.get('source')), None
 
     except ImportError:
         return None, "LDAP library not installed"

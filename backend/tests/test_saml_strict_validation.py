@@ -7,6 +7,7 @@ from models import UserSSOIdentity
 from tests.sso_identity_support import by_identity
 import base64
 import json
+import logging
 import os
 import datetime
 import uuid
@@ -101,7 +102,7 @@ def _ts(delta_minutes=0):
 
 def _response(idp_signer, *, in_response_to=None, sp_base=SP_BASE, audience=None,
               destination=None, issued=0, expires=5, assertion_id=None, name_id=None,
-              scd_expiry=True, attributes=None):
+              scd_expiry=True, attributes=None, friendly=None):
     irt = f' InResponseTo="{in_response_to}"' if in_response_to else ''
     destination = destination or f'{sp_base}{ACS}'
     audience = audience or f'{sp_base}{saml_sp.ENTITY_PATH}'
@@ -113,7 +114,7 @@ def _response(idp_signer, *, in_response_to=None, sp_base=SP_BASE, audience=None
         # A list of (name, values) pairs may repeat a name, as Keycloak's role list does.
         pairs = attributes.items() if isinstance(attributes, dict) else attributes
         attribute_statement = '<saml:AttributeStatement>' + ''.join(
-            f'<saml:Attribute Name="{name}" FriendlyName="{name}">'
+            f'<saml:Attribute Name="{name}"{_friendly_attr(name, friendly)}>'
             + ''.join(f'<saml:AttributeValue>{v}</saml:AttributeValue>' for v in values)
             + '</saml:Attribute>'
             for name, values in pairs) + '</saml:AttributeStatement>'
@@ -142,6 +143,12 @@ def _response(idp_signer, *, in_response_to=None, sp_base=SP_BASE, audience=None
     signed = OneLogin_Saml2_Utils.add_sign(xml, idp_signer[0], idp_signer[1],
                                            sign_algorithm=K.RSA_SHA256, digest_algorithm=K.SHA256)
     return base64.b64encode(signed).decode()
+
+
+def _friendly_attr(name, friendly):
+    """FriendlyName = Name by default; ``friendly`` sets another one, or None for none."""
+    value = name if friendly is None else friendly.get(name)
+    return f' FriendlyName="{value}"' if value else ''
 
 
 def _start_login(client, base=SP_BASE):
@@ -984,3 +991,67 @@ def test_a_saml_login_issues_a_new_session_identifier(app, provider, idp_signer)
     request_id = _start_login(client)
     assert _post(client, _response(idp_signer, in_response_to=request_id)) == OK
     assert client.get_cookie('session', domain='ucm.example.test').value != planted
+
+
+# ---- SSO-04: the refusal says what was read; FriendlyName is shown, never read ----------
+
+REMEDY = 'add a role mapping rule for one of these values, or set a default role'
+IS_MEMBER_OF = 'urn:oid:1.3.6.1.4.1.5923.1.5.1.1'
+
+
+def _refused_details(app, idp_signer, **response_args):
+    from models import AuditLog
+    client = app.test_client()
+    request_id = _start_login(client)
+    name_id = f'saml-{uuid.uuid4().hex[:12]}'
+    username = f'diag-{uuid.uuid4().hex[:8]}'
+    attributes = dict(response_args.pop('attributes', {}), username=[username])
+    resp = _response(idp_signer, in_response_to=request_id, name_id=name_id,
+                     attributes=attributes, **response_args)
+    assert _post(client, resp) == '/login?error=sso_unmapped'
+    with app.app_context():
+        return AuditLog.query.filter_by(action='login_failure', resource_name=username).one().details
+
+
+def test_refusal_names_the_values_and_the_attribute_read(app, mapped_provider, idp_signer):
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}))
+    details = _refused_details(app, idp_signer, attributes={ENTRA_GROUPS: ['g-1', 'g-2']})
+    assert f"groups read from SAML attribute '{ENTRA_GROUPS}': 'g-1', 'g-2'" in details
+    assert details.endswith(REMEDY)
+
+
+def test_refusal_with_nothing_read_lists_the_keycloak_and_shibboleth_names(
+        app, mapped_provider, idp_signer, caplog):
+    """Defaults unchanged: Role, member, isMemberOf are not read, the diagnosis names them."""
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}))
+    with caplog.at_level(logging.DEBUG):
+        details = _refused_details(
+            app, idp_signer,
+            attributes={'Role': ['pki-admins'], 'member': ['pki-admins'],
+                        IS_MEMBER_OF: ['pki-admins'], 'email': ['SENTINEL-MAIL@x'],
+                        'urn:oid:2.5.4.42': ['SENTINEL-GIVEN'], 'mobile': ['SENTINEL-1']},
+            friendly={'Role': None, 'member': None, IS_MEMBER_OF: 'isMemberOf',
+                      'email': None, 'urn:oid:2.5.4.42': 'givenName', 'mobile': None})
+    assert 'no group value was read from SAML attributes \'groups\'' in details
+    assert (f"received attributes that may carry groups: 'Role', 'member', "
+            f"'{IS_MEMBER_OF} (isMemberOf)': map one of them to groups in the attribute "
+            f"mapping") in details
+    assert 'SENTINEL' not in details and 'SENTINEL' not in caplog.text
+    assert 'pki-admins' not in details  # values of attributes not read stay out
+
+
+def test_a_mapping_row_naming_a_friendly_name_reads_nothing(app, mapped_provider, idp_signer):
+    """SAML Core 2.0 §2.7.3.1: FriendlyName MUST NOT identify an attribute."""
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}),
+                    attribute_mapping=json.dumps({'isMemberOf': 'groups'}))
+    details = _refused_details(app, idp_signer, attributes={IS_MEMBER_OF: ['pki-admins']},
+                               friendly={IS_MEMBER_OF: 'isMemberOf'})
+    assert "no group value was read from SAML attribute 'isMemberOf'" in details
+
+
+def test_the_oid_name_mapped_to_groups_is_read(app, mapped_provider, idp_signer):
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}),
+                    attribute_mapping=json.dumps({IS_MEMBER_OF: 'groups'}))
+    role, _ = _login_role(app, idp_signer, attributes={IS_MEMBER_OF: ['pki-admins']},
+                          friendly={IS_MEMBER_OF: 'isMemberOf'})
+    assert role == 'admin'

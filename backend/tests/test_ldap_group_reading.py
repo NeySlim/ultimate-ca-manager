@@ -643,3 +643,77 @@ def test_the_mapping_test_lists_the_groups_the_login_reads(env, monkeypatch, aut
     with env.app.app_context():
         info, err = connection_tests._ldap_authenticate_user(db.session.get(SSOProvider, pid), user, PW)
     assert err is None and info['groups'] == ['pki-admins']
+
+
+# ── SSO-04: a refusal for want of a role says what was read and where ──
+
+REMEDY = 'add a role mapping rule for one of these values, or set a default role'
+
+
+def _refusal_details(app, username):
+    with app.app_context():
+        return AuditLog.query.filter_by(action='login_failure', resource_name=username).one().details
+
+
+def test_refusal_names_the_groups_and_the_search_base(env, monkeypatch, caplog):
+    user = env.user()
+    _openldap(monkeypatch, user)
+    pid = _member_provider(env, role_mapping=json.dumps({'other-group': 'admin'}))
+    with caplog.at_level(logging.WARNING):
+        code, body = env.login(pid, user)
+    assert code == 403
+    # The person signing in is told no more than before.
+    assert body['message'] == 'Access denied: no role mapping rule of this provider matches your account'
+    details = _refusal_details(env.app, user)
+    assert ("groups read from the group search under 'dc=example,dc=com': 'pki-admins'"
+            in details)
+    assert details.endswith(REMEDY)
+    assert details in caplog.text
+
+
+def test_refusal_names_memberof_as_the_source(env, monkeypatch):
+    user = env.user()
+    _ad(monkeypatch, user, ['CN=VPN,OU=Groups,DC=example,DC=com'])
+    pid = _ad_provider(env, role_mapping=json.dumps({'PKI-Admins': 'admin'}))
+    assert env.login(pid, user)[0] == 403
+    assert ("groups read from the memberOf attribute of the user entry: 'VPN'"
+            in _refusal_details(env.app, user))
+
+
+def test_refusal_puts_no_other_directory_value_in_the_log_nor_the_audit(
+        env, monkeypatch, caplog):
+    user = env.user()
+    d = Directory(monkeypatch, 'openldap', ['dc=example,dc=com'])
+    udn = f'uid={user},ou=people,dc=example,dc=com'
+    d.add(udn, {'objectClass': ['inetOrgPerson'], 'uid': user, 'cn': 'SENTINEL-CN',
+                'sn': 'SENTINEL-SN', 'mail': 'SENTINEL-MAIL@example.com', 'userPassword': PW,
+                'telephoneNumber': 'SENTINEL-PHONE', 'entryUUID': str(uuid.uuid4())})
+    d.add('cn=vpn,ou=groups,dc=example,dc=com',
+          {'objectClass': ['groupOfNames'], 'cn': 'vpn', 'member': [udn]})
+    pid = _member_provider(env)
+    with caplog.at_level(logging.DEBUG):
+        assert env.login(pid, user)[0] == 403
+    details = _refusal_details(env.app, user)
+    assert "'vpn'" in details
+    assert 'SENTINEL' not in details
+    assert 'SENTINEL' not in caplog.text
+
+
+def test_the_mapping_test_gives_the_same_diagnosis_as_the_login(env, monkeypatch, auth_client):
+    user = env.user()
+    _ad(monkeypatch, user, [f'CN=G{i:02d},OU=Groups,DC=example,DC=com' for i in range(25)])
+    pid = _ad_provider(env, role_mapping=json.dumps({'PKI-Admins': 'admin'}))
+    tool = _tool(auth_client, pid, user)
+    assert tool['refusal'] == 'unmapped'
+    assert tool['group_source'] == 'the memberOf attribute of the user entry'
+    assert len(tool['groups']) == 25
+    assert env.login(pid, user)[0] == 403
+    assert _refusal_details(env.app, user).endswith(tool['diagnosis'])
+    assert '(+5 more)' in tool['diagnosis']
+
+
+def test_the_mapping_test_gives_no_diagnosis_when_access_is_allowed(env, monkeypatch, auth_client):
+    user = env.user()
+    _openldap(monkeypatch, user)
+    tool = _tool(auth_client, _member_provider(env), user)
+    assert tool['access_allowed'] is True and tool['diagnosis'] is None

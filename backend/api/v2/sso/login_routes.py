@@ -1,6 +1,6 @@
 from . import bp, VALID_ROLES
 from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
-                      _extract_saml_groups, oidc_external_groups, oidc_identity,
+                      saml_groups, oidc_groups, mapped_attributes, oidc_identity,
                       saml_identity)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import return_path, saml_sp
@@ -429,12 +429,15 @@ def sso_callback(provider_type):
                     if claims_error:
                         token_unused = f'unverified token rejected ({claims_error})'
             bound_claims = trusted_id_claims if token_unused is None else None
-            external_data = dict(userinfo, groups=oidc_external_groups(
-                userinfo, bound_claims, token_unused))
+            groups, group_source = oidc_groups(userinfo, bound_claims, token_unused, attr_mapping)
+            external_data = dict(userinfo, groups=groups)
+            if mapped_attributes(attr_mapping, 'groups', set(userinfo) | set(bound_claims or {})):
+                # A claim mapped to groups replaces roles and groups: UserInfo's roles go too.
+                external_data.pop('roles', None)
 
             # Create or update user
             user, error_code = _get_or_create_sso_user(provider, username, email, fullname,
-                                                       external_data)
+                                                       external_data, group_source=group_source)
 
             if not user:
                 return redirect(_login_error(error_code or 'user_creation_failed', oauth2_next))
@@ -627,12 +630,15 @@ def sso_callback(provider_type):
                 return redirect(_login_error('no_username', back))
 
             # Create or update user
+            groups, group_source = saml_groups(attrs, attr_mapping,
+                                               saml_sp.attribute_friendly_names(saml_auth))
             user, error_code = _get_or_create_sso_user(
                 provider, username, email, fullname,
                 {'name_id': name_id, 'name_id_format': name_id_format,
                  'attributes': {k: v for k, v in attrs.items()},
                  # Role mapping reads a top-level 'groups' key (as OIDC/LDAP supply).
-                 'groups': _extract_saml_groups(attrs, attr_mapping)}
+                 'groups': groups},
+                group_source=group_source,
             )
 
             if not user:
