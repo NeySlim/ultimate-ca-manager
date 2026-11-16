@@ -81,9 +81,11 @@ def advance_epoch() -> int:
         ).on_conflict_do_nothing(index_elements=['key']))
         row = (SystemConfig.query.filter_by(key=EPOCH_KEY)
                .with_for_update().populate_existing().one())
-        row.value = str(int(row.value or 0) + 1)
+        # read under the row lock: after the commit the row may already be another node's
+        epoch = int(row.value or 0) + 1
+        row.value = str(epoch)
         db.session.commit()
-        return int(row.value)
+        return epoch
     except Exception:
         db.session.rollback()
         raise

@@ -1306,7 +1306,7 @@
     "customTemplates": "カスタム",
     "systemDescription": "組み込み。編集と削除はできません",
     "customDescription": "ここで作成。編集と削除ができます",
-    "systemNotEditable": "システムテンプレートは編集できません。複製してカスタムのコピーを作成してください。",
+    "systemNotEditable": "システムテンプレートは編集できません。コピーしてカスタム版を作成してください。",
     "systemNotDeletable": "システムテンプレートは削除できません。",
     "defaultValidity": "デフォルト有効期間（日数）",
     "maxValidityHint": "このテンプレートで発行する証明書の有効期間に上限を設けるには、発行ポリシー（ポリシー、最大有効期間）を使用してください。",
@@ -1397,7 +1397,7 @@
     "activate": "有効化",
     "activated": "テンプレートを有効化しました",
     "deactivated": "テンプレートを無効化しました",
-    "deactivateTooltip": "無効化したテンプレートは、証明書の発行フォームにも Windows 自動登録にも提供されません。システムテンプレートは無効化はできますが編集はできません。変更するには複製してください。"
+    "deactivateTooltip": "無効化したテンプレートは、証明書の発行フォームにも Windows 自動登録にも提供されません。システムテンプレートは無効化はできますが編集はできません。変更するにはコピーしてください。"
   },
   "users": {
     "securityKeys": {
@@ -3925,7 +3925,6 @@
     "configuredProviders": "設定済みプロバイダー",
     "acsUrl": "アサーションコンシューマーサービス（ACS）URL",
     "acsUrlDesc": "認証後にIdPがSAMLアサーションを送信する先",
-    "addProvider": "SSOプロバイダーを追加",
     "attributeMapping": "属性マッピング",
     "attributeMappingHelp": "左列はプロバイダーが送信する属性名、右列はそれが設定されるUCMのフィールド（username、email、fullname、groups）です。例: user.userprincipalname → username。",
     "callbackUrls": "コールバックURL",

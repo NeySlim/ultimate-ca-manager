@@ -3922,7 +3922,6 @@
     "configuredProviders": "已配置的提供商",
     "acsUrl": "断言消费服务 (ACS) URL",
     "acsUrlDesc": "IdP 在认证后发送 SAML 断言的地址",
-    "addProvider": "添加 SSO 提供者",
     "attributeMapping": "属性映射",
     "attributeMappingHelp": "左侧：提供商发送的属性名称。右侧：对应填充的 UCM 字段（username、email、fullname 或 groups）。示例：user.userprincipalname → username。",
     "callbackUrls": "回调 URL",

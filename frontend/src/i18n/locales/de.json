@@ -1306,7 +1306,7 @@
     "customTemplates": "Benutzerdefiniert",
     "systemDescription": "Mitgeliefert, nicht bearbeit- oder löschbar",
     "customDescription": "Hier erstellt, bearbeit- und löschbar",
-    "systemNotEditable": "Systemvorlagen können nicht bearbeitet werden. Duplizieren Sie sie für eine eigene Kopie.",
+    "systemNotEditable": "Systemvorlagen können nicht bearbeitet werden. Kopieren Sie sie, um eine eigene Version zu erstellen.",
     "systemNotDeletable": "Systemvorlagen können nicht gelöscht werden.",
     "defaultValidity": "Standard-Gültigkeit (Tage)",
     "maxValidityHint": "Um die Gültigkeit der mit dieser Vorlage ausgestellten Zertifikate zu begrenzen, verwenden Sie eine Ausstellungsrichtlinie (Richtlinien, maximale Gültigkeit).",
@@ -1397,7 +1397,7 @@
     "activate": "Aktivieren",
     "activated": "Vorlage aktiviert",
     "deactivated": "Vorlage deaktiviert",
-    "deactivateTooltip": "Eine deaktivierte Vorlage wird weder im Formular „Zertifikat ausstellen“ noch für die Windows-Autoregistrierung angeboten. Systemvorlagen können deaktiviert, aber nicht bearbeitet werden: Duplizieren Sie sie für eine eigene Kopie."
+    "deactivateTooltip": "Eine deaktivierte Vorlage wird weder im Formular „Zertifikat ausstellen“ noch für die Windows-Autoregistrierung angeboten. Systemvorlagen können deaktiviert, aber nicht bearbeitet werden: Kopieren Sie sie, um eine eigene Version zu erstellen."
   },
   "users": {
     "securityKeys": {
@@ -3922,7 +3922,6 @@
     "configuredProviders": "Konfigurierte Anbieter",
     "acsUrl": "Assertion Consumer Service (ACS) URL",
     "acsUrlDesc": "Wohin der IdP SAML-Assertions nach der Authentifizierung sendet",
-    "addProvider": "SSO-Provider hinzufügen",
     "attributeMapping": "Attributzuordnung",
     "attributeMappingHelp": "Links: der vom Provider gesendete Attributname. Rechts: das UCM-Feld, das damit befüllt wird (username, email, fullname oder groups). Beispiel: user.userprincipalname → username.",
     "callbackUrls": "Callback-URLs",
