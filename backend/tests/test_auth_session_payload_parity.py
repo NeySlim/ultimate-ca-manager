@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from models import User, db
+from models import User, UserSSOIdentity, db
 
 # The session fields that belong to every authenticated-session response.
 SESSION_FIELDS = frozenset({
@@ -143,6 +143,10 @@ class TestSessionFieldParity:
                 ids = [u.id for u in User.query.filter(
                     User.username.in_([totp.username, ldap_name]))]
                 UserSession.query.filter(UserSession.user_id.in_(ids)).delete(
+                    synchronize_session=False)
+                # SQLite applies no ON DELETE CASCADE: the attachments go first
+                UserSSOIdentity.query.filter(db.or_(UserSSOIdentity.user_id.in_(ids),
+                                                    UserSSOIdentity.provider_id == provider_id)).delete(
                     synchronize_session=False)
                 User.query.filter(User.id.in_(ids)).delete(synchronize_session=False)
                 SSOSession.query.filter_by(provider_id=provider_id).delete()

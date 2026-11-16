@@ -7,6 +7,8 @@ from models import CA, db
 from models.hsm import HsmKey, HsmProvider
 from models.system_config import SystemConfig
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _config(key):
     row = SystemConfig.query.filter_by(key=key).first()
@@ -86,6 +88,7 @@ def test_scep_default_ca_refuses_an_hsm_ca(app, auth_client, cas):
         provider.config = json.dumps({'url': 'http://bao.test', 'token': 't'})
         db.session.add(provider)
         db.session.commit()
+        provider_id = provider.id
         key = HsmKey(provider_id=provider.id, key_identifier='settings-key', label='settings',
                      algorithm='rsa', key_type='rsa', purpose='sign')
         db.session.add(key)
@@ -99,6 +102,9 @@ def test_scep_default_ca_refuses_an_hsm_ca(app, auth_client, cas):
     finally:
         with app.app_context():
             db.session.get(CA, signer['id']).hsm_key_id = None
+            db.session.commit()
+            HsmKey.query.filter_by(provider_id=provider_id).delete()
+            HsmProvider.query.filter_by(id=provider_id).delete()
             db.session.commit()
 
 

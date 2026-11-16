@@ -50,7 +50,7 @@ def _run(tmp_path, env):
     (tmp_path / 'test_sample.py').write_text(SAMPLE)
     (tmp_path / 'conftest.py').write_text('from tests.optional_backends import pytest_configure, '
                                           'pytest_runtest_setup, pytest_runtest_makereport  # noqa\n')
-    clean = {k: v for k, v in os.environ.items() if not k.startswith('UCM_TEST_REQUIRE_')}
+    clean = {k: v for k, v in os.environ.items() if not k.startswith('UCM_TEST_REQUIRE_') and k != 'UCM_TEST_LEAK_MODE'}
     proc = subprocess.run([sys.executable, '-m', 'pytest', '-rA', '-p', 'no:cacheprovider', '-p', 'no:randomly',
                            '-o', 'addopts=', str(tmp_path / 'test_sample.py')],
                           cwd=tmp_path, capture_output=True, text=True, timeout=120,
@@ -193,7 +193,7 @@ key_algorithms.mldsa_supported = lambda: False
 
 def _run_files(tmp_path, plugin, files, env, marker=None):
     (tmp_path / 'shim_plugin.py').write_text(plugin)
-    clean = {k: v for k, v in os.environ.items() if not k.startswith('UCM_TEST_REQUIRE_')}
+    clean = {k: v for k, v in os.environ.items() if not k.startswith('UCM_TEST_REQUIRE_') and k != 'UCM_TEST_LEAK_MODE'}
     args = [sys.executable, '-m', 'pytest', '-q', '-rA', '-p', 'no:cacheprovider', '-p', 'no:randomly',
             '-p', 'shim_plugin', *(['-m', marker] if marker else []), *[f'tests/{f}' for f in files]]
     proc = subprocess.run(args, cwd=BACKEND_DIR, capture_output=True, text=True, timeout=600,
