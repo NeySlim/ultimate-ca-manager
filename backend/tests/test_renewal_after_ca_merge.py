@@ -259,3 +259,29 @@ def test_the_scheduler_publishes_the_crl_of_the_ca_of_each_member_of_a_pair(app,
             assert published == [refids]
         finally:
             _forget([first, partner], ids)
+
+
+def test_the_bulk_route_publishes_the_crl_of_the_ca_of_each_member_of_a_pair(
+        app, auth_client, monkeypatch):
+    """The route hands the related member of a renewed pair to the CRL publication too."""
+    from api.v2.certificates import bulk
+    from services.crl import CRLService
+
+    with app.app_context():
+        key, cert = _authority()
+        ca_a, ca_b = _ca_row(key, cert), _ca_row(key, cert)
+        ca_ids = [ca_a.id, ca_b.id]
+        first = _leaf_under(ca_a.refid, 'bulk-pair-a.example.test')
+        partner = _leaf_under(ca_b.refid, 'bulk-pair-b.example.test')
+    crls = []
+    monkeypatch.setattr(CRLService, 'generate_crl', staticmethod(lambda ca_id, **kw: crls.append(ca_id)))
+    monkeypatch.setattr(bulk, 'renew_certificate_in_place', lambda cert, **kw: {
+        'cert_id': cert.id, 'related': [{'cert_id': partner}]})
+    try:
+        r = auth_client.post('/api/v2/certificates/bulk/renew', json={'ids': [first]})
+        assert r.status_code == 200 and r.get_json()['data']['success'] == [first], r.get_json()
+        assert sorted(crls) == sorted(ca_ids)
+    finally:
+        monkeypatch.undo()
+        with app.app_context():
+            _forget([first, partner], ca_ids)
