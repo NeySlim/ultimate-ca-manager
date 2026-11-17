@@ -21,17 +21,17 @@ class SSHCertificateManagementMixin:
         cert.revoked = True
         cert.revoked_at = utc_now()
         cert.revoke_reason = reason
-        # The KRL revokes by serial (PROTOCOL.krl §2.2): every certificate holding it is revoked,
-        # and the rows say so; the caller reads them in `revoked_with`
+        # The KRL revokes by serial (PROTOCOL.krl §2.2): every certificate holding it is revoked;
+        # `revoked_with` names only those this revocation turned from valid to revoked
         siblings = (SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == cert.ssh_ca_id,
                                                 SSHCertificate.serial == cert.serial,
                                                 SSHCertificate.id != cert.id)
                     .order_by(SSHCertificate.id).all() if cert.serial else [])
+        siblings = [s for s in siblings if not s.revoked]
         for sibling in siblings:
-            if not sibling.revoked:
-                sibling.revoked = True
-                sibling.revoked_at = cert.revoked_at
-                sibling.revoke_reason = reason
+            sibling.revoked = True
+            sibling.revoked_at = cert.revoked_at
+            sibling.revoke_reason = reason
         cert.revoked_with = siblings
 
         try:
