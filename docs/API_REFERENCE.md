@@ -3113,7 +3113,9 @@ cancelled`. A restore that commits revokes every session, the caller's included:
 job then answers `401`; sign in again and read the job, whose `result` is the restore's answer.
 A restore whose process stopped before its commit fails (`executor_lost`, `The restore stopped
 before it committed: nothing was restored`); one that stopped after it is finished by the next
-start of the scheduler process, each step done once.
+start of the scheduler process, each step done once. A restore refused by the HA maintenance
+keeps its members in `result.problem` (`code`, and `nodes` for `maintenance_not_acknowledged`),
+and the route answers them as before.
 
 ### Database Operations
 ```http

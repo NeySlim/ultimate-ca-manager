@@ -132,6 +132,8 @@ def _response_of(outcome):
     response = {'code': outcome.code, 'message': outcome.message, 'data': outcome.data}
     if outcome.problem_type:
         response['problem_type'] = outcome.problem_type
+    if outcome.problem:
+        response['problem'] = outcome.problem
     return response
 
 

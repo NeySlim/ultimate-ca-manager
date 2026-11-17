@@ -165,3 +165,32 @@ def test_the_cancel_route_says_a_committed_restore_is_too_late(app, auth_client,
     finally:
         release.set()
     assert runner.join_local(job_id, 60)
+
+
+@pytest.mark.parametrize('respond_async', [False, True])
+def test_a_maintenance_refusal_keeps_its_code_and_nodes(app, auth_client, archive, finished,
+                                                        monkeypatch, respond_async):
+    """The 409 of a refused maintenance carries its text `code` and the silent `nodes`, as before
+    jobs, whether the route answers it or the job read after a 202 does."""
+    from contextlib import contextmanager
+    from services import cluster_maintenance
+
+    @contextmanager
+    def refused(*args, **kwargs):
+        raise cluster_maintenance.NodesNotAcknowledged({'node-b': ['web', 'scheduler']})
+        yield
+    monkeypatch.setattr(cluster_maintenance, 'restore_window', refused)
+    r = _post(auth_client, ROUTES[0], archive, {'Prefer': 'respond-async'} if respond_async else None)
+    if respond_async:
+        assert r.status_code == 202
+        job_id = r.get_json()['data']['job']['id']
+        assert runner.join_local(job_id, 60)
+        r = auth_client.get(f'/api/v2/system/jobs/{job_id}')
+        body = r.get_json()['data']['result']
+        assert body['code'] == 409 and body['problem'] == {
+            'code': 'maintenance_not_acknowledged', 'nodes': {'node-b': ['web', 'scheduler']}}
+        return
+    assert r.status_code == 409, r.data
+    body = r.get_json()
+    assert body['code'] == 'maintenance_not_acknowledged'
+    assert body['nodes'] == {'node-b': ['web', 'scheduler']}

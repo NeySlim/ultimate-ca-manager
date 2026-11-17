@@ -391,7 +391,11 @@ def _restore(ctx, current, stream, password):
         raise
     except cluster_maintenance.MaintenanceRefused as refused:
         logger.warning('Restore refused: %s', refused)
-        return _request_refused(409, str(refused), 'the cluster maintenance could not be held')
+        outcome = _request_refused(409, str(refused), 'the cluster maintenance could not be held')
+        outcome.problem = {'code': refused.code}
+        if getattr(refused, 'missing', None):
+            outcome.problem['nodes'] = refused.missing
+        return outcome
     except FipsRestricted as e:
         outcome = _refused(400, str(e), 'Restore refused: not allowed in FIPS mode')
         outcome.problem_type = FIPS_PROBLEM

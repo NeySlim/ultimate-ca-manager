@@ -53,6 +53,8 @@ class JobOutcome:
     problem_type: Optional[str] = None
     # The run concluded the job itself (a restore: final before it asks the restart)
     concluded: bool = False
+    # RFC 9457 extension members of a failure the route answered (a maintenance's code, nodes)
+    problem: Optional[dict] = None
 
 
 @dataclass(frozen=True)

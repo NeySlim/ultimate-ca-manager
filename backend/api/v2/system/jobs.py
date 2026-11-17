@@ -75,6 +75,8 @@ def final_response(row, extra=None):
                 data = {**data, **extra}
             return _with_headers(success_response(
                 data=data, message=result['message'], status=result['code']))
+        if result.get('problem'):
+            return _with_headers(_problem_with_members(result))
         return _with_headers(error_response(result['message'], result['code'],
                                             problem_type=result.get('problem_type')))
     jt = jobs.job_type(row['kind'])
@@ -82,6 +84,17 @@ def final_response(row, extra=None):
     message = (jt.messages.get(reason) if jt else None) or _FINAL_MESSAGES.get(reason, 'The job failed')
     code = 409 if row['state'] == jobs.CANCELLED else 500
     return _with_headers(error_response(message, code, details={'job': jobs.public_view(row, False)}))
+
+
+def _problem_with_members(result):
+    """The route's problem with its own extension members (``code`` among them), as answered."""
+    from flask import jsonify
+    from utils.response import PROBLEM_CONTENT_TYPE, build_problem
+    body = build_problem(result['message'], result['code'], None, result.get('problem_type'))
+    body.update(result['problem'])
+    response = jsonify(body)
+    response.mimetype = PROBLEM_CONTENT_TYPE
+    return response, result['code']
 
 
 def busy_response(exc):
