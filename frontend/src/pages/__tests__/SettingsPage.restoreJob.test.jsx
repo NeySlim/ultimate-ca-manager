@@ -88,6 +88,9 @@ describe('SettingsPage: restore as a job', () => {
     expect(await screen.findByTestId('restore-sign-in')).toBeTruthy()
     expect(screen.queryByText('Authentication required')).toBeNull()
     expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBe('job-1')
+    // The sign-in comes back to this tab, where the report is shown
+    screen.getByTestId('restore-sign-in-button').click()
+    expect(window.location.href).toBe('/login?next=%2Fsettings%3Ftab%3Dbackup')
   })
 
   it('shows the report of the followed job once signed in again', async () => {

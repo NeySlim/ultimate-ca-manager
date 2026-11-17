@@ -1,7 +1,8 @@
 import { test, expect, createCA, ADMIN_USER, ADMIN_PASSWORD, Api } from './support/fixtures'
 import { readFileSync } from 'node:fs'
 
-// A restore replaces the whole database: the configuration runs this file alone, after the others
+// A restore replaces the whole database: the configuration runs this file alone, after the others,
+// one test at a time (two restores at once: the second answers 409)
 test('a backup created on screen is restored on screen and the report says what came back', async ({ page, api, request }) => {
   const kept = await createCA(api)
   const password = 'Backup-pass-12345'

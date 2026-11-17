@@ -58,6 +58,7 @@ import SsoSection from './settings/SsoSection'
 import BackupSection from './settings/BackupSection'
 import { ceilingNotice } from './settings/backupCeiling'
 import RestoreReport from './settings/RestoreReport'
+import { loginUrl } from '../navigation/safeNext'
 import { useRestoreJob } from './settings/useRestoreJob'
 import AuditSection from './settings/AuditSection'
 import DatabaseSection from './settings/DatabaseSection'
@@ -1937,7 +1938,10 @@ export default function SettingsPage() {
           <div className="space-y-4" data-testid="restore-sign-in">
             <p className="text-sm text-text-primary">{t('settings.restoreSignInAgain')}</p>
             <div className="flex gap-3 justify-end pt-4">
-              <Button type="button" onClick={() => { releaseSignOut(); window.location.reload() }}
+              <Button type="button" onClick={() => {
+                // Back to this tab after the sign-in: its report is shown there
+                releaseSignOut(); window.location.href = loginUrl('/settings', '?tab=backup')
+              }}
                 data-testid="restore-sign-in-button">
                 {t('settings.restoreSignIn')}
               </Button>
