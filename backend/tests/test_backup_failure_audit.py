@@ -15,7 +15,9 @@ LEAKY = '/srv/private/path/' + SECRET
 
 
 @pytest.fixture
-def audit(monkeypatch):
+def audit(auth_client, monkeypatch):
+    # A restore of an earlier file signed the shared client out: its sign-in is no line here
+    assert auth_client.get('/api/v2/system/jobs').status_code == 200
     calls = []
     monkeypatch.setattr(AuditService, 'log_action',
                         staticmethod(lambda **kw: calls.append(kw)))

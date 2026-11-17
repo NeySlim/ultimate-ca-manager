@@ -864,9 +864,11 @@ class SchedulerService:
         from services import cluster_maintenance
         try:
             self._in_app(cluster_maintenance.current)
+            return cluster_maintenance.blocks_writes(self._app)
         except Exception as e:
+            # The gate's own reading failed: the engine guard still refuses the writes
             logger.error(f"Cluster maintenance not read by the scheduler: {type(e).__name__}")
-        return cluster_maintenance.blocks_writes(self._app)
+            return False
 
     def _refresh_caches(self):
         """A restore advanced the session epoch: this process drops its caches once."""
