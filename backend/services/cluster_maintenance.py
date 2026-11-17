@@ -298,10 +298,13 @@ def refusal(view=None):
 
 def gate():
     """before_request: what a node in maintenance still serves (health, reads, OCSP, CRL, AIA)."""
+    from flask import request
+    from utils.public_endpoints import PROBE_PATHS
+    if request.path in PROBE_PATHS:
+        return None  # served in maintenance; readiness reads the row itself, liveness never
     view = current(refresh=True)
     if view is None or not view.active():
         return None
-    from flask import request
     if request.blueprint in OPEN_BLUEPRINTS or request.endpoint in CONTROL_ENDPOINTS:
         return None
     if request.blueprint in REFUSED_BLUEPRINTS:

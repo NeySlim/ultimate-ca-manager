@@ -36,14 +36,16 @@ def database_use(app):
 
 
 @pytest.fixture
-def ha(monkeypatch):
+def ha(app, monkeypatch):
+    from services import cluster_maintenance
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(Config, 'NODE_ID', 'probe-node')
+    # The maintenance view due for a read, as it is every OBSERVE_TTL_SECONDS
+    monkeypatch.setattr(cluster_maintenance.view_of(app), 'observed', None)
 
 
 @pytest.mark.parametrize('path', LIVE)
 def test_liveness_touches_no_database(app, client, ha, path):
-    client.get(path)
     with database_use(app) as seen:
         r = client.get(path)
     assert r.status_code == 200 and r.get_json()['status'] == 'alive'
