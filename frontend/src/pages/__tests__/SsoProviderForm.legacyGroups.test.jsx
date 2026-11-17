@@ -26,6 +26,7 @@ vi.mock('../../services', () => ({
 }))
 
 import SsoProviderForm from '../settings/SsoProviderForm'
+import { hiddenLegacyGroupRows } from '../settings/sso/groupMapping'
 
 const SAML = { id: 7, name: 'idp', provider_type: 'saml', saml_entity_id: 'https://idp/saml',
   saml_sso_url: 'https://idp/sso', saml_certificate: 'MII...' }
@@ -118,5 +119,15 @@ describe('SAML shortcut', () => {
     expect(anyNotice()).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /^Role/ }))
     expect(notice('memberOf')).toBeInTheDocument()
+  })
+})
+
+describe('hiddenLegacyGroupRows', () => {
+  it('reads a long run of inner spaces in linear time', () => {
+    const attribute = `x${' '.repeat(100000)}x`
+    const started = performance.now()
+    expect(hiddenLegacyGroupRows({ [attribute]: 'groups', groups: attribute })).toEqual([])
+    expect(hiddenLegacyGroupRows({ Role: 'groups', groups: ` ${attribute}\u0085` })).toEqual([attribute])
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 })
