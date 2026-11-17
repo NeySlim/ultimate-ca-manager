@@ -145,3 +145,26 @@ def test_a_sqlite_connection_is_reopened_to_load_fresh_statistics(tmp_path):
          'print(Config.SQLALCHEMY_ENGINE_OPTIONS.get("pool_recycle"))'],
         cwd=Path(__file__).resolve().parent.parent, env=env, capture_output=True, text=True, check=True)
     assert out.stdout.strip().splitlines()[-1] == '3600'
+
+
+def _approvals(count):
+    db.session.execute(insert(ApprovalRequest), [
+        dict(request_type='renewal', status='rejected', request_data=json.dumps({'certificate_id': i}))
+        for i in range(count)])
+    db.session.commit()
+
+
+@pytest.mark.parametrize('version, refreshed', [((3, 45, 1), True), ((3, 46, 0), False)])
+def test_before_sqlite_3_46_the_task_analyzes_every_table(own_app, monkeypatch, version, refreshed):
+    # PRAGMA optimize checks every table (0x10000) only from 3.46: older libraries get the bounded ANALYZE
+    import sqlite3
+    import services.sqlite_statistics as stats
+    with own_app.app_context():
+        _approvals(20)
+        stats.refresh_statistics(full=True)
+        _approvals(20)  # twofold: below the tenfold PRAGMA optimize waits for
+    assert max(_rows_of(own_app, 'approval_requests')) == 20
+    monkeypatch.setattr(sqlite3, 'sqlite_version_info', version)
+    with own_app.app_context():
+        stats.scheduled_refresh()
+    assert (max(_rows_of(own_app, 'approval_requests')) == 40) is refreshed
