@@ -6064,6 +6064,7 @@
     "revokeSharedSerial": "这也会吊销此 CA 中所有序列号为 {{serial}} 的其他证书：KRL 按序列号吊销。",
     "revokedWithShared": "SSH 证书已吊销，同时吊销了其 CA 中所有序列号为 {{serial}} 的证书",
     "revokedWithKeyId": "SSH 证书已吊销，其 CA 中所有密钥 ID 为 {{keyId}} 的证书一并吊销",
+    "revokedWithKeyIdAndSerials": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}} and every holder of their serials",
     "revokeSerialZero": "序列号 0 不是有效的序列号：KRL 按密钥 ID {{keyId}} 吊销此证书，这会吊销此 CA 中所有具有该密钥 ID 的证书，无论其序列号为何。",
     "deleteConfirm": "确定要删除此 SSH 证书吗？",
     "certInformation": "证书信息",
