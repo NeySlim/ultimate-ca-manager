@@ -181,8 +181,9 @@ class RestorePlan:
     def _warn_shared_identities(self, pruned) -> None:
         for name in sorted(set(self.shared) - set(pruned)):
             for key, ids in self.shared[name].items():
-                if name == _SSO_IDENTITIES and key[1] is None and key[2] is not None and key[3] is None:
-                    self.warnings.append(shared_identity_warning(name, key, ids, '', others=[], taken=_UNBOUND_TAKEN))
+                if unbound_of_known_idp(name, key):
+                    self.warnings.append(shared_identity_warning(
+                        name, key, ids, '', others=[], taken=_UNBOUND_TAKEN + ', and the rest are left as they are'))
                     continue
                 self.warnings.append(shared_identity_warning(name, key, ids, 'left as they are'))
 
@@ -605,18 +606,25 @@ def _identities_here(model, primary: str, fields: Tuple[str, ...]):
 
 # Unbound orphans of a known IdP are also what the archive's bound orphans without a row bind
 _UNBOUND_TAKEN = ("the archive's unbound rows of it and its orphans of this IdP that have no row "
-                  "here take them oldest first, in the archive's order, and the rest are left as they are")
+                  "left here take them oldest first, in the archive's order")
+
+
+def unbound_of_known_idp(section_name: str, key: Tuple) -> bool:
+    """Whether the key is an account's unbound orphans of one IdP key, which bound ones bind."""
+    return section_name == _SSO_IDENTITIES and key[1] is None and key[2] is not None and key[3] is None
 
 
 def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate: str,
                             others: Optional[List[Any]] = None,
-                            taken: str = "the archive's rows of it go to them oldest first") -> str:
+                            taken: Optional[str] = None) -> str:
     others = ids[1:] if others is None else others
+    taken = taken or "the archive's rows of it go to them oldest first"
     fields, parts = SECTIONS[section_name].identity, key
     if section_name == _SSO_IDENTITIES:
         fields = _sso_identity_fields(key)
         parts = [key[_SSO_IDENTITY_FIELDS.index(field)] for field in fields]
-    spelt = '/'.join('' if part is None else str(part) for part in parts)
+    # A part holding the separator is quoted: an IdP key ending in '/' must not read as '//'
+    spelt = '/'.join('' if part is None else f'"{part}"' if '/' in str(part) else str(part) for part in parts)
     message = (f"{section_name} {spelt}: {len(ids)} rows here share this "
                f"{'/'.join(fields)} (id {', '.join(map(str, ids))}); {taken}")
     return f"{message}, and the others (id {', '.join(map(str, others))}) are {fate}" if others else message

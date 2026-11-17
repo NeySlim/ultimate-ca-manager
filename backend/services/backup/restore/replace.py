@@ -30,7 +30,8 @@ from ..export_generic import load_model
 from ..manifest import SECTIONS
 from .conflict import RestoreConflictError, describe_row
 from .plan import (
-    RestorePlan, _normalise, _temporal_identity, shared_identity_warning, sso_identity_key,
+    _UNBOUND_TAKEN, RestorePlan, _normalise, _temporal_identity, shared_identity_warning,
+    sso_identity_key, unbound_of_known_idp,
 )
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,8 @@ def rows_to_remove(section_name: str, archived_rows: List[Dict[str, Any]],
     for key, ids in shared.items():
         gone = ids[archived.get(key, 0):]
         doomed.extend(gone)
-        plan.warnings.append(shared_identity_warning(section_name, key, ids, 'removed', gone))
+        taken = _UNBOUND_TAKEN if unbound_of_known_idp(section_name, key) else None
+        plan.warnings.append(shared_identity_warning(section_name, key, ids, 'removed', gone, taken=taken))
     # No archived row can be one whose identity misses a part
     incomplete = plan.incomplete.get(section_name) or []
     if incomplete:
