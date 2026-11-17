@@ -376,6 +376,7 @@ class RestoreExtendedMixin:
         the certificate and let the restore report the ones that worked.
         """
         results.setdefault('ssh_certificates', 0)
+        results.setdefault('ssh_revoked_with_serial', 0)
         rows = backup_data.get('ssh_certificates', [])
         if not rows:
             return

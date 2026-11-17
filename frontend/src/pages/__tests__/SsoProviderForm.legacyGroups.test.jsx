@@ -123,6 +123,20 @@ describe('SAML shortcut', () => {
 })
 
 describe('hiddenLegacyGroupRows', () => {
+  // The 29 code points Python's str.strip() removes; the backend trims with it.
+  const TRIMMED = [9, 10, 11, 12, 13, 28, 29, 30, 31, 32, 0x85, 0xa0, 0x1680, 0x2000, 0x2001, 0x2002, 0x2003,
+    0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000]
+
+  it.each(TRIMMED)('trims code point %i at both ends', (code) => {
+    const c = String.fromCharCode(code)
+    expect(hiddenLegacyGroupRows({ Role: 'groups', groups: `${c}a${c}` })).toEqual(['a'])
+  })
+
+  it.each([0, 0x180e, 0x200b, 0x2060, 0xfeff])('keeps code point %i, which the backend keeps', (code) => {
+    const c = String.fromCharCode(code)
+    expect(hiddenLegacyGroupRows({ Role: 'groups', groups: `${c}a${c}` })).toEqual([`${c}a${c}`])
+  })
+
   it('reads a long run of inner spaces in linear time', () => {
     const attribute = `x${' '.repeat(100000)}x`
     const started = performance.now()
