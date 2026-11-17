@@ -3526,8 +3526,17 @@ POST /api/v2/system/alerts/expiry/check
 
 ### Updates
 ```http
-# Check for updates
+# Check for updates (within the installed major version; the highest final release of a
+# later major version is reported apart in major_upgrade: {version, published_at,
+# release_notes, html_url, download_url, package_name, checksum_url, assets}, null when
+# there is none, never a release candidate)
 GET /api/v2/system/updates/check
+
+# Upgrade to the later major version reported by the check (400 without one or without
+# version, 409 when version is not the one the check now reports; without
+# "major_upgrade": true the route refuses any release of another major version)
+POST /api/v2/system/updates/install
+{"major_upgrade": true, "version": "<major_upgrade.version>"}
 
 # Install update (HA mode: starts a rolling update of every node, 409 when one runs, a node
 # has no package family (Docker, unknown), the release lacks a present family's package or

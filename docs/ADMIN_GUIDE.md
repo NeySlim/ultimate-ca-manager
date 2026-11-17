@@ -520,6 +520,10 @@ psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 
 The scheduled automatic install verifies the package against the `.sha256` file the release publishes beside it: on a single node, a release whose package is published before that file waits, logged at every check and audited once per version (`settings_update`, "waits: not published yet"), and the next check after the file appears installs it.
 
+### Major version upgrade
+
+The update check, the notification and the automatic install stay within the installed major version, on the stable channel and on the release candidate channel. The highest final release of a later major version (never a release candidate) is shown apart in Settings > Updates, with its own **Upgrade** button and a confirmation; the check reports it as `major_upgrade`, and `POST /api/v2/system/updates/install` installs it only with `"major_upgrade": true` and its `version`. A major upgrade changes the schema in one step: read the release notes and take a backup first. The `system.update_available` event is emitted once per later major version, with `major_upgrade` set to `true` in its `update` object; in HA only one node emits it. In HA the upgrade is a rolling update campaign, with the checks of [HA.md](HA.md#rolling-update-from-the-web-interface-debrpm). Docker and Kubernetes show the image tag to deploy and no button.
+
 ### HA mode: scheduler and startup
 
 With `UCM_HA=1`, every node runs against the same PostgreSQL database and names itself with `UCM_NODE_ID` (default: the host name, which must differ between nodes).
