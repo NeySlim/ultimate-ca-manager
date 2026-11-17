@@ -233,7 +233,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SSO: a sign-in refused over a name gave the same reason for every account; the log and audit entry now say whether the account is local, linked to another provider, bound to another identity or without provider, and what repairs it. A provider with no rule and no default role now says so on the login page (`sso_no_default_role`).
 - Users: a CSV import refused a local account whose e-mail an SSO account used, which a single creation accepts, and answered `500` when another request took one of its e-mails or usernames first; it now accepts that e-mail and answers `409` naming the e-mail or username taken.
 - SSO: a second attribute mapping row with the same attribute name silently replaced the first one on save; the row is now marked and the provider is not saved until one of them is changed or removed.
-- SSH: the KRL of a CA failed to generate once a certificate of serial 0 (an imported one) was revoked; such a certificate is now listed as OpenSSH lists it, by its key ID under that CA.
+- SSH: the KRL of a CA failed to generate once a certificate of serial 0 (an imported one) was revoked; such a certificate is now listed as OpenSSH lists it, by its key ID under that CA, and the CA's other certificates with that key ID are revoked with it.
 
 ### Security
 

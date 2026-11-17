@@ -479,6 +479,94 @@ def test_three_holders_take_the_oldest_revocation_which_the_check_sees_missing(i
     assert check_ssh_serials(db.engine)['diverging_revocations'] == 0
 
 
+def _signed_with_key_id(key, serial, key_id):
+    import time
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    now = int(time.time())
+    cert = (serialization.SSHCertificateBuilder().public_key(ed25519.Ed25519PrivateKey.generate().public_key())
+            .serial(serial).type(serialization.SSHCertificateType.USER).key_id(key_id)
+            .valid_principals([b'outside']).valid_after(now - 60).valid_before(now + 3600).sign(key))
+    return cert.public_bytes().decode()
+
+
+def test_a_revoked_serial_zero_revokes_its_key_id_which_the_check_sees_missing(installation):
+    """The KRL revokes the key ID of a revoked serial 0 certificate under its CA: a valid
+    certificate bearing it is flagged, then revoked with it and audited; another key ID is not."""
+    from services.database_admin.verify import VerificationError, check_ssh_serials
+    from utils import ssh_serials
+    ca_id, key = _imported_ca('serial zero key ID')
+    ids = [SSHCertificateService.import_certificate(_signed_with_key_id(key, s, k), ssh_ca_id=ca_id,
+                                                    username='t').id
+           for s, k in ((0, b'alice'), (7, b'alice'), (8, b'bob'))]
+    revoked_at = datetime(2026, 2, 1, 12, 0)
+    db.session.execute(CERTS.update().where(CERTS.c.id == ids[0]).values(
+        revoked=True, revoked_at=revoked_at, revoke_reason='keyCompromise'))
+    db.session.commit()
+    with pytest.raises(VerificationError) as excinfo:
+        check_ssh_serials(db.engine)
+    assert f'#{ids[1]} beside #{ids[0]}' in str(excinfo.value)
+    assert f'#{ids[2]}' not in str(excinfo.value)
+
+    aligned = ssh_serials.align_revocations(ssh_serials.session_run)
+    assert aligned == {ids[1]: ids[0]}
+    assert ssh_serials.revocation_entries(ssh_serials.session_run, aligned)[0]['details'] == (
+        f'SSH certificate revoked with #{ids[0]}, of serial 0 and the same key ID under their CA: '
+        'the KRL revokes that key ID')
+    db.session.commit()
+    rows = db.session.execute(select(CERTS.c.revoked, CERTS.c.revoke_reason, CERTS.c.revoked_at)
+                              .where(CERTS.c.id.in_(ids)).order_by(CERTS.c.id)).all()
+    assert [(bool(r[0]), r[1], r[2]) for r in rows] == [
+        (True, 'keyCompromise', revoked_at), (True, 'keyCompromise', revoked_at), (False, None, None)]
+    assert check_ssh_serials(db.engine)['diverging_revocations'] == 0
+
+
+def test_the_holder_of_a_serial_a_revoked_key_id_takes_is_revoked_too(installation):
+    """Revoked through its key ID, a certificate revokes its serial: its pair follows, with and
+    after it, in the restore alignment as in a revocation."""
+    from utils import ssh_serials
+    for path in ('align', 'revoke'):
+        ca_id, key = _imported_ca(f'key ID then serial {path}')
+        zero, numbered = [SSHCertificateService.import_certificate(_signed_with_key_id(key, s, k), ssh_ca_id=ca_id,
+                                                                   username='t').id
+                          for s, k in ((0, b'erin'), (7, b'erin'))]
+        mate = SSHCertificateService.import_certificate(_signed_with_key_id(key, 8, b'frank'), ssh_ca_id=ca_id,
+                                                        username='t').id
+        db.session.execute(CERTS.update().where(CERTS.c.id == mate).values(serial=7, serial_duplicate=True))
+        db.session.commit()
+        if path == 'align':
+            db.session.execute(CERTS.update().where(CERTS.c.id == zero).values(revoked=True))
+            assert ssh_serials.align_revocations(ssh_serials.session_run) == {numbered: zero, mate: numbered}
+            db.session.commit()
+        else:
+            cert = SSHCertificateService.revoke_certificate(zero, 'superseded', 't')
+            assert [c.id for c in cert.revoked_with] == [numbered, mate]
+        db.session.expire_all()
+        assert all(db.session.get(SSHCertificate, i).revoked for i in (zero, numbered, mate))
+
+
+def test_a_key_id_the_krl_revokes_is_neither_issued_nor_imported(installation):
+    """A certificate bearing the key ID of a revoked serial 0 certificate of its CA would be
+    revoked by the KRL from the start: issuance and import refuse it, and spend no serial."""
+    ca_id, key = _imported_ca('revoked key ID')
+    db.session.execute(CAS.update().where(CAS.c.id == ca_id).values(allow_custom_key_id=True))
+    db.session.commit()
+    zero = SSHCertificateService.import_certificate(_signed_with_key_id(key, 0, b'carol'), ssh_ca_id=ca_id,
+                                                    username='t')
+    SSHCertificateService.revoke_certificate(zero.id, 'superseded', 't')
+    counter = _counter(ca_id)
+    with pytest.raises(ValueError, match=f"key ID 'carol'.*#{zero.id}"):
+        SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['carol'], key_id='carol')
+    db.session.rollback()
+    with pytest.raises(ValueError, match=f"key ID 'carol'.*#{zero.id}"):
+        SSHCertificateService.import_certificate(_signed_with_key_id(key, 9, b'carol'), ssh_ca_id=ca_id,
+                                                 username='t')
+    db.session.rollback()
+    assert _counter(ca_id) == counter
+    assert db.session.query(SSHCertificate).filter_by(ssh_ca_id=ca_id).count() == 1
+    assert SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['carol'], key_id='dave').id
+
+
 def test_a_restore_without_ssh_certificates_still_counts_them(installation):
     _ca('no certificate in the archive')
     master, store = _archive()

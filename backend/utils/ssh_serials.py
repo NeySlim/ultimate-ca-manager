@@ -6,7 +6,8 @@ which their signature carries: the oldest stays in the index, so no new row can 
 ``serial_duplicate`` takes the others out of it; the upgrade lists them and the next start reports
 them once. ``ssh_cas.serial_counter`` never trails the serials
 its CA holds; every path that writes certificates or counters calls ``raise_counters``. A pair is
-revoked as the KRL revokes it, both holders or neither (``align_revocations``).
+revoked as the KRL revokes it, both holders or neither, and so is every certificate bearing the key ID
+of a revoked serial 0 certificate of its CA, which ssh-keygen lists by key ID (``align_revocations``).
 """
 import json
 import logging
@@ -41,15 +42,19 @@ _GROUPS = ('SELECT c.id, c.ssh_ca_id, a.descr, c.serial, c.key_id FROM ssh_certi
            'ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id AND o.serial = c.serial AND o.id <> c.id) '
            'ORDER BY c.ssh_ca_id, c.serial, c.id')
 
-# Each valid holder of a serial a revoked certificate of its CA holds, and the revoked holder of the
-# oldest revocation (dated before undated, then lowest id)
-_UNREVOKED = ('SELECT c.id, (SELECT o.id FROM ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id '
-              'AND o.serial = c.serial AND o.revoked '
+# The KRL revokes c through o (PROTOCOL.krl): o holds c's non-zero serial, or o is of serial 0, which
+# ssh-keygen -k lists by key ID under the CA, and c bears that key ID, whatever its serial or key
+_REVOKES = ('o.ssh_ca_id = c.ssh_ca_id AND o.id <> c.id AND o.revoked AND '
+            '((c.serial <> 0 AND o.serial = c.serial) OR (o.serial = 0 AND o.key_id = c.key_id))')
+# Each valid certificate the KRL revokes, and the certificate of the oldest revocation revoking it
+# (dated before undated, then lowest id)
+_UNREVOKED = (f'SELECT c.id, (SELECT o.id FROM ssh_certificates o WHERE {_REVOKES} '
               'ORDER BY CASE WHEN o.revoked_at IS NULL THEN 1 ELSE 0 END, o.revoked_at, o.id LIMIT 1) '
               'FROM ssh_certificates c '
-              'WHERE c.serial <> 0 AND NOT COALESCE(c.revoked, FALSE) AND EXISTS (SELECT 1 FROM '
-              'ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id AND o.serial = c.serial AND o.revoked) '
+              f'WHERE NOT COALESCE(c.revoked, FALSE) AND EXISTS (SELECT 1 FROM ssh_certificates o WHERE {_REVOKES}) '
               'ORDER BY c.id')
+_ZERO_BEARING = ('SELECT id FROM ssh_certificates WHERE ssh_ca_id = :ca AND serial = 0 AND revoked '
+                 'AND key_id = :k ORDER BY id LIMIT 1')
 _REVOKE_AS = ('UPDATE ssh_certificates SET revoked = TRUE, '
               'revoked_at = (SELECT s.revoked_at FROM ssh_certificates s WHERE s.id = :s), '
               'revoke_reason = (SELECT s.revoke_reason FROM ssh_certificates s WHERE s.id = :s) WHERE id = :i')
@@ -88,19 +93,43 @@ def duplicate_groups(run: Run, ids=None) -> List[Dict]:
 
 
 def diverging_revocations(run: Run) -> Dict[int, int]:
-    """{valid holder of a serial a revoked certificate of its CA holds: the holder it would be revoked with}."""
+    """{valid certificate the KRL revokes: the revoked certificate it would be revoked with}."""
     return {row_id: source for row_id, source in run(_UNREVOKED, {}).fetchall()}
 
 
+def revoking_key_id(run: Run, ca_id: int, key_id: str) -> Optional[int]:
+    """The revoked certificate of serial 0 of the CA bearing *key_id*, whose KRL entry revokes it."""
+    row = run(_ZERO_BEARING, {'ca': ca_id, 'k': key_id}).fetchone()
+    return row[0] if row else None
+
+
+def refuse_revoked_key_id(ca_id: int, key_id: str) -> None:
+    """A new certificate bearing a key ID its CA's KRL revokes would be revoked from the start."""
+    source = revoking_key_id(session_run, ca_id, key_id)
+    if source is not None:
+        raise ValueError(f"The KRL of this SSH CA revokes key ID '{key_id}', which revoked certificate "
+                         f"#{source} of serial 0 bears: a certificate bearing it would be revoked from the start")
+
+
+def _by_key_id(run: Run, source: int) -> bool:
+    row = run('SELECT serial FROM ssh_certificates WHERE id = :i', {'i': source}).fetchone()
+    return row is not None and row[0] == 0
+
+
 def align_revocations(run: Run) -> Dict[int, int]:
-    """The KRL revokes a serial: each valid holder of a revoked one is revoked with the date and
-    reason of the oldest revocation among its holders. {id revoked here: id it was revoked with}."""
-    aligned = diverging_revocations(run)
-    for row_id, source in aligned.items():
-        run(_REVOKE_AS, {'i': row_id, 's': source})
-        logger.warning("SSH certificate #%s revoked with #%s, which holds its serial under their CA "
-                       "(the KRL revokes by serial)", row_id, source)
-    return aligned
+    """Each valid certificate the KRL revokes (``_REVOKES``) is revoked with the date and reason of
+    the oldest revocation revoking it, until none is left. {id revoked here: id it was revoked with}."""
+    aligned: Dict[int, int] = {}
+    while True:
+        diverging = diverging_revocations(run)
+        if not diverging:
+            return aligned
+        for row_id, source in diverging.items():
+            run(_REVOKE_AS, {'i': row_id, 's': source})
+            logger.warning("SSH certificate #%s revoked with #%s, which %s under their CA (the KRL revokes "
+                           "it)", row_id, source,
+                           'is of serial 0 and bears its key ID' if _by_key_id(run, source) else 'holds its serial')
+        aligned.update(diverging)
 
 
 def revocation_entries(run: Run, aligned: Dict[int, int]) -> List[Dict]:
@@ -110,10 +139,12 @@ def revocation_entries(run: Run, aligned: Dict[int, int]) -> List[Dict]:
         row = run('SELECT serial, key_id FROM ssh_certificates WHERE id = :i', {'i': row_id}).fetchone()
         if row is None:
             continue
+        details = (f'SSH certificate revoked with #{source}, of serial 0 and the same key ID under their CA: '
+                   'the KRL revokes that key ID' if _by_key_id(run, source) else
+                   f'SSH certificate revoked with #{source}, which holds serial {row[0]} '
+                   'under their CA: the KRL revokes by serial')
         entries.append(dict(action='ssh_cert_revoked', resource_type='ssh_certificate', resource_id=str(row_id),
-                            resource_name=row[1], success=True,
-                            details=f'SSH certificate revoked with #{source}, which holds serial {row[0]} '
-                                    'under their CA: the KRL revokes by serial'))
+                            resource_name=row[1], success=True, details=details))
     return entries
 
 

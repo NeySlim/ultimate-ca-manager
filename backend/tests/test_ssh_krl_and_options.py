@@ -120,6 +120,33 @@ def test_a_revoked_certificate_of_serial_zero_is_revoked_within_its_ca(app, tmp_
             assert result.returncode == 0 and 'REVOKED' not in result.stdout, still_valid
 
 
+@needs_ssh_keygen
+@pytest.mark.parametrize('key_id', (b'alice', b''))
+def test_revoking_serial_zero_revokes_the_numbered_certificates_of_its_key_id(app, tmp_path, key_id):
+    """The KRL revokes the key ID of a serial 0 certificate under its CA, whatever the serial or
+    the key of the certificate bearing it: UCM revokes those certificates with it, no others."""
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from tests.test_ssh_serial_counter_matrix import _imported_ca
+    with app.app_context():
+        ca_id, key = _imported_ca('KRL key ID CA')
+        subject = ed25519.Ed25519PrivateKey.generate().public_key
+        zero = _signed(key, subject(), 0, key_id)
+        same = _signed(key, subject(), 5, key_id)
+        other = _signed(key, subject(), 6, b'bob')
+        ids = [SSHCertificateService.import_certificate(c, ssh_ca_id=ca_id, username='t').id
+               for c in (zero, same, other)]
+        cert = SSHCertificateService.revoke_certificate(ids[0], 'keyCompromise', username='t')
+        assert [c.id for c in cert.revoked_with] == [ids[1]]
+        db.session.expire_all()
+        rows = [db.session.get(SSHCertificate, i) for i in ids]
+        assert [(r.revoked, r.revoke_reason) for r in rows] == [
+            (True, 'keyCompromise'), (True, 'keyCompromise'), (False, None)]
+        assert rows[1].revoked_at == rows[0].revoked_at
+        krl = SSHKRLService.generate_krl(ca_id)
+        for row, certificate in zip(rows, (zero, same, other)):
+            assert ('REVOKED' in _query(tmp_path, krl, certificate).stdout) is bool(row.revoked)
+
+
 class TestCriticalOptions:
     @pytest.fixture()
     def user_ca(self, app):

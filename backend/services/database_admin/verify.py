@@ -615,7 +615,8 @@ def check_local_email_flags(engine) -> Dict[str, Any]:
 
 def check_ssh_serials(engine) -> Dict[str, Any]:
     """Every SSH CA counts past its certificates, none holds a serial twice under the index, and
-    the holders of a serial are revoked together.
+    every certificate the KRL revokes is revoked: the holders of a serial together, and those
+    bearing the key ID of a revoked serial 0 certificate of their CA with it.
 
     A KRL revokes by serial (PROTOCOL.krl): a trailing counter hands a number out again, an
     unmarked pair means the unique index ``uq_ssh_certificates_ca_serial`` is not there, and a
@@ -646,8 +647,9 @@ def check_ssh_serials(engine) -> Dict[str, Any]:
     if diverging:
         listed = ', '.join(f"#{row_id} beside #{source}" for row_id, source in list(diverging.items())[:10])
         raise VerificationError(
-            f"{len(diverging)} SSH certificate(s) are valid while another holder of their serial under "
-            f"their CA is revoked ({listed}): the KRL revokes them all")
+            f"{len(diverging)} SSH certificate(s) are valid while the KRL revokes them, another holder of "
+            f"their serial, or a certificate of serial 0 with their key ID, being revoked under their CA "
+            f"({listed})")
     return {'cas_checked': int(checked or 0), 'lagging': 0, 'unmarked_duplicates': 0,
             'diverging_revocations': 0}
 
