@@ -147,6 +147,47 @@ def test_revoking_serial_zero_revokes_the_numbered_certificates_of_its_key_id(ap
             assert ('REVOKED' in _query(tmp_path, krl, certificate).stdout) is bool(row.revoked)
 
 
+def _krl_log(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelname == 'ERROR' and 'KRL' in r.getMessage()]
+
+
+@pytest.mark.parametrize('certificate', ('', '   '))
+def test_a_revoked_serial_zero_without_its_certificate_fails_once_in_the_log(app, auth_client, caplog,
+                                                                             certificate):
+    """A serial 0 entry is the certificate itself: without it the KRL cannot be built, the API
+    answers 500, and the log says why once, naming the certificate."""
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from tests.test_ssh_serial_counter_matrix import _imported_ca
+    with app.app_context():
+        ca_id, key = _imported_ca('KRL empty certificate CA')
+        zero = _signed(key, ed25519.Ed25519PrivateKey.generate().public_key(), 0, b'alice')
+        cert = SSHCertificateService.import_certificate(zero, ssh_ca_id=ca_id, username='t')
+        SSHCertificateService.revoke_certificate(cert.id, username='t')
+        cert.certificate = certificate
+        db.session.commit()
+        cert_id = cert.id
+    with caplog.at_level('ERROR'):
+        response = auth_client.get(f'/api/v2/ssh/cas/{ca_id}/krl')
+    assert response.status_code == 500
+    assert response.get_json()['message'] == 'Failed to generate KRL'
+    assert _krl_log(caplog) == [
+        f'Failed to generate KRL for CA {ca_id}: SSH certificate #{cert_id} has serial 0 and no certificate']
+
+
+def test_an_ssh_keygen_failure_is_logged_once(app, auth_client, caplog, monkeypatch):
+    import services.ssh_krl_service as krl_service
+    with app.app_context():
+        ca = SSHCAService.create_ca(descr='KRL failing CA', ca_type='user', key_type='ed25519', username='t',
+                                    allow_any_principal=True)
+        ca_id = ca.id
+    monkeypatch.setattr(krl_service.subprocess, 'run', lambda *a, **k: subprocess.CompletedProcess(
+        a[0], 1, stdout='', stderr='bad spec line'))
+    with caplog.at_level('ERROR'):
+        response = auth_client.get(f'/api/v2/ssh/cas/{ca_id}/krl')
+    assert response.status_code == 500
+    assert _krl_log(caplog) == [f'Failed to generate KRL for CA {ca_id}: ssh-keygen: bad spec line']
+
+
 class TestCriticalOptions:
     @pytest.fixture()
     def user_ca(self, app):

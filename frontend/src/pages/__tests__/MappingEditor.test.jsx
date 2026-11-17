@@ -117,3 +117,15 @@ describe('MappingEditor', () => {
     expect(keyInputs().every(i => i.validity.valid)).toBe(true)
   })
 })
+
+describe('MappingEditor rows of one key', () => {
+  it('emits the first row of a repeated key, the one left unmarked', () => {
+    const onEmit = vi.fn()
+    render(<Harness initial={{ groups: 'memberOf', mail: 'email' }} onEmit={onEmit} />)
+    fireEvent.click(screen.getByText('common.add'))
+    fireEvent.change(keyInputs()[2], { target: { value: 'groups' } })
+    fireEvent.change(valInputs()[2], { target: { value: 'other' } })
+    expect(onEmit).toHaveBeenLastCalledWith({ groups: 'memberOf', mail: 'email' })
+    expect(Object.keys(onEmit.mock.lastCall[0])).toEqual(['groups', 'mail'])
+  })
+})

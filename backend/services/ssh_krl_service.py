@@ -28,7 +28,7 @@ def _revocation_line(cert):
         return f"serial: {int(cert.serial)}\n"
     certificate = ' '.join((cert.certificate or '').split()[:2])
     if not certificate:
-        raise RuntimeError(f"Failed to generate KRL: SSH certificate #{cert.id} has serial 0 and no certificate")
+        raise RuntimeError(f"SSH certificate #{cert.id} has serial 0 and no certificate")
     return f"{certificate}\n"
 
 
@@ -83,9 +83,9 @@ class SSHKRLService:
                 capture_output=True, text=True, timeout=30
             )
 
+            # The caller logs the failure once, prefixed with what failed
             if result.returncode != 0:
-                logger.error(f"ssh-keygen KRL generation failed: {result.stderr}")
-                raise RuntimeError(f"Failed to generate KRL: {result.stderr}")
+                raise RuntimeError(f"ssh-keygen: {result.stderr.strip()}")
 
             # Read the generated KRL
             with open(krl_path, 'rb') as f:

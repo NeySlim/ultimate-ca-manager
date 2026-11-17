@@ -156,3 +156,42 @@ def test_the_start_calls_the_report(app, monkeypatch):
     from tests.fresh_app import fresh_app
     with fresh_app() as application:
         assert called == [application]
+
+
+@pytest.mark.parametrize('dialect', BACKENDS)
+def test_a_certificate_revoked_by_key_id_is_listed_for_the_next_start(dialect, tmp_path, monkeypatch, app):
+    """The KRL revokes the key ID of a revoked serial 0 certificate under its CA: the step revokes the
+    valid certificate bearing it, lists it as it lists the pairs, and the next start audits it once."""
+    from models import db as app_db, AuditLog, SystemConfig
+    from utils.ssh_serials import describe, report_marked_duplicates
+    for db in make_base(dialect, tmp_path, monkeypatch, 'ssh168k'):
+        _ca(db, 3, 0)
+        _cert(db, 31, 3, 0)
+        _cert(db, 32, 3, 5)
+        _cert(db, 33, 3, 6)
+        db.run(f"UPDATE {CERTS} SET key_id = 'alice' WHERE id IN (31, 32)")
+        db.run(f"UPDATE {CERTS} SET revoked = TRUE, revoke_reason = 'keyCompromise' WHERE id = 31")
+        assert db.upgrade()
+        assert [(i, bool(r)) for i, r in db.run(f"SELECT id, revoked FROM {CERTS} ORDER BY id")] == [
+            (31, True), (32, True), (33, False)]
+        listed = _listed(db)
+        assert [(e['ssh_ca_id'], e['ids'], e['revoked']) for e in listed] == [(3, [32], [[32, 31]])]
+        text = describe(listed[0])
+        assert "#32 'alice' revoked with #31" in text and 'the KRL revokes that key ID' in text
+        _run_step_again(db, dialect)
+        assert _listed(db) == listed
+
+    with app.app_context():
+        before = app_db.session.query(app_db.func.max(AuditLog.id)).scalar() or 0
+        app_db.session.add(SystemConfig(key=MARKED_KEY, value=json.dumps(listed)))
+        app_db.session.commit()
+    try:
+        assert report_marked_duplicates(app) == 1
+        with app.app_context():
+            entries = AuditLog.query.filter(AuditLog.id > before, AuditLog.action == 'ssh_cert_revoked').all()
+            assert [(e.resource_type, e.resource_id, e.resource_name, e.details) for e in entries] == [
+                ('ssh_certificate', '32', 'alice', text)]
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key=MARKED_KEY).delete()
+            app_db.session.commit()

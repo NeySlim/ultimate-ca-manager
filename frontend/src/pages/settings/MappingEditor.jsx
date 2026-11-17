@@ -5,11 +5,14 @@ import { Button, Input, Select } from '../../components'
 
 // Rows carry a stable id so editing a key neither reorders the list nor
 // collides with another entry mid-typing (#222). The object shape expected
-// by the API is only rebuilt on emit, where a repeated key keeps one row: every
-// later row of a key is marked invalid, so its form refuses to submit until resolved.
+// by the API is only rebuilt on emit, where a repeated key keeps its first row: every
+// later row of a key is marked invalid, which blocks a submit only inside a <form>.
 let nextRowId = 0
 const toRows = (obj) => Object.entries(obj || {}).map(([key, val]) => ({ id: ++nextRowId, key, val }))
-const toObject = (rows) => Object.fromEntries(rows.map(r => [r.key, r.val]))
+const toObject = (rows) => {
+  const seen = new Set()
+  return Object.fromEntries(rows.filter(r => !seen.has(r.key) && seen.add(r.key)).map(r => [r.key, r.val]))
+}
 
 // Ids of the rows whose non-empty key an earlier row already holds
 const repeatedRows = (rows) => {
