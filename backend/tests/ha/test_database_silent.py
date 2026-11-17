@@ -37,11 +37,15 @@ def cluster(tmp_path_factory):
 
 def _probe(node, path, timeout):
     """(status or the exception's name, seconds), on a new connection as a kubelet probe makes."""
+    http = requests.Session()
+    http.verify = False  # the node's self-signed certificate
     began = time.monotonic()
     try:
-        code = requests.get(node.url(path), verify=False, timeout=timeout).status_code
+        code = http.get(node.url(path), timeout=timeout).status_code
     except requests.RequestException as e:
         code = type(e).__name__
+    finally:
+        http.close()
     return code, time.monotonic() - began
 
 
