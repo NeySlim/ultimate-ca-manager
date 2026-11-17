@@ -2826,7 +2826,15 @@ Content-Type: application/json
 ```http
 GET /api/v2/audit/verify
 GET /api/v2/audit/verify?start_id=1&end_id=1000
+POST /api/v2/audit/verify          {"start_id": 1, "end_id": 1000}
 ```
+
+Permission `read:audit`. The verification runs as a [background job](#background-jobs) of
+kind `audit_verify`. `GET` joins the verification already running over the same range, or
+starts one; `POST` starts one and answers `409` while another runs (as does `GET` for another
+range). A verification finished within 25 seconds answers `200` with the body below, as before;
+a longer one answers `202 Accepted` with a `Location` to follow, its result then in the job's
+`result.data`.
 
 **Response:**
 ```json
@@ -3041,6 +3049,58 @@ Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `p
 ---
 
 ## System
+
+### Background Jobs
+
+Long operations (the audit chain verification) run outside the web worker, in the
+scheduler process. The route that starts one waits at most 25 seconds:
+
+- finished by then, it answers exactly what it answered before jobs existed (code, `message`,
+  `data`);
+- otherwise `202 Accepted`, a `Location: /api/v2/system/jobs/<id>` header and
+  `{"data": {"job": {...}}}`.
+
+`Prefer: respond-async` (RFC 7240) answers `202` at once, with
+`Preference-Applied: respond-async`; `Prefer: wait=N` shortens the wait to `N` seconds (never
+beyond 25). A second start while the job's slot is taken answers `409` with
+`details.job` naming the active job (`id`, `kind`, `state`, `created_at`, `requested_by`).
+One job is active per slot on the whole installation, HA cluster included. During an HA
+cluster maintenance no job starts: `GET` and `POST` of a starting route both answer `503`
+with `Retry-After: 30`, code `maintenance` and the message `A cluster maintenance is in
+progress, no background job starts until it ends`, and no job is created. A `GET` that would
+join a job already running answers `503` too: follow that job at `GET /api/v2/system/jobs/<id>`.
+
+```http
+GET  /api/v2/system/jobs                  # ?kind=audit_verify&state=active|final&limit=20 (max 100)
+GET  /api/v2/system/jobs/<id>
+POST /api/v2/system/jobs/<id>/cancel
+```
+
+Each job is read and cancelled with its own permission (`read:audit` for `audit_verify`); the
+list shows only the kinds the caller may read, and the id of another kind answers `404`.
+
+```json
+{
+  "data": {
+    "id": "0b6f5c1e-...", "kind": "audit_verify", "state": "running", "reason": null,
+    "phase": "verifying", "progress": {"done": 400000, "total": 1000000},
+    "cancel_requested": false, "requested_by": {"id": 1, "username": "admin"},
+    "created_at": "2026-11-16T10:00:00Z", "started_at": "2026-11-16T10:00:01Z",
+    "finished_at": null,
+    "result": null
+  }
+}
+```
+
+- `state`: `pending`, `running`, then one of `succeeded`, `failed`, `cancelled`.
+- `reason` once final: `done`, `refused` (the operation answered an error, kept in `result`),
+  `error`, `cancelled`, `executor_lost` (the process running it stopped: run it again) or
+  `not_taken` (no process took it within 5 minutes). A lost job is never started again on its own.
+- `result` once final: `{"code", "message", "data"}`, the answer the starting route would have given.
+- Cancel: a pending job ends at once (`200`, `Job cancelled`); a running one stops at its next
+  page (`200`, `Cancellation requested`); an ended one answers `409`.
+
+A finished job is kept 30 days, and the latest of each kind always.
 
 ### Database Operations
 ```http

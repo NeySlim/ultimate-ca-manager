@@ -578,6 +578,8 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'backup_archives': 'the HA archive store: earlier archives, never carried inside a new one',
     'backup_archive_chunks': 'the bytes of the HA archive store, never carried inside a new archive',
     'file_removals': 'paths a restore removed, deleted by each node from its own disk: never restored',
+    'background_jobs': ('backups, restores and audit verifications in progress or done: runtime state '
+                        'of this installation, kept across a restore, never exported'),
     'second_factor_failures': 'second-factor and WebAuthn lockout counters: runtime state, never restored',
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',

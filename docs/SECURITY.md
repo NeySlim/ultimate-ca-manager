@@ -197,7 +197,10 @@ database can recompute, and the check reports the log as not protected. A retent
 removes the oldest entries only and records, sealed, where the log now starts.
 
 `GET /api/v2/audit/verify` (Audit Logs > Verify Integrity) reports `intact`, `broken` at
-entry N, or `unprotected`. Once the key has sealed an entry, an entry written after it
+entry N, or `unprotected`. It runs as a background job in the scheduler process, page by page,
+so the web worker stays available and other writes go on meanwhile; past 25 seconds the route
+answers `202` and the job is followed at `/api/v2/system/jobs/<id>` (see API_REFERENCE.md,
+Background Jobs). A purge during the check makes it start again, so it never reads as a break. Once the key has sealed an entry, an entry written after it
 without the key is a break.
 
 Changing the master key re-anchors the chain. UCM keeps the ids of the keys it has sealed

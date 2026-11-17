@@ -227,9 +227,25 @@ def test_the_scheduler_process_prepares_then_runs_then_hands_over(monkeypatch):
     monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
     monkeypatch.setattr('services.ws_relay.start_publisher', lambda a: calls.append(('relay', a)))
     monkeypatch.setattr('services.ws_relay.stop_publisher', lambda **kw: calls.append('relay stop'))
+
+    class Runner:
+        def __init__(self, app, scheduler):
+            calls.append(('jobs', app))
+
+        def start(self):
+            return self
+
+        def stop(self):
+            calls.append('jobs stop')
+
+        def join(self, timeout):
+            calls.append('jobs join')
+            return True
+    monkeypatch.setattr('services.jobs.runner.JobRunner', Runner)
     assert scheduler_main.main() == 0
     assert calls == [('create_app', '1'), ('relay', 'the-app'), ('housekeeping', 'the-app'), 'rearm',
-                     ('start', 'the-app'), 'relinquish', ('join', 7.0), 'relay stop']
+                     ('start', 'the-app'), ('jobs', 'the-app'), 'jobs stop', 'relinquish',
+                     ('join', 7.0), 'jobs join', 'relay stop']
 
 
 def test_under_gunicorn_the_master_skips_the_startup_housekeeping(monkeypatch):
@@ -290,6 +306,20 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
     monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
     monkeypatch.setattr('services.ws_relay.start_publisher', lambda a: None)
     monkeypatch.setattr('services.ws_relay.stop_publisher', lambda **kw: exits.append('relay stop'))
+
+    class Runner:
+        def __init__(self, app, scheduler):
+            pass
+
+        def start(self):
+            return self
+
+        def stop(self):
+            pass
+
+        def join(self, timeout):
+            return True
+    monkeypatch.setattr('services.jobs.runner.JobRunner', Runner)
     with pytest.raises(Exit):
         scheduler_main.main()
     assert exits == ['relay stop', 0]

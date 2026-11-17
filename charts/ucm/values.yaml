@@ -112,6 +112,8 @@ fips:
 extraEnv: []
   # - name: UCM_LOG_LEVEL
   #   value: DEBUG
+  # - name: UCM_WORKER_TIMEOUT   # seconds a web request may run, 30 to 3600 (default 120)
+  #   value: "300"
 
 service:
   type: ClusterIP

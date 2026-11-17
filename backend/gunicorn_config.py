@@ -35,7 +35,9 @@ backlog = 2048
 workers = 1
 worker_class = 'workers.MTLSGeventWebSocketWorker'
 worker_connections = 1000
-timeout = 120
+# UCM_WORKER_TIMEOUT, 120 s by default; out of bounds the start is refused
+from worker_timeout import worker_timeout  # noqa: E402
+timeout = worker_timeout()
 keepalive = 5
 
 # Security

@@ -50,6 +50,7 @@ from models.shared_file import SharedFile
 from models.backup_archive import BackupArchive, BackupArchiveChunk
 from models.second_factor_failure import SecondFactorFailure
 from models.file_removal import FileRemoval
+from models.background_job import BackgroundJob
 
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -75,5 +76,5 @@ __all__ = [
     "RevokedSerial", "CompromisedKeyRecord", "EstSignerCert",
     "DeployTarget", "DeployBinding", "CRLDeployBinding", "DeployDelivery",
     "ClusterCommand", "ClusterMaintenance", "ClusterNode", "SchedulerRequest", "EncryptionKey", "WebsocketRelayEvent",
-    "SharedFile", "BackupArchive", "BackupArchiveChunk", "SecondFactorFailure", "FileRemoval",
+    "SharedFile", "BackupArchive", "BackupArchiveChunk", "SecondFactorFailure", "FileRemoval", "BackgroundJob",
 ]
