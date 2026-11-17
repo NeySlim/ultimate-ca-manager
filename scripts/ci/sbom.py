@@ -453,7 +453,8 @@ def scan_rootfs(fileobj, app):
             data = tar.extractfile(member).read()
             m = _DIST_INFO.match(name)
             if m:
-                meta = email.parser.BytesParser().parsebytes(data, headersonly=True)
+                # METADATA is UTF-8 text: parsed as bytes, a non-ASCII field comes back as a Header object
+                meta = email.parser.Parser().parsestr(data.decode('utf-8', 'replace'), headersonly=True)
                 dists.append({'loc': m['loc'], 'name': meta.get('Name'), 'version': meta.get('Version'),
                               'expression': meta.get('License-Expression'), 'license': meta.get('License'),
                               'classifiers': [c for c in meta.get_all('Classifier', []) if c.startswith('License ::')]})

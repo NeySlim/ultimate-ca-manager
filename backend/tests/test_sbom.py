@@ -277,6 +277,8 @@ def test_python_versions_and_licenses_come_from_the_installed_metadata(tmp_path)
     assert sa['version'] == '2.0.46' and sa['licenses'] == [{'license': {'id': 'MIT'}}]
     (pyjks,) = _by_name(doc, 'pyjks')
     assert pyjks['licenses'] == [{'license': {'name': 'MIT License'}}]
+    (accent,) = _by_name(doc, 'accent')
+    assert accent['licenses'] == [{'license': {'name': 'MIT © Société'}}]
     assert not _by_name(doc, 'twofish')
     # The tools left in the environment are components too, in both locations
     (pip,) = _by_name(doc, 'pip')
