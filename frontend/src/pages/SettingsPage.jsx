@@ -234,6 +234,7 @@ export default function SettingsPage() {
   }
   const restoreJob = useRestoreJob({
     enabled: hasPermission('admin:system'),
+    account: user?.username,
     onReport: (data) => {
       setShowRestoreModal(false)
       setRestoreReport(data)

@@ -26,7 +26,7 @@ import { notificationSpies } from './pageRenderingSetup.jsx'
 import SettingsPage from '../SettingsPage'
 import { systemService } from '../../services/system.service'
 import { holdSignOut } from '../../services/apiClient'
-import { PENDING_RESTORE_KEY } from '../settings/useRestoreJob'
+import { PENDING_RESTORE_KEY, pendingRestore } from '../settings/useRestoreJob'
 
 // An administrator: the page picks up the restore this browser followed
 vi.mock('../../hooks/usePermission', () => ({
@@ -76,7 +76,7 @@ describe('SettingsPage: restore as a job', () => {
     jobsApi.get.mockResolvedValueOnce({ data: running }).mockResolvedValue({ data: succeeded })
     await startRestore()
     expect(await screen.findByTestId('restore-job')).toBeTruthy()
-    expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBe('job-1')
+    expect(pendingRestore('admin')).toBe('job-1')
     await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
     expect(await screen.findByText('Sign the CRL of Root CA')).toBeTruthy()
     expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBeNull()
@@ -89,19 +89,40 @@ describe('SettingsPage: restore as a job', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
     expect(await screen.findByTestId('restore-sign-in')).toBeTruthy()
     expect(screen.queryByText('Authentication required')).toBeNull()
-    expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBe('job-1')
+    expect(pendingRestore('admin')).toBe('job-1')
     // The sign-in comes back to this tab, where the report is shown
     screen.getByTestId('restore-sign-in-button').click()
     expect(window.location.href).toBe('/login?next=%2Fsettings%3Ftab%3Dbackup')
   })
 
   it('shows the report of the followed job once signed in again', async () => {
-    window.localStorage.setItem(PENDING_RESTORE_KEY, 'job-1')
+    window.localStorage.setItem(PENDING_RESTORE_KEY, JSON.stringify({ id: 'job-1', account: 'admin' }))
     jobsApi.get.mockResolvedValue({ data: succeeded })
     renderPage()
     expect(await screen.findByText('Sign the CRL of Root CA')).toBeTruthy()
     expect(jobsApi.get).toHaveBeenCalledWith('job-1')
     expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBeNull()
+  })
+
+  it('never shows another account the restore this browser followed', async () => {
+    window.localStorage.setItem(PENDING_RESTORE_KEY, JSON.stringify({ id: 'job-old', account: 'someone-else' }))
+    jobsApi.get.mockResolvedValue({ data: { ...succeeded, id: 'job-old' } })
+    renderPage()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+    expect(jobsApi.get).not.toHaveBeenCalled()
+    expect(screen.queryByText('Sign the CRL of Root CA')).toBeNull()
+    expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBeNull()
+    expect(pendingRestore('someone-else')).toBeNull()
+  })
+
+  it('keeps the followed restore under the account that started it', async () => {
+    systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
+    jobsApi.get.mockResolvedValue({ data: running })
+    await startRestore()
+    expect(JSON.parse(window.localStorage.getItem(PENDING_RESTORE_KEY))).toEqual(
+      { id: 'job-1', account: 'admin' })
+    expect(pendingRestore('admin')).toBe('job-1')
+    expect(pendingRestore('someone-else')).toBeNull()
   })
 
   it('says a cancelled restore restored nothing', async () => {
@@ -135,11 +156,11 @@ describe('SettingsPage: restore as a job', () => {
     expect(screen.queryByTestId('restore-job')).toBeNull()
     expect(screen.queryByTestId('restore-sign-in')).toBeNull()
     expect(notificationSpies.showError).toHaveBeenCalledWith('settings.restoreContactLost')
-    expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBe('job-1')  // shown at the next visit
+    expect(pendingRestore('admin')).toBe('job-1')  // shown at the next visit
   })
 
   it('says so when the restore picked up at load stops answering', async () => {
-    window.localStorage.setItem(PENDING_RESTORE_KEY, 'job-1')
+    window.localStorage.setItem(PENDING_RESTORE_KEY, JSON.stringify({ id: 'job-1', account: 'admin' }))
     jobsApi.get.mockResolvedValueOnce({ data: { ...running, phase: 'applying' } })
       .mockRejectedValue(Object.assign(new Error('Service unavailable'), { status: 503 }))
     renderPage()
