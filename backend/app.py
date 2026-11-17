@@ -879,7 +879,7 @@ def create_app(config_name=None):
                 name="sqlite_statistics",
                 func=scheduled_refresh,
                 interval=3600,
-                description="Analyze the SQLite tables that grew or shrank tenfold since their statistics"
+                description="Refresh the SQLite planner statistics (PRAGMA optimize from 3.46, bounded ANALYZE before)"
             )
 
         # Register discovery scheduler task (checks every 60s for due profiles)

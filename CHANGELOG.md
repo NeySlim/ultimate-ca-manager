@@ -84,6 +84,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- **SQLite planner statistics.** A scheduled task refreshes them every hour, and Optimize Database now reads a bounded sample of each index (`PRAGMA analysis_limit = 1000`) instead of every row.
 - **Manual backups run in the background.** Creating a backup no longer holds the web worker: the dialog shows its progress, can cancel it and offers the archive once it is ready, a reload picks it up again, and past 25 seconds the create routes answer `202` with a job to follow; a shorter one answers as before.
 - **The audit chain verification runs in the background.** It no longer holds the web worker: past 25 seconds `GET /api/v2/audit/verify` answers `202` with a job to follow (`/api/v2/system/jobs`), the screen shows its progress and can cancel it, and `POST /api/v2/audit/verify` starts one explicitly; a shorter one answers as before. During an HA cluster maintenance no job starts: both answer `503` with `Retry-After`.
 - **`UCM_WORKER_TIMEOUT`.** The gunicorn worker timeout, 120 seconds until now, is set by this variable from 30 to 3600 seconds; a value outside these bounds stops the start with a message naming it and exit code 78, which systemd does not restart.

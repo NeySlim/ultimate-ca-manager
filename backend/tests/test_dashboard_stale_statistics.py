@@ -140,6 +140,7 @@ def test_a_sqlite_connection_is_reopened_to_load_fresh_statistics(tmp_path):
     from pathlib import Path
     env = {k: v for k, v in os.environ.items() if k != 'DATABASE_URL'}
     env['DATABASE_PATH'] = str(tmp_path / 'ucm.db')
+    env['UCM_CONFIG_DIR'] = str(tmp_path)   # no ucm.env of the host: it may name PostgreSQL
     out = subprocess.run(
         [sys.executable, '-c', 'from config.settings import Config; '
          'print(Config.SQLALCHEMY_ENGINE_OPTIONS.get("pool_recycle"))'],
