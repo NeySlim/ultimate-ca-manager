@@ -424,9 +424,11 @@ def revoke_ssh_certificate(cert_id):
         cert = SSHCertificateService.revoke_certificate(cert_id, reason, username)
         others = list(getattr(cert, 'revoked_with', []))
         message = 'SSH certificate revoked'
+        # The KRL revokes a serial 0 certificate by its key ID under the CA, any other by serial
+        held = f"key ID '{cert.key_id}'" if not cert.serial else f'serial {cert.serial}'
         if others:
-            message = (f'SSH certificate revoked with {len(others)} other certificate(s) holding serial '
-                       f'{cert.serial} under this CA: the KRL revokes by serial')
+            message = (f'SSH certificate revoked with {len(others)} other certificate(s) the KRL revokes '
+                       f'with it under this CA, by {held}')
 
         AuditService.log_action(
             action='ssh_cert_revoked',
@@ -434,7 +436,7 @@ def revoke_ssh_certificate(cert_id):
             resource_id=str(cert.id),
             resource_name=cert.key_id,
             details=f'SSH certificate revoked: {reason}' + (
-                f'; serial {cert.serial} also revokes ' + ', '.join(f"#{o.id} '{o.key_id}'" for o in others)
+                f'; {held} also revokes ' + ', '.join(f"#{o.id} '{o.key_id}'" for o in others)
                 if others else ''),
             success=True,
             username=username,

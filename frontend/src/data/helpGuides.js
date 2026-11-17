@@ -3787,7 +3787,7 @@ On clients, add the Host CA to known_hosts:
 
 A revoked certificate stays in the KRL, and in the list, until it expires: deleting it earlier is refused, since the KRL is built from these records and the certificate would be accepted again. Each KRL download carries a higher version number (v2.252).
 
-The KRL names a certificate by its serial number, which UCM gives out once per CA. An installation upgraded from 2.x, or one that restored a 2.x archive, may hold two certificates of one CA sharing a serial: the list marks them **Shared serial**, and revoking one revokes them all; when one of them was already revoked, the others are revoked with it. Revoke them and issue new certificates.
+The KRL names a certificate by its serial number, which UCM gives out once per CA. An installation upgraded from 2.x, or one that restored a 2.x archive, may hold two certificates of one CA sharing a serial: the list marks them **Shared serial**, and revoking one revokes them all; when one of them was already revoked, the others are revoked with it. Revoke them and issue new certificates. A certificate of serial 0, which OpenSSH reads as not numbered (an imported one, for instance), is listed in the KRL by its key ID once revoked, as OpenSSH does: every certificate of the CA with that key ID, whatever its serial, is refused with it, and UCM revokes them with it. A certificate with that key ID can then no longer be issued or imported under the CA. The key itself and certificates from other CAs stay valid.
 
 > ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
 

@@ -469,7 +469,8 @@
       "never": "Nie ausgeführt",
       "active": "Aktiv",
       "revoked": "Widerrufen"
-    }
+    },
+    "duplicateKey": "Another row above already uses \"{{key}}\": only one of them can be saved"
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",
@@ -6036,6 +6037,8 @@
     "serialSharedDetail": "Die Seriennummer {{serial}} wird auch von einem anderen Zertifikat dieser CA verwendet. Die KRL widerruft nach Seriennummer, ein Widerruf trifft also alle: Widerrufen Sie sie und stellen Sie neue Zertifikate aus.",
     "revokeSharedSerial": "Damit werden auch alle anderen Zertifikate dieser CA mit der Seriennummer {{serial}} widerrufen: Die KRL widerruft nach Seriennummer.",
     "revokedWithShared": "SSH-Zertifikat widerrufen, zusammen mit allen Zertifikaten seiner CA mit der Seriennummer {{serial}}",
+    "revokedWithKeyId": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}}",
+    "revokeSerialZero": "Serial 0 is not a number: the KRL revokes this certificate by its key ID {{keyId}}, which revokes every certificate of this CA with that key ID, whatever its serial.",
     "deleteConfirm": "Möchten Sie dieses SSH-Zertifikat wirklich löschen?",
     "certInformation": "Zertifikatsinformationen",
     "validityInfo": "Gültigkeit",

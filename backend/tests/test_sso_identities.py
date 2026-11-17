@@ -899,9 +899,10 @@ def test_orphans_of_one_idp_each_find_their_own_row_however_often_restored(app, 
             assert results.get('removed', {}).get('user_sso_identities', 0) == 0
 
 
-def _orphan_restore(app, archived, here, mode, password='Correct-Horse-Battery-9'):
+def _orphan_restore(app, archived, here, mode, password='Correct-Horse-Battery-9', told=None):
     """An account holding the `archived` orphans is archived, holds `here` instead, then is
-    restored twice: what it holds after each pass, oldest first, and the ids `here` had."""
+    restored twice: what it holds after each pass, oldest first, and the ids `here` had.
+    The first pass's warnings about identity rows go into `told`."""
     from services.backup import manifest
     uid = _add(app, username=_name(), password_hash=NOPASS)
 
@@ -925,7 +926,9 @@ def _orphan_restore(app, archived, here, mode, password='Correct-Horse-Battery-9
         orphans(here)
         before, passes = held(), []
         for _ in range(2):
-            _backup().restore_backup(blob, password, mode=mode)
+            results = _backup().restore_backup(blob, password, mode=mode)
+            if told is not None and not passes:
+                told.extend(w for w in results['warnings'] if 'user_sso_identities' in w)
             passes.append(held())
     return before, passes
 
@@ -987,13 +990,40 @@ def test_unbound_orphans_sharing_a_key_are_said_to_be_bound_by_the_archive(app, 
         db.session.commit()
         first, second = rows[0].id, rows[1].id
         results = _backup().restore_backup(blob, password, mode='merge')
-    shared = sorted(w for w in results['warnings'] if 'user_sso_identities' in w)
+    shared = sorted((w for w in results['warnings'] if 'user_sso_identities' in w), key=lambda w: _IDP in w)
     assert len(shared) == 2, results['warnings']
     assert f'{uid}//:' in shared[0] and shared[0].endswith('are left as they are')
-    assert "this IdP that have no row here" not in shared[0]
+    assert "this IdP that have no row left here" not in shared[0]
+    assert f'{uid}/"{_IDP}"/:' in shared[1]
     assert shared[1].endswith(
         f"(id {first}, {second}); the archive's unbound rows of it and its orphans of this IdP that have "
-        "no row here take them oldest first, in the archive's order, and the rest are left as they are")
+        "no row left here take them oldest first, in the archive's order, and the rest are left as they are")
+
+
+def test_a_second_archived_orphan_whose_row_is_taken_binds_an_unbound_one(app, providers):
+    """The first archived (X, e1) takes the row here, the second finds none left and binds."""
+    told = []
+    before, passes = _orphan_restore(app, [(_IDP, 'e1'), (_IDP, 'e1')],
+                                     [(_IDP, 'e1'), (_IDP, None), (_IDP, None)], 'merge', told=told)
+    assert passes[0] == [before[0], (before[1][0], _IDP, 'e1'), before[2]] and passes[1] == passes[0]
+    unbound = [w for w in told if f'(id {before[1][0]}, {before[2][0]})' in w]
+    assert len(unbound) == 1, told
+    assert "orphans of this IdP that have no row left here take them oldest first" in unbound[0]
+
+
+def test_a_replacement_says_a_bound_orphan_takes_the_unbound_row_it_keeps(app, providers):
+    """The archive's bound orphan comes first and binds the kept row; its unbound one is added."""
+    told = []
+    before, passes = _orphan_restore(app, [(_IDP, 'e1'), (_IDP, None)],
+                                     [(_IDP, None), (_IDP, None)], 'replace', told=told)
+    kept, gone = before[0][0], before[1][0]
+    assert passes[0][0] == (kept, _IDP, 'e1') and [(r[1], r[2]) for r in passes[0][1:]] == [(_IDP, None)]
+    assert passes[1] == passes[0]
+    assert len(told) == 1, told
+    assert told[0].endswith(
+        f"(id {kept}, {gone}); the archive's unbound rows of it and its orphans of this IdP that have "
+        f"no row left here take them oldest first, in the archive's order, and the others (id {gone}) "
+        "are removed"), told[0]
 
 
 def test_a_bound_orphan_here_is_not_taken_for_another_identity(app, providers):
@@ -1025,6 +1055,8 @@ def test_the_shared_identity_warning_names_the_fields_that_tell_its_key_apart():
             (sso_identity_key(2, 5, None, 'x'), '2/5', 'user_id/provider_id'),
             (sso_identity_key(2, None, 'oauth2:k', 'x'), '2/oauth2:k/x', 'user_id/orphan_of/external_id'),
             (sso_identity_key(2, None, 'oauth2:k', None), '2/oauth2:k/', 'user_id/orphan_of/external_id'),
+            (sso_identity_key(2, None, 'oauth2:https://k.example/', None), '2/"oauth2:https://k.example/"/',
+             'user_id/orphan_of/external_id'),
             (sso_identity_key(2, None, None, 'x'), '2//x', 'user_id/orphan_of/external_id')):
         text = shared_identity_warning('user_sso_identities', key, [1, 2], 'left alone')
         assert text.startswith(f'user_sso_identities {spelt}: 2 rows here share this {fields} (id 1, 2)'), text

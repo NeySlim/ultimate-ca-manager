@@ -469,7 +469,8 @@
       "never": "从未运行",
       "active": "活跃",
       "revoked": "已吊销"
-    }
+    },
+    "duplicateKey": "Another row above already uses \"{{key}}\": only one of them can be saved"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -6036,6 +6037,8 @@
     "serialSharedDetail": "序列号 {{serial}} 也被此 CA 的另一个证书使用。KRL 按序列号吊销，因此吊销其中一个会吊销全部：请吊销它们并重新签发证书。",
     "revokeSharedSerial": "这也会吊销此 CA 中所有序列号为 {{serial}} 的其他证书：KRL 按序列号吊销。",
     "revokedWithShared": "SSH 证书已吊销，同时吊销了其 CA 中所有序列号为 {{serial}} 的证书",
+    "revokedWithKeyId": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}}",
+    "revokeSerialZero": "Serial 0 is not a number: the KRL revokes this certificate by its key ID {{keyId}}, which revokes every certificate of this CA with that key ID, whatever its serial.",
     "deleteConfirm": "确定要删除此 SSH 证书吗？",
     "certInformation": "证书信息",
     "validityInfo": "有效期",

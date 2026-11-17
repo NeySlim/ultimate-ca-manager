@@ -7,7 +7,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key) => key,
+    t: (key, opts) => (opts?.key !== undefined ? `${key}:${opts.key}` : key),
     i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
   }),
   Trans: ({ children }) => children,
@@ -86,5 +86,34 @@ describe('MappingEditor', () => {
       <MappingEditor value={{ x: '9', y: '8' }} onChange={() => {}} keyPlaceholder="ext-group" valuePlaceholder="role" keyLabel="k" valueLabel="v" />
     )
     expect(keyInputs().map(i => i.value)).toEqual(['x', 'y'])
+  })
+
+  it('names the second row of a key and makes its form refuse to submit', () => {
+    const onSubmit = vi.fn((e) => e.preventDefault())
+    render(
+      <form onSubmit={onSubmit}>
+        <Harness initial={{ groups: 'memberOf' }} />
+        <button type="submit">save</button>
+      </form>
+    )
+    fireEvent.click(screen.getByText('common.add'))
+    fireEvent.change(keyInputs()[1], { target: { value: 'groups' } })
+
+    expect(screen.getAllByText('common.duplicateKey:groups')).toHaveLength(1)
+    expect(keyInputs()[0].validity.valid).toBe(true)
+    expect(keyInputs()[1].validationMessage).toBe('common.duplicateKey:groups')
+    expect(document.querySelector('form').checkValidity()).toBe(false)
+
+    fireEvent.change(keyInputs()[1], { target: { value: 'memberOf' } })
+    expect(screen.queryByText(/^common\.duplicateKey/)).toBeNull()
+    expect(document.querySelector('form').checkValidity()).toBe(true)
+  })
+
+  it('does not flag rows whose key is still empty', () => {
+    render(<Harness initial={{}} />)
+    fireEvent.click(screen.getByText('common.add'))
+    fireEvent.click(screen.getByText('common.add'))
+    expect(screen.queryByText(/^common\.duplicateKey/)).toBeNull()
+    expect(keyInputs().every(i => i.validity.valid)).toBe(true)
   })
 })

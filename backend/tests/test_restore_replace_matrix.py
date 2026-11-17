@@ -307,6 +307,54 @@ def test_two_rows_that_traded_names_take_the_archives_back(target, table_name):
     assert _orphans() == []
 
 
+@pytest.mark.parametrize('table_name', ['webhook_endpoints', 'acme_client_accounts'])
+def test_three_rows_whose_names_went_round_take_the_archives_back(target, table_name):
+    """a->b->c->a: each kept row is renamed in place. What points at each row proves it was
+    not removed and written again, which a reused id on SQLite would hide."""
+    from models.acme_dns_update import AcmeDnsUpdateKey
+    from models.webhook_delivery import WebhookDelivery
+    table = TABLES[table_name]
+    _user('replace-admin')
+    things = (T1, T2, 'three')
+    rows = {thing: table.make(name, thing) for thing, name in zip(things, 'abc')}
+    db.session.add_all(rows.values())
+    db.session.flush()
+    ids = {thing: row.id for thing, row in rows.items()}
+    keys = {}
+    if table_name == 'acme_client_accounts':
+        for thing, row in rows.items():
+            key = AcmeDnsUpdateKey(acme_client_account_id=row.id, name=f'cycle-{thing}.example.test.')
+            key.secret = 'c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0'
+            db.session.add(key)
+            db.session.flush()
+            keys[key.id] = thing
+    blob = _snapshot()
+    for thing, name in ((T1, 'tmp'), ('three', 'a'), (T2, 'c'), (T1, 'b')):
+        setattr(rows[thing], table.column, name)
+        db.session.flush()
+    if table_name == 'webhook_endpoints':
+        db.session.add_all(WebhookDelivery(endpoint_id=ids[thing], event_type='certificate.issued',
+                                           payload=json.dumps({'thing': thing}),
+                                           event_timestamp='2026-01-01T00:00:00Z') for thing in things)
+    db.session.commit()
+
+    try:
+        results = _restore(blob)
+
+        assert _state(table) == sorted(zip('abc', things, (ids[t] for t in things)))
+        assert results['renamed'] == []
+        if table_name == 'webhook_endpoints':
+            held = {(json.loads(d.payload)['thing'], d.endpoint_id) for d in WebhookDelivery.query}
+            assert held == {(thing, ids[thing]) for thing in things}
+        else:
+            held = {(k.id, _thing_of(_account_of(k))) for k in AcmeDnsUpdateKey.query}
+            assert held == set(keys.items())
+        assert _orphans() == []
+    finally:
+        WebhookDelivery.query.delete()
+        db.session.commit()
+
+
 def _named_in_archive(blob, table, thing, name):
     """The archive with the row of that thing under `name`: an archive older than 124."""
     from tests.test_backup_hostile_corpus import _reseal

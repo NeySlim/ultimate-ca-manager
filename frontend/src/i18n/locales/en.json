@@ -1,5 +1,6 @@
 {
   "common": {
+    "duplicateKey": "Another row above already uses \"{{key}}\": only one of them can be saved",
     "saved": "Settings saved",
     "saveFailed": "Failed to save",
     "save": "Save",
@@ -6039,6 +6040,8 @@
     "serialSharedDetail": "Serial {{serial}} is also held by another certificate of this CA. The KRL revokes by serial, so revoking one revokes them all: revoke them and issue new certificates.",
     "revokeSharedSerial": "This also revokes every other certificate of this CA holding serial {{serial}}: the KRL revokes by serial.",
     "revokedWithShared": "SSH certificate revoked, with every certificate of its CA holding serial {{serial}}",
+    "revokedWithKeyId": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}}",
+    "revokeSerialZero": "Serial 0 is not a number: the KRL revokes this certificate by its key ID {{keyId}}, which revokes every certificate of this CA with that key ID, whatever its serial.",
     "deleteConfirm": "Are you sure you want to delete this SSH certificate?",
     "certInformation": "Certificate Information",
     "validityInfo": "Validity",

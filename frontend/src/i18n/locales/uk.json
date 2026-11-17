@@ -471,7 +471,8 @@
       "never": "Ніколи не запускалося",
       "active": "Активний",
       "revoked": "Відкликано"
-    }
+    },
+    "duplicateKey": "Another row above already uses \"{{key}}\": only one of them can be saved"
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
@@ -6108,6 +6109,8 @@
     "serialSharedDetail": "Серійний номер {{serial}} має також інший сертифікат цього ЦС. KRL відкликає за серійним номером, тож відкликання одного відкликає всі: відкличте їх і видайте нові сертифікати.",
     "revokeSharedSerial": "Це також відкличе всі інші сертифікати цього ЦС із серійним номером {{serial}}: KRL відкликає за серійним номером.",
     "revokedWithShared": "Сертифікат SSH відкликано разом з усіма сертифікатами його ЦС із серійним номером {{serial}}",
+    "revokedWithKeyId": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}}",
+    "revokeSerialZero": "Serial 0 is not a number: the KRL revokes this certificate by its key ID {{keyId}}, which revokes every certificate of this CA with that key ID, whatever its serial.",
     "deleteConfirm": "Ви впевнені, що хочете видалити цей SSH-сертифікат?",
     "certInformation": "Інформація про сертифікат",
     "validityInfo": "Термін дії",

@@ -403,13 +403,14 @@ def _ssh_ca(engine, ca_id, counter):
             "'prv', 'ed25519', :f, :c, 1, 0)"), {'i': ca_id, 'r': f'ca-{ca_id}', 'f': f'f{ca_id}', 'c': counter})
 
 
-def _ssh_cert(engine, cert_id, ca_id, serial, marked=False):
+def _ssh_cert(engine, cert_id, ca_id, serial, marked=False, revoked=False):
     with engine.begin() as conn:
         conn.execute(text(
             "INSERT INTO ssh_certificates (id, refid, ssh_ca_id, cert_type, key_id, public_key, certificate, "
-            "principals, serial, serial_duplicate, valid_from, valid_to, key_type, fingerprint) VALUES "
-            "(:i, :r, :c, 'user', 'k', 'pub', 'cert', '[]', :s, :m, '2026-01-01', '2027-01-01', 'ed25519', :f)"),
-            {'i': cert_id, 'r': f'c-{cert_id}', 'c': ca_id, 's': serial, 'm': marked, 'f': f'f{cert_id}'})
+            "principals, serial, serial_duplicate, valid_from, valid_to, key_type, fingerprint, revoked) VALUES "
+            "(:i, :r, :c, 'user', 'k', 'pub', 'cert', '[]', :s, :m, '2026-01-01', '2027-01-01', 'ed25519', :f, :v)"),
+            {'i': cert_id, 'r': f'c-{cert_id}', 'c': ca_id, 's': serial, 'm': marked, 'f': f'f{cert_id}',
+             'v': revoked})
 
 
 class TestSSHSerials:
@@ -421,7 +422,21 @@ class TestSSHSerials:
         _ssh_cert(target, 2, 1, 3, marked=True)
         _ssh_cert(target, 3, 1, 0)
         _ssh_cert(target, 4, 1, 0)
-        assert check_ssh_serials(target) == {'cas_checked': 1, 'lagging': 0, 'unmarked_duplicates': 0}
+        assert check_ssh_serials(target) == {'cas_checked': 1, 'lagging': 0, 'unmarked_duplicates': 0,
+                                             'diverging_revocations': 0}
+
+    @pytest.mark.parametrize('revoked', ['older', 'newer'])
+    def test_a_pair_revoked_on_one_holder_only_is_refused(self, target, revoked):
+        """The KRL revokes the serial: a valid holder beside a revoked one is a revoked certificate."""
+        _ssh_ca(target, 1, 3)
+        _ssh_cert(target, 1, 1, 3, revoked=revoked == 'older')
+        _ssh_cert(target, 2, 1, 3, marked=True, revoked=revoked == 'newer')
+        _ssh_cert(target, 3, 1, 0, revoked=True)
+        _ssh_cert(target, 4, 1, 0)
+        with pytest.raises(VerificationError) as excinfo:
+            check_ssh_serials(target)
+        valid = '#2' if revoked == 'older' else '#1'
+        assert valid in str(excinfo.value) and 'revoked' in str(excinfo.value), str(excinfo.value)
 
     def test_a_counter_behind_its_certificates_is_refused(self, target):
         _ssh_ca(target, 1, 2)

@@ -441,7 +441,8 @@ class RestoreExtendedMixin:
 
         db.session.flush()
         aligned = SSHSerials.settle_marks(SSHSerials.session_run)
-        results['ssh_revoked_with_serial'] = len(aligned)
+        self._ssh_aligned = {**getattr(self, '_ssh_aligned', {}), **aligned}
+        results['ssh_revoked_with_serial'] = len(self._ssh_aligned)
 
     def _restore_microsoft_cas(self, backup_data: Dict, results: Dict,
                                plan: Optional[RestorePlan] = None) -> None:

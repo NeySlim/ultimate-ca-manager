@@ -1284,6 +1284,7 @@
     "issueAnyway": "Émettre pour la même entité"
   },
   "common": {
+    "duplicateKey": "Une ligne plus haut utilise déjà « {{key}} » : une seule des deux peut être enregistrée",
     "saved": "Paramètres enregistrés",
     "saveFailed": "Échec de l'enregistrement",
     "save": "Enregistrer",
@@ -6039,6 +6040,8 @@
     "serialSharedDetail": "Le numéro de série {{serial}} est aussi porté par un autre certificat de cette AC. La KRL révoque par numéro de série, révoquer l'un les révoque donc tous : révoquez-les et émettez de nouveaux certificats.",
     "revokeSharedSerial": "Cela révoque aussi tous les autres certificats de cette AC portant le numéro de série {{serial}} : la KRL révoque par numéro de série.",
     "revokedWithShared": "Certificat SSH révoqué, avec tous les certificats de son AC portant le numéro de série {{serial}}",
+    "revokedWithKeyId": "Certificat SSH révoqué, avec tous les certificats de son AC portant l'identifiant de clé {{keyId}}",
+    "revokeSerialZero": "Le numéro 0 n'est pas un numéro : la KRL révoque ce certificat par son identifiant de clé {{keyId}}, ce qui révoque tout certificat de cette AC portant cet identifiant, quel que soit son numéro de série.",
     "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce certificat SSH ?",
     "certInformation": "Informations du certificat",
     "validityInfo": "Validité",
