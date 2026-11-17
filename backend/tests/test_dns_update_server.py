@@ -1134,6 +1134,9 @@ def gunicorn_conf(app, monkeypatch):
     monkeypatch.setattr(srv_mod, 'start_dns_update_server',
                         lambda a, **kw: calls.append(('dns', a, kw)))
     monkeypatch.setattr('services.ws_relay.start_reader', lambda a: None)
+    # A real watcher would outlive the test and roll back the shared test connection
+    monkeypatch.setattr('services.backup.restore.invalidate.start_epoch_watcher',
+                        lambda app, interval=None: None)
     return module, calls
 
 
@@ -1154,6 +1157,14 @@ def test_startup_gunicorn_error_after_follows_graceful_timeout_pos(gunicorn_conf
     module, calls = gunicorn_conf
     module.post_worker_init(_worker(60))
     assert calls[1][2] == {'error_after': 65.0}
+
+
+def test_post_worker_init_leaves_no_epoch_watcher_behind_neg(gunicorn_conf):
+    import threading
+    module = gunicorn_conf[0]
+    module.post_worker_init(_worker())
+    # A live watcher would roll back the shared test connection under later tests
+    assert [t.name for t in threading.enumerate() if t.name == 'EpochCacheWatcher'] == []
 
 
 def test_startup_gunicorn_dns_update_starts_when_the_http_server_fails_neg(gunicorn_conf, monkeypatch):

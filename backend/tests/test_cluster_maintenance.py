@@ -159,11 +159,12 @@ def test_no_session_row_is_written_during_maintenance(app, held, monkeypatch):
 
 
 def test_outside_ha_a_row_changes_nothing(app, auth_client, monkeypatch):
-    """A single node never reads the maintenance, holds none and answers as before."""
+    """A single node never reads the maintenance, holds none and answers as before; its view
+    is only the local gate of a restore job, down here."""
     from models import db
     monkeypatch.setattr(Config, 'HA_MODE', False)
     with app.app_context():
-        assert cm.current() is None
+        assert not cm.current().active() and not cm.blocks_writes()
         with cm.restore_window('admin') as hold:
             assert hold is None
         assert db.session.execute(db.text("SELECT count(*) FROM cluster_maintenance")).scalar() == 0

@@ -31,7 +31,7 @@ import { settingsService, systemService, casService, ssoService, mtlsService, ms
 import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
-import { usePermission, useJob } from '../hooks'
+import { usePermission, useJob, isTransientError } from '../hooks'
 import { acceptedJob } from '../services/jobs.service'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { useTheme } from '../contexts/ThemeContext'
@@ -59,6 +59,8 @@ import SsoSection from './settings/SsoSection'
 import BackupSection from './settings/BackupSection'
 import { ceilingNotice } from './settings/backupCeiling'
 import RestoreReport from './settings/RestoreReport'
+import { loginUrl } from '../navigation/safeNext'
+import { useRestoreJob, VALIDATED_PHASES } from './settings/useRestoreJob'
 import AuditSection from './settings/AuditSection'
 import DatabaseSection from './settings/DatabaseSection'
 import { afterDatabaseReset } from './settings/databaseReset'
@@ -225,6 +227,36 @@ export default function SettingsPage() {
       }
     }
   }, [])
+  // A restore that outlasts the request runs as a job; its report survives its own sign-out
+  const releaseSignOut = () => {
+    holdingSignOut.current = false
+    holdSignOut(false)
+  }
+  const restoreJob = useRestoreJob({
+    enabled: hasPermission('admin:system'),
+    account: user?.username,
+    onReport: (data) => {
+      setShowRestoreModal(false)
+      setRestoreReport(data)
+    },
+    onFailure: (job) => {
+      releaseSignOut()
+      setShowRestoreModal(false)
+      if (job.state === 'cancelled') showWarning(t('settings.restoreCancelled'))
+      else if (job.reason === 'executor_lost' || job.reason === 'not_taken') showError(t('settings.restoreLost'))
+      else showError(job.result?.message || t('messages.errors.backup.restoreFailed'))
+    },
+    // The server stopped answering before the commit: its end shows at the next visit
+    onLost: (error) => {
+      releaseSignOut()
+      setShowRestoreModal(false)
+      showError(isTransientError(error) ? t('settings.restoreContactLost')
+        : error?.message || t('messages.errors.backup.restoreFailed'))
+    },
+  })
+  useEffect(() => {
+    if (restoreJob.running || restoreJob.signInNeeded) setShowRestoreModal(true)
+  }, [restoreJob.running, restoreJob.signInNeeded])
   
   // HTTPS import modal
   const [showHttpsImportModal, setShowHttpsImportModal] = useState(false)
@@ -1469,9 +1501,13 @@ export default function SettingsPage() {
         window.location.reload()
         return
       }
-      setShowRestoreModal(false)
       setRestorePassword('')
       setRestoreFile(null)
+      // Past the bounded wait: the job is followed in the dialog, its report shown at the end
+      setBackupLoading(false)
+      setRestoreProgress(null)
+      if (await restoreJob.start(result)) return
+      setShowRestoreModal(false)
       setRestoreReport(result.data || {})
     } catch (error) {
       holdingSignOut.current = false
@@ -1482,6 +1518,18 @@ export default function SettingsPage() {
       setRestoreProgress(null)
     }
   }
+
+  const handleCancelRestore = async () => {
+    try {
+      await restoreJob.cancel()
+    } catch (error) {
+      showError(error.message || t('settings.restoreCancelFailed'))
+    }
+  }
+
+  const restoreJobProgress = restoreJob.job?.progress?.total
+    ? t('settings.restoreJobProgress', { done: restoreJob.job.progress.done || 0, total: restoreJob.job.progress.total })
+    : t('settings.restoreJobStarting')
 
   const handleOptimizeDb = async () => {
     try {
@@ -1989,12 +2037,49 @@ export default function SettingsPage() {
         )}
       </Modal>
 
-      {/* Restore Password Modal */}
+      {/* Restore Password Modal; then the running restore, or the sign-in its end asks for */}
       <Modal
         open={showRestoreModal}
-        onClose={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}
+        onClose={() => {
+          // Closed on "sign in again": every call now answers 401, which must lead to the sign-in
+          if (restoreJob.signInNeeded) releaseSignOut()
+          setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null)
+        }}
         title={t('settings.restoreFromBackup')}
       >
+        {restoreJob.signInNeeded ? (
+          <div className="space-y-4" data-testid="restore-sign-in">
+            <p className="text-sm text-text-primary" role="status">{t('settings.restoreSignInAgain')}</p>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" autoFocus onClick={() => {
+                // Back to this tab after the sign-in: its report is shown there
+                releaseSignOut(); window.location.href = loginUrl('/settings', '?tab=backup')
+              }}
+                data-testid="restore-sign-in-button">
+                {t('settings.restoreSignIn')}
+              </Button>
+            </div>
+          </div>
+        ) : restoreJob.running ? (
+          <div className="space-y-4" data-testid="restore-job">
+            <p className="text-sm text-text-primary" role="status" data-testid="restore-job-progress">
+              {restoreJobProgress}
+            </p>
+            <p className="text-sm text-text-secondary">{t('settings.restoreRunsInBackground')}</p>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" variant="secondary" onClick={() => setShowRestoreModal(false)}>
+                {t('common.close')}
+              </Button>
+              {/* Validated: the server refuses the cancellation (409), so none is offered */}
+              {!VALIDATED_PHASES.includes(restoreJob.job?.phase) && (
+                <Button type="button" variant="danger" onClick={handleCancelRestore}
+                  disabled={!!restoreJob.job?.cancel_requested} data-testid="restore-job-cancel">
+                  {t('settings.restoreCancel')}
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
           <div className="p-3 status-warning-bg status-warning-border border rounded-lg">
             <p className="text-sm status-warning-text font-medium">⚠️ {t('common.warning')}</p>
@@ -2033,6 +2118,7 @@ export default function SettingsPage() {
             </Button>
           </div>
         </div>
+        )}
       </Modal>
 
       <RestoreReport data={restoreReport} onClose={() => setRestoreReport(null)} />

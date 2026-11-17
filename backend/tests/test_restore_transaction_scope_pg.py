@@ -20,7 +20,8 @@ pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
 
 def test_another_thread_commits_while_a_restore_runs(app, auth_client, monkeypatch):
     """Single node: only the restore's own session is one transaction; a commit made by
-    another request meanwhile stays a commit."""
+    another session meanwhile stays a commit. The restore's write gate refuses an ordinary
+    write, so the neighbour writes as the restore's own bookkeeping does (exempt)."""
     monkeypatch.setattr(Config, 'HA_MODE', False)
     blob = _archive(app)
     from models import SystemConfig
@@ -31,10 +32,18 @@ def test_another_thread_commits_while_a_restore_runs(app, auth_client, monkeypat
     def with_a_neighbour(self, *args, **kwargs):
         real(self, *args, **kwargs)
 
+        from services.cluster_maintenance import MaintenanceActive, exempt
+
         def neighbour():
             with app.app_context():
-                db.session.add(SystemConfig(key=key, value='kept'))
-                db.session.commit()
+                try:
+                    db.session.add(SystemConfig(key=key + '.refused', value='refused'))
+                    db.session.commit()
+                except MaintenanceActive:
+                    db.session.rollback()
+                with exempt():
+                    db.session.add(SystemConfig(key=key, value='kept'))
+                    db.session.commit()
         thread = threading.Thread(target=neighbour)
         thread.start()
         thread.join(10)
@@ -43,6 +52,8 @@ def test_another_thread_commits_while_a_restore_runs(app, auth_client, monkeypat
         r = _restore(auth_client, blob)
         assert r.status_code == 200, r.data
         assert _sql(app, "SELECT value FROM system_config WHERE key = :k", {'k': key}) == [('kept',)]
+        assert _sql(app, "SELECT value FROM system_config WHERE key = :k",
+                    {'k': key + '.refused'}) == []
         assert _sql(app, "SELECT count(*) FROM cluster_maintenance")[0][0] == 0
     finally:
-        _sql(app, "DELETE FROM system_config WHERE key = :k", {'k': key})
+        _sql(app, "DELETE FROM system_config WHERE key LIKE :k", {'k': key + '%'})

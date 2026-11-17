@@ -129,7 +129,7 @@ An archive is restored from any node, from Settings > Backup or `POST /api/v2/sy
 
 After the commit, every node makes its certificate and key files match the database at its turn of the rolling restart (the cluster stays in maintenance until then, and no node's files move before it), whether its directories are its own (the chart's `emptyDir`) or shared by every node: it writes the files that are missing or differ and removes those of the rows the restore removed (see [Files after a restore](ADMIN_GUIDE.md#files-after-a-restore)). Nodes sharing a directory take turns, through a PostgreSQL advisory lock keyed by an identifier written once in the directory (`.ucm-files-id`); nodes with directories of their own run at the same time. The HTTPS certificate and key of the archive stay in the database and every node serves them from its turn of the rolling restart, as it does a regenerated one, until a certificate is bound or regenerated, or a later restore replaces them.
 
-A restore that fails leaves the database as it was, lifts the maintenance and answers the error. An archive that carries no data lifts it with no restart. Sessions, archives encrypted by another installation and archives of older versions follow the single-node rules (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md#restoring-backups)).
+The restore runs as a background job in the scheduler process of the node that received the archive: the archive stays in a file of that node, and only that node takes the job. A restore that fails leaves the database as it was, lifts the maintenance and answers the error. An archive that carries no data lifts it with no restart. Sessions, archives encrypted by another installation and archives of older versions follow the single-node rules (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md#restoring-backups)).
 
 ### What a node in maintenance serves
 
@@ -145,7 +145,7 @@ A node that starts while a restore has not committed yet waits for its end befor
 
 ### When the restoring node dies
 
-The maintenance has a lease of 5 minutes, renewed every 30 seconds while the restore runs. A restore that had not committed is rolled back by PostgreSQL with the node's connection, and the first node that sees the lease ended lifts the maintenance. A restore that had committed is completed by the first node that sees its lease ended: it revokes the sessions and requests the rolling restart, as the restoring node would have. The rolling restart phase has a lease of 30 minutes. An administrator lifts the maintenance at once from any node with `DELETE /api/v2/system/maintenance`, which first completes a committed restore the same way.
+The maintenance has a lease of 5 minutes, renewed every 30 seconds while the restore runs. A restore that had not committed is rolled back by PostgreSQL with the node's connection, and the first node that sees the lease ended lifts the maintenance. A restore that had committed is completed by the first node that sees its lease ended: it revokes the sessions and requests the rolling restart, as the restoring node would have. Its job is finished by the leader once the job's own lease (2 minutes) has ended; the session epoch moves once, whichever of the two comes first. The rolling restart phase has a lease of 30 minutes. An administrator lifts the maintenance at once from any node with `DELETE /api/v2/system/maintenance`, which first completes a committed restore the same way.
 
 ### Restoring with PostgreSQL's tools
 

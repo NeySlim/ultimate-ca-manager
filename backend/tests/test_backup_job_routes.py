@@ -12,6 +12,7 @@ from models import AuditLog, db
 from services import jobs
 from services.jobs import backup as backup_job
 from services.jobs import runner, store
+from tests.job_dispatch_support import DeferredDispatch
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
 SYSTEM, SETTINGS = '/api/v2/system/backup', '/api/v2/settings/backup/create'
@@ -27,12 +28,15 @@ def backup_dir(app, tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def jobs_made(app):
-    """Every backup job a test made is ended and removed."""
+def jobs_made(app, monkeypatch):
+    """Every backup job a test made is ended and removed; each starts once the request that
+    made it has answered (the tests' SQLite is one shared connection, unlike production)."""
+    deferred = DeferredDispatch(app, monkeypatch)
     with app.app_context():
         before = {r[0] for r in db.session.execute(select(T.c.id).where(T.c.kind == backup_job.KIND))}
         db.session.rollback()
-    yield
+    yield deferred
+    deferred.conclude_leftovers()
     with app.app_context():
         made = [r[0] for r in db.session.execute(select(T.c.id).where(T.c.kind == backup_job.KIND))
                 if r[0] not in before]
@@ -148,6 +152,7 @@ def test_past_the_wait_a_backup_answers_202_and_its_job_ends_with_the_answer(
     if url == SETTINGS:  # the generated password is in this answer, the only one
         assert r.get_json()['data']['password_generated'] is True
         assert len(r.get_json()['data']['password']) >= 16
+    jobs_made.release()
     assert reached.wait(20)
     assert _row(app, job['id'])['secret'] is None  # cleared by the take
     release.set()

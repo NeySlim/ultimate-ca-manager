@@ -132,6 +132,8 @@ def _response_of(outcome):
     response = {'code': outcome.code, 'message': outcome.message, 'data': outcome.data}
     if outcome.problem_type:
         response['problem_type'] = outcome.problem_type
+    if outcome.problem:
+        response['problem'] = outcome.problem
     return response
 
 
@@ -166,6 +168,8 @@ def run_job(app, row, executor, done=None):
                 if jt is None:
                     raise RuntimeError(f'unknown job kind {kind}')
                 outcome = jt.run(JobContext(app, row, executor))
+                if outcome.concluded:
+                    return  # the run concluded the job itself, audit line included
                 ok = outcome.code < 400
                 state = store.SUCCEEDED if ok else store.FAILED
                 # A 4xx is the run refusing; a 5xx is an error, whoever caught it
@@ -192,17 +196,22 @@ def run_job(app, row, executor, done=None):
                 def _job_result_line(r, s, why):
                     return audit(r, s, why, details, resource)
                 line = _job_result_line
+            # A run that failed past a resumable phase (a committed restore) is the recovery's
+            past = tuple(jt.resumable_phases) if jt is not None else ()
+            unfinished = (store.T.c.phase.is_(None) | store.T.c.phase.notin_(past),) if past else ()
+
             def conclude(result_line):
                 return store.conclude_job(
                     db.session, job_id, state=state, reason=reason, from_states=(store.RUNNING,),
-                    now=jobs._now(), result=result, executor=executor, result_line=result_line)
+                    now=jobs._now(), result=result, executor=executor, result_line=result_line,
+                    where=unfinished)
             # One result line per job: tried twice, then the job ends without it (a slot held
             # until a restart is worse) and the line goes to the log; no-op if concluded elsewhere
             if (not _conclude_after_maintenance(app, lambda: conclude(line)) and line is not None
                     and not _conclude_after_maintenance(app, lambda: conclude(line))
                     and _conclude_after_maintenance(app, lambda: conclude(None))):
                 logger.error(f"Background job {job_id} concluded without its audit line: "
-                             + jobs.result_line_text(kind, state, reason, details, resource))
+                             + jobs.result_line_text(kind, state, reason, details, resource, row))
         except Exception as e:
             logger.error(f"Background job {job_id} not concluded: {type(e).__name__}")
             db.session.rollback()
@@ -307,12 +316,15 @@ class JobRunner:
             # taken here before it: a take needs the lead, and recovery comes first in a pass)
             all_running = not ha and not self._recovered
             store.recover_orphans(db.session, now=jobs._now(), all_running=all_running,
-                          audit_for=jobs.audit_writer, mine=finished)
+                          audit_for=jobs.audit_writer, mine=finished, resume_for=jobs.resumer,
+                          executor=self.executor)
             self._recovered, self._last_recover = True, now_mono
         # Each node sweeps its own disk, leader or not: a job concluded by another node
         # purged that node's disk only. Unknown files stay after the first pass (uploads).
         if not self._swept or now_mono - self._last_files >= RECOVER_SECONDS:
             store.sweep_job_files(db.session, keep_unknown=self._swept)
+            from services.jobs import restore as restore_job
+            restore_job.sweep_state(db.session)
             db.session.rollback()
             self._swept, self._last_files = True, now_mono
         if leads and now_mono - self._last_purge >= PURGE_SECONDS:

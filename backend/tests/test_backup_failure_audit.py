@@ -15,8 +15,10 @@ LEAKY = '/srv/private/path/' + SECRET
 
 
 @pytest.fixture
-def audit(monkeypatch):
+def audit(auth_client, monkeypatch):
     from models import db
+    # A restore of an earlier file signed the shared client out: its sign-in is no line here
+    assert auth_client.get('/api/v2/system/jobs').status_code == 200
     calls = []
 
     # Commits and returns the line as log_action does: a backup job concludes in that commit
@@ -184,12 +186,17 @@ def test_a_failure_after_the_restore_committed_leaves_no_failure_line(auth_clien
     monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
                         lambda self, *a, **k: {'sections_carried': ['users']})
     monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
+    from tests.restore_job_support import sessions_kept
+    sessions_kept(monkeypatch)  # the restore job's own sessions step
     monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0] else 'request_restart',
                         lambda: (False, 'no'))
+    # The restore job finishes it, from the completion module
+    monkeypatch.setattr('services.backup.restore_completion.request_restart', lambda: (False, 'no'))
 
     def boom(results):
         raise RuntimeError(LEAKY)
     monkeypatch.setattr(module, 'restore_message', boom)
+    monkeypatch.setattr('services.backup.restore_completion.restore_message', boom)
 
     response = _restore(auth_client, route, _form())
 
@@ -208,8 +215,12 @@ def test_a_committed_restore_is_audited_even_when_its_details_cannot_be_built(au
     monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
                         lambda self, *a, **k: {'sections_carried': ['users']})
     monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
+    from tests.restore_job_support import sessions_kept
+    sessions_kept(monkeypatch)  # the restore job's own sessions step
     monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0] else 'request_restart',
                         lambda: (False, 'no'))
+    # The restore job finishes it, from the completion module
+    monkeypatch.setattr('services.backup.restore_completion.request_restart', lambda: (False, 'no'))
 
     def boom(filename, results):
         raise RuntimeError(LEAKY)
@@ -245,6 +256,8 @@ def test_the_audited_file_name_is_its_base_name_on_one_line(auth_client, audit, 
         monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
                             lambda self, *a, **k: {'sections_carried': ['users']})
         monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
+        from tests.restore_job_support import sessions_kept
+        sessions_kept(monkeypatch)  # the restore job's own sessions step
         monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0]
                             else 'request_restart', lambda: (False, 'no'))
         _raw_restore(auth_client, route, '../../x\r\nforged.ucmbkp')
@@ -282,6 +295,8 @@ def test_a_restore_refused_while_busy_carries_the_request_marker(auth_client, au
         raise exc
         yield
     monkeypatch.setattr(module, 'database_migration_lock', busy)
+    # The restore job takes it, from its own module
+    monkeypatch.setattr('services.database_admin.lock.database_migration_lock', busy)
     response = _restore(auth_client, route, _form())
     assert response.status_code == 409
     _single_refusal(audit, 'system_restore')

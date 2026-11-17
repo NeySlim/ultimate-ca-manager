@@ -3574,7 +3574,17 @@
       "resumeFailed": "Das rollierende Update konnte nicht fortgesetzt werden",
       "started": "Rollierendes Update auf v{{version}} gestartet: Die Knoten werden nacheinander aktualisiert",
       "haNote": "HA-Modus: Die Knoten werden nacheinander aktualisiert, der nächste erst, wenn der vorherige wieder mit der neuen Version läuft."
-    }
+    },
+    "restoreJobStarting": "The restore is starting",
+    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
+    "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
+    "restoreCancel": "Cancel the restore",
+    "restoreCancelled": "The restore was cancelled: nothing was restored",
+    "restoreCancelFailed": "The cancellation could not be sent",
+    "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
+    "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
+    "restoreSignIn": "Sign in again",
+    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
   },
   "account": {
     "profile": "Profil",

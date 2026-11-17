@@ -46,6 +46,11 @@ class TestRoutesAnswerWithTheLines:
         monkeypatch.setattr(BackupService, 'check_archive_opens', lambda self, *a, **k: None)
         monkeypatch.setattr(invalidate, 'invalidate_after_restore',
                             lambda *a, **k: DEGRADED['invalidated'])
+        from tests.restore_job_support import sessions_kept
+        sessions_kept(monkeypatch)  # the restore job's own sessions step
+        # The restore job's CRL step reports what the degraded aftermath says
+        monkeypatch.setattr(invalidate, 'regenerate_crls_summary',
+                            lambda: dict(DEGRADED['invalidated']))
         for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
             loaded = importlib.import_module(module)
             for name in ('_request_restart_after_restore', 'request_restart'):

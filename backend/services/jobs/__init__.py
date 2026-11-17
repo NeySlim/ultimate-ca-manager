@@ -51,6 +51,10 @@ class JobOutcome:
     audit_resource: Optional[str] = None
     # RFC 9457 type of a failure the route answered with a typed problem (FIPS refusal)
     problem_type: Optional[str] = None
+    # The run concluded the job itself (a restore: final before it asks the restart)
+    concluded: bool = False
+    # RFC 9457 extension members of a failure the route answered (a maintenance's code, nodes)
+    problem: Optional[dict] = None
 
 
 @dataclass(frozen=True)
@@ -65,10 +69,15 @@ class JobType:
     resource_type: str = 'system'
     # The audit line's resource name; None names it by its label
     resource_name: Optional[str] = None
+    # The parameter that names the audit line's resource on every conclusion (a restore's archive)
+    resource_param: Optional[str] = None
     # HA: only the node that created the job takes it (a restore reads a file of that node)
     node_bound: bool = False
     # Final message when the run gave none (lost, never taken, cancelled), by reason
     messages: Dict[str, str] = field(default_factory=dict)
+    # resume(job_id, executor): an orphan in one of these phases is finished, not failed
+    resume: Optional[Callable[[str, str], bool]] = None
+    resumable_phases: frozenset = frozenset()
 
 
 _TYPES: Dict[str, JobType] = {}
@@ -151,6 +160,14 @@ def get_job(job_id: str) -> Optional[dict]:
     return row
 
 
+def resumer(kind: str, phase: Optional[str]):
+    """The resume callable for an orphan of ``kind`` left in ``phase``, or None."""
+    jt = _TYPES.get(kind)
+    if jt is None or jt.resume is None or phase not in jt.resumable_phases:
+        return None
+    return jt.resume
+
+
 def list_jobs(kinds, state: Optional[str] = None, limit: int = 20) -> list:
     from sqlalchemy import select
     from models import db
@@ -176,7 +193,7 @@ def audit_writer(kind: str):
         from services.audit_service import AuditService
         written = AuditService.log_action(
             action=jt.audit_action, resource_type=jt.resource_type,
-            resource_name=_resource_of(jt, resource), resource_id=(row or {}).get('id'),
+            resource_name=_resource_of(jt, resource, row), resource_id=(row or {}).get('id'),
             details=details or _phrase(jt, state, reason), success=state == SUCCEEDED,
             username=(row or {}).get('requested_by_name') or 'system',
             user_id=(row or {}).get('requested_by_id'),
@@ -194,14 +211,24 @@ _PHRASES = {
 }
 
 
-def _resource_of(jt, resource=None):
-    return resource or jt.resource_name or jt.label
+def _resource_of(jt, resource=None, row=None):
+    return resource or _param_of(jt, row) or jt.resource_name or jt.label
 
 
-def result_line_text(kind, state, reason, details=None, resource=None):
+def _param_of(jt, row):
+    if jt.resource_param is None or not (row or {}).get('params'):
+        return None
+    try:
+        value = json.loads(row['params']).get(jt.resource_param)
+    except (ValueError, AttributeError):
+        return None
+    return value if isinstance(value, str) and value else None
+
+
+def result_line_text(kind, state, reason, details=None, resource=None, row=None):
     """The result line ``audit_writer`` writes, as one log line: fixed phrases, no secret."""
     jt = _TYPES[kind]
-    return (f"action={jt.audit_action} resource={_resource_of(jt, resource)} "
+    return (f"action={jt.audit_action} resource={_resource_of(jt, resource, row)} "
             f"success={state == SUCCEEDED} details={details or _phrase(jt, state, reason)}")
 
 
@@ -210,11 +237,22 @@ def _phrase(jt, state, reason):
 
 
 def request_cancellation(job_id: str) -> str:
-    """'cancelled', 'requested' or 'final' (store.cancel_or_flag)."""
+    """'cancelled', 'requested', 'final' or 'too_late' (a restore past its commit)."""
+    from contextlib import nullcontext
     from models import db
+    from services.cluster_maintenance import exempt, holds
+    # The SQLite transaction of a restore holds the database: its local state answers
+    from services.jobs import restore as restore_job
+    local = restore_job.cancel_locally(job_id)
+    if local is not None:
+        return local
     row = store.job_row(db.session, job_id)
     db.session.rollback()
-    return store.cancel_or_flag(db.session, job_id, _now(), result_line=audit_writer(row['kind']))
+    jt = _TYPES.get(row['kind'])
+    # A maintenance refuses writes (MaintenanceActive) but the flag of the restore holding it
+    with exempt() if holds(row) else nullcontext():
+        return store.cancel_or_flag(db.session, job_id, _now(), result_line=audit_writer(row['kind']),
+                                    past=jt.resumable_phases if jt else ())
 
 
 def wait_for_job(job_id: str, seconds: float) -> Optional[dict]:
@@ -241,4 +279,4 @@ def public_view(row: dict, with_result: bool = True) -> dict:
 
 
 # The job types this release ships, registered in every process that imports the service
-from services.jobs import audit_verify, backup  # noqa: E402,F401
+from services.jobs import audit_verify, backup, restore  # noqa: E402,F401

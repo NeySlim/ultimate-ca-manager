@@ -99,7 +99,8 @@ describe('SettingsPage: backup job', () => {
   })
 
   it('picks a running backup up after a reload', async () => {
-    jobsService.list.mockResolvedValueOnce({ data: [running] })
+    // The page asks for its running restore too: each question gets the answer of its kind
+    jobsService.list.mockImplementation(({ kind }) => Promise.resolve({ data: kind === 'backup' ? [running] : [] }))
     jobsService.get.mockResolvedValueOnce({ data: done })
     renderPage()
     expect(await screen.findByTestId('backup-job')).toBeTruthy()

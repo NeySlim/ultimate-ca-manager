@@ -2085,6 +2085,7 @@ Upload a backup file to restore UCM to a previous state.
 - Backups and restores share one lock: a restore is refused (409) while a backup runs, and a manual backup waits for a running restore
 - In HA mode, a restore from any node first has every node refuse writes (503) and leave the balancer's rotation until it ends; it is refused, naming the node, when a node does not acknowledge within 30 s. The nodes then restart one at a time, and each serves the restored state once restarted
 - An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
+- The restore runs in the background: past 25 seconds its dialog follows it and can cancel it until it commits; meanwhile every write is refused (503), on a single node too, and the report shows after the sign-in its end asks for
 - Archives carry ACME client orders, approval requests and key recovery requests (v2.251)
 - A DNS provider, ACME CA account or webhook whose name another row holds here is restored as \`name (2)\`
 - The API also accepts \`mode=merge\`, which adds the archive to the data here instead of replacing it

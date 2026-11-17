@@ -8,6 +8,9 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import jobsService, { isFinalJob } from '../services/jobs.service'
 
 export const JOB_POLL_MS = 1000
+// No answer (0) or a proxy's 502/503/504: polled again this many times in a row, then given up
+export const JOB_POLL_RETRIES = 5
+export const isTransientError = (error) => [0, 502, 503, 504].includes(error?.status)
 
 const unwrap = (response) => response?.data || response
 
@@ -31,9 +34,12 @@ export function useJob({ interval = JOB_POLL_MS } = {}) {
     setJob(next)
   }, [])
 
-  const follow = useCallback((initial) => new Promise((resolve, reject) => {
+  // giveUp(error, seen): true stops at this error, retried or not; the rejection carries
+  // the job last seen as error.job
+  const follow = useCallback((initial, { giveUp } = {}) => new Promise((resolve, reject) => {
     clearTimeout(timer.current)
     show(initial)
+    let failures = 0
     const step = (seen) => {
       if (!alive.current) return
       if (isFinalJob(seen)) {
@@ -41,14 +47,24 @@ export function useJob({ interval = JOB_POLL_MS } = {}) {
         return
       }
       timer.current = setTimeout(async () => {
+        let next
         try {
-          const next = unwrap(await jobsService.get(seen.id))
-          if (!alive.current) return
-          show(next)
-          step(next)
+          next = unwrap(await jobsService.get(seen.id))
         } catch (error) {
+          if (!alive.current) return
+          failures += 1
+          if (isTransientError(error) && failures <= JOB_POLL_RETRIES && !giveUp?.(error, seen)) {
+            step(seen)
+            return
+          }
+          error.job = seen
           reject(error)
+          return
         }
+        if (!alive.current) return
+        failures = 0
+        show(next)
+        step(next)
       }, interval)
     }
     step(initial)

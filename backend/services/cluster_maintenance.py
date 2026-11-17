@@ -3,8 +3,8 @@
 One row in ``cluster_maintenance``. Every process's command applier reads it on each tick,
 and the request gate when its last reading is older than OBSERVE_TTL_SECONDS. A process
 that has seen it refuses writes (503 with Retry-After), leaves /health/ready and then
-acknowledges it in ``cluster_nodes``. The lease bounds it when its holder dies. Nothing
-here does anything outside HA.
+acknowledges it in ``cluster_nodes``. The lease bounds it when its holder dies. Outside HA
+the same view is fed by the local write gate of a restore job (observe_local), and nothing else.
 """
 import contextvars
 import logging
@@ -170,12 +170,57 @@ def _app():
     return current_app._get_current_object() if has_app_context() else None
 
 
+LOCAL_REASON = 'local_restore'
+
+
+def observe_local(app):
+    """Single node: the write gate a restore job holds, read from its local state file
+    (cheap: one stat, one read when it changed). The view refuses writes while it is up."""
+    from services.jobs import restore as restore_job
+    from utils.datetime_utils import utc_now
+    view = view_of(app)
+    reader = getattr(view, 'local_reader', None)
+    if reader is None:
+        reader = view.local_reader = restore_job.StateReader()
+    state = reader.read()
+    row = None
+    if state is not None:
+        now = utc_now()
+        row = {'token': state.get('job_id'), 'reason': LOCAL_REASON, 'phase': PHASE_RESTORING,
+               'started_at': _from_epoch(state.get('started_at')) or now, 'expires_at': now + timedelta(
+                   seconds=max(0.0, state['expires'] - time.time())),
+               'restored_at': None, 'node_id': None, 'actor': state.get('actor')}
+        view.set(row, now)
+    elif view.row is not None:
+        view.set(None, None)
+    return view
+
+
+def _from_epoch(seconds):
+    """A naive UTC datetime, like utc_now(), from a time.time() value; None if unreadable."""
+    from datetime import datetime, timezone
+    if not isinstance(seconds, (int, float)):
+        return None
+    try:
+        return datetime.fromtimestamp(seconds, timezone.utc).replace(tzinfo=None)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def current(refresh=True):
-    """HA: this application's view, read again when older than OBSERVE_TTL_SECONDS; else None."""
+    """This application's view: HA, read again when older than OBSERVE_TTL_SECONDS; a single
+    node, the local restore gate read on every refresh."""
     from utils.ha import ha_enabled
     app = _app()
-    if app is None or not ha_enabled():
+    if app is None:
         return None
+    if not ha_enabled():
+        if refresh:
+            try:
+                observe_local(app)
+            except Exception as e:
+                logger.error(f"Restore write gate not readable: {type(e).__name__}: {e}")
+        return view_of(app)
     view = view_of(app)
     if refresh and (view.observed is None or time.monotonic() - view.observed > OBSERVE_TTL_SECONDS):
         from models import db
@@ -243,12 +288,12 @@ def install_engine_guard(app, engine):
         if not is_write(statement):
             return
         if blocked():
-            raise MaintenanceActive(MESSAGE.format(what=_what(view)))
+            raise MaintenanceActive(_message(view))
         conn.info[_WROTE] = True
 
     def on_commit(conn):
         if conn.info.pop(_WROTE, False) and blocked():
-            raise MaintenanceActive(MESSAGE.format(what=_what(view)))
+            raise MaintenanceActive(_message(view))
 
     def on_rollback(conn):
         # An invalidated connection's info is cleared when its record reconnects; reading it
@@ -265,9 +310,20 @@ def install_engine_guard(app, engine):
     event.listen(engine, 'checkin', on_checkin)
 
 
+LOCAL_MESSAGE = ("This UCM instance is restoring a backup: writes are refused until the restore "
+                 "ends. Retry later.")
+
+
 def _what(view):
     row = view.row or {}
-    return 'a backup restore' if row.get('reason') == REASON_RESTORE else 'set by an administrator'
+    return 'a backup restore' if row.get('reason') in (REASON_RESTORE, LOCAL_REASON) \
+        else 'set by an administrator'
+
+
+def _message(view):
+    if (view.row or {}).get('reason') == LOCAL_REASON:
+        return LOCAL_MESSAGE
+    return MESSAGE.format(what=_what(view))
 
 
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
@@ -282,15 +338,35 @@ CONTROL_ENDPOINTS = frozenset({'system_v2.maintenance_status', 'system_v2.mainte
 # Routes that start a background job: authenticated first, then refused by start_job itself,
 # so GET and POST answer the same 503
 JOB_START_ENDPOINTS = frozenset({'audit_v2.verify_integrity', 'system_v2.create_backup',
-                                 'settings_v2.create_backup'})
+                                 'settings_v2.create_backup', 'system_v2.restore_backup',
+                                 'settings_v2.restore_backup'})
+# The cancellation of the restore that holds the maintenance: a flag on its own job row.
+# Through a restore's maintenance only; holds() decides which job it may write.
+JOB_CONTROL_ENDPOINTS = frozenset({'system_v2.cancel_job'})
+
+
+def holds(job, view=None) -> bool:
+    """``job`` (a job row) is the restore that holds the maintenance this process sees: the one
+    job whose cancellation writes through it. A manual maintenance is held by no job."""
+    view = view or current(refresh=False)
+    row = (view.row or {}) if view is not None and view.active() else {}
+    if job is None or job.get('kind') != 'restore' or job.get('state') not in ('pending', 'running'):
+        return False
+    if row.get('reason') == LOCAL_REASON:
+        return row.get('token') == job.get('id')
+    if row.get('reason') == REASON_RESTORE:
+        return job.get('node_id') in (None, row.get('node_id'))
+    return False
 
 
 def refusal(view=None, message=None):
     from flask import jsonify
     from utils.response import PROBLEM_CONTENT_TYPE, build_problem
     view = view or current(refresh=False)
-    body = build_problem(message or MESSAGE.format(
-        what=_what(view) if view else 'set by an administrator'), 503, title='Cluster maintenance')
+    local = view is not None and (view.row or {}).get('reason') == LOCAL_REASON
+    body = build_problem(message or (_message(view) if view else MESSAGE.format(
+        what='set by an administrator')), 503,
+        title='Restore in progress' if local else 'Cluster maintenance')
     body['code'] = 'maintenance'
     body['maintenance'] = view.public() if view else None
     response = jsonify(body)
@@ -312,6 +388,9 @@ def gate():
     if (request.blueprint in OPEN_BLUEPRINTS or request.endpoint in CONTROL_ENDPOINTS
             or request.endpoint in JOB_START_ENDPOINTS):
         return None
+    if request.endpoint in JOB_CONTROL_ENDPOINTS and (view.row or {}).get('reason') in (
+            REASON_RESTORE, LOCAL_REASON):
+        return None  # the route writes only for the restore that holds it (holds())
     if request.blueprint in REFUSED_BLUEPRINTS:
         return refusal(view)
     if request.method in SAFE_METHODS or request.blueprint in READ_BLUEPRINTS:
@@ -320,7 +399,7 @@ def gate():
 
 
 def init_app(app):
-    """Gate, write guard and 503 answer; inert outside HA (no row is ever observed there)."""
+    """Gate, write guard and 503 answer; outside HA only a local restore job raises it."""
     from models import db
     view_of(app)
     app.before_request(gate)
@@ -662,6 +741,13 @@ def complete_committed(row, now):
     # Only the node that won the UPDATE revokes: the epoch commits with the phase and
     # the restart, so a loser never refuses the sessions opened since
     cluster_commands.emit(cluster_commands.RESTART)
+    # A restore job that already passed its sessions step advanced the epoch: not twice
+    from services.jobs.restore import claim_sessions
+    if claim_sessions(db.session) == 'done':
+        db.session.commit()
+        logger.warning(f"Cluster maintenance: the restore committed by node {row['node_id']} had "
+                       "revoked its sessions; rolling restart requested here")
+        return True
     _advance_session_epoch()
     try:
         _revoke_database_sessions()

@@ -26,6 +26,7 @@ from . import container, installation
 from .errors import BackupSchemaError, RestoreFilesUnwritable
 from .export_generic import REFERENCE_SUFFIX
 from .restore import RestorePlan, single_transaction
+from .restore.transaction import checkpoint
 from .manifest import SECTIONS
 from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import apply_columns, apply_section, relink_references
@@ -423,6 +424,7 @@ class RestoreCoreMixin:
         # each reference resolves to on this installation.
         # Orders this installation moved on with: kept in a merge, named in a replacement
         order_warnings = keep_newer_orders(backup_data, mode)
+        checkpoint('plan')
         plan = RestorePlan.build(backup_data, pruned=pruned)
         plan.warnings.extend(order_warnings + windows_warnings)
         for warning in plan.warnings:
@@ -442,7 +444,7 @@ class RestoreCoreMixin:
 
         aligned = []
         try:
-            with single_transaction(), insert_file_writes_suspended():
+            with single_transaction(results), insert_file_writes_suspended():
                 # Every file the rows have now; what they still name afterwards is struck out
                 generation = advance_generation() if carried else None
                 if generation is not None:
@@ -470,6 +472,7 @@ class RestoreCoreMixin:
                 # reference at once, so they are resolved again now that every
                 # row exists: this is where an authority finds the HSM key the
                 # same restore has just created.
+                checkpoint('relink')
                 results['relinked'] = relink_references(backup_data, plan)
                 link_restored_connectors(backup_data)
                 results['repairs'] = replay_repairs(backup_data, plan)
@@ -689,6 +692,7 @@ class RestoreCoreMixin:
     def _apply_all(self, backup_data, results, master_key, plan):
         """Every write of a restore, inside the one transaction."""
         # Core restores
+        checkpoint('core')
         self._restore_users(backup_data, results, plan)
         self._restore_cas(backup_data, results, master_key, plan)
         self._restore_certificates(backup_data, results, master_key, plan)
@@ -703,6 +707,7 @@ class RestoreCoreMixin:
         db.session.flush()
 
         # RBAC restores
+        checkpoint('rbac')
         self._restore_groups(backup_data, results, plan)
         self._restore_custom_roles(backup_data, results, plan)
         self._restore_templates(backup_data, results)
@@ -715,6 +720,7 @@ class RestoreCoreMixin:
         self._restore_truststore(backup_data, results, plan)
 
         # Auth restores
+        checkpoint('auth')
         self._restore_sso_providers(backup_data, results)
         self._restore_legacy_sso_identities(results, plan)
         self._restore_hsm_providers(backup_data, results, plan)
@@ -722,16 +728,19 @@ class RestoreCoreMixin:
         self._restore_auth_certificates(backup_data, results, plan)
 
         # Notification restores
+        checkpoint('notifications')
         self._restore_smtp_config(backup_data, results)
         self._restore_notification_config(backup_data, results)
 
         # Policy restores
+        checkpoint('policies')
         self._restore_policies(backup_data, results, plan)
         self._restore_dns_providers(backup_data, results)
         self._restore_acme_domains(backup_data, results, plan)
         self._restore_acme_local_domains(backup_data, results, plan)
 
         # Extended restores
+        checkpoint('extended')
         self._restore_ssh_cas(backup_data, results, master_key, plan)
         self._restore_ssh_certificates(backup_data, results, plan)
         self._restore_microsoft_cas(backup_data, results)
@@ -745,6 +754,7 @@ class RestoreCoreMixin:
         # Sections the manifest carries and the hand-written restorers never
         # learned about: applied from the manifest, with every column and with
         # references resolved through the plan.
+        checkpoint('generic')
         for name in GENERIC_SECTIONS:
             rows = backup_data.get(name)
             if not rows:

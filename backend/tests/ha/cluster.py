@@ -6,6 +6,7 @@ UCM_CONFIG_DIR, logs and port under the bench directory, its own database URL
 UCM_DB_ENCRYPTION_KEY.
 The guard on its PYTHONPATH stops a node that touches an installation path.
 """
+import json
 import os
 import re
 import secrets
@@ -502,6 +503,55 @@ class Client:
     def patch(self, path, payload=None, **kw):
         return self.http.patch(self.node.url(path), json=payload or {}, headers=self._headers(),
                                timeout=120, **kw)
+
+
+class _Answer:
+    """The answer a restore route would have given, read back from its job."""
+
+    def __init__(self, result):
+        self.status_code = result['code']
+        if result['code'] < 400:
+            self._body = {'data': result.get('data'), 'message': result.get('message')}
+        else:
+            self._body = {'message': result.get('message'), 'code': result['code'],
+                          **(result.get('problem') or {})}
+        self.text = json.dumps(self._body)
+
+    def json(self):
+        return self._body
+
+
+def restore_answer(client, node, name, content, password, cluster, timeout=300, prefer=None):
+    """POST a restore to ``node``; past the route's wait (202) follow its job and answer what the
+    route would have. Once the restore has revoked the session (401) the job is read in the
+    jobs table: signing in again is refused (503) until the node restarts after the restore."""
+    headers = dict(client._headers(), **({'Prefer': prefer} if prefer else {}))
+    r = client.http.post(node.url('/api/v2/system/restore'), headers=headers,
+                         files={'file': (name, content)}, data={'password': password},
+                         timeout=timeout)
+    if r.status_code != 202:
+        return r
+    job_id, location = r.json()['data']['job']['id'], r.headers['Location']
+    deadline, revoked = time.monotonic() + timeout, False
+    while time.monotonic() < deadline:
+        if not revoked:
+            seen = client.http.get(node.url(location), timeout=60)
+            revoked = seen.status_code == 401
+            if not revoked:
+                assert seen.status_code == 200, seen.text[:500]
+        if revoked:
+            (state, result), = cluster.sql(
+                'SELECT state, result FROM background_jobs WHERE id = %s', (job_id,))
+        else:
+            state, result = seen.json()['data']['state'], seen.json()['data']['result']
+        if state in ('succeeded', 'failed', 'cancelled'):
+            result = json.loads(result) if isinstance(result, str) else result
+            assert result is not None, (job_id, state)
+            answer = _Answer(result)
+            answer.accepted = r
+            return answer
+        time.sleep(1)
+    raise AssertionError(f'restore job not final within {timeout}s')
 
 
 TASK_LINE = re.compile(r"Task '([A-Za-z0-9_]+)' (?:completed|skipped|failed)")

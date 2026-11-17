@@ -713,6 +713,7 @@ class SchedulerService:
                     # Nothing claimed, run or published; the heartbeat above goes on
                     self._wake.wait(LOCK_RETRY_SECONDS)
                     continue
+                self._refresh_caches()
                 if not self._owns_lock:
                     if _ha() and not self.deposed:
                         self._start_node_tasks()
@@ -881,15 +882,28 @@ class SchedulerService:
             self._release_lock()
 
     def _in_maintenance(self) -> bool:
-        """HA: this process refuses writes for a cluster maintenance, so no task starts."""
-        if not _ha() or self._app is None:
+        """This process refuses writes (HA cluster maintenance, or a single node's restore
+        gate), so no task starts."""
+        if self._app is None:
             return False
         from services import cluster_maintenance
         try:
             self._in_app(cluster_maintenance.current)
+            return cluster_maintenance.blocks_writes(self._app)
         except Exception as e:
+            # The gate's own reading failed: the engine guard still refuses the writes
             logger.error(f"Cluster maintenance not read by the scheduler: {type(e).__name__}")
-        return cluster_maintenance.blocks_writes(self._app)
+            return False
+
+    def _refresh_caches(self):
+        """A restore advanced the session epoch: this process drops its caches once."""
+        if self._app is None:
+            return
+        from services.backup.restore.invalidate import refresh_caches_on_epoch
+        try:
+            self._in_app(refresh_caches_on_epoch)
+        except Exception as e:
+            logger.error(f"Caches not checked against the session epoch: {type(e).__name__}")
 
     def _in_app(self, fn, *args):
         if self._app is not None:
