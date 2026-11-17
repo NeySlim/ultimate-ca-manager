@@ -3067,7 +3067,8 @@ beyond 25). A second start while the job's slot is taken answers `409` with
 One job is active per slot on the whole installation, HA cluster included. During an HA
 cluster maintenance no job starts: `GET` and `POST` of a starting route both answer `503`
 with `Retry-After: 30`, code `maintenance` and the message `A cluster maintenance is in
-progress, no background job starts until it ends`, and no job is created.
+progress, no background job starts until it ends`, and no job is created. A `GET` that would
+join a job already running answers `503` too: follow that job at `GET /api/v2/system/jobs/<id>`.
 
 ```http
 GET  /api/v2/system/jobs                  # ?kind=audit_verify&state=active|final&limit=20 (max 100)

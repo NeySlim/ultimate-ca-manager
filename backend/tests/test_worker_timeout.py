@@ -56,7 +56,8 @@ def test_refused_values_stop_the_start(value, capsys):
     assert 'UCM_WORKER_TIMEOUT' in message and f'{MINIMUM}' in message and f'{MAXIMUM}' in message
 
 
-def test_the_gunicorn_master_exits_78_on_a_refused_value(tmp_path):
+def test_the_gunicorn_configuration_exits_78_on_a_refused_value(tmp_path):
+    """Run by runpy, which stands in for gunicorn's loader: it catches Exception only."""
     run = _load_config(tmp_path, '5')
     assert run.returncode == 78, run.stderr
     assert 'UCM_WORKER_TIMEOUT must be a whole number of seconds from 30 to 3600' in run.stderr
