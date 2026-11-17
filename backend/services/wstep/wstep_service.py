@@ -928,9 +928,10 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
         return None, None, None
 
     patterned = template if _cn_pattern_applies(template) else None
-    subject, san, reached = None, None, True
+    subject, san, reached, consulted = None, None, True, False
     unresolved = 'could not resolve the requester'
     if sam_account_name and is_machine:
+        consulted = True
         if patterned is not None:
             computer = lookup.lookup_computer_identity(connector, sam_account_name)
             dns_hostname = computer['dns_hostname'] if computer else computer
@@ -948,6 +949,7 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
                 # The CN no longer names the host: the SAN it implied is given as such
                 san = san if san is not None else _cn_implied_dns_san(patterned, csr, dns_hostname)
     elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca, profile=profile)):
+        consulted = True
         subject, san = _user_directory_subject(connector, sam_account_name, patterned, profile=profile)
         if isinstance(subject, _PatternRefusal):
             return None, None, str(subject)
@@ -963,8 +965,9 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
     # The requester is not at fault when the directory cannot answer: env:Receiver
     if subject is None and not reached:
         return None, None, ServerError('The directory that builds the certificate subject could not be reached')
-    if subject is None and built_by_ca and not naked:
-        if template is None and sam_account_name and not is_machine:
+    # A directory asked that names no subject is the reason, whatever the request's shape (naked included)
+    if subject is None and (consulted or (built_by_ca and not naked)):
+        if not consulted and template is None and sam_account_name and not is_machine:
             return None, None, 'The request matches no certificate template whose subject it may supply'
         return None, None, f'The certificate subject is built from Active Directory, which {unresolved}'
     return subject, san, None
@@ -1116,8 +1119,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     no template is refused (``NO_TEMPLATE``, or the key when another key's template fits), unless it
     renews the requester's own valid certificate issued here without one (``_requester_renewal``).
     Only a matched template announcing a client-supplied subject keeps the CSR's.
-    Derivation never fails open: a naked CSR falls through to the normal
-    rejection, a populated one under a CA-built template or none is refused.
+    Derivation never fails open: a request the directory was asked for and cannot name is
+    refused with the directory's reason, naked or not; a naked CSR no directory was asked
+    for falls through to the normal rejection, a populated one under a CA-built template is refused.
 
     ``profile``: the Windows enrollment profile serving the request; a Kerberos principal is
     issued only by the enabled profile of its own realm, with that profile's connector.
