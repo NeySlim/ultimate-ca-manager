@@ -120,9 +120,9 @@ def start_job(kind: str, params: Optional[dict] = None, secret: Optional[str] = 
     from models import db
     from utils.ha import ha_enabled
     jt = _TYPES[kind]
-    from services import cluster_maintenance
-    cluster_maintenance.current(refresh=True)
-    if cluster_maintenance.blocks_writes():
+    # The view the engine guard reads: the INSERT below would be refused under it
+    from services.cluster_maintenance import blocks_writes
+    if blocks_writes():
         raise JobsSuspended()
     cipher = None
     if secret is not None:
