@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 def _revocation_line(cert):
     """The ssh-keygen KRL specification line of a revoked certificate. Serial 0 means "not
-    numbered" (PROTOCOL.certkeys): the certificate itself is given, and ssh-keygen revokes it
-    as OpenSSH does, by key ID under its CA (by its key only when the key ID is empty)."""
+    numbered" (PROTOCOL.certkeys): the certificate itself is given, and ssh-keygen lists it by
+    key ID under its CA, which revokes every certificate of the CA with that key ID, empty included."""
     if cert.serial:
         return f"serial: {int(cert.serial)}\n"
     certificate = ' '.join((cert.certificate or '').split()[:2])
