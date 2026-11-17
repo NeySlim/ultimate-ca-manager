@@ -6,6 +6,8 @@ import pytest
 import compliance_profiles
 from models import AuditLog, SystemConfig, db
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 URL = '/api/v2/settings/general'
 
 

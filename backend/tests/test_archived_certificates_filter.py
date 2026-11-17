@@ -1,6 +1,9 @@
 """Archived rows (superseded by a protocol re-enrolment) are visible as such:
 the list exposes the flag and offers a status filter for them."""
 from models import CA, Certificate, db
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _cert(app, ca_id, cn, archived=False):

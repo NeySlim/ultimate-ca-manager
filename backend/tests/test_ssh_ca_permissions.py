@@ -13,6 +13,8 @@ from auth.permissions import (
 from models import User
 from tests.test_ssh import _generate_test_ssh_key
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 ACTIONS = ('read', 'write', 'delete')
 
 

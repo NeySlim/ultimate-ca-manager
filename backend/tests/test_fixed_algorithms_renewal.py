@@ -14,6 +14,9 @@ from services.cert.renewal import renew_certificate_in_place
 from tests.conftest import get_json
 from tests.test_fixed_algorithms_digest import _template
 from tests.test_policy_algorithms_397 import _drop, _policy
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _p384_ca(create_ca, cn):

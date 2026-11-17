@@ -24,6 +24,8 @@ from utils.upn_san import build_upn_other_name, extract_upns_from_san_list
 from tests.windows_profile_support import default_profile, default_realm, template_extension
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 FIXTURES = Path(__file__).parent / 'fixtures'
 MACHINE = 'WIN11$@EXAMPLE.TEST'
 USER = 'alice@EXAMPLE.TEST'

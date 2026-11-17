@@ -14,8 +14,10 @@ import pytest
 
 from models import CA, User, db
 from models.api_key import APIKey
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 OFFLINE_PASSWORD = 'OfflineP@ss2026!'
 EXPORT_PASSWORD = 'ExportPass123!'

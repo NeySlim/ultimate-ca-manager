@@ -23,6 +23,8 @@ from services.smart_import.parser import MAX_KDF_ITERATIONS, UNINSPECTED_KEY, in
 from tests.conftest import get_json
 from tests.test_smart_import_kdf_budget import RIGHT, _key_sealed_in_a_layer, _pkcs12, _with_iterations
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 COSTLY = f'{MAX_KDF_ITERATIONS + 1} iterations'
 GOOD_PWD = 'Sup3rStr0ng!Pass#2026'
 

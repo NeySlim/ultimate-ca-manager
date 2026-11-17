@@ -13,8 +13,10 @@ from cryptography.x509.oid import NameOID
 
 from models import CA, Certificate, db
 from tests.test_unique_subject import _csr, _data, _issue, _key, _scoped_client, _sign, unique_ca
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+pytestmark = with_fixtures(pytestmark, 'drop_new_users')
 
 
 @pytest.fixture

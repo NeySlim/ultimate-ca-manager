@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session, declarative_base
 
 from utils.pagination import parse_request_limit
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 _Base = declarative_base()
 
 

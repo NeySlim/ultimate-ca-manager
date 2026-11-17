@@ -9,6 +9,8 @@ import pytest
 
 from models import db, SystemConfig
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 URL = '/api/v2/settings/general'
 FLAGS = {
     'crl_auto_delete_expired_revoked': 'is_auto_delete_enabled',

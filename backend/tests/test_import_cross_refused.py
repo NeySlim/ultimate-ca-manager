@@ -17,6 +17,8 @@ from cryptography.x509.oid import NameOID
 
 from models import db, CA
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _cert(subject_key, cn, issuer_key=None, issuer_cn=None, days=365):
     now = datetime.now(timezone.utc)

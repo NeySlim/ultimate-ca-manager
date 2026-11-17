@@ -18,6 +18,8 @@ import pytest
 
 from models import db, CA
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 class ChainWalkTimeout(Exception):
     """The walk under test did not terminate inside the watchdog."""

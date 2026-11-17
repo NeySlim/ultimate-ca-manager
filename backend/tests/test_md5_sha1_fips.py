@@ -16,6 +16,8 @@ from models import db, CA, Certificate, DnsProvider
 from services.acme.dns_providers.rfc2136 import Rfc2136DnsProvider
 from services.trust_store import TrustStoreService
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 TSIG_REFUSAL = 'TSIG hmac-md5 not available in FIPS mode'
 
 

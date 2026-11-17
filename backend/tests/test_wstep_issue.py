@@ -19,6 +19,8 @@ from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS
 from tests.windows_profile_support import restore, set_config, snapshot
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 ISSUE_URL = '/ADCertificateService_CES_UsernamePassword/service.svc'
 WSTEP_USER = 'wstep-test'

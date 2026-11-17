@@ -14,6 +14,9 @@ Uses shared conftest fixtures: app, client, auth_client, create_ca, create_cert.
 """
 import json
 from tests.conftest import get_json, assert_success, assert_error
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 CONTENT_JSON = 'application/json'
 BASE = '/api/v2/audit'

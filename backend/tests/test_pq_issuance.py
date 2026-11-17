@@ -14,6 +14,7 @@ from services.trust_store import TrustStoreService
 from tests.pqc_fixtures import fixture_bytes
 from utils import key_algorithms
 from tests.fixtures.templates import templates_created_here_removed
+from tests.leak_marks import with_fixtures
 
 
 @pytest.fixture(autouse=True, scope='module')
@@ -24,6 +25,8 @@ def _templates_stay_in_this_module(app):
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
+pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 PRIVATE = {'44': mldsa.MLDSA44PrivateKey, '65': mldsa.MLDSA65PrivateKey, '87': mldsa.MLDSA87PrivateKey}
 PUBLIC = {'44': mldsa.MLDSA44PublicKey, '65': mldsa.MLDSA65PublicKey, '87': mldsa.MLDSA87PublicKey}

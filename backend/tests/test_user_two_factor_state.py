@@ -7,6 +7,9 @@ import uuid
 
 from models import User, db
 from tests.test_webauthn_second_factor import enforce_2fa, make_user  # noqa: F401 (fixtures)
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 
 def _user(app, confirmed):

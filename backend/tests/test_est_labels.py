@@ -20,6 +20,8 @@ from tests.test_est_rfc7030 import (  # reuse the EST harness
     EST_BASE, _basic_auth, _make_csr, _post_csr, _set_config, est_config,  # noqa: F401
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture(autouse=True)
 def _est_on(app, est_config):

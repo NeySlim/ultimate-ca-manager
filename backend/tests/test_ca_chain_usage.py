@@ -12,6 +12,8 @@ from tests.fixtures.cross_pki import make_cert, new_key, pem
 from tests.fixtures.cross_world import build_world, set_served
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture(autouse=True)
 def _remove_what_the_test_added(app):

@@ -15,6 +15,9 @@ from services.smart_import.importer import SmartImporter
 from tests.fixtures.cross_pki import key_pem, new_key, openssl_verify, pem
 from tests.test_cross_sign import _cert_of, _sign
 from utils.key_codec import store_pem_bytes
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _name(cn):

@@ -27,6 +27,8 @@ from cryptography import x509
 from utils.revocation_reasons import (REASON_FLAGS, REVOCATION_REASONS,
                                       normalize_revocation_reason)
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODAL = os.path.join(_REPO, 'frontend', 'src', 'components',
                      'RevokeCertificateModal.jsx')

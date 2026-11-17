@@ -19,6 +19,8 @@ from models import db, CA
 from models.system_config import SystemConfig
 from services.scep.message_parser import verify_cms_signature
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _set_config(key, value):
     row = SystemConfig.query.filter_by(key=key).first()

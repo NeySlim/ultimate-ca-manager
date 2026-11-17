@@ -10,6 +10,8 @@ import pytest
 
 from tests.conftest import assert_success
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 FACTOR_ROUTES = [
     ('post', '/api/v2/account/password', {'current_password': 'x', 'new_password': 'Xx1!xxxxxxxxxxx'}),
     ('patch', '/api/v2/account/profile', {'email': 'attacker@example.com'}),
