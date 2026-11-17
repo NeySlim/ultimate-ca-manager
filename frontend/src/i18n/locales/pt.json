@@ -630,10 +630,10 @@
     "tooManyAttempts": "Tentativas falhadas em excesso",
     "retryAfterSeconds": "Tente novamente dentro de {{seconds}} segundos.",
     "retryLater": "Tente novamente mais tarde.",
-    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
-    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
-    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
-    "retryNow": "Retry now"
+    "maintenanceRestoring": "Está a terminar a restauração de um backup: este servidor volta a aceitar inícios de sessão depois de reiniciar.",
+    "maintenanceActive": "Este servidor está em manutenção: os inícios de sessão são recusados até ao fim da manutenção.",
+    "maintenanceRetryIn": "Nova tentativa de início de sessão dentro de {{seconds}} s.",
+    "retryNow": "Tentar agora"
   },
   "dashboard": {
     "goodMorning": "Bom dia",

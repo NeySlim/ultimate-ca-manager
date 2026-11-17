@@ -632,10 +632,10 @@
     "tooManyAttempts": "Забагато невдалих спроб",
     "retryAfterSeconds": "Повторіть спробу через {{seconds}} с.",
     "retryLater": "Повторіть спробу пізніше.",
-    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
-    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
-    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
-    "retryNow": "Retry now"
+    "maintenanceRestoring": "Відновлення з резервної копії завершується: цей сервер знову прийматиме вхід після перезапуску.",
+    "maintenanceActive": "Цей сервер на обслуговуванні: вхід відхиляється до його завершення.",
+    "maintenanceRetryIn": "Повторний вхід через {{seconds}} с.",
+    "retryNow": "Повторити зараз"
   },
   "dashboard": {
     "goodMorning": "Доброго ранку",

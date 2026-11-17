@@ -630,10 +630,10 @@
     "tooManyAttempts": "Troppi tentativi falliti",
     "retryAfterSeconds": "Riprova tra {{seconds}} secondi.",
     "retryLater": "Riprova più tardi.",
-    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
-    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
-    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
-    "retryNow": "Retry now"
+    "maintenanceRestoring": "Il ripristino di un backup sta terminando: questo server accetterà di nuovo gli accessi dopo il riavvio.",
+    "maintenanceActive": "Questo server è in manutenzione: gli accessi sono rifiutati fino al termine.",
+    "maintenanceRetryIn": "Nuovo tentativo di accesso tra {{seconds}} s.",
+    "retryNow": "Riprova ora"
   },
   "dashboard": {
     "goodMorning": "Buongiorno",

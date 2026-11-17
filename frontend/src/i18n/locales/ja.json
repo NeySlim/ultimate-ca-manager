@@ -630,10 +630,10 @@
     "tooManyAttempts": "失敗した試行が多すぎます",
     "retryAfterSeconds": "{{seconds}}秒後にもう一度お試しください。",
     "retryLater": "しばらくしてからもう一度お試しください。",
-    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
-    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
-    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
-    "retryNow": "Retry now"
+    "maintenanceRestoring": "バックアップの復元が完了しつつあります。サーバーが再起動すると、再びサインインできるようになります。",
+    "maintenanceActive": "サーバーはメンテナンス中です。終了するまでサインインできません。",
+    "maintenanceRetryIn": "{{seconds}}秒後に再度サインインします。",
+    "retryNow": "今すぐ再試行"
   },
   "dashboard": {
     "goodMorning": "おはようございます",

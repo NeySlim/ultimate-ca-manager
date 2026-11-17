@@ -630,10 +630,10 @@
     "tooManyAttempts": "Zu viele fehlgeschlagene Versuche",
     "retryAfterSeconds": "Versuchen Sie es in {{seconds}} Sekunden erneut.",
     "retryLater": "Versuchen Sie es später erneut.",
-    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
-    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
-    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
-    "retryNow": "Retry now"
+    "maintenanceRestoring": "Eine Wiederherstellung der Sicherung wird abgeschlossen: Dieser Server nimmt Anmeldungen wieder an, sobald er neu gestartet ist.",
+    "maintenanceActive": "Dieser Server befindet sich in Wartung: Anmeldungen werden abgelehnt, bis sie beendet ist.",
+    "maintenanceRetryIn": "Erneute Anmeldung in {{seconds}} s.",
+    "retryNow": "Jetzt erneut versuchen"
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
