@@ -43,10 +43,13 @@ export function pendingRestore(account) {
 export const VALIDATED_PHASES = ['committed', 'sessions_revoked', 'session_files_removed',
   'caches_purged', 'crls_regenerated']
 const validated = (job) => VALIDATED_PHASES.includes(job?.phase)
+// From the start of the commit the server answers a cancellation 409
+export const UNCANCELLABLE_PHASES = ['committing', ...VALIDATED_PHASES]
 
 /**
  * onReport(data): the restore succeeded, its report; onFailure(job): it ended otherwise;
- * onLost(error): the server stopped answering before the commit, the end is unknown here.
+ * onLost(error): the job can no longer be followed and no commit was seen (no answer after
+ * the retries, or any other error of the server): the end is unknown here.
  */
 export function useRestoreJob({ enabled = true, account, onReport, onFailure, onLost } = {}) {
   const { job, running, follow, cancel, clear } = useJob()

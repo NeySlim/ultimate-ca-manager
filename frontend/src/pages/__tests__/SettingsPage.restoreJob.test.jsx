@@ -186,16 +186,19 @@ describe('SettingsPage: restore as a job', () => {
     jobsApi.get.mockResolvedValueOnce({ data: running })
       .mockRejectedValue(Object.assign(new Error('Authentication required'), { status: 401 }))
     await startRestore()
-    expect((await screen.findByTestId('restore-job-progress')).getAttribute('role')).toBe('status')
+    const region = await screen.findByTestId('restore-job-progress')
+    expect(region.getAttribute('role')).toBe('status')
     await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
     const signIn = await screen.findByTestId('restore-sign-in')
-    expect(signIn.querySelector('[role="status"]').textContent).toBe('settings.restoreSignInAgain')
+    // The same live region, its text changed: a region born with its text is not always announced
+    expect(signIn.querySelector('[role="status"]')).toBe(region)
+    expect(region.textContent).toBe('settings.restoreSignInAgain')
     expect(document.activeElement).toBe(screen.getByTestId('restore-sign-in-button'))
   })
 
-  it('offers no cancellation once the restore has committed', async () => {
+  it.each(['committing', 'sessions_revoked'])('offers no cancellation from the commit on (%s)', async (phase) => {
     systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
-    jobsApi.get.mockResolvedValue({ data: { ...running, phase: 'sessions_revoked' } })
+    jobsApi.get.mockResolvedValue({ data: { ...running, phase } })
     await startRestore()
     expect(await screen.findByTestId('restore-job-cancel')).toBeTruthy()  // before it commits
     await act(async () => { await vi.advanceTimersByTimeAsync(1500) })

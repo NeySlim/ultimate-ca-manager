@@ -295,6 +295,27 @@ def test_a_job_that_does_not_hold_a_restore_maintenance_is_not_cancelled_through
         assert jobs.get_job(job_id)['state'] == 'pending'
 
 
+@pytest.mark.parametrize('kind', ['audit_verify', 'restore'])
+def test_a_job_that_does_not_hold_a_single_nodes_restore_gate_is_not_cancelled_through_it(
+        app, auth_client, finished, monkeypatch, kind):
+    """One node: the gate of a restore lets the cancel route through, for the job holding it
+    only; another restore (a gate left by one that died) is no more its holder than a verification."""
+    import types
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
+    assert auth_client.get('/api/v2/system/jobs').status_code == 200  # signed in before the gate
+    job_id = _job(app, kind)
+    holder = types.SimpleNamespace(job_id=str(uuid.uuid4()), node_id=None, requested_by='admin',
+                                   view={'id': 'x', 'kind': 'restore'}, app=app)
+    gate = restore_job.LocalGate(app, holder).raise_gate()
+    try:
+        r = auth_client.post(f'/api/v2/system/jobs/{job_id}/cancel')
+    finally:
+        gate.lift()
+    assert r.status_code == 503, r.data
+    with app.app_context():
+        assert jobs.get_job(job_id)['state'] == 'pending'
+
+
 def test_only_the_restore_holding_the_maintenance_is_cancelled_through_it(
         app, auth_client, finished, maintenance_view, monkeypatch):
     from services import cluster_maintenance as cm

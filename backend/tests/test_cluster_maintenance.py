@@ -21,8 +21,10 @@ def _row(phase=cm.PHASE_MANUAL, reason=cm.REASON_MANUAL, minutes=5, restored_at=
 
 
 @pytest.fixture
-def held(app, monkeypatch):
+def held(app, auth_client, monkeypatch):
     """HA on, this application's view in maintenance; never read again from the database."""
+    # A test before this one may have ended every session: signing in again is a write
+    assert auth_client.get('/api/v2/cas').status_code == 200
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(cm, 'OBSERVE_TTL_SECONDS', 3600)
     view = cm.view_of(app)

@@ -60,7 +60,7 @@ import BackupSection from './settings/BackupSection'
 import { ceilingNotice } from './settings/backupCeiling'
 import RestoreReport from './settings/RestoreReport'
 import { loginUrl } from '../navigation/safeNext'
-import { useRestoreJob, VALIDATED_PHASES } from './settings/useRestoreJob'
+import { useRestoreJob, UNCANCELLABLE_PHASES } from './settings/useRestoreJob'
 import AuditSection from './settings/AuditSection'
 import DatabaseSection from './settings/DatabaseSection'
 import { afterDatabaseReset } from './settings/databaseReset'
@@ -246,7 +246,7 @@ export default function SettingsPage() {
       else if (job.reason === 'executor_lost' || job.reason === 'not_taken') showError(t('settings.restoreLost'))
       else showError(job.result?.message || t('messages.errors.backup.restoreFailed'))
     },
-    // The server stopped answering before the commit: its end shows at the next visit
+    // The job can no longer be followed and no commit was seen: its end shows at the next visit
     onLost: (error) => {
       releaseSignOut()
       setShowRestoreModal(false)
@@ -2070,8 +2070,8 @@ export default function SettingsPage() {
               <Button type="button" variant="secondary" onClick={() => setShowRestoreModal(false)}>
                 {t('common.close')}
               </Button>
-              {/* Validated: the server refuses the cancellation (409), so none is offered */}
-              {!VALIDATED_PHASES.includes(restoreJob.job?.phase) && (
+              {/* From the commit on the server refuses the cancellation (409): none is offered */}
+              {!UNCANCELLABLE_PHASES.includes(restoreJob.job?.phase) && (
                 <Button type="button" variant="danger" onClick={handleCancelRestore}
                   disabled={!!restoreJob.job?.cancel_requested} data-testid="restore-job-cancel">
                   {t('settings.restoreCancel')}
