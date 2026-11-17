@@ -15,6 +15,7 @@ import copy
 import os
 import uuid
 from contextlib import contextmanager
+from datetime import datetime
 
 import pytest
 from sqlalchemy import select, text
@@ -432,8 +433,50 @@ def test_a_restored_pair_is_revoked_as_the_krl_revokes_it(installation, mode, pa
     results = _restore(master, payload, mode)
     db.session.remove()
     _assert_pair(_holders(_ca_by_refid(refid), serial), pair)
-    # The restore says how many certificates it revoked with their serial
+    # The restore says how many certificates it revoked with their serial, and audits each
     assert results['ssh_revoked_with_serial'] == (1 if pair in ('older', 'newer') else 0)
+    held = db.session.execute(select(CERTS.c.id).where(CERTS.c.ssh_ca_id == _ca_by_refid(refid),
+                                                       CERTS.c.serial == serial).order_by(CERTS.c.id)).scalars().all()
+    audited = _revocations_audited(held)
+    if pair in ('older', 'newer'):
+        revoked, source = (held[1], held[0]) if pair == 'older' else (held[0], held[1])
+        assert audited == [(str(revoked), f'SSH certificate revoked with #{source}, which holds serial {serial} '
+                                          'under their CA: the KRL revokes by serial')]
+    else:
+        assert audited == []
+
+
+def _revocations_audited(ids):
+    from models import AuditLog
+    return [(r.resource_id, r.details) for r in AuditLog.query.filter(
+        AuditLog.action == 'ssh_cert_revoked', AuditLog.resource_type == 'ssh_certificate',
+        AuditLog.username == 'system', AuditLog.resource_id.in_([str(i) for i in ids])).order_by(AuditLog.id)]
+
+
+def test_three_holders_take_the_oldest_revocation_which_the_check_sees_missing(installation):
+    """The date reported is the oldest revocation, not the revoked holder of lowest id."""
+    from services.database_admin.verify import VerificationError, check_ssh_serials
+    from utils import ssh_serials
+    ca_id = _ca('three holders')
+    ids = [SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['three']).id for _ in range(3)]
+    serial = db.session.get(SSHCertificate, ids[0]).serial
+    late, early = datetime(2026, 3, 1, 12, 0), datetime(2026, 1, 1, 12, 0)
+    for row_id, values in ((ids[1], {'serial': serial, 'serial_duplicate': True, 'revoked': True,
+                                     'revoked_at': early, 'revoke_reason': 'keyCompromise'}),
+                           (ids[2], {'serial': serial, 'serial_duplicate': True}),
+                           (ids[0], {'revoked': True, 'revoked_at': late, 'revoke_reason': 'superseded'})):
+        db.session.execute(CERTS.update().where(CERTS.c.id == row_id).values(**values))
+    db.session.commit()
+    with pytest.raises(VerificationError) as excinfo:
+        check_ssh_serials(db.engine)
+    assert f'#{ids[2]}' in str(excinfo.value) and 'revoked' in str(excinfo.value)
+
+    assert ssh_serials.align_revocations(ssh_serials.session_run) == {ids[2]: ids[1]}
+    db.session.commit()
+    rows = _holders(ca_id, serial)
+    assert [(bool(r[0]), r[1], r[2]) for r in rows] == [
+        (True, 'superseded', late), (True, 'keyCompromise', early), (True, 'keyCompromise', early)]
+    assert check_ssh_serials(db.engine)['diverging_revocations'] == 0
 
 
 def test_a_restore_without_ssh_certificates_still_counts_them(installation):

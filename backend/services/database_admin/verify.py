@@ -614,11 +614,13 @@ def check_local_email_flags(engine) -> Dict[str, Any]:
 
 
 def check_ssh_serials(engine) -> Dict[str, Any]:
-    """Every SSH CA counts past its certificates, and none holds a serial twice under the index.
+    """Every SSH CA counts past its certificates, none holds a serial twice under the index, and
+    the holders of a serial are revoked together.
 
-    A KRL revokes by serial (PROTOCOL.krl): a trailing counter hands a number out again, and an
-    unmarked pair means the unique index ``uq_ssh_certificates_ca_serial`` is not there."""
-    from utils.ssh_serials import lagging_counters, unmarked_duplicates
+    A KRL revokes by serial (PROTOCOL.krl): a trailing counter hands a number out again, an
+    unmarked pair means the unique index ``uq_ssh_certificates_ca_serial`` is not there, and a
+    valid holder beside a revoked one is shown valid while the KRL revokes it."""
+    from utils.ssh_serials import diverging_revocations, lagging_counters, unmarked_duplicates
     _insp, table_names = _reflect(engine)
     if 'ssh_cas' not in table_names or 'ssh_certificates' not in table_names:
         return {'cas_checked': 0, 'skipped_count': 1, 'skipped': [{
@@ -629,6 +631,7 @@ def check_ssh_serials(engine) -> Dict[str, Any]:
             return conn.execute(text(sql), params or {})
         lagging = lagging_counters(run)
         unmarked = unmarked_duplicates(run)
+        diverging = diverging_revocations(run)
         checked = _scalar(conn, text('SELECT COUNT(*) FROM "ssh_cas"'), what="the SSH CAs")
     if lagging:
         listed = ', '.join(f"CA #{ca_id} at {counter} below serial {highest}"
@@ -640,7 +643,13 @@ def check_ssh_serials(engine) -> Dict[str, Any]:
         raise VerificationError(
             f"{len(unmarked)} SSH certificate(s) hold a serial an older certificate of their CA holds, "
             f"unmarked (#{', #'.join(map(str, unmarked[:10]))}): the unique serial index is missing")
-    return {'cas_checked': int(checked or 0), 'lagging': 0, 'unmarked_duplicates': 0}
+    if diverging:
+        listed = ', '.join(f"#{row_id} beside #{source}" for row_id, source in list(diverging.items())[:10])
+        raise VerificationError(
+            f"{len(diverging)} SSH certificate(s) are valid while another holder of their serial under "
+            f"their CA is revoked ({listed}): the KRL revokes them all")
+    return {'cas_checked': int(checked or 0), 'lagging': 0, 'unmarked_duplicates': 0,
+            'diverging_revocations': 0}
 
 
 # ---------------------------------------------------------------------------

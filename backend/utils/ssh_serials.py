@@ -41,9 +41,12 @@ _GROUPS = ('SELECT c.id, c.ssh_ca_id, a.descr, c.serial, c.key_id FROM ssh_certi
            'ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id AND o.serial = c.serial AND o.id <> c.id) '
            'ORDER BY c.ssh_ca_id, c.serial, c.id')
 
-# Each valid holder of a serial a revoked certificate of its CA holds, and the oldest revoked holder
-_UNREVOKED = ('SELECT c.id, (SELECT MIN(o.id) FROM ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id '
-              'AND o.serial = c.serial AND o.revoked) FROM ssh_certificates c '
+# Each valid holder of a serial a revoked certificate of its CA holds, and the revoked holder of the
+# oldest revocation (dated before undated, then lowest id)
+_UNREVOKED = ('SELECT c.id, (SELECT o.id FROM ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id '
+              'AND o.serial = c.serial AND o.revoked '
+              'ORDER BY CASE WHEN o.revoked_at IS NULL THEN 1 ELSE 0 END, o.revoked_at, o.id LIMIT 1) '
+              'FROM ssh_certificates c '
               'WHERE c.serial <> 0 AND NOT COALESCE(c.revoked, FALSE) AND EXISTS (SELECT 1 FROM '
               'ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id AND o.serial = c.serial AND o.revoked) '
               'ORDER BY c.id')
@@ -84,15 +87,34 @@ def duplicate_groups(run: Run, ids=None) -> List[Dict]:
     return [g for g in groups.values() if wanted is None or wanted & set(g['ids'])]
 
 
+def diverging_revocations(run: Run) -> Dict[int, int]:
+    """{valid holder of a serial a revoked certificate of its CA holds: the holder it would be revoked with}."""
+    return {row_id: source for row_id, source in run(_UNREVOKED, {}).fetchall()}
+
+
 def align_revocations(run: Run) -> Dict[int, int]:
     """The KRL revokes a serial: each valid holder of a revoked one is revoked with the date and
-    reason of its oldest revoked holder. {id revoked here: id it was revoked with}."""
-    aligned = {row_id: source for row_id, source in run(_UNREVOKED, {}).fetchall()}
+    reason of the oldest revocation among its holders. {id revoked here: id it was revoked with}."""
+    aligned = diverging_revocations(run)
     for row_id, source in aligned.items():
         run(_REVOKE_AS, {'i': row_id, 's': source})
         logger.warning("SSH certificate #%s revoked with #%s, which holds its serial under their CA "
                        "(the KRL revokes by serial)", row_id, source)
     return aligned
+
+
+def revocation_entries(run: Run, aligned: Dict[int, int]) -> List[Dict]:
+    """One audit entry per certificate *aligned* revoked, in a fixed phrase: ids, serial and key id only."""
+    entries = []
+    for row_id, source in sorted(aligned.items()):
+        row = run('SELECT serial, key_id FROM ssh_certificates WHERE id = :i', {'i': row_id}).fetchone()
+        if row is None:
+            continue
+        entries.append(dict(action='ssh_cert_revoked', resource_type='ssh_certificate', resource_id=str(row_id),
+                            resource_name=row[1], success=True,
+                            details=f'SSH certificate revoked with #{source}, which holds serial {row[0]} '
+                                    'under their CA: the KRL revokes by serial'))
+    return entries
 
 
 def mark_duplicates(run: Run, aligned: Optional[Dict[int, int]] = None) -> List[Dict]:
