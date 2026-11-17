@@ -2,21 +2,23 @@
 # UCM_HA database handling: a node never owns a SQLite file, the database is PostgreSQL.
 # Functions only: the image entrypoint sources this file, and the tests source it too.
 
+# A flag as the application reads it: surrounding blanks dropped, lower case.
+ucm_flag_text() {
+    local v="${1:-}"
+    v="${v#"${v%%[![:space:]]*}"}"
+    v="${v%"${v##*[![:space:]]}"}"
+    printf '%s' "$v" | tr '[:upper:]' '[:lower:]'
+}
+
 ucm_ha_active() {
-    local ha
-    ha=$(printf '%s' "${UCM_HA:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
-    case "$ha" in
+    case "$(ucm_flag_text "${UCM_HA:-}")" in
         1|true|yes|on) return 0 ;;
         *) return 1 ;;
     esac
 }
 
-# 1, true or yes, surrounding blanks dropped, as the application reads a flag.
 ucm_flag_set() {
-    local v="${1:-}"
-    v="${v#"${v%%[![:space:]]*}"}"
-    v="${v%"${v##*[![:space:]]}"}"
-    case "$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')" in
+    case "$(ucm_flag_text "${1:-}")" in
         1|true|yes) return 0 ;;
         *) return 1 ;;
     esac

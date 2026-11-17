@@ -464,12 +464,15 @@ def cluster_summary(wake_interval) -> dict:
 
 
 def cluster_nodes_detail(wake_interval) -> list:
-    """Every registered node, for authenticated status pages only."""
+    """Every registered node, for authenticated status pages only. A node stopped cleanly
+    (its row released) is ``stopped`` and never ``stale``, as /health counts it."""
     from models import ClusterNode
     from utils.datetime_utils import utc_isoformat
     now = cluster_utc_now()
     return [{'node_id': n.node_id, 'leader': bool(n.is_leader),
-             'stale': _is_stale(n, wake_interval, now), 'version': n.version,
+             'stopped': n.instance_token is None,
+             'stale': n.instance_token is not None and _is_stale(n, wake_interval, now),
+             'version': n.version,
              'started_at': utc_isoformat(n.started_at), 'heartbeat_at': utc_isoformat(n.heartbeat_at),
              'command_seen': n.command_seen, 'kek_fingerprint': n.kek_fingerprint,
              'package_family': n.package_family}

@@ -214,6 +214,20 @@ def test_a_node_silent_past_the_gone_window_counts_nowhere(app, ha):
     assert _ours(detail) == ['late', 'live']
 
 
+def test_a_node_stopped_cleanly_is_listed_stopped_and_never_stale(app, ha):
+    """The status page judges as /health does: a released row is a stopped node, not a silent one."""
+    _beat(app, 'late', 'late-token', age=3 * WAKE + 0.1)
+    _beat(app, 'gone', 'gone-token', age=3 * WAKE + 0.1)
+    with app.app_context():
+        assert scheduler_leader.release_node(PREFIX + 'gone', 'gone-token')
+        summary = scheduler_leader.cluster_summary(WAKE)
+        detail = {n['node_id'][len(PREFIX):]: n for n in scheduler_leader.cluster_nodes_detail(WAKE)
+                  if n['node_id'].startswith(PREFIX)}
+    assert (summary['nodes'], summary['stale']) == (1, 1)
+    assert (detail['gone']['stopped'], detail['gone']['stale']) == (True, False)
+    assert (detail['late']['stopped'], detail['late']['stale']) == (False, True)
+
+
 def test_the_leader_deletes_the_rows_of_gone_nodes_and_a_node_back_writes_one(app, ha):
     from models import ClusterNode, db
     leader = ha('leader')

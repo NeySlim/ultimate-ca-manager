@@ -583,7 +583,7 @@ def test_the_notice_says_a_password_the_chart_drew_is_not_the_operators(tmp_path
 
 
 FLAG_VALUES = [('1', True), (' 1', True), ('1 ', True), ('\tTrue\n', True), (' yes ', True),
-               ('0', False), ('', False), (' ', False), ('on', False), ('t rue', False), ('1 1', False)]
+               ('0', False), ('', False), (' ', False), ('on', False), ('t rue', False), ('1 1', False), ('\x1c1', False)]
 
 
 @pytest.mark.parametrize('raw, expected', FLAG_VALUES)
@@ -595,3 +595,17 @@ def test_the_force_change_flag_reads_the_same_in_the_script_and_the_application(
     got = initial_admin.resolve({'INITIAL_ADMIN_PASSWORD': 'Some-Value-1!',
                                  'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE': raw})
     assert got.force_change is expected, raw
+
+
+HA_VALUES = [('1', True), (' true ', True), ('\tON\n', True), ('yes', True),
+             ('0', False), ('', False), (' ', False), ('t rue', False), ('o n', False), ('1 1', False),
+             ('\x1c1', False)]
+
+
+@pytest.mark.parametrize('raw, expected', HA_VALUES)
+def test_the_ha_flag_reads_the_same_in_the_script_and_the_application(tmp_path, monkeypatch, raw, expected):
+    from config.settings import env_bool
+    r = _run('if ucm_ha_active; then echo set; else echo unset; fi', {'UCM_HA': raw}, tmp_path)
+    assert r.stdout.strip() == ('set' if expected else 'unset'), raw
+    monkeypatch.setenv('UCM_HA', raw)
+    assert env_bool('UCM_HA', False) is expected, raw
