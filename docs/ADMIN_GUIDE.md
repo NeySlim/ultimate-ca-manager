@@ -454,6 +454,8 @@ The migration is **bidirectional** (SQLite ↔ PostgreSQL) and:
 
 Location: `/opt/ucm/data/ucm.db`
 
+**Optimize.** **Settings > Database > Optimize** runs `VACUUM`, then `ANALYZE` with `PRAGMA analysis_limit = 1000`: SQLite reads about 1,000 rows of each index, so the write lock it holds stays short on a large database. SQLite never refreshes these statistics on its own. The `sqlite_statistics` task (Settings > Scheduler, "Database statistics") runs `PRAGMA optimize` every hour under the same limit: it analyzes only the tables that grew or shrank tenfold, or that have no statistics yet. Each connection loads the statistics when it opens and is reopened hourly. The task does not exist on PostgreSQL, whose autovacuum keeps its statistics; there **Optimize** runs `VACUUM ANALYZE`.
+
 **Vacuum database:**
 ```bash
 sudo systemctl stop ucm

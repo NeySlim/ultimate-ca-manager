@@ -83,8 +83,9 @@ def optimize_db():
             with db.engine.execution_options(isolation_level='AUTOCOMMIT').connect() as conn:
                 conn.execute(db.text('VACUUM ANALYZE'))
         else:
+            from services.sqlite_statistics import refresh_statistics
             db.session.execute(db.text('VACUUM'))
-            db.session.execute(db.text('ANALYZE'))
+            refresh_statistics(full=True)
         ts = utc_isoformat(utc_now())
         try:
             _set_system_config('db_last_optimized', ts,

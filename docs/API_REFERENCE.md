@@ -3116,7 +3116,7 @@ Permission `admin:system`. Downloads a SQL dump (`application/sql`). Only a SQLi
 ```http
 POST /api/v2/system/database/optimize
 ```
-Permission `admin:system`. Runs VACUUM and ANALYZE (SQLite and PostgreSQL).
+Permission `admin:system`. Runs VACUUM and ANALYZE (SQLite and PostgreSQL). On SQLite, ANALYZE reads about 1,000 rows of each index (`PRAGMA analysis_limit`).
 
 ```http
 POST /api/v2/system/database/integrity-check

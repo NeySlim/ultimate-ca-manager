@@ -1,6 +1,6 @@
 """On a database of its own, outside the isolation fixture: "Optimize database" on a small
 installation, then growth. The queue and the renewal lists keep their indexes whatever the
-statistics say."""
+statistics say, and the periodic task brings the statistics back to the grown tables."""
 import json
 import time
 import uuid
@@ -90,3 +90,58 @@ def test_the_lists_keep_their_indexes_whatever_the_statistics(own_app, state):
     print(f'{state}: queue and four lists in {time.perf_counter() - started:.3f}s')
     assert not _violations(own_app, client)
 
+
+def test_the_periodic_task_analyzes_the_grown_tables(own_app):
+    from services.sqlite_statistics import scheduled_refresh
+    _small_then_grown(own_app, 'stale')
+    assert max(_rows_of(own_app, 'approval_requests')) < 10
+    with own_app.app_context():
+        scheduled_refresh()
+    assert min(_rows_of(own_app, 'approval_requests')) > GROWTH
+    # a partial index counts only its own rows
+    assert max(_rows_of(own_app, 'certificates')) > GROWTH
+
+
+def test_optimize_analyzes_under_the_analysis_limit_and_puts_it_back(own_app):
+    from services.sqlite_statistics import ANALYSIS_LIMIT
+    from tests.conftest import admin_client
+    client = admin_client(own_app)
+    with own_app.app_context():
+        raw = db.session.connection().connection.driver_connection
+        raw.execute('PRAGMA analysis_limit = 7')
+        traced = []
+        raw.set_trace_callback(traced.append)
+        try:
+            assert client.post('/api/v2/system/database/optimize').status_code == 200
+        finally:
+            raw.set_trace_callback(None)
+        analyze = [i for i, s in enumerate(traced) if s.strip().upper() == 'ANALYZE']
+        limits = [(i, s) for i, s in enumerate(traced) if 'analysis_limit =' in s]
+        assert analyze, traced
+        # the last limit set before ANALYZE is the bound, the previous one is restored after it
+        assert [s for i, s in limits if i < analyze[0]][-1].endswith(f'= {ANALYSIS_LIMIT}'), limits
+        assert raw.execute('PRAGMA analysis_limit').fetchone()[0] == 7
+
+
+def test_the_task_runs_on_sqlite_only(app, auth_client):
+    from services.sqlite_statistics import refresh_statistics
+    tasks = {t['name'] for t in auth_client.get('/api/v2/system/scheduler').get_json()['data']['tasks']}
+    with app.app_context():
+        sqlite = db.engine.dialect.name == 'sqlite'
+        assert ('sqlite_statistics' in tasks) is sqlite, sorted(tasks)
+        assert refresh_statistics() is sqlite
+        db.session.rollback()
+
+
+def test_a_sqlite_connection_is_reopened_to_load_fresh_statistics(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    env = {k: v for k, v in os.environ.items() if k != 'DATABASE_URL'}
+    env['DATABASE_PATH'] = str(tmp_path / 'ucm.db')
+    out = subprocess.run(
+        [sys.executable, '-c', 'from config.settings import Config; '
+         'print(Config.SQLALCHEMY_ENGINE_OPTIONS.get("pool_recycle"))'],
+        cwd=Path(__file__).resolve().parent.parent, env=env, capture_output=True, text=True, check=True)
+    assert out.stdout.strip().splitlines()[-1] == '3600'
