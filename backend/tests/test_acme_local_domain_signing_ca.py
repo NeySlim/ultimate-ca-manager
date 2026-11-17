@@ -18,6 +18,8 @@ import pytest
 
 from models import db
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _zone(name):
     return f'{name}.signing-ca.test'

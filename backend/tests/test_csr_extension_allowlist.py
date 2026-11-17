@@ -36,6 +36,8 @@ from tests.test_est_rfc7030 import (  # reuse the EST harness
     EST_BASE, _basic_auth, _post_csr, est_config,  # noqa: F401
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 ATTACKER_CDP = 'http://attacker.example/stale.crl'
 ATTACKER_OCSP = 'http://attacker.example/ocsp'
 ATTACKER_SID = 'S-1-5-21-1-2-3-500'

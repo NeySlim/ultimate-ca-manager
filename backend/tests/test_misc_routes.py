@@ -18,8 +18,10 @@ Uses shared conftest fixtures: app, client, auth_client, create_ca, create_user.
 import json
 from tests.conftest import get_json, assert_success, assert_error, assert_refused
 import pytest
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 CONTENT_JSON = 'application/json'
 

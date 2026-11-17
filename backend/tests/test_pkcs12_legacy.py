@@ -22,6 +22,8 @@ from cryptography.x509.oid import NameOID
 
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 # DER-encoded OBJECT IDENTIFIERs as they appear inside the archive
 OID_PBE_SHA1_3DES = bytes.fromhex('060a2a864886f70d010c0103')   # 1.2.840.113549.1.12.1.3
 OID_PBES2 = bytes.fromhex('06092a864886f70d01050d')             # 1.2.840.113549.1.5.13

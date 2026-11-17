@@ -12,6 +12,9 @@ from cryptography.x509.oid import NameOID
 
 from api.v2.certificates.export import _build_ca_chain, _resolve_issuer_cert
 from models import CA, db
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _name(common_name):

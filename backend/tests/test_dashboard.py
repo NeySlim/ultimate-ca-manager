@@ -16,6 +16,8 @@ import json
 import pytest
 from tests.conftest import get_json, assert_success, assert_error
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CONTENT_JSON = 'application/json'
 STATS_OVERVIEW = '/api/v2/stats/overview'
 DASH = '/api/v2/dashboard'

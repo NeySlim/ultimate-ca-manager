@@ -14,8 +14,10 @@ from services.ocsp_service import OCSPService
 from services.smart_import.importer import SmartImporter
 from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 from utils.datetime_utils import utc_now
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 
 def _x(b, xid=None, tail=''):

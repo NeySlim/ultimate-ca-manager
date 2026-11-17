@@ -17,6 +17,8 @@ from services.acme.acme_service import AcmeService
 from services.acme.http01 import MAX_REDIRECTS as _HTTP01_MAX_REDIRECTS
 import utils.ssrf_protection as ssrf_protection
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def acme_account_id(app):

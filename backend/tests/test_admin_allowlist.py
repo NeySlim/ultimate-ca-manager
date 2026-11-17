@@ -8,6 +8,8 @@ from utils import admin_allowlist
 from utils.admin_allowlist import REFUSAL_MESSAGE, SocketIOAllowlistGate
 from tests.test_est_rfc7030 import est_config  # noqa: F401  (fixture)
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 INSIDE = '10.1.2.3'
 OUTSIDE = '203.0.113.9'
 

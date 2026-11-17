@@ -18,6 +18,9 @@ from models import db, CA, Certificate
 from models.crl import CRLMetadata
 
 from tests.test_ocsp_service import _ca_model, _cert_model, _load_x509
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _post(client, url, body):

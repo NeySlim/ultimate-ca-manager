@@ -16,6 +16,8 @@ from tests.fixtures.cross_pki import build_cross_pki, key_pem, openssl_verify, p
 from utils.datetime_utils import utc_now
 from utils.key_codec import store_pem_bytes
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _spki(cert):
     return cert.public_key().public_bytes(serialization.Encoding.DER,

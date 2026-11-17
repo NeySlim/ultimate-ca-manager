@@ -41,6 +41,8 @@ from cryptography.x509.oid import NameOID
 
 from services.acme.acme_service import AcmeService
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture(scope='module')
 def signing_key():

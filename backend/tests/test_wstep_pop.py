@@ -26,6 +26,9 @@ from cryptography.x509.oid import NameOID
 from models import CA, db
 from services.wstep import wstep_service
 from services.wstep.rst_parser import _unwrap_pkcs7_csr
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 _REAL_WIN11_CMC_REQUEST = """
 -----BEGIN NEW CERTIFICATE REQUEST-----

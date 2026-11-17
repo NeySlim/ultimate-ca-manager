@@ -27,6 +27,27 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from models import db
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+
+@pytest.fixture(autouse=True, scope='module')
+def scep_settings_restored(app, drop_new_cas_and_certificates):
+    """The SCEP default CA and switch as the file found them, before its CAs are deleted."""
+    from models.system_config import SystemConfig
+    keys = ('scep_enabled', 'scep_ca_id')
+    with app.app_context():
+        saved = {k: (SystemConfig.query.filter_by(key=k).first() or SystemConfig(key=k, value=None)).value
+                 for k in keys}
+    yield
+    with app.app_context():
+        for k in keys:
+            row = SystemConfig.query.filter_by(key=k).first()
+            if saved[k] is None and row is not None:
+                db.session.delete(row)
+            elif row is not None:
+                row.value = saved[k]
+        db.session.commit()
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 

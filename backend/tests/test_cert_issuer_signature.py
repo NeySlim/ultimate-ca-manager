@@ -14,6 +14,8 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from tests.conftest import assert_success
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CONTENT_JSON = 'application/json'
 BASE = '/api/v2/certificates'
 CAS = '/api/v2/cas'

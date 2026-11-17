@@ -11,6 +11,8 @@ import pytest
 from models import SystemConfig, db
 from security.password_policy import validate_password
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 KEYS = ('min_password_length', 'password_require_special')
 
 

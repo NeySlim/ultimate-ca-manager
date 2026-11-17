@@ -19,9 +19,11 @@ from services.wstep.rst_parser import parse_rst
 from tests.pqc_fixtures import load_mldsa_key, scep_wstep_mldsa_signed_cms
 from tests.test_wstep_renew import _build_signed_rst
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 
 def _csr(key, cn='wstep-pq.example.test'):

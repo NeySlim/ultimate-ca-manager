@@ -4,6 +4,8 @@ import pytest
 
 from models import db, SystemConfig, KeyRecoveryRequest
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _set_dual_control(app, enabled):
     with app.app_context():

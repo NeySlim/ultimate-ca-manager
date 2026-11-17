@@ -17,6 +17,8 @@ from services import fips_preflight
 from services.policy_service import PolicyEvaluationService
 from utils import key_algorithms
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 SIZES = [(1024, False), (2046, False), (2047, False), (2048, True), (2049, False), (2050, True),
          (3072, True), (8192, True), (8193, False), (16384, True), (16385, False), (16386, False)]
 

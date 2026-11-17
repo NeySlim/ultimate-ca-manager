@@ -22,6 +22,8 @@ from tests.test_mtls_p12_identity import (  # noqa: F401  (fixture + helpers)
     _forged_cert_with_serial, _post, _serial_int, victim,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+
 
 def _login(app, username, password):
     client = app.test_client()

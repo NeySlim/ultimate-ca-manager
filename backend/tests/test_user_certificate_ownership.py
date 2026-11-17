@@ -13,6 +13,8 @@ from models import Certificate, User, db
 from models.auth_certificate import AuthCertificate
 from models.policy import ApprovalRequest, CertificatePolicy
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+
 BASE = '/api/v2/user-certificates'
 PERMS = ['read:user_certificates', 'write:user_certificates', 'delete:user_certificates']
 
