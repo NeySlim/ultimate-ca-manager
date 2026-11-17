@@ -261,6 +261,29 @@ def test_a_revocation_after_an_issuance_revokes_it_on_every_engine(app, ssh_ca, 
     assert _diverging(app, ca_id) == {}
 
 
+def test_a_certificate_revoked_by_another_revocation_meanwhile_is_not_listed_again(app, ssh_ca):
+    """The caller's session read a certificate before another revocation revoked it: the search,
+    made under the CA row, reads it again and leaves it out of revoked_with."""
+    ca_id, key = ssh_ca
+    other, numbered, mate, zero = (_import(app, ca_id, key, s, k)
+                                   for s, k in ((0, 'gina'), (5, 'gina'), (8, 'hugo'), (6, 'hugo')))
+    with app.app_context():
+        # mate holds serial 5 too (a kept 2.254 pair), zero is a second serial 0 certificate
+        db.session.execute(CERTS.update().where(CERTS.c.id == mate).values(serial=5, serial_duplicate=True))
+        db.session.execute(CERTS.update().where(CERTS.c.id == zero).values(serial=0))
+        db.session.commit()
+        held = db.session.get(SSHCertificate, mate)  # kept: the identity map holds it weakly
+        assert held.revoked is False
+        outcome = {}
+        _in_thread(app, 'other', outcome, lambda: [
+            c.id for c in SSHCertificateService.revoke_certificate(other, 'superseded', 't').revoked_with]).join(30)
+        assert outcome['other'] == [numbered, mate], outcome
+        # Key ID 'hugo' reaches mate, which the other revocation took through serial 5
+        assert [c.id for c in SSHCertificateService.revoke_certificate(zero, 'superseded', 't').revoked_with] == []
+        db.session.remove()
+    assert _diverging(app, ca_id) == {}
+
+
 def test_sqlite_is_sent_no_row_lock(app, ssh_ca):
     """SQLite has no FOR UPDATE: the lock of the CA row adds nothing to what it is sent."""
     if _on_postgresql(app):
