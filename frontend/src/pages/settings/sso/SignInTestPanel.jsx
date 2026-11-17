@@ -129,7 +129,12 @@ export default function SignInTestPanel({ provider, dirty, formData, handleChang
     setPhase('idle')
   }
 
-  const onClick = () => (dirty && phase !== 'confirm' ? setPhase('confirm') : start())
+  // Asking for confirmation ends the test in progress, whose poll would otherwise replace it.
+  const onClick = () => {
+    if (!dirty || phase === 'confirm') return start()
+    abandon()
+    setPhase('confirm')
+  }
 
   return (
     <div className="space-y-2">

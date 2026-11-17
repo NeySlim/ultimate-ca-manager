@@ -225,6 +225,31 @@ describe('Test sign-in panel', () => {
     expect(getSignInTest).toHaveBeenCalledWith('tok')
   })
 
+  it('drops the wait in progress when a click with unsaved changes asks for confirmation', async () => {
+    renderPanel({ dirty: true })
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTest')) })
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTestRunSaved')) })
+    await act(async () => { testWindow() })
+    getSignInTest.mockResolvedValue({ data: { state: 'done', report: ACCEPTED } })
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTest')) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_MS * 3) })
+    expect(getSignInTest).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert').textContent).toBe('sso.signInTestUnsaved')
+    expect(screen.queryByText('sso.signInTestAccepted')).toBeNull()
+  })
+
+  it('tells a window still opening to stop when a click with unsaved changes asks for confirmation', async () => {
+    renderPanel({ dirty: true })
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTest')) })
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTestRunSaved')) })
+    const key = window.open.mock.calls[0][0].split('#')[1]
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTest')) })
+    expect(FakeChannel.posted).toContainEqual({ type: 'abort', key })
+    await act(async () => { await vi.advanceTimersByTimeAsync(LAUNCH_MS) })
+    expect(screen.queryByText('sso.signInTestPopupBlocked')).toBeNull()
+    expect(screen.getByRole('alert').textContent).toBe('sso.signInTestUnsaved')
+  })
+
   it('gives the hand back on cancel, and polls no more', async () => {
     renderPanel()
     await launch()
