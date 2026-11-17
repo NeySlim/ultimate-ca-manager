@@ -24,6 +24,8 @@ CREATE_INDEX = (f'CREATE UNIQUE INDEX IF NOT EXISTS {INDEX} '
 # SystemConfig key the upgrade leaves for the next start, and the audit action it becomes
 MARKED_KEY = 'ssh_serial_duplicates_marked'
 MARKED_ACTION = 'ssh_serial_duplicate_marked'
+# A listed certificate the upgrade revoked through the key ID of a serial 0 certificate, not a pair
+KEY_ID_KIND = 'revoked_by_key_id'
 REMEDY = ('the KRL revokes by serial, so revoking one revokes them all: '
           'revoke them and issue new certificates')
 
@@ -165,6 +167,22 @@ def mark_duplicates(run: Run, aligned: Optional[Dict[int, int]] = None) -> List[
     return groups
 
 
+def key_id_revocations(run: Run, aligned: Dict[int, int], groups: List[Dict]) -> List[Dict]:
+    """One entry per certificate of *aligned* revoked through the key ID of a serial 0 certificate
+    that no group of *groups* already lists, in the form ``list_for_next_start`` keeps."""
+    listed = {i for entry in groups for i, _ in entry.get('revoked') or []}
+    entries = []
+    for row_id, source in sorted(aligned.items()):
+        if row_id in listed or not _by_key_id(run, source):
+            continue
+        row = run('SELECT c.ssh_ca_id, a.descr, c.key_id FROM ssh_certificates c LEFT JOIN ssh_cas a '
+                  'ON a.id = c.ssh_ca_id WHERE c.id = :i', {'i': row_id}).fetchone()
+        if row is not None:
+            entries.append({'kind': KEY_ID_KIND, 'ssh_ca_id': row[0], 'ca': row[1], 'ids': [row_id],
+                            'key_ids': [row[2]], 'revoked': [[row_id, source]]})
+    return entries
+
+
 def settle_marks(run: Run) -> Dict[int, int]:
     """The oldest holder of each serial under the index, every other one marked; marks first, so
     no statement ever puts two holders under the index. Then ``align_revocations``, returned."""
@@ -174,7 +192,12 @@ def settle_marks(run: Run) -> Dict[int, int]:
 
 
 def describe(entry: Dict) -> str:
-    """One group as the log and the audit entry show it."""
+    """One group, or one certificate revoked through a key ID, as the log and the audit entry show it."""
+    if entry.get('kind') == KEY_ID_KIND:
+        (row_id, source), = entry.get('revoked') or [[None, None]]
+        return (f"SSH CA '{entry.get('ca') or ''}' (#{entry.get('ssh_ca_id')}): certificate #{row_id} "
+                f"'{(entry.get('key_ids') or [''])[0]}' revoked with #{source}, of serial 0 and the same key ID: "
+                "the KRL revokes that key ID")
     held = ', '.join(f"#{i} '{k}'" for i, k in zip(entry.get('ids') or [], entry.get('key_ids') or []))
     revoked = ''.join(f"; #{i} revoked with #{s}, as the KRL already revoked it"
                       for i, s in entry.get('revoked') or [])
@@ -230,6 +253,12 @@ def report_marked_duplicates(app) -> int:
         for entry in entries:
             text = describe(entry)
             logger.warning("%s", text)
+            if entry.get('kind') == KEY_ID_KIND:
+                AuditService.log_action(action='ssh_cert_revoked', resource_type='ssh_certificate',
+                                        resource_id=str((entry.get('ids') or [''])[0]),
+                                        resource_name=(entry.get('key_ids') or [''])[0],
+                                        details=text, success=True, username='system')
+                continue
             AuditService.log_action(action=MARKED_ACTION, resource_type='ssh_ca',
                                     resource_id=str(entry.get('ssh_ca_id')), resource_name=entry.get('ca'),
                                     details=text, success=True, username='system')
