@@ -33,8 +33,11 @@ ha:
 redis:
   url: ""
 
-## Fully qualified domain name UCM serves on. Used for the self-signed UI
-## certificate and as the default base URL for issued AIA/CRL/OCSP URLs.
+## Fully qualified domain name UCM serves on. Used as the default base URL for issued
+## AIA/CRL/OCSP URLs, and for the self-signed UI certificate, which is generated at the first
+## start only (kept on the data volume): changing fqdn later does not change it. To replace it,
+## apply a certificate in Settings > HTTPS, or regenerate the
+## self-signed one there.
 fqdn: ucm.local
 
 ## Initial admin password (first boot only). Empty: the chart generates one into its
@@ -205,6 +208,14 @@ readinessProbe:
   periodSeconds: 15
   timeoutSeconds: 10
   failureThreshold: 3
+
+## Stopping a pod: preStop sleeps preStopSleepSeconds, the time the endpoints and kube-proxy take
+## to stop sending it connections, then UCM receives SIGTERM. The grace covers that sleep and UCM's
+## clean stop (at most 35 s: a running scheduled task gets 30 s, then the node releases its row);
+## the render refuses a grace shorter than preStopSleepSeconds + 35. 0 disables the preStop hook.
+lifecycle:
+  preStopSleepSeconds: 10
+terminationGracePeriodSeconds: 60
 
 serviceAccount:
   create: true

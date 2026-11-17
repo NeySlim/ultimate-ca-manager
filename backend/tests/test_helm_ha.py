@@ -139,7 +139,7 @@ def test_leaving_ha_keeps_the_encryption_key_pos():
 
 
 def test_secret_with_a_key_is_kept_on_uninstall_pos():
-    for args in (HA, ['--set', 'secrets.keyEncryptionKey=K']):
+    for args in (HA, ['--set', 'secrets.keyEncryptionKey=K'], ['--set', 'secrets.dbEncryptionKey=D']):
         ann = _docs(*args)['Secret']['metadata'].get('annotations', {})
         assert ann.get('helm.sh/resource-policy') == 'keep'
 
@@ -173,3 +173,29 @@ def test_ha_with_a_former_data_pvc_still_renders_it_kept_and_unmounted_pos(tmp_p
     assert pvcs[0]['metadata']['annotations']['helm.sh/resource-policy'] == 'keep'
     pod = next(d for d in docs if d['kind'] == 'Deployment')['spec']['template']['spec']
     assert pod['volumes'] == [{'name': 'data', 'emptyDir': {}}]
+
+
+@pytest.mark.parametrize('mode', [[], HA], ids=['single', 'ha'])
+def test_the_pod_leaves_the_service_before_sigterm(mode):
+    """preStop sleeps while the endpoints drop the pod, then UCM gets SIGTERM; the grace covers
+    the sleep and the clean stop (scheduled task 30 s + 5 s, the row released after it)."""
+    pod = _docs(*mode)['Deployment']['spec']['template']['spec']
+    container = pod['containers'][0]
+    assert container['lifecycle'] == {'preStop': {'exec': {'command': ['sleep', '10']}}}
+    assert pod['terminationGracePeriodSeconds'] == 60
+
+
+def test_the_stop_delays_are_values():
+    pod = _docs('--set', 'lifecycle.preStopSleepSeconds=20', '--set',
+                'terminationGracePeriodSeconds=90')['Deployment']['spec']['template']['spec']
+    assert pod['containers'][0]['lifecycle']['preStop']['exec']['command'] == ['sleep', '20']
+    assert pod['terminationGracePeriodSeconds'] == 90
+    pod = _docs('--set', 'lifecycle.preStopSleepSeconds=0')['Deployment']['spec']['template']['spec']
+    assert 'lifecycle' not in pod['containers'][0]
+
+
+def test_a_grace_shorter_than_the_clean_stop_is_refused_neg():
+    r = _helm('--set', 'lifecycle.preStopSleepSeconds=10', '--set', 'terminationGracePeriodSeconds=40',
+              check=False)
+    assert r.returncode == 1
+    assert 'terminationGracePeriodSeconds must be at least lifecycle.preStopSleepSeconds + 35' in r.stderr
