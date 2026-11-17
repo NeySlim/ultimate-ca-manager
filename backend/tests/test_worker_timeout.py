@@ -1,7 +1,6 @@
 """UCM_WORKER_TIMEOUT sets gunicorn's worker timeout: 120 s unset, 30 to 3600 s, and a value
 out of bounds or unreadable refuses the start with a message naming the variable and exit 78,
 the configuration refusal the systemd unit does not restart."""
-import ast
 import os
 import pathlib
 import subprocess
@@ -67,11 +66,8 @@ def test_the_bounds():
     assert (MINIMUM, DEFAULT, MAXIMUM) == (30, 120, 3600)
 
 
-def test_the_gunicorn_configuration_reads_it():
-    """Read without importing: the configuration runs gevent's monkey.patch_all."""
-    tree = ast.parse(CONFIG.read_text(encoding='utf-8'))
-    bound = [node.value for node in ast.walk(tree) if isinstance(node, ast.Assign)
-             and any(isinstance(t, ast.Name) and t.id == 'timeout' for t in node.targets)]
-    assert len(bound) == 1
-    call = bound[0]
-    assert isinstance(call, ast.Call) and getattr(call.func, 'id', None) == 'worker_timeout'
+@pytest.mark.parametrize('value, expected', [('45', 45), (None, 120)])
+def test_the_gunicorn_configuration_reads_it(tmp_path, value, expected):
+    run = _load_config(tmp_path, value)
+    assert run.returncode == 0, run.stderr
+    assert run.stdout.strip().splitlines()[-1] == f'timeout {expected}'
