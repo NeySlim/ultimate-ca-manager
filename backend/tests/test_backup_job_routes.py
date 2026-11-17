@@ -216,6 +216,7 @@ def test_a_held_backup_lock_fails_the_job_with_the_409_of_before(app, auth_clien
     assert not list(backup_dir.glob('ucm_backup_*'))
 
 
+@pytest.mark.slow    # the real wait, about 15 s
 def test_a_held_backup_lock_answers_409_within_the_route_wait(app, auth_client, backup_dir,
                                                               jobs_made):
     """Real constants: the job gives up on the lock before the route stops waiting for it."""
