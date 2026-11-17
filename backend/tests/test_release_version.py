@@ -293,6 +293,18 @@ def test_the_release_notes_step_names_the_published_files(tmp_path, v):
     assert f'https://github.com/o/r/blob/v{v}/CHANGELOG.md' in text
 
 
+@pytest.mark.parametrize('v', ['3.0', '3.0-rc1'])
+def test_every_link_of_the_release_notes_is_absolute(tmp_path, v):
+    """A release page resolves no relative link: each one names the repository, the docs at the tag."""
+    result, notes = _notes_step(tmp_path, v, '## [Unreleased]\n- x\n' if '-rc' in v else f'## [{v}] - d\n- x\n')
+    assert result.returncode == 0, result.stderr
+    links = re.findall(r'\]\(([^)]+)\)', notes.read_text())
+    assert links and all(link.startswith('https://') for link in links), links
+    for doc in ('docs/installation/README.md', 'UPGRADE.md'):
+        assert f'https://github.com/o/r/blob/v{v}/{doc}' in links, doc
+        assert (ROOT / doc).is_file(), doc
+
+
 @pytest.mark.parametrize('v,changelog', [('3.0', '## [Unreleased]\n- x\n'), ('3.0-rc1', '## [2.254] - d\n- x\n')])
 def test_the_release_notes_step_fails_without_its_section(tmp_path, v, changelog):
     result, notes = _notes_step(tmp_path, v, changelog)

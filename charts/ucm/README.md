@@ -1,6 +1,6 @@
 # UCM Helm Chart
 
-Deploy [Ultimate Certificate Manager](https://github.com/NeySlim/ultimate-ca-manager) (UCM) — a web-based Certificate Authority and PKI platform (ACME, SCEP, EST, OCSP, CRL/CDP) — into a Kubernetes cluster.
+Deploy [Ultimate Certificate Manager](https://github.com/NeySlim/ultimate-ca-manager) (UCM), a web-based Certificate Authority and PKI platform (ACME, SCEP, EST, OCSP, CRL/CDP), into a Kubernetes cluster.
 
 > Clusters can already *consume* UCM today via the cert-manager integration in `examples/kubernetes/cert-manager/`. This chart deploys UCM *itself* in-cluster.
 
@@ -14,6 +14,13 @@ helm install ucm ./charts/ucm \
 ```
 
 Then `kubectl -n ucm port-forward svc/ucm 8443:8443` and open <https://localhost:8443> (admin / your password).
+
+Each stable release also publishes the chart to `oci://ghcr.io/neyslim/charts/ucm`, versioned as the release in semver form (UCM 3.0 is chart `3.0.0`) and deploying the image of that release by default:
+
+```bash
+helm install ucm oci://ghcr.io/neyslim/charts/ucm --version 3.0.0 \
+  --namespace ucm --create-namespace --set fqdn=ucm.example.com
+```
 
 ## Prerequisites
 

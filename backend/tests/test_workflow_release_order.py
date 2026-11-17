@@ -19,8 +19,9 @@ FIPS = 'sha256:' + 'b' * 64
 RC_TAG = github_context('push', 'refs/tags/v3.0-rc1')
 STABLE_TAG = github_context('push', 'refs/tags/v3.0')
 BRANCH = github_context('workflow_dispatch', 'refs/heads/feature/x')
+REHEARSAL = {'version': '3.0', 'dry_run': True}
 STATUS = re.compile(r'\b(success|failure|cancelled|always)\s*\(')
-PUBLISHING = ('imagetools create', 'dockerhub-description', 'action-gh-release', 'gh release')
+PUBLISHING = ('imagetools create', 'dockerhub-description', 'action-gh-release', 'gh release', 'helm push')
 
 
 def _jobs():
@@ -49,7 +50,7 @@ def _smoke_caller(jobs):
 
 
 def _publishers(jobs):
-    """Jobs that tag an image, edit the Docker Hub page or write a GitHub release."""
+    """Jobs that tag an image, edit the Docker Hub page, write a GitHub release or push the chart."""
     out = set()
     for name, job in jobs.items():
         text = ' '.join(str(s.get('run', '')) + ' ' + str(s.get('uses', '')) for s in job.get('steps', []))
@@ -60,7 +61,7 @@ def _publishers(jobs):
 
 def test_the_publishing_jobs_are_the_expected_ones():
     # Guards the detection itself: a publisher it missed would escape the order tests below
-    assert _publishers(_jobs()) == {'docker-manifest', 'docker-fips-manifest', 'release'}
+    assert _publishers(_jobs()) == {'docker-manifest', 'docker-fips-manifest', 'release', 'publish-chart'}
 
 
 def test_every_publication_waits_for_the_smoke_and_the_smoke_for_none():
@@ -84,7 +85,7 @@ def test_a_red_fips_smoke_also_holds_the_standard_image():
         assert not job.get('continue-on-error') and 'if' not in job, name
 
 
-def _simulate(github, smoke_result):
+def _simulate(github, smoke_result, inputs=None):
     """Result of each job of a run, as GitHub decides it: a job whose `if` names no status function
     also needs every dependency to have succeeded. The build jobs succeed; the smoke gives `smoke_result`."""
     jobs = _jobs()
@@ -97,7 +98,9 @@ def _simulate(github, smoke_result):
             if any(n not in results for n in needs):
                 continue
             pending.remove(name)
-            ctx = {'github': github, 'needs': {n: {'result': results[n]} for n in needs}}
+            prerelease = 'true' if '-rc' in github['ref'] else 'false'
+            ctx = {'github': github, 'inputs': inputs or {},
+                   'needs': {n: {'result': results[n], 'outputs': {'prerelease': prerelease}} for n in needs}}
             cond = jobs[name].get('if')
             all_ok = all(results[n] == 'success' for n in needs)
             if cond is None or not STATUS.search(str(cond)):
@@ -113,8 +116,10 @@ def _simulate(github, smoke_result):
 @pytest.mark.parametrize('github', [RC_TAG, STABLE_TAG], ids=['rc', 'stable'])
 def test_a_green_smoke_publishes_after_it(github):
     results = _simulate(github, 'success')
-    for name in _publishers(_jobs()):
+    for name in _publishers(_jobs()) - {'publish-chart'}:
         assert results[name] == 'success', name
+    # The chart goes out with a stable release only
+    assert results['publish-chart'] == ('skipped' if github is RC_TAG else 'success')
     assert results['smoke-failed'] == 'skipped'
 
 
@@ -126,12 +131,14 @@ def test_a_red_smoke_publishes_nothing_and_says_what_is_left(github):
     assert results['smoke-failed'] == 'success'
 
 
-def test_a_branch_run_pushes_publishes_and_smokes_nothing():
-    results = _simulate(BRANCH, 'success')
+def test_a_rehearsal_smokes_and_reaches_the_publishing_jobs_whose_steps_it_skips():
+    """The steps that publish carry the guard (test_workflow_rehearsal.py); the chart job is all publication."""
+    results = _simulate(BRANCH, 'success', REHEARSAL)
     jobs = _jobs()
-    assert results['build-docker'] == results['build-docker-fips'] == 'success'
-    for name in _publishers(jobs) | {_smoke_caller(jobs), 'smoke-targets', 'smoke-failed'}:
-        assert results[name] == 'skipped', name
+    for name in _publishers(jobs) - {'publish-chart'} | {_smoke_caller(jobs), 'smoke-targets'}:
+        assert results[name] == 'success', name
+    assert results['publish-chart'] == results['smoke-failed'] == 'skipped'
+    assert _simulate(BRANCH, 'failure', REHEARSAL)['smoke-failed'] == 'skipped'
 
 
 def test_the_failure_message_names_what_is_left():
@@ -148,10 +155,10 @@ def test_the_failure_message_names_what_is_left():
 
 # ---- what the smoke receives -------------------------------------------------------------------
 
-def _call_inputs(github=RC_TAG):
+def _call_inputs(github=RC_TAG, inputs=None):
     jobs = _jobs()
     job = jobs[_smoke_caller(jobs)]
-    ctx = {'github': github, 'needs': {
+    ctx = {'github': {**github, 'sha': 'c' * 40}, 'inputs': inputs or {}, 'needs': {
         'build-deb': {'outputs': {'version': '3.0-rc1'}},
         'smoke-targets': {'outputs': {'image-digest': STD, 'fips-image-digest': FIPS}}}}
     return {k: (render(v, ctx) if isinstance(v, str) else v) for k, v in job['with'].items()}
@@ -162,7 +169,38 @@ def test_the_call_hands_over_the_digests_and_the_run_artifacts():
     assert inputs['version'] == '3.0-rc1'
     assert inputs['image-digest'] == STD and inputs['fips-image-digest'] == FIPS
     assert str(inputs['from-run']).lower() == 'true'
+    assert str(inputs['rehearsal']).lower() == 'false' and inputs['ref'] == ''
     assert not [v for v in inputs.values() if 'releases/download' in str(v) or ':3.0' in str(v)]
+
+
+def test_a_rehearsal_call_hands_over_its_commit_and_its_saved_images():
+    inputs = _call_inputs(BRANCH, REHEARSAL)
+    assert str(inputs['rehearsal']).lower() == 'true' and inputs['ref'] == 'c' * 40
+    checkout = load('release-smoke.yml')['jobs']['smoke-sqlite']['steps'][0]
+    assert render(checkout['with']['ref'], {'inputs': {**inputs, 'version': '3.0'}}) == 'c' * 40
+
+
+@pytest.mark.parametrize('job, digest, local', [
+    ('smoke-sqlite', STD, 'ucm-rehearsal:standard'), ('smoke-postgres', STD, 'ucm-rehearsal:standard'),
+    ('smoke-fips', FIPS, 'ucm-rehearsal:fips')])
+def test_a_rehearsal_call_boots_the_image_its_run_saved(tmp_path, job, digest, local):
+    proc, out = _resolve(tmp_path, job, {**_call_inputs(BRANCH, REHEARSAL), 'rehearsal': True})
+    assert proc.returncode == 0, proc.stderr
+    assert out['ref'] == local
+    steps = load('release-smoke.yml')['jobs'][job]['steps']
+    pull = next(s for s in steps if s.get('name') == 'Pull Docker image')
+    take = next(s for s in steps if s.get('name') == 'Take the image of the rehearsal')
+    load_ = next(s for s in steps if s.get('name') == 'Load the image of the rehearsal')
+    for inputs, rehearsal in (({'rehearsal': True}, True), ({'rehearsal': False}, False), ({}, False)):
+        assert bool(evaluate(pull['if'], {'inputs': inputs})) is not rehearsal
+        assert bool(evaluate(take['if'], {'inputs': inputs})) is rehearsal
+        assert bool(evaluate(load_['if'], {'inputs': inputs})) is rehearsal
+    prefix = 'fips' if job == 'smoke-fips' else 'std'
+    assert take['with']['name'] == f'{prefix}-image-amd64'
+    # The variant saved under that local tag is the one this job boots
+    build = 'build-docker-fips' if job == 'smoke-fips' else 'build-docker'
+    save = next(s for s in _jobs()[build]['steps'] if s.get('name') == 'Save the image for the rehearsal smoke')
+    assert f'docker tag "$REF" {local}' in save['run']
 
 
 def test_the_targets_job_reads_the_amd64_digests_of_both_variants():
