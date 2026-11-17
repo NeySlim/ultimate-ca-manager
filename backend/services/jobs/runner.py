@@ -21,6 +21,7 @@ RENEW_SECONDS = 30
 RECOVER_SECONDS = 15
 PURGE_SECONDS = 3600
 WAIT_POLL_SECONDS = 0.5
+CONCLUDE_RETRY_SECONDS = 2
 
 # Jobs run by a thread of this process: their end is awaited on the event, not the database
 _local_done = {}
@@ -131,6 +132,21 @@ def _response_of(outcome):
     return {'code': outcome.code, 'message': outcome.message, 'data': outcome.data}
 
 
+def _conclude_after_maintenance(app, conclude):
+    """A conclusion refused by a maintenance is tried again once it is lifted, lease kept:
+    its audit line is no write to make while a restore replaces the tables."""
+    from models import db
+    from services.cluster_maintenance import MaintenanceActive, blocks_writes
+    while True:
+        try:
+            if conclude() or not blocks_writes(app):
+                return
+        except MaintenanceActive:
+            db.session.rollback()
+        while blocks_writes(app):
+            time.sleep(CONCLUDE_RETRY_SECONDS)
+
+
 def run_job(app, row, executor, done=None):
     """Run a taken job to its one conclusion, whatever the run raises."""
     from models import db
@@ -166,9 +182,9 @@ def run_job(app, row, executor, done=None):
                 def _job_result_line(r, s, why):
                     return audit(r, s, why, details)
                 line = _job_result_line
-            store.conclude_job(db.session, job_id, state=state, reason=reason,
-                           from_states=(store.RUNNING,), now=jobs._now(), result=result,
-                           executor=executor, result_line=line)
+            _conclude_after_maintenance(app, lambda: store.conclude_job(
+                db.session, job_id, state=state, reason=reason, from_states=(store.RUNNING,),
+                now=jobs._now(), result=result, executor=executor, result_line=line))
         except Exception as e:
             logger.error(f"Background job {job_id} not concluded: {type(e).__name__}")
             db.session.rollback()

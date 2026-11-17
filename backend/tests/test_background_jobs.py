@@ -282,6 +282,33 @@ def test_a_run_concluded_elsewhere_never_concludes_twice(app, operation, created
     _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name)
 
 
+@pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
+def test_a_run_that_ends_during_a_maintenance_concludes_once_it_is_lifted(app, operation, created,
+                                                                        monkeypatch):
+    """Its conclusion waits for the maintenance, lease kept: the result is not lost."""
+    from services import cluster_maintenance
+    monkeypatch.setattr(runner, 'CONCLUDE_RETRY_SECONDS', 0.05)
+    view = cluster_maintenance.view_of(app)
+    held = threading.Event()
+    monkeypatch.setattr(view, 'active', held.is_set)
+    gate = Gate(monkeypatch, 3)
+    before = _audit_lines_in(app)
+    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
+    gate.wait()
+    held.set()
+    try:
+        gate.release.set()
+        assert not runner.join_local(job_id, 0.5), 'the run gave up its conclusion'
+        with app.app_context():
+            row = _row(job_id)
+            assert (row['state'], row['reason']) == ('running', None)
+    finally:
+        held.clear()
+    _assert_final(app, job_id, 'succeeded', 'done', before, operation.lines, name)
+    with app.app_context():
+        assert _row(job_id)['result'] is not None
+
+
 def test_the_conclusion_is_undone_when_its_audit_line_is_not_written(app, fake_types, created,
                                                                     monkeypatch):
     monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
