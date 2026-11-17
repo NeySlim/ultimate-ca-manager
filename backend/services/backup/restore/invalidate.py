@@ -259,6 +259,13 @@ def _purge_oidc_cache() -> None:
     clear_oidc_cache()
 
 
+def _purge_sso_sign_in_tests() -> None:
+    """OIDC and SAML sign-in tests: their owner and provider are rows of the content replaced."""
+    from models.sso import SSOSignInTest
+    SSOSignInTest.query.delete(synchronize_session=False)
+    db.session.commit()
+
+
 def _purge_smtp_oauth_tokens() -> None:
     """Access tokens obtained with the SMTP credentials that were replaced."""
     from services import smtp_oauth
@@ -296,6 +303,7 @@ CACHE_PURGES: Tuple[Tuple[str, Callable[[], None]], ...] = (
     ('ocsp_responses', _purge_ocsp_responses),
     ('certificate_fingerprints', _purge_fingerprint_cache),
     ('oidc_discovery', _purge_oidc_cache),
+    ('sso_sign_in_tests', _purge_sso_sign_in_tests),
     ('smtp_oauth_tokens', _purge_smtp_oauth_tokens),
     ('kerberos_contexts', _purge_kerberos_contexts),
     ('ca_request_chain', _purge_ca_request_caches),
