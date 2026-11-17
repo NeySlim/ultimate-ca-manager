@@ -53,7 +53,12 @@ def test_after_a_restore_on_a_every_node_holds_the_files_of_the_database(cluster
     name = r.json()['data']['filename']
     archive = admin.get(f'/api/v2/system/backup/{name}/download')
     assert archive.status_code == 200, archive.text[:300]
-    archived_https = (a.data_dir / 'https_cert.pem').read_bytes()
+    # The archive carries the HTTPS pair of the node that made it: the leader, whichever was asked
+    listed = admin.get('/api/v2/system/backups?per_page=100').json()['data']['items']
+    (maker,) = [i['node'] for i in listed if i['filename'] == name]
+    writer = next(node for node in cluster.nodes if node.name == maker)
+    other_node = b if writer is a else a
+    archived_https = (writer.data_dir / 'https_cert.pem').read_bytes()
 
     # The database moves on: KEPT holds another PEM on B, REMOVED is issued after the archive
     (kept_crt,) = cluster.sql('SELECT crt FROM certificates WHERE id = %s', (kept['id'],))[0]
@@ -64,7 +69,7 @@ def test_after_a_restore_on_a_every_node_holds_the_files_of_the_database(cluster
     (b.data_dir / 'certs' / kept_name).write_bytes(base64.b64decode(other_crt))
     removed = issue(on_b, ca['id'], 'removed.restore-files.ucm-ha.test')
     removed_name = next(n for n in _crt_files(b) if n.startswith('removed.restore-files'))
-    assert _served(b) != x509.load_pem_x509_certificate(archived_https)
+    assert _served(other_node) != x509.load_pem_x509_certificate(archived_https)
 
     # B's certificate directory becomes A's: a directory both nodes share
     b.stop()
