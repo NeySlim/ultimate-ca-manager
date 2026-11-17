@@ -18,7 +18,7 @@ from services.backup.errors import RestoreFilesUnwritable
 from services.backup.restore.plan import RestoreValidationError
 from services.backup.restore_report import safe_restore_audit_details
 from services.backup.restore_completion import (
-    maintenance_refusal, record_failure, record_request_refusal, record_restore, request_restart,
+    record_failure, record_request_refusal, record_restore, request_restart,
     restore_actor, restore_message, attach_restore_todo, preflight_v4, start_restore)
 from services.database_admin.lock import (
     MigrationBusyError,
@@ -185,10 +185,6 @@ def restore_backup():
         # A v4's password is checked here; the job, run by the scheduler process, does the rest
         preflight_v4(file.stream, password)
         return start_restore(file, password, audited_name, mode)
-    except cluster_maintenance.MaintenanceRefused as refused:
-        logger.warning(f"Settings restore refused: {refused}")
-        record_request_refusal(audited_name, 'the cluster maintenance could not be held')
-        return maintenance_refusal(refused)
     except FipsRestricted:
         record_failure('system_restore', audited_name, 'Restore refused: not allowed in FIPS mode')
         raise  # the app maps it to its problem type, message unchanged

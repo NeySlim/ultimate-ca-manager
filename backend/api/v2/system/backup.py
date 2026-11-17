@@ -46,7 +46,6 @@ logger = logging.getLogger(__name__)
 from services.backup.restore_completion import (
     record_failure as _audit_failure,
     record_request_refusal,
-    maintenance_refusal,
     record_restore as _safe_audit_log,
     request_restart as _request_restart_after_restore,
     restore_actor as _actor,
@@ -494,10 +493,6 @@ def restore_backup():
         # A v4's password is checked here; the job, run by the scheduler process, does the rest
         preflight_v4(file.stream, password)
         return start_restore(file, password, audited_name, mode)
-    except cluster_maintenance.MaintenanceRefused as refused:
-        logger.warning('Restore refused: %s', refused)
-        record_request_refusal(audited_name, 'the cluster maintenance could not be held')
-        return maintenance_refusal(refused)
     except FipsRestricted:
         _audit_failure('system_restore', audited_name, 'Restore refused: not allowed in FIPS mode')
         raise  # the application maps it to its problem type, message unchanged
