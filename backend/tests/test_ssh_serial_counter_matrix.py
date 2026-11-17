@@ -429,9 +429,11 @@ def test_a_restored_pair_is_revoked_as_the_krl_revokes_it(installation, mode, pa
     for row in held:
         row['serial'] = serial
     _forget(ca_id, [first.serial, second.serial])
-    _restore(master, payload, mode)
+    results = _restore(master, payload, mode)
     db.session.remove()
     _assert_pair(_holders(_ca_by_refid(refid), serial), pair)
+    # The restore says how many certificates it revoked with their serial
+    assert results['ssh_revoked_with_serial'] == (1 if pair in ('older', 'newer') else 0)
 
 
 @pytest.mark.parametrize('holder', ('valid', 'revoked'))

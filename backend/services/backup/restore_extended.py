@@ -439,7 +439,8 @@ class RestoreExtendedMixin:
                 sc.serial_duplicate = True
 
         db.session.flush()
-        SSHSerials.settle_marks(SSHSerials.session_run)
+        aligned = SSHSerials.settle_marks(SSHSerials.session_run)
+        results['ssh_revoked_with_serial'] = len(aligned)
 
     def _restore_microsoft_cas(self, backup_data: Dict, results: Dict,
                                plan: Optional[RestorePlan] = None) -> None:

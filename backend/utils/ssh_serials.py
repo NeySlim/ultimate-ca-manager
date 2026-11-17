@@ -112,12 +112,12 @@ def mark_duplicates(run: Run, aligned: Optional[Dict[int, int]] = None) -> List[
     return groups
 
 
-def settle_marks(run: Run) -> None:
+def settle_marks(run: Run) -> Dict[int, int]:
     """The oldest holder of each serial under the index, every other one marked; marks first, so
-    no statement ever puts two holders under the index."""
+    no statement ever puts two holders under the index. Then ``align_revocations``, returned."""
     mark_duplicates(run)
     run(f'UPDATE ssh_certificates SET {FLAG} = FALSE WHERE {FLAG} AND NOT {_OLDER}', {})
-    align_revocations(run)
+    return align_revocations(run)
 
 
 def describe(entry: Dict) -> str:
