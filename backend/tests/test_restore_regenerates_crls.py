@@ -227,6 +227,11 @@ def test_both_restore_routes_name_an_authority_left_without_a_crl(app, auth_clie
     import services.backup.restore.invalidate as invalidate
     monkeypatch.setattr(invalidate, 'invalidate_after_restore',
                         lambda *a, **k: {'crls_regenerated': [], 'crls_failed': ['Unsigned HSM CA']})
+    from tests.restore_job_support import sessions_kept
+    sessions_kept(monkeypatch)  # the restore job's own sessions step
+    # The restore job's CRL step
+    monkeypatch.setattr(invalidate, 'regenerate_crls_summary',
+                        lambda: {'crls_regenerated': [], 'crls_failed': ['Unsigned HSM CA']})
     monkeypatch.setattr('utils.service_manager.restart_service', lambda *a, **k: (False, 'no'))
     response = _upload(auth_client, route)
     assert response.status_code == 200, response.get_json()

@@ -66,7 +66,9 @@ class TestAMigrationHoldsBothRoutes:
         def busy(*args, **kwargs):
             raise MigrationBusyError('A migration is running.')
 
-        for module in ('api.v2.system.backup', 'api.v2.settings.backup'):
+        # The routes, and the restore job that takes the lock for them
+        for module in ('api.v2.system.backup', 'api.v2.settings.backup',
+                       'services.database_admin.lock'):
             loaded = importlib.import_module(module)
             if hasattr(loaded, 'database_migration_lock'):
                 monkeypatch.setattr(loaded, 'database_migration_lock', busy)
@@ -136,6 +138,8 @@ class TestAnArchiveThatCarriesNothingChangesNothing:
         import services.backup.restore.invalidate as invalidate
         monkeypatch.setattr(invalidate, 'invalidate_after_restore',
                             lambda *a, **k: revoked.append('revoked'))
+        from tests.restore_job_support import sessions_kept
+        sessions_kept(monkeypatch)  # the restore job's own sessions step
 
         response = _upload(auth_client, route)
 
@@ -178,6 +182,8 @@ class TestBothRoutesSayWhatTheArchiveGotWrong:
         import services.backup.restore.invalidate as invalidate
         monkeypatch.setattr(invalidate, 'invalidate_after_restore',
                             lambda *a, **k: None)
+        from tests.restore_job_support import sessions_kept
+        sessions_kept(monkeypatch)  # the restore job's own sessions step
 
         response = _upload(auth_client, route)
         body = response.data.lower()

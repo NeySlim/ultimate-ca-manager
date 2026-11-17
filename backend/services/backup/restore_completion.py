@@ -107,3 +107,75 @@ def maintenance_refusal(refused):
     response = jsonify(body)
     response.mimetype = PROBLEM_CONTENT_TYPE
     return response, 409
+
+
+def preflight_v4(stream, password) -> None:
+    """A v4 archive's password, header and schema, checked in the request (cheap: its
+    header and first chunk); an older archive is checked by the job, which decrypts it."""
+    from services.backup import container
+    from services.backup_service import BackupService
+    start = stream.tell()
+    head = stream.read(container.HEADER_PREFIX_SIZE)
+    stream.seek(start)
+    if container.format_version_of(head) == container.FORMAT_VERSION_V4:
+        BackupService().check_archive_opens(stream, password)
+
+
+def start_restore(file, password, audited_name, mode='replace'):
+    """Both restore routes: the archive in the job's file, then the job, then the bounded
+    wait. A start refused (slot held, maintenance) removes the file at once."""
+    import uuid
+    from api.v2.system.jobs import busy_response, started_response, suspended_response
+    from models import db
+    from services import jobs
+    from services.jobs import restore as restore_job
+    from services.jobs import store
+    from utils.response import error_response
+    job_id = str(uuid.uuid4())
+    try:
+        name = restore_job.write_archive(job_id, file.stream)
+    except OSError as exc:
+        logger.error("Restore: the upload could not be stored: %s", type(exc).__name__)
+        record_failure('system_restore', audited_name,
+                       'Restore failed: the upload could not be stored')
+        return error_response('The uploaded archive could not be stored on this server', 500)
+    try:
+        jobs.start_job(restore_job.KIND, params=restore_job.params_of(audited_name, file.filename, mode),
+                       secret=password, file_name=name, job_id=job_id)
+    except jobs.JobsSuspended:
+        store.purge_file(name)
+        return suspended_response()
+    except jobs.SlotBusy as busy:
+        store.purge_file(name)
+        record_request_refusal(audited_name, 'a backup or another restore is running')
+        return busy_response(busy)
+    except BaseException:
+        store.purge_file(name)
+        raise
+    # No transaction of this request stays open while the restore runs
+    db.session.rollback()
+    response = started_response(job_id)
+    _forget_revoked_session(job_id)
+    return response
+
+
+def _forget_revoked_session(job_id):
+    """The answer of a restore that revoked every session never writes the caller's back."""
+    from flask import has_request_context, session
+    from services import jobs
+    from services.jobs import restore as restore_job
+    if not has_request_context():
+        return
+    try:
+        row = jobs.get_job(job_id)
+    except Exception:
+        return
+    if row is None or row['phase'] not in restore_job.REVOKED or not session:
+        return
+    from auth.session_epoch import holds_current_epoch
+    try:
+        stale = not holds_current_epoch(session)
+    except Exception:
+        stale = True
+    if stale:
+        session.clear()

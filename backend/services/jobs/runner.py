@@ -129,7 +129,10 @@ class JobContext:
 
 
 def _response_of(outcome):
-    return {'code': outcome.code, 'message': outcome.message, 'data': outcome.data}
+    response = {'code': outcome.code, 'message': outcome.message, 'data': outcome.data}
+    if outcome.problem_type:
+        response['problem_type'] = outcome.problem_type
+    return response
 
 
 def _conclude_after_maintenance(app, conclude):
@@ -139,8 +142,10 @@ def _conclude_after_maintenance(app, conclude):
     from services.cluster_maintenance import MaintenanceActive, blocks_writes
     while True:
         try:
-            if conclude() or not blocks_writes(app):
-                return
+            if conclude():
+                return True
+            if not blocks_writes(app):
+                return False
         except MaintenanceActive:
             db.session.rollback()
         while blocks_writes(app):
@@ -161,12 +166,18 @@ def run_job(app, row, executor, done=None):
                 if jt is None:
                     raise RuntimeError(f'unknown job kind {kind}')
                 outcome = jt.run(JobContext(app, row, executor))
+                if outcome.concluded:
+                    return  # the run concluded the job itself, audit line included
                 ok = outcome.code < 400
                 state = store.SUCCEEDED if ok else store.FAILED
-                reason = store.DONE if ok else store.REFUSED
+                # A 4xx is the run refusing; a 5xx is an error, whoever caught it
+                reason = (store.DONE if ok else store.ERROR if outcome.code >= 500
+                          else store.REFUSED)
                 result, details = _response_of(outcome), outcome.audit_details
+                resource = outcome.audit_resource
             except jobs.JobCancelled:
                 state, reason, result, details = store.CANCELLED, store.CANCELLED_REASON, None, None
+                resource = None
             except store.JobLost:
                 logger.warning(f"Background job {job_id} was concluded elsewhere while it ran")
                 return
@@ -174,17 +185,29 @@ def run_job(app, row, executor, done=None):
                 logger.error(f"Background job {job_id} ({kind}) failed: {type(e).__name__}",
                              exc_info=isinstance(e, Exception))
                 state, reason, result, details = store.FAILED, store.ERROR, None, None
+                resource = None
                 if not isinstance(e, Exception):
                     raised = e
             db.session.rollback()
             line = None
             if audit is not None:
                 def _job_result_line(r, s, why):
-                    return audit(r, s, why, details)
+                    return audit(r, s, why, details, resource)
                 line = _job_result_line
-            _conclude_after_maintenance(app, lambda: store.conclude_job(
-                db.session, job_id, state=state, reason=reason, from_states=(store.RUNNING,),
-                now=jobs._now(), result=result, executor=executor, result_line=line))
+            # A run that failed past a resumable phase (a committed restore) is the recovery's
+            past = tuple(jt.resumable_phases) if jt is not None else ()
+            unfinished = (store.T.c.phase.is_(None) | store.T.c.phase.notin_(past),) if past else ()
+
+            def conclude(result_line):
+                return store.conclude_job(
+                    db.session, job_id, state=state, reason=reason, from_states=(store.RUNNING,),
+                    now=jobs._now(), result=result, executor=executor, result_line=result_line,
+                    where=unfinished)
+            if not _conclude_after_maintenance(app, lambda: conclude(line)) and line is not None:
+                # The result stands without its line rather than hold the slot until a restart
+                # (a no-op when another actor concluded the job meanwhile)
+                if _conclude_after_maintenance(app, lambda: conclude(None)):
+                    logger.error(f"Background job {job_id} concluded without its result line")
         except Exception as e:
             logger.error(f"Background job {job_id} not concluded: {type(e).__name__}")
             db.session.rollback()
@@ -289,12 +312,15 @@ class JobRunner:
             # taken here before it: a take needs the lead, and recovery comes first in a pass)
             all_running = not ha and not self._recovered
             store.recover_orphans(db.session, now=jobs._now(), all_running=all_running,
-                          audit_for=jobs.audit_writer, mine=finished)
+                          audit_for=jobs.audit_writer, mine=finished, resume_for=jobs.resumer,
+                          executor=self.executor)
             self._recovered, self._last_recover = True, now_mono
         # Each node sweeps its own disk, leader or not: a job concluded by another node
         # purged that node's disk only. Unknown files stay after the first pass (uploads).
         if not self._swept or now_mono - self._last_files >= RECOVER_SECONDS:
             store.sweep_job_files(db.session, keep_unknown=self._swept)
+            from services.jobs import restore as restore_job
+            restore_job.sweep_state(db.session)
             db.session.rollback()
             self._swept, self._last_files = True, now_mono
         if leads and now_mono - self._last_purge >= PURGE_SECONDS:

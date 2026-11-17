@@ -1062,6 +1062,9 @@ def create_app(config_name=None):
     # checks an identity; the certificate hook reads the epoch for itself
     from auth.session_epoch import remember_request_epoch
     app.before_request(remember_request_epoch)
+    # A restore run by another process advanced the epoch: this one drops its caches once
+    from services.backup.restore.invalidate import refresh_caches_before_request
+    app.before_request(refresh_caches_before_request)
     # Before the CSRF check registered below: a failed load is retried before a token is checked
     app.before_request(reload_if_pending)
     

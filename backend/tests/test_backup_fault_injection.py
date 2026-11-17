@@ -438,6 +438,11 @@ class TestTheFilesAndTheDatabaseAgreeAboutTheCommit:
             invalidate, '_revoke_database_sessions',
             lambda: (_ for _ in ()).throw(
                 RuntimeError('the session table is unreachable')))
+        # The restore job's sessions step
+        monkeypatch.setattr(
+            invalidate, 'revoke_sessions_with',
+            lambda claim: (_ for _ in ()).throw(
+                RuntimeError('the session table is unreachable')))
 
         response = _restore_through_the_route(auth_client, blob)
 

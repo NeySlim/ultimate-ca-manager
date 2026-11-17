@@ -10,6 +10,7 @@ import logging
 from flask import g, request
 
 from api.v2.system import bp
+from models import db
 from auth.unified import has_permission, require_auth
 from services import jobs
 from utils.response import error_response, success_response
@@ -52,9 +53,9 @@ def _with_headers(response, **headers):
     return body, status
 
 
-def accepted(row, applied=None):
+def accepted(row, applied=None, extra=None):
     response = success_response(
-        data={'job': jobs.public_view(row, with_result=False)},
+        data={'job': jobs.public_view(row, with_result=False), **(extra or {})},
         message='Accepted: the job runs in the background', status=202)
     headers = {'Location': location(row['id'])}
     if applied:
@@ -62,15 +63,20 @@ def accepted(row, applied=None):
     return _with_headers(response, **headers)
 
 
-def final_response(row):
-    """The answer of a finished job: the route's own response, or why there is none."""
+def final_response(row, extra=None):
+    """The answer of a finished job: the route's own response, or why there is none.
+    ``extra`` joins the data of a success only (a generated password, never stored)."""
     import json
     result = json.loads(row['result']) if row['result'] else None
     if result is not None:
         if result['code'] < 400:
+            data = result['data']
+            if extra and isinstance(data, dict):
+                data = {**data, **extra}
             return _with_headers(success_response(
-                data=result['data'], message=result['message'], status=result['code']))
-        return _with_headers(error_response(result['message'], result['code']))
+                data=data, message=result['message'], status=result['code']))
+        return _with_headers(error_response(result['message'], result['code'],
+                                            problem_type=result.get('problem_type')))
     jt = jobs.job_type(row['kind'])
     reason = row['reason'] or 'error'
     message = (jt.messages.get(reason) if jt else None) or _FINAL_MESSAGES.get(reason, 'The job failed')
@@ -98,8 +104,9 @@ def suspended_response():
     return response, 503
 
 
-def started_response(job_id):
-    """What a starting route answers for ``job_id``: bounded wait, then 200 or 202."""
+def started_response(job_id, extra=None):
+    """What a starting route answers for ``job_id``: bounded wait, then 200 or 202.
+    ``extra`` is data the route holds in memory only, given once in this answer."""
     prefs = parse_prefer(request.headers.getlist('Prefer'))
     asynchronous = bool(prefs.get('respond-async'))
     wait = prefs.get('wait')
@@ -110,11 +117,11 @@ def started_response(job_id):
         # respond-async alone: 202 at once; with wait=N, after at most N seconds (RFC 7240 §4.1)
         seconds = 0 if asynchronous else jobs.JOB_WAIT_SECONDS
     if asynchronous and seconds == 0:
-        return accepted(jobs.get_job(job_id), applied='respond-async')
+        return accepted(jobs.get_job(job_id), applied='respond-async', extra=extra)
     row = jobs.wait_for_job(job_id, seconds)
     if row is not None and row['state'] in jobs.FINAL_STATES:
-        return final_response(row)
-    return accepted(row, applied='respond-async' if asynchronous else None)
+        return final_response(row, extra)
+    return accepted(row, applied='respond-async' if asynchronous else None, extra=extra)
 
 
 def _readable(kind):
@@ -146,10 +153,27 @@ def _visible(job_id):
     return row
 
 
+def _held_view(job_id):
+    """A restore's view from its local state, when its SQLite transaction holds the database."""
+    from services.jobs import restore as restore_job
+    view = restore_job.local_view(job_id)
+    if view is None or not _readable(view.get('kind')):
+        return None
+    return view
+
+
 @bp.route('/api/v2/system/jobs/<job_id>', methods=['GET'])
 @require_auth()
 def get_job(job_id):
-    row = _visible(job_id)
+    from sqlalchemy.exc import OperationalError
+    try:
+        row = _visible(job_id)
+    except OperationalError:
+        db.session.rollback()
+        view = _held_view(job_id)
+        if view is None:
+            raise
+        return success_response(data=view)
     if row is None:
         return error_response('Job not found', 404)
     return success_response(data=jobs.public_view(row))
@@ -159,7 +183,12 @@ def get_job(job_id):
 @require_auth()
 def cancel_job(job_id):
     """A pending job ends at once; a running one stops at its next check."""
-    row = _visible(job_id)
+    from sqlalchemy.exc import OperationalError
+    try:
+        row = _visible(job_id)
+    except OperationalError:
+        db.session.rollback()
+        row = _held_view(job_id)
     if row is None:
         return error_response('Job not found', 404)
     try:
@@ -169,6 +198,12 @@ def cancel_job(job_id):
         return error_response('Job not cancelled', 500)
     if outcome == 'final':
         return error_response('The job has already ended', 409)
-    row = jobs.get_job(job_id)
+    if outcome == 'too_late':
+        from services.jobs.restore import TOO_LATE
+        return error_response(TOO_LATE, 409)
     message = 'Job cancelled' if outcome == 'cancelled' else 'Cancellation requested'
+    view = _held_view(job_id)
+    if view is not None:
+        return success_response(data={**view, 'cancel_requested': True}, message=message)
+    row = jobs.get_job(job_id)
     return success_response(data=jobs.public_view(row), message=message)
