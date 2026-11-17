@@ -4,6 +4,12 @@ const RETRY_MIN_S = 2
 const RETRY_MAX_S = 30
 const RETRY_DEFAULT_S = 10
 
+// No answer at all, or a proxy's answer for a node that is down: what a restart looks like
+export const NO_ANSWER_RETRY_S = 5
+export const NO_ANSWER_TRIES = 12
+export const isNoAnswer = (error) =>
+  [0, 502, 503, 504].includes(error?.status) && error?.data?.code !== 'maintenance'
+
 // Known by its RFC 9457 extension member, never by its text
 export const isMaintenanceRefusal = (error) => error?.status === 503 && error?.data?.code === 'maintenance'
 

@@ -91,6 +91,8 @@ describe('the maintenance refusal', () => {
 describe('LoginPage during a maintenance', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Answers queued by a test never reach the next one
+    for (const call of [s.loginPassword, s.login2FA, s.ldapLogin, s.authenticateWebAuthn]) call.mockReset()
     vi.useFakeTimers({ shouldAdvanceTime: true })
     try { localStorage.clear() } catch { /* ignore */ }
     s.detectMethods.mockResolvedValue({ password: true })
@@ -181,6 +183,79 @@ describe('LoginPage during a maintenance', () => {
     await waitFor(() => expect(s.navigate).toHaveBeenCalledWith('/dashboard'))
   })
 
+  it('stops trying when the user goes back from the second factor', async () => {
+    s.loginPassword.mockResolvedValue({ requires_2fa: true, methods: ['totp'] })
+    s.login2FA.mockRejectedValue(refused(2))
+    renderLogin()
+    await submitPassword()
+    await screen.findByText('auth.twoFactorTitle')
+    const code = document.querySelector('input[autocomplete="one-time-code"]') || screen.getAllByRole('textbox').pop()
+    fireEvent.change(code, { target: { value: '123456' } })
+    fireEvent.submit(code.closest('form'))
+    await screen.findByRole('status')
+    fireEvent.click(screen.getByText('common.back'))
+    expect(screen.queryByRole('status')).toBeNull()
+    await tick(4000)
+    expect(s.login2FA).toHaveBeenCalledTimes(1)
+    expect(s.showError).not.toHaveBeenCalled()
+  })
+
+  it.each([0, 502, 504])('keeps trying while the node restarts (%s), then signs in', async (status) => {
+    const down = Object.assign(new Error('Network error'), { status })
+    s.loginPassword.mockRejectedValueOnce(refused(2)).mockRejectedValueOnce(down).mockRejectedValueOnce(down)
+      .mockResolvedValue({ user: { username: 'alice' } })
+    renderLogin()
+    await submitPassword()
+    await screen.findByRole('status')
+    await tick(2500)
+    await waitFor(() => expect(s.loginPassword).toHaveBeenCalledTimes(2))
+    // No answer from a node that restarts is still the restore: the banner stays, no error shown
+    expect(await screen.findByRole('status')).toHaveTextContent('auth.maintenanceRestoring')
+    expect(s.showError).not.toHaveBeenCalled()
+    await tick(25000)
+    await waitFor(() => expect(s.navigate).toHaveBeenCalledWith('/dashboard'))
+    expect(s.loginPassword).toHaveBeenCalledTimes(4)
+  })
+
+  it('gives up after a minute without an answer, and shows the error', async () => {
+    const down = Object.assign(new Error('Network error'), { status: 0 })
+    s.loginPassword.mockRejectedValueOnce(refused(2)).mockRejectedValue(down)
+    renderLogin()
+    await submitPassword()
+    await screen.findByRole('status')
+    await tick(90000)
+    await waitFor(() => expect(s.showError).toHaveBeenCalledWith('Network error'))
+    expect(screen.queryByRole('status')).toBeNull()
+    const calls = s.loginPassword.mock.calls.length
+    await tick(30000)
+    expect(s.loginPassword).toHaveBeenCalledTimes(calls)
+  })
+
+  it('counts the tries without an answer afresh once the server answers again', async () => {
+    const down = Object.assign(new Error('Network error'), { status: 0 })
+    for (let n = 0; n < 2; n += 1) {
+      s.loginPassword.mockRejectedValueOnce(refused(2))
+      for (let lost = 0; lost < 11; lost += 1) s.loginPassword.mockRejectedValueOnce(down)
+    }
+    s.loginPassword.mockResolvedValue({ user: { username: 'alice' } })
+    renderLogin()
+    await submitPassword()
+    await tick(125000)
+    await waitFor(() => expect(s.navigate).toHaveBeenCalledWith('/dashboard'))
+    expect(s.showError).not.toHaveBeenCalled()
+    expect(s.loginPassword).toHaveBeenCalledTimes(25)
+  })
+
+  it('takes no answer for a failure when no maintenance was seen', async () => {
+    s.loginPassword.mockRejectedValue(Object.assign(new Error('Network error'), { status: 0 }))
+    renderLogin()
+    await submitPassword()
+    await waitFor(() => expect(s.showError).toHaveBeenCalledWith('Network error'))
+    expect(screen.queryByRole('status')).toBeNull()
+    await tick(15000)
+    expect(s.loginPassword).toHaveBeenCalledTimes(1)
+  })
+
   it('sends the password in the field when it tries again, not the refused one', async () => {
     s.loginPassword.mockRejectedValueOnce(refused(2)).mockRejectedValueOnce(refused(2)).mockResolvedValue({ user: { username: 'alice' } })
     renderLogin()
@@ -236,6 +311,39 @@ describe('LoginPage during a maintenance', () => {
     await waitFor(() => expect(s.navigate).toHaveBeenCalledWith('/dashboard'))
     expect(peak).toBe(1)
     expect(s.loginPassword).toHaveBeenCalledTimes(2)
+  })
+
+  it('takes no answer for a failure once the user signs in by hand', async () => {
+    s.loginPassword.mockRejectedValueOnce(refused(30)).mockRejectedValue(Object.assign(new Error('Network error'), { status: 0 }))
+    renderLogin()
+    await submitPassword()
+    await screen.findByRole('status')
+    fireEvent.click(screen.getByText('auth.login'))
+    await waitFor(() => expect(s.showError).toHaveBeenCalledWith('Network error'))
+    expect(screen.queryByRole('status')).toBeNull()
+    await tick(10000)
+    expect(s.loginPassword).toHaveBeenCalledTimes(2)
+  })
+
+  it('tries a security key again from the button only, never by itself', async () => {
+    s.detectMethods.mockResolvedValue({ password: true, webauthn: true })
+    s.loginPassword.mockRejectedValueOnce(new Error('Invalid credentials'))
+    s.authenticateWebAuthn.mockRejectedValueOnce(refused(2))
+      .mockRejectedValue(Object.assign(new Error('Network error'), { status: 0 }))
+    renderLogin()
+    await submitPassword()
+    await waitFor(() => expect(s.showError).toHaveBeenCalledWith('Invalid credentials'))
+    fireEvent.click(screen.getByText('auth.useSecurityKey'))
+    const banner = await screen.findByRole('status')
+    expect(banner).not.toHaveTextContent('auth.maintenanceRetryIn')
+    await tick(5000)
+    expect(s.authenticateWebAuthn).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByText('auth.retryNow'))
+    await waitFor(() => expect(s.authenticateWebAuthn).toHaveBeenCalledTimes(2))
+    // The key needs a touch: no answer ends the wait, it is not tried again by itself
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
+    await tick(15000)
+    expect(s.authenticateWebAuthn).toHaveBeenCalledTimes(2)
   })
 
   it('makes no planned attempt while a security key sign-in waits', async () => {

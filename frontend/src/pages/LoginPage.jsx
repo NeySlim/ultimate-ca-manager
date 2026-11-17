@@ -21,7 +21,9 @@ import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
 import { cn } from '../lib/utils'
 import { safeNext } from '../navigation/safeNext'
-import { isMaintenanceRefusal, isRestoreMaintenance, maintenanceRetrySeconds } from './loginMaintenance'
+import {
+  NO_ANSWER_RETRY_S, NO_ANSWER_TRIES, isMaintenanceRefusal, isNoAnswer, isRestoreMaintenance, maintenanceRetrySeconds,
+} from './loginMaintenance'
 
 const STORAGE_KEY = 'ucm_last_username'
 const STORAGE_AUTH_METHOD_KEY = 'ucm_last_auth_method'
@@ -69,6 +71,8 @@ export default function LoginPage() {
   // { restoring, seconds }: seconds counts down to the next attempt, null when none is planned
   const [maintenance, setMaintenance] = useState(null)
   const maintenanceRetry = useRef(null)
+  // The maintenance waited out, kept across its planned attempts: { restoring, lost }
+  const outage = useRef(null)
   const latestAttempt = useRef({})
   const { login, sessionChecked } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
@@ -325,6 +329,7 @@ export default function LoginPage() {
 
   const clearMaintenance = () => {
     maintenanceRetry.current = null
+    outage.current = null
     setMaintenance(null)
   }
 
@@ -334,7 +339,16 @@ export default function LoginPage() {
     if (isMaintenanceRefusal(error)) {
       setRateLimit(null)
       maintenanceRetry.current = again
+      outage.current = { restoring: isRestoreMaintenance(error), lost: 0 }
       setMaintenance({ restoring: isRestoreMaintenance(error), seconds: auto ? maintenanceRetrySeconds(error) : null })
+      return true
+    }
+    // A node that restarts at the end of the maintenance gives no answer: still waited out, a while
+    const kept = outage.current
+    if (kept && auto && isNoAnswer(error) && kept.lost < NO_ANSWER_TRIES) {
+      maintenanceRetry.current = again
+      outage.current = { ...kept, lost: kept.lost + 1 }
+      setMaintenance({ restoring: kept.restoring, seconds: NO_ANSWER_RETRY_S })
       return true
     }
     clearMaintenance()
@@ -345,8 +359,12 @@ export default function LoginPage() {
   const retryNow = () => {
     if (loading) return
     const again = maintenanceRetry.current
+    const kept = outage.current
     setMaintenance(m => (m ? { ...m, seconds: null } : m))
-    if (again) latestAttempt.current[again]()
+    if (!again) return
+    latestAttempt.current[again]()
+    // The attempt dropped the wait as any attempt does: this one belongs to it
+    outage.current = kept
   }
 
   // The countdown of a planned attempt; one attempt at zero, which plans the next if refused again
@@ -412,7 +430,6 @@ export default function LoginPage() {
       if (userData.requires_2fa) {
         twoFactorFrom.current = 'password'
         setRateLimit(null)
-        clearMaintenance()
         setStep('2fa')
         setTwoFactorMethods(userData.methods || ['totp'])
         setTotpCode('')
@@ -433,7 +450,7 @@ export default function LoginPage() {
       navigate(landing)
     } catch (error) {
       if (!noteRefusal(error, 'password')) showError(error.message || t('auth.invalidCredentials'))
-      if (!isMaintenanceRefusal(error)) setPassword('')  // kept for the next attempt
+      if (!maintenanceRetry.current) setPassword('')  // kept while a maintenance is waited out
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -458,7 +475,7 @@ export default function LoginPage() {
       navigate(landing)
     } catch (error) {
       if (!noteRefusal(error, 'totp')) showError(error.message || t('auth.invalidTotpCode'))
-      if (!isMaintenanceRefusal(error)) setTotpCode('')
+      if (!maintenanceRetry.current) setTotpCode('')
     } finally {
       setLoading(false)
     }
@@ -525,7 +542,6 @@ export default function LoginPage() {
       if (responseData.requires_2fa) {
         twoFactorFrom.current = 'ldap'
         setRateLimit(null)
-        clearMaintenance()
         setStep('2fa')
         setTwoFactorMethods(responseData.methods || ['totp'])
         setTotpCode('')
@@ -539,7 +555,7 @@ export default function LoginPage() {
       navigate(landing)
     } catch (error) {
       if (!noteRefusal(error, 'ldap')) showError(error.message || t('auth.ldapFailed'))
-      if (!isMaintenanceRefusal(error)) setPassword('')
+      if (!maintenanceRetry.current) setPassword('')
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -973,7 +989,7 @@ export default function LoginPage() {
             )}
 
             <button
-              onClick={() => { setStep('auth'); setTotpCode(''); setAuthMethod('password') }}
+              onClick={() => { clearMaintenance(); setStep('auth'); setTotpCode(''); setAuthMethod('password') }}
               className="flex items-center justify-center gap-2 text-sm text-text-secondary hover:text-text-primary cursor-pointer transition-colors py-2 w-full"
             >
               <ArrowLeft size={16} />
