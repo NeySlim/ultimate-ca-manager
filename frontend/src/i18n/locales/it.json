@@ -2798,6 +2798,15 @@
     "chooseCertificate": "Scegli un certificato...",
     "color": "Colore",
     "createAndDownload": "Crea e scarica",
+    "backupInProgress": "Backup in progress",
+    "backupStarting": "The backup is starting",
+    "backupProgress": "Exporting part {{done}} of {{total}}",
+    "backupRunsInBackground": "The backup runs on the server: closing this window does not stop it, and Create Backup shows it again.",
+    "backupCancel": "Cancel the backup",
+    "backupCancelFailed": "The backup could not be cancelled",
+    "backupCancelled": "The backup was cancelled: no archive was kept",
+    "backupLost": "The backup stopped before the end: start it again",
+    "backupReady": "The archive {{filename}} is ready",
     "createBackup": "Crea backup",
     "createBackupDesc": "Crea un backup contenente tutti i dati (database, certificati, CA, utenti, configurazione). Il backup sarà crittografato con la tua password.",
     "creating": "Creazione in corso...",
@@ -4842,6 +4851,7 @@
     "success": {
       "backup": {
         "created": "Backup creato e scaricato con successo",
+        "ready": "Backup created: download it from the dialog",
         "deleted": "Backup eliminato con successo",
         "downloaded": "Backup scaricato con successo",
         "restored": "Backup ripristinato con successo"

@@ -273,7 +273,8 @@ def test_the_scheduler_process_never_exits_with_a_code_that_halts_gunicorn(outco
     assert scheduler_main.exit_code(outcome) == expected
 
 
-def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
+@pytest.mark.parametrize('task_ends, job_ends', [(False, True), (True, False)])
+def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch, caplog, task_ends, job_ends):
     import app as app_module
     import scheduler_main
     from services import scheduler_service
@@ -292,7 +293,7 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
 
     class Scheduler:
         def join(self, timeout):
-            return False
+            return task_ends
 
         def rearm_grace(self):
             pass
@@ -319,11 +320,12 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
             pass
 
         def join(self, timeout):
-            return True
+            return job_ends
     monkeypatch.setattr('services.jobs.runner.JobRunner', Runner)
-    with pytest.raises(Exit):
+    with caplog.at_level('WARNING', logger='ucm.scheduler_main'), pytest.raises(Exit):
         scheduler_main.main()
     assert exits == ['relay stop', 0]
+    assert 'A scheduled task or a background job outlasted 30.0s' in caplog.text
 
 
 def test_the_master_stopping_stops_the_process_then_says_the_node_stopped(supervisor):

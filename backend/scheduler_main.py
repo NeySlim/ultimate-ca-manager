@@ -57,7 +57,8 @@ def main() -> int:
     # short stays running and is concluded by the next start (or, in HA, its lapsed lease)
     if not scheduler.join(grace) or not runner.join(max(0.0, deadline - time.monotonic())):
         # A stop that was asked for: 0, or the arbiter logs "Worker exited with code 1"
-        logger.warning("A scheduled task outlasted %ss: the scheduler process exits anyway", grace)
+        logger.warning("A scheduled task or a background job outlasted %ss: "
+                       "the scheduler process exits anyway", grace)
         stop_publisher(timeout=2)
         logging.shutdown()
         os._exit(0)

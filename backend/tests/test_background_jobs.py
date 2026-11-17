@@ -2,8 +2,9 @@
 
 Every case ends a job one way and checks the same things: its final state and reason,
 exactly one audit line for a job that writes them (none for the audit verification), no
-secret and no file left, its slot free again. Operations: the audit verification, and a
-fake job on the backup and restore slots that later sub-lots replace with their own.
+secret and no file left, its slot free again. Operations: the audit verification, the manual
+backup (no archive published unless it succeeded, no spool left), and a fake job on the
+restore slot that a later sub-lot replaces with its own.
 """
 import os
 import threading
@@ -92,9 +93,9 @@ class Gate:
         assert self.reached.wait(10), 'the run never reached the gate'
 
 
-def _audit_lines():
+def _audit_lines(action=FAKE_ACTION):
     found = db.session.execute(select(func.count(AuditLog.id)).where(
-        AuditLog.action == FAKE_ACTION)).scalar()
+        AuditLog.action == action)).scalar()
     db.session.rollback()
     return found
 
@@ -123,18 +124,20 @@ def _row(job_id):
     return row
 
 
-def _assert_final(app, job_id, state, reason, lines_before, lines, file_name=None):
-    assert runner.join_local(job_id, 10)
+def _assert_final(app, job_id, state, reason, lines_before, lines, file_name=None, operation=None):
+    assert runner.join_local(job_id, 30)
     with app.app_context():
         row = _row(job_id)
         assert (row['state'], row['reason']) == (state, reason)
         assert row['secret'] is None and row['lease_expires_at'] is None
         assert row['finished_at'] is not None
-        assert _audit_lines() - lines_before == lines
+        assert _audit_lines(getattr(operation, 'action', FAKE_ACTION)) - lines_before == lines
         assert not [r for r in store.active_jobs(db.session, row['slot'])]
         db.session.rollback()
     if file_name:
         assert not os.path.exists(os.path.join(store.jobs_tmp_dir(), file_name))
+    if operation is not None and operation.check is not None:
+        operation.check(state)
 
 
 def _audit_rows(app, count=7):
@@ -145,38 +148,70 @@ def _audit_rows(app, count=7):
 
 # -- the matrix -------------------------------------------------------------------------
 
-OPERATIONS = ['fake_backup', 'fake_restore', 'verify']
+OPERATIONS = ['backup', 'fake_restore', 'verify']
+BACKUP_PASSWORD = 'Matrix-Backup-Password-9'
+
+
+def _backup_operation(monkeypatch, tmp_path):
+    """The real manual backup, its archives in a directory of the test's own."""
+    from config.settings import Config
+    from services.backup import storage
+    from services.jobs import backup as backup_job
+    monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
+    real = storage.export_archive
+
+    def seen(service, password, **kwargs):
+        _SEEN['secret'] = password
+        return real(service, password, **kwargs)
+    monkeypatch.setattr(storage, 'export_archive', seen)
+
+    def check(state):
+        archives = [p.name for p in tmp_path.glob('ucm_backup_*')]
+        assert len(archives) == (1 if state == 'succeeded' else 0), archives
+        assert not list(tmp_path.glob('.ucm_backup_*.tmp')), 'a spool was left'
+    return types.SimpleNamespace(
+        kind=backup_job.KIND, lines=1, slot=jobs.SLOT_BACKUP, secret=BACKUP_PASSWORD,
+        with_file=False, action=backup_job.ACTION, check=check,
+        params=backup_job.params_of(backup_job.ROUTE_SYSTEM))
 
 
 @pytest.fixture
-def operation(request, app, fake_types, monkeypatch):
+def operation(request, app, fake_types, monkeypatch, tmp_path):
     name = request.param
     if name == 'verify':
         import services.audit.core as core
         monkeypatch.setattr(core, 'VERIFY_PAGE', 2)
         _audit_rows(app)
         return types.SimpleNamespace(kind='audit_verify', lines=0, slot=jobs.SLOT_AUDIT_VERIFY,
-                                     secret=None, with_file=False)
-    slot = jobs.SLOT_BACKUP if name == 'fake_backup' else jobs.SLOT_RESTORE
-    return types.SimpleNamespace(kind=fake_types[slot], lines=1, slot=slot, secret='archive-pw',
-                                 with_file=True)
+                                     secret=None, with_file=False, action=FAKE_ACTION, check=None,
+                                     params=None)
+    if name == 'backup':
+        return _backup_operation(monkeypatch, tmp_path)
+    return types.SimpleNamespace(kind=fake_types[jobs.SLOT_RESTORE], lines=1, slot=jobs.SLOT_RESTORE,
+                                 secret='archive-pw', with_file=True, action=FAKE_ACTION, check=None,
+                                 params=None)
+
+
+def _go(app, operation, created):
+    return _start(app, operation.kind, created, operation.secret, operation.with_file,
+                  operation.params)
+
+
+def _lines(app, operation):
+    with app.app_context():
+        return _audit_lines(operation.action)
 
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 def test_a_job_that_runs_to_the_end(app, operation, created):
-    before = _audit_lines_in(app)
-    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
-    _assert_final(app, job_id, 'succeeded', 'done', before, operation.lines, name)
+    before = _lines(app, operation)
+    job_id, name = _go(app, operation, created)
+    _assert_final(app, job_id, 'succeeded', 'done', before, operation.lines, name, operation)
     with app.app_context():
         row = _row(job_id)
     assert row['progress_done'] == row['progress_total']
     if operation.secret:
         assert _SEEN.pop('secret') == operation.secret
-
-
-def _audit_lines_in(app):
-    with app.app_context():
-        return _audit_lines()
 
 
 # (gate position, failure): 1 = taken, before its first effect; 3 = after two pages
@@ -190,55 +225,55 @@ POINTS = [(1, 'taken'), (3, 'middle')]
 def test_a_failure_in_the_thread_fails_the_job(app, operation, created, monkeypatch, at, failure):
     gate = Gate(monkeypatch, at, fail=failure)
     gate.release.set()
-    before = _audit_lines_in(app)
-    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
-    _assert_final(app, job_id, 'failed', 'error', before, operation.lines, name)
+    before = _lines(app, operation)
+    job_id, name = _go(app, operation, created)
+    _assert_final(app, job_id, 'failed', 'error', before, operation.lines, name, operation)
 
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 @pytest.mark.parametrize('at', [p[0] for p in POINTS], ids=[p[1] for p in POINTS])
 def test_a_cancellation_stops_a_running_job(app, operation, created, monkeypatch, at):
     gate = Gate(monkeypatch, at)
-    before = _audit_lines_in(app)
-    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
+    before = _lines(app, operation)
+    job_id, name = _go(app, operation, created)
     gate.wait()
     with app.app_context():
         assert jobs.request_cancellation(job_id) == 'requested'
         assert _row(job_id)['state'] == 'running'
     gate.release.set()
-    _assert_final(app, job_id, 'cancelled', 'cancelled', before, operation.lines, name)
+    _assert_final(app, job_id, 'cancelled', 'cancelled', before, operation.lines, name, operation)
 
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 def test_a_pending_job_cancels_at_once(app, operation, created, monkeypatch):
     monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)  # no executor yet
-    before = _audit_lines_in(app)
-    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
+    before = _lines(app, operation)
+    job_id, name = _go(app, operation, created)
     with app.app_context():
         if operation.secret:  # encrypted while it waits
             assert _row(job_id)['secret'] not in (None, operation.secret)
         assert jobs.request_cancellation(job_id) == 'cancelled'
         assert jobs.request_cancellation(job_id) == 'final'
-    _assert_final(app, job_id, 'cancelled', 'cancelled', before, operation.lines, name)
+    _assert_final(app, job_id, 'cancelled', 'cancelled', before, operation.lines, name, operation)
 
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 def test_a_job_nobody_takes_ends_not_taken(app, operation, created, monkeypatch):
     monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
-    before = _audit_lines_in(app)
-    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
+    before = _lines(app, operation)
+    job_id, name = _go(app, operation, created)
     with app.app_context():
         now = jobs._now()
         # Not yet past the delay: left alone
         assert store.recover_orphans(db.session, now=now, all_running=False, audit_for=jobs.audit_writer) == 0
         later = now + timedelta(seconds=store.NOT_TAKEN_SECONDS + 1)
         assert store.recover_orphans(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
-    _assert_final(app, job_id, 'failed', 'not_taken', before, operation.lines, name)
+    _assert_final(app, job_id, 'failed', 'not_taken', before, operation.lines, name, operation)
 
 
 def _taken_by_a_lost_executor(app, operation, created, monkeypatch):
     monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
-    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
+    job_id, name = _go(app, operation, created)
     with app.app_context():
         assert store.claim_job(db.session, job_id, 'lost-node/1/x', jobs._now()) is not None
         assert _row(job_id)['secret'] is None  # cleared by the take itself
@@ -247,17 +282,17 @@ def _taken_by_a_lost_executor(app, operation, created, monkeypatch):
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 def test_a_single_node_start_concludes_every_running_job(app, operation, created, monkeypatch):
-    before = _audit_lines_in(app)
+    before = _lines(app, operation)
     job_id, name = _taken_by_a_lost_executor(app, operation, created, monkeypatch)
     with app.app_context():
         assert store.recover_orphans(db.session, now=jobs._now(), all_running=True,
                              audit_for=jobs.audit_writer) >= 1
-    _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name)
+    _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name, operation)
 
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 def test_a_lapsed_lease_concludes_the_job_and_only_then(app, operation, created, monkeypatch):
-    before = _audit_lines_in(app)
+    before = _lines(app, operation)
     job_id, name = _taken_by_a_lost_executor(app, operation, created, monkeypatch)
     with app.app_context():
         now = jobs._now()
@@ -265,21 +300,21 @@ def test_a_lapsed_lease_concludes_the_job_and_only_then(app, operation, created,
         assert _row(job_id)['state'] == 'running'
         later = now + timedelta(seconds=store.LEASE_SECONDS + 1)
         assert store.recover_orphans(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
-    _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name)
+    _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name, operation)
 
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
 def test_a_run_concluded_elsewhere_never_concludes_twice(app, operation, created, monkeypatch):
     """The reaper wins while the run is held mid-way: the run stops at its next progress."""
     gate = Gate(monkeypatch, 3)
-    before = _audit_lines_in(app)
-    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
+    before = _lines(app, operation)
+    job_id, name = _go(app, operation, created)
     gate.wait()
     with app.app_context():
         later = jobs._now() + timedelta(seconds=store.LEASE_SECONDS + 1)
         assert store.recover_orphans(db.session, now=later, all_running=False, audit_for=jobs.audit_writer) == 1
     gate.release.set()
-    _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name)
+    _assert_final(app, job_id, 'failed', 'executor_lost', before, operation.lines, name, operation)
 
 
 @pytest.mark.parametrize('operation', OPERATIONS, indirect=True)
@@ -292,8 +327,8 @@ def test_a_run_that_ends_during_a_maintenance_concludes_once_it_is_lifted(app, o
     held = threading.Event()
     monkeypatch.setattr(view, 'active', held.is_set)
     gate = Gate(monkeypatch, 3)
-    before = _audit_lines_in(app)
-    job_id, name = _start(app, operation.kind, created, operation.secret, operation.with_file)
+    before = _lines(app, operation)
+    job_id, name = _go(app, operation, created)
     gate.wait()
     held.set()
     try:
@@ -304,7 +339,7 @@ def test_a_run_that_ends_during_a_maintenance_concludes_once_it_is_lifted(app, o
             assert (row['state'], row['reason']) == ('running', None)
     finally:
         held.clear()
-    _assert_final(app, job_id, 'succeeded', 'done', before, operation.lines, name)
+    _assert_final(app, job_id, 'succeeded', 'done', before, operation.lines, name, operation)
     with app.app_context():
         assert _row(job_id)['result'] is not None
 
@@ -319,6 +354,57 @@ def test_the_conclusion_is_undone_when_its_audit_line_is_not_written(app, fake_t
                                   result_line=lambda row, state, reason: False)
         assert _row(job_id)['state'] == 'pending'
         assert jobs.request_cancellation(job_id) == 'cancelled'
+
+
+def _flaky_audit(monkeypatch, failures):
+    """AuditService.log_action failing for FAKE_ACTION ``failures`` times, then real."""
+    real, calls = AuditService.log_action, []
+
+    def flaky(**kwargs):
+        if kwargs.get('action') == FAKE_ACTION:
+            calls.append(kwargs)
+            if len(calls) <= failures:
+                raise RuntimeError('audit down')
+        return real(**kwargs)
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(flaky))
+    return calls
+
+
+def _result_lines(job_id):
+    lines = AuditLog.query.filter_by(action=FAKE_ACTION, resource_id=job_id).all()
+    db.session.rollback()
+    return lines
+
+
+def test_a_result_line_that_fails_once_is_written_on_the_retry(app, fake_types, created,
+                                                               monkeypatch):
+    calls = _flaky_audit(monkeypatch, failures=1)
+    job_id, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
+    assert runner.join_local(job_id, 10)
+    with app.app_context():
+        assert (_row(job_id)['state'], _row(job_id)['reason']) == ('succeeded', 'done')
+        lines = _result_lines(job_id)
+        assert len(calls) == 2 and len(lines) == 1
+        assert lines[0].details == 'Fake job finished' and lines[0].success
+
+
+def test_a_run_whose_result_line_fails_twice_still_ends_and_logs_it(app, fake_types, created,
+                                                                     monkeypatch, caplog):
+    """Its result stands without the line rather than hold the slot until a restart."""
+    calls = _flaky_audit(monkeypatch, failures=2)
+    job_id, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
+    with caplog.at_level('ERROR', logger='services.jobs.runner'):
+        assert runner.join_local(job_id, 10)
+    with app.app_context():
+        row = _row(job_id)
+        assert (row['state'], row['reason']) == ('succeeded', 'done')
+        assert row['result'] is not None and not store.active_jobs(db.session, jobs.SLOT_BACKUP)
+        assert len(calls) == 2 and _result_lines(job_id) == []
+        db.session.rollback()
+    errors = [r.getMessage() for r in caplog.records
+              if r.levelname == 'ERROR' and r.name == 'services.jobs.runner']
+    assert len(errors) == 1, errors
+    assert job_id in errors[0] and FAKE_ACTION in errors[0] and 'Fake job finished' in errors[0]
 
 
 def test_the_audit_line_names_the_requester(app, fake_types, created):

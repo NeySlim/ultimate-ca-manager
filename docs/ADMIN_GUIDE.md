@@ -25,7 +25,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `SECRET_KEY` | `UCM_SECRET_KEY` | (generated) | Session signing key (signs the CSRF tokens). Once rotated with encryption enabled, the key stored in the database signs and this value is only the fallback; see [Session key rotation](#session-key-rotation) |
 | `HOST` | `HOST` | `0.0.0.0` | Listen address for HTTPS and the HTTP protocol port; `::` = IPv6 + IPv4 (dual-stack) |
 | `HTTPS_PORT` | `UCM_HTTPS_PORT` | `8443` | HTTPS port |
-| `UCM_WORKER_TIMEOUT` | `UCM_WORKER_TIMEOUT` | `120` | Seconds a web request may run before gunicorn restarts the worker, from 30 to 3600; a value outside these bounds or not a whole number stops UCM at startup with a message naming the variable and exit code 78, which the systemd unit does not restart. The audit chain verification runs in the background and does not need it raised |
+| `UCM_WORKER_TIMEOUT` | `UCM_WORKER_TIMEOUT` | `120` | Seconds a web request may run before gunicorn restarts the worker, from 30 to 3600; a value outside these bounds or not a whole number stops UCM at startup with a message naming the variable and exit code 78, which the systemd unit does not restart. Manual backups and the audit chain verification run in the background and do not need it raised |
 | `DATA_DIR` | (fixed) | `/opt/ucm/data` | Data storage |
 | `UCM_CONFIG_DIR` | `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`. Set it in the process environment (the service unit or the shell), not in `ucm.env`, which is read from it; the packages leave it unset |
 | `LOG_LEVEL` | `UCM_LOG_LEVEL` | `INFO` | Logging verbosity |
@@ -348,11 +348,13 @@ The `certificate.expired` webhooks of a pass cover what expired since the previo
 1. Go to **Settings** > **Backup** tab
 2. Click **Create Backup**
 3. Enter encryption password
-4. Download `.ucmbkp` file
+4. Download the `.ucmbkp` file
+
+The backup runs in the background, in the scheduler process. A backup done within 25 seconds downloads at once; a longer one keeps its dialog open with the part of the database being exported, a **Cancel the backup** button (nothing is kept, the temporary file is removed) and, once the archive is ready, a **Download** button. Closing the dialog or reloading the page does not stop it: **Create Backup** shows it again. One manual backup runs at a time on the whole installation, HA cluster included: a second one answers 409 and names the one running. A backup whose process stops before the end (service restart) fails and is not started again on its own: start it again.
 
 Settings > Backup shows the space the archives counted by retention take (the `ucm_backup_*.ucmbkp` files of the backup directory, or in HA every archive of the database) and sets a size ceiling for all of them, in MiB (0, the default, for none). Retention removes the oldest archives until the total fits and audits each removal by name. It never removes the archives it protects: on a single node, the newest archive that matches its validation record, up to 2 archives with no validation record, and the `backup_min_keep` newest archives not found altered (2 by default); in HA, the `backup_min_keep` newest archives. The total can therefore stay above the ceiling, and the screen, the log and the retention response say so. A manual backup removes nothing: its response carries a `warning` when the total is then above the ceiling, and the next retention applies it. Other archive files of the directory (an archive copied there by hand, a `.json.enc` archive) are neither counted nor removed by retention, and the screen gives their number. The ceiling travels in a backup archive with the other settings and comes back with a restore.
 
-Backups, retention and restores take the same lock, so an archive never holds half of a restore: a manual backup started meanwhile waits up to 30 seconds, then answers 409; the scheduled one runs at the next minute.
+Backups, retention and restores take the same lock, so an archive never holds half of a restore: a manual backup started meanwhile waits up to 15 seconds, then answers 409; the scheduled one runs at the next minute.
 
 **Via command line (SQLite):**
 ```bash

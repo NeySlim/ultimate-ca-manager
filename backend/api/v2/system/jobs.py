@@ -38,9 +38,10 @@ def parse_prefer(values):
             if not head:
                 continue
             name, _, token = head.partition('=')
-            name = name.strip().lower()
+            name, token = name.strip().lower(), token.strip().strip('"')
             if name and name not in found:
-                found[name] = token.strip().strip('"') if _ else True
+                # An empty value is no value (RFC 7240 section 2): respond-async="" is respond-async
+                found[name] = token or True
     return found
 
 
@@ -52,9 +53,9 @@ def _with_headers(response, **headers):
     return body, status
 
 
-def accepted(row, applied=None):
+def accepted(row, applied=None, extra=None):
     response = success_response(
-        data={'job': jobs.public_view(row, with_result=False)},
+        data={'job': jobs.public_view(row, with_result=False), **(extra or {})},
         message='Accepted: the job runs in the background', status=202)
     headers = {'Location': location(row['id'])}
     if applied:
@@ -62,15 +63,20 @@ def accepted(row, applied=None):
     return _with_headers(response, **headers)
 
 
-def final_response(row):
-    """The answer of a finished job: the route's own response, or why there is none."""
+def final_response(row, extra=None):
+    """The answer of a finished job: the route's own response, or why there is none.
+    ``extra`` joins the data of a success only (a generated password, never stored)."""
     import json
     result = json.loads(row['result']) if row['result'] else None
     if result is not None:
         if result['code'] < 400:
+            data = result['data']
+            if extra and isinstance(data, dict):
+                data = {**data, **extra}
             return _with_headers(success_response(
-                data=result['data'], message=result['message'], status=result['code']))
-        return _with_headers(error_response(result['message'], result['code']))
+                data=data, message=result['message'], status=result['code']))
+        return _with_headers(error_response(result['message'], result['code'],
+                                            problem_type=result.get('problem_type')))
     jt = jobs.job_type(row['kind'])
     reason = row['reason'] or 'error'
     message = (jt.messages.get(reason) if jt else None) or _FINAL_MESSAGES.get(reason, 'The job failed')
@@ -98,8 +104,9 @@ def suspended_response():
     return response, 503
 
 
-def started_response(job_id):
-    """What a starting route answers for ``job_id``: bounded wait, then 200 or 202."""
+def started_response(job_id, extra=None):
+    """What a starting route answers for ``job_id``: bounded wait, then 200 or 202.
+    ``extra`` is data the route holds in memory only, given once in this answer."""
     prefs = parse_prefer(request.headers.getlist('Prefer'))
     asynchronous = bool(prefs.get('respond-async'))
     wait = prefs.get('wait')
@@ -110,11 +117,11 @@ def started_response(job_id):
         # respond-async alone: 202 at once; with wait=N, after at most N seconds (RFC 7240 §4.1)
         seconds = 0 if asynchronous else jobs.JOB_WAIT_SECONDS
     if asynchronous and seconds == 0:
-        return accepted(jobs.get_job(job_id), applied='respond-async')
+        return accepted(jobs.get_job(job_id), applied='respond-async', extra=extra)
     row = jobs.wait_for_job(job_id, seconds)
     if row is not None and row['state'] in jobs.FINAL_STATES:
-        return final_response(row)
-    return accepted(row, applied='respond-async' if asynchronous else None)
+        return final_response(row, extra)
+    return accepted(row, applied='respond-async' if asynchronous else None, extra=extra)
 
 
 def _readable(kind):

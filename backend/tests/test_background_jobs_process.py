@@ -2,7 +2,8 @@
 and the HA lease on PostgreSQL with two connections.
 
 The child processes load only the model and services/jobs/store.py on a database of their
-own (never the application, its settings nor the host's): each asserts it.
+own (never the application, its settings nor the host's): each asserts it. The scheduler
+process tests run scheduler_main on a SQLite data directory under tmp_path.
 """
 import os
 import signal
@@ -318,6 +319,91 @@ def test_a_stop_during_the_wait_for_a_maintenance_exits_within_the_grace(tmp_pat
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         _until(lambda: _job_state(url, job_id)[0] != 'running', second)
         assert _job_state(url, job_id)[:2] == ('failed', 'executor_lost')
+        second.send_signal(signal.SIGTERM)
+        assert second.wait(timeout=15) == 0
+    finally:
+        for child in (first, second):
+            if child is not None and child.poll() is None:
+                child.kill()
+                child.wait()
+
+
+_HELD_IN_A_BACKUP = r'''
+import os, time
+from services.jobs import backup
+taken = os.environ['TEST_BACKUP_TAKEN']
+real = backup._reporter
+
+
+def reporter(ctx):
+    # The real export, held at its first section: the lock is taken and the spool open
+    inner = real(ctx)
+
+    def progress(done=None, total=None):
+        inner(done, total)
+        if done is not None:
+            open(taken, 'w').write(ctx.job_id)
+            time.sleep(300)
+    return progress
+
+
+backup._reporter = reporter
+import scheduler_main  # noqa: E402
+os._exit(scheduler_main.exit_code(scheduler_main.main))
+'''
+
+
+@pytest.mark.slow
+def test_a_backup_whose_scheduler_is_killed_is_lost_once_and_leaves_nothing(tmp_path):
+    """kill -9 of the scheduler process during a real backup: the next start concludes it
+    executor_lost with one audit line, no archive and no spool remain, the lock is free."""
+    import fcntl
+    from tests.test_scheduler_process import _scheduler_env
+    from utils.encryption import encrypt_value
+    env, data = _scheduler_env(tmp_path)
+    (tmp_path / 'etc').mkdir()
+    env = {k: v for k, v in env.items() if not k.startswith('GIT_')}
+    taken = tmp_path / 'taken'
+    env.update(UCM_CONFIG_DIR=str(tmp_path / 'etc'), TEST_BACKUP_TAKEN=str(taken), UCM_HA='')
+    url = f"sqlite:///{data / 'ucm.db'}"
+    backups = data / 'backups'
+    first = subprocess.Popen([sys.executable, '-c', _HELD_IN_A_BACKUP], cwd=BACKEND, env=env,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    second = None
+    try:
+        _until(lambda: (data / 'scheduler_state.json').exists(), first)
+        engine = create_engine(url)
+        with Session(engine) as session:
+            job_id = store.create_job(
+                session, kind='backup', slot='backup', exclusive=False, exclusive_slots=EXCLUSIVE,
+                now=utc_now(), params={'route': 'system', 'kdf': None, 'generated': False},
+                secret=encrypt_value('Killed-Backup-Password-42'), requester=(None, 'admin', None))
+        engine.dispose()
+        _until(taken.exists, first)
+        assert _job_state(url, job_id)[0] == 'running'
+        assert list(backups.glob('.ucm_backup_*.tmp')), 'the export never opened its spool'
+        os.kill(first.pid, signal.SIGKILL)
+        first.wait(timeout=10)
+        assert _job_state(url, job_id)[0] == 'running'
+        second = subprocess.Popen([sys.executable, '-m', 'scheduler_main'], cwd=BACKEND, env=env,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _until(lambda: _job_state(url, job_id)[0] != 'running', second)
+        assert _job_state(url, job_id)[:2] == ('failed', 'executor_lost')
+        engine = create_engine(url)
+        with engine.connect() as conn:
+            lines = conn.execute(text(
+                "SELECT details, success FROM audit_logs WHERE action = 'system_backup' "
+                "AND resource_id = :id"), {'id': job_id}).all()
+            secret = conn.execute(text('SELECT secret FROM background_jobs WHERE id = :id'),
+                                  {'id': job_id}).scalar()
+        engine.dispose()
+        assert [tuple(line) for line in lines] == [
+            ('Backup stopped: the process running it was lost', False)]
+        assert secret is None
+        assert not list(backups.glob('ucm_backup_*')) and not list(backups.glob('.ucm_backup_*.tmp'))
+        with open(backups / '.ucm_backup_operation.lock', 'a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)  # raises if still held
+            fcntl.flock(lock, fcntl.LOCK_UN)
         second.send_signal(signal.SIGTERM)
         assert second.wait(timeout=15) == 0
     finally:

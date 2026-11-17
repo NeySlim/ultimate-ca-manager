@@ -3,6 +3,7 @@ System Backup Operations
 """
 
 from services.backup import shared_store, storage
+from services.jobs import backup as backup_job
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.errors import RestoreFilesUnwritable
 from services.backup.restore.plan import RestoreValidationError
@@ -28,10 +29,7 @@ from services.audit_service import AuditService
 from services.backup.backup_service import check_backup_kdf
 from services.backup_service import (
     BackupService,
-    BackupExportError,
-    BackupPasswordError,
     BackupSchemaError,
-    BackupValidationError,
     ContainerError,
 )
 from datetime import datetime, timezone
@@ -76,15 +74,6 @@ _SORT_KEYS = {
     'name_desc': (lambda item: (item['filename'].lower(), item['filename']), True),
 }
 _DEFAULT_SORT = 'created_desc'
-
-
-def _format_size(size_bytes: int) -> str:
-    """`N B`, `N.N KB` or `N.N MB`."""
-    if size_bytes < 1024:
-        return f'{size_bytes} B'
-    if size_bytes < 1024 * 1024:
-        return f'{size_bytes / 1024:.1f} KB'
-    return f'{size_bytes / (1024 * 1024):.1f} MB'
 
 
 def _scan_archives(directory) -> list:
@@ -132,7 +121,7 @@ def _disk_meta(directory) -> dict:
         return {
             'disk_total_bytes': usage.total,
             'disk_free_bytes': usage.free,
-            'disk_free': _format_size(usage.free),
+            'disk_free': backup_job.format_size(usage.free),
             'disk_used_pct': (round(usage.used * 100 / usage.total, 1)
                               if usage.total else None),
         }
@@ -146,6 +135,11 @@ def _disk_meta(directory) -> dict:
 @require_auth(['admin:system'])
 def create_backup():
     """Create an encrypted archive in the backup directory."""
+    # The gate lets this start through: a maintenance refuses it before any check or audit write
+    from api.v2.system.jobs import suspended_response
+    from services.cluster_maintenance import blocks_writes
+    if blocks_writes():
+        return suspended_response()
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         data = {}
@@ -170,58 +164,23 @@ def create_backup():
         _audit_failure('system_backup', 'manual', 'Backup refused: key derivation not accepted')
         return error_response(str(e), 400)
 
+    # The export runs as a job; within the bounded wait its answer is this route's own
+    return start_backup_job(backup_job.params_of(backup_job.ROUTE_SYSTEM, kdf), password)
+
+
+def start_backup_job(params, password, extra=None):
+    """Start the backup job for either route: 409 naming the active job (audited as the
+    busy refusal it replaces), 503 during a cluster maintenance, else the bounded wait."""
+    from api.v2.system.jobs import busy_response, started_response, suspended_response
+    from services import jobs
     try:
-        service = BackupService()
-        size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
-    except FipsRestricted:
-        _audit_failure('system_backup', 'manual', 'Backup refused: not allowed in FIPS mode')
-        raise  # the application maps it to its problem type
-    except BackupBusyError as busy:
-        logger.info('Backup refused: %s', busy)
-        _audit_failure('system_backup', 'manual', 'Backup refused: another backup or restore is running')
-        return error_response(str(busy), 409)
-    except BackupPasswordError as e:
-        _audit_failure('system_backup', 'manual', 'Backup refused: password rejected')
-        return error_response(str(e), 400)
-    except BackupExportError as e:
-        logger.error('Backup aborted: %s', e)
-        _audit_failure('system_backup', 'manual', 'Backup failed: export aborted')
-        return error_response(f'Backup aborted: {e}', 500)
-    except BackupValidationError as e:
-        logger.error('Backup written but not validated: %s', e)
-        _audit_failure('system_backup', 'manual', 'Backup failed: archive could not be validated')
-        return error_response(f'Backup could not be validated: {e}', 500)
-    except ValueError:
-        logger.exception('Backup refused: invalid parameters')
-        _audit_failure('system_backup', 'manual', 'Backup refused: invalid parameters')
-        return error_response('Invalid backup parameters', 400)
-    except Exception:
-        logger.exception('Backup failed')
-        _audit_failure('system_backup', 'manual', 'Backup failed: unexpected error')
-        return error_response('Backup failed', 500)
-
-    _safe_audit_log(
-        action='system_backup',
-        resource_type='system',
-        resource_name=filename,
-        details=f'Created backup: {filename}',
-        success=True,
-    )
-
-    from services.backup.schedule import safe_ceiling_warning
-    data = {
-        'filename': filename,
-        'size': _format_size(size),
-        'size_bytes': size,
-        'download_url': f'/api/v2/system/backup/{filename}/download',
-        # Creation removes nothing: the next retention brings the archives under the ceiling
-        'warning': safe_ceiling_warning(),
-    }
-    message = 'Backup created successfully'
-    if service.last_export_warnings:
-        data['export_warnings'] = list(service.last_export_warnings)
-        message = f"{message}. {'; '.join(service.last_export_warnings)}"
-    return success_response(data=data, message=message)
+        job_id = jobs.start_job(backup_job.KIND, params=params, secret=password)
+    except jobs.JobsSuspended:
+        return suspended_response()
+    except jobs.SlotBusy as busy:
+        _audit_failure('system_backup', 'manual', backup_job.BUSY)
+        return busy_response(busy)
+    return started_response(job_id, extra)
 
 
 @bp.route('/api/v2/system/backups', methods=['GET'])
@@ -250,7 +209,7 @@ def list_backups():
         start = (page - 1) * per_page
         items = [{
             'filename': item['filename'],
-            'size': _format_size(item['size_bytes']),
+            'size': backup_job.format_size(item['size_bytes']),
             'size_bytes': item['size_bytes'],
             'created_at': datetime.fromtimestamp(
                 item['_mtime'], timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'),
@@ -263,9 +222,9 @@ def list_backups():
             'total': total,
             'total_all': len(everything),
             'total_size_bytes': total_size,
-            'total_size': _format_size(total_size),
+            'total_size': backup_job.format_size(total_size),
             'total_size_all_bytes': total_size_all,
-            'total_size_all': _format_size(total_size_all),
+            'total_size_all': backup_job.format_size(total_size_all),
             'page': page,
             'per_page': per_page,
             'pages': max(1, -(-total // per_page)),

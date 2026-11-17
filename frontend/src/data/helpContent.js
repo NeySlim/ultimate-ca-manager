@@ -1151,6 +1151,14 @@ export const helpContent = {
         ]
       },
       {
+        title: "Manual backup",
+        items: [
+          { label: "In the background", text: "Create Backup runs on the server: the dialog shows which part of the database is being exported and offers the archive for download when it is ready. A backup done within 25 seconds downloads at once, as before. Closing the dialog or reloading the page does not stop it: Create Backup shows it again" },
+          { label: "Cancel", text: "Cancel the backup stops it between two parts of the export: no archive is kept and its temporary file is removed" },
+          { label: "One at a time", text: "One manual backup runs at a time on the whole installation, HA cluster included: a second one is refused (409) and names the one running. A backup that finds a scheduled backup or a restore holding the backup lock waits up to 15 seconds, then is refused (409)" },
+        ]
+      },
+      {
         title: 'Restore (v2.251)',
         items: [
           { label: 'Replace or merge', text: 'Restore from Backup replaces the data here with the archive\'s and removes what the archive does not carry; the audit entry lists what was removed. The API also accepts mode=merge, which adds the archive to the data here' },

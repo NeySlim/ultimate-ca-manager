@@ -2969,6 +2969,9 @@ Content-Type: application/json
 
 # Create backup ("kdf": "pbkdf2" writes an archive a FIPS-mode instance can restore)
 # Removes nothing for the ceiling: "warning" is set when the archives are then above it, null otherwise
+# A background job (see Background Jobs): 200 as before within 25 s, else 202. Without "password"
+# one is generated and given in this answer only ("password", "password_generated"), 200 or 202:
+# the job never holds it in clear and its result does not carry it
 POST /api/v2/settings/backup/create
 {
   "password": "...",
@@ -3052,8 +3055,8 @@ Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `p
 
 ### Background Jobs
 
-Long operations (the audit chain verification) run outside the web worker, in the
-scheduler process. The route that starts one waits at most 25 seconds:
+Long operations (the manual backup, the audit chain verification) run outside the web
+worker, in the scheduler process. The route that starts one waits at most 25 seconds:
 
 - finished by then, it answers exactly what it answered before jobs existed (code, `message`,
   `data`);
@@ -3071,12 +3074,13 @@ progress, no background job starts until it ends`, and no job is created. A `GET
 join a job already running answers `503` too: follow that job at `GET /api/v2/system/jobs/<id>`.
 
 ```http
-GET  /api/v2/system/jobs                  # ?kind=audit_verify&state=active|final&limit=20 (max 100)
+GET  /api/v2/system/jobs                  # ?kind=backup|audit_verify&state=active|final&limit=20 (max 100)
 GET  /api/v2/system/jobs/<id>
 POST /api/v2/system/jobs/<id>/cancel
 ```
 
-Each job is read and cancelled with its own permission (`read:audit` for `audit_verify`); the
+Each job is read and cancelled with its own permission (`admin:system` for `backup`,
+`read:audit` for `audit_verify`); the
 list shows only the kinds the caller may read, and the id of another kind answers `404`.
 
 ```json
@@ -3093,12 +3097,22 @@ list shows only the kinds the caller may read, and the id of another kind answer
 ```
 
 - `state`: `pending`, `running`, then one of `succeeded`, `failed`, `cancelled`.
-- `reason` once final: `done`, `refused` (the operation answered an error, kept in `result`),
-  `error`, `cancelled`, `executor_lost` (the process running it stopped: run it again) or
+- `reason` once final: `done`; `refused` (the operation answered a `4xx`, kept in `result`);
+  `error` (the operation answered a `5xx`, kept in `result`, or its run failed, `result` then
+  `null`); `cancelled`; `executor_lost` (the process running it stopped: run it again) or
   `not_taken` (no process took it within 5 minutes). A lost job is never started again on its own.
-- `result` once final: `{"code", "message", "data"}`, the answer the starting route would have given.
+- `result` once final, for `done`, `refused` and an `error` the operation answered:
+  `{"code", "message", "data"}`, the answer the starting route would have given, plus
+  `problem_type` when that answer was a typed problem (RFC 9457 `type`, such as a refusal in FIPS
+  mode); `null` otherwise.
 - Cancel: a pending job ends at once (`200`, `Job cancelled`); a running one stops at its next
-  page (`200`, `Cancellation requested`); an ended one answers `409`.
+  page (`200`, `Cancellation requested`); an ended one answers `409`. A backup stops between two
+  sections of the export, or within a second inside one: no archive is kept.
+
+A job of an audited operation (the backup) writes one audit line when it ends. If that write
+fails twice, the job still ends, without the line, and the service log records it at level
+`ERROR` (`Background job <id> concluded without its audit line: ...`, with the line's action,
+resource, success and phrase).
 
 A finished job is kept 30 days, and the latest of each kind always.
 
@@ -3198,6 +3212,10 @@ GET /api/v2/system/backups
 # Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id"; POST /api/v2/system/backup is the same route)
 # Removes nothing for the ceiling: "warning" is set when the
 # archives are then above it, null otherwise; the next retention applies it
+# A background job of kind "backup" (see Background Jobs): within 25 s the answer of before
+# (200, or 400, 409 and 500 with their messages), else 202 with the job, its "result.data" once
+# succeeded; 409 naming the job while another backup is active; the password is stored only
+# encrypted until the job is taken, then cleared
 POST /api/v2/system/backup/create
 POST /api/v2/system/backup
 

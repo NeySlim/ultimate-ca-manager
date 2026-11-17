@@ -2838,6 +2838,15 @@
     "chooseCertificate": "Виберіть сертифікат...",
     "color": "Колір",
     "createAndDownload": "Створити та завантажити",
+    "backupInProgress": "Backup in progress",
+    "backupStarting": "The backup is starting",
+    "backupProgress": "Exporting part {{done}} of {{total}}",
+    "backupRunsInBackground": "The backup runs on the server: closing this window does not stop it, and Create Backup shows it again.",
+    "backupCancel": "Cancel the backup",
+    "backupCancelFailed": "The backup could not be cancelled",
+    "backupCancelled": "The backup was cancelled: no archive was kept",
+    "backupLost": "The backup stopped before the end: start it again",
+    "backupReady": "The archive {{filename}} is ready",
     "createBackup": "Створити резервну копію",
     "createBackupDesc": "Створіть резервну копію всіх даних (база даних, сертифікати, ЦС, користувачі, конфігурація). Резервну копію буде зашифровано вашим паролем.",
     "creating": "Створення...",
@@ -4906,6 +4915,7 @@
     "success": {
       "backup": {
         "created": "Резервну копію створено та завантажено",
+        "ready": "Backup created: download it from the dialog",
         "deleted": "Резервну копію видалено",
         "downloaded": "Резервну копію завантажено",
         "restored": "Резервну копію відновлено"

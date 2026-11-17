@@ -3171,6 +3171,15 @@
     "encryptionPasswordHelper": "Utilisez un mot de passe fort - vous en aurez besoin pour restaurer la sauvegarde",
     "creating": "Création en cours...",
     "createAndDownload": "Créer et télécharger",
+    "backupInProgress": "Sauvegarde en cours",
+    "backupStarting": "La sauvegarde démarre",
+    "backupProgress": "Export de la partie {{done}} sur {{total}}",
+    "backupRunsInBackground": "La sauvegarde se fait sur le serveur : fermer cette fenêtre ne l'arrête pas, et Créer une sauvegarde la montre de nouveau.",
+    "backupCancel": "Annuler la sauvegarde",
+    "backupCancelFailed": "La sauvegarde n'a pas pu être annulée",
+    "backupCancelled": "La sauvegarde a été annulée : aucune archive n'a été gardée",
+    "backupLost": "La sauvegarde s'est arrêtée avant la fin : relancez-la",
+    "backupReady": "L'archive {{filename}} est prête",
     "restoreWarning": "Ceci REMPLACE toutes les données actuelles : utilisateurs, clés privées et secrets stockés compris, par le contenu de la sauvegarde, et est irréversible. Ne restaurez qu'une sauvegarde que vous avez créée vous-même : une sauvegarde dont un attaquant contrôle le mot de passe peut implanter un compte administrateur persistant.",
     "file": "Fichier",
     "backupPassword": "Mot de passe de la sauvegarde",
@@ -5091,6 +5100,7 @@
       },
       "backup": {
         "created": "Sauvegarde créée et téléchargée avec succès",
+        "ready": "Sauvegarde créée : téléchargez-la depuis la boîte de dialogue",
         "downloaded": "Sauvegarde téléchargée avec succès",
         "deleted": "Sauvegarde supprimée avec succès",
         "restored": "Sauvegarde restaurée avec succès"

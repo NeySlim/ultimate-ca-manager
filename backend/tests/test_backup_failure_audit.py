@@ -16,9 +16,15 @@ LEAKY = '/srv/private/path/' + SECRET
 
 @pytest.fixture
 def audit(monkeypatch):
+    from models import db
     calls = []
-    monkeypatch.setattr(AuditService, 'log_action',
-                        staticmethod(lambda **kw: calls.append(kw)))
+
+    # Commits and returns the line as log_action does: a backup job concludes in that commit
+    def log_action(**kw):
+        calls.append(kw)
+        db.session.commit()
+        return kw
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(log_action))
     return calls
 
 
