@@ -19,6 +19,8 @@ name: ucm-ha
 x-ucm-node: &ucm-node
   image: neyslim/ultimate-ca-manager:latest
   restart: unless-stopped
+  # A clean stop: a running scheduled task gets 30 s, then the node releases its row
+  stop_grace_period: 45s
   depends_on:
     postgres:
       condition: service_healthy
