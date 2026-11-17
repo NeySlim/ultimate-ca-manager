@@ -105,8 +105,7 @@ What does not follow the database: SoftHSM tokens, files a node mirrored on its 
 
 - `/health/ready` through the balancer answers `200` for each node in turn. A node answers `503` while it has never registered in `cluster_nodes`, while another live process uses its identifier, and during a restore (see [Restoring a backup](#restoring-a-backup)).
 - `/health` reports `ha`, `node_id`, `leader` and, in HA mode, `cluster: {leader_node_id, nodes, stale}`: every node running is counted in `nodes`, none should be in `stale`, and `leader_node_id` names exactly one. A node stopped cleanly gave its row up and is counted in neither, at once; a node killed or cut off is counted in `stale` after three passes (3 minutes) without a heartbeat. After 15 passes (15 minutes, as long as an update campaign waits for a node) a row is counted nowhere, and the leader deletes it at its next pass once it has led for three passes. This matters under Kubernetes, where `UCM_NODE_ID` is the pod name and a replaced pod never comes back; a node that comes back under a deleted identifier writes a new row with its first heartbeat.
-- `GET /api/v2/system/service/status` lists rows up to the same 15 minutes, nodes stopped cleanly included.
-- `GET /api/v2/system/service/status` (signed in) lists every node with its version, heartbeat, `command_seen`, `kek_fingerprint` and `package_family`: the fingerprints must be equal.
+- `GET /api/v2/system/service/status` (signed in, `read:settings`) lists under `cluster.nodes` every row heard from in the last 15 minutes, nodes stopped cleanly included, each with `leader`, `stale`, `version`, `started_at`, `heartbeat_at`, `command_seen`, `kek_fingerprint` and `package_family`: the fingerprints must be equal.
 - The status bar of the web interface shows the node that answers, whether it leads, the number of nodes and how many are late.
 
 ## First administrator
