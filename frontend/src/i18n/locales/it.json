@@ -4138,7 +4138,7 @@
     "signInTestMapHint": "Un clic aggiunge la riga alla mappatura degli attributi; salva il provider, poi testa di nuovo.",
     "signInTestNotVerified": "Non verificato (modalità di compatibilità)",
     "signInTestProviderDisabled": "Questo provider è disabilitato: la pagina di accesso non lo propone e non accetta alcun accesso finché non viene abilitato.",
-    "signInTestNothingDone": "Nulla è stato modificato: nessun account, identità o sessione. Il test è registrato nel log di audit, a differenza degli accessi.",
+    "signInTestNothingDone": "Nulla è stato modificato: nessun account, identità o sessione. Il test è registrato nel log di audit, separatamente dagli accessi.",
     "signInTestCompleteTitle": "Test di accesso terminato",
     "signInTestCompleteDone": "Il risultato è mostrato nella schermata del provider. Questa finestra può essere chiusa.",
     "signInTestCompleteUsed": "Questo test è già stato usato. Avviane uno nuovo dalla schermata del provider.",

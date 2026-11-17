@@ -4138,7 +4138,7 @@
     "signInTestMapHint": "Um clique adiciona a linha ao mapeamento de atributos; salve o provedor e teste novamente.",
     "signInTestNotVerified": "Não verificado (modo de compatibilidade)",
     "signInTestProviderDisabled": "Este provedor está desabilitado: a página de login não o oferece e ele não aceita login até ser habilitado.",
-    "signInTestNothingDone": "Nada foi alterado: nenhuma conta, identidade ou sessão. O teste é registrado no log de auditoria, exceto os logins.",
+    "signInTestNothingDone": "Nada foi alterado: nenhuma conta, identidade ou sessão. O teste é registrado no log de auditoria, separadamente dos logins.",
     "signInTestCompleteTitle": "Teste de login concluído",
     "signInTestCompleteDone": "O resultado é mostrado na tela do provedor. Esta janela pode ser fechada.",
     "signInTestCompleteUsed": "Este teste já foi usado. Inicie um novo na tela do provedor.",

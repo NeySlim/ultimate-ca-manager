@@ -611,9 +611,18 @@ def test_the_ha_flag_reads_the_same_in_the_script_and_the_application(tmp_path, 
     assert env_bool('UCM_HA', False) is expected, raw
 
 
+def _utf8_locale_trims_unicode_blanks():
+    """Whether bash has C.UTF-8 here: without it the cases below would pass either way."""
+    r = subprocess.run(['bash', '-c', 'x=$1; [ "${x%[[:space:]]}" != "$x" ]', '_', '1\u3000'],
+                       env={'PATH': '/usr/bin:/bin', 'LC_ALL': 'C.UTF-8'}, capture_output=True)
+    return r.returncode == 0
+
+
 @pytest.mark.parametrize('raw', ['1\u3000', '\u2028true', 'on\u2003'])
 def test_the_script_drops_no_blank_the_application_keeps_under_a_utf8_locale(tmp_path, monkeypatch, raw):
     from config.settings import env_bool
+    if not _utf8_locale_trims_unicode_blanks():
+        pytest.skip('no C.UTF-8 locale for bash here')
     r = _run('if ucm_ha_active; then echo set; else echo unset; fi',
              {'UCM_HA': raw, 'LC_ALL': 'C.UTF-8'}, tmp_path)
     assert r.stdout.strip() == 'unset', ascii(raw)

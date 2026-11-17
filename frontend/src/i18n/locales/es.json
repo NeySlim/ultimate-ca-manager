@@ -4138,7 +4138,7 @@
     "signInTestMapHint": "Un clic agrega la fila a la asignación de atributos; guarde el proveedor y pruebe de nuevo.",
     "signInTestNotVerified": "No verificado (modo de compatibilidad)",
     "signInTestProviderDisabled": "Este proveedor está deshabilitado: la página de inicio de sesión no lo ofrece y no acepta ningún inicio de sesión hasta que se habilite.",
-    "signInTestNothingDone": "No se cambió nada: ninguna cuenta, identidad ni sesión. La prueba se registra en el registro de auditoría, salvo los inicios de sesión.",
+    "signInTestNothingDone": "No se cambió nada: ninguna cuenta, identidad ni sesión. La prueba se registra en el registro de auditoría, aparte de los inicios de sesión.",
     "signInTestCompleteTitle": "Prueba de inicio de sesión finalizada",
     "signInTestCompleteDone": "El resultado se muestra en la pantalla del proveedor. Puede cerrar esta ventana.",
     "signInTestCompleteUsed": "Esta prueba ya se usó. Inicie una nueva desde la pantalla del proveedor.",
