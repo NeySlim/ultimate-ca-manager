@@ -142,4 +142,14 @@ describe('docker hint of an ordinary update', () => {
     expect(screen.getByText(/docker pull ghcr\.io\/neyslim\/ultimate-ca-manager:3\.2/)).toBeInTheDocument()
     expect(screen.queryByText(/:latest/)).toBeNull()
   })
+
+  it('shows the image the server names when it names one', async () => {
+    mocks.get.mockResolvedValue(check({
+      update_available: true, can_auto_update: false, latest_version: '3.2', major_upgrade: null,
+      download_url: 'ghcr.io/neyslim/ultimate-ca-manager:3.2-fips',
+    }))
+    render(<UpdateChecker />)
+    await flush()
+    expect(screen.getByText(/docker pull ghcr\.io\/neyslim\/ultimate-ca-manager:3\.2-fips/)).toBeInTheDocument()
+  })
 })

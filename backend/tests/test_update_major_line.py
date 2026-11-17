@@ -167,13 +167,13 @@ def test_a_later_major_flagged_prerelease_is_never_offered(monkeypatch, instance
     assert updates.check_for_updates(channel='rc')['major_upgrade'] is None
 
 
-def test_without_a_later_major_the_notice_stays(instance):
+def test_without_a_later_major_nothing_is_offered_apart(instance):
     instance('3.1', ['3.2', '3.1'])
     result = updates.check_for_updates(channel='stable')
     assert result['major_upgrade'] is None
 
 
-def test_notice_and_empty_major_on_a_failed_check(monkeypatch):
+def test_a_failed_check_offers_no_major(monkeypatch):
     monkeypatch.setitem(updates._releases_cache, 'data', None)
 
     def _down(*a, **k):
@@ -184,11 +184,35 @@ def test_notice_and_empty_major_on_a_failed_check(monkeypatch):
     assert result['major_upgrade'] is None
 
 
-def test_check_route_returns_the_major_upgrade_and_notice(auth_client, instance):
+def test_check_route_returns_the_update_and_the_major_upgrade(auth_client, instance):
     instance('3.1', MIXED)
     data = auth_client.get('/api/v2/system/updates/check').get_json()['data']
     assert data['latest_version'] == '3.2'
     assert data['major_upgrade']['version'] == '4.0'
+
+
+def test_the_fix_of_this_major_is_found_behind_a_busy_later_major(monkeypatch):
+    """GitHub lists 30 releases by default, newest first: the request asks for the page of 100."""
+    monkeypatch.setattr(updates, 'get_current_version', lambda: '3.4')
+    monkeypatch.setitem(updates._releases_cache, 'data', None)
+    listed = [_release(f'4.{n}') for n in range(30, 0, -1)] + [_release('3.5'), _release('3.4')]
+
+    class Page:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.rows
+
+    def github(url, params=None, **kwargs):
+        return Page(listed[:(params or {}).get('per_page', 30)])
+    monkeypatch.setattr(updates.requests, 'get', github)
+    result = updates.check_for_updates(force=True, channel='stable')
+    assert result['update_available'] and result['latest_version'] == '3.5'
+    assert result['major_upgrade']['version'] == '4.30'
 
 
 # ---- unattended install ---------------------------------------------------------------------

@@ -224,7 +224,10 @@ def _pick_asset(release, version):
     family = package_family()
     if family == CONTAINER_FAMILY:
         if assets:
-            download_url = f"ghcr.io/neyslim/ultimate-ca-manager:{version}"
+            # The FIPS image is published under <version>-fips
+            import fips_mode
+            suffix = '-fips' if fips_mode.requested() else ''
+            download_url = f"ghcr.io/neyslim/ultimate-ca-manager:{version}{suffix}"
             package_name = assets[0]['name']
     else:
         chosen = family_package(assets, family)
@@ -304,7 +307,10 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
                 headers['Authorization'] = f'token {github_token}'
             
             try:
-                response = requests.get(url, headers=headers, timeout=10, verify=_ca_bundle or True)
+                # The page of 100 (30 by default), newest first: the releases of a later major
+                # must not push this major's fixes off it
+                response = requests.get(url, headers=headers, params={'per_page': 100},
+                                        timeout=10, verify=_ca_bundle or True)
                 response.raise_for_status()
                 releases = response.json()
                 _releases_cache['data'] = releases
