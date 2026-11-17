@@ -61,6 +61,7 @@ def test_scheduled_auto_update_never_installs_locally_in_ha(app, monkeypatch):
     import services.updates as updates
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.delenv('UCM_DOCKER', raising=False)
+    monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
 
     def boom(*a, **k):
         raise AssertionError('no local install in HA mode')

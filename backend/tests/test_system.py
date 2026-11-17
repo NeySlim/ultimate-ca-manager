@@ -1054,14 +1054,16 @@ class TestUpdatesCheck:
         assert updates._releases_cache == before
 
     def test_a_newer_stable_release_is_offered(self, auth_client, monkeypatch):
+        import services.updates as updates
+        major = updates.major_of(updates.get_current_version())
         self._releases(monkeypatch, [
-            {'tag_name': 'v999.1', 'draft': False, 'prerelease': False, 'assets': [],
+            {'tag_name': f'v{major}.999', 'draft': False, 'prerelease': False, 'assets': [],
              'body': 'notes', 'published_at': '2030-01-01T00:00:00Z'},
-            {'tag_name': 'v999.2-rc1', 'draft': False, 'prerelease': True, 'assets': []},
-            {'tag_name': 'v1000.0', 'draft': True, 'prerelease': False, 'assets': []},
+            {'tag_name': f'v{major}.1000-rc1', 'draft': False, 'prerelease': True, 'assets': []},
+            {'tag_name': f'v{major}.1001', 'draft': True, 'prerelease': False, 'assets': []},
         ])
         data = assert_success(auth_client.get('/api/v2/system/updates/check?force=true'))
-        assert data['latest_version'] == '999.1'
+        assert data['latest_version'] == f'{major}.999'
         assert data['update_available'] is True
 
     def test_nothing_newer_offers_nothing(self, auth_client, monkeypatch):
