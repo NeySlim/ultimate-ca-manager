@@ -117,3 +117,91 @@ def test_readiness_still_answers_200_with_the_database(app, client, ha, monkeypa
         r = client.get('/health/ready')
     assert r.status_code == 200, r.get_json()
     assert 'SELECT 1' in seen
+
+
+def _concurrent_checks(app, hr, monkeypatch, read, callers, spacing=0.05):
+    """`callers` database checks started `spacing` apart: their results, durations, the reads
+    made and the most reads in flight at once."""
+    state = {'reads': 0, 'inflight': 0, 'peak': 0}
+    lock = threading.Lock()
+
+    def select_1(_app):
+        with lock:
+            state['reads'] += 1
+            state['inflight'] += 1
+            state['peak'] = max(state['peak'], state['inflight'])
+        try:
+            read()
+        finally:
+            with lock:
+                state['inflight'] -= 1
+    monkeypatch.setattr(hr, '_select_1', select_1)
+    results = [None] * callers
+
+    def call(i):
+        with app.app_context():
+            began = time.monotonic()
+            outcome = hr._check_database()
+            results[i] = (outcome['status'], time.monotonic() - began, time.monotonic())
+    threads = []
+    for i in range(callers):
+        threads.append(threading.Thread(target=call, args=(i,)))
+        threads[-1].start()
+        time.sleep(spacing)
+    for t in threads:
+        t.join(10)
+    return results, state
+
+
+@pytest.mark.parametrize('callers', [1, 2, 5])
+def test_probes_during_a_slow_healthy_check_share_its_success(app, ha, monkeypatch, callers):
+    import api.health_routes as hr
+    monkeypatch.setattr(hr, 'READY_DATABASE_TIMEOUT_SECONDS', 2.0)
+    results, state = _concurrent_checks(app, hr, monkeypatch, lambda: time.sleep(0.4), callers)
+    assert [r[0] for r in results] == ['ok'] * callers
+    assert state['reads'] == 1 and state['peak'] == 1
+    assert all(took < 0.9 for _, took, _ in results), results
+
+
+@pytest.mark.parametrize('callers', [1, 2, 5])
+def test_probes_during_a_silent_check_give_up_at_its_deadline(app, ha, monkeypatch, callers):
+    import api.health_routes as hr
+    release = threading.Event()
+    monkeypatch.setattr(hr, 'READY_DATABASE_TIMEOUT_SECONDS', 0.6)
+    try:
+        began = time.monotonic()
+        results, state = _concurrent_checks(app, hr, monkeypatch, lambda: release.wait(30), callers)
+    finally:
+        release.set()
+    hr.wait_for_pending_check(5)
+    assert [r[0] for r in results] == ['error'] * callers
+    assert state['reads'] == 1 and state['peak'] == 1
+    # Every caller waits for the one check until its deadline, none past it
+    ends = [end - began for _, _, end in results]
+    assert all(0.5 < end < 1.0 for end in ends), ends
+
+
+@pytest.mark.parametrize('callers', [1, 2, 5])
+def test_probes_against_a_failing_database_fail_one_read_at_a_time(app, ha, monkeypatch, callers):
+    import api.health_routes as hr
+
+    def refused():
+        time.sleep(0.01)
+        raise OSError('connection refused')
+    results, state = _concurrent_checks(app, hr, monkeypatch, refused, callers, spacing=0.002)
+    assert [r[0] for r in results] == ['error'] * callers
+    assert 1 <= state['reads'] <= callers and state['peak'] == 1
+    assert all(took < 0.5 for _, took, _ in results), results
+
+
+def test_a_probe_sharing_a_failed_check_logs_it(app, ha, monkeypatch, caplog):
+    import api.health_routes as hr
+    monkeypatch.setattr(hr, 'READY_DATABASE_TIMEOUT_SECONDS', 2.0)
+
+    def refused():
+        time.sleep(0.3)
+        raise OSError('connection refused')
+    with caplog.at_level('ERROR'):
+        results, _ = _concurrent_checks(app, hr, monkeypatch, refused, 2)
+    assert [r[0] for r in results] == ['error', 'error']
+    assert sum('Database health check failed' in r.getMessage() for r in caplog.records) == 2
