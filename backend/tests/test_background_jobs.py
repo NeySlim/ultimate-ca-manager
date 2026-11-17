@@ -419,6 +419,25 @@ def test_a_job_whose_thread_died_unconcluded_is_concluded_by_its_runner(app, fak
         assert _row(job_id)['reason'] == 'executor_lost'
 
 
+def test_a_later_recovery_pass_leaves_the_runners_own_job_running(app, fake_types, created,
+                                                                 monkeypatch):
+    """Single node: only the first pass may take every running job for an orphan."""
+    gate = Gate(monkeypatch, 1)
+    job_id = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created)
+    jr = runner.JobRunner(app, _Scheduler())
+    with app.app_context():
+        jr.run_pass()
+    gate.wait()
+    jr._last_recover = 0.0
+    with app.app_context():
+        jr.run_pass()
+        assert _row(job_id)['state'] == 'running'
+    gate.release.set()
+    assert jr.join(10)
+    with app.app_context():
+        assert _row(job_id)['state'] == 'succeeded'
+
+
 def test_purge_keeps_thirty_days_and_the_latest_of_each_kind(app, fake_types, created, monkeypatch):
     monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
     kind = fake_types[jobs.SLOT_BACKUP]
