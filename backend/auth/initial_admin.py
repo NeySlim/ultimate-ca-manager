@@ -59,7 +59,8 @@ def read_command(path) -> str:
 def resolve(config) -> InitialPassword:
     """Both sources set is refused: which one the operator meant cannot be guessed."""
     value = config.get('INITIAL_ADMIN_PASSWORD') or ''
-    force = str(config.get('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE') or '').lower() in ('1', 'true', 'yes')
+    # Read as docker/ha-database.sh ucm_flag_set reads it: surrounding blanks dropped
+    force = str(config.get('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE') or '').strip().lower() in ('1', 'true', 'yes')
     path = config.get('INITIAL_ADMIN_PASSWORD_FILE') or ''
     if value and path:
         raise InitialPasswordError(

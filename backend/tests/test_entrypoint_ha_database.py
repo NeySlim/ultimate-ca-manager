@@ -580,3 +580,18 @@ def test_the_notice_says_a_password_the_chart_drew_is_not_the_operators(tmp_path
     assert 'the one you provided' not in r.stdout
     assert 'drawn by the deployment' in r.stdout and 'Secret' in r.stdout
     assert 'changed at first login' in r.stdout and 'Drawn24CharsByTheChart00' not in r.stdout
+
+
+FLAG_VALUES = [('1', True), (' 1', True), ('1 ', True), ('\tTrue\n', True), (' yes ', True),
+               ('0', False), ('', False), (' ', False), ('on', False), ('t rue', False), ('1 1', False)]
+
+
+@pytest.mark.parametrize('raw, expected', FLAG_VALUES)
+def test_the_force_change_flag_reads_the_same_in_the_script_and_the_application(tmp_path, raw, expected):
+    """The notice and the application agree: surrounding blanks dropped, nothing else."""
+    from auth import initial_admin
+    r = _run('if ucm_flag_set "$FLAG"; then echo set; else echo unset; fi', {'FLAG': raw}, tmp_path)
+    assert r.stdout.strip() == ('set' if expected else 'unset'), raw
+    got = initial_admin.resolve({'INITIAL_ADMIN_PASSWORD': 'Some-Value-1!',
+                                 'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE': raw})
+    assert got.force_change is expected, raw
