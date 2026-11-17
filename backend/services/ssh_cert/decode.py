@@ -139,11 +139,18 @@ class SSHCertificateDecodeMixin:
         )
 
         try:
+            SSHCAService.lock_ca(matched_ca.id)
             db.session.add(ssh_cert)
             db.session.flush()
+            # Under the CA row, and after the write (SQLite's write lock): a revocation of
+            # the key ID that committed meanwhile is seen here
+            SSHSerials.refuse_revoked_key_id(matched_ca.id, decoded['key_id'], imported=True)
             # The CA chose this serial outside UCM: the next one UCM gives out comes after it
             SSHCAService.raise_serial_counter(matched_ca.id)
             db.session.commit()
+        except ValueError:
+            db.session.rollback()
+            raise
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to store imported SSH certificate: {e}")

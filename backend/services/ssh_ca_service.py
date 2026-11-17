@@ -542,6 +542,13 @@ class SSHCAService:
         raise_counters(session_run, ca_id)
 
     @staticmethod
+    def lock_ca(ca_id):
+        """The CA row, locked until the caller commits (PostgreSQL; SQLite serializes writers):
+        revocations, issuances and imports under one CA take it first, then certificate rows."""
+        db.session.query(SSHCertificateAuthority.id).filter(
+            SSHCertificateAuthority.id == ca_id).with_for_update().first()
+
+    @staticmethod
     def get_next_serial(ca_id):
         """Commit the next serial number of a CA and return it; a failed signature leaves a gap.
 

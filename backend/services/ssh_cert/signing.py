@@ -117,7 +117,8 @@ class SSHCertificateSigningMixin:
             )
         key_id = key_id or default_key_id
         # before a serial is spent
-        SSHSerials.refuse_revoked_key_id(ca_id, key_id, named_by_ca=not ca.allow_custom_key_id)
+        named_by_ca = not ca.allow_custom_key_id
+        SSHSerials.refuse_revoked_key_id(ca_id, key_id, named_by_ca=named_by_ca)
 
         public_key = SSHCertificateUtilsMixin._parse_public_key(public_key_data)
         subject_key_type = SSHCertificateUtilsMixin._detect_key_type(public_key)
@@ -249,9 +250,17 @@ class SSHCertificateSigningMixin:
             serial = SSHCAService.get_next_serial(ca_id)
             ssh_cert = _signed(serial)
             try:
+                SSHCAService.lock_ca(ca_id)
                 db.session.add(ssh_cert)
+                db.session.flush()
+                # Under the CA row, and after the write (SQLite's write lock): a revocation of
+                # the key ID that committed meanwhile is seen here
+                SSHSerials.refuse_revoked_key_id(ca_id, key_id, named_by_ca=named_by_ca)
                 db.session.commit()
                 break
+            except ValueError:
+                db.session.rollback()
+                raise
             except IntegrityError as e:
                 db.session.rollback()
                 if not _serial_held(ca_id, serial):
