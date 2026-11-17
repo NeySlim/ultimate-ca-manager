@@ -675,6 +675,8 @@ result of the OPNsense file importer list such CAs in `unverifiable_parents`: `c
 DELETE /api/v2/cas/{ca_id}
 ```
 
+Answers `204`, or `409` with the reason while the CA is still in use: intermediate CAs or certificates under it, SCEP or Windows enrollment profiles, ACME domains, issuance policies, CRL deployments, or a setting that names it (the default SCEP, ACME issuing or EST CA, the TSA CA, the trusted mTLS CA, an EST label). The message says where to change it; the CA is deleted once nothing names it.
+
 ### List CA Certificates
 ```http
 GET /api/v2/cas/{ca_id}/certificates
@@ -722,10 +724,12 @@ Content-Type: application/json
 {
   "data": {
     "success": [1, 2],
-    "failed": [3]
+    "failed": [{"id": 3, "error": "default ACME issuing CA"}]
   }
 }
 ```
+
+Each CA is judged as `DELETE /api/v2/cas/{ca_id}` judges it; a refused one is listed in `failed` with the short reason and the others are still deleted.
 
 ### Bulk Export CAs
 ```http
