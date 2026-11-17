@@ -72,6 +72,10 @@ def rate_limit_enabled() -> bool:
     return env_bool("RATE_LIMIT_ENABLED", True)
 
 
+CONTAINER_RESTART_REFUSAL = ("Service restart is not available in a container (Docker, Kubernetes). "
+                             "Restart the container or pod instead.")
+
+
 def is_docker():
     """Detect if running in Docker container"""
     return os.path.exists('/.dockerenv') or os.environ.get('UCM_DOCKER') == '1'
@@ -81,7 +85,7 @@ def restart_ucm_service():
     """
     Restart UCM service via signal file.
     ucm-watcher.path detects the file and ucm-watcher.service runs systemctl restart.
-    Not available in Docker — container must be restarted externally, except in HA
+    Not available in a container (Docker, Kubernetes), restarted externally, except in HA
     mode, where a rolling restart of every node is queued instead.
     Returns: (success: bool, message: str)
     """
@@ -90,7 +94,7 @@ def restart_ucm_service():
         from services.cluster_commands import request_restart
         return request_restart()
     if is_docker():
-        return False, "Service restart not available in Docker. Restart the container instead."
+        return False, CONTAINER_RESTART_REFUSAL
     try:
         restart_signal = DATA_DIR / '.restart_requested'
         restart_signal.write_text('restart')
