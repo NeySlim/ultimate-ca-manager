@@ -602,6 +602,13 @@ def sso_callback(provider_type):
     if provider_type not in ('saml', 'oauth2'):
         return redirect('/login?error=invalid_provider_type')
 
+    # Circular import: a sign-in test runs the stages above.
+    from . import sign_in_tests
+    # A callback whose server-side transaction is a sign-in test's never reaches the login.
+    test = sign_in_tests.transaction_of(provider_type)
+    if test is not None:
+        return sign_in_tests.finish(test, provider_type)
+
     # Spent by any OAuth2 return, used only by a successful one.
     oauth2_next = session.pop('sso_next', None) if provider_type == 'oauth2' else None
 

@@ -106,3 +106,4 @@ tests/test_msca_status_import_deploys.py
 tests/test_ssh_serial_concurrency.py
 tests/test_failed_login_count.py
 tests/test_background_jobs*.py
+tests/test_sso_sign_in_test*.py

@@ -42,6 +42,7 @@ from . import mapping_tests
 from . import sessions
 from . import saml_routes
 from . import login_routes
+from . import sign_in_tests
 from . import ldap_routes
 
 # Re-export commonly used helper functions for backward compatibility with tests

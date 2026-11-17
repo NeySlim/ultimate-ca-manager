@@ -4,7 +4,7 @@ from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, UserSSOIdentity
-from models.sso import SSOProvider, SSOSession
+from models.sso import SSOProvider, SSOSession, SSOSignInTest
 from services.audit_service import AuditService
 import json
 from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_list, validate_role_mapping
@@ -450,8 +450,9 @@ def delete_provider(provider_id):
     provider_name = provider.name
     provider_type = provider.provider_type
 
-    # Delete associated sessions first
+    # Delete associated sessions first, and its sign-in tests: a later provider may take its id
     SSOSession.query.filter_by(provider_id=provider_id).delete()
+    SSOSignInTest.query.filter_by(provider_id=provider_id).delete()
     # Its attachments become orphans on both backends (SQLite does not apply ON DELETE
     # SET NULL), keeping its IdP so that only a provider recreated for it takes them back.
     UserSSOIdentity.query.filter_by(provider_id=provider_id).update(
