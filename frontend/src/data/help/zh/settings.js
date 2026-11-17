@@ -545,7 +545,7 @@ Windows 也可以用 \`certreq ... Renew\` 续期，以待续期的证书作为 
 
 自 3.0 起，按证书续期由证书所记录的配置文件（2.x 的 WSTEP 证书：默认配置文件）在该配置文件的签发 CA 下服务；当该配置文件已被删除或已禁用时拒绝，每次拒绝都会连同配置文件和原因写入审计。只有 SID 会由该配置文件的连接器再次检查：请吊销已从组中移除的计算机的证书。TLS 客户端证书仅适用于其签发 CA 即 mTLS CA 或在其之下的配置文件：监听器不信任的证书会在 TLS 握手期间被拒绝，UCM 看不到请求，因此 UCM 不会记录审计（请查看客户端输出和服务日志）。其他配置文件只能通过 Kerberos 续期（由主体所在领域的配置文件提供服务，新证书会记录该配置文件）；若 Kerberos 拒绝（请求者已从 AD 组中移除、配置文件已禁用），则无法续期。Kerberos keytab 会保留已禁用配置文件的密钥，因此其请求会被拒绝并留下审计条目：只有删除该配置文件才会移除这些密钥。
 
-Over Kerberos, a request signed by the requester's own valid certificate of the profile renews it when it names that certificate's template (or the certificate carries none, as one issued before 3.0): the renewed certificate is marked superseded by the new one, as on the Certificate binding, the audit entry is \`certificate.renewed\` and the webhook \`cert.renewed\`, and a second renewal of it is refused on either binding (\`Renewed certificate superseded by a newer one\`). A request naming another template is an enrollment (\`certificate.issued\`), even when the certificate that signs it was renewed already. After a change of the profile's issuing CA, a certificate of the former CA renews the same way: the new CA issues it, and the audit entry \`certificate.renewed\` names the old serial and the old CA.
+通过 Kerberos 时，如果请求由请求者自己持有的、属于该配置文件的有效证书签名，且请求指定的是该证书的模板（或该证书没有模板，如 3.0 之前签发的证书），则会续期该证书：被续期的证书会被标记为已被新证书取代，与证书绑定上一致，审计条目为 \`certificate.renewed\`，Webhook 为 \`cert.renewed\`，对它再次续期在两种绑定上都会被拒绝（\`Renewed certificate superseded by a newer one\`）。指定其他模板的请求属于注册（\`certificate.issued\`），即使用于签名的证书已被续期也是如此。更换配置文件的签发 CA 后，原 CA 的证书以同样方式续期：由新 CA 签发，审计条目 \`certificate.renewed\` 会记录旧序列号和旧 CA。
 
 ### SID 安全扩展 (KB5014754)
 
