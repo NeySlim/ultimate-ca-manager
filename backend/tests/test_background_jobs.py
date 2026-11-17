@@ -7,6 +7,7 @@ fake job on the backup and restore slots that later sub-lots replace with their 
 """
 import os
 import threading
+import time
 import types
 from datetime import timedelta
 
@@ -430,6 +431,32 @@ def test_a_later_recovery_pass_leaves_the_runners_own_job_running(app, fake_type
     gate.wait()
     jr._last_recover = 0.0
     with app.app_context():
+        jr.run_pass()
+        assert _row(job_id)['state'] == 'running'
+    gate.release.set()
+    assert jr.join(10)
+    with app.app_context():
+        assert _row(job_id)['state'] == 'succeeded'
+
+
+def test_the_lease_is_renewed_while_the_job_runs(app, fake_types, created, monkeypatch):
+    """A run longer than its lease stays its executor's: the lease thread pushes it forward."""
+    monkeypatch.setattr(runner, 'RENEW_SECONDS', 0.05)
+    gate = Gate(monkeypatch, 1)
+    job_id = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created)
+    jr = runner.JobRunner(app, _Scheduler())
+    with app.app_context():
+        jr.run_pass()
+    gate.wait()
+    with app.app_context():
+        lapsed = jobs._now() - timedelta(seconds=1)
+        db.session.execute(update(T).where(T.c.id == job_id).values(lease_expires_at=lapsed))
+        db.session.commit()
+        deadline = time.monotonic() + 5
+        while _row(job_id)['lease_expires_at'] <= lapsed:
+            assert time.monotonic() < deadline, 'the lease was never renewed'
+            time.sleep(0.05)
+        jr._last_recover = 0.0
         jr.run_pass()
         assert _row(job_id)['state'] == 'running'
     gate.release.set()
