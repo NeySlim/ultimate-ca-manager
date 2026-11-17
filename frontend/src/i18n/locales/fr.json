@@ -3963,7 +3963,7 @@
     "signInTestCompleteClose": "Cette fenêtre ne s'est pas fermée d'elle-même : fermez-la pour revenir à l'écran du fournisseur.",
     "signInTestCancel": "Annuler",
     "signInTestShadowed": "Autres fournisseurs activés de ce type : {{names}}. La connexion n'emploie qu'un fournisseur activé par type, et pas forcément celui-ci : désactivez {{names}}.",
-    "signInTestShadowedDisabled": "Fournisseurs activés de ce type : {{names}}. La connexion n'emploie qu'un fournisseur activé par type, et pas forcément celui-ci : désactivez {{names}} avant d'activer celui-ci."
+    "signInTestShadowedDisabled": "Fournisseurs activés de ce type : {{names}}. La connexion n'emploie qu'un fournisseur activé par type : désactivez {{names}} avant d'activer celui-ci, sinon la connexion ne passera pas forcément par lui."
   },
   "templates": {
     "template": "Modèle",

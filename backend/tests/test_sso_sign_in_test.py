@@ -1291,3 +1291,34 @@ def test_a_start_during_maintenance_is_refused_and_leaves_no_transaction(app, oi
         Config.HA_MODE, cm.OBSERVE_TTL_SECONDS = saved
     with app.app_context():
         assert SSOSignInTest.query.count() == before
+
+
+def test_deleting_an_account_removes_its_sign_in_tests(app):
+    """A tombstone outlives its test by a day: it must not outlive its owner, whose id SQLite reuses."""
+    from api.v2.users.crud import _purge_user_dependencies
+    with app.app_context():
+        owner, other = (User(username=_uid('owner'), email=f"{_uid('o')}@example.org", role='admin')
+                        for _ in range(2))
+        for user in (owner, other):
+            user.set_password('Sit-Owner-Pass-1!')
+            db.session.add(user)
+        db.session.commit()
+        ids = []
+        for user in (owner, other):
+            row = SSOSignInTest(token=uuid.uuid4().hex, provider_id=1, user_id=user.id, protocol='oauth2',
+                                transaction_hash=uuid.uuid4().hex, browser_hash='', state=SSOSignInTest.DONE,
+                                expires_at=utc_now() - timedelta(minutes=1))
+            db.session.add(row)
+            db.session.commit()
+            ids.append(row.id)
+        try:
+            _purge_user_dependencies(owner.id)
+            db.session.commit()
+            assert db.session.get(SSOSignInTest, ids[0]) is None
+            assert db.session.get(SSOSignInTest, ids[1]) is not None
+        finally:
+            db.session.rollback()
+            SSOSignInTest.query.filter(SSOSignInTest.id.in_(ids)).delete(synchronize_session=False)
+            for user in (owner, other):
+                db.session.delete(db.session.get(User, user.id))
+            db.session.commit()

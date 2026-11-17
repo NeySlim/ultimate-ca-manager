@@ -173,6 +173,9 @@ def _purge_user_dependencies(user_id):
     # Provider attachments (SQLite applies no ON DELETE CASCADE)
     from models import UserSSOIdentity
     UserSSOIdentity.query.filter_by(user_id=user_id).delete()
+    # Sign-in tests keep an emptied row for a day: none outlives its owner, whose id may be reused
+    from models.sso import SSOSignInTest
+    SSOSignInTest.query.filter_by(user_id=user_id).delete()
 
     # SSO sessions
     try:

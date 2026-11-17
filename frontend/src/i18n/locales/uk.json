@@ -4199,7 +4199,7 @@
     "signInTestCompleteClose": "This window did not close by itself: close it to return to the provider screen.",
     "signInTestCancel": "Cancel",
     "signInTestShadowed": "Other enabled providers of this type: {{names}}. A login goes through only one enabled provider per type, and not necessarily this one: disable {{names}}.",
-    "signInTestShadowedDisabled": "Enabled providers of this type: {{names}}. A login goes through only one enabled provider per type, and not necessarily this one: disable {{names}} before enabling this one."
+    "signInTestShadowedDisabled": "Enabled providers of this type: {{names}}. A login goes through only one enabled provider per type: disable {{names}} before enabling this one, or logins may not go through it."
   },
   "notifications": {
     "certificateIssued": "Сертифікат видано: {{name}}",
