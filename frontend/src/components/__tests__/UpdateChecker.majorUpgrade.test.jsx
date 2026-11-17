@@ -130,3 +130,16 @@ describe('upgrade to a later major version', () => {
     expect(mocks.waitForRestart).not.toHaveBeenCalled()
   })
 })
+
+describe('docker hint of an ordinary update', () => {
+  it('names the tag of the new version, never latest', async () => {
+    mocks.get.mockResolvedValue(check({
+      update_available: true, can_auto_update: false, latest_version: '3.2', major_upgrade: null,
+      download_url: null,
+    }))
+    render(<UpdateChecker />)
+    await flush()
+    expect(screen.getByText(/docker pull ghcr\.io\/neyslim\/ultimate-ca-manager:3\.2/)).toBeInTheDocument()
+    expect(screen.queryByText(/:latest/)).toBeNull()
+  })
+})

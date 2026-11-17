@@ -225,7 +225,7 @@ export function UpdateChecker() {
 
             {updateInfo?.update_available && !updateInfo?.can_auto_update && (
               <div className="text-xs text-text-tertiary mt-1">
-                💡 docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+                💡 docker pull {updateInfo.download_url || `ghcr.io/neyslim/ultimate-ca-manager:${updateInfo.latest_version}`}
               </div>
             )}
             
