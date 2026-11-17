@@ -17,7 +17,7 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import requests
 import urllib3
@@ -95,6 +95,72 @@ def group_pids(pgid) -> set:
         if int(fields[2]) == pgid and fields[0] != 'Z':
             pids.add(int(entry.name))
     return pids
+
+
+class SilentProxy:
+    """TCP relay from the nodes to PostgreSQL that can fall silent: while `silent()` lasts it
+    forwards nothing either way and leaves new connections unanswered, so the database neither
+    answers nor refuses (a frozen server, or an address that no longer routes)."""
+
+    def __init__(self, host, port):
+        self.upstream = (host, port)
+        self.listener = socket.create_server(('127.0.0.1', 0))
+        self.port = self.listener.getsockname()[1]
+        self.quiet = threading.Event()
+        self.closed = threading.Event()
+        self.held = []
+        threading.Thread(target=self._accept, daemon=True, name='silent-proxy').start()
+
+    def _accept(self):
+        while not self.closed.is_set():
+            try:
+                client, _ = self.listener.accept()
+            except OSError:
+                return
+            if self.quiet.is_set():
+                self.held.append(client)
+                continue
+            try:
+                server = socket.create_connection(self.upstream, timeout=10)
+                server.settimeout(None)
+            except OSError:
+                client.close()
+                continue
+            for src, dst in ((client, server), (server, client)):
+                threading.Thread(target=self._pump, args=(src, dst), daemon=True).start()
+
+    def _pump(self, src, dst):
+        try:
+            while True:
+                data = src.recv(65536)
+                if not data:
+                    break
+                while self.quiet.is_set() and not self.closed.is_set():
+                    self.closed.wait(0.05)
+                dst.sendall(data)
+        except OSError:
+            pass
+        finally:
+            for sock in (src, dst):
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+
+    @contextmanager
+    def silent(self):
+        self.quiet.set()
+        try:
+            yield
+        finally:
+            self.quiet.clear()
+            held, self.held = self.held, []
+            for client in held:
+                client.close()
+
+    def close(self):
+        self.closed.set()
+        self.listener.close()
 
 
 class Node:
@@ -242,10 +308,13 @@ class Node:
 class Cluster:
     """Nodes A and B (and C), on a schema created here and dropped by close()."""
 
-    def __init__(self, root: Path, names=NODE_NAMES[:2]):
+    def __init__(self, root: Path, names=NODE_NAMES[:2], silent_proxy=False):
         self.schema = f'{SCHEMA_PREFIX}{os.getpid()}_{secrets.token_hex(3)}'
         self.root = root
         self._admin = None
+        # The nodes reach PostgreSQL through it; the bench's own connections do not
+        parts = urlsplit(PG_URL)
+        self.proxy = SilentProxy(parts.hostname, parts.port or 5432) if silent_proxy else None
         self.password = f'Ha-{secrets.token_hex(8)}-9z'
         from cryptography.fernet import Fernet
         shared = {
@@ -268,8 +337,14 @@ class Cluster:
         return [self.app_name(node.name) for node in self.nodes]
 
     def database_url(self, node_name):
-        separator = '&' if '?' in PG_URL else '?'
-        return (f'{PG_URL}{separator}options={quote(f"-csearch_path={self.schema}")}'
+        url = PG_URL
+        if self.proxy is not None:
+            parts = urlsplit(PG_URL)
+            userinfo = parts.netloc.rpartition('@')[0]
+            netloc = f'{userinfo}@127.0.0.1:{self.proxy.port}' if userinfo else f'127.0.0.1:{self.proxy.port}'
+            url = urlunsplit(parts._replace(netloc=netloc))
+        separator = '&' if '?' in url else '?'
+        return (f'{url}{separator}options={quote(f"-csearch_path={self.schema}")}'
                 f'&application_name={quote(self.app_name(node_name))}')
 
     def __getitem__(self, index):
@@ -366,6 +441,8 @@ class Cluster:
                 cur.execute(f'DROP SCHEMA IF EXISTS "{self.schema}" CASCADE')
             self._admin.close()
             self._admin = None
+        if self.proxy is not None:
+            self.proxy.close()
         if errors:
             raise AssertionError('; '.join(errors))
 
