@@ -3106,6 +3106,7 @@
     "majorUpgradeNotes": "阅读发行说明",
     "majorUpgradeInstall": "升级",
     "majorUpgradeConfirm": "将 UCM 从 {{current}} 升级到 {{version}}？这是一个新的主版本：请先阅读发行说明并进行备份。服务将重新启动。",
+    "majorUpgradeConfirmHa": "Upgrade UCM from {{current}} to {{version}}? This is a new major version: read its release notes and take a backup first. This starts a rolling update: the nodes update one at a time, and it stops if the release needs a full stop for its migrations.",
     "majorUpgradeInitiated": "已开始升级到 UCM {{version}}。服务即将重新启动。",
     "majorUpgradeDocker": "Docker：如需升级，请将镜像标签改为 {{image}} 并重新创建容器。",
     "expiryCheckResult": "检查完成：已发送 {{count}} 条提醒",

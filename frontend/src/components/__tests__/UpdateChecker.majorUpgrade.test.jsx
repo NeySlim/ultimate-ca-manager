@@ -118,6 +118,24 @@ describe('upgrade to a later major version', () => {
     expect(screen.getByText(`settings.majorUpgradeDocker:${JSON.stringify({ image })}`)).toBeInTheDocument()
   })
 
+  it('asks the confirmation that fits the mode: a restart, or a rolling update in HA', async () => {
+    const values = JSON.stringify({ current: '3.1', version: '4.3' })
+    mocks.get.mockResolvedValueOnce(check())
+    const first = render(<UpdateChecker />)
+    await flush()
+    fireEvent.click(screen.getByText('settings.majorUpgradeInstall'))
+    await flush()
+    expect(mocks.showConfirm.mock.calls[0][0]).toBe(`settings.majorUpgradeConfirm:${values}`)
+    first.unmount()
+
+    mocks.get.mockResolvedValueOnce(check({ ha_mode: true }))
+    render(<UpdateChecker />)
+    await flush()
+    fireEvent.click(screen.getByText('settings.majorUpgradeInstall'))
+    await flush()
+    expect(mocks.showConfirm.mock.calls[1][0]).toBe(`settings.majorUpgradeConfirmHa:${values}`)
+  })
+
   it('in HA starts a campaign instead of waiting for a restart', async () => {
     const campaign = { id: 'c1', status: 'stopped', target: '4.3', order: [], done: [], current: null, failed: null, skipped: [] }
     mocks.get.mockResolvedValue(check({ ha_mode: true }))
