@@ -3696,7 +3696,16 @@
       "resumeFailed": "Échec de la reprise de la mise à jour progressive",
       "started": "Mise à jour progressive vers v{{version}} lancée : les nœuds se mettent à jour un par un",
       "haNote": "Mode HA : les nœuds se mettent à jour un par un, le suivant seulement une fois le précédent revenu sur la nouvelle version."
-    }
+    },
+    "restoreJobStarting": "La restauration démarre",
+    "restoreJobProgress": "Restauration en cours : étape {{done}} sur {{total}}",
+    "restoreRunsInBackground": "La restauration se déroule en arrière-plan. Les écritures sont refusées jusqu’à sa fin, et elle ferme toutes les sessions : vous vous reconnecterez pour lire son compte rendu.",
+    "restoreCancel": "Annuler la restauration",
+    "restoreCancelled": "La restauration a été annulée : rien n’a été restauré",
+    "restoreCancelFailed": "L’annulation n’a pas pu être envoyée",
+    "restoreLost": "La restauration s’est arrêtée avant d’être validée : rien n’a été restauré. Relancez-la.",
+    "restoreSignInAgain": "La restauration a probablement été validée : elle a fermé cette session. Reconnectez-vous pour lire son compte rendu.",
+    "restoreSignIn": "Se reconnecter"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

@@ -3564,7 +3564,16 @@
       "resumeFailed": "继续滚动更新失败",
       "started": "已开始滚动更新至 v{{version}}：节点将逐个更新",
       "haNote": "HA 模式：节点逐个更新，仅在上一个节点以新版本恢复后才更新下一个。"
-    }
+    },
+    "restoreJobStarting": "The restore is starting",
+    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
+    "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
+    "restoreCancel": "Cancel the restore",
+    "restoreCancelled": "The restore was cancelled: nothing was restored",
+    "restoreCancelFailed": "The cancellation could not be sent",
+    "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
+    "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
+    "restoreSignIn": "Sign in again"
   },
   "account": {
     "profile": "个人资料",
