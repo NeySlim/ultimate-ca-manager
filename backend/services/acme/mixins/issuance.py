@@ -199,7 +199,7 @@ class IssuanceMixin:
                     return False, f"CAA check failed ({caa_checker.DNS_ERROR_MARKER}): lookup error"
                 logger.warning(f"CAA check error (non-blocking): {e}")
         
-        # Resolve CA: domain-specific → global default → first available
+        # Resolve CA: domain-specific → global default; first available only when nothing was chosen
         # IP-only orders have no domains: skips the per-domain mappings and
         # resolves straight to the global default (acme.issuing_ca_id)
         if not ca_refid:
@@ -581,6 +581,10 @@ class IssuanceMixin:
             raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} no longer exists: '
                                     f'choose another one in {where}')
         if not ca.has_private_key:
+            # Taken offline with its key exported: the remedy is the CA itself
+            if ca.offline:
+                raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} is offline: bring it '
+                                        f'back online, or choose a CA able to sign in {where}')
             raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} has no private key: '
                                     f'choose a CA able to sign in {where}')
         return ca.refid

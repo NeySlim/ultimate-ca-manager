@@ -98,7 +98,7 @@ def _issuer_refid(order):
 def _assert_refused(success, error, service, order, words):
     assert not success
     assert words in error, error
-    # RFC 8555 §7.4: a server-side failure; the route puts the order back to ready
+    # A server-side failure; the route puts the order back to ready (tested through the route below)
     assert service._last_finalize_error_type == 'serverInternal'
     assert order.status == 'processing' and order.certificate_id is None
 
@@ -206,3 +206,49 @@ def test_a_resumed_approval_whose_ca_lost_its_key_is_not_signed_by_another(app, 
         success, error, service, order = _finalize(monkeypatch, _domain(), ca_refid=ca.refid,
                                                    approval=object())
         _assert_refused(success, error, service, order, words=NO_KEY)
+
+
+def test_the_finalize_route_answers_a_server_error_and_the_order_stays_ready(app, client, monkeypatch,
+                                                                              create_ca, default_setting):
+    """What UPGRADE.md says of the refusal: serverInternal, the order ready again, the cause audited
+    and kept from the client."""
+    from models import AuditLog
+    from tests.test_acme_server_rfc_conformance import _b64u, _new_account, _ready_order, _signed
+    from utils import caa_checker
+    monkeypatch.setattr(caa_checker, 'check_caa_for_domains', lambda *a, **k: (True, 'allowed'))
+    chosen = create_ca(cn='Default CA without key, by the route')
+    domain = _domain()
+    with app.app_context():
+        _set_default(db.session.get(CA, chosen['id']).refid)
+        _drop_key(chosen['id'])
+    acct = _new_account(app)
+    order_id = _ready_order(app, acct, [{'type': 'dns', 'value': domain}])
+    key = ec.generate_private_key(ec.SECP256R1())
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, domain)]))
+           .add_extension(x509.SubjectAlternativeName([x509.DNSName(domain)]), False)
+           .sign(key, hashes.SHA256()))
+    response = _signed(client, acct, f'/acme/order/{order_id}/finalize',
+                       {'csr': _b64u(csr.public_bytes(serialization.Encoding.DER))})
+    assert response.status_code == 500, response.get_data(as_text=True)
+    problem = response.get_json()
+    assert problem['type'] == 'urn:ietf:params:acme:error:serverInternal'
+    assert NO_KEY not in json.dumps(problem)
+    with app.app_context():
+        order = AcmeOrder.query.filter_by(order_id=order_id).one()
+        assert order.status == 'ready' and order.certificate_id is None
+        line = (AuditLog.query.filter_by(action='acme.order.finalize', resource_id=str(order_id))
+                .order_by(AuditLog.id.desc()).first())
+        assert line is not None and not line.success and NO_KEY in line.details
+
+
+def test_a_chosen_ca_taken_offline_is_named_as_offline(app, monkeypatch, create_ca, default_setting):
+    chosen = create_ca(cn='Default CA taken offline')
+    with app.app_context():
+        ca = db.session.get(CA, chosen['id'])
+        _set_default(ca.refid)
+        ca.prv, ca.hsm_key_id, ca.offline = None, None, True
+        db.session.commit()
+        success, error, service, order = _finalize(monkeypatch, _domain())
+        assert not success and 'is offline' in error and NO_KEY not in error, error
+        assert service._last_finalize_error_type == 'serverInternal' and order.certificate_id is None
