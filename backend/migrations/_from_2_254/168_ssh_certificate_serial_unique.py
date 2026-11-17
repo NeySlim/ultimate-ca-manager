@@ -4,13 +4,15 @@
 ``ssh_certificates.serial_duplicate`` marks them, which takes them out of the unique index
 ``uq_ssh_certificates_ca_serial``; each pair is logged and listed under
 ``ssh_serial_duplicates_marked``, which the next start turns into audit entries
-(utils/ssh_serials.report_marked_duplicates). Every counter then moves past the serials its CA
+(utils/ssh_serials.report_marked_duplicates). A valid holder of a revoked serial is revoked with it,
+as the KRL revokes it, and its entry says so. Every counter then moves past the serials its CA
 holds. Running it again changes nothing.
 """
 import logging
 import sqlite3
 
-from utils.ssh_serials import CREATE_INDEX, FLAG, describe, list_for_next_start, mark_duplicates, raise_counters
+from utils.ssh_serials import (CREATE_INDEX, FLAG, align_revocations, describe, list_for_next_start,
+                               mark_duplicates, raise_counters)
 
 logger = logging.getLogger(__name__)
 pg_compatible = True
@@ -24,7 +26,7 @@ def _apply(run, tables, columns, add_column):
         return
     if FLAG not in columns:
         run(add_column)
-    groups = mark_duplicates(run)
+    groups = mark_duplicates(run, align_revocations(run))
     for entry in groups:
         logger.warning("Upgrade step 168: %s", describe(entry))
     if CONFIG in tables:

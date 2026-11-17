@@ -375,3 +375,109 @@ def test_an_archive_whose_counter_trails_its_certificates_restores_past_them(ins
     _restore(master, payload, mode)
     db.session.remove()
     _next_is_new(_ca_by_refid(refid), issued)
+
+
+# --- a pair whose holders are revoked or not -----------------------------------------------
+# The KRL revokes a serial (PROTOCOL.krl §2.2): once a holder of a pair is revoked, its partner is
+# revoked too, with the date and reason of the oldest revoked holder. Pair {none revoked, the older,
+# the newer, both} x path {upgrade, restore merge, restore replace}; an import cannot make a pair (it
+# refuses a held serial), so its cells are the holder {valid, revoked}. 14 cells per engine.
+PAIRS = ('none', 'older', 'newer', 'both')
+REASONS = {'older': 'keyCompromise', 'newer': 'superseded'}
+
+
+def _expected_pair(pair):
+    """(revoked, reason) of the older and the newer holder once the path ran."""
+    if pair == 'none':
+        return [(False, None), (False, None)]
+    if pair == 'both':
+        return [(True, REASONS['older']), (True, REASONS['newer'])]
+    return [(True, REASONS[pair])] * 2
+
+
+def _holders(ca_id, serial):
+    return db.session.execute(select(CERTS.c.revoked, CERTS.c.revoke_reason, CERTS.c.revoked_at)
+                              .where(CERTS.c.ssh_ca_id == ca_id, CERTS.c.serial == serial)
+                              .order_by(CERTS.c.id)).all()
+
+
+def _assert_pair(rows, pair):
+    assert [(bool(r[0]), r[1]) for r in rows] == _expected_pair(pair), rows
+    if pair in ('older', 'newer'):
+        assert rows[0][2] is not None and rows[0][2] == rows[1][2], rows
+
+
+@pytest.mark.parametrize('mode', ('merge', 'replace'))
+@pytest.mark.parametrize('pair', PAIRS)
+def test_a_restored_pair_is_revoked_as_the_krl_revokes_it(installation, mode, pair):
+    ca_id = _ca(f'revoked pair {mode} {pair}')
+    refid = db.session.get(SSHCertificateAuthority, ca_id).refid
+    first, second = (SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['pair'])
+                     for _ in range(2))
+    ids = [first.id, second.id]
+    if pair in ('older', 'both'):
+        SSHCertificateService.revoke_certificate(first.id, REASONS['older'], 't')
+    if pair in ('newer', 'both'):
+        SSHCertificateService.revoke_certificate(second.id, REASONS['newer'], 't')
+    master, store = _archive()
+    payload = {name: copy.deepcopy(list(store[name])) for name in ('ssh_cas', 'ssh_certificates')}
+    for row in payload['ssh_certificates']:
+        row.pop('serial_duplicate', None)
+    held = [row for row in payload['ssh_certificates'] if row['refid'] in
+            {c.refid for c in db.session.query(SSHCertificate).filter(SSHCertificate.id.in_(ids))}]
+    serial = min(row['serial'] for row in held)
+    for row in held:
+        row['serial'] = serial
+    _forget(ca_id, [first.serial, second.serial])
+    _restore(master, payload, mode)
+    db.session.remove()
+    _assert_pair(_holders(_ca_by_refid(refid), serial), pair)
+
+
+@pytest.mark.parametrize('holder', ('valid', 'revoked'))
+def test_an_import_never_makes_a_pair(installation, holder):
+    ca_id, key = _imported_ca(f'import pair {holder}')
+    SSHCertificateService.import_certificate(_signed_elsewhere(key, 4), ssh_ca_id=ca_id, username='t')
+    held = db.session.query(SSHCertificate).filter_by(ssh_ca_id=ca_id, serial=4).one()
+    if holder == 'revoked':
+        SSHCertificateService.revoke_certificate(held.id, 'superseded', 't')
+    with pytest.raises(ValueError, match='already exists'):
+        SSHCertificateService.import_certificate(_signed_elsewhere(key, 4), ssh_ca_id=ca_id, username='t')
+    db.session.rollback()
+    assert len(_holders(ca_id, 4)) == 1
+
+
+@pytest.mark.parametrize('dialect', ENGINES)
+def test_an_upgraded_pair_is_revoked_as_the_krl_revokes_it(app, dialect, tmp_path, monkeypatch):
+    import json
+    from utils.ssh_serials import MARKED_KEY, describe
+    when = {'older': '2026-03-01 10:00:00', 'newer': '2026-04-01 10:00:00'}
+    for base in make_base(dialect, tmp_path, monkeypatch, 'sshpr'):
+        for n, pair in enumerate(PAIRS, start=1):
+            base.run("INSERT INTO ssh_cas (id, refid, descr, ca_type, public_key, private_key, key_type, "
+                     "fingerprint, serial_counter, allow_any_principal, allow_custom_key_id) VALUES "
+                     "(:i, :r, :d, 'user', 'pub', 'prv', 'ed25519', :f, 1, TRUE, FALSE)",
+                     {'i': n, 'r': f'pair-{pair}', 'd': f'Pair {pair}', 'f': f'SHA256:pair{n}'})
+            for m, side in enumerate(('older', 'newer')):
+                revoked = pair in (side, 'both')
+                base.run("INSERT INTO ssh_certificates (id, refid, ssh_ca_id, cert_type, key_id, public_key, "
+                         "certificate, principals, serial, valid_from, valid_to, key_type, fingerprint, revoked, "
+                         "revoked_at, revoke_reason) VALUES (:i, :r, :c, 'user', 'k', 'pub', 'cert', '[]', 5, "
+                         "'2026-01-01 00:00:00', '2027-01-01 00:00:00', 'ed25519', :f, :rv, :at, :why)",
+                         {'i': 10 * n + m, 'r': f'pair-{pair}-{m}', 'c': n, 'f': f'SHA256:{pair}{m}',
+                          'rv': revoked, 'at': when[side] if revoked else None,
+                          'why': REASONS[side] if revoked else None})
+        assert base.upgrade()
+        listed = {e['ssh_ca_id']: e for e in json.loads(
+            base.run('SELECT value FROM system_config WHERE key = :k', {'k': MARKED_KEY})[0][0])}
+        for n, pair in enumerate(PAIRS, start=1):
+            rows = base.run('SELECT revoked, revoke_reason, revoked_at FROM ssh_certificates '
+                            'WHERE ssh_ca_id = :c ORDER BY id', {'c': n})
+            assert [(bool(r[0]), r[1]) for r in rows] == _expected_pair(pair), (pair, rows)
+            text_of = describe(listed[n])
+            if pair in ('older', 'newer'):
+                assert str(rows[0][2])[:19] == str(rows[1][2])[:19] == when[pair], rows
+                partner, source = (10 * n + 1, 10 * n) if pair == 'older' else (10 * n, 10 * n + 1)
+                assert f'#{partner} revoked with #{source}' in text_of, text_of
+            else:
+                assert 'revoked with' not in text_of, text_of
