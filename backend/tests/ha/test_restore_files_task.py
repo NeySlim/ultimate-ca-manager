@@ -33,7 +33,7 @@ def test_each_node_reconciles_its_own_directories_at_its_restart(cluster, admin)
     assert not (b.data_dir / 'certs').is_symlink()
 
     def restore():
-        found = restore_answer(admin, a, name, archive.content, PASSWORD, cluster.password)
+        found = restore_answer(admin, a, name, archive.content, PASSWORD, cluster)
         if found.status_code == 409 and 'maintenance_not_acknowledged' in found.text:
             return None
         if found.status_code == 503:  # the refused attempt's maintenance, not yet seen lifted here

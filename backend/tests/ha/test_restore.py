@@ -24,6 +24,20 @@ def _cas(client):
     return {ca.get('descr') or ca.get('common_name'): ca['id'] for ca in items}
 
 
+def _rolling_restart(cluster):
+    """The rolling restart, as the watchers would run it: node A, then B (then C)."""
+    for node in cluster.nodes:
+        restart_file = node.data_dir / '.restart_requested'
+        wait_until(lambda: restart_file.exists() or not node.alive(), READY_TIMEOUT,
+                   f'node {node.name} takes its turn of the rolling restart')
+        node.stop()
+        restart_file.unlink(missing_ok=True)
+        node.start()
+        wait_until(node.ready, READY_TIMEOUT, f'node {node.name} ready again')
+    wait_until(lambda: all(n.health().get('maintenance') is None for n in cluster.nodes), 60,
+               'the maintenance lifted on every node')
+
+
 def test_a_restore_on_a_while_b_writes(cluster, admin):
     a, b = cluster.nodes[:2]
     before = create_ca(admin, 'HA restore kept CA')
@@ -58,7 +72,7 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
         started = time.monotonic()
         cookies_before = admin.http.cookies.get_dict()
         stored_before = cluster.sql('SELECT session_id, data, expiry FROM flask_sessions')
-        r = restore_answer(admin, a, name, archive.content, PASSWORD, cluster.password)
+        r = restore_answer(admin, a, name, archive.content, PASSWORD, cluster)
         assert r.status_code == 200, r.text[:1000]
         restored_in = time.monotonic() - started
         assert r.json()['data']['restart_requested'] is True
@@ -78,18 +92,7 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
         wait_until(lambda: node.health()['maintenance']['phase'] == 'restarting',
                    3 * OBSERVE_TTL_SECONDS, f'node {node.name} shows the restore as done')
 
-    # The rolling restart, as the watchers would run it: node A, then B (then C)
-    for node in cluster.nodes:
-        restart_file = node.data_dir / '.restart_requested'
-        wait_until(lambda: restart_file.exists() or not node.alive(), READY_TIMEOUT,
-                   f'node {node.name} takes its turn of the rolling restart')
-        node.stop()
-        restart_file.unlink(missing_ok=True)
-        node.start()
-        wait_until(node.ready, READY_TIMEOUT, f'node {node.name} ready again')
-
-    wait_until(lambda: all(n.health().get('maintenance') is None for n in cluster.nodes), 60,
-               'the maintenance lifted on every node')
+    _rolling_restart(cluster)
     # Lifted once every fresh heartbeat carries a start after the restore
     serving = time.monotonic()
     wait_until(lambda: cluster.sql('SELECT count(*) FROM cluster_maintenance')[0][0] == 0, 120,
@@ -110,3 +113,42 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
     issue(again, names['HA restore kept CA'], 'after-restore.ucm-ha.test')
     print(f'restore with acknowledgements: {restored_in:.1f}s; B refused from write {first} '
           f'of {len(codes)}; row removed {lifted_in:.1f}s after both nodes served')
+
+
+def test_a_restore_answered_202_is_followed_to_its_end(cluster):
+    """Prefer: respond-async forces the job branch: its session revoked and every sign-in refused
+    while the maintenance holds, the bench reads the job in its table; the end is the route's 200."""
+    import json
+    a = cluster.nodes[0]
+    client = Client.login(a, cluster.password)
+    create_ca(client, 'HA async restore kept CA')
+    r = client.post('/api/v2/system/backup', {'password': PASSWORD})
+    assert r.status_code == 200, r.text[:500]
+    name = r.json()['data']['filename']
+    archive = client.get(f'/api/v2/system/backup/{name}/download')
+    assert archive.status_code == 200, archive.text[:300]
+    create_ca(client, 'HA async restore dropped CA')
+    answer = restore_answer(client, a, name, archive.content, PASSWORD, cluster,
+                            prefer='respond-async')
+    accepted = getattr(answer, 'accepted', None)
+    assert accepted is not None and accepted.status_code == 202, answer.text[:500]
+    assert accepted.headers['Preference-Applied'] == 'respond-async'
+    assert answer.status_code == 200, answer.text[:1000]
+    assert answer.json()['data']['restart_requested'] is True
+    job_id = accepted.json()['data']['job']['id']
+    (state, phase, result), = cluster.sql(
+        'SELECT state, phase, result FROM background_jobs WHERE id = %s', (job_id,))
+    assert (state, phase) == ('succeeded', 'crls_regenerated')
+    assert json.loads(result)['code'] == 200
+    # Revoked: the restorer's session is refused, and so is a new sign-in until the restart
+    # (unless node A already left for its turn of the rolling restart)
+    try:
+        assert client.get('/api/v2/account/profile').status_code == 401
+        refused = client.http.post(a.url('/api/v2/auth/login'), timeout=30,
+                                   json={'username': 'admin', 'password': cluster.password})
+        assert refused.status_code == 503, refused.text[:300]
+    except requests.ConnectionError:
+        assert not a.alive()
+    _rolling_restart(cluster)
+    names = _cas(Client.login(a, cluster.password))
+    assert 'HA async restore kept CA' in names and 'HA async restore dropped CA' not in names, names

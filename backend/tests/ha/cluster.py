@@ -521,26 +521,35 @@ class _Answer:
         return self._body
 
 
-def restore_answer(client, node, name, content, password, admin_password, timeout=300):
-    """POST a restore to ``node``; past the route's wait (202) follow its job, signing in again
-    once the restore has revoked the session, and answer what the route would have."""
-    r = client.http.post(node.url('/api/v2/system/restore'), headers=client._headers(),
+def restore_answer(client, node, name, content, password, cluster, timeout=300, prefer=None):
+    """POST a restore to ``node``; past the route's wait (202) follow its job and answer what the
+    route would have. Once the restore has revoked the session (401) the job is read in the
+    jobs table: signing in again is refused (503) until the node restarts after the restore."""
+    headers = dict(client._headers(), **({'Prefer': prefer} if prefer else {}))
+    r = client.http.post(node.url('/api/v2/system/restore'), headers=headers,
                          files={'file': (name, content)}, data={'password': password},
                          timeout=timeout)
     if r.status_code != 202:
         return r
-    location, reader = r.headers['Location'], client
-    deadline = time.monotonic() + timeout
+    job_id, location = r.json()['data']['job']['id'], r.headers['Location']
+    deadline, revoked = time.monotonic() + timeout, False
     while time.monotonic() < deadline:
-        seen = reader.http.get(node.url(location), timeout=60)
-        if seen.status_code == 401:
-            reader = Client.login(node, admin_password)
-            continue
-        assert seen.status_code == 200, seen.text[:500]
-        job = seen.json()['data']
-        if job['state'] in ('succeeded', 'failed', 'cancelled'):
-            assert job['result'] is not None, job
-            return _Answer(job['result'])
+        if not revoked:
+            seen = client.http.get(node.url(location), timeout=60)
+            revoked = seen.status_code == 401
+            if not revoked:
+                assert seen.status_code == 200, seen.text[:500]
+        if revoked:
+            (state, result), = cluster.sql(
+                'SELECT state, result FROM background_jobs WHERE id = %s', (job_id,))
+        else:
+            state, result = seen.json()['data']['state'], seen.json()['data']['result']
+        if state in ('succeeded', 'failed', 'cancelled'):
+            result = json.loads(result) if isinstance(result, str) else result
+            assert result is not None, (job_id, state)
+            answer = _Answer(result)
+            answer.accepted = r
+            return answer
         time.sleep(1)
     raise AssertionError(f'restore job not final within {timeout}s')
 

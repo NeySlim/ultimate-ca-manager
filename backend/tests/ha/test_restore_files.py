@@ -81,7 +81,7 @@ def test_after_a_restore_on_a_every_node_holds_the_files_of_the_database(cluster
 
     def restore():
         # B's scheduler process acknowledges once its start is done: refused until then
-        found = restore_answer(admin, a, name, archive.content, PASSWORD, cluster.password)
+        found = restore_answer(admin, a, name, archive.content, PASSWORD, cluster)
         if found.status_code == 409 and 'maintenance_not_acknowledged' in found.text:
             return None
         if found.status_code == 503:  # the refused attempt's maintenance, not yet seen lifted here
