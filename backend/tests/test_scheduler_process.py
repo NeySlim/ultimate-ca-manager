@@ -4,6 +4,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 import types
 
@@ -321,3 +322,41 @@ def test_stop_says_the_node_stopped_once(supervisor):
     s.stop()
     s.stop()
     assert calls == [1]
+
+
+class _UnseenExit:
+    """The process as gevent's Popen sees it in the master once the arbiter's waitpid(-1)
+    reaped it first: its child watcher never fires, poll() stays None, wait() times out."""
+
+    def __init__(self, proc):
+        self._proc, self.pid, self.returncode = proc, proc.pid, None
+
+    def poll(self):
+        return None
+
+    def wait(self, timeout=None):
+        time.sleep(timeout or 0)
+        raise subprocess.TimeoutExpired('scheduler', timeout)
+
+    def send_signal(self, signum):
+        os.kill(self.pid, signum)
+
+    def kill(self):
+        self.send_signal(signal.SIGKILL)
+
+
+def test_a_process_another_reaper_collected_counts_as_stopped(supervisor):
+    s = supervisor(graceful=3.0)
+    calls = []
+    s._owner_pid, s._on_stopped = os.getpid(), lambda: calls.append(1)
+    real = s._spawn()
+    s._proc = _UnseenExit(real)
+    # The arbiter's reap_workers collects the exit, so the Popen object never sees it
+    reaper = threading.Thread(target=os.waitpid, args=(real.pid, 0), daemon=True)
+    reaper.start()
+    started = time.monotonic()
+    s.stop()
+    assert time.monotonic() - started < 1.5, 'waited for an exit nobody would report'
+    assert calls == [1]
+    reaper.join(5)
+    real.returncode = 0

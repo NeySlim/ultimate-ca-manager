@@ -39,8 +39,12 @@ def test_a_node_stopped_twenty_times_releases_its_row_each_time(cluster):
         assert held.get(node.url('/health/live'), timeout=10).status_code == 200  # stays open
         os.kill(node.proc.pid, signal.SIGTERM)
         began = time.monotonic()
-        wait_until(lambda: _token(cluster, node) == (None, None), ORCHESTRATOR_GRACE - 1,
-                   f'row of {node.name} released and marked stopped (stop {stop + 1})')
+        try:
+            wait_until(lambda: _token(cluster, node) == (None, None), ORCHESTRATOR_GRACE - 1,
+                       f'row of {node.name} released and marked stopped (stop {stop + 1})')
+        except AssertionError as e:
+            row = cluster.sql('SELECT * FROM cluster_nodes WHERE node_id = %s', (node.name,))
+            raise AssertionError(f'{e}\nrow: {row}\nconsole:\n{node.console.read_text()[-8000:]}') from None
         released_after.append(time.monotonic() - began)
         node._signal(signal.SIGKILL)
         node.proc.wait(timeout=STOP_TIMEOUT)

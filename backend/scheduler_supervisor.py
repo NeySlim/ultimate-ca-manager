@@ -15,6 +15,33 @@ HEALTHY_AFTER = 60
 STOP_POLL = 0.5
 
 
+def _gone(proc) -> bool:
+    """The process exited. The gunicorn arbiter reaps every child with waitpid(-1): when it
+    collects this one first, gevent's Popen in the master never learns of the exit."""
+    if proc.poll() is not None:
+        return True
+    try:
+        os.kill(proc.pid, 0)
+    except ProcessLookupError:
+        return True
+    except OSError:
+        return False
+    try:  # exited, not reaped yet
+        with open(f'/proc/{proc.pid}/stat') as handle:
+            return handle.read().rsplit(')', 1)[1].split()[0] == 'Z'
+    except (OSError, IndexError):
+        return False
+
+
+def _wait_gone(proc, timeout, step=0.1) -> bool:
+    deadline = time.monotonic() + timeout
+    while not _gone(proc):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(step)
+    return True
+
+
 class SchedulerSupervisor:
     def __init__(self, command=None):
         self.command = command or [sys.executable, '-m', 'scheduler_main']
@@ -109,10 +136,8 @@ class SchedulerSupervisor:
         """The process's exit code. The master stopping stops it at once, beside the workers'
         drain: an orchestrator's kill at the end of its grace then finds the node released."""
         while True:
-            try:
-                return proc.wait(timeout=STOP_POLL)
-            except subprocess.TimeoutExpired:
-                pass
+            if _wait_gone(proc, STOP_POLL, STOP_POLL):
+                return proc.returncode
             if self._mine() and self._master_stopping():
                 self._stopping = True
                 self._terminate()
@@ -135,15 +160,16 @@ class SchedulerSupervisor:
             return
         try:
             proc.send_signal(signal.SIGTERM)
-            proc.wait(timeout=self.graceful_timeout + 5)
-        except subprocess.TimeoutExpired:
-            if not self._mine():
-                return
-            self.log.warning("Scheduler process %s killed after %ss", proc.pid, self.graceful_timeout)
-            proc.kill()
-            proc.wait(timeout=5)
         except OSError:
-            pass
+            return
+        if _wait_gone(proc, self.graceful_timeout + 5) or not self._mine():
+            return
+        self.log.warning("Scheduler process %s killed after %ss", proc.pid, self.graceful_timeout)
+        try:
+            proc.kill()
+        except OSError:
+            return
+        _wait_gone(proc, 5)
 
     def restart(self) -> None:
         """New code and configuration on HUP: stop the process, the watcher starts another."""
