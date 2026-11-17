@@ -1248,6 +1248,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     if held is not None and matched_template is not None and not _renews_template(
             held, matched_template, ca, profile=profile):
         renewed = None
+    # Nor does a replaced certificate of a template renew a request naming none: refused as when valid
+    if isinstance(renewed, SupersededRenewal) and matched_template is None and _template_ext_oid(held) is not None:
+        renewed = None
     # Renewed already, on either binding: refused as the Certificate binding refuses it
     if isinstance(renewed, SupersededRenewal):
         return None, RENEWED_SUPERSEDED

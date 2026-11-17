@@ -363,6 +363,16 @@ def test_a_request_for_another_template_signed_by_a_renewed_certificate_is_an_en
     assert _archived(app, old) == [True]
 
 
+def test_a_template_less_request_signed_by_a_templated_certificate_is_refused_alike_replaced_or_not(
+        app, client, world, realm_a, directory):
+    """Naming no template, signed by hosta$'s certificate of a template: the same refusal whether
+    that certificate is still valid or was renewed already."""
+    old, key = _old(app, client, world, realm_a, True)
+    assert _fault(_renew(client, world, MACHINE, old, key)) == (400, 's:Sender', NO_TEMPLATE)
+    assert _certificate_renewal(client, old, key).status_code == 200
+    assert _fault(_renew(client, world, MACHINE, old, key)) == (400, 's:Sender', NO_TEMPLATE)
+
+
 # --- The webhook a renewal emits ------------------------------------------------------------------
 
 @pytest.fixture
