@@ -79,7 +79,7 @@ def _rows_holding(cert: x509.Certificate, *criteria) -> list:
         # Every spelling: rows the upgrade step 144 left pending may hold the revoked twin
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
-    ).all()
+    ).order_by(Certificate.id).all()    # one order on both engines: callers read the first row
     rows = []
     for row in candidates:
         try:
