@@ -52,6 +52,20 @@ def test_liveness_touches_no_database(app, client, ha, path):
     assert seen == []
 
 
+@pytest.mark.parametrize('path', LIVE + READY)
+def test_a_session_key_reload_due_waits_for_another_request(app, client, ha, monkeypatch, path):
+    import api.health_routes as hr
+    from security import session_key
+    monkeypatch.setattr(hr, '_select_1', lambda _app: None)
+    monkeypatch.setattr(hr, '_check_cluster', lambda: {'status': 'ok'})
+    state = app.extensions.setdefault(session_key._STATE, {})
+    monkeypatch.setitem(state, 'retry', (time.monotonic() - 1, 1))
+    loads = []
+    monkeypatch.setattr(session_key, 'load_keys', lambda *a, **k: loads.append(a))
+    assert client.get(path).status_code == 200
+    assert loads == []
+
+
 @pytest.mark.parametrize('path', READY)
 def test_readiness_reads_nothing_more_once_select_1_failed(app, client, ha, monkeypatch, path):
     import api.health_routes as hr
