@@ -7,6 +7,7 @@ import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
 import LegacyGroupsNotice from './LegacyGroupsNotice'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import SignInTestPanel from './SignInTestPanel'
 import { formatDate } from '../../../lib/utils'
 
 export const NAMEID_UNSPECIFIED = 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
@@ -44,6 +45,7 @@ export default function SsoSamlFields({
   samlAcsUrl,
   samlSloUrl,
   handleTestConnection,
+  dirty,
 }) {
   const { t } = useTranslation()
 
@@ -143,6 +145,7 @@ export default function SsoSamlFields({
               {t('sso.testConnection')}
             </Button>
           )}
+          <SignInTestPanel provider={provider} dirty={dirty} formData={formData} handleChange={handleChange} />
         </div>
       </CompactSection>
 

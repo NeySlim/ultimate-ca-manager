@@ -7,6 +7,7 @@ import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
 import LegacyGroupsNotice from './LegacyGroupsNotice'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
+import SignInTestPanel from './SignInTestPanel'
 
 export default function SsoOAuth2Fields({
   formData,
@@ -21,6 +22,7 @@ export default function SsoOAuth2Fields({
   customRoles,
   oauthCallbackUrl,
   handleTestConnection,
+  dirty,
   secretProps,
 }) {
   const { t } = useTranslation()
@@ -115,6 +117,7 @@ export default function SsoOAuth2Fields({
               {t('sso.testConnection')}
             </Button>
           )}
+          <SignInTestPanel provider={provider} dirty={dirty} formData={formData} handleChange={handleChange} />
         </div>
       </CompactSection>
 
