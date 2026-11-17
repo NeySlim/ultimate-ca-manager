@@ -630,7 +630,7 @@
     "tooManyAttempts": "失败尝试次数过多",
     "retryAfterSeconds": "请在 {{seconds}} 秒后重试。",
     "retryLater": "请稍后重试。",
-    "maintenanceRestoring": "备份恢复即将完成：服务器重启后将再次接受登录。",
+    "maintenanceRestoring": "备份恢复正在进行：恢复结束后，此服务器将再次接受登录。",
     "maintenanceActive": "服务器正在维护：维护结束前将拒绝登录。",
     "maintenanceRetryIn": "{{seconds}} 秒后重新登录。",
     "retryNow": "立即重试"
@@ -3102,7 +3102,7 @@
     "updateInitiated": "已启动v{{version}}更新...",
     "installFailed": "安装更新失败",
     "majorUpgradeTitle": "升级到 UCM {{version}}",
-    "majorUpgradeDesc": "这是一个新的主版本。自动更新绝不会安装它：升级只能在此处由您手动发起。",
+    "majorUpgradeDesc": "这是一个新的主版本。自动更新绝不会安装它：只有在您提出请求时才会进行升级。",
     "majorUpgradeNotes": "阅读发行说明",
     "majorUpgradeInstall": "升级",
     "majorUpgradeConfirm": "将 UCM 从 {{current}} 升级到 {{version}}？这是一个新的主版本：请先阅读发行说明并进行备份。服务将重新启动。",

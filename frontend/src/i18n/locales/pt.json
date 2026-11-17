@@ -630,7 +630,7 @@
     "tooManyAttempts": "Tentativas falhadas em excesso",
     "retryAfterSeconds": "Tente novamente dentro de {{seconds}} segundos.",
     "retryLater": "Tente novamente mais tarde.",
-    "maintenanceRestoring": "Está a terminar a restauração de um backup: este servidor volta a aceitar inícios de sessão depois de reiniciar.",
+    "maintenanceRestoring": "Está em curso a restauração de um backup: este servidor volta a aceitar inícios de sessão quando terminar.",
     "maintenanceActive": "Este servidor está em manutenção: os inícios de sessão são recusados até ao fim da manutenção.",
     "maintenanceRetryIn": "Nova tentativa de início de sessão dentro de {{seconds}} s.",
     "retryNow": "Tentar agora"
@@ -3102,7 +3102,7 @@
     "updateInitiated": "Atualização para v{{version}} iniciada...",
     "installFailed": "Falha ao instalar a atualização",
     "majorUpgradeTitle": "Atualizar para o UCM {{version}}",
-    "majorUpgradeDesc": "Uma nova versão principal. As atualizações automáticas nunca a instalam: a atualização só é feita aqui, a seu pedido.",
+    "majorUpgradeDesc": "Uma nova versão principal. As atualizações automáticas nunca a instalam: a atualização só é feita a seu pedido.",
     "majorUpgradeNotes": "Ler as notas da versão",
     "majorUpgradeInstall": "Atualizar",
     "majorUpgradeConfirm": "Atualizar o UCM de {{current}} para {{version}}? Esta é uma nova versão principal: leia as notas da versão e faça primeiro uma cópia de segurança. O serviço será reiniciado.",

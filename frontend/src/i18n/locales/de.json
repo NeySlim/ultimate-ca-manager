@@ -630,7 +630,7 @@
     "tooManyAttempts": "Zu viele fehlgeschlagene Versuche",
     "retryAfterSeconds": "Versuchen Sie es in {{seconds}} Sekunden erneut.",
     "retryLater": "Versuchen Sie es später erneut.",
-    "maintenanceRestoring": "Eine Wiederherstellung der Sicherung wird abgeschlossen: Dieser Server nimmt Anmeldungen wieder an, sobald er neu gestartet ist.",
+    "maintenanceRestoring": "Eine Wiederherstellung der Sicherung läuft: Dieser Server nimmt Anmeldungen wieder an, sobald sie beendet ist.",
     "maintenanceActive": "Dieser Server befindet sich in Wartung: Anmeldungen werden abgelehnt, bis sie beendet ist.",
     "maintenanceRetryIn": "Erneute Anmeldung in {{seconds}} s.",
     "retryNow": "Jetzt erneut versuchen"
@@ -3102,7 +3102,7 @@
     "updateInitiated": "Update auf v{{version}} gestartet...",
     "installFailed": "Update-Installation fehlgeschlagen",
     "majorUpgradeTitle": "Upgrade auf UCM {{version}}",
-    "majorUpgradeDesc": "Eine neue Hauptversion. Automatische Updates installieren sie nie: das Upgrade erfolgt nur hier, auf Ihre Anforderung.",
+    "majorUpgradeDesc": "Eine neue Hauptversion. Automatische Updates installieren sie nie: das Upgrade erfolgt nur auf Ihre Anforderung.",
     "majorUpgradeNotes": "Versionshinweise lesen",
     "majorUpgradeInstall": "Upgrade",
     "majorUpgradeConfirm": "UCM von {{current}} auf {{version}} aktualisieren? Dies ist eine neue Hauptversion: lesen Sie die Versionshinweise und erstellen Sie zuerst eine Sicherung. Der Dienst wird neu gestartet.",

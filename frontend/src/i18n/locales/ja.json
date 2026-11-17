@@ -630,7 +630,7 @@
     "tooManyAttempts": "失敗した試行が多すぎます",
     "retryAfterSeconds": "{{seconds}}秒後にもう一度お試しください。",
     "retryLater": "しばらくしてからもう一度お試しください。",
-    "maintenanceRestoring": "バックアップの復元が完了しつつあります。サーバーが再起動すると、再びサインインできるようになります。",
+    "maintenanceRestoring": "バックアップの復元を実行中です。完了すると、このサーバーで再びサインインできるようになります。",
     "maintenanceActive": "サーバーはメンテナンス中です。終了するまでサインインできません。",
     "maintenanceRetryIn": "{{seconds}}秒後に再度サインインします。",
     "retryNow": "今すぐ再試行"
@@ -3102,7 +3102,7 @@
     "updateInitiated": "v{{version}}へのアップデートを開始しました...",
     "installFailed": "アップデートのインストールに失敗しました",
     "majorUpgradeTitle": "UCM {{version}} へのアップグレード",
-    "majorUpgradeDesc": "新しいメジャーバージョンです。自動更新ではインストールされません。アップグレードはご要望に応じてここからのみ行われます。",
+    "majorUpgradeDesc": "新しいメジャーバージョンです。自動更新ではインストールされません。アップグレードはご要望があった場合にのみ行われます。",
     "majorUpgradeNotes": "リリースノートを読む",
     "majorUpgradeInstall": "アップグレード",
     "majorUpgradeConfirm": "UCM を {{current}} から {{version}} にアップグレードしますか？新しいメジャーバージョンです。リリースノートを読み、先にバックアップを取ってください。サービスが再起動します。",

@@ -630,7 +630,7 @@
     "tooManyAttempts": "Too many failed attempts",
     "retryAfterSeconds": "Try again in {{seconds}} seconds.",
     "retryLater": "Try again later.",
-    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceRestoring": "A backup restore is in progress: this server accepts sign-ins again once it is over.",
     "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
     "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
     "retryNow": "Retry now"
@@ -3103,7 +3103,7 @@
     "updateInitiated": "Update to v{{version}} initiated...",
     "installFailed": "Failed to install update",
     "majorUpgradeTitle": "Upgrade to UCM {{version}}",
-    "majorUpgradeDesc": "A new major version. Automatic updates never install it: the upgrade is only made from here, on your request.",
+    "majorUpgradeDesc": "A new major version. Automatic updates never install it: the upgrade is made only on your request.",
     "majorUpgradeNotes": "Read the release notes",
     "majorUpgradeInstall": "Upgrade",
     "majorUpgradeConfirm": "Upgrade UCM from {{current}} to {{version}}? This is a new major version: read its release notes and take a backup first. The service will restart.",

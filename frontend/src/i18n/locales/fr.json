@@ -835,7 +835,7 @@
     "tooManyAttempts": "Trop de tentatives échouées",
     "retryAfterSeconds": "Réessayez dans {{seconds}} secondes.",
     "retryLater": "Réessayez plus tard.",
-    "maintenanceRestoring": "Une restauration de sauvegarde se termine : ce serveur accepte de nouveau les connexions une fois redémarré.",
+    "maintenanceRestoring": "Une restauration de sauvegarde est en cours : ce serveur accepte de nouveau les connexions une fois celle-ci terminée.",
     "maintenanceActive": "Ce serveur est en maintenance : les connexions sont refusées jusqu'à sa fin.",
     "maintenanceRetryIn": "Nouvelle tentative de connexion dans {{seconds}} s.",
     "retryNow": "Réessayer maintenant"
@@ -2882,7 +2882,7 @@
     "updateInitiated": "Mise à jour vers v{{version}} initiée...",
     "installFailed": "Échec de l'installation de la mise à jour",
     "majorUpgradeTitle": "Passer à UCM {{version}}",
-    "majorUpgradeDesc": "Une nouvelle version majeure. Les mises à jour automatiques ne l'installent jamais : le passage se fait seulement ici, à votre demande.",
+    "majorUpgradeDesc": "Une nouvelle version majeure. Les mises à jour automatiques ne l'installent jamais : le passage se fait seulement à votre demande.",
     "majorUpgradeNotes": "Lire les notes de version",
     "majorUpgradeInstall": "Mettre à niveau",
     "majorUpgradeConfirm": "Passer UCM de {{current}} à {{version}} ? Il s'agit d'une nouvelle version majeure : lisez ses notes de version et faites d'abord une sauvegarde. Le service va redémarrer.",

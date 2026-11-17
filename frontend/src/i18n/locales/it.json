@@ -630,7 +630,7 @@
     "tooManyAttempts": "Troppi tentativi falliti",
     "retryAfterSeconds": "Riprova tra {{seconds}} secondi.",
     "retryLater": "Riprova più tardi.",
-    "maintenanceRestoring": "Il ripristino di un backup sta terminando: questo server accetterà di nuovo gli accessi dopo il riavvio.",
+    "maintenanceRestoring": "Un ripristino di backup è in corso: questo server accetterà di nuovo gli accessi al termine.",
     "maintenanceActive": "Questo server è in manutenzione: gli accessi sono rifiutati fino al termine.",
     "maintenanceRetryIn": "Nuovo tentativo di accesso tra {{seconds}} s.",
     "retryNow": "Riprova ora"
@@ -3102,7 +3102,7 @@
     "updateInitiated": "Aggiornamento a v{{version}} avviato...",
     "installFailed": "Impossibile installare l'aggiornamento",
     "majorUpgradeTitle": "Passa a UCM {{version}}",
-    "majorUpgradeDesc": "Una nuova versione principale. Gli aggiornamenti automatici non la installano mai: il passaggio avviene solo da qui, su tua richiesta.",
+    "majorUpgradeDesc": "Una nuova versione principale. Gli aggiornamenti automatici non la installano mai: il passaggio avviene solo su tua richiesta.",
     "majorUpgradeNotes": "Leggi le note di rilascio",
     "majorUpgradeInstall": "Aggiorna",
     "majorUpgradeConfirm": "Aggiornare UCM da {{current}} a {{version}}? È una nuova versione principale: leggi le note di rilascio ed esegui prima un backup. Il servizio verrà riavviato.",
