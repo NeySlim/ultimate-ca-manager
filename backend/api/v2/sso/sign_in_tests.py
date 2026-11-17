@@ -227,8 +227,12 @@ def _audit(test, details, success):
 def finish(test, protocol):
     """Run the returning test once, then purge what expired (this test too, when it had)."""
     response = _finish(test, protocol)
-    _purge_expired()
-    db.session.commit()
+    try:  # the return still answers when the purge cannot write; the scheduled task retries it
+        _purge_expired()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f"Sign-in test purge on return failed: {type(e).__name__}")
     return response
 
 

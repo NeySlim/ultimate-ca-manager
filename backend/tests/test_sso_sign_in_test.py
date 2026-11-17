@@ -1037,6 +1037,20 @@ def test_a_read_and_a_return_purge_what_expired(app, oidc_provider, monkeypatch)
         case.cleanup()
 
 
+def test_a_return_still_answers_when_the_purge_fails(app, oidc_provider, monkeypatch):
+    case = Case(app, oidc_provider, 'oauth2')
+    try:
+        _install_idp(monkeypatch, OIDCIdP(case.external_id, _oidc_userinfo(case)))
+        client = _admin_client(app)
+        started = _start(client, oidc_provider)
+        monkeypatch.setattr(sign_in_tests, '_purge_expired', _boom)
+        state = parse_qs(urlsplit(started['url']).query)['state'][0]
+        assert _location(_oidc_callback(client, state)) == '/sso-test-complete?result=done'
+        assert _read_report(client, started['id'])['verdict'] == 'accepted'
+    finally:
+        case.cleanup()
+
+
 # -- a return after the expiry is still a test's, for a day ------------------------------
 
 KEPT = ('id', 'token', 'provider_id', 'user_id', 'protocol', 'transaction_hash', 'state',
