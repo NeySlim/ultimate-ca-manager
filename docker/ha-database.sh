@@ -123,6 +123,8 @@ ucm_refuse_unaccepted_major_upgrade() {
         fi
         [ "$rc" -eq 7 ] || continue
         echo -e "${RED:-}❌ This image will not upgrade the database without your consent:${NC:-}"
+        # The file is named (it may sit at a path from before 2.70); a URL never is
+        [ "$db" = DATABASE_URL ] || echo "   Database: $db"
         printf '%s\n' "$out" | sed '1d' | sed 's/^/   /'
         return 78
     done

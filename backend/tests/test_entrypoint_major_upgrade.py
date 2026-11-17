@@ -82,6 +82,9 @@ def test_a_2254_volume_stops_the_image_unchanged(tmp_path, where, value):
     assert _says_major(r.stdout), r.stdout
     assert "pin the image tag '2'" in r.stdout and 'UPGRADE.md' in r.stdout
     assert '—' not in r.stdout
+    # Which database: one mounted at a path from before 2.70 is not where the operator looks
+    folder = 'opt/ucm/data' if where == 'current' else 'opt/ucm/backend/data'
+    assert str(tmp_path / 'volume' / folder / 'ucm.db') in r.stdout, r.stdout
 
 
 @pytest.mark.parametrize('where', ['current', 'from before 2.70'])

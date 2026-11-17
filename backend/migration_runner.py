@@ -210,7 +210,8 @@ MAJOR_UPGRADE_REFUSAL = (
 def major_upgrade_refusal(state, applied, engine):
     """In the image, a database the pivot accepts and 300 has not upgraded (2.254 started it last)
     waits for UCM_ACCEPT_MAJOR_UPGRADE to be exactly the major of this release. The marker of an
-    upgrade already begun (SQLite) is that consent: the database is no longer the 2.254 one."""
+    upgrade already begun (SQLite) is that consent: it was given for this database, which 2.254
+    must not start again."""
     if os.environ.get("UCM_DOCKER") != "1" or state == "fresh" or UPGRADE_MIGRATION in applied:
         return None
     if os.environ.get(ACCEPT_MAJOR_VARIABLE) == MAJOR:
