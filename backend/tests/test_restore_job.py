@@ -865,3 +865,47 @@ def test_the_cancellation_and_the_mark_never_both_win(pg_jobs, first):
     finally:
         mark.close()
         flag.close()
+
+
+@pytest.mark.postgres
+def test_a_backup_started_while_a_restore_is_created_waits_and_is_refused(pg_jobs, monkeypatch):
+    """The restore holds every slot: the index sees only its own, so the creation lock makes a
+    backup created meanwhile wait for the restore's commit and answer 409 naming it."""
+    from sqlalchemy.orm import Session
+    from utils.datetime_utils import utc_now
+    real, checked, go = store._conflict, threading.Event(), threading.Event()
+
+    def conflict(session, job_id, slot, *args):
+        found = real(session, job_id, slot, *args)
+        if slot == 'restore':  # checked, not yet committed: the backup comes now
+            checked.set()
+            assert go.wait(10)
+        return found
+    monkeypatch.setattr(store, '_conflict', conflict)
+    restore_s, backup_s, answers = Session(pg_jobs), Session(pg_jobs), {}
+
+    def create(session, name, slot):
+        try:
+            answers[name] = store.create_job(session, kind=name, slot=slot,
+                                             exclusive=slot == 'restore',
+                                             exclusive_slots={'restore'}, now=utc_now())
+        except store.SlotBusy as busy:
+            answers[name] = busy
+    try:
+        restore = threading.Thread(target=create, args=(restore_s, 'restore', 'restore'))
+        restore.start()
+        assert checked.wait(10)
+        backup = threading.Thread(target=create, args=(backup_s, 'backup', 'backup'))
+        backup.start()
+        backup.join(1.0)
+        assert backup.is_alive(), 'the backup did not wait for the creation lock'
+        go.set()
+        restore.join(10)
+        backup.join(10)
+        assert isinstance(answers['restore'], str)
+        assert isinstance(answers['backup'], store.SlotBusy), answers
+        assert answers['backup'].job['id'] == answers['restore']
+    finally:
+        go.set()
+        restore_s.close()
+        backup_s.close()
