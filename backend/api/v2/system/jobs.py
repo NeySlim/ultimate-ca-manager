@@ -103,7 +103,8 @@ def started_response(job_id):
     prefs = parse_prefer(request.headers.getlist('Prefer'))
     asynchronous = bool(prefs.get('respond-async'))
     wait = prefs.get('wait')
-    if isinstance(wait, str) and wait.isdigit():
+    # ASCII digits only: str.isdigit() also takes '²', which int() refuses after the job exists
+    if isinstance(wait, str) and wait.isascii() and wait.isdigit():
         seconds = min(int(wait), jobs.JOB_WAIT_SECONDS)
     else:
         # respond-async alone: 202 at once; with wait=N, after at most N seconds (RFC 7240 §4.1)

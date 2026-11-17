@@ -139,6 +139,47 @@ def test_prefer_wait_never_exceeds_the_bound(monkeypatch):
     assert routes.parse_prefer(['Respond-Async; foo=bar']) == {'respond-async': True}
 
 
+def test_prefer_wait_is_capped_by_the_bounded_wait(app, auth_client, held, cleanup, monkeypatch):
+    monkeypatch.setattr(jobs, 'JOB_WAIT_SECONDS', 0.5)
+    reached, release = held
+    started = time.monotonic()
+    r = auth_client.get(VERIFY, headers={'Prefer': 'wait=600'})
+    assert r.status_code == 202 and time.monotonic() - started < 5
+    release.set()
+    assert runner.join_local(r.get_json()['data']['job']['id'], 15)
+
+
+# Latin-1 superscripts: str.isdigit() takes them, int() does not (a WSGI header is Latin-1)
+@pytest.mark.parametrize('value', ['\u00b2', '1\u00b3', '-1', '1.5', ''])
+def test_an_unreadable_prefer_wait_is_ignored(app, auth_client, held, cleanup, monkeypatch, value):
+    """A wait that is not ASCII digits is no preference: the bounded wait, never an error."""
+    monkeypatch.setattr(jobs, 'JOB_WAIT_SECONDS', 0.3)
+    reached, release = held
+    r = auth_client.get(VERIFY, headers={'Prefer': f'wait={value}'})
+    assert r.status_code == 202, r.data
+    release.set()
+    assert runner.join_local(r.get_json()['data']['job']['id'], 15)
+
+
+def test_a_job_cancelled_during_the_wait_answers_409(app, auth_client, held, cleanup):
+    reached, release = held
+    answer = {}
+    waiting = threading.Thread(target=lambda: answer.setdefault('r', auth_client.get(VERIFY)))
+    waiting.start()
+    assert reached.wait(10)
+    with app.app_context():
+        job_id = store.active_jobs(db.session, jobs.SLOT_AUDIT_VERIFY)[0]['id']
+        db.session.rollback()
+        assert jobs.request_cancellation(job_id) == 'requested'
+    release.set()
+    waiting.join(20)
+    r = answer['r']
+    assert r.status_code == 409, r.data
+    body = r.get_json()
+    assert body['message'] == 'The verification was cancelled'
+    assert body['details']['job']['state'] == 'cancelled'
+
+
 def test_cancel_route_and_list(app, auth_client, held, cleanup, monkeypatch):
     monkeypatch.setattr(jobs, 'JOB_WAIT_SECONDS', 0.2)
     reached, release = held
