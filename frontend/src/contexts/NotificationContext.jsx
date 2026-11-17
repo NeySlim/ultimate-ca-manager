@@ -29,10 +29,11 @@ export function NotificationProvider({ children }) {
     }
   }, [removeToast])
 
-  const showSuccess = useCallback((message) => addToast('success', message), [addToast])
-  const showError = useCallback((message) => addToast('error', message), [addToast])
-  const showWarning = useCallback((message) => addToast('warning', message), [addToast])
-  const showInfo = useCallback((message) => addToast('info', message), [addToast])
+  // duration 0: the toast stays until the user closes it
+  const showSuccess = useCallback((message, duration) => addToast('success', message, duration), [addToast])
+  const showError = useCallback((message, duration) => addToast('error', message, duration), [addToast])
+  const showWarning = useCallback((message, duration) => addToast('warning', message, duration), [addToast])
+  const showInfo = useCallback((message, duration) => addToast('info', message, duration), [addToast])
 
   // Confirmation dialog
   const showConfirm = useCallback((message, options = {}) => {
@@ -123,6 +124,7 @@ export function NotificationProvider({ children }) {
             key={toast.id}
             className={`rounded-xl border p-4 shadow-2xl backdrop-blur-sm transition-all ${getColors(toast.type)}`}
             open={true}
+            duration={toast.duration > 0 ? toast.duration : Infinity}
             onOpenChange={() => removeToast(toast.id)}
           >
             <div className="flex items-start gap-3">
