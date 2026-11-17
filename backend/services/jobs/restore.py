@@ -338,10 +338,7 @@ def run(ctx):
     else:
         with os.fdopen(fd, 'rb') as stream:
             outcome = _restore(ctx, _Run(ctx, sqlite), stream, password)
-    # Every audit line of a restore names its archive, refusals included
-    if outcome.audit_resource is None:
-        outcome.audit_resource = _archive_label(ctx)
-    return outcome
+    return outcome  # its audit line names the archive: the type's resource_param
 
 
 def _archive_label(ctx):
@@ -747,6 +744,8 @@ def cancel_locally(job_id):
 register(JobType(
     kind=KIND, slot=SLOT_RESTORE, permission='admin:system', run=run, label='Restore',
     audit_action=ACTION, node_bound=True, resume=resume, resumable_phases=VALIDATED,
+    # Every result line names the archive, whoever concludes the job (cancelled, lost, not taken)
+    resource_param='name',
     messages={'executor_lost': 'The restore stopped before it committed: nothing was restored',
               'not_taken': 'The restore was never started: nothing was restored',
               'cancelled': 'The restore was cancelled: nothing was restored',

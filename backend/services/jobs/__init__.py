@@ -69,6 +69,8 @@ class JobType:
     resource_type: str = 'system'
     # The audit line's resource name; None names it by its label
     resource_name: Optional[str] = None
+    # The parameter that names the audit line's resource on every conclusion (a restore's archive)
+    resource_param: Optional[str] = None
     # HA: only the node that created the job takes it (a restore reads a file of that node)
     node_bound: bool = False
     # Final message when the run gave none (lost, never taken, cancelled), by reason
@@ -191,7 +193,7 @@ def audit_writer(kind: str):
         from services.audit_service import AuditService
         written = AuditService.log_action(
             action=jt.audit_action, resource_type=jt.resource_type,
-            resource_name=_resource_of(jt, resource), resource_id=(row or {}).get('id'),
+            resource_name=_resource_of(jt, resource, row), resource_id=(row or {}).get('id'),
             details=details or _phrase(jt, state, reason), success=state == SUCCEEDED,
             username=(row or {}).get('requested_by_name') or 'system',
             user_id=(row or {}).get('requested_by_id'),
@@ -209,14 +211,24 @@ _PHRASES = {
 }
 
 
-def _resource_of(jt, resource=None):
-    return resource or jt.resource_name or jt.label
+def _resource_of(jt, resource=None, row=None):
+    return resource or _param_of(jt, row) or jt.resource_name or jt.label
 
 
-def result_line_text(kind, state, reason, details=None, resource=None):
+def _param_of(jt, row):
+    if jt.resource_param is None or not (row or {}).get('params'):
+        return None
+    try:
+        value = json.loads(row['params']).get(jt.resource_param)
+    except (ValueError, AttributeError):
+        return None
+    return value if isinstance(value, str) and value else None
+
+
+def result_line_text(kind, state, reason, details=None, resource=None, row=None):
     """The result line ``audit_writer`` writes, as one log line: fixed phrases, no secret."""
     jt = _TYPES[kind]
-    return (f"action={jt.audit_action} resource={_resource_of(jt, resource)} "
+    return (f"action={jt.audit_action} resource={_resource_of(jt, resource, row)} "
             f"success={state == SUCCEEDED} details={details or _phrase(jt, state, reason)}")
 
 

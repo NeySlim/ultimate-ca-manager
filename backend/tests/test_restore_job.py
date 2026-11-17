@@ -123,6 +123,13 @@ def _lines():
     return found
 
 
+def _named(job_id):
+    found = [r[0] for r in db.session.execute(select(AuditLog.resource_name).where(
+        AuditLog.action == ACTION, AuditLog.resource_id == job_id))]
+    db.session.rollback()
+    return found
+
+
 def _lines_in(app):
     with app.app_context():
         return _lines()
@@ -135,6 +142,8 @@ def _assert_final(app, job_id, state, reason, before, file_name, restored):
         assert (row['state'], row['reason']) == (state, reason), row
         assert row['secret'] is None and row['lease_expires_at'] is None
         assert _lines() - before == 1
+        # Every result line of a restore names its archive, whoever concludes it
+        assert _named(job_id) == ['r.ucmbkp']
         assert not store.active_jobs(db.session)
         db.session.rollback()
         assert _has_group() is restored
@@ -198,6 +207,12 @@ def test_a_restore_runs_to_the_end(app, archive, created, no_restart, mode):
     with app.app_context():
         assert _epoch() == epoch + 1
     assert no_restart == [1]
+
+
+def test_a_refused_restore_restores_nothing(app, archive, created):
+    before = _lines_in(app)
+    job_id, name = _start(app, archive, created, password='Not-The-Password-1')
+    _assert_final(app, job_id, 'failed', 'refused', before, name, False)
 
 
 @pytest.mark.filterwarnings('ignore::pytest.PytestUnhandledThreadExceptionWarning')

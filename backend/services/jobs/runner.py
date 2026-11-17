@@ -211,7 +211,7 @@ def run_job(app, row, executor, done=None):
                     and not _conclude_after_maintenance(app, lambda: conclude(line))
                     and _conclude_after_maintenance(app, lambda: conclude(None))):
                 logger.error(f"Background job {job_id} concluded without its audit line: "
-                             + jobs.result_line_text(kind, state, reason, details, resource))
+                             + jobs.result_line_text(kind, state, reason, details, resource, row))
         except Exception as e:
             logger.error(f"Background job {job_id} not concluded: {type(e).__name__}")
             db.session.rollback()
