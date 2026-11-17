@@ -2982,6 +2982,7 @@ GET /api/v2/settings/backup/history
 GET /api/v2/settings/backup/{backup_id}/download
 
 # Restore backup (in HA, as POST /api/v2/system/backup/restore: see Backup Operations)
+# A background job, like the system route: 200 as before within 25 s, else 202 (see Background Jobs)
 POST /api/v2/settings/backup/restore
 Content-Type: multipart/form-data
 
@@ -3101,6 +3102,18 @@ list shows only the kinds the caller may read, and the id of another kind answer
   page (`200`, `Cancellation requested`); an ended one answers `409`.
 
 A finished job is kept 30 days, and the latest of each kind always.
+
+A `restore` job (`admin:system`) holds every slot: nothing else runs beside it. Its `phase` is
+`checking`, `reading`, `applying` and `committing`, then, once the restore has committed,
+`committed`, `sessions_revoked`, `session_files_removed`, `caches_purged` and
+`crls_regenerated` as each step after the commit is done; `progress` counts the steps of the
+restore before the commit. It can be cancelled until its commit: nothing is restored. From
+`committed` on, the cancel route answers `409` `The restore has committed: it can no longer be
+cancelled`. A restore that commits revokes every session, the caller's included: following the
+job then answers `401`; sign in again and read the job, whose `result` is the restore's answer.
+A restore whose process stopped before its commit fails (`executor_lost`, `The restore stopped
+before it committed: nothing was restored`); one that stopped after it is finished by the next
+start of the scheduler process, each step done once.
 
 ### Database Operations
 ```http
@@ -3225,6 +3238,16 @@ restart one at a time". Both restore routes also answer `data.todo`, a list of s
 (sections not restored, a CA whose CRL could not be signed, a secret to enter again); it is empty when there is
 nothing to do. The backup listing's `meta.restore_limits` gives `upload_bytes` (archives before v4) and
 `archive_bytes` (v4, `0` for no ceiling), the sizes a restore accepts.
+
+Both restore routes start a background job of kind `restore` (see Background Jobs). The route
+keeps the uploaded archive in a file of its own, still encrypted, and answers what it answered
+before when the restore ends within 25 seconds, failures included: a wrong password of a v4
+archive is still refused at once, that of an older archive once the job has decrypted it, with
+the same `400`. Past 25 seconds it answers `202`. While a restore runs, on a single node as in
+HA, writes answer `503` with `Retry-After: 30`, code `maintenance` and the message `This UCM
+instance is restoring a backup: writes are refused until the restore ends. Retry later.`
+(single node); reads, OCSP, CRL, health and `GET /api/v2/system/jobs/<id>` are served. Another
+job, or a second restore, answers `409` naming the active job, and no archive file is kept.
 
 ```http
 DELETE /api/v2/system/backup/{filename}
