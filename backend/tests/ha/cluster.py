@@ -6,6 +6,7 @@ UCM_CONFIG_DIR, logs and port under the bench directory, its own database URL
 UCM_DB_ENCRYPTION_KEY.
 The guard on its PYTHONPATH stops a node that touches an installation path.
 """
+import json
 import os
 import re
 import secrets
@@ -417,6 +418,46 @@ class Client:
     def patch(self, path, payload=None, **kw):
         return self.http.patch(self.node.url(path), json=payload or {}, headers=self._headers(),
                                timeout=120, **kw)
+
+
+class _Answer:
+    """The answer a restore route would have given, read back from its job."""
+
+    def __init__(self, result):
+        self.status_code = result['code']
+        if result['code'] < 400:
+            self._body = {'data': result.get('data'), 'message': result.get('message')}
+        else:
+            self._body = {'message': result.get('message'), 'code': result['code'],
+                          **(result.get('problem') or {})}
+        self.text = json.dumps(self._body)
+
+    def json(self):
+        return self._body
+
+
+def restore_answer(client, node, name, content, password, admin_password, timeout=300):
+    """POST a restore to ``node``; past the route's wait (202) follow its job, signing in again
+    once the restore has revoked the session, and answer what the route would have."""
+    r = client.http.post(node.url('/api/v2/system/restore'), headers=client._headers(),
+                         files={'file': (name, content)}, data={'password': password},
+                         timeout=timeout)
+    if r.status_code != 202:
+        return r
+    location, reader = r.headers['Location'], client
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        seen = reader.http.get(node.url(location), timeout=60)
+        if seen.status_code == 401:
+            reader = Client.login(node, admin_password)
+            continue
+        assert seen.status_code == 200, seen.text[:500]
+        job = seen.json()['data']
+        if job['state'] in ('succeeded', 'failed', 'cancelled'):
+            assert job['result'] is not None, job
+            return _Answer(job['result'])
+        time.sleep(1)
+    raise AssertionError(f'restore job not final within {timeout}s')
 
 
 TASK_LINE = re.compile(r"Task '([A-Za-z0-9_]+)' (?:completed|skipped|failed)")

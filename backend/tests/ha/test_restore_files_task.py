@@ -5,7 +5,7 @@ import base64
 
 import pytest
 
-from tests.ha.cluster import READY_TIMEOUT, create_ca, issue, wait_until
+from tests.ha.cluster import READY_TIMEOUT, create_ca, issue, restore_answer, wait_until
 from tests.ha.test_restore_files import _cert_names, _crt_files, _matches
 
 pytestmark = pytest.mark.ha
@@ -33,10 +33,10 @@ def test_each_node_reconciles_its_own_directories_at_its_restart(cluster, admin)
     assert not (b.data_dir / 'certs').is_symlink()
 
     def restore():
-        found = admin.http.post(a.url('/api/v2/system/restore'), headers=admin._headers(),
-                                files={'file': (name, archive.content)},
-                                data={'password': PASSWORD}, timeout=300)
+        found = restore_answer(admin, a, name, archive.content, PASSWORD, cluster.password)
         if found.status_code == 409 and 'maintenance_not_acknowledged' in found.text:
+            return None
+        if found.status_code == 503:  # the refused attempt's maintenance, not yet seen lifted here
             return None
         return [found]
     (r,) = wait_until(restore, 240, 'the restore acknowledged by every node')

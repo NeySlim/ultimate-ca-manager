@@ -8,7 +8,7 @@ import pytest
 import requests
 
 from services.cluster_maintenance import OBSERVE_TTL_SECONDS
-from tests.ha.cluster import READY_TIMEOUT, Client, create_ca, issue, node_counts, wait_until
+from tests.ha.cluster import READY_TIMEOUT, Client, create_ca, issue, node_counts, restore_answer, wait_until
 
 pytestmark = [pytest.mark.ha, node_counts(2, 3)]
 
@@ -58,9 +58,7 @@ def test_a_restore_on_a_while_b_writes(cluster, admin):
         started = time.monotonic()
         cookies_before = admin.http.cookies.get_dict()
         stored_before = cluster.sql('SELECT session_id, data, expiry FROM flask_sessions')
-        r = admin.http.post(a.url('/api/v2/system/restore'), headers=admin._headers(),
-                            files={'file': (name, archive.content)}, data={'password': PASSWORD},
-                            timeout=300)
+        r = restore_answer(admin, a, name, archive.content, PASSWORD, cluster.password)
         assert r.status_code == 200, r.text[:1000]
         restored_in = time.monotonic() - started
         assert r.json()['data']['restart_requested'] is True

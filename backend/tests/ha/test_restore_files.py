@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 from cryptography import x509
 
-from tests.ha.cluster import READY_TIMEOUT, create_ca, issue, wait_until
+from tests.ha.cluster import READY_TIMEOUT, create_ca, issue, restore_answer, wait_until
 
 pytestmark = pytest.mark.ha
 
@@ -81,10 +81,10 @@ def test_after_a_restore_on_a_every_node_holds_the_files_of_the_database(cluster
 
     def restore():
         # B's scheduler process acknowledges once its start is done: refused until then
-        found = admin.http.post(a.url('/api/v2/system/restore'), headers=admin._headers(),
-                                files={'file': (name, archive.content)},
-                                data={'password': PASSWORD}, timeout=300)
+        found = restore_answer(admin, a, name, archive.content, PASSWORD, cluster.password)
         if found.status_code == 409 and 'maintenance_not_acknowledged' in found.text:
+            return None
+        if found.status_code == 503:  # the refused attempt's maintenance, not yet seen lifted here
             return None
         return [found]
     (r,) = wait_until(restore, 240, 'the restore acknowledged by every node')
