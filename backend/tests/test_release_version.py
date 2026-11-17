@@ -412,6 +412,22 @@ def test_npm_form_refuses_another_grammar(version):
     assert _cli('npm', version).returncode == 1
 
 
+@pytest.mark.parametrize('version,chart,prerelease', [
+    ('3.0', '3.0.0', 'false'), ('3.0-rc1', '3.0.0-rc1', 'true'), ('3.1', '3.1.0', 'false'),
+    ('2.254.2', '2.254.2', 'false'), ('2.254.2-rc1', '2.254.2-rc1', 'true'),
+])
+def test_chart_version_and_prerelease_of_a_tag(version, chart, prerelease):
+    assert _cli('chart', version).stdout.strip() == chart
+    assert _cli('prerelease', version).stdout.strip() == prerelease
+
+
+@pytest.mark.parametrize('cmd', ['chart', 'prerelease'])
+@pytest.mark.parametrize('version', ['3.0-dev', '3.0.0', 'v3.0', ''])
+def test_chart_and_prerelease_refuse_what_is_not_a_tag(cmd, version):
+    r = _cli(cmd, version)
+    assert r.returncode == 1 and not r.stdout
+
+
 def test_a_dev_version_is_never_a_tag():
     assert _cli('validate', '3.0-dev').returncode == 1
     assert _cli('deb', '3.0-dev').returncode == 1
@@ -422,6 +438,8 @@ def test_version_files_agree():
     pkg = json.loads((ROOT / 'frontend' / 'package.json').read_text())
     lock = json.loads((ROOT / 'frontend' / 'package-lock.json').read_text())
     assert npm and pkg['version'] == lock['version'] == lock['packages']['']['version'] == npm
+    # The chart is versioned with the application it deploys
+    assert yaml.safe_load((ROOT / 'charts' / 'ucm' / 'Chart.yaml').read_text())['version'] == npm
 
 
 def _scratch_tree(tmp_path):
@@ -458,18 +476,22 @@ def test_bump_version_updates_every_file(tmp_path, v, npm, chart_app):
     assert lock['version'] == lock['packages']['']['version'] == npm
     after = _chart(root)
     assert after['appVersion'] == (chart_app or before['appVersion'])
-    # The chart version follows chart changes, not the application
-    assert after['version'] == before['version']
+    # The chart is versioned with the application, in the semver form helm requires
+    assert after['version'] == npm
+    assert {k: v for k, v in after.items() if k not in ('version', 'appVersion')} == \
+        {k: v for k, v in before.items() if k not in ('version', 'appVersion')}
 
 
 @pytest.mark.parametrize('v', ['2.254-1', '3.0.0', 'v3', ''])
 def test_bump_version_refuses_a_version_the_release_grammar_refuses(tmp_path, v):
     root = _scratch_tree(tmp_path)
     pkg = (root / 'frontend' / 'package.json').read_text()
+    chart = (root / 'charts' / 'ucm' / 'Chart.yaml').read_text()
     r = subprocess.run([BASH, str(root / 'scripts' / 'bump-version.sh'), v], capture_output=True, text=True)
     assert r.returncode != 0
     assert not (root / 'VERSION').exists()
     assert (root / 'frontend' / 'package.json').read_text() == pkg
+    assert (root / 'charts' / 'ucm' / 'Chart.yaml').read_text() == chart
 
 
 # ---- 6. smoke_release compares the reported version exactly -------------------------------------

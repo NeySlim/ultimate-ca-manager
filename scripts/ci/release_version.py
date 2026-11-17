@@ -3,7 +3,7 @@
 
 Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
 A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
-Usage: release_version.py <validate|deb|rpm|tar|file|npm|assets|notes|latest> <version> [CHANGELOG]
+Usage: release_version.py <validate|deb|rpm|tar|file|npm|chart|prerelease|assets|notes|latest> <version> [CHANGELOG]
 `latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
 """
 import re
@@ -58,6 +58,12 @@ def npm_version(version):
     m = parse(version)
     base = f"{m.group('major')}.{m.group('minor')}.{m.group('patch') or 0}"
     return base + (f"-{m.group('rc')}" if m.group('rc') else '')
+
+
+def chart_version(version):
+    """Helm chart version of a tag: the semver form, the chart being versioned with its application."""
+    parse(version)
+    return npm_version(version)
 
 
 def asset_names(version):
@@ -138,6 +144,10 @@ def main(argv):
             print(file_version(version))
         elif cmd == 'npm':
             print(npm_version(version))
+        elif cmd == 'chart':
+            print(chart_version(version))
+        elif cmd == 'prerelease':
+            print('false' if is_stable(version) else 'true')
         elif cmd == 'assets':
             print('\n'.join(asset_names(version).values()))
         elif cmd == 'latest':

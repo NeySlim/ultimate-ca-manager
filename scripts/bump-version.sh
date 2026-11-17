@@ -30,17 +30,18 @@ echo "$VERSION" > "$ROOT_DIR/VERSION"
 # 2. frontend/package.json (read by vite at build time) and both occurrences of the lock
 VERSION="$NPM_VERSION" FRONTEND="$ROOT_DIR/frontend" node -e "const fs=require('fs'); for (const n of ['package.json','package-lock.json']) { const f=process.env.FRONTEND+'/'+n; const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=process.env.VERSION; if (p.packages && p.packages['']) p.packages[''].version=process.env.VERSION; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
 
-# 3. Helm chart appVersion: the image tag the chart deploys by default. The release
-#    workflow publishes an image for every tag (stable and RC), none for a -dev version,
-#    which leaves appVersion as it is.
-#    The chart `version` follows chart changes only.
+# 3. Helm chart: `version` is the npm (semver) form, the chart being versioned with the
+#    application; appVersion is the image tag it deploys, published for every tag (stable
+#    and RC) and for no -dev version, which leaves appVersion as it is.
+sed -i "s/^version: .*/version: $NPM_VERSION/" "$ROOT_DIR/charts/ucm/Chart.yaml"
+CHART_NOTE="   - charts/ucm/Chart.yaml (version)"
 if [[ "$VERSION" != *-dev ]]; then
     sed -i "s/^appVersion: \".*\"/appVersion: \"$VERSION\"/" "$ROOT_DIR/charts/ucm/Chart.yaml"
-    CHART_NOTE="   - charts/ucm/Chart.yaml (appVersion)"
+    CHART_NOTE="   - charts/ucm/Chart.yaml (version, appVersion)"
 fi
 
 echo "✅ Version updated to $VERSION"
 echo "   - VERSION"
 echo "   - frontend/package.json"
 echo "   - frontend/package-lock.json"
-if [ -n "${CHART_NOTE:-}" ]; then echo "$CHART_NOTE"; fi
+echo "$CHART_NOTE"
