@@ -151,6 +151,12 @@ CA_SETTING_WORDING = {
 }
 
 
+def setting_names_ca(value, ca, by_number=True) -> bool:
+    """A setting value names this CA: its refid, or (number settings) what the readers' int() takes."""
+    value = (value or '').strip()
+    return bool(value) and (value == ca.refid or (by_number and _int_or_none(value) == ca.id))
+
+
 def _int_or_none(value):
     """The number the readers' int() takes from a setting ('05' and ' +5' are 5), or None."""
     try:
@@ -176,8 +182,7 @@ def _ca_setting_blockers(ca) -> Iterator[DeletionBlocker]:
     for row in SystemConfig.query.order_by(SystemConfig.key):
         value = (row.value or '').strip()
         for reference, by_number in declared:
-            names_ca = value == ca.refid or (by_number and _int_or_none(value) == ca.id)
-            if value and names_ca and re.fullmatch(reference.pattern, row.key):
+            if setting_names_ca(value, ca, by_number) and re.fullmatch(reference.pattern, row.key):
                 label, screen = CA_SETTING_WORDING.get(row.key, (f'named by the setting {row.key}', 'Settings'))
                 yield DeletionBlocker(
                     409,

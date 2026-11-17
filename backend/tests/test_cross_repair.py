@@ -217,6 +217,26 @@ def _config(key):
     return row.value if row else None
 
 
+def test_convert_moves_a_setting_that_names_the_ca_by_a_padded_number(app, auth_client):
+    """'07' reads as CA 7 (int()), as the readers and the deletion blocker take it."""
+    from models import SystemConfig
+    pki, ids = _world(app)
+    keys = ('acme.issuing_ca_id', 'scep_ca_id')
+    with app.app_context():
+        for key in keys:
+            SystemConfig.query.filter_by(key=key).delete()
+        _set_config(acme__issuing_ca_id=f"0{ids['x']}", scep_ca_id=f" +0{ids['x']} ")
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        try:
+            for key in keys:
+                assert _config(key) == str(ids['b']), key
+        finally:
+            for key in keys:
+                SystemConfig.query.filter_by(key=key).delete()
+            db.session.commit()
+
+
 def test_convert_moves_the_ca_settings_to_the_root(app, auth_client):
     from models import SystemConfig
     from tests import windows_profile_support as profile

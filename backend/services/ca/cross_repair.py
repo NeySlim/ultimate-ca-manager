@@ -103,6 +103,7 @@ def _move_settings(record, root, cross=None):
     """Point the CA settings, the Windows profiles, the OCSP responder choice and the public URLs
     of *record* at *root*."""
     from models import SystemConfig, WindowsEnrollmentProfile
+    from services.deletion_blockers import setting_names_ca
     for profile in WindowsEnrollmentProfile.query.all():
         for column in ('issuing_ca_refid', 'policy_ca_refid'):
             if getattr(profile, column) == record.refid:
@@ -111,9 +112,9 @@ def _move_settings(record, root, cross=None):
         cfg = SystemConfig.query.filter_by(key=key).first()
         if cfg is None:
             continue
-        if cfg.value == record.refid:
+        if (cfg.value or '').strip() == record.refid:
             cfg.value = root.refid
-        elif cfg.value == str(record.id):
+        elif setting_names_ca(cfg.value, record):
             cfg.value = str(root.id)
     labels_cfg = SystemConfig.query.filter_by(key='est_labels').first()
     try:
@@ -263,7 +264,8 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     _move_ca_dependents(db, record, root)
     from models import SystemConfig
     scep_cfg = SystemConfig.query.filter_by(key='scep_ca_id').first()
-    was_scep_ca = bool(scep_cfg and scep_cfg.value in (str(record.id), record.refid))
+    from services.deletion_blockers import setting_names_ca
+    was_scep_ca = bool(scep_cfg and setting_names_ca(scep_cfg.value, record))
     _move_settings(record, root, row)
     _move_scep_challenge(record, root, was_scep_ca)
     _move_publication(record, root)

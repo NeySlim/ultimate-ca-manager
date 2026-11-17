@@ -47,7 +47,8 @@ const validated = (job) => VALIDATED_PHASES.includes(job?.phase)
 export const UNCANCELLABLE_PHASES = ['committing', ...VALIDATED_PHASES]
 
 /**
- * onReport(data): the restore succeeded, its report; onFailure(job): it ended otherwise;
+ * onReport(data): the restore succeeded, its report; onFailure(job): it ended otherwise, or
+ * committed without finishing (result.code >= 400);
  * onLost(error): the job can no longer be followed and no commit was seen (no answer after
  * the retries, or any other error of the server): the end is unknown here.
  */
