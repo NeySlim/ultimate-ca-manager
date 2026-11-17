@@ -271,6 +271,31 @@ def test_a_value_error_of_the_export_answers_each_route_as_before(
     assert _lines(app)[before:] == [('manual', details, False, 'admin')]
 
 
+@pytest.mark.parametrize('where', ['service', 'secret', 'unreadable secret'])
+@pytest.mark.parametrize('url', [SYSTEM, SETTINGS])
+def test_a_failure_before_the_export_answers_as_before(app, auth_client, backup_dir, jobs_made,
+                                                       monkeypatch, where, url):
+    """The service's constructor or the password's decryption: today's 500 and audit phrase."""
+    from services.backup_service import BackupService
+
+    def fail(*args, **kwargs):
+        raise RuntimeError('/internal/path on host-1')
+    if where == 'service':
+        monkeypatch.setattr(BackupService, '__init__', fail)
+    elif where == 'secret':
+        monkeypatch.setattr(runner.JobContext, 'secret', property(fail))
+    else:  # decrypt_value answers None for a value this node's key does not open
+        monkeypatch.setattr(runner.JobContext, 'secret', property(lambda ctx: None))
+    before = len(_lines(app))
+    r = _post(auth_client, url, {'password': PASSWORD})
+    assert r.status_code == 500, r.data
+    assert r.get_json()['message'] == 'Backup failed' and 'details' not in r.get_json()
+    assert b'/internal' not in r.data and b'host-1' not in r.data
+    assert _lines(app)[before:] == [('manual', 'Backup failed: unexpected error', False, 'admin')]
+    row = _row(app, _job_id_of(app))
+    assert (row['state'], row['reason'], row['secret']) == ('failed', 'error', None)
+
+
 def test_a_cancellation_stops_the_export_between_two_rows(app, auth_client, backup_dir, jobs_made,
                                                           monkeypatch):
     """Asked inside a section, it is seen before the next section starts: nothing published."""

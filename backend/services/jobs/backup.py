@@ -60,18 +60,25 @@ def _reporter(ctx):
     return progress
 
 
-def _export(ctx, service, password, kdf, route):
-    """(size, filename) or the JobOutcome of today's refusal for what the export raised."""
+def _export(ctx, kdf, route):
+    """(size, filename, service) or the JobOutcome of today's refusal for what the export,
+    the service's constructor or the password's decryption raised."""
     from fips_mode import FipsRestricted, PROBLEM_TYPE as FIPS_PROBLEM
     from services.backup import storage
     from services.backup.locking import BackupBusyError
-    from services.backup_service import (BackupExportError, BackupPasswordError,
+    from services.backup_service import (BackupExportError, BackupPasswordError, BackupService,
                                          BackupValidationError)
     try:
+        service = BackupService()
+        password = ctx.secret
+        if not password:
+            # Never the caller's fault: the route stored one, this node cannot read it back
+            raise RuntimeError('backup password unavailable')
         size, _path, filename = storage.export_archive(service, password, kdf=kdf,
                                                        timeout=LOCK_WAIT_SECONDS,
                                                        progress=_reporter(ctx))
-        return (size, filename), None
+        del password
+        return (size, filename, service), None
     except (JobCancelled, JobLost):
         raise
     except FipsRestricted as e:
@@ -101,17 +108,13 @@ def _export(ctx, service, password, kdf, route):
 
 def run(ctx):
     from services.backup.schedule import safe_ceiling_warning
-    from services.backup_service import BackupService
     route = ctx.params.get('route') or ROUTE_SYSTEM
     generated = bool(ctx.params.get('generated'))
-    password = ctx.secret
     ctx.progress(done=0, phase='waiting')
-    service = BackupService()
-    made, refusal = _export(ctx, service, password, ctx.params.get('kdf'), route)
-    del password
+    made, refusal = _export(ctx, ctx.params.get('kdf'), route)
     if refusal is not None:
         return refusal
-    size, filename = made
+    size, filename, service = made
     family = 'settings' if route == ROUTE_SETTINGS else 'system'
     data = {
         'filename': filename,
