@@ -428,10 +428,11 @@ def test_a_later_maintenance_release_of_the_previous_line_is_not_offered(instanc
     assert updates.check_for_updates(channel='rc')['update_available'] is False
 
 
-def test_the_last_previous_line_release_is_offered_the_new_line(instance):
+def test_the_new_line_is_a_major_upgrade_not_an_update_of_the_previous_line(instance):
     instance('2.254.2', [_release('2.254.2'), _release('3.0')])
     result = updates.check_for_updates(channel='stable')
-    assert (result['update_available'], result['latest_version']) == (True, '3.0')
+    assert (result['update_available'], result['latest_version']) == (False, '2.254.2')
+    assert result['major_upgrade']['version'] == '3.0'
 
 
 # ---- 5. version files and the bump script ------------------------------------------------------

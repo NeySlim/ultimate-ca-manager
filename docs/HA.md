@@ -260,6 +260,8 @@ The campaign stops, and leaves the remaining nodes alone, when a node fails to d
 
 While the campaign runs, the updated nodes and the others share the database. The first updated node applies the target's migrations, which only add to what the older version uses: the nodes not yet updated keep serving until their turn.
 
+A later major version is never started by the scheduled install: an admin requests it from Settings > Updates (`major_upgrade` on the install route), and it runs as the same campaign with the packages and the `full-stop-migrations.json` of that release.
+
 In Docker and Kubernetes the route and the scheduled install refuse with a message: the orchestrator updates the image (`docker compose pull`, `helm upgrade`).
 
 During a roll from a version without the scheduled backup's conclusion marker, a scheduled backup run by an older leader is not marked as concluded: a newer leader then writes one extra archive two hours later, once.

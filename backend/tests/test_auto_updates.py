@@ -112,6 +112,7 @@ class TestCheckForUpdatesChecksumUrl:
             ],
         }])
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         monkeypatch.setattr(updates.os.path, 'exists',
                             lambda p: p == '/usr/bin/dpkg')
         result = updates.check_for_updates()
@@ -137,6 +138,7 @@ class TestChannelFilter:
         import time as _time
         monkeypatch.setitem(updates._releases_cache, 'data', releases)
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         monkeypatch.setattr(updates.os.path, 'exists',
                             lambda p: p == '/usr/bin/dpkg')
 
@@ -374,6 +376,10 @@ class TestNotifyMarker:
 
 
 class TestScheduledTask:
+    @pytest.fixture(autouse=True)
+    def _installed_major(self, monkeypatch):
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
+
     def _base_result(self, **over):
         result = {
             'update_available': True, 'current_version': '2.0',
@@ -730,6 +736,7 @@ class TestRpmAssetPerDistribution:
         monkeypatch.setitem(updates._releases_cache, 'data', [{
             'tag_name': 'v99.0', 'draft': False, 'prerelease': False, 'body': '', 'assets': assets}])
         monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
+        monkeypatch.setattr(updates, 'get_current_version', lambda: '99.0-dev')
         monkeypatch.setattr(updates.os.path, 'exists', lambda p: p == '/usr/bin/rpm')
         monkeypatch.setattr(updates, '_el_release', lambda: el)
         return updates.check_for_updates()
