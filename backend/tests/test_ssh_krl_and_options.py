@@ -84,21 +84,40 @@ class TestRevokedCertificateStaysInTheKrl:
             assert version(SSHKRLService.generate_krl(ca.id)) > first
 
 
+def _signed(ca_key, subject, serial, key_id):
+    from cryptography.hazmat.primitives import serialization
+    now = int(time.time())
+    cert = (serialization.SSHCertificateBuilder().public_key(subject).serial(serial)
+            .type(serialization.SSHCertificateType.USER).key_id(key_id)
+            .valid_principals([b'outside']).valid_after(now - 60).valid_before(now + 3600).sign(ca_key))
+    return cert.public_bytes().decode()
+
+
 @needs_ssh_keygen
-def test_a_revoked_certificate_of_serial_zero_is_revoked_by_its_key(app, tmp_path):
-    """Serial 0 names no certificate (PROTOCOL.certkeys): the KRL revokes its key, which
-    revokes the certificate, and no other certificate of serial 0 under the CA."""
-    from tests.test_ssh_serial_counter_matrix import _imported_ca, _signed_elsewhere
+@pytest.mark.parametrize('stored_public_key', ('kept', 'empty'))
+def test_a_revoked_certificate_of_serial_zero_is_revoked_within_its_ca(app, tmp_path, stored_public_key):
+    """Serial 0 names no certificate (PROTOCOL.certkeys): the KRL lists the certificate as
+    ssh-keygen -k does, by key ID under the CA, never the bare key nor another CA's certificate."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from tests.test_ssh_serial_counter_matrix import _imported_ca
     with app.app_context():
         ca_id, key = _imported_ca('KRL serial zero CA')
-        zero = _signed_elsewhere(key, 0)
+        subject = ed25519.Ed25519PrivateKey.generate().public_key()
+        zero = _signed(key, subject, 0, b'alice')
         cert = SSHCertificateService.import_certificate(zero, ssh_ca_id=ca_id, username='t')
         assert cert.serial == 0
         SSHCertificateService.revoke_certificate(cert.id, username='t')
+        if stored_public_key == 'empty':
+            cert.public_key = ''
+            db.session.commit()
         krl = SSHKRLService.generate_krl(ca_id)
         assert 'REVOKED' in _query(tmp_path, krl, zero).stdout
-        other = _query(tmp_path, krl, _signed_elsewhere(key, 0))
-        assert other.returncode == 0 and 'REVOKED' not in other.stdout
+        bare = subject.public_bytes(serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH).decode()
+        other_ca = ed25519.Ed25519PrivateKey.generate()
+        for still_valid in (bare, _signed(key, subject, 0, b'bob'), _signed(other_ca, subject, 77, b'alice')):
+            result = _query(tmp_path, krl, still_valid)
+            assert result.returncode == 0 and 'REVOKED' not in result.stdout, still_valid
 
 
 class TestCriticalOptions:

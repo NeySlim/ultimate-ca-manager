@@ -22,13 +22,14 @@ logger = logging.getLogger(__name__)
 
 def _revocation_line(cert):
     """The ssh-keygen KRL specification line of a revoked certificate. Serial 0 means "not
-    numbered" (PROTOCOL.certkeys), so such a certificate is revoked by its key, one line only."""
+    numbered" (PROTOCOL.certkeys): the certificate itself is given, and ssh-keygen revokes it
+    as OpenSSH does, by key ID under its CA (by its key only when the key ID is empty)."""
     if cert.serial:
         return f"serial: {int(cert.serial)}\n"
-    key = ' '.join((cert.public_key or '').split()[:2])
-    if not key:
-        raise RuntimeError(f"Failed to generate KRL: SSH certificate #{cert.id} has serial 0 and no public key")
-    return f"key: {key}\n"
+    certificate = ' '.join((cert.certificate or '').split()[:2])
+    if not certificate:
+        raise RuntimeError(f"Failed to generate KRL: SSH certificate #{cert.id} has serial 0 and no certificate")
+    return f"{certificate}\n"
 
 
 class SSHKRLService:
