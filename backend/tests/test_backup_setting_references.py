@@ -292,3 +292,19 @@ def test_a_setting_the_archive_writes_again_is_not_announced_as_emptied(target):
     from models import CA
     assert _setting('scep_ca_id') == str(CA.query.filter_by(refid='settings-archived').one().id)
     assert not any(w.startswith('setting scep_ca_id') for w in results['warnings'])
+
+
+@pytest.mark.parametrize('form', ['{n}', '0{n}', ' {n} ', '+{n}', ' +0{n} '])
+def test_a_number_is_read_as_the_readers_of_the_setting_read_it(target, form):
+    """int() takes ' +05 ' for 5: the archive names the same row, or the restore empties the setting."""
+    from services.backup.restore.setting_refs import export_references
+    ca = _authority_row('settings-ca-signed')[0]
+    entries = export_references({'acme.issuing_ca_id': form.format(n=ca.id)})
+    assert [(e['key'], e['table']) for e in entries] == [('acme.issuing_ca_id', 'certificate_authorities')]
+    assert entries[0]['identity'], entries
+
+
+def test_zero_or_text_names_no_row_by_number(target):
+    from services.backup.restore.setting_refs import export_references
+    assert export_references({'acme.issuing_ca_id': '0'}) == []
+    assert export_references({'acme.issuing_ca_id': ' +0 '}) == []

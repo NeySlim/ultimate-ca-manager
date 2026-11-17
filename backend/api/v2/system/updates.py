@@ -67,9 +67,12 @@ def install_update():
     if is_container_install():
         if in_ha:
             return error_response(CONTAINER_HA_REFUSAL, 400)
+        # The FIPS image is published under <version>-fips
+        import fips_mode
+        tag = '<version>-fips' if fips_mode.requested() else '<version>'
         return error_response(
             "Auto-update is not available in Docker. Pull the image tag of the new "
-            "version instead: ghcr.io/neyslim/ultimate-ca-manager:<version>", 400
+            f"version instead: ghcr.io/neyslim/ultimate-ca-manager:{tag}", 400
         )
 
     try:

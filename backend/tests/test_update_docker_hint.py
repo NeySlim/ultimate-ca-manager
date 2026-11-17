@@ -31,3 +31,10 @@ def test_a_container_is_pointed_at_the_image_of_the_new_version(monkeypatch):
 def test_a_fips_container_is_pointed_at_the_fips_image(monkeypatch):
     """The FIPS image is published under <version>-fips: the standard one has no FIPS module."""
     assert _container_check(monkeypatch, fips=True)['download_url'] == 'ghcr.io/neyslim/ultimate-ca-manager:3.2-fips'
+
+
+def test_the_docker_refusal_names_the_fips_tag_on_a_fips_container(app, auth_client, monkeypatch):
+    monkeypatch.setattr(updates, 'is_container_install', lambda: True)
+    monkeypatch.setenv('UCM_FIPS', '1')
+    message = auth_client.post('/api/v2/system/updates/install', json={}).get_json()['message']
+    assert 'ultimate-ca-manager:<version>-fips' in message
