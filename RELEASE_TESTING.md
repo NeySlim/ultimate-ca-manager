@@ -29,6 +29,43 @@ production container with an RC image.
 "Fresh database" means an empty PostgreSQL database. The boot log must show
 `Database: POSTGRESQL`, `migration baseline marked` and no line starting with `✗`.
 
+On a release candidate, the Helm chart cell installs the chart from the
+`helm-chart` artifact of the release run: only a stable release pushes it to the
+registry.
+
+## Rehearsal before a release candidate
+
+Before the bump commit of a candidate or of a stable release, dispatch
+`build-release.yml` on the branch that will carry it, with `version` set to the
+version to simulate and `dry_run` on (its default). A rehearsal plays the whole
+chain and publishes nothing: no tag, no release, no registry push, no Docker Hub
+page, no chart. Its images go to a registry started inside each build job and
+gone with it; the smoke boots the amd64 images the run saved. A dispatch with
+`dry_run` off is refused unless it runs on the tag of its own version.
+
+What the run keeps, to read before tagging:
+
+| Artifact | Holds |
+|----------|-------|
+| `deb-package`, `rpm-package`, `rpm-el9-package`, `rpm-el10-package` | the packages, their `.sha256` and their SBOMs |
+| `std-sbom-*`, `fips-sbom-*`, `std-digest-*`, `fips-digest-*` | one SBOM and one digest per image platform (amd64, arm64) |
+| `std-image-amd64`, `fips-image-amd64` | the images the smoke booted |
+| `helm-chart` | `ucm-<chart version>.tgz` and its checksum |
+| `release-rehearsal` | `notes.md`, `release.txt` (tag, prerelease, make_latest), `full-stop-migrations.json`, `sbom-index.json` |
+
+The manifest jobs print the image tags a release would create: `X.Y-rcN` and
+`X.Y-rcN-fips` for a candidate; `X.Y`, `X.Y-fips`, `latest` and `latest-fips`
+for a stable release that no published stable tag exceeds (a `2.254.N` released
+after 3.0 takes neither).
+
+A release run, from the tag, then publishes: the GitHub release (a prerelease for
+a candidate) with the DEB, the Fedora, EL9 and EL10 RPMs, their checksums and
+SBOMs, `full-stop-migrations.json` and `sbom-index.json`; the images of both
+variants and both architectures on both registries; for a stable release only,
+the chart at `oci://ghcr.io/neyslim/charts/ucm`, versioned as the release in
+semver form. `scripts/bump-version.sh X.Y-rcN` writes the version into
+`VERSION`, both npm files and the chart before the tag.
+
 ## Smoke and UI checks
 
 `scripts/smoke_release.py` checks `/api/v2/health` (the version it reports must

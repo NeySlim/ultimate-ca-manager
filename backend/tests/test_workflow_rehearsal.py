@@ -212,6 +212,7 @@ def _mode(event, ref, inputs):
     ('workflow_dispatch', 'refs/heads/feature/x', {'version': '3.0', 'dry_run': False}, False),
     ('workflow_dispatch', 'refs/tags/v3.0', {'version': '3.1', 'dry_run': False}, False),
     ('workflow_dispatch', 'refs/heads/v3.0', {'version': '3.0', 'dry_run': False}, False),
+    ('workflow_dispatch', 'refs/heads/x', {'version': 'refs/heads/x', 'dry_run': False}, False),
 ])
 def test_the_mode_check(event, ref, inputs, ok):
     assert (_mode(event, ref, inputs).returncode == 0) is ok
