@@ -62,6 +62,8 @@ def _registry(kind):
         '2.254': names,
         '3.0': names + ['300_upgrade_from_2_254'],
         'short': [n for n in names if n != '001_fix_dn_format'],
+        # The 2.254 migration that deleted the leftovers of lifted holds: 3.0 reads a record as a hold
+        'no-136': [n for n in names if n != '136_lifted_hold_leftovers'],
         'later': names + ['300_upgrade_from_2_254', '999_from_the_future'],
         'short-and-later': [n for n in names if n != '001_fix_dn_format'] + ['999_from_the_future'],
     }[kind]
@@ -93,7 +95,7 @@ class TestSQLite:
         assert _check(path=db)[0] == STARTABLE
 
     @pytest.mark.parametrize('kind, reason', [
-        ('short', '001_fix_dn_format'), (None, 'it has no migration registry')])
+        ('short', '001_fix_dn_format'), ('no-136', '136_lifted_hold_leftovers'), (None, 'it has no migration registry')])
     def test_what_the_pivot_refuses_is_refused_with_its_reason(self, tmp_path, kind, reason):
         db = tmp_path / 'ucm.db'
         _sqlite(db, _registry(kind) if kind else None)
@@ -259,7 +261,7 @@ class TestPostgreSQL:
         assert _check(url=pg_url)[0] == STARTABLE
 
     @pytest.mark.parametrize('kind, reason', [
-        ('short', '001_fix_dn_format'), (None, 'it has no migration registry')])
+        ('short', '001_fix_dn_format'), ('no-136', '136_lifted_hold_leftovers'), (None, 'it has no migration registry')])
     def test_what_the_pivot_refuses_is_refused(self, pg_url, kind, reason):
         _pg(pg_url, _registry(kind) if kind else None)
         code, lines = _check(url=pg_url)
