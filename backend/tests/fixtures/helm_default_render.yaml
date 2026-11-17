@@ -168,6 +168,9 @@ spec:
                   key: UCM_INITIAL_ADMIN_PASSWORD
             - name: INITIAL_ADMIN_PASSWORD_FORCE_CHANGE
               value: "1"
+            # helm upgrade to this chart is the operator's consent to its major (see values.yaml)
+            - name: UCM_ACCEPT_MAJOR_UPGRADE
+              value: "3"
           # A first start that upgrades the database, or in HA the wait for a previous heartbeat
           startupProbe:
             httpGet:

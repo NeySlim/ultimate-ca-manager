@@ -111,6 +111,13 @@ proxy:
 fips:
   enabled: false
 
+## Upgrade from 2.x: the image stops on a database 2.254 started last unless
+## UCM_ACCEPT_MAJOR_UPGRADE names its major. A helm upgrade to this chart is
+## that consent: the chart sets the variable to the major of its appVersion.
+## false keeps the image's gate (set the variable yourself in extraEnv).
+majorUpgrade:
+  accept: true
+
 ## Extra environment variables (UCM_* etc.), passed verbatim.
 extraEnv: []
   # - name: UCM_LOG_LEVEL
