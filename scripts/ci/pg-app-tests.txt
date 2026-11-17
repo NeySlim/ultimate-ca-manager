@@ -108,3 +108,4 @@ tests/test_failed_login_count.py
 tests/test_background_jobs*.py
 tests/test_restore_job.py
 tests/test_sso_sign_in_test*.py
+tests/test_ca_deletion_setting_refs.py

@@ -129,16 +129,7 @@ def ca_deletion_blockers(ca) -> Iterator[DeletionBlocker]:
             'Rescope or delete them first.',
             f'{policies} issuance policy(ies) scoped to it',
         )
-    # Kept as a bare id: SQLite may hand it to the next CA created (#426)
-    from models.system_config import SystemConfig
-    scep_default = SystemConfig.query.filter_by(key='scep_ca_id').first()
-    if scep_default and scep_default.value in (str(ca.id), ca.refid):
-        yield DeletionBlocker(
-            409,
-            'Cannot delete CA: it is the default SCEP CA. '
-            'Clear it or choose another one in the SCEP settings first.',
-            'default SCEP CA',
-        )
+    yield from _ca_setting_blockers(ca)
     from models.deploy import CRLDeployBinding
     crl_bindings = CRLDeployBinding.query.filter_by(ca_id=ca.id).count()
     if crl_bindings > 0:
@@ -147,6 +138,65 @@ def ca_deletion_blockers(ca) -> Iterator[DeletionBlocker]:
             f'Cannot delete CA: its CRL is deployed to {crl_bindings} target(s). '
             'Remove the CRL deployment binding(s) first.',
             f'CRL deployed to {crl_bindings} target(s)',
+        )
+
+
+# What each setting naming a CA is called, and where it is changed
+CA_SETTING_WORDING = {
+    'scep_ca_id': ('the default SCEP CA', 'the SCEP settings'),
+    'acme.issuing_ca_id': ('the default ACME issuing CA', 'the ACME settings'),
+    'est_ca_refid': ('the default EST CA', 'the EST settings'),
+    'tsa_ca_refid': ('the timestamping (TSA) CA', 'the TSA settings'),
+    'mtls_trusted_ca_id': ('the trusted CA of mTLS client certificates', 'the mTLS settings'),
+}
+
+
+def _int_or_none(value):
+    """The number the readers' int() takes from a setting ('05' and ' +5' are 5), or None."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ca_setting_blockers(ca) -> Iterator[DeletionBlocker]:
+    """Global settings whose value names this CA, as the backup manifest declares them.
+
+    A number would pass to the next CA SQLite gives it (#426) and a refid would
+    dangle: the setting is changed first, never emptied behind the administrator.
+    """
+    import json
+    import re
+    from models.system_config import SystemConfig
+    from services.backup.manifest import CA_REFID_SETTINGS, SETTING_REFERENCES
+
+    declared = [(r, True) for r in SETTING_REFERENCES]
+    declared += [(r, False) for r in CA_REFID_SETTINGS]
+    declared = [(r, by_number) for r, by_number in declared if r.value == 'certificate_authorities']
+    for row in SystemConfig.query.order_by(SystemConfig.key):
+        value = (row.value or '').strip()
+        for reference, by_number in declared:
+            names_ca = value == ca.refid or (by_number and _int_or_none(value) == ca.id)
+            if value and names_ca and re.fullmatch(reference.pattern, row.key):
+                label, screen = CA_SETTING_WORDING.get(row.key, (f'named by the setting {row.key}', 'Settings'))
+                yield DeletionBlocker(
+                    409,
+                    f'Cannot delete CA: it is {label}. Clear it or choose another one in {screen} first.',
+                    label[4:] if label.startswith('the ') else label,
+                )
+    # est_labels maps each EST label to the refid of the CA it reaches
+    labels = SystemConfig.query.filter_by(key='est_labels').first()
+    try:
+        mapping = json.loads(labels.value) if labels and labels.value else {}
+    except ValueError:
+        mapping = {}
+    names = sorted(k for k, v in mapping.items() if v == ca.refid) if isinstance(mapping, dict) else []
+    if names:
+        yield DeletionBlocker(
+            409,
+            f"Cannot delete CA: EST label(s) {', '.join(names)} route to it. "
+            'Remove them or point them at another CA in the EST settings first.',
+            f"EST label(s) {', '.join(names)} route to it",
         )
 
 

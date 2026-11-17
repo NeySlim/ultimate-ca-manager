@@ -569,9 +569,39 @@ def test_a_later_recovery_pass_leaves_another_executors_job_running(app, fake_ty
                            from_states=(store.RUNNING,), now=jobs._now())
 
 
+class _TickedStop(threading.Event):
+    """The lease thread's stop event: its period ends only on tick(), so a renewal never
+    shares the tests' one SQLite connection (StaticPool) with another thread's statements."""
+
+    def __init__(self):
+        super().__init__()
+        self._tick, self._idle = threading.Semaphore(0), threading.Event()
+
+    def wait(self, timeout=None):
+        self._idle.set()
+        while not self.is_set():
+            if self._tick.acquire(timeout=0.01):
+                self._idle.clear()
+                return False
+        return True
+
+    def tick(self):
+        assert self._idle.wait(10), 'the lease thread never started'
+        self._idle.clear()
+        self._tick.release()
+        assert self._idle.wait(10), 'the renewal never ended'
+
+
 def test_the_lease_is_renewed_while_the_job_runs(app, fake_types, created, monkeypatch):
     """A run longer than its lease stays its executor's: the lease thread pushes it forward."""
-    monkeypatch.setattr(runner, 'RENEW_SECONDS', 0.05)
+    stops = []
+
+    class TickedLease(runner._Lease):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self._stop = _TickedStop()
+            stops.append(self._stop)
+    monkeypatch.setattr(runner, '_Lease', TickedLease)
     gate = Gate(monkeypatch, 1)
     job_id = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created)
     jr = runner.JobRunner(app, _Scheduler())
@@ -582,10 +612,9 @@ def test_the_lease_is_renewed_while_the_job_runs(app, fake_types, created, monke
         lapsed = jobs._now() - timedelta(seconds=1)
         db.session.execute(update(T).where(T.c.id == job_id).values(lease_expires_at=lapsed))
         db.session.commit()
-        deadline = time.monotonic() + 5
-        while _row(job_id)['lease_expires_at'] <= lapsed:
-            assert time.monotonic() < deadline, 'the lease was never renewed'
-            time.sleep(0.05)
+    stops[0].tick()
+    with app.app_context():
+        assert _row(job_id)['lease_expires_at'] > lapsed, 'the lease was never renewed'
         jr._last_recover = 0.0
         jr.run_pass()
         assert _row(job_id)['state'] == 'running'
