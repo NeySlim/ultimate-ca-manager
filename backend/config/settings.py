@@ -247,6 +247,10 @@ class Config:
     # Pre-ping, keepalives and connect timeout, plus UCM_PG_PREPARE_THRESHOLD (utils/db_url)
     if _db_url:
         SQLALCHEMY_ENGINE_OPTIONS.update(postgres_engine_options(_db_url))
+    if SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
+        # A SQLite connection plans with the statistics it loaded when it opened: reopened hourly,
+        # as often as the sqlite_statistics task refreshes them
+        SQLALCHEMY_ENGINE_OPTIONS["pool_recycle"] = 3600
     
     
     @classmethod

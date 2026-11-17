@@ -872,6 +872,16 @@ def create_app(config_name=None):
             per_node=True
         )
         
+        # SQLite only: its statistics stay as the last ANALYZE left them (PostgreSQL has autovacuum)
+        if app.config.get('SQLALCHEMY_DATABASE_URI', '').startswith('sqlite'):
+            from services.sqlite_statistics import scheduled_refresh
+            scheduler.register_task(
+                name="sqlite_statistics",
+                func=scheduled_refresh,
+                interval=3600,
+                description="Analyze the SQLite tables that grew or shrank tenfold since their statistics"
+            )
+
         # Register discovery scheduler task (checks every 60s for due profiles)
         try:
             from services.discovery_scheduler_task import DiscoverySchedulerTask

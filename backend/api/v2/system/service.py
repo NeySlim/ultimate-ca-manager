@@ -51,6 +51,7 @@ _TASK_LABELS = {
     'update_check': 'Update check',
     'update_result': 'Update result',
     'files_reconcile': 'Certificate and key files',
+    'sqlite_statistics': 'Database statistics',
     'discovery_scan': 'Discovery scans',
     'scheduled_reports': 'Scheduled reports',
     'scheduled_backup': 'Scheduled backups',
