@@ -75,6 +75,11 @@ dump_logs() {
   for f in "$WORK/console.log" "$WORK/logs/ucm.log" "$WORK/logs/access.log" "$WORK/guard.log"; do
     if [ -s "$f" ]; then echo "--- $(basename "$f") (last 100 lines)"; tail -n 100 "$f"; fi
   done
+  # A failure early in the suite is out of those tails: every error and 5xx of the whole run
+  echo "--- errors of the whole run"
+  grep -h -E -A30 ' (ERROR|CRITICAL) |Traceback \(most recent call last\)' \
+    "$WORK/logs/ucm.log" "$WORK/logs/error.log" "$WORK/console.log" 2>/dev/null | tail -n 400 || true
+  grep -h -E '" 5[0-9]{2} ' "$WORK/logs/access.log" 2>/dev/null | tail -n 50 || true
 }
 
 wait_healthy() {
