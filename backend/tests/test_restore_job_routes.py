@@ -273,6 +273,20 @@ def test_an_administrators_maintenance_refuses_every_cancellation(
     assert auth_client.post(f'/api/v2/system/jobs/{uuid.uuid4()}/cancel').status_code == 503
 
 
+def test_a_job_that_does_not_hold_a_restore_maintenance_is_not_cancelled_through_it(
+        app, auth_client, finished, maintenance_view, monkeypatch):
+    """A restore's maintenance lets the cancel route through: the route writes for its job only."""
+    from services import cluster_maintenance as cm
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
+    assert auth_client.get('/api/v2/system/jobs').status_code == 200
+    job_id = _job(app, 'audit_verify')
+    maintenance_view(cm.REASON_RESTORE)
+    r = auth_client.post(f'/api/v2/system/jobs/{job_id}/cancel')
+    assert r.status_code == 503, r.data
+    with app.app_context():
+        assert jobs.get_job(job_id)['state'] == 'pending'
+
+
 def test_only_the_restore_holding_the_maintenance_is_cancelled_through_it(
         app, auth_client, finished, maintenance_view, monkeypatch):
     from services import cluster_maintenance as cm
