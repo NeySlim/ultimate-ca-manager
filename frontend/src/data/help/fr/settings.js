@@ -58,6 +58,14 @@ export default {
         ]
       },
       {
+        title: "Sauvegarde manuelle",
+        items: [
+          { label: "En tâche de fond", text: "Créer une sauvegarde s'exécute sur le serveur : la fenêtre montre quelle partie de la base est exportée et propose de télécharger l'archive quand elle est prête. Une sauvegarde finie en 25 secondes se télécharge aussitôt, comme avant. Fermer la fenêtre ou recharger la page ne l'arrête pas : Créer une sauvegarde la montre de nouveau" },
+          { label: "Annuler", text: "Annuler la sauvegarde l'arrête entre deux parties de l'export : aucune archive n'est gardée et son fichier temporaire est supprimé" },
+          { label: "Une à la fois", text: "Une seule sauvegarde manuelle s'exécute à la fois sur toute l'installation, cluster HA compris : une seconde est refusée (409) et nomme celle en cours. Une sauvegarde qui trouve le verrou de sauvegarde tenu par une sauvegarde programmée ou une restauration attend jusqu'à 30 secondes, puis est refusée (409)" },
+        ]
+      },
+      {
         title: 'Restauration (v2.251)',
         items: [
           { label: "Remplacer ou fusionner", text: "Restaurer depuis une sauvegarde remplace les données d'ici par celles de l'archive et supprime ce que l'archive ne contient pas ; l'entrée d'audit liste ce qui a été supprimé. L'API accepte aussi mode=merge, qui ajoute l'archive aux données d'ici" },
@@ -300,6 +308,8 @@ Une nouvelle installation crée la clé maître à son premier démarrage (dans 
 
 ### Sauvegarde manuelle
 Cliquez sur **Créer une sauvegarde** pour générer un instantané de la base de données. Les sauvegardes incluent les certificats, AC, clés et paramètres ; le journal d'audit et les autres tables d'historique n'y figurent pas.
+
+Une sauvegarde manuelle s'exécute sur le serveur : la fenêtre montre son avancement, peut l'annuler (aucune archive n'est gardée) et propose de télécharger l'archive quand elle est prête ; fermer la fenêtre ou recharger la page ne l'arrête pas. Une seule sauvegarde manuelle s'exécute à la fois sur toute l'installation.
 
 ### Sauvegarde programmée
 Configurez des sauvegardes automatiques :

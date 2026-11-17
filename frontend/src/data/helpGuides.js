@@ -2071,6 +2071,8 @@ A new installation creates the master key at its first start (in a container, on
 ### Manual Backup
 Click **Create Backup** to generate a database snapshot. Backups include the certificates, CAs, keys and settings; the audit log and other history tables are not included.
 
+A manual backup runs on the server: the dialog shows its progress, can cancel it (no archive is kept) and offers the archive for download when it is ready; closing the dialog or reloading the page does not stop it. One manual backup runs at a time on the whole installation.
+
 ### Scheduled Backup
 Configure automatic backups:
 - Frequency (daily, weekly, monthly)
