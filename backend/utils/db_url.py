@@ -64,6 +64,19 @@ def postgres_engine_options(url, environ=None) -> dict:
     return {'pool_pre_ping': True, 'connect_args': args}
 
 
+def database_label(url, sqlite_path) -> str:
+    """The database a start announces: engine and name, never the address or the password."""
+    if not url:
+        return f'SQLite, {sqlite_path}'
+    if not is_postgres_url(url):
+        return 'DATABASE_URL'
+    try:
+        name = make_url(str(url)).database
+    except Exception:
+        name = None
+    return f'PostgreSQL, database {name}' if name else 'PostgreSQL (DATABASE_URL)'
+
+
 def is_postgres_url(url: str) -> bool:
     """True for every PostgreSQL spelling: postgres://, postgresql://, postgresql+driver://."""
     return (url or '').startswith(('postgresql://', 'postgres://', 'postgresql+'))

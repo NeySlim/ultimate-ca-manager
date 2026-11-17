@@ -17,13 +17,26 @@ ucm_env_database_line() {
     echo "DATABASE_PATH=${UCM_DATABASE_PATH}"
 }
 
-# Value shown in the configuration summary.
+# Value shown in the configuration summary: the engine and the database name, never the
+# address or the password of DATABASE_URL.
 ucm_database_label() {
-    if ucm_ha_active; then
-        echo "PostgreSQL (DATABASE_URL)"
-    else
-        echo "${UCM_DATABASE_PATH}"
+    local url="${DATABASE_URL:-}" name
+    if [ -z "$url" ]; then
+        if ucm_ha_active; then
+            echo "PostgreSQL (DATABASE_URL)"
+        else
+            echo "SQLite, ${UCM_DATABASE_PATH}"
+        fi
+        return 0
     fi
+    case "$url" in
+        postgres://*|postgresql://*|postgresql+*://*)
+            name="${url%%\?*}"
+            name="${name#*://}"
+            case "$name" in */*) name="${name##*/}" ;; *) name="" ;; esac
+            if [ -n "$name" ]; then echo "PostgreSQL, database ${name}"; else echo "PostgreSQL (DATABASE_URL)"; fi ;;
+        *) echo "DATABASE_URL" ;;
+    esac
 }
 
 # Where the first password comes from; never the value itself.

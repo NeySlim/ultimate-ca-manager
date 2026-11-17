@@ -552,3 +552,22 @@ def test_two_tmpfs_each_holding_its_part_are_not_summed(tmp_path):
     _database(tmp_path, [n for n in NAMES if n != '300_upgrade_from_2_254'])
     r = _run(_df_names(3000, 3000, 1, 2) + _START, env, tmp_path)
     assert r.returncode == 0 and 'cp ' in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize('ha', [None, '1'])
+@pytest.mark.parametrize('url,label', [
+    ('postgresql://ucm:s3cret@db.example:5432/ucmprod?sslmode=require', 'PostgreSQL, database ucmprod'),
+    ('postgres://ucm:s3cret@db/ucm', 'PostgreSQL, database ucm'),
+    ('postgresql+psycopg://ucm@db:5432/pki', 'PostgreSQL, database pki'),
+])
+def test_the_summary_names_the_database_in_use_not_the_sqlite_path(tmp_path, ha, url, label):
+    """A single instance on PostgreSQL showed the unused SQLite path; never the address or password."""
+    env = {**_sqlite_env(tmp_path, ha), 'DATABASE_URL': url}
+    r = _run('ucm_database_label', env, tmp_path)
+    assert r.stdout.strip() == label
+    assert 's3cret' not in r.stdout and 'db.example' not in r.stdout
+
+
+def test_without_database_url_the_summary_names_the_sqlite_file(tmp_path):
+    env = _sqlite_env(tmp_path, None)
+    assert _run('ucm_database_label', env, tmp_path).stdout.strip() == f"SQLite, {env['UCM_DATABASE_PATH']}"

@@ -74,3 +74,13 @@ def test_a_pooled_connection_killed_by_the_server_is_replaced_unseen():
     finally:
         engine.dispose()
         admin.dispose()
+
+
+@pytest.mark.parametrize('url,label', [
+    ('postgresql://ucm:s3cret@db.example:5432/ucmprod?sslmode=require', 'PostgreSQL, database ucmprod'),
+    ('postgresql+psycopg://ucm@db/pki', 'PostgreSQL, database pki'),
+    (None, 'SQLite, /data/ucm.db'),
+])
+def test_the_start_names_the_database_in_use(url, label):
+    """Neither the address nor the password; the SQLite path only when SQLite is used."""
+    assert db_url.database_label(url, '/data/ucm.db') == label
