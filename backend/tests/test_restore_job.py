@@ -538,6 +538,29 @@ def test_the_local_gate_refuses_writes_and_serves_reads_during_the_restore(
         assert not cluster_maintenance.current().active()
 
 
+def _gate(app):
+    ctx = types.SimpleNamespace(job_id=str(uuid.uuid4()), node_id=None, requested_by='admin',
+                                view={'id': 'x', 'kind': 'restore'}, app=app)
+    return restore_job.LocalGate(app, ctx)
+
+
+def test_the_gate_says_when_the_restore_started_not_when_it_was_read(app, auth_client):
+    """Two 503 a second apart, the gate renewed between them: the same started_at."""
+    import time
+    assert auth_client.get('/api/v2/system/jobs').status_code == 200  # signed in before the gate
+    gate = _gate(app).raise_gate()
+    try:
+        first = auth_client.post('/api/v2/groups', json={'name': 'refused-during-restore'})
+        time.sleep(1.1)
+        gate.set_view(phase=restore_job.APPLYING)  # what a renewal writes
+        second = auth_client.post('/api/v2/groups', json={'name': 'refused-during-restore'})
+    finally:
+        gate.lift()
+    assert (first.status_code, second.status_code) == (503, 503)
+    started = [r.get_json()['maintenance']['started_at'] for r in (first, second)]
+    assert started[0] and started[0] == started[1]
+
+
 def test_a_gate_whose_executor_died_refuses_nothing(app, monkeypatch):
     from services import cluster_maintenance
     monkeypatch.setattr(restore_job, '_alive', lambda pid: False)

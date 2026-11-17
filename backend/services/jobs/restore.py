@@ -187,6 +187,8 @@ class LocalGate:
     def __init__(self, app, ctx):
         self.app, self.ctx = app, ctx
         self.view = dict(ctx.view)
+        # Written once: every renewal keeps the time the gate went up, which the 503 shows
+        self.started_at = time.time()
         self._stop = threading.Event()
         self._lock = threading.Lock()
         self._thread = threading.Thread(target=self._renew_loop, daemon=True,
@@ -195,7 +197,7 @@ class LocalGate:
     def _state(self):
         return {'job_id': self.ctx.job_id, 'pid': os.getpid(), 'node_id': self.ctx.node_id,
                 'actor': self.ctx.requested_by,
-                'started_at': time.time(), 'expires': time.time() + GATE_LEASE_SECONDS,
+                'started_at': self.started_at, 'expires': time.time() + GATE_LEASE_SECONDS,
                 'view': self.view}
 
     def raise_gate(self):

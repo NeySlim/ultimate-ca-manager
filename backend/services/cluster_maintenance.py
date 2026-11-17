@@ -184,13 +184,24 @@ def observe_local(app):
     if state is not None:
         now = utc_now()
         row = {'token': state.get('job_id'), 'reason': LOCAL_REASON, 'phase': PHASE_RESTORING,
-               'started_at': now, 'expires_at': now + timedelta(
+               'started_at': _from_epoch(state.get('started_at')) or now, 'expires_at': now + timedelta(
                    seconds=max(0.0, state['expires'] - time.time())),
                'restored_at': None, 'node_id': None, 'actor': state.get('actor')}
         view.set(row, now)
     elif view.row is not None:
         view.set(None, None)
     return view
+
+
+def _from_epoch(seconds):
+    """A naive UTC datetime, like utc_now(), from a time.time() value; None if unreadable."""
+    from datetime import datetime, timezone
+    if not isinstance(seconds, (int, float)):
+        return None
+    try:
+        return datetime.fromtimestamp(seconds, timezone.utc).replace(tzinfo=None)
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def current(refresh=True):
