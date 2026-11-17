@@ -286,3 +286,64 @@ def test_after_a_ca_change_a_held_renewal_of_the_former_ca_s_certificate_replace
             db.session.commit()
         reason, invalid, _echo = _held_fault(_query(client, world, request_id))
         assert reason == 'Renewed certificate revoked' and invalid == 'true'
+
+
+# --- A request for another template signed by a certificate of the first ---------------------------
+
+@pytest.fixture
+def other_machine(app, world, realm_a):
+    """A second machine template on CA A: the OID profile c04-a serves for it."""
+    import json
+    from models import CA, CertificateTemplate, WindowsEnrollmentProfile
+    from services.xcep.policy_builder import served_template_oid
+    from tests.fixtures.templates import delete_templates
+    with app.app_context():
+        other = CertificateTemplate(name='ZZ Other Machine', template_type='vpn_client', key_type='RSA-2048',
+                                    validity_days=30, digest='sha256', is_active=True,
+                                    extensions_template=json.dumps({'extended_key_usage': ['clientAuth']}))
+        db.session.add(other)
+        db.session.flush()
+        db.session.add(CATemplatePin(ca_id=world['cas']['A']['id'], template_id=other.id))
+        db.session.commit()
+        profile = WindowsEnrollmentProfile.query.filter_by(name='c04-a').one()
+        oid, other_id = served_template_oid(profile, db.session.get(CA, world['cas']['A']['id']), other), other.id
+    yield oid
+    with app.app_context():
+        CATemplatePin.query.filter_by(template_id=other_id).delete()
+        db.session.commit()
+        delete_templates([other_id])
+        db.session.commit()
+
+
+def _other_template_request(client, world, old, key, template_oid):
+    """A request naming *template_oid*, signed by the new key and by *old*, as Windows renews."""
+    new_key = _key()
+    return _renew(client, world, MACHINE, old, key, new_key, _csr(template_oid=template_oid, key=new_key))
+
+
+def test_a_request_for_another_template_signed_by_a_certificate_of_the_first_is_an_enrollment(
+        app, client, world, realm_a, other_machine, directory):
+    """Signed by hosta$'s certificate of the machine template, a request naming another template is
+    an enrollment: audited as an issuance, nothing archived; the certificate still renews after it."""
+    old, key = _old(app, client, world, realm_a, True)
+    floor = _top_audit(app)
+    r = _other_template_request(client, world, old, key, other_machine)
+    assert r.status_code == 200, r.data
+    (action, _u, _n, details, ok), = _audits(app, floor)
+    assert (action, ok) == ('certificate.issued', True) and str(old.serial_number) not in details
+    assert _archived(app, old) == [False]
+    assert _certificate_renewal(client, old, key).status_code == 200
+    assert _archived(app, old) == [True]
+
+
+def test_a_held_request_for_another_template_carries_no_renewal(
+        app, client, auth_client, world, realm_a, other_machine):
+    """Held for approval, the same request names no renewed certificate, and its approval archives nothing."""
+    old, key = _old(app, client, world, realm_a, True)
+    with approval_policy(app, world['cas']['A']['id'], 'c19-held-other-template') as pid:
+        request_id = _pending(_other_template_request(client, world, old, key, other_machine))
+        (approval_id, status, data, _c), = requests_of(app, pid, 'wstep_request')
+        assert status == 'pending' and not data.get('renewal_of'), data
+        approve(auth_client, approval_id)
+        assert _query(client, world, request_id).status_code == 200
+        assert _archived(app, old) == [False]

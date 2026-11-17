@@ -464,6 +464,15 @@ def _template_ext_oid(cert_or_csr):
         return None
 
 
+def _renews_template(renewed, template, ca, *, profile):
+    """Whether *renewed* renews under *template*: it carries no template (issued before 3.0), or
+    this one under the OID served now or any OID this instance announced for it before."""
+    oid = _template_ext_oid(renewed)
+    if oid is None or oid == _template_oid_for(ca, template, profile=profile):
+        return True
+    return _template_id_of_policy_oid(oid) == template.id and oid in _instance_template_oids(template)
+
+
 def _eku_oids(cert_or_csr):
     """Dotted EKU OIDs, or None without an ExtendedKeyUsage extension."""
     try:
@@ -1237,6 +1246,10 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # Renewed already, on either binding: refused as the Certificate binding refuses it
     if renewed is SUPERSEDED_RENEWAL:
         return None, RENEWED_SUPERSEDED
+    # A certificate of another template signing the request does not make it its renewal
+    if renewed is not None and matched_template is not None and not _renews_template(
+            renewed, matched_template, ca, profile=profile):
+        renewed = None
     # The renewed row is replaced by the new certificate, under the CA that issued it
     renewal_ca, superseded_row = (_issuing_ca(ca, renewed), None) if renewed is not None else (None, None)
     if renewed is not None:
