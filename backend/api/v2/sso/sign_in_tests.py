@@ -295,10 +295,11 @@ def _run(test_id, protocol, secret, callback_key):
                 'reason': 'the provider was deleted or changed type'}
     base = {'protocol': protocol, 'provider_id': provider.id, 'provider_name': provider.name,
             'provider_enabled': bool(provider.enabled)}
-    # The login goes through one enabled provider of the type: a sign-in never reaches another.
-    chosen = login_routes.login_provider(protocol)
-    if chosen is not None and chosen.id != provider.id:
-        base['shadowed_by'] = {'id': chosen.id, 'name': chosen.name}
+    # A login goes through one enabled provider of the type, in no set order: every other one
+    # is listed, never a guess at which the login would take.
+    others = SSOProvider.query.filter_by(provider_type=protocol, enabled=True).filter(
+        SSOProvider.id != provider.id).order_by(SSOProvider.id)
+    base['other_enabled_providers'] = [{'id': p.id, 'name': _cut(p.name)} for p in others]
 
     if protocol == 'oauth2':
         code = request.args.get('code')

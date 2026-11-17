@@ -4188,7 +4188,8 @@
     "signInTestLaunching": "Opening the identity provider…",
     "signInTestCompleteClose": "This window did not close by itself: close it to return to the provider screen.",
     "signInTestCancel": "Cancel",
-    "signInTestShadowed": "The login now goes through the enabled provider {{name}} of this type, not this one: a sign-in would not reach this provider. Disable one of them."
+    "signInTestShadowed": "Other enabled providers of this type: {{names}}. A login goes through only one enabled provider per type, and not necessarily this one: disable {{names}}.",
+    "signInTestShadowedDisabled": "Enabled providers of this type: {{names}}. A login goes through only one enabled provider per type, and not necessarily this one: disable {{names}} before enabling this one."
   },
   "notifications": {
     "certificateIssued": "Сертифікат видано: {{name}}",

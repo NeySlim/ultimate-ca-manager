@@ -3952,7 +3952,8 @@
     "signInTestLaunching": "Ouverture du fournisseur d'identité…",
     "signInTestCompleteClose": "Cette fenêtre ne s'est pas fermée d'elle-même : fermez-la pour revenir à l'écran du fournisseur.",
     "signInTestCancel": "Annuler",
-    "signInTestShadowed": "La connexion passe aujourd'hui par le fournisseur activé {{name}} de ce type, pas par celui-ci : une connexion n'atteindrait pas ce fournisseur. Désactivez l'un des deux."
+    "signInTestShadowed": "Autres fournisseurs activés de ce type : {{names}}. La connexion n'emploie qu'un fournisseur activé par type, et pas forcément celui-ci : désactivez {{names}}.",
+    "signInTestShadowedDisabled": "Fournisseurs activés de ce type : {{names}}. La connexion n'emploie qu'un fournisseur activé par type, et pas forcément celui-ci : désactivez {{names}} avant d'activer celui-ci."
   },
   "templates": {
     "template": "Modèle",

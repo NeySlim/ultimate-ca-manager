@@ -673,38 +673,37 @@ def _second_oidc(app, enabled=True):
         return row.id
 
 
-def _login_pick(app, protocol):
-    with app.app_context():
-        return login_routes.login_provider(protocol).id
-
-
-@pytest.mark.parametrize('second_enabled', (True, False))
-def test_a_report_names_the_enabled_provider_the_login_uses_instead(
-        app, oidc_provider, monkeypatch, second_enabled):
+@pytest.mark.parametrize('tried_enabled', (True, False))
+def test_a_report_lists_every_other_enabled_provider_of_the_type(
+        app, oidc_provider, monkeypatch, tried_enabled):
+    """Whatever order the database returns rows in, no report claims which one the login takes."""
     case = Case(app, oidc_provider, 'oauth2')
-    second = _second_oidc(app, enabled=second_enabled)
+    others = [_second_oidc(app), _second_oidc(app), _second_oidc(app, enabled=False)]
     try:
+        _set(app, oidc_provider, enabled=tried_enabled)
         _install_idp(monkeypatch, OIDCIdP(case.external_id, _oidc_userinfo(case)))
         client = _admin_client(app)
-        chosen = _login_pick(app, 'oauth2')
-        assert chosen in (oidc_provider, second)
         with app.app_context():
-            chosen_name = db.session.get(SSOProvider, chosen).name
-        for pid in (oidc_provider, second):
-            started, _state = _oidc_test(client, pid)
-            report = _read_report(client, started['id'])
-            if pid == chosen:
-                assert report.get('shadowed_by') is None, report
-            else:
-                assert report['shadowed_by'] == {'id': chosen, 'name': chosen_name}, report
-        # The login itself goes through the provider named, whatever the test of the other said.
-        login = app.test_client()
-        assert _location(login.get('/api/v2/sso/login/oauth2', base_url=SP_BASE))
-        with login.session_transaction(base_url=SP_BASE) as s:
-            assert s['sso_provider_id'] == chosen
+            names = {pid: db.session.get(SSOProvider, pid).name for pid in others}
+        started, _state = _oidc_test(client, oidc_provider)
+        report = _read_report(client, started['id'])
+        assert report['provider_enabled'] is tried_enabled
+        assert report['other_enabled_providers'] == [
+            {'id': pid, 'name': names[pid]} for pid in others[:2]], report
+        assert 'shadowed_by' not in report
+
+        started, _state = _oidc_test(client, others[0])
+        expected = [{'id': others[1], 'name': names[others[1]]}]
+        if tried_enabled:
+            with app.app_context():
+                expected.insert(0, {'id': oidc_provider,
+                                    'name': db.session.get(SSOProvider, oidc_provider).name})
+        assert _read_report(client, started['id'])['other_enabled_providers'] == expected
     finally:
         case.cleanup()
-        _drop_provider(app, second)
+        _set(app, oidc_provider, enabled=True)
+        for pid in others:
+            _drop_provider(app, pid)
 
 
 # -- invariant 2: a test transaction never ends as a login, nor the reverse ---------
