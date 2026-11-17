@@ -21,17 +21,25 @@ class SSHCertificateManagementMixin:
         cert.revoked = True
         cert.revoked_at = utc_now()
         cert.revoke_reason = reason
-        # The KRL revokes by serial (PROTOCOL.krl §2.2): every certificate holding it is revoked;
-        # `revoked_with` names only those this revocation turned from valid to revoked
-        siblings = (SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == cert.ssh_ca_id,
-                                                SSHCertificate.serial == cert.serial,
-                                                SSHCertificate.id != cert.id)
-                    .order_by(SSHCertificate.id).all() if cert.serial else [])
-        siblings = [s for s in siblings if not s.revoked]
-        for sibling in siblings:
-            sibling.revoked = True
-            sibling.revoked_at = cert.revoked_at
-            sibling.revoke_reason = reason
+        # The KRL revokes a non-zero serial, and the key ID of a serial 0 certificate under its CA
+        # (ssh-keygen -k): every certificate it revokes is revoked; `revoked_with` names only those
+        # this revocation turned from valid to revoked
+        siblings, pending = [], [cert]
+        while pending:
+            held = pending.pop(0)
+            match = (SSHCertificate.serial == held.serial if held.serial
+                     else SSHCertificate.key_id == held.key_id)
+            for sibling in (SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == cert.ssh_ca_id, match,
+                                                        SSHCertificate.id != held.id)
+                            .order_by(SSHCertificate.id).all()):
+                if sibling.revoked:
+                    continue
+                sibling.revoked = True
+                sibling.revoked_at = cert.revoked_at
+                sibling.revoke_reason = reason
+                siblings.append(sibling)
+                pending.append(sibling)
+        siblings.sort(key=lambda s: s.id)
         cert.revoked_with = siblings
 
         try:

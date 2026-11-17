@@ -25,6 +25,8 @@ from models import CA, db
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 _on_pg = [pytest.mark.postgres,
           pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')]

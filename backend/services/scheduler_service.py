@@ -173,6 +173,8 @@ class SchedulerService:
         self._started_cluster = None  # _started_at on the cluster clock, set by the first heartbeat
         self._last_heartbeat = None
         self._heartbeat_error_logged = False
+        self._led_since = None  # monotonic instant this process took the lock (HA)
+        self._last_prune = None
         self._claimed: Dict[str, list] = {}
         self._leadership_hooks: list = []
         self.tasks: Dict[str, ScheduledTask] = {}
@@ -699,6 +701,7 @@ class SchedulerService:
                     self._heartbeat()  # a process whose row another one holds never takes the lock
                 if not lost and not self._owns_lock and not self.deposed and lock.acquire():
                     self._owns_lock, self._owner_pid = True, os.getpid()
+                    self._led_since = time.monotonic()
                     logger.info(f"Scheduler lock acquired: pid {os.getpid()} on node {self.node_id} "
                                 "runs the scheduled tasks")
                     self._heartbeat(force=True)
@@ -717,6 +720,7 @@ class SchedulerService:
                         self._publish_state()  # this node's per-node runs, for its web workers
                     self._wake.wait(LOCK_RETRY_SECONDS)
                     continue
+                self._prune_registry()
                 try:
                     requested = self._take_deferred()
                     taken = self._take_requests() if supervised() or _ha() else []
@@ -833,6 +837,27 @@ class SchedulerService:
             if not self._heartbeat_error_logged:
                 logger.error(f"Node heartbeat not written: {type(e).__name__}: {e}")
                 self._heartbeat_error_logged = True
+
+    def _prune_registry(self) -> None:
+        """HA leader, once a pass: delete the rows of nodes gone for good. Only after leading a
+        stale window: past a database cut every live node has beaten again by then."""
+        if not _ha() or not self._owns_lock or self._led_since is None:
+            return
+        now = time.monotonic()
+        from services.scheduler_leader import GONE_PASSES, STALE_PASSES, prune_gone_nodes
+        if now - self._led_since < STALE_PASSES * self.wake_interval:
+            return
+        if self._last_prune is not None and now - self._last_prune < self.wake_interval:
+            return
+        self._last_prune = now
+        try:
+            removed = self._in_app(prune_gone_nodes, self.node_id, self.wake_interval)
+        except Exception as e:
+            self._in_app(_rollback)
+            logger.warning(f"Cluster registry not pruned: {type(e).__name__}: {e}")
+            return
+        if removed:
+            logger.info(f"Cluster registry: {removed} node(s) silent for {GONE_PASSES} passes removed")
 
     @property
     def instance_token(self) -> str:

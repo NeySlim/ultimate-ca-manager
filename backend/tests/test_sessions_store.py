@@ -256,7 +256,7 @@ def test_store_methods_retry_a_transient_database_error(sql_store_app, monkeypat
 
 def test_a_purge_the_database_refuses_never_fails_the_request_it_rides(monkeypatch, tmp_path):
     """The purge of expired sessions rides one request in N: with the database away the
-    liveness probe still answers 200, after one attempt and no retry delay."""
+    request still answers 200, after one attempt and no retry delay."""
     from sqlalchemy.exc import OperationalError
     from config.settings import TestingConfig
     from tests import pg_app_harness
@@ -281,10 +281,47 @@ def test_a_purge_the_database_refuses_never_fails_the_request_it_rides(monkeypat
             m.setattr(interface, '_store', away)
             m.setattr('random.randint', lambda low, high: 0)
             m.setattr('time.sleep', slept.append)
-            assert app.test_client().get('/health/live').status_code == 200
+            assert app.test_client().get('/health').status_code == 200
         assert attempts == [1] and slept == []
     finally:
         from models import db
         with app.app_context():
             db.session.remove()
             db.engine.dispose()
+
+
+
+@pytest.fixture
+def purging_app(monkeypatch, tmp_path):
+    """The SQL session store purging on every request (one in N, N = 1)."""
+    from config.settings import TestingConfig
+    from tests import pg_app_harness
+
+    if pg_app_harness.ENABLED:
+        pytest.skip('file-database fixture, not meaningful in PostgreSQL mode')
+    monkeypatch.setattr(TestingConfig, 'SQLALCHEMY_DATABASE_URI', f'sqlite:///{tmp_path / "s.db"}')
+    monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
+    monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
+    monkeypatch.setattr(TestingConfig, 'SESSION_CLEANUP_N_REQUESTS', 1, raising=False)
+    from app import create_app
+    application = create_app('testing')
+    application.config['PROPAGATE_EXCEPTIONS'] = False
+    yield application
+    from models import db
+    with application.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
+
+@pytest.mark.parametrize('path', ['/health/live', '/api/v2/health/live', '/health/ready'])
+def test_the_purge_never_rides_a_probe(purging_app, monkeypatch, path):
+    """A database that does not answer would hold that probe for the connect timeout (10 s):
+    the purge waits for another request, or for the scheduled session cleanup."""
+    interface, purges = purging_app.session_interface, []
+    monkeypatch.setattr(interface, '_purge_expired', lambda: purges.append(1))
+    monkeypatch.setattr('random.randint', lambda low, high: 0)
+    client = purging_app.test_client()
+    client.get(path)
+    assert purges == []
+    client.get('/health')
+    assert purges == [1]

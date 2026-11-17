@@ -148,8 +148,8 @@ class TestSessionFieldParity:
                 UserSSOIdentity.query.filter(db.or_(UserSSOIdentity.user_id.in_(ids),
                                                     UserSSOIdentity.provider_id == provider_id)).delete(
                     synchronize_session=False)
-                User.query.filter(User.id.in_(ids)).delete(synchronize_session=False)
                 SSOSession.query.filter_by(provider_id=provider_id).delete()
+                User.query.filter(User.id.in_(ids)).delete(synchronize_session=False)
                 SSOProvider.query.filter_by(id=provider_id).delete()
                 db.session.commit()
 

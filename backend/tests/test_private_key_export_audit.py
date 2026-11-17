@@ -3,6 +3,8 @@ import pytest
 
 from models import AuditLog
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+
 PASSWORD = 'Export-Passw0rd!'
 
 

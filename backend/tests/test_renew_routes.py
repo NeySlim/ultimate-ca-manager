@@ -15,6 +15,8 @@ from services.cert.renewal import RenewalError
 from services.crl import CRLService
 from tests.test_approval_on_sign_and_renew import _cert_row, _drop_policy, _drop_rows, _json, _operator
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
+
 BAD_DURATION = 'validity_days must be an integer from 1 to 3650'
 
 

@@ -26,6 +26,8 @@ from tests.test_scep_rfc8894_operations import (
     _client_identity, _decrypt_response, _issuer_and_serial, _load_ca_material,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 _HASHES = {"sha1": hashes.SHA1, "sha256": hashes.SHA256}
 
 

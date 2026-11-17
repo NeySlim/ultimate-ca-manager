@@ -14,6 +14,8 @@ from services.policy_service import PolicyEvaluationService
 from services.trust_store.constants import hash_algorithm
 from services.trust_store.csr_operations_mixin import CSROperationsMixin
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 SUBJECT = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'hash fallback')])
 
 

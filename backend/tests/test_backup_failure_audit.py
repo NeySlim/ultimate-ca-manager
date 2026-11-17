@@ -16,11 +16,17 @@ LEAKY = '/srv/private/path/' + SECRET
 
 @pytest.fixture
 def audit(auth_client, monkeypatch):
+    from models import db
     # A restore of an earlier file signed the shared client out: its sign-in is no line here
     assert auth_client.get('/api/v2/system/jobs').status_code == 200
     calls = []
-    monkeypatch.setattr(AuditService, 'log_action',
-                        staticmethod(lambda **kw: calls.append(kw)))
+
+    # Commits and returns the line as log_action does: a backup job concludes in that commit
+    def log_action(**kw):
+        calls.append(kw)
+        db.session.commit()
+        return kw
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(log_action))
     return calls
 
 

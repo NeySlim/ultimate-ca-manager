@@ -16,6 +16,8 @@ from tests.acme_fake_ca import key_pem
 from tests.test_acme_renewal_in_place import Bench, _restore_config, _set_config
 from utils.spki_digest import public_key_sha256
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def bench(app):

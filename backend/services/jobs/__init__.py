@@ -191,8 +191,7 @@ def audit_writer(kind: str):
         from services.audit_service import AuditService
         written = AuditService.log_action(
             action=jt.audit_action, resource_type=jt.resource_type,
-            resource_name=resource or jt.resource_name or jt.label,
-            resource_id=(row or {}).get('id'),
+            resource_name=_resource_of(jt, resource), resource_id=(row or {}).get('id'),
             details=details or _phrase(jt, state, reason), success=state == SUCCEEDED,
             username=(row or {}).get('requested_by_name') or 'system',
             user_id=(row or {}).get('requested_by_id'),
@@ -208,6 +207,17 @@ _PHRASES = {
     (CANCELLED, None): '{label} cancelled',
     (FAILED, None): '{label} failed',
 }
+
+
+def _resource_of(jt, resource=None):
+    return resource or jt.resource_name or jt.label
+
+
+def result_line_text(kind, state, reason, details=None, resource=None):
+    """The result line ``audit_writer`` writes, as one log line: fixed phrases, no secret."""
+    jt = _TYPES[kind]
+    return (f"action={jt.audit_action} resource={_resource_of(jt, resource)} "
+            f"success={state == SUCCEEDED} details={details or _phrase(jt, state, reason)}")
 
 
 def _phrase(jt, state, reason):
@@ -256,4 +266,4 @@ def public_view(row: dict, with_result: bool = True) -> dict:
 
 
 # The job types this release ships, registered in every process that imports the service
-from services.jobs import audit_verify, restore  # noqa: E402,F401
+from services.jobs import audit_verify, backup, restore  # noqa: E402,F401

@@ -101,6 +101,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- else if gt (int .Values.replicaCount) 1 -}}
 {{- fail "replicaCount > 1 requires ha.enabled=true (and PostgreSQL): a single instance cannot run in several pods" -}}
 {{- end -}}
+{{- /* The kill at the grace's end must come after UCM's clean stop, at most 41 s after SIGTERM:
+       the scheduler process gets 35 s then is killed, then the node writes its stop (docs/HA.md, Upgrading) */ -}}
+{{- if lt (int .Values.terminationGracePeriodSeconds) (add (int .Values.lifecycle.preStopSleepSeconds) 45 | int) -}}
+{{- fail "terminationGracePeriodSeconds must be at least lifecycle.preStopSleepSeconds + 45 (the time UCM takes to stop cleanly, at most 41 s, and a margin)" -}}
+{{- end -}}
 {{- end }}
 
 {{/*

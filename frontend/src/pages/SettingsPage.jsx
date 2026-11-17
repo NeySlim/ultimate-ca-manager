@@ -2,7 +2,7 @@
  * Settings Page - Horizontal tabs for desktop, scrollable for mobile
  * Uses DetailCard design system
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -31,7 +31,8 @@ import { settingsService, systemService, casService, ssoService, mtlsService, ms
 import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
-import { usePermission } from '../hooks'
+import { usePermission, useJob } from '../hooks'
+import { acceptedJob } from '../services/jobs.service'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { useTheme } from '../contexts/ThemeContext'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
@@ -207,6 +208,10 @@ export default function SettingsPage() {
   const [restorePassword, setRestorePassword] = useState('')
   const [restoreFile, setRestoreFile] = useState(null)
   const [backupLoading, setBackupLoading] = useState(false)
+  // A backup that outlasts the request runs as a job: followed here, its archive offered at the end
+  const { job: backupJob, running: backupRunning, follow: followBackupJob, resume: resumeBackupJob,
+    cancel: cancelBackupJob } = useJob()
+  const [backupReady, setBackupReady] = useState(null)
   const [restoreProgress, setRestoreProgress] = useState(null)
   const [restoreReport, setRestoreReport] = useState(null)
   // Off the page the report can no longer show: the held sign-out goes with it
@@ -1343,6 +1348,54 @@ export default function SettingsPage() {
     }
   }
 
+  const closeBackupModal = () => {
+    setShowBackupModal(false)
+    setBackupPassword('')
+    setBackupReady(null)
+  }
+
+  const showBackupEnd = useCallback((job) => {
+    if (job.state === 'succeeded' && job.result?.data) {
+      setBackupReady(job.result.data)
+      setShowBackupModal(true)
+      showSuccess(t('messages.success.backup.ready'))
+      const notice = ceilingNotice(job.result.data, backupSchedule, {}, t)
+      if (notice) showWarning(notice)
+      loadBackups()
+    } else if (job.state === 'cancelled') {
+      setShowBackupModal(false)
+      showWarning(t('settings.backupCancelled'))
+    } else if (job.reason === 'executor_lost' || job.reason === 'not_taken') {
+      showError(t('settings.backupLost'))
+    } else {
+      showError(job.result?.message || t('messages.errors.backup.createFailed'))
+    }
+  }, [backupSchedule, showSuccess, showWarning, showError, t]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const followBackup = useCallback(async (job) => {
+    try {
+      showBackupEnd(await followBackupJob(job))
+    } catch {
+      showError(t('messages.errors.backup.createFailed'))
+    }
+  }, [followBackupJob, showBackupEnd, showError, t])
+
+  // After a reload: a backup still running is shown and followed again, once per mount
+  const backupEnd = useRef(showBackupEnd)
+  backupEnd.current = showBackupEnd
+  const canBackup = hasPermission('admin:system')
+  useEffect(() => {
+    if (!canBackup) return undefined
+    let gone = false
+    resumeBackupJob('backup').then((job) => {
+      if (!gone && job) backupEnd.current(job)
+    }).catch(() => {})
+    return () => { gone = true }
+  }, [resumeBackupJob, canBackup])
+  useEffect(() => {
+    if (backupRunning) setShowBackupModal(true)
+  }, [backupRunning])
+
   const handleBackup = async () => {
     const problem = backupPasswordProblem(backupPassword, t)
     if (problem) {
@@ -1353,6 +1406,13 @@ export default function SettingsPage() {
     setBackupLoading(true)
     try {
       const response = await systemService.backup(backupPassword)
+      const job = acceptedJob(response)
+      if (job) {
+        setBackupPassword('')
+        setBackupLoading(false)
+        await followBackup(job)
+        return
+      }
       if (response.data) {
         const blob = await systemService.downloadBackup(response.data.filename)
         downloadBlob(blob, response.data.filename)
@@ -1369,6 +1429,18 @@ export default function SettingsPage() {
       setBackupLoading(false)
     }
   }
+
+  const handleCancelBackup = async () => {
+    try {
+      await cancelBackupJob()
+    } catch {
+      showError(t('settings.backupCancelFailed'))
+    }
+  }
+
+  const backupProgress = backupRunning && backupJob?.progress?.total
+    ? t('settings.backupProgress', { done: backupJob.progress.done || 0, total: backupJob.progress.total })
+    : t('settings.backupStarting')
 
   const handleDownloadBackup = async (filename) => {
     try {
@@ -1682,6 +1754,7 @@ export default function SettingsPage() {
             handleRunRetention={handleRunRetention}
             backupBusy={backupBusy}
             setShowBackupModal={setShowBackupModal}
+            backupRunning={backupRunning}
             setShowRestoreModal={setShowRestoreModal}
             setRestoreFile={setRestoreFile}
             handleDownloadBackup={handleDownloadBackup}
@@ -1892,12 +1965,39 @@ export default function SettingsPage() {
         {renderCategoryContent()}
       </ResponsiveLayout>
 
-      {/* Backup Password Modal */}
+      {/* Backup Password Modal; then the running backup, then its archive to download */}
       <Modal
         open={showBackupModal}
-        onClose={() => { setShowBackupModal(false); setBackupPassword('') }}
+        onClose={closeBackupModal}
         title={t('settings.encryptedBackup')}
       >
+        {backupRunning ? (
+          <div className="space-y-4" data-testid="backup-job">
+            <p className="text-sm text-text-primary">{backupProgress}</p>
+            <p className="text-sm text-text-secondary">{t('settings.backupRunsInBackground')}</p>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" variant="secondary" onClick={closeBackupModal}>
+                {t('common.close')}
+              </Button>
+              <Button type="button" variant="danger" onClick={handleCancelBackup} disabled={!!backupJob?.cancel_requested}
+                data-testid="backup-job-cancel">
+                {t('settings.backupCancel')}
+              </Button>
+            </div>
+          </div>
+        ) : backupReady ? (
+          <div className="space-y-4" data-testid="backup-ready">
+            <p className="text-sm text-text-primary">{t('settings.backupReady', { filename: backupReady.filename })}</p>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button type="button" variant="secondary" onClick={closeBackupModal}>
+                {t('common.close')}
+              </Button>
+              <Button type="button" onClick={() => handleDownloadBackup(backupReady.filename)} data-testid="backup-ready-download">
+                {t('common.download')}
+              </Button>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
             {t('settings.createBackupDesc')}
@@ -1915,7 +2015,7 @@ export default function SettingsPage() {
             showStrength
           />
           <div className="flex gap-3 justify-end pt-4">
-            <Button type="button" variant="secondary" onClick={() => { setShowBackupModal(false); setBackupPassword('') }}>
+            <Button type="button" variant="secondary" onClick={closeBackupModal}>
               {t('common.cancel')}
             </Button>
             <Button 
@@ -1926,6 +2026,7 @@ export default function SettingsPage() {
             </Button>
           </div>
         </div>
+        )}
       </Modal>
 
       {/* Restore Password Modal; then the running restore, or the sign-in its end asks for */}

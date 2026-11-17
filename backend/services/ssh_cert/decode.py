@@ -9,6 +9,7 @@ from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from services.ssh_ca_service import SSHCAService
 from utils.key_codec import refuse_eddsa_key
+from utils import ssh_serials as SSHSerials
 from .utils import SSHCertificateUtilsMixin
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,8 @@ class SSHCertificateDecodeMixin:
             raise ValueError(
                 f"A certificate with serial {decoded['serial']} from this CA already exists"
             )
+
+        SSHSerials.refuse_revoked_key_id(matched_ca.id, decoded['key_id'])
 
         principals = decoded['principals']
         cert_type = decoded['type']

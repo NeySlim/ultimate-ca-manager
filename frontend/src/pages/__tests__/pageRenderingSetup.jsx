@@ -14,6 +14,16 @@ beforeAll(() => {
   }
 })
 
+// The notifications every page sees: one set of spies, so a test can read what it was told
+export const notificationSpies = {
+  showSuccess: vi.fn(),
+  showError: vi.fn(),
+  showWarning: vi.fn(),
+  showInfo: vi.fn(),
+  notifications: [],
+  removeNotification: vi.fn(),
+}
+
 // ── Mock all services (prevent real API calls) ─────────────────────
 const mockApiClientInstance = {
   get: vi.fn().mockResolvedValue({ data: [] }),
@@ -234,14 +244,7 @@ vi.mock('../../contexts', () => ({
     checkAuth: vi.fn(),
     checkSession: vi.fn(),
   }),
-  useNotification: () => ({
-    showSuccess: vi.fn(),
-    showError: vi.fn(),
-    showWarning: vi.fn(),
-    showInfo: vi.fn(),
-    notifications: [],
-    removeNotification: vi.fn(),
-  }),
+  useNotification: () => notificationSpies,
   useTheme: () => ({
     theme: 'dark',
     setTheme: vi.fn(),
@@ -301,14 +304,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 }))
 
 vi.mock('../../contexts/NotificationContext', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(),
-    showError: vi.fn(),
-    showWarning: vi.fn(),
-    showInfo: vi.fn(),
-    notifications: [],
-    removeNotification: vi.fn(),
-  }),
+  useNotification: () => notificationSpies,
   NotificationProvider: ({ children }) => children,
 }))
 

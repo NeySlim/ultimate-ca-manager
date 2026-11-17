@@ -6,6 +6,8 @@ import pytest
 from models import db, WebhookDelivery
 from services.webhook_service import WebhookEndpoint, emit_cert_issued, emit_ca_created
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def all_events_endpoint(app):

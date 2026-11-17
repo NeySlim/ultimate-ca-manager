@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from services.ssh_ca_service import SSHCAService, normalize_key_type
+from utils import ssh_serials as SSHSerials
 from .utils import SSHCertificateUtilsMixin
 
 logger = logging.getLogger(__name__)
@@ -115,6 +116,7 @@ class SSHCertificateSigningMixin:
                 "or tick \"Let requesters set the key ID\" on the CA"
             )
         key_id = key_id or default_key_id
+        SSHSerials.refuse_revoked_key_id(ca_id, key_id)  # before a serial is spent
 
         public_key = SSHCertificateUtilsMixin._parse_public_key(public_key_data)
         subject_key_type = SSHCertificateUtilsMixin._detect_key_type(public_key)

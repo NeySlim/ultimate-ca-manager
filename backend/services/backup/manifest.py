@@ -562,6 +562,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'pro_sso_sessions': 'live SSO sessions',
     'flask_sessions': 'the SQL session store (PostgreSQL without Redis): live sessions, emptied after every restore',
     'pro_sso_saml_message_ids': 'pending SAML request ids and a replay cache, valid for minutes',
+    'pro_sso_sign_in_tests': 'OIDC and SAML sign-in tests: reports valid for minutes, emptied rows kept a day',
     'webauthn_challenges': 'single-use registration and login challenges',
     'related_cert_requests': 'a replay cache of relatedCertRequests, each honoured for at most 7 days',
     'cluster_nodes': 'heartbeats of the running HA nodes: runtime state of one cluster, never restored',

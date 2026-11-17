@@ -58,6 +58,14 @@ export default {
         ]
       },
       {
+        title: "Sauvegarde manuelle",
+        items: [
+          { label: "En tâche de fond", text: "Créer une sauvegarde s'exécute sur le serveur : la fenêtre montre quelle partie de la base est exportée et propose de télécharger l'archive quand elle est prête. Une sauvegarde finie en 25 secondes se télécharge aussitôt, comme avant. Fermer la fenêtre ou recharger la page ne l'arrête pas : Créer une sauvegarde la montre de nouveau" },
+          { label: "Annuler", text: "Annuler la sauvegarde l'arrête entre deux parties de l'export : aucune archive n'est gardée et son fichier temporaire est supprimé" },
+          { label: "Une à la fois", text: "Une seule sauvegarde manuelle s'exécute à la fois sur toute l'installation, cluster HA compris : une seconde est refusée (409) et nomme celle en cours. Une sauvegarde qui trouve le verrou de sauvegarde tenu par une sauvegarde programmée ou une restauration attend jusqu'à 15 secondes, puis est refusée (409)" },
+        ]
+      },
+      {
         title: 'Restauration (v2.251)',
         items: [
           { label: "Remplacer ou fusionner", text: "Restaurer depuis une sauvegarde remplace les données d'ici par celles de l'archive et supprime ce que l'archive ne contient pas ; l'entrée d'audit liste ce qui a été supprimé. L'API accepte aussi mode=merge, qui ajoute l'archive aux données d'ici" },
@@ -302,6 +310,8 @@ Une nouvelle installation crée la clé maître à son premier démarrage (dans 
 ### Sauvegarde manuelle
 Cliquez sur **Créer une sauvegarde** pour générer un instantané de la base de données. Les sauvegardes incluent les certificats, AC, clés et paramètres ; le journal d'audit et les autres tables d'historique n'y figurent pas.
 
+Une sauvegarde manuelle s'exécute sur le serveur : la fenêtre montre son avancement, peut l'annuler (aucune archive n'est gardée) et propose de télécharger l'archive quand elle est prête ; fermer la fenêtre ou recharger la page ne l'arrête pas. Une seule sauvegarde manuelle s'exécute à la fois sur toute l'installation.
+
 ### Sauvegarde programmée
 Configurez des sauvegardes automatiques :
 - Fréquence (quotidienne, hebdomadaire, mensuelle)
@@ -538,6 +548,8 @@ XML-DSig n'a pas de méthode de signature ML-DSA : un certificat **ML-DSA** ne p
 Windows peut aussi renouveler avec \`certreq ... Renew\`, authentifié par le certificat à renouveler comme certificat client TLS : activez mTLS avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé (v2.248). Depuis la 3.0, seul un certificat émis par l'inscription Windows se renouvelle ainsi : un certificat signé dans l'interface est refusé (\`not issued through Windows enrollment\`) et doit être réémis par l'inscription Windows.
 
 Depuis la 3.0, un renouvellement par certificat est servi par le profil que le certificat enregistre (un certificat WSTEP 2.x : le profil par défaut), sous l'AC d'émission de ce profil, et refusé quand le profil a été supprimé ou est désactivé ; chaque refus est audité avec le profil et la raison. Seul le SID est revérifié, par le connecteur du profil : révoquez le certificat d'un ordinateur retiré du groupe. Le certificat client TLS ne fonctionne que pour un profil dont l'AC d'émission est l'AC mTLS ou une AC qui en dépend : un certificat que l'écouteur ne reconnaît pas est refusé pendant la poignée de main TLS, avant qu'UCM voie une requête, donc UCM n'audite rien (lire la sortie du client et le journal du service). Les autres profils se renouvellent uniquement par Kerberos (le profil du realm du principal sert et le nouveau certificat l'enregistre), et quand Kerberos refuse (demandeur retiré du groupe AD, profil désactivé) ils ne peuvent pas se renouveler. Le keytab Kerberos garde les clés des profils désactivés, si bien que leurs requêtes sont refusées avec une entrée d'audit : seule la suppression du profil les retire.
+
+Par Kerberos, une demande signée par le certificat valide du demandeur, issu du même profil, le renouvelle quand elle nomme le modèle de ce certificat (ou que le certificat n'en porte aucun, comme un certificat émis avant la 3.0) : le certificat renouvelé est marqué remplacé par le nouveau, comme par la liaison par certificat, l'entrée d'audit est \`certificate.renewed\` et le webhook \`cert.renewed\`, et un second renouvellement du même certificat est refusé par l'une ou l'autre liaison (\`Renewed certificate superseded by a newer one\`). Une demande qui nomme un autre modèle est un enrôlement (\`certificate.issued\`), même quand le certificat qui la signe a déjà été renouvelé. Après un changement d'AC d'émission du profil, un certificat de l'ancienne AC se renouvelle de même : la nouvelle AC l'émet, et l'entrée d'audit \`certificate.renewed\` nomme l'ancien numéro de série et l'ancienne AC.
 
 ### Extension de sécurité SID (KB5014754)
 

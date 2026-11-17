@@ -205,11 +205,13 @@ def run_job(app, row, executor, done=None):
                     db.session, job_id, state=state, reason=reason, from_states=(store.RUNNING,),
                     now=jobs._now(), result=result, executor=executor, result_line=result_line,
                     where=unfinished)
-            if not _conclude_after_maintenance(app, lambda: conclude(line)) and line is not None:
-                # The result stands without its line rather than hold the slot until a restart
-                # (a no-op when another actor concluded the job meanwhile)
-                if _conclude_after_maintenance(app, lambda: conclude(None)):
-                    logger.error(f"Background job {job_id} concluded without its result line")
+            # One result line per job: tried twice, then the job ends without it (a slot held
+            # until a restart is worse) and the line goes to the log; no-op if concluded elsewhere
+            if (not _conclude_after_maintenance(app, lambda: conclude(line)) and line is not None
+                    and not _conclude_after_maintenance(app, lambda: conclude(line))
+                    and _conclude_after_maintenance(app, lambda: conclude(None))):
+                logger.error(f"Background job {job_id} concluded without its audit line: "
+                             + jobs.result_line_text(kind, state, reason, details, resource))
         except Exception as e:
             logger.error(f"Background job {job_id} not concluded: {type(e).__name__}")
             db.session.rollback()

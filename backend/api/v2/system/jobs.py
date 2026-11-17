@@ -39,9 +39,10 @@ def parse_prefer(values):
             if not head:
                 continue
             name, _, token = head.partition('=')
-            name = name.strip().lower()
+            name, token = name.strip().lower(), token.strip().strip('"')
             if name and name not in found:
-                found[name] = token.strip().strip('"') if _ else True
+                # An empty value is no value (RFC 7240 section 2): respond-async="" is respond-async
+                found[name] = token or True
     return found
 
 

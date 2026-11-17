@@ -28,6 +28,8 @@ from utils.acme_ip import (
     format_ip_for_url,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 class TestIPValidation:
     """Test IP address validation utilities"""

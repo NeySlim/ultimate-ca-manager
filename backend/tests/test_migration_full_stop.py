@@ -200,10 +200,11 @@ from sqlalchemy import create_engine, text
 engine = create_engine(__import__('os').environ['DATABASE_URL'])
 
 
-def stop():
+def stop(on_stopped=None):
     # The scheduler process writes its last heartbeat while it stops: the mark comes after it
     with engine.begin() as conn:
         conn.execute(text("UPDATE cluster_nodes SET pid = 7 WHERE node_id = 'node-a'"))
+    on_stopped()
 scheduler_supervisor.supervisor.stop = stop
 gunicorn_config.on_exit(None)
 with engine.connect() as conn:
@@ -225,6 +226,51 @@ def test_the_gunicorn_master_marks_its_node_stopped_on_exit(tmp_path, monkeypatc
                              capture_output=True, text=True, timeout=60)
         assert run.returncode == 0, run.stderr
         assert run.stdout.strip().splitlines()[-1] == 'None'
+
+
+_WATCHER_THEN_EXIT = r'''
+import types
+import boot_config
+boot_config.wstep_enabled = lambda data_path: False
+boot_config.mtls_client_ca = lambda data_path: None
+import gunicorn_config
+import scheduler_supervisor
+from sqlalchemy import create_engine, text
+
+engine = create_engine(__import__('os').environ['DATABASE_URL'])
+sup = scheduler_supervisor.supervisor
+seen = {}
+sup.start = lambda server=None, on_stopped=None: seen.update(cb=on_stopped)
+sup.stop = lambda on_stopped=None: None
+
+
+def pid():
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT pid FROM cluster_nodes WHERE node_id = 'node-a'")).scalar()
+gunicorn_config.when_ready(types.SimpleNamespace(log=None))
+seen['cb']()  # the watcher, as soon as Arbiter.stop() emptied LISTENERS: the workers still drain
+print(pid())
+gunicorn_config.on_exit(None)  # after Arbiter.stop() waited for the workers
+print(pid())
+'''
+
+
+def test_the_stop_mark_waits_for_the_workers_drain(tmp_path, monkeypatch):
+    """The watcher runs while the workers still serve the old code: only on_exit may write pid
+    NULL, or a full-stop migration could run under them."""
+    backend = str(ROOT / 'backend')
+    for db in make_base('sqlite', tmp_path, monkeypatch, 'drain'):
+        assert db.upgrade()
+        _beat(db, 'node-a', '3.0')
+        (tmp_path / 'etc').mkdir()
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
+        env.update(DATA_DIR=str(tmp_path), UCM_BASE_PATH=str(tmp_path), UCM_CONFIG_DIR=str(tmp_path / 'etc'),
+                   PYTHONPATH=backend, UCM_HA='1', UCM_NODE_ID='node-a', DATABASE_URL=db.url,
+                   DATABASE_PATH=db.sqlite_path)
+        run = subprocess.run([sys.executable, '-c', _WATCHER_THEN_EXIT], cwd=backend, env=env,
+                             capture_output=True, text=True, timeout=60)
+        assert run.returncode == 0, run.stderr
+        assert run.stdout.strip().splitlines()[-2:] == ['4242', 'None']
 
 
 class _Time:

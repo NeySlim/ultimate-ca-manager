@@ -2120,7 +2120,7 @@ GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&pla
 - `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value.
 - `DELETE` answers `204`, or `409` when the service refuses (certificates still depend on the CA).
 - `POST /import` imports an existing CA from `private_key` (required) with `descr`, `ca_type` (`user` or `host`), `default_ttl`, `max_ttl` and `comment`; `201`, or `400` for an unusable key.
-- `public-key` downloads the CA public key in OpenSSH format. `krl` downloads the CA's key revocation list. `setup-script` returns a server setup script for trusting the CA: `type` (`user` or `host`), `hostname` (validated, `400` when invalid) and `platform` (`unix` by default, or `windows`).
+- `public-key` downloads the CA public key in OpenSSH format. `krl` downloads the CA's key revocation list; a revoked certificate of serial 0, which OpenSSH reads as not numbered, is listed as `ssh-keygen -k` lists it, by its key ID under the CA, which revokes every certificate of the CA with that key ID, whatever its serial, an empty key ID included. Revoking it revokes those certificates too and lists them in `revoked_with`; issuing or importing a certificate with that key ID under the CA is refused with `400`. `setup-script` returns a server setup script for trusting the CA: `type` (`user` or `host`), `hostname` (validated, `400` when invalid) and `platform` (`unix` by default, or `windows`).
 
 ### SSH Certificates
 ```http
@@ -2140,7 +2140,7 @@ GET /api/v2/ssh/stats
 - `POST /generate` takes the same fields without `public_key`, plus `key_type`: UCM creates the key pair and returns the certificate with the `private_key` once. Both answer `409` when the serial they take is held by another certificate of the CA even after its counter was moved past its certificates; try again.
 - `POST /import` stores an existing certificate: `certificate` (required), optional `descr` and `ssh_ca_id`; `201`.
 - `POST /verify` (`read:ssh`) decodes and verifies `certificate` (required) and returns the result.
-- `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate, with `revoked_with`: the ids of the other certificates of the CA holding the same serial that this revocation revoked with it, since the KRL revokes by serial (a holder already revoked is not listed; empty but for a pair kept by an upgrade from 2.x or by the restore of a 2.x archive). Every certificate carries `serial_shared_with`, the ids of those other holders. `DELETE` answers `204` or `409` when it cannot be deleted.
+- `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate, with `revoked_with`: the ids of the other certificates of the CA that this revocation revoked with it, since the KRL revokes by serial, or by key ID for a certificate of serial 0: those holding the same serial, or bearing the same key ID whatever their serial (a certificate already revoked is not listed; empty but for a pair kept by an upgrade from 2.x or by the restore of a 2.x archive, and for a serial 0 certificate, which only an import brings). Every certificate carries `serial_shared_with`, the ids of those other holders. `DELETE` answers `204` or `409` when it cannot be deleted.
 - `stats` returns the counts shown on the SSH dashboard.
 
 ---
@@ -2969,6 +2969,9 @@ Content-Type: application/json
 
 # Create backup ("kdf": "pbkdf2" writes an archive a FIPS-mode instance can restore)
 # Removes nothing for the ceiling: "warning" is set when the archives are then above it, null otherwise
+# A background job (see Background Jobs): 200 as before within 25 s, else 202. Without "password"
+# one is generated and given in this answer only ("password", "password_generated"), 200 or 202:
+# the job never holds it in clear and its result does not carry it
 POST /api/v2/settings/backup/create
 {
   "password": "...",
@@ -3053,8 +3056,8 @@ Permission `admin:system`. Audit entries, newest first, with `meta` (`total`, `p
 
 ### Background Jobs
 
-Long operations (the audit chain verification) run outside the web worker, in the
-scheduler process. The route that starts one waits at most 25 seconds:
+Long operations (the manual backup, the audit chain verification) run outside the web
+worker, in the scheduler process. The route that starts one waits at most 25 seconds:
 
 - finished by then, it answers exactly what it answered before jobs existed (code, `message`,
   `data`);
@@ -3072,12 +3075,13 @@ progress, no background job starts until it ends`, and no job is created. A `GET
 join a job already running answers `503` too: follow that job at `GET /api/v2/system/jobs/<id>`.
 
 ```http
-GET  /api/v2/system/jobs                  # ?kind=audit_verify&state=active|final&limit=20 (max 100)
+GET  /api/v2/system/jobs                  # ?kind=backup|audit_verify&state=active|final&limit=20 (max 100)
 GET  /api/v2/system/jobs/<id>
 POST /api/v2/system/jobs/<id>/cancel
 ```
 
-Each job is read and cancelled with its own permission (`read:audit` for `audit_verify`); the
+Each job is read and cancelled with its own permission (`admin:system` for `backup`,
+`read:audit` for `audit_verify`); the
 list shows only the kinds the caller may read, and the id of another kind answers `404`.
 
 ```json
@@ -3094,12 +3098,22 @@ list shows only the kinds the caller may read, and the id of another kind answer
 ```
 
 - `state`: `pending`, `running`, then one of `succeeded`, `failed`, `cancelled`.
-- `reason` once final: `done`, `refused` (the operation answered an error, kept in `result`),
-  `error`, `cancelled`, `executor_lost` (the process running it stopped: run it again) or
+- `reason` once final: `done`; `refused` (the operation answered a `4xx`, kept in `result`);
+  `error` (the operation answered a `5xx`, kept in `result`, or its run failed, `result` then
+  `null`); `cancelled`; `executor_lost` (the process running it stopped: run it again) or
   `not_taken` (no process took it within 5 minutes). A lost job is never started again on its own.
-- `result` once final: `{"code", "message", "data"}`, the answer the starting route would have given.
+- `result` once final, for `done`, `refused` and an `error` the operation answered:
+  `{"code", "message", "data"}`, the answer the starting route would have given, plus
+  `problem_type` when that answer was a typed problem (RFC 9457 `type`, such as a refusal in FIPS
+  mode); `null` otherwise.
 - Cancel: a pending job ends at once (`200`, `Job cancelled`); a running one stops at its next
-  page (`200`, `Cancellation requested`); an ended one answers `409`.
+  page (`200`, `Cancellation requested`); an ended one answers `409`. A backup stops between two
+  sections of the export, or within a second inside one: no archive is kept.
+
+A job of an audited operation (the backup) writes one audit line when it ends. If that write
+fails twice, the job still ends, without the line, and the service log records it at level
+`ERROR` (`Background job <id> concluded without its audit line: ...`, with the line's action,
+resource, success and phrase).
 
 A finished job is kept 30 days, and the latest of each kind always.
 
@@ -3131,7 +3145,7 @@ Permission `admin:system`. Downloads a SQL dump (`application/sql`). Only a SQLi
 ```http
 POST /api/v2/system/database/optimize
 ```
-Permission `admin:system`. Runs VACUUM and ANALYZE (SQLite and PostgreSQL).
+Permission `admin:system`. Runs VACUUM and ANALYZE (SQLite and PostgreSQL). On SQLite, ANALYZE reads about 1,000 rows of each index (`PRAGMA analysis_limit`).
 
 ```http
 POST /api/v2/system/database/integrity-check
@@ -3213,6 +3227,10 @@ GET /api/v2/system/backups
 # Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id"; POST /api/v2/system/backup is the same route)
 # Removes nothing for the ceiling: "warning" is set when the
 # archives are then above it, null otherwise; the next retention applies it
+# A background job of kind "backup" (see Background Jobs): within 25 s the answer of before
+# (200, or 400, 409 and 500 with their messages), else 202 with the job, its "result.data" once
+# succeeded; 409 naming the job while another backup is active; the password is stored only
+# encrypted until the job is taken, then cleared
 POST /api/v2/system/backup/create
 POST /api/v2/system/backup
 
@@ -4495,6 +4513,14 @@ POST /api/v2/sso/providers/{provider_id}/toggle
 POST /api/v2/sso/providers/{provider_id}/test
 ```
 
+### Test an OIDC or SAML Sign-in (admin)
+```http
+POST /api/v2/sso/providers/{provider_id}/test-sign-in
+GET /api/v2/sso/sign-in-tests/{test_id}
+```
+- `test-sign-in` (`write:sso`, no body) starts a sign-in test of the saved OIDC or SAML provider, enabled or not, and returns `id`, `url` (the IdP address to open in the browser) and `expires_at` (10 minutes); it sets a cookie that ties the test to this browser. The IdP returns to the login callback (`/api/v2/sso/callback/oauth2` or the ACS URL), which recognises the test by its server-side transaction, runs the login's checks and its account decision, opens no session and changes no account, and redirects to `/sso-test-complete?result=done` (`used`, `expired` or `other_browser` when the return is refused). At the expiry the report and the secrets of the test are erased, but its transaction is kept for 24 hours, so a late return still redirects to `result=expired` (`used` once it returned) and is audited as a failed `sso_sign_in_test`, never as a login. `400` for an LDAP provider or one without an authorization URL and client ID or a SAML SSO URL; `404` for an unknown provider; `503` with `Retry-After` during a cluster maintenance.
+- `sign-in-tests/{test_id}` (`write:sso`) returns `state` (`pending`, `running` or `done`), `provider_id`, `protocol`, `expires_at` and, once done, `report`: `verdict` (`accepted` or `refused`), `stage` (`protocol` for a refusal of the IdP's answer, `account` for one of the account decision), `code` (the login page's error code), `reason`, `identity` (`username`, `email`, `fullname`, `external_id`), `groups` (at most 20 values of 64 characters, `groups_more` counts the rest), `group_source`, `candidates` (at most 20 names of received claims or attributes that may carry groups, when none was read), `diagnosis` and `detail` (the audit text of a refusal), `account` (`outcome`: `open`, `create`, `disabled` or `refused`, with `username`, and for `open` whether it `binds_identity`), `role`, `custom_role`, `role_change`, `not_verified` (compatibility mode), `provider_enabled` and `other_enabled_providers` (`id` and `name` of every other enabled provider of the same type, by `id`; a login goes through one enabled provider per type, which is not necessarily the one tested). No token, assertion, authorization code or PKCE verifier is part of it. `404` for a test another account started, an unknown one, or one whose 10 minutes after the return have passed.
+
 ### List SSO Sessions (admin)
 ```http
 GET /api/v2/sso/sessions
@@ -5233,7 +5259,7 @@ GET /api/v2/health
 GET /api/v2/health/ready
 ```
 
-Verifies the application can serve traffic (database, filesystem, Redis when configured). Returns 200 if ready, 503 if not. The response also carries `ha`, `node_id` and `leader` as above.
+Verifies the application can serve traffic (database, filesystem, Redis when configured). Returns 200 if ready, 503 if not. The response also carries `ha`, `node_id` and `leader` as above. A database that does not answer `SELECT 1` within 5 seconds fails the check; once it failed nothing else is read from the database, so in HA mode `checks.cluster` is an error too and `leader` is `null`.
 
 **Response:**
 ```json
@@ -5256,7 +5282,7 @@ In safe mode, `status` is `"safe_mode"`, `reason` gives the cause and `checks` i
 GET /api/v2/health/live
 ```
 
-Returns 200 if the application process is alive, regardless of dependency status.
+Returns 200 if the application process is alive, regardless of dependency status. Neither the route nor any request hook reads the database for it (nor for the readiness check, apart from its own checks), and neither response carries `Strict-Transport-Security`, whose settings are in the database.
 
 **Response:**
 ```json

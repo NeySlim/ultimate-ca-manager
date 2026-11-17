@@ -5,6 +5,8 @@ import pytest
 import fips_mode
 from tests.test_msca_admin_channel import BASE, _make_msca_cert, post_json, put_json
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def fips(monkeypatch):

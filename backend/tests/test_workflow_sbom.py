@@ -12,10 +12,8 @@ import sys
 import pytest
 
 from tests import sbom_support as s
-from tests.workflow_support import ROOT, evaluate, github_context, load, render
+from tests.workflow_support import ROOT, load, render
 
-TAG = github_context('push', 'refs/tags/v3.0-rc1')
-BRANCH = github_context('workflow_dispatch', 'refs/heads/feature/x')
 IMAGE_JOBS = {'build-docker': ('std', 'standard'), 'build-docker-fips': ('fips', 'fips')}
 MANIFESTS = {'docker-manifest': ('std', 'standard'), 'docker-fips-manifest': ('fips', 'fips')}
 
@@ -144,8 +142,12 @@ def test_an_image_sbom_is_made_from_the_pushed_digest_before_the_digest_leaves(j
     assert push < sbom < upload < export
     st = j['steps'][sbom]
     assert st['run'] == f'scripts/ci/sbom-image.sh {variant}'
-    # The digest of the push, never a tag nor the local check image
-    assert st['env']['DIGEST'] == '${{ steps.push.outputs.digest }}'
+    # The digest of the push that ran (the registry or the rehearsal one), never a tag nor the check image
+    assert st['env']['DIGEST'] == '${{ steps.built.outputs.digest }}'
+    assert st['env']['REPOSITORY'] == '${{ steps.built.outputs.repository }}'
+    built = j['steps'][_index(j, _named('Digest of the build'))]
+    assert built['env']['DIGEST'] == '${{ steps.push.outputs.digest || steps.rehearse.outputs.digest }}'
+    assert _index(j, lambda s: s.get('id') == 'rehearse') < _index(j, _named('Digest of the build')) < sbom
     assert not st.get('continue-on-error') and not j.get('continue-on-error')
     up = j['steps'][upload]
     assert up['with']['if-no-files-found'] == 'error'
@@ -154,11 +156,11 @@ def test_an_image_sbom_is_made_from_the_pushed_digest_before_the_digest_leaves(j
 
 
 @pytest.mark.parametrize('job', IMAGE_JOBS)
-@pytest.mark.parametrize('github, runs', [(TAG, True), (BRANCH, False)], ids=['tag', 'branch'])
-def test_image_sboms_follow_the_digest_rule(job, github, runs):
+def test_image_sboms_follow_the_digest_rule(job):
+    """Every run pushes its image, to a registry or to the rehearsal one: its SBOM goes with its digest."""
     j = _jobs()[job]
-    for name in ('SBOM of the pushed image', 'Upload the image SBOM', 'Export digest'):
-        assert bool(evaluate(j['steps'][_index(j, _named(name))]['if'], {'github': github})) is runs, name
+    for name in ('SBOM of the pushed image', 'Upload the image SBOM', 'Export digest', 'Digest of the build'):
+        assert 'if' not in j['steps'][_index(j, _named(name))], name
 
 
 # ---- manifests: no tag without both SBOMs on the digests about to be tagged ----------------------

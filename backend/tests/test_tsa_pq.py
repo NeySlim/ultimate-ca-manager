@@ -21,9 +21,11 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from models import CA, SystemConfig, db
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 OPENSSL = shutil.which('openssl')
 TST_INFO_OID = '1.2.840.113549.1.9.16.1.4'

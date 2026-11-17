@@ -183,7 +183,7 @@ Sur les clients, ajoutez l'AC hôte à known_hosts :
 
 Un certificat révoqué reste dans la KRL, et dans la liste, jusqu'à son expiration : le supprimer plus tôt est refusé, puisque la KRL est construite à partir de ces enregistrements et que le certificat serait de nouveau accepté. Chaque téléchargement de la KRL porte un numéro de version plus élevé (v2.252).
 
-La KRL désigne un certificat par son numéro de série, qu'UCM n'attribue qu'une fois par AC. Une installation montée depuis une 2.x, ou qui a restauré une archive 2.x, peut contenir deux certificats d'une même AC portant le même numéro : la liste les signale, et révoquer l'un les révoque tous ; si l'un d'eux était déjà révoqué, les autres le sont avec lui. Révoquez-les et émettez de nouveaux certificats.
+La KRL désigne un certificat par son numéro de série, qu'UCM n'attribue qu'une fois par AC. Une installation montée depuis une 2.x, ou qui a restauré une archive 2.x, peut contenir deux certificats d'une même AC portant le même numéro : la liste les signale, et révoquer l'un les révoque tous ; si l'un d'eux était déjà révoqué, les autres le sont avec lui. Révoquez-les et émettez de nouveaux certificats. Un certificat de numéro 0, qu'OpenSSH lit comme non numéroté (un certificat importé, par exemple), figure dans la KRL par son identifiant de clé une fois révoqué, comme le fait OpenSSH : tout certificat de l'AC portant cet identifiant, quel que soit son numéro, est refusé avec lui, et UCM le révoque avec lui. Un certificat portant cet identifiant ne peut plus alors être émis ni importé sous cette AC. La clé elle-même et les certificats d'autres AC restent valides.
 
 > ⚠ La révocation ne prend effet que lorsque les serveurs vérifient la KRL via \`RevokedKeys\` dans sshd_config.
 

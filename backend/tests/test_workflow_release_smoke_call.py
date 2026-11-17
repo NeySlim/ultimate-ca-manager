@@ -8,7 +8,7 @@ import subprocess
 
 import pytest
 
-from tests.workflow_support import ROOT, evaluate, github_context, load, render, triggers
+from tests.workflow_support import ROOT, github_context, load, render, triggers
 
 SMOKE = './.github/workflows/release-smoke.yml'
 TAG_PUSH = github_context('push', 'refs/tags/v3.0-rc1')
@@ -53,13 +53,14 @@ def test_the_build_calls_the_smoke_before_the_release_with_the_built_version():
     assert job['permissions'] == {'contents': 'read'}
 
 
-@pytest.mark.parametrize('event, ref, runs', [
-    ('push', 'refs/tags/v3.0-rc1', True),
-    ('workflow_dispatch', 'refs/heads/sextant', False),
-])
-def test_the_call_happens_on_a_tag_build_only(event, ref, runs):
+def test_the_call_happens_on_a_tag_build_and_in_a_rehearsal():
+    """The build runs either way; a rehearsal hands the smoke its commit instead of a tag."""
     _, job = _caller(load('build-release.yml'))
-    assert bool(evaluate(job['if'], {'github': github_context(event, ref)})) is runs
+    assert 'if' not in job
+    for github, inputs, ref in ((TAG_PUSH, {}, ''),
+                                ({**github_context('workflow_dispatch', 'refs/heads/feature/x'), 'sha': 'c' * 40},
+                                 {'version': '3.0', 'dry_run': True}, 'c' * 40)):
+        assert render(job['with']['ref'], {'github': github, 'inputs': inputs}) == ref
 
 
 def test_every_checkout_of_the_smoke_takes_the_tag_of_its_version():

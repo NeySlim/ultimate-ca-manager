@@ -4,6 +4,9 @@ import uuid
 from datetime import datetime, timedelta
 
 from models import db, Certificate
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _listed(client, prefix, order):

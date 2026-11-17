@@ -14,7 +14,7 @@ from tests.fixtures.cross_pki import build_cross_pki, key_pem, openssl_verify, p
 from utils.key_codec import store_pem_bytes
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
-pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_cas_and_certificates')
 
 FINDINGS = '/api/v2/cas/cross-findings'
 

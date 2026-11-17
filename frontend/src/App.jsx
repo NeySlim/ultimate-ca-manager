@@ -12,6 +12,8 @@ const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
 const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
 const DevShowcasePage = lazyWithRetry(() => import('./pages/DevShowcasePage'))
+const SsoTestCompletePage = lazyWithRetry(() => import('./pages/SsoTestCompletePage'))
+const SsoTestLaunchPage = lazyWithRetry(() => import('./pages/SsoTestLaunchPage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -127,6 +129,9 @@ export function AppRoutes() {
           element={<LoginPage />} 
         />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        {/* An SSO sign-in test's landing: no application shell, whoever signed in at the IdP */}
+        <Route path="/sso-test-complete" element={<SsoTestCompletePage />} />
+        <Route path="/sso-test-launch" element={<SsoTestLaunchPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         <Route element={<AppShell />}>

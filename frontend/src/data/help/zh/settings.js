@@ -58,6 +58,14 @@ export default {
         ]
       },
       {
+        title: "手动备份",
+        items: [
+          { label: "后台运行", text: "创建备份在服务器上运行：对话框显示正在导出数据库的哪一部分，并在归档就绪时提供下载。25 秒内完成的备份会像以前一样立即下载。关闭对话框或重新加载页面不会停止它：创建备份会再次显示它" },
+          { label: "取消", text: "取消备份会在导出的两个部分之间停止它：不保留任何归档，其临时文件被删除" },
+          { label: "一次一个", text: "整个安装（包括 HA 集群）同一时间只运行一个手动备份：第二个会被拒绝 (409)，并指出正在运行的备份。发现备份锁被计划备份或恢复占用的备份最多等待 15 秒，然后被拒绝 (409)" },
+        ]
+      },
+      {
         title: "恢复 (v2.251)",
         items: [
           { label: "替换或合并", text: "从备份恢复会用归档中的数据替换此处的数据，并移除归档中没有的内容；审计条目会列出被移除的内容。API 还接受 mode=merge，将归档添加到此处的数据中" },
@@ -302,6 +310,8 @@ export default {
 ### 手动备份
 点击**创建备份**生成数据库快照。备份包括证书、CA、密钥和设置；审计日志和其他历史表不包含在内。
 
+手动备份在服务器上运行：对话框显示其进度，可以取消它（不保留任何归档），并在归档就绪时提供下载；关闭对话框或重新加载页面不会停止它。整个安装同一时间只运行一个手动备份。
+
 ### 计划备份
 配置自动备份：
 - 频率（每日、每周、每月）
@@ -536,6 +546,8 @@ XML-DSig 没有 ML-DSA 签名方法，因此 **ML-DSA** 证书无法通过此方
 Windows 也可以用 \`certreq ... Renew\` 续期，以待续期的证书作为 TLS 客户端证书进行身份验证：请启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU (v2.248)。自 3.0 起，只有通过 Windows 注册签发的证书才能这样续期：在界面中签发的证书会被拒绝（\`not issued through Windows enrollment\`），必须通过 Windows 注册重新签发。
 
 自 3.0 起，按证书续期由证书所记录的配置文件（2.x 的 WSTEP 证书：默认配置文件）在该配置文件的签发 CA 下服务；当该配置文件已被删除或已禁用时拒绝，每次拒绝都会连同配置文件和原因写入审计。只有 SID 会由该配置文件的连接器再次检查：请吊销已从组中移除的计算机的证书。TLS 客户端证书仅适用于其签发 CA 即 mTLS CA 或在其之下的配置文件：监听器不信任的证书会在 TLS 握手期间被拒绝，UCM 看不到请求，因此 UCM 不会记录审计（请查看客户端输出和服务日志）。其他配置文件只能通过 Kerberos 续期（由主体所在领域的配置文件提供服务，新证书会记录该配置文件）；若 Kerberos 拒绝（请求者已从 AD 组中移除、配置文件已禁用），则无法续期。Kerberos keytab 会保留已禁用配置文件的密钥，因此其请求会被拒绝并留下审计条目：只有删除该配置文件才会移除这些密钥。
+
+Over Kerberos, a request signed by the requester's own valid certificate of the profile renews it when it names that certificate's template (or the certificate carries none, as one issued before 3.0): the renewed certificate is marked superseded by the new one, as on the Certificate binding, the audit entry is \`certificate.renewed\` and the webhook \`cert.renewed\`, and a second renewal of it is refused on either binding (\`Renewed certificate superseded by a newer one\`). A request naming another template is an enrollment (\`certificate.issued\`), even when the certificate that signs it was renewed already. After a change of the profile's issuing CA, a certificate of the former CA renews the same way: the new CA issues it, and the audit entry \`certificate.renewed\` names the old serial and the old CA.
 
 ### SID 安全扩展 (KB5014754)
 

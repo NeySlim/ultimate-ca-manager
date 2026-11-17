@@ -4,6 +4,7 @@ name: Release Smoke Tests
 # and the scripts it runs are those of the tag; every checkout names that tag. A call
 # smokes the run's own output (images by digest, packages from its artifacts); a manual
 # run smokes the published images and packages. Runs smoke_release.py against them.
+# A rehearsal call checks out its commit and boots the images saved in its artifacts.
 
 on:
   workflow_call:
@@ -32,6 +33,16 @@ on:
         required: false
         default: ''
         type: string
+      rehearsal:
+        description: 'Smoke a rehearsal: the images saved in the run artifacts, the commit given as ref'
+        required: false
+        default: false
+        type: boolean
+      ref:
+        description: 'Commit to check out instead of the tag v<version> (a rehearsal)'
+        required: false
+        default: ''
+        type: string
   workflow_dispatch:
     inputs:
       version:
@@ -55,7 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/v${{ inputs.version }}
+          ref: ${{ inputs.ref || format('refs/tags/v{0}', inputs.version) }}
 
       - name: Resolve version
         id: ver
@@ -65,13 +76,17 @@ jobs:
           INPUT_IMAGE: ${{ inputs.image }}
           INPUT_DIGEST: ${{ inputs.image-digest }}
           INPUT_FROM_RUN: ${{ inputs.from-run }}
+          INPUT_REHEARSAL: ${{ inputs.rehearsal }}
         run: |
           VER="$INPUT_VERSION"
           IMAGE="${INPUT_IMAGE:-neyslim/ultimate-ca-manager}"
           python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
-          # A release call pulls the untagged image its run built, never a tag that may be older
-          if [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
+          # A rehearsal boots the image its run saved; a release call pulls the untagged image
+          # its run built, never a tag that may be older
+          if [ "$INPUT_REHEARSAL" = true ]; then
+            REF=ucm-rehearsal:standard
+          elif [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
             [[ "$INPUT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid image digest: $INPUT_DIGEST"; exit 1; }
             REF="$IMAGE@$INPUT_DIGEST"
           else
@@ -91,8 +106,20 @@ jobs:
           fi
 
       - name: Pull Docker image
+        if: inputs.rehearsal != true
         run: |
           docker pull "${{ steps.ver.outputs.ref }}"
+
+      - name: Take the image of the rehearsal
+        if: inputs.rehearsal
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: std-image-amd64
+          path: ${{ runner.temp }}/image
+
+      - name: Load the image of the rehearsal
+        if: inputs.rehearsal
+        run: docker load -i "$RUNNER_TEMP/image/image.tar.gz"
 
       - name: Boot UCM container (SQLite)
         run: |
@@ -140,7 +167,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/v${{ inputs.version }}
+          ref: ${{ inputs.ref || format('refs/tags/v{0}', inputs.version) }}
 
       - name: Resolve version
         id: ver
@@ -211,7 +238,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/v${{ inputs.version }}
+          ref: ${{ inputs.ref || format('refs/tags/v{0}', inputs.version) }}
 
       - name: Resolve version
         id: ver
@@ -221,13 +248,17 @@ jobs:
           INPUT_IMAGE: ${{ inputs.image }}
           INPUT_DIGEST: ${{ inputs.image-digest }}
           INPUT_FROM_RUN: ${{ inputs.from-run }}
+          INPUT_REHEARSAL: ${{ inputs.rehearsal }}
         run: |
           VER="$INPUT_VERSION"
           IMAGE="${INPUT_IMAGE:-neyslim/ultimate-ca-manager}"
           python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
-          # A release call pulls the untagged image its run built, never a tag that may be older
-          if [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
+          # A rehearsal boots the image its run saved; a release call pulls the untagged image
+          # its run built, never a tag that may be older
+          if [ "$INPUT_REHEARSAL" = true ]; then
+            REF=ucm-rehearsal:standard
+          elif [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
             [[ "$INPUT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid image digest: $INPUT_DIGEST"; exit 1; }
             REF="$IMAGE@$INPUT_DIGEST"
           else
@@ -247,7 +278,19 @@ jobs:
           fi
 
       - name: Pull Docker image
+        if: inputs.rehearsal != true
         run: docker pull "${{ steps.ver.outputs.ref }}"
+
+      - name: Take the image of the rehearsal
+        if: inputs.rehearsal
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: std-image-amd64
+          path: ${{ runner.temp }}/image
+
+      - name: Load the image of the rehearsal
+        if: inputs.rehearsal
+        run: docker load -i "$RUNNER_TEMP/image/image.tar.gz"
 
       - name: Boot UCM container (PostgreSQL)
         # Service container is reachable via host networking from job runner;
@@ -284,7 +327,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: refs/tags/v${{ inputs.version }}
+          ref: ${{ inputs.ref || format('refs/tags/v{0}', inputs.version) }}
 
       - name: Resolve version
         id: ver
@@ -294,13 +337,17 @@ jobs:
           INPUT_IMAGE: ${{ inputs.image }}
           INPUT_DIGEST: ${{ inputs.fips-image-digest }}
           INPUT_FROM_RUN: ${{ inputs.from-run }}
+          INPUT_REHEARSAL: ${{ inputs.rehearsal }}
         run: |
           VER="$INPUT_VERSION"
           IMAGE="${INPUT_IMAGE:-neyslim/ultimate-ca-manager}"
           python3 scripts/ci/release_version.py validate "$VER"
           [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
-          # A release call pulls the untagged image its run built, never a tag that may be older
-          if [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
+          # A rehearsal boots the image its run saved; a release call pulls the untagged image
+          # its run built, never a tag that may be older
+          if [ "$INPUT_REHEARSAL" = true ]; then
+            REF=ucm-rehearsal:fips
+          elif [ "$INPUT_FROM_RUN" = true ] || [ -n "$INPUT_DIGEST" ]; then
             [[ "$INPUT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid image digest: $INPUT_DIGEST"; exit 1; }
             REF="$IMAGE@$INPUT_DIGEST"
           else
@@ -322,7 +369,19 @@ jobs:
           fi
 
       - name: Pull Docker image
+        if: inputs.rehearsal != true
         run: docker pull "${{ steps.ver.outputs.ref }}"
+
+      - name: Take the image of the rehearsal
+        if: inputs.rehearsal
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: fips-image-amd64
+          path: ${{ runner.temp }}/image
+
+      - name: Load the image of the rehearsal
+        if: inputs.rehearsal
+        run: docker load -i "$RUNNER_TEMP/image/image.tar.gz"
 
       - name: Boot UCM container (UCM_FIPS=1)
         env:

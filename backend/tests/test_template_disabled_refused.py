@@ -13,6 +13,8 @@ from models import CertificateTemplate, SystemConfig, db
 from services.acme import profiles as acme_profiles
 from tests.test_csr_sign_extra_names import _csr, _upload
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 CONTENT_JSON = 'application/json'
 
 

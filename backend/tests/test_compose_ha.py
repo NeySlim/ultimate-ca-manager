@@ -84,3 +84,11 @@ def test_load_balancer_retries_a_request_on_the_other_node_pos():
     cfg = DOC['configs']['haproxy_cfg']['content']
     assert re.search(r'^\s*option redispatch\b', cfg, re.M)
     assert re.search(r'^\s*retries [1-9]', cfg, re.M)
+
+
+def test_a_stopping_node_gets_the_time_of_a_clean_stop_pos():
+    """Docker's default 10 s would kill a node whose scheduled task takes its 30 s grace before
+    its row is released (docs/HA.md, Upgrading)."""
+    for name in ('ucm-1', 'ucm-2'):
+        grace = DOC['services'][name]['stop_grace_period']
+        assert grace.endswith('s') and int(grace[:-1]) >= 45

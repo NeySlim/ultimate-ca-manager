@@ -19,7 +19,7 @@ import json
 from tests.conftest import get_json, assert_success, assert_error, assert_refused
 import pytest
 
-pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_config_rows')
 
 CONTENT_JSON = 'application/json'
 

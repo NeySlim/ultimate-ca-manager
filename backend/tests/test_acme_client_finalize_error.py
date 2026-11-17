@@ -14,6 +14,8 @@ from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService
 from tests.db_write_probe import watching_writes
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture(autouse=True)
 def _no_order_left(app):

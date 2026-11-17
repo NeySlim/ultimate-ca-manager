@@ -287,3 +287,33 @@ def test_revoking_one_of_a_pair_names_only_what_it_revokes(app, auth_client, mon
     finally:
         with app.app_context():
             _drop(ca_id)
+
+
+def test_revoking_serial_zero_says_it_takes_its_key_id(app, auth_client):
+    """The KRL revokes a serial 0 certificate by its key ID under the CA: the response and the
+    audit name the key ID and the certificates it takes, not a serial."""
+    from models import AuditLog
+    with app.app_context():
+        ca_id = _ca('serial zero message')
+        rows = [_row(ca_id, 0), _row(ca_id, 5), _row(ca_id, 6)]
+        rows[0].key_id = rows[1].key_id = 'alice'
+        rows[2].key_id = 'bob'
+        db.session.add_all(rows)
+        db.session.commit()
+        zero, same, other = (r.id for r in rows)
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+    try:
+        response = auth_client.post(f'/api/v2/ssh/certificates/{zero}/revoke', json={'reason': 'keyCompromise'})
+        assert response.status_code == 200, response.get_json()
+        body = response.get_json()
+        assert body['data']['revoked_with'] == [same]
+        assert body['message'] == ("SSH certificate revoked with 1 other certificate(s) the KRL revokes "
+                                   "with it under this CA, by key ID 'alice'")
+        with app.app_context():
+            details = [e.details for e in AuditLog.query.filter(
+                AuditLog.id > floor, AuditLog.action == 'ssh_cert_revoked', AuditLog.resource_id == str(zero))]
+            assert details == [f"SSH certificate revoked: keyCompromise; key ID 'alice' also revokes #{same} 'alice'"]
+            assert db.session.get(SSHCertificate, other).revoked is False
+    finally:
+        with app.app_context():
+            _drop(ca_id)

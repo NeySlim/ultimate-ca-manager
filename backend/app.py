@@ -697,6 +697,14 @@ def create_app(config_name=None):
                         "under an old one"
         )
 
+        from services.sso_sign_in_test_purge import scheduled_purge as purge_sign_in_tests
+        scheduler.register_task(
+            name="sso_sign_in_test_purge",
+            func=purge_sign_in_tests,
+            interval=60,
+            description="Purge OIDC and SAML sign-in tests and their reports past their expiry"
+        )
+
         from security.session_key import scheduled_retire as retire_session_key
         scheduler.register_task(
             name="session_key_retire",
@@ -872,6 +880,16 @@ def create_app(config_name=None):
             per_node=True
         )
         
+        # SQLite only: its statistics stay as the last ANALYZE left them (PostgreSQL has autovacuum)
+        if app.config.get('SQLALCHEMY_DATABASE_URI', '').startswith('sqlite'):
+            from services.sqlite_statistics import scheduled_refresh
+            scheduler.register_task(
+                name="sqlite_statistics",
+                func=scheduled_refresh,
+                interval=3600,
+                description="Refresh the SQLite planner statistics (PRAGMA optimize from 3.46, bounded ANALYZE before)"
+            )
+
         # Register discovery scheduler task (checks every 60s for due profiles)
         try:
             from services.discovery_scheduler_task import DiscoverySchedulerTask
@@ -1180,7 +1198,9 @@ def create_app(config_name=None):
         # HSTS is operator-configurable (Settings -> General, or UCM_HSTS_*
         # env vars) so instances serving self-signed certs during setup can
         # opt out entirely — see issue #154.
-        if 'Strict-Transport-Security' not in response.headers:
+        from utils.public_endpoints import PROBE_PATHS
+        # HSTS settings live in the database: a probe answers without them
+        if 'Strict-Transport-Security' not in response.headers and request.path not in PROBE_PATHS:
             from utils.hsts import build_hsts_header
             hsts_value = build_hsts_header()
             if hsts_value:
@@ -1961,7 +1981,8 @@ def main():
     print(f"{'='*60}")
     print(f"  HTTPS Server: https://{config.HOST}:{config.HTTPS_PORT}")
     print(f"  Certificate: {config.HTTPS_CERT_PATH}")
-    print(f"  Database: {config.DATABASE_PATH}")
+    from utils.db_url import database_label
+    print(f"  Database: {database_label(os.getenv('DATABASE_URL'), config.DATABASE_PATH)}")
     print(f"{'='*60}\n")
     
     # Start HTTP protocol server for CDP/OCSP (dev mode, non-blocking thread)

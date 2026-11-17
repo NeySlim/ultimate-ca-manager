@@ -139,6 +139,14 @@ def test_prefer_wait_never_exceeds_the_bound(monkeypatch):
     assert routes.parse_prefer(['Respond-Async; foo=bar']) == {'respond-async': True}
 
 
+def test_an_empty_preference_value_is_no_value():
+    """RFC 7240 section 2: an empty value is the same as no value at all."""
+    from api.v2.system import jobs as routes
+    for header in ('respond-async=""', 'respond-async=', 'respond-async = ""; foo'):
+        assert routes.parse_prefer([header]) == {'respond-async': True}, header
+    assert routes.parse_prefer(['wait = 10']) == {'wait': '10'}
+
+
 def test_prefer_wait_is_capped_by_the_bounded_wait(app, auth_client, held, cleanup, monkeypatch):
     monkeypatch.setattr(jobs, 'JOB_WAIT_SECONDS', 0.5)
     reached, release = held

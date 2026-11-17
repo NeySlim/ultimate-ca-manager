@@ -118,6 +118,9 @@ def test_ha_existing_claim_keeps_the_data_pvc_pos():
     (['--set', 'ha.enabled=true'] + PG, 'replicaCount >= 2'),
     (['--set', 'ha.enabled=true', '--set', 'replicaCount=2', '--set', 'database.type=postgresql'],
      'databaseUrl'),
+    # helm lint reports a fail as INFO and exits 0: each refusal is proven by a render
+    (['--set', 'ha.enabled=true', '--set', 'replicaCount=2', '--set', 'secrets.keyEncryptionKey=K'] + PG,
+     'set secrets.dbEncryptionKey too'),
 ])
 def test_ha_render_is_refused_neg(args, message):
     r = _helm(*args, check=False)
@@ -139,7 +142,7 @@ def test_leaving_ha_keeps_the_encryption_key_pos():
 
 
 def test_secret_with_a_key_is_kept_on_uninstall_pos():
-    for args in (HA, ['--set', 'secrets.keyEncryptionKey=K']):
+    for args in (HA, ['--set', 'secrets.keyEncryptionKey=K'], ['--set', 'secrets.dbEncryptionKey=D']):
         ann = _docs(*args)['Secret']['metadata'].get('annotations', {})
         assert ann.get('helm.sh/resource-policy') == 'keep'
 
@@ -173,3 +176,42 @@ def test_ha_with_a_former_data_pvc_still_renders_it_kept_and_unmounted_pos(tmp_p
     assert pvcs[0]['metadata']['annotations']['helm.sh/resource-policy'] == 'keep'
     pod = next(d for d in docs if d['kind'] == 'Deployment')['spec']['template']['spec']
     assert pod['volumes'] == [{'name': 'data', 'emptyDir': {}}]
+
+
+@pytest.mark.parametrize('mode', [[], HA], ids=['single', 'ha'])
+def test_the_pod_leaves_the_service_before_sigterm(mode):
+    """preStop sleeps while the endpoints drop the pod, then UCM gets SIGTERM; the grace covers
+    the sleep and the clean stop (at most 41 s) with a margin."""
+    pod = _docs(*mode)['Deployment']['spec']['template']['spec']
+    container = pod['containers'][0]
+    assert container['lifecycle'] == {'preStop': {'exec': {'command': ['sleep', '10']}}}
+    assert pod['terminationGracePeriodSeconds'] == 60
+
+
+def test_the_stop_delays_are_values():
+    pod = _docs('--set', 'lifecycle.preStopSleepSeconds=20', '--set',
+                'terminationGracePeriodSeconds=90')['Deployment']['spec']['template']['spec']
+    assert pod['containers'][0]['lifecycle']['preStop']['exec']['command'] == ['sleep', '20']
+    assert pod['terminationGracePeriodSeconds'] == 90
+    pod = _docs('--set', 'lifecycle.preStopSleepSeconds=0')['Deployment']['spec']['template']['spec']
+    assert 'lifecycle' not in pod['containers'][0]
+
+
+CLEAN_STOP_REFUSAL = 'terminationGracePeriodSeconds must be at least lifecycle.preStopSleepSeconds + 45'
+
+
+@pytest.mark.parametrize('sleep', [10, 0])
+def test_a_grace_shorter_than_the_clean_stop_is_refused_neg(sleep):
+    """UCM stops within 41 s of SIGTERM (scheduler process 35 s then killed, then the stop
+    written): the grace must cover the sleep and that, with a margin."""
+    r = _helm('--set', f'lifecycle.preStopSleepSeconds={sleep}', '--set',
+              f'terminationGracePeriodSeconds={sleep + 44}', check=False)
+    assert r.returncode == 1
+    assert CLEAN_STOP_REFUSAL in r.stderr
+
+
+@pytest.mark.parametrize('sleep', [10, 0])
+def test_the_shortest_grace_covering_the_clean_stop_renders(sleep):
+    pod = _docs('--set', f'lifecycle.preStopSleepSeconds={sleep}', '--set',
+                f'terminationGracePeriodSeconds={sleep + 45}')['Deployment']['spec']['template']['spec']
+    assert pod['terminationGracePeriodSeconds'] == sleep + 45

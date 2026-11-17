@@ -311,3 +311,37 @@ class SAMLMessageId(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
     # AuthnRequest only: the page this login returns to, checked by sso.return_path.
     next_path = db.Column(db.String(512))
+
+
+class SSOSignInTest(db.Model):
+    """An OIDC or SAML sign-in test: its transaction while the IdP answers, then its report.
+
+    The row alone marks a callback as a test, never a parameter the browser or the IdP sends:
+    it is found by the hash of its `state` or AuthnRequest id, used once, and read only by
+    the account that started it. Shared by every node; emptied once `expires_at` passes and
+    deleted a day later, so a late return still ends as a test's.
+    """
+    __tablename__ = 'pro_sso_sign_in_tests'
+    __table_args__ = (
+        db.UniqueConstraint('token', name='uq_pro_sso_sign_in_tests_token'),
+        db.UniqueConstraint('transaction_hash', name='uq_pro_sso_sign_in_tests_transaction'),
+    )
+
+    PENDING = 'pending'
+    RUNNING = 'running'
+    DONE = 'done'
+
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(64), nullable=False)
+    provider_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, nullable=False)
+    protocol = db.Column(db.String(16), nullable=False)
+    transaction_hash = db.Column(db.String(64), nullable=False)
+    browser_hash = db.Column(db.String(64), nullable=False)
+    # OIDC: the PKCE verifier and nonce, encrypted, wiped once the callback claims the row
+    secret = db.Column(db.Text)
+    state = db.Column(db.String(16), nullable=False)
+    report = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    finished_at = db.Column(db.DateTime)

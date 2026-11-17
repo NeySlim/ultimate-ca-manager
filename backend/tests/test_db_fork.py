@@ -134,7 +134,7 @@ def test_the_master_hooks_drive_the_scheduler_process(app, monkeypatch):
     calls = []
     for name in ('start', 'restart', 'stop'):
         monkeypatch.setattr(scheduler_supervisor.supervisor, name,
-                            lambda *a, _n=name: calls.append(_n))
+                            lambda *a, _n=name, **k: calls.append(_n))
     server = types.SimpleNamespace(log=logging.getLogger('test.arbiter'))
     module.when_ready(server)
     module.on_reload(server)

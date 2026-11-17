@@ -21,6 +21,8 @@ from services.policy_service import PolicyEvaluationService
 from api.v2.policies import _issue_approved_certificate
 from tests.fixtures.templates import templates_created_here_removed
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 
 @pytest.fixture(autouse=True, scope='module')
 def _templates_stay_in_this_module(app):

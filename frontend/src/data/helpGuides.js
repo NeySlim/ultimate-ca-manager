@@ -2071,6 +2071,8 @@ A new installation creates the master key at its first start (in a container, on
 ### Manual Backup
 Click **Create Backup** to generate a database snapshot. Backups include the certificates, CAs, keys and settings; the audit log and other history tables are not included.
 
+A manual backup runs on the server: the dialog shows its progress, can cancel it (no archive is kept) and offers the archive for download when it is ready; closing the dialog or reloading the page does not stop it. One manual backup runs at a time on the whole installation.
+
 ### Scheduled Backup
 Configure automatic backups:
 - Frequency (daily, weekly, monthly)
@@ -2304,6 +2306,8 @@ XML-DSig has no ML-DSA signature method, so an **ML-DSA** certificate cannot ren
 Windows can also renew with \`certreq ... Renew\`, authenticated by the certificate being renewed as TLS client certificate: enable mTLS with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews (v2.248). Since 3.0 only a certificate issued through Windows enrollment renews this way: one signed in the interface is refused (\`not issued through Windows enrollment\`) and must be reissued through Windows enrollment.
 
 Since 3.0 a renewal by certificate is served by the profile the certificate records (a 2.x WSTEP certificate: the default profile), under that profile's issuing CA, and refused when the profile was deleted or is disabled; each refusal is audited with the profile and the reason. Only the SID is checked again, by the profile's connector: revoke the certificate of a computer removed from the group. The TLS client certificate works only for a profile whose issuing CA is the mTLS CA or a CA under it: a certificate the listener does not trust is refused during the TLS handshake, before UCM sees a request, so nothing is audited by UCM (read the client output and the service log). The other profiles renew over Kerberos only (the profile of the principal's realm serves and the new certificate records it), and when Kerberos refuses (requester removed from the AD group, profile disabled) they cannot renew. The Kerberos keytab keeps the keys of disabled profiles, so their requests are refused with an audit entry: only deleting the profile removes them.
+
+Over Kerberos, a request signed by the requester's own valid certificate of the profile renews it when it names that certificate's template (or the certificate carries none, as one issued before 3.0): the renewed certificate is marked superseded by the new one, as on the Certificate binding, the audit entry is \`certificate.renewed\` and the webhook \`cert.renewed\`, and a second renewal of it is refused on either binding (\`Renewed certificate superseded by a newer one\`). A request naming another template is an enrollment (\`certificate.issued\`), even when the certificate that signs it was renewed already. After a change of the profile's issuing CA, a certificate of the former CA renews the same way: the new CA issues it, and the audit entry \`certificate.renewed\` names the old serial and the old CA.
 
 ### SID Security Extension (KB5014754)
 
@@ -2823,6 +2827,9 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 
 ### Diagnosing a refused sign-in
 A sign-in refused because no rule matches, or because the provider has no rule and no default role, is recorded in the **Audit Logs** as a failed login (quick filter **Failed Logins**). The entry gives the group values UCM read (at most 20, each cut at 64 characters) and where they were read: the ID token, UserInfo or both for OIDC, with the reason the ID token was not used; the attributes read for SAML; the group search base or \`memberOf\` for LDAP. When nothing was read through OIDC or SAML, it names the claims or attributes received that look like group lists, never their values: map one of them to \`groups\`. Then add a role mapping rule for one of the values, or set a default role. The refused user sees only the refusal message (no rule matched, or no default role and no role mapping rule), never the group values.
+
+### Testing a sign-in
+**Test sign-in**, beside **Test Connection** on a saved OIDC or SAML provider, enabled or not, opens the IdP in a new window: sign in there with the identity to try. The IdP returns to the same redirect URI or ACS URL as a sign-in, and UCM runs the same checks and the same account decision. The provider screen then shows the identity and groups read, the verdict, the role, the account that would be opened or created and, for a refusal, its reason with the attributes to map to \`groups\`. Nobody is signed in and no account changes; the window only says the test is over. The test uses the saved provider (unsaved changes are announced, not sent); only the administrator who started it reads the result, for 10 minutes. The audit log records it as \`sso_sign_in_test\`, apart from sign-ins.
 
 ## LDAP
 
@@ -3783,7 +3790,7 @@ On clients, add the Host CA to known_hosts:
 
 A revoked certificate stays in the KRL, and in the list, until it expires: deleting it earlier is refused, since the KRL is built from these records and the certificate would be accepted again. Each KRL download carries a higher version number (v2.252).
 
-The KRL names a certificate by its serial number, which UCM gives out once per CA. An installation upgraded from 2.x, or one that restored a 2.x archive, may hold two certificates of one CA sharing a serial: the list marks them **Shared serial**, and revoking one revokes them all; when one of them was already revoked, the others are revoked with it. Revoke them and issue new certificates.
+The KRL names a certificate by its serial number, which UCM gives out once per CA. An installation upgraded from 2.x, or one that restored a 2.x archive, may hold two certificates of one CA sharing a serial: the list marks them **Shared serial**, and revoking one revokes them all; when one of them was already revoked, the others are revoked with it. Revoke them and issue new certificates. A certificate of serial 0, which OpenSSH reads as not numbered (an imported one, for instance), is listed in the KRL by its key ID once revoked, as OpenSSH does: every certificate of the CA with that key ID, whatever its serial, is refused with it, and UCM revokes them with it. A certificate with that key ID can then no longer be issued or imported under the CA. The key itself and certificates from other CAs stay valid.
 
 > ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
 

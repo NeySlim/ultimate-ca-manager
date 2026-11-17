@@ -7,7 +7,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key, opts) => (opts?.attributes ? `${key}:${opts.attributes}` : key),
+    t: (key, opts) => (opts?.attributes ? `${key}:${opts.attributes}` : opts?.key ? `${key}:${opts.key}` : key),
     i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
   }),
   Trans: ({ children }) => children,
@@ -143,5 +143,38 @@ describe('hiddenLegacyGroupRows', () => {
     expect(hiddenLegacyGroupRows({ [attribute]: 'groups', groups: attribute })).toEqual([])
     expect(hiddenLegacyGroupRows({ Role: 'groups', groups: ` ${attribute}\u0085` })).toEqual([attribute])
     expect(performance.now() - started).toBeLessThan(1000)
+  })
+})
+
+describe.each([['SAML', SAML], ['OIDC', OIDC]])('%s mapping rows of one key', (_n, provider) => {
+  // The browser's own validation refuses the submit: clicking Save runs it, a bare submit event does not
+  it('refuses to save while two rows share a key, naming the second', () => {
+    const onSave = open(provider, { groups: 'memberOf' })
+    fireEvent.click(screen.getAllByText('common.add')[0])
+    const keys = () => screen.getAllByPlaceholderText('e.g., preferred_username')
+    fireEvent.change(keys()[1], { target: { value: 'groups' } })
+    expect(screen.getByText('common.duplicateKey:groups')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('common.save'))
+    expect(onSave).not.toHaveBeenCalled()
+
+    fireEvent.change(keys()[1], { target: { value: 'memberOf' } })
+    fireEvent.click(screen.getByText('common.save'))
+    expect(onSave).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe.each([['SAML', SAML], ['OIDC', OIDC]])('%s mapping rows of one key in a closed section', (_n, provider) => {
+  it('opens the section that holds the repeated row when the save is refused', () => {
+    const onSave = open(provider, { groups: 'memberOf' })
+    fireEvent.click(screen.getAllByText('common.add')[0])
+    fireEvent.change(screen.getAllByPlaceholderText('e.g., preferred_username')[1], { target: { value: 'groups' } })
+    const header = screen.getByRole('button', { name: /sso\.attributeRoleMappingSection/ })
+    fireEvent.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(screen.getByText('common.save'))
+    expect(onSave).not.toHaveBeenCalled()
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('common.duplicateKey:groups')).toBeInTheDocument()
   })
 })

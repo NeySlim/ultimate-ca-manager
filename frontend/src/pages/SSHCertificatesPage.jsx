@@ -215,9 +215,12 @@ export default function SSHCertificatesPage() {
     try {
       muteToasts()
       const res = await sshCertificatesService.revoke(revokingCert.id, reason)
-      showSuccess(res?.data?.revoked_with?.length
-        ? t('sshCertificates.revokedWithShared', { serial: revokingCert.serial })
-        : t('messages.success.revoke.sshCertificate'))
+      // The KRL revokes serial 0 by key ID under the CA, any other serial by number
+      showSuccess(!res?.data?.revoked_with?.length
+        ? t('messages.success.revoke.sshCertificate')
+        : revokingCert.serial
+          ? t('sshCertificates.revokedWithShared', { serial: revokingCert.serial })
+          : t('sshCertificates.revokedWithKeyId', { keyId: revokingCert.key_id }))
       setShowRevokeModal(false)
       setRevokingCert(null)
       if (selectedCert?.id === revokingCert.id) setSelectedCert(null)
@@ -1324,6 +1327,11 @@ function RevokeCertificateForm({ cert, onSubmit, onCancel }) {
         {cert?.serial_shared_with?.length > 0 && (
           <p className="mt-2 text-xs text-status-danger">
             {t('sshCertificates.revokeSharedSerial', { serial: cert.serial })}
+          </p>
+        )}
+        {cert && cert.serial === 0 && (
+          <p className="mt-2 text-xs text-status-danger">
+            {t('sshCertificates.revokeSerialZero', { keyId: cert.key_id })}
           </p>
         )}
       </div>

@@ -323,9 +323,9 @@ CONTROL_ENDPOINTS = frozenset({'system_v2.maintenance_status', 'system_v2.mainte
                                'system_v2.maintenance_lift'})
 # Routes that start a background job: authenticated first, then refused by start_job itself,
 # so GET and POST answer the same 503
-JOB_START_ENDPOINTS = frozenset({'audit_v2.verify_integrity'})
-JOB_START_ENDPOINTS = JOB_START_ENDPOINTS | frozenset({
-    'system_v2.restore_backup', 'settings_v2.restore_backup'})
+JOB_START_ENDPOINTS = frozenset({'audit_v2.verify_integrity', 'system_v2.create_backup',
+                                 'settings_v2.create_backup', 'system_v2.restore_backup',
+                                 'settings_v2.restore_backup'})
 # The cancellation of the restore that holds the maintenance: a flag on its own job row
 JOB_CONTROL_ENDPOINTS = frozenset({'system_v2.cancel_job'})
 
@@ -349,10 +349,13 @@ def refusal(view=None, message=None):
 
 def gate():
     """before_request: what a node in maintenance still serves (health, reads, OCSP, CRL, AIA)."""
+    from flask import request
+    from utils.public_endpoints import PROBE_PATHS
+    if request.path in PROBE_PATHS:
+        return None  # served in maintenance; readiness reads the row itself, liveness never
     view = current(refresh=True)
     if view is None or not view.active():
         return None
-    from flask import request
     if (request.blueprint in OPEN_BLUEPRINTS or request.endpoint in CONTROL_ENDPOINTS
             or request.endpoint in JOB_START_ENDPOINTS or request.endpoint in JOB_CONTROL_ENDPOINTS):
         return None

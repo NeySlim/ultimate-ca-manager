@@ -23,6 +23,8 @@ from tests.test_scep_rfc8894_operations import FAIL_INFO_OID, PKI_STATUS_OID, _r
 from utils.csr_diagnostics import weak_csr_hash_error
 from utils.request_names import RequestRejected
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 SHA1_REASON = 'CSR signed with an unsupported hash algorithm (sha1); use SHA-256 or stronger'
 FAIL_INFO_TEXT_OID = '1.3.6.1.5.5.7.24.1'
 

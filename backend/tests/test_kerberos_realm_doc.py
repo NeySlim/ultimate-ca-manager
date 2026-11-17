@@ -53,3 +53,38 @@ def test_guide_connector_409_says_realm_can_be_cleared():
     text = GUIDE.read_text()
     assert 'whose realm can only be moved to another realm of its keytab or cleared' in text
     assert 'whose realm only its keytab can change' not in text
+
+
+def test_guide_says_what_the_windows_bench_showed():
+    text = GUIDE.read_text()
+    row = _refusal_row('| The AD connector cannot resolve the requester')
+    assert 'the naked autoenrollment request (empty subject, no SAN) gets the directory' in row
+    assert '`HashAlgorithm = sha256`' in text and 'signed with SHA-1 inside its CMC envelope, is served' in text
+    assert 'list the entry **Active Directory Enrollment Policy** in the GPO next to UCM' in text
+    assert '`certreq -new` with `RenewalCert` in the INF, then `certreq -submit`' in text
+    assert 'Windows keeps the policy it read for up to 8 hours' in text
+    assert 'the old certificate is marked superseded by the new one, as on the Certificate binding' in text
+    assert 'a certificate of the former CA renews the same way' in text
+    upgrade = (GUIDE.parents[1] / 'UPGRADE.md').read_text()
+    assert '`HashAlgorithm = sha256` in the `certreq` INF' in upgrade
+    assert 'Windows enrollment, renewal over Kerberos:' in upgrade
+
+
+def test_texts_say_a_kerberos_renewal_keeps_its_template():
+    """Guide, CHANGELOG and help (en, fr) say the renewal keeps profile AND template, and that a
+    request for another template is an enrollment, as wstep_service.issue does."""
+    text = GUIDE.read_text()
+    assert 'renews that certificate when it names the same template' in text
+    assert 'A request naming another template is an enrollment (`certificate.issued`)' in text
+    root = GUIDE.parents[1]
+    changelog = (root / 'CHANGELOG.md').read_text()
+    assert 'of the same profile and template, and the requester\'s' in changelog
+    assert 'of the same profile and the requester\'s;' not in changelog
+    assert "renews it when the request names that certificate's template" in (root / 'UPGRADE.md').read_text()
+    help_dir = root / 'frontend' / 'src' / 'data'
+    en = (help_dir / 'helpGuides.js').read_text()
+    assert "renews it when it names that certificate's template" in en
+    assert 'A request naming another template is an enrollment' in en
+    fr = (help_dir / 'help' / 'fr' / 'settings.js').read_text()
+    assert 'le renouvelle quand elle nomme le modèle de ce certificat' in fr
+    assert 'Une demande qui nomme un autre modèle est un enrôlement' in fr

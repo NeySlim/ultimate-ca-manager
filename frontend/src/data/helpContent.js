@@ -1151,6 +1151,14 @@ export const helpContent = {
         ]
       },
       {
+        title: "Manual backup",
+        items: [
+          { label: "In the background", text: "Create Backup runs on the server: the dialog shows which part of the database is being exported and offers the archive for download when it is ready. A backup done within 25 seconds downloads at once, as before. Closing the dialog or reloading the page does not stop it: Create Backup shows it again" },
+          { label: "Cancel", text: "Cancel the backup stops it between two parts of the export: no archive is kept and its temporary file is removed" },
+          { label: "One at a time", text: "One manual backup runs at a time on the whole installation, HA cluster included: a second one is refused (409) and names the one running. A backup that finds a scheduled backup or a restore holding the backup lock waits up to 15 seconds, then is refused (409)" },
+        ]
+      },
+      {
         title: 'Restore (v2.251)',
         items: [
           { label: 'Replace or merge', text: 'Restore from Backup replaces the data here with the archive\'s and removes what the archive does not carry; the audit entry lists what was removed. The API also accepts mode=merge, which adds the archive to the data here' },
@@ -1566,7 +1574,7 @@ export const helpContent = {
           { label: 'SP Certificate', text: 'UCM HTTPS certificate included in metadata, must be trusted by the IDP or metadata will be rejected' },
           { label: 'Entity ID', text: 'UCM service provider entity identifier' },
           { label: 'ACS URL', text: 'Assertion Consumer Service callback URL' },
-          { label: 'Attribute Mapping', text: 'Left column: the attribute name sent by the IdP. Right column: the UCM field it fills (username, email, fullname or groups). Example: user.userprincipalname → username.' },
+          { label: 'Attribute Mapping', text: 'Left column: the attribute name sent by the IdP. Right column: the UCM field it fills (username, email, fullname or groups). Example: user.userprincipalname → username. An attribute takes one row: a second row with the same name is marked and the provider is not saved until one of them is changed or removed.' },
           { label: 'Groups for role mapping', text: 'Read from the attributes mapped to groups, else from groups and the Microsoft Entra ID / AD FS group and role claims. When Entra ID sends groups.link instead of the groups (users in more than 150 groups), a warning is logged and, when role mapping rules exist, the user is refused: emit only the groups assigned to the application, or app roles.' },
           { label: 'IdP-initiated login', text: 'Accepts logins started from the IdP portal, checked like any other response. On for providers created before 2.243, off for new ones: turn it on only if users start from the IdP portal.' },
           { label: 'NameID format', text: 'Unspecified (IdP default), Persistent, Email address or Transient: sent in each login request and published in the SP metadata. Persistent gives a stable identifier; a transient NameID is never used to recognise the account.' },

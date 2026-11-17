@@ -197,7 +197,9 @@ def _run_files(tmp_path, plugin, files, env, marker=None):
     args = [sys.executable, '-m', 'pytest', '-q', '-rA', '-p', 'no:cacheprovider', '-p', 'no:randomly',
             '-p', 'shim_plugin', *(['-m', marker] if marker else []), *[f'tests/{f}' for f in files]]
     proc = subprocess.run(args, cwd=BACKEND_DIR, capture_output=True, text=True, timeout=600,
-                          env={**clean, **env, 'PYTHONPATH': os.pathsep.join([str(tmp_path), str(BACKEND_DIR)])})
+                          # Named, not only removed: a conftest default must not make the child strict
+                          env={**clean, **env, 'UCM_TEST_LEAK_MODE': 'warn',
+                               'PYTHONPATH': os.pathsep.join([str(tmp_path), str(BACKEND_DIR)])})
     return proc, proc.stdout.strip().splitlines()[-1]
 
 

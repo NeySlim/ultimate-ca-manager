@@ -24,6 +24,8 @@ from models import CA, Certificate, db
 from services.trust_store.trust_store_service import TrustStoreService
 from utils.key_codec import store_pem_bytes
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users', 'drop_new_config_rows')
+
 
 def _ca_material(*, not_before, not_after, cn='Validity Window CA', key=None, name=None):
     key = key or rsa.generate_private_key(public_exponent=65537, key_size=2048)

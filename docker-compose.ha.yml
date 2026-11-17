@@ -19,6 +19,9 @@ name: ucm-ha
 x-ucm-node: &ucm-node
   image: neyslim/ultimate-ca-manager:latest
   restart: unless-stopped
+  # A clean stop, at most 41 s: a running scheduled task gets 30 s, the scheduler process 5 s
+  # more before it is killed, then the node writes its stop in cluster_nodes
+  stop_grace_period: 45s
   depends_on:
     postgres:
       condition: service_healthy

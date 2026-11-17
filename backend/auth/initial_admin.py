@@ -58,8 +58,10 @@ def read_command(path) -> str:
 
 def resolve(config) -> InitialPassword:
     """Both sources set is refused: which one the operator meant cannot be guessed."""
+    from config.settings import FLAG_BLANKS
     value = config.get('INITIAL_ADMIN_PASSWORD') or ''
-    force = str(config.get('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE') or '').lower() in ('1', 'true', 'yes')
+    # Read as docker/ha-database.sh ucm_flag_set reads it: surrounding blanks dropped
+    force = str(config.get('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE') or '').strip(FLAG_BLANKS).lower() in ('1', 'true', 'yes')
     path = config.get('INITIAL_ADMIN_PASSWORD_FILE') or ''
     if value and path:
         raise InitialPasswordError(
@@ -123,6 +125,10 @@ def prepare(config, defer_write=False) -> InitialPassword:
     prepared = resolve(config)
     if prepared.generated:
         _put(password_file(config), prepared.value, probe_only=defer_write)
+    elif prepared.force_change:
+        # Nobody chose it: the change at first login is what the policy judges
+        logger.info(f'The password from {prepared.source} was drawn by the deployment tool '
+                    '(INITIAL_ADMIN_PASSWORD_FORCE_CHANGE): it must be changed at first login')
     else:
         _warn_if_weak(prepared)
     return prepared

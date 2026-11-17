@@ -15,6 +15,8 @@ import pytest
 
 from services.compliance_service import calculate_compliance_score
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CERTIFICATES = '/api/v2/certificates'
 
 

@@ -97,6 +97,23 @@ describe('SSHCertificatesPage: a serial two certificates share', () => {
     expect(await screen.findByText('sshCertificates.revokeSharedSerial')).toBeInTheDocument()
   })
 
+  it('warns that serial 0 revokes its key ID, and says what the revocation took', async () => {
+    const ZERO = { ...ALONE, id: 4, key_id: 'zero-cert', serial: 0 }
+    const showSuccess = vi.spyOn(stable.notify, 'showSuccess')
+    getAll.mockResolvedValue({ data: [ZERO], meta: { total: 1 } })
+    getById.mockResolvedValue({ data: ZERO })
+    revoke.mockResolvedValue({ data: { ...ZERO, revoked: true, revoked_with: [5] } })
+    renderPage()
+    fireEvent.click(await screen.findByText('zero-cert'))
+    await waitFor(() => expect(getById).toHaveBeenCalledWith(4))
+    fireEvent.click(screen.getAllByText('sshCertificates.revokeCertificate').find(el => el.closest('button')))
+    expect(await screen.findByText('sshCertificates.revokeSerialZero')).toBeInTheDocument()
+    expect(screen.queryByText('sshCertificates.revokeSharedSerial')).toBeNull()
+    fireEvent.click(screen.getAllByText('sshCertificates.revokeCertificate').filter(el => el.closest('button[type="submit"]')).pop())
+    await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('sshCertificates.revokedWithKeyId'))
+    showSuccess.mockRestore()
+  })
+
   it('says nothing of the kind for a serial held once', async () => {
     getById.mockResolvedValue({ data: ALONE })
     renderPage()

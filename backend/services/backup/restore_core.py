@@ -439,6 +439,8 @@ class RestoreCoreMixin:
         # A merge never lowers a revocation made here, of a certificate or a CA (_kept_revocation)
         self._merging = mode == 'merge'
         self._kept_revocations = []
+        # SSH certificates revoked with their serial's revoked holder: audited after the commit
+        self._ssh_aligned = {}
 
         aligned = []
         try:
@@ -489,7 +491,9 @@ class RestoreCoreMixin:
                     results.update(remove_after_writes(replacement).report())
                 # On the final rows: an authority a replacement removes after the writes holds nothing
                 db.session.flush()
-                SSHSerials.settle_marks(SSHSerials.session_run)
+                self._ssh_aligned.update(SSHSerials.settle_marks(SSHSerials.session_run))
+                results['ssh_revoked_with_serial'] = len(self._ssh_aligned)
+                aligned.extend(SSHSerials.revocation_entries(SSHSerials.session_run, self._ssh_aligned))
                 SSHSerials.raise_counters(SSHSerials.session_run)
                 self._settle_local_emails(backup_data)
                 for key_id, held in key_binding.shared_keys().items():

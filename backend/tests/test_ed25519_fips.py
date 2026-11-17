@@ -19,6 +19,8 @@ from fips_mode import FipsRestricted
 from models import CA, Certificate, SSHCertificateAuthority, db
 from utils.key_codec import eddsa_key_name, store_pem_bytes
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 _EDDSA = (ed25519.Ed25519PrivateKey, ed25519.Ed25519PublicKey,
           ed448.Ed448PrivateKey, ed448.Ed448PublicKey)
 

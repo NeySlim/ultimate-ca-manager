@@ -16,6 +16,8 @@ from cryptography.x509.oid import ExtensionOID, NameOID
 
 from tests.conftest import assert_error, assert_success, get_json
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 BASE = '/api/v2/cas'
 
 _seq = [0]

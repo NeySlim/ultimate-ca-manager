@@ -30,7 +30,8 @@ from ..export_generic import load_model
 from ..manifest import SECTIONS
 from .conflict import RestoreConflictError, describe_row
 from .plan import (
-    RestorePlan, _normalise, _temporal_identity, shared_identity_warning, sso_identity_key,
+    _UNBOUND_TAKEN, RestorePlan, _normalise, _temporal_identity, shared_identity_warning,
+    sso_identity_key, unbound_of_known_idp,
 )
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,8 @@ def rows_to_remove(section_name: str, archived_rows: List[Dict[str, Any]],
     for key, ids in shared.items():
         gone = ids[archived.get(key, 0):]
         doomed.extend(gone)
-        plan.warnings.append(shared_identity_warning(section_name, key, ids, 'removed', gone))
+        taken = _UNBOUND_TAKEN if unbound_of_known_idp(section_name, key) else None
+        plan.warnings.append(shared_identity_warning(section_name, key, ids, 'removed', gone, taken=taken))
     # No archived row can be one whose identity misses a part
     incomplete = plan.incomplete.get(section_name) or []
     if incomplete:
@@ -224,6 +226,7 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'webhook_deliveries': 'delivery queue, removed with its endpoint as deleting it does',
     'deploy_deliveries': 'delivery queue, removed with its binding as deleting it does',
     'pro_sso_saml_message_ids': 'replay cache of SAML message ids',
+    'pro_sso_sign_in_tests': 'sign-in tests: reports minutes long, emptied rows kept a day',
     # 3.0 only: a 2.254 archive carries the provider on the account row instead
     'user_sso_identities': 'not in a 2.254 archive; removed with its account, orphaned with its provider',
 }
@@ -242,6 +245,8 @@ SOFT_LINKS = (
     ('acme_dns_update_keys', 'created_by_user_id', 'users', 'id'),
     ('acme_proxy_dns_challenges', 'acme_client_account_id', 'acme_client_accounts', 'id'),
     ('pro_sso_saml_message_ids', 'provider_id', 'pro_sso_providers', 'id'),
+    ('pro_sso_sign_in_tests', 'provider_id', 'pro_sso_providers', 'id'),
+    ('pro_sso_sign_in_tests', 'user_id', 'users', 'id'),
     ('revoked_serials', 'certificate_id', 'certificates', 'id'),
     ('key_recovery_requests', 'cert_id', 'certificates', 'id'),
     ('webhook_deliveries', 'endpoint_id', 'webhook_endpoints', 'id'),
