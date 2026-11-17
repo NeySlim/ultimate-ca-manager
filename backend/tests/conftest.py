@@ -456,6 +456,12 @@ _LEAK_EXEMPT = {
 
 
 _ORPHAN_RECORDS = 'revocation records of a deleted certificate'
+# Rows SQLite keeps when their ACME account is deleted behind the service (no foreign key
+# enforcement): a database check of a later file reports them as dangling references
+_ORPHAN_ACME = {
+    'ACME authorizations of a deleted account': 'acme_authorizations',
+    'ACME orders of a deleted account': 'acme_orders',
+}
 
 
 def _leak_counts():
@@ -475,6 +481,12 @@ def _leak_counts():
             counts[_ORPHAN_RECORDS] = db.session.execute(_text(
                 'SELECT COUNT(*) FROM revoked_serials r WHERE r.certificate_id IS NOT NULL AND NOT EXISTS'
                 ' (SELECT 1 FROM certificates c WHERE c.id = r.certificate_id)')).scalar()
+        if 'acme_accounts' in present:
+            for label, table in _ORPHAN_ACME.items():
+                if table in present:
+                    counts[label] = db.session.execute(_text(
+                        f'SELECT COUNT(*) FROM "{table}" o WHERE o.account_id IS NOT NULL AND NOT EXISTS'
+                        ' (SELECT 1 FROM acme_accounts a WHERE a.account_id = o.account_id)')).scalar()
         for table, ignored in _LEAK_CONTENT.items():
             if table in present:
                 rows = db.session.execute(_text(f'SELECT * FROM "{table}" ORDER BY id')).mappings()
