@@ -162,3 +162,19 @@ describe.each([['SAML', SAML], ['OIDC', OIDC]])('%s mapping rows of one key', (_
     expect(onSave).toHaveBeenCalledTimes(1)
   })
 })
+
+describe.each([['SAML', SAML], ['OIDC', OIDC]])('%s mapping rows of one key in a closed section', (_n, provider) => {
+  it('opens the section that holds the repeated row when the save is refused', () => {
+    const onSave = open(provider, { groups: 'memberOf' })
+    fireEvent.click(screen.getAllByText('common.add')[0])
+    fireEvent.change(screen.getAllByPlaceholderText('e.g., preferred_username')[1], { target: { value: 'groups' } })
+    const header = screen.getByRole('button', { name: /sso\.attributeRoleMappingSection/ })
+    fireEvent.click(header)
+    expect(header).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(screen.getByText('common.save'))
+    expect(onSave).not.toHaveBeenCalled()
+    expect(header).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('common.duplicateKey:groups')).toBeInTheDocument()
+  })
+})
