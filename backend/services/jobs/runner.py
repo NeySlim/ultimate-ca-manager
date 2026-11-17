@@ -285,8 +285,9 @@ class JobRunner:
         now_mono = time.monotonic()
         if leads and (not self._recovered or finished
                       or now_mono - self._last_recover >= RECOVER_SECONDS):
-            # Single node: the first pass under the host lock finds only orphans
-            all_running = not ha and not self._recovered and not self._running
+            # Single node: the first pass under the host lock finds only orphans (nothing is
+            # taken here before it: a take needs the lead, and recovery comes first in a pass)
+            all_running = not ha and not self._recovered
             store.recover_orphans(db.session, now=jobs._now(), all_running=all_running,
                           audit_for=jobs.audit_writer, mine=finished)
             self._recovered, self._last_recover = True, now_mono

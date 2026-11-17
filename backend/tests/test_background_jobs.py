@@ -467,6 +467,22 @@ def test_a_later_recovery_pass_leaves_the_runners_own_job_running(app, fake_type
         assert _row(job_id)['state'] == 'succeeded'
 
 
+def test_a_later_recovery_pass_leaves_another_executors_job_running(app, fake_types, created):
+    """Single node, nothing running here: a job taken since the first pass is not an orphan."""
+    jr = runner.JobRunner(app, _Scheduler())
+    with app.app_context():
+        jr.run_pass()
+    job_id = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created)
+    with app.app_context():
+        store.claim_job(db.session, job_id, 'another-process/1/x', jobs._now())
+        jr._last_recover = 0.0
+        jr.run_pass()
+        assert not jr._running and _row(job_id)['state'] == 'running'
+        jobs.request_cancellation(job_id)
+        store.conclude_job(db.session, job_id, state=store.CANCELLED, reason=store.CANCELLED_REASON,
+                           from_states=(store.RUNNING,), now=jobs._now())
+
+
 def test_the_lease_is_renewed_while_the_job_runs(app, fake_types, created, monkeypatch):
     """A run longer than its lease stays its executor's: the lease thread pushes it forward."""
     monkeypatch.setattr(runner, 'RENEW_SECONDS', 0.05)
