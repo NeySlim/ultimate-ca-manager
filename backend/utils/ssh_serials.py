@@ -5,7 +5,8 @@ non-zero serial once per CA (0 means "no number"). Rows issued twice before 3.0 
 which their signature carries: the oldest stays in the index, so no new row can take the number,
 ``serial_duplicate`` takes the others out of it; the upgrade lists them and the next start reports
 them once. ``ssh_cas.serial_counter`` never trails the serials
-its CA holds; every path that writes certificates or counters calls ``raise_counters``.
+its CA holds; every path that writes certificates or counters calls ``raise_counters``. A pair is
+revoked as the KRL revokes it, both holders or neither (``align_revocations``).
 """
 import json
 import logging
@@ -40,6 +41,16 @@ _GROUPS = ('SELECT c.id, c.ssh_ca_id, a.descr, c.serial, c.key_id FROM ssh_certi
            'ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id AND o.serial = c.serial AND o.id <> c.id) '
            'ORDER BY c.ssh_ca_id, c.serial, c.id')
 
+# Each valid holder of a serial a revoked certificate of its CA holds, and the oldest revoked holder
+_UNREVOKED = ('SELECT c.id, (SELECT MIN(o.id) FROM ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id '
+              'AND o.serial = c.serial AND o.revoked) FROM ssh_certificates c '
+              'WHERE c.serial <> 0 AND NOT COALESCE(c.revoked, FALSE) AND EXISTS (SELECT 1 FROM '
+              'ssh_certificates o WHERE o.ssh_ca_id = c.ssh_ca_id AND o.serial = c.serial AND o.revoked) '
+              'ORDER BY c.id')
+_REVOKE_AS = ('UPDATE ssh_certificates SET revoked = TRUE, '
+              'revoked_at = (SELECT s.revoked_at FROM ssh_certificates s WHERE s.id = :s), '
+              'revoke_reason = (SELECT s.revoke_reason FROM ssh_certificates s WHERE s.id = :s) WHERE id = :i')
+
 Run = Callable[..., object]
 
 
@@ -73,14 +84,31 @@ def duplicate_groups(run: Run, ids=None) -> List[Dict]:
     return [g for g in groups.values() if wanted is None or wanted & set(g['ids'])]
 
 
-def mark_duplicates(run: Run) -> List[Dict]:
-    """Mark every certificate but the oldest of a shared serial; the groups newly marked."""
+def align_revocations(run: Run) -> Dict[int, int]:
+    """The KRL revokes a serial: each valid holder of a revoked one is revoked with the date and
+    reason of its oldest revoked holder. {id revoked here: id it was revoked with}."""
+    aligned = {row_id: source for row_id, source in run(_UNREVOKED, {}).fetchall()}
+    for row_id, source in aligned.items():
+        run(_REVOKE_AS, {'i': row_id, 's': source})
+        logger.warning("SSH certificate #%s revoked with #%s, which holds its serial under their CA "
+                       "(the KRL revokes by serial)", row_id, source)
+    return aligned
+
+
+def mark_duplicates(run: Run, aligned: Optional[Dict[int, int]] = None) -> List[Dict]:
+    """Mark every certificate but the oldest of a shared serial; the groups newly marked or holding
+    a certificate of *aligned* (``align_revocations``), which each group lists under 'revoked'."""
+    aligned = aligned or {}
     ids = unmarked_duplicates(run)
-    if not ids:
+    if not ids and not aligned:
         return []
-    groups = duplicate_groups(run, ids)
+    groups = duplicate_groups(run, set(ids) | set(aligned))
     for row_id in ids:
         run(f'UPDATE ssh_certificates SET {FLAG} = TRUE WHERE id = :i', {'i': row_id})
+    for entry in groups:
+        revoked = [[i, aligned[i]] for i in entry['ids'] if i in aligned]
+        if revoked:
+            entry['revoked'] = revoked
     return groups
 
 
@@ -89,13 +117,16 @@ def settle_marks(run: Run) -> None:
     no statement ever puts two holders under the index."""
     mark_duplicates(run)
     run(f'UPDATE ssh_certificates SET {FLAG} = FALSE WHERE {FLAG} AND NOT {_OLDER}', {})
+    align_revocations(run)
 
 
 def describe(entry: Dict) -> str:
     """One group as the log and the audit entry show it."""
     held = ', '.join(f"#{i} '{k}'" for i, k in zip(entry.get('ids') or [], entry.get('key_ids') or []))
+    revoked = ''.join(f"; #{i} revoked with #{s}, as the KRL already revoked it"
+                      for i, s in entry.get('revoked') or [])
     return (f"SSH CA '{entry.get('ca') or ''}' (#{entry.get('ssh_ca_id')}) issued serial "
-            f"{entry.get('serial')} to {len(entry.get('ids') or [])} certificates ({held}): {REMEDY}")
+            f"{entry.get('serial')} to {len(entry.get('ids') or [])} certificates ({held}){revoked}: {REMEDY}")
 
 
 def list_for_next_start(run: Run, groups: List[Dict]) -> None:

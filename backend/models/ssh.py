@@ -315,8 +315,7 @@ class SSHCertificate(db.Model if db else object):
         return shared
 
     def to_dict(self, shared=None):
-        """*shared*: ``shared_serials()`` read once for a page of certificates."""
-        """Convert to dict for API response"""
+        """API form; *shared*: ``shared_serials()`` read once for a page of certificates."""
         return {
             'id': self.id,
             'refid': self.refid,

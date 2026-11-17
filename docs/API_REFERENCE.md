@@ -2140,7 +2140,7 @@ GET /api/v2/ssh/stats
 - `POST /generate` takes the same fields without `public_key`, plus `key_type`: UCM creates the key pair and returns the certificate with the `private_key` once. Both answer `409` when the serial they take is held by another certificate of the CA even after its counter was moved past its certificates; try again.
 - `POST /import` stores an existing certificate: `certificate` (required), optional `descr` and `ssh_ca_id`; `201`.
 - `POST /verify` (`read:ssh`) decodes and verifies `certificate` (required) and returns the result.
-- `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate, with `revoked_with`: the ids of the other certificates of the CA holding the same serial, revoked with it, since the KRL revokes by serial (empty but for a pair an upgrade from 2.x kept). Every certificate carries `serial_shared_with`, the ids of those other holders. `DELETE` answers `204` or `409` when it cannot be deleted.
+- `export` returns the certificate in OpenSSH format. `revoke` takes an optional `reason` (default `unspecified`) and returns the certificate, with `revoked_with`: the ids of the other certificates of the CA holding the same serial that this revocation revoked with it, since the KRL revokes by serial (a holder already revoked is not listed; empty but for a pair kept by an upgrade from 2.x or by the restore of a 2.x archive). Every certificate carries `serial_shared_with`, the ids of those other holders. `DELETE` answers `204` or `409` when it cannot be deleted.
 - `stats` returns the counts shown on the SSH dashboard.
 
 ---

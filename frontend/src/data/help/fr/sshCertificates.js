@@ -183,7 +183,7 @@ Sur les clients, ajoutez l'AC hôte à known_hosts :
 
 Un certificat révoqué reste dans la KRL, et dans la liste, jusqu'à son expiration : le supprimer plus tôt est refusé, puisque la KRL est construite à partir de ces enregistrements et que le certificat serait de nouveau accepté. Chaque téléchargement de la KRL porte un numéro de version plus élevé (v2.252).
 
-La KRL désigne un certificat par son numéro de série, qu'UCM n'attribue qu'une fois par AC. Une installation montée depuis une 2.x peut contenir deux certificats d'une même AC portant le même numéro : la liste les signale, et révoquer l'un les révoque tous. Révoquez-les et émettez de nouveaux certificats.
+La KRL désigne un certificat par son numéro de série, qu'UCM n'attribue qu'une fois par AC. Une installation montée depuis une 2.x, ou qui a restauré une archive 2.x, peut contenir deux certificats d'une même AC portant le même numéro : la liste les signale, et révoquer l'un les révoque tous ; si l'un d'eux était déjà révoqué, les autres le sont avec lui. Révoquez-les et émettez de nouveaux certificats.
 
 > ⚠ La révocation ne prend effet que lorsque les serveurs vérifient la KRL via \`RevokedKeys\` dans sshd_config.
 

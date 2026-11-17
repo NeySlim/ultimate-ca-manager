@@ -258,3 +258,32 @@ def test_revoking_one_of_a_pair_revokes_both_and_says_so(app, auth_client):
     finally:
         with app.app_context():
             _drop(ca_id)
+
+
+def test_revoking_one_of_a_pair_names_only_what_it_revokes(app, auth_client, monkeypatch):
+    """The partner was revoked before: the response, the audit and the events leave it alone."""
+    import websocket.emitters as emitters
+    from models import AuditLog
+    events = []
+    monkeypatch.setattr(emitters, 'on_ssh_certificate_revoked', lambda cert_id, *a, **k: events.append(cert_id))
+    with app.app_context():
+        ca_id, first, second, _ = _pair('revoked before')
+        partner = db.session.get(SSHCertificate, second)
+        partner.revoked, partner.revoke_reason = True, 'superseded'
+        db.session.commit()
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+    try:
+        response = auth_client.post(f'/api/v2/ssh/certificates/{first}/revoke', json={'reason': 'keyCompromise'})
+        assert response.status_code == 200, response.get_json()
+        body = response.get_json()
+        assert body['data']['revoked_with'] == []
+        assert body['message'] == 'SSH certificate revoked'
+        assert events == [first]
+        with app.app_context():
+            assert db.session.get(SSHCertificate, second).revoke_reason == 'superseded'
+            details = [e.details for e in AuditLog.query.filter(
+                AuditLog.id > floor, AuditLog.action == 'ssh_cert_revoked')]
+            assert details and not any(f'#{second}' in d for d in details), details
+    finally:
+        with app.app_context():
+            _drop(ca_id)
