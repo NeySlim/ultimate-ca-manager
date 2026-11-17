@@ -191,11 +191,14 @@ def run_job(app, row, executor, done=None):
                 if not isinstance(e, Exception):
                     raised = e
             db.session.rollback()
-            line = None
+            line = last_line = None
             if audit is not None:
-                def _job_result_line(r, s, why):
+                # One syslog copy per line: none from a first attempt that failed
+                def line(r, s, why):
+                    return audit(r, s, why, details, resource, last=False)
+
+                def last_line(r, s, why):
                     return audit(r, s, why, details, resource)
-                line = _job_result_line
             # A run that failed past a resumable phase (a committed restore) is the recovery's
             past = tuple(jt.resumable_phases) if jt is not None else ()
             unfinished = (store.T.c.phase.is_(None) | store.T.c.phase.notin_(past),) if past else ()
@@ -208,7 +211,7 @@ def run_job(app, row, executor, done=None):
             # One result line per job: tried twice, then the job ends without it (a slot held
             # until a restart is worse) and the line goes to the log; no-op if concluded elsewhere
             if (not _conclude_after_maintenance(app, lambda: conclude(line)) and line is not None
-                    and not _conclude_after_maintenance(app, lambda: conclude(line))
+                    and not _conclude_after_maintenance(app, lambda: conclude(last_line))
                     and _conclude_after_maintenance(app, lambda: conclude(None))):
                 logger.error(f"Background job {job_id} concluded without its audit line: "
                              + jobs.result_line_text(kind, state, reason, details, resource, row))

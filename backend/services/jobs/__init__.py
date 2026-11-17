@@ -189,7 +189,7 @@ def audit_writer(kind: str):
     if jt is None or jt.audit_action is None:
         return None
 
-    def _write_job_result_line(row, state, reason, details=None, resource=None):
+    def _write_job_result_line(row, state, reason, details=None, resource=None, last=True):
         from services.audit_service import AuditService
         written = AuditService.log_action(
             action=jt.audit_action, resource_type=jt.resource_type,
@@ -197,7 +197,7 @@ def audit_writer(kind: str):
             details=details or _phrase(jt, state, reason), success=state == SUCCEEDED,
             username=(row or {}).get('requested_by_name') or 'system',
             user_id=(row or {}).get('requested_by_id'),
-            ip_address=(row or {}).get('requested_ip'))
+            ip_address=(row or {}).get('requested_ip'), syslog_unsaved=last)
         return written is not None
     return _write_job_result_line
 
