@@ -1,5 +1,6 @@
 {
   "common": {
+    "duplicateKey": "Another row above already uses \"{{key}}\": only one of them can be saved",
     "saved": "Einstellungen gespeichert",
     "saveFailed": "Speichern fehlgeschlagen",
     "save": "Speichern",

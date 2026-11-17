@@ -12,7 +12,7 @@ export default {
           { label: 'SP 证书', text: '元数据中包含的 UCM HTTPS 证书，必须被 IDP 信任，否则元数据将被拒绝' },
           { label: 'Entity ID', text: 'UCM 服务提供商实体标识符' },
           { label: 'ACS URL', text: '断言消费者服务回调 URL' },
-          { label: '属性映射', text: '左列：IdP 发送的属性名称。右列：对应填充的 UCM 字段（username、email、fullname 或 groups）。示例：user.userprincipalname → username。' },
+          { label: '属性映射', text: '左列：IdP 发送的属性名称。右列：对应填充的 UCM 字段（username、email、fullname 或 groups）。示例：user.userprincipalname → username。每个属性只占一行：同名的第二行会被标出，在修改或删除其中一行之前，提供程序无法保存。' },
           { label: '用于角色映射的组', text: '从映射到 groups 的属性中读取；否则从 groups 以及 Microsoft Entra ID / AD FS 的组和角色声明中读取。当 Entra ID 发送 groups.link 而不是组（用户属于超过 150 个组）时，会记录一条警告并应用默认角色：请只发出分配给该应用程序的组，或应用角色。' },
           { label: '由 IdP 发起的登录', text: '接受从 IdP 门户发起的登录，与其他响应一样进行校验。2.243 之前创建的提供商默认开启，新提供商默认关闭：仅当用户从 IdP 门户开始登录时才开启。' },
           { label: 'NameID 格式', text: '未指定（IdP 默认）、持久 (persistent)、电子邮件地址或临时 (transient)：随每个登录请求发送，并发布在 SP 元数据中。持久格式提供稳定的标识符；临时 NameID 绝不用于识别账户。' },

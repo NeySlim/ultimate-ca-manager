@@ -1284,6 +1284,7 @@
     "issueAnyway": "Émettre pour la même entité"
   },
   "common": {
+    "duplicateKey": "Une ligne plus haut utilise déjà « {{key}} » : une seule des deux peut être enregistrée",
     "saved": "Paramètres enregistrés",
     "saveFailed": "Échec de l'enregistrement",
     "save": "Enregistrer",

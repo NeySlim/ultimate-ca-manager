@@ -1,5 +1,6 @@
 {
   "common": {
+    "duplicateKey": "Another row above already uses \"{{key}}\": only one of them can be saved",
     "saved": "设置已保存",
     "saveFailed": "保存失败",
     "save": "保存",
