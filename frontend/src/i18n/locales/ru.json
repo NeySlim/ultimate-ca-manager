@@ -4187,7 +4187,9 @@
     "signInTestCompleteUsed": "Эта проверка уже использована. Запустите новую с экрана поставщика.",
     "signInTestCompleteExpired": "Срок этой проверки истёк, или она неизвестна. Запустите новую с экрана поставщика.",
     "signInTestCompleteOtherBrowser": "Эта проверка была запущена в другом браузере. Завершите её там или запустите новую из этого браузера.",
-    "signInTestCompleteBack": "Назад к поставщикам SSO"
+    "signInTestCompleteBack": "Назад к поставщикам SSO",
+    "signInTestLaunching": "Открывается поставщик удостоверений…",
+    "signInTestCompleteClose": "Это окно не закрылось само: закройте его, чтобы вернуться к экрану поставщика."
   },
   "notifications": {
     "certificateIssued": "Сертификат выпущен: {{name}}",

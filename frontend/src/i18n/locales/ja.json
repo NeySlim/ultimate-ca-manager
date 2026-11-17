@@ -4137,7 +4137,9 @@
     "signInTestCompleteUsed": "This test was already used. Start a new one from the provider screen.",
     "signInTestCompleteExpired": "This test expired or is unknown. Start a new one from the provider screen.",
     "signInTestCompleteOtherBrowser": "This test was started in another browser. Finish it there, or start a new one from this browser.",
-    "signInTestCompleteBack": "Back to the SSO providers"
+    "signInTestCompleteBack": "Back to the SSO providers",
+    "signInTestLaunching": "Opening the identity provider…",
+    "signInTestCompleteClose": "This window did not close by itself: close it to return to the provider screen."
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",

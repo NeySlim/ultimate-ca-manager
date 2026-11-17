@@ -3948,7 +3948,9 @@
     "signInTestCompleteUsed": "Cet essai a déjà servi. Lancez-en un nouveau depuis l'écran du fournisseur.",
     "signInTestCompleteExpired": "Cet essai a expiré ou est inconnu. Lancez-en un nouveau depuis l'écran du fournisseur.",
     "signInTestCompleteOtherBrowser": "Cet essai a été lancé dans un autre navigateur. Terminez-le là-bas, ou lancez-en un nouveau depuis ce navigateur.",
-    "signInTestCompleteBack": "Retour aux fournisseurs SSO"
+    "signInTestCompleteBack": "Retour aux fournisseurs SSO",
+    "signInTestLaunching": "Ouverture du fournisseur d'identité…",
+    "signInTestCompleteClose": "Cette fenêtre ne s'est pas fermée d'elle-même : fermez-la pour revenir à l'écran du fournisseur."
   },
   "templates": {
     "template": "Modèle",
