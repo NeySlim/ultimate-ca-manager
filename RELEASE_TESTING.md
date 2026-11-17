@@ -61,7 +61,8 @@ after 3.0 takes neither).
 A release run, from the tag, then publishes: the GitHub release (a prerelease for
 a candidate) with the DEB, the Fedora, EL9 and EL10 RPMs, their checksums and
 SBOMs, `full-stop-migrations.json` and `sbom-index.json`; the images of both
-variants and both architectures on both registries; for a stable release only,
+variants and both architectures on both registries; the Docker Hub page when the
+image takes `latest`; for a stable release only,
 the chart at `oci://ghcr.io/neyslim/charts/ucm`, versioned as the release in
 semver form. `scripts/bump-version.sh X.Y-rcN` writes the version into
 `VERSION`, both npm files and the chart before the tag.

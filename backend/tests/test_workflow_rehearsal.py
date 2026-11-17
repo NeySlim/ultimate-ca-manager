@@ -137,7 +137,9 @@ def _step_runs(job, step, github, inputs):
     if results[job] != 'success':
         return False
     cond = step.get('if')
-    return cond is None or bool(evaluate(cond, {'github': github, 'inputs': inputs, 'matrix': {'arch': 'amd64'}}))
+    ctx = {'github': github, 'inputs': inputs, 'matrix': {'arch': 'amd64'},
+           'steps': {'latest': {'outputs': {'latest': 'true'}}}}
+    return cond is None or bool(evaluate(cond, ctx))
 
 
 def test_the_dispatch_is_a_rehearsal_unless_said_otherwise():
@@ -309,3 +311,15 @@ def test_the_chart_is_published_for_a_stable_tag_only_after_the_release():
     push = next(s for s in job['steps'] if s.get('name') == 'Push the chart to the OCI registry')
     assert 'helm push "chart-out/$f" "oci://$REGISTRY/$owner/charts"' in push['run']
     assert load('build-release.yml')['env']['REGISTRY'] == 'ghcr.io'
+
+
+@pytest.mark.parametrize('latest, runs', [('true', True), ('false', False)])
+def test_the_docker_hub_page_follows_the_latest_image(latest, runs):
+    """A candidate, or a 2.254.N released after 3.0, leaves the page of the latest stable as it is."""
+    step = next(s for s in _jobs()['docker-manifest']['steps'] if s.get('name') == 'Update Docker Hub description')
+    for github, inputs in (TAG_PUSH, REDO_ON_TAG):
+        ctx = {'github': github, 'inputs': inputs, 'steps': {'latest': {'outputs': {'latest': latest}}}}
+        assert bool(evaluate(step['if'], ctx)) is runs
+    for github, inputs in REHEARSALS.values():
+        ctx = {'github': github, 'inputs': inputs, 'steps': {'latest': {'outputs': {'latest': 'true'}}}}
+        assert not evaluate(step['if'], ctx)

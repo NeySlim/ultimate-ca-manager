@@ -656,8 +656,9 @@ jobs:
             docker buildx imagetools inspect "${tags[0]}"
           done
 
+      # The page describes the latest image: a candidate or an older line leaves it as it is
       - name: Update Docker Hub description
-        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run && steps.latest.outputs.latest == 'true'
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
