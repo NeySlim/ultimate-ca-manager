@@ -873,6 +873,40 @@ def configure_test_app(application):
     application.config['FQDN'] = 'ucm.test'
 
 
+# The session database never hands out an id twice, as PostgreSQL never does: a file's
+# cleanup frees ids, and audit or queue rows naming them must not reach the next file.
+_SESSION_ENGINE = {'building': False, 'engine': None}
+
+
+def _is_session_engine(connection):
+    if connection.dialect.name != 'sqlite':
+        return False
+    if _SESSION_ENGINE['engine'] is not None:
+        return connection.engine is _SESSION_ENGINE['engine']
+    if not _SESSION_ENGINE['building']:
+        return False
+    from flask import has_app_context
+    from models import db
+    return has_app_context() and connection.engine is db.engine
+
+
+def _autoincrement_on(table, connection, **kw):
+    if _is_session_engine(connection):
+        table.info['_flk_autoincrement'] = table.dialect_options['sqlite']['autoincrement']
+        table.dialect_options['sqlite']['autoincrement'] = True
+
+
+def _autoincrement_restored(table, connection, **kw):
+    # The model metadata stays as the product declares it for every other database
+    if '_flk_autoincrement' in table.info:
+        table.dialect_options['sqlite']['autoincrement'] = table.info.pop('_flk_autoincrement')
+
+
+from sqlalchemy import Table as _SaTable, event as _sa_event  # noqa: E402
+_sa_event.listen(_SaTable, 'before_create', _autoincrement_on)
+_sa_event.listen(_SaTable, 'after_create', _autoincrement_restored)
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
@@ -891,7 +925,14 @@ def app():
     if _pg_app.ENABLED:
         application = _pg_app.session_app(create_app, 'testing')
     else:
-        application = create_app('testing')
+        _SESSION_ENGINE['building'] = True
+        try:
+            application = create_app('testing')
+        finally:
+            _SESSION_ENGINE['building'] = False
+        from models import db as _db
+        with application.app_context():
+            _SESSION_ENGINE['engine'] = _db.engine
 
     _sandbox, _ = sandbox_paths(application)
     configure_test_app(application)
@@ -901,6 +942,7 @@ def app():
     _SESSION_APP.append(application)
     yield application
     _SESSION_APP.clear()
+    _SESSION_ENGINE['engine'] = None
     if _pg_app.ENABLED:
         from models import db as _db
         with application.app_context():
