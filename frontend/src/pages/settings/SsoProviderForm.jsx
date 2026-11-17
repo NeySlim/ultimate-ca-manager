@@ -281,7 +281,10 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
 
   const defaultRoleOptions = [{ value: '', label: t('sso.defaultRoleNone') }, ...roleOptions]
 
-  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, defaultRoleOptions, customRoles, handleTestConnection,
+  // A sign-in test runs on the saved provider: the screen says so when the form differs
+  const dirty = JSON.stringify(formData) !== JSON.stringify(savedForm)
+
+  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, defaultRoleOptions, customRoles, handleTestConnection, dirty,
     secretProps: secretTarget ? secretInputProps(t, secretTarget) : {} }
 
   return (

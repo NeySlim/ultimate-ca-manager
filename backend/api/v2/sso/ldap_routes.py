@@ -16,6 +16,7 @@ try:
     HAS_LIMITER = True
 except ImportError:
     HAS_LIMITER = False
+from dataclasses import dataclass
 from datetime import timedelta
 import ldap3
 from ldap3 import Server, Connection, ALL, Tls
@@ -346,26 +347,32 @@ def _extract_external_id(provider, external_data):
     return val or None
 
 
-def _bind_external_id(row, provider, external_id):
-    """Bind the stable id to the row (TOFU). Never replaces an id already bound,
-    nor takes one another account of this provider owns. True if bound."""
-    if not external_id or row.external_id == external_id:
-        return True
-    username = row.user.username if row.user is not None else '?'
-    if row.external_id:
-        logger.warning(
-            f"SSO external id of '{username}' is already bound; not replacing it")
-        return False
+def _bind_refusal(row, user, provider, external_id):
+    """Why the stable id is not bound to ``row`` of ``user`` (TOFU), or None. Never replaces
+    an id already bound, nor takes one another account of this provider owns. Reads only."""
+    if not external_id or (row is not None and row.external_id == external_id):
+        return None
+    username = user.username if user is not None else '?'
+    if row is not None and row.external_id:
+        return f"SSO external id of '{username}' is already bound; not replacing it"
     taken = UserSSOIdentity.query.filter(
         UserSSOIdentity.provider_id == provider.id,
         UserSSOIdentity.external_id == external_id,
     ).first()
     if taken is not None and taken is not row:
-        logger.warning(
-            f"SSO external id {external_id!r} already bound to '{taken.user.username}'; "
-            f"not rebinding to '{username}'")
+        return (f"SSO external id {external_id!r} already bound to '{taken.user.username}'; "
+                f"not rebinding to '{username}'")
+    return None
+
+
+def _bind_external_id(row, provider, external_id):
+    """Bind the stable id to the row (TOFU) unless :func:`_bind_refusal` says why not. True if bound."""
+    refusal = _bind_refusal(row, row.user, provider, external_id)
+    if refusal:
+        logger.warning(refusal)
         return False
-    row.bind(external_id)
+    if external_id and row.external_id != external_id:
+        row.bind(external_id)
     return True
 
 
@@ -448,14 +455,13 @@ def _refuse(username, details, code):
     return None, code
 
 
-def _refuse_username_conflict(provider, username, account):
+def _username_conflict_text(provider, username, account):
     state, remedy = describe_conflict(account, provider)
-    return _refuse(username, (f"SSO login via {provider.name!r} refused: the name {username!r} "
-                              f"belongs to an account it may not open, which {state} ({remedy})"),
-                   USERNAME_CONFLICT)
+    return (f"SSO login via {provider.name!r} refused: the name {username!r} "
+            f"belongs to an account it may not open, which {state} ({remedy})")
 
 
-def _refuse_email_conflict(provider, username, email, account, unverified):
+def _email_conflict_text(provider, username, email, account, unverified):
     """No second account for an e-mail an account this identity may not open owns."""
     # This provider may adopt it: only a verified e-mail matches it, attaching would not.
     row = _claimable(account, provider) if unverified else None
@@ -467,19 +473,19 @@ def _refuse_email_conflict(provider, username, email, account, unverified):
         remedy = "have the IdP verify the e-mail address"
     else:
         state, remedy = describe_conflict(account, provider)
-    return _refuse(username, (f"SSO login via {provider.name!r} refused for {username!r}: the e-mail "
-                              f"{bounded(email)!r} belongs to the account {account.username!r}, which "
-                              f"{state}; no second account is created ({remedy}; for another person, create "
-                              f"an account named {username!r} and attach this provider to it, removing "
-                              f"its local password)"),
-                   EMAIL_CONFLICT)
+    return (f"SSO login via {provider.name!r} refused for {username!r}: the e-mail "
+            f"{bounded(email)!r} belongs to the account {account.username!r}, which "
+            f"{state}; no second account is created ({remedy}; for another person, create "
+            f"an account named {username!r} and attach this provider to it, removing "
+            f"its local password)")
 
 
 _GENERIC_SOURCES = {'oauth2': "the IdP's claims", 'saml': 'the assertion', 'ldap': 'the directory'}
 
 
-def _refuse_unmapped(provider, username, external_data=None, group_source=None):
-    """The refusal for want of a role, with the groups read, their source and the remedy."""
+def _unmapped_refusal(provider, username, external_data=None, group_source=None):
+    """(code, text, diagnosis) of the refusal for want of a role: the groups read, their
+    source and the remedy."""
     if _mapping_rules(provider):
         reason, code = 'no role mapping rule matches it', UNMAPPED
     else:
@@ -487,8 +493,8 @@ def _refuse_unmapped(provider, username, external_data=None, group_source=None):
     if group_source is None:
         group_source = GroupSource(_GENERIC_SOURCES.get(provider.provider_type, 'the IdP'))
     diagnosis = refusal_diagnosis(_external_groups(external_data), group_source)
-    return _refuse(username, f"SSO login via {provider.name!r} refused for {username!r}: "
-                             f"{reason}; {diagnosis}", code)
+    return code, (f"SSO login via {provider.name!r} refused for {username!r}: "
+                  f"{reason}; {diagnosis}"), diagnosis
 
 
 def _email_owner(provider, account, unverified):
@@ -559,32 +565,127 @@ def _ldap_local_account(provider, identity):
     return user or conflict
 
 
-def _get_or_create_sso_user(provider, username, email, fullname, external_data, group_source=None):
-    """Create or update a user from SSO authentication; ``group_source`` says where the
-    groups were read, for a refusal for want of a role.
+OPEN, CREATE, DISABLED, REFUSED = 'open', 'create', 'disabled', 'refused'
 
-    Returns:
-        tuple: (user, error_code) - user object or None, and error code if failed
-    """
+
+@dataclass
+class AccountDecision:
+    """What a sign-in with this identity does to the UCM account, decided by reads alone:
+    the login applies it (:func:`apply_sso_account`), a sign-in test only reports it."""
+    outcome: str
+    username: str
+    code: str = None            # REFUSED: the refusal code the login answers
+    refusal: str = None         # REFUSED: its log and audit text; None when only logged
+    diagnosis: str = None       # REFUSED for want of a role: the groups read and the remedy
+    user: object = None         # OPEN, DISABLED: the account; REFUSED: the one refused on
+    row: object = None          # OPEN: the identity row it opens with; None for a pre-024 account
+    rebind: bool = False        # OPEN: the DN-bound row moves to the stable uid
+    external_id: str = None
+    bind_refusal: str = None    # OPEN: why the stable id is not bound
+    email: str = None           # OPEN: the e-mail written, None unchanged; CREATE: the account's
+    fullname: str = None
+    role: str = None            # OPEN, CREATE: the base role after the sign-in
+    custom_role: object = None  # CREATE: the CustomRole given
+    custom_sync: tuple = None   # OPEN: (custom_role_id, custom_role_source) written, None untouched
+    custom_role_name: str = None  # OPEN, CREATE: the custom role after the sign-in
+    role_change: tuple = None
+    custom_change: tuple = None
+
+
+def decide_sso_account(provider, username, email, fullname, external_data, group_source=None):
+    """The :class:`AccountDecision` of a sign-in; ``group_source`` says where the groups were
+    read, for a refusal for want of a role. Adds nothing to the session, writes nothing."""
     external_id = _extract_external_id(provider, external_data)
     user, row, rebind, conflict, email_owner = _resolve_sso_account(
         provider, username, email, external_data)
 
     if not user and conflict:
-        return _refuse_username_conflict(provider, username, conflict)
+        return AccountDecision(REFUSED, username, code=USERNAME_CONFLICT, user=conflict,
+                               refusal=_username_conflict_text(provider, username, conflict))
 
     if user and not user.active:
-        # A disabled account is a refused login: every caller checks it a
-        # few lines on. Synchronising first bound the stable identity, which
-        # decides whose account this is, for good.
-        logger.warning(
-            f"SSO sync skipped for '{username}': the local account is disabled")
-        return user, None
+        # A disabled account is a refused login: every caller checks it. Synchronising
+        # first would bind the stable identity, which decides whose account this is, for good.
+        return AccountDecision(DISABLED, username, user=user, external_id=external_id)
 
     if not sso_admission(provider, external_data):
-        return _refuse_unmapped(provider, username, external_data, group_source)
+        code, text, diagnosis = _unmapped_refusal(provider, username, external_data, group_source)
+        return AccountDecision(REFUSED, username, code=code, refusal=text, diagnosis=diagnosis,
+                               user=user)
 
     if user:
+        decision = AccountDecision(
+            OPEN, username, user=user, row=row, rebind=rebind, external_id=external_id,
+            bind_refusal=None if rebind else _bind_refusal(row, user, provider, external_id),
+            role=user.role)
+        # Userinfo sync (email, full name), by `auto_update_users`; never the role. The
+        # identity is the stable id, so an e-mail a local account shares is safe here.
+        if provider.auto_update_users:
+            if email and email != user.email:
+                decision.email = email
+            if fullname:
+                decision.fullname = fullname
+        current = user.custom_role.name if user.custom_role_id and user.custom_role else None
+        decision.custom_role_name = current
+        # See #81: the role is set at creation, then managed in UCM; re-sync on login is
+        # opt-in and acts on a role_mapping match only, never on `default_role`.
+        if provider.sync_role_on_login:
+            mapped_role, mapped_custom = _resolve_mapped_roles(provider, external_data)
+            if mapped_role is not None and user.role != mapped_role:
+                decision.role_change = (user.role, mapped_role)
+                decision.role = mapped_role
+            # A custom role set by hand (source NULL) is never replaced nor removed.
+            by_hand = user.custom_role_id is not None and user.custom_role_source != 'sso'
+            if mapped_custom is not None and not by_hand:
+                if user.custom_role_id != mapped_custom.id:
+                    decision.custom_change = (current, mapped_custom.name)
+                decision.custom_sync = (mapped_custom.id, 'sso')
+                decision.custom_role_name = mapped_custom.name
+            elif user.custom_role_source == 'sso':
+                if user.custom_role_id is not None:
+                    decision.custom_change = (current, None)
+                decision.custom_sync = (None, None)
+                decision.custom_role_name = None
+        return decision
+
+    if not provider.auto_create_users:
+        return AccountDecision(REFUSED, username, code='auto_create_disabled')
+    # Only where an account was about to be created: any earlier refusal keeps its answer.
+    if email_owner:
+        return AccountDecision(REFUSED, username, code=EMAIL_CONFLICT, user=email_owner,
+                               refusal=_email_conflict_text(
+                                   provider, username, email, email_owner,
+                                   _email_unverified(provider, external_data)))
+
+    # A distinct SSO account. The email may belong to a LOCAL account: the identity is the
+    # stable id, so both coexist; an admin who wants one attaches the provider to it
+    # instead (POST /api/v2/users/<id>/sso-identities). See #136/#138.
+    # Creation keeps the historical fallback to default_role.
+    mapped_role, mapped_custom = _resolve_mapped_roles(provider, external_data)
+    return AccountDecision(
+        CREATE, username, external_id=external_id,
+        email=email or f'{username}@sso.local', fullname=fullname or username,
+        role=_resolve_role(provider, external_data, mapped=mapped_role),
+        custom_role=mapped_custom, custom_role_name=mapped_custom.name if mapped_custom else None)
+
+
+def apply_sso_account(provider, decision):
+    """Carry out ``decision`` as the login does. Returns (user, error_code): the account, or
+    None and the refusal code; a disabled account is returned for the caller to refuse."""
+    d = decision
+    username = d.username
+    if d.outcome == REFUSED:
+        if d.refusal is None:
+            logger.warning(f"SSO user {username} not found and auto_create disabled")
+            return None, d.code
+        return _refuse(username, d.refusal, d.code)
+
+    if d.outcome == DISABLED:
+        logger.warning(f"SSO sync skipped for '{username}': the local account is disabled")
+        return d.user, None
+
+    if d.outcome == OPEN:
+        user, row = d.user, d.row
         if row is None:
             # An SSO account from before migration 024: the first provider to open it records itself.
             row = UserSSOIdentity(provider_id=provider.id)
@@ -593,52 +694,25 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data, 
             row.provider_id, row.orphan_of = provider.id, None  # taken back by the same IdP
 
         # Bind the stable id (trust-on-first-use) for future stable matching.
-        if rebind:
+        if d.rebind:
             logger.info(f"SSO external id of '{user.username}' moves from its DN to the LDAP uid")
-            row.bind(external_id)
-        else:
-            _bind_external_id(row, provider, external_id)
+            row.bind(d.external_id)
+        elif d.bind_refusal:
+            logger.warning(d.bind_refusal)
+        elif d.external_id and row.external_id != d.external_id:
+            row.bind(d.external_id)
 
-        # ── Userinfo sync (email, full name) ─────────────────────────────
-        # Controlled by `auto_update_users`. Does NOT touch the role.
-        if provider.auto_update_users:
-            # SSO identity is the stable external id, not the email, so syncing
-            # the directory email is safe even if a local account shares it
-            # (email is unique only among local accounts).
-            if email and email != user.email:
-                user.email = email
-            if fullname:
-                user.full_name = fullname
-
-        # ── Role sync ────────────────────────────────────────────────────
-        role_change = None
-        # See #81. Default behaviour: role is set at creation only and
-        # then managed in the UCM UI. Re-sync on login is opt-in via
-        # `sync_role_on_login` and only acts on an explicit role_mapping
-        # match — never falls back to `default_role` for existing users.
-        custom_change = None
-        if provider.sync_role_on_login:
-            mapped_role, mapped_custom = _resolve_mapped_roles(provider, external_data)
-            if mapped_role is not None and user.role != mapped_role:
-                logger.info(
-                    f"SSO role sync: user {username} role changed "
-                    f"{user.role} → {mapped_role} (mapping match)"
-                )
-                role_change = (user.role, mapped_role)
-                user.role = mapped_role
-            # A custom role set by hand (source NULL) is never replaced nor removed.
-            current = user.custom_role.name if user.custom_role_id and user.custom_role else None
-            by_hand = user.custom_role_id is not None and user.custom_role_source != 'sso'
-            if mapped_custom is not None and not by_hand:
-                if user.custom_role_id != mapped_custom.id:
-                    custom_change = (current, mapped_custom.name)
-                    user.custom_role_id = mapped_custom.id
-                user.custom_role_source = 'sso'
-            elif user.custom_role_source == 'sso':
-                if user.custom_role_id is not None:
-                    custom_change = (current, None)
-                user.custom_role_id = None
-                user.custom_role_source = None
+        if d.email is not None:
+            user.email = d.email
+        if d.fullname:
+            user.full_name = d.fullname
+        role_change, custom_change = d.role_change, d.custom_change
+        if role_change:
+            logger.info(f"SSO role sync: user {username} role changed "
+                        f"{role_change[0]} → {role_change[1]} (mapping match)")
+            user.role = role_change[1]
+        if d.custom_sync is not None:
+            user.custom_role_id, user.custom_role_source = d.custom_sync
 
         user.last_login = utc_now()
         try:
@@ -649,12 +723,8 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data, 
             role_change = custom_change = None
 
         if role_change:
-            # Recorded once the new role is committed, and from the values
-            # captured before it was assigned. Written first, this call said
-            # the role had changed before it had, and its own rollback could
-            # undo the identity binding made a few lines above while the
-            # assignment that followed was committed anyway.
-            from services.audit_service import AuditService
+            # Recorded once the new role is committed, from the values captured before it
+            # was assigned: a rollback above leaves no audit of a change that did not happen.
             AuditService.log_action(
                 action='role_change',
                 resource_type='user',
@@ -667,7 +737,6 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data, 
                 success=True
             )
         if custom_change:
-            from services.audit_service import AuditService
             AuditService.log_action(
                 action='role_change',
                 resource_type='user',
@@ -682,38 +751,18 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data, 
             )
         return user, None
 
-    # Create new user if auto_create is enabled
-    if not provider.auto_create_users:
-        logger.warning(f"SSO user {username} not found and auto_create disabled")
-        return None, 'auto_create_disabled'
-    # Only where an account was about to be created: any earlier refusal keeps its answer.
-    if email_owner:
-        return _refuse_email_conflict(provider, username, email, email_owner,
-                                      _email_unverified(provider, external_data))
-
-    # Auto-create a distinct SSO account. The email may already belong to a LOCAL
-    # account — that's fine: SSO identity is the stable external id, never the
-    # email, so the two accounts coexist (email is unique only among local
-    # accounts). An admin who wants a single account attaches the provider to the
-    # existing one instead (POST /api/v2/users/<id>/sso-identities). See #136/#138.
-    effective_email = email or f'{username}@sso.local'
-
-    # Creation path keeps the historical fallback to default_role.
-    mapped_role, mapped_custom = _resolve_mapped_roles(provider, external_data)
-    role = _resolve_role(provider, external_data, mapped=mapped_role)
-
     user = User(
         username=username,
-        email=effective_email,
-        full_name=fullname or username,
-        role=role,
+        email=d.email,
+        full_name=d.fullname,
+        role=d.role,
         active=True,
         last_login=utc_now(),
     )
     user.sso_identities.append(UserSSOIdentity(provider_id=provider.id))
-    user.sso_identities[0].bind(external_id)
-    if mapped_custom is not None:
-        user.custom_role_id = mapped_custom.id
+    user.sso_identities[0].bind(d.external_id)
+    if d.custom_role is not None:
+        user.custom_role_id = d.custom_role.id
         user.custom_role_source = 'sso'
 
     # SSO users don't have a password — use sentinel that cannot match any hash
@@ -727,5 +776,12 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data, 
         logger.error(f"Failed to create SSO user {username}: {e}")
         raise
 
-    logger.info(f"Created SSO user: {username} with role {role}")
+    logger.info(f"Created SSO user: {username} with role {d.role}")
     return user, None
+
+
+def _get_or_create_sso_user(provider, username, email, fullname, external_data, group_source=None):
+    """Create or update a user from SSO authentication: :func:`decide_sso_account`, then
+    :func:`apply_sso_account`. Returns (user, error_code)."""
+    return apply_sso_account(provider, decide_sso_account(
+        provider, username, email, fullname, external_data, group_source))

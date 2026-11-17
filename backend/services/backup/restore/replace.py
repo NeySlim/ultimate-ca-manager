@@ -224,6 +224,7 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'webhook_deliveries': 'delivery queue, removed with its endpoint as deleting it does',
     'deploy_deliveries': 'delivery queue, removed with its binding as deleting it does',
     'pro_sso_saml_message_ids': 'replay cache of SAML message ids',
+    'pro_sso_sign_in_tests': 'sign-in tests and their reports, minutes long',
     # 3.0 only: a 2.254 archive carries the provider on the account row instead
     'user_sso_identities': 'not in a 2.254 archive; removed with its account, orphaned with its provider',
 }
@@ -242,6 +243,8 @@ SOFT_LINKS = (
     ('acme_dns_update_keys', 'created_by_user_id', 'users', 'id'),
     ('acme_proxy_dns_challenges', 'acme_client_account_id', 'acme_client_accounts', 'id'),
     ('pro_sso_saml_message_ids', 'provider_id', 'pro_sso_providers', 'id'),
+    ('pro_sso_sign_in_tests', 'provider_id', 'pro_sso_providers', 'id'),
+    ('pro_sso_sign_in_tests', 'user_id', 'users', 'id'),
     ('revoked_serials', 'certificate_id', 'certificates', 'id'),
     ('key_recovery_requests', 'cert_id', 'certificates', 'id'),
     ('webhook_deliveries', 'endpoint_id', 'webhook_endpoints', 'id'),

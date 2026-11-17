@@ -4470,6 +4470,14 @@ POST /api/v2/sso/providers/{provider_id}/toggle
 POST /api/v2/sso/providers/{provider_id}/test
 ```
 
+### Test an OIDC or SAML Sign-in (admin)
+```http
+POST /api/v2/sso/providers/{provider_id}/test-sign-in
+GET /api/v2/sso/sign-in-tests/{test_id}
+```
+- `test-sign-in` (`write:sso`, no body) starts a sign-in test of the saved OIDC or SAML provider, enabled or not, and returns `id`, `url` (the IdP address to open in the browser) and `expires_at` (10 minutes); it sets a cookie that ties the test to this browser. The IdP returns to the login callback (`/api/v2/sso/callback/oauth2` or the ACS URL), which recognises the test by its server-side transaction, runs the login's checks and its account decision, opens no session and changes no account, and redirects to `/sso-test-complete?result=done` (`used`, `expired` or `other_browser` when the return is refused). `400` for an LDAP provider or one without an authorization URL and client ID or a SAML SSO URL; `404` for an unknown provider; `503` with `Retry-After` during a cluster maintenance.
+- `sign-in-tests/{test_id}` (`write:sso`) returns `state` (`pending`, `running` or `done`), `provider_id`, `protocol`, `expires_at` and, once done, `report`: `verdict` (`accepted` or `refused`), `stage` (`protocol` for a refusal of the IdP's answer, `account` for one of the account decision), `code` (the login page's error code), `reason`, `identity` (`username`, `email`, `fullname`, `external_id`), `groups` (at most 20 values of 64 characters, `groups_more` counts the rest), `group_source`, `candidates` (at most 20 names of received claims or attributes that may carry groups, when none was read), `diagnosis` and `detail` (the audit text of a refusal), `account` (`outcome`: `open`, `create`, `disabled` or `refused`, with `username`, and for `open` whether it `binds_identity`), `role`, `custom_role`, `role_change`, `not_verified` (compatibility mode) and `provider_enabled`. No token, assertion, authorization code or PKCE verifier is part of it. `404` for a test another account started, an unknown one, or one whose 10 minutes after the return have passed.
+
 ### List SSO Sessions (admin)
 ```http
 GET /api/v2/sso/sessions
