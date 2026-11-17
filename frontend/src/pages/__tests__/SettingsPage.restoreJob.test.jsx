@@ -21,7 +21,7 @@ vi.mock('../../services/jobs.service', async (importOriginal) => {
   return { ...real, default: jobsApi }
 })
 
-import './pageRenderingSetup.jsx'
+import { notificationSpies } from './pageRenderingSetup.jsx'
 
 import SettingsPage from '../SettingsPage'
 import { systemService } from '../../services/system.service'
@@ -43,6 +43,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   vi.stubGlobal('location', { ...window.location, reload: vi.fn() })
   window.localStorage.clear()
+  notificationSpies.showError.mockClear()
   jobsApi.list.mockResolvedValue({ data: [] })
 })
 afterEach(() => {
@@ -109,6 +110,40 @@ describe('SettingsPage: restore as a job', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
     expect(screen.queryByTestId('restore-job')).toBeNull()
     expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBeNull()
+  })
+
+  it.each([0, 502, 503])('takes a %s after the commit for the restart: sign in again', async (status) => {
+    systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
+    jobsApi.get.mockResolvedValueOnce({ data: { ...running, phase: 'committed' } })
+      .mockRejectedValue(Object.assign(new Error('Bad gateway'), { status }))
+    await startRestore()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
+    expect(await screen.findByTestId('restore-sign-in')).toBeTruthy()
+    expect(notificationSpies.showError).not.toHaveBeenCalledWith('Bad gateway')
+    expect(notificationSpies.showError).not.toHaveBeenCalledWith('settings.restoreContactLost')
+  })
+
+  it.each([0, 502, 503])('says it lost the restore after %s errors before the commit', async (status) => {
+    systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
+    jobsApi.get.mockResolvedValueOnce({ data: { ...running, phase: 'applying' } })
+      .mockRejectedValue(Object.assign(new Error('Bad gateway'), { status }))
+    await startRestore()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+    expect(screen.getByTestId('restore-job')).toBeTruthy()  // one error: still followed
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000) })
+    expect(screen.queryByTestId('restore-job')).toBeNull()
+    expect(screen.queryByTestId('restore-sign-in')).toBeNull()
+    expect(notificationSpies.showError).toHaveBeenCalledWith('settings.restoreContactLost')
+    expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBe('job-1')  // shown at the next visit
+  })
+
+  it('says so when the restore picked up at load stops answering', async () => {
+    window.localStorage.setItem(PENDING_RESTORE_KEY, 'job-1')
+    jobsApi.get.mockResolvedValueOnce({ data: { ...running, phase: 'applying' } })
+      .mockRejectedValue(Object.assign(new Error('Service unavailable'), { status: 503 }))
+    renderPage()
+    await act(async () => { await vi.advanceTimersByTimeAsync(12000) })
+    expect(notificationSpies.showError).toHaveBeenCalledWith('settings.restoreContactLost')
   })
 
   it('asks the server to cancel the running restore', async () => {

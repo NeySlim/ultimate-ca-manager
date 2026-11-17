@@ -31,7 +31,7 @@ import { settingsService, systemService, casService, ssoService, mtlsService, ms
 import { holdSignOut } from '../services/apiClient'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
-import { usePermission, useJob } from '../hooks'
+import { usePermission, useJob, isTransientError } from '../hooks'
 import { acceptedJob } from '../services/jobs.service'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { useTheme } from '../contexts/ThemeContext'
@@ -244,6 +244,13 @@ export default function SettingsPage() {
       if (job.state === 'cancelled') showWarning(t('settings.restoreCancelled'))
       else if (job.reason === 'executor_lost' || job.reason === 'not_taken') showError(t('settings.restoreLost'))
       else showError(job.result?.message || t('messages.errors.backup.restoreFailed'))
+    },
+    // The server stopped answering before the commit: its end shows at the next visit
+    onLost: (error) => {
+      releaseSignOut()
+      setShowRestoreModal(false)
+      showError(isTransientError(error) ? t('settings.restoreContactLost')
+        : error?.message || t('messages.errors.backup.restoreFailed'))
     },
   })
   useEffect(() => {

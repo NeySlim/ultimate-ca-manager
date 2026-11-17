@@ -3584,7 +3584,8 @@
     "restoreCancelFailed": "The cancellation could not be sent",
     "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
     "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
-    "restoreSignIn": "Sign in again"
+    "restoreSignIn": "Sign in again",
+    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
   },
   "account": {
     "profile": "Profile",

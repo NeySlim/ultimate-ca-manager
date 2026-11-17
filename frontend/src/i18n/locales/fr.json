@@ -3715,7 +3715,8 @@
     "restoreCancelFailed": "L’annulation n’a pas pu être envoyée",
     "restoreLost": "La restauration s’est arrêtée avant d’être validée : rien n’a été restauré. Relancez-la.",
     "restoreSignInAgain": "La restauration a probablement été validée : elle a fermé cette session. Reconnectez-vous pour lire son compte rendu.",
-    "restoreSignIn": "Se reconnecter"
+    "restoreSignIn": "Se reconnecter",
+    "restoreContactLost": "Le serveur ne répond plus pendant la restauration. Rechargez la page plus tard pour voir comment elle s’est terminée."
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

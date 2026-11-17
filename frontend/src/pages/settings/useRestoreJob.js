@@ -6,7 +6,7 @@
  * this browser until its report has been shown, so the report appears after the sign-in.
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useJob } from '../../hooks'
+import { useJob, isTransientError } from '../../hooks'
 import jobsService, { acceptedJob, isFinalJob } from '../../services/jobs.service'
 
 export const PENDING_RESTORE_KEY = 'ucm.restore.pendingJob'
@@ -25,14 +25,21 @@ export function pendingRestore() {
   try { return window.localStorage.getItem(PENDING_RESTORE_KEY) } catch { return null }
 }
 
+// Phases from the commit on: the restore is validated, what follows signs every session out
+// and asks a restart (no answer, 502, 503 for a while)
+export const VALIDATED_PHASES = ['committed', 'sessions_revoked', 'session_files_removed',
+  'caches_purged', 'crls_regenerated']
+const validated = (job) => VALIDATED_PHASES.includes(job?.phase)
+
 /**
- * onReport(data): the restore succeeded, its report; onFailure(job): it ended otherwise.
+ * onReport(data): the restore succeeded, its report; onFailure(job): it ended otherwise;
+ * onLost(error): the server stopped answering before the commit, the end is unknown here.
  */
-export function useRestoreJob({ enabled = true, onReport, onFailure } = {}) {
-  const { job, running, follow, cancel } = useJob()
+export function useRestoreJob({ enabled = true, onReport, onFailure, onLost } = {}) {
+  const { job, running, follow, cancel, clear } = useJob()
   const [signInNeeded, setSignInNeeded] = useState(false)
-  const handlers = useRef({ onReport, onFailure })
-  handlers.current = { onReport, onFailure }
+  const handlers = useRef({ onReport, onFailure, onLost })
+  handlers.current = { onReport, onFailure, onLost }
 
   const conclude = useCallback((final) => {
     forget()
@@ -42,14 +49,20 @@ export function useRestoreJob({ enabled = true, onReport, onFailure } = {}) {
 
   const track = useCallback(async (started) => {
     remember(started.id)
+    // Past the commit, no answer is the restart the restore asked: not retried
+    const restarting = (error, seen) => isTransientError(error) && validated(seen)
     try {
-      conclude(await follow(started))
+      conclude(await follow(started, { giveUp: restarting }))
     } catch (error) {
-      // The restore revoked this session: the report waits for the next sign-in
-      if (error?.status === 401) setSignInNeeded(true)
-      else throw error
+      // The restore revoked this session or restarts the service: the report waits for the
+      // next sign-in. Before its commit, the end is unknown: said, the id kept for later
+      if (error?.status === 401 || restarting(error, error?.job)) setSignInNeeded(true)
+      else {
+        clear()
+        handlers.current.onLost?.(error)
+      }
     }
-  }, [follow, conclude])
+  }, [follow, conclude, clear])
 
   // The route's answer: a 202 is followed here; a finished restore answered itself (false)
   const start = useCallback(async (response) => {
@@ -76,7 +89,7 @@ export function useRestoreJob({ enabled = true, onReport, onFailure } = {}) {
     pick.then((seen) => {
       if (gone || !seen) return
       if (isFinalJob(seen)) conclude(seen)
-      else track(seen).catch(() => {})
+      else track(seen)
     })
     return () => { gone = true }
   }, [enabled]) // eslint-disable-line react-hooks/exhaustive-deps

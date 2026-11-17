@@ -12,7 +12,7 @@ vi.mock('../../services/jobs.service', async (importOriginal) => {
 
 import jobsService from '../../services/jobs.service'
 import { acceptedJob } from '../../services/jobs.service'
-import { useJob, JOB_POLL_MS } from '../useJob'
+import { useJob, JOB_POLL_MS, JOB_POLL_RETRIES } from '../useJob'
 
 const tick = (ms) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
 const job = (state, extra = {}) => ({ id: 'j1', kind: 'audit_verify', state, progress: { done: 0, total: 10 }, ...extra })
@@ -74,6 +74,46 @@ describe('useJob', () => {
     unmount()
     await tick(JOB_POLL_MS * 5)
     expect(jobsService.get).not.toHaveBeenCalled()
+  })
+
+  it.each([0, 502, 503])('polls again after a %s, then gives up with the job last seen', async (status) => {
+    const lost = Object.assign(new Error('lost'), { status })
+    jobsService.get.mockResolvedValueOnce({ data: job('running', { phase: 'applying' }) })
+      .mockRejectedValueOnce(lost)
+      .mockResolvedValueOnce({ data: job('running', { phase: 'applying' }) })
+      .mockRejectedValue(lost)
+    const { result } = renderHook(() => useJob())
+    let failure
+    act(() => { result.current.follow(job('pending')).catch((e) => { failure = e }) })
+    await tick(JOB_POLL_MS * 3)
+    expect(failure).toBeUndefined()  // one error between two answers: still followed
+    await tick(JOB_POLL_MS * (JOB_POLL_RETRIES + 1))
+    expect(failure.status).toBe(status)
+    expect(failure.job.phase).toBe('applying')
+    expect(jobsService.get).toHaveBeenCalledTimes(3 + JOB_POLL_RETRIES + 1)
+  })
+
+  it('gives up at once when the caller says so', async () => {
+    jobsService.get.mockRejectedValue(Object.assign(new Error('gone'), { status: 503 }))
+    const { result } = renderHook(() => useJob())
+    let failure
+    act(() => {
+      result.current.follow(job('running'), { giveUp: (e) => e.status === 503 })
+        .catch((e) => { failure = e })
+    })
+    await tick(JOB_POLL_MS)
+    expect(failure.status).toBe(503)
+    expect(jobsService.get).toHaveBeenCalledTimes(1)
+  })
+
+  it('never retries a refusal', async () => {
+    jobsService.get.mockRejectedValue(Object.assign(new Error('nope'), { status: 401 }))
+    const { result } = renderHook(() => useJob())
+    let failure
+    act(() => { result.current.follow(job('running')).catch((e) => { failure = e }) })
+    await tick(JOB_POLL_MS)
+    expect(failure.status).toBe(401)
+    expect(jobsService.get).toHaveBeenCalledTimes(1)
   })
 
   it('tells a 202 job from a finished answer', () => {
