@@ -68,8 +68,8 @@ def install_update():
         if in_ha:
             return error_response(CONTAINER_HA_REFUSAL, 400)
         return error_response(
-            "Auto-update is not available in Docker. Pull the new image instead: "
-            "docker pull ghcr.io/neyslim/ultimate-ca-manager:latest", 400
+            "Auto-update is not available in Docker. Pull the image tag of the new "
+            "version instead: ghcr.io/neyslim/ultimate-ca-manager:<version>", 400
         )
 
     try:
