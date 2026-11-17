@@ -352,3 +352,10 @@ def test_a_chain_names_the_krl_entry_that_takes_each_certificate(app, auth_clien
     finally:
         with app.app_context():
             _drop(ca_id)
+
+
+def test_the_entries_of_a_chained_revocation_read_as_a_list():
+    from api.v2.ssh_certificates import _listed
+    assert _listed(["key ID 'alice'"]) == "key ID 'alice'"
+    assert _listed(["key ID 'alice'", 'serial 5']) == "key ID 'alice' and serial 5"
+    assert _listed(["key ID 'alice'", 'serial 5', 'serial 6']) == "key ID 'alice', serial 5 and serial 6"

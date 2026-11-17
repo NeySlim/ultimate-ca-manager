@@ -136,6 +136,11 @@ def _validate_ssh_sign_payload(data, *, require_pubkey):
     }, None
 
 
+
+def _listed(names):
+    """'a', 'a and b', 'a, b and c'."""
+    return names[0] if len(names) == 1 else ', '.join(names[:-1]) + ' and ' + names[-1]
+
 @bp.route('/api/v2/ssh/certificates', methods=['GET'])
 @require_auth(['read:ssh'])
 def list_ssh_certificates():
@@ -435,7 +440,7 @@ def revoke_ssh_certificate(cert_id):
         message = 'SSH certificate revoked'
         if others:
             message = (f'SSH certificate revoked with {len(others)} other certificate(s) the KRL revokes '
-                       f'with it under this CA, by ' + ' and '.join(named(e) for e in entries))
+                       f'with it under this CA, by ' + _listed([named(e) for e in entries]))
 
         AuditService.log_action(
             action='ssh_cert_revoked',
