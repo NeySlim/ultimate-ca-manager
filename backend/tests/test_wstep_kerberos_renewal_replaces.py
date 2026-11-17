@@ -347,3 +347,17 @@ def test_a_held_request_for_another_template_carries_no_renewal(
         approve(auth_client, approval_id)
         assert _query(client, world, request_id).status_code == 200
         assert _archived(app, old) == [False]
+
+
+def test_a_request_for_another_template_signed_by_a_renewed_certificate_is_an_enrollment(
+        app, client, world, realm_a, other_machine, directory):
+    """The template check comes before the renewed-already refusal: signed by hosta$'s certificate
+    already replaced, a request naming another template is served as an enrollment."""
+    old, key = _old(app, client, world, realm_a, True)
+    assert _certificate_renewal(client, old, key).status_code == 200
+    floor = _top_audit(app)
+    r = _other_template_request(client, world, old, key, other_machine)
+    assert r.status_code == 200, r.data
+    (action, _u, _n, details, ok), = _audits(app, floor)
+    assert (action, ok) == ('certificate.issued', True) and str(old.serial_number) not in details
+    assert _archived(app, old) == [True]

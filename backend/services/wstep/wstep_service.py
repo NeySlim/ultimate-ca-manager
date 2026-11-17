@@ -1243,13 +1243,14 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     unresolved = renewed is lookup.UNREACHABLE
     if unresolved:
         renewed = None
-    # Renewed already, on either binding: refused as the Certificate binding refuses it
-    if renewed is SUPERSEDED_RENEWAL:
-        return None, RENEWED_SUPERSEDED
-    # A certificate of another template signing the request does not make it its renewal
-    if renewed is not None and matched_template is not None and not _renews_template(
-            renewed, matched_template, ca, profile=profile):
+    # A certificate of another template signing the request does not make it its renewal, replaced or not
+    held = renewed.cert if isinstance(renewed, SupersededRenewal) else renewed
+    if held is not None and matched_template is not None and not _renews_template(
+            held, matched_template, ca, profile=profile):
         renewed = None
+    # Renewed already, on either binding: refused as the Certificate binding refuses it
+    if isinstance(renewed, SupersededRenewal):
+        return None, RENEWED_SUPERSEDED
     # The renewed row is replaced by the new certificate, under the CA that issued it
     renewal_ca, superseded_row = (_issuing_ca(ca, renewed), None) if renewed is not None else (None, None)
     if renewed is not None:
@@ -1551,11 +1552,11 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
     """The certificate a Kerberos request renews, as Windows signs the envelope with its key: one a
     CA of UCM issued (*ca* or, after a change of CA, the former one), valid (not revoked, expired or
     superseded), recorded under *profile* and the requester's own (``_requester_holds``); None for
-    an initial enrollment or the certificate of another, ``SUPERSEDED_RENEWAL`` when the requester's
-    own is renewed already, ``lookup.UNREACHABLE`` when the directory could not say whose it is."""
+    an initial enrollment or the certificate of another, a ``SupersededRenewal`` of the requester's
+    own when it is renewed already, ``lookup.UNREACHABLE`` when the directory could not say whose it is."""
     from services.ad_connector import lookup
     from services.windows_profiles import certificate_profile
-    unreachable = superseded = False
+    unreachable, superseded = False, None
     for cert in _envelope_certificates(outer_signed_data):
         row, refusal = _renewal_refusal(ca, cert)
         if (row is None or refusal not in (None, RENEWED_SUPERSEDED)
@@ -1569,16 +1570,19 @@ def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, conne
         if held is lookup.UNREACHABLE:
             unreachable = True
         elif held and refusal:
-            superseded = True
+            superseded = superseded or SupersededRenewal(cert)
         elif held:
             return cert
     if unreachable:
         return lookup.UNREACHABLE
-    return SUPERSEDED_RENEWAL if superseded else None
+    return superseded
 
 
-# The requester's own certificate signs the envelope but a renewal replaced it already
-SUPERSEDED_RENEWAL = object()
+class SupersededRenewal:
+    """The requester's own certificate signs the envelope but a renewal replaced it already."""
+
+    def __init__(self, cert):
+        self.cert = cert
 
 
 def _issuing_ca(ca, cert):
