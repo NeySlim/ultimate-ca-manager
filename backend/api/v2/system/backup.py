@@ -5,12 +5,8 @@ System Backup Operations
 from services.backup import shared_store, storage
 from services.jobs import backup as backup_job
 from services.backup.locking import BackupBusyError, backup_operation_lock
-from services.backup.errors import RestoreFilesUnwritable
 from services.backup.restore.plan import RestoreValidationError
-from services.backup.restore_report import safe_restore_audit_details, with_restore_warnings
 from services.database_admin.lock import (
-    MigrationBusyError,
-    database_migration_lock,
     pending_switch_refusal,
 )
 from fips_mode import FipsRestricted
@@ -25,10 +21,8 @@ from auth.unified import require_auth
 from utils.sanitize import client_filename
 from utils.response import success_response, error_response
 from utils.pagination import parse_request_pagination
-from services.audit_service import AuditService
 from services.backup.backup_service import check_backup_kdf
 from services.backup_service import (
-    BackupService,
     BackupSchemaError,
     ContainerError,
 )
@@ -47,10 +41,6 @@ from services.backup.restore_completion import (
     record_failure as _audit_failure,
     record_request_refusal,
     record_restore as _safe_audit_log,
-    request_restart as _request_restart_after_restore,
-    restore_actor as _actor,
-    restore_message,
-    attach_restore_todo,
     preflight_v4,
     start_restore,
 )

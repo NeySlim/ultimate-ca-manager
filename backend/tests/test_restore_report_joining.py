@@ -99,8 +99,8 @@ class TestTheTwoRoutesFinishTheSameWay:
                 and node.module == 'services.backup.restore_completion'
                 for alias in node.names
             }
-            assert {'record_restore', 'request_restart', 'restore_message'} \
-                <= imported, (
+            # The restore job records, words and restarts: both routes only start it
+            assert {'preflight_v4', 'start_restore'} <= imported, (
                 f'{route} does not go through the shared completion: '
                 f'{imported}')
 
