@@ -11,6 +11,8 @@ from services.smart_import.importer import SmartImporter
 from services.smart_import.parser import SmartParser
 from tests.fixtures.cross_pki import build_cross_pki, pem
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _bundle(*certs):
     return ''.join(pem(c) for c in certs)

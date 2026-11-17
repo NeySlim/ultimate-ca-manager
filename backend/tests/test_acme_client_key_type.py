@@ -12,6 +12,8 @@ from tests.seeded_rows import placeholder_certificate_id
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 REQUEST = '/api/v2/acme/client/request'
 
 

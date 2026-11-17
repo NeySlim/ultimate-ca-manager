@@ -19,6 +19,8 @@ from models import CA, CertificatePolicy, db
 from services.policy_service import PolicyViolation
 from tests.test_policy_algorithms_397 import _drop, _policy, _signed, _store_csr
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _csr(*names):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

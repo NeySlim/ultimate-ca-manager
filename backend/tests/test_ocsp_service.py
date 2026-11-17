@@ -17,6 +17,8 @@ from models import db, CA, Certificate, OCSPResponse, SystemConfig
 from services.cert_service import CertificateService
 from services.ocsp_service import OCSPService
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _ca_model(ca_dict):
     return db.session.get(CA, ca_dict['id'])

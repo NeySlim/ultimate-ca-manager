@@ -29,6 +29,8 @@ from tests.test_scep_rfc8894_operations import _load_ca_material
 from utils.leaf_key_usage import constrain_builder_key_usage, key_usage_for_key
 from tests.fixtures.templates import templates_created_here_removed
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 
 @pytest.fixture(autouse=True, scope='module')
 def _templates_stay_in_this_module(app):

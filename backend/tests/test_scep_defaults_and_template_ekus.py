@@ -18,6 +18,8 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID, NameOID
 from models import CA, Certificate, SCEPRequest, db
 from models.certificate_template import CertificateTemplate
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 SMARTCARD_LOGON = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.2')
 
 

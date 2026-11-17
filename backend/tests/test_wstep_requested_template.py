@@ -18,6 +18,8 @@ from tests.test_wstep_renew_tls import _eku_csr, _renew, _template_oid
 from tests.windows_profile_support import default_profile, template_oid
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 TWINS = {
     'User': ('usr_cert', ['clientAuth'], False, 'RSA-2048'),
     'VPNUser': ('usr_cert', ['clientAuth'], False, 'RSA-2048'),

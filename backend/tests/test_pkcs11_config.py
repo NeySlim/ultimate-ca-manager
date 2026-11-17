@@ -15,6 +15,8 @@ from utils.pkcs11_config import (
     pkcs11_config_needs_normalization,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_config_rows')
+
 try:
     import pkcs11 as _pkcs11  # noqa: F401
     _PKCS11_AVAILABLE = True

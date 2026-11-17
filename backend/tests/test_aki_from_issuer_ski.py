@@ -24,6 +24,8 @@ from cryptography.x509.oid import ExtensionOID, NameOID
 from models import CA, Certificate, db
 from utils.key_codec import store_pem_bytes
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 ODD_SKI = bytes(range(20))  # deliberately not SHA-1(subjectPublicKey)
 
 

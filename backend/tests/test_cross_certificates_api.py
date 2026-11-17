@@ -9,6 +9,8 @@ from services.smart_import.importer import SmartImporter
 from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, openssl_verify, pem
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def pki():
@@ -184,11 +186,15 @@ def test_attach_audits_and_emits_a_snapshot(app, auth_client, pki, cas, monkeypa
     seen = []
     monkeypatch.setattr('services.webhook_service.emit_ca_updated',
                         lambda ca, actor=None, changes=None: seen.append((ca, changes)))
+    with app.app_context():
+        # An earlier file's CA may have had this id: only the entries of this attach count
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
     xid = _attach(auth_client, b, pki.cross_b).get_json()['data']['id']
     assert isinstance(seen[0][0], dict) and seen[0][0]['id'] == b
     assert seen[0][1]['cross_certificate'] == 'attached' and seen[0][1]['cross_certificate_id'] == xid
     with app.app_context():
-        assert AuditLog.query.filter_by(action='ca_cross_certificate_attached', resource_id=str(b)).count() == 1
+        assert AuditLog.query.filter(AuditLog.id > floor).filter_by(
+            action='ca_cross_certificate_attached', resource_id=str(b)).count() == 1
 
 
 def test_viewer_may_read_but_not_write(viewer_client, auth_client, pki, cas):

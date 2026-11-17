@@ -31,6 +31,8 @@ from utils.file_naming import ca_cert_path
 import pytest
 from tests.fixtures.templates import templates_created_here_removed
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 
 @pytest.fixture(autouse=True, scope='module')
 def _templates_stay_in_this_module(app):

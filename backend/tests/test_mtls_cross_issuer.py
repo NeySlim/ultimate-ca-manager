@@ -10,6 +10,8 @@ from models.auth_certificate import AuthCertificate
 from models.revoked_serial import RevokedSerial
 from tests.test_backfill_cross_dupes import _cert, _row
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def twin_records(app):

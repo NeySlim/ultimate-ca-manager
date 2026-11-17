@@ -11,9 +11,11 @@ from cryptography.hazmat.primitives.serialization import pkcs7
 from models import CA, SystemConfig, db
 from tests.test_acme_pq import OPENSSL, needs_openssl_35, openssl_mldsa_csr
 from utils import key_algorithms
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 EST_BASE = '/.well-known/est'
 EST_USER = 'est-pq'

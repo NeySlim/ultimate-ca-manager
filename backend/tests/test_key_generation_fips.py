@@ -20,6 +20,8 @@ from tests.test_est_rfc7030 import (  # noqa: F401 (est_config is a fixture)
 from utils import key_algorithms
 from utils.key_algorithms import KeyGenerationError
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 @pytest.fixture
 def genpkey(monkeypatch):

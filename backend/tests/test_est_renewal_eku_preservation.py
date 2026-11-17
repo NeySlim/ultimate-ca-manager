@@ -32,6 +32,8 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID, NameOID
 from services.trust_store.trust_store_service import TrustStoreService
 from tests.test_est_rfc7030 import est_config  # noqa: F401  # the EST service under test
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 SERVER_AUTH = ExtendedKeyUsageOID.SERVER_AUTH
 CLIENT_AUTH = ExtendedKeyUsageOID.CLIENT_AUTH
 IPSEC_IKE = ExtendedKeyUsageOID.IPSEC_IKE

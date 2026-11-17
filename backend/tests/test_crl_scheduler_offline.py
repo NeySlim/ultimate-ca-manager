@@ -10,6 +10,9 @@ from unittest.mock import patch
 
 from models import db, CA
 from tests.conftest import get_json
+import pytest
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 class TestCrlSchedulerSkipsOfflineCas:

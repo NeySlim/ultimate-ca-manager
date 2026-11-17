@@ -19,6 +19,8 @@ from tests.test_ocsp_service import (  # noqa: E402
 )
 from tests.test_ca_service_hsm import _patch_hsm, hsm_provider_and_key  # noqa: E402,F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
+
 
 
 @pytest.fixture(autouse=True, scope='module')

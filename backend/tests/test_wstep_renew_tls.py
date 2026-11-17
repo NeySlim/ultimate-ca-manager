@@ -36,6 +36,8 @@ from tests.windows_profile_support import default_profile
 from tests.test_wstep_renew import RENEW_URL, _build_signed_rst, wstep_renew_config  # noqa: F401
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 PKIDATA_OID = '1.3.6.1.5.5.7.12.2'
 PKCS7_VALUE_TYPE = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'
 

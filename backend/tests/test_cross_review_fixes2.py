@@ -14,7 +14,7 @@ from tests.test_cross_import_opnsense import _row, _run
 from tests.test_opnsense_import import _key_pem
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_cas_and_certificates')
 
 
 def _x(b, xid=None, tail=''):

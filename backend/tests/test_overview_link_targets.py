@@ -8,6 +8,8 @@ from models import db
 from models.acme_models import AcmeAccount, AcmeOrder
 from models.scep import SCEPRequest
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _body(r):
     return json.loads(r.data)['data']

@@ -28,6 +28,8 @@ from services.acme import profiles as acme_profiles
 from services.acme.acme_service import AcmeService
 from tests.test_scep_rfc8894_operations import _load_ca_material
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 CONTENT_JSON = 'application/json'
 OCSP_SIGNING = '1.3.6.1.5.5.7.3.9'
 

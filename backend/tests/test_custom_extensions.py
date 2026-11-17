@@ -11,6 +11,8 @@ from tests.test_acme_profile_template import _drop_template
 from utils.custom_extensions import (MAX_EXTENSIONS, MAX_VALUE_BYTES, merge_custom_extensions,
                                      validate_custom_extensions)
 
+pytestmark = pytest.mark.usefixtures('drop_new_users')
+
 _SEQ = itertools.count(1)
 OID_A = '1.3.6.1.4.1.55555.1.1'
 OID_B = '1.3.6.1.4.1.55555.1.2'

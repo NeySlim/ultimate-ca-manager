@@ -29,6 +29,8 @@ from utils.upn_san import extract_upns_from_san_list
 from tests.windows_profile_support import connectors_kept, restore, set_config, snapshot, template_extension
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 ISSUE_URL = '/ADCertificateService_CES_Kerberos/service.svc'
 KERBEROS_PRINCIPAL = 'HOST$@HAGLAND.DOMAIN'
 

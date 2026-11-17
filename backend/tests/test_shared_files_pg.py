@@ -15,11 +15,13 @@ from services import shared_files
 from services.kerberos import negotiate_auth
 from tests import pg_app_harness
 from tests.keytab_support import keytab
-from tests.windows_profile_support import upload_keytab
+from tests.leak_marks import with_fixtures
+from tests.windows_profile_support import upload_keytab, windows_profiles_restored  # noqa: F401
 from utils.datetime_utils import utc_now
 
 pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
                                 reason='needs UCM_TEST_APP_PG_URL (HA runs on PostgreSQL)')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 PREFIX = f'sf-{secrets.token_hex(3)}-'
 KEYTAB = keytab('HTTP/ucm.example.test@EXAMPLE.TEST')

@@ -22,6 +22,8 @@ from fips_mode import FipsRestricted
 from models import CA, SSHCertificateAuthority, db
 from utils import key_algorithms
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 ALL = frozenset(fips_mode.MODULE_DEPENDENT_SIGNATURES)
 CLASSICAL = ('RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521')
 

@@ -456,6 +456,12 @@ _LEAK_EXEMPT = {
 
 
 _ORPHAN_RECORDS = 'revocation records of a deleted certificate'
+# Rows SQLite keeps when their ACME account is deleted behind the service (no foreign key
+# enforcement): a database check of a later file reports them as dangling references
+_ORPHAN_ACME = {
+    'ACME authorizations of a deleted account': 'acme_authorizations',
+    'ACME orders of a deleted account': 'acme_orders',
+}
 
 
 def _leak_counts():
@@ -475,6 +481,12 @@ def _leak_counts():
             counts[_ORPHAN_RECORDS] = db.session.execute(_text(
                 'SELECT COUNT(*) FROM revoked_serials r WHERE r.certificate_id IS NOT NULL AND NOT EXISTS'
                 ' (SELECT 1 FROM certificates c WHERE c.id = r.certificate_id)')).scalar()
+        if 'acme_accounts' in present:
+            for label, table in _ORPHAN_ACME.items():
+                if table in present:
+                    counts[label] = db.session.execute(_text(
+                        f'SELECT COUNT(*) FROM "{table}" o WHERE o.account_id IS NOT NULL AND NOT EXISTS'
+                        ' (SELECT 1 FROM acme_accounts a WHERE a.account_id = o.account_id)')).scalar()
         for table, ignored in _LEAK_CONTENT.items():
             if table in present:
                 rows = db.session.execute(_text(f'SELECT * FROM "{table}" ORDER BY id')).mappings()
@@ -731,21 +743,106 @@ def _database_key_stays_readable(request):
 
 @pytest.fixture(scope='module')
 def drop_new_cas_and_certificates(app):
-    """Deletes the certificates then the CAs a module created, with their dependent rows."""
+    """Deletes what a module created above the ids present before it: the ACME orders, ACME
+    domains, ACME local domains, CRL deploy bindings, certificate policies and SCEP profiles
+    that would block a CA, then certificates, then CAs (children first, until a pass removes
+    nothing). Yields the cleanup itself, which runs once however often it is called."""
     from models import db, CA, Certificate
+    from models.acme_models import AcmeDomain, AcmeLocalDomain, AcmeOrder
+    from models.deploy import CRLDeployBinding
+    from models.policy import CertificatePolicy
+    from models.scep import ScepProfile
     from services.ca_service import CAService
     from services.cert_service import CertificateService
+    import warnings
 
     def _top(model):
         with app.app_context():
             return db.session.query(db.func.max(model.id)).scalar() or 0
-    floors = {Certificate: _top(Certificate), CA: _top(CA)}
-    yield
-    for model, delete in ((Certificate, CertificateService.delete_certificate),
-                          (CA, CAService.delete_ca)):
+    # What blocks deleting a CA goes with it
+    blockers = (AcmeOrder, AcmeDomain, AcmeLocalDomain, CRLDeployBinding, CertificatePolicy, ScepProfile)
+    floors = {m: _top(m) for m in (Certificate, CA, *blockers)}
+
+    def _ids(model):
+        return [row.id for row in model.query.filter(model.id > floors[model]).order_by(model.id.desc())]
+
+    def _try(delete, row_id, errors):
+        try:
+            return delete(row_id)
+        except Exception as exc:
+            db.session.rollback()
+            errors[row_id] = exc
+            return False
+
+    done = []
+
+    def cleanup():
+        if done:
+            return
+        done.append(True)
         with app.app_context():
-            for row_id in [row.id for row in model.query.filter(model.id > floors[model])]:
-                delete(row_id)
+            for model in blockers:
+                for row in model.query.filter(model.id > floors[model]).all():
+                    db.session.delete(row)
+                db.session.commit()
+            errors = {}
+            for row_id in _ids(Certificate):
+                _try(CertificateService.delete_certificate, row_id, errors)
+            for row_id, exc in errors.items():
+                warnings.warn(f'drop_new_cas_and_certificates kept certificate {row_id}: {exc}', stacklevel=1)
+            pending, errors = _ids(CA), {}
+            while pending:
+                left = [i for i in pending if not _try(CAService.delete_ca, i, errors)]
+                if len(left) == len(pending):
+                    break
+                pending = left
+            # A CA refused on one pass is often deleted once its children are gone: only the last word counts
+            for row_id in _ids(CA):
+                warnings.warn(f'drop_new_cas_and_certificates kept CA {row_id}: {errors.get(row_id)}', stacklevel=1)
+            db.session.remove()
+    yield cleanup
+    cleanup()
+
+
+@pytest.fixture(scope='module')
+def drop_new_config_rows(app, request):
+    """Deletes the policies, SCEP profiles, templates and HSM providers (with their keys) a
+    module created above the ids present before it, after the module's CAs and certificates
+    when it uses drop_new_cas_and_certificates: those hold templates and HSM keys."""
+    from models import db, HsmKey, HsmProvider
+    from models.certificate_template import CertificateTemplate
+    from models.policy import CertificatePolicy
+    from models.scep import ScepProfile
+    models = (CertificatePolicy, ScepProfile, CertificateTemplate, HsmKey, HsmProvider)
+    drop_cas = (request.getfixturevalue('drop_new_cas_and_certificates')
+                if 'drop_new_cas_and_certificates' in request.fixturenames else None)
+
+    def _top(model):
+        with app.app_context():
+            return db.session.query(db.func.max(model.id)).scalar() or 0
+    floors = {m: _top(m) for m in models}
+    yield
+    if drop_cas is not None:
+        drop_cas()
+    with app.app_context():
+        errors = {}
+        for _ in range(2):
+            for model in models:
+                for row in model.query.filter(model.id > floors[model]).all():
+                    key = (model.__name__, row.id)
+                    try:
+                        db.session.delete(row)
+                        db.session.commit()
+                        errors.pop(key, None)
+                    except Exception as exc:
+                        db.session.rollback()
+                        errors[key] = exc
+        import warnings
+        for model in models:
+            for row in model.query.filter(model.id > floors[model]).all():
+                key = (model.__name__, row.id)
+                warnings.warn(f'drop_new_config_rows kept {key[0]} {key[1]}: {errors.get(key)}', stacklevel=1)
+        db.session.remove()
 
 
 @pytest.fixture(scope='module')
@@ -769,9 +866,14 @@ def drop_new_users(app):
     assert r.status_code == 200, r.data
     import warnings
     for user_id in made:
+        with app.app_context():
+            # A pending approval of the account would refuse its deletion
+            from models.policy import ApprovalRequest
+            ApprovalRequest.query.filter_by(requester_id=user_id, status='pending').delete()
+            db.session.commit()
         r = admin.delete(f'/api/v2/users/{user_id}')
         if r.status_code != 200:
-            warnings.warn(f'drop_new_users could not delete user {user_id}: HTTP {r.status_code}')
+            warnings.warn(f'drop_new_users could not delete user {user_id}: HTTP {r.status_code} {r.data[:200]}')
 
 
 def sandbox_paths(application, replaced=None):
@@ -813,6 +915,40 @@ def configure_test_app(application):
     application.config['FQDN'] = 'ucm.test'
 
 
+# The session database never hands out an id twice, as PostgreSQL never does: a file's
+# cleanup frees ids, and audit or queue rows naming them must not reach the next file.
+_SESSION_ENGINE = {'building': False, 'engine': None}
+
+
+def _is_session_engine(connection):
+    if connection.dialect.name != 'sqlite':
+        return False
+    if _SESSION_ENGINE['engine'] is not None:
+        return connection.engine is _SESSION_ENGINE['engine']
+    if not _SESSION_ENGINE['building']:
+        return False
+    from flask import has_app_context
+    from models import db
+    return has_app_context() and connection.engine is db.engine
+
+
+def _autoincrement_on(table, connection, **kw):
+    if _is_session_engine(connection):
+        table.info['_flk_autoincrement'] = table.dialect_options['sqlite']['autoincrement']
+        table.dialect_options['sqlite']['autoincrement'] = True
+
+
+def _autoincrement_restored(table, connection, **kw):
+    # The model metadata stays as the product declares it for every other database
+    if '_flk_autoincrement' in table.info:
+        table.dialect_options['sqlite']['autoincrement'] = table.info.pop('_flk_autoincrement')
+
+
+from sqlalchemy import Table as _SaTable, event as _sa_event  # noqa: E402
+_sa_event.listen(_SaTable, 'before_create', _autoincrement_on)
+_sa_event.listen(_SaTable, 'after_create', _autoincrement_restored)
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
@@ -831,7 +967,14 @@ def app():
     if _pg_app.ENABLED:
         application = _pg_app.session_app(create_app, 'testing')
     else:
-        application = create_app('testing')
+        _SESSION_ENGINE['building'] = True
+        try:
+            application = create_app('testing')
+        finally:
+            _SESSION_ENGINE['building'] = False
+        from models import db as _db
+        with application.app_context():
+            _SESSION_ENGINE['engine'] = _db.engine
 
     _sandbox, _ = sandbox_paths(application)
     configure_test_app(application)
@@ -841,6 +984,7 @@ def app():
     _SESSION_APP.append(application)
     yield application
     _SESSION_APP.clear()
+    _SESSION_ENGINE['engine'] = None
     if _pg_app.ENABLED:
         from models import db as _db
         with application.app_context():

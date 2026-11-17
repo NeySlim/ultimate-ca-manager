@@ -8,6 +8,7 @@ from tests import test_est_rfc7030 as est
 from tests import test_wstep_issue as wstep
 from tests.test_est_rfc7030 import est_config  # noqa: F401
 from tests.test_wstep_issue import wstep_config  # noqa: F401
+from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 TEXT = 'already used with another key'
 

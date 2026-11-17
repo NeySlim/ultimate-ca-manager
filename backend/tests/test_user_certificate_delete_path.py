@@ -17,7 +17,7 @@ import pytest
 from models import db
 from tests.test_user_certificate_key_export_guard import _enrolment_for
 
-pytestmark = pytest.mark.usefixtures('drop_new_users')
+pytestmark = pytest.mark.usefixtures('drop_new_users', 'drop_new_cas_and_certificates')
 
 
 @pytest.fixture

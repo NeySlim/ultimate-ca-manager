@@ -19,9 +19,11 @@ from services.policy_service import PolicyViolation
 from services.trust_store import TrustStoreService
 from utils import key_algorithms, related_cert
 from utils.datetime_utils import utc_now
+from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates', 'drop_new_users')
 
 PQ_LABEL = next(label for label in key_algorithms.labels('ML-DSA') if label.endswith('65'))
 

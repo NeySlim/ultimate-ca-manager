@@ -19,6 +19,8 @@ from models import CA, Certificate, CertificateTemplate, db
 from services.policy_service import PolicyViolation
 from tests.test_csr_sign_extra_names import _csr, _upload
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users', 'drop_new_config_rows')
+
 
 def _template(app, san_types, name=None, enforce=True):
     with app.app_context():

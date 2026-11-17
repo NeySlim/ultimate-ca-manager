@@ -16,6 +16,8 @@ from cryptography.x509.oid import NameOID
 import fips_mode
 from utils.pkcs12_import import REFUSAL, looks_like_pkcs12
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 PASSWORD = 'fips-import-pw-123'
 
 
