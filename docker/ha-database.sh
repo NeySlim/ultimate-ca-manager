@@ -2,9 +2,9 @@
 # UCM_HA database handling: a node never owns a SQLite file, the database is PostgreSQL.
 # Functions only: the image entrypoint sources this file, and the tests source it too.
 
-# A flag as the application reads it: surrounding blanks dropped, lower case.
+# A flag as the application reads it: surrounding ASCII blanks dropped (C locale), lower case.
 ucm_flag_text() {
-    local v="${1:-}"
+    local LC_ALL=C v="${1:-}"
     v="${v#"${v%%[![:space:]]*}"}"
     v="${v%"${v##*[![:space:]]}"}"
     printf '%s' "$v" | tr '[:upper:]' '[:lower:]'

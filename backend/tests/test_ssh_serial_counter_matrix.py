@@ -568,6 +568,21 @@ def test_a_key_id_the_krl_revokes_is_neither_issued_nor_imported(installation):
     assert SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['carol'], key_id='dave').id
 
 
+def test_a_ca_that_names_the_key_id_itself_is_not_told_to_use_another(installation):
+    """Without "Let requesters set the key ID" the requester cannot pick another key ID."""
+    ca_id, key = _imported_ca('named by the CA')
+    descr = db.session.execute(CAS.select().where(CAS.c.id == ca_id)).mappings().one()['descr']
+    zero = SSHCertificateService.import_certificate(
+        _signed_with_key_id(key, 0, f'carol@{descr}'.encode()), ssh_ca_id=ca_id, username='t')
+    SSHCertificateService.revoke_certificate(zero.id, 'superseded', 't')
+    with pytest.raises(ValueError) as refused:
+        SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['carol'])
+    db.session.rollback()
+    assert 'Use another key ID' not in str(refused.value)
+    assert f'Tick "Let requesters set the key ID" on the CA to use another key ID, or delete ' \
+           f'certificate #{zero.id} once it has expired' in str(refused.value)
+
+
 def test_a_restore_without_ssh_certificates_still_counts_them(installation):
     _ca('no certificate in the archive')
     master, store = _archive()

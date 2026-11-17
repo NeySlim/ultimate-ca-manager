@@ -30,6 +30,11 @@ def test_without_ha_nothing_changes_pos(ha):
     assert 'passed' in _run(env).stdout
 
 
+@pytest.mark.parametrize('ha', ['1\u3000', '\u2028true', 'on\u2003'])
+def test_a_unicode_blank_is_no_ha_under_a_utf8_locale_pos(ha):
+    assert 'passed' in _run({'UCM_HA': ha, 'LC_ALL': 'C.UTF-8'}).stdout
+
+
 def test_entrypoint_checks_ha_secret_before_generating_one_neg():
     # test d'ordre textuel, le comportement est prouvé par les tests de ha-secret.sh et par l'image en CI
     text = (ROOT / 'docker' / 'entrypoint.sh').read_text()

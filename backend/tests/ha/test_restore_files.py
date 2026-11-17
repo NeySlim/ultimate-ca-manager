@@ -1,6 +1,7 @@
-"""After a restore on A, node B's certificate files and HTTPS pair follow the database by
-themselves: a PEM of the same path rewritten, the file of a removed row deleted. Two nodes
-sharing a directory (B's certificate directory is A's) reconcile it at the same time."""
+"""After a restore on A, node B's certificate files follow the database by themselves (a PEM
+of the same path rewritten, the file of a removed row deleted), and the node that did not make
+the archive serves its HTTPS pair. Two nodes sharing a directory (B's certificate directory
+is A's) reconcile it at the same time."""
 import base64
 import ssl
 from types import SimpleNamespace

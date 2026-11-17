@@ -116,7 +116,8 @@ class SSHCertificateSigningMixin:
                 "or tick \"Let requesters set the key ID\" on the CA"
             )
         key_id = key_id or default_key_id
-        SSHSerials.refuse_revoked_key_id(ca_id, key_id)  # before a serial is spent
+        # before a serial is spent
+        SSHSerials.refuse_revoked_key_id(ca_id, key_id, named_by_ca=not ca.allow_custom_key_id)
 
         public_key = SSHCertificateUtilsMixin._parse_public_key(public_key_data)
         subject_key_type = SSHCertificateUtilsMixin._detect_key_type(public_key)

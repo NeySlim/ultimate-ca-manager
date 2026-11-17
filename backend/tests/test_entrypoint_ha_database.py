@@ -609,3 +609,13 @@ def test_the_ha_flag_reads_the_same_in_the_script_and_the_application(tmp_path, 
     assert r.stdout.strip() == ('set' if expected else 'unset'), raw
     monkeypatch.setenv('UCM_HA', raw)
     assert env_bool('UCM_HA', False) is expected, raw
+
+
+@pytest.mark.parametrize('raw', ['1\u3000', '\u2028true', 'on\u2003'])
+def test_the_script_drops_no_blank_the_application_keeps_under_a_utf8_locale(tmp_path, monkeypatch, raw):
+    from config.settings import env_bool
+    r = _run('if ucm_ha_active; then echo set; else echo unset; fi',
+             {'UCM_HA': raw, 'LC_ALL': 'C.UTF-8'}, tmp_path)
+    assert r.stdout.strip() == 'unset', ascii(raw)
+    monkeypatch.setenv('UCM_HA', raw)
+    assert env_bool('UCM_HA', False) is False

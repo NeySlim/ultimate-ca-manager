@@ -105,13 +105,15 @@ def revoking_key_id(run: Run, ca_id: int, key_id: str) -> Optional[int]:
     return row[0] if row else None
 
 
-def refuse_revoked_key_id(ca_id: int, key_id: str, imported: bool = False) -> None:
+def refuse_revoked_key_id(ca_id: int, key_id: str, imported: bool = False, named_by_ca: bool = False) -> None:
     """A new certificate bearing a key ID its CA's KRL revokes would be revoked from the start."""
     source = revoking_key_id(session_run, ca_id, key_id)
     if source is not None:
         raise ValueError(f"The KRL of this SSH CA revokes key ID '{key_id}', which revoked certificate "
                          f"#{source} of serial 0 bears: a certificate bearing it would be revoked from the start. "
                          + (f"Delete certificate #{source} once it has expired, then import again" if imported
+                            else f'Tick "Let requesters set the key ID" on the CA to use another key ID, or '
+                                 f"delete certificate #{source} once it has expired" if named_by_ca
                             else f"Use another key ID, or delete certificate #{source} once it has expired"))
 
 

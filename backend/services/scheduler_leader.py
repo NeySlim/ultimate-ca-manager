@@ -491,7 +491,7 @@ def node_is_leader(node_id, wake_interval) -> bool:
     """Whether this node's scheduler process holds the lock, as its last fresh heartbeat says."""
     from models import ClusterNode, db
     node = db.session.get(ClusterNode, node_id)
-    return bool(node and node.is_leader and node.instance_token in (None, instance_token())
+    return bool(node and node.is_leader and node.instance_token == instance_token()
                 and not _is_stale(node, wake_interval, cluster_utc_now()))
 
 

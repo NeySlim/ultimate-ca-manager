@@ -3,8 +3,8 @@
 # Functions only: entrypoint.sh sources this file, and the tests source it too.
 
 check_ha_secret() {
-    # Read as the application reads it: surrounding blanks dropped, lower case
-    local ha="${UCM_HA:-}"
+    # Read as the application reads it: surrounding ASCII blanks dropped (C locale), lower case
+    local LC_ALL=C ha="${UCM_HA:-}"
     ha="${ha#"${ha%%[![:space:]]*}"}"
     ha="${ha%"${ha##*[![:space:]]}"}"
     case "$(printf '%s' "$ha" | tr '[:upper:]' '[:lower:]')" in

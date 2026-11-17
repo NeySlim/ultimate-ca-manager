@@ -350,6 +350,10 @@ def test_a_leader_flag_written_by_another_token_is_not_this_node_leading(app, cl
     with app.app_context():
         assert scheduler_leader.node_is_leader(node, 60) is False
     assert client.get('/health').get_json()['leader'] is False
+    _put(app, node, None, leader=True)  # released by a clean stop, the flag left behind
+    with app.app_context():
+        assert scheduler_leader.node_is_leader(node, 60) is False
+    assert client.get('/health').get_json()['leader'] is False
     _put(app, node, scheduler_leader.instance_token(), leader=True)  # its own flag still counts
     with app.app_context():
         assert scheduler_leader.node_is_leader(node, 60) is True
