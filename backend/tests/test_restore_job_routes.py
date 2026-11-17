@@ -43,8 +43,10 @@ def finished(app, monkeypatch):
 
 @pytest.fixture
 def no_restart(monkeypatch):
+    asked = []
     monkeypatch.setattr('services.backup.restore_completion.request_restart',
-                        lambda: (True, 'Service restart initiated'))
+                        lambda: asked.append(1) or (True, 'Service restart initiated'))
+    return asked
 
 
 @pytest.mark.parametrize('route', ROUTES)
@@ -87,6 +89,12 @@ def test_a_restore_past_the_wait_answers_202(app, auth_client, archive, finished
         assert reached.is_set()
     finally:
         release.set()
+    # Ended here, while the stubs hold: never the real restart after the test
+    job_id = r.get_json()['data']['job']['id']
+    assert runner.join_local(job_id, 60)
+    with app.app_context():
+        assert jobs.get_job(job_id)['state'] == 'succeeded'
+    assert no_restart == [1]
 
 
 @pytest.mark.parametrize('route', ROUTES)
