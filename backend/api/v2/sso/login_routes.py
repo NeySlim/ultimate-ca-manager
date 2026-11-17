@@ -214,6 +214,11 @@ def get_available_providers():
     } for p in providers])
 
 
+def login_provider(provider_type):
+    """The provider a login of this type goes through: the first enabled one, in no set order."""
+    return SSOProvider.query.filter_by(provider_type=provider_type, enabled=True).first()
+
+
 @bp.route('/api/v2/sso/login/<provider_type>', methods=['GET'])
 def initiate_sso_login(provider_type):
     """
@@ -225,7 +230,7 @@ def initiate_sso_login(provider_type):
     if provider_type not in ('saml', 'oauth2'):
         return error_response("Use /api/v2/sso/ldap/login for LDAP authentication", 400)
 
-    provider = SSOProvider.query.filter_by(provider_type=provider_type, enabled=True).first()
+    provider = login_provider(provider_type)
     if not provider:
         return error_response(f"No enabled {provider_type.upper()} provider found", 404)
 
@@ -612,7 +617,7 @@ def sso_callback(provider_type):
     # Spent by any OAuth2 return, used only by a successful one.
     oauth2_next = session.pop('sso_next', None) if provider_type == 'oauth2' else None
 
-    provider = SSOProvider.query.filter_by(provider_type=provider_type, enabled=True).first()
+    provider = login_provider(provider_type)
     if not provider:
         return redirect(_login_error('provider_not_found', oauth2_next))
 

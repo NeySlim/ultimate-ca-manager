@@ -4194,7 +4194,12 @@
     "signInTestCompleteUsed": "This test was already used. Start a new one from the provider screen.",
     "signInTestCompleteExpired": "This test expired or is unknown. Start a new one from the provider screen.",
     "signInTestCompleteOtherBrowser": "This test was started in another browser. Finish it there, or start a new one from this browser.",
-    "signInTestCompleteBack": "Back to the SSO providers"
+    "signInTestCompleteBack": "Back to the SSO providers",
+    "signInTestLaunching": "Opening the identity provider…",
+    "signInTestCompleteClose": "This window did not close by itself: close it to return to the provider screen.",
+    "signInTestCancel": "Cancel",
+    "signInTestShadowed": "Other enabled providers of this type: {{names}}. A login goes through only one enabled provider per type, and not necessarily this one: disable {{names}}.",
+    "signInTestShadowedDisabled": "Enabled providers of this type: {{names}}. A login goes through only one enabled provider per type, and not necessarily this one: disable {{names}} before enabling this one."
   },
   "notifications": {
     "certificateIssued": "Сертифікат видано: {{name}}",

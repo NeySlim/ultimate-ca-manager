@@ -37,6 +37,8 @@ export default function SignInTestReport({ report, formData, handleChange }) {
   const accepted = report.verdict === 'accepted'
   const account = report.account || {}
   const identity = report.identity
+  // Every other enabled provider of the type: the login takes one of them, in no set order.
+  const others = report.other_enabled_providers || []
   const mapped = formData?.attribute_mapping || {}
 
   const mapToGroups = (name) => {
@@ -127,6 +129,12 @@ export default function SignInTestReport({ report, formData, handleChange }) {
             {report.not_verified.map(item => <li key={item}>{item}</li>)}
           </ul>
         </div>
+      )}
+      {others.length > 0 && (
+        <p role="alert" className="status-warning-text">
+          {t(report.provider_enabled === false ? 'sso.signInTestShadowedDisabled' : 'sso.signInTestShadowed',
+            { names: others.map(p => p.name).join(', ') })}
+        </p>
       )}
       {report.provider_enabled === false && (
         <p className="text-text-tertiary">{t('sso.signInTestProviderDisabled')}</p>
