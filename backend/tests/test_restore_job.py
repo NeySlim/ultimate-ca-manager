@@ -441,6 +441,36 @@ def test_a_flag_set_before_the_mark_rolls_the_restore_back(app, archive, created
     _assert_final(app, job_id, 'cancelled', 'cancelled', before, name, False)
 
 
+def test_a_flag_set_between_the_last_checkpoint_and_the_mark_cancels_the_restore(
+        app, archive, created, monkeypatch):
+    """No checkpoint reads the flag after 'relink': the mark's own condition sees it and the
+    restore rolls back. PostgreSQL application (UCM_TEST_APP_PG_URL): on SQLite no other
+    connection writes during the restore transaction."""
+    from services import cluster_maintenance
+    if not os.getenv('UCM_TEST_APP_PG_URL'):
+        pytest.skip('UCM_TEST_APP_PG_URL not set')
+    with app.app_context():
+        assert db.engine.dialect.name == 'postgresql'
+    passed = []
+    real_check, real_mark = restore_job._Run.checkpoint, restore_job._Run.mark
+
+    def checkpoint(run, step):
+        real_check(run, step)
+        passed.append(step)
+
+    def mark(run, session, report):
+        assert 'relink' in passed
+        with app.app_context(), cluster_maintenance.exempt(), db.engine.begin() as conn:
+            conn.execute(update(T).where(T.c.id == run.ctx.job_id).values(cancel_requested=True))
+        return real_mark(run, session, report)
+    monkeypatch.setattr(restore_job._Run, 'checkpoint', checkpoint)
+    monkeypatch.setattr(restore_job._Run, 'mark', mark)
+    before = _lines_in(app)
+    job_id, name = _start(app, archive, created)
+    row = _assert_final(app, job_id, 'cancelled', 'cancelled', before, name, False)
+    assert row['phase'] not in restore_job.VALIDATED
+
+
 # -- the archive file ------------------------------------------------------------------
 
 def test_the_archive_is_written_owner_only_before_the_job(app, created, monkeypatch):
