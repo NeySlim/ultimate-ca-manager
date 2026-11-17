@@ -10,6 +10,7 @@ from models import db
 from services import jobs
 from services.audit_service import AuditService
 from services.jobs import audit_verify, runner, store
+from tests.job_dispatch_support import DeferredDispatch
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
 VERIFY = '/api/v2/audit/verify'
@@ -33,14 +34,12 @@ def held(monkeypatch):
 
 
 @pytest.fixture
-def cleanup(app):
-    yield
-    with app.app_context():
-        for row in store.active_jobs(db.session):
-            runner.join_local(row['id'], 15)
-        for row in store.active_jobs(db.session):
-            store.cancel_or_flag(db.session, row['id'], jobs._now())
-        db.session.rollback()
+def cleanup(app, monkeypatch):
+    """Each job starts once the request that made it has answered (the tests' SQLite is one
+    shared connection, unlike production); none is left active after the test."""
+    deferred = DeferredDispatch(app, monkeypatch)
+    yield deferred
+    deferred.conclude_leftovers()
 
 
 def _login(app, user):
@@ -305,6 +304,7 @@ def test_start_job_refuses_before_any_write_during_a_maintenance(app, maintenanc
         db.session.rollback()
     assert _job_count(app) == before
     # The maintenance's own writer still starts one; it concludes once the maintenance ends
+    cleanup.off()  # no request runs beside it: it starts at once, during the maintenance
     with app.app_context(), cm.exempt():
         job_id = jobs.start_job(audit_verify.KIND)
     maintenance.row = None

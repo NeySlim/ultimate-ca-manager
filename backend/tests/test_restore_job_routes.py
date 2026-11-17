@@ -11,6 +11,7 @@ from models import db
 from services import jobs
 from services.jobs import restore as restore_job
 from services.jobs import runner, store
+from tests.job_dispatch_support import DeferredDispatch
 from tests.test_restore_job import GROUP, PASSWORD, _has_group, archive  # noqa: F401 (fixture)
 
 ROUTES = ['/api/v2/system/restore', '/api/v2/settings/backup/restore']
@@ -30,12 +31,12 @@ def _archives():
 
 
 @pytest.fixture
-def finished(app):
-    yield
-    with app.app_context():
-        for row in store.active_jobs(db.session):
-            runner.join_local(row['id'], 60)
-        db.session.rollback()
+def finished(app, monkeypatch):
+    """Jobs start once the request has answered, and none is left active after the test.
+    The tests' SQLite is one shared connection; production threads each have their own."""
+    deferred = DeferredDispatch(app, monkeypatch)
+    yield deferred
+    deferred.conclude_leftovers()
     restore_job.remove_state()
 
 
@@ -157,6 +158,7 @@ def test_the_cancel_route_says_a_committed_restore_is_too_late(app, auth_client,
     assert auth_client.get('/api/v2/system/jobs').status_code == 200  # signed in before the gate
     r = _post(auth_client, ROUTES[0], archive, {'Prefer': 'respond-async'})
     job_id = r.get_json()['data']['job']['id']
+    finished.release()
     try:
         assert reached.wait(30)
         cancel = auth_client.post(f'/api/v2/system/jobs/{job_id}/cancel')
