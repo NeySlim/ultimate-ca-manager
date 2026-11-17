@@ -535,6 +535,8 @@ Windows 也可以用 \`certreq ... Renew\` 续期，以待续期的证书作为 
 
 自 3.0 起，按证书续期由证书所记录的配置文件（2.x 的 WSTEP 证书：默认配置文件）在该配置文件的签发 CA 下服务；当该配置文件已被删除或已禁用时拒绝，每次拒绝都会连同配置文件和原因写入审计。只有 SID 会由该配置文件的连接器再次检查：请吊销已从组中移除的计算机的证书。TLS 客户端证书仅适用于其签发 CA 即 mTLS CA 或在其之下的配置文件：监听器不信任的证书会在 TLS 握手期间被拒绝，UCM 看不到请求，因此 UCM 不会记录审计（请查看客户端输出和服务日志）。其他配置文件只能通过 Kerberos 续期（由主体所在领域的配置文件提供服务，新证书会记录该配置文件）；若 Kerberos 拒绝（请求者已从 AD 组中移除、配置文件已禁用），则无法续期。Kerberos keytab 会保留已禁用配置文件的密钥，因此其请求会被拒绝并留下审计条目：只有删除该配置文件才会移除这些密钥。
 
+Over Kerberos, a request signed by the requester's own valid certificate of the profile renews it: the renewed certificate is marked superseded by the new one, as on the Certificate binding, and a second renewal of it is refused on either binding (\`Renewed certificate superseded by a newer one\`). After a change of the profile's issuing CA, a certificate of the former CA renews the same way: the new CA issues it, and the audit entry \`certificate.renewed\` names the old serial and the old CA.
+
 ### SID 安全扩展 (KB5014754)
 
 在**经 Kerberos 身份验证的签发**中，UCM 会在签发证书的 Microsoft SID 安全扩展（\`szOID_NTDS_CA_SECURITY_EXT\`）中嵌入请求者的 AD SID。域控制器将其用于**强证书映射**（KB5014754）：自 AD 对基于证书的身份验证（智能卡登录、PKINIT）强制执行强映射以来，这是必需项。启用 AD 连接器时，SID 无法解析的请求会被拒绝而不是在没有它的情况下签发，其中也包括来自连接器域之外的领域的主体。WSTEP、EST 或 SCEP 续期会沿用被续期证书的 SID 扩展，绝不采用 CSR 中的 SID；启用 AD 连接器时，该 SID 必须仍对应目录中的某个账户。
