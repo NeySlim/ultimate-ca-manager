@@ -697,6 +697,14 @@ def create_app(config_name=None):
                         "under an old one"
         )
 
+        from services.sso_sign_in_test_purge import scheduled_purge as purge_sign_in_tests
+        scheduler.register_task(
+            name="sso_sign_in_test_purge",
+            func=purge_sign_in_tests,
+            interval=60,
+            description="Purge OIDC and SAML sign-in tests and their reports past their expiry"
+        )
+
         from security.session_key import scheduled_retire as retire_session_key
         scheduler.register_task(
             name="session_key_retire",

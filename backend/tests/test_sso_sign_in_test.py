@@ -868,6 +868,56 @@ def test_a_test_expires_ten_minutes_after_its_start_and_its_report_after_its_ret
         case.cleanup()
 
 
+def _expire(app, token):
+    with app.app_context():
+        SSOSignInTest.query.filter_by(token=token).one().expires_at = utc_now() - timedelta(seconds=1)
+        db.session.commit()
+
+
+def _exists(app, token):
+    with app.app_context():
+        db.session.remove()
+        return SSOSignInTest.query.filter_by(token=token).count() == 1
+
+
+def test_an_expired_report_is_purged_by_the_scheduled_task(app, oidc_provider, monkeypatch):
+    """Where nobody starts another test, the report (name, e-mail, groups) still goes."""
+    case = Case(app, oidc_provider, 'oauth2')
+    try:
+        _install_idp(monkeypatch, OIDCIdP(case.external_id, _oidc_userinfo(case)))
+        done, _state = _oidc_test(_admin_client(app), oidc_provider)
+        live, _state = _oidc_test(_admin_client(app), oidc_provider)
+        _expire(app, done['id'])
+        status = app.scheduler.run_task_now('sso_sign_in_test_purge')
+        assert status and status['last_status'] == 'ok' and status['interval'] == 60, status
+        assert status['per_node'] is False, status  # HA: the elected node runs it
+        assert not _exists(app, done['id'])
+        assert _exists(app, live['id'])
+    finally:
+        case.cleanup()
+
+
+def test_a_read_and_a_return_purge_what_expired(app, oidc_provider, monkeypatch):
+    case = Case(app, oidc_provider, 'oauth2')
+    try:
+        _install_idp(monkeypatch, OIDCIdP(case.external_id, _oidc_userinfo(case)))
+        client = _admin_client(app)
+        first, _state = _oidc_test(client, oidc_provider)
+        _expire(app, first['id'])
+        assert client.get(f"/api/v2/sso/sign-in-tests/{first['id']}", base_url=SP_BASE).status_code == 404
+        assert not _exists(app, first['id'])
+
+        second, _state = _oidc_test(client, oidc_provider)
+        pending = _start(client, oidc_provider)
+        _expire(app, second['id'])
+        state = parse_qs(urlsplit(pending['url']).query)['state'][0]
+        assert _location(_oidc_callback(client, state)) == '/sso-test-complete?result=done'
+        assert not _exists(app, second['id'])
+        assert _exists(app, pending['id'])
+    finally:
+        case.cleanup()
+
+
 def test_pkce_nonce_and_redirect_uri_are_the_logins(app, oidc_provider, monkeypatch):
     case = Case(app, oidc_provider, 'oauth2')
     try:

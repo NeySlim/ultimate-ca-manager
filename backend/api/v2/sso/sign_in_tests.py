@@ -18,12 +18,13 @@ from datetime import timedelta
 from urllib.parse import urlsplit
 
 from flask import g, make_response, redirect, request
-from sqlalchemy import delete, update
+from sqlalchemy import update
 
 from auth.unified import require_auth
 from models import User, db
 from models.sso import SSOProvider, SSOSignInTest
 from services.audit_service import AuditService
+from services.sso_sign_in_test_purge import purge_expired_sign_in_tests as _purge_expired
 from utils.datetime_utils import utc_isoformat, utc_now
 from utils.db_transaction import safe_commit
 from utils.response import error_response, success_response
@@ -51,10 +52,6 @@ def _digest(value):
 
 def _transaction_hash(protocol, value):
     return _digest(f'{protocol}:{value}')
-
-
-def _purge_expired():
-    db.session.execute(delete(SSOSignInTest).where(SSOSignInTest.expires_at < utc_now()))
 
 
 def _callback_path(protocol):
@@ -153,6 +150,12 @@ def start_sign_in_test(provider_id):
 @require_auth(['write:sso'])
 def get_sign_in_test(token):
     """A test's state and report, for the account that started it only."""
+    try:  # a read still answers when the purge cannot write; the scheduled task retries it
+        _purge_expired()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f"Sign-in test purge on read failed: {type(e).__name__}")
     test = SSOSignInTest.query.filter_by(token=str(token)[:64]).first()
     # Another account's test, or one gone, answers as if it never existed.
     if (test is None or test.user_id != getattr(g, 'user_id', None)
@@ -222,7 +225,15 @@ def _audit(test, details, success):
 
 
 def finish(test, protocol):
-    """Run the returning test once: the login's checks, then its account decision alone."""
+    """Run the returning test once, then purge what expired (this test too, when it had)."""
+    response = _finish(test, protocol)
+    _purge_expired()
+    db.session.commit()
+    return response
+
+
+def _finish(test, protocol):
+    """The login's checks, then its account decision alone."""
     now = utc_now()
     test_id, secret, callback_key = test.id, test.secret, getattr(test, 'callback_key', None)
     if test.state != SSOSignInTest.PENDING:
