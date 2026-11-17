@@ -204,8 +204,15 @@ def _no_job_left(cluster):
     for node in cluster.nodes:
         if not node.alive():
             _back(node)
-    wait_until(lambda: not _active(cluster) and _maintenance(cluster) is None,
-               MAINTENANCE_LEASE + NOT_TAKEN_SECONDS + MARGIN, 'no job nor maintenance left')
+
+    def settled():
+        for node in cluster.nodes:  # a rolling restart asked meanwhile, as a watcher runs it
+            if (node.data_dir / '.restart_requested').exists():
+                node.stop()
+                (node.data_dir / '.restart_requested').unlink(missing_ok=True)
+                _back(node)
+        return not _active(cluster) and _maintenance(cluster) is None
+    wait_until(settled, MAINTENANCE_LEASE + NOT_TAKEN_SECONDS + MARGIN, 'no job nor maintenance left')
 
 
 # -- invariants 1, 2 (unbound jobs) and 7 (a backup cancelled from the other node) --
