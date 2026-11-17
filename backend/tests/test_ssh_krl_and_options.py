@@ -84,6 +84,23 @@ class TestRevokedCertificateStaysInTheKrl:
             assert version(SSHKRLService.generate_krl(ca.id)) > first
 
 
+@needs_ssh_keygen
+def test_a_revoked_certificate_of_serial_zero_is_revoked_by_its_key(app, tmp_path):
+    """Serial 0 names no certificate (PROTOCOL.certkeys): the KRL revokes its key, which
+    revokes the certificate, and no other certificate of serial 0 under the CA."""
+    from tests.test_ssh_serial_counter_matrix import _imported_ca, _signed_elsewhere
+    with app.app_context():
+        ca_id, key = _imported_ca('KRL serial zero CA')
+        zero = _signed_elsewhere(key, 0)
+        cert = SSHCertificateService.import_certificate(zero, ssh_ca_id=ca_id, username='t')
+        assert cert.serial == 0
+        SSHCertificateService.revoke_certificate(cert.id, username='t')
+        krl = SSHKRLService.generate_krl(ca_id)
+        assert 'REVOKED' in _query(tmp_path, krl, zero).stdout
+        other = _query(tmp_path, krl, _signed_elsewhere(key, 0))
+        assert other.returncode == 0 and 'REVOKED' not in other.stdout
+
+
 class TestCriticalOptions:
     @pytest.fixture()
     def user_ca(self, app):

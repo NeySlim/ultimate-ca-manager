@@ -2120,7 +2120,7 @@ GET /api/v2/ssh/cas/{ca_id}/setup-script?type=user&hostname=host.example.com&pla
 - `PUT` updates the same metadata (`descr`, `default_ttl`, `max_ttl`, `comment`, `default_extensions`, `allowed_principals`); `400` for an invalid value.
 - `DELETE` answers `204`, or `409` when the service refuses (certificates still depend on the CA).
 - `POST /import` imports an existing CA from `private_key` (required) with `descr`, `ca_type` (`user` or `host`), `default_ttl`, `max_ttl` and `comment`; `201`, or `400` for an unusable key.
-- `public-key` downloads the CA public key in OpenSSH format. `krl` downloads the CA's key revocation list. `setup-script` returns a server setup script for trusting the CA: `type` (`user` or `host`), `hostname` (validated, `400` when invalid) and `platform` (`unix` by default, or `windows`).
+- `public-key` downloads the CA public key in OpenSSH format. `krl` downloads the CA's key revocation list; a revoked certificate of serial 0, which OpenSSH reads as not numbered, is listed by its public key, which revokes every certificate of that key. `setup-script` returns a server setup script for trusting the CA: `type` (`user` or `host`), `hostname` (validated, `400` when invalid) and `platform` (`unix` by default, or `windows`).
 
 ### SSH Certificates
 ```http

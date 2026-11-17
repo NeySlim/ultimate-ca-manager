@@ -20,6 +20,17 @@ from models import db
 logger = logging.getLogger(__name__)
 
 
+def _revocation_line(cert):
+    """The ssh-keygen KRL specification line of a revoked certificate. Serial 0 means "not
+    numbered" (PROTOCOL.certkeys), so such a certificate is revoked by its key, one line only."""
+    if cert.serial:
+        return f"serial: {int(cert.serial)}\n"
+    key = ' '.join((cert.public_key or '').split()[:2])
+    if not key:
+        raise RuntimeError(f"Failed to generate KRL: SSH certificate #{cert.id} has serial 0 and no public key")
+    return f"key: {key}\n"
+
+
 class SSHKRLService:
     """Service for generating SSH Key Revocation Lists"""
 
@@ -61,7 +72,7 @@ class SSHKRLService:
 
             with open(revoked_serials_path, 'w') as f:
                 for cert in revoked_certs:
-                    f.write(f"serial: {cert.serial}\n")
+                    f.write(_revocation_line(cert))
 
             # PROTOCOL.krl: krl_version increases each time the KRL changes; every
             # generation is a new KRL, so its time in milliseconds is used
