@@ -5059,6 +5059,7 @@
       },
       "backup": {
         "created": "Backup created and downloaded successfully",
+        "ready": "Backup created: download it from the dialog",
         "downloaded": "Backup downloaded successfully",
         "deleted": "Backup deleted successfully",
         "restored": "Backup restored successfully"

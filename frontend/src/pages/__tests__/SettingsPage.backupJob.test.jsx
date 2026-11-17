@@ -26,7 +26,7 @@ vi.mock('../../services/jobs.service', async (importOriginal) => {
   return { ...real, default: { get: vi.fn(), list: vi.fn(), cancel: vi.fn() } }
 })
 
-import './pageRenderingSetup.jsx'
+import { notificationSpies } from './pageRenderingSetup.jsx'
 
 import SettingsPage from '../SettingsPage'
 import { systemService } from '../../services/system.service'
@@ -68,6 +68,7 @@ describe('SettingsPage: backup job', () => {
     await startBackup()
     await waitFor(() => expect(systemService.downloadBackup).toHaveBeenCalledWith('ucm_backup_x.ucmbkp'))
     expect(jobsService.get).not.toHaveBeenCalled()
+    expect(notificationSpies.showSuccess).toHaveBeenCalledWith('messages.success.backup.created')
   })
 
   it('follows a 202 job, shows its progress, then offers the archive', async () => {
@@ -78,6 +79,9 @@ describe('SettingsPage: backup job', () => {
     expect(screen.getByTestId('backup-job-cancel')).toBeTruthy()
     const download = await screen.findByTestId('backup-ready-download', {}, { timeout: 3000 })
     expect(systemService.downloadBackup).not.toHaveBeenCalled()
+    // Nothing is downloaded yet: the notice says where the archive is, not that it was downloaded
+    expect(notificationSpies.showSuccess).toHaveBeenCalledWith('messages.success.backup.ready')
+    expect(notificationSpies.showSuccess).not.toHaveBeenCalledWith('messages.success.backup.created')
     await act(async () => { download.click() })
     expect(systemService.downloadBackup).toHaveBeenCalledWith('ucm_backup_x.ucmbkp')
   })

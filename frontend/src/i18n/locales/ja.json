@@ -4813,6 +4813,7 @@
     "success": {
       "backup": {
         "created": "バックアップが作成され、ダウンロードされました",
+        "ready": "Backup created: download it from the dialog",
         "deleted": "バックアップが削除されました",
         "downloaded": "バックアップがダウンロードされました",
         "restored": "バックアップが復元されました"

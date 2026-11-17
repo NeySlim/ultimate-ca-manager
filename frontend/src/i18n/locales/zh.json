@@ -4810,6 +4810,7 @@
     "success": {
       "backup": {
         "created": "备份已创建并下载成功",
+        "ready": "Backup created: download it from the dialog",
         "deleted": "备份已删除",
         "downloaded": "备份下载成功",
         "restored": "备份恢复成功"

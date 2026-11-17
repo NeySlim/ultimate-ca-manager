@@ -4874,6 +4874,7 @@
     "success": {
       "backup": {
         "created": "Резервну копію створено та завантажено",
+        "ready": "Backup created: download it from the dialog",
         "deleted": "Резервну копію видалено",
         "downloaded": "Резервну копію завантажено",
         "restored": "Резервну копію відновлено"

@@ -1334,7 +1334,7 @@ export default function SettingsPage() {
     if (job.state === 'succeeded' && job.result?.data) {
       setBackupReady(job.result.data)
       setShowBackupModal(true)
-      showSuccess(t('messages.success.backup.created'))
+      showSuccess(t('messages.success.backup.ready'))
       const notice = ceilingNotice(job.result.data, backupSchedule, {}, t)
       if (notice) showWarning(notice)
       loadBackups()

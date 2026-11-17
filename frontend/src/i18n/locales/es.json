@@ -4810,6 +4810,7 @@
     "success": {
       "backup": {
         "created": "Copia de seguridad creada y descargada exitosamente",
+        "ready": "Backup created: download it from the dialog",
         "deleted": "Copia de seguridad eliminada exitosamente",
         "downloaded": "Copia de seguridad descargada exitosamente",
         "restored": "Copia de seguridad restaurada exitosamente"

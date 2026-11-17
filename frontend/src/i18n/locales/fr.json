@@ -5059,6 +5059,7 @@
       },
       "backup": {
         "created": "Sauvegarde créée et téléchargée avec succès",
+        "ready": "Sauvegarde créée : téléchargez-la depuis la boîte de dialogue",
         "downloaded": "Sauvegarde téléchargée avec succès",
         "deleted": "Sauvegarde supprimée avec succès",
         "restored": "Sauvegarde restaurée avec succès"
