@@ -112,8 +112,9 @@ def refuse_revoked_key_id(ca_id: int, key_id: str, imported: bool = False, named
         raise ValueError(f"The KRL of this SSH CA revokes key ID '{key_id}', which revoked certificate "
                          f"#{source} of serial 0 bears: a certificate bearing it would be revoked from the start. "
                          + (f"Delete certificate #{source} once it has expired, then import again" if imported
-                            else f'Tick "Let requesters set the key ID" on the CA to use another key ID, or '
-                                 f"delete certificate #{source} once it has expired" if named_by_ca
+                            else f'Change the principals, or tick "Let requesters set the key ID" on the CA to '
+                                 f"use another key ID, or delete certificate #{source} once it has expired"
+                            if named_by_ca
                             else f"Use another key ID, or delete certificate #{source} once it has expired"))
 
 

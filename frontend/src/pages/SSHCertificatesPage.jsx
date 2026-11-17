@@ -215,9 +215,12 @@ export default function SSHCertificatesPage() {
     try {
       muteToasts()
       const res = await sshCertificatesService.revoke(revokingCert.id, reason)
-      // The KRL revokes serial 0 by key ID under the CA, any other serial by number
+      // The KRL revokes serial 0 by key ID under the CA, any other serial by number; a key ID
+      // may take a numbered certificate, whose serial takes its other holders (revoked_by)
       showSuccess(!res?.data?.revoked_with?.length
         ? t('messages.success.revoke.sshCertificate')
+        : (res.data.revoked_by || []).length > 1
+          ? t('sshCertificates.revokedWithKeyIdAndSerials', { keyId: revokingCert.key_id })
         : revokingCert.serial
           ? t('sshCertificates.revokedWithShared', { serial: revokingCert.serial })
           : t('sshCertificates.revokedWithKeyId', { keyId: revokingCert.key_id }))

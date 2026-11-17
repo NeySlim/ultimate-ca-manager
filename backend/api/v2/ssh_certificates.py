@@ -423,21 +423,29 @@ def revoke_ssh_certificate(cert_id):
 
         cert = SSHCertificateService.revoke_certificate(cert_id, reason, username)
         others = list(getattr(cert, 'revoked_with', []))
+        through = getattr(cert, 'revoked_through', {})
+        # Each KRL entry that took a certificate, in order: a key ID may take a serial, whose holders follow
+        entries = []
+        for entry in through.values():
+            if entry not in entries:
+                entries.append(entry)
+
+        def named(entry):
+            return f"key ID '{entry['key_id']}'" if 'key_id' in entry else f"serial {entry['serial']}"
         message = 'SSH certificate revoked'
-        # The KRL revokes a serial 0 certificate by its key ID under the CA, any other by serial
-        held = f"key ID '{cert.key_id}'" if not cert.serial else f'serial {cert.serial}'
         if others:
             message = (f'SSH certificate revoked with {len(others)} other certificate(s) the KRL revokes '
-                       f'with it under this CA, by {held}')
+                       f'with it under this CA, by ' + ' and '.join(named(e) for e in entries))
 
         AuditService.log_action(
             action='ssh_cert_revoked',
             resource_type='ssh_certificate',
             resource_id=str(cert.id),
             resource_name=cert.key_id,
-            details=f'SSH certificate revoked: {reason}' + (
-                f'; {held} also revokes ' + ', '.join(f"#{o.id} '{o.key_id}'" for o in others)
-                if others else ''),
+            details=f'SSH certificate revoked: {reason}' + ''.join(
+                f'; {named(e)} also revokes ' + ', '.join(f"#{o.id} '{o.key_id}'"
+                                                         for o in others if through[o.id] == e)
+                for e in entries),
             success=True,
             username=username,
         )
@@ -450,7 +458,7 @@ def revoke_ssh_certificate(cert_id):
             pass
 
         return success_response(
-            data={**cert.to_dict(), 'revoked_with': [o.id for o in others]},
+            data={**cert.to_dict(), 'revoked_with': [o.id for o in others], 'revoked_by': entries},
             message=message
         )
 

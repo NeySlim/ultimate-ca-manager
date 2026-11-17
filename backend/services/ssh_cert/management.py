@@ -23,10 +23,11 @@ class SSHCertificateManagementMixin:
         cert.revoke_reason = reason
         # The KRL revokes a non-zero serial, and the key ID of a serial 0 certificate under its CA
         # (ssh-keygen -k): every certificate it revokes is revoked; `revoked_with` names only those
-        # this revocation turned from valid to revoked
-        siblings, pending = [], [cert]
+        # this revocation turned from valid to revoked, `revoked_through` the KRL entry of each
+        siblings, pending, through = [], [cert], {}
         while pending:
             held = pending.pop(0)
+            entry = {'serial': int(held.serial)} if held.serial else {'key_id': held.key_id}
             match = (SSHCertificate.serial == held.serial if held.serial
                      else SSHCertificate.key_id == held.key_id)
             for sibling in (SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == cert.ssh_ca_id, match,
@@ -38,9 +39,11 @@ class SSHCertificateManagementMixin:
                 sibling.revoked_at = cert.revoked_at
                 sibling.revoke_reason = reason
                 siblings.append(sibling)
+                through[sibling.id] = entry
                 pending.append(sibling)
         siblings.sort(key=lambda s: s.id)
         cert.revoked_with = siblings
+        cert.revoked_through = through
 
         try:
             db.session.commit()

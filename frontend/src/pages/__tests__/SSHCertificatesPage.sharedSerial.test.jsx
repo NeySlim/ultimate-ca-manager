@@ -114,6 +114,22 @@ describe('SSHCertificatesPage: a serial two certificates share', () => {
     showSuccess.mockRestore()
   })
 
+  it('names the serials a key ID took along, not the key ID alone', async () => {
+    const ZERO = { ...ALONE, id: 4, key_id: 'zero-cert', serial: 0 }
+    const showSuccess = vi.spyOn(stable.notify, 'showSuccess')
+    getAll.mockResolvedValue({ data: [ZERO], meta: { total: 1 } })
+    getById.mockResolvedValue({ data: ZERO })
+    revoke.mockResolvedValue({ data: { ...ZERO, revoked: true, revoked_with: [5, 6],
+      revoked_by: [{ key_id: 'zero-cert' }, { serial: 9 }] } })
+    renderPage()
+    fireEvent.click(await screen.findByText('zero-cert'))
+    await waitFor(() => expect(getById).toHaveBeenCalledWith(4))
+    fireEvent.click(screen.getAllByText('sshCertificates.revokeCertificate').find(el => el.closest('button')))
+    fireEvent.click(screen.getAllByText('sshCertificates.revokeCertificate').filter(el => el.closest('button[type="submit"]')).pop())
+    await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('sshCertificates.revokedWithKeyIdAndSerials'))
+    showSuccess.mockRestore()
+  })
+
   it('says nothing of the kind for a serial held once', async () => {
     getById.mockResolvedValue({ data: ALONE })
     renderPage()

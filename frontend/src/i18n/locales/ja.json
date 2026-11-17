@@ -6067,6 +6067,7 @@
     "revokeSharedSerial": "これにより、この CA でシリアル番号 {{serial}} を持つ他のすべての証明書も失効します（KRL はシリアル番号で失効させるため）。",
     "revokedWithShared": "SSH 証明書を失効させました（この CA でシリアル番号 {{serial}} を持つすべての証明書を含む）",
     "revokedWithKeyId": "SSH 証明書を失効しました。同じ CA でキー ID {{keyId}} を持つすべての証明書も失効しました",
+    "revokedWithKeyIdAndSerials": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}} and every holder of their serials",
     "revokeSerialZero": "シリアル 0 は番号ではありません：KRL はこの証明書をキー ID {{keyId}} で失効します。これにより、シリアルに関係なく、この CA でそのキー ID を持つすべての証明書が失効します。",
     "deleteConfirm": "このSSH証明書を削除してもよろしいですか？",
     "certInformation": "証明書情報",

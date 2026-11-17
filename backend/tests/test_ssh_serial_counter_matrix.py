@@ -579,8 +579,9 @@ def test_a_ca_that_names_the_key_id_itself_is_not_told_to_use_another(installati
         SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['carol'])
     db.session.rollback()
     assert 'Use another key ID' not in str(refused.value)
-    assert f'Tick "Let requesters set the key ID" on the CA to use another key ID, or delete ' \
-           f'certificate #{zero.id} once it has expired' in str(refused.value)
+    # The CA names the key ID from the principals: other principals give another key ID
+    assert f'Change the principals, or tick "Let requesters set the key ID" on the CA to use another ' \
+           f'key ID, or delete certificate #{zero.id} once it has expired' in str(refused.value)
 
 
 def test_a_restore_without_ssh_certificates_still_counts_them(installation):

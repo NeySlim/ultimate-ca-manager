@@ -6064,6 +6064,7 @@
     "revokeSharedSerial": "Damit werden auch alle anderen Zertifikate dieser CA mit der Seriennummer {{serial}} widerrufen: Die KRL widerruft nach Seriennummer.",
     "revokedWithShared": "SSH-Zertifikat widerrufen, zusammen mit allen Zertifikaten seiner CA mit der Seriennummer {{serial}}",
     "revokedWithKeyId": "SSH-Zertifikat widerrufen, zusammen mit jedem Zertifikat seiner CA mit der Schlüssel-ID {{keyId}}",
+    "revokedWithKeyIdAndSerials": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}} and every holder of their serials",
     "revokeSerialZero": "Seriennummer 0 ist keine echte Seriennummer: Die KRL widerruft dieses Zertifikat über seine Schlüssel-ID {{keyId}}, was jedes Zertifikat dieser CA mit dieser Schlüssel-ID widerruft, unabhängig von der Seriennummer.",
     "deleteConfirm": "Möchten Sie dieses SSH-Zertifikat wirklich löschen?",
     "certInformation": "Zertifikatsinformationen",

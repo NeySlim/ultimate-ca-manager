@@ -6064,6 +6064,7 @@
     "revokeSharedSerial": "Isto revoga também todos os outros certificados desta CA com o número de série {{serial}}: a KRL revoga por número de série.",
     "revokedWithShared": "Certificado SSH revogado, com todos os certificados da sua CA com o número de série {{serial}}",
     "revokedWithKeyId": "Certificado SSH revogado, junto com todos os certificados da sua CA com o ID de chave {{keyId}}",
+    "revokedWithKeyIdAndSerials": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}} and every holder of their serials",
     "revokeSerialZero": "O número de série 0 não é um número: a KRL revoga este certificado pelo seu ID de chave {{keyId}}, o que revoga todos os certificados desta CA com esse ID de chave, qualquer que seja o número de série.",
     "deleteConfirm": "Tem certeza de que deseja excluir este certificado SSH?",
     "certInformation": "Informações do certificado",

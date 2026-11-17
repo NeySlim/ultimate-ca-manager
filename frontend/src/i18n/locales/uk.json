@@ -6136,6 +6136,7 @@
     "revokeSharedSerial": "Це також відкличе всі інші сертифікати цього ЦС із серійним номером {{serial}}: KRL відкликає за серійним номером.",
     "revokedWithShared": "Сертифікат SSH відкликано разом з усіма сертифікатами його ЦС із серійним номером {{serial}}",
     "revokedWithKeyId": "SSH-сертифікат відкликано разом з усіма сертифікатами його ЦС з ідентифікатором ключа {{keyId}}",
+    "revokedWithKeyIdAndSerials": "SSH certificate revoked, with every certificate of its CA bearing key ID {{keyId}} and every holder of their serials",
     "revokeSerialZero": "Серійний номер 0 не є номером: KRL відкликає цей сертифікат за його ідентифікатором ключа {{keyId}}, що відкликає всі сертифікати цього ЦС з таким ідентифікатором ключа, незалежно від серійного номера.",
     "deleteConfirm": "Ви впевнені, що хочете видалити цей SSH-сертифікат?",
     "certInformation": "Інформація про сертифікат",
