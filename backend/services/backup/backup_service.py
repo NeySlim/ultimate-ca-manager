@@ -11,7 +11,7 @@ import base64
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Iterator, List, Optional, Tuple
+from typing import Callable, Dict, Any, Iterator, List, Optional, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -158,7 +158,8 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         password: str,
         backup_type: str = "full",
         include: Optional[Dict[str, bool]] = None,
-        kdf: Optional[str] = None
+        kdf: Optional[str] = None,
+        progress: Optional[Callable[..., None]] = None,
     ) -> Iterator[bytes]:
         """
         Yield an encrypted v4 archive: the header, then one chunk at a time
@@ -168,6 +169,8 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             backup_type: "full", "database", or "certificates"
             include: Dict of what to include (cas, certificates, users, etc.)
             kdf: "pbkdf2" or "argon2id"; None picks Argon2id when it can
+            progress: called as progress(done, total) before each section and the end,
+                and as progress() between two rows; what it raises stops the export
 
         Sections are read a page at a time and written as they come: no step
         holds a section, only a page of rows and the chunk being filled.
@@ -295,8 +298,19 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             except ContainerError as exc:
                 raise BackupExportError(str(exc)) from exc
 
+        def step(done):
+            if progress is not None:
+                progress(done, len(names))
+
+        def ticking(rows):
+            # Outside guarded(): a stop asked between two rows is not an export failure
+            for row in rows:
+                yield row
+                progress()
+
         yield header
 
+        step(0)
         metadata = self._get_metadata(backup_type)
         metadata.update({
             'schema_version': self.SCHEMA_VERSION,
@@ -318,16 +332,21 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                 key_mismatches.extend(self._key_mismatches({name: (row,)}))
                 yield row
 
-        for name in SECTIONS:
+        for done, name in enumerate(SECTIONS, start=1):
+            step(done)
             rows = export(name)
             if name in self._PRIVATE_KEY_SECTIONS:
                 rows = sealed_keys(name, rows)
+            if progress is not None and not isinstance(rows, dict):
+                rows = ticking(rows)
             yield from write(name, rows)
             del rows
 
         # Files, not a table: the HTTPS certificate and key the server serves
+        step(len(names) - 1)
         yield from write('https_server', _section('https_server', self._export_https_files))
 
+        step(len(names))
         yield writer.finish({'key_mismatches': key_mismatches})
         self.last_payload_size = writer.payload_bytes
 

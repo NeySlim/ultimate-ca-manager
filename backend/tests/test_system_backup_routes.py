@@ -36,10 +36,16 @@ def backup_dir(app, tmp_path, monkeypatch):
 
 @pytest.fixture
 def audit_spy(monkeypatch):
+    from models import db
     from services.audit_service import AuditService
     calls = []
-    monkeypatch.setattr(AuditService, 'log_action',
-                        staticmethod(lambda **kw: calls.append(kw)))
+
+    # Commits and returns the line as log_action does: a backup job concludes in that commit
+    def log_action(**kw):
+        calls.append(kw)
+        db.session.commit()
+        return kw
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(log_action))
     return calls
 
 

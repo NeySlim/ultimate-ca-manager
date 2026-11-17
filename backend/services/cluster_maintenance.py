@@ -281,7 +281,8 @@ CONTROL_ENDPOINTS = frozenset({'system_v2.maintenance_status', 'system_v2.mainte
                                'system_v2.maintenance_lift'})
 # Routes that start a background job: authenticated first, then refused by start_job itself,
 # so GET and POST answer the same 503
-JOB_START_ENDPOINTS = frozenset({'audit_v2.verify_integrity'})
+JOB_START_ENDPOINTS = frozenset({'audit_v2.verify_integrity', 'system_v2.create_backup',
+                                 'settings_v2.create_backup'})
 
 
 def refusal(view=None, message=None):

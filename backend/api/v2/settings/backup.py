@@ -36,10 +36,7 @@ from services.backup.settings_contract import (
 from services.backup.backup_service import check_backup_kdf
 from services.backup_service import (
     BackupService,
-    BackupExportError,
-    BackupPasswordError,
     BackupSchemaError,
-    BackupValidationError,
     ContainerError,
 )
 import logging
@@ -98,64 +95,12 @@ def create_backup():
         record_failure('system_backup', 'manual', 'Backup refused: key derivation not accepted')
         return error_response(str(e), 400)
 
-    try:
-        service = BackupService()
-        size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
-    except FipsRestricted:
-        record_failure('system_backup', 'manual', 'Backup refused: not allowed in FIPS mode')
-        raise
-    except BackupBusyError as busy:
-        logger.info('Settings backup refused: %s', busy)
-        record_failure('system_backup', 'manual', 'Backup refused: another backup or restore is running')
-        return error_response(str(busy), 409)
-    except BackupPasswordError as e:
-        record_failure('system_backup', 'manual', 'Backup refused: password rejected')
-        return error_response(str(e), 400)
-    except BackupExportError as e:
-        logger.error(f"Settings backup aborted: {e}")
-        record_failure('system_backup', 'manual', 'Backup failed: export aborted')
-        return error_response(f'Backup aborted: {e}', 500)
-    except BackupValidationError as e:
-        logger.error(f"Settings backup written but not validated: {e}")
-        record_failure('system_backup', 'manual', 'Backup failed: archive could not be validated')
-        return error_response(f'Backup could not be validated: {e}', 500)
-    except Exception as e:
-        logger.error(f"Settings backup failed: {e}")
-        record_failure('system_backup', 'manual', 'Backup failed: unexpected error')
-        return error_response('Backup failed', 500)
-
-    AuditService.log_action(
-        action='system_backup',
-        resource_type='system',
-        resource_name=filename,
-        details=f'Created backup: {filename}',
-        success=True
-    )
-
-    from services.backup.schedule import safe_ceiling_warning
-    response_data = {
-        'filename': filename,
-        # `size` stays the byte count this route has always returned; both
-        # families also answer `size_bytes`, which means the same thing on
-        # either of them. The absolute path is gone: where the instance keeps
-        # its archives is not the caller's business.
-        'size': size,
-        'size_bytes': size,
-        'download_url': f'/api/v2/settings/backup/{filename}/download',
-        # Creation removes nothing: the next retention brings the archives under the ceiling
-        'warning': safe_ceiling_warning(),
-    }
-
-    # Include generated password in response so user can save it
-    if generated_password:
-        response_data['password'] = password
-        response_data['password_generated'] = True
-
-    message = 'Backup created successfully' + (' - SAVE THE PASSWORD!' if generated_password else '')
-    if service.last_export_warnings:
-        response_data['export_warnings'] = list(service.last_export_warnings)
-        message += (' ' if message.endswith('!') else '. ') + '; '.join(service.last_export_warnings)
-    return success_response(data=response_data, message=message)
+    # The generated password is given in this answer only: the job holds it encrypted
+    from api.v2.system.backup import start_backup_job
+    from services.jobs import backup as backup_job
+    extra = {'password': password, 'password_generated': True} if generated_password else None
+    return start_backup_job(backup_job.params_of(backup_job.ROUTE_SETTINGS, kdf, generated_password),
+                            password, extra)
 
 
 @bp.route('/api/v2/settings/backup/restore', methods=['POST'])

@@ -47,6 +47,10 @@ class JobOutcome:
     message: Optional[str] = None
     data: Any = None
     audit_details: Optional[str] = None
+    # The audit line's resource name when it is not the type's (a backup names its archive)
+    audit_resource: Optional[str] = None
+    # RFC 9457 type of a failure the route answered with a typed problem (FIPS refusal)
+    problem_type: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +63,8 @@ class JobType:
     # None: the job writes no audit line (the audit verification writes none, as before)
     audit_action: Optional[str] = None
     resource_type: str = 'system'
+    # The audit line's resource name; None names it by its label
+    resource_name: Optional[str] = None
     # HA: only the node that created the job takes it (a restore reads a file of that node)
     node_bound: bool = False
     # Final message when the run gave none (lost, never taken, cancelled), by reason
@@ -166,10 +172,11 @@ def audit_writer(kind: str):
     if jt is None or jt.audit_action is None:
         return None
 
-    def _write_job_result_line(row, state, reason, details=None):
+    def _write_job_result_line(row, state, reason, details=None, resource=None):
         from services.audit_service import AuditService
         written = AuditService.log_action(
-            action=jt.audit_action, resource_type=jt.resource_type, resource_name=jt.label,
+            action=jt.audit_action, resource_type=jt.resource_type,
+            resource_name=resource or jt.resource_name or jt.label,
             resource_id=(row or {}).get('id'),
             details=details or _phrase(jt, state, reason), success=state == SUCCEEDED,
             username=(row or {}).get('requested_by_name') or 'system',
@@ -224,4 +231,4 @@ def public_view(row: dict, with_result: bool = True) -> dict:
 
 
 # The job types this release ships, registered in every process that imports the service
-from services.jobs import audit_verify  # noqa: E402,F401
+from services.jobs import audit_verify, backup  # noqa: E402,F401
