@@ -318,7 +318,8 @@ class SSOSignInTest(db.Model):
 
     The row alone marks a callback as a test, never a parameter the browser or the IdP sends:
     it is found by the hash of its `state` or AuthnRequest id, used once, and read only by
-    the account that started it. Shared by every node; purged once `expires_at` passes.
+    the account that started it. Shared by every node; emptied once `expires_at` passes and
+    deleted a day later, so a late return still ends as a test's.
     """
     __tablename__ = 'pro_sso_sign_in_tests'
     __table_args__ = (

@@ -971,9 +971,7 @@ def test_a_test_expires_ten_minutes_after_its_start_and_its_report_after_its_ret
             db.session.commit()
         assert client.get(f"/api/v2/sso/sign-in-tests/{done['id']}", base_url=SP_BASE).status_code == 404
         _start(client, oidc_provider)  # a start purges what expired
-        with app.app_context():
-            assert SSOSignInTest.query.filter(SSOSignInTest.token.in_(
-                [started['id'], done['id']])).count() == 0
+        assert _erased(app, started['id']) and _erased(app, done['id'])
     finally:
         case.cleanup()
 
@@ -984,10 +982,21 @@ def _expire(app, token):
         db.session.commit()
 
 
-def _exists(app, token):
+def _row(app, token):
     with app.app_context():
         db.session.remove()
-        return SSOSignInTest.query.filter_by(token=token).count() == 1
+        test = SSOSignInTest.query.filter_by(token=token).first()
+        return None if test is None else {c.name: getattr(test, c.name)
+                                          for c in SSOSignInTest.__table__.columns}
+
+
+def _exists(app, token):
+    return _row(app, token) is not None
+
+
+def _erased(app, token):
+    row = _row(app, token)
+    return row is not None and (row['report'], row['secret'], row['browser_hash']) == (None, None, '')
 
 
 def test_an_expired_report_is_purged_by_the_scheduled_task(app, oidc_provider, monkeypatch):
@@ -1001,8 +1010,8 @@ def test_an_expired_report_is_purged_by_the_scheduled_task(app, oidc_provider, m
         status = app.scheduler.run_task_now('sso_sign_in_test_purge')
         assert status and status['last_status'] == 'ok' and status['interval'] == 60, status
         assert status['per_node'] is False, status  # HA: the elected node runs it
-        assert not _exists(app, done['id'])
-        assert _exists(app, live['id'])
+        assert _erased(app, done['id'])
+        assert _row(app, live['id'])['report'] is not None
     finally:
         case.cleanup()
 
@@ -1015,15 +1024,102 @@ def test_a_read_and_a_return_purge_what_expired(app, oidc_provider, monkeypatch)
         first, _state = _oidc_test(client, oidc_provider)
         _expire(app, first['id'])
         assert client.get(f"/api/v2/sso/sign-in-tests/{first['id']}", base_url=SP_BASE).status_code == 404
-        assert not _exists(app, first['id'])
+        assert _erased(app, first['id'])
 
         second, _state = _oidc_test(client, oidc_provider)
         pending = _start(client, oidc_provider)
         _expire(app, second['id'])
         state = parse_qs(urlsplit(pending['url']).query)['state'][0]
         assert _location(_oidc_callback(client, state)) == '/sso-test-complete?result=done'
-        assert not _exists(app, second['id'])
-        assert _exists(app, pending['id'])
+        assert _erased(app, second['id'])
+        assert _row(app, pending['id'])['report'] is not None
+    finally:
+        case.cleanup()
+
+
+# -- a return after the expiry is still a test's, for a day ------------------------------
+
+KEPT = ('id', 'token', 'provider_id', 'user_id', 'protocol', 'transaction_hash', 'state',
+        'created_at', 'expires_at', 'finished_at')
+ERASED = {'secret': None, 'report': None, 'browser_hash': ''}
+
+
+def _age(app, token, past):
+    with app.app_context():
+        SSOSignInTest.query.filter_by(token=token).one().expires_at = utc_now() - past
+        db.session.commit()
+
+
+def _purge_by(app, client, token, how):
+    if how == 'read':
+        assert client.get(f'/api/v2/sso/sign-in-tests/{token}', base_url=SP_BASE).status_code == 404
+    else:
+        assert app.scheduler.run_task_now('sso_sign_in_test_purge')['last_status'] == 'ok'
+
+
+def _late_returns(app, client, case, protocol, pid, signer):
+    """A pending test and a finished one, each with the return to play again later."""
+    if protocol == 'oauth2':
+        pending = _start(client, pid)
+        state = parse_qs(urlsplit(pending['url']).query)['state'][0]
+        done, done_state = _oidc_test(client, pid)
+        return [(pending['id'], lambda: _oidc_callback(client, state), 'expired'),
+                (done['id'], lambda: _oidc_callback(client, done_state), 'used')]
+    answer = _saml_answer(case, signer)
+    pending = _start(client, pid)
+    late = answer(_request_id(pending['url']))
+    done = _start(client, pid)
+    replay = answer(_request_id(done['url']))
+    assert _location(client.post(ACS, base_url=SP_BASE, data={'SAMLResponse': replay})) \
+        == '/sso-test-complete?result=done'
+    return [(pending['id'], lambda: client.post(ACS, base_url=SP_BASE, data={'SAMLResponse': late}),
+             'expired'),
+            (done['id'], lambda: client.post(ACS, base_url=SP_BASE, data={'SAMLResponse': replay}),
+             'used')]
+
+
+@pytest.mark.parametrize('how', ('read', 'task'))
+@pytest.mark.parametrize('protocol', ('oauth2', 'saml'))
+def test_a_return_after_the_expiry_is_still_a_test_and_the_row_keeps_nothing_personal(
+        app, request, monkeypatch, protocol, how):
+    pid = request.getfixturevalue('oidc_provider' if protocol == 'oauth2' else 'saml_provider')
+    signer = request.getfixturevalue('idp_signer') if protocol == 'saml' else None
+    case = Case(app, pid, protocol)
+    try:
+        if protocol == 'oauth2':
+            _install_idp(monkeypatch, OIDCIdP(case.external_id, _oidc_userinfo(case)))
+        client = _admin_client(app)
+        returns = _late_returns(app, client, case, protocol, pid, signer)
+        tokens = [token for token, _r, _x in returns]
+        for token in tokens:
+            _age(app, token, timedelta(seconds=1))
+        before = {token: _row(app, token) for token in tokens}
+        assert before[tokens[1]]['report'] and case.username in before[tokens[1]]['report']
+        _purge_by(app, client, tokens[0], how)
+
+        for token in tokens:  # every column: what names the transaction stays, nothing else
+            row = _row(app, token)
+            assert set(row) == set(KEPT) | set(ERASED)
+            assert {k: row[k] for k in KEPT} == {k: before[token][k] for k in KEPT}
+            assert {k: row[k] for k in ERASED} == ERASED
+            assert case.username not in repr(row) and case.email not in repr(row)
+
+        floor = _top_audit(app)
+        for _token, again, result in returns:
+            assert _location(again()) == f'/sso-test-complete?result={result}'
+        assert [(e[0], e[3]) for e in _audit_since(app, floor)] == \
+            [(sign_in_tests.AUDIT_ACTION, False)] * 2  # never a login_failure
+        assert _session_of(app, client)[1]['username'] == 'admin'
+        assert _no_account(app, case.username)
+
+        for token in tokens:
+            _age(app, token, timedelta(hours=23))
+        _purge_by(app, client, tokens[0], how)
+        assert all(_row(app, token) is not None for token in tokens)
+        for token in tokens:
+            _age(app, token, timedelta(hours=24, seconds=1))
+        _purge_by(app, client, tokens[0], how)
+        assert all(_row(app, token) is None for token in tokens)
     finally:
         case.cleanup()
 
