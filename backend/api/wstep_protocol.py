@@ -228,12 +228,12 @@ def _renewed_certificate_standing(ca, approval):
     """An approved renewal is refused only when the certificate it renews
     was revoked; any other status (expired, no longer on record) delivers it."""
     from services import protocol_approval
-    from services.cert.issued_lookup import REVOKED, issued_certificate_status
     renewal_of = protocol_approval.request_data(approval).get('renewal_of')
     if not renewal_of:
         return True
-    _row, status = issued_certificate_status(ca, x509.load_pem_x509_certificate(renewal_of.encode()))
-    return status != REVOKED
+    # Looked up under the CA that issued it, the profile's former one included
+    _row, refusal = wstep_service._renewal_refusal(ca, x509.load_pem_x509_certificate(renewal_of.encode()))
+    return refusal != protocol_approval.RENEWED_REVOKED
 
 
 def _answer_held(ca, parsed, approval):
@@ -343,9 +343,11 @@ def _issue_and_respond(ca, parsed, username, *, profile, kerberos_principal=None
     old_serial = renewal.get('serial')
     served = f'profile {profile.name}' + (f', realm {profile.realm}' if kerberos_principal else '')
     if old_serial is not None:
+        # After a change of the profile's CA the renewed certificate is the former CA's: named
+        former = f", old CA {renewal['ca']}" if renewal.get('ca') else ''
         action, details = 'certificate.renewed', (
             f'WSTEP renewal from {client_ip()}: old serial {old_serial}, '
-            f'new serial {cert.serial_number} ({served})')
+            f'new serial {cert.serial_number}{former} ({served})')
     else:
         action = 'certificate.issued'
         details = f'WSTEP enrollment from {client_ip()}: serial {cert.serial_number} ({served})'
