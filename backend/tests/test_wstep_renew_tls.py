@@ -987,6 +987,29 @@ def _imported_twin_listed_first(app, ca_id, cert):
             db.session.commit()
 
 
+def test_the_rows_holding_a_certificate_come_oldest_first(app, wstep_renew_config):
+    """One order on both engines: SQLite would follow the (caref, serial) index, PostgreSQL the heap."""
+    from services.cert.issued_lookup import find_issued_rows
+    cert, _ = _issue(app, wstep_renew_config['id'], 'tls-renew-order.example.test')
+    twin_refid = '0000' + uuid.uuid4().hex[:28]      # sorts before any refid in the index
+    with app.app_context():
+        ca = db.session.get(CA, wstep_renew_config['id'])
+        values = {c.key: getattr(ca, c.key) for c in CA.__table__.columns if c.key != 'id'}
+        values.update(refid=twin_refid, descr=f'{ca.descr} twin', url_slug=None, hsm_key_id=None)
+        db.session.add(CA(**values))
+        original = Certificate.query.filter_by(caref=ca.refid, serial_number=str(cert.serial_number)).one()
+        values = {c.key: getattr(original, c.key) for c in Certificate.__table__.columns if c.key != 'id'}
+        values.update(refid=uuid.uuid4().hex, caref=twin_refid, source='import', windows_profile_id=None)
+        db.session.add(Certificate(**values))
+        db.session.commit()
+        try:
+            assert [r.source for r in find_issued_rows(ca, cert)] == ['wstep', 'import']
+        finally:
+            Certificate.query.filter_by(caref=twin_refid).delete()
+            CA.query.filter_by(refid=twin_refid).delete()
+            db.session.commit()
+
+
 @pytest.mark.parametrize('path', ['tls', 'ws-security'])
 def test_a_certificate_bound_renewal_is_served_when_an_imported_twin_is_read_first(
         client, app, wstep_renew_config, path):

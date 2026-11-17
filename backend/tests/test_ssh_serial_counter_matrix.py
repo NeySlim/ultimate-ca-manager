@@ -436,6 +436,13 @@ def test_a_restored_pair_is_revoked_as_the_krl_revokes_it(installation, mode, pa
     assert results['ssh_revoked_with_serial'] == (1 if pair in ('older', 'newer') else 0)
 
 
+def test_a_restore_without_ssh_certificates_still_counts_them(installation):
+    _ca('no certificate in the archive')
+    master, store = _archive()
+    results = _restore(master, {'ssh_cas': copy.deepcopy(list(store['ssh_cas']))}, 'merge')
+    assert results['ssh_revoked_with_serial'] == 0
+
+
 @pytest.mark.parametrize('holder', ('valid', 'revoked'))
 def test_an_import_never_makes_a_pair(installation, holder):
     ca_id, key = _imported_ca(f'import pair {holder}')
