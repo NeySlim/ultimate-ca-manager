@@ -360,3 +360,21 @@ def test_a_process_another_reaper_collected_counts_as_stopped(supervisor):
     assert calls == [1]
     reaper.join(5)
     real.returncode = 0
+
+
+def test_on_exit_waits_for_the_stop_the_watcher_is_recording(supervisor):
+    s = supervisor()
+    entered, release, calls = threading.Event(), threading.Event(), []
+
+    def slow():
+        entered.set()
+        release.wait(5)
+        calls.append('recorded')
+    s._owner_pid, s._on_stopped = os.getpid(), slow
+    watcher = threading.Thread(target=s._say_stopped)
+    watcher.start()
+    assert entered.wait(5)
+    threading.Timer(0.3, release.set).start()
+    s.stop()  # on_exit: returns only once the row is recorded, or the exit would cut it off
+    assert calls == ['recorded']
+    watcher.join(5)

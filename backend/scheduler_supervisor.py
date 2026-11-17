@@ -144,14 +144,15 @@ class SchedulerSupervisor:
                 self._say_stopped()
 
     def _say_stopped(self) -> None:
+        # Under the lock: on_exit, coming second, waits for the watcher's call to end
         with self._stopped_lock:
             if self._stopped_said or self._on_stopped is None or not self._mine():
                 return
             self._stopped_said = True
-        try:
-            self._on_stopped()
-        except Exception as e:  # the stop goes on; on_exit and atexit try again
-            self.log.warning("Node stop not recorded: %s", type(e).__name__)
+            try:
+                self._on_stopped()
+            except Exception as e:  # the stop goes on; atexit releases the row again
+                self.log.warning("Node stop not recorded: %s", type(e).__name__)
 
     def _terminate(self) -> None:
         """SIGTERM, graceful_timeout for the running task to end, then SIGKILL."""
