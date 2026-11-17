@@ -834,7 +834,11 @@
     "samlLogoutRejected": "La demande de déconnexion du fournisseur d'identité n'a pas pu être vérifiée ; vous êtes toujours connecté.",
     "tooManyAttempts": "Trop de tentatives échouées",
     "retryAfterSeconds": "Réessayez dans {{seconds}} secondes.",
-    "retryLater": "Réessayez plus tard."
+    "retryLater": "Réessayez plus tard.",
+    "maintenanceRestoring": "Une restauration de sauvegarde se termine : ce serveur accepte de nouveau les connexions une fois redémarré.",
+    "maintenanceActive": "Ce serveur est en maintenance : les connexions sont refusées jusqu'à sa fin.",
+    "maintenanceRetryIn": "Nouvelle tentative de connexion dans {{seconds}} s.",
+    "retryNow": "Réessayer maintenant"
   },
   "cas": {
     "chainRevoked": "Révoquée en amont",

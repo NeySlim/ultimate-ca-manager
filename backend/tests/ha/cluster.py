@@ -185,6 +185,8 @@ class Node:
             'PYTHONPATH': os.pathsep.join([str(GUARD_DIR), str(BACKEND)]),
             'PYTHONDONTWRITEBYTECODE': '1',
             'UCM_HA_GUARD_FILE': str(self.guard_file),
+            # tests/ha/guard/ha_bench_pauses.py: inert until the bench writes a pause file there
+            'UCM_HA_PAUSE_DIR': str(root),
             'UCM_NODE_ID': name,
             'UCM_CONFIG_DIR': str(self.config_dir),
             'UCM_BASE_PATH': str(root),
@@ -291,6 +293,27 @@ class Node:
             self._signal(signal.SIGKILL)
             self.proc.wait(timeout=STOP_TIMEOUT)
             wait_until(lambda: not self.pids(), STOP_TIMEOUT, f'node {self.name} processes gone')
+
+    def pause(self, point):
+        """Hold this node's jobs at `point` (tests/ha/guard/ha_bench_pauses.py) until release()."""
+        (self.root / f'pause-{point}').touch()
+
+    def release(self, point=None):
+        """Let a paused point go on; every point when none is named (and the markers a killed
+        node left)."""
+        for path in self.root.glob(f'pause-{point or "*"}'):
+            path.unlink(missing_ok=True)
+        if point is None:
+            for path in self.root.glob('paused-*'):
+                path.unlink(missing_ok=True)
+
+    def paused(self, point) -> bool:
+        """A process of this node waits at `point` now."""
+        return (self.root / f'paused-{point}').exists()
+
+    def job_file(self, name) -> Path:
+        """A job's file on this node's disk (DATA_DIR/tmp)."""
+        return self.data_dir / 'tmp' / name
 
     def log_text(self) -> str:
         parts = []

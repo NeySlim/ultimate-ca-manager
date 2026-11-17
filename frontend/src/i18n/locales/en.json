@@ -629,7 +629,11 @@
     "samlLogoutRejected": "The sign-out request of the identity provider could not be verified; you are still signed in.",
     "tooManyAttempts": "Too many failed attempts",
     "retryAfterSeconds": "Try again in {{seconds}} seconds.",
-    "retryLater": "Try again later."
+    "retryLater": "Try again later.",
+    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
+    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
+    "retryNow": "Retry now"
   },
   "dashboard": {
     "goodMorning": "Good morning",
