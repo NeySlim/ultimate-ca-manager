@@ -601,12 +601,12 @@ def _finish_steps(job_id):
 
 def predicted_restart():
     """What asking the restart will answer, known before it is asked (it may end this process)."""
-    from config.settings import Config, is_docker
+    from config.settings import CONTAINER_RESTART_REFUSAL, Config, is_docker
     if Config.HA_MODE:
         from services.cluster_commands import ROLLING_RESTART_MESSAGE
         return True, ROLLING_RESTART_MESSAGE
     if is_docker():
-        return False, "Service restart not available in Docker. Restart the container instead."
+        return False, CONTAINER_RESTART_REFUSAL
     return True, "Service restart initiated"
 
 

@@ -99,7 +99,8 @@ export function UpdateChecker() {
     const target = updateInfo?.major_upgrade
     if (!target) return
     const confirmed = await showConfirm(
-      t('settings.majorUpgradeConfirm', { current: updateInfo.current_version, version: target.version }),
+      t(updateInfo.ha_mode ? 'settings.majorUpgradeConfirmHa' : 'settings.majorUpgradeConfirm',
+        { current: updateInfo.current_version, version: target.version }),
       { title: t('settings.majorUpgradeTitle', { version: target.version }), confirmText: t('settings.majorUpgradeInstall'), variant: 'primary' }
     )
     if (!confirmed) return

@@ -71,7 +71,7 @@ def install_update():
         import fips_mode
         tag = '<version>-fips' if fips_mode.requested() else '<version>'
         return error_response(
-            "Auto-update is not available in Docker. Pull the image tag of the new "
+            "Auto-update is not available in a container (Docker, Kubernetes). Pull the image tag of the new "
             f"version instead: ghcr.io/neyslim/ultimate-ca-manager:{tag}", 400
         )
 
@@ -90,6 +90,9 @@ def install_update():
         # naming the version the operator confirmed.
         major_upgrade = body.get('major_upgrade') is True
         update_info = check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev)
+
+        if update_info.get('error'):
+            return error_response(update_info['error'], 502)
 
         if major_upgrade:
             target = update_info.get('major_upgrade')
@@ -254,7 +257,7 @@ def update_update_settings():
     from services.updates import is_container_install
     if data.get('auto_install') and is_container_install():
         return error_response(
-            "Auto-update is not available in Docker. Pull the new image instead.", 400
+            "Auto-update is not available in a container (Docker, Kubernetes). Pull the new image instead.", 400
         )
 
     # All fields in one transaction: a commit failure must yield an error,

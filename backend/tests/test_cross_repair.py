@@ -434,6 +434,24 @@ def test_convert_moves_the_scep_challenge_with_the_scep_ca(app, auth_client):
         db.session.commit()
 
 
+def test_convert_takes_the_challenge_of_the_scep_ca_named_by_a_padded_number(app, auth_client):
+    """scep_ca_id '0<id>' still names the converted record: its challenge replaces the root's."""
+    from models import SystemConfig
+    pki, ids = _world(app)
+    with app.app_context():
+        SystemConfig.query.filter_by(key='scep_ca_id').delete()
+        _set_config(scep_ca_id=f"0{ids['x']}")
+        _set_config(**{f"scep_challenge_{ids['x']}": 'secret-x', f"scep_challenge_{ids['b']}": 'secret-b'})
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        try:
+            assert _config(f"scep_challenge_{ids['b']}") == 'secret-x'
+            assert _config(f"scep_challenge_{ids['x']}") is None
+        finally:
+            SystemConfig.query.filter(SystemConfig.key.like('scep_%')).delete(synchronize_session=False)
+            db.session.commit()
+
+
 def test_convert_drops_the_challenge_of_a_non_scep_duplicate_when_the_root_has_one(app, auth_client):
     pki, ids = _world(app)
     with app.app_context():

@@ -580,6 +580,20 @@ def test_a_failed_group_read_the_admission_does_not_need_lets_the_user_in(env, m
     assert env.login(pid, user)[0] == 200
 
 
+@pytest.mark.parametrize('uac,disabled', [(514, True), (512, False), (66050, True)])
+def test_user_account_control_is_read_from_the_ldap3_attribute(env, monkeypatch, uac, disabled):
+    """ACCOUNTDISABLE (0x2) of the value ldap3 returns, not of the Attribute object."""
+    user = env.user()
+    _ad(monkeypatch, user, ['CN=PKI-Admins,OU=Groups,DC=example,DC=com'], uac=uac)
+    pid = _ad_provider(env, role_mapping=json.dumps({'PKI-Admins': 'admin'}))
+    code, body = env.login(pid, user)
+    if disabled:
+        assert (code, body.get('message')) == (
+            403, 'This account has been disabled in Active Directory / LDAP')
+    else:
+        assert code == 200, body
+
+
 # ── 6. The mapping test reads and decides as the login does ──────────────────
 
 def _scenarios():

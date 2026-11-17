@@ -3106,6 +3106,7 @@
     "majorUpgradeNotes": "リリースノートを読む",
     "majorUpgradeInstall": "アップグレード",
     "majorUpgradeConfirm": "UCM を {{current}} から {{version}} にアップグレードしますか？新しいメジャーバージョンです。リリースノートを読み、先にバックアップを取ってください。サービスが再起動します。",
+    "majorUpgradeConfirmHa": "Upgrade UCM from {{current}} to {{version}}? This is a new major version: read its release notes and take a backup first. This starts a rolling update: the nodes update one at a time, and it stops if the release needs a full stop for its migrations.",
     "majorUpgradeInitiated": "UCM {{version}} へのアップグレードを開始しました。まもなくサービスが再起動します。",
     "majorUpgradeDocker": "Docker：アップグレードするには、イメージのタグを {{image}} に変更し、コンテナーを再作成してください。",
     "expiryCheckResult": "チェック完了: {{count}} 件のアラートを送信しました",

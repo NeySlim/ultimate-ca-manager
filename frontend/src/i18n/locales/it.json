@@ -3106,6 +3106,7 @@
     "majorUpgradeNotes": "Leggi le note di rilascio",
     "majorUpgradeInstall": "Aggiorna",
     "majorUpgradeConfirm": "Aggiornare UCM da {{current}} a {{version}}? È una nuova versione principale: leggi le note di rilascio ed esegui prima un backup. Il servizio verrà riavviato.",
+    "majorUpgradeConfirmHa": "Upgrade UCM from {{current}} to {{version}}? This is a new major version: read its release notes and take a backup first. This starts a rolling update: the nodes update one at a time, and it stops if the release needs a full stop for its migrations.",
     "majorUpgradeInitiated": "Passaggio a UCM {{version}} avviato. Il servizio verrà riavviato a breve.",
     "majorUpgradeDocker": "Docker: per aggiornare, cambia il tag dell'immagine in {{image}} e ricrea il container.",
     "expiryCheckResult": "Verifica completata: {{count}} avviso/i inviato/i",
