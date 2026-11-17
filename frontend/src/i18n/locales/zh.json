@@ -3575,16 +3575,16 @@
       "started": "已开始滚动更新至 v{{version}}：节点将逐个更新",
       "haNote": "HA 模式：节点逐个更新，仅在上一个节点以新版本恢复后才更新下一个。"
     },
-    "restoreJobStarting": "The restore is starting",
-    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
-    "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
-    "restoreCancel": "Cancel the restore",
-    "restoreCancelled": "The restore was cancelled: nothing was restored",
-    "restoreCancelFailed": "The cancellation could not be sent",
-    "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
-    "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
-    "restoreSignIn": "Sign in again",
-    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
+    "restoreJobStarting": "恢复正在启动",
+    "restoreJobProgress": "正在恢复：第 {{done}} 步，共 {{total}} 步",
+    "restoreRunsInBackground": "恢复在后台运行。恢复结束前将拒绝所有写入操作，并且所有会话都会被登出：您需要重新登录才能查看恢复报告。",
+    "restoreCancel": "取消恢复",
+    "restoreCancelled": "恢复已取消：未恢复任何内容",
+    "restoreCancelFailed": "无法发送取消请求",
+    "restoreLost": "恢复在提交完成前中断：未恢复任何内容。请重新开始。",
+    "restoreSignInAgain": "恢复很可能已提交生效：此会话已被登出。请重新登录以查看恢复报告。",
+    "restoreSignIn": "重新登录",
+    "restoreContactLost": "恢复期间服务器停止响应。请稍后刷新页面，查看恢复的结果。"
   },
   "account": {
     "profile": "个人资料",

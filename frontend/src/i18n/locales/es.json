@@ -3575,16 +3575,16 @@
       "started": "Actualización progresiva a v{{version}} iniciada: los nodos se actualizan uno a uno",
       "haNote": "Modo HA: los nodos se actualizan uno a uno, y el siguiente solo cuando el anterior ha vuelto con la nueva versión."
     },
-    "restoreJobStarting": "The restore is starting",
-    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
-    "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
-    "restoreCancel": "Cancel the restore",
-    "restoreCancelled": "The restore was cancelled: nothing was restored",
-    "restoreCancelFailed": "The cancellation could not be sent",
-    "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
-    "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
-    "restoreSignIn": "Sign in again",
-    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
+    "restoreJobStarting": "La restauración está comenzando",
+    "restoreJobProgress": "Restauración en curso: paso {{done}} de {{total}}",
+    "restoreRunsInBackground": "La restauración se ejecuta en segundo plano. Se rechazan las escrituras hasta que termine, y cierra todas las sesiones: deberá volver a iniciar sesión para leer su informe.",
+    "restoreCancel": "Cancelar la restauración",
+    "restoreCancelled": "La restauración se canceló: no se restauró nada",
+    "restoreCancelFailed": "No se pudo enviar la cancelación",
+    "restoreLost": "La restauración se detuvo antes de aplicarse definitivamente: no se restauró nada. Iníciela de nuevo.",
+    "restoreSignInAgain": "Es probable que la restauración se haya aplicado definitivamente: cerró esta sesión. Vuelva a iniciar sesión para leer su informe.",
+    "restoreSignIn": "Volver a iniciar sesión",
+    "restoreContactLost": "El servidor dejó de responder durante la restauración. Recargue la página más tarde para ver cómo terminó."
   },
   "account": {
     "profile": "Perfil",

@@ -3575,16 +3575,16 @@
       "started": "Aggiornamento progressivo alla v{{version}} avviato: i nodi si aggiornano uno alla volta",
       "haNote": "Modalità HA: i nodi si aggiornano uno alla volta, il successivo solo quando il precedente è tornato attivo sulla nuova versione."
     },
-    "restoreJobStarting": "The restore is starting",
-    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
-    "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
-    "restoreCancel": "Cancel the restore",
-    "restoreCancelled": "The restore was cancelled: nothing was restored",
-    "restoreCancelFailed": "The cancellation could not be sent",
-    "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
-    "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
-    "restoreSignIn": "Sign in again",
-    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
+    "restoreJobStarting": "Il ripristino si sta avviando",
+    "restoreJobProgress": "Ripristino in corso: passaggio {{done}} di {{total}}",
+    "restoreRunsInBackground": "Il ripristino viene eseguito in background. Le scritture sono rifiutate finché non termina e il ripristino disconnette ogni sessione: dovrai accedere di nuovo per leggerne il report.",
+    "restoreCancel": "Annulla il ripristino",
+    "restoreCancelled": "Il ripristino è stato annullato: nulla è stato ripristinato",
+    "restoreCancelFailed": "Non è stato possibile inviare l'annullamento",
+    "restoreLost": "Il ripristino si è interrotto prima di essere confermato: nulla è stato ripristinato. Riavvialo.",
+    "restoreSignInAgain": "Il ripristino è probabilmente stato confermato: ha disconnesso questa sessione. Accedi di nuovo per leggerne il report.",
+    "restoreSignIn": "Accedi di nuovo",
+    "restoreContactLost": "Il server ha smesso di rispondere durante il ripristino. Ricarica la pagina più tardi per vedere come è andato a finire."
   },
   "account": {
     "profile": "Profilo",

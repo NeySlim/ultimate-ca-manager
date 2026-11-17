@@ -3575,16 +3575,16 @@
       "started": "Atualização gradual para v{{version}} iniciada: os nós são atualizados um de cada vez",
       "haNote": "Modo HA: os nós são atualizados um de cada vez, o seguinte só quando o anterior voltar na nova versão."
     },
-    "restoreJobStarting": "The restore is starting",
-    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
-    "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
-    "restoreCancel": "Cancel the restore",
-    "restoreCancelled": "The restore was cancelled: nothing was restored",
-    "restoreCancelFailed": "The cancellation could not be sent",
-    "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
-    "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
-    "restoreSignIn": "Sign in again",
-    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
+    "restoreJobStarting": "A restauração está iniciando",
+    "restoreJobProgress": "Restauração em andamento: etapa {{done}} de {{total}}",
+    "restoreRunsInBackground": "A restauração é executada em segundo plano. As gravações são recusadas até que ela termine, e todas as sessões são encerradas: você precisará fazer login novamente para ler o relatório.",
+    "restoreCancel": "Cancelar a restauração",
+    "restoreCancelled": "A restauração foi cancelada: nada foi restaurado",
+    "restoreCancelFailed": "Não foi possível enviar o cancelamento",
+    "restoreLost": "A restauração parou antes de ser confirmada: nada foi restaurado. Inicie-a novamente.",
+    "restoreSignInAgain": "A restauração provavelmente foi confirmada: esta sessão foi encerrada. Faça login novamente para ler o relatório.",
+    "restoreSignIn": "Fazer login novamente",
+    "restoreContactLost": "O servidor parou de responder durante a restauração. Recarregue a página mais tarde para ver como terminou."
   },
   "account": {
     "profile": "Perfil",

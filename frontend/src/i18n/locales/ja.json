@@ -3576,16 +3576,16 @@
       "started": "v{{version}} へのローリングアップデートを開始しました: ノードは 1 つずつ更新されます",
       "haNote": "HA モード: ノードは 1 つずつ更新され、前のノードが新しいバージョンで復帰してから次のノードが更新されます。"
     },
-    "restoreJobStarting": "The restore is starting",
-    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
-    "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
-    "restoreCancel": "Cancel the restore",
-    "restoreCancelled": "The restore was cancelled: nothing was restored",
-    "restoreCancelFailed": "The cancellation could not be sent",
-    "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
-    "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
-    "restoreSignIn": "Sign in again",
-    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
+    "restoreJobStarting": "復元を開始しています",
+    "restoreJobProgress": "復元を実行中: {{total}} 手順中 {{done}} 手順目",
+    "restoreRunsInBackground": "復元はバックグラウンドで実行されます。完了するまで書き込みは拒否され、すべてのセッションがサインアウトされます。レポートを確認するには、再度サインインしてください。",
+    "restoreCancel": "復元をキャンセル",
+    "restoreCancelled": "復元はキャンセルされました。何も復元されていません",
+    "restoreCancelFailed": "キャンセルを送信できませんでした",
+    "restoreLost": "復元は確定する前に停止しました。何も復元されていません。もう一度開始してください。",
+    "restoreSignInAgain": "復元はおそらく確定しています。このセッションはサインアウトされました。レポートを確認するには、再度サインインしてください。",
+    "restoreSignIn": "再度サインイン",
+    "restoreContactLost": "復元中にサーバーが応答しなくなりました。しばらくしてからページを再読み込みして、結果を確認してください。"
   },
   "account": {
     "profile": "プロフィール",

@@ -3575,16 +3575,16 @@
       "started": "Rollierendes Update auf v{{version}} gestartet: Die Knoten werden nacheinander aktualisiert",
       "haNote": "HA-Modus: Die Knoten werden nacheinander aktualisiert, der nächste erst, wenn der vorherige wieder mit der neuen Version läuft."
     },
-    "restoreJobStarting": "The restore is starting",
-    "restoreJobProgress": "Restore in progress: step {{done}} of {{total}}",
-    "restoreRunsInBackground": "The restore runs in the background. Writes are refused until it ends, and it signs every session out: you will sign in again to read its report.",
-    "restoreCancel": "Cancel the restore",
-    "restoreCancelled": "The restore was cancelled: nothing was restored",
-    "restoreCancelFailed": "The cancellation could not be sent",
-    "restoreLost": "The restore stopped before it committed: nothing was restored. Start it again.",
-    "restoreSignInAgain": "The restore has probably committed: it signed this session out. Sign in again to read its report.",
-    "restoreSignIn": "Sign in again",
-    "restoreContactLost": "The server stopped answering during the restore. Reload the page later to see how it ended."
+    "restoreJobStarting": "Die Wiederherstellung startet",
+    "restoreJobProgress": "Wiederherstellung läuft: Schritt {{done}} von {{total}}",
+    "restoreRunsInBackground": "Die Wiederherstellung läuft im Hintergrund. Schreibzugriffe werden bis zu ihrem Ende abgelehnt, und sie beendet alle Sitzungen: Sie melden sich erneut an, um den Bericht zu lesen.",
+    "restoreCancel": "Wiederherstellung abbrechen",
+    "restoreCancelled": "Die Wiederherstellung wurde abgebrochen: Es wurde nichts wiederhergestellt",
+    "restoreCancelFailed": "Der Abbruch konnte nicht gesendet werden",
+    "restoreLost": "Die Wiederherstellung wurde beendet, bevor sie festgeschrieben wurde: Es wurde nichts wiederhergestellt. Starten Sie sie erneut.",
+    "restoreSignInAgain": "Die Wiederherstellung wurde wahrscheinlich festgeschrieben: Sie hat diese Sitzung beendet. Melden Sie sich erneut an, um den Bericht zu lesen.",
+    "restoreSignIn": "Erneut anmelden",
+    "restoreContactLost": "Der Server antwortet während der Wiederherstellung nicht mehr. Laden Sie die Seite später neu, um zu sehen, wie sie geendet hat."
   },
   "account": {
     "profile": "Profil",
