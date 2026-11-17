@@ -91,6 +91,9 @@ def install_update():
         major_upgrade = body.get('major_upgrade') is True
         update_info = check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev)
 
+        if update_info.get('error'):
+            return error_response(update_info['error'], 502)
+
         if major_upgrade:
             target = update_info.get('major_upgrade')
             if not target:

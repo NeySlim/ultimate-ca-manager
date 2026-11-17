@@ -3526,13 +3526,14 @@ POST /api/v2/system/alerts/expiry/check
 
 ### Updates
 ```http
-# Check for updates (within the installed major version; the highest final release of a
-# later major version is reported apart in major_upgrade: {version, published_at,
+# Check for updates (within the installed major version; the highest final release of the
+# next major version (installed + 1) is reported apart in major_upgrade: {version, published_at,
 # release_notes, html_url, download_url, package_name, checksum_url, assets}, null when
 # there is none, never a release candidate)
 GET /api/v2/system/updates/check
 
-# Upgrade to the later major version reported by the check (400 without one or without
+# Upgrade to the next major version reported by the check (502 with the message of a
+# failed check, 400 without one or without
 # version, 409 when version is not the one the check now reports; without
 # "major_upgrade": true the route refuses any release of another major version)
 POST /api/v2/system/updates/install

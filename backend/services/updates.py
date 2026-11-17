@@ -238,11 +238,11 @@ def _pick_asset(release, version):
 
 
 def _major_upgrade(releases, current):
-    """The highest final release of a later major version, never an RC, or None."""
+    """The highest final release of the NEXT major version (installed + 1), never an RC, or None."""
     if major_of(current) == 0:
         return None  # installed version unreadable: no major to compare with
     later = [r for r in releases
-             if _is_final(r) and major_of(r.get('tag_name', '')) > major_of(current)]
+             if _is_final(r) and major_of(r.get('tag_name', '')) == major_of(current) + 1]
     if not later:
         return None
     best = max(later, key=lambda r: parse_version(r.get('tag_name', '')))

@@ -147,6 +147,16 @@ def test_the_highest_stable_later_major_is_offered(instance):
     assert updates.check_for_updates(channel='rc')['major_upgrade']['version'] == '4.2'
 
 
+def test_only_the_next_major_is_offered_never_a_further_one(instance):
+    instance('3.1', ['3.1', '4.2', '4.1', '5.0'])
+    assert updates.check_for_updates(channel='stable')['major_upgrade']['version'] == '4.2'
+
+
+def test_a_further_major_alone_is_not_offered(instance):
+    instance('3.1', ['3.1', '5.0'])
+    assert updates.check_for_updates(channel='stable')['major_upgrade'] is None
+
+
 def test_a_later_major_rc_alone_is_never_offered(instance):
     instance('3.1', ['3.2', '4.0-rc1', '4.0-rc2'])
     for channel in ('stable', 'rc'):
@@ -182,6 +192,26 @@ def test_a_failed_check_offers_no_major(monkeypatch):
     result = updates.check_for_updates(force=True)
     assert result['error']
     assert result['major_upgrade'] is None
+
+
+def _releases_down(monkeypatch):
+    monkeypatch.setattr(updates, 'get_current_version', lambda: '3.1')
+    monkeypatch.setitem(updates._releases_cache, 'data', None)
+
+    def _down(*a, **k):
+        raise updates.requests.ConnectionError('no egress')
+    monkeypatch.setattr(updates.requests, 'get', _down)
+
+
+@pytest.mark.parametrize('body', [{}, {'major_upgrade': True, 'version': '4.0'}])
+def test_a_failed_check_is_a_502_with_its_message_on_install(app, auth_client, monkeypatch, body):
+    monkeypatch.setattr(updates, 'is_container_install', lambda: False)
+    monkeypatch.setattr('api.v2.system.updates.ha_enabled', lambda: False)
+    _releases_down(monkeypatch)
+    r = auth_client.post('/api/v2/system/updates/install', json=body)
+    assert r.status_code == 502, r.data
+    assert 'Failed to check for updates' in r.get_json()['message']
+    assert 'No update available' not in r.get_json()['message']
 
 
 def test_check_route_returns_the_update_and_the_major_upgrade(auth_client, instance):
@@ -374,6 +404,9 @@ def test_a_later_major_is_notified_once_per_major(app, clean, instance, monkeypa
     assert len([e for e in events if e.get('major_upgrade')]) == 1
     # a new major notifies once
     instance('3.1', ['3.1', '4.1', '5.0'])
+    _tick(app)
+    assert [e['latest_version'] for e in events if e.get('major_upgrade')] == ['4.0']
+    instance('4.5', ['4.5', '5.0'])
     _tick(app)
     _tick(app)
     majors = [e for e in events if e.get('major_upgrade')]
