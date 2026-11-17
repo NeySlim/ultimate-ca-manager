@@ -2823,6 +2823,9 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 ### Diagnosing a refused sign-in
 A sign-in refused because no rule matches, or because the provider has no rule and no default role, is recorded in the **Audit Logs** as a failed login (quick filter **Failed Logins**). The entry gives the group values UCM read (at most 20, each cut at 64 characters) and where they were read: the ID token, UserInfo or both for OIDC, with the reason the ID token was not used; the attributes read for SAML; the group search base or \`memberOf\` for LDAP. When nothing was read through OIDC or SAML, it names the claims or attributes received that look like group lists, never their values: map one of them to \`groups\`. Then add a role mapping rule for one of the values, or set a default role. The refused user sees only the refusal message (no rule matched, or no default role and no role mapping rule), never the group values.
 
+### Testing a sign-in
+**Test sign-in**, beside **Test Connection** on a saved OIDC or SAML provider, enabled or not, opens the IdP in a new window: sign in there with the identity to try. The IdP returns to the same redirect URI or ACS URL as a sign-in, and UCM runs the same checks and the same account decision. The provider screen then shows the identity and groups read, the verdict, the role, the account that would be opened or created and, for a refusal, its reason with the attributes to map to \`groups\`. Nobody is signed in and no account changes; the window only says the test is over. The test uses the saved provider (unsaved changes are announced, not sent); only the administrator who started it reads the result, for 10 minutes. The audit log records it as \`sso_sign_in_test\`, apart from sign-ins.
+
 ## LDAP
 
 ### Configuration
