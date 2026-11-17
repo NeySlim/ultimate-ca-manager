@@ -242,3 +242,86 @@ def test_a_take_read_before_another_one_committed_loses(app, database, monkeypat
         assert store.claim_job(b, job_id, 'node-b/1/y', utc_now()) is None
         monkeypatch.undo()
         assert store.job_row(b, job_id)['executor'] == 'node-a/1/x'
+
+
+_STOPPED_IN_A_MAINTENANCE = r'''
+import os
+from services import cluster_maintenance
+from services.jobs import store
+waiting = os.environ['TEST_JOB_WAITING']
+real = store.conclude_job
+
+
+def refused(*args, **kwargs):
+    # The run's own conclusion meets a maintenance that never lifts
+    if kwargs.get('reason') == store.DONE:
+        open(waiting, 'w').write('waiting')
+        raise cluster_maintenance.MaintenanceActive('test maintenance')
+    return real(*args, **kwargs)
+
+
+store.conclude_job = refused
+cluster_maintenance.blocks_writes = lambda app=None: os.path.exists(waiting)
+import scheduler_main  # noqa: E402
+os._exit(scheduler_main.exit_code(scheduler_main.main))
+'''
+
+
+def _job_state(url, job_id):
+    engine = create_engine(url)
+    try:
+        with Session(engine) as session:
+            row = store.job_row(session, job_id)
+            return row and (row['state'], row['reason'], row['executor'])
+    finally:
+        engine.dispose()
+
+
+def _until(predicate, child, timeout=60):
+    deadline = time.monotonic() + timeout
+    while not predicate():
+        assert child.poll() is None, 'the scheduler process stopped early'
+        assert time.monotonic() < deadline, 'timed out'
+        time.sleep(0.1)
+
+
+@pytest.mark.slow
+def test_a_stop_during_the_wait_for_a_maintenance_exits_within_the_grace(tmp_path):
+    """SIGTERM while a run waits for the maintenance to conclude: the process exits within
+    its grace, the job stays running, and the next start concludes it executor_lost."""
+    from tests.test_scheduler_process import _scheduler_env
+    env, data = _scheduler_env(tmp_path)
+    (tmp_path / 'etc').mkdir()
+    env = {k: v for k, v in env.items() if not k.startswith('GIT_')}
+    waiting = tmp_path / 'waiting'
+    env.update(UCM_CONFIG_DIR=str(tmp_path / 'etc'), TEST_JOB_WAITING=str(waiting),
+               UCM_SCHEDULER_GRACEFUL_TIMEOUT='3', UCM_HA='')
+    url = f"sqlite:///{data / 'ucm.db'}"
+    first = subprocess.Popen([sys.executable, '-c', _STOPPED_IN_A_MAINTENANCE], cwd=BACKEND,
+                             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    second = None
+    try:
+        _until(lambda: (data / 'scheduler_state.json').exists(), first)
+        engine = create_engine(url)
+        with Session(engine) as session:
+            job_id = _create(session, 'audit_verify', 'audit_verify')
+        engine.dispose()
+        _until(waiting.exists, first)
+        assert _job_state(url, job_id)[:2] == ('running', None)
+        stopped_at = time.monotonic()
+        first.send_signal(signal.SIGTERM)
+        assert first.wait(timeout=15) == 0
+        assert time.monotonic() - stopped_at < 3 + 5
+        state, reason, executor = _job_state(url, job_id)
+        assert (state, reason) == ('running', None) and executor
+        second = subprocess.Popen([sys.executable, '-m', 'scheduler_main'], cwd=BACKEND, env=env,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _until(lambda: _job_state(url, job_id)[0] != 'running', second)
+        assert _job_state(url, job_id)[:2] == ('failed', 'executor_lost')
+        second.send_signal(signal.SIGTERM)
+        assert second.wait(timeout=15) == 0
+    finally:
+        for child in (first, second):
+            if child is not None and child.poll() is None:
+                child.kill()
+                child.wait()
