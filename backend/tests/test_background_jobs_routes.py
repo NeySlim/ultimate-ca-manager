@@ -205,3 +205,58 @@ def test_a_failed_job_answers_a_fixed_message(app, auth_client, cleanup, monkeyp
     assert body['message'] == 'Audit chain verification failed'
     assert '/secret' not in json.dumps(body) and 'host-1' not in json.dumps(body)
     assert body['details']['job']['reason'] == 'error'
+
+
+@pytest.fixture
+def maintenance(app, monkeypatch):
+    """HA on, this application's view in a manual maintenance, never read again."""
+    from datetime import timedelta
+    from config.settings import Config
+    from services import cluster_maintenance as cm
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(cm, 'OBSERVE_TTL_SECONDS', 3600)
+    view = cm.view_of(app)
+    from utils.datetime_utils import utc_now
+    now = utc_now()
+    view.set({'token': 'tok', 'reason': cm.REASON_MANUAL, 'phase': cm.PHASE_MANUAL,
+              'started_at': now, 'expires_at': now + timedelta(minutes=5), 'restored_at': None,
+              'node_id': 'node-x', 'actor': 'admin'}, now)
+    yield view
+    view.row, view.observed, view.process_started, view.deadline = None, None, None, 0.0
+
+
+def _job_count(app):
+    from sqlalchemy import func, select
+    with app.app_context():
+        found = db.session.execute(select(func.count()).select_from(T)).scalar()
+        db.session.rollback()
+    return found
+
+
+@pytest.mark.parametrize('method', ['GET', 'POST'])
+def test_no_job_starts_during_a_cluster_maintenance(app, auth_client, maintenance, cleanup, method):
+    """GET and POST answer the same 503: no row written, a Retry-After, the reason said."""
+    from services import cluster_maintenance as cm
+    before = _job_count(app)
+    r = auth_client.open(VERIFY, method=method, json={} if method == 'POST' else None)
+    assert r.status_code == 503, r.data
+    assert r.headers['Retry-After'] == str(cm.RETRY_AFTER_SECONDS)
+    body = r.get_json()
+    assert body['message'] == jobs.JobsSuspended.MESSAGE
+    assert body['code'] == 'maintenance' and body['maintenance']['phase'] == cm.PHASE_MANUAL
+    assert _job_count(app) == before
+
+
+def test_start_job_refuses_before_any_write_during_a_maintenance(app, maintenance, cleanup):
+    from services import cluster_maintenance as cm
+    before = _job_count(app)
+    with app.app_context():
+        with pytest.raises(jobs.JobsSuspended):
+            jobs.start_job(audit_verify.KIND)
+        db.session.rollback()
+    assert _job_count(app) == before
+    # The maintenance's own writer still starts one; it concludes once the maintenance ends
+    with app.app_context(), cm.exempt():
+        job_id = jobs.start_job(audit_verify.KIND)
+    maintenance.row = None
+    assert runner.join_local(job_id, 15)

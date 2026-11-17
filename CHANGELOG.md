@@ -80,7 +80,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- **The audit chain verification runs in the background.** It no longer holds the web worker: past 25 seconds `GET /api/v2/audit/verify` answers `202` with a job to follow (`/api/v2/system/jobs`), the screen shows its progress and can cancel it, and `POST /api/v2/audit/verify` starts one explicitly; a shorter one answers as before.
+- **The audit chain verification runs in the background.** It no longer holds the web worker: past 25 seconds `GET /api/v2/audit/verify` answers `202` with a job to follow (`/api/v2/system/jobs`), the screen shows its progress and can cancel it, and `POST /api/v2/audit/verify` starts one explicitly; a shorter one answers as before. During an HA cluster maintenance no job starts: both answer `503` with `Retry-After`.
 - **`UCM_WORKER_TIMEOUT`.** The gunicorn worker timeout, 120 seconds until now, is set by this variable from 30 to 3600 seconds; a value outside these bounds stops the start with a message naming it.
 - **PostgreSQL databases must be UTF8.** A database in another encoding (`SQL_ASCII`) is refused at startup with a message naming its encoding, where it failed with `TypeError: cannot use a string pattern on a bytes-like object`.
 - **One systemd unit for both packages; a refused database or a failed upgrade is not restarted.** Either one stops the service with exit code 78, which the unit leaves failed until you act: the DEB unit restarted it three times, the RPM unit every 10 seconds without end. A failure while it runs restarts it, at most 5 times in 5 minutes; a restart asked from the interface, an update or a package install is not counted.

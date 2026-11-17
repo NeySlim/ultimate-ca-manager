@@ -279,14 +279,17 @@ READ_BLUEPRINTS = frozenset({'ocsp'})
 OPEN_BLUEPRINTS = frozenset({'health'})
 CONTROL_ENDPOINTS = frozenset({'system_v2.maintenance_status', 'system_v2.maintenance_begin',
                                'system_v2.maintenance_lift'})
+# Routes that start a background job: authenticated first, then refused by start_job itself,
+# so GET and POST answer the same 503
+JOB_START_ENDPOINTS = frozenset({'audit_v2.verify_integrity'})
 
 
-def refusal(view=None):
+def refusal(view=None, message=None):
     from flask import jsonify
     from utils.response import PROBLEM_CONTENT_TYPE, build_problem
     view = view or current(refresh=False)
-    body = build_problem(MESSAGE.format(what=_what(view) if view else 'set by an administrator'),
-                         503, title='Cluster maintenance')
+    body = build_problem(message or MESSAGE.format(
+        what=_what(view) if view else 'set by an administrator'), 503, title='Cluster maintenance')
     body['code'] = 'maintenance'
     body['maintenance'] = view.public() if view else None
     response = jsonify(body)
@@ -302,7 +305,8 @@ def gate():
     if view is None or not view.active():
         return None
     from flask import request
-    if request.blueprint in OPEN_BLUEPRINTS or request.endpoint in CONTROL_ENDPOINTS:
+    if (request.blueprint in OPEN_BLUEPRINTS or request.endpoint in CONTROL_ENDPOINTS
+            or request.endpoint in JOB_START_ENDPOINTS):
         return None
     if request.blueprint in REFUSED_BLUEPRINTS:
         return refusal(view)

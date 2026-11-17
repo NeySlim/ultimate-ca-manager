@@ -7,7 +7,7 @@ from auth.unified import require_auth
 from services.audit_service import AuditService
 from services import jobs
 from services.jobs import audit_verify
-from api.v2.system.jobs import busy_response, started_response
+from api.v2.system.jobs import busy_response, started_response, suspended_response
 from utils.pagination import parse_date_filter, parse_request_pagination, parse_request_limit
 from utils.response import success_response, error_response
 from datetime import datetime
@@ -246,6 +246,8 @@ def verify_integrity():
 
     try:
         job_id = jobs.start_job(audit_verify.KIND, params=params)
+    except jobs.JobsSuspended:
+        return suspended_response()
     except jobs.SlotBusy as busy:
         if joinable(busy.job):
             return started_response(busy.job['id'])

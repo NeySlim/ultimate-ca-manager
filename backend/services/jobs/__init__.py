@@ -27,6 +27,14 @@ EXCLUSIVE_SLOTS = frozenset({SLOT_RESTORE})
 JOB_WAIT_SECONDS = 25
 
 
+class JobsSuspended(Exception):
+    """A cluster maintenance is in progress: no job starts, as a restore may replace what it reads."""
+    MESSAGE = 'A cluster maintenance is in progress, no background job starts until it ends'
+
+    def __init__(self):
+        super().__init__(self.MESSAGE)
+
+
 class JobCancelled(Exception):
     """Raised by ctx.progress()/ctx.check() when a cancellation was asked: the run stops."""
 
@@ -105,12 +113,17 @@ def _node_id():
 
 def start_job(kind: str, params: Optional[dict] = None, secret: Optional[str] = None,
           file_name: Optional[str] = None, job_id: Optional[str] = None) -> str:
-    """Create the job (SlotBusy when its slot is held) and hand it to an executor; its id.
+    """Create the job (SlotBusy when its slot is held, JobsSuspended during a cluster
+    maintenance, before any write) and hand it to an executor; its id.
 
     ``secret`` is encrypted here and stored until the executor takes the job."""
     from models import db
     from utils.ha import ha_enabled
     jt = _TYPES[kind]
+    from services import cluster_maintenance
+    cluster_maintenance.current(refresh=True)
+    if cluster_maintenance.blocks_writes():
+        raise JobsSuspended()
     cipher = None
     if secret is not None:
         from utils.encryption import encrypt_value

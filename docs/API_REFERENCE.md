@@ -3064,7 +3064,10 @@ scheduler process. The route that starts one waits at most 25 seconds:
 `Preference-Applied: respond-async`; `Prefer: wait=N` shortens the wait to `N` seconds (never
 beyond 25). A second start while the job's slot is taken answers `409` with
 `details.job` naming the active job (`id`, `kind`, `state`, `created_at`, `requested_by`).
-One job is active per slot on the whole installation, HA cluster included.
+One job is active per slot on the whole installation, HA cluster included. During an HA
+cluster maintenance no job starts: `GET` and `POST` of a starting route both answer `503`
+with `Retry-After: 30`, code `maintenance` and the message `A cluster maintenance is in
+progress, no background job starts until it ends`, and no job is created.
 
 ```http
 GET  /api/v2/system/jobs                  # ?kind=audit_verify&state=active|final&limit=20 (max 100)

@@ -90,6 +90,14 @@ def busy_response(exc):
         details={'job': job}, meta={'location': location(row['id'])}))
 
 
+def suspended_response():
+    """503 with Retry-After: no job starts during a cluster maintenance."""
+    from services.cluster_maintenance import refusal
+    response = refusal(message=jobs.JobsSuspended.MESSAGE)
+    response.headers.add('Vary', 'Prefer')
+    return response, 503
+
+
 def started_response(job_id):
     """What a starting route answers for ``job_id``: bounded wait, then 200 or 202."""
     prefs = parse_prefer(request.headers.getlist('Prefer'))
