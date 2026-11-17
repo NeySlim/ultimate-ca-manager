@@ -35,12 +35,18 @@ _DEFAULT_LOCALHOSTS = frozenset({
     'ucm.example.com', 'ucm.local', 'test.local',
 })
 
+# Liveness and readiness probes: no request hook reads the database for them, so they
+# answer while it does not (docs/HA.md, When PostgreSQL is unavailable)
+PROBE_PATHS = frozenset({
+    '/health/live', '/api/health/live', '/api/v2/health/live',
+    '/health/ready', '/api/health/ready', '/api/v2/health/ready',
+})
 # Paths that skip canonical-admin redirect and strict host-role checks.
 _HEALTH_PATHS = frozenset({
     '/api/v2/health', '/api/health', '/health',
     '/metrics', '/api/v2/metrics',
     '/api/auth/verify', '/api/v2/auth/verify',
-})
+}) | PROBE_PATHS
 # Single source of truth for "this path belongs to a PKI protocol client, not
 # to the admin UI". app.py (http→https exemption, safe-mode allowlist),
 # security/csrf.py and api/ui_routes.py all derive their lists from here; each

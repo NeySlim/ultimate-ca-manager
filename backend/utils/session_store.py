@@ -224,8 +224,12 @@ class IsolatedSqlSessionInterface(KeepsRemovedRecordsGone, SqlAlchemySessionInte
     _delete_expired_sessions = retry_query()(_purge_expired)
 
     def _cleanup_n_requests(self):
-        """The purge rides one request in N, a probe included: tried once, and a database
-        that is away never fails that request."""
+        """The purge rides one request in N, never a probe (a silent database would hold it
+        for the connect timeout): tried once, and a database that is away never fails it."""
+        from flask import request
+        from utils.public_endpoints import PROBE_PATHS
+        if request.path in PROBE_PATHS:
+            return
         if self.cleanup_n_requests and random.randint(0, self.cleanup_n_requests) == 0:
             try:
                 self._purge_expired()

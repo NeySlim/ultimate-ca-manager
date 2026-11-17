@@ -1180,7 +1180,9 @@ def create_app(config_name=None):
         # HSTS is operator-configurable (Settings -> General, or UCM_HSTS_*
         # env vars) so instances serving self-signed certs during setup can
         # opt out entirely — see issue #154.
-        if 'Strict-Transport-Security' not in response.headers:
+        from utils.public_endpoints import PROBE_PATHS
+        # HSTS settings live in the database: a probe answers without them
+        if 'Strict-Transport-Security' not in response.headers and request.path not in PROBE_PATHS:
             from utils.hsts import build_hsts_header
             hsts_value = build_hsts_header()
             if hsts_value:
@@ -1961,7 +1963,8 @@ def main():
     print(f"{'='*60}")
     print(f"  HTTPS Server: https://{config.HOST}:{config.HTTPS_PORT}")
     print(f"  Certificate: {config.HTTPS_CERT_PATH}")
-    print(f"  Database: {config.DATABASE_PATH}")
+    from utils.db_url import database_label
+    print(f"  Database: {database_label(os.getenv('DATABASE_URL'), config.DATABASE_PATH)}")
     print(f"{'='*60}\n")
     
     # Start HTTP protocol server for CDP/OCSP (dev mode, non-blocking thread)

@@ -18,8 +18,10 @@ def test_single_node_procedure_migrates_sqlite_before_ha_pos():
     steps = _single_node_section()
     migrate = steps.find('Migrate data and switch')
     pg_upgrade = steps.find('database.type=postgresql')
-    ha_upgrade = steps.find('ha.enabled=true`, then check')
-    assert -1 < migrate < pg_upgrade < ha_upgrade
+    # The single instance stops before the HA pods start: never both on one database
+    stop = steps.find('--replicas=0')
+    ha_upgrade = steps.find('ha.enabled=true` and `replicaCount` 2 or more, then check')
+    assert -1 < migrate < pg_upgrade < stop < ha_upgrade
 
 
 def test_no_polling_fallback_claimed_neg():

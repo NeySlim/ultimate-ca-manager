@@ -402,6 +402,19 @@ def test_a_weak_provided_password_is_kept_and_said_without_its_value(app, caplog
     assert 'changeme123' not in caplog.text
 
 
+def test_a_password_a_deployment_tool_drew_is_not_judged_by_the_policy(app, caplog):
+    """The Helm chart's draw (24 letters and digits) is changed at first login under the policy:
+    no warning, and the log says who made it."""
+    from auth import initial_admin
+    with app.app_context(), caplog.at_level('INFO', logger='auth.initial_admin'):
+        got = initial_admin.prepare({'INITIAL_ADMIN_PASSWORD': 'abcdefghjkmnpqrstuvwxyz2',
+                                     'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE': '1'})
+    assert got.force_change and not got.generated
+    assert 'does not meet the password policy' not in caplog.text
+    assert 'drawn by the deployment' in caplog.text and 'changed at first login' in caplog.text
+    assert 'abcdefghjkmnpqrstuvwxyz2' not in caplog.text
+
+
 @pytest.mark.parametrize('flag, forced', [('1', True), ('true', True), ('', False), ('0', False)])
 def test_the_force_change_flag_marks_a_provided_password(flag, forced):
     from auth import initial_admin

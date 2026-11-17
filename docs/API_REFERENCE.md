@@ -5208,7 +5208,7 @@ GET /api/v2/health
 GET /api/v2/health/ready
 ```
 
-Verifies the application can serve traffic (database, filesystem, Redis when configured). Returns 200 if ready, 503 if not. The response also carries `ha`, `node_id` and `leader` as above.
+Verifies the application can serve traffic (database, filesystem, Redis when configured). Returns 200 if ready, 503 if not. The response also carries `ha`, `node_id` and `leader` as above. A database that does not answer `SELECT 1` within 5 seconds fails the check; once it failed nothing else is read from the database, so in HA mode `checks.cluster` is an error too and `leader` is `null`.
 
 **Response:**
 ```json
@@ -5231,7 +5231,7 @@ In safe mode, `status` is `"safe_mode"`, `reason` gives the cause and `checks` i
 GET /api/v2/health/live
 ```
 
-Returns 200 if the application process is alive, regardless of dependency status.
+Returns 200 if the application process is alive, regardless of dependency status. Neither the route nor any request hook reads the database for it (nor for the readiness check, apart from its own checks), and neither response carries `Strict-Transport-Security`, whose settings are in the database.
 
 **Response:**
 ```json

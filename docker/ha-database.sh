@@ -11,19 +11,40 @@ ucm_ha_active() {
     esac
 }
 
+# 1, true or yes, as the application reads a flag.
+ucm_flag_set() {
+    case "$(printf '%s' "${1:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" in
+        1|true|yes) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # Line for the generated .env: no SQLite path in HA mode.
 ucm_env_database_line() {
     ucm_ha_active && return 0
     echo "DATABASE_PATH=${UCM_DATABASE_PATH}"
 }
 
-# Value shown in the configuration summary.
+# Value shown in the configuration summary: the engine and the database name, never the
+# address or the password of DATABASE_URL.
 ucm_database_label() {
-    if ucm_ha_active; then
-        echo "PostgreSQL (DATABASE_URL)"
-    else
-        echo "${UCM_DATABASE_PATH}"
+    local url="${DATABASE_URL:-}" name
+    if [ -z "$url" ]; then
+        if ucm_ha_active; then
+            echo "PostgreSQL (DATABASE_URL)"
+        else
+            echo "SQLite, ${UCM_DATABASE_PATH}"
+        fi
+        return 0
     fi
+    case "$url" in
+        postgres://*|postgresql://*|postgresql+*://*)
+            name="${url%%\?*}"
+            name="${name#*://}"
+            case "$name" in */*) name="${name##*/}" ;; *) name="" ;; esac
+            if [ -n "$name" ]; then echo "PostgreSQL, database ${name}"; else echo "PostgreSQL (DATABASE_URL)"; fi ;;
+        *) echo "DATABASE_URL" ;;
+    esac
 }
 
 # Where the first password comes from; never the value itself.
@@ -36,6 +57,11 @@ ucm_initial_admin_notice() {
         # The application refuses to start then: which one was meant cannot be guessed
         echo "   • Password: INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set:"
         echo "     the start will be refused, keep only one"
+    elif [ -n "$source" ] && ucm_flag_set "${INITIAL_ADMIN_PASSWORD_FORCE_CHANGE:-}"; then
+        # The Helm chart sets the flag for the value it draws into its Secret
+        echo "   • Password: drawn by the deployment (${source}), not chosen by anyone;"
+        echo "     with the Helm chart it is in the release's Secret, key UCM_INITIAL_ADMIN_PASSWORD."
+        echo "     It must be changed at first login."
     elif [ -n "$source" ]; then
         echo "   • Password: the one you provided (${source})"
     else
