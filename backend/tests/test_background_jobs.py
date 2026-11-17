@@ -555,6 +555,72 @@ def test_purge_keeps_thirty_days_and_the_latest_of_each_kind(app, fake_types, cr
         assert _row(latest) is None and _row(recent) is not None
 
 
+def _cancel(app, job_id):
+    with app.app_context():
+        assert jobs.request_cancellation(job_id) == 'cancelled'
+
+
+def test_a_maintenance_holds_the_passes_without_an_error_line(app, fake_types, created, monkeypatch,
+                                                             caplog):
+    """No recovery nor purge is tried while the view is in maintenance, so nothing is logged
+    pass after pass; both run once it is lifted."""
+    import logging
+    import utils.ha
+    from services import cluster_maintenance
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
+    monkeypatch.setattr(utils.ha, 'ha_enabled', lambda: True)
+    kind = fake_types[jobs.SLOT_BACKUP]
+    old, _ = _start(app, kind, created)
+    _cancel(app, old)
+    latest, _ = _start(app, kind, created)
+    _cancel(app, latest)  # the latest of the kind: the old one is purgeable
+    with app.app_context():
+        at = jobs._now() - timedelta(days=40)
+        db.session.execute(update(T).where(T.c.id == old).values(created_at=at, finished_at=at))
+        db.session.commit()
+    orphan = _create_pending(app, fake_types[jobs.SLOT_RESTORE], created)
+    with app.app_context():
+        store.claim_job(db.session, orphan, 'gone-node/1/x', jobs._now() - timedelta(hours=1),
+                        lease_seconds=1)
+    view = cluster_maintenance.view_of(app)
+    held = threading.Event()
+    held.set()
+    monkeypatch.setattr(view, 'active', held.is_set)
+
+    class Scheduler(_Scheduler):
+        def _in_maintenance(self):
+            return cluster_maintenance.blocks_writes(app)
+    jr = runner.JobRunner(app, Scheduler())
+    passes = []
+    real = jr.run_pass
+
+    def counted():
+        passes.append(1)
+        return real()
+    monkeypatch.setattr(jr, 'run_pass', counted)
+    monkeypatch.setattr(runner, 'POLL_SECONDS', 0.01)
+    monkeypatch.setattr(runner, 'RECOVER_SECONDS', 0)
+    monkeypatch.setattr(runner, 'PURGE_SECONDS', 0)
+    caplog.set_level(logging.WARNING)
+    jr.start()
+    try:
+        deadline = time.monotonic() + 10
+        while len(passes) < 10:
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+    finally:
+        jr.stop()
+        assert jr.join(5)
+    assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
+    with app.app_context():
+        assert _row(old) is not None and _row(orphan)['state'] == 'running'
+    held.clear()
+    with app.app_context():
+        jr.run_pass()
+        assert _row(old) is None
+        assert (_row(orphan)['state'], _row(orphan)['reason']) == ('failed', 'executor_lost')
+
+
 def test_the_start_sweep_keeps_active_jobs_files_only(app, fake_types, created, monkeypatch,
                                                       tmp_path):
     monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)

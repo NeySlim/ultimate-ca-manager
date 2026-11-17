@@ -274,6 +274,9 @@ class JobRunner:
         from models import db
         from utils.ha import ha_enabled
         ha = ha_enabled()
+        # A maintenance refuses every write of this pass: none is tried until it is lifted
+        if self.scheduler._in_maintenance():
+            return
         leads = self.leads()
         finished = {job_id: self.executor for job_id, thread in self._running.items()
                     if not thread.is_alive()}
@@ -296,7 +299,7 @@ class JobRunner:
         if leads and now_mono - self._last_purge >= PURGE_SECONDS:
             store.purge_finished(db.session, jobs._now())
             self._last_purge = now_mono
-        if self._stop.is_set() or self.scheduler._in_maintenance():
+        if self._stop.is_set():
             return
         self._take_pending(leads)
 
