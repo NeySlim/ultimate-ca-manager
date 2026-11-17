@@ -543,7 +543,7 @@ jobs:
           compression-level: 0
           retention-days: 1
 
-  # Tags the two per-arch digests as <version> and, by the latest rule, latest; tag runs only,
+  # Tags the two per-arch digests as <version> and, by their rules, latest and the line; tag runs only,
   # after a green smoke of the standard and FIPS amd64 digests (arm64 is not smoked)
   docker-manifest:
     name: Publish Docker Image
@@ -571,6 +571,24 @@ jobs:
           LATEST=$(python3 scripts/ci/release_version.py latest "$VERSION" <<< "$TAGS")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
+
+      # The line tag (`3`, `2`) goes to the highest published stable of its major, by the same guard
+      - name: Decide the line tag
+        id: line
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          REHEARSAL: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/tags/* && "$REHEARSAL" != true ]]; then
+            echo "line=" >> "$GITHUB_OUTPUT"
+            echo "line tag for $VERSION: none (not a tag run)"
+            exit 0
+          fi
+          TAGS=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2)
+          LINE=$(python3 scripts/ci/release_version.py line "$VERSION" <<< "$TAGS")
+          echo "line=$LINE" >> "$GITHUB_OUTPUT"
+          echo "line tag for $VERSION: ${LINE:-none}"
 
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -636,6 +654,7 @@ jobs:
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}
             type=raw,value=latest,enable=${{ steps.latest.outputs.latest == 'true' }}
+            type=raw,value=${{ steps.line.outputs.line }},enable=${{ steps.line.outputs.line != '' }}
 
       - name: Show the tags a release would create
         if: inputs.dry_run
@@ -870,7 +889,7 @@ jobs:
           compression-level: 0
           retention-days: 1
 
-  # Tags the two per-arch digests as <version>-fips and, by the latest rule, latest-fips; tag runs
+  # Tags the two per-arch digests as <version>-fips and, by their rules, latest-fips and <line>-fips; tag runs
   # only, after a green smoke of the standard and FIPS amd64 digests (arm64 is not smoked)
   docker-fips-manifest:
     name: Publish Docker Image (FIPS)
@@ -900,6 +919,24 @@ jobs:
           LATEST=$(python3 scripts/ci/release_version.py latest "$VERSION" <<< "$TAGS")
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "latest for $VERSION: $LATEST"
+
+      # The line tag (`3`, `2`) goes to the highest published stable of its major, by the same guard
+      - name: Decide the line tag
+        id: line
+        env:
+          VERSION: ${{ needs.build-deb.outputs.version }}
+          REHEARSAL: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/tags/* && "$REHEARSAL" != true ]]; then
+            echo "line=" >> "$GITHUB_OUTPUT"
+            echo "line tag for $VERSION: none (not a tag run)"
+            exit 0
+          fi
+          TAGS=$(git ls-remote --tags --refs origin 'refs/tags/v*' | cut -f2)
+          LINE=$(python3 scripts/ci/release_version.py line "$VERSION" <<< "$TAGS")
+          echo "line=$LINE" >> "$GITHUB_OUTPUT"
+          echo "line tag for $VERSION: ${LINE:-none}"
 
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -967,6 +1004,7 @@ jobs:
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}-fips
             type=raw,value=latest-fips,enable=${{ steps.latest.outputs.latest == 'true' }}
+            type=raw,value=${{ steps.line.outputs.line }}-fips,enable=${{ steps.line.outputs.line != '' }}
 
       - name: Show the tags a release would create
         if: inputs.dry_run
