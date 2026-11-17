@@ -5,10 +5,8 @@ from tests.test_approval_on_sign_and_renew import (
     _cert_row, _csr_row, _drop_policy, _drop_rows, _json, _operator, _policy)
 from tests.test_approval_template_issuance import _mk_approval_id, _requester_id
 import pytest
-from tests.leak_marks import with_fixtures
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users', 'drop_new_config_rows')
 
 
 def test_approved_issuance_fires_certificate_issued(app, create_ca, events):

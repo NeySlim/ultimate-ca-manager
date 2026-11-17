@@ -27,8 +27,7 @@ def _templates_stay_in_this_module(app):
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
+pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates', 'drop_new_config_rows')
 
 KU_BITS = ('digital_signature', 'content_commitment', 'key_encipherment', 'data_encipherment',
            'key_agreement', 'key_cert_sign', 'crl_sign')

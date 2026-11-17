@@ -13,10 +13,8 @@ from models import CA, Certificate, CertificateTemplate, db
 from tests.test_csr_sign_extra_names import _csr, _upload
 from tests.test_acme_profile_template import _drop_template
 from utils.qc_statements import QC_STATEMENTS_OID, decode_qc_statements
-from tests.leak_marks import with_fixtures
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
 
 _SEQ = itertools.count(1)
 QC = {

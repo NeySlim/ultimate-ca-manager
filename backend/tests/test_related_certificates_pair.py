@@ -16,8 +16,7 @@ from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
-pytestmark = (pytestmark if isinstance(pytestmark, list) else [pytestmark]) + [pytest.mark.usefixtures('drop_new_users')]
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
+pytestmark = with_fixtures(pytestmark, 'drop_new_users', 'drop_new_cas_and_certificates')
 
 CLASSICAL = next(label for label in key_algorithms.labels('EC') if label.endswith('P256'))
 PQ = next(label for label in key_algorithms.labels('ML-DSA') if label.endswith('65'))

@@ -743,8 +743,10 @@ def _database_key_stays_readable(request):
 
 @pytest.fixture(scope='module')
 def drop_new_cas_and_certificates(app):
-    """Deletes what a module created above the ids present before it: ACME orders and
-    domains, certificates, then CAs (children first, until a pass removes nothing)."""
+    """Deletes what a module created above the ids present before it: the ACME orders, ACME
+    domains, ACME local domains, CRL deploy bindings, certificate policies and SCEP profiles
+    that would block a CA, then certificates, then CAs (children first, until a pass removes
+    nothing). Yields the cleanup itself, which runs once however often it is called."""
     from models import db, CA, Certificate
     from models.acme_models import AcmeDomain, AcmeLocalDomain, AcmeOrder
     from models.deploy import CRLDeployBinding
@@ -752,6 +754,7 @@ def drop_new_cas_and_certificates(app):
     from models.scep import ScepProfile
     from services.ca_service import CAService
     from services.cert_service import CertificateService
+    import warnings
 
     def _top(model):
         with app.app_context():
@@ -759,59 +762,86 @@ def drop_new_cas_and_certificates(app):
     # What blocks deleting a CA goes with it
     blockers = (AcmeOrder, AcmeDomain, AcmeLocalDomain, CRLDeployBinding, CertificatePolicy, ScepProfile)
     floors = {m: _top(m) for m in (Certificate, CA, *blockers)}
-    yield
 
     def _ids(model):
         return [row.id for row in model.query.filter(model.id > floors[model]).order_by(model.id.desc())]
 
-    def _try(delete, row_id):
+    def _try(delete, row_id, errors):
         try:
             return delete(row_id)
         except Exception as exc:
             db.session.rollback()
-            import warnings
-            warnings.warn(f'drop_new_cas_and_certificates kept {delete.__qualname__} {row_id}: {exc}', stacklevel=1)
+            errors[row_id] = exc
             return False
-    with app.app_context():
-        for model in blockers:
-            for row in model.query.filter(model.id > floors[model]).all():
-                db.session.delete(row)
-            db.session.commit()
-        for row_id in _ids(Certificate):
-            _try(CertificateService.delete_certificate, row_id)
-        pending = _ids(CA)
-        while pending:
-            left = [i for i in pending if not _try(CAService.delete_ca, i)]
-            if len(left) == len(pending):
-                break
-            pending = left
-        db.session.remove()
+
+    done = []
+
+    def cleanup():
+        if done:
+            return
+        done.append(True)
+        with app.app_context():
+            for model in blockers:
+                for row in model.query.filter(model.id > floors[model]).all():
+                    db.session.delete(row)
+                db.session.commit()
+            errors = {}
+            for row_id in _ids(Certificate):
+                _try(CertificateService.delete_certificate, row_id, errors)
+            for row_id, exc in errors.items():
+                warnings.warn(f'drop_new_cas_and_certificates kept certificate {row_id}: {exc}', stacklevel=1)
+            pending, errors = _ids(CA), {}
+            while pending:
+                left = [i for i in pending if not _try(CAService.delete_ca, i, errors)]
+                if len(left) == len(pending):
+                    break
+                pending = left
+            # A CA refused on one pass is often deleted once its children are gone: only the last word counts
+            for row_id in _ids(CA):
+                warnings.warn(f'drop_new_cas_and_certificates kept CA {row_id}: {errors.get(row_id)}', stacklevel=1)
+            db.session.remove()
+    yield cleanup
+    cleanup()
 
 
 @pytest.fixture(scope='module')
-def drop_new_config_rows(app):
+def drop_new_config_rows(app, request):
     """Deletes the policies, SCEP profiles, templates and HSM providers (with their keys) a
-    module created above the ids present before it."""
+    module created above the ids present before it, after the module's CAs and certificates
+    when it uses drop_new_cas_and_certificates: those hold templates and HSM keys."""
     from models import db, HsmKey, HsmProvider
     from models.certificate_template import CertificateTemplate
     from models.policy import CertificatePolicy
     from models.scep import ScepProfile
     models = (CertificatePolicy, ScepProfile, CertificateTemplate, HsmKey, HsmProvider)
+    drop_cas = (request.getfixturevalue('drop_new_cas_and_certificates')
+                if 'drop_new_cas_and_certificates' in request.fixturenames else None)
 
     def _top(model):
         with app.app_context():
             return db.session.query(db.func.max(model.id)).scalar() or 0
     floors = {m: _top(m) for m in models}
     yield
+    if drop_cas is not None:
+        drop_cas()
     with app.app_context():
+        errors = {}
         for _ in range(2):
             for model in models:
                 for row in model.query.filter(model.id > floors[model]).all():
+                    key = (model.__name__, row.id)
                     try:
                         db.session.delete(row)
                         db.session.commit()
-                    except Exception:
+                        errors.pop(key, None)
+                    except Exception as exc:
                         db.session.rollback()
+                        errors[key] = exc
+        import warnings
+        for model in models:
+            for row in model.query.filter(model.id > floors[model]).all():
+                key = (model.__name__, row.id)
+                warnings.warn(f'drop_new_config_rows kept {key[0]} {key[1]}: {errors.get(key)}', stacklevel=1)
         db.session.remove()
 
 

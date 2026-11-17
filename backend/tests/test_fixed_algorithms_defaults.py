@@ -8,10 +8,8 @@ from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from utils import issuance_defaults
-from tests.leak_marks import with_fixtures
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
 
 
 @pytest.fixture

@@ -23,10 +23,8 @@ from models.policy import CertificatePolicy
 from services import compliance_signer
 from services.policy_service import PolicyEvaluationService, PolicyViolation, SystemPolicy
 from tests.conftest import get_json
-from tests.leak_marks import with_fixtures
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_config_rows')
 
 JSON = 'application/json'
 
