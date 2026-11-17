@@ -25,7 +25,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `SECRET_KEY` | `UCM_SECRET_KEY` | (generated) | Session signing key (signs the CSRF tokens). Once rotated with encryption enabled, the key stored in the database signs and this value is only the fallback; see [Session key rotation](#session-key-rotation) |
 | `HOST` | `HOST` | `0.0.0.0` | Listen address for HTTPS and the HTTP protocol port; `::` = IPv6 + IPv4 (dual-stack) |
 | `HTTPS_PORT` | `UCM_HTTPS_PORT` | `8443` | HTTPS port |
-| `UCM_WORKER_TIMEOUT` | `UCM_WORKER_TIMEOUT` | `120` | Seconds a web request may run before gunicorn restarts the worker, from 30 to 3600; a value outside these bounds or not a whole number stops UCM at startup with a message naming the variable. The audit chain verification runs in the background and does not need it raised |
+| `UCM_WORKER_TIMEOUT` | `UCM_WORKER_TIMEOUT` | `120` | Seconds a web request may run before gunicorn restarts the worker, from 30 to 3600; a value outside these bounds or not a whole number stops UCM at startup with a message naming the variable and exit code 78, which the systemd unit does not restart. The audit chain verification runs in the background and does not need it raised |
 | `DATA_DIR` | (fixed) | `/opt/ucm/data` | Data storage |
 | `UCM_CONFIG_DIR` | `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`. Set it in the process environment (the service unit or the shell), not in `ucm.env`, which is read from it; the packages leave it unset |
 | `LOG_LEVEL` | `UCM_LOG_LEVEL` | `INFO` | Logging verbosity |
