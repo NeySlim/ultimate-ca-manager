@@ -222,4 +222,32 @@ describe('LoginPage during a maintenance', () => {
     expect(s.ldapLogin).toHaveBeenLastCalledWith('alice', 'corrected', 2)
   })
 
+  it('drops the planned attempt when the user signs in again by hand', async () => {
+    let inFlight = 0, peak = 0
+    s.loginPassword.mockRejectedValueOnce(refused(2)).mockImplementation(() => {
+      inFlight += 1; peak = Math.max(peak, inFlight)
+      return new Promise(resolve => setTimeout(() => { inFlight -= 1; resolve({ user: { username: 'alice' } }) }, 3000))
+    })
+    renderLogin()
+    await submitPassword()
+    await screen.findByRole('status')
+    fireEvent.click(screen.getByText('auth.login'))
+    await tick(5000)
+    await waitFor(() => expect(s.navigate).toHaveBeenCalledWith('/dashboard'))
+    expect(peak).toBe(1)
+    expect(s.loginPassword).toHaveBeenCalledTimes(2)
+  })
+
+  it('makes no planned attempt while a security key sign-in waits', async () => {
+    s.detectMethods.mockResolvedValue({ password: true, webauthn: true })
+    s.authenticateWebAuthn.mockImplementation(() => new Promise(() => {}))
+    s.loginPassword.mockRejectedValueOnce(refused(2))
+    renderLogin()
+    await submitPassword()
+    await screen.findByRole('status')
+    fireEvent.click(screen.getByText('auth.useSecurityKey'))
+    await waitFor(() => expect(s.authenticateWebAuthn).toHaveBeenCalledTimes(1))
+    await tick(5000)
+    expect(s.loginPassword).toHaveBeenCalledTimes(1)
+  })
 })

@@ -292,6 +292,7 @@ export default function LoginPage() {
   // ═══════════════════════════════════════════════════
 
   const attemptWebAuthn = useCallback(async () => {
+    clearMaintenance()
     setAuthMethod('webauthn')
     setStatusMessage(t('auth.touchSecurityKey'))
     setLoading(true)
@@ -340,7 +341,9 @@ export default function LoginPage() {
     return noteRateLimit(error)
   }
 
+  // Never a second request while one is in flight; each attempt drops the one planned
   const retryNow = () => {
+    if (loading) return
     const again = maintenanceRetry.current
     setMaintenance(m => (m ? { ...m, seconds: null } : m))
     if (again) latestAttempt.current[again]()
@@ -355,7 +358,7 @@ export default function LoginPage() {
     }
     const timer = setTimeout(() => setMaintenance(m => (m?.seconds != null ? { ...m, seconds: m.seconds - 1 } : m)), 1000)
     return () => clearTimeout(timer)
-  }, [maintenance])
+  }, [maintenance, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleContinue = async (e) => {
     e?.preventDefault()
@@ -400,6 +403,7 @@ export default function LoginPage() {
       return
     }
 
+    clearMaintenance()
     setLoading(true)
     setStatusMessage(t('auth.signingIn'))
 
@@ -443,6 +447,7 @@ export default function LoginPage() {
       return
     }
 
+    clearMaintenance()
     setLoading(true)
     try {
       const userData = await authMethodsService.login2FA(totpCode)
@@ -460,6 +465,7 @@ export default function LoginPage() {
   }
 
   const handle2FAWebAuthn = async () => {
+    clearMaintenance()
     setLoading(true)
     try {
       const userData = await authMethodsService.login2FAWebAuthn()
@@ -508,6 +514,7 @@ export default function LoginPage() {
       return
     }
 
+    clearMaintenance()
     setLoading(true)
     setStatusMessage(t('auth.authenticating'))
 
