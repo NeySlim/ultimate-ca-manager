@@ -4,6 +4,7 @@ a maintenance, and never an archive file left by a start that did not happen."""
 import io
 import os
 import threading
+import uuid
 
 import pytest
 
@@ -219,3 +220,68 @@ def test_a_refusal_concluded_by_the_runner_names_the_archive(app, auth_client, a
         lines = db.session.execute(select(AuditLog.success, AuditLog.resource_name).where(
             AuditLog.action == restore_job.ACTION, AuditLog.resource_id == job_id)).all()
     assert [tuple(line) for line in lines] == [(False, 'mine.ucmbkp')]
+
+
+@pytest.fixture
+def maintenance_view(app, monkeypatch):
+    """HA on; set(reason) puts this application's view in that maintenance, never read again."""
+    from datetime import timedelta
+    from config.settings import Config
+    from services import cluster_maintenance as cm
+    from utils.datetime_utils import utc_now
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(cm, 'OBSERVE_TTL_SECONDS', 3600)
+    view = cm.view_of(app)
+
+    def put(reason):
+        now = utc_now()
+        view.set({'token': 'tok', 'reason': reason, 'phase': (
+            cm.PHASE_MANUAL if reason == cm.REASON_MANUAL else cm.PHASE_RESTORING),
+            'started_at': now, 'expires_at': now + timedelta(minutes=5), 'restored_at': None,
+            'node_id': 'node-x', 'actor': 'admin'}, now)
+    yield put
+    view.row, view.observed, view.process_started, view.deadline = None, None, None, 0.0
+
+
+def _job(app, kind, take=False):
+    with app.app_context():
+        jt = jobs.job_type(kind)
+        job_id = store.create_job(db.session, kind=kind, slot=jt.slot,
+                                  exclusive=jt.slot in jobs.EXCLUSIVE_SLOTS,
+                                  exclusive_slots=jobs.EXCLUSIVE_SLOTS, now=jobs._now())
+        if take:
+            assert store.claim_job(db.session, job_id, 'elsewhere/1/x', jobs._now()) is not None
+    return job_id
+
+
+@pytest.mark.parametrize('kind', ['audit_verify', 'restore'])
+def test_an_administrators_maintenance_refuses_every_cancellation(
+        app, auth_client, finished, maintenance_view, monkeypatch, kind):
+    """No job holds a manual maintenance: cancelling one would write its conclusion and its
+    audit line while every write is refused. 503, nothing written."""
+    from services import cluster_maintenance as cm
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
+    assert auth_client.get('/api/v2/system/jobs').status_code == 200  # signed in before it
+    job_id = _job(app, kind)
+    maintenance_view(cm.REASON_MANUAL)
+    r = auth_client.post(f'/api/v2/system/jobs/{job_id}/cancel')
+    assert r.status_code == 503, r.data
+    assert r.headers['Retry-After'] == str(cm.RETRY_AFTER_SECONDS)
+    with app.app_context():
+        assert jobs.get_job(job_id)['state'] == 'pending'
+    # Refused at the gate, before the route reads anything
+    assert auth_client.post(f'/api/v2/system/jobs/{uuid.uuid4()}/cancel').status_code == 503
+
+
+def test_only_the_restore_holding_the_maintenance_is_cancelled_through_it(
+        app, auth_client, finished, maintenance_view, monkeypatch):
+    from services import cluster_maintenance as cm
+    monkeypatch.setattr(runner, 'dispatch_job', lambda job_id: None)
+    assert auth_client.get('/api/v2/system/jobs').status_code == 200
+    job_id = _job(app, 'restore', take=True)
+    maintenance_view(cm.REASON_RESTORE)
+    r = auth_client.post(f'/api/v2/system/jobs/{job_id}/cancel')
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['cancel_requested'] is True
+    with app.app_context():
+        assert jobs.get_job(job_id)['cancel_requested']

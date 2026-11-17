@@ -340,8 +340,23 @@ CONTROL_ENDPOINTS = frozenset({'system_v2.maintenance_status', 'system_v2.mainte
 JOB_START_ENDPOINTS = frozenset({'audit_v2.verify_integrity', 'system_v2.create_backup',
                                  'settings_v2.create_backup', 'system_v2.restore_backup',
                                  'settings_v2.restore_backup'})
-# The cancellation of the restore that holds the maintenance: a flag on its own job row
+# The cancellation of the restore that holds the maintenance: a flag on its own job row.
+# Through a restore's maintenance only; holds() decides which job it may write.
 JOB_CONTROL_ENDPOINTS = frozenset({'system_v2.cancel_job'})
+
+
+def holds(job, view=None) -> bool:
+    """``job`` (a job row) is the restore that holds the maintenance this process sees: the one
+    job whose cancellation writes through it. A manual maintenance is held by no job."""
+    view = view or current(refresh=False)
+    row = (view.row or {}) if view is not None and view.active() else {}
+    if job is None or job.get('kind') != 'restore' or job.get('state') not in ('pending', 'running'):
+        return False
+    if row.get('reason') == LOCAL_REASON:
+        return row.get('token') == job.get('id')
+    if row.get('reason') == REASON_RESTORE:
+        return job.get('node_id') in (None, row.get('node_id'))
+    return False
 
 
 def refusal(view=None, message=None):
@@ -371,8 +386,11 @@ def gate():
     if view is None or not view.active():
         return None
     if (request.blueprint in OPEN_BLUEPRINTS or request.endpoint in CONTROL_ENDPOINTS
-            or request.endpoint in JOB_START_ENDPOINTS or request.endpoint in JOB_CONTROL_ENDPOINTS):
+            or request.endpoint in JOB_START_ENDPOINTS):
         return None
+    if request.endpoint in JOB_CONTROL_ENDPOINTS and (view.row or {}).get('reason') in (
+            REASON_RESTORE, LOCAL_REASON):
+        return None  # the route writes only for the restore that holds it (holds())
     if request.blueprint in REFUSED_BLUEPRINTS:
         return refusal(view)
     if request.method in SAFE_METHODS or request.blueprint in READ_BLUEPRINTS:

@@ -238,8 +238,9 @@ def _phrase(jt, state, reason):
 
 def request_cancellation(job_id: str) -> str:
     """'cancelled', 'requested', 'final' or 'too_late' (a restore past its commit)."""
+    from contextlib import nullcontext
     from models import db
-    from services.cluster_maintenance import exempt
+    from services.cluster_maintenance import exempt, holds
     # The SQLite transaction of a restore holds the database: its local state answers
     from services.jobs import restore as restore_job
     local = restore_job.cancel_locally(job_id)
@@ -248,8 +249,8 @@ def request_cancellation(job_id: str) -> str:
     row = store.job_row(db.session, job_id)
     db.session.rollback()
     jt = _TYPES.get(row['kind'])
-    # A maintenance refuses writes: the flag of the job that holds it is not one of them
-    with exempt():
+    # A maintenance refuses writes (MaintenanceActive) but the flag of the restore holding it
+    with exempt() if holds(row) else nullcontext():
         return store.cancel_or_flag(db.session, job_id, _now(), result_line=audit_writer(row['kind']),
                                     past=jt.resumable_phases if jt else ())
 

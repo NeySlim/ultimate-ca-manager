@@ -205,8 +205,12 @@ def cancel_job(job_id):
         row = _held_view(job_id)
     if row is None:
         return error_response('Job not found', 404)
+    from services.cluster_maintenance import MaintenanceActive
     try:
         outcome = jobs.request_cancellation(job_id)
+    except MaintenanceActive:
+        db.session.rollback()
+        raise  # the maintenance's 503: only the restore holding it is cancelled through it
     except Exception as e:
         logger.error(f"Job {job_id} not cancelled: {type(e).__name__}")
         return error_response('Job not cancelled', 500)
