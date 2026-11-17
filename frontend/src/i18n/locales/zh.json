@@ -629,7 +629,11 @@
     "samlLogoutRejected": "无法验证身份提供方的注销请求；您仍处于登录状态。",
     "tooManyAttempts": "失败尝试次数过多",
     "retryAfterSeconds": "请在 {{seconds}} 秒后重试。",
-    "retryLater": "请稍后重试。"
+    "retryLater": "请稍后重试。",
+    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
+    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
+    "retryNow": "Retry now"
   },
   "dashboard": {
     "goodMorning": "早上好",

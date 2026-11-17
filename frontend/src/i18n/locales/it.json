@@ -629,7 +629,11 @@
     "samlLogoutRejected": "Non è stato possibile verificare la richiesta di disconnessione del provider di identità; sei ancora connesso.",
     "tooManyAttempts": "Troppi tentativi falliti",
     "retryAfterSeconds": "Riprova tra {{seconds}} secondi.",
-    "retryLater": "Riprova più tardi."
+    "retryLater": "Riprova più tardi.",
+    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
+    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
+    "retryNow": "Retry now"
   },
   "dashboard": {
     "goodMorning": "Buongiorno",

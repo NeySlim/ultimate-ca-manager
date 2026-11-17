@@ -629,7 +629,11 @@
     "samlLogoutRejected": "Die Abmeldeanforderung des Identitätsanbieters konnte nicht überprüft werden; Sie sind weiterhin angemeldet.",
     "tooManyAttempts": "Zu viele fehlgeschlagene Versuche",
     "retryAfterSeconds": "Versuchen Sie es in {{seconds}} Sekunden erneut.",
-    "retryLater": "Versuchen Sie es später erneut."
+    "retryLater": "Versuchen Sie es später erneut.",
+    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
+    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
+    "retryNow": "Retry now"
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",

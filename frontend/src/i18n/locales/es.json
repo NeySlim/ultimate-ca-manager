@@ -629,7 +629,11 @@
     "samlLogoutRejected": "No se pudo verificar la solicitud de cierre de sesión del proveedor de identidad; su sesión sigue abierta.",
     "tooManyAttempts": "Demasiados intentos fallidos",
     "retryAfterSeconds": "Vuelva a intentarlo en {{seconds}} segundos.",
-    "retryLater": "Vuelva a intentarlo más tarde."
+    "retryLater": "Vuelva a intentarlo más tarde.",
+    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
+    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
+    "retryNow": "Retry now"
   },
   "dashboard": {
     "goodMorning": "Buenos días",

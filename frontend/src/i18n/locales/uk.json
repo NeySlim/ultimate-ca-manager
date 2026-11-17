@@ -631,7 +631,11 @@
     "samlLogoutRejected": "Не вдалося перевірити запит на вихід від постачальника ідентичності; ви досі в системі.",
     "tooManyAttempts": "Забагато невдалих спроб",
     "retryAfterSeconds": "Повторіть спробу через {{seconds}} с.",
-    "retryLater": "Повторіть спробу пізніше."
+    "retryLater": "Повторіть спробу пізніше.",
+    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
+    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
+    "retryNow": "Retry now"
   },
   "dashboard": {
     "goodMorning": "Доброго ранку",

@@ -629,7 +629,11 @@
     "samlLogoutRejected": "ID プロバイダーからのサインアウト要求を検証できませんでした。サインインしたままです。",
     "tooManyAttempts": "失敗した試行が多すぎます",
     "retryAfterSeconds": "{{seconds}}秒後にもう一度お試しください。",
-    "retryLater": "しばらくしてからもう一度お試しください。"
+    "retryLater": "しばらくしてからもう一度お試しください。",
+    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
+    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
+    "retryNow": "Retry now"
   },
   "dashboard": {
     "goodMorning": "おはようございます",

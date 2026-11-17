@@ -21,11 +21,13 @@ import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
 import { cn } from '../lib/utils'
 import { safeNext } from '../navigation/safeNext'
+import { isMaintenanceRefusal, isRestoreMaintenance, maintenanceRetrySeconds } from './loginMaintenance'
 
 const STORAGE_KEY = 'ucm_last_username'
 const STORAGE_AUTH_METHOD_KEY = 'ucm_last_auth_method'
 const SSO_RETRY_BASE_MS = 2000
 const SSO_RETRY_MAX_MS = 30000
+const NO_EVENT = { preventDefault() {} }
 
 const toProviderList = (ssoData) => (Array.isArray(ssoData?.data) ? ssoData.data : [])
 
@@ -64,6 +66,9 @@ export default function LoginPage() {
   const requested = safeNext(searchParams.get('next'))
   const landing = requested || '/dashboard'
   const [rateLimit, setRateLimit] = useState(null)
+  // { restoring, seconds }: seconds counts down to the next attempt, null when none is planned
+  const [maintenance, setMaintenance] = useState(null)
+  const maintenanceRetry = useRef(null)
   const { login, sessionChecked } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
@@ -301,7 +306,8 @@ export default function LoginPage() {
       setAuthMethod('password')
       setStatusMessage('')
       setLoading(false)
-      if (noteRateLimit(error)) return
+      // A security key is touched again by the user: no attempt is made for them
+      if (noteRefusal(error, attemptWebAuthn, false)) return
       if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
         showInfo(t('auth.securityKeyCancelled'))
       }
@@ -314,6 +320,41 @@ export default function LoginPage() {
     setRateLimit({ retryAfter: Number.isFinite(error.retryAfter) ? error.retryAfter : null })
     return true
   }
+
+  const clearMaintenance = () => {
+    maintenanceRetry.current = null
+    setMaintenance(null)
+  }
+
+  // A 429 or a maintenance's 503 shown as a banner (true); `again` repeats the attempt, by
+  // itself after the Retry-After when `auto`, or from the banner's button
+  const noteRefusal = (error, again, auto = true) => {
+    if (isMaintenanceRefusal(error)) {
+      setRateLimit(null)
+      maintenanceRetry.current = again
+      setMaintenance({ restoring: isRestoreMaintenance(error), seconds: auto ? maintenanceRetrySeconds(error) : null })
+      return true
+    }
+    clearMaintenance()
+    return noteRateLimit(error)
+  }
+
+  const retryNow = () => {
+    const again = maintenanceRetry.current
+    setMaintenance(m => (m ? { ...m, seconds: null } : m))
+    if (again) again()
+  }
+
+  // The countdown of a planned attempt; one attempt at zero, which plans the next if refused again
+  useEffect(() => {
+    if (maintenance?.seconds == null) return undefined
+    if (maintenance.seconds <= 0) {
+      retryNow()
+      return undefined
+    }
+    const timer = setTimeout(() => setMaintenance(m => (m?.seconds != null ? { ...m, seconds: m.seconds - 1 } : m)), 1000)
+    return () => clearTimeout(timer)
+  }, [maintenance])
 
   const handleContinue = async (e) => {
     e?.preventDefault()
@@ -366,6 +407,7 @@ export default function LoginPage() {
       if (userData.requires_2fa) {
         twoFactorFrom.current = 'password'
         setRateLimit(null)
+        clearMaintenance()
         setStep('2fa')
         setTwoFactorMethods(userData.methods || ['totp'])
         setTotpCode('')
@@ -385,8 +427,8 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (!noteRateLimit(error)) showError(error.message || t('auth.invalidCredentials'))
-      setPassword('')
+      if (!noteRefusal(error, () => handlePasswordLogin(NO_EVENT))) showError(error.message || t('auth.invalidCredentials'))
+      if (!isMaintenanceRefusal(error)) setPassword('')  // kept for the next attempt
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -409,8 +451,8 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (!noteRateLimit(error)) showError(error.message || t('auth.invalidTotpCode'))
-      setTotpCode('')
+      if (!noteRefusal(error, () => handle2FAVerify(NO_EVENT))) showError(error.message || t('auth.invalidTotpCode'))
+      if (!isMaintenanceRefusal(error)) setTotpCode('')
     } finally {
       setLoading(false)
     }
@@ -426,7 +468,7 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (noteRateLimit(error)) {
+      if (noteRefusal(error, handle2FAWebAuthn, false)) {
         // banner shown
       } else if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
         showInfo(t('auth.twoFactorKeyCancelled'))
@@ -466,6 +508,7 @@ export default function LoginPage() {
       if (responseData.requires_2fa) {
         twoFactorFrom.current = 'ldap'
         setRateLimit(null)
+        clearMaintenance()
         setStep('2fa')
         setTwoFactorMethods(responseData.methods || ['totp'])
         setTotpCode('')
@@ -478,8 +521,8 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (!noteRateLimit(error)) showError(error.message || t('auth.ldapFailed'))
-      setPassword('')
+      if (!noteRefusal(error, () => handleLDAPLogin(NO_EVENT))) showError(error.message || t('auth.ldapFailed'))
+      if (!isMaintenanceRefusal(error)) setPassword('')
     } finally {
       setLoading(false)
       setStatusMessage('')
@@ -487,6 +530,7 @@ export default function LoginPage() {
   }
 
   const handleBack = () => {
+    clearMaintenance()
     setStep('username')
     setAuthMethod(null)
     setPassword('')
@@ -548,6 +592,22 @@ export default function LoginPage() {
                 ? t('auth.retryAfterSeconds', { seconds: rateLimit.retryAfter })
                 : t('auth.retryLater')}
             </span>
+          </div>
+        )}
+
+        {maintenance && (
+          <div role="status" className="rounded-lg border border-status-warning bg-bg-secondary p-3 text-sm text-text-primary">
+            <strong className="block">
+              {maintenance.restoring ? t('auth.maintenanceRestoring') : t('auth.maintenanceActive')}
+            </strong>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-text-secondary">
+                {maintenance.seconds != null ? t('auth.maintenanceRetryIn', { seconds: maintenance.seconds }) : null}
+              </span>
+              <Button type="button" size="sm" variant="secondary" onClick={retryNow} disabled={loading}>
+                {t('auth.retryNow')}
+              </Button>
+            </div>
           </div>
         )}
 

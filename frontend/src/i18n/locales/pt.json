@@ -629,7 +629,11 @@
     "samlLogoutRejected": "Não foi possível verificar o pedido de fim de sessão do fornecedor de identidade; continua com sessão iniciada.",
     "tooManyAttempts": "Tentativas falhadas em excesso",
     "retryAfterSeconds": "Tente novamente dentro de {{seconds}} segundos.",
-    "retryLater": "Tente novamente mais tarde."
+    "retryLater": "Tente novamente mais tarde.",
+    "maintenanceRestoring": "A backup restore is finishing: this server accepts sign-ins again once it has restarted.",
+    "maintenanceActive": "This server is in maintenance: sign-ins are refused until it ends.",
+    "maintenanceRetryIn": "Signing in again in {{seconds}} s.",
+    "retryNow": "Retry now"
   },
   "dashboard": {
     "goodMorning": "Bom dia",
