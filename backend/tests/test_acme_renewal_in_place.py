@@ -776,7 +776,12 @@ def test_a_kept_order_whose_key_cannot_be_read_is_replaced(bench, encryption_ena
 
 
 def test_deleting_an_order_leaves_no_dangling_renewal_link(app, auth_client, bench):
+    from sqlalchemy import text
     from services.database_admin.verify import check_declared_foreign_keys
+    # Other files on the worker delete orders in bulk and leave their proxy links: not this route's
+    db.session.execute(text('DELETE FROM acme_proxy_challenge_links WHERE order_id NOT IN '
+                            '(SELECT id FROM acme_client_orders)'))
+    db.session.commit()
     kept = bench.child(status='processing', renewal_enabled=False, renewal_of_order_id=bench.parent_id)
     with patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=bench.client):
         answer = auth_client.delete(f'/api/v2/acme/client/orders/{bench.parent_id}')
