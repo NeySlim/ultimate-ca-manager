@@ -1,8 +1,8 @@
 """Background jobs: long operations a route starts and the scheduler process runs.
 
-A route calls ``start(kind, ...)``, which creates the job under its slot (SlotBusy when
+A route calls ``start_job(kind, ...)``, which creates the job under its slot (SlotBusy when
 taken) and hands it to an executor: the scheduler process under gunicorn, a thread of this
-process otherwise. ``wait`` bounds how long the route waits for the end. A job type is a
+process otherwise. ``wait_for_job`` bounds how long the route waits for the end. A job type is a
 ``JobType`` registered once at import; its ``run(ctx)`` returns a ``JobOutcome``.
 """
 import json
@@ -145,14 +145,6 @@ def get_job(job_id: str) -> Optional[dict]:
     return row
 
 
-def active_job(kind: str) -> Optional[dict]:
-    from models import db
-    jt = _TYPES[kind]
-    rows = [r for r in store.active_jobs(db.session, jt.slot) if r['kind'] == kind]
-    db.session.rollback()
-    return rows[0] if rows else None
-
-
 def list_jobs(kinds, state: Optional[str] = None, limit: int = 20) -> list:
     from sqlalchemy import select
     from models import db
@@ -201,7 +193,7 @@ def _phrase(jt, state, reason):
 
 
 def request_cancellation(job_id: str) -> str:
-    """'cancelled', 'requested' or 'final' (store.request_cancel)."""
+    """'cancelled', 'requested' or 'final' (store.cancel_or_flag)."""
     from models import db
     row = store.job_row(db.session, job_id)
     db.session.rollback()
