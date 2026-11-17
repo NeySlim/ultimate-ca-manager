@@ -186,9 +186,8 @@ def test_a_second_backup_is_refused_naming_the_first(app, auth_client, backup_di
 def test_a_held_backup_lock_fails_the_job_with_the_409_of_before(app, auth_client, backup_dir,
                                                                 jobs_made, monkeypatch):
     """The scheduled backup's lock: the job waits a bounded time, then answers today's 409."""
-    from services.backup import storage
     from services.backup.locking import BackupBusyError, backup_operation_lock
-    monkeypatch.setattr(storage, 'EXPORT_LOCK_WAIT', 0.2)
+    monkeypatch.setattr(backup_job, 'LOCK_WAIT_SECONDS', 0.2)
     taken, release, refused = threading.Event(), threading.Event(), []
 
     def holder():
@@ -215,6 +214,29 @@ def test_a_held_backup_lock_fails_the_job_with_the_409_of_before(app, auth_clien
     row = _row(app, _job_id_of(app))
     assert (row['state'], row['reason']) == ('failed', 'refused')
     assert not list(backup_dir.glob('ucm_backup_*'))
+
+
+def test_a_held_backup_lock_answers_409_within_the_route_wait(app, auth_client, backup_dir,
+                                                              jobs_made):
+    """Real constants: the job gives up on the lock before the route stops waiting for it."""
+    from services.backup.locking import backup_operation_lock
+    taken, release = threading.Event(), threading.Event()
+
+    def holder():
+        with backup_operation_lock(timeout=0, purpose='a scheduled backup'):
+            taken.set()
+            release.wait(60)
+    thread = threading.Thread(target=holder)
+    thread.start()
+    try:
+        assert taken.wait(10)
+        r = _post(auth_client, SYSTEM, {'password': PASSWORD})
+    finally:
+        release.set()
+        thread.join(10)
+    assert r.status_code == 409, r.data
+    row = _row(app, _job_id_of(app))
+    assert (row['state'], row['reason']) == ('failed', 'refused')
 
 
 def test_an_unexpected_failure_answers_as_before_and_is_an_error(app, auth_client, backup_dir,

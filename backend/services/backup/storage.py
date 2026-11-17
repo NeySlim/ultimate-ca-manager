@@ -474,7 +474,8 @@ def restore_size_refusal(stream):
     return None
 
 
-# Seconds a manual backup waits for the backup lock before it is refused.
+# Seconds the scheduled backup waits for the backup lock before it is refused
+# (a manual one waits services.jobs.backup.LOCK_WAIT_SECONDS).
 EXPORT_LOCK_WAIT = 30
 
 

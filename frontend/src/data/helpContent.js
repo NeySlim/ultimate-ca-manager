@@ -1155,7 +1155,7 @@ export const helpContent = {
         items: [
           { label: "In the background", text: "Create Backup runs on the server: the dialog shows which part of the database is being exported and offers the archive for download when it is ready. A backup done within 25 seconds downloads at once, as before. Closing the dialog or reloading the page does not stop it: Create Backup shows it again" },
           { label: "Cancel", text: "Cancel the backup stops it between two parts of the export: no archive is kept and its temporary file is removed" },
-          { label: "One at a time", text: "One manual backup runs at a time on the whole installation, HA cluster included: a second one is refused (409) and names the one running. A backup that finds a scheduled backup or a restore holding the backup lock waits up to 30 seconds, then is refused (409)" },
+          { label: "One at a time", text: "One manual backup runs at a time on the whole installation, HA cluster included: a second one is refused (409) and names the one running. A backup that finds a scheduled backup or a restore holding the backup lock waits up to 15 seconds, then is refused (409)" },
         ]
       },
       {

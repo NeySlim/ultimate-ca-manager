@@ -62,7 +62,7 @@ export default {
         items: [
           { label: "En tâche de fond", text: "Créer une sauvegarde s'exécute sur le serveur : la fenêtre montre quelle partie de la base est exportée et propose de télécharger l'archive quand elle est prête. Une sauvegarde finie en 25 secondes se télécharge aussitôt, comme avant. Fermer la fenêtre ou recharger la page ne l'arrête pas : Créer une sauvegarde la montre de nouveau" },
           { label: "Annuler", text: "Annuler la sauvegarde l'arrête entre deux parties de l'export : aucune archive n'est gardée et son fichier temporaire est supprimé" },
-          { label: "Une à la fois", text: "Une seule sauvegarde manuelle s'exécute à la fois sur toute l'installation, cluster HA compris : une seconde est refusée (409) et nomme celle en cours. Une sauvegarde qui trouve le verrou de sauvegarde tenu par une sauvegarde programmée ou une restauration attend jusqu'à 30 secondes, puis est refusée (409)" },
+          { label: "Une à la fois", text: "Une seule sauvegarde manuelle s'exécute à la fois sur toute l'installation, cluster HA compris : une seconde est refusée (409) et nomme celle en cours. Une sauvegarde qui trouve le verrou de sauvegarde tenu par une sauvegarde programmée ou une restauration attend jusqu'à 15 secondes, puis est refusée (409)" },
         ]
       },
       {

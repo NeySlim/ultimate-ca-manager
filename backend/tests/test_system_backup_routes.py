@@ -557,7 +557,8 @@ class TestOneLockForArchivesAndRestores:
 
     @pytest.fixture
     def quick_export_wait(self, monkeypatch):
-        monkeypatch.setattr(storage, 'EXPORT_LOCK_WAIT', 0.3)
+        from services.jobs import backup as backup_job
+        monkeypatch.setattr(backup_job, 'LOCK_WAIT_SECONDS', 0.3)
 
     @pytest.mark.parametrize('url', ['/api/v2/system/backup/create',
                                      '/api/v2/settings/backup/create'])

@@ -7,7 +7,8 @@ The scheduled backup is not a job: it already runs in the scheduler process.
 import logging
 import time
 
-from services.jobs import SLOT_BACKUP, JobCancelled, JobOutcome, JobType, register
+from services.jobs import (JOB_WAIT_SECONDS, SLOT_BACKUP, JobCancelled, JobOutcome, JobType,
+                           register)
 from services.jobs.store import JobLost
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,11 @@ ROUTE_SYSTEM, ROUTE_SETTINGS = 'system', 'settings'
 ACTION = 'system_backup'
 # Seconds between two cancellation checks inside a section
 CHECK_SECONDS = 1.0
+
+# The job gives up on a held backup lock well before the route stops waiting for it,
+# so a busy lock answers the 409 of before rather than a 202 whose job fails later
+LOCK_WAIT_MARGIN_SECONDS = 10
+LOCK_WAIT_SECONDS = JOB_WAIT_SECONDS - LOCK_WAIT_MARGIN_SECONDS
 
 BUSY = 'Backup refused: another backup or restore is running'
 
@@ -63,6 +69,7 @@ def _export(ctx, service, password, kdf, route):
                                          BackupValidationError)
     try:
         size, _path, filename = storage.export_archive(service, password, kdf=kdf,
+                                                       timeout=LOCK_WAIT_SECONDS,
                                                        progress=_reporter(ctx))
         return (size, filename), None
     except (JobCancelled, JobLost):
