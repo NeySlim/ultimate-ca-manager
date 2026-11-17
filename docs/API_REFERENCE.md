@@ -3108,7 +3108,9 @@ list shows only the kinds the caller may read, and the id of another kind answer
   mode); `null` otherwise.
 - Cancel: a pending job ends at once (`200`, `Job cancelled`); a running one stops at its next
   page (`200`, `Cancellation requested`); an ended one answers `409`. A backup stops between two
-  sections of the export, or within a second inside one: no archive is kept.
+  sections of the export, or within a second inside one: no archive is kept. During a cluster
+  maintenance, or a restore on a single node, the cancel route answers the maintenance's `503`
+  for every job but the restore holding it.
 
 A job of an audited operation (the backup) writes one audit line when it ends. If that write
 fails twice, the job still ends, without the line, and the service log records it at level
@@ -3129,7 +3131,8 @@ A restore whose process stopped before its commit fails (`executor_lost`, `The r
 before it committed: nothing was restored`); one that stopped after it is finished by the next
 start of the scheduler process, each step done once. A restore refused by the HA maintenance
 keeps its members in `result.problem` (`code`, and `nodes` for `maintenance_not_acknowledged`),
-and the route answers them as before.
+and the route answers them as before. Every audit line of a restore job names its archive, a
+cancelled, lost or never started one included.
 
 ### Database Operations
 ```http
