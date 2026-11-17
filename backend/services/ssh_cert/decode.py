@@ -107,7 +107,7 @@ class SSHCertificateDecodeMixin:
                 f"A certificate with serial {decoded['serial']} from this CA already exists"
             )
 
-        SSHSerials.refuse_revoked_key_id(matched_ca.id, decoded['key_id'])
+        SSHSerials.refuse_revoked_key_id(matched_ca.id, decoded['key_id'], imported=True)
 
         principals = decoded['principals']
         cert_type = decoded['type']

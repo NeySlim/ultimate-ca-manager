@@ -555,10 +555,11 @@ def test_a_key_id_the_krl_revokes_is_neither_issued_nor_imported(installation):
                                                     username='t')
     SSHCertificateService.revoke_certificate(zero.id, 'superseded', 't')
     counter = _counter(ca_id)
-    with pytest.raises(ValueError, match=f"key ID 'carol'.*#{zero.id}"):
+    with pytest.raises(ValueError, match=f"key ID 'carol'.*#{zero.id}.*Use another key ID"):
         SSHCertificateService.sign_certificate(ca_id, _pubkey(), 'user', ['carol'], key_id='carol')
     db.session.rollback()
-    with pytest.raises(ValueError, match=f"key ID 'carol'.*#{zero.id}"):
+    # The key ID of an imported certificate is under its signature: no other one to suggest
+    with pytest.raises(ValueError, match=f"key ID 'carol'.*#{zero.id}.*then import again$"):
         SSHCertificateService.import_certificate(_signed_with_key_id(key, 9, b'carol'), ssh_ca_id=ca_id,
                                                  username='t')
     db.session.rollback()

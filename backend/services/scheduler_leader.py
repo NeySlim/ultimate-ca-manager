@@ -469,7 +469,7 @@ def cluster_nodes_detail(wake_interval) -> list:
     from models import ClusterNode
     from utils.datetime_utils import utc_isoformat
     now = cluster_utc_now()
-    return [{'node_id': n.node_id, 'leader': bool(n.is_leader),
+    return [{'node_id': n.node_id, 'leader': bool(n.is_leader) and n.instance_token is not None,
              'stopped': n.instance_token is None,
              'stale': n.instance_token is not None and _is_stale(n, wake_interval, now),
              'version': n.version,

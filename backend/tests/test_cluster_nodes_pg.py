@@ -219,12 +219,16 @@ def test_a_node_stopped_cleanly_is_listed_stopped_and_never_stale(app, ha):
     _beat(app, 'late', 'late-token', age=3 * WAKE + 0.1)
     _beat(app, 'gone', 'gone-token', age=3 * WAKE + 0.1)
     with app.app_context():
+        from models import ClusterNode, db
         assert scheduler_leader.release_node(PREFIX + 'gone', 'gone-token')
+        db.session.get(ClusterNode, PREFIX + 'gone').is_leader = True  # as a leader stopped last leaves it
+        db.session.commit()
         summary = scheduler_leader.cluster_summary(WAKE)
         detail = {n['node_id'][len(PREFIX):]: n for n in scheduler_leader.cluster_nodes_detail(WAKE)
                   if n['node_id'].startswith(PREFIX)}
     assert (summary['nodes'], summary['stale']) == (1, 1)
     assert (detail['gone']['stopped'], detail['gone']['stale']) == (True, False)
+    assert detail['gone']['leader'] is False  # a released row leads nothing, flag left or not
     assert (detail['late']['stopped'], detail['late']['stale']) == (False, True)
 
 
