@@ -1082,6 +1082,11 @@ def create_app(config_name=None):
         report_removed_keys(app)
     except Exception as e:
         app.logger.warning(f"Trust store key report skipped: {e}")
+    try:
+        from utils import ssh_serials
+        ssh_serials.report_marked_duplicates(app)
+    except Exception as e:
+        app.logger.warning(f"SSH serial report skipped: {e}")
 
     # Auto-register SoftHSM provider if Docker entrypoint initialized a token
     try:

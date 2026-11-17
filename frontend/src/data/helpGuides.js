@@ -3780,6 +3780,8 @@ On clients, add the Host CA to known_hosts:
 
 A revoked certificate stays in the KRL, and in the list, until it expires: deleting it earlier is refused, since the KRL is built from these records and the certificate would be accepted again. Each KRL download carries a higher version number (v2.252).
 
+The KRL names a certificate by its serial number, which UCM gives out once per CA. An installation upgraded from 2.x may hold two certificates of one CA sharing a serial: the list marks them **Shared serial**, and revoking one revokes them all. Revoke them and issue new certificates.
+
 > ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
 
 ## Troubleshooting

@@ -21,6 +21,18 @@ class SSHCertificateManagementMixin:
         cert.revoked = True
         cert.revoked_at = utc_now()
         cert.revoke_reason = reason
+        # The KRL revokes by serial (PROTOCOL.krl §2.2): every certificate holding it is revoked,
+        # and the rows say so; the caller reads them in `revoked_with`
+        siblings = (SSHCertificate.query.filter(SSHCertificate.ssh_ca_id == cert.ssh_ca_id,
+                                                SSHCertificate.serial == cert.serial,
+                                                SSHCertificate.id != cert.id)
+                    .order_by(SSHCertificate.id).all() if cert.serial else [])
+        for sibling in siblings:
+            if not sibling.revoked:
+                sibling.revoked = True
+                sibling.revoked_at = cert.revoked_at
+                sibling.revoke_reason = reason
+        cert.revoked_with = siblings
 
         try:
             db.session.commit()

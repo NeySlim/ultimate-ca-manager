@@ -613,6 +613,36 @@ def check_local_email_flags(engine) -> Dict[str, Any]:
     return {'accounts_checked': int(checked or 0), 'disagreeing': 0}
 
 
+def check_ssh_serials(engine) -> Dict[str, Any]:
+    """Every SSH CA counts past its certificates, and none holds a serial twice under the index.
+
+    A KRL revokes by serial (PROTOCOL.krl): a trailing counter hands a number out again, and an
+    unmarked pair means the unique index ``uq_ssh_certificates_ca_serial`` is not there."""
+    from utils.ssh_serials import lagging_counters, unmarked_duplicates
+    _insp, table_names = _reflect(engine)
+    if 'ssh_cas' not in table_names or 'ssh_certificates' not in table_names:
+        return {'cas_checked': 0, 'skipped_count': 1, 'skipped': [{
+            'table': 'ssh_cas', 'constraint': 'serial_counter',
+            'reason': 'ssh_cas or ssh_certificates is missing on the target'}]}
+    with _connect(engine) as conn:
+        def run(sql, params=None):
+            return conn.execute(text(sql), params or {})
+        lagging = lagging_counters(run)
+        unmarked = unmarked_duplicates(run)
+        checked = _scalar(conn, text('SELECT COUNT(*) FROM "ssh_cas"'), what="the SSH CAs")
+    if lagging:
+        listed = ', '.join(f"CA #{ca_id} at {counter} below serial {highest}"
+                           for ca_id, _descr, counter, highest in lagging[:10])
+        raise VerificationError(
+            f"ssh_cas.serial_counter trails the certificates of {len(lagging)} SSH CA(s) ({listed}): "
+            "a serial would be issued twice")
+    if unmarked:
+        raise VerificationError(
+            f"{len(unmarked)} SSH certificate(s) hold a serial an older certificate of their CA holds, "
+            f"unmarked (#{', #'.join(map(str, unmarked[:10]))}): the unique serial index is missing")
+    return {'cas_checked': int(checked or 0), 'lagging': 0, 'unmarked_duplicates': 0}
+
+
 # ---------------------------------------------------------------------------
 # 4. Sequences (PostgreSQL only)
 # ---------------------------------------------------------------------------
@@ -1032,6 +1062,7 @@ def verify_migration(target_engine, expected_counts: Dict[str, int], *,
         ('foreign_keys', lambda: check_foreign_keys(target_engine)),
         ('unique_constraints', lambda: check_unique_constraints(target_engine)),
         ('local_email_flags', lambda: check_local_email_flags(target_engine)),
+        ('ssh_serials', lambda: check_ssh_serials(target_engine)),
         ('sequences', lambda: check_sequences(target_engine)),
         ('secrets', lambda: check_secret_decryption(target_engine)),
     )

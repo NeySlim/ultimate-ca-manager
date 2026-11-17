@@ -275,10 +275,11 @@ def test_ssh_ca_eddsa_key(session):
 
 def test_ssh_certificates_eddsa_key(session):
     ca = _ssh_ca('Signer', 'ecdsa-p256', ec.generate_private_key(ec.SECP256R1()))
-    for key_id, key_type, valid_to in (('alice-ed', 'ed25519', 1), ('bob-ec', 'ecdsa-p256', 1),
-                                       ('old-ed', 'ed25519', -1)):
+    # One serial per certificate of a CA: the database holds each once
+    for serial, (key_id, key_type, valid_to) in enumerate((('alice-ed', 'ed25519', 1), ('bob-ec', 'ecdsa-p256', 1),
+                                                           ('old-ed', 'ed25519', -1)), start=1):
         session.add(SSHCertificate(ssh_ca_id=ca.id, cert_type='user', key_id=key_id,
-                                   public_key='k', certificate='c', principals='[]', serial=1,
+                                   public_key='k', certificate='c', principals='[]', serial=serial,
                                    valid_from=utc_now() - timedelta(days=2),
                                    valid_to=utc_now() + timedelta(days=valid_to),
                                    key_type=key_type, fingerprint=key_id))

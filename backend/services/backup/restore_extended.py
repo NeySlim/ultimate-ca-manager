@@ -28,6 +28,7 @@ from sqlalchemy import inspect as sa_inspect
 
 from models import db
 from utils.datetime_utils import to_naive_utc
+from utils import ssh_serials as SSHSerials
 
 from .errors import BackupSchemaError
 from .export_generic import REFERENCE_SUFFIX, load_model
@@ -311,6 +312,8 @@ class RestoreExtendedMixin:
         for sca_data in rows:
             refid = sca_data.get('refid')
             sca = _existing_row('ssh_cas', {'refid': refid})
+            # A serial this CA gave out here stays given out, whatever an older archive says
+            counter_here = sca.serial_counter if sca is not None else 0
             if sca is None:
                 # refid, descr, ca_type, public_key, private_key, key_type,
                 # fingerprint and serial_counter are NOT NULL; all but the
@@ -328,6 +331,7 @@ class RestoreExtendedMixin:
                 db.session.add(sca)
 
             apply_columns(sca, 'ssh_cas', sca_data, plan)
+            sca.serial_counter = max(counter_here or 0, sca.serial_counter or 0)
             if 'allow_any_principal' not in sca_data:
                 # An older archive: an empty list meant any principal then
                 sca.allow_any_principal = not sca.get_allowed_principals()
@@ -429,8 +433,13 @@ class RestoreExtendedMixin:
 
             if apply_columns(sc, 'ssh_certificates', sc_data, plan):
                 results['ssh_certificates'] += 1
+            # Out of the unique index before any later query autoflushes it: an archive may hold
+            # a 2.254 pair; settle_marks puts the oldest holder of each serial back after the flush.
+            if sc.serial:
+                sc.serial_duplicate = True
 
         db.session.flush()
+        SSHSerials.settle_marks(SSHSerials.session_run)
 
     def _restore_microsoft_cas(self, backup_data: Dict, results: Dict,
                                plan: Optional[RestorePlan] = None) -> None:

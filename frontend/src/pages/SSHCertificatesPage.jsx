@@ -214,8 +214,10 @@ export default function SSHCertificatesPage() {
     if (!revokingCert) return
     try {
       muteToasts()
-      await sshCertificatesService.revoke(revokingCert.id, reason)
-      showSuccess(t('messages.success.revoke.sshCertificate'))
+      const res = await sshCertificatesService.revoke(revokingCert.id, reason)
+      showSuccess(res?.data?.revoked_with?.length
+        ? t('sshCertificates.revokedWithShared', { serial: revokingCert.serial })
+        : t('messages.success.revoke.sshCertificate'))
       setShowRevokeModal(false)
       setRevokingCert(null)
       if (selectedCert?.id === revokingCert.id) setSelectedCert(null)
@@ -342,6 +344,9 @@ export default function SSHCertificatesPage() {
                 : <User size={14} weight="duotone" />}
             </div>
             <span className="font-medium truncate">{val || t('common.unnamed')}</span>
+            {row.serial_shared_with?.length > 0 && (
+              <Badge variant="warning" size="sm" icon={Warning}>{t('sshCertificates.serialShared')}</Badge>
+            )}
           </div>
         )
       },
@@ -495,6 +500,16 @@ export default function SSHCertificatesPage() {
           </Button>
         )}
       </div>
+
+      {/* Another certificate of the CA holds this serial: the KRL revokes by serial */}
+      {selectedCert.serial_shared_with?.length > 0 && (
+        <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
+          <div className="flex items-start gap-2 text-status-warning text-xs">
+            <Warning size={16} className="shrink-0" />
+            <span>{t('sshCertificates.serialSharedDetail', { serial: selectedCert.serial })}</span>
+          </div>
+        </div>
+      )}
 
       {/* Certificate Information */}
       <CompactSection title={t('sshCertificates.certInformation')} icon={Certificate}>
@@ -1306,6 +1321,11 @@ function RevokeCertificateForm({ cert, onSubmit, onCancel }) {
           <Warning size={16} />
           {t('sshCertificates.revokeConfirm')}
         </div>
+        {cert?.serial_shared_with?.length > 0 && (
+          <p className="mt-2 text-xs text-status-danger">
+            {t('sshCertificates.revokeSharedSerial', { serial: cert.serial })}
+          </p>
+        )}
       </div>
 
       {cert && (
