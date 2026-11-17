@@ -209,7 +209,7 @@ class LocalGate:
             time.sleep(GATE_DRAIN_SECONDS)
         return self
 
-    def update(self, **view):
+    def set_view(self, **view):
         with self._lock:
             self.view.update(view)
             if not self._stop.is_set():
@@ -218,7 +218,7 @@ class LocalGate:
     def _renew_loop(self):
         while not self._stop.wait(GATE_RENEW_SECONDS):
             try:
-                self.update()
+                self.set_view()
             except OSError as e:
                 logger.error(f"Restore write gate not renewed: {type(e).__name__}")
 
@@ -256,7 +256,7 @@ class _Run:
         self._last = now
         held = self.sqlite and transaction.inside()
         if self.gate is not None:
-            self.gate.update(phase=phase, progress={'done': self._done, 'total': len(STEPS)},
+            self.gate.set_view(phase=phase, progress={'done': self._done, 'total': len(STEPS)},
                              held=held)
         if cancel_flagged(self.ctx.job_id):
             raise JobCancelled(self.ctx.job_id)
@@ -270,7 +270,7 @@ class _Run:
         from sqlalchemy import update
         T = store.T
         if self.gate is not None:
-            self.gate.update(phase=COMMITTING)
+            self.gate.set_view(phase=COMMITTING)
         if cancel_flagged(self.ctx.job_id):
             raise JobCancelled(self.ctx.job_id)
         done = session.execute(update(T).where(
@@ -594,7 +594,7 @@ def finish(job_id, executor, results, name, filename, maintenance=None, gate=Non
         _conclude(job_id, executor, 200, NOTHING_CARRIED, results, details, name)
         return JobOutcome(concluded=True)
     if gate is not None:
-        gate.update(phase=COMMITTED, held=False)  # a cancellation is now the row's to refuse
+        gate.set_view(phase=COMMITTED, held=False)  # a cancellation is now the row's to refuse
     with cluster_maintenance.exempt():
         try:
             _marked(job_id, results)
