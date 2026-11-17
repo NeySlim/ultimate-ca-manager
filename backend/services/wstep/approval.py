@@ -39,7 +39,7 @@ def make_gate(ca, *, operation, profile, identity=None, extra=None):
         data = dict(extra or {}, operation=operation, profile_id=getattr(profile, 'id', None),
                     profile_name=getattr(profile, 'name', None), profile_realm=getattr(profile, 'realm', None))
         csr_ref = protocol_approval.csr_ref(csr)
-        # A Kerberos renewal exempted from the template rule keeps the requester's identity
+        # A Kerberos renewal keeps the certificate it renews, which the approval supersedes
         renewal_of = signing_cert if signing_cert is not None else renewed
         if renewal_of is not None:
             data['renewal_of'] = renewal_of.public_bytes(Encoding.PEM).decode()
@@ -126,7 +126,7 @@ def _issue(approval, data):
                 ca, signing_cert, db_cert, csr, validity_days, 'wstep', require_pop,
                 on_stored=protocol_approval.linker(approval), profile=profile)
     else:
-        # The template-less renewal the request was held for: its certificate is checked again as on
+        # The Kerberos renewal the request was held for: its certificate is checked again as on
         # arrival, so an expiry, a revocation or a renewal since withdraws it
         renewed = x509.load_pem_x509_certificate(data['renewal_of'].encode()) if data.get('renewal_of') else None
         cert_pem, err = wstep_service.issue(

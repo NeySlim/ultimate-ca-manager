@@ -376,6 +376,7 @@ class TestNakedCsrSubjectDerivation:
     def test_naked_csr_with_failed_ad_lookup_still_rejected(
         self, client, app, wstep_kerberos_config, monkeypatch
     ):
+        """Refused with the directory's reason: the naked request followed the policy."""
         _configure_ad_connector(app)
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda _config, sam_account_name: 'S-1-5-21-1-2-3-1000')
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
@@ -392,7 +393,7 @@ class TestNakedCsrSubjectDerivation:
             headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
         )
         assert r.status_code == 400
-        assert b'CSR subject must include a non-empty CN or a SubjectAltName' in r.data, r.data
+        assert b'The certificate subject is built from Active Directory, which could not resolve the requester' in r.data, r.data
 
     def test_naked_csr_with_realm_mismatch_still_rejected(
         self, client, app, wstep_kerberos_config, monkeypatch

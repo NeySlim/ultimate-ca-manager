@@ -74,7 +74,7 @@ class HeldForApproval(Exception):
 def _pass_gate(gate, csr, template, subject, san, signing_cert=None, renewed=None):
     """None when *gate* lets the request through, else the error to answer;
     raises :class:`HeldForApproval` when a policy holds it. ``renewed``: the certificate
-    a Kerberos request renews under the template-less exemption, held with the request."""
+    a Kerberos request renews, held with the request."""
     if gate is None:
         return None
     from services.protocol_approval import ApprovalGateUnavailable
@@ -462,6 +462,15 @@ def _template_ext_oid(cert_or_csr):
             x509.MSCertificateTemplate).value.template_id.dotted_string
     except (x509.ExtensionNotFound, ValueError):
         return None
+
+
+def _renews_template(renewed, template, ca, *, profile):
+    """Whether *renewed* renews under *template*: it carries no template (issued before 3.0), or
+    this one under the OID served now or any OID this instance announced for it before."""
+    oid = _template_ext_oid(renewed)
+    if oid is None or oid == _template_oid_for(ca, template, profile=profile):
+        return True
+    return _template_id_of_policy_oid(oid) == template.id and oid in _instance_template_oids(template)
 
 
 def _eku_oids(cert_or_csr):
@@ -928,9 +937,10 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
         return None, None, None
 
     patterned = template if _cn_pattern_applies(template) else None
-    subject, san, reached = None, None, True
+    subject, san, reached, consulted = None, None, True, False
     unresolved = 'could not resolve the requester'
     if sam_account_name and is_machine:
+        consulted = True
         if patterned is not None:
             computer = lookup.lookup_computer_identity(connector, sam_account_name)
             dns_hostname = computer['dns_hostname'] if computer else computer
@@ -948,6 +958,7 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
                 # The CN no longer names the host: the SAN it implied is given as such
                 san = san if san is not None else _cn_implied_dns_san(patterned, csr, dns_hostname)
     elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca, profile=profile)):
+        consulted = True
         subject, san = _user_directory_subject(connector, sam_account_name, patterned, profile=profile)
         if isinstance(subject, _PatternRefusal):
             return None, None, str(subject)
@@ -963,8 +974,9 @@ def _directory_subject(ca, template, csr, principal, sam_account_name, connector
     # The requester is not at fault when the directory cannot answer: env:Receiver
     if subject is None and not reached:
         return None, None, ServerError('The directory that builds the certificate subject could not be reached')
-    if subject is None and built_by_ca and not naked:
-        if template is None and sam_account_name and not is_machine:
+    # A directory asked that names no subject is the reason, whatever the request's shape (naked included)
+    if subject is None and (consulted or (built_by_ca and not naked)):
+        if not consulted and template is None and sam_account_name and not is_machine:
             return None, None, 'The request matches no certificate template whose subject it may supply'
         return None, None, f'The certificate subject is built from Active Directory, which {unresolved}'
     return subject, san, None
@@ -1116,13 +1128,15 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     no template is refused (``NO_TEMPLATE``, or the key when another key's template fits), unless it
     renews the requester's own valid certificate issued here without one (``_requester_renewal``).
     Only a matched template announcing a client-supplied subject keeps the CSR's.
-    Derivation never fails open: a naked CSR falls through to the normal
-    rejection, a populated one under a CA-built template or none is refused.
+    Derivation never fails open: a request the directory was asked for and cannot name is
+    refused with the directory's reason, naked or not; a naked CSR no directory was asked
+    for falls through to the normal rejection, a populated one under a CA-built template is refused.
 
     ``profile``: the Windows enrollment profile serving the request; a Kerberos principal is
     issued only by the enabled profile of its own realm, with that profile's connector.
     ``renewal``: a dict that receives the ``serial`` of the certificate a Kerberos request renews
-    (``_requester_renewal``), for the audit. ``approved_renewal``: that certificate, as the
+    (``_requester_renewal``), and its CA's ``ca`` name when another CA issued it, for the audit; that
+    certificate is superseded by the new one. ``approved_renewal``: that certificate, as the
     approval of a held request replays it (the envelope is not kept); never read from a request.
 
     Enroll ACL: see ``_required_enroll_acl_groups`` for exactly which
@@ -1229,8 +1243,26 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     unresolved = renewed is lookup.UNREACHABLE
     if unresolved:
         renewed = None
+    # Renewed already, on either binding: refused as the Certificate binding refuses it
+    if renewed is SUPERSEDED_RENEWAL:
+        return None, RENEWED_SUPERSEDED
+    # A certificate of another template signing the request does not make it its renewal
+    if renewed is not None and matched_template is not None and not _renews_template(
+            renewed, matched_template, ca, profile=profile):
+        renewed = None
+    # The renewed row is replaced by the new certificate, under the CA that issued it
+    renewal_ca, superseded_row = (_issuing_ca(ca, renewed), None) if renewed is not None else (None, None)
+    if renewed is not None:
+        superseded_row, withdrawn = _renewal_refusal(ca, renewed)
+        # An approved request is processed as a new one (MS-CSRA ResubmitRequest, rule 3): the
+        # arrival's check again, so an expiry, a revocation or a renewal since withdraws it
+        if withdrawn:
+            return None, withdrawn
+        superseded_row = _windows_row(renewal_ca, renewed, superseded_row)
     if renewal is not None and renewed is not None:
         renewal['serial'] = renewed.serial_number
+        if renewal_ca.id != ca.id:
+            renewal['ca'] = renewal_ca.descr
     # Only the requester's own valid Windows certificate issued without template (before 3.0) is exempted
     exempted = None
     if kerberos_principal and matched_template is None:
@@ -1238,11 +1270,6 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             return None, ServerError(renewal_identity.UNRESOLVED_MESSAGE)
         if renewed is None or _template_ext_oid(renewed) is not None:
             return None, _other_key_refusal(ca, csr, profile=profile) or NO_TEMPLATE
-        # An approved request is processed as a new one (MS-CSRA ResubmitRequest, rule 3): the
-        # arrival's check again, so an expiry, a revocation or a renewal since withdraws it
-        withdrawn = _renewal_refusal(ca, approved_renewal)[1] if approved_renewal is not None else None
-        if withdrawn:
-            return None, withdrawn
         exempted = renewed
     template_oid = None
     if matched_template is not None:
@@ -1310,7 +1337,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # The approval gate sees the subject and names the certificate will carry
     err = _pass_gate(gate, csr, matched_template,
                      override_subject if override_subject is not None else csr.subject, override_san,
-                     renewed=exempted)
+                     renewed=renewed)
     if err:
         return None, err
 
@@ -1336,10 +1363,14 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
             windows_profile_id=getattr(profile, 'id', None), unique_subject=patterned,
             subject_holder=sid_holder(requester_sid), audit_subject_refusal=False,
+            # Archived in the commit that stores its successor, as on the Certificate binding
+            supersedes=superseded_row,
             # The renewed template-less certificate proves the same entity (designated renewal)
-            renews=(find_issued_rows(ca, exempted)
+            renews=(find_issued_rows(renewal_ca, exempted)
                     if exempted is not None and applies_unique_subject(ca, patterned) else None),
         )
+    except AlreadySuperseded:
+        return None, RENEWED_SUPERSEDED
     except SubjectTaken as e:
         return None, SubjectHeldByAnother(matched_template if patterned else None, e)
     except PolicyViolation as e:  # the route logs the refusal it answers
@@ -1517,34 +1548,58 @@ def _envelope_certificates(outer_signed_data):
 
 def _requester_renewal(ca, outer_signed_data, principal, sam_account_name, connector, requester_sid, *,
                        profile):
-    """The certificate a Kerberos request renews, as Windows signs the envelope with its key: one of
-    *ca*, valid (not revoked, expired or superseded), recorded under *profile* and the requester's
-    own (``_requester_holds``); None for an initial enrollment or the certificate of another,
-    ``lookup.UNREACHABLE`` when the directory could not say whose it is."""
+    """The certificate a Kerberos request renews, as Windows signs the envelope with its key: one a
+    CA of UCM issued (*ca* or, after a change of CA, the former one), valid (not revoked, expired or
+    superseded), recorded under *profile* and the requester's own (``_requester_holds``); None for
+    an initial enrollment or the certificate of another, ``SUPERSEDED_RENEWAL`` when the requester's
+    own is renewed already, ``lookup.UNREACHABLE`` when the directory could not say whose it is."""
     from services.ad_connector import lookup
     from services.windows_profiles import certificate_profile
-    unreachable = False
+    unreachable = superseded = False
     for cert in _envelope_certificates(outer_signed_data):
         row, refusal = _renewal_refusal(ca, cert)
-        if row is None or refusal or _verify_renewal_signer(outer_signed_data, cert) is not None:
+        if (row is None or refusal not in (None, RENEWED_SUPERSEDED)
+                or _verify_renewal_signer(outer_signed_data, cert) is not None):
             continue
-        row = _windows_row(ca, cert, row)
+        row = _windows_row(_issuing_ca(ca, cert), cert, row)
         recorded, _refusal = certificate_profile(row)
         if recorded is None or profile is None or recorded.id != profile.id:
             continue
         held = _requester_holds(cert, principal, sam_account_name, connector, requester_sid, profile=profile)
         if held is lookup.UNREACHABLE:
             unreachable = True
+        elif held and refusal:
+            superseded = True
         elif held:
             return cert
-    return lookup.UNREACHABLE if unreachable else None
+    if unreachable:
+        return lookup.UNREACHABLE
+    return SUPERSEDED_RENEWAL if superseded else None
+
+
+# The requester's own certificate signs the envelope but a renewal replaced it already
+SUPERSEDED_RENEWAL = object()
+
+
+def _issuing_ca(ca, cert):
+    """The CA of UCM whose key signed *cert* and that stores it: *ca*, else the CA a stored row of
+    *cert* names (one the profile issued under before a change of CA); *ca* when none did."""
+    from models import CA
+    from services.cert.issued_lookup import find_issued_rows, find_stored_rows
+    if find_issued_rows(ca, cert):
+        return ca
+    for row in find_stored_rows(cert):
+        other = CA.query.filter_by(refid=row.caref).first() if row.caref else None
+        if other is not None and other.id != ca.id and find_issued_rows(other, cert):
+            return other
+    return ca
 
 
 def _renewal_refusal(ca, cert):
     """(row, refusal): *cert*'s stored row and why it cannot be renewed, None while valid; one
-    check for a request on arrival and for a held one at its approval."""
+    check for a request on arrival and for a held one at its approval, under the CA that issued it."""
     from services.cert.issued_lookup import EXPIRED, OK, REVOKED, SUPERSEDED, issued_certificate_status
-    row, status = issued_certificate_status(ca, cert)
+    row, status = issued_certificate_status(_issuing_ca(ca, cert), cert)
     if status == OK:
         return row, None
     return row, {REVOKED: RENEWED_REVOKED, SUPERSEDED: RENEWED_SUPERSEDED,
