@@ -3105,6 +3105,11 @@ list shows only the kinds the caller may read, and the id of another kind answer
   page (`200`, `Cancellation requested`); an ended one answers `409`. A backup stops between two
   sections of the export, or within a second inside one: no archive is kept.
 
+A job of an audited operation (the backup) writes one audit line when it ends. If that write
+fails twice, the job still ends, without the line, and the service log records it at level
+`ERROR` (`Background job <id> concluded without its audit line: ...`, with the line's action,
+resource, success and phrase).
+
 A finished job is kept 30 days, and the latest of each kind always.
 
 ### Database Operations

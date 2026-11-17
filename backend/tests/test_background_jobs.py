@@ -356,19 +356,55 @@ def test_the_conclusion_is_undone_when_its_audit_line_is_not_written(app, fake_t
         assert jobs.request_cancellation(job_id) == 'cancelled'
 
 
-def test_a_run_whose_result_line_cannot_be_written_still_ends(app, fake_types, created,
-                                                              monkeypatch):
-    """Its result stands without the line rather than hold the slot until a restart."""
-    def down(**kwargs):
-        raise RuntimeError('audit down')
-    monkeypatch.setattr(AuditService, 'log_action', staticmethod(down))
+def _flaky_audit(monkeypatch, failures):
+    """AuditService.log_action failing for FAKE_ACTION ``failures`` times, then real."""
+    real, calls = AuditService.log_action, []
+
+    def flaky(**kwargs):
+        if kwargs.get('action') == FAKE_ACTION:
+            calls.append(kwargs)
+            if len(calls) <= failures:
+                raise RuntimeError('audit down')
+        return real(**kwargs)
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(flaky))
+    return calls
+
+
+def _result_lines(job_id):
+    lines = AuditLog.query.filter_by(action=FAKE_ACTION, resource_id=job_id).all()
+    db.session.rollback()
+    return lines
+
+
+def test_a_result_line_that_fails_once_is_written_on_the_retry(app, fake_types, created,
+                                                               monkeypatch):
+    calls = _flaky_audit(monkeypatch, failures=1)
     job_id, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
     assert runner.join_local(job_id, 10)
+    with app.app_context():
+        assert (_row(job_id)['state'], _row(job_id)['reason']) == ('succeeded', 'done')
+        lines = _result_lines(job_id)
+        assert len(calls) == 2 and len(lines) == 1
+        assert lines[0].details == 'Fake job finished' and lines[0].success
+
+
+def test_a_run_whose_result_line_fails_twice_still_ends_and_logs_it(app, fake_types, created,
+                                                                     monkeypatch, caplog):
+    """Its result stands without the line rather than hold the slot until a restart."""
+    calls = _flaky_audit(monkeypatch, failures=2)
+    job_id, _ = _start(app, fake_types[jobs.SLOT_BACKUP], created)
+    with caplog.at_level('ERROR', logger='services.jobs.runner'):
+        assert runner.join_local(job_id, 10)
     with app.app_context():
         row = _row(job_id)
         assert (row['state'], row['reason']) == ('succeeded', 'done')
         assert row['result'] is not None and not store.active_jobs(db.session, jobs.SLOT_BACKUP)
+        assert len(calls) == 2 and _result_lines(job_id) == []
         db.session.rollback()
+    errors = [r.getMessage() for r in caplog.records
+              if r.levelname == 'ERROR' and r.name == 'services.jobs.runner']
+    assert len(errors) == 1, errors
+    assert job_id in errors[0] and FAKE_ACTION in errors[0] and 'Fake job finished' in errors[0]
 
 
 def test_the_audit_line_names_the_requester(app, fake_types, created):
