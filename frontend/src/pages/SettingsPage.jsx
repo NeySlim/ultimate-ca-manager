@@ -60,7 +60,7 @@ import BackupSection from './settings/BackupSection'
 import { ceilingNotice } from './settings/backupCeiling'
 import RestoreReport from './settings/RestoreReport'
 import { loginUrl } from '../navigation/safeNext'
-import { useRestoreJob } from './settings/useRestoreJob'
+import { useRestoreJob, VALIDATED_PHASES } from './settings/useRestoreJob'
 import AuditSection from './settings/AuditSection'
 import DatabaseSection from './settings/DatabaseSection'
 import { afterDatabaseReset } from './settings/databaseReset'
@@ -2039,14 +2039,18 @@ export default function SettingsPage() {
       {/* Restore Password Modal; then the running restore, or the sign-in its end asks for */}
       <Modal
         open={showRestoreModal}
-        onClose={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}
+        onClose={() => {
+          // Closed on "sign in again": every call now answers 401, which must lead to the sign-in
+          if (restoreJob.signInNeeded) releaseSignOut()
+          setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null)
+        }}
         title={t('settings.restoreFromBackup')}
       >
         {restoreJob.signInNeeded ? (
           <div className="space-y-4" data-testid="restore-sign-in">
-            <p className="text-sm text-text-primary">{t('settings.restoreSignInAgain')}</p>
+            <p className="text-sm text-text-primary" role="status">{t('settings.restoreSignInAgain')}</p>
             <div className="flex gap-3 justify-end pt-4">
-              <Button type="button" onClick={() => {
+              <Button type="button" autoFocus onClick={() => {
                 // Back to this tab after the sign-in: its report is shown there
                 releaseSignOut(); window.location.href = loginUrl('/settings', '?tab=backup')
               }}
@@ -2057,16 +2061,21 @@ export default function SettingsPage() {
           </div>
         ) : restoreJob.running ? (
           <div className="space-y-4" data-testid="restore-job">
-            <p className="text-sm text-text-primary">{restoreJobProgress}</p>
+            <p className="text-sm text-text-primary" role="status" data-testid="restore-job-progress">
+              {restoreJobProgress}
+            </p>
             <p className="text-sm text-text-secondary">{t('settings.restoreRunsInBackground')}</p>
             <div className="flex gap-3 justify-end pt-4">
               <Button type="button" variant="secondary" onClick={() => setShowRestoreModal(false)}>
                 {t('common.close')}
               </Button>
-              <Button type="button" variant="danger" onClick={handleCancelRestore}
-                disabled={!!restoreJob.job?.cancel_requested} data-testid="restore-job-cancel">
-                {t('settings.restoreCancel')}
-              </Button>
+              {/* Validated: the server refuses the cancellation (409), so none is offered */}
+              {!VALIDATED_PHASES.includes(restoreJob.job?.phase) && (
+                <Button type="button" variant="danger" onClick={handleCancelRestore}
+                  disabled={!!restoreJob.job?.cancel_requested} data-testid="restore-job-cancel">
+                  {t('settings.restoreCancel')}
+                </Button>
+              )}
             </div>
           </div>
         ) : (

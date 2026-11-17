@@ -25,6 +25,7 @@ import { notificationSpies } from './pageRenderingSetup.jsx'
 
 import SettingsPage from '../SettingsPage'
 import { systemService } from '../../services/system.service'
+import { holdSignOut } from '../../services/apiClient'
 import { PENDING_RESTORE_KEY } from '../settings/useRestoreJob'
 
 // An administrator: the page picks up the restore this browser followed
@@ -144,6 +145,41 @@ describe('SettingsPage: restore as a job', () => {
     renderPage()
     await act(async () => { await vi.advanceTimersByTimeAsync(12000) })
     expect(notificationSpies.showError).toHaveBeenCalledWith('settings.restoreContactLost')
+  })
+
+  it('lets the sign-out go when the "sign in again" box is closed', async () => {
+    systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
+    jobsApi.get.mockRejectedValue(Object.assign(new Error('Authentication required'), { status: 401 }))
+    await startRestore()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+    expect(await screen.findByTestId('restore-sign-in')).toBeTruthy()
+    expect(holdSignOut).toHaveBeenLastCalledWith()  // held since the restore began
+    fireEvent.keyDown(document.activeElement, { key: 'Escape' })
+    await act(async () => {})
+    expect(screen.queryByTestId('restore-sign-in')).toBeNull()
+    expect(holdSignOut).toHaveBeenLastCalledWith(false)
+  })
+
+  it('announces the progress and the sign-in, the sign-in button focused', async () => {
+    systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
+    jobsApi.get.mockResolvedValueOnce({ data: running })
+      .mockRejectedValue(Object.assign(new Error('Authentication required'), { status: 401 }))
+    await startRestore()
+    expect((await screen.findByTestId('restore-job-progress')).getAttribute('role')).toBe('status')
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
+    const signIn = await screen.findByTestId('restore-sign-in')
+    expect(signIn.querySelector('[role="status"]').textContent).toBe('settings.restoreSignInAgain')
+    expect(document.activeElement).toBe(screen.getByTestId('restore-sign-in-button'))
+  })
+
+  it('offers no cancellation once the restore has committed', async () => {
+    systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
+    jobsApi.get.mockResolvedValue({ data: { ...running, phase: 'sessions_revoked' } })
+    await startRestore()
+    expect(await screen.findByTestId('restore-job-cancel')).toBeTruthy()  // before it commits
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+    expect(screen.getByTestId('restore-job')).toBeTruthy()
+    expect(screen.queryByTestId('restore-job-cancel')).toBeNull()
   })
 
   it('asks the server to cancel the running restore', async () => {
