@@ -258,6 +258,30 @@ def test_a_renamed_row_takes_its_name_back_from_another_thing(target, table_name
     assert _orphans() == []
 
 
+def test_a_webhook_renamed_in_place_keeps_its_deliveries(target):
+    """The id alone proves nothing on SQLite, which gives a deleted id back: the deliveries do."""
+    from models.webhook_delivery import WebhookDelivery
+    _user('replace-admin')
+    hook = _webhook(N, T1)
+    db.session.add(hook)
+    db.session.flush()
+    blob = _snapshot()
+    hook.name = M
+    db.session.add(WebhookDelivery(endpoint_id=hook.id, event_type='certificate.issued',
+                                   payload='{}', event_timestamp='2026-01-01T00:00:00Z'))
+    db.session.commit()
+
+    _restore(blob)
+
+    try:
+        assert [(row.name, _hook_thing(row)) for row in TABLES['webhook_endpoints'].model().query.all()] == [
+            (N, T1)]
+        assert WebhookDelivery.query.count() == 1
+    finally:
+        WebhookDelivery.query.delete()
+        db.session.commit()
+
+
 @pytest.mark.parametrize('table_name', ['webhook_endpoints', 'acme_client_accounts'])
 def test_two_rows_that_traded_names_take_the_archives_back(target, table_name):
     table = TABLES[table_name]
