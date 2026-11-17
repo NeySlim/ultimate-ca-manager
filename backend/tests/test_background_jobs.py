@@ -9,6 +9,7 @@ import os
 import threading
 import time
 import types
+import uuid
 from datetime import timedelta
 
 import pytest
@@ -104,7 +105,7 @@ def _start(app, kind, created, secret=None, with_file=False, params=None):
         g.user_id = 4242
         name = None
         if with_file:
-            job_file_id = str(__import__('uuid').uuid4())
+            job_file_id = str(uuid.uuid4())
             name = store.file_name_for(job_file_id, '.upload')
             os.makedirs(store.jobs_tmp_dir(), exist_ok=True)
             with open(os.path.join(store.jobs_tmp_dir(), name), 'wb') as handle:
@@ -463,6 +464,45 @@ def test_the_lease_is_renewed_while_the_job_runs(app, fake_types, created, monke
     assert jr.join(10)
     with app.app_context():
         assert _row(job_id)['state'] == 'succeeded'
+
+
+def _job_file(name):
+    os.makedirs(store.jobs_tmp_dir(), exist_ok=True)
+    path = os.path.join(store.jobs_tmp_dir(), name)
+    with open(path, 'w') as handle:
+        handle.write('archive')
+    return path
+
+
+def test_every_node_sweeps_its_job_files_leader_or_not(app, fake_types, created, monkeypatch):
+    """HA: a follower's disk is swept at its first pass, then of the files of final jobs
+    concluded elsewhere; a file whose job is not known yet stays after the first pass."""
+    import utils.ha
+    monkeypatch.setattr(utils.ha, 'ha_enabled', lambda: True)
+    left_over = _job_file(store.file_name_for(str(uuid.uuid4()), '.upload'))
+    jr = runner.JobRunner(app, _Scheduler(leads=False))
+    with app.app_context():
+        jr.run_pass()
+    assert not os.path.exists(left_over)
+
+    job_id = _create_pending(app, fake_types[jobs.SLOT_BACKUP], created, node_id='another-node')
+    name = store.file_name_for(job_id, '.upload')
+    with app.app_context():
+        db.session.execute(update(T).where(T.c.id == job_id).values(file_name=name))
+        db.session.commit()
+        # Concluded by the leader: its own disk is purged, not this node's
+        assert store.conclude_job(db.session, job_id, state=store.FAILED, reason=store.NOT_TAKEN,
+                                  from_states=(store.PENDING,), now=jobs._now())
+    concluded_elsewhere = _job_file(name)
+    not_yet_known = _job_file(store.file_name_for(str(uuid.uuid4()), '.upload'))
+    try:
+        jr._last_files = 0.0
+        with app.app_context():
+            jr.run_pass()
+        assert not os.path.exists(concluded_elsewhere)
+        assert os.path.exists(not_yet_known)
+    finally:
+        os.unlink(not_yet_known)
 
 
 def test_purge_keeps_thirty_days_and_the_latest_of_each_kind(app, fake_types, created, monkeypatch):

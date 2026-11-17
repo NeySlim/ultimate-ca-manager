@@ -279,8 +279,9 @@ def purge_file(name, directory=None):
     return True
 
 
-def sweep_job_files(executor, directory=None):
-    """At start: remove every job file whose job is final or unknown, never an active job's."""
+def sweep_job_files(executor, directory=None, keep_unknown=False):
+    """Remove this disk's job files whose job is final or, unless ``keep_unknown``, unknown;
+    never an active job's. A file may exist before its row is committed: hence keep_unknown."""
     directory = directory or jobs_tmp_dir()
     try:
         names = os.listdir(directory)
@@ -292,7 +293,7 @@ def sweep_job_files(executor, directory=None):
         if not match:
             continue
         row = _job_row(executor, match.group(1))
-        if row is not None and row['state'] in ACTIVE_STATES:
+        if row is None and keep_unknown or row is not None and row['state'] in ACTIVE_STATES:
             continue
         removed += purge_file(name, directory)
     return removed

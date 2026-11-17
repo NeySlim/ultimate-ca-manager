@@ -215,6 +215,8 @@ class JobRunner:
         self._recovered = False
         self._last_recover = 0.0
         self._last_purge = 0.0
+        self._swept = False
+        self._last_files = 0.0
 
     def start(self):
         self._thread = threading.Thread(target=self._runner_loop, daemon=True, name='JobRunner')
@@ -268,10 +270,13 @@ class JobRunner:
             all_running = not ha and not self._recovered and not self._running
             store.recover_orphans(db.session, now=jobs._now(), all_running=all_running,
                           audit_for=jobs.audit_writer, mine=finished)
-            if not self._recovered:
-                store.sweep_job_files(db.session)
-                db.session.rollback()
             self._recovered, self._last_recover = True, now_mono
+        # Each node sweeps its own disk, leader or not: a job concluded by another node
+        # purged that node's disk only. Unknown files stay after the first pass (uploads).
+        if not self._swept or now_mono - self._last_files >= RECOVER_SECONDS:
+            store.sweep_job_files(db.session, keep_unknown=self._swept)
+            db.session.rollback()
+            self._swept, self._last_files = True, now_mono
         if leads and now_mono - self._last_purge >= PURGE_SECONDS:
             store.purge_finished(db.session, jobs._now())
             self._last_purge = now_mono
