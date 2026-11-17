@@ -267,14 +267,14 @@ def test_the_history_command_is_gone(tmp_path):
     assert _cli('history', '3.0', str(tmp_path / 'CHANGELOG.md')).returncode == 2
 
 
-def _notes_step(tmp_path, v, changelog):
+def _notes_step(tmp_path, v, changelog, env=None):
     work = tmp_path / 'w'
     (work / 'scripts').mkdir(parents=True)
     (work / 'scripts' / 'ci').symlink_to(ROOT / 'scripts' / 'ci')
     (work / 'CHANGELOG.md').write_text(changelog)
     step = _step('build-release.yml', 'release', 'Generate release notes')
     result = _run_step(step, work, subst={'${{ needs.build-deb.outputs.version }}': v,
-                                          '${{ github.repository }}': 'o/r'})
+                                          '${{ github.repository }}': 'o/r'}, env=env)
     return result, work / 'notes.md'
 
 
@@ -311,6 +311,31 @@ def test_the_release_notes_step_fails_without_its_section(tmp_path, v, changelog
     assert result.returncode != 0
     assert 'CHANGELOG' in result.stdout + result.stderr
 
+
+
+@pytest.mark.parametrize('v', ['3.0', '2.254.1'])
+def test_a_rehearsed_stable_without_its_section_takes_unreleased_with_a_warning(tmp_path, v):
+    """A stable is rehearsed before its bump commit: the dry run borrows [Unreleased], the tag run stays strict."""
+    changelog = '## [Unreleased]\n- Marker.\n\n## [2.200] - 2026-01-01\n- Old.\n'
+    result, notes = _notes_step(tmp_path, v, changelog, env={'REHEARSAL': 'true'})
+    assert result.returncode == 0, result.stderr
+    assert 'Marker.' in notes.read_text() and 'Old.' not in notes.read_text()
+    assert f'::warning::CHANGELOG.md has no [{v}] section' in result.stdout + result.stderr
+    for strict in ({'REHEARSAL': 'false'}, {'REHEARSAL': ''}):
+        assert _notes_step(tmp_path / ('s' + strict['REHEARSAL']), v, changelog, env=strict)[0].returncode != 0
+
+
+def test_the_notes_step_reads_the_rehearsal_flag_from_the_dispatch():
+    step = _step('build-release.yml', 'release', 'Generate release notes')
+    assert step['env']['REHEARSAL'] == '${{ inputs.dry_run }}'
+
+
+def test_a_rehearsal_does_not_relax_the_notes_of_a_rc_or_a_present_section(tmp_path):
+    r = _notes(tmp_path, '3.0', CHANGELOG)
+    rr = _cli('notes', '3.0', str(tmp_path / 'CHANGELOG.md'), '--rehearsal')
+    assert rr.returncode == 0 and rr.stdout == r.stdout and '::warning::' not in rr.stderr
+    assert _notes(tmp_path, '3.0-rc1', '## [2.254] - d\n- x\n').returncode == 1
+    assert _cli('notes', '3.0-rc1', str(tmp_path / 'CHANGELOG.md'), '--rehearsal').returncode == 1
 
 # ---- 3b. the branch a tag must sit on -------------------------------------------------------------
 

@@ -3,7 +3,7 @@
 
 Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
 A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
-Usage: release_version.py <validate|deb|rpm|tar|file|npm|chart|prerelease|assets|notes|latest> <version> [CHANGELOG]
+Usage: release_version.py <validate|deb|rpm|tar|file|npm|chart|prerelease|assets|notes|latest> <version> [CHANGELOG] [--rehearsal]
 `latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
 """
 import re
@@ -101,13 +101,19 @@ def changelog_section(version, text):
             or _section(re.compile(r'^## ' + re.escape(version) + r'(\s|$)'), text, '## '))
 
 
-def release_notes(version, text):
-    """Its own section when it has entries; a RC without one ships `[Unreleased]`, a stable fails."""
+def release_notes(version, text, rehearsal=False):
+    """Its own section when it has entries; a RC without one ships `[Unreleased]`, a stable fails.
+
+    A rehearsal of a stable runs before its bump commit: it borrows `[Unreleased]` and warns instead.
+    """
     body = changelog_section(version, text)
     if body.strip():
         return body
     if is_stable(version):
-        raise ValueError(f'CHANGELOG.md has no [{version}] section with entries for {version}')
+        missing = f'CHANGELOG.md has no [{version}] section with entries for {version}'
+        if not rehearsal:
+            raise ValueError(missing)
+        print(f'::warning::{missing}: the rehearsal takes [Unreleased]', file=sys.stderr)
     body = _section(re.compile(r'^## \[Unreleased\]'), text, '## [')
     if not body.strip():
         raise ValueError(f'CHANGELOG.md has no [{version}] or [Unreleased] section with entries for {version}')
@@ -153,10 +159,12 @@ def main(argv):
         elif cmd == 'latest':
             print('true' if is_latest(version, sys.stdin.read().splitlines()) else 'false')
         elif cmd == 'notes':
-            path = argv[3] if len(argv) > 3 else 'CHANGELOG.md'
+            rehearsal = '--rehearsal' in argv[3:]
+            rest = [a for a in argv[3:] if a != '--rehearsal']
+            path = rest[0] if rest else 'CHANGELOG.md'
             with open(path, encoding='utf-8') as fh:
                 text = fh.read()
-            sys.stdout.write(release_notes(version, text))
+            sys.stdout.write(release_notes(version, text, rehearsal))
         else:
             print(f'Unknown command: {cmd}', file=sys.stderr)
             return 2

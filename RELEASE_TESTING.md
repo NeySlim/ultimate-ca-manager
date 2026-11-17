@@ -42,6 +42,8 @@ chain and publishes nothing: no tag, no release, no registry push, no Docker Hub
 page, no chart. Its images go to a registry started inside each build job and
 gone with it; the smoke boots the amd64 images the run saved. A dispatch with
 `dry_run` off is refused unless it runs on the tag of its own version.
+A stable rehearsed before its bump commit has no `## [X.Y]` section yet: its
+notes take `[Unreleased]` with a warning, where the tag run stops.
 
 What the run keeps, to read before tagging:
 
