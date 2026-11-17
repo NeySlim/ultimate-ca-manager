@@ -54,6 +54,11 @@ describe.each([['SAML', SAML], ['OIDC', OIDC]])('%s legacy groups notice', (_n, 
     expect(notice('a, b')).toBeInTheDocument()
   })
 
+  it('counts a row whose key is groups too as the new form, as the backend does', () => {
+    open(provider, { groups: 'groups', ' groups ': 'memberOf' })
+    expect(notice('memberOf')).toBeInTheDocument()
+  })
+
   it('trims the key side', () => {
     open(provider, { ' groups ': 'memberOf', Role: 'groups' })
     expect(notice('memberOf')).toBeInTheDocument()

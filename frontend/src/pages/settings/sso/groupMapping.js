@@ -7,7 +7,7 @@ const clean = (s) => (typeof s === 'string' ? s.trim() : '')
 // a row `attribute -> groups` exists (same trimming rules as its mapped_attributes).
 export function hiddenLegacyGroupRows(mapping) {
   const entries = Object.entries(mapping || {}).map(([k, v]) => [clean(k), clean(v)])
-  if (!entries.some(([k, v]) => k && k !== 'groups' && v === 'groups')) return []
+  if (!entries.some(([k, v]) => k && v === 'groups')) return []
   const legacy = entries.filter(([k, v]) => k === 'groups' && v && !UCM_FIELDS.includes(v)).map(([, v]) => v)
   return [...new Set(legacy)]
 }
