@@ -621,12 +621,18 @@ def finish(job_id, executor, results, name, filename, maintenance=None, gate=Non
     from services.backup.restore_report import safe_restore_audit_details
     results = dict(results or {})
     details = safe_restore_audit_details(name, results)
+
+    def lift_gate():
+        # Down before the job is final: a client that sees the end and writes is never refused
+        if gate is not None:
+            gate.lift()
     if not results.get('sections_carried'):
         # Nothing changed: no session revoked, no restart
         if maintenance:
             maintenance.lift_unchanged()
         logger.warning('Restore: the archive carried no data section')
         attach_restore_todo(results)
+        lift_gate()
         _conclude(job_id, executor, 200, NOTHING_CARRIED, results, details, name)
         return JobOutcome(concluded=True)
     if gate is not None:
@@ -638,6 +644,7 @@ def finish(job_id, executor, results, name, filename, maintenance=None, gate=Non
         except Exception:
             db.session.rollback()
             logger.exception('Restore: sessions could not be revoked')
+            lift_gate()
             _conclude(job_id, executor, 500,
                       'Backup restored, but the sessions opened before it could not be revoked. '
                       'Restart the application before using it.', None, details, name, ok=True)
@@ -653,12 +660,12 @@ def finish(job_id, executor, results, name, filename, maintenance=None, gate=Non
             # Committed and audited as a success: no second, contradicting line
             db.session.rollback()
             logger.exception('Restore: finishing after the restore failed')
+            lift_gate()
             _conclude(job_id, executor, 500, 'Backup restored, but finishing the restore failed. '
                       'Restart the application before using it.', None, details, name, ok=True)
             return JobOutcome(concluded=True)
+        lift_gate()
         _conclude(job_id, executor, 200, message, results, details, name)
-    if gate is not None:
-        gate.lift()
     # Asked once the job is final: the restart may stop this process
     if maintenance is not None:
         actual = maintenance.finish()

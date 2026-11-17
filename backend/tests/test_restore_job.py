@@ -538,6 +538,27 @@ def test_the_local_gate_refuses_writes_and_serves_reads_during_the_restore(
         assert not cluster_maintenance.current().active()
 
 
+@pytest.mark.parametrize('carried', [True, False], ids=['restored', 'nothing_carried'])
+def test_the_gate_is_down_before_the_job_says_it_is_over(app, archive, created, monkeypatch,
+                                                         no_restart, carried):
+    """A client that sees the job final and writes at once is never answered 503."""
+    from services import cluster_maintenance
+    if not carried:
+        monkeypatch.setattr('services.backup_service.BackupService.restore_backup_from_stream',
+                            lambda self, *a, **k: {'sections_carried': []})
+    seen = []
+    real = restore_job._conclude
+
+    def concluding(*args, **kwargs):
+        seen.append(cluster_maintenance.observe_local(app).active())
+        return real(*args, **kwargs)
+    monkeypatch.setattr(restore_job, '_conclude', concluding)
+    before = _lines_in(app)
+    job_id, name = _start(app, archive, created)
+    _assert_final(app, job_id, 'succeeded', 'done', before, name, carried)
+    assert seen == [False], 'the job concluded while the write gate was still up'
+
+
 def _gate(app):
     ctx = types.SimpleNamespace(job_id=str(uuid.uuid4()), node_id=None, requested_by='admin',
                                 view={'id': 'x', 'kind': 'restore'}, app=app)
