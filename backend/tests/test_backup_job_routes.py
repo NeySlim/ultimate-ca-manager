@@ -254,6 +254,23 @@ def test_an_unexpected_failure_answers_as_before_and_is_an_error(app, auth_clien
     assert b'/internal' not in r.data and b'host-1' not in r.data
 
 
+@pytest.mark.parametrize('url,code,message,details', [
+    (SYSTEM, 400, 'Invalid backup parameters', 'Backup refused: invalid parameters'),
+    (SETTINGS, 500, 'Backup failed', 'Backup failed: unexpected error')])
+def test_a_value_error_of_the_export_answers_each_route_as_before(
+        app, auth_client, backup_dir, jobs_made, monkeypatch, url, code, message, details):
+    from services.backup_service import BackupService
+
+    def bad(self, *args, **kwargs):
+        raise ValueError('bad parameter')
+    monkeypatch.setattr(BackupService, 'iter_backup', bad)
+    before = len(_lines(app))
+    r = _post(auth_client, url, {'password': PASSWORD})
+    assert r.status_code == code, r.data
+    assert r.get_json()['message'] == message and 'details' not in r.get_json()
+    assert _lines(app)[before:] == [('manual', details, False, 'admin')]
+
+
 def test_a_cancellation_stops_the_export_between_two_rows(app, auth_client, backup_dir, jobs_made,
                                                           monkeypatch):
     """Asked inside a section, it is seen before the next section starts: nothing published."""
