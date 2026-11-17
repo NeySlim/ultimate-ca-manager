@@ -18,7 +18,7 @@ CERTS = SSHCertificate.__tablename__
 
 def test_the_step_follows_the_sso_identities_step():
     from migrations._from_2_254 import STEPS
-    assert STEPS.index(STEP) == STEPS.index('167_user_sso_identities') + 1 == len(STEPS) - 1
+    assert STEPS.index(STEP) == STEPS.index('167_user_sso_identities') + 1
 
 
 def test_the_model_declares_what_the_step_writes():
