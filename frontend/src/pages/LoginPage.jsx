@@ -69,6 +69,7 @@ export default function LoginPage() {
   // { restoring, seconds }: seconds counts down to the next attempt, null when none is planned
   const [maintenance, setMaintenance] = useState(null)
   const maintenanceRetry = useRef(null)
+  const latestAttempt = useRef({})
   const { login, sessionChecked } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
@@ -307,7 +308,7 @@ export default function LoginPage() {
       setStatusMessage('')
       setLoading(false)
       // A security key is touched again by the user: no attempt is made for them
-      if (noteRefusal(error, attemptWebAuthn, false)) return
+      if (noteRefusal(error, 'webauthn', false)) return
       if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
         showInfo(t('auth.securityKeyCancelled'))
       }
@@ -326,7 +327,7 @@ export default function LoginPage() {
     setMaintenance(null)
   }
 
-  // A 429 or a maintenance's 503 shown as a banner (true); `again` repeats the attempt, by
+  // A 429 or a maintenance's 503 shown as a banner (true); `again` names the attempt repeated, by
   // itself after the Retry-After when `auto`, or from the banner's button
   const noteRefusal = (error, again, auto = true) => {
     if (isMaintenanceRefusal(error)) {
@@ -342,7 +343,7 @@ export default function LoginPage() {
   const retryNow = () => {
     const again = maintenanceRetry.current
     setMaintenance(m => (m ? { ...m, seconds: null } : m))
-    if (again) again()
+    if (again) latestAttempt.current[again]()
   }
 
   // The countdown of a planned attempt; one attempt at zero, which plans the next if refused again
@@ -427,7 +428,7 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (!noteRefusal(error, () => handlePasswordLogin(NO_EVENT))) showError(error.message || t('auth.invalidCredentials'))
+      if (!noteRefusal(error, 'password')) showError(error.message || t('auth.invalidCredentials'))
       if (!isMaintenanceRefusal(error)) setPassword('')  // kept for the next attempt
     } finally {
       setLoading(false)
@@ -451,7 +452,7 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (!noteRefusal(error, () => handle2FAVerify(NO_EVENT))) showError(error.message || t('auth.invalidTotpCode'))
+      if (!noteRefusal(error, 'totp')) showError(error.message || t('auth.invalidTotpCode'))
       if (!isMaintenanceRefusal(error)) setTotpCode('')
     } finally {
       setLoading(false)
@@ -468,7 +469,7 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (noteRefusal(error, handle2FAWebAuthn, false)) {
+      if (noteRefusal(error, 'key2fa', false)) {
         // banner shown
       } else if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
         showInfo(t('auth.twoFactorKeyCancelled'))
@@ -478,6 +479,15 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // A retry runs the handler of the latest render, so it sends what the fields hold now
+  latestAttempt.current = {
+    password: () => handlePasswordLogin(NO_EVENT),
+    totp: () => handle2FAVerify(NO_EVENT),
+    ldap: () => handleLDAPLogin(NO_EVENT),
+    webauthn: () => attemptWebAuthn(),
+    key2fa: () => handle2FAWebAuthn(),
   }
 
   const handleSSOLogin = (provider) => {
@@ -521,7 +531,7 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (!noteRefusal(error, () => handleLDAPLogin(NO_EVENT))) showError(error.message || t('auth.ldapFailed'))
+      if (!noteRefusal(error, 'ldap')) showError(error.message || t('auth.ldapFailed'))
       if (!isMaintenanceRefusal(error)) setPassword('')
     } finally {
       setLoading(false)
