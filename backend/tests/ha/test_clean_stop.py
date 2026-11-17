@@ -1,11 +1,11 @@
 """A node stopped as an orchestrator stops it, twenty times: SIGTERM to the gunicorn master alone
 (the container's first process) while a client keeps a connection open, SIGKILL to every process
-at the end of the grace. Each time the node's row in cluster_nodes is released before that kill
-(docs/HA.md, Upgrading: a node stopped cleanly says so when it exits), and the next start takes it
-at once.
+at the end of the grace. Each time the node's token in cluster_nodes is released before the
+workers' drain ends, its row is marked stopped when it exits (docs/HA.md, Upgrading), both before
+that kill, and the next start takes the row at once.
 
-An open connection holds the workers' drain for gunicorn's graceful_timeout (30 s), as long as
-Kubernetes' default grace: the release must not wait for that drain.
+An open connection holds the workers' drain for gunicorn's graceful_timeout (30 s): the token
+release must not wait for it; the stop mark comes after it (on_exit), within the chart's grace.
 """
 import os
 import signal
@@ -18,8 +18,10 @@ from tests.ha.cluster import READY_TIMEOUT, STOP_TIMEOUT, wait_until
 pytestmark = pytest.mark.ha
 
 STOPS = 20
-# Kubernetes' default terminationGracePeriodSeconds, the trial's
-ORCHESTRATOR_GRACE = 30
+# gunicorn's default graceful_timeout, which an open connection holds to the end
+DRAIN = 30
+# The chart's terminationGracePeriodSeconds (60) less its preStop sleep (10): the time UCM gets
+ORCHESTRATOR_GRACE = 50
 
 
 def _token(cluster, node):
@@ -40,16 +42,18 @@ def test_a_node_stopped_twenty_times_releases_its_row_each_time(cluster):
         os.kill(node.proc.pid, signal.SIGTERM)
         began = time.monotonic()
         try:
-            wait_until(lambda: _token(cluster, node) == (None, None), ORCHESTRATOR_GRACE - 1,
-                       f'row of {node.name} released and marked stopped (stop {stop + 1})')
+            wait_until(lambda: _token(cluster, node)[0] is None, DRAIN - 1,
+                       f'token of {node.name} released before the drain ends (stop {stop + 1})')
+            released_after.append(time.monotonic() - began)
+            wait_until(lambda: _token(cluster, node) == (None, None), ORCHESTRATOR_GRACE - 1 - (time.monotonic() - began),
+                       f'row of {node.name} marked stopped before the kill (stop {stop + 1})')
         except AssertionError as e:
             row = cluster.sql('SELECT * FROM cluster_nodes WHERE node_id = %s', (node.name,))
             raise AssertionError(f'{e}\nrow: {row}\nconsole:\n{node.console.read_text()[-8000:]}') from None
-        released_after.append(time.monotonic() - began)
         node._signal(signal.SIGKILL)
         node.proc.wait(timeout=STOP_TIMEOUT)
         wait_until(lambda: not node.pids(), STOP_TIMEOUT, f'node {node.name} processes gone')
         held.close()
-    print(f'{STOPS} stops: row released after {min(released_after):.1f}s to {max(released_after):.1f}s')
+    print(f'{STOPS} stops: token released after {min(released_after):.1f}s to {max(released_after):.1f}s')
     node.start()
     wait_until(node.ready, READY_TIMEOUT, f'node {node.name} ready after the last stop')
