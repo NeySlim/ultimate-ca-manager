@@ -20,6 +20,8 @@ from services.acme.acme_service import AcmeService
 from tests.test_acme_security_paths import _build_jws, _nonce, acme_account  # noqa: F401
 from utils.datetime_utils import utc_now
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 API = '/api/v2/acme/eab-credentials'
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 REJECTED = 'urn:ietf:params:acme:error:rejectedIdentifier'
