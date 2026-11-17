@@ -110,7 +110,8 @@ def refuse_revoked_key_id(ca_id: int, key_id: str) -> None:
     source = revoking_key_id(session_run, ca_id, key_id)
     if source is not None:
         raise ValueError(f"The KRL of this SSH CA revokes key ID '{key_id}', which revoked certificate "
-                         f"#{source} of serial 0 bears: a certificate bearing it would be revoked from the start")
+                         f"#{source} of serial 0 bears: a certificate bearing it would be revoked from the start. "
+                         f"Use another key ID, or delete certificate #{source} once it has expired")
 
 
 def _by_key_id(run: Run, source: int) -> bool:
@@ -219,7 +220,7 @@ def list_for_next_start(run: Run, groups: List[Dict]) -> None:
         run('UPDATE system_config SET value = :v WHERE key = :k', {'v': value, 'k': MARKED_KEY})
     else:
         run("INSERT INTO system_config (key, value, description, updated_at) VALUES (:k, :v, "
-            "'SSH certificates the upgrade found sharing a serial under their CA', CURRENT_TIMESTAMP)",
+            "'SSH certificates the upgrade found sharing a serial or revoked through a key ID', CURRENT_TIMESTAMP)",
             {'k': MARKED_KEY, 'v': value})
 
 
@@ -231,7 +232,8 @@ def session_run(sql, params=None):
 
 
 def report_marked_duplicates(app) -> int:
-    """At start: one WARNING and one audit entry per serial the upgrade found shared, once.
+    """At start: one WARNING and one audit entry per serial the upgrade found shared, and per
+    certificate it revoked through a key ID, once.
 
     The list is deleted in the transaction of the first entry: a node that finds it gone reports nothing."""
     from models import db, SystemConfig
