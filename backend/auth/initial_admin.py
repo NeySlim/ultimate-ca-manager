@@ -123,6 +123,10 @@ def prepare(config, defer_write=False) -> InitialPassword:
     prepared = resolve(config)
     if prepared.generated:
         _put(password_file(config), prepared.value, probe_only=defer_write)
+    elif prepared.force_change:
+        # Nobody chose it: the change at first login is what the policy judges
+        logger.info(f'The password from {prepared.source} was drawn by the deployment tool '
+                    '(INITIAL_ADMIN_PASSWORD_FORCE_CHANGE): it must be changed at first login')
     else:
         _warn_if_weak(prepared)
     return prepared

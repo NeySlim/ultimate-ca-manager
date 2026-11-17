@@ -571,3 +571,12 @@ def test_the_summary_names_the_database_in_use_not_the_sqlite_path(tmp_path, ha,
 def test_without_database_url_the_summary_names_the_sqlite_file(tmp_path):
     env = _sqlite_env(tmp_path, None)
     assert _run('ucm_database_label', env, tmp_path).stdout.strip() == f"SQLite, {env['UCM_DATABASE_PATH']}"
+
+
+def test_the_notice_says_a_password_the_chart_drew_is_not_the_operators(tmp_path):
+    env = {'UCM_DATABASE_PATH': str(tmp_path / 'absent.db'), 'UCM_INITIAL_ADMIN_PASSWORD': 'Drawn24CharsByTheChart00',
+           'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE': '1'}
+    r = _run('ucm_initial_admin_notice', env, tmp_path)
+    assert 'the one you provided' not in r.stdout
+    assert 'drawn by the deployment' in r.stdout and 'Secret' in r.stdout
+    assert 'changed at first login' in r.stdout and 'Drawn24CharsByTheChart00' not in r.stdout

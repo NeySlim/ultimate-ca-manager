@@ -11,6 +11,14 @@ ucm_ha_active() {
     esac
 }
 
+# 1, true or yes, as the application reads a flag.
+ucm_flag_set() {
+    case "$(printf '%s' "${1:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" in
+        1|true|yes) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # Line for the generated .env: no SQLite path in HA mode.
 ucm_env_database_line() {
     ucm_ha_active && return 0
@@ -49,6 +57,11 @@ ucm_initial_admin_notice() {
         # The application refuses to start then: which one was meant cannot be guessed
         echo "   • Password: INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set:"
         echo "     the start will be refused, keep only one"
+    elif [ -n "$source" ] && ucm_flag_set "${INITIAL_ADMIN_PASSWORD_FORCE_CHANGE:-}"; then
+        # The Helm chart sets the flag for the value it draws into its Secret
+        echo "   • Password: drawn by the deployment (${source}), not chosen by anyone;"
+        echo "     with the Helm chart it is in the release's Secret, key UCM_INITIAL_ADMIN_PASSWORD."
+        echo "     It must be changed at first login."
     elif [ -n "$source" ]; then
         echo "   • Password: the one you provided (${source})"
     else
