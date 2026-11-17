@@ -492,12 +492,17 @@ jobs:
           pytest --tb=short -rs -m needs_redis tests/
 
   # Real UCM nodes (two, then three) in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
-  # Manual only: run the workflow by hand with the `ha` input ticked.
+  # Manual only: run the workflow by hand with the `ha` input ticked. In shards
+  # (scripts/ci/ha-bench-shard.sh): the whole bench in one job outlasts the time limit.
   test-ha-bench:
-    name: HA bench (three nodes)
+    name: HA bench (three nodes, ${{ matrix.shard }})
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && inputs.ha
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [crash-crl, jobs, restore, rest]
 
     services:
       postgres:
@@ -555,7 +560,10 @@ jobs:
           UCM_TEST_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
           cd backend
-          pytest --tb=short -m ha tests/ha
+          # A failed or empty list stops the step: pytest without files runs the whole suite
+          files=$(../scripts/ci/ha-bench-shard.sh ${{ matrix.shard }})
+          [ -n "$files" ]
+          pytest --tb=short -m ha $files
 
   # The pytest tests that call `helm template` are skipped without helm: they run here.
   test-helm:
