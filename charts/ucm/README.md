@@ -82,7 +82,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `livenessProbe` | enabled, 40 s delay, every 30 s, timeout 10 s, 3 failures | Liveness probe on `/health/live` |
 | `readinessProbe` | enabled, 20 s delay, every 15 s, timeout 10 s, 3 failures | Readiness probe on `/health/ready` |
 | `lifecycle.preStopSleepSeconds` | `10` | Sleep of the `preStop` hook, before UCM receives `SIGTERM`: the pod leaves the Service's endpoints first, so new connections go to the other pods; `0` removes the hook |
-| `terminationGracePeriodSeconds` | `60` | Grace before Kubernetes kills a stopping pod; covers the `preStop` sleep and UCM's clean stop (at most 35 s); the render fails below `lifecycle.preStopSleepSeconds` + 35 |
+| `terminationGracePeriodSeconds` | `60` | Grace before Kubernetes kills a stopping pod; covers the `preStop` sleep and UCM's clean stop (at most 41 s); the render fails below `lifecycle.preStopSleepSeconds` + 45 |
 | `startupProbe` | enabled, every 10 s, timeout 10 s, 36 failures | Probe on `/health/live` that holds the liveness and readiness probes until UCM answers (360 s by default): a first start that upgrades a large database answers nothing until the upgrade ends |
 | `serviceAccount.create` / `serviceAccount.name` / `serviceAccount.annotations` | `true` / `""` / `{}` | Create a ServiceAccount (name defaults to the full name) |
 | `podSecurityContext` / `securityContext` | non-root UID/GID 1000, `fsGroup` 1000, seccomp `RuntimeDefault`; no privilege escalation, every capability dropped | Pod and container security contexts |
