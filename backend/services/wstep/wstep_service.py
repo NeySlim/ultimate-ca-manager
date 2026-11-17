@@ -1365,7 +1365,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             windows_profile_id=getattr(profile, 'id', None), unique_subject=patterned,
             subject_holder=sid_holder(requester_sid), audit_subject_refusal=False,
             # Archived in the commit that stores its successor, as on the Certificate binding
-            supersedes=superseded_row,
+            supersedes=superseded_row, emits_renewal=renewed is not None,
             # The renewed template-less certificate proves the same entity (designated renewal)
             renews=(find_issued_rows(renewal_ca, exempted)
                     if exempted is not None and applies_unique_subject(ca, patterned) else None),

@@ -168,6 +168,7 @@ class CASigningMixin:
         subject_holder: str = None,
         renews: list = None,
         audit_subject_refusal: bool = True,
+        emits_renewal: bool = False,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -222,6 +223,8 @@ class CASigningMixin:
             renews: rows of a designated renewal that ``supersedes`` does not archive (WSTEP's
                 template-less Kerberos renewal): the same entity, whose lineage the row inherits.
             audit_subject_refusal: False when the caller audits a SubjectTaken itself (WSTEP).
+            emits_renewal: the certificate replaces another without ``renewal_of``'s grace (WSTEP's
+                Kerberos renewal): the webhook says cert.renewed, as for ``renewal_of``.
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -398,7 +401,7 @@ class CASigningMixin:
         # Renewal flows pass source like '<orig>-renewal'; everything else
         # (EST enrollment, etc.) is a fresh issuance.
         from services.webhook_service import emit_cert_renewed, emit_cert_issued
-        if renewal_of is not None or 'renewal' in (source or ''):
+        if renewal_of is not None or emits_renewal or 'renewal' in (source or ''):
             emit_cert_renewed(new_cert.to_dict(), ca_refid=ca.refid)
         else:
             emit_cert_issued(new_cert.to_dict(), ca_refid=ca.refid)
