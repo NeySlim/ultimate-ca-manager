@@ -157,3 +157,23 @@ def test_names_already_read_are_not_suggested_again():
     from api.v2.sso.helpers import saml_groups
     _values, source = saml_groups({'groups': [], 'Role': ['r']}, None)
     assert source.candidates == ['Role']
+
+
+def test_ldap_group_info_line_is_bounded(monkeypatch, caplog):
+    from api.v2.sso import connection_tests
+    groups = [f'cn=group-{i:03d},ou=g,dc=example,dc=test' for i in range(200)]
+    monkeypatch.setattr(connection_tests, '_ldap_read_groups', lambda *a, **k: groups)
+    provider = SimpleNamespace(ldap_group_filter='(cn=*)', role_mapping=None, ldap_required_groups=None)
+    with caplog.at_level(logging.INFO):
+        result, error = connection_tests._ldap_entry_groups(provider, None, 'cn=u', 'u')
+    assert result == groups and error is None
+    line = next(r.getMessage() for r in caplog.records if 'LDAP groups for' in r.getMessage())
+    assert 'group-019' in line and 'group-020' not in line
+    assert '(+180 more)' in line
+
+
+def test_mapped_attributes_reads_only_form_rows_once_one_targets_groups():
+    from api.v2.sso.helpers import mapped_attributes
+    # Contract: a form row to groups hides a legacy `groups -> attribute` row; the screen says so.
+    assert mapped_attributes({'groups': 'memberOf', 'Role': 'groups'}, 'groups') == ('Role',)
+    assert set(mapped_attributes({'memberOf': 'groups', 'Role': 'groups'}, 'groups')) == {'memberOf', 'Role'}

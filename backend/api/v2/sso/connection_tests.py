@@ -3,7 +3,7 @@ from . import bp
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from .diagnostics import NAME_LENGTH, shown
+from .diagnostics import NAME_LENGTH, shown, shown_list
 from .helpers import ldap_auto_bind, ldap_bind, _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password, _parse_json_field, _parse_group_list, _mapping_rules, group_match_key
 import ldap3
 from ldap3 import Server, Connection, ALL, Tls
@@ -277,7 +277,7 @@ def _ldap_entry_groups(provider, server, user_dn, username, report=None):
     except LdapGroupsUnreadable as e:
         logger.warning(f"LDAP groups of {username} could not be read: {e}")
         return [], str(e)
-    logger.info(f"LDAP groups for {username}: {groups}")
+    logger.info(f"LDAP groups for {username}: {shown_list(groups)}")
     return groups, None
 
 

@@ -5,6 +5,7 @@ import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
+import LegacyGroupsNotice from './LegacyGroupsNotice'
 import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
 import { formatDate } from '../../../lib/utils'
 
@@ -170,6 +171,7 @@ export default function SsoSamlFields({
               keyPlaceholder="e.g., preferred_username"
               valuePlaceholder="e.g., username"
             />
+            <LegacyGroupsNotice mapping={formData.attribute_mapping} />
             <div className="mt-2">
               <p className="text-xs text-text-tertiary mb-1">{t('sso.samlGroupShortcuts')}</p>
               <div className="flex flex-wrap gap-1.5">
