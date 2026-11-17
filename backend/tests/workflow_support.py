@@ -1,7 +1,7 @@
 """Reading GitHub workflows in tests: YAML loading and a small evaluator of `${{ }}` expressions.
 
 The evaluator covers the subset the workflows use (contexts, literals, ==, !=, !, &&, ||, parentheses,
-startsWith, endsWith, contains and the status functions); anything else raises, never guesses.
+startsWith, endsWith, contains, format and the status functions); anything else raises, never guesses.
 """
 import pathlib
 import re
@@ -54,7 +54,19 @@ def _contains(hay, needle):
     return str(needle).lower() in str(hay or '').lower()
 
 
+def _format(template, *args):
+    # GitHub's format(): {N} takes argument N, {{ and }} are literal braces
+    def arg(m):
+        return '{' if m.group(0) == '{{' else '}' if m.group(0) == '}}' else _text(args[int(m.group(1))])
+    return re.sub(r'\{\{|\}\}|\{(\d+)\}', arg, str(template))
+
+
+def _text(v):
+    return '' if v is None else str(v).lower() if isinstance(v, bool) else str(v)
+
+
 _FUNCS = {
+    'format': _format,
     'startswith': lambda s, p: str(s or '').lower().startswith(str(p).lower()),
     'endswith': lambda s, p: str(s or '').lower().endswith(str(p).lower()),
     'contains': _contains,
