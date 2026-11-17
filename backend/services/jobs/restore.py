@@ -334,9 +334,18 @@ def run(ctx):
     try:
         fd = os.open(path or '', os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
     except OSError:
-        return _refused(500, GONE, 'Restore failed: the uploaded archive was gone')
-    with os.fdopen(fd, 'rb') as stream:
-        return _restore(ctx, _Run(ctx, sqlite), stream, password)
+        outcome = _refused(500, GONE, 'Restore failed: the uploaded archive was gone')
+    else:
+        with os.fdopen(fd, 'rb') as stream:
+            outcome = _restore(ctx, _Run(ctx, sqlite), stream, password)
+    # Every audit line of a restore names its archive, refusals included
+    if outcome.audit_resource is None:
+        outcome.audit_resource = _archive_label(ctx)
+    return outcome
+
+
+def _archive_label(ctx):
+    return ctx.params.get('name') or 'upload'
 
 
 def _restore(ctx, current, stream, password):
@@ -350,7 +359,7 @@ def _restore(ctx, current, stream, password):
     from services.backup_service import BackupSchemaError, BackupService, ContainerError
     from services.database_admin.lock import MigrationBusyError, database_migration_lock
     from utils.ha import ha_enabled
-    name, mode = ctx.params.get('name') or 'upload', ctx.params.get('mode') or 'replace'
+    name, mode = _archive_label(ctx), ctx.params.get('mode') or 'replace'
     service = BackupService()
     actor = ctx.requested_by
     try:

@@ -194,3 +194,26 @@ def test_a_maintenance_refusal_keeps_its_code_and_nodes(app, auth_client, archiv
     body = r.get_json()
     assert body['code'] == 'maintenance_not_acknowledged'
     assert body['nodes'] == {'node-b': ['web', 'scheduler']}
+
+
+@pytest.mark.parametrize('route', ROUTES)
+def test_a_refusal_concluded_by_the_runner_names_the_archive(app, auth_client, archive, finished,
+                                                            monkeypatch, route):
+    from sqlalchemy import select
+
+    from models import AuditLog
+
+    def unreadable(self, *a, **k):
+        raise ValueError('broken')
+    monkeypatch.setattr('services.backup_service.BackupService.restore_backup_from_stream',
+                        unreadable)
+    r = auth_client.post(route, headers={'Prefer': 'respond-async'}, data={
+        'file': (io.BytesIO(archive), 'mine.ucmbkp'), 'password': PASSWORD},
+        content_type='multipart/form-data')
+    assert r.status_code == 202, r.data
+    job_id = r.get_json()['data']['job']['id']
+    assert runner.join_local(job_id, 60)
+    with app.app_context():
+        lines = db.session.execute(select(AuditLog.success, AuditLog.resource_name).where(
+            AuditLog.action == restore_job.ACTION, AuditLog.resource_id == job_id)).all()
+    assert [tuple(line) for line in lines] == [(False, 'mine.ucmbkp')]
