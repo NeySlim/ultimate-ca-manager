@@ -589,6 +589,42 @@ def test_the_gate_is_down_before_the_job_says_it_is_over(app, archive, created, 
     assert seen == [False], 'the job concluded while the write gate was still up'
 
 
+@pytest.mark.parametrize('carried', [True, False], ids=['restored', 'nothing_carried'])
+def test_a_lease_lapsed_during_the_restore_lets_no_recovery_take_the_job_before_its_end(
+        app, archive, created, monkeypatch, no_restart, carried):
+    """SQLite: the lease is not renewed while the transaction holds the database. A recovery
+    pass that runs once the gate is down, before the conclusion, finds the job still its own."""
+    def lapse():
+        db.session.execute(update(T).where(T.c.id == created[-1]).values(
+            lease_expires_at=jobs._now() - timedelta(seconds=1)))
+        db.session.commit()
+    if carried:
+        real_marked = restore_job._marked
+
+        def marked(*args, **kwargs):
+            real_marked(*args, **kwargs)
+            lapse()
+        monkeypatch.setattr(restore_job, '_marked', marked)
+    else:
+        monkeypatch.setattr('services.backup_service.BackupService.restore_backup_from_stream',
+                            lambda self, *a, **k: lapse() or {'sections_carried': []})
+    passes, taken, real = [], [], restore_job._conclude
+
+    def concluding(job_id, executor, *args, **kwargs):
+        if not passes:  # once: a resume concludes through this function too
+            passes.append(1)
+            taken.append(store.recover_orphans(
+                db.session, now=jobs._now(), all_running=False, audit_for=jobs.audit_writer,
+                resume_for=jobs.resumer, executor=executor))
+        return real(job_id, executor, *args, **kwargs)
+    monkeypatch.setattr(restore_job, '_conclude', concluding)
+    before = _lines_in(app)
+    job_id, name = _start(app, archive, created)
+    _assert_final(app, job_id, 'succeeded', 'done', before, name, carried)
+    assert taken == [0], 'a recovery pass took the job over between the gate and its end'
+    assert no_restart == ([1] if carried else [])
+
+
 def _gate(app):
     ctx = types.SimpleNamespace(job_id=str(uuid.uuid4()), node_id=None, requested_by='admin',
                                 view={'id': 'x', 'kind': 'restore'}, app=app)
