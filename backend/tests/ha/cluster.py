@@ -325,8 +325,16 @@ class Cluster:
             'INITIAL_ADMIN_PASSWORD': self.password,
             'FQDN': 'ucm-ha.test',
         }
+        self.shared = shared
         self.nodes = [Node(name, root / name, {**shared, 'DATABASE_URL': self.database_url(name)}, port)
                       for name, port in zip(names, free_ports(len(names)))]
+
+    def add_node(self, name):
+        """One more node on the same schema and secrets (a replacement pod of another name);
+        started by the caller, stopped by close()."""
+        node = Node(name, self.root / name, {**self.shared, 'DATABASE_URL': self.database_url(name)})
+        self.nodes.append(node)
+        return node
 
     def app_name(self, node_name):
         """A node's application_name: it names the node in pg_stat_activity whatever client
