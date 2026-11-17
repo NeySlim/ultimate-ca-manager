@@ -3097,10 +3097,14 @@ list shows only the kinds the caller may read, and the id of another kind answer
 ```
 
 - `state`: `pending`, `running`, then one of `succeeded`, `failed`, `cancelled`.
-- `reason` once final: `done`, `refused` (the operation answered an error, kept in `result`),
-  `error`, `cancelled`, `executor_lost` (the process running it stopped: run it again) or
+- `reason` once final: `done`; `refused` (the operation answered a `4xx`, kept in `result`);
+  `error` (the operation answered a `5xx`, kept in `result`, or its run failed, `result` then
+  `null`); `cancelled`; `executor_lost` (the process running it stopped: run it again) or
   `not_taken` (no process took it within 5 minutes). A lost job is never started again on its own.
-- `result` once final: `{"code", "message", "data"}`, the answer the starting route would have given.
+- `result` once final, for `done`, `refused` and an `error` the operation answered:
+  `{"code", "message", "data"}`, the answer the starting route would have given, plus
+  `problem_type` when that answer was a typed problem (RFC 9457 `type`, such as a refusal in FIPS
+  mode); `null` otherwise.
 - Cancel: a pending job ends at once (`200`, `Job cancelled`); a running one stops at its next
   page (`200`, `Cancellation requested`); an ended one answers `409`. A backup stops between two
   sections of the export, or within a second inside one: no archive is kept.
