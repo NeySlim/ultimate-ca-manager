@@ -85,6 +85,9 @@ def _load_gunicorn_config(monkeypatch, app):
     wsgi.app = app
     monkeypatch.setitem(sys.modules, 'wsgi', wsgi)
     monkeypatch.setattr(gevent, 'get_hub', lambda: types.SimpleNamespace(handle_error=None))
+    # A real watcher would outlive the test and roll back the shared test connection
+    monkeypatch.setattr('services.backup.restore.invalidate.start_epoch_watcher',
+                        lambda app, interval=None: None)
     return module
 
 
@@ -312,3 +315,14 @@ def test_a_forked_worker_opens_its_own_syslog_connection(explicit):
     finally:
         forwarder._close()
         collector.close()
+
+
+def test_post_worker_init_leaves_no_epoch_watcher_behind_neg(app, monkeypatch):
+    import threading
+    module = _load_gunicorn_config(monkeypatch, app)
+    monkeypatch.setattr('utils.db_fork.forget_inherited_connections', lambda engines: None)
+    monkeypatch.setattr('protocol_http_server.start_http_protocol_server', lambda a, **kw: None)
+    monkeypatch.setattr('services.ws_relay.start_reader', lambda a: None)
+    module.post_worker_init(_worker())
+    # A live watcher would roll back the shared test connection under later tests
+    assert [t.name for t in threading.enumerate() if t.name == 'EpochCacheWatcher'] == []
