@@ -512,6 +512,10 @@ def cmd_image(args):
     comps = []
     for c in trivy.get('components', []):
         c = json.loads(json.dumps(c))
+        # Trivy gives ids the schema's SPDX list does not hold (Debian's SMAIL-GPL): kept, as names
+        for lic in (entry.get('license') or {} for entry in c.get('licenses') or []):
+            if 'id' in lic and lic['id'] not in spdx_ids():
+                lic['name'] = lic.pop('id')
         c.setdefault('properties', []).insert(0, prop('ucm:role', 'content'))
         c['properties'].append(prop('ucm:evidence', 'trivy (os packages)'))
         if not c.get('licenses'):
