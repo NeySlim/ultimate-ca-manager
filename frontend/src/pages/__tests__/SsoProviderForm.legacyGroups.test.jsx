@@ -59,6 +59,26 @@ describe.each([['SAML', SAML], ['OIDC', OIDC]])('%s legacy groups notice', (_n, 
     expect(notice('memberOf')).toBeInTheDocument()
   })
 
+  it('says nothing of an attribute a new-form row still reads', () => {
+    open(provider, { groups: 'memberOf', memberOf: 'groups' })
+    expect(screen.queryByText(/^sso\.legacyGroupsHidden/)).not.toBeInTheDocument()
+  })
+
+  it('names only the attributes no new-form row reads', () => {
+    open(provider, { groups: 'memberOf', ' groups ': 'Role', memberOf: 'groups' })
+    expect(notice('Role')).toBeInTheDocument()
+  })
+
+  it('trims what the backend trims, a next-line character included', () => {
+    open(provider, { '\u0085groups': 'memberOf', Role: '\u001fgroups' })
+    expect(notice('memberOf')).toBeInTheDocument()
+  })
+
+  it('keeps a byte order mark the backend keeps', () => {
+    open(provider, { '\ufeffgroups': 'memberOf', Role: 'groups' })
+    expect(screen.queryByText(/^sso\.legacyGroupsHidden/)).not.toBeInTheDocument()
+  })
+
   it('trims the key side', () => {
     open(provider, { ' groups ': 'memberOf', Role: 'groups' })
     expect(notice('memberOf')).toBeInTheDocument()
