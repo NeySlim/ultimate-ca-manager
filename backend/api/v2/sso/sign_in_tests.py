@@ -291,6 +291,10 @@ def _run(test_id, protocol, secret, callback_key):
                 'reason': 'the provider was deleted or changed type'}
     base = {'protocol': protocol, 'provider_id': provider.id, 'provider_name': provider.name,
             'provider_enabled': bool(provider.enabled)}
+    # The login goes through one enabled provider of the type: a sign-in never reaches another.
+    chosen = login_routes.login_provider(protocol)
+    if chosen is not None and chosen.id != provider.id:
+        base['shadowed_by'] = {'id': chosen.id, 'name': chosen.name}
 
     if protocol == 'oauth2':
         code = request.args.get('code')

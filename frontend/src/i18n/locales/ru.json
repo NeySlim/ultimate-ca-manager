@@ -4190,7 +4190,8 @@
     "signInTestCompleteBack": "Назад к поставщикам SSO",
     "signInTestLaunching": "Открывается поставщик удостоверений…",
     "signInTestCompleteClose": "Это окно не закрылось само: закройте его, чтобы вернуться к экрану поставщика.",
-    "signInTestCancel": "Отменить"
+    "signInTestCancel": "Отменить",
+    "signInTestShadowed": "Сейчас вход выполняется через включённого поставщика {{name}} этого типа, а не через этого: вход не дойдёт до этого поставщика. Отключите одного из них."
   },
   "notifications": {
     "certificateIssued": "Сертификат выпущен: {{name}}",

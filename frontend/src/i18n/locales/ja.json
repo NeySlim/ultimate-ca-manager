@@ -4140,7 +4140,8 @@
     "signInTestCompleteBack": "Back to the SSO providers",
     "signInTestLaunching": "Opening the identity provider…",
     "signInTestCompleteClose": "This window did not close by itself: close it to return to the provider screen.",
-    "signInTestCancel": "Cancel"
+    "signInTestCancel": "Cancel",
+    "signInTestShadowed": "The login now goes through the enabled provider {{name}} of this type, not this one: a sign-in would not reach this provider. Disable one of them."
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",

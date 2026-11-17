@@ -597,6 +597,57 @@ def test_saml_parity_protocol(app, saml_provider, idp_signer, other_signer, name
         _reset_provider(app, saml_provider)
 
 
+# -- two enabled providers of one type: the login uses one of them only -------------------
+
+def _second_oidc(app, enabled=True):
+    with app.app_context():
+        row = SSOProvider(
+            name=_uid('sit-oidc2'), provider_type='oauth2', enabled=enabled,
+            oauth2_client_id='ucm-client', oauth2_client_secret=SECRET_CLIENT,
+            oauth2_auth_url='https://idp.example/authorize',
+            oauth2_token_url='https://idp.example/token',
+            oauth2_userinfo_url='https://idp.example/userinfo',
+            oauth2_issuer='https://idp.example', id_token_verify=True,
+            auto_create_users=True, default_role='viewer')
+        db.session.add(row)
+        db.session.commit()
+        return row.id
+
+
+def _login_pick(app, protocol):
+    with app.app_context():
+        return login_routes.login_provider(protocol).id
+
+
+@pytest.mark.parametrize('second_enabled', (True, False))
+def test_a_report_names_the_enabled_provider_the_login_uses_instead(
+        app, oidc_provider, monkeypatch, second_enabled):
+    case = Case(app, oidc_provider, 'oauth2')
+    second = _second_oidc(app, enabled=second_enabled)
+    try:
+        _install_idp(monkeypatch, OIDCIdP(case.external_id, _oidc_userinfo(case)))
+        client = _admin_client(app)
+        chosen = _login_pick(app, 'oauth2')
+        assert chosen in (oidc_provider, second)
+        with app.app_context():
+            chosen_name = db.session.get(SSOProvider, chosen).name
+        for pid in (oidc_provider, second):
+            started, _state = _oidc_test(client, pid)
+            report = _read_report(client, started['id'])
+            if pid == chosen:
+                assert report.get('shadowed_by') is None, report
+            else:
+                assert report['shadowed_by'] == {'id': chosen, 'name': chosen_name}, report
+        # The login itself goes through the provider named, whatever the test of the other said.
+        login = app.test_client()
+        assert _location(login.get('/api/v2/sso/login/oauth2', base_url=SP_BASE))
+        with login.session_transaction(base_url=SP_BASE) as s:
+            assert s['sso_provider_id'] == chosen
+    finally:
+        case.cleanup()
+        _drop_provider(app, second)
+
+
 # -- invariant 2: a test transaction never ends as a login, nor the reverse ---------
 
 def _no_account(app, username):

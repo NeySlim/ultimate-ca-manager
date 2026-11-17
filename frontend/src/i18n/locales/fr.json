@@ -3951,7 +3951,8 @@
     "signInTestCompleteBack": "Retour aux fournisseurs SSO",
     "signInTestLaunching": "Ouverture du fournisseur d'identité…",
     "signInTestCompleteClose": "Cette fenêtre ne s'est pas fermée d'elle-même : fermez-la pour revenir à l'écran du fournisseur.",
-    "signInTestCancel": "Annuler"
+    "signInTestCancel": "Annuler",
+    "signInTestShadowed": "La connexion passe aujourd'hui par le fournisseur activé {{name}} de ce type, pas par celui-ci : une connexion n'atteindrait pas ce fournisseur. Désactivez l'un des deux."
   },
   "templates": {
     "template": "Modèle",

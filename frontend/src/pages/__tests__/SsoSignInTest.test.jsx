@@ -129,6 +129,18 @@ describe('Test sign-in panel', () => {
     expect(screen.getByText('staff')).toBeTruthy()
   })
 
+  it('warns when the login goes through another enabled provider of the type', async () => {
+    renderPanel()
+    await runUntilReport({ state: 'done', report: { ...ACCEPTED, shadowed_by: { id: 9, name: 'Corp IdP' } } })
+    expect(screen.getByText('sso.signInTestShadowed {"name":"Corp IdP"}')).toBeTruthy()
+  })
+
+  it('has no such warning when the login goes through this provider', async () => {
+    renderPanel()
+    await runUntilReport({ state: 'done', report: ACCEPTED })
+    expect(screen.queryByText(/sso.signInTestShadowed/)).toBeNull()
+  })
+
   it('shows a refusal with its diagnosis and maps a received attribute to groups by its Name', async () => {
     const handleChange = renderPanel()
     await runUntilReport({ state: 'done', report: REFUSED })

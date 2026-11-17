@@ -128,6 +128,11 @@ export default function SignInTestReport({ report, formData, handleChange }) {
           </ul>
         </div>
       )}
+      {report.shadowed_by && (
+        <p role="alert" className="status-warning-text">
+          {t('sso.signInTestShadowed', { name: report.shadowed_by.name })}
+        </p>
+      )}
       {report.provider_enabled === false && (
         <p className="text-text-tertiary">{t('sso.signInTestProviderDisabled')}</p>
       )}
