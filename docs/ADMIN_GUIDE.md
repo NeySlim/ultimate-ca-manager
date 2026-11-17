@@ -47,6 +47,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `UCM_NODE_ID` | `UCM_NODE_ID` | hostname | Node name reported as `node_id` by `/health` and `/health/ready`; in HA mode it must differ on every node (a node whose identifier a live node uses refuses to start) |
 | `BACKUP_MAX_UPLOAD_MB` | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive written before 3.0 (format v1 to v3) a restore accepts and reads, in MB; its decompressed content may be four times that. Archives written since 3.0 (v4) are read in chunks and not bound by it. Every other request keeps the 50 MB limit |
 | `BACKUP_MAX_ARCHIVE_MB` | `BACKUP_MAX_ARCHIVE_MB` | `0` | Largest v4 archive a restore accepts, in MB; `0` accepts any size |
+| (not read) | `UCM_ACCEPT_MAJOR_UPGRADE` | (unset) | Docker image only: `3` lets it upgrade a database last started by 2.254; unset or any other value, it stops on such a database without writing anything. The Helm chart sets it. The packages ignore it. See [UPGRADE.md](../UPGRADE.md#upgrading-to-v30) |
 
 ### Systemd Service
 

@@ -177,6 +177,8 @@ check_ha_secret || exit 1
 : "${UCM_BACKUP_RETENTION_DAYS:=30}"
 # Before the first write to the volumes: a refused database is never copied
 ucm_refuse_unstartable_database || exit $?
+# Then, on every backend: a 2.254 database moves to this major only with UCM_ACCEPT_MAJOR_UPGRADE
+ucm_refuse_unaccepted_major_upgrade || exit $?
 
 # Initial Admin User (the unprefixed names, as set by older Helm charts, still count)
 : "${UCM_INITIAL_ADMIN_USERNAME:="${INITIAL_ADMIN_USERNAME:-admin}"}"

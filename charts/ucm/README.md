@@ -69,6 +69,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `persistence.data.accessMode` / `persistence.etc.accessMode` | `ReadWriteOnce` | Access modes of the claims |
 | `persistence.data.existingClaim` / `persistence.etc.existingClaim` | `""` | Use an existing claim; in HA a data claim must be ReadWriteMany |
 | `fips.enabled` | `false` | Run the `<tag>-fips` image with `UCM_FIPS=1`; the pod refuses to start without the FIPS provider |
+| `majorUpgrade.accept` | `true` | Sets `UCM_ACCEPT_MAJOR_UPGRADE` to the major of the chart's `appVersion` (`3`): a `helm upgrade` to this chart upgrades a database 2.254 started last. `false` keeps the image's gate, which stops the pod on such a database until the variable is set |
 | `service.type` | `ClusterIP` | Service type |
 | `service.httpsPort` / `service.httpPort` | `8443` / `8080` | UI/API (HTTPS) and protocol (HTTP) ports |
 | `service.annotations` | `{}` | Annotations of the Service |

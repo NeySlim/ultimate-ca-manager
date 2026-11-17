@@ -126,11 +126,14 @@ volumes:
 
 ## Tags
 
-- `latest` -- Latest stable release
-- Version tags (e.g. `2.248`)
-- `latest-fips` and `<version>-fips` -- FIPS variant on the OpenSSL FIPS Provider 3.5.9, run with `UCM_FIPS=1`
+- `latest` -- Latest stable release, whatever its major version
+- `3`, `2` -- Latest stable release of that major version: pin `3` to receive every 3.x and never a 4.0, `2` to stay on 2.x
+- Version tags (e.g. `3.0`, `2.254.4`)
+- `latest-fips`, `3-fips` and `<version>-fips` -- FIPS variant on the OpenSSL FIPS Provider 3.5.9, run with `UCM_FIPS=1`
 
-Release candidates are published under their own `X.Y-rcN` (and `X.Y-rcN-fips`) tag and never move `latest` or `latest-fips`.
+Release candidates are published under their own `X.Y-rcN` (and `X.Y-rcN-fips`) tag and never move `latest`, a major tag or their `-fips` forms.
+
+A 3.x image started on a volume last used by 2.254 stops without changing anything until `UCM_ACCEPT_MAJOR_UPGRADE=3` is set: back up first, see UPGRADE.md.
 
 ## Image Details
 
