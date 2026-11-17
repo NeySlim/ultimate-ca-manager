@@ -483,7 +483,8 @@ def test_a_restore_whose_receiver_dies_before_the_commit_fails_and_lifts_the_mai
     took = time.monotonic() - killed
     assert (done['state'], done['reason']) == ('failed', 'executor_lost'), done
     assert _audit_lines(cluster, job_id) == 1
-    assert _maintenance(cluster) is None
+    # Its lease ended, so no process sees it any more; the next tend deletes the row
+    wait_until(lambda: _maintenance(cluster) is None, 60, 'the expired maintenance row removed')
     print(f'restore concluded executor_lost {took:.0f}s after its node was killed in the maintenance')
     on_leader = _login(cluster, leader)
     seen = on_leader.get(f'/api/v2/system/jobs/{job_id}').json()['data']
