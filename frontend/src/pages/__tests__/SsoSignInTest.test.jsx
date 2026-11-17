@@ -3,6 +3,7 @@
  * unsaved changes announced before the test of the saved provider, and the landing page.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { StrictMode } from 'react'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -230,6 +231,12 @@ describe('Test sign-in panel', () => {
     expect(FakeChannel.posted).toContainEqual({ type: 'abort', key })
     await act(async () => { testWindow() })
     expect(startSignInTest).not.toHaveBeenCalled()
+  })
+
+  it('shows the report under StrictMode, whose effects mount twice', async () => {
+    render(<StrictMode><SignInTestPanel provider={{ id: 3 }} dirty={false} formData={{}} handleChange={vi.fn()} /></StrictMode>)
+    await runUntilReport({ state: 'done', report: ACCEPTED })
+    expect(screen.getByText('sso.signInTestAccepted')).toBeTruthy()
   })
 
   it('is not offered before the provider is saved', () => {

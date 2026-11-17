@@ -40,7 +40,11 @@ export default function SignInTestPanel({ provider, dirty, formData, handleChang
     stop()
   }
 
-  useEffect(() => () => { alive.current = false; stop() }, [])
+  // Set on every mount: StrictMode unmounts and mounts again before the first click.
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false; stop() }
+  }, [])
 
   if (!provider?.id) return null
 
