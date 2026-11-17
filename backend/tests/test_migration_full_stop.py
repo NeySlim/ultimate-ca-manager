@@ -200,10 +200,11 @@ from sqlalchemy import create_engine, text
 engine = create_engine(__import__('os').environ['DATABASE_URL'])
 
 
-def stop():
+def stop(on_stopped=None):
     # The scheduler process writes its last heartbeat while it stops: the mark comes after it
     with engine.begin() as conn:
         conn.execute(text("UPDATE cluster_nodes SET pid = 7 WHERE node_id = 'node-a'"))
+    on_stopped()
 scheduler_supervisor.supervisor.stop = stop
 gunicorn_config.on_exit(None)
 with engine.connect() as conn:

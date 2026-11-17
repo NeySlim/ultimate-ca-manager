@@ -293,3 +293,31 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
     with pytest.raises(Exit):
         scheduler_main.main()
     assert exits == ['relay stop', 0]
+
+
+def test_the_master_stopping_stops_the_process_then_says_the_node_stopped(supervisor):
+    """SIGTERM to the master: the scheduler process stops beside the workers' drain, and the
+    node's row is released at once, not after graceful_timeout of open connections."""
+    s = supervisor()
+    calls = []
+    server = types.SimpleNamespace(log=s.log, LISTENERS=['listener'],
+                                   cfg=types.SimpleNamespace(graceful_timeout=1))
+    s.start(server, on_stopped=lambda: calls.append(s._proc.poll()))
+    assert _wait(lambda: s.pid is not None)
+    pid = s.pid
+    server.LISTENERS = []  # Arbiter.stop() empties them, then drains the workers
+    assert _wait(lambda: not _alive(pid), timeout=3)
+    assert _wait(lambda: calls, timeout=3)
+    assert calls[0] is not None  # after the process exited: its last heartbeat is written
+    s.stop()
+    assert len(calls) == 1
+
+
+def test_stop_says_the_node_stopped_once(supervisor):
+    s = supervisor()
+    calls = []
+    s.start(on_stopped=lambda: calls.append(1))
+    assert _wait(lambda: s.pid is not None)
+    s.stop()
+    s.stop()
+    assert calls == [1]

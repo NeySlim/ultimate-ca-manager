@@ -412,7 +412,20 @@ def _release_at_exit(node_id, token) -> None:
             logger.warning(f"HA: node identifier {node_id} not released at exit: {type(e).__name__}")
         finally:
             engine.dispose()
+    global _claimed_release
+    _claimed_release = release
     atexit.register(release)
+
+
+# The release registered by this process's claim (a no-op in another process)
+_claimed_release = None
+
+
+def release_claimed_node() -> None:
+    """Clean stop, once this node's scheduler process exited: give the row up now; the atexit
+    release repeats it, matching nothing then."""
+    if _claimed_release is not None:
+        _claimed_release()
 
 
 def node_held_elsewhere(node_id, wake_interval) -> bool:

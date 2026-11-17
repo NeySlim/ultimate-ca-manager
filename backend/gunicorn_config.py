@@ -270,9 +270,18 @@ tmp_upload_dir = None
 def on_starting(server):
     server.log.info("Starting UCM with Gunicorn")
 
+def _node_stopped():
+    # After the scheduler process's last heartbeat: a full-stop migration need not wait for this
+    # node, and its next start takes its row at once
+    from migration_runner import mark_node_stopped
+    mark_node_stopped()
+    from services.scheduler_leader import release_claimed_node
+    release_claimed_node()
+
 def when_ready(server):
     from scheduler_supervisor import supervisor
-    supervisor.start(server)
+    # Run as soon as the master stops (beside the workers' drain), else by on_exit
+    supervisor.start(server, on_stopped=_node_stopped)
 
 def on_reload(server):
     server.log.info("Reloading UCM")
@@ -282,10 +291,7 @@ def on_reload(server):
 
 def on_exit(server):
     from scheduler_supervisor import supervisor
-    supervisor.stop()
-    # After the scheduler process's last heartbeat: a full-stop migration need not wait for this node
-    from migration_runner import mark_node_stopped
-    mark_node_stopped()
+    supervisor.stop(on_stopped=_node_stopped)
 
 def worker_int(worker):
     worker.log.info("Worker received INT or QUIT signal")

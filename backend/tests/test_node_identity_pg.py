@@ -248,6 +248,23 @@ def test_a_clean_stop_releases_the_row(app, ha):
     assert _row(app, node)[0] is None
 
 
+def test_the_claimed_row_is_released_before_the_process_exits(app, ha, monkeypatch):
+    """The master's stop releases the row as soon as its scheduler process is gone (the
+    supervisor's on_stopped), not only at exit: a kill at the end of a grace finds it released."""
+    import atexit
+    registered = []
+    monkeypatch.setattr(atexit, 'register', registered.append)
+    monkeypatch.setattr(scheduler_leader, '_claimed_release', None)
+    node = PREFIX + 'early'
+    with app.app_context():
+        scheduler_leader.claim_node_at_start(node, 'early-token')
+        assert scheduler_leader.write_heartbeat(node, False, scheduler_leader.cluster_utc_now(), 'early-token')
+        assert _row(app, node)[0] == 'early-token'
+        scheduler_leader.release_claimed_node()
+    assert _row(app, node)[0] is None
+    assert len(registered) == 1  # atexit still releases, a no-op once released
+
+
 # ------------------------------------------------------------ 3. no race
 
 def test_two_processes_claiming_together_one_wins(app, ha):
