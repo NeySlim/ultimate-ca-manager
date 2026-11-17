@@ -106,6 +106,37 @@ def test_an_older_database_keeps_its_own_refusal(dialect, tmp_path, monkeypatch,
     assert 'UCM_ACCEPT_MAJOR_UPGRADE' not in out
 
 
+def _half_upgraded(tmp_path, monkeypatch, label):
+    """A SQLite 2.254 database an accepted upgrade began (marker committed, 300 not recorded).
+    PostgreSQL runs 300 in one transaction: a stop leaves no such state there."""
+    import pre_upgrade_copy
+    for db in make_base('sqlite', tmp_path, monkeypatch, label):
+        pre_upgrade_copy.mark_started(db.sqlite_path)
+        assert pre_upgrade_copy.MARKER_TABLE in db.tables()
+        yield db
+
+
+def test_an_upgrade_stopped_partway_resumes_without_the_variable(tmp_path, monkeypatch, capsys, image):
+    for db in _half_upgraded(tmp_path, monkeypatch, 'half'):
+        assert db.upgrade() is True
+        assert '300_upgrade_from_2_254' in db.registry()
+        assert '_upgrade_from_2_254_started' not in db.tables()
+    out = capsys.readouterr().out
+    assert 'UCM_ACCEPT_MAJOR_UPGRADE' not in out
+    assert "pin the image tag '2'" not in out
+
+
+def test_the_checks_let_an_upgrade_stopped_partway_resume(tmp_path, monkeypatch, capsys, image):
+    from services.database_admin import migration as switch
+    for db in _half_upgraded(tmp_path, monkeypatch, 'halfchk'):
+        before = _untouched(db)
+        assert _check(db, monkeypatch, True) == 0
+        assert switch._start_refusal(db.engine, True) is None
+        assert switch.start_refusal(db.url) is None
+        assert _untouched(db) == before
+    assert 'UCM_ACCEPT_MAJOR_UPGRADE' not in capsys.readouterr().out
+
+
 # ---- the read-only check the image's entrypoint runs before any write ---------------------------
 
 def _check(db, monkeypatch, *flags):

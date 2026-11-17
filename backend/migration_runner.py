@@ -207,12 +207,16 @@ MAJOR_UPGRADE_REFUSAL = (
     f"To stay on 2.x: pin the image tag '2' (or an exact version, 2.254.N) instead of 'latest'.")
 
 
-def major_upgrade_refusal(state, applied):
+def major_upgrade_refusal(state, applied, engine):
     """In the image, a database the pivot accepts and 300 has not upgraded (2.254 started it last)
-    waits for UCM_ACCEPT_MAJOR_UPGRADE to be exactly the major of this release."""
+    waits for UCM_ACCEPT_MAJOR_UPGRADE to be exactly the major of this release. The marker of an
+    upgrade already begun (SQLite) is that consent: the database is no longer the 2.254 one."""
     if os.environ.get("UCM_DOCKER") != "1" or state == "fresh" or UPGRADE_MIGRATION in applied:
         return None
     if os.environ.get(ACCEPT_MAJOR_VARIABLE) == MAJOR:
+        return None
+    from pre_upgrade_copy import MARKER_TABLE
+    if MARKER_TABLE in inspect(engine).get_table_names():
         return None
     return MAJOR_UPGRADE_REFUSAL
 
@@ -544,7 +548,7 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 
         # Checked before any write, the creation of `_migrations` included; an older database
         # keeps its own refusal first
-        refusal = pivot_refusal(state, applied) or major_upgrade_refusal(state, applied)
+        refusal = pivot_refusal(state, applied) or major_upgrade_refusal(state, applied, engine)
         if refusal:
             say(f"✗ {refusal}")
             return False
@@ -939,16 +943,18 @@ def check_database(major_upgrade: bool = False) -> int:
                 if sqlite_path is not None:
                     conn.execute(text("SELECT name FROM sqlite_master LIMIT 1")).fetchall()
             state, applied = _get_state(engine)
+            refusal = pivot_refusal(state, applied)
+            major = (major_upgrade_refusal(state, applied, engine)
+                     if major_upgrade and not refusal else None)
     except Exception as exc:  # noqa: BLE001
         cause = getattr(exc, "orig", None) or exc
         # Never the URL: only the driver's first line, which names no password
         say(f"unreadable: {type(cause).__name__}: {str(cause).splitlines()[0] if str(cause) else ''}")
         return CHECK_UNREADABLE
-    refusal = pivot_refusal(state, applied)
     if refusal:
         say(refusal)
         return CHECK_UNKNOWN if unknown_migrations(applied) else CHECK_REFUSED
-    refusal = major_upgrade_refusal(state, applied) if major_upgrade else None
+    refusal = major
     if refusal:
         say(refusal)
         return CHECK_MAJOR_UPGRADE

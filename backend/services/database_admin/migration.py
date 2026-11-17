@@ -445,7 +445,7 @@ def _target_has_users(target_engine) -> bool:
 def _start_refusal(engine, has_users: bool):
     """Why the next start would refuse the database behind *engine*, or None; read-only."""
     state, applied = _get_state(engine)
-    refusal = pivot_refusal(state, applied) or major_upgrade_refusal(state, applied)
+    refusal = pivot_refusal(state, applied) or major_upgrade_refusal(state, applied, engine)
     if refusal:
         return f"The target would not start with this release. {refusal}"
     # A 2.254 registry awaits its upgrade: a fresh 3.0 registry over it would skip that upgrade
@@ -465,7 +465,7 @@ def start_refusal(database_url: str):
                            connect_args=postgres_connect_args(database_url))
     try:
         state, applied = _get_state(engine)
-        return pivot_refusal(state, applied) or major_upgrade_refusal(state, applied)
+        return pivot_refusal(state, applied) or major_upgrade_refusal(state, applied, engine)
     finally:
         engine.dispose()
 

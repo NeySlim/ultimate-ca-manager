@@ -271,7 +271,7 @@ To upgrade: back up the data volume (and the PostgreSQL database if you use one)
 To stay on 2.x: pin the image tag '2' (or an exact version, 2.254.N) instead of 'latest'.
 ```
 
-The container exits with code 78: `docker logs <container>` shows the message, `docker ps -a` shows `Exited (78)`, or `Restarting (78)` with a restart policy, each new start refusing the same way. To upgrade, back up, then add `-e UCM_ACCEPT_MAJOR_UPGRADE=3` (or `UCM_ACCEPT_MAJOR_UPGRADE: "3"` under `environment:` in Compose) and start again; the variable can stay set, a 3.x database ignores it. Any other value (`true`, `1`, `4`) is refused, so consent given for 3 never covers a later major version. The Helm chart sets it for you (`majorUpgrade.accept`).
+The container exits with code 78: `docker logs <container>` shows the message, `docker ps -a` shows `Exited (78)`, or `Restarting (78)` with a restart policy, each new start refusing the same way. To upgrade, back up, then add `-e UCM_ACCEPT_MAJOR_UPGRADE=3` (or `UCM_ACCEPT_MAJOR_UPGRADE: "3"` under `environment:` in Compose) and start again; the variable can stay set, a 3.x database ignores it. An accepted upgrade of a SQLite database that stopped partway resumes at the next start, variable set or not. Any other value (`true`, `1`, `4`) is refused, so consent given for 3 never covers a later major version. The Helm chart sets it for you (`majorUpgrade.accept`).
 
 ### Backup Data
 
