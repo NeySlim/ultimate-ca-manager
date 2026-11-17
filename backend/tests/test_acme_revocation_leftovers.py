@@ -9,8 +9,6 @@ from models import db, Certificate, AcmeClientOrder
 from services.acme import upstream_revocation
 from services.cert import issued_lookup
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture
 def twin_rows(app, create_cert):

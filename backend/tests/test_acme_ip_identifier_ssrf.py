@@ -20,8 +20,6 @@ import pytest
 
 from utils.ssrf_protection import validate_host_not_private
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _make_ip_challenge(value, challenge_type):
     """Persist an account/order/authz/challenge for an RFC 8738 'ip' order."""

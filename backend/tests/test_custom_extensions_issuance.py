@@ -2,8 +2,6 @@
 import base64
 import types
 
-import pytest
-
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -14,10 +12,6 @@ from tests.test_acme_profile_template import _clear_profiles, _install_profiles
 from tests.test_csr_sign_extra_names import _csr, _upload
 from tests.test_custom_extensions import (  # noqa: F401 (fixture)
     DER_A, DER_B, OID_A, OID_B, _SEQ, _cert, _set_template_extensions, _value, make_template)
-from tests.leak_marks import with_fixtures
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 
 # ── issuance ────────────────────────────────────────────────────────────────

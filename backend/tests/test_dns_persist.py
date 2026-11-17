@@ -19,8 +19,6 @@ from tests.test_acme_security_paths import (
     _build_jws, _gen_key_and_jwk, _nonce, _post_jws, _thumbprint,
 )
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 class _Rdata:
     """Minimal dnspython TXT rdata stand-in: .strings (list of bytes)."""

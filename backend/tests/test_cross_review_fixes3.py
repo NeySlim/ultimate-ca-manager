@@ -13,8 +13,6 @@ from tests.fixtures.cross_world import build_world, set_served
 from tests.test_cross_chain_paths import _der, _loads
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture
 def world(app, auth_client):

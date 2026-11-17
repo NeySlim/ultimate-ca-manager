@@ -10,8 +10,6 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 INDEXES = {
     'ix_revoked_serials_caref': ['caref'],

@@ -28,8 +28,6 @@ from cryptography.hazmat.primitives.serialization import pkcs7
 from models import db, Certificate
 from tests.conftest import get_json, assert_success, assert_error, assert_refused
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 CONTENT_JSON = 'application/json'
 BASE = '/api/v2/certificates'
 

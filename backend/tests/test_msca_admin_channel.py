@@ -12,8 +12,6 @@ import pytest
 
 from tests.conftest import get_json
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 CONTENT_JSON = 'application/json'
 BASE = '/api/v2/microsoft-cas'
 CERTS = '/api/v2/certificates'

@@ -17,8 +17,6 @@ from tests.test_est_rfc7030 import _basic_auth, _post_csr, est_config  # noqa: F
 from tests.test_wstep_renew_tls import USER_AND_CODESIGN, _eku_csr, _key, _renew
 from services.wstep import wstep_service
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 templated_ca = renew_tls.templated_ca
 MAIL = {'Mail': (['emailProtection'], None)}
 

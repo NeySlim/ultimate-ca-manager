@@ -20,7 +20,7 @@ from services.wstep import wstep_service
 from tests.ad_connector_support import add_connector
 from tests.test_revocation_record_rule import _wait_for_a_lock_waiter
 from tests.test_wstep_cn_pattern import _connector, _csr, _renew, _served_realm, pattern_ca  # noqa: F401
-from tests.windows_profile_support import connectors_kept, default_profile, windows_profiles_restored  # noqa: F401
+from tests.windows_profile_support import connectors_kept, default_profile
 
 EMAIL = ExtendedKeyUsageOID.EMAIL_PROTECTION
 SERVER_AUTH = ExtendedKeyUsageOID.SERVER_AUTH

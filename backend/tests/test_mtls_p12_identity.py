@@ -25,8 +25,6 @@ from cryptography.x509.oid import NameOID
 from models import CA, Certificate, db
 from models.auth_certificate import AuthCertificate
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _post(client, url, data):
     return client.post(url, data=json.dumps(data), content_type='application/json')

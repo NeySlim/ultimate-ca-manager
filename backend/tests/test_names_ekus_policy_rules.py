@@ -19,8 +19,6 @@ from models.policy import CertificatePolicy
 from services.trust_store.constraints_mixin import validate_name_constraints
 from utils.eku_validation import normalize_extra_ekus
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 SMARTCARD = '1.3.6.1.4.1.311.20.2.2'
 UPN_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.3')
 

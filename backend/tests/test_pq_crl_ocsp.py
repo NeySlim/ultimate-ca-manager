@@ -17,11 +17,9 @@ from cryptography.hazmat.primitives import hashes, serialization
 from models import AuditLog, CA, Certificate, SystemConfig, db
 from models.crl import CRLMetadata
 from utils import key_algorithms
-from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 OPENSSL = shutil.which('openssl')
 MLDSA65_OID = '2.16.840.1.101.3.4.3.18'

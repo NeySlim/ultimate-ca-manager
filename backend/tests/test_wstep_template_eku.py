@@ -29,8 +29,6 @@ from tests.fixtures.templates import delete_templates
 from services.wstep import wstep_service
 from tests.windows_profile_support import windows_profiles_restored, restore, set_config, snapshot  # noqa: F401
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 SMARTCARD_LOGON = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.2')
 
 

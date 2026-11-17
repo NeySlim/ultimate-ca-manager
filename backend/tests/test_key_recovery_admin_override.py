@@ -16,8 +16,6 @@ import pytest
 
 from models import db
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 class TestTheTwoSpellingsOfTheSameQuestion:
     def test_the_route_asks_the_function_it_imported(self):

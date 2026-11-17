@@ -16,8 +16,6 @@ from tests.fixtures.cross_pki import make_cert, new_key, pem
 from tests.test_serial_encoding_crl_ocsp import _make_ca
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture
 def world(app, auth_client):

@@ -10,9 +10,6 @@ from uuid import uuid4
 
 from models import db, AuditLog, AcmeAccount, AcmeOrder
 from utils.datetime_utils import utc_now
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 class TestAuditUniqueUsers:

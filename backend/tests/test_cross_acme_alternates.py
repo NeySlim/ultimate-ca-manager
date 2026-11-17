@@ -15,8 +15,6 @@ from tests.test_acme_security_paths import _build_jws, _gen_key_and_jwk, _nonce,
 from tests.test_cross_chain_paths import _der, _loads
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 BASE = 'http://localhost'
 
 

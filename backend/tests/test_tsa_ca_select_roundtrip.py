@@ -8,9 +8,6 @@ ca_refid first, then lets ca_id override it, so the selection is wiped
 (ca_id null → '') or reverted (ca_id stale → previous CA).
 """
 import json
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 class TestTsaCaSelectRoundtrip:

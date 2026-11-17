@@ -24,8 +24,6 @@ from services.backup.export_generic import IdentityIndex, export_section
 from services.backup.restore import (
     RestorePlan, RestoreValidationError, single_transaction)
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 
 def _service():
     from services.backup_service import BackupService

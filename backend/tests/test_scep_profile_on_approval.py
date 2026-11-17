@@ -18,8 +18,6 @@ from models.certificate_template import CertificateTemplate
 from models.scep import ScepProfile
 from models.system_config import SystemConfig
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _csr(cn):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

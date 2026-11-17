@@ -6,8 +6,6 @@ from unittest.mock import patch
 import pytest
 from cryptography import x509
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 SCT_LIST_OID = x509.ObjectIdentifier("1.3.6.1.4.1.11129.2.4.2")
 CT_POISON_OID = x509.ObjectIdentifier("1.3.6.1.4.1.11129.2.4.3")

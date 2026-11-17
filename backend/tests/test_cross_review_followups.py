@@ -8,10 +8,8 @@ from cryptography.hazmat.primitives import serialization
 from models import CA, Certificate, db
 from tests.fixtures.cross_pki import make_cert, new_key, pem
 import pytest
-from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 
 def _ca_row(cert, label):

@@ -10,10 +10,8 @@ import pytest
 
 from models import CA, Certificate, db
 from models.policy import ApprovalRequest, CertificatePolicy
-from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 
 def _json(client, method, url, payload=None):

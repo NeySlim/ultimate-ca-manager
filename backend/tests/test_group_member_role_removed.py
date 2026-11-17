@@ -9,9 +9,6 @@ import uuid
 
 from models import db
 from models.group import GroupMember
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 
 def _post(client, url, body):

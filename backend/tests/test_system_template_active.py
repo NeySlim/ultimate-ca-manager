@@ -7,8 +7,6 @@ import pytest
 from models import AuditLog, db
 from models.certificate_template import CertificateTemplate
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _put(auth_client, template_id, body):
     return auth_client.put(f'/api/v2/templates/{template_id}', data=json.dumps(body),

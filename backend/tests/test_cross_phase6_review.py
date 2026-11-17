@@ -12,8 +12,6 @@ from services.smart_import.importer import SmartImporter
 from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 from tests.test_cross_repair import _world, _row, _set_config, _config
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _served(ca_id):
     return CACrossCertificate.query.filter_by(ca_id=ca_id, served=True).count()

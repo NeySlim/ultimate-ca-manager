@@ -1,8 +1,5 @@
 """The certificate listing counts the SANs the picker shows (#365 follow-up)."""
 import json
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _listed(auth_client, cn):

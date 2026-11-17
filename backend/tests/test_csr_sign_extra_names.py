@@ -14,8 +14,6 @@ from cryptography.x509.oid import NameOID
 from models import Certificate, db
 from services.trust_store.trust_store_service import TrustStoreService
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 CSRS = '/api/v2/csrs'
 
 

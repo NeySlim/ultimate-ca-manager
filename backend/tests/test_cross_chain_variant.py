@@ -6,8 +6,6 @@ from models import Certificate, DeployBinding, db
 from tests.fixtures.cross_world import admin_enrolment, build_world, set_served
 from tests.test_cross_chain_paths import _der, _loads
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 BAD = ['bogus', 'cross:999999', 'cross:', 'CROSS:1']
 
 

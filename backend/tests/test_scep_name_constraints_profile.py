@@ -12,8 +12,6 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from models import CA, Certificate, SCEPRequest, db
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 NC = [{'type': 'dns', 'value': 'example.com'}, {'type': 'email', 'value': 'example.com'}]
 
 

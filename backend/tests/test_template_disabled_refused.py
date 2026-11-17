@@ -12,10 +12,6 @@ import pytest
 from models import CertificateTemplate, SystemConfig, db
 from services.acme import profiles as acme_profiles
 from tests.test_csr_sign_extra_names import _csr, _upload
-from tests.leak_marks import with_fixtures
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 CONTENT_JSON = 'application/json'
 

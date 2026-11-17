@@ -24,9 +24,6 @@ from tests.test_scep_rfc8894_operations import (
     _build_request, _load_ca_material, _client_identity, _response_attributes,
     PKI_STATUS_OID, FAIL_INFO_OID,
 )
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 MSG_TYPE_PKI_REQ = 19
 

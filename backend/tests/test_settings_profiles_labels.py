@@ -10,8 +10,6 @@ import pytest
 from models import CA, SystemConfig, db
 from services.acme import profiles as acme_profiles
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def patch_json(client, url, payload):
     return client.patch(url, data=json.dumps(payload),

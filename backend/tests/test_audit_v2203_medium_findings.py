@@ -27,8 +27,6 @@ import json
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 
 # ---------------------------------------------------------------------------
 # #8 — mTLS issuance requires an issuance scope

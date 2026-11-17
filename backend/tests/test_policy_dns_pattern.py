@@ -7,8 +7,6 @@ import pytest
 from services.policy_service import PolicyEvaluationService
 from tests.test_approval_fail_closed import _approval_policy, _cleanup, _operator_client
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 
 class _Policy:
     def __init__(self, pattern):

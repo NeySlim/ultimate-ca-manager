@@ -13,8 +13,6 @@ import pytest
 
 from utils.pagination import parse_request_pagination, parse_request_limit
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 # The three routes that had no ceiling at all.
 UNBOUNDED_BEFORE = (

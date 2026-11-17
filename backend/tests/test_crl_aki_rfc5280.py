@@ -19,9 +19,6 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
 
 from tests.conftest import assert_success, get_json
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

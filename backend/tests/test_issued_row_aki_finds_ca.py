@@ -14,9 +14,6 @@ from models import CA, Certificate, db
 from services.ca_service import CAService
 from utils.cert_issuer import find_ca_by_ski
 from utils.key_codec import load_pem_bytes
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _csr(cn):

@@ -18,9 +18,6 @@ from tests.test_wstep_protocol_conformance import _fault, _fault_code
 from tests.test_wstep_requested_template import TWINS, _oid_of
 from tests.test_wstep_subject_source import _issue, subject_ca  # noqa: F401
 from tests.windows_profile_support import default_profile, windows_profiles_restored  # noqa: F401
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 TEMPLATE_EXT_OID = '1.3.6.1.4.1.311.21.7'
 

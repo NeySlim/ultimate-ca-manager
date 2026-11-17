@@ -20,8 +20,6 @@ from utils.datetime_utils import utc_now
 from utils.revocation_reasons import reason_code
 from utils.spki_digest import public_key_sha256
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 EVENT = 'acme_order.revocation_failed'
 ERROR = 'urn:ietf:params:acme:error:'
 

@@ -5,8 +5,6 @@ import pytest
 from models import CA, Certificate, SystemConfig, db
 from tests.conftest import get_json
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 URL = '/api/v2/dashboard/health'
 TS_OID = '1.3.6.1.5.5.7.3.8'
 KEYS = ('tsa_enabled', 'tsa_signer_cert_refid', 'tsa_ca_refid', 'tsa_require_dedicated_cert')

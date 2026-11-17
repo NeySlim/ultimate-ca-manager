@@ -14,8 +14,6 @@ import pytest
 
 from models import db, AuditLog
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 class TestTheImportEntriesAreSealed:
     def _stage_one(self, app, name):

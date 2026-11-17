@@ -19,7 +19,6 @@ from tests.ad_connector_support import add_connector
 from tests.fixtures.templates import delete_templates
 from tests.windows_profile_support import connectors_kept, default_profile, default_realm
 from utils.upn_san import build_upn_other_name
-from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 MACHINE = 'WIN11$@EXAMPLE.TEST'
 USER = 'alice@EXAMPLE.TEST'

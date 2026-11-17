@@ -14,8 +14,6 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID, NameOID
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 BASE = '/api/v2/certificates'
 CA_IMPORT = '/api/v2/cas/import'
 

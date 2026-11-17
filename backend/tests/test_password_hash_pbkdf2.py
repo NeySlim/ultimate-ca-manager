@@ -11,7 +11,6 @@ from werkzeug.security import generate_password_hash
 from models import SystemConfig, User, db
 from utils.backup_codes import consume_code, hash_codes, verify_code_only
 from utils.password_hash import PASSWORD_METHOD, hash_password, verify_password
-from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 CONTENT_JSON = 'application/json'
 PBKDF2 = PASSWORD_METHOD + '$'

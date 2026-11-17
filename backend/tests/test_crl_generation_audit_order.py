@@ -12,8 +12,6 @@ import pytest
 
 from models import db
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture
 def audit_always_fails(monkeypatch):

@@ -8,7 +8,6 @@ from models import Certificate, CertificateTemplate, db
 from services.ad_connector import lookup as ad_lookup
 from tests.test_wstep_kerberos_issue import _issued_cert_from_rstr
 from tests.test_windows_profile_routing import _audits, _fault, _issue, _top_audit, world  # noqa: F401
-from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 TEMPLATE = 'C04 A User'

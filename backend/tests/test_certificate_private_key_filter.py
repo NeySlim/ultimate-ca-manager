@@ -1,9 +1,6 @@
 """The certificate picker asks for certificates holding a private key: the
 server filters, so pagination and the total count only those."""
 from models import CA, Certificate, db
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _cert(app, ca_id, cn, keep_key=True):

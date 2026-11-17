@@ -13,8 +13,6 @@ from models import Certificate, db
 from models.policy import ApprovalRequest, CertificatePolicy
 from tests.test_approval_on_sign_and_renew import _cert_row, _csr_row, _drop_policy, _drop_rows, _json, _operator
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 
 def _days_left(app, cert_id):
     with app.app_context():

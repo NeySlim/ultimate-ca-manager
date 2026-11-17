@@ -9,8 +9,6 @@ import pytest
 
 from tests.conftest import assert_error, assert_success, get_json
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 BASE = '/api/v2/deploy'
 
 _seq = [0]

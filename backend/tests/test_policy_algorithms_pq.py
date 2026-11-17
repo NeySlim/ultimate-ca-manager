@@ -19,7 +19,6 @@ from services.policy_service import PolicyEvaluationService, PolicyViolation
 from tests.conftest import get_json
 from utils import key_algorithms
 from tests.fixtures.templates import delete_templates, templates_created_here_removed
-from tests.leak_marks import with_fixtures
 
 
 @pytest.fixture(autouse=True, scope='module')
@@ -30,7 +29,6 @@ def _templates_stay_in_this_module(app):
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 
 def _post(client, url, body):

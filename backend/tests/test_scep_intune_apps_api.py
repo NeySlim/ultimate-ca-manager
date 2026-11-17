@@ -7,11 +7,6 @@ import json
 
 from tests.conftest import get_json
 from tests.test_scep_profiles import _create_profile
-import pytest
-from tests.leak_marks import with_fixtures
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 CONTENT_JSON = 'application/json'
 

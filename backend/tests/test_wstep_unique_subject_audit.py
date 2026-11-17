@@ -11,7 +11,6 @@ from tests.test_windows_profile_renewal import (  # noqa: F401
 from tests.test_windows_profile_routing import NEGOTIATE, _csr, _fault, held_on_b, world  # noqa: F401
 from tests.test_wstep_issue import _basic_auth
 from tests.test_wstep_kerberos_issue import _build_rst
-from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 

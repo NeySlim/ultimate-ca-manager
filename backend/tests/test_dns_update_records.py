@@ -23,8 +23,6 @@ from models.acme_dns_update import AcmeProxyDnsChallenge
 from services.acme.dns_update import records
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 UPSTREAM = 'https://acme-stub.example'
 AUTHZ_URL = f'{UPSTREAM}/acme/authz-v3/9001'
 CHALL_URL = f'{UPSTREAM}/acme/chall-v3/9001/AbCd'

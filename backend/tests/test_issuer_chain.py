@@ -12,8 +12,6 @@ from utils.ca_chain import (ChainVariantError, anchor_chain, chain_variants, iss
                             variant_ids)
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture
 def world(app, auth_client):

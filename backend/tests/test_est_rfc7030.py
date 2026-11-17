@@ -20,8 +20,6 @@ from pyasn1.codec.der import decoder as der_decoder
 from models import CA, db
 from models.system_config import SystemConfig
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 EST_BASE = '/.well-known/est'
 EST_USER = 'est-test'

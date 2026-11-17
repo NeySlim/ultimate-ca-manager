@@ -17,7 +17,6 @@ from models import CA, AuditLog, Certificate, db
 from tests.test_est_rfc7030 import _basic_auth, _post_csr, _set_config, est_config  # noqa: F401
 from tests.test_wstep_cn_pattern import _served_realm as served_realm, pattern_ca  # noqa: F401
 from tests.test_wstep_cn_pattern_unique import accounts  # noqa: F401
-from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 

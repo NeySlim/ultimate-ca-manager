@@ -15,8 +15,6 @@ import fips_mode
 from fips_mode import FipsRestricted
 from models import db
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 PASSWORD = 'fips-export-pw-123'
 LEGACY_REFUSAL = 'PKCS#12 legacy encryption (3DES/SHA-1) not available in FIPS mode'
 JKS_REFUSAL = 'JKS export not available in FIPS mode'

@@ -15,8 +15,6 @@ from tests.test_cross_chain_paths import _der, _loads
 from tests.test_cross_review_fixes3 import sibling_records  # noqa: F401
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 
 @pytest.fixture
 def world(app, auth_client):

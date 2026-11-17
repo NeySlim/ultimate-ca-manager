@@ -9,8 +9,6 @@ from models import CA
 from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 from tests.test_opnsense_import import _Session
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _row(cert, descr):
     return {'uuid': str(uuid.uuid4()), 'refid': uuid.uuid4().hex[:13], 'descr': descr,

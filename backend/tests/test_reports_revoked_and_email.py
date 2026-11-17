@@ -16,8 +16,6 @@ from services import report_service
 from services.email_service import EmailService
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _post(c, url, body):
     return c.post(url, data=json.dumps(body), content_type='application/json')

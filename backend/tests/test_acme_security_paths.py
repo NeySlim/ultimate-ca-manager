@@ -26,8 +26,6 @@ from models.acme_models import (
 )
 from services.acme.acme_service import AcmeService
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _int_to_b64(n):
     raw = n.to_bytes((n.bit_length() + 7) // 8, 'big')

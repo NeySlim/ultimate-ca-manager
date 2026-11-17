@@ -22,8 +22,6 @@ from services.policy_service import POLICY_DIGESTS, PolicyEvaluationService, Pol
 from tests.conftest import get_json
 from utils import key_algorithms
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 CONTENT_JSON = 'application/json'
 FIPS_LABELS = sorted(key_algorithms.fips_approved_labels())
 SYSTEM_POLICY = 'FIPS mode'

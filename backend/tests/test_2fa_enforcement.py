@@ -7,11 +7,7 @@ session after confirming TOTP, and the self-disable block under enforcement.
 import json
 import pyotp
 
-import pytest
-
 from tests.conftest import get_json
-
-pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 
 def _login(client, username, password):

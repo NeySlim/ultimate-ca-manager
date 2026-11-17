@@ -7,8 +7,6 @@ from asn1crypto import algos, tsp
 
 from models import CA, SystemConfig, db
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 KEY = 'tsa_require_dedicated_cert'
 KEYS = ('tsa_enabled', 'tsa_ca_refid', 'tsa_signer_cert_refid', KEY)
 TS_OID = '1.3.6.1.5.5.7.3.8'

@@ -26,8 +26,6 @@ from tests.test_est_serverkeygen_cms import (
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 _KEYS = ('est_enabled', 'est_ca_refid', 'est_username', 'est_password', 'est_validity_days')
 
 

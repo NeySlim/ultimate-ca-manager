@@ -13,10 +13,8 @@ from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 from tests.test_cross_import_opnsense import _row, _run
 from tests.test_opnsense_import import _key_pem
 from utils.datetime_utils import utc_now
-from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.usefixtures('drop_new_users')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 
 def _x(b, xid=None, tail=''):

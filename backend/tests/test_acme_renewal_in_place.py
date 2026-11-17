@@ -21,8 +21,6 @@ from tests.db_write_probe import watching_writes
 from utils.datetime_utils import utc_now
 from utils.key_codec import load_pem_bytes
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _pub(key_or_cert):
     return key_or_cert.public_key().public_bytes(serialization.Encoding.DER,

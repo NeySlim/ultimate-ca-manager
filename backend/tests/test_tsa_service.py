@@ -7,8 +7,6 @@ import pytest
 
 from asn1crypto import tsp, algos, core
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _status_info(resp_der):
     """Load PKIStatusInfo from granted or token-less rejection responses."""

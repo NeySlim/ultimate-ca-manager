@@ -13,8 +13,6 @@ from models import CA, Certificate, SystemConfig, db
 from tests.fixtures.cross_pki import openssl_verify, pem
 from tests.fixtures.cross_world import admin_enrolment, build_world, set_served
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 PEM_BLOCK = re.compile(rb'-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----', re.S)
 
 

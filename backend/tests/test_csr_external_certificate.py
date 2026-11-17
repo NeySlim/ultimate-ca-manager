@@ -15,8 +15,6 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CSRS = '/api/v2/csrs'

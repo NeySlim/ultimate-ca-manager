@@ -20,9 +20,6 @@ from cryptography.x509.oid import CRLEntryExtensionOID, ExtensionOID
 
 from tests.conftest import assert_success, get_json
 from utils.datetime_utils import utc_now
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

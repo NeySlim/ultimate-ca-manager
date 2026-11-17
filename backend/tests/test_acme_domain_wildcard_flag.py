@@ -13,8 +13,6 @@ from models.acme_models import AcmeDomain, DnsProvider
 from tests.test_acme_proxy_identifier_syntax import _post_new_order
 from tests.test_acme_security_paths import _build_jws, _nonce, acme_account  # noqa: F401
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture
 def domain_entry(app):

@@ -6,8 +6,6 @@ from config.settings import Config
 from migration_marks import FULL_STOP_ASSET
 from utils.ha import reject_in_ha
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 ROUTES = [
     '/api/v2/database/switch',
     '/api/v2/database/migrate',

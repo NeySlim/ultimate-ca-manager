@@ -15,9 +15,6 @@ from models.crl import CRLMetadata
 from services.crl_scheduler_task import CRLSchedulerTask
 from tests.conftest import get_json
 from utils.datetime_utils import utc_now
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 CONTENT_JSON = 'application/json'
 

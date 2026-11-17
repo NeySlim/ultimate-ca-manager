@@ -31,8 +31,6 @@ from tests.test_acme_security_paths import (
 )
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 BASE = 'http://localhost'
 
 

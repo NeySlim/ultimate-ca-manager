@@ -12,8 +12,6 @@ from services.policy_service import PolicyEvaluationService
 from tests.test_policy_algorithms_397 import _csr, _drop, _pol, _policy, _signed, _store_csr
 from utils import issuance_defaults
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _ec384_ca(create_ca, cn):
     return create_ca(cn=cn, keyAlgo='EC-P384', keyType='EC-P384', keySize='secp384r1',

@@ -5,8 +5,6 @@ from models import CA
 from services.smart_import.importer import SmartImporter
 from tests.fixtures.cross_pki import build_cross_pki, pem
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture
 def pki():

@@ -23,8 +23,6 @@ import json
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 LISTINGS = (
     '/api/v2/certificates',

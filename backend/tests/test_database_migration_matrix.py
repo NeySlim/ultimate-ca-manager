@@ -24,11 +24,9 @@ from services.database_admin.lock import (
     switch_pending_path,
 )
 from services.database_admin.verify import VerificationError
-from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.sqlite_only(
     reason='the session database is the migration source, SQLite by design; a PostgreSQL source has its own engine (UCM_TEST_PG_URL)')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 _needs_pg = pytest.mark.skipif(

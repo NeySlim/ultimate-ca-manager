@@ -32,8 +32,6 @@ from services.ocsp_service import OCSPService
 
 from tests.test_serial_encoding_crl_ocsp import _make_ca, _issue, _store, _key
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _crl_serials(ca_id):
     meta = CRLService.generate_crl(ca_id)

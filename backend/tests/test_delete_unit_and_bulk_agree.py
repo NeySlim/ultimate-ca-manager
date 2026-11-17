@@ -30,10 +30,6 @@ from utils.datetime_utils import utc_now
 from utils.file_naming import ca_cert_path
 import pytest
 from tests.fixtures.templates import templates_created_here_removed
-from tests.leak_marks import with_fixtures
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 
 @pytest.fixture(autouse=True, scope='module')

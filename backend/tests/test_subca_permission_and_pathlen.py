@@ -23,8 +23,6 @@ from cryptography.x509.oid import ExtensionOID, NameOID
 
 from services.trust_store.trust_store_service import TrustStoreService
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 
 def _ca(path_length):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

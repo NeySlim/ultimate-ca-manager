@@ -16,8 +16,6 @@ from tests.test_ca_external_csr import (
 )
 from tests.test_ca_external_cross_offer import _active_under, _crt
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 BASE = '/api/v2/cas'
 
 

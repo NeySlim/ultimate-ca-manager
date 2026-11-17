@@ -7,9 +7,6 @@ import json
 import uuid
 
 from models import SystemConfig, db
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_users')
 
 
 def test_the_former_bypass_setting_is_ignored(app, auth_client):

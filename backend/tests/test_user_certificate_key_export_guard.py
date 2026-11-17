@@ -22,8 +22,6 @@ import pytest
 
 from models import db
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates', 'drop_new_users')
-
 
 @pytest.fixture
 def an_operator(app, create_user):

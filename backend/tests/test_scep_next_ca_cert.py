@@ -11,8 +11,6 @@ from cryptography.hazmat.primitives.serialization import pkcs7
 
 from models import CA, SystemConfig, db
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 URL = '/scep/pkiclient.exe?operation=GetNextCACert'
 
 

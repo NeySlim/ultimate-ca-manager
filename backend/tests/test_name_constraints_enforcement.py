@@ -14,8 +14,6 @@ from services.hsm.ca_key_loader import get_ca_signing_key
 from services.trust_store import TrustStoreService
 from tests.conftest import get_json
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _ca_with_name_constraints(app, ca_id, permitted=None, excluded=None):
     """Replace a fixture CA certificate with one using the same key plus constraints."""

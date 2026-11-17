@@ -12,8 +12,6 @@ import uuid
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 CSRS = '/api/v2/csrs'
 SIGNED = 23  # more than the old hard ceiling of one 20-row page
 

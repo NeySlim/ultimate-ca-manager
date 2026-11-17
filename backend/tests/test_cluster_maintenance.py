@@ -10,8 +10,6 @@ from config.settings import Config
 from services import cluster_maintenance as cm
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _row(phase=cm.PHASE_MANUAL, reason=cm.REASON_MANUAL, minutes=5, restored_at=None):
     now = utc_now()

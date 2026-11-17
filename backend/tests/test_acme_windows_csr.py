@@ -13,9 +13,6 @@ from models import CA, Certificate, db
 from services.acme.acme_service import AcmeService
 import tests.test_acme_profile_template as profile_tests
 from tests.test_csr_windows_basic_constraints import _windows_shaped_csr
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def test_finalize_issues_for_a_windows_shaped_request(app, monkeypatch, create_ca):

@@ -6,8 +6,6 @@ import pytest
 from models import db, Certificate
 from services import cert_linting_service as L
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 pkilint_available = L.linters_status()['pkilint']
 needs_pkilint = pytest.mark.skipif(not pkilint_available, reason='pkilint not installed')
 

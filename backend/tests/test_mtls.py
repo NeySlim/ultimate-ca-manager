@@ -12,8 +12,6 @@ import base64
 import json
 from tests.conftest import get_json
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 def _post(client, url, data=None):
     return client.post(
         url,

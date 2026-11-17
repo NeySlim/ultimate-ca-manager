@@ -28,8 +28,6 @@ from tests.test_est_serverkeygen_cms import (  # noqa: F401 (fixtures)
 )
 from utils.est_key_encryption import UnsupportedCapabilities, choose_key_encryption, smime_capabilities
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 SMIME_CAPABILITIES = '1.2.840.113549.1.9.15'
 
 

@@ -17,8 +17,6 @@ from services.email_service import EmailService
 from services.notification_service import NotificationService
 from utils.datetime_utils import utc_now
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 class _SmtpConfig:
     enabled = True

@@ -14,11 +14,9 @@ import fips_mode
 from models import CA, Certificate, db
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
-from tests.leak_marks import with_fixtures
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
 
 LEVELS = {'44': (mldsa.MLDSA44PrivateKey, mldsa.MLDSA44PublicKey),
           '65': (mldsa.MLDSA65PrivateKey, mldsa.MLDSA65PublicKey),

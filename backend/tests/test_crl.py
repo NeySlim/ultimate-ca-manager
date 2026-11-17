@@ -17,8 +17,6 @@ import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 CONTENT_JSON = 'application/json'

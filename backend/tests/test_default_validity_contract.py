@@ -27,8 +27,6 @@ from tests.fixtures.templates import templates_created_here_removed
 from utils.validity import (DEFAULT_CERTIFICATE_VALIDITY_DAYS,
                             DEFAULT_TEMPLATE_VALIDITY_DAYS)
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture(autouse=True, scope='module')
 def _templates_stay_in_this_module(app):

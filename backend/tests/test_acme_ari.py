@@ -10,8 +10,6 @@ from models.acme_models import AcmeAccount, AcmeOrder
 from services.acme import ari
 from utils.serial_format import serial_to_int
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _b64url(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).rstrip(b'=').decode()

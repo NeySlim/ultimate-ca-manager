@@ -8,9 +8,6 @@ import base64
 import json
 
 from tests.conftest import get_json
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 BASE = '/api/v2/certificates'
 

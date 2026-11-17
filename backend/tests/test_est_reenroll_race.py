@@ -11,8 +11,6 @@ from models import Certificate, db
 from tests.test_final_review_followups import _csr, _enrol, _pem
 from tests.test_est_rfc7030 import _post_csr, est_config  # noqa: F401
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _twin_row(original, cert, twin):
     columns = {c.name: getattr(original, c.name) for c in Certificate.__table__.columns

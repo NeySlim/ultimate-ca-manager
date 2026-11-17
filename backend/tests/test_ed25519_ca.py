@@ -12,8 +12,6 @@ from models import CA, Certificate, db
 from tests.fixtures.templates import templates_created_here_removed
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture(autouse=True, scope='module')
 def _templates_stay_in_this_module(app):

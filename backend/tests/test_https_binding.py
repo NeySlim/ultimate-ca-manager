@@ -16,8 +16,6 @@ from services.https_binding import (
     set_bound_refid,
 )
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture
 def clean_binding(app):

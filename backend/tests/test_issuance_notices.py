@@ -13,8 +13,6 @@ from models import db
 from models.policy import CertificatePolicy
 from tests.conftest import get_json
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture()
 def capping_policy(app):

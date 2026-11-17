@@ -22,8 +22,6 @@ from services.wstep.soap_envelope import SOAP_NS
 from tests.windows_profile_support import restore, set_config, snapshot
 from tests.windows_profile_support import windows_profiles_restored  # noqa: F401
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 XCEP_KRB_URL = '/ADPolicyProvider_CEP_Kerberos/service.svc'
 XCEP_USERPASS_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'
 XCEP_NS = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollmentpolicy'

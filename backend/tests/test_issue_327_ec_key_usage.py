@@ -28,10 +28,6 @@ from tests.conftest import get_json
 from tests.test_scep_rfc8894_operations import _load_ca_material
 from utils.leaf_key_usage import constrain_builder_key_usage, key_usage_for_key
 from tests.fixtures.templates import templates_created_here_removed
-from tests.leak_marks import with_fixtures
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 
 @pytest.fixture(autouse=True, scope='module')

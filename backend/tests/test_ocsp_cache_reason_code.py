@@ -8,9 +8,6 @@ from sqlalchemy import text
 
 from models import OCSPResponse, db
 from tests.test_ca_revocation import CAS, _intermediate, _ocsp_status, _post, _serial_int
-import pytest
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def test_the_cached_reason_is_the_crlreason_code(app, auth_client, create_ca):

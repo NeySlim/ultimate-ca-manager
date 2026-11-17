@@ -731,76 +731,21 @@ def _database_key_stays_readable(request):
 
 @pytest.fixture(scope='module')
 def drop_new_cas_and_certificates(app):
-    """Deletes what a module created above the ids present before it: ACME orders and
-    domains, certificates, then CAs (children first, until a pass removes nothing)."""
+    """Deletes the certificates then the CAs a module created, with their dependent rows."""
     from models import db, CA, Certificate
-    from models.acme_models import AcmeDomain, AcmeLocalDomain, AcmeOrder
-    from models.deploy import CRLDeployBinding
-    from models.policy import CertificatePolicy
-    from models.scep import ScepProfile
     from services.ca_service import CAService
     from services.cert_service import CertificateService
 
     def _top(model):
         with app.app_context():
             return db.session.query(db.func.max(model.id)).scalar() or 0
-    # What blocks deleting a CA goes with it
-    blockers = (AcmeOrder, AcmeDomain, AcmeLocalDomain, CRLDeployBinding, CertificatePolicy, ScepProfile)
-    floors = {m: _top(m) for m in (Certificate, CA, *blockers)}
+    floors = {Certificate: _top(Certificate), CA: _top(CA)}
     yield
-
-    def _ids(model):
-        return [row.id for row in model.query.filter(model.id > floors[model]).order_by(model.id.desc())]
-
-    def _try(delete, row_id):
-        try:
-            return delete(row_id)
-        except Exception as exc:
-            db.session.rollback()
-            import warnings
-            warnings.warn(f'drop_new_cas_and_certificates kept {delete.__qualname__} {row_id}: {exc}', stacklevel=1)
-            return False
-    with app.app_context():
-        for model in blockers:
-            for row in model.query.filter(model.id > floors[model]).all():
-                db.session.delete(row)
-            db.session.commit()
-        for row_id in _ids(Certificate):
-            _try(CertificateService.delete_certificate, row_id)
-        pending = _ids(CA)
-        while pending:
-            left = [i for i in pending if not _try(CAService.delete_ca, i)]
-            if len(left) == len(pending):
-                break
-            pending = left
-        db.session.remove()
-
-
-@pytest.fixture(scope='module')
-def drop_new_config_rows(app):
-    """Deletes the policies, SCEP profiles, templates and HSM providers (with their keys) a
-    module created above the ids present before it."""
-    from models import db, HsmKey, HsmProvider
-    from models.certificate_template import CertificateTemplate
-    from models.policy import CertificatePolicy
-    from models.scep import ScepProfile
-    models = (CertificatePolicy, ScepProfile, CertificateTemplate, HsmKey, HsmProvider)
-
-    def _top(model):
+    for model, delete in ((Certificate, CertificateService.delete_certificate),
+                          (CA, CAService.delete_ca)):
         with app.app_context():
-            return db.session.query(db.func.max(model.id)).scalar() or 0
-    floors = {m: _top(m) for m in models}
-    yield
-    with app.app_context():
-        for _ in range(2):
-            for model in models:
-                for row in model.query.filter(model.id > floors[model]).all():
-                    try:
-                        db.session.delete(row)
-                        db.session.commit()
-                    except Exception:
-                        db.session.rollback()
-        db.session.remove()
+            for row_id in [row.id for row in model.query.filter(model.id > floors[model])]:
+                delete(row_id)
 
 
 @pytest.fixture(scope='module')
@@ -824,14 +769,9 @@ def drop_new_users(app):
     assert r.status_code == 200, r.data
     import warnings
     for user_id in made:
-        with app.app_context():
-            # A pending approval of the account would refuse its deletion
-            from models.policy import ApprovalRequest
-            ApprovalRequest.query.filter_by(requester_id=user_id, status='pending').delete()
-            db.session.commit()
         r = admin.delete(f'/api/v2/users/{user_id}')
         if r.status_code != 200:
-            warnings.warn(f'drop_new_users could not delete user {user_id}: HTTP {r.status_code} {r.data[:200]}')
+            warnings.warn(f'drop_new_users could not delete user {user_id}: HTTP {r.status_code}')
 
 
 def sandbox_paths(application, replaced=None):

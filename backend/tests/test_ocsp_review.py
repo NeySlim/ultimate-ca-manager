@@ -18,10 +18,6 @@ from tests.test_ocsp_service import (  # noqa: E402
     _ca_model, _load_x509, _delegated_certificate, _configure_delegated_responder,
 )
 from tests.test_ca_service_hsm import _patch_hsm, hsm_provider_and_key  # noqa: E402,F401
-from tests.leak_marks import with_fixtures
-
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 
 

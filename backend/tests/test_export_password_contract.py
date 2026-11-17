@@ -32,8 +32,6 @@ from utils.export_password import (EXPORT_PASSWORD_MAX_LENGTH,
                                    EXPORT_PASSWORD_MIN_LENGTH,
                                    validate_export_password)
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 TOO_SHORT = 'x' * (EXPORT_PASSWORD_MIN_LENGTH - 1)
 JUST_RIGHT = 'x' * EXPORT_PASSWORD_MIN_LENGTH
 TOO_LONG = 'x' * (EXPORT_PASSWORD_MAX_LENGTH + 1)

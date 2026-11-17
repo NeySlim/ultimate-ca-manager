@@ -20,8 +20,6 @@ from cryptography.x509.oid import ExtensionOID
 from tests.conftest import get_json
 from tests.fixtures.templates import templates_created_here_removed
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 @pytest.fixture(autouse=True, scope='module')
 def _templates_stay_in_this_module(app):

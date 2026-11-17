@@ -16,7 +16,6 @@ from services.trust_store import TrustStoreService
 from utils import key_algorithms
 from utils.leaf_key_usage import key_usage_for_key
 from tests.fixtures.templates import templates_created_here_removed
-from tests.leak_marks import with_fixtures
 
 
 @pytest.fixture(autouse=True, scope='module')
@@ -27,8 +26,6 @@ def _templates_stay_in_this_module(app):
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
-pytestmark = with_fixtures(pytestmark, 'drop_new_cas_and_certificates')
-pytestmark = with_fixtures(pytestmark, 'drop_new_config_rows')
 
 KU_BITS = ('digital_signature', 'content_commitment', 'key_encipherment', 'data_encipherment',
            'key_agreement', 'key_cert_sign', 'crl_sign')

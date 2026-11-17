@@ -17,8 +17,6 @@ from tests.test_policy_algorithms_397 import _drop, _pol, _policy
 from utils import key_algorithms
 from utils.issuance_defaults import generated_key_algorithm
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def _pub(key):
     return key.public_key()

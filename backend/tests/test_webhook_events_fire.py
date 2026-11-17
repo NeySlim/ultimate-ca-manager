@@ -14,8 +14,6 @@ from services.webhook_service import (
 )
 from models import db
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 
 def test_event_catalogue_has_15_plus():
     assert len(WebhookService.ALL_EVENTS) >= 15

@@ -14,8 +14,6 @@ from models import db
 from models.scep import IntuneApp, ScepProfile
 from utils.encryption import encrypt_value
 
-pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
-
 SECRET = 'zz-intune-client-secret'
 
 
