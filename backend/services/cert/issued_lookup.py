@@ -389,6 +389,8 @@ def apply_persisted_revocations(ids=None) -> list:
             record = row_persisted_revocation(row)
             if record is not None:
                 found.append((row, record))
+    # Rows marked in id order, whatever order the database returned them in
+    found.sort(key=lambda pair: pair[0].id)
     # Every record locked before any row is marked, as an unhold takes them
     held = _records_still_held(record for _, record in found)
     return [(row, record) for row, record in found
