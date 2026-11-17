@@ -118,6 +118,9 @@ def test_ha_existing_claim_keeps_the_data_pvc_pos():
     (['--set', 'ha.enabled=true'] + PG, 'replicaCount >= 2'),
     (['--set', 'ha.enabled=true', '--set', 'replicaCount=2', '--set', 'database.type=postgresql'],
      'databaseUrl'),
+    # helm lint reports a fail as INFO and exits 0: each refusal is proven by a render
+    (['--set', 'ha.enabled=true', '--set', 'replicaCount=2', '--set', 'secrets.keyEncryptionKey=K'] + PG,
+     'set secrets.dbEncryptionKey too'),
 ])
 def test_ha_render_is_refused_neg(args, message):
     r = _helm(*args, check=False)
