@@ -613,3 +613,11 @@ SETTING_REFERENCES: Tuple[SettingReference, ...] = (
     SettingReference(r'cert_scts_(\d+)', key='certificates'),
     SettingReference(r'ca_url_cross_.+', value='ca_cross_certificates'),
 )
+
+# Settings naming a CA by refid: carried as they are by a backup (a refid reads the
+# same everywhere), but a CA they name is not deleted (services/deletion_blockers.py).
+CA_REFID_SETTINGS: Tuple[SettingReference, ...] = (
+    SettingReference(r'est_ca_refid', value='certificate_authorities'),
+    SettingReference(r'tsa_ca_refid', value='certificate_authorities'),
+    SettingReference(r'mtls_trusted_ca_id', value='certificate_authorities'),
+)

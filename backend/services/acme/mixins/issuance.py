@@ -200,6 +200,11 @@ class IssuanceMixin:
         # resolves straight to the global default (acme.issuing_ca_id)
         if not ca_refid:
             ca_refid = self._resolve_ca_for_domains(order_domains)
+            # A default naming a CA that is gone is no default: never the first CA instead
+            if not ca_refid and self._default_ca_gone():
+                self._last_finalize_error_type = 'serverInternal'
+                return False, ('The ACME issuing CA chosen in the ACME settings no longer '
+                               'exists: choose another one in the ACME settings')
 
         if approval is None:
             held, gate_error = self._approval_gate(order, csr, csr_pem, ca_refid)
@@ -564,7 +569,17 @@ class IssuanceMixin:
                 return ca.refid
         
         return None
-    
+
+    @staticmethod
+    def _default_ca_gone() -> bool:
+        """Whether acme.issuing_ca_id holds a value that names no CA."""
+        from models import SystemConfig, CA
+        cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+        value = (cfg.value or '').strip() if cfg else ''
+        if not value or CA.query.filter_by(refid=value).first() is not None:
+            return False
+        return not (value.isdigit() and db.session.get(CA, int(value)) is not None)
+
     @staticmethod
     def _is_request_failure(exc) -> bool:
         """Whether a signing failure is the request's fault (badCSR, order
