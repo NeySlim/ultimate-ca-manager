@@ -3102,6 +3102,9 @@ list shows only the kinds the caller may read, and the id of another kind answer
   `error` (the operation answered a `5xx`, kept in `result`, or its run failed, `result` then
   `null`); `cancelled`; `executor_lost` (the process running it stopped: run it again) or
   `not_taken` (no process took it within 5 minutes). A lost job is never started again on its own.
+- A `restore` job that committed but could not finish (sessions not revoked, or a later step
+  failed) ends `succeeded` with `result.code` 500: the backup is restored, and `result.message`
+  asks to restart the application before using it.
 - `result` once final, for `done`, `refused` and an `error` the operation answered:
   `{"code", "message", "data"}`, the answer the starting route would have given, plus
   `problem_type` when that answer was a typed problem (RFC 9457 `type`, such as a refusal in FIPS

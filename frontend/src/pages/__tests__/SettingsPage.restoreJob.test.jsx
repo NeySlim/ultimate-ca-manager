@@ -125,6 +125,17 @@ describe('SettingsPage: restore as a job', () => {
     expect(pendingRestore('someone-else')).toBeNull()
   })
 
+  it('shows what a restore that committed but could not finish asks, not an empty report', async () => {
+    const message = 'Backup restored, but finishing the restore failed. Restart the application before using it.'
+    systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
+    jobsApi.get.mockResolvedValue({ data: { ...running, state: 'succeeded', result: { code: 500, message, data: null } } })
+    await startRestore()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+    expect(notificationSpies.showError).toHaveBeenCalledWith(message)
+    expect(screen.queryByTestId('restore-job')).toBeNull()
+    expect(window.localStorage.getItem(PENDING_RESTORE_KEY)).toBeNull()
+  })
+
   it('says a cancelled restore restored nothing', async () => {
     systemService.restore = vi.fn().mockResolvedValue({ data: { job: running } })
     jobsApi.get.mockResolvedValue({ data: { ...running, state: 'cancelled', reason: 'cancelled' } })

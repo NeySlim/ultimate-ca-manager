@@ -59,7 +59,9 @@ export function useRestoreJob({ enabled = true, account, onReport, onFailure, on
 
   const conclude = useCallback((final) => {
     forget()
-    if (final.state === 'succeeded') handlers.current.onReport?.(final.result?.data || {})
+    // Committed but not finished (result.code 500): its message asks a restart, there is no report
+    const finished = final.state === 'succeeded' && !(final.result?.code >= 400)
+    if (finished) handlers.current.onReport?.(final.result?.data || {})
     else handlers.current.onFailure?.(final)
   }, [])
 
