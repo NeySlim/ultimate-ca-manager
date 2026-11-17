@@ -275,8 +275,8 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
             prereleases — alpha/beta/dev tags never qualify for either.
 
     The update (update_available, latest_version, package) is only ever a
-    release of the installed major version; the highest final release of a
-    later major version, if any, is reported apart in major_upgrade.
+    release of the installed major version; the highest final release of the
+    next major version (installed + 1), if any, is reported apart in major_upgrade.
 
     Returns dict with:
         - update_available: bool

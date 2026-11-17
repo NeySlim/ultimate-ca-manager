@@ -2886,7 +2886,7 @@
     "majorUpgradeNotes": "Lire les notes de version",
     "majorUpgradeInstall": "Mettre à niveau",
     "majorUpgradeConfirm": "Passer UCM de {{current}} à {{version}} ? Il s'agit d'une nouvelle version majeure : lisez ses notes de version et faites d'abord une sauvegarde. Le service va redémarrer.",
-    "majorUpgradeConfirmHa": "Passer UCM de {{current}} à {{version}} ? Il s'agit d'une nouvelle version majeure : lisez ses notes de version et faites d'abord une sauvegarde. Cela lance une mise à jour progressive : les nœuds se mettent à jour un par un, et elle s'arrête si la version exige un arrêt complet pour ses migrations.",
+    "majorUpgradeConfirmHa": "Passer UCM de {{current}} à {{version}} ? Il s'agit d'une nouvelle version majeure : lisez ses notes de version et faites d'abord une sauvegarde. Cela lance une mise à jour progressive : les nœuds se mettent à jour un par un. Elle est refusée, et rien n'est installé, si la version exige l'arrêt de tous les nœuds pour ses migrations.",
     "majorUpgradeInitiated": "Passage à UCM {{version}} lancé. Le service va redémarrer sous peu.",
     "majorUpgradeDocker": "Conteneur : pour passer à cette version, déployez l'image {{image}} (changez l'étiquette de l'image et recréez le conteneur, ou lancez helm upgrade avec elle).",
     "expiryCheckResult": "Vérification terminée : {{count}} alerte(s) envoyée(s)",

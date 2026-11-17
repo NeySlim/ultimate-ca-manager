@@ -3542,7 +3542,7 @@ POST /api/v2/system/updates/install
 # Install update (HA mode: starts a rolling update of every node, 409 when one runs, a node
 # has no package family (Docker, unknown), the release lacks a present family's package or
 # SHA-256, or its full-stop-migrations.json is missing or names a migration not yet applied;
-# Docker/Kubernetes: 400, the orchestrator updates)
+# Docker/Kubernetes: 400, the orchestrator updates; 502 with the message of a failed check)
 POST /api/v2/system/updates/install
 
 # HA rolling update state: {ha, campaign: {status (running|stopped|done), target, order,

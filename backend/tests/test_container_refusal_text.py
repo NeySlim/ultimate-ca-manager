@@ -1,6 +1,4 @@
 """Every container refusal says container (Docker, Kubernetes): the Helm chart runs the same image."""
-import pytest
-
 from config.settings import Config
 import services.updates as updates
 

@@ -442,12 +442,13 @@ def test_convert_takes_the_challenge_of_the_scep_ca_named_by_a_padded_number(app
         SystemConfig.query.filter_by(key='scep_ca_id').delete()
         _set_config(scep_ca_id=f"0{ids['x']}")
         _set_config(**{f"scep_challenge_{ids['x']}": 'secret-x', f"scep_challenge_{ids['b']}": 'secret-b'})
-    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
-    with app.app_context():
-        try:
+    try:
+        assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+        with app.app_context():
             assert _config(f"scep_challenge_{ids['b']}") == 'secret-x'
             assert _config(f"scep_challenge_{ids['x']}") is None
-        finally:
+    finally:
+        with app.app_context():
             SystemConfig.query.filter(SystemConfig.key.like('scep_%')).delete(synchronize_session=False)
             db.session.commit()
 
