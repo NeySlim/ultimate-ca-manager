@@ -21,6 +21,12 @@ def test_postgresql_pings_each_checkout_with_the_leader_timeouts():
     assert options['connect_args']['connect_timeout'] > 0 and options['connect_args']['keepalives'] == 1
 
 
+def test_data_a_silent_server_never_acknowledges_ends_the_connection():
+    """A query sent to a server that dropped off the network fails within 30 s instead of the
+    kernel's retransmission timeout (about 15 minutes), so the pool and readiness recover."""
+    assert db_url.postgres_engine_options(_PG, {})['connect_args']['tcp_user_timeout'] == 30000
+
+
 def test_a_setting_in_the_url_is_left_to_the_url():
     args = db_url.postgres_engine_options(f'{_PG}?connect_timeout=3&keepalives_idle=5', {})['connect_args']
     assert 'connect_timeout' not in args and 'keepalives_idle' not in args

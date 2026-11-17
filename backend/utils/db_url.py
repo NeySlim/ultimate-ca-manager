@@ -43,9 +43,10 @@ def postgres_connect_args(url, environ=None) -> dict:
 
 
 # Client side: a dead server or a partition is noticed within about a minute, an
-# unreachable one refused in ten seconds (the application pool and the leader's lock)
+# unreachable one refused in ten seconds, data it never acknowledges given up after 30 s
+# (the application pool and the leader's lock)
 POSTGRES_KEEPALIVE_ARGS = {'keepalives': 1, 'keepalives_idle': 30, 'keepalives_interval': 10,
-                           'keepalives_count': 3, 'connect_timeout': 10}
+                           'keepalives_count': 3, 'connect_timeout': 10, 'tcp_user_timeout': 30000}
 
 
 def postgres_engine_options(url, environ=None) -> dict:

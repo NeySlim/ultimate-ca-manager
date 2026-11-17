@@ -1180,7 +1180,9 @@ def create_app(config_name=None):
         # HSTS is operator-configurable (Settings -> General, or UCM_HSTS_*
         # env vars) so instances serving self-signed certs during setup can
         # opt out entirely — see issue #154.
-        if 'Strict-Transport-Security' not in response.headers:
+        from utils.public_endpoints import PROBE_PATHS
+        # HSTS settings live in the database: a probe answers without them
+        if 'Strict-Transport-Security' not in response.headers and request.path not in PROBE_PATHS:
             from utils.hsts import build_hsts_header
             hsts_value = build_hsts_header()
             if hsts_value:
