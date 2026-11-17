@@ -4136,7 +4136,8 @@
     "signInTestCompleteOtherBrowser": "This test was started in another browser. Finish it there, or start a new one from this browser.",
     "signInTestCompleteBack": "Back to the SSO providers",
     "signInTestLaunching": "Opening the identity provider…",
-    "signInTestCompleteClose": "This window did not close by itself: close it to return to the provider screen."
+    "signInTestCompleteClose": "This window did not close by itself: close it to return to the provider screen.",
+    "signInTestCancel": "Cancel"
   },
   "notifications": {
     "certificateIssued": "Certificato emesso: {{name}}",

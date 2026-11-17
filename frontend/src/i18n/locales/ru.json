@@ -4189,7 +4189,8 @@
     "signInTestCompleteOtherBrowser": "Эта проверка была запущена в другом браузере. Завершите её там или запустите новую из этого браузера.",
     "signInTestCompleteBack": "Назад к поставщикам SSO",
     "signInTestLaunching": "Открывается поставщик удостоверений…",
-    "signInTestCompleteClose": "Это окно не закрылось само: закройте его, чтобы вернуться к экрану поставщика."
+    "signInTestCompleteClose": "Это окно не закрылось само: закройте его, чтобы вернуться к экрану поставщика.",
+    "signInTestCancel": "Отменить"
   },
   "notifications": {
     "certificateIssued": "Сертификат выпущен: {{name}}",

@@ -197,6 +197,41 @@ describe('Test sign-in panel', () => {
     expect(screen.getByText('sso.signInTestAccepted')).toBeTruthy()
   })
 
+  it('can be started again while it waits, which drops the wait in progress', async () => {
+    renderPanel()
+    startSignInTest.mockResolvedValueOnce({ data: { id: 'first', url: 'https://idp.example/a' } })
+    await launch()
+    const button = screen.getByText('sso.signInTest').closest('button')
+    expect(button.disabled).toBe(false)
+    getSignInTest.mockResolvedValue({ data: { state: 'pending' } })
+    const second = await launch()
+    expect(window.open).toHaveBeenCalledTimes(2)
+    expect(second.got.at(-1)).toMatchObject({ type: 'go', url: 'https://idp.example/authorize?state=s' })
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_MS * 3) })
+    expect(getSignInTest.mock.calls.map((c) => c[0])).not.toContain('first')
+    expect(getSignInTest).toHaveBeenCalledWith('tok')
+  })
+
+  it('gives the hand back on cancel, and polls no more', async () => {
+    renderPanel()
+    await launch()
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTestCancel')) })
+    expect(screen.queryByText('sso.signInTestWaiting')).toBeNull()
+    expect(screen.queryByText('sso.signInTestCancel')).toBeNull()
+    await act(async () => { await vi.advanceTimersByTimeAsync(POLL_MS * 3) })
+    expect(getSignInTest).not.toHaveBeenCalled()
+  })
+
+  it('tells a window still opening to stop when it is cancelled', async () => {
+    renderPanel()
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTest')) })
+    const key = window.open.mock.calls[0][0].split('#')[1]
+    await act(async () => { fireEvent.click(screen.getByText('sso.signInTestCancel')) })
+    expect(FakeChannel.posted).toContainEqual({ type: 'abort', key })
+    await act(async () => { testWindow() })
+    expect(startSignInTest).not.toHaveBeenCalled()
+  })
+
   it('is not offered before the provider is saved', () => {
     render(<SignInTestPanel provider={null} dirty={false} formData={{}} handleChange={vi.fn()} />)
     expect(screen.queryByText('sso.signInTest')).toBeNull()

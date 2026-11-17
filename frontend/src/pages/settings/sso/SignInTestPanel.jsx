@@ -33,6 +33,13 @@ export default function SignInTestPanel({ provider, dirty, formData, handleChang
     r.channel?.close()
   }
 
+  // Drops the test in progress: a window still opening is told to stop, the wait ends here.
+  const abandon = () => {
+    const r = run.current
+    if (r && !r.id) r.channel?.postMessage({ type: 'abort', key: r.key })
+    stop()
+  }
+
   useEffect(() => () => { alive.current = false; stop() }, [])
 
   if (!provider?.id) return null
@@ -82,7 +89,7 @@ export default function SignInTestPanel({ provider, dirty, formData, handleChang
   }
 
   const start = () => {
-    stop()
+    abandon()
     setReport(null)
     const r = { key: randomKey(), started: false }
     r.channel = openChannel((msg) => {
@@ -113,6 +120,11 @@ export default function SignInTestPanel({ provider, dirty, formData, handleChang
   }
 
   const busy = phase === 'opening' || phase === 'waiting'
+  const cancel = () => {
+    abandon()
+    setPhase('idle')
+  }
+
   const onClick = () => (dirty && phase !== 'confirm' ? setPhase('confirm') : start())
 
   return (
@@ -124,11 +136,19 @@ export default function SignInTestPanel({ provider, dirty, formData, handleChang
         </div>
       )}
       <Button type="button" variant="secondary" size="sm" onClick={onClick}
-        disabled={busy} className="gap-1.5">
-        {busy ? <LoadingSpinner size="xs" /> : <SignIn size={14} />}
+        className="gap-1.5">
+        <SignIn size={14} />
         {phase === 'confirm' ? t('sso.signInTestRunSaved') : t('sso.signInTest')}
       </Button>
-      {busy && <p role="status" className="text-xs text-text-tertiary">{t('sso.signInTestWaiting')}</p>}
+      {busy && (
+        <div className="flex items-center gap-2 text-xs text-text-tertiary">
+          <LoadingSpinner size="xs" />
+          <p role="status">{t('sso.signInTestWaiting')}</p>
+          <button type="button" onClick={cancel} className="text-accent-primary hover:underline">
+            {t('sso.signInTestCancel')}
+          </button>
+        </div>
+      )}
       {phase === 'expired' && <p role="status" className="text-xs text-status-error">{t('sso.signInTestExpired')}</p>}
       {phase === 'failed' && <p role="status" className="text-xs text-status-error">{t('sso.signInTestFailed')}</p>}
       {phase === 'blocked' && <p role="status" className="text-xs text-status-error">{t('sso.signInTestPopupBlocked')}</p>}
