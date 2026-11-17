@@ -296,6 +296,22 @@ def test_no_backup_starts_during_a_cluster_maintenance(app, auth_client, jobs_ma
     assert len(_lines(app)) == lines
 
 
+@pytest.mark.parametrize('url,body', [(SYSTEM, {}), (SYSTEM, {'password': 'short'}),
+                                      (SYSTEM, {'password': PASSWORD, 'kdf': 'bogus'}),
+                                      (SETTINGS, {'password': 'short'}),
+                                      (SETTINGS, {'password': PASSWORD, 'kdf': 'bogus'})])
+def test_an_invalid_backup_request_during_a_maintenance_is_refused_first(
+        app, auth_client, jobs_made, maintenance, url, body, caplog):
+    from services import cluster_maintenance as cm
+    lines = len(_lines(app))
+    r = _post(auth_client, url, body)
+    assert r.status_code == 503, r.data
+    assert r.headers['Retry-After'] == str(cm.RETRY_AFTER_SECONDS)
+    assert r.get_json()['message'] == jobs.JobsSuspended.MESSAGE
+    assert 'lost entry' not in caplog.text
+    assert len(_lines(app)) == lines
+
+
 def test_a_backup_job_is_read_with_admin_system_only(app, auth_client, create_user, backup_dir,
                                                     jobs_made):
     r = _post(auth_client, SYSTEM, {'password': PASSWORD})

@@ -68,6 +68,11 @@ def create_backup():
     What is particular to this route is the password it generates for a caller
     that did not bring one, which it returns once.
     """
+    # The gate lets this start through: a maintenance refuses it before any check or audit write
+    from api.v2.system.jobs import suspended_response
+    from services.cluster_maintenance import blocks_writes
+    if blocks_writes():
+        return suspended_response()
     data = request.json or {}
     password = data.get('password')
     generated_password = False

@@ -144,6 +144,11 @@ def _disk_meta(directory) -> dict:
 @require_auth(['admin:system'])
 def create_backup():
     """Create an encrypted archive in the backup directory."""
+    # The gate lets this start through: a maintenance refuses it before any check or audit write
+    from api.v2.system.jobs import suspended_response
+    from services.cluster_maintenance import blocks_writes
+    if blocks_writes():
+        return suspended_response()
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         data = {}
