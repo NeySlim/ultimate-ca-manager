@@ -336,6 +336,31 @@ def test_an_archive_holding_a_serial_twice_restores_both_marked(installation, mo
 
 
 @pytest.mark.parametrize('mode', ('merge', 'replace'))
+def test_an_archive_with_rows_after_its_pair_restores_them_all(installation, mode):
+    """Certificates signed after a 2.254 pair sit after it in the archive: the restore writes them too."""
+    ca_id = _ca(f'pair then more {mode}')
+    refid = db.session.get(SSHCertificateAuthority, ca_id).refid
+    for _ in range(4):
+        _sign(ca_id)
+    master, store = _archive()
+    payload = {name: copy.deepcopy(list(store[name])) for name in ('ssh_cas', 'ssh_certificates')}
+    held = [row for row in payload['ssh_certificates'] if row.get('ssh_ca_id_ref', {}).get('refid') == refid
+            or row.get('ssh_ca_id') == ca_id]
+    assert sorted(row['serial'] for row in held) == [1, 2, 3, 4]
+    for row in payload['ssh_certificates']:
+        row.pop('serial_duplicate', None)
+    next(row for row in held if row['serial'] == 2)['serial'] = 1
+    _forget(ca_id, [1, 2, 3, 4])
+    _restore(master, payload, mode)
+    db.session.remove()
+    restored = _ca_by_refid(refid)
+    rows = db.session.execute(select(CERTS.c.serial, CERTS.c.serial_duplicate)
+                              .where(CERTS.c.ssh_ca_id == restored).order_by(CERTS.c.id)).all()
+    assert [(serial, bool(flag)) for serial, flag in rows] == [(1, False), (1, True), (3, False), (4, False)], rows
+    _next_is_new(restored, {1, 3, 4})
+
+
+@pytest.mark.parametrize('mode', ('merge', 'replace'))
 def test_an_archive_whose_counter_trails_its_certificates_restores_past_them(installation, mode):
     """A 2.254 archive taken where the counter had fallen behind: the restore counts past its rows."""
     ca_id = _ca(f'archived lag {mode}')

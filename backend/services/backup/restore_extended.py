@@ -28,6 +28,7 @@ from sqlalchemy import inspect as sa_inspect
 
 from models import db
 from utils.datetime_utils import to_naive_utc
+from utils import ssh_serials as SSHSerials
 
 from .errors import BackupSchemaError
 from .export_generic import REFERENCE_SUFFIX, load_model
@@ -268,24 +269,6 @@ def refuse_archived_shared_keys(backup_data, plan):
             "An HSM key backs one authority only; nothing has been changed.")
 
 
-def _mark_shared_serials(written) -> None:
-    """Before the flush: every holder of a non-zero serial a restored certificate shares with another
-    of its CA (a 2.254 archive may hold such pairs) leaves the unique index; the restore puts the
-    oldest back once every row is written (utils/ssh_serials.settle_marks)."""
-    from models.ssh import SSHCertificate
-    groups: Dict[tuple, Dict[int, Any]] = {}
-    for sc in written:
-        if sc.serial:
-            groups.setdefault((sc.ssh_ca_id, sc.serial), {})[id(sc)] = sc
-    with db.session.no_autoflush:
-        for (ca_id, serial), held in groups.items():
-            for row in SSHCertificate.query.filter_by(ssh_ca_id=ca_id, serial=serial):
-                held.setdefault(id(row), row)
-            if len(held) > 1:
-                for row in held.values():
-                    row.serial_duplicate = True
-
-
 class RestoreExtendedMixin:
     def _restore_ssh_cas(self, backup_data: Dict, results: Dict, master_key: bytes,
                          plan: Optional[RestorePlan] = None) -> None:
@@ -405,7 +388,6 @@ class RestoreExtendedMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('ssh_certificates', plan)
 
-        written = []
         for position, sc_data in enumerate(rows):
             where = f"SSH certificate {sc_data.get('refid') or position}"
             _required(where, sc_data, 'ssh_ca_id')
@@ -451,10 +433,13 @@ class RestoreExtendedMixin:
 
             if apply_columns(sc, 'ssh_certificates', sc_data, plan):
                 results['ssh_certificates'] += 1
-            written.append(sc)
+            # Out of the unique index before any later query autoflushes it: an archive may hold
+            # a 2.254 pair; settle_marks puts the oldest holder of each serial back after the flush.
+            if sc.serial:
+                sc.serial_duplicate = True
 
-        _mark_shared_serials(written)
         db.session.flush()
+        SSHSerials.settle_marks(SSHSerials.session_run)
 
     def _restore_microsoft_cas(self, backup_data: Dict, results: Dict,
                                plan: Optional[RestorePlan] = None) -> None:
