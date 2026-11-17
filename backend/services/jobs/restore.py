@@ -589,6 +589,8 @@ def finish(job_id, executor, results, name, filename, maintenance=None, gate=Non
         attach_restore_todo(results)
         _conclude(job_id, executor, 200, NOTHING_CARRIED, results, details, name)
         return JobOutcome(concluded=True)
+    if gate is not None:
+        gate.update(phase=COMMITTED, held=False)  # a cancellation is now the row's to refuse
     with cluster_maintenance.exempt():
         try:
             _marked(job_id, results)

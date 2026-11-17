@@ -284,6 +284,8 @@ def test_a_restore_lost_before_its_commit_failed_and_restored_nothing(app, archi
 # -- after the commit: every end step replayed once ------------------------------------
 
 STEP_FUNCTIONS = [
+    # The first thing after the restore returns: only the mark in its transaction says it committed
+    ('services.backup.restore_report.safe_restore_audit_details', restore_job.COMMITTED),
     ('services.backup.restore.invalidate.revoke_sessions_with', restore_job.COMMITTED),
     ('services.backup.restore.invalidate.remove_session_files', restore_job.SESSIONS),
     ('services.backup.restore.invalidate.purge_caches', restore_job.SESSION_FILES),
@@ -293,7 +295,8 @@ STEP_FUNCTIONS = [
 
 
 @pytest.mark.filterwarnings('ignore::pytest.PytestUnhandledThreadExceptionWarning')
-@pytest.mark.parametrize('target, phase', STEP_FUNCTIONS, ids=[p for _, p in STEP_FUNCTIONS])
+@pytest.mark.parametrize('target, phase', STEP_FUNCTIONS,
+                         ids=['returned'] + [p for _, p in STEP_FUNCTIONS[1:]])
 def test_an_executor_lost_after_the_commit_is_finished_by_the_recovery(
         app, archive, created, monkeypatch, no_restart, target, phase):
     """The executor dies before an end step (a BaseException is all a dying thread sees):
