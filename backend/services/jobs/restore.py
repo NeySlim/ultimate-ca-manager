@@ -104,23 +104,51 @@ def state_path():
     return os.path.join(store.jobs_tmp_dir(), STATE_NAME)
 
 
-def read_state():
-    """The local state written by a live executor, or None (absent, unreadable, dead pid)."""
-    path = state_path()
+def _load_state(path):
+    """The state file as written (a regular file only), or None."""
+    import stat as _stat
     try:
-        info = os.lstat(path)
-        import stat as _stat
-        if not _stat.S_ISREG(info.st_mode):
+        if not _stat.S_ISREG(os.lstat(path).st_mode):
             return None
         with open(path, 'r', encoding='utf-8') as handle:
             state = json.load(handle)
     except (OSError, ValueError):
         return None
-    if not isinstance(state, dict) or not _alive(state.get('pid')):
+    return state if isinstance(state, dict) else None
+
+
+def _live(state):
+    """``state`` while its executor lives and its lease holds, else None."""
+    if state is None or not _alive(state.get('pid')):
         return None
     if (state.get('expires') or 0) <= time.time():
         return None
     return state
+
+
+def read_state():
+    """The local state written by a live executor, or None (absent, unreadable, dead pid)."""
+    return _live(_load_state(state_path()))
+
+
+class StateReader:
+    """read_state() for every request: one stat, the file parsed again only when it was
+    replaced (every write is a rename: a new inode and mtime)."""
+
+    def __init__(self):
+        self._key, self._state = None, None
+
+    def read(self):
+        path = state_path()
+        try:
+            info = os.lstat(path)
+        except OSError:
+            self._key, self._state = None, None
+            return None
+        key = (info.st_ino, info.st_mtime_ns, info.st_ctime_ns, info.st_size)
+        if key != self._key:
+            self._key, self._state = key, _load_state(path)
+        return _live(self._state)
 
 
 def _alive(pid):

@@ -561,6 +561,24 @@ def test_the_gate_says_when_the_restore_started_not_when_it_was_read(app, auth_c
     assert started[0] and started[0] == started[1]
 
 
+def test_the_gate_file_is_parsed_only_when_it_changed(app, monkeypatch):
+    from services import cluster_maintenance
+    parsed = []
+    real = restore_job._load_state
+    monkeypatch.setattr(restore_job, '_load_state', lambda path: parsed.append(1) or real(path))
+    gate = _gate(app).raise_gate()
+    try:
+        for _ in range(5):
+            assert cluster_maintenance.observe_local(app).active()
+        assert len(parsed) == 1, 'every request opened and parsed the gate file'
+        gate.set_view(phase=restore_job.APPLYING)
+        assert cluster_maintenance.observe_local(app).active()
+        assert len(parsed) == 2, 'a rewritten gate file was not read again'
+    finally:
+        gate.lift()
+    assert not cluster_maintenance.observe_local(app).active()
+
+
 def test_a_gate_whose_executor_died_refuses_nothing(app, monkeypatch):
     from services import cluster_maintenance
     monkeypatch.setattr(restore_job, '_alive', lambda pid: False)

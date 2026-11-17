@@ -179,7 +179,10 @@ def observe_local(app):
     from services.jobs import restore as restore_job
     from utils.datetime_utils import utc_now
     view = view_of(app)
-    state = restore_job.read_state()
+    reader = getattr(view, 'local_reader', None)
+    if reader is None:
+        reader = view.local_reader = restore_job.StateReader()
+    state = reader.read()
     row = None
     if state is not None:
         now = utc_now()
