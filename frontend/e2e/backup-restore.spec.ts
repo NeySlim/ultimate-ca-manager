@@ -33,3 +33,37 @@ test('a backup created on screen is restored on screen and the report says what 
   expect(names).toContain(kept.common_name)
   expect(names).not.toContain(later.common_name)
 })
+
+// Past the bounded wait (forced here by Prefer: respond-async) the restore is a job: the dialog
+// follows it, its own sign-out is a request to sign in again, and the report follows the sign-in
+test('a restore that runs as a job signs the page out and shows its report after the sign-in', async ({ page, api, request }) => {
+  const kept = await createCA(api)
+  const password = 'Backup-pass-67890'
+  const made = await api.post('/system/backup', { password })
+  const blob = await (await page.request.get(`/api/v2/system/backup/${made.filename}/download`)).body()
+  const later = await createCA(api)
+
+  await page.route('**/api/v2/system/restore', route =>
+    route.continue({ headers: { ...route.request().headers(), prefer: 'respond-async' } }))
+  await page.goto('/settings?tab=backup')
+  await page.locator('input[type="file"]').last().setInputFiles({
+    name: 'e2e-job.ucmbkp', mimeType: 'application/octet-stream', buffer: blob,
+  })
+  const restore = page.getByRole('dialog', { name: 'Restore from Backup' })
+  await restore.getByLabel('Backup Password').fill(password)
+  await restore.getByRole('button', { name: 'Restore Backup' }).click()
+
+  await expect(restore.getByText(/The restore has probably committed/)).toBeVisible({ timeout: 120_000 })
+  await restore.getByRole('button', { name: 'Sign in again' }).click()
+  await page.getByLabel('Username').fill(ADMIN_USER)
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByLabel('Password').fill(ADMIN_PASSWORD)
+  await page.getByRole('button', { name: 'Sign In' }).click()
+
+  const report = page.getByRole('dialog', { name: 'Restore report' })
+  await expect(report.getByText(/Backup restored successfully/)).toBeVisible({ timeout: 60_000 })
+  const fresh = await Api.login(request, ADMIN_USER, ADMIN_PASSWORD)
+  const names = JSON.stringify(await fresh.get('/cas?per_page=500'))
+  expect(names).toContain(kept.common_name)
+  expect(names).not.toContain(later.common_name)
+})
