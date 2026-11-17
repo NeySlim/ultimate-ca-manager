@@ -100,6 +100,34 @@ ucm_refuse_unstartable_database() {
     done
 }
 
+# 78: a database 2.254 started last stops the image of the new major before anything is written,
+# until UCM_ACCEPT_MAJOR_UPGRADE names that major (migration_runner.py major_upgrade_refusal).
+# Every node asks, PostgreSQL and HA included; an unreachable database is left to the application.
+ucm_refuse_unaccepted_major_upgrade() {
+    local db out rc dbs=()
+    if [ -n "${DATABASE_URL:-}" ] || ucm_ha_active; then
+        dbs=(DATABASE_URL)
+    else
+        for db in "$UCM_DATABASE_PATH" "$(ucm_old_database)"; do
+            [ -f "$db" ] && dbs+=("$db")
+        done
+    fi
+    for db in "${dbs[@]}"; do
+        rc=0
+        if [ "$db" = DATABASE_URL ]; then
+            out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 UCM_DOCKER=1 \
+                python3 migration_runner.py check --major-upgrade 2>&1) || rc=$?
+        else
+            out=$(cd "${UCM_BASE_PATH:-/opt/ucm}/backend" && PYTHONDONTWRITEBYTECODE=1 UCM_DOCKER=1 \
+                DATABASE_URL= DATABASE_PATH="$db" python3 migration_runner.py check --major-upgrade 2>&1) || rc=$?
+        fi
+        [ "$rc" -eq 7 ] || continue
+        echo -e "${RED:-}❌ This image will not upgrade the database without your consent:${NC:-}"
+        printf '%s\n' "$out" | sed '1d' | sed 's/^/   /'
+        return 78
+    done
+}
+
 # The data directories of the images before 2.70, which some volumes are still mounted at
 ucm_old_data_paths() {
     # shellcheck disable=SC2086  # a list of paths without spaces

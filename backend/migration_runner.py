@@ -193,6 +193,30 @@ def pivot_refusal(state, applied):
             f"{PIVOT_VERSION} still starts on this database.")
 
 
+# The Docker image moves to a new major only when the operator names it: pulling `latest` is not
+# consent. UCM_DOCKER=1 is set by the Dockerfile alone (Kubernetes included); a package installed
+# in a container has /.dockerenv but not this variable, and installing a package is consent.
+MAJOR = "3"
+ACCEPT_MAJOR_VARIABLE = "UCM_ACCEPT_MAJOR_UPGRADE"
+MAJOR_UPGRADE_REFUSAL = (
+    f"This database was last started by UCM {PIVOT_VERSION} and this image is UCM {MAJOR}: starting it "
+    f"would upgrade the database to the new major version, which {PIVOT_VERSION} cannot start "
+    f"afterwards. Nothing was changed.\n"
+    f"To upgrade: back up the data volume (and the PostgreSQL database if you use one), then set "
+    f"{ACCEPT_MAJOR_VARIABLE}={MAJOR} and start again. See UPGRADE.md, Upgrading to v3.0.\n"
+    f"To stay on 2.x: pin the image tag '2' (or an exact version, 2.254.N) instead of 'latest'.")
+
+
+def major_upgrade_refusal(state, applied):
+    """In the image, a database the pivot accepts and 300 has not upgraded (2.254 started it last)
+    waits for UCM_ACCEPT_MAJOR_UPGRADE to be exactly the major of this release."""
+    if os.environ.get("UCM_DOCKER") != "1" or state == "fresh" or UPGRADE_MIGRATION in applied:
+        return None
+    if os.environ.get(ACCEPT_MAJOR_VARIABLE) == MAJOR:
+        return None
+    return MAJOR_UPGRADE_REFUSAL
+
+
 # ---------------------------------------------------------------------------
 # Full stop: a marked migration waits until no node of another version beats
 # ---------------------------------------------------------------------------
@@ -518,8 +542,9 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
             )
             return True
 
-        # Checked before any write, the creation of `_migrations` included
-        refusal = pivot_refusal(state, applied)
+        # Checked before any write, the creation of `_migrations` included; an older database
+        # keeps its own refusal first
+        refusal = pivot_refusal(state, applied) or major_upgrade_refusal(state, applied)
         if refusal:
             say(f"✗ {refusal}")
             return False
@@ -832,8 +857,10 @@ def show_status():
 
 
 # Exit codes of `check`; any other code (a crash) means the answer is unknown. REFUSED is a
-# database older than 2.254, UNKNOWN one whose registry names migrations this release lacks.
+# database older than 2.254, UNKNOWN one whose registry names migrations this release lacks,
+# MAJOR_UPGRADE (with --major-upgrade only, the image's entrypoint) major_upgrade_refusal.
 CHECK_STARTABLE, CHECK_FRESH, CHECK_REFUSED, CHECK_UNREADABLE, CHECK_UNKNOWN = 0, 3, 4, 5, 6
+CHECK_MAJOR_UPGRADE = 7
 
 
 def _journal_holds_data(path: str) -> bool:
@@ -886,13 +913,14 @@ def _probe_engine(db_url: str):
         engine.dispose()
 
 
-def check_database() -> int:
-    """For the package scripts: whether this release starts on the configured database.
+def check_database(major_upgrade: bool = False) -> int:
+    """For the package scripts and the image: whether this release starts on the configured database.
 
     Prints the backend first ("sqlite <path>", "postgresql", or "other" for any other URL),
     then the reason of a refusal or of an unreadable database, and returns one of the
     CHECK_* codes: a missing or empty SQLite file is fresh, a registry naming unknown
-    migrations is UNKNOWN even when 2.254 migrations are missing too.
+    migrations is UNKNOWN even when 2.254 migrations are missing too. *major_upgrade* (the
+    image) also answers MAJOR_UPGRADE for a database major_upgrade_refusal refuses.
     """
     db_url = _get_db_url()
     sqlite_path = db_url[len("sqlite:///"):] if db_url.startswith("sqlite:///") else None
@@ -920,6 +948,10 @@ def check_database() -> int:
     if refusal:
         say(refusal)
         return CHECK_UNKNOWN if unknown_migrations(applied) else CHECK_REFUSED
+    refusal = major_upgrade_refusal(state, applied) if major_upgrade else None
+    if refusal:
+        say(refusal)
+        return CHECK_MAJOR_UPGRADE
     return CHECK_FRESH if state == "fresh" else CHECK_STARTABLE
 
 
@@ -934,12 +966,14 @@ if __name__ == "__main__":
         default="status",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--major-upgrade", action="store_true",
+                        help="check: also refuse an unaccepted upgrade from 2.254 (image only)")
     args = parser.parse_args()
 
     if args.command == "status":
         show_status()
     elif args.command == "check":
-        sys.exit(check_database())
+        sys.exit(check_database(major_upgrade=args.major_upgrade))
     elif args.command == "dry-run":
         run_all_migrations(dry_run=True, verbose=args.verbose)
     elif args.command == "run":
