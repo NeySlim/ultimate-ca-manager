@@ -27,7 +27,10 @@ def _fixed_key(pattern):
 
 NUMBERED = [_fixed_key(r.pattern) for r in SETTING_REFERENCES if r.value == CA_SECTION]
 BY_REFID = [_fixed_key(r.pattern) for r in CA_REFID_SETTINGS if r.value == CA_SECTION]
-CASES = [(key, 'id') for key in NUMBERED] + [(key, 'refid') for key in NUMBERED + BY_REFID]
+# 'padded' is a number the readers' int() still parses to the CA ('05', ' +5 ')
+CASES = ([(key, form) for key in NUMBERED for form in ('id', 'padded')]
+         + [(key, 'refid') for key in NUMBERED + BY_REFID])
+_FORMS = {'id': lambda ca: str(ca.id), 'padded': lambda ca: f' +0{ca.id} ', 'refid': lambda ca: ca.refid}
 
 
 def _set(key, value):
@@ -67,7 +70,7 @@ def test_a_ca_named_by_a_setting_is_not_deleted(app, auth_client, create_ca, key
     ca = create_ca(cn=f'Named by {key} {form}')
     with app.app_context():
         row = db.session.get(CA, ca['id'])
-        before = _set(key, str(row.id) if form == 'id' else row.refid)
+        before = _set(key, _FORMS[form](row))
     try:
         r = auth_client.delete(f"/api/v2/cas/{ca['id']}")
         assert r.status_code == 409, r.data
@@ -226,3 +229,22 @@ def test_an_issuing_ca_already_gone_issues_nothing(app, monkeypatch, create_ca, 
             assert order.certificate_id is None
         finally:
             _put_back('acme.issuing_ca_id', before)
+
+
+def test_a_padded_number_sent_to_the_acme_settings_still_blocks(app, auth_client, create_ca):
+    """The settings route stores '05' as sent and issuance reads it as CA 5."""
+    from services.acme.mixins.issuance import IssuanceMixin
+    ca = create_ca(cn='ACME issuing CA by padded number')
+    with app.app_context():
+        before = _set('acme.issuing_ca_id', '')
+    try:
+        r = auth_client.patch('/api/v2/acme/settings', json={'issuing_ca_id': f"0{ca['id']}"})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert IssuanceMixin()._resolve_ca_for_domains([]) == db.session.get(CA, ca['id']).refid
+        r = auth_client.delete(f"/api/v2/cas/{ca['id']}")
+        assert r.status_code == 409, r.data
+    finally:
+        with app.app_context():
+            _put_back('acme.issuing_ca_id', before)
+    assert auth_client.delete(f"/api/v2/cas/{ca['id']}").status_code == 204

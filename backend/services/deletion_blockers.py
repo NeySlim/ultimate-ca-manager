@@ -151,6 +151,14 @@ CA_SETTING_WORDING = {
 }
 
 
+def _int_or_none(value):
+    """The number the readers' int() takes from a setting ('05' and ' +5' are 5), or None."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _ca_setting_blockers(ca) -> Iterator[DeletionBlocker]:
     """Global settings whose value names this CA, as the backup manifest declares them.
 
@@ -162,13 +170,14 @@ def _ca_setting_blockers(ca) -> Iterator[DeletionBlocker]:
     from models.system_config import SystemConfig
     from services.backup.manifest import CA_REFID_SETTINGS, SETTING_REFERENCES
 
-    declared = [(r, (str(ca.id), ca.refid)) for r in SETTING_REFERENCES]
-    declared += [(r, (ca.refid,)) for r in CA_REFID_SETTINGS]
-    declared = [(r, forms) for r, forms in declared if r.value == 'certificate_authorities']
+    declared = [(r, True) for r in SETTING_REFERENCES]
+    declared += [(r, False) for r in CA_REFID_SETTINGS]
+    declared = [(r, by_number) for r, by_number in declared if r.value == 'certificate_authorities']
     for row in SystemConfig.query.order_by(SystemConfig.key):
         value = (row.value or '').strip()
-        for reference, forms in declared:
-            if value and value in forms and re.fullmatch(reference.pattern, row.key):
+        for reference, by_number in declared:
+            names_ca = value == ca.refid or (by_number and _int_or_none(value) == ca.id)
+            if value and names_ca and re.fullmatch(reference.pattern, row.key):
                 label, screen = CA_SETTING_WORDING.get(row.key, (f'named by the setting {row.key}', 'Settings'))
                 yield DeletionBlocker(
                     409,
