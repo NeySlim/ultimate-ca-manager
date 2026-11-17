@@ -347,3 +347,53 @@ def test_a_held_request_for_another_template_carries_no_renewal(
         approve(auth_client, approval_id)
         assert _query(client, world, request_id).status_code == 200
         assert _archived(app, old) == [False]
+
+
+def test_a_request_for_another_template_signed_by_a_renewed_certificate_is_an_enrollment(
+        app, client, world, realm_a, other_machine, directory):
+    """The template check comes before the renewed-already refusal: signed by hosta$'s certificate
+    already replaced, a request naming another template is served as an enrollment."""
+    old, key = _old(app, client, world, realm_a, True)
+    assert _certificate_renewal(client, old, key).status_code == 200
+    floor = _top_audit(app)
+    r = _other_template_request(client, world, old, key, other_machine)
+    assert r.status_code == 200, r.data
+    (action, _u, _n, details, ok), = _audits(app, floor)
+    assert (action, ok) == ('certificate.issued', True) and str(old.serial_number) not in details
+    assert _archived(app, old) == [True]
+
+
+# --- The webhook a renewal emits ------------------------------------------------------------------
+
+@pytest.fixture
+def webhook_events(monkeypatch):
+    """The certificate webhooks emitted, as (event, serial)."""
+    from services import webhook_service
+    events = []
+    for name, event in (('emit_cert_renewed', 'cert.renewed'), ('emit_cert_issued', 'cert.issued')):
+        monkeypatch.setattr(webhook_service, name,
+                            lambda cert, ca_refid=None, _e=event: events.append((_e, cert.get('serial_number'))))
+    return events
+
+
+@pytest.mark.parametrize('binding', ['kerberos', 'certificate'])
+@pytest.mark.parametrize('with_template', [True, False], ids=['template', 'template-less'])
+def test_a_renewal_emits_cert_renewed_on_either_binding(
+        app, client, world, realm_a, directory, webhook_events, with_template, binding):
+    """A renewal that replaces a certificate emits cert.renewed on both bindings, never cert.issued."""
+    old, key = _old(app, client, world, realm_a, with_template)
+    webhook_events.clear()
+    r = _renewal(binding, client, world, realm_a, old, key, with_template)
+    assert r.status_code == 200, r.data
+    new = _issued_cert_from_rstr(r.data)
+    assert [e for e, _s in webhook_events] == ['cert.renewed']
+    assert _archived(app, old) == [True] and _archived(app, new) == [False]
+
+
+def test_an_enrollment_signed_by_a_certificate_of_another_template_emits_cert_issued(
+        app, client, world, realm_a, other_machine, directory, webhook_events):
+    """Nothing replaced, nothing renewed: the enrollment emits cert.issued."""
+    old, key = _old(app, client, world, realm_a, True)
+    webhook_events.clear()
+    assert _other_template_request(client, world, old, key, other_machine).status_code == 200
+    assert [e for e, _s in webhook_events] == ['cert.issued']

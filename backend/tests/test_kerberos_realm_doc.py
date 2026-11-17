@@ -68,3 +68,23 @@ def test_guide_says_what_the_windows_bench_showed():
     upgrade = (GUIDE.parents[1] / 'UPGRADE.md').read_text()
     assert '`HashAlgorithm = sha256` in the `certreq` INF' in upgrade
     assert 'Windows enrollment, renewal over Kerberos:' in upgrade
+
+
+def test_texts_say_a_kerberos_renewal_keeps_its_template():
+    """Guide, CHANGELOG and help (en, fr) say the renewal keeps profile AND template, and that a
+    request for another template is an enrollment, as wstep_service.issue does."""
+    text = GUIDE.read_text()
+    assert 'renews that certificate when it names the same template' in text
+    assert 'A request naming another template is an enrollment (`certificate.issued`)' in text
+    root = GUIDE.parents[1]
+    changelog = (root / 'CHANGELOG.md').read_text()
+    assert 'of the same profile and template, and the requester\'s' in changelog
+    assert 'of the same profile and the requester\'s;' not in changelog
+    assert "renews it when the request names that certificate's template" in (root / 'UPGRADE.md').read_text()
+    help_dir = root / 'frontend' / 'src' / 'data'
+    en = (help_dir / 'helpGuides.js').read_text()
+    assert "renews it when it names that certificate's template" in en
+    assert 'A request naming another template is an enrollment' in en
+    fr = (help_dir / 'help' / 'fr' / 'settings.js').read_text()
+    assert 'le renouvelle quand elle nomme le modèle de ce certificat' in fr
+    assert 'Une demande qui nomme un autre modèle est un enrôlement' in fr
