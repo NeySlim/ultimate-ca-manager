@@ -301,6 +301,8 @@ def worker_exit(server, worker):
     stop_applier()
     from services.ws_relay import stop_reader
     stop_reader()
+    from services.backup.restore.invalidate import stop_epoch_watcher
+    stop_epoch_watcher()
 
 def post_worker_init(worker):
     """Post-worker initialization:
@@ -368,6 +370,16 @@ def post_worker_init(worker):
     except Exception as e:
         import logging
         logging.getLogger('ucm.cluster').error("Cluster command applier not started: %s", e)
+
+    # A restore run by another process advanced the session epoch: this worker drops its
+    # caches within EPOCH_CHECK_SECONDS, on its own timer rather than on a request
+    try:
+        from services.backup.restore.invalidate import start_epoch_watcher
+        from wsgi import app as flask_app
+        start_epoch_watcher(flask_app)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.backup').error("Session epoch cache watcher not started: %s", e)
 
     # Without Redis: this worker emits to its clients the events of the scheduler process,
     # and in HA those of the other workers and nodes, to which it also publishes its own

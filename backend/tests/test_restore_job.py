@@ -573,6 +573,27 @@ def test_a_process_purges_its_caches_once_when_the_epoch_moves(app, monkeypatch)
     assert purged == [False], 'a process purged the cache tables, or purged twice'
 
 
+def test_a_web_worker_purges_on_its_own_timer_without_a_request(app, monkeypatch):
+    import time
+
+    from auth.session_epoch import advance_epoch
+    from services.backup.restore import invalidate
+    purged = []
+    monkeypatch.setattr(invalidate, 'purge_caches',
+                        lambda with_tables=False: purged.append(with_tables) or ([], []))
+    with app.app_context():
+        invalidate.note_purged_epoch()
+        advance_epoch()
+    invalidate.start_epoch_watcher(app, interval=0.05)
+    try:
+        deadline = time.monotonic() + 10
+        while not purged and time.monotonic() < deadline:
+            time.sleep(0.05)
+    finally:
+        invalidate.stop_epoch_watcher()
+    assert purged == [False]
+
+
 # -- a real process killed around the commit (no application loaded in the child) --------------
 
 CHILD = r'''

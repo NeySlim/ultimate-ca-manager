@@ -561,13 +561,51 @@ def refresh_caches_on_epoch(force: bool = False) -> bool:
     return True
 
 
-def refresh_caches_before_request():
-    """before_request: never answers, never fails the request."""
-    try:
-        refresh_caches_on_epoch()
-    except Exception as e:
-        logger.error(f"Caches not checked against the session epoch: {type(e).__name__}")
-    return None
+class _EpochWatcher:
+    """A web worker's own timer for refresh_caches_on_epoch: no request ever pays its read."""
+
+    def __init__(self, app, interval):
+        import threading
+        self.app, self.interval = app, interval
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True, name='EpochCacheWatcher')
+
+    def _loop(self):
+        while not self._stop.wait(self.interval):
+            try:
+                with self.app.app_context():
+                    try:
+                        refresh_caches_on_epoch(force=True)
+                    finally:
+                        db.session.remove()
+            except Exception as e:
+                logger.error(f"Caches not checked against the session epoch: {type(e).__name__}")
+
+    def start(self):
+        self._thread.start()
+        return self
+
+    def stop(self, timeout=5.0):
+        self._stop.set()
+        self._thread.join(timeout)
+
+
+_watcher: Optional[_EpochWatcher] = None
+
+
+def start_epoch_watcher(app, interval: float = EPOCH_CHECK_SECONDS) -> _EpochWatcher:
+    """Web worker (post_worker_init): the scheduler process checks from its own loop."""
+    global _watcher
+    if _watcher is None:
+        _watcher = _EpochWatcher(app, interval).start()
+    return _watcher
+
+
+def stop_epoch_watcher() -> None:
+    global _watcher
+    watcher, _watcher = _watcher, None
+    if watcher is not None:
+        watcher.stop()
 
 
 __all__ = ['invalidate_after_restore', 'CACHE_PURGES']
