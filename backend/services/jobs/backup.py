@@ -32,7 +32,8 @@ def params_of(route, kdf=None, generated=False):
     return {'route': route, 'kdf': kdf, 'generated': bool(generated)}
 
 
-def format_size(size_bytes):
+def format_size(size_bytes: int) -> str:
+    """`N B`, `N.N KB` or `N.N MB`: the backup routes' one size format."""
     if size_bytes < 1024:
         return f'{size_bytes} B'
     if size_bytes < 1024 * 1024:

@@ -76,15 +76,6 @@ _SORT_KEYS = {
 _DEFAULT_SORT = 'created_desc'
 
 
-def _format_size(size_bytes: int) -> str:
-    """`N B`, `N.N KB` or `N.N MB`."""
-    if size_bytes < 1024:
-        return f'{size_bytes} B'
-    if size_bytes < 1024 * 1024:
-        return f'{size_bytes / 1024:.1f} KB'
-    return f'{size_bytes / (1024 * 1024):.1f} MB'
-
-
 def _scan_archives(directory) -> list:
     """Regular archive files of the directory; links and foreign names are skipped."""
     items = []
@@ -130,7 +121,7 @@ def _disk_meta(directory) -> dict:
         return {
             'disk_total_bytes': usage.total,
             'disk_free_bytes': usage.free,
-            'disk_free': _format_size(usage.free),
+            'disk_free': backup_job.format_size(usage.free),
             'disk_used_pct': (round(usage.used * 100 / usage.total, 1)
                               if usage.total else None),
         }
@@ -218,7 +209,7 @@ def list_backups():
         start = (page - 1) * per_page
         items = [{
             'filename': item['filename'],
-            'size': _format_size(item['size_bytes']),
+            'size': backup_job.format_size(item['size_bytes']),
             'size_bytes': item['size_bytes'],
             'created_at': datetime.fromtimestamp(
                 item['_mtime'], timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'),
@@ -231,9 +222,9 @@ def list_backups():
             'total': total,
             'total_all': len(everything),
             'total_size_bytes': total_size,
-            'total_size': _format_size(total_size),
+            'total_size': backup_job.format_size(total_size),
             'total_size_all_bytes': total_size_all,
-            'total_size_all': _format_size(total_size_all),
+            'total_size_all': backup_job.format_size(total_size_all),
             'page': page,
             'per_page': per_page,
             'pages': max(1, -(-total // per_page)),
