@@ -108,7 +108,7 @@ describe('upgrade to a later major version', () => {
   })
 
   it('under Docker shows the image the server names', async () => {
-    const image = 'ghcr.io/neyslim/ultimate-ca-manager:4.3'
+    const image = 'ghcr.io/neyslim/ultimate-ca-manager:4.3-fips'
     mocks.get.mockResolvedValue(check({
       can_auto_update: false,
       major_upgrade: { version: '4.3', html_url: 'https://example.invalid/r', download_url: image },
