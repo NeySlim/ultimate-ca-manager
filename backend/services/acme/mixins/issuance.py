@@ -21,6 +21,10 @@ def _is_ip_text(value: str) -> bool:
         return False
 
 
+class IssuingCAUnusable(Exception):
+    """An issuing CA was chosen (domain or default) but cannot sign: the order is refused."""
+
+
 class IssuanceMixin:
     def _caa_request_context(self, order):
         """Return the RFC 8657 account URL and validation method per DNS authz."""
@@ -199,12 +203,13 @@ class IssuanceMixin:
         # IP-only orders have no domains: skips the per-domain mappings and
         # resolves straight to the global default (acme.issuing_ca_id)
         if not ca_refid:
-            ca_refid = self._resolve_ca_for_domains(order_domains)
-            # A default naming a CA that is gone is no default: never the first CA instead
-            if not ca_refid and self._default_ca_gone():
+            # A chosen CA that is gone or keyless refuses the order: never another CA instead
+            try:
+                ca_refid = self._resolve_ca_for_domains(order_domains)
+            except IssuingCAUnusable as e:
+                logger.error("ACME order %s refused: %s", order_id, e)
                 self._last_finalize_error_type = 'serverInternal'
-                return False, ('The ACME issuing CA chosen in the ACME settings no longer '
-                               'exists: choose another one in the ACME settings')
+                return False, str(e)
 
         if approval is None:
             held, gate_error = self._approval_gate(order, csr, csr_pem, ca_refid)
@@ -529,56 +534,56 @@ class IssuanceMixin:
     
     def _resolve_ca_for_domains(self, domains: list) -> Optional[str]:
         """Resolve which CA should sign for the given domains.
-        
-        Resolution order:
+
+        Resolution order, the first choice found decides:
         1. Local ACME domain mapping (acme_local_domains table)
         2. DNS domain-specific CA (acme_domains.issuing_ca_id)
         3. Global default from acme.issuing_ca_id config
-        4. None (will fall back to first available CA in _sign_certificate_with_ca)
+        4. None: nothing chosen, _select_signing_ca takes the first CA able to sign
+
+        Raises IssuingCAUnusable when the chosen CA is gone or has no private key.
         """
         from api.v2.acme_local_domains import find_local_domain_ca
         from api.v2.acme_domains import find_provider_for_domain
         from models import SystemConfig, CA
-        
+        from services.deletion_blockers import _int_or_none
+
         # Check local ACME domain mapping first
         for domain in domains:
             ca_id = find_local_domain_ca(domain)
             if ca_id:
-                ca = db.session.get(CA, ca_id)
-                if ca and ca.has_private_key:
-                    return ca.refid
-        
+                return self._chosen_ca_refid(db.session.get(CA, ca_id), f'for the ACME domain {domain}',
+                                             'the ACME local domain settings')
+
         # Check DNS domain-specific CA
         for domain in domains:
             result = find_provider_for_domain(domain)
             if result and result.get('issuing_ca_id'):
-                ca = db.session.get(CA, result['issuing_ca_id'])
-                if ca and ca.has_private_key:
-                    return ca.refid
-        
-        # Fall back to global default
-        ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
-        if ca_id_cfg and ca_id_cfg.value:
-            ca = CA.query.filter_by(refid=ca_id_cfg.value).first()
-            if not ca:
-                try:
-                    ca = db.session.get(CA, int(ca_id_cfg.value))
-                except (ValueError, TypeError):
-                    pass
-            if ca and ca.has_private_key:
-                return ca.refid
-        
+                return self._chosen_ca_refid(db.session.get(CA, result['issuing_ca_id']),
+                                             f'for the ACME domain {domain}', 'the ACME domain settings')
+
+        # Global default, read as the deletion blocker reads it (refid, else what int() takes)
+        cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+        value = (cfg.value or '').strip() if cfg else ''
+        if value:
+            ca = CA.query.filter_by(refid=value).first()
+            number = _int_or_none(value)
+            if ca is None and number is not None:
+                ca = db.session.get(CA, number)
+            return self._chosen_ca_refid(ca, 'in the ACME settings', 'the ACME settings')
+
         return None
 
     @staticmethod
-    def _default_ca_gone() -> bool:
-        """Whether acme.issuing_ca_id holds a value that names no CA."""
-        from models import SystemConfig, CA
-        cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
-        value = (cfg.value or '').strip() if cfg else ''
-        if not value or CA.query.filter_by(refid=value).first() is not None:
-            return False
-        return not (value.isdigit() and db.session.get(CA, int(value)) is not None)
+    def _chosen_ca_refid(ca, chosen, where) -> str:
+        """The refid of a chosen CA that can sign; IssuingCAUnusable otherwise."""
+        if ca is None:
+            raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} no longer exists: '
+                                    f'choose another one in {where}')
+        if not ca.has_private_key:
+            raise IssuingCAUnusable(f'The ACME issuing CA chosen {chosen} has no private key: '
+                                    f'choose a CA able to sign in {where}')
+        return ca.refid
 
     @staticmethod
     def _is_request_failure(exc) -> bool:
