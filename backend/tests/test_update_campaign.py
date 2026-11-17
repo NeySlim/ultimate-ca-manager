@@ -90,6 +90,16 @@ def test_a_node_that_does_not_come_back_stops_the_campaign_after_the_guard():
     assert _plan(new, nodes) == (None, None)
 
 
+def test_a_node_whose_row_the_leader_deleted_is_a_node_not_back():
+    """Its row gone (silent GONE_PASSES): waited on until the guard, done when it beats again."""
+    since = T0 - timedelta(seconds=120)
+    c = _campaign(current={'node': 'a', 'since': since.isoformat(), 'state': uc.INSTALLING})
+    others = {'b': _node(600, 10, '3.0'), 'c': _node(600, 10, '3.0')}
+    assert _plan(c, others) == (None, None)
+    assert _plan(c, others, now=since + timedelta(seconds=GUARD + 1))[1][0] == 'stopped'
+    assert _plan(c, {**others, 'a': _node(30, 5, '3.1')})[1] == ('node_done', 'a', None)
+
+
 def test_a_node_back_on_the_old_version_stops_the_campaign_at_once():
     since = T0 - timedelta(seconds=120)
     c = _campaign(current={'node': 'a', 'since': since.isoformat(), 'state': uc.INSTALLING})
