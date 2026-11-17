@@ -286,6 +286,10 @@ def test_a_failure_before_the_export_answers_as_before(app, auth_client, backup_
         monkeypatch.setattr(runner.JobContext, 'secret', property(fail))
     else:  # decrypt_value answers None for a value this node's key does not open
         monkeypatch.setattr(runner.JobContext, 'secret', property(lambda ctx: None))
+    from services.backup import storage
+    real, exported = storage.export_archive, []
+    monkeypatch.setattr(storage, 'export_archive',
+                        lambda *a, **k: exported.append(1) or real(*a, **k))
     before = len(_lines(app))
     r = _post(auth_client, url, {'password': PASSWORD})
     assert r.status_code == 500, r.data
@@ -294,6 +298,7 @@ def test_a_failure_before_the_export_answers_as_before(app, auth_client, backup_
     assert _lines(app)[before:] == [('manual', 'Backup failed: unexpected error', False, 'admin')]
     row = _row(app, _job_id_of(app))
     assert (row['state'], row['reason'], row['secret']) == ('failed', 'error', None)
+    assert exported == []  # nothing exported without the password
 
 
 def test_a_cancellation_stops_the_export_between_two_rows(app, auth_client, backup_dir, jobs_made,
