@@ -328,7 +328,7 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch, caplog, task
     assert 'A scheduled task or a background job outlasted 30.0s' in caplog.text
 
 
-def test_the_master_stopping_stops_the_process_then_says_the_node_stopped(supervisor):
+def test_the_master_stopping_stops_the_process_then_releases_the_node(supervisor):
     """SIGTERM to the master: the scheduler process stops beside the workers' drain, and the
     node's row is released at once, not after graceful_timeout of open connections."""
     s = supervisor()
@@ -346,7 +346,7 @@ def test_the_master_stopping_stops_the_process_then_says_the_node_stopped(superv
     assert len(calls) == 1
 
 
-def test_stop_says_the_node_stopped_once(supervisor):
+def test_stop_releases_the_node_once(supervisor):
     s = supervisor()
     calls = []
     s.start(on_stopped=lambda: calls.append(1))

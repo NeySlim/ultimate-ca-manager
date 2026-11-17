@@ -2,7 +2,6 @@
 Health Check Routes
 Endpoints for load balancers, monitoring, and readiness checks.
 """
-import threading
 import time
 from flask import Blueprint, jsonify, current_app
 from models import db
@@ -10,6 +9,7 @@ from config.settings import redis_url as config_redis_url
 import os
 
 import fips_mode
+from shared_check import SharedCheck
 
 health_bp = Blueprint('health', __name__)
 
@@ -203,8 +203,7 @@ def metrics():
 # /health/ready waits at most this long for SELECT 1: a server that stops answering without
 # refusing leaves the probe at 503 instead of hanging it (docs/HA.md)
 READY_DATABASE_TIMEOUT_SECONDS = 5.0
-_pending_lock = threading.Lock()
-_pending = None
+_database_check = SharedCheck('ucm-ready-database')
 
 
 def _select_1(app):
@@ -215,40 +214,22 @@ def _select_1(app):
 
 def wait_for_pending_check(timeout):
     """Tests: let a database check still running end."""
-    worker = _pending
-    if worker is not None:
-        worker.join(timeout)
+    _database_check.wait(timeout)
 
 
 def _check_database():
-    """SELECT 1 on a pooled connection, given up after READY_DATABASE_TIMEOUT_SECONDS; one check
-    at a time, so probes during an outage do not pile connections up on the silent server."""
-    global _pending
+    """SELECT 1 on a pooled connection, one at a time per worker: a probe that arrives while it
+    runs shares its result, and gives up READY_DATABASE_TIMEOUT_SECONDS after it started."""
     app = current_app._get_current_object()
-    failure = {'status': 'error', 'message': 'Database connection failed'}
-    outcome = {}
-
-    def run():
-        try:
-            _select_1(app)
-            outcome['ok'] = True
-        except Exception as e:
-            outcome['error'] = e
-
-    with _pending_lock:
-        if _pending is not None and _pending.is_alive():
-            return failure
-        worker = _pending = threading.Thread(target=run, name='ucm-ready-database', daemon=True)
-        worker.start()
-    worker.join(READY_DATABASE_TIMEOUT_SECONDS)
-    if worker.is_alive():
+    result, error = _database_check(lambda: _select_1(app), READY_DATABASE_TIMEOUT_SECONDS)
+    if result == 'ok':
+        return {'status': 'ok'}
+    if result == 'timeout':
         current_app.logger.error(
             f"Database health check failed: no answer within {READY_DATABASE_TIMEOUT_SECONDS:g}s")
-        return failure
-    if 'ok' not in outcome:
-        current_app.logger.error(f"Database health check failed: {outcome.get('error')}")
-        return failure
-    return {'status': 'ok'}
+    else:
+        current_app.logger.error(f"Database health check failed: {error}")
+    return {'status': 'error', 'message': 'Database connection failed'}
 
 
 def _check_filesystem():

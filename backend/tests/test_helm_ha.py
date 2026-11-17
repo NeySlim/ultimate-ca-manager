@@ -181,7 +181,7 @@ def test_ha_with_a_former_data_pvc_still_renders_it_kept_and_unmounted_pos(tmp_p
 @pytest.mark.parametrize('mode', [[], HA], ids=['single', 'ha'])
 def test_the_pod_leaves_the_service_before_sigterm(mode):
     """preStop sleeps while the endpoints drop the pod, then UCM gets SIGTERM; the grace covers
-    the sleep and the clean stop (scheduled task 30 s + 5 s, the row released after it)."""
+    the sleep and the clean stop (at most 41 s) with a margin."""
     pod = _docs(*mode)['Deployment']['spec']['template']['spec']
     container = pod['containers'][0]
     assert container['lifecycle'] == {'preStop': {'exec': {'command': ['sleep', '10']}}}
@@ -197,8 +197,21 @@ def test_the_stop_delays_are_values():
     assert 'lifecycle' not in pod['containers'][0]
 
 
-def test_a_grace_shorter_than_the_clean_stop_is_refused_neg():
-    r = _helm('--set', 'lifecycle.preStopSleepSeconds=10', '--set', 'terminationGracePeriodSeconds=40',
-              check=False)
+CLEAN_STOP_REFUSAL = 'terminationGracePeriodSeconds must be at least lifecycle.preStopSleepSeconds + 45'
+
+
+@pytest.mark.parametrize('sleep', [10, 0])
+def test_a_grace_shorter_than_the_clean_stop_is_refused_neg(sleep):
+    """UCM stops within 41 s of SIGTERM (scheduler process 35 s then killed, then the stop
+    written): the grace must cover the sleep and that, with a margin."""
+    r = _helm('--set', f'lifecycle.preStopSleepSeconds={sleep}', '--set',
+              f'terminationGracePeriodSeconds={sleep + 44}', check=False)
     assert r.returncode == 1
-    assert 'terminationGracePeriodSeconds must be at least lifecycle.preStopSleepSeconds + 35' in r.stderr
+    assert CLEAN_STOP_REFUSAL in r.stderr
+
+
+@pytest.mark.parametrize('sleep', [10, 0])
+def test_the_shortest_grace_covering_the_clean_stop_renders(sleep):
+    pod = _docs('--set', f'lifecycle.preStopSleepSeconds={sleep}', '--set',
+                f'terminationGracePeriodSeconds={sleep + 45}')['Deployment']['spec']['template']['spec']
+    assert pod['terminationGracePeriodSeconds'] == sleep + 45

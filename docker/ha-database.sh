@@ -11,9 +11,12 @@ ucm_ha_active() {
     esac
 }
 
-# 1, true or yes, as the application reads a flag.
+# 1, true or yes, surrounding blanks dropped, as the application reads a flag.
 ucm_flag_set() {
-    case "$(printf '%s' "${1:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" in
+    local v="${1:-}"
+    v="${v#"${v%%[![:space:]]*}"}"
+    v="${v%"${v##*[![:space:]]}"}"
+    case "$(printf '%s' "$v" | tr '[:upper:]' '[:lower:]')" in
         1|true|yes) return 0 ;;
         *) return 1 ;;
     esac
