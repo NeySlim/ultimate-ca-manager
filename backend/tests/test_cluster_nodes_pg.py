@@ -172,3 +172,77 @@ def test_a_pass_longer_than_the_stale_window_keeps_the_leader_fresh(app, ha, mon
     finally:
         s.stop(timeout=10)
     assert seen == [PREFIX + 'slow']
+
+
+def _beat(app, name, token, age=0.0):
+    """A heartbeat of node ``name`` written ``age`` seconds ago."""
+    from models import ClusterNode, db
+    with app.app_context():
+        assert scheduler_leader.write_heartbeat(PREFIX + name, False, utc_now(), token, WAKE)
+        if age:
+            db.session.get(ClusterNode, PREFIX + name).heartbeat_at = \
+                scheduler_leader.cluster_utc_now() - timedelta(seconds=age)
+            db.session.commit()
+
+
+def _ours(entries):
+    return sorted(e['node_id'][len(PREFIX):] for e in entries if e['node_id'].startswith(PREFIX))
+
+
+GONE = scheduler_leader.GONE_PASSES * WAKE
+
+
+def test_a_node_stopped_cleanly_is_counted_no_more(app, ha):
+    """A rolling restart under Kubernetes replaces every pod by one of another name: the
+    replaced ones released their rows and count neither in nodes nor in stale."""
+    _beat(app, 'live', 'live-token')
+    _beat(app, 'gone', 'gone-token')
+    with app.app_context():
+        assert scheduler_leader.release_node(PREFIX + 'gone', 'gone-token')
+        summary = scheduler_leader.cluster_summary(WAKE)
+    assert (summary['nodes'], summary['stale']) == (1, 0)
+
+
+def test_a_node_silent_past_the_gone_window_counts_nowhere(app, ha):
+    _beat(app, 'live', 'live-token')
+    _beat(app, 'late', 'late-token', age=3 * WAKE + 0.1)  # stale, still counted
+    _beat(app, 'lost', 'lost-token', age=GONE + 1)  # killed long ago
+    with app.app_context():
+        summary = scheduler_leader.cluster_summary(WAKE)
+        detail = scheduler_leader.cluster_nodes_detail(WAKE)
+    assert (summary['nodes'], summary['stale']) == (2, 1)
+    assert _ours(detail) == ['late', 'live']
+
+
+def test_the_leader_deletes_the_rows_of_gone_nodes_and_a_node_back_writes_one(app, ha):
+    from models import ClusterNode, db
+    leader = ha('leader')
+    leader.start(app=app)
+    assert wait_for(lambda: rows(app).get(PREFIX + 'leader') is True)
+    _beat(app, 'late', 'late-token', age=3 * WAKE + 0.1)
+    _beat(app, 'lost', 'lost-token', age=GONE + 30)
+    # After a stale window of leadership: one pass at most
+    assert wait_for(lambda: PREFIX + 'lost' not in rows(app), timeout=3 * WAKE + 5)
+    assert PREFIX + 'late' in rows(app) and PREFIX + 'leader' in rows(app)
+    _beat(app, 'lost', 'lost-token')
+    with app.app_context():
+        assert db.session.get(ClusterNode, PREFIX + 'lost') is not None
+        assert scheduler_leader.cluster_summary(WAKE)['nodes'] >= 3
+
+
+def test_a_leader_new_to_the_lock_deletes_nothing(app, ha):
+    """After a database cut every heartbeat is old: the leader waits a stale window, in which
+    every live node beats again, before it deletes a row."""
+    leader = ha('fresh-leader')
+    leader._led_since = time.monotonic()
+    leader._owns_lock = True
+    _beat(app, 'quiet', 'quiet-token', age=GONE + 30)
+    with app.app_context():
+        leader._app = app
+        leader._prune_registry()
+    assert PREFIX + 'quiet' in rows(app)
+    leader._led_since -= 3 * WAKE + 0.1
+    with app.app_context():
+        leader._prune_registry()
+    assert PREFIX + 'quiet' not in rows(app)
+    leader._owns_lock = False
