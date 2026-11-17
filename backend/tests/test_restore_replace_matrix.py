@@ -232,6 +232,176 @@ def test_every_restored_row_bears_the_name_the_archive_gives(target, mode, table
     assert _orphans() == []
 
 
+@pytest.mark.parametrize('table_name', ['webhook_endpoints', 'acme_client_accounts'])
+def test_a_renamed_row_takes_its_name_back_from_another_thing(target, table_name):
+    """Renamed here, its archived name now held by another thing: the holder goes."""
+    table = TABLES[table_name]
+    _user('replace-admin')
+    archived = table.make(N, T1)
+    db.session.add(archived)
+    db.session.flush()
+    archived_id = archived.id
+    if table_name == 'acme_client_accounts':
+        _update_key_on(archived)     # kept by the archive: the account cannot go first
+    blob = _snapshot()
+    setattr(archived, table.column, M)
+    db.session.flush()
+    db.session.add(table.make(N, T2))
+    db.session.commit()
+
+    results = _restore(blob)
+
+    rows = table.model().query.all()
+    assert [(row.id, getattr(row, table.column), table.thing(row)) for row in rows] == [
+        (archived_id, N, T1)]
+    assert results['renamed'] == []
+    assert _orphans() == []
+
+
+@pytest.mark.parametrize('table_name', ['webhook_endpoints', 'acme_client_accounts'])
+def test_two_rows_that_traded_names_take_the_archives_back(target, table_name):
+    table = TABLES[table_name]
+    _user('replace-admin')
+    first, second = table.make(N, T1), table.make(M, T2)
+    db.session.add_all([first, second])
+    db.session.flush()
+    ids = {T1: first.id, T2: second.id}
+    blob = _snapshot()
+    setattr(first, table.column, 'trading')
+    db.session.flush()
+    setattr(second, table.column, N)
+    db.session.flush()
+    setattr(first, table.column, M)
+    db.session.commit()
+
+    results = _restore(blob)
+
+    rows = table.model().query.all()
+    assert sorted((getattr(row, table.column), table.thing(row), row.id) for row in rows) == sorted(
+        [(N, T1, ids[T1]), (M, T2, ids[T2])])
+    assert results['renamed'] == []
+    assert _orphans() == []
+
+
+def _named_in_archive(blob, table, thing, name):
+    """The archive with the row of that thing under `name`: an archive older than 124."""
+    from tests.test_backup_hostile_corpus import _reseal
+    _key, data = _service()._decrypt_framed(blob, PASSWORD)
+    row = next(r for r in data[table.section]
+               if any(f'-{thing}.' in str(value) for value in r.values()))
+    row[table.column] = name
+    return _reseal(blob, data)
+
+
+def _thing_of(row):
+    return next(thing for thing in (T1, T2, 'three')
+                if f'-{thing}.' in (getattr(row, 'url', None) or getattr(row, 'directory_url', '')))
+
+
+def _state(table):
+    return sorted((getattr(row, table.column), _thing_of(row), row.id)
+                  for row in table.model().query.all())
+
+
+def _renamed(results):
+    return sorted((e['from'], e['to'], e['reason']) for e in results['renamed'])
+
+
+SAME_HERE = 'same row here under this name'
+
+
+@pytest.mark.parametrize('table_name', ['webhook_endpoints', 'acme_client_accounts'])
+def test_a_name_kept_here_by_a_row_that_cannot_move_is_not_taken(target, table_name):
+    """T2 cannot take X (another archived row has it), so T1 cannot take N from T2."""
+    table = TABLES[table_name]
+    _user('replace-admin')
+    one, two, three = table.make(N, T1), table.make('x', T2), table.make('y', 'three')
+    db.session.add_all([one, two, three])
+    db.session.flush()
+    ids = {T1: one.id, T2: two.id, 'three': three.id}
+    blob = _named_in_archive(_snapshot(), table, 'three', 'x')
+    for row, name in ((two, 'tmp'), (three, 'x'), (one, M), (two, N)):
+        setattr(row, table.column, name)
+        db.session.flush()
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert _state(table) == sorted([(M, T1, ids[T1]), (N, T2, ids[T2]),
+                                    ('x', 'three', ids['three'])])
+    assert _renamed(results) == sorted([(N, M, SAME_HERE), ('x', N, SAME_HERE)])
+    assert _orphans() == []
+
+
+@pytest.mark.parametrize('table_name', ['webhook_endpoints', 'acme_client_accounts'])
+def test_two_renamed_rows_wanting_one_archived_name_do_not_both_take_it(target, table_name):
+    table = TABLES[table_name]
+    _user('replace-admin')
+    one, two = table.make(N, T1), table.make('z', T2)
+    db.session.add_all([one, two])
+    db.session.flush()
+    ids = {T1: one.id, T2: two.id}
+    blob = _named_in_archive(_snapshot(), table, T2, N)
+    setattr(one, table.column, 'a')
+    setattr(two, table.column, 'b')
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert _state(table) == sorted([(N, T1, ids[T1]), ('b', T2, ids[T2])])
+    assert _renamed(results) == [(N, 'b', SAME_HERE)]
+    assert _orphans() == []
+
+
+@pytest.mark.parametrize('table_name', ['webhook_endpoints', 'acme_client_accounts'])
+def test_the_name_a_renamed_row_leaves_is_free_for_the_archive(target, table_name):
+    table = TABLES[table_name]
+    _user('replace-admin')
+    one, other = table.make(N, T1), table.make(M, 'three')
+    db.session.add_all([one, other])
+    db.session.flush()
+    one_id = one.id
+    blob = _snapshot()
+    db.session.delete(other)
+    db.session.flush()
+    setattr(one, table.column, M)
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert [(name, thing) for name, thing, _id in _state(table)] == sorted(
+        [(N, T1), (M, 'three')])
+    assert db.session.get(table.model(), one_id).__getattribute__(table.column) == N
+    assert results['renamed'] == []
+    assert _orphans() == []
+
+
+def test_a_name_a_kept_row_needs_here_is_not_taken_by_a_renamed_row(target):
+    """The holder of N carries a kept update key: N stays with it until the writes."""
+    table = TABLES['acme_client_accounts']
+    _user('replace-admin')
+    one = table.make(N, T1)
+    db.session.add(one)
+    db.session.flush()
+    one_id = one.id
+    key = _update_key_on(one)
+    db.session.flush()
+    blob = _snapshot()
+    setattr(one, table.column, M)
+    holder = table.make(N, T2)
+    db.session.add(holder)
+    db.session.flush()
+    key.acme_client_account_id = holder.id
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert _state(table) == [(M, T1, one_id)]
+    assert _renamed(results) == [(N, M, SAME_HERE)]
+    assert _account_of(type(key).query.one()).id == one_id
+    assert _orphans() == []
+
+
 # -- ACME server state --------------------------------------------------------
 
 STATES = ('order', 'valid_authorization', 'pre_authorization', 'challenge')

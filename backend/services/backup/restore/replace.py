@@ -17,6 +17,7 @@ row is decided here, the same way on every database engine: see
 `DEPENDENT_TABLES`.
 """
 import logging
+import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -408,12 +409,17 @@ def remove_before_writes(replacement: Replacement) -> Replacement:
 
 
 def _rename_in_place(replacement: Replacement) -> None:
-    """Each kept row takes the archive's name, freed by the deletions just made."""
+    """Each kept row takes the archive's name, freed by the deletions just made.
+
+    Through a unique placeholder first, so rows trading names never collide.
+    """
     for name, rows in replacement.renamed_here.items():
         table = _table_of(name)
         primary = _primary(table)
-        for row_id, (column, value) in sorted(rows.items()):
-            db.session.execute(table.update().where(primary == row_id).values({column: value}))
+        for final in (False, True):
+            for row_id, (column, value) in sorted(rows.items()):
+                value = value if final else f'restore-{uuid.uuid4().hex}'
+                db.session.execute(table.update().where(primary == row_id).values({column: value}))
 
 
 # An authority that waits for the writes goes with them: its HSM key is free for an archived one now
