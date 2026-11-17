@@ -118,6 +118,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - **OIDC attribute mapping to `groups` ignored.** An OIDC attribute mapping row to `groups` was ignored: the mapped claim, by exact name or dotted path such as `realm_access.roles`, is now the source of the groups in place of `roles` and `groups` (see UPGRADE.md). The "Role resolution" log line no longer writes the whole role mapping and every group value.
+- **A replacing restore leaves no ACME server state behind.** The authorizations and challenges of an ACME account the archive does not hold were kept without an owner, the valid ones for good; they now go with the account, and the legacy CRL rows of a removed CA go with it.
+- **A replacing restore keeps the names of the archive.** A webhook or ACME CA account that matched a row here under another name was restored under the name here; it now takes the archive's name.
 - **Bulk exports survive an unreadable row.** The certificate and CA exports answered 500 in P7B and carried the damaged data in PEM, as the trust store did in PEM while its P7B dropped the entry silently and answered 400 when none was left; each now skips the row, logs it, lists its id in `X-Skipped-Certificates` or `X-Skipped-CAs` (first 100, with `-Count`) and answers 404 in both formats when none is readable.
 - **AIA `.p7c` bundle with an unreadable certificate.** It answered 500; it now serves the readable certificates of the CA, logs the unreadable ones and answers 404 when none is readable.
 - **Renewal during a CA record merge.** An in-place renewal already stored answered with an error when the SKI/AKI repair merged the record of its CA right after; it now reports the renewal and regenerates the CRL of the record that remains.

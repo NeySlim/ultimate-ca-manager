@@ -17,6 +17,7 @@ row is decided here, the same way on every database engine: see
 `DEPENDENT_TABLES`.
 """
 import logging
+import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -196,13 +197,14 @@ def _archived_sso_identities(row: Dict[str, Any], plan: RestorePlan) -> Set[Tupl
 # and goes with the row otherwise (see REMOVED_WITH_TARGET).
 DEPENDENT_TABLES: Dict[str, str] = {
     'crl_metadata': 'regenerated from the authorities',
+    'crls': 'legacy CRL rows, named by the refid of their authority',
     'ocsp_responses': 'a response cache',
     'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',
     'user_sessions': 'live sessions, revoked after every restore anyway',
     'pro_sso_sessions': 'live SSO sessions',
     'webauthn_challenges': 'single-use challenges',
     'acme_orders': 'in-flight protocol state of the ACME server',
-    'acme_authorizations': 'in-flight protocol state, tied to orders',
+    'acme_authorizations': 'in-flight protocol state, tied to orders and accounts',
     'acme_challenges': 'in-flight protocol state, tied to authorizations',
     'acme_proxy_dns_challenges': 'expected TXT values of in-flight proxy orders',
     'acme_proxy_challenge_links': 'which in-flight proxy order a challenge belongs to',
@@ -226,9 +228,10 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'user_sso_identities': 'not in a 2.254 archive; removed with its account, orphaned with its provider',
 }
 
-# Integer links the schema holds without a foreign key, handled as if it had one:
-# SQLite hands a removed row's id to the next row inserted.
+# Links the schema holds without a foreign key, handled as if it had one: SQLite
+# hands a removed row's id to the next row inserted, and a refid outlives its row.
 SOFT_LINKS = (
+    ('crls', 'caref', 'certificate_authorities', 'refid'),
     ('certificates', 'related_certificate_id', 'certificates', 'id'),
     ('certificates', 'windows_profile_id', 'windows_enrollment_profiles', 'id'),
     ('deploy_bindings', 'attention_successor_id', 'certificates', 'id'),
@@ -265,8 +268,10 @@ def link_scope(dependent, column, named):
 CLOSED_WITH_TARGET = {('key_recovery_requests', 'cert_id')}
 
 # Links whose row goes with the row it names although the column allows none:
-# an approval of a certificate that is gone, as deleting the certificate does.
-REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id')}
+# an approval of a certificate that is gone, as deleting the certificate does, and
+# an ACME authorization of an order or account that is gone, as deleting the account does.
+REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id'),
+                       ('acme_authorizations', 'order_id'), ('acme_authorizations', 'account_id')}
 
 # An identity row whose provider goes keeps that provider's IdP key, as deleting the provider
 # does: only a provider for the exact same IdP takes it back (OIDC Core §5.7).
@@ -335,6 +340,8 @@ class Replacement:
     deferred: Dict[str, Set[Any]] = field(default_factory=dict)
     # Rows that give their name up to an archived row: they must go before the writes
     displaced: Dict[str, Set[Any]] = field(default_factory=dict)
+    # Rows the archive carries under another name: renamed in place once the names are free
+    renamed_here: Dict[str, Dict[Any, Tuple[str, str]]] = field(default_factory=dict)
     removed: Dict[str, int] = field(default_factory=dict)
     cleared: Dict[str, int] = field(default_factory=dict)
     unlinked: Dict[str, int] = field(default_factory=dict)
@@ -348,11 +355,16 @@ class Replacement:
 
 def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: Set[str], *,
                      keep: Optional[Dict[str, Set[Any]]] = None,
-                     displaced: Optional[Dict[str, Set[Any]]] = None) -> Replacement:
+                     displaced: Optional[Dict[str, Set[Any]]] = None,
+                     renamed_here: Optional[Dict[str, Dict[Any, Tuple[str, str]]]] = None
+                     ) -> Replacement:
     """The rows each pruned section loses, in the order they can go."""
     _index_tables()
-    keep = keep or {}
+    keep = {name: set(ids) for name, ids in (keep or {}).items()}
     displaced = displaced or {}
+    renamed_here = {name: dict(rows) for name, rows in (renamed_here or {}).items() if rows}
+    for name, rows in renamed_here.items():
+        keep.setdefault(name, set()).update(rows)
     pruned = {name for name in sections
               if isinstance(backup_data.get(name), list) and name not in MERGED_ONLY}
     doomed: Dict[str, Set[Any]] = {}
@@ -363,7 +375,8 @@ def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: S
             doomed[name] = ids
     return Replacement(order=[name for name in deletion_order(set(doomed))],
                        doomed=doomed, pruned=pruned,
-                       displaced={name: set(ids) for name, ids in displaced.items() if ids})
+                       displaced={name: set(ids) for name, ids in displaced.items() if ids},
+                       renamed_here=renamed_here)
 
 
 def remove_before_writes(replacement: Replacement) -> Replacement:
@@ -389,9 +402,24 @@ def remove_before_writes(replacement: Replacement) -> Replacement:
         _release_dependents(replacement, table, _primary(table), replacement.doomed[name], name)
     for name in replacement.order:
         _delete(replacement, name, replacement.doomed[name] - replacement.deferred.get(name, set()))
+    _rename_in_place(replacement)
     _release_waiting_hsm_keys(replacement)
     db.session.expire_all()
     return replacement
+
+
+def _rename_in_place(replacement: Replacement) -> None:
+    """Each kept row takes the archive's name, freed by the deletions just made.
+
+    Through a unique placeholder first, so rows trading names never collide.
+    """
+    for name, rows in replacement.renamed_here.items():
+        table = _table_of(name)
+        primary = _primary(table)
+        for final in (False, True):
+            for row_id, (column, value) in sorted(rows.items()):
+                value = value if final else f'restore-{uuid.uuid4().hex}'
+                db.session.execute(table.update().where(primary == row_id).values({column: value}))
 
 
 # An authority that waits for the writes goes with them: its HSM key is free for an archived one now

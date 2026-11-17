@@ -55,16 +55,20 @@ RULES = {
 def rename_clashing_rows(backup_data: Dict[str, Any],
                          warnings: Optional[List[str]] = None, *,
                          replacing: frozenset = frozenset(),
-                         displaced: Optional[Dict[str, set]] = None) -> List[Dict[str, str]]:
+                         displaced: Optional[Dict[str, set]] = None,
+                         renamed_here: Optional[Dict[str, dict]] = None) -> List[Dict[str, str]]:
     """Rename, in the archive, the rows that would land on another row's name.
 
     References carried by identity follow the rename; an ambiguous one is added
     to `warnings`. Returns one entry per row restored under another name. In a
     section a replacing restore prunes (`replacing`), a row here that is not
-    the same thing gives its name up instead: its id lands in `displaced`.
+    the same thing gives its name up instead: its id lands in `displaced`; one
+    that is the same thing under another name takes the archive's name in place
+    before the writes: `renamed_here` maps its id to (column, name).
     """
     warnings = warnings if warnings is not None else []
     displaced = displaced if displaced is not None else {}
+    renamed_here = renamed_here if renamed_here is not None else {}
     renamed = []
     for section_name, rule in RULES.items():
         rows = backup_data.get(section_name)
@@ -75,9 +79,13 @@ def rename_clashing_rows(backup_data: Dict[str, Any],
         if not rows:
             continue
         before = [dict(row) for row in rows]
-        final, reasons, given_up = _place(section_name, rule, rows, replacing, backup_data)
+        final, reasons, given_up, here_renamed = _place(section_name, rule, rows, replacing,
+                                                        backup_data)
         if given_up:
             displaced.setdefault(section_name, set()).update(given_up)
+        if here_renamed:
+            renamed_here.setdefault(section_name, {}).update(
+                {target_id: (rule.column, name) for target_id, name in here_renamed.items()})
         for index, row in enumerate(rows):
             if final[index] != row[rule.column]:
                 renamed.append({'section': section_name, 'from': row[rule.column],
@@ -91,8 +99,8 @@ def rename_clashing_rows(backup_data: Dict[str, Any],
 
 
 def _place(section_name, rule, rows, pruned=frozenset(), backup_data=None):
-    """The name each archived row is restored under, why it changed, and the
-    rows here that give their name up to it."""
+    """The name each archived row is restored under, why it changed, the rows
+    here that give their name up to it, and those renamed in place to it."""
     model = load_model(SECTIONS[section_name])
     here = model.query.order_by(model.id).all()
     by_name: Dict[str, list] = {}
@@ -114,7 +122,10 @@ def _place(section_name, rule, rows, pruned=frozenset(), backup_data=None):
         if claim(row, row[rule.column]) is not None:
             final[index] = row[rule.column]
 
-    # Same thing under another name: updated, and keeps its name here.
+    # Same thing under another name: updated, and keeps its name here. A replacing
+    # restore renames it in place to the archive's name, keeping its id and dependents,
+    # unless that name stays held here or by another archived row.
+    matched: Dict[int, Any] = {}
     if rule.key is not None:
         by_key: Dict[tuple, list] = {}
         for target in here:
@@ -128,14 +139,44 @@ def _place(section_name, rule, rows, pruned=frozenset(), backup_data=None):
             target = next((t for t in by_key.get(key, ()) if t.id not in claimed), None)
             if target is not None:
                 claimed.add(target.id)
-                final[index] = getattr(target, rule.column)
-                reasons[index] = 'same row here under this name'
+                matched[index] = target
+    # A holder of the wanted name gives it up, or is itself renamed away: until stable.
+    moving = set(matched) if section_name in pruned else set()
+    taken = set(final.values())
+    while True:
+        moved = {matched[i].id for i in moving}
+        first = {}
+        for i in sorted(moving):
+            first.setdefault(rows[i][rule.column], i)
+        stuck = {i for i in moving if first[rows[i][rule.column]] != i or not _can_move(
+            model, rows[i][rule.column], matched[i], by_name, claimed, moved, taken,
+            pruned, backup_data)}
+        if not stuck:
+            break
+        moving -= stuck
+    given_up = set()
+    renamed_here: Dict[Any, str] = {}
+    for index, target in matched.items():
+        wanted = rows[index][rule.column]
+        if index in moving:
+            holders = {t.id for t in by_name.get(wanted, ()) if t.id not in claimed}
+            given_up |= holders
+            claimed |= holders
+            renamed_here[target.id] = wanted
+            final[index] = wanted
+            by_name[getattr(target, rule.column)].remove(target)
+        else:
+            final[index] = getattr(target, rule.column)
+            reasons[index] = 'same row here under this name'
+
+    for target_id, wanted in renamed_here.items():
+        by_name.setdefault(wanted, []).append(next(t for t in here if t.id == target_id))
+    by_name = {name: targets for name, targets in by_name.items() if targets}
 
     # Anything else takes its own name if free, else the first free suffix.
     # A replacing restore removes the rows here nothing claimed: their names are free.
     used = set(final.values())
     originals = {row[rule.column] for row in rows}
-    given_up = set()
     for index, row in enumerate(rows):
         if index in final:
             continue
@@ -162,7 +203,17 @@ def _place(section_name, rule, rows, pruned=frozenset(), backup_data=None):
                               else 'name held here by a different row')
         final[index] = candidate
         used.add(candidate)
-    return final, reasons, given_up
+    return final, reasons, given_up, renamed_here
+
+
+def _can_move(model, wanted, target, by_name, claimed, moved, taken, pruned, backup_data):
+    """Whether `target` can take `wanted` here: no other archived row takes it, and
+    each row holding it is renamed away or gives it up."""
+    holders = [t for t in by_name.get(wanted, ()) if t.id != target.id]
+    if wanted in taken or any(t.id in claimed and t.id not in moved for t in holders):
+        return False
+    free = {t.id for t in holders if t.id not in claimed}
+    return not (free and _required_by_kept_rows(model, free, pruned, backup_data or {}))
 
 
 def _required_by_kept_rows(model, ids, pruned, backup_data) -> bool:
