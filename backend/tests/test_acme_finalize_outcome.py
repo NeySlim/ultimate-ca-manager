@@ -160,6 +160,12 @@ def test_an_identifier_outside_the_order_is_refused_before_processing(app, clien
     r = _finalize(client, account, order_id, domain, dns=[domain, 'stranger.example'])
     _assert_ready_after_bad_csr(client, account, order_id, r, 'stranger.example')
     assert seen == []  # judged without taking the order
+    from models import AuditLog
+    with app.app_context():
+        # The refusal is audited with its cause, like any failed finalize
+        line = (AuditLog.query.filter_by(action='acme.order.finalize', resource_id=str(order_id))
+                .order_by(AuditLog.id.desc()).first())
+        assert line is not None and not line.success and 'stranger.example' in line.details
     _assert_issued(client, account, order_id, _finalize(client, account, order_id, domain))
 
 
