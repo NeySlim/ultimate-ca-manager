@@ -33,6 +33,7 @@ from .restore.conflict import conflict_from_integrity_error, is_value_too_long
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
 from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
+from .restore.sso_providers import orphan_accounts_of, settle_other_idp_providers
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
 
 logger = logging.getLogger(__name__)
@@ -328,7 +329,6 @@ class RestoreCoreMixin:
         displaced: Dict[str, set] = {}
         renamed = rename_clashing_rows(backup_data, ambiguous_references,
                                        replacing=frozenset(pruned), displaced=displaced)
-
         # An archive of metadata alone restores nothing. Announcing it as a
         # success made the caller revoke every session and ask for a restart
         # over a file that changed not one row.
@@ -336,6 +336,10 @@ class RestoreCoreMixin:
             name for name in SECTIONS
             if backup_data.get(name)
         )
+        # After `carried`: a provider left out was still carried. Before the plan, which
+        # finds providers by name: a provider of another IdP is another provider
+        sso_warnings: List[str] = []
+        settle_other_idp_providers(backup_data, 'sso_providers' in pruned, sso_warnings, displaced)
 
         # Named before anything is written, so the answer can say what this
         # version will not put back even though the archive carries it.
@@ -398,7 +402,7 @@ class RestoreCoreMixin:
         # Orders this installation moved on with: kept in a merge, named in a replacement
         order_warnings = keep_newer_orders(backup_data, mode)
         plan = RestorePlan.build(backup_data, pruned=pruned)
-        plan.warnings.extend(order_warnings)
+        plan.warnings.extend(order_warnings + sso_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
@@ -420,6 +424,8 @@ class RestoreCoreMixin:
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
                     replacement = plan_replacement(backup_data, plan, pruned, displaced=displaced)
+                    # Unlinked with their IdP kept, before the removal unlinks them without it
+                    orphan_accounts_of(replacement.displaced.get('sso_providers'))
                     prune_doomed_settings(replacement, plan, deferred_keys(
                         backup_data.get('configuration') if isinstance(
                             backup_data.get('configuration'), dict) else {}))
