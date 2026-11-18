@@ -171,6 +171,8 @@ def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
     since it was read."""
     if not cert.crt:
         raise RenewalError('Certificate data not available', 400)
+    if _stored(cert) is None:
+        raise _unreadable(cert.id, False, link=False)
     # Any revocation, a suspension included: renewing would hand back a good serial
     if cert.revoked:
         raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
@@ -411,8 +413,10 @@ def _refuse_unreadable(row, related=False):
         raise _unreadable(row.id, related) from e
 
 
-def _unreadable(row_id, related) -> 'RenewalError':
+def _unreadable(row_id, related, link=True) -> 'RenewalError':
     what = f'Related certificate {row_id}' if related else f'Certificate {row_id}'
+    if not link:
+        return RenewalError(f'{what} cannot be read: the renewal is refused', 409)
     return RenewalError(f'{what} cannot be read: renewing would drop its RFC 9763 link, so the '
                         f'renewal is refused', 409)
 
@@ -446,7 +450,10 @@ def _named_related(row):
         row_id, linked_id = row.id, row.related_certificate_id
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
         return None, None
-    original = x509.load_pem_x509_certificate(b64decode(row.crt))
+    try:
+        original = x509.load_pem_x509_certificate(b64decode(row.crt))
+    except ValueError as e:  # binascii.Error included: the row itself is unreadable
+        raise _unreadable(row_id, False, link=False) from e
     try:
         if related_cert.read_related_certificate(original) is None:
             return None, None

@@ -1006,7 +1006,7 @@ server holds both keys and renews the pair as one; the response
 lists the other member in `related_renewed`. A certificate renewed alone names only the
 certificate its original named (RFC 9763 §4.1): once that one is replaced, revoked, archived or
 expired, the renewed certificate carries no `relatedCertificate` extension, leaves its pair, and
-`meta.notices` says why. A renewal answers `409`, naming the certificate, when the other member's
+`meta.notices` says why. A renewal answers `409`, naming the certificate, when its own stored certificate, the other member's
 certificate or the renewed certificate's own `relatedCertificate` extension cannot be read;
 nothing is written and the pair stays as it is. When the two members require approval under
 different policies, the renewal answers `409` and only an administrator can perform it. A
