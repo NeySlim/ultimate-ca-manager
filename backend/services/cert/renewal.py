@@ -392,7 +392,28 @@ def _linked_members(cert):
     from services.cert.issued_lookup import row_revoked
     if row_revoked(partner):  # by its row or by the record of its serial
         return [cert], linked
+    _refuse_unreadable(partner, related=True)
+    _refuse_unreadable(cert)
     return list(anchor_first(cert, partner)), linked
+
+
+def _refuse_unreadable(row, related=False):
+    """Refuse, naming *row*, when its certificate or its RelatedCertificate extension cannot be
+    read: a corrupt row never unlinks a pair in silence."""
+    from services.cert.related_pair import row_certificate
+    from utils.related_cert import read_related_certificate
+    try:
+        certificate = row_certificate(row)
+        if certificate is not None:
+            read_related_certificate(certificate)
+    except ValueError as e:  # RelatedCertError included
+        raise _unreadable(row.id, related) from e
+
+
+def _unreadable(row_id, related) -> 'RenewalError':
+    what = f'Related certificate {row_id}' if related else f'Certificate {row_id}'
+    return RenewalError(f'{what} cannot be read: renewing would drop its RFC 9763 link, so the '
+                        f'renewal is refused', 409)
 
 
 def _as_stored(row_id):
@@ -413,8 +434,9 @@ def _current_related(row):
 
 
 def _named_related(row):
-    """``(A, why)``: A while held, valid, unrevoked and unarchived (RFC 9763 §4.1), else None and
-    why the renewed certificate names nothing (*why* None when the original named nothing)."""
+    """``(A, why)``: the A *row*'s extension hashes (RFC 9763 §4.1) while held, valid, unrevoked and
+    unarchived, else None and why it is no longer named (None: the original named nothing).
+    Refused when that extension, or a linked row that could hold A, cannot be read."""
     from services.cert.related_pair import row_certificate
     from utils import related_cert
     try:
@@ -427,8 +449,8 @@ def _named_related(row):
     try:
         if related_cert.read_related_certificate(original) is None:
             return None, None
-    except related_cert.RelatedCertError:  # an unreadable hash names no certificate
-        return None, None
+    except related_cert.RelatedCertError as e:  # an unreadable hash: refused, not dropped
+        raise _unreadable(row_id, False) from e
     a_row = _row_named_by(original, row_id, linked_id)
     if a_row is None:
         return None, 'has been replaced or removed'
@@ -444,16 +466,16 @@ def _named_related(row):
 
 
 def _row_named_by(original, row_id, linked_id):
-    """The row, as stored now, holding the certificate *original*'s extension hashes: the
-    linked row, else a row linked to *row_id* (A linked to its own B still names its A)."""
+    """The row, as stored now, holding the certificate *original*'s extension hashes: the linked
+    row, else a row linked to *row_id*. A linked row that cannot be read refuses the renewal."""
     from services.cert.related_pair import row_certificate
     from utils.related_cert import references
 
     def hashed(candidate):
         try:
             return bool(candidate.crt) and references(original, row_certificate(candidate))
-        except ValueError:  # an unreadable certificate is not the one hashed
-            return False
+        except ValueError as e:  # it may be the one hashed: never read as "not named"
+            raise _unreadable(candidate.id, True) from e
 
     if linked_id:
         linked = _as_stored(linked_id)

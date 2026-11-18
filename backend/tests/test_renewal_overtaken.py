@@ -984,13 +984,13 @@ def test_the_named_a_is_found_without_reading_every_certificate(app, tmp_path):
             db.session.remove()
 
 
-def test_a_malformed_extension_names_nothing(app, tmp_path):
-    """An extension that cannot be read hashes no certificate: the linked row is not named."""
+def test_a_malformed_extension_refuses_instead_of_naming_nothing(app, tmp_path):
+    """An extension that cannot be read refuses the renewal: dropping it would unlink the pair."""
     import base64
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.x509 import UnrecognizedExtension
     from models import CA
-    from services.cert.renewal import _current_related
+    from services.cert.renewal import RenewalError, _current_related
     from services.hsm.ca_key_loader import get_ca_signing_key
     from tests.test_backup_cross_installation import _bound_to
     from utils.related_cert import RELATED_CERT_EXTENSION_OID
@@ -1010,14 +1010,18 @@ def test_a_malformed_extension_names_nothing(app, tmp_path):
             broken = builder.sign(get_ca_signing_key(ca), hashes.SHA256())
             b.crt = base64.b64encode(broken.public_bytes(serialization.Encoding.PEM)).decode()
             db.session.commit()
-            assert _current_related(db.session.get(Certificate, b_id)) is None
+            with pytest.raises(RenewalError) as refused:
+                _current_related(db.session.get(Certificate, b_id))
+            assert (refused.value.status, refused.value.message) == (
+                409, f'Certificate {b_id} cannot be read: renewing would drop its RFC 9763 link, '
+                     'so the renewal is refused')
             db.session.remove()
 
 
 @pytest.mark.parametrize('state', ['archived', 'expired', 'unreadable'])
 def test_an_a_no_longer_current_is_not_named(app, tmp_path, monkeypatch, state):
     """The certificate the extension hashes is named only while its row holds it, unarchived
-    and unexpired; an unreadable linked row names nothing and raises nothing."""
+    and unexpired; an unreadable linked row refuses the renewal, naming that row."""
     from datetime import timedelta
     from services.cert import renewal
     from tests.test_backup_cross_installation import _bound_to
@@ -1034,5 +1038,10 @@ def test_an_a_no_longer_current_is_not_named(app, tmp_path, monkeypatch, state):
             if state == 'expired':
                 later = a.valid_to + timedelta(days=1)
                 monkeypatch.setattr(renewal, 'utc_now', lambda: later)
-            assert renewal._current_related(db.session.get(Certificate, b_id)) is None
+            if state == 'unreadable':
+                with pytest.raises(renewal.RenewalError) as refused:
+                    renewal._current_related(db.session.get(Certificate, b_id))
+                assert f'Related certificate {a_id} cannot be read' in refused.value.message
+            else:
+                assert renewal._current_related(db.session.get(Certificate, b_id)) is None
             db.session.remove()

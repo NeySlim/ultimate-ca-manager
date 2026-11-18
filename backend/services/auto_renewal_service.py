@@ -365,7 +365,7 @@ class AutoRenewalService:
             try:
                 held = AutoRenewalService._held_for_approval(
                     cert, already_queued=bool(deadlines))
-            except PairApprovalConflict as e:
+            except (PairApprovalConflict, RenewalError) as e:  # RenewalError: the pair not read
                 db.session.rollback()
                 AutoRenewalService._log_failure(cert_id, common_name, str(e))
                 stats['failed'] += 1
