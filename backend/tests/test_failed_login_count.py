@@ -930,6 +930,33 @@ def test_an_ldap_attempt_is_counted_on_the_account_linked_by_its_address(
     assert failures == MAX_ATTEMPTS and locked_until is not None
 
 
+def test_an_ldap_attempt_is_never_counted_on_the_owner_of_its_address(
+        app, client, username, ldap_provider, any_spelling):
+    """The account of another provider that owns the entry's mail is not opened by this bind:
+    guesses at the entry never lock it."""
+    with app.app_context():
+        other = SSOProvider(name=f'cnt-oidc-{uuid.uuid4().hex[:6]}', provider_type='oidc',
+                            enabled=False)
+        db.session.add(other)
+        db.session.commit()
+        other_id = other.id
+        _another_worker_writes(username, auth_source='oidc', sso_provider_id=other_id)
+    entry_uid = f'dir{uuid.uuid4().hex[:8]}'
+    directory = any_spelling(_AnySpellingDirectory(entry_uid, f'{username}@example.test'))
+    try:
+        for _ in range(BURST):
+            assert client.post(LDAP_DOOR, json=_ldap_body(entry_uid, ldap_provider)
+                               ).status_code == 401
+        assert len(directory.binds) == BURST  # an entry with no account of its own is not counted
+        with app.app_context():
+            assert tuple(_stored(username)) == (0, None)
+    finally:
+        with app.app_context():
+            _another_worker_writes(username, auth_source='local', sso_provider_id=None)
+            db.session.delete(db.session.get(SSOProvider, other_id))
+            db.session.commit()
+
+
 def test_an_ldap_attempt_is_stored_before_its_bind(app, client, ldap_user, ldap_provider,
                                                    any_spelling):
     """Committed, not only written: nothing the bind does to the session takes it back,
