@@ -15,7 +15,7 @@ REMOVED_ACTION = 'truststore_private_key_removed'
 # Any armour naming a private key: PKCS#8, RSA, EC, DSA, OpenSSH, OpenPGP (label goes on), RFC 4716
 # (four dashes and a space), and the PuTTY file header; the label is any printable text on the line
 # (ML-DSA-65, X9.42 DH), never a line break
-_PRIVATE_KEY = re.compile(rb'-{4,5} ?BEGIN [\x20-\x7e]*?PRIVATE KEY|PuTTY-User-Key-File-\d')
+_PRIVATE_KEY = re.compile(rb'-{4,5} ?BEGIN [\x20-\x7e]{0,64}?PRIVATE KEY|PuTTY-User-Key-File-\d')
 # A block body is base64 and whitespace only, so no other armour can hide inside one. 2.x also stored
 # the `X509 CERTIFICATE` label: read here, never handed out (RFC 7468 5.1, generators MUST NOT)
 _CERTIFICATE_BLOCK = re.compile(rb'-----BEGIN (?P<label>(?:X509 )?CERTIFICATE)-----[A-Za-z0-9+/=\s]*?'

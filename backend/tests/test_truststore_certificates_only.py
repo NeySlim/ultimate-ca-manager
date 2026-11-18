@@ -303,3 +303,11 @@ def test_no_certificate_of_the_system_bundle_is_taken_for_a_key():
         data = bundle.read()
     assert b'BEGIN CERTIFICATE' in data
     assert not holds_private_key(data)
+
+
+def test_a_line_of_repeated_armour_openers_is_scanned_in_linear_time():
+    import time
+    from utils.trust_pem import holds_private_key
+    start = time.monotonic()
+    assert holds_private_key(b'----BEGIN ' * 80_000) is False
+    assert time.monotonic() - start < 5
