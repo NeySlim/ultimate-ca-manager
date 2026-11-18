@@ -633,3 +633,23 @@ def test_the_release_notes_enable_the_ubuntu_stream_of_the_guide(tmp_path):
     guide = (ROOT / 'docs' / 'installation' / 'README.md').read_text()
     # The `fips` stream ships the binaries certified under CMVP #5115; `fips-updates` does not
     assert _pro_streams(notes.read_text()) == _pro_streams(guide) == {'fips'}
+
+
+@pytest.mark.parametrize('version, content, code', [
+    ('3.0-rc3', '3.0-rc3\n', 0), ('3.0-rc3', '  3.0-rc3 \r\n', 0), ('3.0', '3.0', 0),
+    ('2.254.5-rc1', '2.254.5-rc1\n', 0),
+    ('3.0-rc3', '3.0-dev\n', 1), ('3.0-rc3', '3.0-rc2\n', 1), ('3.0-rc3', '3.0\n', 1),
+    ('3.0-rc3', '', 1), ('3.0-rc3', '\n', 1),
+])
+def test_matches_compares_a_tag_to_the_version_file(tmp_path, version, content, code):
+    f = tmp_path / 'VERSION'
+    f.write_text(content)
+    r = _cli('matches', version, str(f))
+    assert r.returncode == code and not r.stdout
+    if code:
+        assert version in r.stderr
+
+
+def test_matches_refuses_a_missing_file(tmp_path):
+    r = _cli('matches', '3.0-rc3', str(tmp_path / 'absent'))
+    assert r.returncode == 1 and r.stderr
