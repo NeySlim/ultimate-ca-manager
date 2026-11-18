@@ -82,23 +82,37 @@ def settle_other_idp_providers(backup_data: Dict[str, Any], replacing: bool,
 
 def _name_unchecked_bindings(backup_data: Dict[str, Any], rows: List[Any],
                              warnings: List[str]) -> None:
-    """Accounts whose provider the archive does not carry bind by name to the one here, IdP unchecked."""
+    """Accounts whose provider the archive does not carry: bound by name only within one database.
+
+    From another installation the provider of that name here may talk to another IdP:
+    the accounts come back unbound, their `sso_orphan_of` as the archive gives it."""
     from models.sso import SSOProvider
+    from ..installation import same_installation
+    here_too = same_installation(backup_data)
     carried = {row.get('name') for row in rows if isinstance(row, dict)}
-    accounts: Dict[str, List[str]] = {}
+    accounts: Dict[str, List[Dict[str, Any]]] = {}
     for user in backup_data.get('users') or []:
         ref = user.get(f'sso_provider_id{REFERENCE_SUFFIX}') if isinstance(user, dict) else None
         name = ref.get('name') if isinstance(ref, dict) else None
         if isinstance(name, str) and name not in carried:
-            accounts.setdefault(name, []).append(str(user.get('username')))
-    for name, usernames in sorted(accounts.items()):
+            accounts.setdefault(name, []).append(user)
+    for name, users in sorted(accounts.items()):
         here = SSOProvider.query.filter_by(name=name).first()
         if here is None:
             continue
+        usernames = ', '.join(sorted(str(user.get('username')) for user in users))
+        if here_too:
+            warnings.append(
+                f"sso_providers: the archive binds {usernames} to a provider {name!r} it does "
+                f"not carry; they are bound to the provider of that name here (#{here.id}), "
+                "whose IdP could not be checked against theirs")
+            continue
+        for user in users:
+            user.update({'sso_provider_id': None, f'sso_provider_id{REFERENCE_SUFFIX}': None})
         warnings.append(
-            f"sso_providers: the archive binds {', '.join(sorted(usernames))} to a provider "
-            f"{name!r} it does not carry; they are bound to the provider of that name here "
-            f"(#{here.id}), whose IdP could not be checked against theirs")
+            f"sso_providers: the archive, from another installation, binds {usernames} to a "
+            f"provider {name!r} it does not carry; they are restored without a provider, not "
+            f"bound to the provider of that name here (#{here.id}), whose IdP may differ")
 
 
 def _leave_out(backup_data: Dict[str, Any], rows: List[Dict[str, Any]]) -> None:

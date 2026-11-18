@@ -249,3 +249,36 @@ def test_accounts_without_their_provider_in_the_archive_are_named(target, mode, 
     warnings = _sso_warnings(results)
     assert len(warnings) == 1, warnings
     assert all(part in warnings[0] for part in (repr(NAME), 'kate', 'mona')), warnings
+
+
+@pytest.mark.parametrize('kind', ['oauth2', 'saml', 'ldap'])
+@pytest.mark.parametrize('mode', ['replace', 'merge'])
+def test_accounts_of_another_installation_without_their_provider_are_unbound(target, mode, kind):
+    """From another installation the provider of that name here is unchecked: nobody binds to it."""
+    from api.v2.sso.ldap_routes import _resolve_sso_account
+    from models import SystemConfig, User
+    from models.sso import SSOProvider
+    from services.backup import installation
+    provider = _provider(kind, 'B')
+    _account('kate', provider, 'kate-archived')
+    _account('mona', provider, 'mona-archived')
+    db.session.commit()
+    blob = _service().create_backup(PASSWORD, include=_only('users'))
+    _instance(kind)
+    # This database is now another installation than the archive's
+    SystemConfig.query.filter_by(key=installation.CONFIG_KEY).one().value = uuid.uuid4().hex
+    db.session.commit()
+
+    results = _restore(blob, mode)
+
+    here = SSOProvider.query.filter_by(name=NAME).one()
+    assert here.idp_key() == KEY_OF[kind]['A']
+    mona = User.query.filter_by(username='mona').one()
+    assert (mona.sso_provider_id, mona.sso_external_id) == (None, 'mona-archived')
+    assert User.query.filter_by(sso_provider_id=here.id, sso_external_id='kate-archived').count() == 0
+    account, _rebind, _conflict, _owner, _unverified = _resolve_sso_account(
+        here, 'whoever', 'whoever@example.test', _presented(kind, 'mona-archived'))
+    assert account is None, 'mona at B opened through A'
+    warnings = _sso_warnings(results)
+    assert len(warnings) == 1, warnings
+    assert all(part in warnings[0] for part in (repr(NAME), 'kate', 'mona', 'without')), warnings
