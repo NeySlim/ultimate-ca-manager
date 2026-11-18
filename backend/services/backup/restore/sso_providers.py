@@ -47,9 +47,15 @@ def refuse_archived_shared_types(backup_data) -> None:
                 "backup. Nothing has been changed.")
 
 
-def _idp_key(row: Dict[str, Any]) -> Optional[str]:
+def _key_of(fields: Dict[str, Any]) -> Optional[str]:
+    """The IdP ``fields`` name; a value that is not text names none."""
     from models.sso import SSOProvider
-    return SSOProvider(**{field: row.get(field) for field in _IDP_FIELDS}).idp_key()
+    return SSOProvider(**{field: value if isinstance(value, str) else None
+                          for field, value in fields.items()}).idp_key()
+
+
+def _idp_key(row: Dict[str, Any]) -> Optional[str]:
+    return _key_of({field: row.get(field) for field in _IDP_FIELDS})
 
 
 def _comparable(key: Optional[str]) -> Optional[str]:
@@ -66,10 +72,10 @@ def _another_idp(provider, row: Dict[str, Any]) -> bool:
 
     A field the row does not carry keeps its value here, as the restore does. A provider whose
     key the restore leaves as it is (even unknown on both sides) keeps its accounts."""
-    from models.sso import SSOProvider
-    after = SSOProvider(**{field: row[field] if field in row else getattr(provider, field)
-                           for field in _IDP_FIELDS})
-    here, there = _comparable(provider.idp_key()), _comparable(after.idp_key())
+    here = _key_of({field: getattr(provider, field) for field in _IDP_FIELDS})
+    there = _key_of({field: row[field] if field in row else getattr(provider, field)
+                     for field in _IDP_FIELDS})
+    here, there = _comparable(here), _comparable(there)
     return here != there
 
 
