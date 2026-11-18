@@ -654,7 +654,11 @@ def sso_callback(provider_type):
 
     provider = _return_provider(provider_type)
     if not provider:
-        return redirect(_login_error('provider_not_found', oauth2_next))
+        refused = redirect(_login_error('provider_not_found', oauth2_next))
+        if provider_type == 'saml' and request.cookies.get(saml_sp.REQUEST_COOKIE):
+            # Its provider is gone: kept, the cookie would refuse every response until it expires
+            saml_sp.clear_request_cookie(refused, saml_sp.sp_base_url(request))
+        return refused
 
     if provider.provider_type == 'oauth2':
         code = request.args.get('code')

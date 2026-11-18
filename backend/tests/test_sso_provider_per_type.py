@@ -221,6 +221,55 @@ def test_a_saml_response_whose_provider_is_gone_is_refused_not_rerouted(app, two
     assert saml_answered_by == []
 
 
+def _acs_response(app, request_id):
+    client = app.test_client()
+    if request_id:
+        client.set_cookie(saml_sp.REQUEST_COOKIE, request_id)
+    response = client.post('/api/v2/sso/callback/saml', data={'SAMLResponse': 'x'})
+    assert response.status_code == 302
+    cleared = any(h.startswith(f'{saml_sp.REQUEST_COOKIE}=;') and 'Max-Age=0' in h
+                  for h in response.headers.getlist('Set-Cookie'))
+    return response.headers['Location'], cleared
+
+
+def test_a_refused_saml_response_of_a_gone_provider_drops_its_request_cookie(app, two_of_a_type,
+                                                                              saml_answered_by):
+    """The browser is not held to provider_not_found until the request expires."""
+    first = two_of_a_type('saml')
+    second = two_of_a_type('saml')
+    request_id = _authn_request(app, second)
+    with app.app_context():
+        db.session.delete(db.session.get(SSOProvider, second))  # its request row stays
+        db.session.commit()
+    location, cleared = _acs_response(app, request_id)
+    assert location.endswith('/login?error=provider_not_found') and cleared
+    assert saml_answered_by == []
+    # Without the cookie, the next response is the IdP's own, answered by the provider of the type
+    assert 'error=stop-here' in _acs_response(app, None)[0]
+    assert saml_answered_by == [first]
+
+
+def test_a_deleted_saml_provider_takes_its_pending_requests_with_it(app, auth_client, saml_answered_by):
+    """A provider created after it, under the same number or not, never answers its requests."""
+    with app.app_context():
+        aside = step_aside('saml')
+        old = _add('saml')
+    created = []
+    try:
+        request_id = _authn_request(app, old)
+        assert auth_client.delete(f'/api/v2/sso/providers/{old}').status_code == 200
+        with app.app_context():
+            assert SAMLMessageId.query.filter_by(provider_id=old, kind=SAMLMessageId.KIND_REQUEST).count() == 0
+            created.append(_add('saml'))
+        location, cleared = _acs_response(app, request_id)
+        assert 'error=saml_login_expired' in location and cleared
+        assert saml_answered_by == []
+    finally:
+        with app.app_context():
+            _drop(old, *created)
+            aside.back()
+
+
 # --- LDAP: a provider named by id is an LDAP provider -------------------------------------------
 
 def test_an_ldap_login_naming_another_type_is_refused(app, two_of_a_type):
