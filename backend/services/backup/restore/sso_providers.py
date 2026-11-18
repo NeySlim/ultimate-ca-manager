@@ -35,7 +35,10 @@ def _comparable(key: Optional[str]) -> Optional[str]:
     """``key`` with the scheme and host of an OIDC issuer in lower case (RFC 3986 6.2.2.1)."""
     if not key or not key.startswith('oauth2:'):
         return key
-    parts = urlsplit(key[len('oauth2:'):])
+    try:
+        parts = urlsplit(key[len('oauth2:'):])
+    except ValueError:      # not a URL: compared as written
+        return key
     return 'oauth2:' + urlunsplit(parts._replace(scheme=parts.scheme.lower(),
                                                  netloc=parts.netloc.lower()))
 

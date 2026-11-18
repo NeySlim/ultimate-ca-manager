@@ -221,6 +221,13 @@ def test_the_subject_of_kate_at_a_never_opens_her_account_through_b(target, scop
     ({'oauth2_issuer': 'https://idp.example.test'}, {'oauth2_issuer': None}, True),
     ({'oauth2_issuer': 'https://idp.example.test'}, {}, False),  # not carried: kept here
     ({'oauth2_issuer': 'https://idp.example.test'}, {'provider_type': 'saml'}, True),
+    # An issuer no URL parser reads is compared as written
+    ({'oauth2_issuer': 'https://[idp.example.test/realms/X'},
+     {'oauth2_issuer': 'https://[idp.example.test/realms/X'}, False),
+    ({'oauth2_issuer': 'https://idp.example.test/realms/X'},
+     {'oauth2_issuer': 'https://[idp.example.test/realms/X'}, True),
+    ({'oauth2_issuer': 'https://[idp.example.test/realms/X'},
+     {'oauth2_issuer': 'https://[other.example.test/realms/X'}, True),
 ])
 def test_what_counts_as_another_idp(app, here, archived, other):
     from models.sso import SSOProvider
