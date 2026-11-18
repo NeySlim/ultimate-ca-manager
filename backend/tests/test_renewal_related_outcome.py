@@ -79,7 +79,8 @@ def test_a_scheduled_renewal_logs_that_the_named_certificate_was_replaced(app, m
     with caplog.at_level(logging.INFO, logger='services.auto_renewal_service'):
         stats, _sent, _audits = _auto_pass(app, monkeypatch, old_b)
     assert stats['renewed'] == 1, stats
-    assert any(_said(r.getMessage(), old_b) for r in caplog.records), caplog.text
+    assert any(_said(r.getMessage(), old_b) for r in caplog.records
+               if r.name == 'services.auto_renewal_service'), caplog.text
     assert _names_none(app, old_b)
     assert any(_said(d, old_b) for d in _renewed_audit(app, old_b))
 
