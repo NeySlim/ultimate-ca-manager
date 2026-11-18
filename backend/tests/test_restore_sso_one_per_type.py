@@ -330,3 +330,130 @@ def test_a_merge_adds_no_row_for_the_live_binding_of_the_same_idp(target):
               **_archived_account('3.0', 'gina', 'corp', 'gina-sub')}, 'merge')
     db.session.expire_all()
     assert _rows('gina') == [(okta, 'gina-sub', None)]
+
+
+# --- The matrix: the account's rows here before a merge, by archive format and IdP ---------------
+#
+# Here: corp (oauth2, issuer https://same.example). Archive: okta, left out by the merge, binding
+# gina to A. 'same' : okta's issuer is corp's (K = their IdP key); 'other' : okta.example (K = its
+# key). P = corp's row, A = the archive's subject, B = another subject of IdP K.
+# Columns: rows after the merge; the user_sso_identities warning ('bound', 'orphan' or None);
+# per signed-in subject at corp: whether gina opens, and her rows after the sign-in.
+P, A, B, K = 'P', 'gina-sub', 'gina-here', 'K'
+STATES = {
+    'none': [],
+    'bound_same': [(P, A, None)],
+    'bound_other': [(P, B, None)],
+    'pending': [(P, None, None)],
+    'orphan_same': [(None, A, K)],
+    'orphan_other': [(None, B, K)],
+}
+MATRIX = {
+    ('same', '3.0', 'none'): ([(P, A, None)], None, {A: (True, [(P, A, None)])}),
+    ('same', '3.0', 'bound_same'): ([(P, A, None)], None, {A: (True, [(P, A, None)])}),
+    ('same', '3.0', 'bound_other'): ([(P, B, None), (None, A, K)], 'bound', {
+        A: (False, [(P, B, None), (None, A, K)]), B: (True, [(P, B, None), (None, A, K)])}),
+    ('same', '3.0', 'pending'): ([(P, A, None)], None, {A: (True, [(P, A, None)])}),
+    ('same', '3.0', 'orphan_same'): ([(None, A, K)], None, {A: (True, [(P, A, None)])}),
+    ('same', '3.0', 'orphan_other'): ([(None, B, K), (None, A, K)], 'orphan', {
+        A: (True, [(None, B, K), (P, A, None)]), B: (True, [(P, B, None), (None, A, K)])}),
+    # A 2.254 account that holds rows here keeps them alone (the legacy merge rule)
+    ('same', '2.254', 'none'): ([(P, A, None)], None, {A: (True, [(P, A, None)])}),
+    ('same', '2.254', 'bound_same'): ([(P, A, None)], None, {A: (True, [(P, A, None)])}),
+    ('same', '2.254', 'bound_other'): ([(P, B, None)], None, {
+        A: (False, [(P, B, None)]), B: (True, [(P, B, None)])}),
+    ('same', '2.254', 'pending'): ([(P, None, None)], None, {A: (True, [(P, A, None)])}),
+    ('same', '2.254', 'orphan_same'): ([(None, A, K)], None, {A: (True, [(P, A, None)])}),
+    ('same', '2.254', 'orphan_other'): ([(None, B, K)], None, {
+        A: (False, [(None, B, K)]), B: (True, [(P, B, None)])}),
+    # Another IdP: never attached to corp, never taken back by a sign-in at corp
+    ('other', '3.0', 'none'): ([(None, A, K)], None, {A: (False, [(None, A, K)])}),
+    ('other', '3.0', 'bound_same'): ([(P, A, None), (None, A, K)], None, {
+        A: (True, [(P, A, None), (None, A, K)])}),
+    ('other', '3.0', 'bound_other'): ([(P, B, None), (None, A, K)], None, {
+        A: (False, [(P, B, None), (None, A, K)]), B: (True, [(P, B, None), (None, A, K)])}),
+    ('other', '3.0', 'pending'): ([(P, None, None), (None, A, K)], None, {
+        A: (True, [(P, A, None), (None, A, K)])}),
+    ('other', '3.0', 'orphan_same'): ([(None, A, K)], None, {A: (False, [(None, A, K)])}),
+    ('other', '3.0', 'orphan_other'): ([(None, B, K), (None, A, K)], None, {
+        A: (False, [(None, B, K), (None, A, K)]), B: (False, [(None, B, K), (None, A, K)])}),
+    ('other', '2.254', 'none'): ([(None, A, K)], None, {A: (False, [(None, A, K)])}),
+    ('other', '2.254', 'bound_same'): ([(P, A, None)], None, {A: (True, [(P, A, None)])}),
+    ('other', '2.254', 'bound_other'): ([(P, B, None)], None, {
+        A: (False, [(P, B, None)]), B: (True, [(P, B, None)])}),
+    ('other', '2.254', 'pending'): ([(P, None, None)], None, {A: (True, [(P, A, None)])}),
+    ('other', '2.254', 'orphan_same'): ([(None, A, K)], None, {A: (False, [(None, A, K)])}),
+    ('other', '2.254', 'orphan_other'): ([(None, B, K)], None, {
+        A: (False, [(None, B, K)]), B: (False, [(None, B, K)])}),
+}
+WARNINGS = {'bound': "the account 'gina' is bound here to provider 'corp' under another subject",
+            'orphan': "the account 'gina' holds an orphan of the IdP of provider 'corp' under another subject"}
+MATRIX_CASES = [pytest.param(*case, subject, id=f'{"-".join(case)}-signs-in-{subject}')
+                for case, (_after, _warning, logins) in MATRIX.items() for subject in logins]
+
+
+def _sign_in(provider_id, subject):
+    """The sign-in at the provider here with ``subject``, by the login's own resolution."""
+    from flask import current_app
+    from api.v2.sso.ldap_routes import _get_or_create_sso_user
+    provider = db.session.get(SSOProvider, provider_id)
+    with current_app.test_request_context():
+        opened, _error = _get_or_create_sso_user(provider, 'gina', 'gina@per-type.test', 'Gina',
+                                                 {'sub': subject})
+        opened_id = opened.id if opened is not None else None
+    db.session.rollback()
+    return opened_id
+
+
+def _one_row_per_subject_of_an_idp(username):
+    keys = []
+    for row in UserSSOIdentity.query.filter_by(user_id=User.query.filter_by(username=username).one().id):
+        idp = db.session.get(SSOProvider, row.provider_id).idp_key() if row.provider_id else row.orphan_of
+        if row.external_id is not None and idp is not None:
+            keys.append((idp, row.external_id))
+    assert len(keys) == len(set(keys)), keys
+
+
+@pytest.mark.parametrize('idp, fmt, state, subject', MATRIX_CASES)
+def test_a_merge_leaves_one_row_per_subject_of_an_idp(target, idp, fmt, state, subject):
+    """One subject of one IdP is one row of an account, after the merge and after the sign-in that
+    follows it (OIDC Core §5.7); the archive's identity joins corp only when gina holds no row of
+    its IdP, never over one, and never across two IdPs."""
+    issuer = 'https://same.example/' if idp == 'same' else 'https://okta.example'
+    key = SSOProvider(provider_type='oauth2', oauth2_issuer=issuer).idp_key()
+    corp = _here('corp', 'oauth2', 'https://same.example')
+    symbols = {P: corp, K: key}
+    gina = User(username='gina', email='gina@per-type.test', role='viewer', active=True,
+                password_hash=NOPASS)
+    db.session.add(gina)
+    db.session.flush()
+    for provider, external_id, orphan_of in STATES[state]:
+        row = UserSSOIdentity(user_id=gina.id, provider_id=symbols.get(provider),
+                              orphan_of=symbols.get(orphan_of))
+        if external_id is not None:
+            row.bind(external_id)
+        db.session.add(row)
+    db.session.commit()
+    gina_id = gina.id
+    after, warning, logins = MATRIX[(idp, fmt, state)]
+
+    def resolved(rows):
+        return sorted(((symbols.get(p), e, symbols.get(o)) for p, e, o in rows), key=repr)
+
+    results = _restore({'sso_providers': [_archived_provider('okta', 'oauth2', issuer)],
+                        **_archived_account(fmt, 'gina', 'okta', A)}, 'merge')
+    db.session.commit()
+    db.session.expire_all()
+    assert sorted(_rows('gina'), key=repr) == resolved(after)
+    identity_warnings = [w for w in results['warnings'] if w.startswith('user_sso_identities:')]
+    assert len(identity_warnings) == (1 if warning else 0), identity_warnings
+    if warning:
+        assert WARNINGS[warning] in identity_warnings[0], identity_warnings
+    _one_row_per_subject_of_an_idp('gina')
+
+    opens, rows_after = logins[subject]
+    assert (_sign_in(corp, subject) == gina_id) is opens
+    db.session.expire_all()
+    assert sorted(_rows('gina'), key=repr) == resolved(rows_after)
+    _one_row_per_subject_of_an_idp('gina')
+    _one_per_type_and_no_dangling_provider()
