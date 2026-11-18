@@ -104,6 +104,7 @@ ssh <host> "docker rm -f ucm-rc-test 2>/dev/null; \
              -v <state-dir>/etc:/etc/ucm \
              -v <state-dir>/data:/opt/ucm/data \
              neyslim/ultimate-ca-manager:<X.Y-rcN>"                        # Docker
+# On a volume last started by 2.254, add -e UCM_ACCEPT_MAJOR_UPGRADE=3 (see UPGRADE.md)
 
 # 2. Verify boot
 ssh <host> "journalctl -u ucm -n 80 --no-pager | grep -E 'Database|migration|listening'"
@@ -211,7 +212,9 @@ curl -k https://<host>:<port>/api/v2/system/security/encryption-status
 1. Install 2.254 (the latest 2.254.N), start it once, create a certificate and
    take a backup archive and a copy of the database.
 2. Install the release under test and start it. It must come up on the same
-   data with the certificate intact and the smoke passing. On a database 2.254
+   data with the certificate intact and the smoke passing. The Docker image
+   first stops with exit code 78 and writes nothing: check that refusal, then
+   start it with `UCM_ACCEPT_MAJOR_UPGRADE=3`. On a database 2.254
    never started, it must refuse to start and write nothing, with the message
    `UPGRADE.md` quotes.
 3. Roll back following the *Rollback* section of `UPGRADE.md` (written for the
