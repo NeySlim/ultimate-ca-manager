@@ -307,6 +307,20 @@ def test_an_archived_idp_field_that_is_not_text_names_no_idp(target, kind, field
         assert (None, 'kate-sub', a) in _rows('kate')
 
 
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+@pytest.mark.parametrize('value', sorted(NOT_TEXT))
+def test_an_archived_provider_type_that_is_not_text_is_refused(target, value, mode):
+    from services.backup.errors import BackupSchemaError
+    corp = _instance('oauth2')
+    archive = _archive('3.0', 'oauth2', IDPS['oauth2'][1], 'kate-sub-b')
+    archive['sso_providers'][0]['provider_type'] = NOT_TEXT[value]
+    with pytest.raises(BackupSchemaError) as refused:
+        _restore(archive, mode)
+    assert "'corp'" in str(refused.value) and 'Nothing has been changed' in str(refused.value)
+    db.session.rollback()
+    assert _rows('kate') == [(corp, 'kate-sub', None)]
+
+
 @pytest.mark.parametrize('kind, field', NOT_TEXT_FIELDS)
 def test_a_field_here_that_is_not_text_names_no_idp(app, kind, field):
     from services.backup.restore.sso_providers import _another_idp

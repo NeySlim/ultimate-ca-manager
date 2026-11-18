@@ -34,10 +34,16 @@ def _archived(backup_data) -> List[Dict[str, Any]]:
 
 
 def refuse_archived_shared_types(backup_data) -> None:
-    """BackupSchemaError, before any write, when the archive itself holds two providers of one type."""
+    """BackupSchemaError, before any write, when the archive itself holds two providers of one type
+    or a provider whose type is not text."""
     by_type: Dict[str, List[str]] = {}
     for row in _archived(backup_data):
-        by_type.setdefault(row.get('provider_type') or 'oauth2', []).append(row['name'])
+        kind = row.get('provider_type') or 'oauth2'
+        if not isinstance(kind, str):
+            raise BackupSchemaError(
+                f"Cannot restore: the type of the archive's SSO provider {row['name']!r} is not "
+                "text. Nothing has been changed.")
+        by_type.setdefault(kind, []).append(row['name'])
     for kind, names in by_type.items():
         if len(names) > 1:
             raise BackupSchemaError(
@@ -48,7 +54,7 @@ def refuse_archived_shared_types(backup_data) -> None:
 
 
 def _key_of(fields: Dict[str, Any]) -> Optional[str]:
-    """The IdP ``fields`` name; a value that is not text names none."""
+    """The IdP ``fields`` name; a value that is not text is read as absent."""
     from models.sso import SSOProvider
     return SSOProvider(**{field: value if isinstance(value, str) else None
                           for field, value in fields.items()}).idp_key()
