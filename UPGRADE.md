@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Trust store: private keys removed, certificates only
+
+An entry of the trust store whose file held a private key next to its certificate kept that key in the database, and every account allowed to read the trust store could read it through the API, the exports and the backups. At the first start after the upgrade, the key is removed from each such entry; the entry keeps its identifier and its certificates, and the log and the audit log name every entry cleaned (identifier and name, never the key). Treat each key named there as compromised: revoke the certificate it belongs to and replace it. Backup archives made before the upgrade are not rewritten and may still carry such a key: restoring one removes it again, but protect or delete the old archives. A trust store import or `POST /api/v2/truststore` that carries a private key is now refused with `400`, and `certificate_pem` in the API, the exports and the backups holds certificates only.
+
 ### SSO role mapping reads more groups
 
 OIDC role mapping rules now also match the `groups` and `roles` of the ID token validated for the login, and a `roles` claim no longer hides `groups`; SAML matching is unchanged, except that an assertion repeating an attribute name is now accepted with all its values, and the LDAP changes are in the next note. A user no rule matched before may now be admitted, or, with *Sync role on each login*, get a higher role at the next sign-in: review the mapping rules of OIDC providers before upgrading.

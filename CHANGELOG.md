@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- Trust store: an imported file holding a private key with its certificate was stored whole, and the key could be read back through the API, the exports and the backups by every account allowed to read the trust store. Such an entry is now refused, only certificates are stored and handed out, and a key already stored is removed at start and must be treated as compromised.
+
 ## [2.254.4] - 2026-11-16
 
 ### Security
