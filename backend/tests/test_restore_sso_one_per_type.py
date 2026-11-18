@@ -264,6 +264,23 @@ def test_a_merge_attaches_the_identities_of_the_same_idp_to_the_provider_here(ta
     _one_per_type_and_no_dangling_provider()
 
 
+@pytest.mark.parametrize('fmt', FORMATS)
+def test_a_merge_whose_name_is_held_by_another_type_attaches_to_the_provider_of_the_same_idp(target, fmt):
+    """The same IdP is judged against the provider here of the archived one's type, not the holder."""
+    _here('corp', 'ldap', 'ldap.example')
+    okta = _here('okta', 'oauth2', 'https://same.example')
+    _account('gina', okta, 'gina-sub')
+    db.session.commit()
+    results = _restore({'sso_providers': [_archived_provider('corp', 'oauth2', 'https://same.example')],
+                        **_archived_account(fmt, 'gina', 'corp', 'gina-sub')}, 'merge')
+    db.session.expire_all()
+    assert _rows('gina') == [(okta, 'gina-sub', None)]
+    assert any("'corp' is not restored: a ldap provider holds its name here" in w
+               and "the same IdP" in w and "'okta'" in w
+               for w in results['warnings']), results['warnings']
+    _one_per_type_and_no_dangling_provider()
+
+
 def test_a_merge_never_attaches_the_identities_of_another_idp(target):
     corp = _here('corp', 'oauth2', 'https://corp.example')
     _account('ivan', corp, 'ivan-sub')

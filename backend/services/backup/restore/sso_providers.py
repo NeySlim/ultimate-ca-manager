@@ -86,14 +86,19 @@ def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
         provider = clashes[0]
         held = (f"a {provider.provider_type} provider holds its name here" if provider is holder
                 else f"this installation's {kind} provider is {provider.name!r}")
-        same_idp = _idp_key(row) is not None and _idp_key(row) == provider.idp_key()
+        # Only the provider here of the same type can speak to the same IdP (the key holds the type)
+        peer = next((p for p in clashes if p.provider_type == kind), None)
+        if peer is not None and peer is not provider:
+            held += f" (#{provider.id}) and this installation's {kind} provider is {peer.name!r}"
+            provider = peer
+        same_idp = peer is not None and _idp_key(row) is not None and _idp_key(row) == peer.idp_key()
         fate = (f"it speaks to the same IdP, so the accounts the archive attaches to it are attached "
-                f"to {provider.name!r}" if same_idp
+                f"to {peer.name!r}" if same_idp
                 else "the accounts the archive attaches to it come back as orphans of its IdP")
         warnings.append(
             f"sso_providers: the archive's {kind} provider {row['name']!r} is not restored: {held} "
             f"(#{provider.id}), and there is one provider per type; {fate}")
-        left_out.append((row, provider.name if same_idp else None))
+        left_out.append((row, peer.name if same_idp else None))
     if left_out:
         _leave_out(backup_data, left_out)
 
