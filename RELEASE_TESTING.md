@@ -12,6 +12,34 @@ tag. **6/6 mandatory**: 3 distros × 2 backends.
 > RC test containers always go on **8444** under a separate name (e.g.
 > `ucm-rc-test`). Never restart a production container with an RC image.
 
+## Maintenance releases (2.254.N)
+
+Every 2.254.N, RC and stable, is cut from the maintenance branch `v2.x` only,
+at its head: `test` and `main` do not carry them.
+
+1. A push to `v2.x` runs the full suites in the pre-push hook; the CI runs the
+   sequential suite, the FIPS image build and the DEB sanity build.
+2. RC: `scripts/bump-version.sh 2.254.N-rc1`, commit `chore: 2.254.N-rc1`, push
+   `v2.x`, then tag `v2.254.N-rc1` at the head of `v2.x` and push the tag.
+3. Stable, after the 6/6 matrix below: commit `release(v2.254.N)` at the head of
+   `v2.x`, push it, then tag `v2.254.N` on that commit and push the tag.
+4. Back to development: commit `chore: 2.254.(N+1)-dev` on `v2.x`.
+
+A stable 2.254.N gets the image tags `2.254.N` and `2` (`-fips` for the FIPS
+image); `latest` and the Docker Hub page only when no later major version has a
+stable release. A RC gets its version tag only.
+
+Release smoke: `release-smoke.yml` starts by `workflow_run`, so GitHub runs the
+copy of the default branch, which also checks out the head of the default
+branch: the smoke scripts are those of that commit, the version is the tag name.
+While the default branch carries 2.x this smokes the 2.254.N images. Once it
+carries a later major version, do not rely on that run: smoke the release by
+hand from `v2.x`, whose workflow definition and scripts are then used:
+
+```bash
+gh workflow run release-smoke.yml --ref v2.x -f version=2.254.N
+```
+
 ## Smoke + UC scripts
 
 | Script                              | Scope                          |
