@@ -661,3 +661,15 @@ def test_matches_refuses_a_file_that_is_not_utf8_with_an_annotation(tmp_path):
     f.write_bytes(b'3.0-rc3\xff\xfe\n')
     r = _cli('matches', '3.0-rc3', str(f))
     assert r.returncode == 1 and r.stderr.startswith('::error::') and str(f) in r.stderr
+
+
+def test_notes_refuses_a_missing_changelog_with_an_annotation(tmp_path):
+    r = _cli('notes', '3.0-rc3', str(tmp_path / 'absent'))
+    assert r.returncode == 1 and r.stderr.startswith('::error::') and 'absent' in r.stderr
+
+
+def test_notes_refuses_a_changelog_that_is_not_utf8_with_an_annotation(tmp_path):
+    f = tmp_path / 'CHANGELOG.md'
+    f.write_bytes(b'# Changelog\n\n## 3.0-rc3\n\xff\xfe\n')
+    r = _cli('notes', '3.0-rc3', str(f))
+    assert r.returncode == 1 and r.stderr.startswith('::error::') and str(f) in r.stderr

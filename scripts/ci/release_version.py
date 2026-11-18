@@ -194,8 +194,12 @@ def main(argv):
             rehearsal = '--rehearsal' in argv[3:]
             rest = [a for a in argv[3:] if a != '--rehearsal']
             path = rest[0] if rest else 'CHANGELOG.md'
-            with open(path, encoding='utf-8') as fh:
-                text = fh.read()
+            try:
+                with open(path, encoding='utf-8') as fh:
+                    text = fh.read()
+            except (OSError, ValueError) as exc:
+                print(f'::error::{path} cannot be read: {exc}', file=sys.stderr)
+                return 1
             sys.stdout.write(release_notes(version, text, rehearsal))
         else:
             print(f'Unknown command: {cmd}', file=sys.stderr)
