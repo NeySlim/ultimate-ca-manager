@@ -184,7 +184,7 @@ def main(argv):
             try:
                 with open(argv[3], encoding='utf-8') as fh:
                     found = fh.read().strip()
-            except OSError as exc:
+            except (OSError, ValueError) as exc:
                 print(f'::error::{argv[3]} cannot be read: {exc}', file=sys.stderr)
                 return 1
             if found != version:
