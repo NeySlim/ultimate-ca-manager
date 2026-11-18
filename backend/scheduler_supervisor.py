@@ -78,8 +78,9 @@ class SchedulerSupervisor:
         self._thread.start()
 
     def _spawn(self):
-        from scheduler_main import GRACE_ENV
-        env = dict(os.environ, UCM_SCHEDULER_PROCESS='1', **{GRACE_ENV: str(self.graceful_timeout)})
+        from scheduler_main import GRACE_ENV, MASTER_ENV
+        env = dict(os.environ, UCM_SCHEDULER_PROCESS='1',
+                   **{GRACE_ENV: str(self.graceful_timeout), MASTER_ENV: str(os.getpid())})
         return subprocess.Popen(self.command, cwd=BACKEND, env=env)
 
     def _mine(self) -> bool:

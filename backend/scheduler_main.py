@@ -10,13 +10,15 @@ import threading
 import time
 
 GRACE_ENV = 'UCM_SCHEDULER_GRACEFUL_TIMEOUT'
+MASTER_ENV = 'UCM_SCHEDULER_MASTER_PID'  # set by the supervisor: the master that started this process
 
 logger = logging.getLogger('ucm.scheduler_main')
 
 
 def main() -> int:
-    # Read before anything loads: a master that dies while this process starts is noticed below
-    parent = os.getppid()
+    # Named by the master, or read before anything loads: one that dies while this process
+    # starts is noticed below
+    parent = int(os.environ.get(MASTER_ENV) or os.getppid())
     from services.scheduler_service import SUPERVISED_ENV, get_scheduler
     os.environ[SUPERVISED_ENV] = '1'  # create_app registers the tasks, the loop starts below
 
