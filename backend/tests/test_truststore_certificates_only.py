@@ -4,6 +4,7 @@ import base64
 import datetime
 import io
 import json
+import os
 
 import pytest
 from cryptography import x509
@@ -13,7 +14,7 @@ from cryptography.x509.oid import NameOID
 
 from models import db, CA
 from models.truststore import TrustedCertificate
-from utils.trust_pem import PRIVATE_KEY_REFUSAL
+from utils.trust_pem import PRIVATE_KEY_REFUSAL, holds_private_key
 
 TS = '/api/v2/truststore'
 
@@ -51,6 +52,10 @@ def _keys(key):
                b'-----END PGP PRIVATE KEY BLOCK-----\n',
         'ssh2': b'---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----\nP2/56wAAAssh2BodyOfAKey\n'
                 b'---- END SSH2 ENCRYPTED PRIVATE KEY ----\n',
+        'ml-dsa': b'-----BEGIN ML-DSA-65 PRIVATE KEY-----\nMLDSAbodyOfAKey\n'
+                  b'-----END ML-DSA-65 PRIVATE KEY-----\n',
+        'x942': b'-----BEGIN X9.42 DH PRIVATE KEY-----\nX942bodyOfAKey\n'
+                b'-----END X9.42 DH PRIVATE KEY-----\n',
         'putty': b'PuTTY-User-Key-File-3: ssh-ed25519\nAAAAC3puttyBodyOfAKey\nPrivate-Lines: 1\n'
                  b'AAAAIputtyPrivateLine\nPrivate-MAC: 00\n',
     }
@@ -90,7 +95,7 @@ WRITES = {'import': _upload, 'create': _create}
 @pytest.mark.parametrize('write', WRITES, ids=str)
 @pytest.mark.parametrize('order', ['key-then-certificate', 'certificate-then-key'])
 @pytest.mark.parametrize('armour', ['pkcs8', 'encrypted-pkcs8', 'sec1', 'rsa-traditional', 'openssh',
-                                    'pgp', 'ssh2', 'putty'])
+                                    'pgp', 'ssh2', 'putty', 'ml-dsa', 'x942'])
 def test_an_entry_with_a_private_key_is_refused_and_nothing_is_stored(app, auth_client, drop, caplog,
                                                                      write, order, armour):
     key, cert = _issue(f'{write}-{order}-{armour}')
@@ -290,3 +295,11 @@ def test_a_block_left_open_after_a_certificate_refuses_the_entry(app, auth_clien
     with app.app_context():
         assert TrustedCertificate.query.filter_by(
             fingerprint_sha256=first.fingerprint(hashes.SHA256()).hex()).count() == 0
+
+
+@pytest.mark.skipif(not os.path.exists('/etc/ssl/certs/ca-certificates.crt'), reason='no system bundle')
+def test_no_certificate_of_the_system_bundle_is_taken_for_a_key():
+    with open('/etc/ssl/certs/ca-certificates.crt', 'rb') as bundle:
+        data = bundle.read()
+    assert b'BEGIN CERTIFICATE' in data
+    assert not holds_private_key(data)
