@@ -203,7 +203,7 @@ def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
 
     # After the refusals above, before the first decoding of the certificate below
     if _stored(cert) is None:
-        raise _unreadable(cert.id, False, link=False)
+        raise _unreadable(cert.id, False, link=cert.related_certificate_id is not None)
 
     # The template's SAN types bind the renewed names as they bound the issuance
     template_id = getattr(cert, 'template_id', None)
@@ -455,7 +455,7 @@ def _named_related(row):
     try:
         original = x509.load_pem_x509_certificate(b64decode(row.crt))
     except ValueError as e:  # binascii.Error included: the row itself is unreadable
-        raise _unreadable(row_id, False, link=False) from e
+        raise _unreadable(row_id, False, link=linked_id is not None) from e
     try:
         if related_cert.read_related_certificate(original) is None:
             return None, None

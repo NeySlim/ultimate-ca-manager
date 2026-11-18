@@ -284,3 +284,68 @@ def test_a_row_whose_certificate_cannot_be_decoded_is_refused_by_the_extension_r
             _named_related(db.session.get(Certificate, cert_id))
         db.session.remove()
     assert refusal.value.status == 409 and _named(refusal.value.message, cert_id)
+
+
+def _b_unreadable(app, held):
+    """``(a_id, b_id, before)``: B, linked to A, whose own stored certificate cannot be decoded."""
+    a_id, (b_id,) = _linked_rows(app)
+    with app.app_context():
+        db.session.get(Certificate, b_id).crt = UNREADABLE
+        if not held:  # B renews alone
+            db.session.get(Certificate, a_id).prv = None
+        db.session.commit()
+        db.session.remove()
+    return a_id, b_id, _rows(app, a_id, b_id)
+
+
+def _names_link(text, cert_id):
+    return f'Certificate {cert_id} cannot be read' in text and 'RFC 9763 link' in text
+
+
+@pytest.mark.parametrize('held', [True, False])
+def test_a_manual_renewal_of_an_unreadable_pair_member_names_its_link(app, auth_client, held):
+    a_id, b_id, before = _b_unreadable(app, held)
+    r = _json(auth_client, 'post', f'/api/v2/certificates/{b_id}/renew', {})
+    assert r.status_code == 409, r.get_json()
+    assert _names_link(r.get_json()['message'], b_id), r.get_json()
+    assert _rows(app, a_id, b_id) == before
+
+
+@pytest.mark.parametrize('held', [True, False])
+def test_a_bulk_renewal_of_an_unreadable_pair_member_names_its_link(app, auth_client, held):
+    a_id, b_id, before = _b_unreadable(app, held)
+    r = _json(auth_client, 'post', '/api/v2/certificates/bulk/renew', {'ids': [b_id]})
+    assert r.status_code == 200, r.get_json()
+    data = r.get_json()['data']
+    assert [f['id'] for f in data['failed']] == [b_id], data
+    assert _names_link(data['failed'][0]['error'], b_id), data
+    assert _rows(app, a_id, b_id) == before
+
+
+def test_a_scheduled_renewal_of_an_unreadable_pair_member_names_its_link(app, monkeypatch):
+    from services.auto_renewal_service import AutoRenewalService as svc
+    a_id, b_id, before = _b_unreadable(app, held=True)
+    reasons = []
+    monkeypatch.setattr(svc, '_log_failure', staticmethod(
+        lambda cert_id, cn, reason: reasons.append((cert_id, reason))))
+    monkeypatch.setattr(svc, '_send_failure_notification', staticmethod(lambda stats: None))
+    monkeypatch.setattr(svc, '_publish_crls', staticmethod(lambda carefs: None))
+    with app.app_context():
+        svc.set_renewal_config({'enabled': True})
+        monkeypatch.setattr(svc, 'get_certificates_for_renewal',
+                            staticmethod(lambda: [db.session.get(Certificate, b_id)]))
+        stats = svc.run_auto_renewal()
+        db.session.remove()
+    assert stats['failed'] == 1, stats
+    assert [c for c, _ in reasons] == [b_id] and _names_link(reasons[0][1], b_id), reasons
+    assert _rows(app, a_id, b_id) == before
+
+
+def test_the_extension_read_of_an_unreadable_pair_member_names_its_link(app):
+    from services.cert.renewal import RenewalError, _named_related
+    _a_id, b_id, _ = _b_unreadable(app, held=True)
+    with app.app_context():
+        with pytest.raises(RenewalError) as refusal:
+            _named_related(db.session.get(Certificate, b_id))
+        db.session.remove()
+    assert refusal.value.status == 409 and _names_link(refusal.value.message, b_id)

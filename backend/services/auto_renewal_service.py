@@ -367,7 +367,8 @@ class AutoRenewalService:
             try:
                 from services.cert import renewal as _renewal
                 if cert.crt and _renewal._stored(cert) is None:  # refused before the gate decodes it
-                    raise _renewal._unreadable(cert.id, False, link=False)
+                    raise _renewal._unreadable(cert.id, False,
+                                               link=cert.related_certificate_id is not None)
                 held = AutoRenewalService._held_for_approval(
                     cert, already_queued=bool(deadlines))
             except (PairApprovalConflict, RenewalError) as e:  # RenewalError: the pair not read
