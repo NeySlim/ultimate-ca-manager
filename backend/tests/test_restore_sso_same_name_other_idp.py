@@ -315,3 +315,32 @@ def test_a_field_here_that_is_not_text_names_no_idp(app, kind, field):
         assert _another_idp(provider, {'name': 'corp', **IDPS[kind][0]}) is True
         assert _another_idp(provider, {'name': 'corp'}) is False
 
+
+UNREADABLE = 'https://[idp.example.test/realms/x'
+
+
+@pytest.mark.parametrize('here, archived, other', [
+    (UNREADABLE, UNREADABLE, False),                              # compared as written
+    ('https://idp.example.test/realms/x', UNREADABLE, True),
+    (UNREADABLE, 'https://[other.example.test/realms/x', True),
+])
+def test_an_issuer_no_url_parser_reads_is_compared_as_written(app, here, archived, other):
+    from services.backup.restore.sso_providers import _another_idp
+    with app.app_context():
+        provider = SSOProvider(name='corp', provider_type='oauth2', oauth2_issuer=here)
+        assert _another_idp(provider, {'name': 'corp', 'oauth2_issuer': archived}) is other
+
+
+@pytest.mark.parametrize('mode', ['replace', 'merge'])
+def test_an_unreadable_issuer_on_both_sides_restores_in_place(target, mode):
+    corp = SSOProvider(name='corp', provider_type='oauth2', enabled=False, default_role='viewer',
+                       oauth2_issuer=UNREADABLE)
+    db.session.add(corp)
+    db.session.commit()
+    results = _restore({'sso_providers': [{'name': 'corp', 'provider_type': 'oauth2',
+                                           'display_name': 'Corp', 'oauth2_issuer': UNREADABLE}]},
+                       mode)
+    db.session.expire_all()
+    assert not [w for w in results['warnings'] if w.startswith('sso_providers:')]
+    assert SSOProvider.query.filter_by(provider_type='oauth2').one().id == corp.id
+
