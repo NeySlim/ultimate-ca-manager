@@ -350,6 +350,8 @@ class AutoRenewalService:
             common_name = cert.common_name
             try:
                 partner = renewal_partner(cert)
+            except RenewalError:  # an unreadable member: the renewal below refuses and records it
+                partner = None
             except Exception:  # the renewal itself then reports what is wrong with the row
                 logger.warning(f"Auto-renewal: related certificate of {cert_id} not read", exc_info=True)
                 partner = None

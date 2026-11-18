@@ -165,7 +165,8 @@ def test_a_scheduled_renewal_naming_an_unreadable_certificate_fails_and_goes_on(
     assert _rows(app, lone_id) != lone_before
 
 
-def test_a_pair_member_whose_partner_cannot_be_read_is_refused_by_the_scheduler(app, monkeypatch):
+def test_a_pair_member_whose_partner_cannot_be_read_is_refused_by_the_scheduler(app, monkeypatch,
+                                                                               caplog):
     """A's key held: the pair is chosen, and its unreadable A refuses B's renewal, from the
     approval check on."""
     from services.auto_renewal_service import AutoRenewalService as svc
@@ -184,6 +185,8 @@ def test_a_pair_member_whose_partner_cannot_be_read_is_refused_by_the_scheduler(
     assert stats['failed'] == 1, stats
     assert [c for c, _ in reasons] == [b_id] and _refusal(reasons[0][1], a_id), reasons
     assert _rows(app, a_id, b_id) == before
+    # Recorded once as a failure: no second line with a traceback at each pass
+    assert not [r for r in caplog.records if r.exc_info and 'not read' in r.getMessage()]
 
 
 @pytest.mark.parametrize('held', [True, False])

@@ -371,7 +371,8 @@ def _stored(row):
 def _renewal_members(cert):
     """``[cert]``, or both members of its related pair with A first. A partner whose key
     the server does not hold (enrolled by a device) renews through its own protocol, never
-    here; an archived one (superseded) is not renewed at all."""
+    here; an archived one (superseded) is not renewed at all. Refused (RenewalError, 409) when a
+    member cannot be read."""
     return _linked_members(cert)[0]
 
 
