@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Deleting a CA a setting names
+
+As for the default SCEP CA, deleting a CA chosen as the default ACME issuing, EST, TSA, WSTEP, XCEP or trusted mTLS CA, or reached through an EST label, is now refused with `409` and a message naming the setting, in a single and a bulk deletion: choose another CA in that setting, or clear it, then delete. An ACME issuing CA setting that already names a deleted CA refuses the orders it would sign (`serverInternal`, the order stays `ready`) instead of signing them with the first CA: choose the CA again in the ACME settings.
+
 ### SSO role mapping reads more groups
 
 OIDC role mapping rules now also match the `groups` and `roles` of the ID token validated for the login, and a `roles` claim no longer hides `groups`; SAML matching is unchanged, except that an assertion repeating an attribute name is now accepted with all its values, and the LDAP changes are in the next note. A user no rule matched before may now be admitted, or, with *Sync role on each login*, get a higher role at the next sign-in: review the mapping rules of OIDC providers before upgrading.

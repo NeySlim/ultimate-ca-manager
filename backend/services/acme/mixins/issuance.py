@@ -193,6 +193,12 @@ class IssuanceMixin:
         # resolves straight to the global default (acme.issuing_ca_id)
         if not ca_refid:
             ca_refid = self._resolve_ca_for_domains(order_domains)
+            # A default naming a CA that is gone is no default: never the first CA instead
+            if not ca_refid and self._default_ca_gone():
+                logger.error("ACME order %s refused: the ACME issuing CA setting names no CA", order_id)
+                self._last_finalize_error_type = 'serverInternal'
+                return False, ('The ACME issuing CA chosen in the ACME settings no longer '
+                               'exists: choose another one in the ACME settings')
         
         # Sign certificate with UCM CA
         self._last_signing_exception = None
@@ -496,7 +502,19 @@ class IssuanceMixin:
                 return ca.refid
         
         return None
-    
+
+    @staticmethod
+    def _default_ca_gone() -> bool:
+        """Whether acme.issuing_ca_id holds a value that names no CA."""
+        from models import SystemConfig, CA
+        from services.deletion_blockers import _int_or_none
+        cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+        value = (cfg.value or '').strip() if cfg else ''
+        if not value or CA.query.filter_by(refid=value).first() is not None:
+            return False
+        number = _int_or_none(value)
+        return number is None or db.session.get(CA, number) is None
+
     @staticmethod
     def _is_request_failure(exc) -> bool:
         """Whether a signing failure is the request's fault (badCSR, order
