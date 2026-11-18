@@ -1006,7 +1006,9 @@ server holds both keys and renews the pair as one; the response
 lists the other member in `related_renewed`. A certificate renewed alone names only the
 certificate its original named (RFC 9763 §4.1): once that one is replaced, revoked, archived or
 expired, the renewed certificate carries no `relatedCertificate` extension, leaves its pair, and
-`meta.notices` says why. When the two members require approval under
+`meta.notices` says why. A renewal answers `409`, naming the certificate, when the other member's
+certificate or the renewed certificate's own `relatedCertificate` extension cannot be read;
+nothing is written and the pair stays as it is. When the two members require approval under
 different policies, the renewal answers `409` and only an administrator can perform it. A
 certificate or a pair link changed by another request while the renewal runs also answers
 `409`: reload the certificate and retry.
@@ -1131,7 +1133,8 @@ revoked are listed in `related_not_revoked`, the certificates themselves countin
 Bulk renewal also renews the other member of each hybrid pair; a member already renewed or
 revoked with its pair counts as a success. What a renewal did on other terms, such as a
 `relatedCertificate` extension left out, is listed in `notices` as `{"id", "notices"}` entries,
-present only when there is one.
+present only when there is one. A member whose pair cannot be read fails with the refusal of
+a single renewal.
 
 **Response:**
 ```json
