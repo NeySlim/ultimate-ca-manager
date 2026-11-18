@@ -214,6 +214,31 @@ def test_the_next_ca_never_becomes_the_acme_issuing_ca(app, auth_client, create_
             _put_back('acme.issuing_ca_id', before)
 
 
+def test_a_number_left_by_an_older_version_names_the_ca_now_holding_it(app, auth_client, create_ca):
+    """State left before the blocker: the setting names a free number, a CA created later takes it.
+    Nothing tells that CA from one the administrator chose: it is the issuing CA, and is not deleted."""
+    import uuid
+    from services.acme.mixins.issuance import IssuanceMixin
+    source = create_ca(cn='Source of the copied key')
+    with app.app_context():
+        free = (db.session.query(db.func.max(CA.id)).scalar() or 0) + 1000
+        before = _set('acme.issuing_ca_id', str(free))
+    try:
+        with app.app_context():
+            row = db.session.get(CA, source['id'])
+            copied = {c.name: getattr(row, c.name) for c in CA.__table__.columns
+                      if c.name not in ('id', 'refid', 'url_slug', 'hsm_key_id', 'descr')}
+            db.session.add(CA(id=free, refid=str(uuid.uuid4()), descr='Took the free number', **copied))
+            db.session.commit()
+            taker = db.session.get(CA, free)
+            assert IssuanceMixin()._resolve_ca_for_domains([]) == taker.refid
+        assert auth_client.delete(f'/api/v2/cas/{free}').status_code == 409
+    finally:
+        with app.app_context():
+            _put_back('acme.issuing_ca_id', before)
+    assert auth_client.delete(f'/api/v2/cas/{free}').status_code == 204
+
+
 @pytest.mark.parametrize('dangling', ['no-such-ca-refid', '987654321'])
 def test_an_issuing_ca_already_gone_issues_nothing(app, monkeypatch, create_ca, dangling):
     """A database where the setting names a CA deleted before the blocker: no other CA signs."""
