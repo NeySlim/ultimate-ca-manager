@@ -84,7 +84,7 @@ Limita gli algoritmi e le dimensioni delle chiavi utilizzabili:
 **Hash di firma consentiti** limita l'hash di firma allo stesso modo (SHA-256, SHA-384, SHA-512); se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione propone solo i tipi di chiave consentiti, Crea CA solo i tipi di chiave e gli hash consentiti.
 
 ### Restrizioni SAN
-- **Massimo nomi DNS**: Limita il numero di nomi DNS nel SAN; le voci IP, e-mail e URI non sono conteggiate
+- **Massimo nomi DNS**: Limita il numero di nomi DNS nel SAN; le voci IP, e-mail e URI non sono conteggiate. In ACME conta anche un nome DNS presente solo nel CN (RFC 8555 §7.4)
 - **Pattern DNS**: Limita a pattern di dominio specifici (es. \`*.company.com\`)
 
 ## Flussi di approvazione

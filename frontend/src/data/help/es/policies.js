@@ -84,7 +84,7 @@ Restringir qué algoritmos y tamaños de clave se pueden utilizar:
 **Hashes de firma permitidos** restringe el hash de firma del mismo modo (SHA-256, SHA-384, SHA-512); si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión ofrece solo los tipos de clave permitidos, y Crear CA solo los tipos de clave y hashes permitidos.
 
 ### Restricciones de SAN
-- **Máximo de nombres DNS**: Limitar el número de nombres DNS en el SAN; las entradas IP, correo y URI no se cuentan
+- **Máximo de nombres DNS**: Limitar el número de nombres DNS en el SAN; las entradas IP, correo y URI no se cuentan. En ACME, un nombre DNS que solo lleva el CN también cuenta (RFC 8555 §7.4)
 - **Patrón DNS**: Limita la política a las solicitudes cuyo CN o SAN DNS coinciden, etiqueta por etiqueta y sin distinguir mayúsculas: \`*.company.com\` cubre los nombres bajo company.com, \`company.com\` cubre también company.com. Los demás nombres no se rechazan: la política no se les aplica
 
 ## Flujos de aprobación
