@@ -200,8 +200,9 @@ class IssuanceMixin:
                 # The order's own dates: no other CSR can be issued on it
                 return self._refuse_order(order, 'malformed', error, approval)
             if isinstance(exc, DnsNameCountRefused) and self._order_dns_count_refused(order, exc.policies):
-                # The order's own distinct names exceed the limit: no CSR lowers
-                # their count (RFC 8555 §6.7 rejectedIdentifier); a repeated SAN is badCSR
+                # The order's own distinct names exceed the limit: every CSR carries each
+                # in its CN or SAN, counted alike (RFC 8555 §7.4, §6.7 rejectedIdentifier);
+                # a repeated SAN is badCSR
                 return self._refuse_order(order, 'rejectedIdentifier', error, approval)
             self._last_finalize_error_type = 'badCSR'
             return False, error
@@ -721,12 +722,16 @@ class IssuanceMixin:
 
         # Extract CN from CSR for better description
         descr = f"ACME Certificate - Order {order.order_id}"
+        subject_dns = []
         try:
             from cryptography.hazmat.backends import default_backend
             from cryptography import x509
             csr_bytes = csr_pem.encode() if isinstance(csr_pem, str) else csr_pem
             csr = x509.load_pem_x509_csr(csr_bytes, default_backend())
-            
+            # Every CN is an order identifier (_validate_csr_subject): its DNS names are requested
+            subject_dns = [a.value for a in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+                           if not _is_ip_text(a.value)]
+
             # Try to get CN from subject
             cn = None
             for attr in csr.subject:
@@ -787,6 +792,7 @@ class IssuanceMixin:
                 not_before=not_before,
                 not_after=not_after,
                 subject_holder=f'acme:{order.account_id}', source='acme',
+                subject_dns=subject_dns,
             )
             
             return True, signed_cert.id, None

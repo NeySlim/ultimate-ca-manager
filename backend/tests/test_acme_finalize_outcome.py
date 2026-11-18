@@ -286,6 +286,41 @@ def test_a_dns_name_count_only_a_repeated_san_exceeds_is_a_bad_csr(app, client, 
     _assert_issued(client, account, order_id, _finalize(client, account, order_id, domain))
 
 
+def _max_one_dns_name(app, ca_id):
+    from models.policy import CertificatePolicy
+    with app.app_context():
+        policy = CertificatePolicy(name=f'acme-outcome-cn-{uuid.uuid4().hex[:6]}', policy_type='issuance',
+                                   ca_id=ca_id, requires_approval=False, min_approvers=1,
+                                   is_active=True, priority=100, notify_on_violation=False)
+        policy.set_rules({'san_restrictions': {'max_dns_names': 1}})
+        db.session.add(policy)
+        db.session.commit()
+
+
+def test_a_dns_name_carried_by_the_cn_alone_counts_against_the_policy(app, client, served):
+    """RFC 8555 §7.4: an identifier in the CN alone is requested; the order's two names exceed one."""
+    account, ca_id, domain = served
+    second = f'two-{domain}'
+    with app.app_context():
+        db.session.add(AcmeLocalDomain(domain=second, issuing_ca_id=ca_id))
+        db.session.commit()
+    _max_one_dns_name(app, ca_id)
+    order_id = _ready_order(app, account, [{'type': 'dns', 'value': domain}, {'type': 'dns', 'value': second}])
+    r = _finalize(client, account, order_id, domain, cn=second.upper() + '.', dns=[domain])
+    assert r.status_code == 400, r.get_json()
+    assert r.get_json()['type'] == 'urn:ietf:params:acme:error:rejectedIdentifier'
+    read = _read(client, account, order_id)
+    assert read['status'] == 'invalid' and 'DNS names' in read['error']['detail']
+
+
+def test_a_cn_repeating_the_san_is_not_counted_twice(app, client, served):
+    account, ca_id, domain = served
+    _max_one_dns_name(app, ca_id)
+    order_id = _order(app, account, domain)
+    _assert_issued(client, account, order_id, _finalize(client, account, order_id, domain,
+                                                        cn=domain.upper() + '.', dns=[domain]))
+
+
 def test_a_withdrawn_profile_invalidates_the_order(app, client, served):
     account, _ca_id, domain = served
     order_id = _order(app, account, domain)

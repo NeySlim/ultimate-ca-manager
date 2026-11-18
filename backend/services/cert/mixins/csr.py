@@ -228,6 +228,7 @@ class CSRMixin:
         subject_holder: str = None,
         override_unique_subject: bool = False,
         source: str = 'csr',
+        subject_dns: list = None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -257,6 +258,7 @@ class CSRMixin:
             override_unique_subject: an operator issues although the CA's unique subject
                 is taken (audited); never set by a protocol
             source: the issuance path its refusal audit names
+            subject_dns: DNS names the subject requests (ACME CN), counted by the policies
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -385,6 +387,7 @@ class CSRMixin:
                 'ca_id': ca.id,
                 'template_id': policy_template_id if policy_template_id is not None else template_id,
                 'digest_explicit': digest_explicit,
+                'subject_dns': list(subject_dns or ()),
             },
             notices=notices,
             not_before=not_before,
