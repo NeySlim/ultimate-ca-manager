@@ -205,6 +205,8 @@ def bulk_renew_certificates():
                 cert, username=username, actor_user_id=actor_user_id, rekey=True,
                 regenerate_crl=False, trigger='bulk')
             results['success'].append(cert_id)
+            if outcome.get('notices'):
+                results.setdefault('notices', []).append({'id': cert_id, 'notices': outcome['notices']})
             for done in [outcome] + list(outcome.get('related') or []):
                 renewed_with_pair.add(done['cert_id'])
                 renewed_cert_ids.append(done['cert_id'])

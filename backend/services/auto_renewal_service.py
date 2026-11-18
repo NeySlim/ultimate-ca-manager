@@ -194,7 +194,7 @@ class AutoRenewalService:
             return None, 'Certificate no longer exists'
 
         try:
-            renew_certificate_in_place(
+            outcome = renew_certificate_in_place(
                 cert, username=AUTO_RENEWAL_ACTOR, actor_user_id=None, rekey=False,
                 regenerate_crl=regenerate_crl, trigger='auto', known_serial=known_serial)
         except RenewalError as e:
@@ -213,6 +213,8 @@ class AutoRenewalService:
             return False, 'Renewal failed'
 
         logger.info(f"Auto-renewed cert {cert_id} ({common_name})")
+        for notice in outcome.get('notices') or []:
+            logger.info(f"Auto-renewed cert {cert_id}: {notice}")
         return True, cert_id
 
     @staticmethod
