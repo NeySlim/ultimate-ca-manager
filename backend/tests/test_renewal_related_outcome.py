@@ -151,7 +151,6 @@ def test_a_scheduled_renewal_naming_an_unreadable_certificate_fails_and_goes_on(
     monkeypatch.setattr(svc, '_log_failure', staticmethod(
         lambda cert_id, cn, reason: reasons.append((cert_id, reason))))
     monkeypatch.setattr(svc, '_send_failure_notification', staticmethod(lambda stats: None))
-    monkeypatch.setattr(svc, '_held_for_approval', staticmethod(lambda cert, already_queued: None))
     monkeypatch.setattr(svc, '_publish_crls', staticmethod(lambda carefs: None))
     with app.app_context():
         svc.set_renewal_config({'enabled': True})
@@ -264,7 +263,6 @@ def test_a_scheduled_renewal_of_an_unreadable_lone_certificate_fails_once_and_go
     monkeypatch.setattr(svc, '_log_failure', staticmethod(
         lambda cert_id, cn, reason: reasons.append((cert_id, reason))))
     monkeypatch.setattr(svc, '_send_failure_notification', staticmethod(lambda stats: None))
-    monkeypatch.setattr(svc, '_held_for_approval', staticmethod(lambda cert, already_queued: None))
     monkeypatch.setattr(svc, '_publish_crls', staticmethod(lambda carefs: None))
     with app.app_context():
         svc.set_renewal_config({'enabled': True})

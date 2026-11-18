@@ -365,6 +365,9 @@ class AutoRenewalService:
             # A policy that requires approval for renewals holds the scheduler
             # too: the renewal is queued once, and performed on approval only
             try:
+                from services.cert import renewal as _renewal
+                if cert.crt and _renewal._stored(cert) is None:  # refused before the gate decodes it
+                    raise _renewal._unreadable(cert.id, False, link=False)
                 held = AutoRenewalService._held_for_approval(
                     cert, already_queued=bool(deadlines))
             except (PairApprovalConflict, RenewalError) as e:  # RenewalError: the pair not read
