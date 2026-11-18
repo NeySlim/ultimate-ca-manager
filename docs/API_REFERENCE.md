@@ -1001,7 +1001,8 @@ Content-Type: application/json
 }
 ```
 
-Renewing a member of a hybrid pair renews both, and the new B names the new A; the response
+Renewing a member of a hybrid pair renews both, and the new B names the new A, since the
+server holds both keys and renews the pair as one; the response
 lists the other member in `related_renewed`. A certificate renewed alone names only the
 certificate its original named (RFC 9763 §4.1): once that one is replaced, revoked, archived or
 expired, the renewed certificate carries no `relatedCertificate` extension, leaves its pair, and
