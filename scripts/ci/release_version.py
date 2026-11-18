@@ -4,6 +4,7 @@
 Tags: X.Y, X.Y-rcN (this line), X.Y.Z, X.Y.Z-rcN with Z >= 1 (maintenance of the previous line).
 A development version (X.Y-dev, X.Y.Z-dev) has an npm form but is never a tag.
 Usage: release_version.py <validate|deb|rpm|tar|file|npm|chart|prerelease|assets|notes|latest|line> <version> [CHANGELOG] [--rehearsal]
+`matches <version> <file>` exits 1, naming both values, when the file (whitespace stripped) is not that version.
 `latest` reads the published tags (refs/tags/vX or vX, one per line) on stdin and prints true or false.
 `line` reads them the same way and prints the line tag (the major) to apply, or an empty line.
 """
@@ -176,6 +177,15 @@ def main(argv):
             print('true' if is_latest(version, sys.stdin.read().splitlines()) else 'false')
         elif cmd == 'line':
             print(line_tag(version, sys.stdin.read().splitlines()))
+        elif cmd == 'matches':
+            if len(argv) < 4:
+                print(__doc__, file=sys.stderr)
+                return 2
+            with open(argv[3], encoding='utf-8') as fh:
+                found = fh.read().strip()
+            if found != version:
+                print(f'::error::{argv[3]} says {found!r} but the tag is {version!r}', file=sys.stderr)
+                return 1
         elif cmd == 'notes':
             rehearsal = '--rehearsal' in argv[3:]
             rest = [a for a in argv[3:] if a != '--rehearsal']

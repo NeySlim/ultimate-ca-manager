@@ -67,7 +67,7 @@ variants and both architectures on both registries; the Docker Hub page when the
 image takes `latest`; for a stable release only,
 the chart at `oci://ghcr.io/neyslim/charts/ucm`, versioned as the release in
 semver form. `scripts/bump-version.sh X.Y-rcN` writes the version into
-`VERSION`, both npm files and the chart before the tag.
+`VERSION`, both npm files and the chart before the tag. A tag run refuses a tag whose commit carries another version in `VERSION`.
 
 ## Smoke and UI checks
 

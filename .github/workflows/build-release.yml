@@ -65,6 +65,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: python3 scripts/ci/release_version.py validate "${GITHUB_REF#refs/tags/v}"
 
+      # A tag run builds the tag's version: the tagged commit must say the same in VERSION.
+      # A rehearsal builds its input version whatever VERSION says, so it is exempt.
+      - name: Check VERSION matches the tag
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+        run: python3 scripts/ci/release_version.py matches "${GITHUB_REF#refs/tags/v}" VERSION
+
       - name: Ensure tag points to the correct release branch
         if: startsWith(github.ref, 'refs/tags/')
         run: |
