@@ -10,9 +10,13 @@ Decided before the plan, on the archive itself, in either mode and for archives 
 * a merge keeps the provider here and leaves the archived one out: the accounts the archive
   attaches to it come back as orphans of its IdP.
 
+An archived provider with the name and the type of the one here but another IdP key is another
+provider, and is treated as one under another name.
+
 Each case is a warning of the restore's report.
 """
 from typing import Any, Dict, List, Optional, Set
+from urllib.parse import urlsplit, urlunsplit
 
 from ..errors import BackupSchemaError
 from ..export_generic import REFERENCE_SUFFIX
@@ -48,6 +52,27 @@ def _idp_key(row: Dict[str, Any]) -> Optional[str]:
     return SSOProvider(**{field: row.get(field) for field in _IDP_FIELDS}).idp_key()
 
 
+def _comparable(key: Optional[str]) -> Optional[str]:
+    """``key`` with the scheme and host of an OIDC issuer in lower case (RFC 3986 §6.2.2.1)."""
+    if not key or not key.startswith('oauth2:'):
+        return key
+    parts = urlsplit(key[len('oauth2:'):])
+    return 'oauth2:' + urlunsplit(parts._replace(scheme=parts.scheme.lower(),
+                                                 netloc=parts.netloc.lower()))
+
+
+def _another_idp(provider, row: Dict[str, Any]) -> bool:
+    """Whether the archived ``row`` would point ``provider`` here at another IdP.
+
+    A field the row does not carry keeps its value here, as the restore does. A provider whose
+    key the restore leaves as it is (even unknown on both sides) keeps its accounts."""
+    from models.sso import SSOProvider
+    after = SSOProvider(**{field: row[field] if field in row else getattr(provider, field)
+                           for field in _IDP_FIELDS})
+    here, there = _comparable(provider.idp_key()), _comparable(after.idp_key())
+    return here != there
+
+
 def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
                           displaced: Dict[str, Set[Any]]) -> None:
     """Make the archive's providers and those here one per type, as the module says.
@@ -67,7 +92,9 @@ def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
     for row in rows:
         kind = row.get('provider_type') or 'oauth2'
         holder = by_name.get(row['name'])
-        clashes = [holder] if holder is not None and holder.provider_type != kind else []
+        # The holder of the name is another provider when its type or its IdP differs
+        elsewhere = holder is not None and holder.provider_type == kind and _another_idp(holder, row)
+        clashes = [holder] if holder is not None and (holder.provider_type != kind or elsewhere) else []
         clashes += [p for p in by_type.get(kind, ()) if p.name != row['name']]
         if not clashes:
             continue
@@ -76,15 +103,21 @@ def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
                 if provider.id in removed:
                     continue
                 removed.add(provider.id)
+                reason = ('it signs in through another IdP' if provider is holder and elsewhere
+                          else 'one provider per type')
                 displaced.setdefault(SECTION, set()).add(provider.id)
                 warnings.append(
                     f"sso_providers: the {provider.provider_type} provider {provider.name!r} "
                     f"(#{provider.id}) is replaced by the archive's {kind} provider {row['name']!r}: "
-                    "one provider per type; the accounts it opened here keep its IdP as orphans")
+                    f"{reason}; the accounts it opened here keep its IdP as orphans")
             continue
         provider = clashes[0]
-        held = (f"a {provider.provider_type} provider holds its name here" if provider is holder
-                else f"this installation's {kind} provider is {provider.name!r}")
+        if provider is holder and elsewhere:
+            held = f"the {kind} provider of that name here signs in through another IdP"
+        elif provider is holder:
+            held = f"a {provider.provider_type} provider holds its name here"
+        else:
+            held = f"this installation's {kind} provider is {provider.name!r}"
         warnings.append(
             f"sso_providers: the archive's {kind} provider {row['name']!r} is not restored: {held} "
             f"(#{provider.id}), and there is one provider per type; the accounts the archive "
