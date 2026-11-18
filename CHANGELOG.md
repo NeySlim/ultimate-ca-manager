@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- Backup: a restore whose SSO provider had the name of one here that signs in through another IdP (OIDC issuer, SAML entity ID, LDAP server and base DN) rewrote it in place, so the accounts it had bound answered to the archive's IdP. A replacement now keeps those accounts as orphans of their IdP, a merge leaves the archive's provider out and restores its accounts as orphans of its IdP, and the restore report names the provider.
+- Backup: a restore whose SSO provider had the name of one here that signs in through another IdP (OIDC issuer, SAML entity ID, LDAP server and base DN) rewrote it in place, so the accounts it had bound answered to the archive's IdP. A replacement now keeps those accounts as orphans of their IdP, a merge leaves the archive's provider out and restores its accounts as orphans of its IdP, and the restore report names the provider, as it names accounts an archive restores without their provider, whose IdP cannot be checked.
 
 ## [2.254.5] - 2026-11-18
 
