@@ -352,6 +352,12 @@ class RestoreCoreMixin:
         # Before the plan, which finds these rows again by name.
         ambiguous_references: List[str] = []
         displaced: Dict[str, set] = {}
+        # An archive of metadata alone restores nothing (no session revoked, no restart).
+        # Counted before any row is left out: a provider a merge leaves out was carried.
+        carried = sorted(
+            name for name in SECTIONS
+            if _carries(backup_data, name)
+        )
         # One SSO provider per type at the end, whatever the mode (restore/sso_providers.py)
         refuse_archived_shared_types(backup_data)
         sso_warnings: List[str] = []
@@ -360,14 +366,6 @@ class RestoreCoreMixin:
         renamed = rename_clashing_rows(backup_data, ambiguous_references,
                                        replacing=frozenset(pruned), displaced=displaced,
                                        renamed_here=renamed_here)
-
-        # An archive of metadata alone restores nothing. Announcing it as a
-        # success made the caller revoke every session and ask for a restart
-        # over a file that changed not one row.
-        carried = sorted(
-            name for name in SECTIONS
-            if _carries(backup_data, name)
-        )
 
         # Named before anything is written, so the answer can say what this
         # version will not put back even though the archive carries it.
