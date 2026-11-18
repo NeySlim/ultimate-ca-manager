@@ -195,6 +195,33 @@ def test_the_scheduler_process_stops_when_its_master_dies(tmp_path):
                 pass
 
 
+def test_a_scheduler_process_whose_master_died_before_it_ran_stops(tmp_path):
+    """The master spawns through the supervisor and dies at once: the orphan, adopted
+    before it read its parent, still stops once its loop runs."""
+    env, data = _scheduler_env(tmp_path)
+    pidfile = tmp_path / 'scheduler.pid'
+    script = tmp_path / 'master.py'
+    script.write_text(
+        'import os, sys\n'
+        f'sys.path.insert(0, {BACKEND!r})\n'
+        'from scheduler_supervisor import SchedulerSupervisor\n'
+        'proc = SchedulerSupervisor()._spawn()\n'
+        f'open({str(pidfile)!r}, "w").write(str(proc.pid))\n'
+        'os._exit(0)\n')
+    master = subprocess.run([sys.executable, str(script)], cwd=BACKEND, env=env, timeout=30,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    child = int(pidfile.read_text())
+    try:
+        assert master.returncode == 0
+        assert _wait(lambda: not _alive(child), timeout=60)
+        assert 'The gunicorn master is gone' in (tmp_path / 'ucm.log').read_text()
+    finally:
+        try:
+            os.kill(child, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
 def test_the_scheduler_process_prepares_then_runs_then_hands_over(monkeypatch):
     import app as app_module
     import scheduler_main
