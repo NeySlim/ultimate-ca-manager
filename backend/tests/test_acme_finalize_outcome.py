@@ -269,6 +269,23 @@ def test_a_dns_name_count_a_policy_refuses_invalidates_the_order(app, client, se
     assert 'DNS names' in read['error']['detail']
 
 
+def test_a_dns_name_count_only_a_repeated_san_exceeds_is_a_bad_csr(app, client, served):
+    """The order's one name fits the policy: a CSR that repeats it is amended, the order stays ready."""
+    from models.policy import CertificatePolicy
+    account, ca_id, domain = served
+    with app.app_context():
+        policy = CertificatePolicy(name=f'acme-outcome-dup-{uuid.uuid4().hex[:6]}', policy_type='issuance',
+                                   ca_id=ca_id, requires_approval=False, min_approvers=1,
+                                   is_active=True, priority=100, notify_on_violation=False)
+        policy.set_rules({'san_restrictions': {'max_dns_names': 1}})
+        db.session.add(policy)
+        db.session.commit()
+    order_id = _order(app, account, domain)
+    r = _finalize(client, account, order_id, domain, dns=[domain, domain.upper()])
+    _assert_ready_after_bad_csr(client, account, order_id, r, 'DNS names')
+    _assert_issued(client, account, order_id, _finalize(client, account, order_id, domain))
+
+
 def test_a_withdrawn_profile_invalidates_the_order(app, client, served):
     account, _ca_id, domain = served
     order_id = _order(app, account, domain)

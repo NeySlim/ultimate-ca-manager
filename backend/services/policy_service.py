@@ -40,7 +40,12 @@ class RequestedValidityRefused(PolicyViolation):
 
 
 class DnsNameCountRefused(PolicyViolation):
-    """A policy refuses the number of DNS names: an ACME order fixes them, no other CSR lifts it."""
+    """A policy refuses the number of DNS names; *policies* judge another count, such as an
+    ACME order's own names, which a CSR repeating a name exceeds without them doing so."""
+
+    def __init__(self, message, policies=()):
+        super().__init__(message)
+        self.policies = list(policies)
 
 
 def _dns_count_violation(rules, policy_name, dns_name_count):

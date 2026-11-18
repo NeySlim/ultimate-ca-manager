@@ -844,8 +844,9 @@ class CSROperationsMixin:
                 logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
                 validity_days = capped
         if violations:
-            raise (RequestedValidityRefused if window_refused else DnsNameCountRefused if count_refused
-                   else PolicyViolation)('; '.join(violations))
+            if count_refused and not window_refused:
+                raise DnsNameCountRefused('; '.join(violations), policies)
+            raise (RequestedValidityRefused if window_refused else PolicyViolation)('; '.join(violations))
 
         # Build certificate from CSR
         builder = x509.CertificateBuilder()

@@ -199,9 +199,9 @@ class IssuanceMixin:
             if isinstance(exc, (RequestedValidityError, RequestedValidityRefused)):
                 # The order's own dates: no other CSR can be issued on it
                 return self._refuse_order(order, 'malformed', error, approval)
-            if isinstance(exc, DnsNameCountRefused):
-                # A CSR carries exactly the order's names: their count refuses
-                # the order itself (RFC 8555 §6.7 rejectedIdentifier)
+            if isinstance(exc, DnsNameCountRefused) and self._order_dns_count_refused(order, exc.policies):
+                # The order's own distinct names exceed the limit: no CSR lowers
+                # their count (RFC 8555 §6.7 rejectedIdentifier); a repeated SAN is badCSR
                 return self._refuse_order(order, 'rejectedIdentifier', error, approval)
             self._last_finalize_error_type = 'badCSR'
             return False, error
@@ -226,6 +226,14 @@ class IssuanceMixin:
         # every ACME issuance twice)
 
         return True, None
+
+    @staticmethod
+    def _order_dns_count_refused(order, policies) -> bool:
+        """Whether *policies* refuse the count of the order's distinct DNS names."""
+        from services.policy_service import PolicyEvaluationService
+        names = {i['value'].lower().rstrip('.') for i in json.loads(order.identifiers)
+                 if i.get('type') == 'dns'}
+        return bool(PolicyEvaluationService.dns_name_count_violations(policies, len(names)))
 
     def _caa_refusal(self, error):
         """A CAA denial refuses the order (caa); a lookup failure is the server's (serverInternal)."""
