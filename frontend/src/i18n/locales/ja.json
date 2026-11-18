@@ -2719,6 +2719,7 @@
     "upToDateTitle": "最新です",
     "installUpdate": "アップデートをインストール",
     "installUpdateConfirm": "v{{version}}にアップデートしますか？\n\nサービスが再起動され、再ログインが必要になる場合があります。",
+    "installUpdateConfirmHa": "Install update v{{version}}?\n\nThis starts a rolling update: the nodes update one at a time. It is refused, and nothing is installed, if the release needs every node stopped for its migrations.",
     "prerelease": "プレリリース",
     "viewReleaseNotes": "リリースノートを表示",
     "includePreReleaseVersions": "プレリリース版を含める",

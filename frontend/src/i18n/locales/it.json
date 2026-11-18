@@ -2719,6 +2719,7 @@
     "upToDateTitle": "Aggiornato",
     "installUpdate": "Installa aggiornamento",
     "installUpdateConfirm": "Installare l'aggiornamento v{{version}}?\n\nIl servizio verrà riavviato e potrebbe essere necessario effettuare nuovamente l'accesso.",
+    "installUpdateConfirmHa": "Install update v{{version}}?\n\nThis starts a rolling update: the nodes update one at a time. It is refused, and nothing is installed, if the release needs every node stopped for its migrations.",
     "prerelease": "Versione preliminare",
     "viewReleaseNotes": "Visualizza note di rilascio",
     "includePreReleaseVersions": "Includi versioni pre-release",

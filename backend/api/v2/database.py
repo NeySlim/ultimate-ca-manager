@@ -144,7 +144,8 @@ def switch_backend():
     """
     if is_docker():
         return error_response(
-            'Switching DB in Docker is not supported. Set DATABASE_URL env var on the container.',
+            'Switching the database is not available in a container (Docker, Kubernetes). '
+            'Set the DATABASE_URL environment variable of the container.',
             400
         )
 

@@ -14,7 +14,8 @@ import logging
 from sqlalchemy.orm.exc import ObjectDeletedError
 
 from models import db, Certificate, CA, SystemConfig
-from services.cert.renewal import RenewalError, SERIAL_UNSET, renew_certificate_in_place
+from services.cert.renewal import (RenewalError, SERIAL_UNSET, check_renewable,
+                                  renew_certificate_in_place)
 from utils.datetime_utils import to_naive_utc, utc_now
 
 logger = logging.getLogger(__name__)
@@ -363,15 +364,13 @@ class AutoRenewalService:
                 stats['skipped'] += 1
                 continue
             # A policy that requires approval for renewals holds the scheduler
-            # too: the renewal is queued once, and performed on approval only
+            # too: the renewal is queued once, and performed on approval only.
+            # As on the routes, a renewal no approval could honour is refused before the gate
             try:
-                from services.cert import renewal as _renewal
-                if cert.crt and _renewal._stored(cert) is None:  # refused before the gate decodes it
-                    raise _renewal._unreadable(cert.id, False,
-                                               link=cert.related_certificate_id is not None)
+                check_renewable(cert, 'auto')
                 held = AutoRenewalService._held_for_approval(
                     cert, already_queued=bool(deadlines))
-            except (PairApprovalConflict, RenewalError) as e:  # RenewalError: the pair not read
+            except (PairApprovalConflict, RenewalError) as e:  # RenewalError: refused, or the pair not read
                 db.session.rollback()
                 AutoRenewalService._log_failure(cert_id, common_name, str(e))
                 stats['failed'] += 1

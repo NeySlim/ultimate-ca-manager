@@ -130,6 +130,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **Two revocations of one SSH certificate at once.** On SQLite, the later one rewrote the date and reason of the earlier; it is now refused as for a certificate already revoked.
+- **The scheduler no longer queues a renewal no approval could honour.** Under a renewal approval policy, a certificate revoked since the listing, issued by a Microsoft CA or holding a key FIPS mode refuses opened an approval request; the scheduled pass now records it as failed with the same reason as the renewal routes and goes on.
 - **Renewing a certificate whose stored copy is unreadable.** A certificate renewed alone whose stored certificate cannot be decoded answered `500`; it now answers `409` naming the certificate, writes nothing, and a scheduled pass records one failure and goes on.
 - **ACME: a DNS name in the CN alone counts against a policy.** The maximum number of DNS names of a policy counted only the SAN, so an order whose extra name was carried by the CN alone was issued past the limit; that name now counts, and the order is refused (`rejectedIdentifier`).
 - **One SSO provider per type, held everywhere.** A restore could leave two providers of one type, after which the sign-in and its return each took one in no set order, possibly not the same one; the database now refuses a second provider of a type, a restore keeps one per type and says so in its report, and an OIDC or SAML return is answered by the provider its sign-in started with, or refused.

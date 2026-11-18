@@ -166,10 +166,10 @@ def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
     """Raise :class:`RenewalError` when ``cert`` cannot be renewed at all
     (no certificate, revoked, issued by a Microsoft CA, key not held by the
     server, key type closed by FIPS, stored certificate unreadable, SAN types
-    its template refuses), in that order. Shared by the renewal itself and by the routes, which check it
-    before queueing a renewal for approval: a request no renewal could honour
-    must not wait for an approver. ``trigger`` words the refusal of a row renewed
-    since it was read."""
+    its template refuses), in that order. Shared by the renewal itself, the
+    routes and the scheduler, which check it before queueing a renewal for
+    approval: a request no renewal could honour must not wait for an approver.
+    ``trigger`` words the refusal of a row renewed since it was read."""
     if not cert.crt:
         raise RenewalError('Certificate data not available', 400)
     # Any revocation, a suspension included: renewing would hand back a good serial
