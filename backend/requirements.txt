@@ -21,7 +21,7 @@ asn1crypto==1.5.1
 
 # WebAuthn/FIDO2 Support
 webauthn==2.7.1
-cbor2==6.1.2
+cbor2==6.3.0
 
 # TOTP/2FA Support
 pyotp>=2.9.0
