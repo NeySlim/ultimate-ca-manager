@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Dependencies: cbor2 6.1.2 → 6.3.0 (GHSA-6rgc-8hxm-rj7p, GHSA-55vx-2phh-7grr, GHSA-p6xp-9h6j-r278). A passkey sign-in response carrying crafted extension data crashed the worker before any signature was checked; it is now refused like any failed sign-in.
 - ACME: the maximum number of DNS names a policy allows counted the SAN only, so an order whose extra name the CSR carried in its CN alone was issued past the limit. That name now counts, and the finalize is refused as an excess of names in the SAN is (`badCSR`, the order becomes `invalid`).
 - Backup: restoring an SSO provider over a provider of the same name but another IdP rewrote it, so its accounts answered to the other IdP. Such a provider is now a different provider, and its accounts keep their IdP as orphans.
 
