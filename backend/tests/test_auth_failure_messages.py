@@ -11,7 +11,6 @@ into the generic one leaves an operator guessing why a correct password is
 refused; moving them ahead of the bind turns them into an account oracle. This
 file pins both halves so either change fails here rather than in production.
 """
-import inspect
 import uuid
 from datetime import timedelta
 
@@ -145,6 +144,15 @@ def test_the_ldap_door_names_a_missing_group(
         403, 'Access denied: you are not a member of the required group(s)')
 
 
+def test_the_ldap_door_names_groups_it_could_not_read(
+    client, local_user, ldap_provider, monkeypatch
+):
+    username = local_user()
+    _bind_succeeds(monkeypatch, username, error='groups_unreadable')
+    assert _login(client, username, '/api/v2/sso/ldap/login', ldap_provider) == (
+        403, 'Access denied: your groups could not be read from the directory')
+
+
 def test_a_wrong_ldap_password_says_nothing_more(
     client, local_user, ldap_provider, monkeypatch
 ):
@@ -193,17 +201,83 @@ def test_a_locked_ldap_refusal_is_audited(app, client, local_user, ldap_provider
             AuditLog.details.contains('account locked')).count() == 1
 
 
-def test_the_named_reasons_are_decided_after_the_bind():
+class _Directory:
+    """A directory that finds the user, takes the service bind and decides the user's."""
+
+    USER_DN = 'uid=probe,ou=people,dc=example,dc=test'
+
+    def __init__(self, user_password_ok, disabled, groups, groups_fail=False):
+        self.user_password_ok, self.disabled, self.groups = user_password_ok, disabled, groups
+        self.groups_fail = groups_fail
+        self.asked = []
+
+    def connection(self, server, user=None, password=None, **kwargs):
+        directory = self
+
+        class _Conn:
+            def __init__(self):
+                self.user, self.entries, self.result = user, [], None
+
+            def search(self, base, query, attributes=None, **kwargs):
+                entry = type('Entry', (), {'entry_dn': directory.USER_DN})()
+                if 'memberOf' in (attributes or []):
+                    directory.asked.append('groups')
+                    if directory.groups_fail:
+                        self.result = {'result': 50, 'description': 'insufficientAccessRights'}
+                        return
+                    entry.memberOf = type('V', (), {'values': [f'CN={g},dc=example,dc=test'
+                                                               for g in directory.groups]})()
+                self.result = {'result': 0}
+                self.entries = [entry]
+
+            def unbind(self):
+                return None
+        return _Conn()
+
+    def bind(self, conn, provider):
+        return self.user_password_ok if conn.user == self.USER_DN else True
+
+    def account_disabled(self, *args):
+        self.asked.append('disabled')
+        return self.disabled
+
+
+@pytest.mark.parametrize('disabled, groups, groups_fail, reason', [
+    (True, ['Admins'], False, 'account_disabled'),
+    (False, ['Others'], False, 'group_denied'),
+    (False, ['Admins'], True, 'groups_unreadable'),
+])
+def test_the_named_reasons_are_decided_after_the_bind(monkeypatch, disabled, groups,
+                                                      groups_fail, reason):
     """The property that makes them safe to say out loud.
 
-    If ``account_disabled`` or ``group_denied`` were ever returned before
-    the user's bind, an unauthenticated caller could read an account's
-    state out of a 403. Checked on the source, because no amount of mocking
-    the bind can demonstrate an ordering.
+    If a named reason were ever returned before the user's bind, an
+    unauthenticated caller could read an account's state out of a 403:
+    with the wrong password the answer is the plain one.
     """
-    from api.v2.sso.connection_tests import _ldap_authenticate_user
+    from types import SimpleNamespace
 
-    source = inspect.getsource(_ldap_authenticate_user)
-    bind = source.index('ldap_bind(user_conn, provider)')
-    for reason in ("'account_disabled'", "'group_denied'"):
-        assert source.index(reason) > bind, f'{reason} is decided before the bind'
+    import ldap3
+    import api.v2.sso.connection_tests as connection_tests
+
+    provider = SimpleNamespace(
+        ldap_server='ldap.example.test', ldap_port=389, ldap_use_ssl=False,
+        ldap_start_tls=False, ldap_bind_dn='cn=svc,dc=example,dc=test',
+        ldap_user_filter='(uid={username})', ldap_base_dn='dc=example,dc=test',
+        account_status_attr=None, ldap_group_filter='(objectClass=group)',
+        ldap_group_member_attr='memberOf', ldap_required_groups='["Admins"]',
+        ldap_uid_attr=None, ldap_username_attr='uid', ldap_email_attr='mail',
+        ldap_fullname_attr='cn', provider_type='ldap', role_mapping=None)
+    for password_ok, expected in ((False, 'Invalid credentials'), (True, reason)):
+        directory = _Directory(password_ok, disabled, groups, groups_fail)
+        monkeypatch.setattr(ldap3, 'Server', lambda *a, **k: object())
+        monkeypatch.setattr(ldap3, 'Connection', directory.connection)
+        monkeypatch.setattr(connection_tests, 'ldap_bind', directory.bind)
+        monkeypatch.setattr(connection_tests, '_build_ldap_tls', lambda provider: None)
+        monkeypatch.setattr(connection_tests, '_decrypt_ldap_password', lambda provider: 'svc')
+        monkeypatch.setattr(connection_tests, '_check_account_disabled', directory.account_disabled)
+
+        user, said = connection_tests._ldap_authenticate_user(provider, 'probe', 'pw')
+        assert (user, said) == (None, expected), password_ok
+        if not password_ok:
+            assert directory.asked == [], 'the account state was read before the bind'

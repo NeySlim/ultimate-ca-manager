@@ -543,7 +543,7 @@ def test_an_ldap_lock_armed_past_a_lowered_threshold_is_alerted_once(
     assert len(_lock_lines(caplog, ldap_user)) == 1
 
 
-@pytest.mark.parametrize('reason', ['account_disabled', 'group_denied'])
+@pytest.mark.parametrize('reason', ['account_disabled', 'group_denied', 'groups_unreadable'])
 def test_a_proved_ldap_password_refused_for_another_reason_never_locks(
         app, client, username, ldap_provider, monkeypatch, reason):
     """The attempt that armed the lock gives it back with its unit."""
@@ -557,7 +557,7 @@ def test_a_proved_ldap_password_refused_for_another_reason_never_locks(
         assert tuple(_stored(username)) == (MAX_ATTEMPTS - 1, None)
 
 
-@pytest.mark.parametrize('reason', ['account_disabled', 'group_denied'])
+@pytest.mark.parametrize('reason', ['account_disabled', 'group_denied', 'groups_unreadable'])
 def test_a_proved_ldap_password_that_armed_nothing_stays_counted(
         app, client, username, ldap_provider, monkeypatch, reason):
     """Nothing stored tells its window from a later one, so its unit is not given back."""

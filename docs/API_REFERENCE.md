@@ -102,7 +102,7 @@ Content-Type: application/json
 }
 ```
 
-**Lockout.** Each attempt is counted before its password is checked: here on a known, active account; at `POST /api/v2/sso/ldap/login` on the local account the directory entry opens, active or not, whatever name the user filter matched, and an entry with no local account yet is not counted. After `max_login_attempts` attempts without a success, the next ones answer 401 `Invalid credentials` without checking the password, the right one included, until `lockout_duration` has passed. A bind that proves the password but opens no session (account disabled here or in the directory, not in the required groups, no role mapped) stays counted, except the attempt that armed the lock: it lifts that lock and is not counted, so such binds never lock the account by themselves. Each lock is logged and sends the `account_locked` alert once. A success resets the count and lifts the lock. When the count cannot be stored, the login answers 500 `Failed to record login attempt`; when a success cannot reset it, 500 `Failed to update login stats`, with no session opened.
+**Lockout.** Each attempt is counted before its password is checked: here on a known, active account; at `POST /api/v2/sso/ldap/login` on the local account the directory entry opens, active or not, whatever name the user filter matched, and an entry with no local account yet is not counted. After `max_login_attempts` attempts without a success, the next ones answer 401 `Invalid credentials` without checking the password, the right one included, until `lockout_duration` has passed. A bind that proves the password but opens no session (account disabled here or in the directory, not in the required groups, groups unreadable, no role mapped) stays counted, except the attempt that armed the lock: it lifts that lock and is not counted, so such binds never lock the account by themselves. Each lock is logged and sends the `account_locked` alert once. A success resets the count and lifts the lock. When the count cannot be stored, the login answers 500 `Failed to record login attempt`; when a success cannot reset it, 500 `Failed to update login stats`, with no session opened.
 
 **Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
 
@@ -218,6 +218,8 @@ Content-Type: application/json
   "password": "NewSecurePassword123!"
 }
 ```
+
+`forgot-password` answers the same `200` whether or not a link was sent. No link is sent to an SSO account (linked to a provider or left without one) that has no local password, and `reset-password` answers `400` (`Invalid or expired reset token`) for a link such an account holds.
 
 ### Check Email Configuration
 ```http
@@ -1823,6 +1825,21 @@ Content-Type: application/json
 }
 ```
 
+### Link or Unlink SSO
+```http
+POST /api/v2/users/{user_id}/link-sso
+Content-Type: application/json
+
+{
+  "provider_id": 1,
+  "remove_password": false
+}
+
+POST /api/v2/users/{user_id}/unlink-sso
+```
+
+`link-sso` (admin, `write:users`) attaches any account to that SSO provider: a local account, one of another provider (moved), one without provider, or one already linked to it (its stable identity is reset). The stored identity is cleared, so the next sign-in through the provider with the account's username or email binds one. A password the account has is kept unless `remove_password` is `true` (a boolean, `400` otherwise), which removes it and any pending reset link so no password login opens the account (`400` on the caller's own account); an account without password is not asked to set one. When the account's provider or identity changes, or its password is removed, its sessions are closed (the caller's own session stays); API keys, security keys and mTLS certificates are kept. The `user_link_sso` audit entry says where the account came from. `400` without `provider_id`, `404` for an unknown user or provider. `unlink-sso` turns an SSO-linked account back into a local one (`400` when it is not linked).
+
 ### Delete User
 ```http
 DELETE /api/v2/users/{user_id}
@@ -3348,7 +3365,7 @@ Additional fields depend on `provider_type` (ldap, oauth2, saml).
 
 Custom roles are referenced by name. Among the groups a user belongs to, the base role is the most privileged one given; the custom role is the first one, in mapping order, that names one. A custom role never grants the permissions reserved to administrators.
 
-The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
+The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. A key is saved without its edge spaces. For an LDAP provider, keys and group names compare ignoring case, edge spaces and the length of inner space runs (caseIgnoreMatch), and two keys equal in that sense return `400`; OIDC and SAML groups compare exactly. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
 
 With `sync_role_on_login` on, each login also updates the custom role, and removes it when no matching group names one, but only if it came from the mapping (`custom_role_source` is `"sso"`). A custom role assigned by hand is never replaced nor removed. System roles cannot be used as the custom role of a mapping. Changes are recorded in the audit log as `role_change`.
 
@@ -3374,6 +3391,16 @@ POST /api/v2/sso/providers/{provider_id}/toggle
 ```http
 POST /api/v2/sso/providers/{provider_id}/test
 ```
+
+### Test LDAP Role Mapping (admin)
+```http
+POST /api/v2/sso/providers/{provider_id}/test-mapping
+Content-Type: application/json
+
+{ "username": "alice" }
+```
+
+A dry run of an LDAP login past the password, without creating a session: the same entry, groups and verdict as the login. `found: false` when the user filter finds no entry; otherwise `user_dn`, `username`, `email`, `groups`, `groups_readable`, `access_allowed`, `refusal` (`null`, `account_disabled`, `groups_unreadable`, `group_denied`, `unmapped` or `no_default_role`), `resolved_role` and `resolved_custom_role` (`null` when refused), `role_mapping`, `default_role`, `required_groups`, and `account_checked: false` with a `note`: the password and the UCM account the sign-in would open are not checked. `400` for a provider that is not LDAP, without `username` ("Username is required") or for a failed user lookup; `404` for an unknown provider.
 
 ### List SSO Sessions (admin)
 ```http
