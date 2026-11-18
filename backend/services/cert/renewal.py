@@ -466,8 +466,8 @@ def _named_related(row):
 
 
 def _row_named_by(original, row_id, linked_id):
-    """The row, as stored now, holding the certificate *original*'s extension hashes: the linked
-    row, else a row linked to *row_id*. A linked row that cannot be read refuses the renewal."""
+    """The row, as stored now, holding the certificate *original*'s extension hashes (RFC 9763
+    §4.1): the linked row, else a row linked to *row_id*. One unreadable refuses the renewal."""
     from services.cert.related_pair import row_certificate
     from utils.related_cert import references
 
