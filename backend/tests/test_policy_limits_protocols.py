@@ -30,6 +30,9 @@ def _lifetime(cert):
     return cert.not_valid_after_utc - cert.not_valid_before_utc
 
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+
 class TestAcmeSigning:
     """CertificateService.sign_csr, the ACME finalize path."""
 

@@ -162,7 +162,7 @@ Database migrations run automatically at startup.
 
 ### ACME: a DNS name in the CN alone counts against a policy
 
-A policy's maximum number of DNS names now counts, over ACME, a DNS name the CSR carries in its CN but not in its SAN. An ACME client that put one more name in the CN than a policy allows, and was issued, is now refused at finalize (`badCSR`, the order becomes `invalid`): raise the policy's limit, or have the client request fewer names per order.
+A policy's maximum number of DNS names now counts, over ACME, a DNS name the CSR carries in its CN but not in its SAN. An ACME client whose CSR carried in its CN a DNS name absent from its SAN, beyond a policy's limit, was issued and is now refused at finalize (`badCSR`, the order becomes `invalid`): raise the policy's limit, or have the client request fewer names per order.
 
 ### Trust store: private keys removed, certificates only
 
