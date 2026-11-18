@@ -344,3 +344,14 @@ def test_an_unreadable_issuer_on_both_sides_restores_in_place(target, mode):
     assert not [w for w in results['warnings'] if w.startswith('sso_providers:')]
     assert SSOProvider.query.filter_by(provider_type='oauth2').one().id == corp.id
 
+
+@pytest.mark.parametrize('kind', sorted(IDPS))
+def test_a_merge_that_leaves_the_provider_out_still_carried_it(target, kind):
+    from services.backup.restore_report import restore_audit_details
+    _instance(kind)
+    archive = _archive('3.0', kind, IDPS[kind][2], 'kate-sub-b')
+    results = _restore({'sso_providers': archive['sso_providers']}, 'merge')
+    # Carried: the job revokes the sessions and restarts, and never answers "carried no data"
+    assert any('is not restored' in w for w in results['warnings']), results['warnings']
+    assert results['sections_carried'] == ['sso_providers']
+    assert 'carried no data' not in restore_audit_details('a.ucmbkp', results)
