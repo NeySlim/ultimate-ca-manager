@@ -129,6 +129,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **One SSO provider per type, held everywhere.** A restore could leave two providers of one type, after which the sign-in and its return each took one in no set order, possibly not the same one; the database now refuses a second provider of a type, a restore keeps one per type and says so in its report, and an OIDC or SAML return is answered by the provider its sign-in started with, or refused.
 - **A deleted CA no longer passes its settings to another CA.** Deleting a CA named by the default ACME issuing, EST, TSA or mTLS CA setting, or by an EST label, is refused (409), as for the default SCEP CA: on SQLite the next CA created took its number and became the ACME issuing CA. An ACME issuing CA setting that names a CA already gone refuses the order instead of signing with the first CA.
 - **An ACME issuing CA without a private key is never replaced.** A CA chosen for an ACME domain or as the default ACME issuing CA that had no private key was skipped in silence, and the default CA or the first CA able to sign issued the certificate; the order is now refused as a server error and nothing is issued.
 - **Health probes and a database that does not answer.** `/health/live` read settings from the database through its request hooks and hung with it, so an orchestrator restarted healthy nodes; it now reads nothing from the database, and `/health/ready` answers 503 within 5 seconds.
@@ -281,6 +282,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Windows enrollment: a Kerberos request naming no template whose EKUs match none of the profile is refused instead of issued as a server certificate; name the template or ask for its EKUs.
 - HSM: creating an X.509 CA on an HSM key (`hsm_key_id`, or `hsm_provider_id` for a new key) now requires `read:hsm` besides `write:cas`, as for an SSH CA; add it to custom roles and API keys that do this (see UPGRADE.md).
 - HSM: a 2.254 database where two X.509 CAs share an HSM key is refused at upgrade, nothing written, naming the CAs and the key; keep one CA per key in 2.254 first (see UPGRADE.md).
+- SSO: a 2.254 database holding two SSO providers of one type is refused at upgrade, nothing written, naming them; keep one provider per type in 2.254 first (see UPGRADE.md).
 - Dashboard: an API key without `read:settings` no longer receives `smtp`, `webhooks` and `auto_renewal` from `GET /api/v2/dashboard/system-status`; add the scope to keys that read them (see UPGRADE.md).
 - Certificates: `serial_number` of certificates issued from the form, renewed in place, issued on policy approval, issued by a Microsoft CA or used as TSA signer is now returned in decimal like the others; the UI still shows colon hex.
 - SSO: a sign-in whose email belongs to an account of another provider is refused instead of receiving a second account; if it is the same person, attach this provider to the existing account, otherwise create an account under the name the provider sends and attach the provider to it, removing its local password.
