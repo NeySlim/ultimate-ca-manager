@@ -21,7 +21,10 @@ FAILED=0
 NEED=0; PUSHED=""; TARGET=""
 while read -r _lref lsha rref _rsha; do
     case "$rref" in
-        refs/heads/dev|refs/heads/v2.x) NEED=1; PUSHED="$lsha"; TARGET="${rref#refs/heads/}" ;;
+        refs/heads/dev|refs/heads/v2.x)
+            # One verdict for one commit: a ref carrying another commit than HEAD is kept, and refused below
+            if [ "$NEED" = 0 ] || [ "$PUSHED" = "$(git rev-parse HEAD)" ]; then PUSHED="$lsha"; fi
+            NEED=1; TARGET="${TARGET:+$TARGET, }${rref#refs/heads/}" ;;
     esac
 done
 if [ "$NEED" = 0 ]; then

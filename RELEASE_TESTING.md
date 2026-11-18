@@ -21,7 +21,7 @@ at its head: `test` and `main` do not carry them.
    sequential suite, the FIPS image build and the DEB sanity build.
 2. RC: `scripts/bump-version.sh 2.254.N-rc1`, commit `chore: 2.254.N-rc1`, push
    `v2.x`, then tag `v2.254.N-rc1` at the head of `v2.x` and push the tag.
-3. Stable, after the 6/6 matrix below: commit `release(v2.254.N)` at the head of
+3. Stable, after the 6/6 matrix above: commit `release(v2.254.N)` at the head of
    `v2.x`, push it, then tag `v2.254.N` on that commit and push the tag.
 4. Back to development: commit `chore: 2.254.(N+1)-dev` on `v2.x`.
 

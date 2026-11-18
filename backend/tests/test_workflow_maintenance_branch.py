@@ -206,6 +206,12 @@ def test_the_rc_sanity_build_runs_on_the_maintenance_branch(branch, expected):
     assert 'pull_request' not in on
 
 
+@pytest.mark.parametrize('workflow', ['tests.yml', 'no-bot-attribution.yml'])
+def test_a_pull_request_to_the_maintenance_branch_is_checked(workflow):
+    branches = _on(_load(workflow))['pull_request']['branches']
+    assert any(_branch_matches(p, 'v2.x') for p in branches), branches
+
+
 # ---- 4. Docker Hub page ------------------------------------------------------------------------
 
 def _steps(job):

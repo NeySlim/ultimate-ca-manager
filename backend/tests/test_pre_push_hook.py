@@ -52,3 +52,21 @@ def test_other_pushes_skip_the_suites(repo, rref):
     res = _push(repo, rref)
     assert res.returncode == 0, res.stdout + res.stderr
     assert 'suites skipped' in res.stdout
+
+
+def _head(repo):
+    return subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=repo, check=True, capture_output=True, text=True,
+                          env=_env()).stdout.strip()
+
+
+@pytest.mark.parametrize('order', [('dev', 'v2.x'), ('v2.x', 'dev')])
+@pytest.mark.parametrize('head_first', [False, True])
+def test_one_push_to_both_branches_is_refused_unless_both_are_head(repo, order, head_first):
+    """The suites judge one commit: a guarded ref carrying another one stops the push, in any order."""
+    shas = [_head(repo), OTHER] if head_first else [OTHER, _head(repo)]
+    lines = ''.join(f'refs/heads/x {sha} refs/heads/{b} {"0" * 40}\n' for b, sha in zip(order, shas))
+    res = subprocess.run([BASH, str(HOOK)], cwd=repo, input=lines, capture_output=True, text=True, env=_env(),
+                         timeout=60)
+    assert res.returncode == 1, res.stdout + res.stderr
+    assert f'{OTHER} is not the HEAD of this worktree' in res.stdout
+    assert 'Pre-push Suites' not in res.stdout
