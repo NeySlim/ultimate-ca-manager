@@ -546,6 +546,10 @@ def _detach_kept_rows(replacement: Replacement, name: str, table) -> None:
                 or _primary(dependent) is None):
             continue
         values = [row[0] for row in _select([named], primary, ids)]
+        if (dependent.name, column.name) == ORPHANED_WITH_PROVIDER:
+            # A kept identity the writes do not take keeps its IdP, as a removed provider's do
+            _orphan_identities(replacement, dependent, values)
+            continue
         gone = replacement.doomed.get(dependent_section, set())
         dependent_primary = _primary(dependent)
         kept = [row[0] for row in _select([dependent_primary], column, values)
