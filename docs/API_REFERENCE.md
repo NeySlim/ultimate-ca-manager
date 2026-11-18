@@ -1437,7 +1437,7 @@ Content-Type: application/json
 }
 ```
 
-The trust store holds certificates only. An entry that carries a private key, in any PEM armour, is refused with `400`, on this route and on the file import; what is stored is the certificates read, re-serialized as PEM. `certificate_pem` in the list, the detail, the exports and the backups holds certificate blocks only.
+The trust store holds certificates only. An entry that carries a private key, in any PEM armour, is refused with `400`, on this route and on the file import, and so is one holding a block that is not a certificate or a block left open; what is stored is the certificates read, re-serialized as PEM. The PEM export answers `400` when no selected entry holds a certificate. `certificate_pem` in the list, the detail, the exports and the backups holds certificate blocks only.
 
 ### Get Trusted Certificate
 ```http

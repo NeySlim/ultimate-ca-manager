@@ -51,6 +51,13 @@ def _keys(key):
         'sec1': _key_pem(key, serialization.PrivateFormat.TraditionalOpenSSL),
         'rsa-traditional': _key_pem(rsa_key, serialization.PrivateFormat.TraditionalOpenSSL),
         'openssh': _key_pem(key, serialization.PrivateFormat.OpenSSH),
+        # Armours cryptography does not write: OpenPGP, RFC 4716 (four dashes), PuTTY
+        'pgp': b'-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQVYBGcAAAABDADpgpBodyOfAKey\n'
+               b'-----END PGP PRIVATE KEY BLOCK-----\n',
+        'ssh2': b'---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----\nP2/56wAAAssh2BodyOfAKey\n'
+                b'---- END SSH2 ENCRYPTED PRIVATE KEY ----\n',
+        'putty': b'PuTTY-User-Key-File-3: ssh-ed25519\nAAAAC3puttyBodyOfAKey\nPrivate-Lines: 1\n'
+                 b'AAAAIputtyPrivateLine\nPrivate-MAC: 00\n',
     }
 
 
@@ -93,7 +100,8 @@ WRITES = {'import': _upload, 'create': _create}
 
 @pytest.mark.parametrize('write', sorted(WRITES))
 @pytest.mark.parametrize('order', ['key-then-certificate', 'certificate-then-key'])
-@pytest.mark.parametrize('armour', ['pkcs8', 'encrypted-pkcs8', 'sec1', 'rsa-traditional', 'openssh'])
+@pytest.mark.parametrize('armour', ['pkcs8', 'encrypted-pkcs8', 'sec1', 'rsa-traditional', 'openssh',
+                                    'pgp', 'ssh2', 'putty'])
 def test_an_entry_with_a_private_key_is_refused_and_nothing_is_stored(app, auth_client, drop, caplog,
                                                                      write, order, armour):
     key, cert = _issue(f'{write}-{order}-{armour}')
