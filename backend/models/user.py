@@ -1,7 +1,7 @@
 """
 User and UserSession Models
 """
-from sqlalchemy import func, select, update
+from sqlalchemy import case, func, select, update
 from sqlalchemy.orm.attributes import set_committed_value
 
 from utils.password_hash import hash_password, needs_rehash, verify_password
@@ -140,7 +140,83 @@ class User(db.Model):
         new = db.session.execute(select(User.session_version).where(User.id == self.id)).scalar_one()
         set_committed_value(self, 'session_version', new)
         self._sessions_bump = (new - 1, new)
-    
+
+    def reserve_login_attempt(self, max_attempts: int, lockout_seconds: int):
+        """Count one login attempt before its secret is checked: ``(rank, armed)``, rank
+        None when the attempt is refused unchecked, armed the stored ``locked_until`` for
+        the one attempt whose count armed the lock, else None. The caller commits before
+        checking the secret.
+
+        One UPDATE decides for every worker: at most ``max_attempts`` attempts get a rank,
+        the one reaching it (or, past a lowered threshold, the next one) arms the lock,
+        and an expired lock restarts the count at 1."""
+        from datetime import timedelta
+        from sqlalchemy import and_, case, or_
+        now = utc_now()
+        expired = and_(User.locked_until.is_not(None), User.locked_until <= now)
+        count = case((expired, 1), else_=func.coalesce(User.failed_logins, 0) + 1)
+        stmt = (update(User)
+                .where(User.id == self.id,
+                       or_(User.locked_until.is_(None), User.locked_until <= now))
+                .values(failed_logins=count,
+                        locked_until=case((count >= max_attempts,
+                                           now + timedelta(seconds=lockout_seconds)), else_=None))
+                .execution_options(synchronize_session=False))
+        columns = (User.failed_logins, User.locked_until)
+        if db.session.get_bind().dialect.update_returning:
+            row = db.session.execute(stmt.returning(*columns)).one_or_none()
+        else:
+            # No RETURNING: the UPDATE holds the write lock until the commit, so the read
+            # sees this attempt's count. No row changed = account locked.
+            row = None
+            if db.session.execute(stmt.execution_options(preserve_rowcount=True)).rowcount:
+                row = db.session.execute(select(*columns).where(User.id == self.id)).one()
+        if row is None:
+            return None, None
+        set_committed_value(self, 'failed_logins', row[0])
+        set_committed_value(self, 'locked_until', row[1])
+        # Only an unlocked row is updated, so an attempt whose count reaches max armed it.
+        return (row[0] if row[0] <= max_attempts else None), \
+            (row[1] if row[0] >= max_attempts else None)
+
+    def release_login_attempt(self, armed):
+        """Give back a reserved attempt whose secret was proved but opened no session.
+
+        Only the attempt that armed the lock can show its window is still open: the stored
+        lock is the one it wrote (``armed``) and still runs. It then lifts that lock and
+        gives its unit back. Any other stays counted, so no window gets back a unit taken in
+        another and each window checks at most ``max_attempts`` wrong secrets. The caller commits."""
+        if armed:
+            db.session.execute(
+                update(User).where(User.id == self.id, User.locked_until == armed,
+                                   User.locked_until > utc_now())
+                # Never below zero: another door may have reset the count meanwhile
+                .values(failed_logins=case((func.coalesce(User.failed_logins, 0) > 0,
+                                            User.failed_logins - 1), else_=0),
+                        locked_until=None)
+                .execution_options(synchronize_session=False))
+        self._reload_lockout()
+
+    def clear_failed_logins(self) -> bool:
+        """Reset the stored count and lock, whatever this copy holds: True when the row
+        held either. The caller commits."""
+        from sqlalchemy import or_
+        result = db.session.execute(
+            update(User).where(User.id == self.id,
+                               or_(func.coalesce(User.failed_logins, 0) != 0,
+                                   User.locked_until.is_not(None)))
+            .values(failed_logins=0, locked_until=None)
+            .execution_options(synchronize_session=False, preserve_rowcount=True))
+        set_committed_value(self, 'failed_logins', 0)
+        set_committed_value(self, 'locked_until', None)
+        return bool(result.rowcount)
+
+    def _reload_lockout(self):
+        row = db.session.execute(
+            select(User.failed_logins, User.locked_until).where(User.id == self.id)).one()
+        set_committed_value(self, 'failed_logins', row[0])
+        set_committed_value(self, 'locked_until', row[1])
+
     def check_password(self, password: str) -> bool:
         """Verify password; a hash of an older method is replaced on success
         and saved by the caller's next commit."""

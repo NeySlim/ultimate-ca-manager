@@ -414,7 +414,7 @@ def test_a_provider_without_auto_create_answers_as_before_on_a_taken_email(
     entry = {'dn': f'uid={idp_name},dc=example', 'uid': str(uuid.uuid4()),
              'email': f'{name}@corp.example'}
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda _p, username, _pw: (dict(entry, username=username), None))
+                        lambda _p, username, _pw, before_bind=None: (dict(entry, username=username), None))
     r = app.test_client().post('/api/v2/sso/ldap/login',
                                json={'username': idp_name, 'password': 'pw', 'provider_id': lid})
     assert (r.status_code, r.get_json()['message']) == (401, 'Invalid credentials')
@@ -552,7 +552,7 @@ def test_the_ldap_door_says_the_email_conflict_without_naming_the_account(app, p
     entry = {'dn': f'uid={idp_name},dc=example', 'uid': str(uuid.uuid4()),
              'email': f'{name}@corp.example'}
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda _p, username, _pw: (dict(entry, username=username), None))
+                        lambda _p, username, _pw, before_bind=None: (dict(entry, username=username), None))
     r = app.test_client().post('/api/v2/sso/ldap/login',
                                json={'username': idp_name, 'password': 'pw', 'provider_id': lid})
     assert r.status_code == 403

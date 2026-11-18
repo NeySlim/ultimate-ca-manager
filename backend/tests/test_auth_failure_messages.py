@@ -71,13 +71,14 @@ def _bind_succeeds(monkeypatch, username, error=None):
     """The directory accepted this user's own password."""
     import api.v2.sso.ldap_routes as ldap_routes
 
-    def _fake(provider, user, password):
+    def _fake(provider, user, password, before_bind=None):
+        entry = {'dn': f'uid={username}', 'uid': username, 'username': username,
+                 'email': f'{username}@example.test', 'fullname': username}
+        if before_bind is not None and not before_bind(dict(entry)):
+            return None, 'attempt_refused'
         if error:
             return None, error
-        return {
-            'dn': f'uid={username}', 'uid': username, 'username': username,
-            'email': f'{username}@example.test', 'fullname': username, 'groups': [],
-        }, None
+        return dict(entry, groups=[]), None
 
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user', _fake)
 

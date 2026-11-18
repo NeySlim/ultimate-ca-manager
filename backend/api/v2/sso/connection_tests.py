@@ -119,6 +119,31 @@ def _test_ldap_connection(provider):
         return error_response("LDAP connection failed. Check server address, port, and credentials.", 400)
 
 
+# Returned when ``before_bind`` refused the entry: the user's password was not tried.
+ATTEMPT_REFUSED = 'attempt_refused'
+
+
+def _ldap_entry_identity(provider, user_entry, username):
+    """dn, stable uid, username, email and full name the directory entry carries."""
+    stable_uid = None
+    for attr in ([provider.ldap_uid_attr] if getattr(provider, 'ldap_uid_attr', None)
+                 else ['objectGUID', 'entryUUID']):
+        try:
+            raw = getattr(user_entry, attr).value
+        except Exception:
+            raw = None
+        if raw:
+            stable_uid = raw.hex() if isinstance(raw, (bytes, bytearray)) else str(raw).strip()
+            break
+    return {
+        'dn': user_entry.entry_dn,
+        'uid': stable_uid,  # immutable id (None → matching falls back to dn/username)
+        'username': str(getattr(user_entry, provider.ldap_username_attr, username)),
+        'email': str(getattr(user_entry, provider.ldap_email_attr, '')),
+        'fullname': str(getattr(user_entry, provider.ldap_fullname_attr, '')),
+    }
+
+
 # Returned when the admission depends on groups the directory did not give.
 GROUPS_UNREADABLE = 'groups_unreadable'
 # Without a group filter, the membership clause alone selects the groups: an objectClass
@@ -293,8 +318,11 @@ def _ldap_find_user(provider, server, username):
         conn.unbind()
 
 
-def _ldap_authenticate_user(provider, username, password):
-    """Authenticate user via LDAP with proper filter escaping"""
+def _ldap_authenticate_user(provider, username, password, before_bind=None):
+    """Authenticate user via LDAP with proper filter escaping.
+
+    ``before_bind(identity)`` runs once the entry is found and before the user's bind;
+    a falsy answer returns (None, ATTEMPT_REFUSED) without trying the password."""
     try:
         import ldap3
         from ldap3 import Server, Connection, ALL, Tls
@@ -315,6 +343,10 @@ def _ldap_authenticate_user(provider, username, password):
         if user_entry is None:
             return None, "Invalid credentials"
         user_dn = user_entry.entry_dn
+        identity = _ldap_entry_identity(provider, user_entry, username)
+
+        if before_bind is not None and not before_bind(dict(identity)):
+            return None, ATTEMPT_REFUSED
 
         # Attempt to bind as the user to verify password
         user_conn = Connection(
@@ -335,27 +367,7 @@ def _ldap_authenticate_user(provider, username, password):
         if refusal:
             return None, refusal
 
-        # Immutable id for stable account matching (entryUUID/objectGUID).
-        stable_uid = None
-        for attr in ([provider.ldap_uid_attr] if getattr(provider, 'ldap_uid_attr', None)
-                     else ['objectGUID', 'entryUUID']):
-            try:
-                raw = getattr(user_entry, attr).value
-            except Exception:
-                raw = None
-            if raw:
-                stable_uid = raw.hex() if isinstance(raw, (bytes, bytearray)) else str(raw).strip()
-                break
-
-        # Return user info
-        return {
-            'dn': user_dn,
-            'uid': stable_uid,  # immutable id (None → matching falls back to dn/username)
-            'username': str(getattr(user_entry, provider.ldap_username_attr, username)),
-            'email': str(getattr(user_entry, provider.ldap_email_attr, '')),
-            'fullname': str(getattr(user_entry, provider.ldap_fullname_attr, '')),
-            'groups': groups
-        }, None
+        return dict(identity, groups=groups), None
 
     except ImportError:
         return None, "LDAP library not installed"

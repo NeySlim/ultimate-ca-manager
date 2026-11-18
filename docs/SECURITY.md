@@ -117,6 +117,8 @@ Protection against brute force and DoS attacks.
 
 The four base rates can be changed with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`. Requests from RFC 1918, loopback and link-local addresses are not rate limited.
 
+Account lockout does not depend on these limits: at the password and LDAP login each attempt is counted before its password is checked (at LDAP on the local account the directory entry opens or the account of the same name it may not open, not the name typed; an entry with no local account yet is not counted), so attempts sent together on an account check at most `max_login_attempts` passwords.
+
 #### Response Headers
 ```
 X-RateLimit-Limit: 600

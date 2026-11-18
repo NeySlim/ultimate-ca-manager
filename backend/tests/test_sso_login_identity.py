@@ -221,7 +221,7 @@ def ldap(app, monkeypatch):
         pid = row.id
     directory = {}
     monkeypatch.setattr(ldap_routes, '_ldap_authenticate_user',
-                        lambda _p, username, _pw: (dict(directory, username=username), None))
+                        lambda _p, username, _pw, before_bind=None: (dict(directory, username=username), None))
 
     def login(username, **entry):
         directory.clear()
