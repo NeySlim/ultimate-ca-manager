@@ -130,6 +130,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- **The ACME order purge no longer holds a large SQLite database.** It scanned the authorization and challenge tables once per expired order, holding the write lock for about 20 seconds with 66 000 orders, so a backup or a page read at that time failed with `database is locked`; both lookups now use an index.
 - **Renewing a certificate whose stored copy is unreadable.** A certificate renewed alone whose stored certificate cannot be decoded answered `500`; it now answers `409` naming the certificate, writes nothing, and a scheduled pass records one failure and goes on.
 - **ACME: a DNS name in the CN alone counts against a policy.** The maximum number of DNS names of a policy counted only the SAN, so an order whose extra name was carried by the CN alone was issued past the limit; that name now counts, and the order is refused (`rejectedIdentifier`).
 - **One SSO provider per type, held everywhere.** A restore could leave two providers of one type, after which the sign-in and its return each took one in no set order, possibly not the same one; the database now refuses a second provider of a type, a restore keeps one per type and says so in its report, and an OIDC or SAML return is answered by the provider its sign-in started with, or refused.

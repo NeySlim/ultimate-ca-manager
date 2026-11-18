@@ -150,7 +150,8 @@ class AcmeAuthorization(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     authorization_id = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
-    order_id = db.Column(db.String(64), db.ForeignKey('acme_orders.order_id'), nullable=True)
+    # Indexed: the order purge finds an order's authorizations by it (migration 171)
+    order_id = db.Column(db.String(64), db.ForeignKey('acme_orders.order_id'), nullable=True, index=True)
     account_id = db.Column(db.String(64), db.ForeignKey('acme_accounts.account_id'), nullable=True)
     
     identifier = db.Column(db.Text, nullable=False)  # JSON of {"type": "dns", "value": "example.com"}
@@ -213,7 +214,8 @@ class AcmeChallenge(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     challenge_id = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
-    authorization_id = db.Column(db.String(64), db.ForeignKey('acme_authorizations.authorization_id'), nullable=False)
+    # Indexed: the order purge finds an authorization's challenges by it (migration 171)
+    authorization_id = db.Column(db.String(64), db.ForeignKey('acme_authorizations.authorization_id'), nullable=False, index=True)
     
     type = db.Column(db.String(20), nullable=False)  # http-01, dns-01, tls-alpn-01
     status = db.Column(db.String(20), default='pending', nullable=False)
