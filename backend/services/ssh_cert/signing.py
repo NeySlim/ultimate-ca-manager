@@ -250,6 +250,7 @@ class SSHCertificateSigningMixin:
             serial = SSHCAService.get_next_serial(ca_id)
             ssh_cert = _signed(serial)
             try:
+                # Explicit, so the guard does not rest on the lock the foreign key takes at the INSERT
                 SSHCAService.lock_ca(ca_id)
                 db.session.add(ssh_cert)
                 db.session.flush()
@@ -258,7 +259,7 @@ class SSHCertificateSigningMixin:
                 SSHSerials.refuse_revoked_key_id(ca_id, key_id, named_by_ca=named_by_ca)
                 db.session.commit()
                 break
-            except ValueError:
+            except SSHSerials.RevokedKeyId:
                 db.session.rollback()
                 raise
             except IntegrityError as e:

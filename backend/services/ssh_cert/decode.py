@@ -139,6 +139,7 @@ class SSHCertificateDecodeMixin:
         )
 
         try:
+            # Explicit, so the guard does not rest on the lock the foreign key takes at the INSERT
             SSHCAService.lock_ca(matched_ca.id)
             db.session.add(ssh_cert)
             db.session.flush()
@@ -148,7 +149,7 @@ class SSHCertificateDecodeMixin:
             # The CA chose this serial outside UCM: the next one UCM gives out comes after it
             SSHCAService.raise_serial_counter(matched_ca.id)
             db.session.commit()
-        except ValueError:
+        except SSHSerials.RevokedKeyId:
             db.session.rollback()
             raise
         except Exception as e:

@@ -306,3 +306,9 @@ def test_sqlite_is_sent_no_row_lock(app, ssh_ca):
         db.session.remove()
     assert sent and not [s for s in sent if 'FOR UPDATE' in s.upper()]
     assert _diverging(app, ca_id) == {}
+
+
+def test_the_refusal_of_a_revoked_key_id_is_a_value_error_of_its_own():
+    """Callers roll back on this refusal alone: any other error of the write is logged as one."""
+    from utils import ssh_serials
+    assert issubclass(ssh_serials.RevokedKeyId, ValueError)
