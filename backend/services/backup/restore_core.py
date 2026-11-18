@@ -883,51 +883,16 @@ class RestoreCoreMixin:
         logger.warning("Restore: %s", warning)
         return warning
 
-    @staticmethod
-    def _kept_binding(plan, user_id, provider_id, bound) -> None:
-        from models import User
-        from models.sso import SSOProvider
-        account, provider = db.session.get(User, user_id), db.session.get(SSOProvider, provider_id)
-        held = (f"is bound here to provider {provider.name!r}" if bound
-                else f"holds an orphan of the IdP of provider {provider.name!r}")
-        warning = (f"user_sso_identities: the account {account.username!r} {held} under another "
-                   "subject than the archive's: it is kept, the archive's subject comes back as an "
-                   "orphan of its IdP")
-        plan.warnings.append(warning)
-        logger.warning("Restore: %s", warning)
-
     def _identities_free_here(self, rows, plan):
         """The archive's identity rows, those whose identity opens another account here made
-        orphans of an unknown IdP: an account without a row nor a password is claimable by name.
-        A row moved to the provider here joins it only when the account holds no row of that
-        IdP (at the provider or orphan of its key), or binds its pending row there: the same
-        subject is dropped, another one (pairwise subjects) becomes an orphan of its IdP."""
-        from sqlalchemy import and_, or_
-        from models import User, UserSSOIdentity
-        from .restore.sso_providers import REPOINTED
+        orphans of an unknown IdP: an account without a row nor a password is claimable by name."""
+        from models import User
         db.session.flush()
         plan.refresh(['users', 'sso_providers'])
         kept = []
         for row in rows:
             user_id = plan.resolve('user_sso_identities', row, 'user_id')
             provider_id = plan.resolve('user_sso_identities', row, 'provider_id')
-            idp = row.get(REPOINTED)
-            if idp and user_id is not None and provider_id is not None:
-                # The repointed key is the provider's here: its orphans are this same IdP's rows
-                mine = UserSSOIdentity.query.filter(
-                    UserSSOIdentity.user_id == user_id,
-                    or_(UserSSOIdentity.provider_id == provider_id,
-                        and_(UserSSOIdentity.provider_id.is_(None),
-                             UserSSOIdentity.orphan_of == idp))).all()
-                if any(r.external_id == row.get('external_id') for r in mine):
-                    continue
-                held = next((r for r in mine if r.provider_id == provider_id), None)
-                if mine and (held is None or held.external_id is not None):
-                    self._kept_binding(plan, user_id, provider_id, bound=held is not None)
-                    kept.append({**row, 'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
-                                 'orphan_of': idp})
-                    continue
-                # No row of this IdP, or a pending one at the provider: the ordinary merge binds it
             holder = self._identity_holder(user_id, provider_id, row.get('external_id'))
             if holder is None:
                 kept.append(row)
