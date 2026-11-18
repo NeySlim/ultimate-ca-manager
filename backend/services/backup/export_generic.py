@@ -146,6 +146,9 @@ def export_section(section_name: str, index: IdentityIndex,
 
         if section_name == 'deploy_bindings':
             data[CHAIN_VARIANT_FINGERPRINT] = _pinned_cross_fingerprint(row.chain_variant)
+        if section_name == 'trusted_certificates':
+            # An archive carries the entry's certificates only, whatever an older version stored with them
+            data['certificate_pem'] = row.served_certificate_pem
 
         rows.append(data)
     return rows

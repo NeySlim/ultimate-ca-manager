@@ -36,13 +36,19 @@ class TrustedCertificate(db.Model):
     notes = db.Column(db.Text)
     
     @property
+    def served_certificate_pem(self) -> str:
+        """The stored certificates and nothing else, whatever the row holds around them."""
+        from utils.trust_pem import served_certificates
+        return served_certificates(self.certificate_pem)
+
+    @property
     def key_facts(self) -> dict:
         """Key facts and signature algorithm of the stored certificate, as Certificate and CA send them."""
         from cryptography import x509
         from utils.key_facts import UNREADABLE, key_facts
         from utils.signature_label import signature_display_name
         try:
-            cert = x509.load_pem_x509_certificate(self.certificate_pem.encode())
+            cert = x509.load_pem_x509_certificate(self.served_certificate_pem.encode())
             return {**key_facts(cert), 'signature_algorithm': signature_display_name(cert)}
         except Exception:
             return {**UNREADABLE, 'signature_algorithm': 'N/A'}
@@ -54,7 +60,7 @@ class TrustedCertificate(db.Model):
             "id": self.id,
             "name": self.name,
             "description": self.description,
-            "certificate_pem": self.certificate_pem,
+            "certificate_pem": self.served_certificate_pem,
             "fingerprint_sha256": self.fingerprint_sha256,
             "fingerprint_sha1": self.fingerprint_sha1,
             "subject": self.subject,
