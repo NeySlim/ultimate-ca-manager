@@ -238,3 +238,50 @@ def test_a_merge_adds_a_provider_of_a_type_not_here(target):
     assert kinds == [('ldap', 'dir'), ('oauth2', 'corp')]
     assert db.session.get(SSOProvider, corp) is not None
     assert not [w for w in results['warnings'] if w.startswith('sso_providers:')], results['warnings']
+
+
+# --- A merge whose left-out provider speaks to the IdP of the one here -------------------------
+
+@pytest.mark.parametrize('fmt', FORMATS)
+def test_a_merge_attaches_the_identities_of_the_same_idp_to_the_provider_here(target, fmt):
+    """One subject of one IdP is one row (OIDC Core §5.7): never an orphan beside the live one."""
+    corp = _here('corp', 'oauth2', 'https://same.example')
+    _account('gina', corp, 'gina-sub')
+    db.session.commit()
+    archived = _archived_account(fmt, 'gina', 'okta', 'gina-sub')
+    hank = _archived_account(fmt, 'hank', 'okta', 'hank-sub')
+    archived['users'] += hank['users']
+    if fmt == '3.0':
+        archived['user_sso_identities'] += hank['user_sso_identities']
+    results = _restore({'sso_providers': [_archived_provider('okta', 'oauth2', 'https://same.example/')],
+                        **archived}, 'merge')
+    db.session.expire_all()
+    assert _providers() == [('oauth2', 'corp', corp)]
+    assert _rows('gina') == [(corp, 'gina-sub', None)]
+    assert _rows('hank') == [(corp, 'hank-sub', None)]
+    assert any("'okta' is not restored" in w and "the same IdP" in w
+               for w in results['warnings']), results['warnings']
+    _one_per_type_and_no_dangling_provider()
+
+
+def test_a_merge_never_attaches_the_identities_of_another_idp(target):
+    corp = _here('corp', 'oauth2', 'https://corp.example')
+    _account('ivan', corp, 'ivan-sub')
+    db.session.commit()
+    _restore({'sso_providers': [_archived_provider('okta', 'oauth2', 'https://okta.example')],
+              **_archived_account('3.0', 'ivan', 'okta', 'ivan-sub')}, 'merge')
+    db.session.expire_all()
+    assert _rows('ivan') == [(corp, 'ivan-sub', None), (None, 'ivan-sub', 'oauth2:https://okta.example')]
+
+
+@pytest.mark.parametrize('fmt', FORMATS)
+def test_a_replacement_by_a_provider_of_the_same_idp_leaves_one_row_per_subject(target, fmt):
+    corp = _here('corp', 'oauth2', 'https://same.example')
+    _account('gina', corp, 'gina-sub')
+    db.session.commit()
+    _restore({'sso_providers': [_archived_provider('okta', 'oauth2', 'https://same.example')],
+              **_archived_account(fmt, 'gina', 'okta', 'gina-sub')}, 'replace')
+    db.session.expire_all()
+    okta = SSOProvider.query.filter_by(name='okta').one()
+    assert _rows('gina') == [(okta.id, 'gina-sub', None)]
+    _one_per_type_and_no_dangling_provider()

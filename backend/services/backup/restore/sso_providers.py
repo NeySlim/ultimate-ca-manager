@@ -8,7 +8,8 @@ Decided before the plan, on the archive itself, in either mode and for archives 
   only a provider of that IdP takes back. Keeping its row for another IdP would hand the
   identities it bound to that IdP's subjects (OIDC Core §5.7: a sub is unique per issuer);
 * a merge keeps the provider here and leaves the archived one out: the accounts the archive
-  attaches to it come back as orphans of its IdP.
+  attaches to it come back as orphans of its IdP, or attached to the provider here when both
+  speak to the same IdP (one subject of one IdP is one row).
 
 Each case is a warning of the restore's report.
 """
@@ -85,31 +86,42 @@ def settle_provider_types(backup_data, replacing: bool, warnings: List[str],
         provider = clashes[0]
         held = (f"a {provider.provider_type} provider holds its name here" if provider is holder
                 else f"this installation's {kind} provider is {provider.name!r}")
+        same_idp = _idp_key(row) is not None and _idp_key(row) == provider.idp_key()
+        fate = (f"it speaks to the same IdP, so the accounts the archive attaches to it are attached "
+                f"to {provider.name!r}" if same_idp
+                else "the accounts the archive attaches to it come back as orphans of its IdP")
         warnings.append(
             f"sso_providers: the archive's {kind} provider {row['name']!r} is not restored: {held} "
-            f"(#{provider.id}), and there is one provider per type; the accounts the archive "
-            "attaches to it come back as orphans of its IdP")
-        left_out.append(row)
+            f"(#{provider.id}), and there is one provider per type; {fate}")
+        left_out.append((row, provider.name if same_idp else None))
     if left_out:
         _leave_out(backup_data, left_out)
 
 
-def _leave_out(backup_data, rows: List[Dict[str, Any]]) -> None:
-    """Drop ``rows`` from the archive; what names them becomes an orphan of their IdP."""
-    keys = {row['name']: _idp_key(row) for row in rows}
-    backup_data[SECTION] = [row for row in backup_data.get(SECTION) if not any(row is r for r in rows)]
+def _leave_out(backup_data, rows: List[Any]) -> None:
+    """Drop the archived ``(row, here)`` from the archive. What names a row goes to the provider
+    ``here`` of the same IdP key, else becomes an orphan of its IdP: one subject, one row."""
+    fates = {row['name']: (_idp_key(row), here) for row, here in rows}
+    backup_data[SECTION] = [row for row in backup_data.get(SECTION)
+                            if not any(row is r for r, _here in rows)]
 
-    def named(ref):
-        return isinstance(ref, dict) and ref.get('name') in keys
+    def fate(ref):
+        return fates.get(ref.get('name')) if isinstance(ref, dict) else None
 
     for row in backup_data.get('user_sso_identities') or []:
         ref = row.get(f'provider_id{REFERENCE_SUFFIX}') if isinstance(row, dict) else None
-        if named(ref):
+        found = fate(ref)
+        if found and found[1] is not None:
+            row[f'provider_id{REFERENCE_SUFFIX}'] = {'name': found[1]}
+        elif found:
             row.update({'provider_id': None, f'provider_id{REFERENCE_SUFFIX}': None,
-                        'orphan_of': keys[ref['name']]})
+                        'orphan_of': found[0]})
     # An archive of 2.254 names the provider on the account row
     for row in backup_data.get('users') or []:
         ref = row.get(f'sso_provider_id{REFERENCE_SUFFIX}') if isinstance(row, dict) else None
-        if named(ref):
+        found = fate(ref)
+        if found and found[1] is not None:
+            row[f'sso_provider_id{REFERENCE_SUFFIX}'] = {'name': found[1]}
+        elif found:
             row.update({'sso_provider_id': None, f'sso_provider_id{REFERENCE_SUFFIX}': None,
-                        'sso_orphan_of': row.get('sso_orphan_of') or keys[ref['name']]})
+                        'sso_orphan_of': row.get('sso_orphan_of') or found[0]})
