@@ -204,6 +204,7 @@ class CSRMixin:
         custom_extensions: list = None,
         not_before=None,
         not_after=None,
+        subject_dns: list = None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -229,6 +230,7 @@ class CSRMixin:
                 over the template's for the same OID; the template's apply to leaves only
             not_before, not_after: dates the requester asked for (naive UTC), issued
                 exactly or refused (ACME notBefore/notAfter)
+            subject_dns: DNS names the subject requests (ACME CN), counted by the policies
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -355,6 +357,7 @@ class CSRMixin:
                 'ca_id': ca.id,
                 'template_id': policy_template_id if policy_template_id is not None else template_id,
                 'digest_explicit': digest_explicit,
+                'subject_dns': list(subject_dns or ()),
             },
             notices=notices,
             not_before=not_before,

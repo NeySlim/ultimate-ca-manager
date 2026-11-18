@@ -629,12 +629,16 @@ class IssuanceMixin:
 
         # Extract CN from CSR for better description
         descr = f"ACME Certificate - Order {order.order_id}"
+        subject_dns = []
         try:
             from cryptography.hazmat.backends import default_backend
             from cryptography import x509
             csr_bytes = csr_pem.encode() if isinstance(csr_pem, str) else csr_pem
             csr = x509.load_pem_x509_csr(csr_bytes, default_backend())
-            
+            # Every CN is an order identifier (_validate_csr_subject): its DNS names are requested
+            subject_dns = [a.value for a in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+                           if not _is_ip_text(a.value)]
+
             # Try to get CN from subject
             cn = None
             for attr in csr.subject:
@@ -694,6 +698,7 @@ class IssuanceMixin:
                 template_id=params.get('template_id'),
                 not_before=not_before,
                 not_after=not_after,
+                subject_dns=subject_dns,
             )
             
             return True, signed_cert.id, None

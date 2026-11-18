@@ -61,6 +61,30 @@ class TestAcmeSigning:
         finally:
             _drop(app, CertificatePolicy, pid)
 
+    def test_a_cn_absent_from_the_san_is_not_counted_outside_acme(self, app, create_ca):
+        """Only ACME passes the subject's names: a CSR signed here keeps its SAN count."""
+        from services.cert_service import CertificateService
+        ca = create_ca(cn='Limits CSR CA CN')
+        pid = _policy(app, 'limits-csr-cn', ca['id'], {'san_restrictions': {'max_dns_names': 1}})
+        cid = _store_csr(app, _cn_apart('two.limits.test', 'one.limits.test'))
+        try:
+            with app.app_context():
+                CertificateService.sign_csr(cert_id=cid, caref=db.session.get(CA, ca['id']).refid,
+                                            validity_days=90, digest='sha256')
+                db.session.commit()
+            assert _signed(app, cid).subject.rfc4514_string() == 'CN=two.limits.test'
+        finally:
+            _drop(app, CertificatePolicy, pid)
+
+
+def _cn_apart(cn, *san):
+    """A CSR whose CN is a DNS name its SAN does not carry."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    return (x509.CertificateSigningRequestBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName(n) for n in san]), critical=False)
+            .sign(key, hashes.SHA256()))
+
 
 class TestEstSigning:
     """CAService.sign_csr_from_crypto, the EST and WSTEP path."""
@@ -75,6 +99,18 @@ class TestEstSigning:
                     db.session.get(CA, ca['id']), _csr('est.limits.test'), validity_days=365)
                 cert = x509.load_pem_x509_certificate(pem if isinstance(pem, bytes) else pem.encode())
             assert _lifetime(cert) <= timedelta(days=15, hours=1)
+        finally:
+            _drop(app, CertificatePolicy, pid)
+
+    def test_a_cn_absent_from_the_san_is_not_counted(self, app, create_ca):
+        from services.ca_service import CAService
+        ca = create_ca(cn='Limits EST CA CN')
+        pid = _policy(app, 'limits-est-cn', ca['id'], {'san_restrictions': {'max_dns_names': 1}})
+        try:
+            with app.app_context():
+                pem, _serial = CAService.sign_csr_from_crypto(
+                    db.session.get(CA, ca['id']), _cn_apart('two.est.test', 'one.est.test'), validity_days=30)
+            assert pem
         finally:
             _drop(app, CertificatePolicy, pid)
 
