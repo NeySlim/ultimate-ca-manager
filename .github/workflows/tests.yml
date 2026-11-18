@@ -52,7 +52,7 @@ jobs:
           cache: 'pip'
       
       - name: Install ruff
-        run: pip install ruff==0.17.4
+        run: pip install ruff==0.17.5
 
       # Blocking: undefined names, bad star imports, syntax errors. The four
       # ignored codes are style debt tracked in backend/pyproject.toml.
