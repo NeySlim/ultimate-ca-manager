@@ -259,7 +259,6 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- **`cbor2` upgraded to 6.3.0.** A crafted CBOR value (a cyclic tag used as a map key) in the data read from a passkey assertion crashed the worker on 6.1.2; it is now refused as a malformed value.
 - Trust store: a file imported with its private key (a `server.pem`) was stored whole, and the key came back to every account allowed to read the trust store, in the PEM bundle and in backups. An entry holding a private key is now refused, entries keep only their certificates, the upgrade and the restore remove a key already stored (audited, see UPGRADE.md), and no export hands out anything but certificate blocks.
 - Account: the password reset by e-mail set a local password on an account created by an SSO provider, which then opened without the provider. Such an account gets no reset link any more, and a reset token sets no password on it.
 - Account: passwords sent at the same time to the password or LDAP login, on one node or several, were all checked before the lockout, and a success could leave another node's lock in place. Each attempt is now counted before its password is checked, at LDAP on the account the directory entry opens whatever name was typed, so at most `max_login_attempts` are checked before the account locks, alerted once, and a success clears the stored count.
