@@ -85,7 +85,7 @@ export default {
         items: [
           { label: "通道", text: "“稳定版”仅跟随正式发布；“候选发布版”额外仅接受 rcN 版本，绝不包含 alpha/beta" },
           { label: '通知', text: '发现新版本时触发 system.update_available Webhook/邮件事件，每个版本仅一次' },
-          { label: '主版本', text: '两个通道的更新都保持在已安装的主版本内。下一个主版本（已安装版本 + 1）的最新正式发布会单独显示，带有独立的“升级”按钮和确认；自动更新绝不会安装它，system.update_available 对每个较新的主版本只发出一次，并带有 major_upgrade 标记' },
+          { label: '主版本', text: '两个通道的更新都保持在已安装的主版本内。下一个主版本（已安装版本 + 1）的最新正式发布会单独显示，带有独立的“升级”按钮和确认；自动更新绝不会安装它，system.update_available 对每个提供升级的主版本只发出一次，并带有 major_upgrade 标记' },
           { label: '自动安装', text: '默认关闭。启用后，UCM 会在选定的时间下载、验证并安装更新，然后重启，仅限 DEB/RPM 安装' },
           { label: '校验和', text: '无人值守安装要求发布版提供已公布的 SHA256 用于验证；手动安装在有校验和公布时也会进行验证' },
           { label: 'Docker', text: '容器无法自行更新，检查和通知仍然有效；请拉取新镜像来完成更新' },
