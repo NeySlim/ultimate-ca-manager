@@ -4169,9 +4169,7 @@
     "signInTestCompleteBack": "Zurück zu den SSO-Anbietern",
     "signInTestLaunching": "Identitätsanbieter wird geöffnet…",
     "signInTestCompleteClose": "Dieses Fenster hat sich nicht selbst geschlossen: Schließen Sie es, um zur Anbieterseite zurückzukehren.",
-    "signInTestCancel": "Abbrechen",
-    "signInTestShadowed": "Weitere aktivierte Anbieter dieses Typs: {{names}}. Eine Anmeldung läuft nur über einen aktivierten Anbieter pro Typ, und nicht unbedingt über diesen: Deaktivieren Sie {{names}}.",
-    "signInTestShadowedDisabled": "Aktivierte Anbieter dieses Typs: {{names}}. Eine Anmeldung läuft nur über einen aktivierten Anbieter pro Typ: Deaktivieren Sie {{names}}, bevor Sie diesen aktivieren, sonst laufen Anmeldungen möglicherweise nicht darüber."
+    "signInTestCancel": "Abbrechen"
   },
   "notifications": {
     "certificateIssued": "Zertifikat ausgestellt: {{name}}",

@@ -261,4 +261,25 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
     expect(ids).toEqual([1, 2])
     expect(options.relatedOf(2)).toBe(1)
   })
+
+  it('shows the notices the server gave for each renewed certificate', async () => {
+    mocks.selection = [3]
+    mocks.bulkRenew.mockResolvedValue({ data: {
+      success: [3], failed: [],
+      notices: [{ id: 3, notices: ['Certificate 3 was renewed without its RelatedCertificate extension', 'Validity cut'] }] } })
+    const dialog = await openBulk('common.renew')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      '#3: Certificate 3 was renewed without its RelatedCertificate extension'))
+    expect(mocks.showWarning).toHaveBeenCalledWith('#3: Validity cut')
+  })
+
+  it('shows no notice when the server gave none', async () => {
+    mocks.selection = [3]
+    mocks.bulkRenew.mockResolvedValue({ data: { success: [3], failed: [] } })
+    const dialog = await openBulk('common.renew')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.bulkRenew).toHaveBeenCalled())
+    expect(mocks.showWarning).not.toHaveBeenCalled()
+  })
 })

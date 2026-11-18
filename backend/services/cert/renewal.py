@@ -201,6 +201,10 @@ def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
             except FipsRestricted as e:
                 raise RenewalError.from_fips(e) from e
 
+    # After the refusals above, before the first decoding of the certificate below
+    if _stored(cert) is None:
+        raise _unreadable(cert.id, False, link=cert.related_certificate_id is not None)
+
     # The template's SAN types bind the renewed names as they bound the issuance
     template_id = getattr(cert, 'template_id', None)
     if template_id:
@@ -411,8 +415,10 @@ def _refuse_unreadable(row, related=False):
         raise _unreadable(row.id, related) from e
 
 
-def _unreadable(row_id, related) -> 'RenewalError':
+def _unreadable(row_id, related, link=True) -> 'RenewalError':
     what = f'Related certificate {row_id}' if related else f'Certificate {row_id}'
+    if not link:
+        return RenewalError(f'{what} cannot be read: the renewal is refused', 409)
     return RenewalError(f'{what} cannot be read: renewing would drop its RFC 9763 link, so the '
                         f'renewal is refused', 409)
 
@@ -446,7 +452,10 @@ def _named_related(row):
         row_id, linked_id = row.id, row.related_certificate_id
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
         return None, None
-    original = x509.load_pem_x509_certificate(b64decode(row.crt))
+    try:
+        original = x509.load_pem_x509_certificate(b64decode(row.crt))
+    except ValueError as e:  # binascii.Error included: the row itself is unreadable
+        raise _unreadable(row_id, False, link=linked_id is not None) from e
     try:
         if related_cert.read_related_certificate(original) is None:
             return None, None

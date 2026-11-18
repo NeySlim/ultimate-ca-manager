@@ -129,28 +129,6 @@ describe('Test sign-in panel', () => {
     expect(screen.getByText('staff')).toBeTruthy()
   })
 
-  const OTHERS = [{ id: 9, name: 'Corp IdP' }, { id: 12, name: 'Lab IdP' }]
-
-  it('names every other enabled provider of the type when the one tried is enabled', async () => {
-    renderPanel()
-    await runUntilReport({ state: 'done', report: { ...ACCEPTED, provider_enabled: true, other_enabled_providers: OTHERS } })
-    expect(screen.getByText('sso.signInTestShadowed {"names":"Corp IdP, Lab IdP"}')).toBeTruthy()
-    expect(screen.queryByText(/sso.signInTestShadowedDisabled/)).toBeNull()
-  })
-
-  it('asks to disable them before enabling the one tried when it is disabled', async () => {
-    renderPanel()
-    await runUntilReport({ state: 'done', report: { ...ACCEPTED, provider_enabled: false, other_enabled_providers: OTHERS.slice(0, 1) } })
-    expect(screen.getByText('sso.signInTestShadowedDisabled {"names":"Corp IdP"}')).toBeTruthy()
-    expect(screen.queryByText(/sso.signInTestShadowed \{/)).toBeNull()
-  })
-
-  it('has no such warning when no other provider of the type is enabled', async () => {
-    renderPanel()
-    await runUntilReport({ state: 'done', report: { ...ACCEPTED, other_enabled_providers: [] } })
-    expect(screen.queryByText(/sso.signInTestShadowed/)).toBeNull()
-  })
-
   it('shows a refusal with its diagnosis and maps a received attribute to groups by its Name', async () => {
     const handleChange = renderPanel()
     await runUntilReport({ state: 'done', report: REFUSED })

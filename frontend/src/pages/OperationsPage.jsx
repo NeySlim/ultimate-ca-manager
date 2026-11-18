@@ -618,6 +618,10 @@ export default function OperationsPage() {
       if (pairedOutside.size > 0 && bulkAction === 'renew') {
         showInfo(t('certificates.hybrid.bulkRelatedRenewed', { count: pairedOutside.size }))
       }
+      // What the server decided on other terms than asked, per renewed certificate
+      for (const entry of data?.notices || []) {
+        for (const notice of entry?.notices || []) showWarning(`#${entry.id}: ${notice}`)
+      }
       const pendingCount = data?.pending_approval?.length || 0
       if (pendingCount > 0) {
         showWarning(t('operations.bulkPendingApproval', {
