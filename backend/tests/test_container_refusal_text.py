@@ -58,3 +58,16 @@ def test_the_env_file_refusal_names_both_runtimes(app, monkeypatch):
     assert CONTAINER in message
     ok, message = persistence.restore_previous_database_url(None)
     assert not ok and CONTAINER in message
+
+
+def test_the_migration_next_step_does_not_give_a_docker_command(app, auth_client, monkeypatch):
+    import api.v2.database as routes
+    monkeypatch.setattr(routes, 'is_docker', lambda: True)
+    monkeypatch.setattr(routes, '_refuse_if_switch_pending', lambda: None)
+    monkeypatch.setattr(routes, '_proof', lambda stats: {})
+    monkeypatch.setattr(routes.svc, 'migrate_data', lambda url: (True, 'ok', {}))
+    r = auth_client.post('/api/v2/database/migrate', json={'database_url': 'postgresql://target.example/ucm'})
+    assert r.status_code == 200, r.get_json()
+    step = r.get_json()['data']['next_step']
+    assert 'DATABASE_URL environment variable of the container' in step
+    assert '-e DATABASE_URL' not in step

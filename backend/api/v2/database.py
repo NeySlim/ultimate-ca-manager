@@ -326,8 +326,8 @@ def _migrate_data():
             'restart_initiated': False,
             'docker': True,
             'next_step': (
-                'Data migrated and verified. Now update your container with '
-                '-e DATABASE_URL=<target_url> and restart it to use the new backend.'
+                'Data migrated and verified. Now set the DATABASE_URL environment variable of '
+                'the container to the target URL and restart it to use the new backend.'
             ),
         }, message='Data migrated and verified. Update container env var and restart manually.')
 
