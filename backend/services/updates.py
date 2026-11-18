@@ -800,7 +800,7 @@ def _notify_update_available(result):
 
 
 def _notify_major_upgrade(result):
-    """Emit the bus event once per later major version (a later build of a notified major
+    """Emit the bus event once per offered major version (a later build of a notified major
     stays silent); the marker is reserved first so one node of a cluster emits."""
     from models import db
     upgrade = result.get('major_upgrade')

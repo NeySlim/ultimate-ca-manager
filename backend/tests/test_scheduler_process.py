@@ -412,9 +412,11 @@ def test_on_exit_waits_for_the_stop_the_watcher_is_recording(supervisor):
     watcher.join(5)
 
 
-@pytest.mark.parametrize('named', [False, True])
-def test_a_master_that_dies_while_the_scheduler_process_starts_is_noticed(monkeypatch, caplog, named):
-    """The parent is read before the application loads, or named by the master: an orphan stops."""
+@pytest.mark.parametrize('named, dies', [(False, True), (True, True), (False, False)])
+def test_a_master_that_dies_while_the_scheduler_process_starts_is_noticed(monkeypatch, caplog, named,
+                                                                         dies):
+    """The parent is read before the application loads, or named by the master: an orphan stops,
+    and a process started by hand follows the parent it has."""
     import app as app_module
     import scheduler_main
     from services import scheduler_service
@@ -429,7 +431,7 @@ def test_a_master_that_dies_while_the_scheduler_process_starts_is_noticed(monkey
         if len(asked) > 5:  # a process that never notices is stopped, and the test fails below
             handlers[signal.SIGTERM]()
         # Not named: the master dies once the loop runs. Named: it was gone before main() ran
-        return 1 if started or named else 4242
+        return 1 if dies and (started or named) else 4242
     monkeypatch.setattr(scheduler_main.os, 'getppid', getppid)
     if named:
         monkeypatch.setenv(scheduler_main.MASTER_ENV, '4242')
@@ -456,7 +458,7 @@ def test_a_master_that_dies_while_the_scheduler_process_starts_is_noticed(monkey
     monkeypatch.setattr('services.jobs.runner.JobRunner', Runner)
     with caplog.at_level('WARNING', logger='ucm.scheduler_main'):
         assert scheduler_main.main() == 0
-    assert 'The gunicorn master is gone' in caplog.text
+    assert ('The gunicorn master is gone' in caplog.text) is dies
 
 
 def test_the_supervisor_names_itself_to_the_scheduler_process(monkeypatch):
