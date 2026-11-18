@@ -96,7 +96,7 @@ def _leave_out(backup_data: Dict[str, Any], rows: List[Dict[str, Any]]) -> None:
 
 
 def orphan_accounts_of(provider_ids) -> int:
-    """Accounts of providers a replacement removes keep their IdP, as deleting a provider does."""
+    """Accounts of the providers displaced by an archived provider of another IdP keep their IdP."""
     from models import User
     from models.sso import SSOProvider
     orphaned = 0
