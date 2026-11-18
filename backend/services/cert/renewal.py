@@ -165,7 +165,8 @@ def resolve_issuing_ca(cert: Certificate) -> 'CA | None':
 def check_renewable(cert: Certificate, trigger: str = 'manual') -> None:
     """Raise :class:`RenewalError` when ``cert`` cannot be renewed at all
     (no certificate, revoked, issued by a Microsoft CA, key not held by the
-    server). Shared by the renewal itself and by the routes, which check it
+    server, key type closed by FIPS, stored certificate unreadable), in that
+    order. Shared by the renewal itself and by the routes, which check it
     before queueing a renewal for approval: a request no renewal could honour
     must not wait for an approver. ``trigger`` words the refusal of a row renewed
     since it was read."""
