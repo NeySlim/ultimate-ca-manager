@@ -73,7 +73,8 @@ def _rate_limit_lan_exempt():
 
 
 def run_startup_housekeeping(app):
-    """Files missing on disk rewritten from the database, interrupted ACME orders reset."""
+    """Files missing on disk rewritten from the database, interrupted ACME orders reset,
+    private keys stored with trust store entries removed."""
     try:
         with app.app_context():
             from services.file_regen_service import regenerate_all_files
@@ -90,6 +91,14 @@ def run_startup_housekeeping(app):
             recover_interrupted_orders()
     except Exception as e:
         app.logger.warning(f"Interrupted ACME orders not recovered (non-fatal): {e}")
+
+    # Private keys older versions stored with trust store entries removed, once per entry
+    try:
+        with app.app_context():
+            from utils import trust_pem
+            trust_pem.strip_stored_private_keys()
+    except Exception as e:
+        app.logger.warning(f"Trust store private key cleanup failed (non-fatal): {e}")
 
 
 def create_app(config_name=None):
