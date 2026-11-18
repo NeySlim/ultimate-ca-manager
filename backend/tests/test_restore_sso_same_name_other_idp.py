@@ -228,3 +228,29 @@ def test_what_counts_as_another_idp(app, here, archived, other):
     with app.app_context():
         provider = SSOProvider(name=NAME, provider_type='oauth2', **here)
         assert another_idp(provider, {'name': NAME, **archived}) is other
+
+
+NOT_TEXT = [12345, ['https://idp-a.example.test'], {'url': 'x'}]
+
+
+# A list or a dict reaches the database in a replacement, which no section guards: left out
+@pytest.mark.parametrize('mode, value', [('merge', v) for v in NOT_TEXT] + [('replace', 12345)])
+@pytest.mark.parametrize('kind', ['oauth2', 'saml', 'ldap'])
+def test_an_idp_field_that_is_not_text_names_no_idp(target, mode, kind, value):
+    from tests.test_backup_hostile_corpus import _reseal
+    blob = _archive(kind, 'A', 'provider')
+    _key, data = _service()._decrypt_framed(blob, PASSWORD)
+    data['sso_providers'][0][next(iter(IDPS[kind]['A']))] = value
+    blob = _reseal(blob, data)
+    _instance(kind)
+
+    results = _restore(blob, mode)
+
+    # No IdP is never the IdP here: the accounts it bound never follow it
+    assert len(_sso_warnings(results)) == 1
+    a = KEY_OF[kind]['A']
+    if mode == 'merge':
+        assert _config(kind) == IDPS[kind]['A']
+        assert _bindings()['kate'] == (NAME, 'kate-a', None)
+    else:
+        assert _bindings()['kate'] == (None, 'kate-a', a)

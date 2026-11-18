@@ -25,8 +25,10 @@ _IDP_FIELDS = ('provider_type', 'oauth2_issuer', 'oauth2_userinfo_url', 'saml_en
 
 
 def _key_of(fields: Dict[str, Any]) -> Optional[str]:
+    """The IdP of ``fields``; an archived value that is not text names no IdP."""
     from models.sso import SSOProvider
-    return SSOProvider(**fields).idp_key()
+    return SSOProvider(**{field: value if isinstance(value, str) else None
+                          for field, value in fields.items()}).idp_key()
 
 
 def _comparable(key: Optional[str]) -> Optional[str]:
