@@ -84,7 +84,7 @@ Einschränken, welche Schlüsselalgorithmen und -größen verwendet werden könn
 **Erlaubte Signatur-Hashes** schränkt den Signatur-Hash auf dieselbe Weise ein (SHA-256, SHA-384, SHA-512); keine Auswahl erlaubt jeden. Hat niemand den Hash gewählt, gilt der Standard, falls erlaubt, sonst der schwächste erlaubte. Das Ausstellungsformular bietet nur die erlaubten Schlüsseltypen an, die CA-Erstellung nur die erlaubten Schlüsseltypen und Hashes.
 
 ### SAN-Einschränkungen
-- **Max. DNS-Namen**: Anzahl der DNS-Namen im SAN begrenzen; IP-, E-Mail- und URI-Einträge werden nicht gezählt
+- **Max. DNS-Namen**: Anzahl der DNS-Namen im SAN begrenzen; IP-, E-Mail- und URI-Einträge werden nicht gezählt. Bei ACME zählt auch ein DNS-Name, den nur der CN trägt (RFC 8555 §7.4)
 - **DNS-Muster**: Auf bestimmte Domänenmuster einschränken (z.B. \`*.firma.com\`)
 
 ## Genehmigungsworkflows

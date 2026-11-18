@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### ACME: a DNS name in the CN alone counts against a policy
+
+A policy's maximum number of DNS names now counts, over ACME, a DNS name the CSR carries in its CN but not in its SAN. An ACME client whose CSR carried in its CN a DNS name absent from its SAN, beyond a policy's limit, was issued and is now refused at finalize (`badCSR`, the order becomes `invalid`): raise the policy's limit, or have the client request fewer names per order.
+
 ### Trust store: private keys removed, certificates only
 
 An entry of the trust store whose file held a private key next to its certificate kept that key in the database, and every account allowed to read the trust store could read it through the API, the exports and the backups. At the first start after the upgrade, the key is removed from each such entry; the entry keeps its identifier and its certificates, and the log and the audit log name every entry cleaned (identifier and name, never the key). Treat each key named there as compromised: revoke the certificate it belongs to and replace it. Backup archives made before the upgrade are not rewritten and may still carry such a key: restoring one removes it again, but protect or delete the old archives. A trust store import or `POST /api/v2/truststore` that carries a private key is now refused with `400`, and `certificate_pem` in the API, the exports and the backups holds certificates only. Two answers change with it: an entry whose first certificate reads but which also holds a block that is not a certificate, or one left open, is refused with `400` instead of being stored with its first certificate; and the PEM export answers `400` (`No valid certificates to export`) instead of `200` when no selected entry holds a certificate.

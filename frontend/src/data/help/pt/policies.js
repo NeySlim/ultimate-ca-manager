@@ -84,7 +84,7 @@ Restringir quais algoritmos e tamanhos de chave podem ser usados:
 **Hashes de Assinatura Permitidos** restringe o hash da assinatura da mesma forma (SHA-256, SHA-384, SHA-512); nenhum selecionado permite qualquer um. Quando ninguém escolheu o hash, aplica-se o padrão se permitido, senão o mais fraco permitido. O formulário de emissão oferece apenas os tipos de chave permitidos, e Criar CA apenas os tipos de chave e hashes permitidos.
 
 ### Restrições de SAN
-- **Máx. Nomes DNS**: Limitar o número de nomes DNS no SAN; entradas de IP, e-mail e URI não são contadas
+- **Máx. Nomes DNS**: Limitar o número de nomes DNS no SAN; entradas de IP, e-mail e URI não são contadas. No ACME, um nome DNS presente apenas no CN também conta (RFC 8555 §7.4)
 - **Padrão DNS**: Restringir a padrões de domínio específicos (ex.: \`*.empresa.com\`)
 
 ## Fluxos de Aprovação

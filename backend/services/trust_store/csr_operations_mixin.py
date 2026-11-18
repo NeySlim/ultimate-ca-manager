@@ -688,9 +688,11 @@ class CSROperationsMixin:
         ``extra_san``: names the operator adds to the request's own (admin
         Sign CSR only); with a request that names none, they join those its
         CN implies, a CN that is not a hostname giving no DNS name.
-        ``policy_scope``: ``{ca_id, template_id, digest_explicit}`` of the
-        issuance; the policies in that scope bind the key type and the digest
+        ``policy_scope``: ``{ca_id, template_id, digest_explicit, subject_dns}`` of
+        the issuance; the policies in that scope bind the key type and the digest
         (an implicit one yields to them). Every production caller passes it.
+        ``subject_dns``: DNS names the subject requests (ACME CN, RFC 8555 §7.4),
+        counted with the SAN's.
         ``san_template``: template whose SAN types bind the request's names;
         names implied by the subject alone are dropped instead of refused.
         ``qualification_template``: template whose qcStatements and policy OIDs
@@ -819,7 +821,11 @@ class CSROperationsMixin:
                 (not_after - (not_before or utc_now()) - CERT_NOT_BEFORE_SKEW).total_seconds() / 86400))
         if policy_scope is not None:
             # Name count, validity ceiling and key horizons, for the protocols as for the form
-            dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
+            # Every SAN dNSName, plus each requested subject name the SAN does not already carry
+            san_dns = [n.value for n in (effective_sans or []) if isinstance(n, x509.DNSName)]
+            landed = {d.lower().rstrip('.') for d in san_dns}
+            dns_count = len(san_dns) + len({d.lower().rstrip('.') for d in policy_scope.get('subject_dns') or ()}
+                                           - landed)
             limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
                 policies, key_type=key_label_for_public_key(csr.public_key()),
                 dns_name_count=dns_count, validity_days=validity_days,

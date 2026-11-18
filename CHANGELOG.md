@@ -7,6 +7,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+
+- ACME: the maximum number of DNS names a policy allows counted the SAN only, so an order whose extra name the CSR carried in its CN alone was issued past the limit. That name now counts, and the finalize is refused as an excess of names in the SAN is (`badCSR`, the order becomes `invalid`).
+
 ## [2.254.5] - 2026-11-18
 
 ### Security
